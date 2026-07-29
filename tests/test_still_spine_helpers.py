@@ -802,6 +802,15 @@ class TestDispatcherStillSpine:
 
         # NO-FALLBACK (2026-07-03): a scene-init family with a MISSING scene still
         # now RAISES -- it never silently degrades to the pre-spine portrait init.
+        #
+        # TYPE CHANGED 2026-07-29 (WIRE-W2), and the change is the point. This
+        # was a bare ``ValueError``, and ShotLock decided whether to defer it
+        # by SUBSTRING-MATCHING the message. It is now a declared
+        # ``DeferredImageGapError``: cast time is before the image phase runs,
+        # so this particular gap is one ShotLock may legitimately defer.
+        # Both halves are asserted, because both matter -- it carries the new
+        # type AND it is still a RenderError, which is what keeps the RENDER
+        # path (which never defers) failing loud on the same condition.
         import pytest
 
         ledger2 = {k: (dict(v) if isinstance(v, dict) else v)
@@ -809,8 +818,9 @@ class TestDispatcherStillSpine:
         ledger2["images"] = {"images": [
             {"object_id": "c01", "kind": "portrait", "char_id": "c01",
              "path": str(portrait)}]}
-        with pytest.raises(ValueError, match="NO scene still"):
+        with pytest.raises(rd.DeferredImageGapError, match="NO scene still") as caught:
             rd.build_request_from_shot(shot("wan_i2v", "image_to_video"), ledger2)
+        assert isinstance(caught.value, rd.RenderError)
 
     def test_mesh_fodder_routing_skips_scene_still(self, tmp_path):
         """3D-image-streams chunk 2: a requires_mesh_fodder engine (mesh_stage,

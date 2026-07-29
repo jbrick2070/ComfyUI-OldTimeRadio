@@ -915,14 +915,14 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
 
     try:
         from ._otr_video_engines.render_driver import (
-            FamilyInputGap, RenderError, _is_character_face_beat,
+            DeferredImageGapError, FamilyInputGap, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
             _radio_is_host_redirect_applies, _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
             engine_family, parse_engine_override)
     except ImportError:
         from _otr_video_engines.render_driver import (
-            FamilyInputGap, RenderError, _is_character_face_beat,
+            DeferredImageGapError, FamilyInputGap, _is_character_face_beat,
             _is_never_humo_video_role, _line_index, _present_request_tokens,
             _radio_is_host_redirect_applies, _required_inputs_for_engine,
             _uses_ambient_master_audio, build_request, build_request_from_shot,
@@ -943,16 +943,6 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         except ImportError:  # pragma: no cover -- flat test imports
             from _otr_shared import route_freeze as _rf  # type: ignore
         return _rf.effective_engine_for_role(str(role or ""), str(eng_id or ""))
-
-    def _is_deferred_image_gap(exc):
-        msg = str(exc)
-        image_gap_needles = (
-            "Missing still",
-            "no radio_host_portrait FACE still",
-            "NO portrait in the ledger",
-            "NO scene still in the ledger",
-        )
-        return any(n in msg for n in image_gap_needles)
 
     def _cast_time_image_gap_request(shot):
         return build_request(
@@ -987,30 +977,29 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
         shot["start_s"] = beat.get("_start_s", 0.0)
         shot["dur_s"] = beat.get("dur_s")
 
+    # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
+    #
+    # This was three excepts deep and two of them were FAIL-OPEN: a
+    # non-deferrable `ValueError` and then a bare `except Exception` both
+    # logged a warning and `return`ed, so cast-time preflight silently passed
+    # a beat it had failed to check at all. A preflight that answers "fine"
+    # when it crashed is worse than no preflight, because the plan is then
+    # built on its silence.
+    #
+    # Deferrability is now DECLARED BY THE RAISE SITE, not guessed here.
+    # The old `_is_deferred_image_gap` substring-matched the message against
+    # four needles, and the LTX-I2V gap's wording matched none of them -- so
+    # ShotLock re-raised, plan-build died, and `ltx_video` came back NO_RENDER
+    # in the 2026-07-28 engine-coverage campaign. Any raise site that means
+    # "the image phase has not run yet" says so by TYPE.
     try:
         req = build_request_from_shot(shot, ledger, master_audio_path="")
-    except RenderError as exc:
-        if _is_deferred_image_gap(exc):
-            req = _cast_time_image_gap_request(shot)
-            log.warning(
-                "[OTR_ShotLock] cast-time image input deferred to "
-                "ImageGenDispatcher/render gate for engine %r beat %s: %s",
-                effective_engine, beat.get("beat_id", ""), exc)
-        else:
-            raise
-    except ValueError as exc:
-        if _is_deferred_image_gap(exc):
-            req = _cast_time_image_gap_request(shot)
-            log.warning(
-                "[OTR_ShotLock] cast-time image input deferred to "
-                "ImageGenDispatcher/render gate for engine %r beat %s: %s",
-                effective_engine, beat.get("beat_id", ""), exc)
-        else:
-            log.warning("[OTR_ShotLock] cast-time build_request_from_shot failed: %s", exc)
-            return
-    except Exception as exc:
-        log.warning("[OTR_ShotLock] cast-time build_request_from_shot failed: %s", exc)
-        return
+    except DeferredImageGapError as exc:
+        req = _cast_time_image_gap_request(shot)
+        log.warning(
+            "[OTR_ShotLock] cast-time image input deferred to "
+            "ImageGenDispatcher/render gate for engine %r beat %s: %s",
+            effective_engine, beat.get("beat_id", ""), exc)
 
     # build_request_from_shot may still apply an in-place structural redirect;
     # validate the engine that would actually receive this request.

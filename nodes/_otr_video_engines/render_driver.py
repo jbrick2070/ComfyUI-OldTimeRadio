@@ -123,11 +123,16 @@ class RenderFloorError(RuntimeError):
     fallback-chain floor machinery."""
 
 
-class RenderError(RuntimeError):
-    """A shot's selected engine failed to render. Fallbacks are DISABLED
-    (operator 2026-06-16, 'this is art, not a space shuttle'): a proven model
-    path must prove itself, so this is terminal -- the episode fails LOUD instead
-    of swapping engines or degrading to a still floor."""
+# RenderError MOVED to the dependency-leaf `render_errors` (2026-07-29,
+# WIRE-W2) so `otr_shot_lock` can import DeferredImageGapError without
+# importing this module. Re-exported here, deliberately: every existing
+# `from .render_driver import RenderError` keeps working, and because it is a
+# re-export rather than a copy the class objects are IDENTICAL, so `except`
+# and `isinstance` behave the same whichever path a caller imported by.
+try:  # pragma: no cover -- package import
+    from .render_errors import DeferredImageGapError, RenderError
+except ImportError:  # pragma: no cover -- flat test imports
+    from render_errors import DeferredImageGapError, RenderError  # type: ignore
 
 
 class FamilyInputGap(RuntimeError):
@@ -1982,7 +1987,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             init_image = _still
             init_source = "scene_still"
         else:
-            raise ValueError(
+            raise DeferredImageGapError(
                 "[OTR.render_driver] %s-family engine %r shot %s beat %s has NO scene still "
                 "in the ledger. NO portrait-init fallback (no-fallback rip) -- a "
                 "scene-init engine MUST have its per-beat scene still minted "
@@ -2046,7 +2051,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             and _ia2v_talking_register_active(_eng))
         if _s4_portrait:
             if not portrait:
-                raise RenderError(
+                raise DeferredImageGapError(
                     "IA2V TALKING register: character beat %s (char %r) has "
                     "NO portrait in the ledger -- NO FALLBACK to the wide "
                     "scene still (face too small to lip-sync; proof7 A/B "
@@ -2102,7 +2107,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             None)
         _fpath = str((_frow or {}).get("path") or "")
         if not _fpath:
-            raise RenderError(
+            raise DeferredImageGapError(
                 "a talking ltx_audio_in %s bookend REQUIRES the minted wide radio-face still "
                 "(MetaBrief mints it when the engine lip-syncs). Missing still %r in the ledger "
                 "for %s bookend shot %s -- NO FALLBACK (never black, never a portrait "
@@ -2143,7 +2148,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "still %s (default since LK-1a)", _bid,
                 os.path.basename(_still))
         else:
-            raise RenderError(
+            raise DeferredImageGapError(
                 "LTX-I2V requires a minted scene still for beat %s; the image "
                 "phase produced no usable path. NO FALLBACK to text-only "
                 "rendering. Fix the image target receipt before video dispatch."
@@ -2176,7 +2181,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "animatable host face)", _role_of_shot(shot), shot.get("shot_id"),
                 os.path.basename(_rh))
         else:
-            raise RenderError(
+            raise DeferredImageGapError(
                 "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait FACE "
                 "still is in the ledger for the lineless %s bookend shot %s -- "
                 "the HuMo host has no init_image. NO FALLBACK (never a black "
