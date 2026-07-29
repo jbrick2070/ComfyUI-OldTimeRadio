@@ -295,6 +295,236 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
+    # ---- beat session (WIRE-W4a, 2026-07-29) ----
+    #: The ComfyUI ``folder_paths`` categories each loader token resolves
+    #: through -- the same lookup the loader NODE will do, which is the only
+    #: resolution the identity may describe (a ``*_DIR``-style override that
+    #: the loader cannot see must not be able to satisfy it).
+    _LOADER_CATEGORIES = {
+        "unet": ("diffusion_models", "unet"),
+        "lora": ("loras",),
+        "clip": ("text_encoders", "clip"),
+        "vae": ("vae",),
+        "whisper": ("audio_encoders",),
+    }
+
+    def _humo_file_receipt(self, path):
+        """A BOUNDED, stable receipt for a model file: (basename, size,
+        mtime_ns). Deliberately NOT a content hash -- ``session_identity()`` is
+        re-read before EVERY segment and hashing a 14B UNET per segment would
+        cost more than the render it protects. Size + mtime catches a swapped
+        or rebuilt weight, which is the drift being guarded against.
+
+        Its own four lines ON PURPOSE. ``wan_shared`` says the same thing for
+        the WAN lanes and ``eng_ltx_8gb`` for its own, and that file's docstring
+        records why: reaching across lanes for a four-line stat is the coupling
+        this build keeps paying for. The MECHANISM is a convention; the DATA is
+        per adapter.
+
+        ``None`` when the file cannot be stat'ed -- the CALLER decides whether
+        that is fatal, because the caller knows which NAMED refusal to raise."""
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
+
+    def _humo_token_path(self, categories, name):
+        """Where the LOADER would find ``name``: ``folder_paths`` first (so
+        ``extra_model_paths.yaml`` is honoured), then the standard
+        ``models/<category>/`` layout. ``None`` when absent everywhere -- the
+        offline invariant means a missing file is fail-closed, never fetched."""
+        for category in categories:
+            try:
+                import folder_paths                  # ComfyUI runtime only
+                hit = folder_paths.get_full_path(category, name)
+                if hit:
+                    return hit
+            except Exception:            # noqa: BLE001 -- no ComfyUI (tests)
+                pass
+            cand = os.path.join(_COMFY_ROOT, "models", category, name)
+            if os.path.exists(cand):
+                return cand
+        return None
+
+    def _humo_session_receipts(self):
+        """``(label, token, receipt)`` for every file this beat's handles are.
+
+        Built from the adapter's OWN ``_loader_names()`` so a tier that points
+        at a different UNET, LoRA or encoder gets it in the identity for free
+        -- the three HuMo subclasses override exactly that method and nothing
+        here needs to know they exist."""
+        names = self._loader_names()
+        out = [("unet", names["unet"],
+                self._humo_file_receipt(self._ckpt_path() or ""))]
+        for label in ("lora", "clip", "vae", "whisper"):
+            token = names.get(label) or ""
+            if label == "lora" and self._lora_is_skipped(token):
+                out.append((label, "", None))       # a tier that runs LoRA-free
+                continue
+            path = self._humo_token_path(
+                self._LOADER_CATEGORIES[label], token) if token else None
+            out.append((label, token,
+                        self._humo_file_receipt(path) if path else None))
+        return tuple(out)
+
+    @staticmethod
+    def _lora_is_skipped(lora_name):
+        """THE ONE reading of "this tier runs LoRA-free".
+
+        The lightx2v distill LoRA is a 14B-shaped adapter and is INCOMPATIBLE
+        with the 1.7B tiers, which switch it off by name. Both the graph and
+        the session have to agree about that: a session that hoisted a ``lora``
+        node the graph never defines would wire a handle nothing reads, and one
+        that skipped a node the graph DOES define would let it reload every
+        segment. This used to be spelled out inside ``_build_graph`` alone."""
+        return (not lora_name) or str(lora_name).strip().lower() in (
+            "none", "skip", "off")
+
+    def _session_node_ids(self):
+        """The graph ids ``prepare`` hoists: every pure file-to-handle LOADER.
+
+        WIDER THAN THE WAN LANES, and the difference is a real property of this
+        family rather than a preference. WAN renders with ``free_after_use=True``
+        precisely so umt5 and the diffusion UNET are never co-resident, so
+        hoisting its CLIP would delete that mitigation. HuMo renders FULLY
+        RESIDENT by contract (BUG-265: forcing inter-node eviction fragmented
+        the allocator into an OOM), so every loader is resident for the whole
+        render anyway -- hoisting them changes how many times they are READ,
+        not how much is held.
+
+        It is also what makes skipping the between-segment reclaim safe. See
+        :meth:`render_clip`: without the hoist, segment 2's graph would build
+        NEW umt5 and whisper handles beside the ones segment 1 left resident,
+        and dropping the reclaim would accumulate rather than reuse.
+
+        ``modelsampling`` is deliberately NOT here -- it is a cheap clone+patch
+        of an already-resident MODEL and is correctly per-render. Neither are
+        ``loadaudio``/``audioenc``: those are the one thing that genuinely
+        DIFFERS per segment on a lip-synced lane."""
+        ids = ["unet", "clip", "vae", "audioenc_loader"]
+        if not self._lora_is_skipped(self._loader_names().get("lora")):
+            ids.insert(1, "lora")
+        return tuple(ids)
+
+    def session_identity(self):
+        """What this adapter's HANDLES are. ``BeatSession`` refuses a
+        multi-segment beat without it -- which is why all three HuMo lanes came
+        back NO_RENDER on the 2026-07-28 campaign.
+
+        It carries the engine name (which is what picks the tier's steps, cfg
+        and native dims), every loader file's token AND receipt, and whether
+        the LoRA is MERGED -- because it is merged into the hoisted patcher, so
+        a beat that turned it off midway would be reusing a model the later
+        segments' graph no longer describes.
+
+        It EXCLUDES per-segment state: prompt, seed, frame count, audio slice.
+        It also excludes steps/cfg, which are KSampler arguments rather than
+        anything baked into a handle.
+
+        Not cached -- the whole job is to notice a weight that MOVED, so the
+        receipts are re-stat'ed on every ask."""
+        return (self.name,
+                "lora_merged=%s" % (
+                    not self._lora_is_skipped(self._loader_names().get("lora")),),
+                repr(self._humo_session_receipts()))
+
+    def prepare(self, host_caps, profile, session_ctx):
+        """Load every heavy handle ONCE PER BEAT instead of once per segment.
+
+        The ``eng_wan_i2v`` sequence, followed deliberately: ``super().prepare()``
+        takes the cross-process GPU lease and resolves classes, a LOADER-ONLY
+        mini-graph runs with ``on_result`` registering each patcher as it lands
+        (if a later node raised, ``run_graph`` never returns a results dict and
+        an unregistered patcher is VRAM nothing will ever detach), and ANY
+        failure tears down what was taken before re-raising.
+
+        ``session_ctx`` is KEPT, because :meth:`render_clip` has no other way to
+        know whether it is one segment of a beat -- and on this lane that
+        decides whether the post-decode VRAM reclaim runs now or at teardown.
+
+        NO ``free_after_use``: this graph is executed exactly the way
+        ``render_clip`` executes its own, because BUG-265 established that
+        forcing inter-node eviction on this stack fragments the allocator into
+        an OOM."""
+        from . import wrapper_bridge as _wb
+        prepared = super().prepare(host_caps, profile, session_ctx)
+        prepared["session_ctx"] = dict(session_ctx or {})
+        try:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
+            bucket = prepared.setdefault("patchers", self._patchers)
+            seen = {id(p) for p in bucket}
+
+            def _register(nid, out):
+                obj = out[0] if out else None
+                if (obj is not None and id(obj) not in seen
+                        and callable(getattr(obj, "detach", None))):
+                    bucket.append(obj)
+                    seen.add(id(obj))
+
+            wanted = set(self._session_node_ids())
+            # BUILT FROM THE REAL GRAPH, never hand-copied. A second literal
+            # spelling of the loader inputs is a second thing to keep in step
+            # with `_build_graph`, and the two drifting is exactly how a
+            # session hoists a handle the render graph would have built
+            # differently.
+            full = self._build_graph("_session_.png", "_session_.wav",
+                                     {"seed": 0}, _HUMO_MIN_FRAMES,
+                                     *self._native_dims())
+            loaders = {nid: spec for nid, spec in full.items() if nid in wanted}
+            missing = wanted - set(loaders)
+            if missing:
+                raise _wb.GraphExecutionError(
+                    "%s wanted to hoist %s but its render graph defines no such "
+                    "node(s) -- the session and the graph disagree about what "
+                    "this lane loads. NO FALLBACK."
+                    % (self.name, sorted(missing)))
+            results = _wb.run_graph(loaders, classes, on_result=_register)
+            absent = [nid for nid in wanted if not results.get(nid)]
+            if absent:
+                raise _wb.GraphExecutionError(
+                    "%s hoisted loader(s) %s returned no output; the beat "
+                    "session has nothing to reuse and every segment would "
+                    "silently reload" % (self.name, sorted(absent)))
+            prepared["external_results"] = {
+                nid: results[nid] for nid in wanted}
+        except BaseException:
+            try:
+                self.teardown(prepared)
+            except BaseException:          # noqa: BLE001 -- never mask the cause
+                pass
+            raise
+        return prepared
+
+    def teardown(self, prepared):
+        """Drop the beat-scoped handles, RECLAIM once, then delegate.
+
+        ``prepared["external_results"]`` holds strong references to every
+        hoisted handle; the base teardown detaches the tracked patchers,
+        unloads, releases the lease and then waits for machine-wide VRAM to
+        settle, and every one of those steps would run with this dict still
+        pinning the tensors it is reclaiming.
+
+        THE RECLAIM MOVES HERE FOR A MULTI-SEGMENT BEAT (see
+        :meth:`render_clip`). It exists to stop CROSS-BEAT accumulation -- "the
+        resident stack drops back down before the next soak beat starts" -- and
+        between two segments of ONE beat there is nothing to drop back for,
+        because the next segment needs the same stack. Running it once here
+        keeps the cross-beat promise exactly.
+
+        Never raises out of teardown (it is a finally-path)."""
+        from . import wrapper_bridge as _wb
+        if isinstance(prepared, dict):
+            prepared.pop("external_results", None)
+            if (prepared.get("session_ctx") or {}).get("multi_clip"):
+                try:
+                    _wb.reclaim_idle_models(reason="humo beat teardown")
+                except Exception:          # noqa: BLE001 -- best-effort
+                    _LOG.warning("[OTR video] %s beat-teardown reclaim failed",
+                                 self.name, exc_info=True)
+        return super().teardown(prepared)
+
     # ---- in-process graph spec (proven topology; filenames VERIFY-ON-GPU) ----
     def _node_candidates(self):
         """Ordered ComfyUI node-class candidates per graph node (all core /
@@ -345,12 +575,25 @@ class HuMoEngine(_MC.MotionEngineBase):
         h = int(os.environ.get("OTR_HUMO_HEIGHT", _dh))
         return w, h
 
-    def _build_graph(self, image_name, audio_name, plan, length, width, height):
+    def _build_graph(self, image_name, audio_name, plan, length, width, height,
+                     external_results=None):
         """The declarative HuMo graph (wrapper_bridge.run_graph format). Mirrors
         the proven build_humo_prompt wiring node-for-node:
         UNETLoader->LoRA->ModelSamplingSD3->KSampler (model); CLIPLoader->pos/neg;
         VAELoader; LoadAudio->AudioEncoderEncode(+AudioEncoderLoader);
-        LoadImage->ref_image; WanHuMoImageToVideo->KSampler->VAEDecode."""
+        LoadImage->ref_image; WanHuMoImageToVideo->KSampler->VAEDecode.
+
+        ``external_results`` names the ids the CALLER already produced and owns
+        for the whole beat (WIRE-W4a: :meth:`prepare` loads every loader once).
+        Those node DEFINITIONS are omitted while every wire that reads them
+        stays -- the executor resolves them from the caller's handles instead.
+        Omission is a contract, not an optimisation: ``run_graph`` REFUSES a
+        graph that also defines an id the caller supplied, because then two
+        parties claim to produce one output.
+
+        Conditional on purpose. A caller that prepared nothing gets the loader
+        nodes exactly as before, byte for byte -- which is the single-clip path
+        and every sibling test that hand-builds ``prepared={"patchers": []}``."""
         from . import wrapper_bridge as _wb
         names = self._loader_names()
         steps = self._steps()
@@ -363,8 +606,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         # it optional so the 1.7B tier runs LoRA-free (set OTR_HUMO_LORA_NAME to
         # none/skip and raise OTR_HUMO_STEPS, since the distill shortcut is gone).
         lora_name = names["lora"]
-        skip_lora = (not lora_name) or str(lora_name).strip().lower() in (
-            "none", "skip", "off")
+        skip_lora = self._lora_is_skipped(lora_name)
         graph = {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": names["unet"],
@@ -413,6 +655,8 @@ class HuMoEngine(_MC.MotionEngineBase):
         graph["vaedecode"] = {
             "class": "vaedecode",
             "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}}
+        for nid in set(external_results or ()):
+            graph.pop(nid, None)
         return graph
 
     def _retain_model_patchers(self, results, prepared):
@@ -481,13 +725,21 @@ class HuMoEngine(_MC.MotionEngineBase):
             target_fc or self.target_fps,
             min_frames=_HUMO_MIN_FRAMES, max_frames=render_max)
         width, height = self._native_dims()
-        graph = self._build_graph(image_name, audio_name, plan, length, width, height)
+        # The beat-scoped handles prepare() hoisted, if any. Their node
+        # definitions drop out of the graph and run_graph resolves the wires
+        # from these instead -- and it adds them to `keep`, so nothing can evict
+        # a handle the NEXT segment still needs.
+        session = (prepared or {}) if isinstance(prepared, dict) else {}
+        external = session.get("external_results") or {}
+        multi_clip = bool((session.get("session_ctx") or {}).get("multi_clip"))
+        graph = self._build_graph(image_name, audio_name, plan, length, width,
+                                  height, external_results=external)
         # Render FULLY RESIDENT -- the proven BUG-265 low_vram_default path: the
         # HuMo-1.7B stack (3.3 GB + umt5/whisper) stays resident with zero offload
         # on a 16 GB card. (No free_after_use: forcing inter-node model eviction
         # only fragmented the allocator into an OOM -- it is NOT what the working
         # OTR_BatchHumoRender does.)
-        results = _wb.run_graph(graph, classes)
+        results = _wb.run_graph(graph, classes, external_results=external)
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
@@ -528,7 +780,18 @@ class HuMoEngine(_MC.MotionEngineBase):
         # inter-phase cleanup) so the resident stack drops back down before the
         # next soak beat starts (no cross-beat accumulation). LOUD; no
         # unload_all_models (V-4/V-5).
-        _wb.reclaim_idle_models(reason="humo post-decode")
+        #
+        # NOT BETWEEN THE SEGMENTS OF ONE BEAT (WIRE-W4a). The sentence above
+        # is the whole justification -- "before the next soak beat starts" --
+        # and between two segments of the SAME beat there is nothing to drop
+        # back for, because the next segment needs the same stack. Reclaiming
+        # here would detach(unpatch_all=True) the very handles ``prepare``
+        # hoisted, so the "one load per beat" contract would survive as a
+        # Python reference while the weights bounced to CPU and back every
+        # segment. ``teardown`` runs it once, which keeps the cross-beat
+        # promise exactly as it was.
+        if not multi_clip:
+            _wb.reclaim_idle_models(reason="humo post-decode")
         # M7 (added 2026-07-27): PROVE the silent-clip color/stream contract on
         # the emitted mp4 before canonicalize self-declares it -- ffprobe is the
         # source of truth, the hardcoded dict is not. Four siblings (wan_i2v,

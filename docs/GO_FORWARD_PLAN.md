@@ -844,8 +844,9 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a
-## and W3b ARE LANDED AND PUSHED; WIRE-W4 (HuMo) is the next line of code.**
+## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
+## W3b and W4a ARE LANDED AND PUSHED; WIRE-W4b (the per-segment audio slice) is
+## the next line of code.**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -925,11 +926,49 @@ no session identity, which made it a control over exactly one engine --
 asserts the whole SET against a named list carrying the chunk that added each
 entry, so it fails in both directions.
 
-**WIRE-W4 IS THE NEXT LINE OF CODE:** the HuMo beat session plus the
-per-segment audio slicer. Three HuMo lanes still come back NO_RENDER, and HuMo
-is the only family where a segment needs its OWN slice of the beat's audio --
-hand every segment the whole beat's waveform and the assembled beat lip-syncs
-to itself once per segment.
+**WIRE-W4a IS LANDED** -- the HuMo beat session. All four HuMo lanes declared
+no `session_identity()`, so `BeatSession` refused every multi-segment beat from
+them, and HuMo beats are dialogue, so they are long, so they are exactly the
+beats the partitioner splits.
+
+- **The hoist is WIDER here than on the WAN lanes, and that is a property of
+  the family.** WAN renders with `free_after_use=True` so umt5 and the
+  diffusion UNET are never co-resident; hoisting its CLIP would delete the one
+  mitigation it has. HuMo renders FULLY RESIDENT by contract (BUG-265), so
+  every loader is held for the whole render anyway -- hoisting changes how many
+  times they are READ, not how much is held. `prepare` takes the UNET, the
+  LoRA, umt5, the VAE and whisper; measured, a 3-segment beat loads each once.
+- **The reclaim is the other half, and neither half works alone.** The LOUD
+  `reclaim_idle_models` at the end of `render_clip` exists "so the resident
+  stack drops back down before the NEXT SOAK BEAT starts". Run between two
+  segments of ONE beat it would `detach(unpatch_all=True)` the very handles
+  `prepare` hoisted -- the load count would still read 1 while the weights
+  bounced to CPU and back every segment. Drop it WITHOUT the hoist and segment
+  2 builds new umt5 and whisper handles beside segment 1's. So it is skipped
+  between segments and run once at `teardown`; the cross-beat promise is
+  unchanged.
+- `loadaudio`/`audioenc` stay per segment deliberately -- they are the one
+  thing that genuinely differs per segment on a lip-synced lane, and **W4b
+  needs them there to have anywhere to land.**
+- `_lora_is_skipped` is now THE one reading of "this tier runs LoRA-free". The
+  session and the graph have to agree: hoisting a `lora` node the graph never
+  defines wires a handle nothing reads; skipping one the graph DOES define lets
+  it reload every segment.
+- `prepare` builds its loader mini-graph BY FILTERING THE REAL GRAPH rather
+  than re-spelling the loader inputs, and refuses NAMED when the two disagree
+  about what this lane loads, or when a hoisted loader produces no handle.
+
+**WIRE-W4b IS THE NEXT LINE OF CODE: the per-segment audio slice.** Today every
+segment of a HuMo beat is handed the WHOLE beat's audio, so a 3-segment beat
+renders three clips all lip-syncing to the same waveform from the top -- the
+assembled beat says the opening of the line three times. `render_driver`
+already owns the slicer (`_slice_master_audio`, cached by
+`slice_cache_key(master_hash, start_s, dur_s)`) and already slices per BEAT at
+`:2200-2270`; W4b narrows `[start_s, dur_s]` to the SEGMENT's window. The
+arithmetic belongs in `coverage_plan` as a pure, CPU-tested helper -- segment
+`i`'s render window is its visible offset MINUS its `drop_head`, for
+`render_frames` at the canvas fps -- because the beat's own `start_s` is the
+only thing `render_driver` should have to add.
 
 **OPERATOR RULING 2026-07-29 -- THE MOTION FLOOR, AND THE CREDITS EXCEPTION.**
 
