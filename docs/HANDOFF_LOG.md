@@ -3,6 +3,33 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD 3e89d6b2 (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
+Did: **WIRE-W3a `3e89d6b2`** -- wan_i2v's beat session. session_identity() and
+  the UNET-only hoist in ONE commit, because codex's r3 warning is real: the
+  identity alone silences BeatSession's refusal and the segment graph still
+  runs UNETLoader every segment, so the beat would look fixed and reload a 14B
+  three times. Acceptance counts LOADER INVOCATIONS, never prepare() calls --
+  BeatSession carries no counters for exactly that reason. Measured: 3-segment
+  beat = 1 UNET load, 3 CLIP loads, 3 VAE loads. The auxiliaries reloading IS
+  the narrowed contract; hoisting the CLIP would pin ~9 GB and delete the
+  free_after_use mitigation that keeps this lane off a 14,499 MB peak.
+  Identity carries the recipe, the loader MODE and a size+mtime receipt for
+  every loader file INCLUDING the un-hoisted CLIP and VAE (r4/A5 -- TI2V
+  distinguishes incompatible VAE generations). Receipt mechanism shared in
+  wan_shared, data per adapter; eng_ltx_8gb keeps its own copy on purpose.
+  Suite 7561 / 27 / 1; Bible 17; canonical 9872624A; mutation 7/7 with M1
+  being the trap itself.
+Current step: WIRE-W3b (wan_ti2v). The session half mirrors wan_i2v almost
+  exactly; the NEW half is the ping-pong -- _floor_length + the extend at
+  render_clip:725-733 must be suppressed for a COVERAGE-PLANNED segment only
+  (it stays load-bearing for the shipped 8GB tier, PBUG-20260723-02), the
+  native frame count and extension mode go on every receipt, and the native
+  budget is computed AFTER prepared-model residency.
+Next: WIRE-W3b -> WIRE-W4 -> WIRE-W7 -> WIRE-W5, then the 45-word run over all
+  18 local video/still engines. NOTHING in this block is live-proven yet.
+Models: Claude (rung 4) only. No Codex spend -- two-strikes never fired.
+Commits: 3e89d6b2 (+ this handoff).
+
 ## 2026-07-29 -- HEAD a14ecdfa (v2.0-alpha) -- WINDOW CODER (wiring block)
 Did: WIRE-W1, WIRE-W2 and WIRE-W6 built, gated and pushed, one green chunk at
   a time, from r3/final.md as amended by r4/final.md.

@@ -869,6 +869,37 @@ no node, widget, link or schema touched by any of them):**
   stay terminal. **Both fail-open swallows in ShotLock are gone.**
 - **`a14ecdfa` WIRE-W6** -- the end card rides the body video's frozen final
   frame; `plan_backdrop` is DELETED. Terminal/presentation boundary per r4/A7.
+- **`3e89d6b2` WIRE-W3a** -- `wan_i2v` gets its beat session. `session_identity()`
+  AND the UNET-only hoist in ONE commit, because codex's r3 warning is real:
+  the identity alone silences `SessionIdentityUnavailable` and the segment
+  graph still runs `UNETLoader` every segment. **Measured: a 3-segment beat
+  loads the UNET once and the CLIP/VAE three times each** -- the auxiliaries
+  reloading is the NARROWED contract ("primary diffusion patcher once per
+  beat; auxiliaries may reload"), not a shortfall, because `free_after_use`
+  keeping umt5 and the 14B out of co-residency is the only thing between this
+  lane and an OOM at 14,499 MB. Receipt mechanism shared in `wan_shared`, data
+  per adapter. Suite 7561; mutation 7/7.
+
+**WIRE-W3b IS THE NEXT LINE OF CODE, and it is NOT just a copy of W3a.** The
+session half mirrors `eng_wan_i2v` almost exactly (identity, UNET-only
+`prepare`, `external_results` in `_build_graph` + `render_clip`, `teardown`
+dropping the handles first -- `_wan_session_receipts()` already works for it).
+The half that is NEW is the ping-pong:
+
+- `eng_wan_ti2v._floor_length` (`:551`) floors the render to what live VRAM
+  affords, and `render_clip` (`:725-733`) PING-PONG EXTENDS that short render
+  up to the beat target. `coverage_plan`'s module docstring forbids exactly
+  that for a planned multi-clip beat.
+- **Do NOT rip it.** It is load-bearing for the shipped 8 GB WAN tier
+  (`PBUG-20260723-02`): WAN renders a short native clip on purpose and fills
+  the beat with it. Suppress it ONLY for a coverage-planned segment, the way
+  `eng_ltx_8gb` does, and leave the single-clip path alone.
+- Record `native_frame_count` and the extension MODE on every receipt so the
+  W5 grader can reject ping-pong on a lane claiming real multi-clip.
+- Compute the native budget AFTER prepared-model residency (r3): with the UNET
+  already hoisted, `free_vram_mb()` reads a different number than it did when
+  the loader ran inside the segment graph, so the budget must be taken with
+  the same memory state every segment sees.
 
 **ONE OPERATOR EYEBALL OWED, and it is the only thing WIRE-W6 cannot settle
 itself:** the credits console used to ride the last drama clip LOOPED; it now
@@ -916,7 +947,8 @@ last section) is the adopted per-chunk gate. Order:
 WIRE-W1  partition   DONE 5efd2baf
 WIRE-W2  typed gap   DONE a218b1f7
 WIRE-W6  end card    DONE a14ecdfa
-WIRE-W3  WAN         <-- NEXT. UNET-only hoist, VAE in identity
+WIRE-W3a wan_i2v     DONE 3e89d6b2  (session: identity + UNET-only hoist)
+WIRE-W3b wan_ti2v    <-- NEXT. Same session shape, PLUS the ping-pong work
 WIRE-W4  HuMo        session BEFORE slicer; SUPPRESS eng_humo.py:525-531
                      per-segment reclaim or the hoist is evicted; conditioning
                      WAV = render_frames with silence padding for trim_tail
