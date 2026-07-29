@@ -691,14 +691,21 @@ the opt-in entirely (operator ruling: everything gets an equal term). See
 CURRENT STEP -- the "first adapter opt-in" step no longer exists, and
 `docs/ENGINE_MATRIX.md` is now the generated per-model requirements record.
 
-**OPERATOR RESCOPE 2026-07-24 (supersedes the older queue everywhere in this
-file):** the 45-word scene matrix, the 54-case visual-style sweep and the
-WHOLE quick-wins block are CUT -- the operator wants coding, not matrices, and
-will triage bugs as a batch later. The order is now **WAN 8-GB contract ->
-LEAN-MEAN FRONT -> Randomizer A -> `dynamic_story` -> LEAN-MEAN TAIL -> SFX ->
-re-observe the parked story bugs.** ENGINE_MATRIX survives the cut as a W6
-sub-step, not a standalone chunk. Two story-shaped defects are PARKED, not
-closed (see OPEN BUGS). **And every remaining big block must be RE-GROUNDED by
+**OPERATOR RESCOPE 2026-07-24 -- ITS CUTS STAND, ITS ORDER DOES NOT.** The
+45-word scene matrix, the 54-case visual-style sweep and the WHOLE quick-wins
+block are CUT -- the operator wants coding, not matrices, and will triage bugs
+as a batch later. ENGINE_MATRIX survives the cut as a W6 sub-step, not a
+standalone chunk. ~~The order is now WAN 8-GB contract -> LEAN-MEAN FRONT ->
+Randomizer A -> `dynamic_story` -> LEAN-MEAN TAIL -> SFX -> re-observe the
+parked story bugs.~~ **THAT ORDER IS SUPERSEDED BY THE OPERATOR DIRECTION
+2026-07-27 in this file: WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX ->
+LEAN-MEAN FRONT -> TAIL. LEAN-MEAN IS LAST, NOT SECOND. And the block that
+runs BEFORE all of them is the LOCAL-ENGINE OBS WIRING block -- see CURRENT
+STEP.** This paragraph's "supersedes the older queue everywhere in this file"
+clause was true on 07-24 and is the single most misread line in the document;
+it does not outrank a later operator direction.
+
+Two story-shaped defects are PARKED, not closed (see OPEN BUGS). **And every remaining big block must be RE-GROUNDED by
 a kibitz arc before it executes -- r3+r4 by default, a full r2->r3->r4 for both
 LEAN-MEAN blocks, dropping to r2 anywhere the coding plan itself proves stale.
 See STANDING RE-GROUND GATE. These plans are two weeks old and the tree moved
@@ -830,8 +837,57 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **the second encoder is CLOSED. The remote-safe lane is
-## now EMPTY except A2, so what is left is the operator's own GPU sequence.**
+## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. The wiring arc
+## r1-r4 is CLOSED and the build spec is written; W1 is the next line of code.**
+
+**THIS IS NOT LEAN-MEAN.** Any window that opens on lean-mean has read a stale
+list -- see the SUPERSEDED banners on the 2026-07-24 rescope, the Coder queue
+and the CODER D row. The live block order is the OPERATOR DIRECTION 2026-07-27
+above: WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX -> LEAN-MEAN FRONT ->
+TAIL. **Lean-mean is LAST.**
+
+**WHY THIS STEP EXISTS.** The 45-word engine-coverage campaign ran to
+completion over all 18 LOCAL engines: **11 publish to `otr/obs/`, 6 NO_RENDER,
+and `mesh_stage` renders 7/7 and publishes nothing.** The six are NOT a stills
+problem -- 5 of 6 are MULTI-SEGMENT COVERAGE (wan x2 at node 92, no
+`session_identity()`; humo x3 at node 90, beat > cap with no per-segment audio
+slicer) and 1 is a preflight string match (`ltx_video`:
+`_is_deferred_image_gap`'s four needles at `nodes/otr_shot_lock.py:947-955`
+miss the LTX-I2V wording, so ShotLock re-raises and node 91 never runs).
+
+**BUILD FROM `kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md` AS
+AMENDED BY `r4/final.md`.** codex's VERIFY-AT-BUILD checklist (`r4/codex.md`,
+last section) is the adopted per-chunk gate. Order:
+
+```text
+WIRE-W1  partition   184 -> [153, 33] trim_tail 2; 185-240 all two segments
+WIRE-W2  typed gap   leaf module; convert ONLY render_driver.py:1985, 2049,
+                     2105, 2146, 2179 -- post-image :1024 / :1055 / :1084
+                     stay TERMINAL
+WIRE-W6  end card
+WIRE-W3  WAN         UNET-only hoist, VAE in identity
+WIRE-W4  HuMo        session BEFORE slicer; SUPPRESS eng_humo.py:525-531
+                     per-segment reclaim or the hoist is evicted; conditioning
+                     WAV = render_frames with silence padding for trim_tail
+WIRE-W7  mouth-still ShotLock is the sole cardinality owner; ZERO OR ONE human
+                     face, never inferred from prose
+WIRE-W5  grader      per-shot frozen-route comparison; histograms are CUT
+```
+
+**THE `WIRE-` PREFIX IS LOAD-BEARING.** LEAN-MEAN FRONT also has a W0..W8
+chain and LEAN-MEAN TAIL has a W8; a bare "W1" is ambiguous across three
+blocks and has already misrouted one window. In this block the chunks are
+named in `r3/final.md` as W1..W7 -- say `WIRE-W1` out loud, always.
+
+**THREE OPERATOR RULINGS BIND THIS BLOCK** (recorded verbatim above): a still
+floor is legal ONLY where the partition math is impossible, never where an
+engine refused; every audio-in beat gets a still with a mouth; the lips may be
+a person OR A RADIO.
+
+**A2 stays HELD. 7d stays PARKED. THE LAW holds. Preserve other windows' dirty
+paths.** The 13 CLOUD engines stay parked pending explicit spend approval.
+
+### Still true from the prior step (2026-07-28, the second encoder)
 
 **7d IS STILL PARKED** until the operator is at the desk -- his call, recorded
 in `docs/TRAVEL_RELAY_PROTOCOL.md`. Do not start it from a remote window.
@@ -848,12 +904,13 @@ instead of clipped in silence, and the log says what it needs: at 288 lines the
 three-column console is a polite fiction, and the answer is a card designed for
 a small canvas, not more ladder. NOT a blocker for anything.
 
-**THE NEXT REAL WORK IS THE OPERATOR'S GPU SEQUENCE, and none of it is
-remote:** the clamped confirmation of ltx recipe v2, then a WAN prequalification
-sweep (the mechanism is built and named on both WAN tiers; no WAN sweep has
-ever run), then 7d. After those, the rescoped block order stands: WAN 8-GB
-contract -> LEAN-MEAN FRONT -> Randomizer A -> `dynamic_story` -> LEAN-MEAN
-TAIL -> SFX -> re-observe the parked story bugs.
+**STILL OWED ON THE GPU LANE, and none of it is remote:** the clamped
+confirmation of ltx recipe v2, then a WAN prequalification sweep (the mechanism
+is built and named on both WAN tiers; no WAN sweep has ever run), then 7d.
+**These do NOT gate the wiring block above -- W1..W5 are code, not GPU time.**
+The block order after the wiring block is the OPERATOR DIRECTION 2026-07-27,
+not the 07-24 list this paragraph used to carry: WAN 8-GB -> Randomizer A ->
+`dynamic_story` -> SFX -> LEAN-MEAN FRONT -> TAIL.
 
 **CARRY FORWARD, and this window is the sixth consecutive proof:** run the
 mutation round even after a QA fan-out clears the change, run the FAN-OUT
@@ -2452,7 +2509,16 @@ leg as evidence; gone -> the LAW-era work already fixed it, tombstone it.
 - **Phase-2 de-naming** (module filenames, `meta[]` ledger keys, wire-schema
   `.v4` literals) -- DEFERRED, operator-flagged, from the keep-6 rename.
 
-## Coder queue (re-grounded 2026-07-24)
+## Coder queue (scope live; ORDER SUPERSEDED 2026-07-27)
+
+**READ THIS BEFORE THE FENCE.** The BLOCKS below are right and their per-block
+re-ground gates still bind. **The ORDER is not.** Lean-mean moved LAST by
+operator direction (see OPERATOR DIRECTION 2026-07-27 in this file): **WAN
+8-GB -> Randomizer A -> `dynamic_story` -> SFX -> LEAN-MEAN FRONT -> TAIL.**
+And one block lands AHEAD of every row here and is not in this list at all --
+the LOCAL-ENGINE OBS WIRING block (W1..W5), arc CLOSED, spec at
+`kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md` as amended by
+`r4/final.md`. See CURRENT STEP. **Use the fence for SCOPE ONLY.**
 
 One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
@@ -2639,13 +2705,14 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | Window | Scope | Model rung (see MODEL & CREDIT BUDGET) | Gate | Size |
 |---|---|---|---|---|
 | RENDER | finish the six-bank 120w wrap ONLY (the 45w matrix and 54-case sweep are CUT); fillers: cpu-tier smoke + nv50 re-soak | local production + Codex-app monitor | opens whenever the operator wants a live leg | GPU days |
+| **CODER W "local-engine OBS wiring" -- THIS IS THE OPEN SLOT** | Close the 6 NO_RENDER local engines so all 18 land a 45-word episode in `otr/obs/`. Arc r1-r4 CLOSED. Spec = `kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md` AS AMENDED BY `r4/final.md`; per-chunk gate = codex's VERIFY-AT-BUILD checklist in `r4/codex.md`. Order **WIRE-W1 -> WIRE-W2 -> WIRE-W6 -> WIRE-W3 -> WIRE-W4 -> WIRE-W7 -> WIRE-W5** (see CURRENT STEP for each). **These W numbers are NOT lean-mean's W0..W8 -- different block, different spec file; prefix them WIRE- in every message.** | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | arc already converged at HEAD -- no further re-ground owed; code now | multi-day |
 | CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4 + B5 + B6. All LANDED GREEN and PUSHED (suite 7213).** THE CODER-WINDOW BLOCK IS COMPLETE. NEXT = **prequalify 512x288** -- a GPU step, so a RENDER window owns it, not this one (boot with `OTR_LTX_8GB_PREQUALIFICATION=1`, measure T5 device and tiled decode, freeze the winner as recipe v2) -- then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine at its production canvas. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
 | ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
-| CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | after A; NO rip before r4 converges at HEAD | multi-day |
+| CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | **LAST BLOCK OF ALL (operator 2026-07-27) -- after WIRING, WAN 8-GB, Randomizer A, `dynamic_story` and SFX. The old "after A" gate is SUPERSEDED.** NO rip before r4 converges at HEAD | multi-day |
 | PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with D | docs |
 | ~~CODER E~~ | independent client-authored source banks v1 -- **ALL SEVEN WAVES DONE @ `30358ad1`**; slot RETIRED, do not reopen (deferred power-user tiers are a NEW block, not this one) | -- | -- | -- |
-| CODER F | **r3 + r4 arc per block FIRST**, then Randomizer A -> `dynamic_story`. For `dynamic_story` the arc is WIRING ONLY -- rev-5's design stays FINAL, do not rerun the design panels. | Claude codes + judges; kibitz = codex + agy | after D; NO code before r4 converges at HEAD | ~6-11 d |
+| CODER F | **r3 + r4 arc per block FIRST**, then Randomizer A -> `dynamic_story`. For `dynamic_story` the arc is WIRING ONLY -- rev-5's design stays FINAL, do not rerun the design panels. | Claude codes + judges; kibitz = codex + agy | after the WIRING block and WAN 8-GB (the old "after D" gate is SUPERSEDED -- D is now LAST) ; NO code before r4 converges at HEAD | ~6-11 d |
 | CODER G "lean-mean tail" | **FULL `r2 -> r3 -> r4` arc FIRST, run HERE and not earlier** (every block before this one edits the writer this block splits), then SW1-SW3, C6, C7, W8 | Claude; kibitz = codex + agy; Fable single final epoch gate | after F; NO split before r4 converges at HEAD | multi-day |
 
 ### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
@@ -2674,11 +2741,18 @@ the same box as the repo, and two of CLAUDE.md's assumptions do not hold:
   PowerShell `*>` redirection writes UTF-16, so read results with
   `Select-String`, not by eyeballing the raw file.
 
-Kickoff lines (paste as the FIRST message of the new window; swap the letter):
+Kickoff lines (paste as the FIRST message of the new window).
 
-> resume the OTR build -- you are CODER WINDOW A per GO_FORWARD "Window
-> packing"; execute your scope in order, one green pushed chunk at a time,
-> and state your MODEL & CREDIT BUDGET rung first.
+**NEVER boot a window by LETTER alone.** The letters are a scope index, not a
+running order, and the Gate column outranks them -- a window that reads its
+letter and starts coding will run whatever block sat there when the letter was
+assigned. **Boot by CURRENT STEP, always:**
+
+> resume the OTR build -- you are a CODER window. Read GO_FORWARD "CURRENT
+> STEP" and execute THAT block only, in its stated order, one green pushed
+> chunk at a time. If CURRENT STEP names a different block than a letter row
+> in "Window packing", CURRENT STEP WINS -- say so and proceed. State your
+> MODEL & CREDIT BUDGET rung first.
 
 ## Parallel lane -- no coder slot required
 

@@ -3,6 +3,49 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD 078dd2d3 (v2.0-alpha) -- WINDOW RENDER/QA -- PLAN REPAIR
+**A CODING WINDOW OPENED ON LEAN-MEAN. THE PLAN TOLD IT TO.** The operator
+caught it; the doc, not the window, was wrong. Four independent places in
+GO_FORWARD still ordered LEAN-MEAN FRONT **second**, and one of them claimed
+supersession authority over the whole file:
+
+1. `CURRENT STEP` itself -- headed "the second encoder is CLOSED ... what is
+   left is the operator's own GPU sequence", and its closing paragraph
+   recited the 07-24 order. **This is the line every window boots on.**
+2. The **OPERATOR RESCOPE 2026-07-24** paragraph -- "(supersedes the older
+   queue everywhere in this file)". True on 07-24, and the single most
+   misread sentence in the document. A later operator direction outranks it;
+   nothing said so.
+3. The **Coder queue** fence, still headed "re-grounded 2026-07-24".
+4. The **Window packing** table: CODER A reads "THE CODER-WINDOW BLOCK IS
+   COMPLETE" and CODER D's gate read "after A". A -> complete, therefore D.
+   D is "lean-mean front". The window's inference was sound.
+
+**AND A FIFTH CAUSE NOBODY HAD NAMED: THE CHUNK NUMBERS COLLIDE.** The wiring
+block's chunks are W1..W7 in `r3/final.md`; LEAN-MEAN FRONT is W0..W8 and
+LEAN-MEAN TAIL owns a W8. A kickoff saying "start with W1" is ambiguous
+across THREE blocks. Every wiring chunk is now written `WIRE-W1`..`WIRE-W7`
+in GO_FORWARD, with the collision stated in the row and in CURRENT STEP.
+
+Fixed: CURRENT STEP rewritten to name the wiring block, its cause taxonomy,
+the `WIRE-` order and the three operator rulings; superseded banners on (2),
+(3) and both stale gate cells; a new **CODER W "local-engine OBS wiring"**
+row placed FIRST in the packing table and marked THIS IS THE OPEN SLOT; the
+generic kickoff line changed from "you are CODER WINDOW A -- swap the letter"
+to boot-by-CURRENT-STEP, with "CURRENT STEP WINS over a letter row" stated in
+the pasted text.
+
+**DOCTRINE, and this is the second time in two days the same bug bit -- it
+bit ME earlier in this same window at the old `:1773` list.** A plan file
+that records supersession as PROSE will re-supersede itself the moment a
+reader lands mid-file. Ordering must live in exactly ONE place; every other
+mention is a pointer or a struck-through line with a banner. **And a document
+whose sections each claim to supersede the others has no order at all -- it
+has four, and the reader picks by where they entered.**
+
+No code changed. A2 HELD, 7d PARKED, THE LAW holds, other windows' dirty
+paths preserved.
+
 ## 2026-07-28 18:40 -- HEAD 7e768828 (v2.0-alpha) -- WINDOW RENDER/QA (cont.)
 Did: ran the 45-word engine-coverage campaign to completion over all 18 LOCAL
   engines. RESULT: 11 publish to otr/obs/, 6 NO_RENDER, mesh_stage renders 7/7
