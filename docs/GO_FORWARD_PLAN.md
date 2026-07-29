@@ -875,6 +875,60 @@ the box -- each leg kills other OTR ComfyUI servers at start):
 **CLEANUP OWED at the end:** `Remove-Item config\profiles\otr_w45_*.json` --
 nineteen scratch profiles in a tracked set; they must never be committed.
 
+## NEXT STEP AFTER THE ENGINES -- **THE WRITER NEVER VETOES** (operator ruling, 2026-07-29)
+
+**The ruling, in the operator's words:** "the writer should not be allowed to
+kill the run, it just needs to fix the ledger" -- and, restated: "the writer
+should never veto, the writers should keep on passing in a loop to agents to
+clean up the ledger." PARKED by the operator: do not build it until the video
+pipe engines work as expected. It is the NEXT step after them, not a
+someday-item.
+
+**Why it is now the top of the forward queue.** The live 45-word campaign spent
+its first ten legs proving the writer is the run's dominant failure mode, not
+the video engines -- roughly four legs in ten died before a renderer was ever
+reached, each one after minutes of GPU time. Three different mechanisms, ONE
+shape:
+
+- `ltx_8gb` -- P5 markup: the retry ladder genuinely exhausted, because the
+  validator surfaced one defect at a time (ROOT-FIXED `3b49d3f8`).
+- `ltx_audio_in` -- P5 runaway: `PromptContextOverflowError` is a plain
+  `RuntimeError`, which `structured_call` does not catch, so it fired on
+  attempt 1 of 3 and SKIPPED the remaining two rungs. The ladder advertised a
+  budget it never spent. 24 minutes, one leg (PBUG-20260729-02, OPEN).
+- `mesh_stage`, `still_flat` -- P0: `repair context is 16796 bytes, over the
+  hard limit 14336`, so the repair could not even be ATTEMPTED. Terminal before
+  it started.
+
+In every one, the writer treated "I could not produce a clean artifact on this
+attempt" as "this episode cannot exist." There is no degrade path anywhere in
+the pass topology; every pass is a veto.
+
+**What the ruling asks for, as a contract:**
+
+1. A writer pass failure DEGRADES to a workable ledger. It never terminates the
+   episode. Fail-loud stays -- the receipt must say exactly what was wrong and
+   what was done about it -- but loud is not the same as fatal.
+2. Passes keep going in a LOOP, handing the artifact to cleanup agents, until
+   the ledger is workable. A bounded ladder that gives up is the shape being
+   replaced; the loop is the shape being asked for.
+3. PBUG-20260729-02's candidate 2 -- let a runaway advance the ladder instead
+   of being terminal -- is now the RULED DIRECTION, not an open design
+   question. Its recorded trap still applies: the typed-repair factory would be
+   handed the ~14,700-token truncated output as `failed_output`, so the repair
+   prompt must be bounded before that path opens. The P0 hard-limit failures
+   above are the same trap from the other side and belong in the same design.
+4. **THE LAW IS UNTOUCHED.** Requested word length, actual word count and drift
+   remain telemetry that may never reject, reroll, retire, replace or block an
+   episode. "Never veto" widens what the writer must survive; it does not
+   license a word-count gate, and `output_budget_mode: "provider_capacity"`
+   stays the decision it already is.
+
+**Do NOT start this while the campaign is live.** It is writer-topology surgery
+across `_otr_structured_call.py`, `_otr_scifi_codex.py` and
+`OTR_LedgerScriptWriter.py`, and the engines are the thing being proven right
+now.
+
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
 variants / 0 failures; canonical `9872624A` byte-identical across all three --

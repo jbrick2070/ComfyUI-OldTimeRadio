@@ -2831,3 +2831,41 @@ out until they independently meet the same production-only admission rule.
   below it.** Any bounded-retry design has to classify its own terminal errors
   explicitly, or the budget it advertises is not the budget it spends.
 - status: **OPEN -- diagnosed, not fixed. Live: 1 occurrence in 6 legs.**
+- **OPERATOR RULING 2026-07-29 (supersedes the "candidates" framing above):**
+  "the writer should not be allowed to kill the run, it just needs to fix the
+  ledger" -- restated: "the writer should never veto, the writers should keep
+  on passing in a loop to agents to clean up the ledger." Candidate 2 is
+  therefore the RULED DIRECTION, not an open design question, and the rule is
+  general rather than runaway-specific: a writer pass failure must degrade to a
+  workable ledger and never terminate the episode. The recorded trap still
+  binds -- the typed-repair factory would be handed the ~14,700-token truncated
+  output as `failed_output`, so the repair prompt must be bounded before that
+  path opens -- and PBUG-20260729-03's hard-limit refusal is the same trap from
+  the other side, so both belong in one design. THE LAW is untouched: word
+  length stays telemetry. PARKED by the operator until the video pipe engines
+  work as expected; queued as the next step in `docs/GO_FORWARD_PLAN.md`
+  ("THE WRITER NEVER VETOES").
+
+## PBUG-20260729-03 -- a P0 repair is refused for being too big to attempt
+- surfaced: the live 45-word campaign, legs `mesh_stage` (07:23, 182s) and
+  `still_flat` (07:26, 208s), headless canonical runs
+- symptom: `P0 failed: P0 repair context is 16796 bytes, over the hard limit
+  14336` -- and on `mesh_stage`, `P0 failed: [OTR_StructuredCall]
+  'scifi_codex:P0' failed after 3 attempt(s); disposition=repair_owner_exhausted`.
+  Two legs, no video engine reached.
+- root cause: the repair context the pass BUILDS is larger than the bound it is
+  allowed to spend, so the repair is refused before it is attempted rather than
+  being trimmed to fit. The bound exists for a good reason (an unbounded repair
+  prompt is how a context window gets eaten); what is missing is the step that
+  makes the context fit it. Same family as PBUG-20260729-02: a budget that
+  refuses instead of degrading, discovered only on live GPU time.
+- fix: **NOT FIXED.** Folded into the operator's "writer never vetoes" ruling
+  above and parked with it -- it is the same design, and fixing the two
+  separately would produce two different answers to one question.
+- verify idea: build a P0 repair context deliberately over the bound and assert
+  the pass still returns a workable artifact, with a receipt naming what was
+  trimmed -- rather than raising.
+- bible-worthy: yes -- same portable rule as PBUG-20260729-02, seen from the
+  other side: **a bound that refuses is not a budget, it is a veto.** A limit
+  on a repair context has to come with the trim that makes the context fit it.
+- status: **OPEN -- diagnosed, parked under the 2026-07-29 operator ruling.**

@@ -928,6 +928,55 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "temporal_overlap": decode_t_overlap}}
         return g
 
+    def _weight_receipt(self, path):
+        """A BOUNDED, stable receipt for one weight file: (basename, size,
+        mtime_ns). Mirrors ``eng_ltx_8gb._file_receipt`` deliberately -- NOT a
+        content hash, because the identity is re-read before every segment and
+        hashing a multi-gigabyte GGUF per segment would cost more than the
+        render. Size + mtime catches a swapped or rebuilt weight.
+
+        A path that does not resolve or cannot be stat'ed returns a NAMED
+        absence rather than raising: `assert_usable` already owns "this weight
+        is missing" and says it far better, and raising here would turn a
+        missing-weight run into a confusing session error instead of the
+        usability refusal it is.
+        """
+        if not path:
+            return ("<unresolved>", -1, -1)
+        try:
+            st = os.stat(path)
+        except OSError:
+            return (os.path.basename(path), -1, -1)
+        return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
+
+    def session_identity(self):
+        """What this adapter's HANDLES are -- engine, recipe, weights.
+
+        ``BeatSession`` REFUSES a multi-segment beat from an engine that cannot
+        answer this (``SessionIdentityUnavailable``, no fallback), because
+        nothing could then prove segment N renders with the model segment 1
+        loaded. Declared on the BASE so every LTX-AV lane inherits it at once;
+        the sibling `ltx_video` lane reached a live render gate without one and
+        refused there, 730 seconds into a leg, which is the most expensive
+        possible place to learn it.
+
+        Deliberately PRE-LOAD STABLE, on the same contract as
+        ``eng_ltx_8gb.session_identity``: read once before the weights land,
+        again after ``prepare()``, and before every segment, so it may only
+        describe things that do not change across the load. The recipe is
+        carried because it selects the whole sampling ladder AND which weights
+        are required; every per-segment value -- prompt, seed, frame count,
+        canvas, the conditioning audio -- is excluded.
+
+        Not cached, by design: the whole job is to notice a weight that MOVED,
+        so the receipts are re-stat'ed on every ask (a stat per weight, not a
+        hash).
+        """
+        parts = [self.name, self._recipe()]
+        for label, path, _floor in self._weight_paths():
+            parts.append("%s=%r" % (label, self._weight_receipt(path)))
+        return tuple(str(part) for part in parts)
+
     # ---- residency ----
     def load(self):
         """Resolve the installed ComfyUI node classes (fail-closed NAMED if

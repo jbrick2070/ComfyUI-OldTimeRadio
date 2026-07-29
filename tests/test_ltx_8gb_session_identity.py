@@ -158,6 +158,16 @@ _ENGINES_WITH_A_SESSION = {
     "humo_1.7B",               # WIRE-W4a -- inherits HuMoEngine's
     "humo_1.7B_169",           # WIRE-W4a -- inherits HuMoEngine's
     "humo_14B_169",            # WIRE-W4a -- inherits HuMoEngine's
+    # The last two local splitters, added together 2026-07-29 after the live
+    # 45-word campaign found the gap the hard way: leg `ltx_video` wrote a
+    # script, minted its stills and assembled its audio, then refused at the
+    # render gate 730s in with SessionIdentityUnavailable. `ltx_audio_in` had
+    # the same hole one leg behind it. With these two the roster invariant is
+    # closed for LOCAL engines, and
+    # tests/test_multiclip_session_identity_roster.py now holds it from the
+    # partitioner's side so the next capped adapter cannot be missed.
+    "ltx_video",               # 2026-07-29, live campaign
+    "ltx_audio_in",            # 2026-07-29, same fix (declared on _LtxAvBase)
 }
 
 

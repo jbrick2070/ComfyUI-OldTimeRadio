@@ -1137,6 +1137,58 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                                          "temporal_overlap": 8}}
         return graph
 
+    def _weight_receipt(self, path):
+        """A BOUNDED, stable receipt for one weight file: (basename, size,
+        mtime_ns). Mirrors ``eng_ltx_8gb._file_receipt`` deliberately -- NOT a
+        content hash, because the identity is re-read before every segment and
+        hashing a multi-gigabyte GGUF per segment would cost more than the
+        render. Size + mtime catches a swapped or rebuilt weight, which is the
+        drift this guards against.
+
+        A path that does not resolve or cannot be stat'ed returns a NAMED
+        absence rather than raising. `assert_usable` already owns "this weight
+        is missing" and says so far better; an identity read is not the place
+        to relitigate it, and raising here would turn a missing-weight run into
+        a confusing session error instead of the usability refusal it is.
+        """
+        if not path:
+            return ("<unresolved>", -1, -1)
+        try:
+            st = os.stat(path)
+        except OSError:
+            return (os.path.basename(path), -1, -1)
+        return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
+
+    def session_identity(self):
+        """What this adapter's HANDLES are -- engine, recipe, weights.
+
+        ``BeatSession`` REFUSES a multi-segment beat from an engine that cannot
+        answer this (``SessionIdentityUnavailable``, no fallback), because
+        nothing could then prove segment N renders with the model segment 1
+        loaded. This lane went without one until the live 45-word campaign
+        found it: leg `ltx_video` wrote a script, minted its stills and
+        assembled its audio, then refused at the render gate 730 seconds in,
+        because a 45-word beat splits into 2 segments against this engine's
+        169-frame ceiling and nothing here could name the handles.
+
+        Deliberately PRE-LOAD STABLE, on the same contract as
+        ``eng_ltx_8gb.session_identity``: it is read once before the weights
+        land, again after ``prepare()``, and before every segment, so it may
+        only describe things that do not change across the load. It carries the
+        recipe (which selects the whole sampling ladder AND which weights are
+        required) and a receipt per required weight, and it EXCLUDES every
+        per-segment value -- prompt, seed, frame count, canvas, init image.
+
+        Not cached, by design: the whole job is to notice a weight that MOVED,
+        so the receipts are re-stat'ed on every ask (a stat per weight, not a
+        hash).
+        """
+        recipe = self._recipe()
+        parts = [self.name, recipe, self._encoder_device()]
+        for label, path, _floor in self._weight_paths():
+            parts.append("%s=%r" % (label, self._weight_receipt(path)))
+        return tuple(str(part) for part in parts)
+
     # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
         """Resolve the installed ComfyUI node classes for the ACTIVE sampling set

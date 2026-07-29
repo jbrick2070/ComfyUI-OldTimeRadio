@@ -3,6 +3,77 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- WINDOW CODER -- SESSION IDENTITY FOR THE LAST TWO LOCAL SPLITTERS + THE CAMPAIGN WAS COUNTING THE WRONG FOLDER
+
+**1. `ltx_video` and `ltx_audio_in` can name their handles.**
+  THE LIVE FAILURE: leg `ltx_video` wrote a script, minted its stills, assembled
+  its audio, and refused at the render gate 730 SECONDS IN with
+  `SessionIdentityUnavailable: engine 'ltx_video' would render 2 segments from
+  ONE set of handles but declares no session_identity()`. The refusal is right
+  -- `MotionEngineBase.prepare()` calls `load()` once per beat, so a
+  multi-segment beat really does render every segment from one set of handles.
+  What was wrong is WHERE it was found. `session_identity()` had been added one
+  engine at a time (ltx_8gb, then wan_i2v / wan_ti2v / humo across the wiring
+  block) and nothing ever checked the rest of the roster.
+  Both lanes now declare one on the ltx_8gb contract: pre-load stable, carrying
+  recipe + a (basename, size, mtime_ns) receipt per required weight, excluding
+  every per-segment value. `ltx_audio_in`'s is on `_LtxAvBase`, so the whole
+  LTX-AV family inherits it at once.
+
+**2. The roster gate that should have caught it, now does.**
+  `tests/test_multiclip_session_identity_roster.py` asks the PARTITIONER which
+  engines it will split on a 30-second beat and requires an identity from
+  exactly those. It costs a second and fails in the suite instead of at minute
+  twelve of a GPU leg. Scope is `declared_isolation` -- engines whose handles
+  are real local objects that can move. **The twelve cloud/remote splitters are
+  NOT covered and that is written down, not hidden**: `word_razzle`,
+  `cloud_*` and `google_*` all split and declare nothing, and a named tripwire
+  fails the day that set changes. They are excluded on a real argument (a cloud
+  adapter holds no local handles, so "the model segment 2 renders with" is not
+  a question it can answer) -- whether BeatSession should demand an identity
+  from an engine with no residency is a design call, not a missing method.
+  **`word_razzle` is a CLOUD i2v engine that `tmp/_w45_make_profiles.py` wrongly
+  carried in the LOCAL campaign roster.** The real local set is 18, not 19.
+
+**3. THE CAMPAIGN HAS BEEN COUNTING THE WRONG FOLDER SINCE LAUNCH.**
+  `still_motion` came back `exit=0 obs_new=0 grade=no_ledger` -- while a
+  finished 48.9 MB episode
+  (`signal_lost_waves_of_innovation_20260729_073620_..._final.mp4`) sat in the
+  real obs folder, written at 07:44:05 by that very leg. `tmp/_w45_campaign.ps1`
+  counted `C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\output\otr\{obs,
+  episodes}`, which the headless runner never writes to: it boots ComfyUI with
+  `--output-directory C:\Users\jeffr\Documents\ComfyUI\output`. So obs_new AND
+  grade were measured against a directory nothing in this campaign touches, and
+  every leg -- including the successful one -- read as "produced nothing".
+  Roots corrected. **The watchdog read those same numbers to decide what to
+  re-run**, so this was not merely misreporting: it would have re-run a leg
+  that had already succeeded and spent a retry pass proving it. The watchdog's
+  criterion is now the runner's EXIT CODE, with the reasoning written at the
+  function; obs_new is trustworthy for reporting from here on but stays out of
+  the re-run decision. Watchdog restarted on the fixed script (it had loaded
+  the old one at launch); the campaign process was left running untouched.
+
+**THE PIPELINE WORKS END TO END.** That is what `still_motion` proves, and it
+is the first thing in this block that is live-proven rather than suite-proven.
+
+GATE: suite 7786 passed / 130 skipped / 1 xfailed; Bible 17; `build_variants --check` 11 variants 0 failures;
+`validate_workflow_links --strict-types` 0 violations; hygiene clean on all
+thirteen touched files; B7 forbidden sweep + scope + cleanup-model-id +
+source-snapshot green with the files STAGED. Mutation `tmp\_sid_mutate.py`:
+**10 killed, 1 equivalent-by-design, 0 skipped of 11.**
+  The FIRST mutation round left FIVE survivors and every one was the same
+  defect: the gate's assertions could be weakened and nothing noticed, because
+  a gate that only ever sees passing input cannot tell whether it would reject
+  anything -- `assert hasattr(engine, "name")` passes for all 31 engines
+  exactly as happily as the real condition. Fixed by moving each PROPERTY into
+  one predicate (`gate_would_accept`, `identity_is_stable`) used by BOTH the
+  roster sweep and a control driving a fake built to fail it, plus a real-file
+  test of `_weight_receipt` -- which the roster sweep can never reach off-box,
+  because the weights are absent and the receipt short-circuits to a named
+  absence before it ever stats anything. The surviving S10 is documented as
+  equivalent in the mutation script, with S11 present to prove the redundancy
+  it exploits is real coverage.
+
 ## 2026-07-29 -- WINDOW CODER -- WIRE-W4e + P5 REPAIR COMPLETENESS (both found by the live campaign)
 Did: fixed the two bugs the 45-word run actually surfaced, plus one hygiene
 defect the run did not surface and a test did.
