@@ -3,6 +3,101 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD cb6fafc7 (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
+Did: four green pushed chunks -- the operator's motion-floor ruling, WIRE-W3b,
+  WIRE-W4a and WIRE-W4b.
+  **`2d20d915` THE MOTION FLOOR + THE CREDITS EXCEPTION.** Operator ruling:
+  video for every beat, and if an engine's minimum is four seconds then render
+  four seconds. AUDITED: that behaviour has been shipped since 2026-07-25 --
+  partition_beat renders the smallest legal length at or above the target and
+  trims, so all 31 engines cover a 1 s beat with real video and google_veo
+  renders 100 frames (4.0 s) and trims 75. Nobody had written it down, and one
+  `allow_tail_trim=False` on a future video adapter would silently reopen the
+  still floor, so tests/test_motion_floor_roster.py is now the roster gate that
+  fails BY NAME. The CREDITS question is CLOSED by the operator's own words (a
+  still, a ping-pong or plain black is fine) -- no eyeball owed, no work queued,
+  and "never credits-over-black" is relaxed. Kibitz r1 also found that the
+  first-ever live green episode was `{"still_flat": 7}` -- seven dead-flat
+  stills that passed every gate we own. Not a defect (still_flat is a declared
+  still route) but **nobody may cite that leg as proof the VIDEO lanes work.**
+  **`439ce8c7` WIRE-W3b** -- wan_ti2v's session plus the ping-pong NARROWING.
+  The mirror-extend stays on the single-clip path (the shipped 8 GB tier,
+  PBUG-20260723-02) and is forbidden inside a coverage plan, because the pad
+  wears the right frame count: a render that did not happen passes
+  render_driver's `got != segment.render_frames` gate wearing the number of one
+  that did. Discriminator is `prepared["session_ctx"]["multi_clip"]`, the only
+  honest one available -- a planned segment's REQUEST is shaped exactly like a
+  single-clip beat's. Brought eng_ltx_8gb's B4 pipeline invariant with it (a
+  decode that returns a different count than the ask now RAISES), which
+  immediately caught that test_wan_recipe_freeze's own fake decoder had been
+  emitting 4 frames for a 33-frame ask since it was written -- that file had
+  been exercising the PAD on every render. native_frame_count +
+  extension_mode now ride every WAN receipt into the manifest.
+  **The r3 warning about the budget was real and load-bearing:** the cost
+  model's `overhead` is "the resident model + fixed buffers", so hoisting the
+  UNET moves those GB out of *free* before `_floor_length` reads it and the
+  same weights get charged twice -- MotionBudgetError would refuse renders that
+  fit. prepare() now MEASURES the hoist (free VRAM either side of the loader
+  graph) and hands the delta to every segment. Without that the session half
+  BREAKS the lane it fixes. Mutation 16/16.
+  **`5a1ee2de` WIRE-W4a** -- all four HuMo tiers get a beat session. The hoist
+  is WIDER than the WAN lanes (UNET + LoRA + umt5 + VAE + whisper) and that is
+  a property of the family: HuMo renders FULLY RESIDENT by contract (BUG-265),
+  so hoisting changes how many times a loader is READ, not how much is held.
+  **The reclaim is the other half and neither works alone:** the LOUD
+  reclaim_idle_models exists "so the resident stack drops back down before the
+  NEXT SOAK BEAT starts", and run between two segments of ONE beat it would
+  detach(unpatch_all=True) the very handles prepare hoisted -- load count still
+  reads 1 while the weights bounce to CPU and back. Skipped between segments,
+  run once at teardown. Mutation 16/16.
+  **`cb6fafc7` WIRE-W4b** -- a lip-synced segment is driven by its OWN audio.
+  Every segment used to get the WHOLE beat's slice, so a 3-segment HuMo beat
+  rendered three clips all lip-syncing to the same waveform FROM THE TOP: the
+  assembled beat said the opening of the line three times, and nothing caught
+  it because every clip had the right frame count and the right still. The
+  arithmetic is `coverage_plan.segment_render_window` (pure); render_driver
+  adds the beat's own start_s. It is the RENDER window, not the visible one --
+  a chained successor renders one frame earlier than it contributes, and the
+  visible window would put every chained segment's mouth a frame ahead of its
+  own audio. Mutation 10/10 + 1 documented control.
+Found and recorded, not built: the negative-offset clamp in
+  segment_render_window is a MEASURED mutation CONTROL -- unreachable because
+  validate_coverage_plan already refuses a first segment with a drop_head. Kept
+  anyway; the alternative is a negative ffmpeg seek.
+One test was CORRECTED, not silenced: test_ltx_8gb_session_identity's CONTROL
+  asserted that wan_ti2v alone had no session identity, which made it a control
+  over exactly one engine -- wan_i2v gained one at WIRE-W3a and nothing in that
+  file noticed. It now asserts the whole SET against a named list carrying the
+  chunk that added each entry, and it fired correctly at W4a.
+Current step: **WIRE-W7 -- mouth-still ownership.** r3's MUST-FIX 11: no W1-W6
+  step enforces the operator's three rulings, and an unowned ruling silently
+  lapses. Needs an explicit OWNER (verify in otr_meta_brief_image_prompt.py,
+  otr_image_director.py, otr_image_gen_dispatcher.py) plus LEDGER-LEVEL
+  CARDINALITY CHECKS before build. Surface already mapped this session: image
+  rows carry `kind` / `object_id` / `char_id` / `beat_id`; a RADIO face is
+  identifiable by `object_id == "radio_host_portrait"`, `object_id.endswith(
+  "_radio_face_169")` or `kind == "scene_open"` (see
+  otr_image_gen_dispatcher.resolve_object_seed:141-153, which already special-
+  cases exactly those three); a HUMAN face is `kind == "portrait"` with a
+  char_id in the cast. The three live radio styles are console_face /
+  ltx_radio_mouth / radio_object (_RADIO_HOST_STYLES,
+  otr_meta_brief_image_prompt:282). ShotLock is the natural owner -- it already
+  stamps the coverage plan and runs before build.
+Next: WIRE-W7 -> WIRE-W5 (the grader; it must grade SOURCE COMPONENTS BEFORE
+  OVERLAYS -- kibitz r1 proved a whole-frame motion check passes a frozen
+  backdrop because the overlay moves, test_credits_roll_spec.py:446-470 -- and
+  it can now read native_frame_count/extension_mode off the manifest to reject
+  a ping-ponged clip on a lane claiming real multi-clip). THEN the 45-word run
+  over all 18 local video/still engines, which is the operator's stated first
+  priority and the only thing that proves any of this.
+**NOTHING IN THIS BLOCK IS LIVE-PROVEN. Suite and contract only.**
+Suite 7551 -> 7665 passed / 36 skipped / 1 xfailed across the four chunks;
+  Bible 17 throughout; build_variants --check 11 variants / 0 failures;
+  validate_workflow_links 0 violations; canonical 9872624A byte-identical at
+  every commit -- no node, widget, link or schema touched.
+Models: Claude (rung 4) only. No Codex spend -- two-strikes never fired.
+Commits: 2d20d915, 439ce8c7, 5a1ee2de, cb6fafc7 (+ this handoff).
+
 ## 2026-07-29 -- HEAD 3e89d6b2 (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
 Did: **WIRE-W3a `3e89d6b2`** -- wan_i2v's beat session. session_identity() and
   the UNET-only hoist in ONE commit, because codex's r3 warning is real: the
