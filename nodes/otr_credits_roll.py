@@ -20,9 +20,15 @@ Hard contracts:
   CreditsDataError before mux. Only probe fields ([SYSTEM]/VRAM) and pure in-world
   flavor text may be soft; frozen story facts (spine/news) are omitted-if-absent,
   never a quiet "(not recorded)".
-- LOOK CONTRACT (operator 2026-06-17): the backdrop under the console is the LAST
-  drama clip LOOPED (plan_backdrop), darkened; the radial console panel is
-  composited at partial alpha so the clip ghosts through (never credits-over-black).
+- LOOK CONTRACT (operator 2026-06-17, amended by the 2026-07-28 wiring arc):
+  the backdrop under the console is the drama's LAST FRAME, held and darkened;
+  the radial console panel is composited at partial alpha so it ghosts through
+  (never credits-over-black). It was the last drama CLIP looped until
+  2026-07-29 -- that read the clip manifest, and an all-mesh_stage episode has
+  no file clip in it, so the terminal node refused a finished episode. The
+  frame now comes from this node's own input video (`extract_final_frame`),
+  which `otr_silent_composite` has already flattened every clip into. HELD
+  rather than looping is a visible change and is flagged for an eyeball.
 """
 from __future__ import annotations
 
@@ -1145,23 +1151,55 @@ def compute_credits_duration_s(roll_px: int, view_h: int,
     return (round(dur, 3), eff)
 
 
-def plan_backdrop(clip_manifest: dict) -> dict:
-    """LOOK CONTRACT (operator 2026-06-17 / BUG-410): the console rides over the
-    LAST existing drama clip, LOOPED. RAISES when the manifest has no usable clip
-    (credits-over-black is a bounce)."""
-    # Exclude DIRECTORY clips (3D mesh_stage writes a frame directory, not an
-    # mp4): ffmpeg `-stream_loop -1 -i <dir>` would crash. kibitz R3. (not-isdir
-    # keeps non-existent fixture paths usable while rejecting real directories.)
-    rows = [r for r in ((clip_manifest or {}).get("clips") or [])
-            if isinstance(r, dict) and r.get("exists") and r.get("path")
-            and not os.path.isdir(str(r.get("path")))]
-    if not rows:
+def extract_final_frame(video_path: str, out_png: str) -> str:
+    """The backdrop: the BODY VIDEO's own final frame, frozen.
+
+    REPLACES ``plan_backdrop`` (2026-07-29, WIRE-W6), which hunted the clip
+    manifest for the last loopable FILE clip and raised when it found none.
+
+    THE DEFECT THAT KILLED: it excluded DIRECTORY clips, because ffmpeg
+    ``-stream_loop -1 -i <dir>`` crashes -- and ``mesh_stage`` writes a frame
+    directory rather than an mp4. So an episode rendered ENTIRELY by mesh_stage
+    had no file clip at all, and the terminal node of the graph refused the
+    whole finished episode. It rendered 7 of 7 shots and published nothing. Not
+    a regression -- true since 2026-07-03, and found by the 2026-07-28
+    engine-coverage campaign.
+
+    THE FIX IS TO STOP LOOKING THERE. ``otr_silent_composite`` has ALREADY
+    flattened every directory clip into the assembled body video by the time
+    this node runs, so the body video is a complete, always-present, always-mp4
+    record of the same pixels -- and it is already this node's own input. One
+    source instead of two. CreditsRoll no longer knows what a directory clip
+    is, and cannot be broken again by a new clip KIND it has never heard of.
+
+    LOOK DELTA, STATED PLAINLY BECAUSE IT IS VISIBLE: the operator's 2026-06-17
+    contract said the console rides over the last drama clip LOOPED. It now
+    rides over that clip's final frame HELD. Still drama, still darkened, still
+    never black -- but motionless for the length of the roll. Ratified in the
+    2026-07-28 wiring arc (r3, unamended by r4); flagged here for an eyeball
+    because a panel cannot judge how a 52-second held frame reads.
+
+    ``-sseof -3`` seeks three seconds from the END and takes the last frame
+    that decodes, which is robust on a container whose duration metadata is
+    approximate. RAISES: a body video whose final frame cannot be read is not
+    a presentation problem, it is an unreadable body.
+    """
+    cmd = [_ffmpeg_bin(), "-y", "-sseof", "-3", "-i", video_path,
+           "-update", "1", "-frames:v", "1", "-q:v", "2", out_png]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(out_png) \
+            or os.path.getsize(out_png) == 0:
+        # A very short body may have nothing 3s from the end; take frame 0.
+        r = subprocess.run(
+            [_ffmpeg_bin(), "-y", "-i", video_path,
+             "-update", "1", "-frames:v", "1", "-q:v", "2", out_png],
+            capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(out_png) \
+            or os.path.getsize(out_png) == 0:
         raise CreditsDataError(
-            "clip manifest has no loopable (file) clip to ride under the credits "
-            "console (look contract: credits-over-black / directory clip is a bounce)")
-    if any(r.get("start_s") is not None for r in rows):
-        return max(rows, key=lambda r: float(r.get("start_s") or 0.0))
-    return rows[-1]
+            "could not extract a backdrop frame from the body video %r "
+            "(rc=%s): %s" % (video_path, r.returncode, (r.stderr or "")[-500:]))
+    return out_png
 
 
 # =========================================================================== #
@@ -1242,7 +1280,12 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
         fade_out_st = max(0.0, dur - _FADE_OUT_S)
         cmd = [
             _ffmpeg_bin(), "-y",
-            "-stream_loop", "-1", "-i", backdrop_path,
+            # The backdrop is a STILL (the body video's frozen final frame --
+            # see `extract_final_frame`), so it is looped like the other two
+            # image inputs rather than `-stream_loop`ed like a clip. It still
+            # feeds the same scale/crop/darken chain below, so the console's
+            # look is unchanged apart from the frame being held.
+            "-loop", "1", "-framerate", f"{fps}", "-i", backdrop_path,
             # base + scroll are STILLS: they MUST be looped image inputs at the clip
             # fps so each carries an advancing per-frame timestamp. Fed as a plain
             # `-i <png>` they are a SINGLE frame at t=0, so the col-3 crop y-expr
@@ -1350,35 +1393,78 @@ class OTRCreditsRoll:
             raise CreditsDataError(
                 f"clip_manifest_json unparseable: {exc}") from exc
 
+        # ---- TERMINAL: the body, and the TRUTH the card is a view of ------ #
+        #
+        # THE BOUNDARY (wiring arc r4/A7, 2026-07-29). This node is the LAST
+        # one in the graph, so everything it raises costs a whole rendered
+        # episode. But it may not simply never fail, because the standing
+        # policy is that the card is a VIEW OF THE DURABLE LEDGER, not the
+        # ledger: a record may never elide. So the two halves are split.
+        #
+        # Above this line is TRUTH. An unreadable body, a malformed manifest,
+        # a ledger missing a receipt the card is obliged to show -- these stay
+        # terminal, and `build_credits_layout` keeps raising exactly as it did.
+        # Degrading here would publish an episode whose credits silently claim
+        # less than the build actually knows, which is the one failure this
+        # card exists to prevent.
         led = get_ledger()
         vp = _probe_video(video_path)
         w = vp["w"] or 1920
         h = vp["h"] or 1080
         layout = build_credits_layout(led.data, w=w, h=h, manifest=manifest)
-        backdrop = plan_backdrop(manifest)
 
         base, ext = os.path.splitext(video_path)
         credits_clip = base + "_credits" + (ext or ".mp4")
+        backdrop_png = base + "_credits_backdrop.png"
         out = base + "_with_credits" + (ext or ".mp4")
 
-        tail_s = render_credits_clip(
-            layout, str(backdrop["path"]), credits_clip,
-            w=w, h=h, fps=vp["fps"])
-        append_credits(video_path, credits_clip, out)
+        # ---- PRESENTATION-ONLY: everything that makes GLASS ---------------- #
+        #
+        # Below this line is glass. Frame extraction, the dim/overlay, the
+        # console composition and its encode all produce a PICTURE of truth
+        # already established above. If any of them fails, the honest outcome
+        # is the finished episode WITHOUT a credits tail plus a receipt saying
+        # so -- never the loss of the episode. `declared_credits_tail_s` goes
+        # to 0.0 so the downstream mux's credits-aware guard is told the truth
+        # about what it is receiving, and the report carries ok=False with the
+        # reason rather than a cheerful default.
+        try:
+            extract_final_frame(video_path, backdrop_png)
+            tail_s = render_credits_clip(
+                layout, backdrop_png, credits_clip, w=w, h=h, fps=vp["fps"])
+            append_credits(video_path, credits_clip, out)
+        except Exception as exc:                      # noqa: BLE001 -- see above
+            log.error(
+                "[OTR_CreditsRoll] PRESENTATION FAILURE -- returning the "
+                "finished body with NO credits tail rather than losing the "
+                "episode: %s", exc)
+            return (video_path, 0.0, json.dumps({
+                "ok": False, "declared_credits_tail_s": 0.0,
+                "credits_rendered": False,
+                "reason": "presentation_failure",
+                "error": str(exc)[:500],
+                "hero": layout["hero"], "output": video_path},
+                ensure_ascii=True))
+        finally:
+            try:
+                os.remove(backdrop_png)
+            except OSError:
+                pass
 
         report = json.dumps({
             "ok": True, "declared_credits_tail_s": round(tail_s, 3),
+            "credits_rendered": True,
             "hero": layout["hero"], "cols": [len(layout["col1"]),
                                              len(layout["col3_flow"])],
-            "backdrop_shot": backdrop.get("shot_id"), "output": out},
+            "backdrop_source": "body_final_frame", "output": out},
             ensure_ascii=True)
-        log.info("[OTR_CreditsRoll] appended %.1fs console (hero=%r backdrop=%s) "
-                 "-> %s", tail_s, layout["hero"], backdrop.get("shot_id"), out)
+        log.info("[OTR_CreditsRoll] appended %.1fs console (hero=%r backdrop="
+                 "body final frame) -> %s", tail_s, layout["hero"], out)
         return (out, float(tail_s), report)
 
 
 __all__ = [
     "OTRCreditsRoll", "CreditsDataError", "build_credits_layout",
-    "compute_credits_duration_s", "plan_backdrop", "render_static_base",
+    "compute_credits_duration_s", "extract_final_frame", "render_static_base",
     "render_scroll_canvas", "render_credits_clip", "append_credits",
 ]

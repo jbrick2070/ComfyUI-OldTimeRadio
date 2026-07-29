@@ -422,8 +422,10 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         # real clip. NOTE (credits enrichment 2026-07-03): this fills only to the
         # MASTER length; the credits POST-ROLL past the master (the old BUG-410
         # floor-extend) is GONE -- the unified credits roll is now a SILENT tail
-        # appended LATE by OTR_CreditsRoll, which reproduces this looped-last-clip
-        # backdrop via plan_backdrop.
+        # appended LATE by OTR_CreditsRoll. It used to reproduce this
+        # looped-last-clip backdrop by re-reading the clip manifest; since
+        # 2026-07-29 (WIRE-W6) it freezes the final frame of the body video
+        # THIS function assembles, so the manifest has exactly one reader.
         tail_n = int(target_total_frames) - cursor
         _clip_rows = [r for r in rows if r.get("exists") and r.get("path")]
         if positioned:
@@ -768,9 +770,10 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         # scrolled in silence after the closing theme (the second "credits
         # organ", Fable BUILD-BREAKER #2). Under the silent-tail model the
         # unified credits roll is appended LATE as a SILENT tail by
-        # OTR_CreditsRoll (which reproduces the looped-last-clip backdrop via
-        # plan_backdrop and DECLARES its duration to the credits-aware mux
-        # guard). The composite now ends at the MASTER length -- no floor-extend.
+        # OTR_CreditsRoll (which since 2026-07-29 rides over the FROZEN FINAL
+        # FRAME of the body this function assembles, and DECLARES its duration
+        # to the credits-aware mux guard). The composite now ends at the MASTER
+        # length -- no floor-extend.
     segments, total = plan_timeline_segments(
         manifest, floor_available=floor_ok, floor_frames=floor_frames,
         target_total_frames=target_total, fps=fps)

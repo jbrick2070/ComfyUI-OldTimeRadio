@@ -64,10 +64,16 @@ def test_the_error_leaf_imports_nothing_from_this_package():
                 "render_errors must stay a dependency leaf; it imports %r"
                 % (node.module,))
         elif isinstance(node, ast.Import):
-            for alias in node.names:
-                assert alias.name in ("os", "sys"), (
+            # Loop var named `imp`, NOT `alias`: the B7 forbidden sweep flags
+            # `alias` as a runtime identifier marker (CW-6 gotcha). It only
+            # sees TRACKED files, so this cost a red HEAD -- the sweep passed
+            # while the file was still untracked and failed the moment it
+            # landed. A new test file is inside the sweep's blast radius the
+            # commit AFTER you write it.
+            for imp in node.names:
+                assert imp.name in ("os", "sys"), (
                     "render_errors must stay a dependency leaf; it imports %r"
-                    % (alias.name,))
+                    % (imp.name,))
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ fields ([SYSTEM]/VRAM) degrade.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import logging
 import subprocess
@@ -337,34 +338,60 @@ def test_duration_is_scroll_driven_with_speedup_and_static():
 
 
 # --------------------------------------------------------------------------- #
-# Backdrop -- looped last clip (look contract)
+# Backdrop -- the BODY VIDEO's frozen final frame (WIRE-W6, 2026-07-29)
 # --------------------------------------------------------------------------- #
-def test_backdrop_is_last_existing_clip_never_black():
-    manifest = {"clips": [
-        {"shot_id": "s0", "path": "a.mp4", "exists": True},
-        {"shot_id": "s2", "path": "b.mp4", "exists": True}]}
-    assert cr.plan_backdrop(manifest)["shot_id"] == "s2"
-    with pytest.raises(cr.CreditsDataError):
-        cr.plan_backdrop({"clips": [{"path": "", "exists": False}]})
-    with pytest.raises(cr.CreditsDataError):
-        cr.plan_backdrop({})
+def _backdrop_png(path, size=(1280, 720)):
+    """A still standing in for the body video's extracted final frame."""
+    from PIL import Image
+    Image.new("RGB", size, (40, 44, 52)).save(str(path))
+    return path
 
 
-def test_backdrop_excludes_directory_clips(tmp_path):
-    """kibitz R3: a 3D frame-DIRECTORY clip must NOT be chosen as the loop
-    backdrop (ffmpeg -stream_loop -i <dir> crashes). Pick the file instead;
-    raise if the only clip is a directory."""
-    d = tmp_path / "frames_dir"
-    d.mkdir()
-    f = tmp_path / "clip.mp4"
-    f.write_bytes(b"x")
-    manifest = {"clips": [
-        {"shot_id": "s0", "path": str(f), "exists": True},
-        {"shot_id": "s1", "path": str(d), "exists": True}]}   # dir is "last"
-    assert cr.plan_backdrop(manifest)["shot_id"] == "s0"       # the file, not the dir
-    with pytest.raises(cr.CreditsDataError):
-        cr.plan_backdrop({"clips": [
-            {"shot_id": "s1", "path": str(d), "exists": True}]})
+def test_plan_backdrop_is_GONE_not_merely_unused():
+    """It hunted the clip manifest for a loopable FILE clip and raised when it
+    found none -- which is why an all-``mesh_stage`` episode (frame
+    DIRECTORIES, no mp4) could render 7 of 7 shots and then be refused by the
+    terminal node of its own graph.
+
+    The backdrop comes from the body video now, so the manifest search has no
+    remaining caller. Leaving it importable would leave a SECOND backdrop
+    authority in the file for someone to wire back up -- the shape this build
+    has paid for repeatedly. Deleted, and asserted deleted.
+    """
+    assert not hasattr(cr, "plan_backdrop")
+    assert "plan_backdrop" not in cr.__all__
+
+
+@needs_ffmpeg
+def test_the_backdrop_comes_from_the_body_video_itself(tmp_path):
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 2.0, size="1280x720")
+    png = tmp_path / "bd.png"
+    cr.extract_final_frame(str(body), str(png))
+    assert png.exists() and png.stat().st_size > 0
+    from PIL import Image
+    assert Image.open(png).size == (1280, 720)
+
+
+@needs_ffmpeg
+def test_a_body_of_only_a_few_frames_still_yields_a_backdrop(tmp_path):
+    """`-sseof -3` finds nothing to decode on a body shorter than the seek, so
+    the extractor falls back to frame 0. A short episode must not lose its
+    credits over an ffmpeg seek that had nothing to seek to."""
+    body = tmp_path / "tiny.mp4"
+    _silent_video(body, 0.2, size="640x360")
+    png = tmp_path / "bd.png"
+    cr.extract_final_frame(str(body), str(png))
+    assert png.exists() and png.stat().st_size > 0
+
+
+def test_an_unreadable_body_is_TERMINAL_at_the_extractor(tmp_path):
+    """A body whose frame cannot be read is not a presentation problem -- there
+    is no picture to make and no episode to hand back either."""
+    bad = tmp_path / "not_a_video.mp4"
+    bad.write_bytes(b"this is not an mp4")
+    with pytest.raises(cr.CreditsDataError, match="backdrop frame"):
+        cr.extract_final_frame(str(bad), str(tmp_path / "bd.png"))
 
 
 # --------------------------------------------------------------------------- #
@@ -391,8 +418,7 @@ def test_scroll_canvas_grows_with_transcript():
 # --------------------------------------------------------------------------- #
 @needs_ffmpeg
 def test_console_clip_renders_silent_and_declares_duration(tmp_path):
-    backdrop = tmp_path / "clip.mp4"
-    _silent_video(backdrop, 1.0)                        # short -> must loop
+    backdrop = _backdrop_png(tmp_path / "bd.png")       # a HELD frame now
     out = tmp_path / "credits.mp4"
     dur = cr.render_credits_clip(_layout(), str(backdrop), str(out),
                                  w=1280, h=720, fps=25.0)
@@ -404,9 +430,8 @@ def test_console_clip_renders_silent_and_declares_duration(tmp_path):
 @needs_ffmpeg
 def test_append_extends_body_and_stays_silent(tmp_path):
     body = tmp_path / "body.mp4"
-    backdrop = tmp_path / "clip.mp4"
     _silent_video(body, 2.0, size="1280x720")
-    _silent_video(backdrop, 1.0, size="1280x720")
+    backdrop = _backdrop_png(tmp_path / "bd.png")
     credits = tmp_path / "credits.mp4"
     dur = cr.render_credits_clip(_layout(), str(backdrop), str(credits),
                                  w=1280, h=720, fps=25.0)
@@ -425,8 +450,7 @@ def test_col3_text_scrolls_even_for_short_episode(tmp_path):
     and assert two in-scroll times differ -- for the SHORT fixture transcript."""
     import hashlib
     from PIL import Image
-    backdrop = tmp_path / "clip.mp4"
-    _silent_video(backdrop, 1.0, size="1280x720")      # constant gray
+    backdrop = _backdrop_png(tmp_path / "bd.png")      # constant flat colour
     out = tmp_path / "credits.mp4"
     dur = cr.render_credits_clip(_layout(), str(backdrop), str(out),
                                  w=1280, h=720, fps=25.0)
@@ -453,8 +477,7 @@ def test_scroll_still_inputs_are_looped_timed(monkeypatch, tmp_path):
     `t`) was frozen at y=0 = the blank top pad. They MUST be LOOPED, fps-timed image
     inputs so `t` advances. Capture the render argv and assert `-loop 1 -framerate`
     precedes each still input -- a guard the fade-masked motion test above missed."""
-    backdrop = tmp_path / "clip.mp4"
-    _silent_video(backdrop, 1.0)                       # real ffmpeg, BEFORE the patch
+    backdrop = _backdrop_png(tmp_path / "bd.png")
     seen = {}
     real_run = cr.subprocess.run
 
@@ -931,3 +954,130 @@ def test_abridging_never_mutates_the_callers_layout():
     cr._abridge(lay, ["FRAMES:", "VRAM:"])
     after = [r[0] for k, b in lay["col1"] if k == "grid" for r in b["rows"]]
     assert before == after
+
+
+# --------------------------------------------------------------------------- #
+# WIRE-W6 -- the failure boundary: TRUTH is terminal, GLASS degrades
+# --------------------------------------------------------------------------- #
+#
+# This node is the LAST in the graph, so anything it raises costs a whole
+# rendered episode. It still may not be incapable of failing, because the
+# standing policy is that the card is a VIEW of the durable ledger: a record
+# may never elide. r4/A7 drew the line -- an unreadable body, a malformed
+# manifest and missing ledger TRUTH stay terminal; everything that merely makes
+# a PICTURE degrades to "the finished episode, no credits tail, and a receipt
+# that says so".
+
+
+def _roll_ledger(monkeypatch, data=None):
+    """Point the node's `get_ledger()` at a fixture ledger."""
+    from nodes import production_ledger as pl
+
+    class _L:
+        pass
+
+    led = _L()
+    led.data = _led() if data is None else data
+    monkeypatch.setattr(pl, "get_ledger", lambda: led)
+    return led
+
+
+@needs_ffmpeg
+def test_a_presentation_failure_returns_the_EPISODE_with_a_zero_tail(
+        tmp_path, monkeypatch):
+    """The whole point of the boundary. The console failed to compose; the
+    episode is finished and sitting on disk. Hand it back."""
+    _roll_ledger(monkeypatch)
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 1.0, size="1280x720")
+
+    def _explode(*_a, **_k):
+        raise RuntimeError("libx264 fell over")
+
+    monkeypatch.setattr(cr, "render_credits_clip", _explode)
+    out, tail, report = cr.OTRCreditsRoll().roll(
+        str(body), json.dumps({"clips": []}))
+
+    assert out == str(body), "the finished episode must be handed back as-is"
+    assert tail == 0.0, (
+        "the mux's credits-aware guard must be told there is NO tail; a "
+        "non-zero declaration here would make it reserve time for a console "
+        "that was never appended")
+    rep = json.loads(report)
+    assert rep["ok"] is False and rep["credits_rendered"] is False
+    assert rep["reason"] == "presentation_failure"
+    assert "libx264 fell over" in rep["error"]
+
+
+@needs_ffmpeg
+def test_a_backdrop_extraction_failure_is_also_presentation_only(
+        tmp_path, monkeypatch):
+    """Frame extraction sits INSIDE the glass half: the body is readable (it
+    probed fine two lines earlier), we simply could not make a picture."""
+    _roll_ledger(monkeypatch)
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 1.0, size="1280x720")
+    monkeypatch.setattr(cr, "extract_final_frame", lambda *a, **k: (_ for _ in ()).throw(
+        cr.CreditsDataError("no frame")))
+    out, tail, report = cr.OTRCreditsRoll().roll(
+        str(body), json.dumps({"clips": []}))
+    assert out == str(body) and tail == 0.0
+    assert json.loads(report)["ok"] is False
+
+
+def test_a_missing_body_is_TERMINAL(tmp_path, monkeypatch):
+    _roll_ledger(monkeypatch)
+    with pytest.raises(cr.CreditsDataError, match="credits input video missing"):
+        cr.OTRCreditsRoll().roll(str(tmp_path / "nope.mp4"), "{}")
+
+
+@needs_ffmpeg
+def test_a_malformed_manifest_is_TERMINAL(tmp_path, monkeypatch):
+    _roll_ledger(monkeypatch)
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 1.0, size="1280x720")
+    with pytest.raises(cr.CreditsDataError, match="unparseable"):
+        cr.OTRCreditsRoll().roll(str(body), "{not json")
+
+
+@needs_ffmpeg
+def test_missing_ledger_TRUTH_is_TERMINAL_not_degraded(tmp_path, monkeypatch):
+    """The half that must NOT soften. A ledger missing a receipt the card is
+    obliged to show would publish credits claiming less than the build knows --
+    the one failure this card exists to prevent. It raises from
+    build_credits_layout, ABOVE the try, so the glass half never sees it."""
+    hollow = _led()
+    hollow["meta"] = dict(hollow.get("meta") or {})
+    hollow["meta"].pop("episode_title", None)
+    _roll_ledger(monkeypatch, hollow)
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 1.0, size="1280x720")
+    with pytest.raises(cr.CreditsDataError):
+        cr.OTRCreditsRoll().roll(str(body), json.dumps({"clips": []}))
+
+
+@needs_ffmpeg
+def test_an_all_DIRECTORY_episode_now_publishes(tmp_path, monkeypatch):
+    """THE mesh_stage DEFECT, closed.
+
+    An episode rendered entirely by mesh_stage has only frame DIRECTORIES in
+    its clip manifest and no mp4 at all. The old backdrop planner searched that
+    manifest for a loopable file clip, found none, and raised -- so the
+    terminal node refused an episode that had rendered every one of its shots.
+    The manifest is no longer consulted: the backdrop is the body video's own
+    final frame, and the body always exists because it is this node's input.
+    """
+    _roll_ledger(monkeypatch)
+    body = tmp_path / "body.mp4"
+    _silent_video(body, 1.0, size="1280x720")
+    frames_dir = tmp_path / "shot_000_frames"
+    frames_dir.mkdir()
+    manifest = {"clips": [
+        {"shot_id": "s0", "path": str(frames_dir), "exists": True},
+        {"shot_id": "s1", "path": str(frames_dir), "exists": True}]}
+
+    out, tail, report = cr.OTRCreditsRoll().roll(str(body), json.dumps(manifest))
+    rep = json.loads(report)
+    assert rep["ok"] is True and rep["credits_rendered"] is True
+    assert rep["backdrop_source"] == "body_final_frame"
+    assert tail > 0.0 and os.path.exists(out) and out != str(body)
