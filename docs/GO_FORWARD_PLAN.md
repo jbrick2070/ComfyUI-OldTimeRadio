@@ -845,8 +845,8 @@ guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
-## W3b and W4a ARE LANDED AND PUSHED; WIRE-W4b (the per-segment audio slice) is
-## the next line of code.**
+## W3b, W4a and W4b ARE LANDED AND PUSHED; WIRE-W7 (mouth-still ownership) is
+## the next line of code, then WIRE-W5 (the acceptance grader).**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -958,17 +958,41 @@ beats the partitioner splits.
   than re-spelling the loader inputs, and refuses NAMED when the two disagree
   about what this lane loads, or when a hoisted loader produces no handle.
 
-**WIRE-W4b IS THE NEXT LINE OF CODE: the per-segment audio slice.** Today every
-segment of a HuMo beat is handed the WHOLE beat's audio, so a 3-segment beat
-renders three clips all lip-syncing to the same waveform from the top -- the
-assembled beat says the opening of the line three times. `render_driver`
-already owns the slicer (`_slice_master_audio`, cached by
-`slice_cache_key(master_hash, start_s, dur_s)`) and already slices per BEAT at
-`:2200-2270`; W4b narrows `[start_s, dur_s]` to the SEGMENT's window. The
-arithmetic belongs in `coverage_plan` as a pure, CPU-tested helper -- segment
-`i`'s render window is its visible offset MINUS its `drop_head`, for
-`render_frames` at the canvas fps -- because the beat's own `start_s` is the
-only thing `render_driver` should have to add.
+**WIRE-W4b IS LANDED** -- a lip-synced segment is driven by its OWN audio.
+Every segment of a multi-clip beat used to be handed the WHOLE beat's slice, so
+a 3-segment HuMo beat rendered three clips all lip-syncing to the same waveform
+FROM THE TOP: an assembled beat that says the opening of the line three times.
+Nothing caught it, because every clip carried the right frame count and the
+right init image -- only the sound was wrong, and no gate listens.
+
+- The arithmetic is `coverage_plan.segment_render_window(plan, index, fps)` --
+  pure and CPU-tested. `render_driver` adds the beat's own `start_s` and
+  nothing else.
+- **It is the RENDER window, not the visible one, and the difference is exactly
+  `drop_head`.** A chained successor renders one frame EARLIER than it
+  contributes, because its first frame duplicates its predecessor's terminal
+  frame and is dropped at assembly. Give it the visible window and every
+  chained segment's mouth runs a frame ahead of its own audio for the whole
+  clip -- small enough to ship, and wrong on every segment but the first.
+- `trim_tail` deliberately does NOT shorten the window: the adapter renders
+  those frames, so they need audio like any others, and the slice comes from
+  the FROZEN MASTER rather than a per-beat file, so the samples exist. They are
+  discarded at assembly, which is the only reason it is safe for them to carry
+  the next beat's sound.
+- A single-clip beat -- and a one-segment plan -- asks for a byte-identical
+  slice, which is what production renders today.
+- Measured mutation CONTROL, recorded rather than chased: the negative-offset
+  clamp in `segment_render_window` is unreachable, because
+  `validate_coverage_plan` already refuses a first segment carrying a
+  `drop_head`. It stays because the alternative is a negative ffmpeg seek.
+
+**WIRE-W7 IS THE NEXT LINE OF CODE:** mouth-still ownership -- ShotLock as the
+sole cardinality owner, zero or one human face, never inferred from prose. Then
+WIRE-W5, the acceptance grader, which must grade SOURCE COMPONENTS BEFORE
+OVERLAYS (see the panel finding above: a whole-frame motion check passes a
+frozen backdrop because the overlay moves), and can now read
+`native_frame_count`/`extension_mode` off the manifest to reject a ping-ponged
+clip on a lane claiming real multi-clip coverage.
 
 **OPERATOR RULING 2026-07-29 -- THE MOTION FLOOR, AND THE CREDITS EXCEPTION.**
 

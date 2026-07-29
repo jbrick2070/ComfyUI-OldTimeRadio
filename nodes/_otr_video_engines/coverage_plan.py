@@ -504,6 +504,75 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
 # independent derivations are two chances to disagree about one string -- the
 # mirror class chunk 1a collapsed for routing.
 
+def segment_render_window(plan, segment_index, fps):
+    """``(offset_s, duration_s)`` of segment ``segment_index``'s RENDER window,
+    measured from the START OF THE BEAT. Pure; the caller adds the beat's own
+    ``start_s`` to place it on the episode timeline.
+
+    THIS IS THE AUDIO ARITHMETIC (WIRE-W4b, 2026-07-29), and the defect it
+    exists to remove is specific: every segment of a multi-clip beat used to be
+    handed the WHOLE beat's audio, so a 3-segment HuMo beat rendered three
+    clips all lip-syncing to the same waveform from the top -- an assembled
+    beat that says the opening of the line three times. A lip-synced segment
+    has to be driven by the audio under the frames it is actually rendering.
+
+    THE RENDER WINDOW, NOT THE VISIBLE ONE, and the difference is exactly
+    ``drop_head``. A chained successor renders one frame EARLIER than it
+    contributes, because its first frame duplicates its predecessor's terminal
+    frame and is dropped at assembly. Give it the visible window and every
+    chained segment's mouth runs one frame ahead of its own audio for the whole
+    clip -- a lip-sync error small enough to ship and wrong on every segment
+    but the first.
+
+    The last segment's ``trim_tail`` deliberately does NOT shorten the window:
+    the adapter renders those frames, so they need audio like any others, and
+    the caller slices from the FROZEN MASTER rather than from a per-beat file,
+    so the samples exist. They are discarded at assembly, which is the only
+    reason it is safe for them to carry the next beat's sound.
+
+    Raises rather than guessing:
+
+    * an ``fps`` of zero or less -- a window derived from it would be infinite
+      or negative, and "0 fps" is a configuration error, not a duration.
+    * an index the plan does not cover. Indices are the plan's OWN, taken from
+      each segment rather than from enumeration order, because a replayed or
+      hand-built plan reaching here through :meth:`CoveragePlan.from_dict` is
+      never re-checked for dense indices -- and positional trust is what made
+      ``jump_still_requests`` mint one still for two segments.
+    """
+    if plan is None:
+        raise CoveragePlanError(
+            "no coverage plan, so segment %r has no window -- a single-clip "
+            "beat takes the BEAT's window and must not ask for a segment's"
+            % (segment_index,))
+    fps = float(fps or 0)
+    if fps <= 0:
+        raise CoveragePlanError(
+            "a segment window needs a positive fps; got %r" % (fps,))
+    validate_coverage_plan(plan, None)
+    index = int(segment_index)
+    seen = [int(s.index) for s in plan.segments]
+    if index not in seen:
+        raise CoveragePlanError(
+            "segment %d is not in this plan, which covers %r. NO FALLBACK -- "
+            "an out-of-plan index used to read as segment 0 and hand back the "
+            "whole beat's window." % (index, seen))
+    visible_start = 0
+    for segment in plan.segments:
+        if int(segment.index) == index:
+            start = visible_start - int(segment.drop_head)
+            # The clamp is DEFENSIVE and currently unreachable -- a MEASURED
+            # mutation CONTROL (2026-07-29): removing it kills no test, because
+            # `validate_coverage_plan` above already refuses a first segment
+            # carrying a drop_head, and only a first segment could go negative.
+            # It stays because the alternative is a negative ffmpeg seek, and
+            # the validator is one edit away from being the thing that changed.
+            return (max(0, start) / fps, int(segment.render_frames) / fps)
+        visible_start += int(segment.visible_frames)
+    raise CoveragePlanError(                      # pragma: no cover -- unreachable
+        "segment %d passed the membership check and then was not found" % index)
+
+
 #: The ledger ``kind`` every jump-segment still carries. Deliberately NOT a
 #: ``scene_*`` kind: ``render_driver._still_index`` and
 #: ``_still_spine_row_for_beat`` both select scene rows BY BEAT with a

@@ -2245,19 +2245,51 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                       _eng_id, bid, float(start_s), float(dur_s))
         if (start_s is not None and dur_s is not None
                 and float(dur_s) > 0):
+            # PER-SEGMENT, NOT PER-BEAT, ON A MULTI-CLIP BEAT (WIRE-W4b,
+            # 2026-07-29). Every segment used to be handed the WHOLE beat's
+            # slice, so a 3-segment HuMo beat rendered three clips all
+            # lip-syncing to the same waveform from the top -- an assembled
+            # beat that says the opening of the line three times. The window
+            # arithmetic lives in ``coverage_plan.segment_render_window``
+            # (pure, CPU-tested, and it is the RENDER window, so a chained
+            # successor's dropped head frame gets its own audio too); the only
+            # thing this site owns is adding the beat's own ``start_s``.
+            #
+            # It CANNOT raise a beat out of existence: a single-clip beat has
+            # no multi-clip plan and takes the branch below untouched, and a
+            # plan this shot could not describe is a stamp error that the
+            # planner's own validator already refuses upstream.
+            _slice_start, _slice_dur = float(start_s), float(dur_s)
+            _seg_label = ""
+            _seg_plan_raw = shot.get("coverage_plan")
+            if isinstance(_seg_plan_raw, dict) and _seg_plan_raw:
+                try:
+                    from . import coverage_plan as _cp  # type: ignore
+                except ImportError:  # pragma: no cover -- flat test imports
+                    import coverage_plan as _cp  # type: ignore
+                _seg_plan = _cp.CoveragePlan.from_dict(_seg_plan_raw)
+                if _seg_plan.is_multi_clip:
+                    _sfps = int(((ledger or {}).get("video") or {}).get("fps")
+                                or 25) or 25
+                    _off, _len = _cp.segment_render_window(
+                        _seg_plan, int(segment_index or 0), _sfps)
+                    _slice_start = float(start_s) + _off
+                    _slice_dur = _len
+                    _seg_label = " segment %d/%d" % (
+                        int(segment_index or 0), _seg_plan.segment_count)
             # 7.3 slice key: the master CONTENT hash is the cache identity
             # (a new master at the same path invalidates the slice).
             _mhash = str(((ledger or {}).get("audio") or {})
                          .get("master_audio_sha256") or "")
             sliced = _slice_master_audio(master_audio_path,
-                                         float(start_s), float(dur_s),
+                                         _slice_start, _slice_dur,
                                          master_hash=_mhash)
             if sliced:
                 _LOG.info("[OTR.render_driver] per-beat audio: sliced "
-                          "%s @%.3f+%.3fs -> %s (beat %s)",
+                          "%s @%.3f+%.3fs -> %s (beat %s%s)",
                           os.path.basename(master_audio_path),
-                          float(start_s), float(dur_s),
-                          os.path.basename(sliced), bid)
+                          _slice_start, _slice_dur,
+                          os.path.basename(sliced), bid, _seg_label)
                 audio = sliced
             else:
                 _LOG.warning("[OTR.render_driver] per-beat audio slice FAILED "
