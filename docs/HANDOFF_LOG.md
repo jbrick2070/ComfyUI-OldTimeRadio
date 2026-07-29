@@ -3,6 +3,90 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD 69daf4fe (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
+Did: two more green pushed chunks, and the FIRST of them corrects the previous
+  one. Re-reading r4/A4 before starting W7 turned up a deviation I had shipped.
+  **`4cc76806` WIRE-W4c -- the trimmed tail is SILENCE.** The ratified contract
+  is "conditioning WAV duration EQUALS render_frames; copy only the
+  visible_frames source interval and APPEND SILENCE for trim_tail_frames --
+  never speech from the next segment." W4b (cb6fafc7) took the whole
+  render_frames window straight off the master. It LOOKED harmless -- the
+  trimmed frames are discarded at assembly, so nobody sees them -- and it is
+  not, because the AUDIO ENCODER SEES THE WHOLE WAVEFORM before a single frame
+  is sampled: speech from the next beat sitting in the tail conditions the
+  frames that DO survive. On the pinned 184 case that is 2 frames of the next
+  line leaning on a 31-frame take.
+  segment_render_window now returns SegmentAudioWindow(offset_s, copy_s,
+  pad_s); total_s still equals render_frames, which is the generation length
+  and is unchanged. _slice_master_audio grew pad_tail_s and builds `-af apad`
+  plus an OUTPUT `-t` of the total -- the PAIR is the contract, because apad
+  alone never terminates and a bare output -t would just re-cut the source. It
+  fixes the far end for free too: a window running past the END of the master
+  now pads to length instead of emitting a short WAV.
+  **The pad is IN the cache key and SLICER_VERSION moved 2 -> 3.** Two segments
+  can copy the identical source interval and owe different silence, so a key
+  that ignored the pad would serve the first one's WAV to the second; and every
+  WAV already on disk describes the OLD contract for the same (master, start,
+  dur). The slicer also honours OTR_FFMPEG now -- it used the bare literal
+  while otr_credits_roll already honoured the config, so on a box where ffmpeg
+  is configured but not on PATH the credits rendered and the slice silently
+  returned "", which reads downstream as "this beat has no voice line" rather
+  than "this box cannot slice". Mutation 11/11.
+  **`69daf4fe` WIRE-W4d -- the requests are built BEFORE the lease is taken.**
+  r3: "Prebuild and validate all segment requests and audio slices BEFORE
+  entering BeatSession; only terminal-image chaining stays in the render loop."
+  The builder is neither cheap nor pure -- it resolves stills off the ledger
+  and shells out to ffmpeg per segment -- and it was running with the
+  cross-process GPU lease held and a 14B UNET resident, between renders. Every
+  other heavy render on the box blocks its full 120 s acquire behind that. It
+  is also where a bad request SHOULD surface: a builder that raised on segment
+  2 used to do it after two completed renders and a 6 GiB load, and the test
+  now proves prepare() never runs. The chain's terminal-frame substitution
+  stays in the loop by design (segment N's init image is segment N-1's last
+  RENDERED frame). Behaviour is otherwise identical -- same builder, same
+  arguments, same order; only the timing moved. Mutation 4/4.
+Process note worth keeping: BOTH of these came from re-reading the ratified
+  r3/r4 finals before starting the NEXT chunk, not from a test going red. The
+  suite was green on the wrong contract. Re-read the spec at the start of every
+  chunk, not just at the start of the block.
+Two stale test fakes updated, not silenced: the per-beat-audio slice fakes took
+  (path, start, dur, master_hash) and would have failed as a TypeError inside
+  build_request_from_shot -- which presents as "the slice failed", not "this
+  fake is stale". And the two new argv tests isolate the slice CACHE to
+  tmp_path, because the cache lives under the shared episode tmp dir and a
+  second run would take a cache hit, skip ffmpeg, and assert against an argv
+  that was never built.
+Current step: **WIRE-W7 -- mouth-still ownership.** r3 MUST-FIX 11: no W1-W6
+  step enforces the operator's three rulings, and an unowned ruling silently
+  lapses. The house rule is at GO_FORWARD:77 verbatim -- "THE SET SPEAKS BY
+  DEFAULT; A FACE MUST BE OVERHEARD ... One face per episode at most". Surface
+  mapped: image rows carry kind / object_id / char_id / beat_id; a RADIO face
+  is object_id == "radio_host_portrait", object_id.endswith("_radio_face_169")
+  or kind == "scene_open" (otr_image_gen_dispatcher.resolve_object_seed:141-153
+  already special-cases exactly those three); a HUMAN face is kind ==
+  "portrait" with a char_id in the cast. The three live radio styles are
+  console_face / ltx_radio_mouth / radio_object (_RADIO_HOST_STYLES,
+  otr_meta_brief_image_prompt:282). ShotLock is the natural owner: it already
+  stamps the coverage plan, and _assert_family_inputs_satisfiable_cast_time
+  (otr_shot_lock:909) is the per-beat preflight that runs before build. The
+  EPISODE-level cardinality belongs after build_execution_plan (:1256).
+  **NOTE the still_plan schema has NO "bears a mouth" field, and adding a token
+  to those closed enums is explicitly an operator decision, not a coder's** --
+  so W7 should derive the answer from the frozen ROUTE, not extend the schema.
+Next: WIRE-W7 -> WIRE-W5 (grade SOURCE COMPONENTS BEFORE OVERLAYS; it can now
+  read native_frame_count/extension_mode off the manifest) -> the 45-word run
+  over all 18 local video/still engines.
+Filed, not built: the durable slice RECEIPT (source PCM hash, segment index,
+  start sample, sample count, rate/channels, output PCM hash) under the
+  canonical episode directory rather than tmp. Telemetry for W5, not
+  correctness.
+**NOTHING IN THIS BLOCK IS LIVE-PROVEN. Suite and contract only.**
+Suite 7665 -> 7679 passed / 36 skipped / 1 xfailed; Bible 17; build_variants
+  --check 11 variants / 0 failures; validate_workflow_links 0 violations;
+  canonical 9872624A byte-identical at both commits.
+Models: Claude (rung 4) only. No Codex spend -- two-strikes never fired.
+Commits: 4cc76806, 69daf4fe (+ this handoff).
+
 ## 2026-07-29 -- HEAD cb6fafc7 (v2.0-alpha) -- WINDOW CODER (wiring block, cont.)
 Did: four green pushed chunks -- the operator's motion-floor ruling, WIRE-W3b,
   WIRE-W4a and WIRE-W4b.
