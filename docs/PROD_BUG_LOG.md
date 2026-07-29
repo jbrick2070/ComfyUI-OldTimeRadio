@@ -2830,7 +2830,13 @@ out until they independently meet the same production-only admission rule.
   RuntimeError inside one rung of a retry ladder silently cancels the rungs
   below it.** Any bounded-retry design has to classify its own terminal errors
   explicitly, or the budget it advertises is not the budget it spends.
-- status: **OPEN -- diagnosed, not fixed. Live: 1 occurrence in 6 legs.**
+- status: **OPEN -- diagnosed, not fixed. Live: 2 occurrences in 13 legs
+  (`ltx_audio_in` 1450s, `still_word` 1420s -- both ~24 minutes of GPU time
+  spent inside a single P5 base call before the refusal).** Both ran to the
+  full remaining provider capacity (14697 and 14359 output tokens), which is
+  the signature: the model never stops adding lines, and the array's declared
+  `max_length` is the GLOBAL product ceiling rather than this episode's
+  accepted line count, so nothing forces the array closed.
 - **OPERATOR RULING 2026-07-29 (supersedes the "candidates" framing above):**
   "the writer should not be allowed to kill the run, it just needs to fix the
   ledger" -- restated: "the writer should never veto, the writers should keep
@@ -2868,4 +2874,23 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- same portable rule as PBUG-20260729-02, seen from the
   other side: **a bound that refuses is not a budget, it is a veto.** A limit
   on a repair context has to come with the trim that makes the context fit it.
-- status: **OPEN -- diagnosed, parked under the 2026-07-29 operator ruling.**
+- status: **OPEN -- diagnosed, parked under the 2026-07-29 operator ruling.
+  Live: 4 occurrences in 13 legs** -- `mesh_stage` 182s and `viz_camera` 165s
+  (`disposition=repair_owner_exhausted`), `still_flat` 208s (`repair context is
+  16796 bytes, over the hard limit 14336`) and `still_pan` 173s (`alternate
+  repair context is 16735 bytes`). The two measured sizes land within 61 bytes
+  of each other against a fixed 14336 bound, which is the tell: this is not
+  flakiness in the model, it is a repair context that is STRUCTURALLY larger
+  than the budget it must fit. Any leg whose P0 needs a repair at all dies
+  here, so the fast legs (165-208s) are all this bug.
+- **CAMPAIGN-WIDE RATE, 2026-07-29 (the number that should inform when this
+  gets unparked):** across the first 13 legs of the live 45-word run, SEVEN
+  died inside the writer -- 2x PBUG-...-02 and 4x PBUG-...-03 plus one
+  PBUG-...-01 -- against 5 engine-side failures (all since fixed) and ONE leg
+  that produced a finished episode. That is a **54% writer failure rate**, and
+  it is the dominant blocker on the campaign, not the video engines. The narrow
+  fix here (trim the repair context to fit its own bound) is SEPARABLE from the
+  full "writer never vetoes" redesign and is the single highest-yield unblock
+  available; it is not being taken because the operator parked writer work
+  until the engines are proven, and that call stands until the operator changes
+  it. Recorded here so whoever unparks it does not have to re-derive the cost.
