@@ -3,6 +3,47 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD ead920d2 (v2.0-alpha) -- OPERATOR: LEAN-MEAN OFF GO_FORWARD
+**Operator direction, same session as the plan repair below:** "Lean-mean
+should only come after the randomization and the SFX. In fact, maybe just put
+lean-mean back onto the roadmap and not on the go-forward plan." Both halves
+executed.
+
+**GO_FORWARD no longer carries lean-mean in any executable form.** Removed: the
+two "Big blocks" entries (FRONT and TAIL) with renumbering; both lines from the
+Coder queue fence; the CODER D and CODER G packing rows (struck through, gates
+voided, "do not re-add this row" on each); the full `r2 -> r3 -> r4` operator
+pin from the STANDING RE-GROUND GATE; items 5 and 6 of the live-order list;
+CODER F's "after D" gate. The 07-24 rescue paragraph's order line was already
+struck; it now reads "IS NOT ON THIS PLAN AT ALL". Every surviving mention in
+the file is a pointer, a banner, or a struck historical line -- verified by
+grep, 40 hits, none of them a queue position.
+
+**ROADMAP.md is now its only home, and it moved DOWN there too:** order 1 ->
+order 3, behind SFX and product expansion, ahead of RunPod/install and the v2
+release. That last part is deliberate and worth keeping: validating an install
+path and tagging a release against a tree still full of dead code would have to
+be redone after the rip. Section headings renumbered to match the table, and
+GO_FORWARD's nine `ROADMAP.md section 1` cites were changed to a NAME-based
+reference so the next renumber cannot break them.
+
+**NOTHING WAS LOST IN THE MOVE.** The new ROADMAP section carries the FRONT and
+TAIL chunk chains, all six required edges, the full `r2 -> r3 -> r4` operator
+pin with its reasoning, the panel composition and the Fable single-gate, the
+drift-check items that fold into the r2 brief, the W2 MIGRATION-FIRST mandate
+with its `otr_image_director._is_3d_engine:109-119` /
+`tests/test_image_platform_c1.py:339-352` cites and its boundary question, the
+ENGINE_MATRIX W6 sub-step spec, the `1a6ae8f1` do-not-re-delete note, and the
+never-interleave rule. A reader who only ever opens ROADMAP can still run the
+campaign.
+
+**AND ONE DEPENDENCY INVERTED, WHICH IS THE EASY THING TO MISS.** The SFX
+section said it was "parked until the 720-word runway and lean-mean campaign
+land." SFX now runs BEFORE lean-mean, so that sentence was backwards the moment
+the order changed. Fixed with the reversal named explicitly. **When a block
+moves, grep for other sections that declared a dependency ON it -- the moved
+block updates itself; its dependents do not.**
+
 ## 2026-07-29 -- HEAD 078dd2d3 (v2.0-alpha) -- WINDOW RENDER/QA -- PLAN REPAIR
 **A CODING WINDOW OPENED ON LEAN-MEAN. THE PLAN TOLD IT TO.** The operator
 caught it; the doc, not the window, was wrong. Four independent places in

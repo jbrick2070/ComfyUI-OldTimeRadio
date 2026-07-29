@@ -541,6 +541,11 @@ proof of 8 GB fit -- they support the RANKING, which is what selects a recipe.
    should re-ground once against the final tree rather than rip first and
    re-ground after two blocks land on freshly-rewired code. SFX carries its
    Timeline Cue Ledger C0/C1 gate + the R4.1 refit as a precondition.
+   **AMENDED 2026-07-29 (operator): lean-mean is not merely last, it is OFF
+   THIS PLAN.** Both blocks moved to the Lean-mean campaign section of `ROADMAP.md`. This plan's order
+   is now: LOCAL-ENGINE OBS WIRING -> WAN 8-GB -> Randomizer A ->
+   `dynamic_story` -> SFX -> re-observe the parked story bugs. Anything after
+   that is ROADMAP work, and lean-mean is the first item there.
 2. **PROFILES ARE BEING RETIRED.** Operator: there is no tier -- whoever runs
    the workflow picks the creative/technical LLM, and the 8gb/16gb variants
    will be the SAME canonical JSON saved with different dropdowns, with no
@@ -697,19 +702,21 @@ block are CUT -- the operator wants coding, not matrices, and will triage bugs
 as a batch later. ENGINE_MATRIX survives the cut as a W6 sub-step, not a
 standalone chunk. ~~The order is now WAN 8-GB contract -> LEAN-MEAN FRONT ->
 Randomizer A -> `dynamic_story` -> LEAN-MEAN TAIL -> SFX -> re-observe the
-parked story bugs.~~ **THAT ORDER IS SUPERSEDED BY THE OPERATOR DIRECTION
-2026-07-27 in this file: WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX ->
-LEAN-MEAN FRONT -> TAIL. LEAN-MEAN IS LAST, NOT SECOND. And the block that
-runs BEFORE all of them is the LOCAL-ENGINE OBS WIRING block -- see CURRENT
-STEP.** This paragraph's "supersedes the older queue everywhere in this file"
+parked story bugs.~~ **THAT ORDER IS SUPERSEDED TWICE OVER. The live order is:
+LOCAL-ENGINE OBS WIRING -> WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX
+-> re-observe the parked story bugs. LEAN-MEAN IS NOT SECOND AND IS NOT ON THIS
+PLAN AT ALL** -- operator direction 2026-07-29 moved FRONT and TAIL to
+the Lean-mean campaign section of `ROADMAP.md`. This paragraph's "supersedes the older queue everywhere in this file"
 clause was true on 07-24 and is the single most misread line in the document;
 it does not outrank a later operator direction.
 
-Two story-shaped defects are PARKED, not closed (see OPEN BUGS). **And every remaining big block must be RE-GROUNDED by
-a kibitz arc before it executes -- r3+r4 by default, a full r2->r3->r4 for both
-LEAN-MEAN blocks, dropping to r2 anywhere the coding plan itself proves stale.
-See STANDING RE-GROUND GATE. These plans are two weeks old and the tree moved
-under all of them.**
+Two story-shaped defects are PARKED, not closed (see OPEN BUGS).
+
+**And every remaining big block must be RE-GROUNDED by a kibitz arc before it
+executes -- r3+r4 by default, dropping to r2 anywhere the coding plan itself
+proves stale. See STANDING RE-GROUND GATE. These plans are two weeks old and
+the tree moved under all of them.** (The full `r2 -> r3 -> r4` pin on both
+lean-mean blocks travelled with them to `ROADMAP.md`.)
 
 This file contains only go-forward work, open bugs, and standing operator
 contracts. Completed work is NEVER re-described here -- it moves to
@@ -800,7 +807,7 @@ rungs instead of grinding a paid pool dry.**
 | 3 | Codex CLI `gpt-5.6-sol` (high) | weekly credits | The second opinion of record: two-strikes law (mandatory 3rd-attempt panel), sec-16 + r5 extensibility confirm, pre-execution grounding of big blocks, live-failure kibitz, HANDOFF_CODEX grind delegation | Mechanical review agy can do alone. Verify `codex_model_selected.txt` every arc (stale skill cache once drifted to gpt-5.5 mid-arc unnoticed) |
 | 4 | Claude (Cowork, this) | weekly credits | The actual work: planner + coder windows, anchor/judge on every panel, live-run drive | Babysitting renders (the Codex-app overnight monitor owns that); single-small-item windows (batch per the Window packing rules) |
 | 5 | Cloud roundtable (OpenRouter) | real $ | Genuine R1 ideas passes only; <$20 autonomy rule applies | Mechanical/grounding review (that is rungs 2-3) |
-| 6 | Fable | scarce | Single final gate on a lean-mean epoch commit only (section-9 reality exception) | Anything else |
+| 6 | Fable | scarce | Single final gate on a lean-mean epoch commit only (section-9 reality exception) -- and lean-mean is now ROADMAP work, so this rung has NO GO_FORWARD claimant | Anything else |
 
 Production (in-pipeline, all $0/local, offline-first): writers = Mistral-Nemo
 (ctx cap 16384) + `gemma-4-12b` (saved runtime-qualified local default);
@@ -813,8 +820,8 @@ Per-window model mapping:
 
 - RENDER / qualification windows: local production models + the Codex-app
   monitor; Claude only to launch and wrap.
-- CODER windows (quick-wins, lean-mean): Claude codes; rung-1 Qwen triages
-  every failure first; Codex only via the two-strikes law.
+- CODER windows: Claude codes; rung-1 Qwen triages every failure first; Codex
+  only via the two-strikes law.
 - PLANNER window: Claude; the sec-16 + r5 kibitz (codex + agy) is THIS WEEK's
   scheduled Codex spend while both pools are fresh -- it is the operator
   bottleneck on the critical path.
@@ -838,13 +845,15 @@ guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. The wiring arc
-## r1-r4 is CLOSED and the build spec is written; W1 is the next line of code.**
+## r1-r4 is CLOSED and the spec is written; WIRE-W1 is the next line of code.**
 
-**THIS IS NOT LEAN-MEAN.** Any window that opens on lean-mean has read a stale
-list -- see the SUPERSEDED banners on the 2026-07-24 rescope, the Coder queue
-and the CODER D row. The live block order is the OPERATOR DIRECTION 2026-07-27
-above: WAN 8-GB -> Randomizer A -> `dynamic_story` -> SFX -> LEAN-MEAN FRONT ->
-TAIL. **Lean-mean is LAST.**
+**THIS IS NOT LEAN-MEAN, AND LEAN-MEAN IS NOT ON THIS DOCUMENT.** Operator
+direction 2026-07-29 moved LEAN-MEAN FRONT and TAIL to the Lean-mean campaign
+section of `ROADMAP.md`, where they sit behind SFX and product expansion. A
+window that opens on lean-mean has read a stale list -- see the struck-through
+2026-07-24 rescope, and the voided CODER D / CODER G rows. **This plan's order
+is: LOCAL-ENGINE OBS WIRING -> WAN 8-GB -> Randomizer A -> `dynamic_story` ->
+SFX -> re-observe the parked story bugs. There is no lean-mean line in it.**
 
 **WHY THIS STEP EXISTS.** The 45-word engine-coverage campaign ran to
 completion over all 18 LOCAL engines: **11 publish to `otr/obs/`, 6 NO_RENDER,
@@ -907,10 +916,12 @@ a small canvas, not more ladder. NOT a blocker for anything.
 **STILL OWED ON THE GPU LANE, and none of it is remote:** the clamped
 confirmation of ltx recipe v2, then a WAN prequalification sweep (the mechanism
 is built and named on both WAN tiers; no WAN sweep has ever run), then 7d.
-**These do NOT gate the wiring block above -- W1..W5 are code, not GPU time.**
-The block order after the wiring block is the OPERATOR DIRECTION 2026-07-27,
-not the 07-24 list this paragraph used to carry: WAN 8-GB -> Randomizer A ->
-`dynamic_story` -> SFX -> LEAN-MEAN FRONT -> TAIL.
+**These do NOT gate the wiring block above -- WIRE-W1..WIRE-W7 are code, not
+GPU time.** The block order after the wiring block: WAN 8-GB -> Randomizer A ->
+`dynamic_story` -> SFX -> re-observe the parked story bugs. **Lean-mean is not
+in it.** Operator direction 2026-07-29 moved LEAN-MEAN FRONT and TAIL off this
+plan entirely, to the Lean-mean campaign section of `ROADMAP.md`, where they run after the randomizer
+and SFX.
 
 **CARRY FORWARD, and this window is the sixth consecutive proof:** run the
 mutation round even after a QA fan-out clears the change, run the FAN-OUT
@@ -1931,6 +1942,9 @@ the next window cannot repeat it.
 
 Live order:
 
+0. **LOCAL-ENGINE OBS WIRING** (`WIRE-W1..WIRE-W7`) -- THE CURRENT STEP. Arc
+   r1-r4 CLOSED; spec `kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md`
+   as amended by `r4/final.md`.
 1. ~~**WAN 8-GB low-VRAM launch contract**~~ -- DONE @ `f914f0a4`
    (`PBUG-20260723-02`). The live 8-GB requalification leg is still owed and
    belongs to a render window.
@@ -1939,15 +1953,14 @@ Live order:
    rerun the design panels.
 4. **SFX** -- carries the Timeline Cue Ledger C0/C1 gate + the R4.1 refit as a
    precondition.
-5. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
-   W5+SW4 -> C1-C5`), with `docs/ENGINE_MATRIX.md` folded in as a W6 sub-step.
-6. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`).
-7. **Re-observe the parked story bugs** -- after SFX, see whether they still
+5. **Re-observe the parked story bugs** -- after SFX, see whether they still
    occur at that HEAD (see OPEN BUGS).
 
-NOTE the knock-on for the Window packing table: its CODER D / F / G rows still
-carry the 07-24 sequencing ("after A", "after D", "after F"). The BLOCKS are
-right, the ORDER is the list above.
+**AND THAT IS THE END OF GO_FORWARD.** Operator direction 2026-07-29: LEAN-MEAN
+FRONT and LEAN-MEAN TAIL are no longer items 5 and 6 of this list -- they are
+**off this plan**, in the Lean-mean campaign section of `ROADMAP.md`, which is where a window goes
+after the list above is exhausted. The packing table's CODER D and CODER G rows
+are struck through and their gates voided to match.
 
 Standing constraints, unchanged by the rescope: keep the RTX 5080 free for
 ComfyUI; the 4060 Qwen endpoint is a read-only QA reviewer, not a production
@@ -2509,42 +2522,37 @@ leg as evidence; gone -> the LAW-era work already fixed it, tombstone it.
 - **Phase-2 de-naming** (module filenames, `meta[]` ledger keys, wire-schema
   `.v4` literals) -- DEFERRED, operator-flagged, from the keep-6 rename.
 
-## Coder queue (scope live; ORDER SUPERSEDED 2026-07-27)
-
-**READ THIS BEFORE THE FENCE.** The BLOCKS below are right and their per-block
-re-ground gates still bind. **The ORDER is not.** Lean-mean moved LAST by
-operator direction (see OPERATOR DIRECTION 2026-07-27 in this file): **WAN
-8-GB -> Randomizer A -> `dynamic_story` -> SFX -> LEAN-MEAN FRONT -> TAIL.**
-And one block lands AHEAD of every row here and is not in this list at all --
-the LOCAL-ENGINE OBS WIRING block (W1..W5), arc CLOSED, spec at
-`kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md` as amended by
-`r4/final.md`. See CURRENT STEP. **Use the fence for SCOPE ONLY.**
+## Coder queue (operator order 2026-07-27, lean-mean removed 2026-07-29)
 
 One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
 ```text
-WAN 8-GB low-VRAM launch contract        (no re-ground needed: a live 2026-07-23
-                                          defect, not an old plan)
-  -> [r2->r3->r4] LEAN-MEAN FRONT (W0->W1->W2->W3->W4a->W4b->W7->W6->W5+SW4->C1-C5)
-       (operator 2026-07-24: lean-mean starts at r2, NOT r3 -- its coding plan
-        is a file-and-line kill list, the most perishable thing a plan can be;
-        ENGINE_MATRIX.md is a W6 SUB-STEP now, not a standalone chunk)
+LOCAL-ENGINE OBS WIRING (WIRE-W1..WIRE-W7)
+       (arc r1-r4 CLOSED and converged at HEAD -- no re-ground owed;
+        spec = kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md
+        as amended by r4/final.md. THIS IS THE CURRENT STEP.)
+  -> WAN 8-GB low-VRAM launch contract  (no re-ground needed: a live
+                                         2026-07-23 defect, not an old plan)
   -> [r3+r4] Randomizer A
   -> [r3+r4] dynamic_story           (wiring only -- rev-5 DESIGN stays FINAL)
-  -> [r2->r3->r4] LEAN-MEAN TAIL (SW1/SW2/SW3 -> C6 -> C7 -> W8)
-       (same doc, same r2 rule; run its arc when the TAIL opens, not before --
-        every block above edits the very writer this block splits)
   -> [R4.1 refit = its re-ground] SFX campaign (after Timeline Cue Ledger C0/C1)
   -> re-observe the PARKED story bugs; batch-triage whatever is left
+  -> THEN, and only then, ROADMAP.md -- OFF THIS PLAN
+       (its order: SFX -> product expansion -> LEAN-MEAN -> RunPod -> release)
 ```
+
+**LEAN-MEAN FRONT AND TAIL ARE NOT IN THIS QUEUE.** Operator direction
+2026-07-29 moved both to the Lean-mean campaign section of `ROADMAP.md`. That is the whole point of
+their position: a deletion campaign's value IS its file-and-line kill
+inventory, so it re-grounds ONCE against the final tree instead of ripping
+first and re-grounding after every block lands on freshly-rewired code. **Do
+not re-add a lean-mean line to this fence.**
 
 The bracket is the STANDING RE-GROUND GATE below. Every one of these plans was
 written against a tree that no longer exists. Default entry is r3 (wiring);
-drop to r2 if the coding plan itself is wrong; if in doubt, start at r2. **Both
-LEAN-MEAN blocks are pinned to a full r2 -> r3 -> r4 by operator decision --
-their doubt is already settled, do not re-argue it down to r3.** No block
-executes without an r4 convergence at current HEAD.
+drop to r2 if the coding plan itself is wrong; if in doubt, start at r2. No
+block executes without an r4 convergence at current HEAD.
 
 CUT by the operator 2026-07-24 and NOT to be re-derived by a later window: the
 45-word scene matrix, the 54-case visual-style sweep, and the entire
@@ -2561,7 +2569,9 @@ still lives in OPEN BUGS above; everything in it that was a nice-to-have is
 simply not being built. Do NOT re-derive this table from git history.
 
 ONE item survived the cut, folded into LEAN-MEAN W6 as a sub-step rather than
-kept as a standalone chunk:
+kept as a standalone chunk. **It travelled to the Lean-mean campaign section of
+`ROADMAP.md` with that block on 2026-07-29; the spec is reproduced there. Kept
+here only so the record of what the 07-24 cut spared stays complete:**
 
 - **`docs/ENGINE_MATRIX.md`** -- emit from the three live CAPABILITIES
   registries per the existing generator pattern (`build_variants.py`
@@ -2608,53 +2618,29 @@ issues turn up go back to r2; if in doubt, restart at r2.** Concretely:
 - **No block executes without an r4 convergence at current HEAD.** Record the
   run under `kibitz-runs/<date>-<block>-r<N>/` and cite it in the block entry
   below when it lands, so the next window can see how fresh the grounding is.
-- **OPERATOR PIN: both LEAN-MEAN blocks run a FULL `r2 -> r3 -> r4`**, not the
-  r3 default. Their doubt is already settled -- a later window must not
-  re-argue them down to r3 to save a round.
+- **The lean-mean full-`r2 -> r3 -> r4` operator pin MOVED with the block** --
+  it now lives in the Lean-mean campaign section of `ROADMAP.md`, not here. Nothing on THIS plan is
+  pinned below the r3 default.
 - **Credit note:** this is rung 2-3 work (agy is $0; codex is weekly credits).
-  Roughly ten panel rounds across the remaining blocks (2 lean-mean arcs at
-  three rounds each, plus r3+r4 for randomizer and dynamic_story) is a real
-  Codex spend -- front-load it early in a credit week, run the blocks' arcs
-  when their block opens rather than all at once, and never let a stale
-  `codex_model_selected.txt` silently drop an arc to codex-only or to the wrong
-  model.
+  Roughly four panel rounds across the remaining GO_FORWARD blocks (r3+r4 for
+  randomizer and dynamic_story; the wiring block's arc is already spent and
+  SFX's R4.1 refit IS its re-ground) -- front-load it early in a credit week,
+  run each block's arc when that block opens rather than all at once, and never
+  let a stale `codex_model_selected.txt` silently drop an arc to codex-only or
+  to the wrong model. The two lean-mean arcs (three rounds each) are ROADMAP
+  spend now, not GO_FORWARD spend.
 
-### Big blocks (in ROADMAP-ratified order)
+### Big blocks (in operator order, 2026-07-27)
 
-1. **LEAN-MEAN FRONT** (`W0 -> W1 -> W2 -> W3 -> W4a -> W4b -> W7 -> W6 ->
-   W5+SW4 -> C1-C5`) -- `docs/2026-07-10-lean-mean-rip-final.md`, D-1..D-6
-   RATIFIED. **RE-GROUND: FULL `r2 -> r3 -> r4`, pinned by the operator
-   2026-07-24 -- do NOT enter at r3.** The reasoning is the block's own nature:
-   it is a deletion campaign whose entire value IS its file-and-line kill
-   inventory, which is the most perishable thing a plan can carry. Its own
-   header already declares five stale areas, and since it was written the
-   extensibility build added modules, moved the writer tail, and grew the suite
-   past 6,400 -- so the question is not "do the line numbers still point at the
-   right code", it is "is this still the right code to delete". That is an r2
-   question. Existing drift-check items fold into the r2 brief (SW-3
-   news_ingest re-survey, W6 keep-list adds, W7 tombstone re-triage, R-7
-   re-grep; SW-1 writer re-survey waits for the TAIL). ENGINE_MATRIX is now a
-   W6 SUB-STEP, not a separate precondition. Dedicated window; multi-day.
-   SECOND ITEM in the rescoped order, after the WAN 8-GB contract.
-   **W2 CARRIES A NEW MANDATORY FIRST CHUNK (2026-07-25 consult, codex
-   `gpt-5.6-sol` high + Claude judge; record
-   `docs/2026-07-25-dormant-3d-rip-judgment.md`).** The operator asked whether
-   the dormant 3D talkers should be ripped; the answer is YES and W2 already
-   said so ("delete, NOT keep-dark"), so nothing was re-litigated. But a LIVE
-   fail-closed guard is hiding inside the dormant code:
-   `otr_image_director._is_3d_engine:109-119` raises for ANY non-empty
-   UNREGISTERED engine (covered at `tests/test_image_platform_c1.py:339-352`),
-   and neither OTR_VideoDirector nor the route freeze validates registry
-   membership -- so deleting the 3D lock path would silently delete a live
-   protection. **W2 chunk 1 is therefore a MIGRATION** of that validation to
-   the VideoDirector / route-freeze boundary, green and pushed on its own,
-   BEFORE any deletion. Also settled there: `triposr` goes as an unimplemented
-   scaffold (it never declared `requires_mesh_portrait`); the live mesh lane
-   (`mesh_stage`, `requires_mesh_fodder`, `directory_clip`, SilentComposite,
-   `portrait_ledger`) is NOT in scope; and W2 must pick its BOUNDARY explicitly
-   -- adapters only, or full lane retirement including the zero-declarer
-   capability and the `character_3d` family contract.
-2. **Randomizer Rolls Design A** --
+**LEAN-MEAN IS NOT IN THIS LIST, AND MUST NOT BE RE-ADDED.** Operator
+direction 2026-07-29: lean-mean comes OFF GO_FORWARD entirely and lives in
+the Lean-mean campaign section of `ROADMAP.md` -- FRONT and TAIL both, with their chunk chains, the W2
+migration-first mandate, the ENGINE_MATRIX W6 sub-step and the full
+`r2 -> r3 -> r4` operator pin carried over intact. It runs AFTER the randomizer
+and SFX, off this plan. A window that wants to rip dead code is on the wrong
+document.
+
+1. **Randomizer Rolls Design A** --
    `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`. NO LONGER GATED --
    extensibility landed, and its `_otr_lane_specs` authority was ABSORBED by
    that build, so this shrinks to `_otr_bank_roll` + eligibility. **RE-GROUND:
@@ -2664,7 +2650,7 @@ issues turn up go back to r2; if in doubt, restart at r2.** Concretely:
    `_otr_lane_specs` authority, and that the bank list is now a LIVE registry
    read (`list_bank_ids()` can return a CLIENT bank; eligibility must treat one
    as an ordinary peer) rather than a six-row literal. 1-2 d + 1 GPU day.
-3. **`dynamic_story` visual direction** -- rev-5 FINAL; roster-agnostic;
+2. **`dynamic_story` visual direction** -- rev-5 FINAL; roster-agnostic;
    re-derive IDs at build. After the randomizer. **RE-GROUND: r3 + r4
    REQUIRED, and the "do not rerun panels" rule still holds -- these are not in
    conflict.** That rule protects the DESIGN (the r1 arc: what the feature
@@ -2673,15 +2659,7 @@ issues turn up go back to r2; if in doubt, restart at r2.** Concretely:
    the roster, the routing authority and the writer tail have all moved since
    rev-5. Re-litigating the design is forbidden; re-grounding the wiring is
    mandatory. 5-9 coder-days + 2-4 GPU days.
-4. **LEAN-MEAN TAIL** (`SW1/SW2/SW3 -> C6 -> C7 -> W8`) -- the writer/widget
-   structural split, REQUIRED by ROADMAP to come after blocks 2-3.
-   **RE-GROUND: FULL `r2 -> r3 -> r4` (same doc as the FRONT, same operator
-   pin), run WHEN THE TAIL OPENS -- not now.** Blocks 1-3 all edit the very
-   writer this block then splits, so an arc run today would ground against a
-   writer that will not exist by the time it executes; running it early is
-   worse than not running it, because it produces a confident stale plan. SW-1's
-   full seam re-survey is part of that arc, against the then-current writer.
-5. **SFX campaign** (after the Timeline Cue Ledger C0/C1 gate) -- **RE-GROUND:
+3. **SFX campaign** (after the Timeline Cue Ledger C0/C1 gate) -- **RE-GROUND:
    the R4.1 refit already IS this gate.** The generated-SFX R4 candidate stays
    local/ignored evidence until it is re-grounded into a tracked current-HEAD
    R4.1 plan; treat that refit as the r3/r4 pass for this block rather than
@@ -2708,12 +2686,12 @@ keeps GO_FORWARD + HANDOFF_LOG current; coder windows never write plans
 | **CODER W "local-engine OBS wiring" -- THIS IS THE OPEN SLOT** | Close the 6 NO_RENDER local engines so all 18 land a 45-word episode in `otr/obs/`. Arc r1-r4 CLOSED. Spec = `kibitz-runs/2026-07-28-local-engine-obs-wiring/r3/final.md` AS AMENDED BY `r4/final.md`; per-chunk gate = codex's VERIFY-AT-BUILD checklist in `r4/codex.md`. Order **WIRE-W1 -> WIRE-W2 -> WIRE-W6 -> WIRE-W3 -> WIRE-W4 -> WIRE-W7 -> WIRE-W5** (see CURRENT STEP for each). **These W numbers are NOT lean-mean's W0..W8 -- different block, different spec file; prefix them WIRE- in every message.** | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | arc already converged at HEAD -- no further re-ground owed; code now | multi-day |
 | CODER A "multi-clip coverage" | WAN 8-GB `f914f0a4`; still-plans S0a/S0a-b/S1/S1b landed then SUPERSEDED. r1/r2/r3/r4 arc JUDGED and CONVERGED. **Chunks 1-7a COMPLETE plus nine QA rounds; then the 8GB block: B1a, B2a, B2b, QA-4, the `*_DIR` tripwire, B1b-0, B1b, and now B3 + B4 + B5 + B6. All LANDED GREEN and PUSHED (suite 7213).** THE CODER-WINDOW BLOCK IS COMPLETE. NEXT = **prequalify 512x288** -- a GPU step, so a RENDER window owns it, not this one (boot with `OTR_LTX_8GB_PREQUALIFICATION=1`, measure T5 device and tiled decode, freeze the winner as recipe v2) -- then **7d** -- the canonical 237-frame opening beat, which is where a GPU first renders through this machine at its production canvas. Seams tabulated in CURRENT STEP -- do not re-invent them. Pause map and audio lanes come LAST. Plans of record: `docs/2026-07-26-8gb-1080p-arc-judgment.md` (the architecture), `docs/2026-07-25-multiclip-coverage-r{1,2,3}-judgment.md`; operator rulings verbatim in `docs/2026-07-25-per-beat-stills-r1-judgment.md`. | Claude codes + judges; Sonnet fan-out + agy for QA rounds (cheap, $0 for agy, and between them they have found real defects in already-green code five times); kibitz = codex `gpt-5.6-sol` high + agy | chunk 7 needs a selective box reset per CLAUDE.md section 4 | multi-day |
 | ~~CODER B~~ | quick-wins harness window -- **DISSOLVED** by the 2026-07-24 rescope (its whole scope was quick-wins) | -- | -- | -- |
-| ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into CODER D's W6 | -- | -- | -- |
-| CODER D "lean-mean front" | **FULL `r2 -> r3 -> r4` kibitz arc FIRST** (operator pin), then W0 .. C1-C5 with ENGINE_MATRIX as a W6 sub-step. The arc is the window's first job, not a formality -- if r2 says the kill list is wrong, the window's output is a new r2, not a rip. | Claude codes + judges; kibitz = codex `gpt-5.6-sol` high + agy | **LAST BLOCK OF ALL (operator 2026-07-27) -- after WIRING, WAN 8-GB, Randomizer A, `dynamic_story` and SFX. The old "after A" gate is SUPERSEDED.** NO rip before r4 converges at HEAD | multi-day |
-| PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with D | docs |
+| ~~CODER C~~ | quick-wins foundations window -- **DISSOLVED** by the 2026-07-24 rescope; ENGINE_MATRIX moved into the lean-mean W6 sub-step, which is now in `ROADMAP.md` | -- | -- | -- |
+| ~~CODER D~~ | lean-mean front -- **REMOVED FROM THIS PLAN 2026-07-29 (operator).** The block is not cancelled; it MOVED to the Lean-mean campaign section of `ROADMAP.md` with its chunk chain, its W2 migration-first mandate and its full `r2 -> r3 -> r4` pin. It runs after the randomizer and SFX, off GO_FORWARD. **Do not re-add this row.** | -- | -- | -- |
+| PLANNER | extensibility hardening + `docs/EXTENDING_OTR.md` DONE 2026-07-24; NEXT = Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with any coder window | docs |
 | ~~CODER E~~ | independent client-authored source banks v1 -- **ALL SEVEN WAVES DONE @ `30358ad1`**; slot RETIRED, do not reopen (deferred power-user tiers are a NEW block, not this one) | -- | -- | -- |
-| CODER F | **r3 + r4 arc per block FIRST**, then Randomizer A -> `dynamic_story`. For `dynamic_story` the arc is WIRING ONLY -- rev-5's design stays FINAL, do not rerun the design panels. | Claude codes + judges; kibitz = codex + agy | after the WIRING block and WAN 8-GB (the old "after D" gate is SUPERSEDED -- D is now LAST) ; NO code before r4 converges at HEAD | ~6-11 d |
-| CODER G "lean-mean tail" | **FULL `r2 -> r3 -> r4` arc FIRST, run HERE and not earlier** (every block before this one edits the writer this block splits), then SW1-SW3, C6, C7, W8 | Claude; kibitz = codex + agy; Fable single final epoch gate | after F; NO split before r4 converges at HEAD | multi-day |
+| CODER F | **r3 + r4 arc per block FIRST**, then Randomizer A -> `dynamic_story`. For `dynamic_story` the arc is WIRING ONLY -- rev-5's design stays FINAL, do not rerun the design panels. | Claude codes + judges; kibitz = codex + agy | after the WIRING block and WAN 8-GB (the old "after D" gate is VOID -- D is off this plan entirely); NO code before r4 converges at HEAD | ~6-11 d |
+| ~~CODER G~~ | lean-mean tail -- **REMOVED FROM THIS PLAN 2026-07-29 (operator)**, same move as D: the Lean-mean campaign section of `ROADMAP.md`, after the randomizer and SFX. Its SW-1 writer re-survey still runs against the THEN-current writer, which is exactly why it is off a plan whose blocks keep editing that writer. **Do not re-add this row.** | -- | -- | -- |
 
 ### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
 
@@ -2928,8 +2906,10 @@ fixture creates a row.
   sanitized line; (b) a blank `meta.episode_title` is now filled at the tail
   instead of exploding later in `otr_credits_roll`. Both are the intended
   direction under THE LAW; neither has a live receipt yet.
-- Lean-mean front/tail drift: the tail's SW-1 re-survey is mandatory against
-  the then-current writer. Never interleave the two campaigns in one window.
+- Lean-mean front/tail drift: MOVED to the Lean-mean campaign section of
+  `ROADMAP.md` with the block (2026-07-29). The constraint itself still holds
+  wherever it runs -- the tail's SW-1 re-survey is mandatory against the
+  then-current writer, and the two campaigns never share a window.
 - No code lands mid-sweep of an active qualification campaign (uniform-code
   confound -- the 420-rung lesson).
 - The active campaigns may surface new lane defects; the campaign window owns
