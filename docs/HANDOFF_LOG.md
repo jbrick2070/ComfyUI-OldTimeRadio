@@ -3,6 +3,94 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- WINDOW CODER -- WIRE-W4e + P5 REPAIR COMPLETENESS (both found by the live campaign)
+Did: fixed the two bugs the 45-word run actually surfaced, plus one hygiene
+defect the run did not surface and a test did.
+
+**1. WIRE-W4e -- a per-line voice WAV is now sliced per segment.**
+  THE LIVE FAILURE: all four HuMo legs died identically inside `OTR_ShotLock`
+  with `beat l001 needs 2 clips on humo (185 frames, cap 177)`. That refusal
+  was ours, and its own text named the remedy: "per-segment audio is the
+  prerequisite, not a workaround". W4b/W4c had built exactly that -- for the
+  MASTER-slice path only. A beat whose line carries its own clean voice wav
+  takes the earlier branch and skips the slicer entirely, so every segment of
+  a multi-clip beat would have received the WHOLE line from its start; on
+  `audio_driven_face` the assembled beat then speaks the opening syllables
+  once per segment. `render_driver.build_request_from_shot` now runs the same
+  window arithmetic (`coverage_plan.segment_render_window`) on the per-line
+  wav -- only the ORIGIN differs, since a per-line wav starts at its own zero
+  where the master slice adds the beat's `start_s`. A slicer failure RAISES;
+  there is no fallback to the whole line, because that is the sync defect this
+  exists to remove and it would ship as a finished episode.
+  With the prerequisite met on both sources, `_stamp_coverage_plan`'s refusal
+  for audio-driven lanes is LIFTED (the history is kept in a comment above the
+  site so nobody re-derives the refusal without reading why it went).
+
+**2. W7 single-take: WARN, do not refuse.**
+  Lifting the refusal above immediately hit our own W7 clause from the same
+  session -- `MouthPolicyError: beat shot_b001 shows the human face of 'c1'
+  across MORE THAN ONE clip`. Two of our own gates were refusing the same
+  beats for opposite reasons. The single-take clause now RETURNS `long_takes`
+  and logs `LOOK:`; the one-human-face-per-episode cap stays TERMINAL. The
+  reasoning is on the record: the remedy that clause offers the operator
+  ("shorten the line, or let the cabinet speak it") is a ROUTING instruction
+  and nothing implements it yet, so refusing on it strands the episode with no
+  action available. The cap is different -- it is a claim about the finished
+  episode that the operator can act on.
+
+**3. P5's one repair shot now sees EVERY defect.**
+  THE LIVE FAILURE, leg `ltx_8gb`: the writer died before any video engine ran.
+      attempt 1/3 base   -> "line IDs do not exactly cover the accepted graph
+                             (missing=[], unknown=['l011','l012','l013'])"
+      attempt 2/3 repair -> "l001: spoken text is production markup"
+      ERROR exhausted the retry ladder after 2 attempt(s)
+  The repair obeyed the only complaint it was given -- it dropped the three
+  invented IDs -- and then died on a defect that was sitting in attempt 1 and
+  was never mentioned. `structured_call` deliberately does NOT retry a repair
+  that was schema-valid but content-invalid, so there was no third shot. That
+  ladder rule is correct and is UNCHANGED; what was wrong is that the
+  validator was spending the one shot one defect at a time. Two changes:
+    - `_validate_p5_structure` reports EVERY offending spoken line, not the
+      first. (One finding still yields the bare historical message, so
+      existing pins on the exact string keep holding.)
+    - when `compile_script_text_draft` refuses outright, the RAW draft rows are
+      scanned too and those findings ride along with the compile refusal.
+      Only rows the score actually owns and marks spoken are judged -- an ID
+      the model invented has no speaker_role, and judging its text would be
+      inventing a contract.
+  Honest limit, pinned in the tests: the role-label rule keys on the LOCKED
+  cast label exactly, so an abbreviated prefix ("ADA (V.O.):" against a cast
+  row named "Ada Sterling") is NOT caught. It is not what killed the live run.
+
+**4. `tests/test_wire_w7_mouth_ownership.py` had a UTF-8 BOM.**
+  Found as the one NEW regression blocking this chunk's gate:
+  `test_no_cleanup_model_id_python_identifiers` scans every file under nodes/
+  visual/ scripts/ tests/ with `ast.parse`, and `ast.parse` rejects a leading
+  U+FEFF even though the interpreter strips it. So the pack ran fine and only
+  the AST-scan guard could see it -- exactly the class of thing that guard is
+  for. Stripped, plus one stray CRLF in the same file. The repo-wide sweep
+  found no other Python file with a BOM (`tmp/_chain_720.ps1` and
+  `tmp/_status_bake.ps1` carry one, belong to another window, and were left
+  alone -- a BOM is normal for PowerShell).
+
+GATE: suite 7749 passed / 62 skipped / 1 xfailed (was 7727; +22 new tests),
+Bible 17 passed, `build_variants --check` 11 variants 0 failures,
+`validate_workflow_links --strict-types` 0 violations, hygiene clean on all
+nine touched files (AST / BOM / CRLF / 0-byte / non-ASCII / banned word),
+B7 forbidden sweep + scope + cleanup-model-id + source-snapshot 29 passed with
+the files STAGED. Mutation round `tmp\_w4e_mutate.py`: **13 killed, 0
+survived, 0 skipped of 13** -- including E1 (the per-line wav skips the slicer
+again, THE live bug), E4 (a failed slice silently falls back to the whole
+line), E8 (the structure validator reports only the first bad line) and E9
+(the compile refusal drops the markup findings again).
+
+CAMPAIGN STATE AT WRITE TIME: still running, do not start a second one. Five
+legs done -- the four HuMo legs and `ltx_8gb` all exit=1 obs_new=0, every one
+of them for a bug fixed above. They MUST be re-run once this lands:
+    tmp\_w45_campaign.ps1 -Words 45 -Only humo,humo_1.7B,humo_1.7B_169,humo_14B_169,ltx_8gb
+Wait for `tmp\_w45_run\DONE.txt` first -- each leg kills other OTR ComfyUI
+servers at start, so two campaigns cannot share the box.
+
 ## 2026-07-29 -- HEAD b2060a31 (v2.0-alpha) -- WINDOW CODER -- THE 45-WORD RUN IS LIVE
 Did: fixed a boot bug found by bringing the box up, then LAUNCHED the campaign.
   **`b2060a31` prestartup_script.py is ASCII-only.** Found while starting

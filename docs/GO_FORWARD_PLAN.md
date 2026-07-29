@@ -844,11 +844,36 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **THE WIRING BLOCK IS CODE-COMPLETE. WIRE-W1, W2, W6, W3a,
-## W3b, W4a, W4b, W4c, W4d, W7 and W5 ARE ALL LANDED AND PUSHED. THE NEXT STEP
-## IS GPU TIME: the 45-word run over all 18 local video/still engines, which is
-## the operator's stated first priority and the ONLY thing that proves any of
-## it. NOTHING in the block is live-proven -- it is suite and contract only.**
+## CURRENT STEP -- **THE 45-WORD RUN IS LIVE AND IS NOW THE WORK. The wiring
+## block (W1, W2, W6, W3a, W3b, W4a, W4b, W4c, W4d, W4e, W7, W5) is landed and
+## pushed. The job now is BABYSITTING the campaign until every local still and
+## every local video path lands output in `output\otr\obs\` -- fix what the run
+## surfaces, re-run the failed legs, repeat.**
+
+**THE RUN IS ALREADY EARNING ITS KEEP. Three bugs in the first five legs, none
+of which the 7,700-test suite could see:**
+
+- `beat l001 needs 2 clips on humo (185 frames, cap 177)` -- killed all four
+  HuMo legs. Fixed by **WIRE-W4e** (a per-line voice WAV is sliced per segment
+  too, not just the master), which let ShotLock's audio-driven multi-clip
+  refusal be lifted.
+- `P5 failed: ... primary_ladder_exhausted; last error -> l001: spoken text is
+  production markup` -- killed `ltx_8gb` before any video engine ran. The
+  writer's ONE typed-repair shot was being spent one defect at a time. Fixed:
+  the P5 validator now reports every offending line, and a compile refusal
+  carries the raw markup findings with it.
+- a UTF-8 BOM in `tests/test_wire_w7_mouth_ownership.py` -- invisible to the
+  interpreter, caught only by the AST-scan guard.
+
+  See HANDOFF_LOG 2026-07-29 (WIRE-W4e + P5 REPAIR COMPLETENESS) for all three.
+
+**RE-RUN OWED** once `tmp\_w45_run\DONE.txt` exists (two campaigns cannot share
+the box -- each leg kills other OTR ComfyUI servers at start):
+
+    tmp\_w45_campaign.ps1 -Words 45 -Only humo,humo_1.7B,humo_1.7B_169,humo_14B_169,ltx_8gb
+
+**CLEANUP OWED at the end:** `Remove-Item config\profiles\otr_w45_*.json` --
+nineteen scratch profiles in a tracked set; they must never be committed.
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11

@@ -1818,6 +1818,14 @@ def _call_script_text_draft(
             if error is not None:
                 return error
         except ScifiCodexError as exc:
+            # The compile refusal alone is not the whole complaint. The typed
+            # repair gets ONE shot, so a draft that both misses the graph AND
+            # speaks production markup must be told both at once -- otherwise
+            # the repair fixes the IDs, re-emits the markup, and the ladder is
+            # spent with nothing left to spend.
+            findings = _p5_raw_spoken_findings(candidate, score, cast)
+            if findings:
+                return f"{exc}; also: " + "; ".join(findings)
             return str(exc)
         compiled_by_identity[id(candidate)] = compiled
         return None
@@ -1969,47 +1977,114 @@ def _build_codex_episode_canon(
     )
 
 
+def _spoken_label_pattern(cast: CastPlanV4) -> "re.Pattern[str]":
+    """Build the role-label prefix matcher for the locked cast.
+
+    Shared by the compiled-script validator and the raw-draft scan so both
+    reject the same "ADA:" / "SFX:" prefixes.
+    """
+    locked_labels = {
+        str(row.name).strip()
+        for row in cast.cast
+        if str(row.name).strip()
+    }
+    locked_labels.update(("ANNOUNCER", "NARRATOR", "SFX", "MUSIC"))
+    return re.compile(
+        r"^\s*(?:" +
+        "|".join(
+            re.escape(label)
+            for label in sorted(locked_labels, key=len, reverse=True)
+        ) +
+        r")\s*:",
+        re.IGNORECASE,
+    )
+
+
+def _spoken_text_finding(
+    line_id: str,
+    text: str,
+    label_pattern: "re.Pattern[str]",
+) -> str | None:
+    """Return the spoken-text defect for one line, or None when clean."""
+    if not text.strip():
+        return f"{line_id}: spoken text is empty"
+    if any(mark in text for mark in ("\n", "\r", "\t")):
+        return f"{line_id}: spoken text contains control markup"
+    if re.fullmatch(r"\s*(?:\[[^\]]+\]|\([^)]*\))\s*", text):
+        return f"{line_id}: spoken text is production markup"
+    if re.match(r"^\s*(?:```|\*)", text) or label_pattern.match(text):
+        return f"{line_id}: spoken text starts with a role label"
+    return None
+
+
 def _validate_p5_structure(
     script: ScriptArtifactV4,
     cast: CastPlanV4,
     score: RadioScoreV4,
 ) -> str | None:
-    """Validate graph, roster, and explicit markup only."""
+    """Validate graph, roster, and explicit markup only.
+
+    Every offending line is reported, not just the first. The structured-call
+    ladder grants the typed repair exactly ONE shot and never retries a repair
+    that was schema-valid but content-invalid, so a validator that surfaces one
+    defect at a time spends that shot fixing line 1 and dies on line 2.
+    """
     try:
         _validate_script_graph(script, score)
         _validate_script_roster_contract(script, cast, score)
-        locked_labels = {
-            str(row.name).strip()
-            for row in cast.cast
-            if str(row.name).strip()
-        }
-        locked_labels.update(("ANNOUNCER", "NARRATOR", "SFX", "MUSIC"))
-        label_pattern = re.compile(
-            r"^\s*(?:" +
-            "|".join(
-                re.escape(label)
-                for label in sorted(locked_labels, key=len, reverse=True)
-            ) +
-            r")\s*:",
-            re.IGNORECASE,
-        )
+        label_pattern = _spoken_label_pattern(cast)
+        findings: list[str] = []
         for line in script.lines:
             if line.skip or line.speaker_role not in (
                 "character", "announcer"
             ):
                 continue
-            text = str(line.text or "")
-            if not text.strip():
-                return f"{line.line_id}: spoken text is empty"
-            if any(mark in text for mark in ("\n", "\r", "\t")):
-                return f"{line.line_id}: spoken text contains control markup"
-            if re.fullmatch(r"\s*(?:\[[^\]]+\]|\([^)]*\))\s*", text):
-                return f"{line.line_id}: spoken text is production markup"
-            if re.match(r"^\s*(?:```|\*)", text) or label_pattern.match(text):
-                return f"{line.line_id}: spoken text starts with a role label"
+            finding = _spoken_text_finding(
+                str(line.line_id), str(line.text or ""), label_pattern,
+            )
+            if finding is not None:
+                findings.append(finding)
+        if findings:
+            return "; ".join(findings)
     except ScifiCodexError as exc:
         return str(exc)
     return None
+
+
+def _p5_raw_spoken_findings(
+    draft: ScriptTextDraftV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+) -> list[str]:
+    """Scan an UNCOMPILED P5 draft for spoken-text defects.
+
+    `compile_script_text_draft` refuses a draft whose line IDs do not cover the
+    accepted graph, and that refusal hides every markup defect behind it -- the
+    repair fixes the IDs, re-emits the same markup, and the ladder is spent. So
+    when compilation fails, scan the raw rows too and hand the repair BOTH
+    complaints at once.
+
+    Only rows whose ID the score actually owns are scanned, and only where the
+    score's own beat marks the line spoken; an ID the model invented has no
+    speaker_role, so judging its text would be inventing a contract.
+    """
+    role_by_line_id: dict[str, str] = {}
+    for scene in score.scenes:
+        for beat in scene.beats:
+            for line_id in beat.line_ids:
+                role_by_line_id[str(line_id)] = str(beat.speaker_role)
+    label_pattern = _spoken_label_pattern(cast)
+    findings: list[str] = []
+    for row in draft.lines:
+        line_id = str(row.line_id)
+        if role_by_line_id.get(line_id) not in ("character", "announcer"):
+            continue
+        finding = _spoken_text_finding(
+            line_id, str(row.text or ""), label_pattern,
+        )
+        if finding is not None:
+            findings.append(finding)
+    return findings
 
 
 def _apply_script_safety_cleanup(

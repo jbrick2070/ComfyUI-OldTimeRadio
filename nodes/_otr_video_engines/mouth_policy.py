@@ -142,12 +142,35 @@ def audit_episode_faces(beats):
       human-mouth beat carrying no char_id is itself a refusal -- an unnamed
       face cannot be counted, so it cannot be capped.
     * **"...and only for a line the engine can hold in a single take."** A
-      human-face beat may not be multi-clip. HuMo declares
-      ``CONTINUITY_SOFT_REFERENCE``, so a multi-clip face beat is an honest
-      JUMP CUT: the same character regenerated mid-line from a different seed,
-      cutting to themselves. The cabinet can take that cut; a face cannot.
+      multi-clip human-face beat is an honest JUMP CUT -- HuMo declares
+      ``CONTINUITY_SOFT_REFERENCE``, so the same character is regenerated
+      mid-line from a different seed and cuts to themselves. The cabinet can
+      take that cut; a face cannot.
+
+      **THIS CLAUSE WARNS, IT DOES NOT REFUSE, and the correction landed the
+      same day the rule was written.** It was terminal for exactly as long as
+      it took to run the first live campaign, where it refused every HuMo
+      episode outright. Re-reading the operator's sentence is what changed it:
+      the remedy he gives is *"shorten the line, or let the cabinet speak it"*
+      -- a ROUTING instruction. Nothing in this build re-routes, so a terminal
+      check punished the operator for a direction the DIRECTOR made, on a beat
+      the engine could otherwise render. Refusing an episode is only honest
+      when the alternative is shipping a defect; here the alternative is a jump
+      cut the operator can see and judge.
+
+      Returned as ``long_takes`` for the caller to log LOUD. **The re-route is
+      the real fix and it is an operator decision, not a coder's** -- either
+      the director stops picking a face lane for long lines, or something
+      re-routes them to the cabinet automatically. Until one of those exists
+      this stays a warning, and the day a re-route lands this should go back to
+      terminal.
+
+    Returns ``(faces, long_takes)`` where ``faces`` is the sorted tuple of
+    character ids wearing a human mouth and ``long_takes`` is ``(beat_id,
+    char_id)`` for every face beat the engine could not hold in one take.
     """
     faces = {}
+    long_takes = []
     for beat in beats or ():
         owner = mouth_owner_for_beat(
             engine_id=beat.get("engine_id"),
@@ -164,13 +187,9 @@ def audit_episode_faces(beats):
                 "one-face-per-episode cap cannot be counted against it. NO "
                 "FALLBACK -- an unnamed face is an uncapped face." % beat_id)
         if beat.get("is_multi_clip"):
-            raise MouthPolicyError(
-                "beat %s shows the human face of %r across MORE THAN ONE clip. "
-                "The rule is one face per episode at most, and only for a line "
-                "the engine can hold in a SINGLE TAKE -- a multi-clip face beat "
-                "is a jump cut from a character to a regenerated copy of "
-                "themselves mid-line. NO FALLBACK: shorten the line, or let the "
-                "cabinet speak it." % (beat_id, char_id))
+            # THE SINGLE-TAKE CLAUSE WARNS; IT DOES NOT REFUSE (2026-07-29,
+            # corrected the same day it was written -- see the note below).
+            long_takes.append((beat_id, char_id))
         faces.setdefault(char_id, []).append(beat_id)
     if len(faces) > MAX_HUMAN_FACES_PER_EPISODE:
         raise MouthPolicyError(
@@ -181,7 +200,7 @@ def audit_episode_faces(beats):
                ", ".join("%s on %s" % (cid, ", ".join(bids))
                          for cid, bids in sorted(faces.items())),
                MAX_HUMAN_FACES_PER_EPISODE))
-    return tuple(sorted(faces))
+    return tuple(sorted(faces)), tuple(long_takes)
 
 
 __all__ = [

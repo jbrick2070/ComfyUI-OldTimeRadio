@@ -2246,6 +2246,56 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                      "NO portrait-index entry -- HuMo will fail closed LOUD "
                      "(NO FALLBACKS)", shot.get("shot_id"), char_id)
     audio = _voice_audio_for_line(line)
+    # A PER-LINE VOICE WAV IS SLICED PER SEGMENT TOO (WIRE-W4e, 2026-07-29).
+    #
+    # W4b/W4c gave the MASTER-slice path its per-segment window, and that left
+    # exactly one hole: a beat whose line carries its own clean voice wav takes
+    # the branch above and skips the slicer entirely, so every segment of a
+    # multi-clip beat received the WHOLE line from its start. On
+    # ``audio_driven_face`` -- the lane this matters for -- the assembled beat
+    # then speaks the opening syllables once per segment.
+    #
+    # ``otr_shot_lock._stamp_coverage_plan`` REFUSED such a beat outright for
+    # this reason, and said so: "per-segment audio is the prerequisite, not a
+    # workaround". This is that prerequisite for the remaining source. The
+    # window arithmetic is the same authority as the master path
+    # (``coverage_plan.segment_render_window``); only the ORIGIN differs -- a
+    # per-line wav starts at its own zero, so nothing is added to the offset,
+    # where the master slice adds the beat's ``start_s``.
+    if audio and isinstance(shot.get("coverage_plan"), dict):
+        try:
+            from . import coverage_plan as _cpv  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            import coverage_plan as _cpv  # type: ignore
+        _vplan = _cpv.CoveragePlan.from_dict(shot.get("coverage_plan") or {})
+        if _vplan.is_multi_clip:
+            _vfps = int(((ledger or {}).get("video") or {}).get("fps")
+                        or 25) or 25
+            _vwin = _cpv.segment_render_window(
+                _vplan, int(segment_index or 0), _vfps)
+            _vhash = str(((ledger or {}).get("audio") or {})
+                         .get("master_audio_sha256") or "")
+            _vcut = _slice_master_audio(audio, _vwin.offset_s, _vwin.copy_s,
+                                        master_hash=_vhash,
+                                        pad_tail_s=_vwin.pad_s)
+            if _vcut:
+                _LOG.info("[OTR.render_driver] per-SEGMENT voice slice: %s "
+                          "@%.3f+%.3fs (+%.3fs silence) -> %s (beat %s segment "
+                          "%d/%d)", os.path.basename(audio), _vwin.offset_s,
+                          _vwin.copy_s, _vwin.pad_s, os.path.basename(_vcut),
+                          _beat_id_for_shot(shot), int(segment_index or 0),
+                          _vplan.segment_count)
+                audio = _vcut
+            else:
+                # NO FALLBACK to the whole line: that is the sync defect this
+                # exists to remove, and it would ship as a finished episode.
+                raise RenderError(
+                    "beat %s segment %d needs its own slice of %s and the "
+                    "slicer failed. NO FALLBACK -- handing this segment the "
+                    "whole line makes the assembled beat repeat the opening "
+                    "syllables once per segment."
+                    % (_beat_id_for_shot(shot), int(segment_index or 0),
+                       os.path.basename(audio)))
     # Per-beat audio fallback: slice the FROZEN master when no per-line wav.
     # The master is opened read-only by ffmpeg; the slice lands in a temp dir
     # so the master is NEVER mutated (V-1 / audio spine frozen).

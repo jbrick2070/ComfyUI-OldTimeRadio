@@ -125,40 +125,51 @@ def test_a_jump_lane_that_mints_stills_STILL_demands_them():
 
 
 # ---------------------------------------------------------------------------
-# The audio-driven lanes: refused at plan time, with the reason
+# The audio-driven lanes: they PLAN multi-clip now (WIRE-W4e)
 # ---------------------------------------------------------------------------
 
 AUDIO_ENGINES = ["humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169"]
 
 
 @pytest.mark.parametrize("engine", AUDIO_ENGINES)
-def test_an_audio_driven_beat_past_its_cap_refuses_at_PLAN_time(engine):
-    """Garbled lip-sync is worse than a refusal, so this refuses.
+def test_an_audio_driven_beat_past_its_cap_PLANS_MULTI_CLIP(engine):
+    """This test used to assert the OPPOSITE, and the flip is the point.
 
-    A lane that requires an ``audio_ref`` renders frames FROM that audio. No
-    code in this build slices the audio per segment -- ``_voice_audio_for_line``
-    takes a line and returns one path, with no segment index in its signature
-    or any of its callers -- so every segment of a split beat would receive the
-    whole line from its start and the assembled clip would speak the opening
-    syllables once per segment.
+    Until 2026-07-29 a lane requiring an ``audio_ref`` was REFUSED at plan time
+    for any beat past its cap, because it renders frames FROM that audio and
+    nothing sliced the audio per segment: every segment of a split beat would
+    have received the whole line from its start, and the assembled clip would
+    speak the opening syllables once per segment. Garbled lip-sync is worse
+    than a refusal, so it refused -- and it named the prerequisite rather than
+    inventing a workaround: "per-segment audio is the prerequisite".
 
-    This is not a new gate. ``humo_14B_169`` already raised at RENDER time for
-    any beat past its 49-frame cap. The refusal moved to plan time, before the
-    GPU work, and now names what is actually missing.
+    That prerequisite is now built for BOTH audio sources a beat can have --
+    the frozen-master slice (WIRE-W4b, tail silenced by W4c) and a per-line
+    voice wav (WIRE-W4e) -- so the beat plans real coverage instead.
+
+    THE REFUSAL WAS RIGHT WHILE IT STOOD. If per-segment slicing is ever
+    removed, this test should go back to expecting the refusal rather than
+    being deleted: a split lip-synced beat with whole-line audio is a sync
+    defect that SHIPS, and nothing downstream would say so.
     """
     contract = fc.frame_contract_for(vreg.get_engine(engine))
     frames = int(contract.max_frames) + 60
-    with pytest.raises(cp.CoveragePlanError, match="slices that audio"):
-        _shot_for(engine, frames)
+    shot = _shot_for(engine, frames)
+    plan = cp.CoveragePlan.from_dict(shot["coverage_plan"])
+    assert plan.segment_count > 1, (
+        "%s should split a %d-frame beat over its %s-frame cap"
+        % (engine, frames, contract.max_frames))
+    assert plan.total_visible_frames == frames, (
+        "the split must still assemble to exactly the beat the audio needs")
+    for segment in plan.segments:
+        assert contract.is_legal_length(segment.render_frames)
 
 
 @pytest.mark.parametrize("engine", AUDIO_ENGINES)
-def test_an_audio_driven_beat_INSIDE_its_cap_is_untouched(engine):
-    """The refusal is scoped to the split, not to the lane.
-
-    Without this the test above would pass just as well if audio lanes had been
-    banned outright, which would take every HuMo beat down with them.
-    """
+def test_an_audio_driven_beat_INSIDE_its_cap_is_STILL_ONE_CLIP(engine):
+    """The split is scoped to beats that need it. A beat that fits must not
+    grow a second segment now that the refusal is gone -- that would put a jump
+    cut in the middle of every ordinary line."""
     contract = fc.frame_contract_for(vreg.get_engine(engine))
     shot = _shot_for(engine, int(contract.max_frames))
     plan = cp.CoveragePlan.from_dict(shot["coverage_plan"])
@@ -168,7 +179,7 @@ def test_an_audio_driven_beat_INSIDE_its_cap_is_untouched(engine):
 
 def test_humo_14B_169_is_the_tier_this_actually_bites():
     """Its cap is 49 frames -- under two seconds. Worth stating outright, so
-    the next reader knows the refusal above is routine for this tier and rare
+    the next reader knows the SPLIT above is routine for this tier and rare
     for its three siblings rather than uniformly rare."""
     capped = fc.frame_contract_for(vreg.get_engine("humo_14B_169"))
     assert capped.max_frames == 49

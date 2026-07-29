@@ -1260,8 +1260,12 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     plan = _cp.partition_beat(target, contract)
     _cp.validate_coverage_plan(plan, contract)
 
-    # AN AUDIO-DRIVEN LANE CANNOT BE SPLIT YET, AND SAYS SO (2026-07-26,
-    # chunk 7a QA panel). A lane that REQUIRES an audio_ref generates its
+    # HISTORY -- THE REFUSAL THAT USED TO LIVE HERE, kept because the reasoning
+    # is what makes the lift below safe to read. It was written 2026-07-26 by
+    # the chunk 7a QA panel and REMOVED 2026-07-29 once its prerequisite was
+    # built; the note after it says by what.
+    #
+    # A lane that REQUIRES an audio_ref generates its
     # frames FROM that audio -- HuMo animates a mouth against speech. Splitting
     # such a beat into segments needs each segment to receive its own slice of
     # that speech, and nothing in this build slices it: ``_voice_audio_for_line``
@@ -1279,22 +1283,34 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     # at render time for any beat past its 49-frame cap -- after the GPU work,
     # with a message about mirroring. This one lands at plan time, names the
     # beat, and says what is actually missing.
-    if plan.is_multi_clip:
-        try:
-            engine_obj = _vreg_local.get_engine(engine_id)
-        except Exception:  # noqa: BLE001
-            engine_obj = None
-        required = tuple(getattr(engine_obj, "required_inputs", ()) or ())
-        if "audio_ref" in required:
-            raise _cp.CoveragePlanError(
-                "beat %s needs %d clips on %s (%d frames, cap %s), but %s "
-                "renders frames FROM its audio_ref and nothing in this build "
-                "slices that audio per segment -- every segment would receive "
-                "the whole line from its start and the assembled beat would "
-                "repeat the opening syllables. NO FALLBACK: per-segment audio "
-                "is the prerequisite, not a workaround."
-                % (beat_id, plan.segment_count, engine_id, target,
-                   contract.max_frames or "none", engine_id))
+    # THE REFUSAL ABOVE IS LIFTED (WIRE-W4e, 2026-07-29) BECAUSE ITS STATED
+    # PREREQUISITE NOW EXISTS. It read, in full:
+    #
+    #     "beat %s needs %d clips on %s ... but %s renders frames FROM its
+    #      audio_ref and nothing in this build slices that audio per segment
+    #      -- every segment would receive the whole line from its start and
+    #      the assembled beat would repeat the opening syllables. NO FALLBACK:
+    #      per-segment audio is the prerequisite, not a workaround."
+    #
+    # It was right, and it was right to name the prerequisite instead of
+    # inventing a workaround. That prerequisite is now built, for BOTH audio
+    # sources a beat can have:
+    #
+    #   * the FROZEN MASTER slice -- WIRE-W4b narrowed it to the segment's own
+    #     render window, and WIRE-W4c made the trimmed tail silence rather than
+    #     the next beat's speech (r4/A4).
+    #   * a PER-LINE VOICE WAV -- WIRE-W4e slices that too, from its own zero,
+    #     through the same `coverage_plan.segment_render_window` authority.
+    #
+    # A HuMo beat past its cap therefore renders as real multi-clip coverage
+    # now, each segment driven by its own slice of the line. This was the ONE
+    # thing standing between the audio-driven lanes and the 45-word run: the
+    # first campaign leg died here on `beat l001 needs 2 clips on humo (185
+    # frames, cap 177)`.
+    #
+    # If per-segment slicing is ever removed, restore this refusal rather than
+    # letting the beats through -- a split lip-synced beat with whole-line
+    # audio is a sync defect that SHIPS, and nothing downstream would say so.
 
     shot["coverage_plan"] = plan.to_dict()
     # THE SIBLING RECEIPT (B3). Present only when the tier ceiling actually
@@ -1460,7 +1476,16 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     # plans do not exist until the loop above has finished. It runs BEFORE the
     # rows reach the ledger, so an episode that breaks the look contract never
     # becomes a lock a downstream phase would honour.
-    _faces = _audit_episode_faces(shots)
+    _faces, _long_takes = _audit_episode_faces(shots)
+    for _bid, _cid in _long_takes:
+        # LOUD, because it is a look defect the operator can see and judge, and
+        # the remedy is his: "shorten the line, or let the cabinet speak it".
+        log.warning(
+            "[OTR_ShotLock] LOOK: beat %s shows the human face of %r across "
+            "MORE THAN ONE clip -- the engine cannot hold this line in a "
+            "single take, so the face jump-cuts to a regenerated copy of "
+            "itself mid-line. Shorten the line, or let the cabinet speak it.",
+            _bid, _cid)
     if _faces:
         log.info("[OTR_ShotLock] the set speaks except for %s -- %d overheard "
                  "human face(s) of at most %d", ", ".join(_faces), len(_faces),

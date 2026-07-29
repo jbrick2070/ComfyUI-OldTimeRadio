@@ -186,10 +186,20 @@ def _beat(beat_id, *, engine_id="humo", family="audio_driven_face",
             "is_multi_clip": multi}
 
 
+def _faces(beats):
+    faces, _long = mp.audit_episode_faces(beats)
+    return faces
+
+
+def _long_takes(beats):
+    _faces_, long = mp.audit_episode_faces(beats)
+    return long
+
+
 def test_THE_SET_SPEAKS_THROUGHOUT_is_a_legal_episode():
     """And it is the DEFAULT look, not a degraded one -- an episode with no
     human face at all passes without comment."""
-    assert mp.audit_episode_faces([
+    assert _faces([
         _beat("b0", engine_id="ltx_audio_in",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False),
@@ -202,7 +212,7 @@ def test_ONE_character_across_MANY_beats_is_still_ONE_face():
     """Counted by DISTINCT char_id, not by beat: a character who says three
     private lines is one face, and a per-beat count would forbid the very
     thing the ruling allows."""
-    assert mp.audit_episode_faces([
+    assert _faces([
         _beat("b1", char_id="ada"), _beat("b2", char_id="ada"),
         _beat("b3", char_id="ada"),
     ]) == ("ada",)
@@ -221,26 +231,46 @@ def test_TWO_faces_in_one_episode_is_REFUSED_and_both_are_NAMED():
     assert "NO FALLBACK" in msg
 
 
-def test_a_MULTI_CLIP_face_beat_is_REFUSED():
-    """"...and only for a line the engine can hold in a SINGLE TAKE." HuMo
-    declares soft-reference continuity, so a multi-clip face beat is an honest
-    JUMP CUT -- the same character regenerated mid-line from a different seed,
-    cutting to themselves. The cabinet can take that cut; a face cannot."""
-    with pytest.raises(mp.MouthPolicyError) as caught:
-        mp.audit_episode_faces([_beat("b1", char_id="ada", multi=True)])
-    assert "SINGLE TAKE" in str(caught.value)
-    assert "ada" in str(caught.value)
+def test_a_MULTI_CLIP_face_beat_is_REPORTED_but_NOT_REFUSED():
+    """"...and only for a line the engine can hold in a SINGLE TAKE." A
+    multi-clip face beat IS a jump cut -- the same character regenerated
+    mid-line from a different seed, cutting to themselves.
+
+    IT WARNS RATHER THAN REFUSING, and that correction landed the same day the
+    rule was written. It was terminal for exactly as long as it took to run the
+    first live campaign, where it refused every HuMo episode outright. The
+    operator's own remedy is *"shorten the line, or let the cabinet speak it"*
+    -- a ROUTING instruction -- and nothing in this build re-routes, so a
+    terminal check punished him for a direction the director made on a beat the
+    engine could otherwise render. Refusing is only honest when the alternative
+    is shipping a defect; here the alternative is a jump cut he can see.
+
+    THE DAY A RE-ROUTE LANDS, this should go back to terminal."""
+    faces, long_takes = mp.audit_episode_faces(
+        [_beat("b1", char_id="ada", multi=True)])
+    assert faces == ("ada",), "the beat still renders"
+    assert long_takes == (("b1", "ada"),), "and it is still reported by name"
 
 
-def test_a_MULTI_CLIP_CABINET_beat_is_FINE():
-    """CONTROL for the test above, and it is the whole point of the asymmetry:
-    the radio may be cut across as many clips as the beat needs. Without this
-    the single-take clause would quietly cap every announcer beat's length."""
-    assert mp.audit_episode_faces([
+def test_a_MULTI_CLIP_CABINET_beat_is_NOT_EVEN_REPORTED():
+    """CONTROL, and it is the whole point of the asymmetry: the radio may be
+    cut across as many clips as the beat needs, silently. Without this the
+    single-take clause would nag about every long announcer beat."""
+    faces, long_takes = mp.audit_episode_faces([
         _beat("b0", engine_id="ltx_audio_in",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False, multi=True),
-    ]) == ()
+    ])
+    assert faces == () and long_takes == ()
+
+
+def test_the_ONE_FACE_CAP_is_STILL_TERMINAL():
+    """The two clauses are not the same strength and must not drift into being
+    treated as one. The CAP stays a refusal -- a second face is a look decision
+    nobody made, and there is no remedy the operator has already named."""
+    with pytest.raises(mp.MouthPolicyError):
+        mp.audit_episode_faces([_beat("b1", char_id="ada", multi=True),
+                                _beat("b2", char_id="grace", multi=True)])
 
 
 def test_a_HUMAN_MOUTH_with_NO_char_id_is_REFUSED():
@@ -262,7 +292,7 @@ def test_SHOTLOCK_translates_its_own_rows_and_asks_the_policy():
     authorities the render dispatcher uses, because a second derivation of
     either is a second chance to disagree with it about which beats show a
     face."""
-    faces = sl._audit_episode_faces([
+    faces, _lt = sl._audit_episode_faces([
         {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
          "char_id": "ada",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
@@ -277,15 +307,17 @@ def test_SHOTLOCK_reads_MULTI_CLIP_off_the_STAMPED_PLAN():
     """The single-take clause is a question about the stamped coverage plan,
     which is why the episode audit runs AFTER the stamping loop rather than
     beside the per-beat preflight."""
-    with pytest.raises(mp.MouthPolicyError) as caught:
-        sl._audit_episode_faces([
-            {"shot_id": "shot_b1", "engine_id": "humo",
-             "role": "character_video", "char_id": "ada",
-             "coverage_plan": {"segments": [
-                 {"index": 0, "render_frames": 153},
-                 {"index": 1, "render_frames": 33, "trim_tail": 2}]}},
-        ])
-    assert "SINGLE TAKE" in str(caught.value)
+    faces, long_takes = sl._audit_episode_faces([
+        {"shot_id": "shot_b1", "engine_id": "humo",
+         "role": "character_video", "char_id": "ada",
+         "coverage_plan": {"segments": [
+             {"index": 0, "render_frames": 153},
+             {"index": 1, "render_frames": 33, "trim_tail": 2}]}},
+    ])
+    assert faces == ("ada",)
+    assert long_takes == (("shot_b1", "ada"),), (
+        "ShotLock must read multi-clip off the STAMPED plan and report the "
+        "long take by name -- it warns rather than refusing (see the policy)")
 
 
 def test_a_shot_with_NO_PLAN_YET_reads_as_a_SINGLE_take():
@@ -293,10 +325,7 @@ def test_a_shot_with_NO_PLAN_YET_reads_as_a_SINGLE_take():
     be guessed into a refusal. ``_stamp_coverage_plan`` runs immediately after
     the row is appended, so this is the ordering inside the loop, not a
     shipped state."""
-    assert sl._audit_episode_faces([
-        {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
-         "char_id": "ada"},
-    ]) == ("ada",)
+    assert sl._audit_episode_faces([{"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video", "char_id": "ada"}])[0] == ("ada",)
 
 
 def test_the_EPISODE_AUDIT_is_wired_into_build_execution_plan():
@@ -344,3 +373,4 @@ def test_the_POLICY_IMPORTS_NOTHING(tmp_path):
         else:
             names.extend(a.name for a in node.names)
     assert names == ["__future__"], names
+

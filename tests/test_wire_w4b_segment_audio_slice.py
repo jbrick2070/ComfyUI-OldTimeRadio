@@ -365,6 +365,89 @@ def test_an_UNPADDED_slice_keeps_the_shipped_ffmpeg_command(tmp_path,
     assert cmd.count("-t") == 1, "only the INPUT read-duration"
 
 
+# ---------------------------------------------------------------------------
+# WIRE-W4e -- a PER-LINE voice wav is sliced per segment too
+# ---------------------------------------------------------------------------
+
+def _ledger_with_line_wav(wav_path):
+    led = _ledger()
+    led["lines"][0]["char_wav_path"] = str(wav_path)
+    return led
+
+
+def test_a_PER_LINE_VOICE_WAV_is_sliced_per_SEGMENT(tmp_path):
+    """THE HOLE W4b LEFT, and the one that blocked the whole audio-driven lane.
+
+    W4b/W4c narrowed the FROZEN-MASTER slice. A beat whose line carries its own
+    clean voice wav never reaches that code -- it takes the per-line branch and
+    skips the slicer entirely -- so every segment of a multi-clip beat got the
+    WHOLE line from its start. ``otr_shot_lock`` refused such beats outright
+    for exactly this reason, which is why every HuMo lane came back unbuildable
+    on the first 45-word campaign leg: "beat l001 needs 2 clips on humo (185
+    frames, cap 177)".
+
+    The window authority is the SAME one the master path uses; only the ORIGIN
+    differs -- a per-line wav starts at its own zero, so no ``start_s`` is
+    added."""
+    wav = tmp_path / "line.wav"
+    wav.write_bytes(b"RIFF fake voice")
+    plan = _plan(cp.JOIN_JUMP, (153, 0, 0), (33, 0, 2))
+    shot = _shot(plan)
+    shot["target_frame_count"] = 184
+    ledger = _ledger_with_line_wav(wav)
+    ledger["lines"][0]["dur_s"] = 184 / FPS
+    seen = []
+
+    def _fake_slice(path, start, dur, master_hash="", pad_tail_s=0.0):
+        seen.append((os.path.basename(str(path)), start, dur, pad_tail_s))
+        out = tmp_path / ("cut_%d.wav" % len(seen))
+        out.write_bytes(b"RIFF cut")
+        return str(out)
+
+    with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
+        for index in (0, 1):
+            rd.build_request_from_shot(dict(shot), ledger, segment_index=index)
+
+    assert [s[0] for s in seen] == ["line.wav", "line.wav"], (
+        "the LINE's own wav is what gets cut, not the master")
+    # offsets are from the wav's OWN zero -- no start_s added
+    assert seen[0][1] == pytest.approx(0.0)
+    assert seen[1][1] == pytest.approx(153 / FPS)
+    # and the trimmed tail is silence, exactly as on the master path
+    assert seen[1][2] == pytest.approx(31 / FPS)
+    assert seen[1][3] == pytest.approx(2 / FPS)
+
+
+def test_a_SINGLE_CLIP_beat_keeps_its_LINE_WAV_UNCUT(tmp_path):
+    """CONTROL, and it is the majority path: every ordinary beat must hand the
+    engine the line's wav exactly as the voice phase produced it."""
+    wav = tmp_path / "line.wav"
+    wav.write_bytes(b"RIFF fake voice")
+    shot = _shot(_plan(cp.JOIN_SINGLE, (99, 0, 0)))
+    with mock.patch.object(rd, "_slice_master_audio") as m:
+        req = rd.build_request_from_shot(
+            dict(shot), _ledger_with_line_wav(wav), segment_index=0)
+    m.assert_not_called()
+    assert (req.get("audio_ref") or {}).get("path") == str(wav)
+
+
+def test_a_FAILED_per_segment_voice_slice_REFUSES_rather_than_using_the_LINE(
+        tmp_path):
+    """NO FALLBACK. Handing the segment the whole line is the sync defect this
+    exists to remove, and it would ship as a finished episode -- so a slicer
+    that comes back empty is terminal, not a degrade."""
+    wav = tmp_path / "line.wav"
+    wav.write_bytes(b"RIFF fake voice")
+    shot = _shot(_plan(cp.JOIN_JUMP, (99, 0, 0), (99, 0, 0)))
+    shot["target_frame_count"] = 198
+    ledger = _ledger_with_line_wav(wav)
+    ledger["lines"][0]["dur_s"] = 198 / FPS
+    with mock.patch.object(rd, "_slice_master_audio", return_value=""):
+        with pytest.raises(rd.RenderError) as caught:
+            rd.build_request_from_shot(dict(shot), ledger, segment_index=1)
+    assert "NO FALLBACK" in str(caught.value)
+
+
 def test_the_SLICER_honours_the_CONFIGURED_ffmpeg(tmp_path, monkeypatch):
     """otr_credits_roll already honoured OTR_FFMPEG while this module used the
     bare literal, so on a box where ffmpeg is configured but not on PATH the
