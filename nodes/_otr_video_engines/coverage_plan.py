@@ -312,41 +312,78 @@ def partition_beat(target_visible_frames, contract, *, join_mode=None,
     splitter = (_discrete_partition if contract.discrete_frames
                 else _ladder_partition)
 
+    # ONE WALK, AND THE LOWEST COUNT WINS (W1, 2026-07-29). Each count gets
+    # both of its chances -- an exact cover first, then a TRIMMED total the
+    # contract already permits -- before the search advances.
+    #
+    # This used to be TWO walks. The first tried an exact cover at every count
+    # from 2 to ``max_segments``; only once that entire walk failed did a
+    # second walk start again at count 2 looking for a trimmed one. So an
+    # exact cover at a HIGH count always beat a trimmed cover at a LOW one,
+    # which contradicts the count-first contract stated at the top of this
+    # module -- and it cost real renders. A 184-frame HuMo beat (33 + 4k
+    # ladder, jump cut, tail trim allowed) planned ``[85, 33, 33, 33]``:
+    # ``c`` segments reach totals congruent to ``c`` modulo 4, so an exact
+    # cover of 184 needs a count divisible by 4, and the first is FOUR. All
+    # the while ``[153, 33]`` with two frames trimmed was legal at count 2.
+    # Four model loads, four renders and four seams, to avoid discarding two
+    # frames the beat audio never asked for.
+    #
+    # A trim is not a last resort to be reached once the ladder is exhausted.
+    # It is part of what a given COUNT can do, and the adapter said so itself
+    # by declaring ``allow_tail_trim``.
+    #
+    # WHAT THIS DELIBERATELY DOES NOT DO: bound the trim. A pre-push fan-out
+    # asked whether a low count should ever be refused for discarding too
+    # much, and built the case -- covering 1019 frames from a ``(10, 999)``
+    # discrete menu, two segments give ``[999, 999]`` and throw away 979
+    # frames where three give ``[999, 10, 10]`` exactly. A bound was written
+    # and MEASURED, and it cost more than it saved: on a ``min=4 max=12
+    # quantum=8`` ladder it turned ``[12, 12]`` into ``[12, 4, 4]`` -- a third
+    # render, a third model load and a third seam, to recover four frames --
+    # and it did that to 4,885 cases across the sweep grid. No contract in
+    # this tree has a menu gap wide enough to produce the pathological case
+    # (the widest shipped menus are Veo's 100/150/200 and Pixverse's 125/200,
+    # whose worst trim is 25 frames), so the bound was reverted and the
+    # observation filed instead. Revisit if an adapter ever declares a menu
+    # whose largest entry dwarfs its smallest.
     for count in range(2, int(max_segments) + 1):
-        total_render = target + drop * (count - 1)
-        lengths = splitter(total_render, contract, count)
+        required = target + drop * (count - 1)
+
+        lengths = splitter(required, contract, count)
         if lengths is not None:
             return _build(target, mode, lengths, drop)
 
-    # ---- exact failed; trim the tail if the contract permits it ----------- #
-    #
-    # THE SEARCH RANGE IS DERIVED, NOT GUESSED (2026-07-25 QA fix). This loop
-    # used to try only ``extra in range(1, quantum + 1)``, on the assumption
-    # that any shortfall could be bridged within one quantum step. That is
-    # false whenever ``count * min_frames`` overshoots the required total by
-    # more than one step -- which happens routinely just above ``max_frames``
-    # when ``min_frames`` is large relative to the gap. An adversarial sweep
-    # found 832 beats that WERE coverable by trimming and were refused anyway.
-    # Smallest repro: min=4 max=5 quantum=1 target=6, where [4, 4] with a
-    # 2-frame tail trim is a perfectly legal cover.
-    #
-    # The honest range comes from the ladder itself: for a given segment count
-    # the total render must be congruent to ``count * min_frames`` modulo the
-    # quantum, so the smallest legal total at or above the required total is
-    # fully determined. There is nothing left to guess.
-    if contract.allow_tail_trim:
-        for count in range(2, int(max_segments) + 1):
-            required = target + drop * (count - 1)
-            for total in _candidate_totals(required, contract, count):
-                lengths = splitter(total, contract, count)
-                if lengths is None:
-                    continue
-                trim = total - required
-                # The trim comes off the LAST segment, which must still
-                # contribute at least one visible frame after its head drop.
-                if lengths[-1] - drop - trim < 1:
-                    continue
-                return _build(target, mode, lengths, drop, trim_tail=trim)
+        if not contract.allow_tail_trim:
+            continue
+
+        # ---- no exact cover at this count; trim the tail ------------------ #
+        #
+        # THE SEARCH RANGE IS DERIVED, NOT GUESSED (2026-07-25 QA fix). This
+        # used to try only ``extra in range(1, quantum + 1)``, on the
+        # assumption that any shortfall could be bridged within one quantum
+        # step. That is false whenever ``count * min_frames`` overshoots the
+        # required total by more than one step -- which happens routinely just
+        # above ``max_frames`` when ``min_frames`` is large relative to the
+        # gap. An adversarial sweep found 832 beats that WERE coverable by
+        # trimming and were refused anyway. Smallest repro: min=4 max=5
+        # quantum=1 target=6, where [4, 4] with a 2-frame tail trim is a
+        # perfectly legal cover.
+        #
+        # The honest range comes from the ladder itself: for a given segment
+        # count the total render must be congruent to ``count * min_frames``
+        # modulo the quantum, so the smallest legal total at or above the
+        # required total is fully determined. There is nothing left to guess.
+        for total in _candidate_totals(required, contract, count):
+            lengths = splitter(total, contract, count)
+            if lengths is None:
+                continue
+            trim = total - required
+            # The trim comes off the LAST segment, which must still
+            # contribute at least one visible frame after its head drop.
+            if lengths[-1] - drop - trim < 1:
+                continue
+            return _build(target, mode, lengths, drop, trim_tail=trim)
 
     raise CoveragePlanError(
         "no exact multi-clip cover of %d visible frame(s) exists for this "

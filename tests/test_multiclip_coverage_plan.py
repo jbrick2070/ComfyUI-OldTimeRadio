@@ -548,3 +548,311 @@ def test_no_false_refusals_across_a_differential_sweep():
                     assert contract.is_legal_length(seg.render_frames)
                     assert seg.visible_frames >= 1
     assert checked > 2000
+
+
+# ---------------------------------------------------------------------------
+# W1 (2026-07-29) -- THE PARTITIONER OVER-SEGMENTS A TRIMMABLE BEAT
+# ---------------------------------------------------------------------------
+#
+# THE MECHANISM, written down so the fix cannot be mistaken for a 184-shaped
+# patch. ``partition_beat`` ran TWO separate walks over the segment count: the
+# first tried an EXACT cover at every count from 2 up to ``max_segments``, and
+# only after that whole walk failed did a second walk start again at count 2
+# looking for a TRIMMED cover. So an exact cover at a HIGH count always beat a
+# trimmed cover at a LOW one.
+#
+# That contradicts this module's own stated contract -- "Solving for the
+# segment COUNT first always finds an exact partition when one exists" -- and
+# it is not what anyone wants from the result: four model loads, four renders
+# and four seams instead of two, for a beat whose two-clip cover was legal all
+# along and differs only by discarding two frames the audio never asked for.
+#
+# The correct order is per COUNT: exact first, then a permitted TRIMMED total,
+# then advance to the next count. Trimming is not a last resort to be reached
+# only once the ladder is exhausted -- it is part of what a given count can do,
+# and the adapter said so itself by declaring ``allow_tail_trim``.
+
+
+#: HuMo's real ladder, transcribed from the DOCUMENTED literals in
+#: ``eng_humo.py`` (33 is the legacy floor, 177 the last empirically verified
+#: ceiling at 480x832 fp8, 4n+1 stride) rather than imported from it. A test
+#: that reads the value it is checking cannot notice the value changing, so
+#: the literals live here and ``test_the_pinned_humo_ladder_is_still_what_the
+#: _engine_declares`` is what fails if the engine ever moves.
+HUMO = fc.FrameContract(min_frames=33, max_frames=177, quantum=4,
+                        native_fps=25, allow_tail_trim=True,
+                        continuity=fc.CONTINUITY_SOFT_REFERENCE)
+
+
+def test_the_pinned_humo_ladder_is_still_what_the_engine_declares():
+    """The premise of every vector below, checked against the real adapter.
+
+    Imported inside the test on purpose: this module is otherwise registry-free
+    and stays that way. The partitioner is pure, and its tests should keep
+    running without a registry -- but a pinned vector whose contract has
+    silently drifted is a vector that proves nothing, so the premise gets
+    checked exactly once, here.
+    """
+    import nodes._otr_video_engines  # noqa: F401  -- populate the registry
+    from nodes._otr_video_engines import frame_contract as live_fc
+    from nodes._otr_video_engines import registry as vreg
+
+    declared = live_fc.frame_contract_for(vreg.get_engine("humo"))
+    assert declared.min_frames == HUMO.min_frames == 33
+    assert declared.max_frames == HUMO.max_frames == 177
+    assert declared.quantum == HUMO.quantum == 4
+    assert declared.allow_tail_trim is True
+    assert declared.continuity == HUMO.continuity
+
+
+def test_a_184_frame_humo_beat_is_TWO_segments_not_four():
+    """THE PINNED CASE (kibitz r3/r4 2026-07-28), live on the 2026-07-28
+    engine-coverage campaign, where a 184-frame HuMo beat planned FOUR clips.
+
+    The arithmetic, so these numbers are checkable rather than merely asserted.
+    HuMo jump-cuts (its reference is a soft identity hint, not a first-frame
+    lock), so ``drop`` is 0 and ``c`` segments must render exactly ``target``
+    frames between them. On a ``33 + 4k`` ladder, ``c`` segments reach totals
+    congruent to ``33c`` modulo 4 -- that is, to ``c`` modulo 4. So an EXACT
+    cover of 184 (which is 0 mod 4) requires a count that is 0 mod 4, and the
+    first such count is FOUR. A two-segment cover needs a total of 186, which
+    is on the ladder as ``153 + 33`` and overshoots by two: trim two.
+
+    Four renders and four model loads to avoid discarding two frames. That is
+    the defect, and 153 + 33 is the plan that was available the whole time.
+    """
+    plan = cp.partition_beat(184, HUMO)
+    assert plan.join_mode == cp.JOIN_JUMP
+    assert plan.segment_count == 2
+    assert [s.render_frames for s in plan.segments] == [153, 33]
+    assert [s.drop_head for s in plan.segments] == [0, 0]
+    assert [s.trim_tail for s in plan.segments] == [0, 2]
+    assert plan.total_visible_frames == 184
+    cp.validate_coverage_plan(plan, HUMO)
+
+
+@pytest.mark.parametrize("target", list(range(185, 241)))
+def test_every_target_from_185_to_240_covers_in_exactly_two_segments(target):
+    """The second pinned vector: the whole band just above HuMo's ceiling.
+
+    177 < target <= 240 no longer fits one render, and two are plainly enough
+    -- two segments make 354 render frames available against a 240-frame ask.
+    Before the fix, three of every four targets in this band planned three,
+    four or five segments, decided purely by which count the bare ladder
+    happened to reach an exact cover at first. A single vector at 184 could be
+    satisfied by a special case; a contiguous band cannot.
+    """
+    plan = cp.partition_beat(target, HUMO)
+    assert plan.segment_count == 2, (
+        "target %d planned %d segments: %r"
+        % (target, plan.segment_count,
+           [s.render_frames for s in plan.segments]))
+    assert plan.total_visible_frames == target
+    cp.validate_coverage_plan(plan, HUMO)
+
+
+def _fewest_legal_multiclip_cover(target, contract, drop, max_count):
+    """INDEPENDENT REFERENCE: ``(count, last_render, trim)``, or ``None``.
+
+    Returns the COMPOSITION, not just the count. A QA lens proved why: an
+    earlier version of this reference returned the count alone, and a mutant
+    that reversed ``_ladder_partition``'s fill order -- putting the leftover
+    in the FIRST segment instead of the last -- passed it with 0 mismatches
+    over 27,954 plans, because the count never changes when you shuffle the
+    same lengths. The count is the cheap half of the answer.
+
+    Re-derived from the ladder's arithmetic as documented on
+    :class:`FrameContract` and :func:`_candidate_totals`, NOT by calling the
+    partitioner -- a reference that asks the code under test what it thinks is
+    a test that verifies a thing it also constructs, which this build treats as
+    decorative until proven otherwise.
+
+    For a count ``c``: the segments render ``target + drop*(c-1)`` frames
+    between them, the reachable totals are ``c*min + quantum*A`` bounded by
+    ``c*max``, and the cheapest legal one is the smallest such total at or
+    above what is required. The ladder filler pushes every segment to the
+    ceiling in order, so the LAST segment carries whatever steps the earlier
+    ones could not absorb -- and it is the last segment that pays the trim, so
+    it must still contribute a visible frame afterwards.
+    """
+    min_f = int(contract.min_frames)
+    q = int(contract.quantum)
+    max_f = int(contract.max_frames)
+    steps_each = (max_f - min_f) // q
+    if steps_each < 0:
+        return None
+    for count in range(2, max_count + 1):
+        required = target + drop * (count - 1)
+        base, span = count * min_f, count * max_f
+        if required > span:
+            continue
+        total = (base if required <= base
+                 else base + -(-(required - base) // q) * q)
+        if total > span:
+            continue
+        steps = (total - base) // q
+        if steps > count * steps_each:
+            continue
+        trim = total - required
+        if trim and not contract.allow_tail_trim:
+            continue
+        last = min_f + max(0, steps - (count - 1) * steps_each) * q
+        if last - drop - trim < 1:
+            continue
+        return count, last, trim
+    return None
+
+
+def test_the_partitioner_uses_THE_FEWEST_LEGAL_SEGMENTS():
+    """THE MECHANISM, pinned as a property over a grid rather than a vector.
+
+    A segment is a model load, a render and a seam. Whenever a lower count
+    could have covered the beat legally -- exactly OR with a trim the adapter
+    already permits -- taking a higher one buys nothing and costs all three.
+
+    This is the test that makes W1 a fix instead of a special case: the 184
+    vector above would be satisfied by hard-coding 184, and this will not be.
+    Every mismatch it reports names the contract, the target, the count taken
+    and the count that would have done.
+    """
+    import itertools
+
+    checked = refused = single = 0
+    for min_f, q, max_f in itertools.product((1, 4, 9, 33), (1, 2, 4, 8),
+                                             (12, 25, 41, 177)):
+        if max_f < min_f:
+            continue
+        for continuity, drop in ((fc.CONTINUITY_STRICT_FIRST_FRAME, 1),
+                                 (fc.CONTINUITY_SOFT_REFERENCE, 0)):
+            for trim_ok in (True, False):
+                contract = fc.FrameContract(
+                    min_frames=min_f, max_frames=max_f, quantum=q,
+                    allow_tail_trim=trim_ok, continuity=continuity)
+                for target in range(1, max_f * 3):
+                    try:
+                        plan = cp.partition_beat(target, contract,
+                                                 max_segments=8)
+                    except cp.CoveragePlanError:
+                        refused += 1
+                        continue
+                    if plan.segment_count < 2:
+                        single += 1
+                        continue
+                    where = ("min=%d q=%d max=%d trim=%s %s target=%d"
+                             % (min_f, q, max_f, trim_ok, continuity, target))
+                    lengths = [s.render_frames for s in plan.segments]
+                    fewest = _fewest_legal_multiclip_cover(
+                        target, contract, drop, 8)
+                    checked += 1
+                    assert fewest is not None, (
+                        "%s -- planned %r but the reference says nothing "
+                        "covers it" % (where, lengths))
+                    count, last, trim = fewest
+                    assert count == plan.segment_count, (
+                        "%s -- planned %d segments %r but %d would have "
+                        "covered it" % (where, plan.segment_count, lengths,
+                                        count))
+                    # COMPOSITION, not just the count -- see the reference's
+                    # docstring for the mutant that made this necessary.
+                    assert lengths[-1] == last, (
+                        "%s -- last segment renders %d, reference says %d"
+                        % (where, lengths[-1], last))
+                    assert plan.segments[-1].trim_tail == trim, (
+                        "%s -- trims %d, reference says %d"
+                        % (where, plan.segments[-1].trim_tail, trim))
+                    # ...and the DOCUMENTED fill order: `_ladder_partition`
+                    # "fills each segment toward the ceiling in order, which
+                    # keeps the plan deterministic and puts the short segment
+                    # last". Asserted against the docstring, not against the
+                    # reference, so it does not share its arithmetic.
+                    assert lengths == sorted(lengths, reverse=True), (
+                        "%s -- segments are not longest-first: %r"
+                        % (where, lengths))
+                    assert all(s.trim_tail == 0 for s in plan.segments[:-1]), (
+                        "%s -- only the LAST segment may be trimmed: %r"
+                        % (where, [s.trim_tail for s in plan.segments]))
+
+    # A FLOOR THAT CAN ACTUALLY NOTICE A COLLAPSE. The old floor was 500
+    # against a measured 27,954 -- 56x slack, so a regression that turned 90%
+    # of this grid into refusals would still have sailed through. A QA lens
+    # demonstrated exactly that: a mutant that made `_candidate_totals` round
+    # the wrong way cut `checked` by 29% (to 19,770) and the old assertion
+    # passed by 39x. The floor now sits just under the real value, and the
+    # refusal count is asserted too so coverage cannot drain into the `except`.
+    assert checked >= 27954, (
+        "grid produced only %d multi-clip plans (measured 27954 at the time "
+        "this was written) -- coverage has collapsed, or the grid moved and "
+        "this floor needs re-measuring" % checked)
+    assert refused <= 12000, (
+        "%d targets refused -- coverage is draining into the except branch"
+        % refused)
+
+
+def test_the_segment_count_ceiling_is_INCLUSIVE():
+    """``max_segments`` is a count the partitioner may actually use.
+
+    Added because a mutation round SURVIVED: turning the walk's
+    ``range(2, max_segments + 1)`` into ``range(2, max_segments)`` broke
+    nothing in the suite, so the boundary was pinned by nobody and a
+    silently-narrowed search would have looked exactly like a genuine refusal.
+
+    17 * 3 == 51 on this ladder with no trim allowed, so 51 needs EXACTLY
+    three segments: at two it is honestly uncoverable, at three it is exact.
+    That makes the pair a boundary rather than a single-sided assertion.
+    """
+    contract = fc.FrameContract(min_frames=9, max_frames=17, quantum=8,
+                                allow_tail_trim=False,
+                                continuity=fc.CONTINUITY_SOFT_REFERENCE)
+    with pytest.raises(cp.CoveragePlanError, match="no exact multi-clip"):
+        cp.partition_beat(51, contract, max_segments=2)
+
+    plan = cp.partition_beat(51, contract, max_segments=3)
+    assert plan.segment_count == 3
+    assert [s.render_frames for s in plan.segments] == [17, 17, 17]
+    assert plan.total_visible_frames == 51
+
+
+def test_a_trimmed_plan_never_starves_its_LAST_segment():
+    """The trim guard's contract, asserted as a property.
+
+    RECORDED HONESTLY: two mutants of the guard itself
+    (``lengths[-1]`` -> ``lengths[0]``, and deleting the guard outright)
+    SURVIVED a mutation round, and the reason is not a missing test -- it is
+    that the guard cannot fire. ``_candidate_totals`` yields the SMALLEST
+    reachable total at or above what is required, so the overshoot it hands
+    back is never big enough to eat a whole final segment. An exhaustive
+    sweep over every ladder with ``min<=10, quantum in {1,2,3,4,8}, max<=80``
+    and nine discrete menus (including the real Veo and Pixverse ones) found
+    ZERO cases where the guard rejects a candidate.
+
+    So the guard is a backstop against a future ``_candidate_totals`` that
+    offers looser candidates, and the honest test is not a contrived call
+    that fakes one -- that would test the fake. It is this: every trimmed
+    plan the partitioner actually emits leaves its last segment contributing
+    real frames. If the candidate policy ever loosens, this is what notices.
+    """
+    seen_trims = 0
+    for min_f, q, max_f in ((4, 1, 5), (9, 8, 161), (10, 2, 12), (33, 4, 177),
+                            (1, 2, 12)):
+        for continuity, drop in ((fc.CONTINUITY_STRICT_FIRST_FRAME, 1),
+                                 (fc.CONTINUITY_SOFT_REFERENCE, 0)):
+            contract = fc.FrameContract(min_frames=min_f, max_frames=max_f,
+                                        quantum=q, allow_tail_trim=True,
+                                        continuity=continuity)
+            for target in range(1, max_f * 3):
+                try:
+                    plan = cp.partition_beat(target, contract, max_segments=8)
+                except cp.CoveragePlanError:
+                    continue
+                last = plan.segments[-1]
+                assert last.visible_frames >= 1, (
+                    "min=%d q=%d max=%d %s target=%d -- last segment renders "
+                    "%d, drops %d, trims %d and contributes NOTHING"
+                    % (min_f, q, max_f, continuity, target,
+                       last.render_frames, last.drop_head, last.trim_tail))
+                assert last.drop_head == (drop if plan.segment_count > 1 else 0)
+                if last.trim_tail:
+                    seen_trims += 1
+    assert seen_trims > 200, (
+        "only %d trimmed plans in the sweep -- this property is not being "
+        "exercised" % seen_trims)
