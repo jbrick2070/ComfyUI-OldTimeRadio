@@ -355,6 +355,148 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
+    # ---- beat session (WIRE-W3b, 2026-07-29) ----
+    #: The node ids :meth:`prepare` hoists out of the segment graph. ONE entry,
+    #: for the same arithmetic reason as ``eng_wan_i2v``: ``render_clip`` runs
+    #: with ``free_after_use=True`` so the umt5 text encode frees before the 5B
+    #: UNET and the 2.2 video VAE decode. Hoisting the CLIP would pin it
+    #: resident for the whole beat and undo the one mitigation this tier has.
+    _SESSION_NODES = ("unet",)
+
+    def session_identity(self):
+        """What this adapter's HANDLES are -- engine, recipe, loader modes,
+        weights. ``BeatSession`` refuses a multi-segment beat without it.
+
+        BOTH loader modes are carried, and unlike ``eng_wan_i2v`` this adapter
+        really has two: the UNET mode picks ``UNETLoader`` vs
+        ``UnetLoaderGGUF``, and the CLIP mode picks ``CLIPLoader`` vs
+        ``CLIPLoaderGGUF`` -- whose input schemas DIFFER (the GGUF one takes no
+        ``device``). A beat that switched either class mid-way would be reusing
+        a handle its own graph no longer knows how to have produced.
+
+        The weight receipts include the CLIP and the VAE even though neither is
+        hoisted (r4/A5): this adapter distinguishes INCOMPATIBLE Wan2.2 VAE
+        generations, so a VAE swapped between segments is exactly the drift
+        this exists to catch.
+
+        Per-segment state -- prompt, seed, frame count, canvas, init image --
+        is deliberately EXCLUDED. Not cached: the whole job is to notice a
+        weight that MOVED, so the receipts are re-stat'ed on every ask."""
+        return (self.name,
+                self._recipe_receipt(),
+                "unet_loader=%s" % (self._loader_mode(),),
+                "clip_loader=%s" % (self._clip_loader_mode(),),
+                repr(self._wan_session_receipts()))
+
+    def prepare(self, host_caps, profile, session_ctx):
+        """Load the 5B UNET ONCE PER BEAT instead of once per segment.
+
+        Mirrors ``eng_wan_i2v.prepare`` step for step (resolve the frozen
+        config BEFORE the lease is taken, ``super().prepare()``, a loader-only
+        mini-graph registering the patcher through ``on_result`` as it lands,
+        tear down and re-raise on ANY failure). Two things are this adapter's
+        own:
+
+        1. ``session_ctx`` IS KEPT. It is the only channel that tells
+           :meth:`render_clip` whether its output will be concatenated with
+           other segments into one beat, and that decides whether the
+           ping-pong extension is legal (see :meth:`render_clip`). The base
+           ``prepare`` drops the argument, and nothing else on the request says
+           it -- a coverage-planned segment's request is shaped exactly like a
+           single-clip beat's.
+
+        2. THE COST OF THE HOIST IS MEASURED, not assumed. ``_floor_length``
+           predicts an affordable render length from live free VRAM minus a
+           cost-model ``overhead`` documented as "the resident model + fixed
+           buffers". Hoisting the UNET moves ~6 GB from *free* into *resident*
+           BEFORE that read happens, so the overhead would be charged twice and
+           the predictor would refuse renders it used to allow -- loudly, via
+           ``MotionBudgetError``, on a lane that works today. Measuring the
+           delta across the loader graph and handing it back to the budget
+           restores exactly the memory state the pre-hoist code measured, with
+           a number read off this box rather than a constant somebody tuned.
+           ``None`` (no torch/CUDA) stays ``None`` and the budget stays
+           geometry-only, as before.
+        """
+        from . import wrapper_bridge as _wb
+        self._resolve_render_config()           # range-checked, fail-closed
+        prepared = super().prepare(host_caps, profile, session_ctx)
+        prepared["session_ctx"] = dict(session_ctx or {})
+        try:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
+            names = self._loader_names()
+            bucket = prepared.setdefault("patchers", self._patchers)
+            seen = {id(p) for p in bucket}
+
+            def _register(nid, out):
+                """Own the handle the moment it exists, not after the graph
+                returns: if a later node raised, ``run_graph`` never returns a
+                results dict and an unregistered patcher is VRAM nothing will
+                ever detach. Slot 0 is the MODEL patcher ``_detach_patchers``
+                knows how to unwind; the duck-typed ``detach`` check keeps that
+                honest rather than a positional assumption."""
+                model = out[0] if out else None
+                if (model is not None and id(model) not in seen
+                        and callable(getattr(model, "detach", None))):
+                    bucket.append(model)
+                    seen.add(id(model))
+
+            if self._loader_mode() == "gguf":
+                unet_inputs = {"unet_name": names["unet"]}
+            else:
+                unet_inputs = {"unet_name": names["unet"],
+                               "weight_dtype": "default"}
+            free_before = _MC.free_vram_mb()
+            results = _wb.run_graph(
+                {"unet": {"class": "unet", "inputs": unet_inputs}},
+                classes, on_result=_register)
+            free_after = _MC.free_vram_mb()
+            out = results.get("unet") or ()
+            if not out:
+                raise _wb.GraphExecutionError(
+                    "wan_ti2v hoisted UNET %r returned no output; the beat "
+                    "session has nothing to reuse and every segment would "
+                    "silently reload" % (names["unet"],))
+            prepared["external_results"] = results
+            prepared["hoisted_vram_mb"] = self._hoist_cost_mb(
+                free_before, free_after)
+        except BaseException:
+            try:
+                self.teardown(prepared)
+            except BaseException:          # noqa: BLE001 -- never mask the cause
+                pass
+            raise
+        return prepared
+
+    @staticmethod
+    def _hoist_cost_mb(free_before, free_after):
+        """MB the hoisted handles took out of free VRAM, or ``None``.
+
+        ``None`` whenever either read is unavailable (no torch/CUDA) so the
+        caller keeps its geometry-only path. NEGATIVE deltas read as 0.0: a
+        concurrent process freeing memory during the load would otherwise hand
+        the budget MORE room than the box has, which is the one direction this
+        correction must never move."""
+        if free_before is None or free_after is None:
+            return None
+        return max(0.0, float(free_before) - float(free_after))
+
+    def teardown(self, prepared):
+        """Drop the beat-scoped handles BEFORE delegating.
+
+        ``prepared["external_results"]`` holds a strong reference to the
+        hoisted UNET. The base teardown detaches the patchers, unloads,
+        releases the lease and then WAITS for machine-wide VRAM to settle --
+        every one of those steps would run with this dict still pinning the
+        very tensors it is trying to reclaim, so the stability wait would be
+        watching its own referent. Clearing first costs nothing.
+
+        Never raises out of teardown (it is a finally-path)."""
+        if isinstance(prepared, dict):
+            prepared.pop("external_results", None)
+        return super().teardown(prepared)
+
     # ---- in-process graph spec (CORE Wan 2.2 TI2V-5B; verified vs /object_info) -
     def _loader_mode(self):
         """``gguf`` (``UnetLoaderGGUF``) or ``safetensors`` (``UNETLoader``).
@@ -548,7 +690,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return _WR.recipe_receipt(RECIPE_WAN_TI2V, PREQUALIFICATION_ENV,
                                   self._recipe_departures(knobs))
 
-    def _floor_length(self, target_frame_count, width=None, height=None):
+    def _floor_length(self, target_frame_count, width=None, height=None,
+                      hoisted_vram_mb=None):
         """The VRAM-PREDICTED render length (4n+1) for this beat (clip-fill fix).
 
         REPLACES the old hard 17-frame "8GB floor" that froze every wan clip to
@@ -559,7 +702,15 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         render up to the full target so the beat is FILLED with motion. The motion
         floor (17) always wins; an absolute hard cap for a tiny/8GB card comes
         from ``OTR_WAN_TI2V_MAX_FRAMES`` or, on a production leg, the tier's
-        ledger-stamped ``max_render_frames`` (default = the engine max, not 17)."""
+        ledger-stamped ``max_render_frames`` (default = the engine max, not 17).
+
+        ``hoisted_vram_mb`` (WIRE-W3b) is what :meth:`prepare` MEASURED the
+        beat-scoped handles cost, added back to the live free reading. The cost
+        model's ``overhead`` term is documented as "the resident model + fixed
+        buffers"; once the UNET is hoisted, free VRAM has already been charged
+        for those weights, so without this the same GB is subtracted twice and
+        a render that fits refuses with ``MotionBudgetError``. ``None`` (no
+        session, or no torch/CUDA) leaves the reading exactly as it was."""
         from . import wrapper_bridge as _wb
         target = int(target_frame_count or _TI2V_DEFAULT_FRAMES)
         # Hard-cap resolution (2026-07-24 WAN 8GB launch contract). BEFORE this,
@@ -583,17 +734,94 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         target = max(1, min(target, hard_cap))
         if width is None or height is None:
             width, height = _TI2V_COST_REF_W, _TI2V_COST_REF_H
+        free_mb = _MC.free_vram_mb()
+        if free_mb is not None and hoisted_vram_mb is not None:
+            free_mb = float(free_mb) + float(hoisted_vram_mb)
         budget = _MC.compute_real_frame_budget(
-            _MC.free_vram_mb(), target, int(width), int(height), self.name)
+            free_mb, target, int(width), int(height), self.name)
         return _wb.quantize_frames_4n1(
             budget, min_frames=_TI2V_MIN_FRAMES, max_frames=hard_cap)
 
-    def _build_graph(self, request, image_name, plan, length, width, height):
+    def _planned_length(self, target_frame_count):
+        """The render length for a COVERAGE-PLANNED segment: its own, whole.
+
+        A planned segment's length came off ``coverage_plan.partition_beat``,
+        which only ever emits lengths this adapter's own ``frame_contract``
+        declares legal -- so there is nothing to snap and nothing to floor. The
+        VRAM predictor is deliberately NOT consulted: it exists to decide how
+        much of an open-ended beat to render, and this length is not a
+        preference, it is the arithmetic the rest of the beat was planned
+        around. A segment that renders anything else leaves the beat short or
+        long by exactly that much.
+
+        THE TWO WAYS THIS CAN REFUSE, both knowable from pure numbers before
+        anything is staged:
+
+        1. The length is not on this adapter's ladder. That means the stamped
+           plan and the declared contract disagree, which is a build error, not
+           a render-time condition.
+        2. The tier pinned a render ceiling BELOW the planned length. WAN is
+           deliberately excluded from ``frame_contract.PLANNING_CAP_ENGINES``
+           -- its ceiling is a RENDER cap that the single-clip path fills
+           around with the ping-pong, and narrowing the planner by it would
+           turn every WAN beat into a pile of 17-frame renders and rewrite the
+           low-VRAM tier ``PBUG-20260723-02`` fixed. The consequence is that a
+           tier ceiling and a multi-clip plan CAN contradict each other, and
+           when they do the honest answer is to say so by name rather than
+           render short and mirror the difference.
+        """
+        from . import wrapper_bridge as _wb
+        target = int(target_frame_count or 0)
+        contract = self.frame_contract
+        if not contract.is_legal_length(target):
+            raise _wb.GraphExecutionError(
+                "wan_ti2v was handed a coverage-planned segment of %d frame(s), "
+                "which is not on its declared ladder (min %d, max %d, quantum "
+                "%d). The stamped plan and the adapter's frame_contract "
+                "disagree. NO FALLBACK -- snapping to a nearby rung would make "
+                "the assembled beat a different length than the plan says."
+                % (target, int(contract.min_frames), int(contract.max_frames),
+                   int(contract.quantum)))
+        ceiling = self.profile_max_render_frames()
+        _raw_env = (os.environ.get("OTR_WAN_TI2V_MAX_FRAMES") or "").strip()
+        try:
+            env_cap = int(_raw_env) if _raw_env else 0
+        except (TypeError, ValueError):
+            env_cap = 0
+        if env_cap > 0:
+            ceiling = env_cap
+        if 0 < ceiling < target:
+            raise _wb.GraphExecutionError(
+                "wan_ti2v was handed a coverage-planned segment of %d frame(s) "
+                "but this tier pins its render ceiling at %d. WAN's ceiling is "
+                "a RENDER cap, not a planning cap (frame_contract."
+                "PLANNING_CAP_ENGINES), so the planner never saw it and the "
+                "two now contradict each other. NO FALLBACK -- rendering %d "
+                "and mirroring the rest would put padded frames inside a beat "
+                "claiming real multi-clip coverage. Raise max_render_frames "
+                "for this tier or route the beat to a single-clip engine."
+                % (target, ceiling, ceiling))
+        return target
+
+    def _build_graph(self, request, image_name, plan, length, width, height,
+                     external_results=None):
         """The declarative Wan TI2V-5B graph (wrapper_bridge.run_graph format).
         ``Wan22ImageToVideoLatent`` builds the latent from the VAE + init image; the
         KSampler takes the CLIPTextEncode positive/negative DIRECTLY (unlike the
         14B's WanImageToVideo, which bundles them). ModelSamplingSD3 applies the 5B
-        sigma shift (default 5.0)."""
+        sigma shift (default 5.0).
+
+        ``external_results`` names the ids the CALLER already produced and owns
+        for the whole beat (WIRE-W3b: :meth:`prepare` loads the UNET once).
+        Those node DEFINITIONS are omitted while every wire that reads them
+        stays -- the executor resolves them from the caller's handles instead.
+        Omitting rather than leaving them is not an optimisation: ``run_graph``
+        REFUSES a graph that also defines an id the caller supplied, because
+        then two parties claim to produce one output.
+
+        Conditional on purpose. A caller that prepared nothing -- every sibling
+        test that hand-builds ``prepared={"patchers": []}`` -- gets the loader
+        nodes exactly as before, byte for byte."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         names = self._loader_names()
@@ -618,7 +846,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         else:
             clip_inputs = {"clip_name": names["clip"], "type": "wan",
                            "device": "default"}
-        return {
+        graph = {
             "unet": {"class": "unet", "inputs": unet_inputs},
             "modelsampling": {"class": "modelsampling",
                               "inputs": {"model": W("unet", 0), "shift": shift}},
@@ -645,6 +873,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vaedecode": {"class": "vaedecode",
                           "inputs": self._vaedecode_inputs(W)},
         }
+        for nid in set(external_results or ()):
+            graph.pop(nid, None)
+        return graph
 
     def _vaedecode_inputs(self, W):
         """VAEDecode inputs; the tiled path adds the schema-verified tile/temporal
@@ -683,7 +914,25 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         SILENT bt709 clip (V-1), retain the MODEL patcher for V-4 teardown, and
         assert the mid-render NVML ceiling. M7 ffprobe-proves the silent-clip
         contract before the mux trusts it. Fail-closed NAMED on a missing node /
-        init image."""
+        init image.
+
+        THE PING-PONG IS NARROWED, NOT RIPPED (WIRE-W3b, 2026-07-29). On a
+        SINGLE-CLIP beat this adapter still renders short on purpose and fills
+        the beat with a mirror-extended clip -- that is the shipped 8 GB tier
+        contract (``PBUG-20260723-02``) and it is untouched. On a
+        COVERAGE-PLANNED segment it is forbidden: ``coverage_plan``'s own
+        docstring says a planned segment delivers the frames it was planned
+        for, and a mirrored tail on a lane declaring ``strict_first_frame``
+        would hand the NEXT segment a mirrored frame to chain from. Worse, the
+        pad wears the right frame count, so a render that did not happen passes
+        ``render_driver``'s ``got != segment.render_frames`` gate wearing the
+        number of one that did.
+
+        ``prepared["session_ctx"]["multi_clip"]`` is the discriminator, and it
+        is the ONLY honest one available here: ``BeatSession`` sets it from the
+        stamped plan's segment count, whereas a segment's REQUEST is shaped
+        exactly like a single-clip beat's. A caller that prepared nothing reads
+        as single-clip, which is the conservative direction."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested
@@ -693,13 +942,32 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
+        session = (prepared or {}) if isinstance(prepared, dict) else {}
+        multi_clip = bool((session.get("session_ctx") or {}).get("multi_clip"))
+        target_frames = int(plan.get("target_frame_count") or 0)
+        # THE LENGTH IS DECIDED BEFORE ANYTHING IS STAGED (the eng_ltx_8gb B4
+        # ordering, adopted here): a request this adapter cannot render is
+        # knowable from pure numbers, so the refusal must not arrive after an
+        # init image has been written -- and never after the GPU work.
+        if multi_clip:
+            length = self._planned_length(target_frames)
+        else:
+            # CLIP-FILL: PREDICT the VRAM-affordable render length for THIS
+            # canvas (never react-to-OOM); the short render is ping-pong-
+            # extended to the beat target below so the composite never
+            # freeze-fills the beat.
+            length = self._floor_length(target_frames, width, height,
+                                        session.get("hoisted_vram_mb"))
         image_name = self._materialize_init_image(
             request, plan["init_image"], width, height)
-        # CLIP-FILL: PREDICT the VRAM-affordable render length for THIS canvas
-        # (never react-to-OOM); the short render is ping-pong-extended to the beat
-        # target below so the composite never freeze-fills the beat.
-        length = self._floor_length(plan["target_frame_count"], width, height)
-        graph = self._build_graph(request, image_name, plan, length, width, height)
+        # The beat-scoped handles prepare() hoisted, if any. Their node
+        # definitions drop out of the graph and run_graph resolves the wires
+        # from these instead -- and it adds them to `keep`, so the
+        # free_after_use pass below cannot evict a handle the NEXT segment
+        # still needs.
+        external = session.get("external_results") or {}
+        graph = self._build_graph(request, image_name, plan, length, width, height,
+                                  external_results=external)
         # free_after_use: the umt5 text-encode frees before the 5B UNET + the 2.2
         # VAE decode; "unet" kept for V-4 patcher teardown, "vae" for the decode,
         # the terminal for the IMAGE read-out. The NVML peak probe spans the whole
@@ -707,7 +975,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(graph, classes, free_after_use=True,
-                                    keep={"unet", "vae", self._TERMINAL})
+                                    keep={"unet", "vae", self._TERMINAL},
+                                    external_results=external)
             images = results[self._TERMINAL][0]               # VAEDecode IMAGE batch
         finally:
             render_peak = probe.stop()
@@ -718,14 +987,39 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
-        # CLIP-FILL: ping-pong-extend the VRAM-bounded short render up to the
-        # beat's audio-derived target so the composite fills the beat with motion
-        # instead of holding the last frame (the 0.68s-then-freeze bug). A no-op
-        # when the native render already meets the target (extend returns as-is).
-        target_frames = int(plan.get("target_frame_count") or 0)
         n_native = len(frames)
+        # THE PIPELINE INVARIANT (WIRE-W3b, the eng_ltx_8gb B4 invariant #1
+        # adopted here). The graph was asked for exactly ``length`` frames, so
+        # anything else is an under-delivery -- and until now the ping-pong
+        # below absorbed it for ANY reason, not just the deliberate VRAM cap,
+        # so a decode that silently returned short was indistinguishable from
+        # one that did what it was told.
+        if n_native != length:
+            raise _wb.GraphExecutionError(
+                "wan_ti2v asked its graph for %d frame(s) and decoded %d. NO "
+                "FALLBACK -- padding the difference is how a render that did "
+                "not happen gets counted as one." % (length, n_native))
+        extension_mode = "none"
         if target_frames > n_native:
+            if multi_clip:
+                # Unreachable by construction (``_planned_length`` returns the
+                # planned length or refuses, and the invariant above proves the
+                # decode matched it), and it stays because "unreachable" is a
+                # claim about today's callers. If it ever fires, the beat is
+                # about to be assembled from part-real, part-mirrored segments.
+                raise _wb.GraphExecutionError(
+                    "wan_ti2v segment rendered %d real frame(s) of a planned "
+                    "%d. NO FALLBACK -- ping-pong padding a COVERAGE-PLANNED "
+                    "segment puts mirrored frames inside a beat that claims "
+                    "real multi-clip coverage, and hands the next chained "
+                    "segment a mirrored frame to continue from."
+                    % (n_native, target_frames))
+            # CLIP-FILL, SINGLE-CLIP ONLY: ping-pong-extend the VRAM-bounded
+            # short render up to the beat's audio-derived target so the
+            # composite fills the beat with motion instead of holding the last
+            # frame (the 0.68s-then-freeze bug, PBUG-20260723-02).
             frames = _wb.extend_frames_to_target(frames, target_frames)
+            extension_mode = "ping_pong"
             _LOG.warning(
                 "[OTR video] wan_ti2v CLIP-FILL: rendered %d frame(s) -> "
                 "ping-pong extended to %d (beat target %d) @ %dx%d so the beat "
@@ -748,8 +1042,17 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # _clip_from_raw -> the manifest row -> stamp_durable(meta.render_engines),
         # so a published episode can be asked which recipe rendered it. It was
         # None on every WAN clip until the freeze landed.
+        #
+        # `native_frame_count` / `extension_mode` (WIRE-W3b, 2026-07-29): how
+        # many of the emitted frames this engine actually RENDERED, and how the
+        # rest got there. Without them a ping-ponged clip and a real one are
+        # indistinguishable downstream -- both carry the right frame_count --
+        # so the W5 acceptance grader has no way to reject a mirror-filled clip
+        # on a lane claiming real multi-clip coverage.
         return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak,
-                "recipe": self._recipe_receipt()}
+                "recipe": self._recipe_receipt(),
+                "native_frame_count": n_native,
+                "extension_mode": extension_mode}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)

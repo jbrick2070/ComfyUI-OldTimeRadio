@@ -844,8 +844,8 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2 and W6
-## ARE LANDED AND PUSHED; WIRE-W3 (WAN) is the next line of code.**
+## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a
+## and W3b ARE LANDED AND PUSHED; WIRE-W4 (HuMo) is the next line of code.**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -880,26 +880,56 @@ no node, widget, link or schema touched by any of them):**
   lane and an OOM at 14,499 MB. Receipt mechanism shared in `wan_shared`, data
   per adapter. Suite 7561; mutation 7/7.
 
-**WIRE-W3b IS THE NEXT LINE OF CODE, and it is NOT just a copy of W3a.** The
-session half mirrors `eng_wan_i2v` almost exactly (identity, UNET-only
-`prepare`, `external_results` in `_build_graph` + `render_clip`, `teardown`
-dropping the handles first -- `_wan_session_receipts()` already works for it).
-The half that is NEW is the ping-pong:
+**WIRE-W3b IS LANDED.** The session half mirrors `eng_wan_i2v` (identity,
+UNET-only `prepare`, `external_results` in `_build_graph` + `render_clip`,
+`teardown` dropping the handles first). Three things are this adapter's own:
 
-- `eng_wan_ti2v._floor_length` (`:551`) floors the render to what live VRAM
-  affords, and `render_clip` (`:725-733`) PING-PONG EXTENDS that short render
-  up to the beat target. `coverage_plan`'s module docstring forbids exactly
-  that for a planned multi-clip beat.
-- **Do NOT rip it.** It is load-bearing for the shipped 8 GB WAN tier
-  (`PBUG-20260723-02`): WAN renders a short native clip on purpose and fills
-  the beat with it. Suppress it ONLY for a coverage-planned segment, the way
-  `eng_ltx_8gb` does, and leave the single-clip path alone.
-- Record `native_frame_count` and the extension MODE on every receipt so the
-  W5 grader can reject ping-pong on a lane claiming real multi-clip.
-- Compute the native budget AFTER prepared-model residency (r3): with the UNET
-  already hoisted, `free_vram_mb()` reads a different number than it did when
-  the loader ran inside the segment graph, so the budget must be taken with
-  the same memory state every segment sees.
+- **THE PING-PONG IS NARROWED, NOT RIPPED.** `eng_wan_ti2v` renders a
+  VRAM-bounded short clip and mirror-extends it to the beat target -- on
+  purpose, and it is the shipped 8 GB tier contract (`PBUG-20260723-02`), so it
+  still does exactly that on a SINGLE-CLIP beat. On a coverage-planned segment
+  it is forbidden: `_planned_length` renders the segment's own length whole, or
+  refuses BY NAME before anything is staged (an off-ladder length means the
+  stamped plan and the `frame_contract` disagree; a tier ceiling below the
+  planned length means a ceiling and a plan contradict, which they CAN because
+  WAN is deliberately out of `PLANNING_CAP_ENGINES`). The discriminator is
+  `prepared["session_ctx"]["multi_clip"]` -- the only honest one available,
+  because a planned segment's REQUEST is shaped exactly like a single-clip
+  beat's.
+- **The pipeline invariant came with it** (`eng_ltx_8gb`'s B4 invariant #1): a
+  decode that returns a different count than the graph asked for now RAISES.
+  The pad used to absorb an under-delivery for ANY reason, so a short decode
+  was indistinguishable from a render that did what it was told -- and
+  `test_wan_recipe_freeze`'s own fake decoder had been exercising the pad on
+  every render since it was written.
+- **`native_frame_count` + `extension_mode` ride every WAN receipt** through
+  the shared `wan_shared._clip_from_raw` into the manifest. `frame_count`
+  cannot answer the question: a padded clip carries the same number as a real
+  one, which is exactly the evidence a pad forges. `wan_i2v` stamps them too
+  (`"none"`, always) -- an ABSENT field is indistinguishable from an unanswered
+  one, and a family where one adapter answers and its sibling does not gives
+  the W5 grader no lane it can trust.
+- **The hoist cost is MEASURED and added back to the budget** (r3's third
+  bullet, and it is not cosmetic -- without it the session half BREAKS the lane
+  it fixes). The cost model's `overhead` is "the resident model + fixed
+  buffers"; hoisting the UNET moves those GB out of *free* before
+  `_floor_length` reads it, so the same weights get charged twice and
+  `MotionBudgetError` refuses renders that fit. `prepare` reads free VRAM
+  either side of the loader graph and hands the delta to every segment -- one
+  number per beat, so two segments of one beat cannot pick different lengths.
+
+**ONE TEST WAS CORRECTED, not silenced.**
+`test_ltx_8gb_session_identity.py`'s CONTROL asserted that `wan_ti2v` alone had
+no session identity, which made it a control over exactly one engine --
+`wan_i2v` gained one at WIRE-W3a and nothing in that file noticed. It now
+asserts the whole SET against a named list carrying the chunk that added each
+entry, so it fails in both directions.
+
+**WIRE-W4 IS THE NEXT LINE OF CODE:** the HuMo beat session plus the
+per-segment audio slicer. Three HuMo lanes still come back NO_RENDER, and HuMo
+is the only family where a segment needs its OWN slice of the beat's audio --
+hand every segment the whole beat's waveform and the assembled beat lip-syncs
+to itself once per segment.
 
 **OPERATOR RULING 2026-07-29 -- THE MOTION FLOOR, AND THE CREDITS EXCEPTION.**
 

@@ -144,12 +144,46 @@ def test_an_identity_read_that_cannot_resolve_its_weights_RAISES(eng, monkeypatc
     assert m._LTX8_DEFAULT_CKPT in str(e.value)
 
 
-# --- CONTROL: engines that never open a multi-segment session stay silent --- #
-def test_CONTROL_the_rollout_is_scoped_to_this_engine_only():
-    """A package-wide rollout was explicitly cut: unbounded engines never open a
-    multi-segment session, and other capped adapters need their own handle
-    contracts. If this starts failing, someone widened the blast radius."""
-    from nodes._otr_video_engines import eng_wan_ti2v
+# --- CONTROL: the rollout is a NAMED LIST, never a package-wide sweep ------- #
+#: Every adapter that declares a handle contract, and the chunk that gave it
+#: one. A package-wide rollout was explicitly cut at B1b: an unbounded engine
+#: never opens a multi-segment session, and every capped adapter needs its own
+#: identity -- what its handles are, and which of them it hoists -- written and
+#: measured for that adapter. So the list grows one ratified chunk at a time.
+_ENGINES_WITH_A_SESSION = {
+    "ltx_8gb",                 # B1b / B2b, 2026-07-27
+    "wan_i2v",                 # WIRE-W3a, 2026-07-29
+    "wan_ti2v",                # WIRE-W3b, 2026-07-29
+}
 
-    wan = eng_wan_ti2v.WanTi2vEngine()
-    assert bs.session_identity(wan) is None
+
+def test_CONTROL_the_rollout_is_a_NAMED_LIST_and_this_is_the_list():
+    """If this starts failing, someone widened the blast radius -- or narrowed
+    it -- without saying so here.
+
+    This used to assert that ``wan_ti2v`` alone stayed silent, which made it a
+    control over exactly one engine: ``wan_i2v`` gained an identity at WIRE-W3a
+    and no test in this file noticed. Asserting the whole SET is the control
+    that was meant, and it fails in both directions.
+    """
+    import nodes._otr_video_engines  # noqa: F401  -- populate the registry
+    from nodes._otr_video_engines import registry as vreg
+
+    declared = set()
+    for name in vreg.all_engine_names():
+        engine = vreg.get_engine(name)
+        # An identity read that RAISES has still been DECLARED -- the adapter
+        # is telling us it cannot describe handles it does offer, which is a
+        # different failure and one this file tests elsewhere.
+        if getattr(engine, "session_identity", None) is None:
+            continue
+        try:
+            if bs.session_identity(engine) is not None:
+                declared.add(name)
+        except Exception:                    # noqa: BLE001 -- declared, unreadable
+            declared.add(name)
+    assert declared == _ENGINES_WITH_A_SESSION, (
+        "the set of adapters declaring a beat-session identity is %r, not the "
+        "ratified %r -- add the engine and its chunk to _ENGINES_WITH_A_SESSION "
+        "in the same commit that gives it one"
+        % (sorted(declared), sorted(_ENGINES_WITH_A_SESSION)))

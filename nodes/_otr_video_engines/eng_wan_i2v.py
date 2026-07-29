@@ -702,9 +702,18 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # `recipe`: the same shape of receipt for the render CONFIG, riding
         # into stamp_durable(meta.render_engines) so a published episode can be
         # asked which recipe rendered it.
+        #
+        # `native_frame_count` / `extension_mode` (WIRE-W3b, 2026-07-29): this
+        # adapter has NEVER extended -- it renders the 4n+1 rung it asked for
+        # and emits it. The fields are stamped anyway, because the W5 grader
+        # reads them off the manifest and an ABSENT field is indistinguishable
+        # from an unanswered one: a family where one adapter declares "none"
+        # and its sibling declares nothing gives the grader no lane to trust.
         return {"out_path": path, "frame_count": n,
                 "vram_peak_mb": render_peak,
-                "recipe": self._recipe_receipt()}
+                "recipe": self._recipe_receipt(),
+                "native_frame_count": len(frames),
+                "extension_mode": "none"}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)

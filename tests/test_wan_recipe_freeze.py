@@ -646,8 +646,29 @@ class _FakeModel:
 def _wan_fakes(np, n=4):
     """The CORE Wan node classes, faked -- same shape as
     ``tests/test_video_motion_forward.py``'s, kept local so this file's receipt
-    tests do not depend on that file's import surface."""
-    img = np.zeros((n, 8, 8, 3), dtype="float32")
+    tests do not depend on that file's import surface.
+
+    THE DECODER HONOURS THE LENGTH IT WAS ASKED FOR (WIRE-W3b, 2026-07-29).
+    It used to emit a fixed ``n`` frames no matter what the latent node was
+    given, and ``wan_ti2v``'s ping-pong quietly extended the difference back up
+    to the target -- so the fake was exercising the PAD on every render rather
+    than the render. ``render_clip`` now refuses a decode that returns a
+    different count than the graph asked for, which is a real executor
+    invariant, so the fake has to be honest about it. ``n`` remains the
+    fallback for a graph that never set a length."""
+    asked = {"length": int(n)}
+
+    def _record_length(self, **k):
+        asked["length"] = max(1, int(k.get("length") or asked["length"]))
+        return (("latent",),)
+
+    def _decode(self, **k):
+        return (np.zeros((asked["length"], 8, 8, 3), dtype="float32"),)
+
+    def _wan_latent(self, **k):
+        asked["length"] = max(1, int(k.get("length") or asked["length"]))
+        return (("p",), ("n",), ("latent",))
+
     return {
         "unet": _mk_node(lambda self, **k: (_FakeModel(),)),
         "modelsampling": _mk_node(lambda self, **k: (_FakeModel(),)),
@@ -656,10 +677,10 @@ def _wan_fakes(np, n=4):
         "neg": _mk_node(lambda self, **k: (("c",),)),
         "vae": _mk_node(lambda self, **k: (object(),)),
         "loadimage": _mk_node(lambda self, **k: (object(), object())),
-        "wan": _mk_node(lambda self, **k: (("p",), ("n",), ("latent",))),
-        "latent": _mk_node(lambda self, **k: (("latent",),)),
+        "wan": _mk_node(_wan_latent),
+        "latent": _mk_node(_record_length),
         "ksampler": _mk_node(lambda self, **k: (("latent",),)),
-        "vaedecode": _mk_node(lambda self, **k: (img,)),
+        "vaedecode": _mk_node(_decode),
     }
 
 

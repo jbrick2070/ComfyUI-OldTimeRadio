@@ -558,6 +558,17 @@ class WanInitImageMixin:
             # written twice is a passthrough that drifts once. None for a raw
             # that did not carry it -- every consumer already uses clip.get().
             "recipe": raw.get("recipe"),
+            # HOW MANY OF THOSE FRAMES ARE REAL (WIRE-W3b, 2026-07-29).
+            # ``frame_count`` cannot answer it: a clip whose tail was
+            # ping-pong-extended to fill a beat carries exactly the same count
+            # as one that rendered every frame, so downstream -- the W5
+            # acceptance grader above all -- has no way to tell a mirror-filled
+            # clip from a real one, and "the count matched" is precisely the
+            # evidence a padded clip forges. ``extension_mode`` is "none" or
+            # "ping_pong"; ``native_frame_count`` is what the graph decoded.
+            # None on a raw that predates the stamp -- consumers use .get().
+            "native_frame_count": raw.get("native_frame_count"),
+            "extension_mode": raw.get("extension_mode"),
         }
 
     @staticmethod
