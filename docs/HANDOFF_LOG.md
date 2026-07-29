@@ -3,6 +3,47 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- HEAD a14ecdfa (v2.0-alpha) -- WINDOW CODER (wiring block)
+Did: WIRE-W1, WIRE-W2 and WIRE-W6 built, gated and pushed, one green chunk at
+  a time, from r3/final.md as amended by r4/final.md.
+  **WIRE-W1 `5efd2baf`** -- partition_beat ran TWO walks over the segment count
+  (exact at every count, then trimmed at every count), so an exact cover at a
+  HIGH count beat a trimmed cover at a LOW one. A 184-frame HuMo beat planned
+  [85,33,33,33] because 184 is 0 mod 4 and an exact cover needs a count
+  divisible by 4, while [153,33] trim 2 was legal at count 2 all along. One
+  walk now. Differential over 798,510 (contract,target) pairs / 2,538 contract
+  shapes: 46,949 plans changed, EVERY ONE a count reduction, zero refusals
+  introduced, zero increases. Mutation 9/9, controls 5/5.
+  **WIRE-W2 `a218b1f7`** -- DeferredImageGapError(RenderError) in the new leaf
+  nodes/_otr_video_engines/render_errors.py; RenderError moved with it and is
+  re-exported. Five cast-time sites declare themselves deferrable, three
+  post-image and two wrong-aspect sites stay terminal, and BOTH fail-open
+  swallows in ShotLock's cast-time preflight are deleted. Mutation 6/6.
+  **WIRE-W6 `a14ecdfa`** -- the credits backdrop is the body video's frozen
+  final frame; plan_backdrop DELETED (it read the clip manifest, which is why
+  an all-mesh_stage episode rendered 7/7 and published nothing). Terminal vs
+  presentation-only boundary per r4/A7. Mutation 4/4.
+Found and NOT built (filed in OPEN BUGS): the fewest-segments rule can accept a
+  disproportionate trim on a wide DISCRETE menu -- a bound was written,
+  MEASURED (it made 4,885 grid cases worse) and REVERTED; unreachable on any
+  shipped contract. And the B7 forbidden sweep only diffs TRACKED files, so a
+  new test file passes its gate and fails the commit after -- that cost one red
+  HEAD this session and is written down so it costs nobody else one.
+The fan-out paid three times, all on my own new code: the WIRE-W1 property test
+  compared segment COUNT only (a reversed ladder fill order passed it with 0
+  mismatches over 27,954 plans), its floor was 500 against a real 27,954, and
+  the trim bound above. All three fixed before the push.
+Current step: WIRE-W3 (WAN) -- UNET-only hoist, VAE in the session identity,
+  external_results injection, teardown dropping external refs before base
+  release, native-frame-count + extension-mode receipts, and ping-pong
+  suppressed for coverage-planned segments ONLY (it stays load-bearing for the
+  shipped 8GB WAN tier).
+Next: WIRE-W3 -> WIRE-W4 -> WIRE-W7 -> WIRE-W5, same window rules.
+Models: Claude (rung 4) + a 3-lens Sonnet fan-out per chunk (rung 4, cheap) +
+  one general-purpose read of the superseded GO_FORWARD region. No Codex spend
+  -- no chunk needed a third attempt, so the two-strikes law never fired.
+Commits: 5efd2baf, a218b1f7, a14ecdfa (+ this handoff).
+
 ## 2026-07-29 -- HEAD ead920d2 (v2.0-alpha) -- OPERATOR: LEAN-MEAN OFF GO_FORWARD
 **Operator direction, same session as the plan repair below:** "Lean-mean
 should only come after the randomization and the SFX. In fact, maybe just put

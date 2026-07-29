@@ -844,8 +844,52 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. The wiring arc
-## r1-r4 is CLOSED and the spec is written; WIRE-W1 is the next line of code.**
+## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2 and W6
+## ARE LANDED AND PUSHED; WIRE-W3 (WAN) is the next line of code.**
+
+**LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
+7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
+variants / 0 failures; canonical `9872624A` byte-identical across all three --
+no node, widget, link or schema touched by any of them):**
+
+- **`5efd2baf` WIRE-W1** -- the partitioner takes the FEWEST legal clips. It
+  ran two walks over the segment count (every count for an EXACT cover, then
+  every count again for a TRIMMED one), so an exact cover at a HIGH count beat
+  a trimmed cover at a LOW one. Now one walk: exact, then a permitted trim,
+  then advance. Measured over 798,510 (contract, target) pairs across 2,538
+  contract shapes -- **46,949 plans changed, EVERY ONE a segment-count
+  reduction, zero refusals introduced, zero count increases.** `184 ->
+  [153, 33]` trim 2, and 185-240 all two segments, as codex pinned.
+- **`a218b1f7` WIRE-W2** -- a cast-time image gap DECLARES itself.
+  `DeferredImageGapError(RenderError)` in the new dependency-leaf
+  `nodes/_otr_video_engines/render_errors.py`; `RenderError` moved with it and
+  is re-exported from `render_driver`. Five cast-time sites raise it (one was a
+  bare `ValueError` -- that is why r3's `:1985` was not in the RenderError
+  list); the three post-image still-spine gaps and both wrong-aspect failures
+  stay terminal. **Both fail-open swallows in ShotLock are gone.**
+- **`a14ecdfa` WIRE-W6** -- the end card rides the body video's frozen final
+  frame; `plan_backdrop` is DELETED. Terminal/presentation boundary per r4/A7.
+
+**ONE OPERATOR EYEBALL OWED, and it is the only thing WIRE-W6 cannot settle
+itself:** the credits console used to ride the last drama clip LOOPED; it now
+rides that clip's final frame HELD, for the length of the roll. Same darkened
+drama imagery, never credits-over-black -- but motionless. Ratified in r3 and
+unamended by r4, and it is what removes the manifest read that made an
+all-`mesh_stage` episode unpublishable. If the held frame reads badly, the fix
+is a short looped tail cut FROM THE BODY rather than a return to the manifest.
+
+**ONE NEW OPEN ROW, filed not built (see OPEN BUGS):** the fewest-segments
+preference can accept a disproportionate trim on a discrete menu whose largest
+entry dwarfs its smallest. A bound was written, MEASURED and REVERTED -- it
+cost more than it saved on real ladders. No shipped contract can produce the
+pathological case.
+
+**A TRAP THAT COST A RED HEAD, worth knowing before the next chunk:** the B7
+forbidden sweep (`tests/test_b7_forbidden_sweep.py`) diffs **tracked** files
+only, so a brand-new test file passes the gate while untracked and fails the
+commit AFTER it lands. It flags `alias` as a runtime identifier. Fixed in
+`a14ecdfa`; run the full suite once more after the first commit of any new
+test file.
 
 **THIS IS NOT LEAN-MEAN, AND LEAN-MEAN IS NOT ON THIS DOCUMENT.** Operator
 direction 2026-07-29 moved LEAN-MEAN FRONT and TAIL to the Lean-mean campaign
@@ -869,12 +913,10 @@ AMENDED BY `r4/final.md`.** codex's VERIFY-AT-BUILD checklist (`r4/codex.md`,
 last section) is the adopted per-chunk gate. Order:
 
 ```text
-WIRE-W1  partition   184 -> [153, 33] trim_tail 2; 185-240 all two segments
-WIRE-W2  typed gap   leaf module; convert ONLY render_driver.py:1985, 2049,
-                     2105, 2146, 2179 -- post-image :1024 / :1055 / :1084
-                     stay TERMINAL
-WIRE-W6  end card
-WIRE-W3  WAN         UNET-only hoist, VAE in identity
+WIRE-W1  partition   DONE 5efd2baf
+WIRE-W2  typed gap   DONE a218b1f7
+WIRE-W6  end card    DONE a14ecdfa
+WIRE-W3  WAN         <-- NEXT. UNET-only hoist, VAE in identity
 WIRE-W4  HuMo        session BEFORE slicer; SUPPRESS eng_humo.py:525-531
                      per-segment reclaim or the hoist is evicted; conditioning
                      WAV = render_frames with silence padding for trim_tail
@@ -2011,6 +2053,35 @@ receipt under `tmp/`.
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 That split is why the two eyeball-era entries below are PARKED rather than
 listed as live.
+
+- **NEW 2026-07-29 (LATENT, no shipped contract can reach it): the
+  fewest-segments partitioner can accept a disproportionate trim on a WIDE
+  discrete menu.** WIRE-W1 makes `partition_beat` take the lowest segment count
+  that covers, including via a permitted tail trim. On a ladder that is always
+  the right trade. On a DISCRETE menu whose largest entry dwarfs its smallest
+  it need not be: covering 1019 frames from a `(10, 999)` menu, two segments
+  give `[999, 999]` and discard 979 frames -- half the work -- where three give
+  `[999, 10, 10]` exactly. **A bound was written and MEASURED and REVERTED, and
+  the measurement is the point:** rejecting a trim of a whole smallest-clip
+  turned `[12, 12]` into `[12, 4, 4]` on a `min=4 max=12 quantum=8` ladder --
+  a third render and a third model load to recover four frames -- across 4,885
+  cases in the sweep grid. **Not reachable today:** the widest shipped menus
+  are Veo's `(100, 150, 200)` and Pixverse's `(125, 200)`, whose worst real
+  trim is 25 frames. Revisit only if an adapter declares a menu with an extreme
+  ratio; the reasoning is recorded in `coverage_plan.partition_beat` so the
+  next reader does not re-derive the bound and re-ship the regression. Found by
+  the pre-push fan-out (lens A), 2026-07-29.
+- **NEW 2026-07-29: the B7 forbidden sweep cannot see an UNTRACKED file, so a
+  new test file passes the gate and fails one commit later.**
+  `tests/test_b7_forbidden_sweep.py` builds its input from
+  `git diff s29-clean-slate-gate -- *.py`, which covers tracked files only. A
+  new test file added and gated in the same session is green; the moment it is
+  committed it enters the diff, and a forbidden runtime identifier in it turns
+  HEAD red with nothing else changed. Cost one red HEAD this session (`alias`
+  as a loop variable, the CW-6 marker). **Not fixed, because the fix is a
+  judgment call:** sweeping the working tree instead of the diff would widen
+  the gate to every untouched file in the repo. Cheap mitigation until then --
+  re-run the full suite once after the FIRST commit of any new test file.
 
 - **THE 8 GB PROFILE FAMILY CANNOT RUN ITS OWN WRITER** (found 2026-07-27,
   RENDER window; LIVE-REPRODUCED TWICE on two different banks, then confirmed
