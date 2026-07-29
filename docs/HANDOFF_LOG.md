@@ -32,7 +32,18 @@ Did: ran the 45-word engine-coverage campaign to completion over all 18 LOCAL
   the engine at the magic-eye tube, no legible text or straight edges in the
   still, and humo_14B_169's 49-frame ceiling stops being a defect on the
   cabinet.
-Current step: r3 of the wiring arc. r1 and r2 are JUDGED
+ARC CLOSED: r1-r4 all judged. **BUILD FROM r3/final.md AS AMENDED BY
+  r4/final.md.** codex's VERIFY-AT-BUILD checklist (r4/codex.md, last section)
+  is the adopted per-chunk gate. Order: W1 partition (184 -> [153,33] trim 2;
+  185-240 two segments) -> W2 typed gap (leaf module; convert ONLY
+  render_driver.py:1985,2049,2105,2146,2179; post-image :1024/:1055/:1084 stay
+  TERMINAL) -> W6 end card -> W3 WAN (UNET-only hoist, VAE in identity) ->
+  W4 HuMo (session BEFORE slicer; SUPPRESS eng_humo.py:525-531 per-segment
+  reclaim or the hoist is evicted; conditioning WAV = render_frames with
+  silence padding for trim_tail) -> W7 mouth-still ownership (ShotLock is the
+  sole cardinality owner; ZERO OR ONE human face, never inferred from prose)
+  -> W5 grader (per-shot frozen-route comparison; histograms are CUT).
+Superseded step line: r3 of the wiring arc. r1 and r2 are JUDGED
   (kibitz-runs/2026-07-28-local-engine-obs-wiring/r{1,2}/final.md); r2/final.md
   carries the build order and is code-ready. NOTE: the opus seat FAILED to
   produce claude.md in r2 -- re-seat it in r3.
