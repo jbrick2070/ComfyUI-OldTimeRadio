@@ -844,11 +844,11 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
-## W3b, W4a, W4b, W4c, W4d and W7 ARE LANDED AND PUSHED; WIRE-W5 (the
-## acceptance grader) is the LAST chunk, and then the 45-word run over all 18
-## local video/still engines -- which is the operator's stated first priority
-## and the only thing that proves any of this.**
+## CURRENT STEP -- **THE WIRING BLOCK IS CODE-COMPLETE. WIRE-W1, W2, W6, W3a,
+## W3b, W4a, W4b, W4c, W4d, W7 and W5 ARE ALL LANDED AND PUSHED. THE NEXT STEP
+## IS GPU TIME: the 45-word run over all 18 local video/still engines, which is
+## the operator's stated first priority and the ONLY thing that proves any of
+## it. NOTHING in the block is live-proven -- it is suite and contract only.**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -1065,13 +1065,49 @@ rulings and no owner for them."*
   CONTROL: same empty `roles`, same beat, answers HUMAN, because the refusal is
   about the family's relationship to a face and not about being a cloud lane.
 
-**WIRE-W5 IS THE NEXT LINE OF CODE** -- the acceptance grader. It must grade
-SOURCE COMPONENTS BEFORE OVERLAYS (kibitz r1: a whole-frame motion check passes
-a frozen backdrop because the overlay moves,
-`tests/test_credits_roll_spec.py:446-470`), it reads the FROZEN route rather
-than the live environment, histograms are CUT, and it can now read
-`native_frame_count`/`extension_mode` off the manifest to reject a ping-ponged
-clip on a lane claiming real multi-clip coverage.
+**WIRE-W5 IS LANDED -- THE WIRING BLOCK IS COMPLETE.**
+`nodes/_otr_video_engines/acceptance.py` is the pure grader and
+`scripts/grade_episode.py` is r4/A6's "durable repository script": a grader
+nobody can run is the same failure mode as an unowned ruling.
+
+    python scripts/grade_episode.py --ledger <ledger.json> --manifest <manifest.json>
+    0 = the episode delivered the route it froze; 1 = findings; 2 = unreadable
+
+- **Per shot, both halves of A6.** `shots[].engine_id ==
+  roles_effective[role]`, then every DELIVERED manifest row's `engine_id`
+  against that same frozen value -- never against the shot row, because a
+  rewritten row would agree with its own rewrite. A role missing from the
+  frozen map is a finding, not a pass.
+- **Histograms are CUT, and there is an experiment rather than an assertion:**
+  a test swaps two shots' engines, shows `engine_histogram` is byte-identical
+  either way, and shows the per-shot grader reports both.
+- **The multi-clip honesty check is what WIRE-W3b's receipts were for.** A beat
+  the plan splits may not deliver `extension_mode="ping_pong"`, and a
+  `"none"` claim must have `native_frame_count == frame_count`. **Silence is
+  not a pass** -- a multi-clip row with no receipt at all is reported, because
+  that is exactly what a lane padding without saying so looks like. A
+  SINGLE-clip beat may pad all it likes: that is the shipped 8 GB WAN tier.
+- **Three refusals, each with a test:** it imports nothing but `__future__`
+  (so it CANNOT query live routing state -- the director froze at plan time and
+  grading against later environment state is a clock-domain mismatch); it never
+  reads `engine_histogram`; and it grades SOURCE receipts, never a composited
+  frame (kibitz r1: `test_credits_roll_spec.py:446-470` scrolls text over a
+  deliberately constant backdrop, so "did the frame change" goes green on a
+  frozen background because the overlay moved).
+- `build_clip_manifest` now carries `native_frame_count` / `extension_mode`
+  onto every row, the same passthrough shape as `recipe` -- a grader reading a
+  field nobody stamps is a grader that always passes, and a test pins the stamp.
+
+**FILED, NOT BUILT:** grading OBS PUBLICATION and the canonical artifacts (A6
+says grade them separately). That is a filesystem question about the `otr/obs/`
+contract, and it belongs with the 45-word run rather than ahead of it.
+
+## NEXT: THE 45-WORD RUN OVER ALL 18 LOCAL VIDEO/STILL ENGINES
+
+The operator's stated first priority, and **the only thing that proves any of
+the wiring block.** Everything above is suite-and-contract green and NOTHING in
+it is live-proven. The run is what turns "the code says it will" into "the box
+did".
 
 **OPERATOR RULING 2026-07-29 -- THE MOTION FLOOR, AND THE CREDITS EXCEPTION.**
 

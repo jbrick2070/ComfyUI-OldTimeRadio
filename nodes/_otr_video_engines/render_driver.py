@@ -4232,6 +4232,17 @@ def build_clip_manifest(result, *, episode_id=""):
             "use_lora": clip.get("use_lora"),
             "render_canvas": clip.get("render_canvas"),
             "vram_peak_mb": clip.get("vram_peak_mb"),
+            # HOW MANY OF THOSE FRAMES ARE REAL (WIRE-W5, 2026-07-29). Same
+            # shape and the same reason as ``recipe`` above: the engine stamps
+            # them on the canonical clip and they die there unless the manifest
+            # carries them. ``frame_count`` cannot answer the question -- a
+            # ping-pong-extended clip carries exactly the number a real one
+            # does, which is precisely the evidence a pad forges -- so the
+            # acceptance grader has no way to reject a mirror-filled clip on a
+            # lane claiming real multi-clip coverage without these. OPTIONAL:
+            # None on every engine that emits no receipt.
+            "native_frame_count": clip.get("native_frame_count"),
+            "extension_mode": clip.get("extension_mode"),
         }
         # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
         # turntable mesh on a TRANSPARENT background -- it composites over a
