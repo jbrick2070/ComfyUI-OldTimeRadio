@@ -845,9 +845,8 @@ guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
 ## CURRENT STEP -- **WIRE THE SIX NO_RENDER LOCAL ENGINES. WIRE-W1, W2, W6, W3a,
-## W3b, W4a, W4b and W4c ARE LANDED AND PUSHED; WIRE-W7 (mouth-still ownership)
-## is the next line of code, then WIRE-W5 (the acceptance grader). WIRE-W4d
-## (prebuild the slices OUTSIDE BeatSession) is filed, not built.**
+## W3b, W4a, W4b, W4c and W4d ARE LANDED AND PUSHED; WIRE-W7 (mouth-still
+## ownership) is the next line of code, then WIRE-W5 (the acceptance grader).**
 
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
@@ -1014,15 +1013,26 @@ next segment."* W4b took the whole window straight off the master.
   configured but not on PATH the credits rendered and the slice silently
   returned `""` -- which reads downstream as "this beat has no voice line".
 
-**WIRE-W4d IS FILED, NOT BUILT** (r3's own W4 paragraph): segment requests and
-audio slices are still built INSIDE `BeatSession` (`render_driver:~3025`), so
-ffmpeg does filesystem work while holding the GPU lease and the hoisted model.
-r3: *"Prebuild and validate all segment requests and audio slices BEFORE
-entering BeatSession; only terminal-image chaining stays in the render loop."*
-It is a sequencing change, not an arithmetic one. Also unbuilt from that
-paragraph: the durable slice RECEIPT (source PCM hash, segment index, start
-sample, sample count, rate/channels, output PCM hash) under the canonical
-episode directory rather than tmp.
+**WIRE-W4d IS LANDED** -- r3: *"Prebuild and validate all segment requests and
+audio slices BEFORE entering BeatSession; only terminal-image chaining stays in
+the render loop."* Every segment request is now built before the session opens.
+
+- **The builder is neither cheap nor pure**: it resolves stills off the ledger
+  and SHELLS OUT TO FFMPEG to cut each segment's conditioning WAV. Run inside
+  the session, that filesystem and subprocess work happened while the
+  cross-process GPU lease was held and a 14B UNET sat resident -- once per
+  segment, between renders. The lease is the scarcest thing this build owns and
+  every heavy render on the box blocks its full 120 s timeout behind it.
+- It is also where a bad request SHOULD surface: a builder that raises on
+  segment 2 used to do it after two renders and a 6 GiB load.
+- **The chain's terminal-frame substitution stays in the loop** and that is not
+  an oversight: segment N's init image is segment N-1's last RENDERED frame,
+  which does not exist until N-1 has run.
+
+**STILL UNBUILT from that paragraph:** the durable slice RECEIPT (source PCM
+hash, segment index, start sample, sample count, rate/channels, output PCM
+hash) under the canonical episode directory rather than tmp. It is telemetry
+for the W5 grader, not correctness, so it is filed rather than jammed in here.
 
 **WIRE-W7 IS THE NEXT LINE OF CODE:** mouth-still ownership -- ShotLock as the
 sole cardinality owner, zero or one human face, never inferred from prose. Then

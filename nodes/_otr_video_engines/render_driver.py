@@ -3094,6 +3094,33 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     beat_id = str(shot.get("beat_id") or shot.get("shot_id") or "")
     chains = plan.join_mode == _cp.JOIN_CHAIN
 
+    # EVERY SEGMENT REQUEST IS BUILT BEFORE THE LEASE IS TAKEN (WIRE-W4d, r3:
+    # "Prebuild and validate all segment requests and audio slices BEFORE
+    # entering BeatSession; only terminal-image chaining stays in the render
+    # loop").
+    #
+    # The builder is not cheap and it is not pure: it resolves stills off the
+    # ledger and it SHELLS OUT TO FFMPEG to cut each segment's conditioning
+    # WAV out of the frozen master. Run inside the session, that filesystem
+    # and subprocess work happened while the cross-process GPU lease was held
+    # and a 14B UNET sat resident -- once per segment, between renders. The
+    # lease is the scarcest thing this build owns; nothing that does not need
+    # the GPU should be inside it.
+    #
+    # It is also where a bad request SHOULD surface. A builder that raises on
+    # segment 2 used to do it after two renders and a 6 GiB load; now the beat
+    # refuses before anything is taken.
+    #
+    # The CHAIN's terminal-frame substitution deliberately stays in the loop:
+    # segment N's init image is segment N-1's last rendered frame, which does
+    # not exist yet. That is the one thing here that genuinely cannot be
+    # prebuilt, and r3 says so in as many words.
+    prebuilt = []
+    for segment in plan.segments:
+        prebuilt.append(
+            (segment, request_builder(shot, ledger, canvas=canvas,
+                                      segment_index=int(segment.index))))
+
     rendered = []            # (path, drop_head, keep_frames) in play order
     out_shot = dict(shot)
     attempts = []
@@ -3106,10 +3133,8 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
                          segment_count=plan.segment_count) as session:
-        for position, segment in enumerate(plan.segments):
+        for position, (segment, request) in enumerate(prebuilt):
             index = int(segment.index)
-            request = request_builder(shot, ledger, canvas=canvas,
-                                      segment_index=index)
             if chains and terminal:
                 # THE TERMINAL TRANSACTION. A chained successor does not get a
                 # minted still at all -- it begins on the real frame its
