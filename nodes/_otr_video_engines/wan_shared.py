@@ -305,6 +305,54 @@ class WanInitImageMixin:
     import. Subclasses provide ``name`` / ``family`` / ``target_fps`` and the
     loader+graph methods."""
 
+    # ---- beat-session receipts (WIRE-W3) ----
+    def _wan_file_receipt(self, path):
+        """A BOUNDED, stable receipt for a model file: (basename, size, mtime_ns).
+
+        Deliberately NOT a content hash. ``session_identity()`` is re-read
+        before EVERY segment, and hashing a 14B UNET per segment would cost
+        more than the render it is protecting. Size + mtime catches a swapped
+        or rebuilt weight, which is the drift being guarded against.
+
+        THE MECHANISM IS SHARED, THE DATA IS NOT (the standing per-adapter
+        rule): this says how to describe a file, and each adapter says WHICH
+        files describe its handles. ``eng_ltx_8gb`` keeps its own copy on
+        purpose -- reaching across lanes for a four-line stat is the coupling
+        this build keeps paying for.
+
+        Returns ``None`` when the file cannot be stat'ed, so the CALLER decides
+        whether that is fatal. It always is today, but the caller is the one
+        that knows which NAMED refusal to raise."""
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
+
+    def _wan_session_receipts(self):
+        """``(label, token, receipt)`` for every file this beat's handles are.
+
+        Built from the adapter's OWN ``_loader_names()`` + ``_aux_loader_files()``
+        so a lane that adds a loader gets it in the identity for free rather
+        than needing this list edited -- the ``eng_wan_i2v`` VRAM-peak lesson
+        (a fix landed on one adapter and never reached its sibling) applied
+        before the fact.
+
+        RESOLVED THE WAY THE LOADER RESOLVES IT. The graphs hand their loader
+        nodes a BARE TOKEN which ComfyUI resolves through ``folder_paths``, so
+        the receipt is taken from ``_resolve_model_file_by_token`` -- the same
+        answer the loader will get. Using ``_resolve_model_file`` instead would
+        let a ``*_DIR`` override satisfy the identity while being invisible to
+        the loader that actually loads the weights."""
+        names = self._loader_names()
+        out = [("unet", names["unet"],
+                self._wan_file_receipt(self._ckpt_path() or ""))]
+        for (label, cats, name, _env) in self._aux_loader_files():
+            path = self._resolve_model_file_by_token(cats, name)
+            out.append((label, name,
+                        self._wan_file_receipt(path) if path else None))
+        return tuple(out)
+
     # ---- offline aux-loader file resolution (M6) ----
     def _resolve_model_file(self, categories, name, env_dir):
         """Full path of a model file: an explicit dir override (``env_dir``)

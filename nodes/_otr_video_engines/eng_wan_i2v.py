@@ -292,6 +292,135 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
 
+    #: The ONE node id hoisted for the whole beat. See :meth:`prepare`.
+    _SESSION_NODES = ("unet",)
+
+    def session_identity(self):
+        """What this adapter's HANDLES are -- engine, recipe, loader modes,
+        weights. ``BeatSession`` refuses a multi-segment beat without it.
+
+        WHY THIS ALONE WOULD HAVE BEEN A TRAP, recorded because it was very
+        nearly built that way: declaring an identity SILENCES
+        ``SessionIdentityUnavailable`` and then the segment graph still
+        executes ``UNETLoader`` every segment. The refusal would be gone and
+        the reload would not. So this landed in the SAME chunk as
+        :meth:`prepare`'s hoist, never before it.
+
+        WHAT IT CARRIES AND WHY:
+
+        * the recipe receipt -- the frozen sampling knobs are baked into the
+          patcher ``ModelSamplingSD3`` clones, and the version rides inside the
+          receipt string, so a recipe bump moves the identity for free.
+        * BOTH loader MODES. The UNET's mode picks the loader CLASS
+          (``UNETLoader`` vs ``UnetLoaderGGUF``), and a beat that switched
+          class mid-way would be reusing a handle its own graph no longer knows
+          how to have produced.
+        * every loader file's token AND receipt -- including the CLIP and the
+          VAE, which are NOT hoisted. r4/A5: both adapters load a VAE
+          independently and TI2V distinguishes INCOMPATIBLE VAE generations, so
+          a VAE swapped between segments is exactly the drift this exists to
+          catch even though the handle itself is per-segment.
+
+        It EXCLUDES per-segment state -- prompt, seed, frame count, canvas,
+        init image -- which change every segment by design.
+
+        Not cached: the whole job is to notice a weight that MOVED, so the
+        receipts are re-stat'ed on every ask."""
+        return (self.name,
+                self._recipe_receipt(),
+                "unet_loader=%s" % (self._loader_mode(),),
+                repr(self._wan_session_receipts()))
+
+    def prepare(self, host_caps, profile, session_ctx):
+        """Load the UNET ONCE PER BEAT instead of once per segment.
+
+        THE UNET ONLY, and the reason is arithmetic rather than taste. The
+        umt5 CLIP and the VAE are deliberately LEFT in the segment graph
+        because ``render_clip`` runs with ``free_after_use=True`` precisely so
+        that umt5-fp8 and the 14B fp8 UNET are never co-resident through the
+        sampler -- the bare smoke without it peaked at 14,499 MB on a 16 GiB
+        card. Hoisting the CLIP would pin ~9 GB resident for the whole beat and
+        nullify the one mitigation standing between this lane and an OOM. The
+        text encode happens per segment either way, so hoisting it buys wall
+        clock and pays for it in the only currency this tier is short of.
+
+        ``ModelSamplingSD3`` stays per segment too: it is a cheap clone+patch
+        of an already-resident MODEL and is correctly per-render.
+
+        Order matters, and each step is here because of a specific defect
+        (the ``eng_ltx_8gb`` B1b sequence, followed deliberately):
+
+        1. Resolve the frozen config BEFORE ``super().prepare()`` so a bad
+           render knob is refused before the cross-process GPU lease is taken.
+           A raise after the lease strands it for the life of the server.
+        2. ``super().prepare()`` takes the lease and resolves classes.
+        3. Execute a LOADER-ONLY mini-graph, registering the patcher through
+           ``on_result`` as it lands -- if a later node raised, ``run_graph``
+           never returns a results dict and an unregistered patcher is VRAM
+           nothing will ever detach.
+        4. On ANY failure tear down what we took and re-raise, with the
+           teardown itself wrapped so a raising ``unload`` cannot replace the
+           real error with its own.
+        """
+        from . import wrapper_bridge as _wb
+        self._resolve_render_config()           # range-checked, fail-closed
+        prepared = super().prepare(host_caps, profile, session_ctx)
+        try:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
+            names = self._loader_names()
+            bucket = prepared.setdefault("patchers", self._patchers)
+            seen = {id(p) for p in bucket}
+
+            def _register(nid, out):
+                """Own the handle the moment it exists, not after the graph
+                returns. Slot 0 is the MODEL patcher ``_detach_patchers``
+                knows how to unwind; the duck-typed ``detach`` check is what
+                keeps that honest rather than a positional assumption."""
+                model = out[0] if out else None
+                if (model is not None and id(model) not in seen
+                        and callable(getattr(model, "detach", None))):
+                    bucket.append(model)
+                    seen.add(id(model))
+
+            if self._loader_mode() == "gguf":
+                unet_inputs = {"unet_name": names["unet"]}
+            else:
+                unet_inputs = {"unet_name": names["unet"],
+                               "weight_dtype": "default"}
+            results = _wb.run_graph(
+                {"unet": {"class": "unet", "inputs": unet_inputs}},
+                classes, on_result=_register)
+            out = results.get("unet") or ()
+            if not out:
+                raise _wb.GraphExecutionError(
+                    "wan_i2v hoisted UNET %r returned no output; the beat "
+                    "session has nothing to reuse and every segment would "
+                    "silently reload" % (names["unet"],))
+            prepared["external_results"] = results
+        except BaseException:
+            try:
+                self.teardown(prepared)
+            except BaseException:          # noqa: BLE001 -- never mask the cause
+                pass
+            raise
+        return prepared
+
+    def teardown(self, prepared):
+        """Drop the beat-scoped handles BEFORE delegating.
+
+        ``prepared["external_results"]`` holds a strong reference to the
+        hoisted UNET. The base teardown detaches the patchers, unloads,
+        releases the lease and then WAITS for machine-wide VRAM to settle --
+        and every one of those steps would run with this dict still pinning the
+        very tensors it is trying to reclaim, so the stability wait would be
+        watching its own referent. Clearing first costs nothing.
+
+        Never raises out of teardown (it is a finally-path)."""
+        if isinstance(prepared, dict):
+            prepared.pop("external_results", None)
+        return super().teardown(prepared)
+
     # ---- in-process graph spec (CORE Wan i2v; verified vs /object_info) ----
     def _loader_mode(self):
         """The UNET loader mode: ``safetensors`` (core ``UNETLoader``) or ``gguf``
@@ -407,12 +536,26 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vae": os.environ.get("OTR_WAN_I2V_VAE_NAME", "wan_2.1_vae.safetensors"),
         }
 
-    def _build_graph(self, request, image_name, plan, length, width, height):
+    def _build_graph(self, request, image_name, plan, length, width, height,
+                     external_results=None):
         """The declarative Wan i2v graph (wrapper_bridge.run_graph format). CORE
         Wan 2.2 topology, verified against the installed /object_info. The unet
         loader emits ``weight_dtype`` only on the safetensors path; the GGUF path
         (UnetLoaderGGUF) takes ``unet_name`` alone. ModelSamplingSD3 applies the
-        sigma shift (~8.0 for the 14B) the bare placeholder omitted."""
+        sigma shift (~8.0 for the 14B) the bare placeholder omitted.
+
+        ``external_results`` names the ids the CALLER already produced and owns
+        for the whole beat (WIRE-W3: ``prepare()`` loads the UNET once). Those
+        node DEFINITIONS are omitted while every wire that reads them stays --
+        the executor resolves them from the caller's handles instead. Omitting
+        rather than leaving them is not an optimisation: ``run_graph`` REFUSES a
+        graph that also defines an id the caller supplied, because then two
+        parties claim to produce one output.
+
+        Conditional on purpose. A caller that prepared nothing -- the
+        single-clip path, which is what production runs today, and every
+        sibling test that hand-builds ``prepared={"patchers": []}`` -- gets the
+        loader nodes exactly as before, byte for byte."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
         names = self._loader_names()
@@ -430,7 +573,7 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             unet_inputs = {"unet_name": names["unet"]}
         else:
             unet_inputs = {"unet_name": names["unet"], "weight_dtype": "default"}
-        return {
+        graph = {
             "unet": {"class": "unet", "inputs": unet_inputs},
             "modelsampling": {"class": "modelsampling",
                               "inputs": {"model": W("unet", 0), "shift": shift}},
@@ -459,6 +602,9 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vaedecode": {"class": "vaedecode",
                           "inputs": {"samples": W("ksampler", 0), "vae": W("vae", 0)}},
         }
+        for nid in set(external_results or ()):
+            graph.pop(nid, None)
+        return graph
 
     # ---- residency (resolve the installed wrapper nodes; weights load on call) -
     def load(self):
@@ -499,7 +645,16 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         length = _wb.quantize_frames_4n1(
             plan["target_frame_count"] or self.target_fps,
             min_frames=_WAN_MIN_FRAMES, max_frames=_WAN_MAX_FRAMES)
-        graph = self._build_graph(request, image_name, plan, length, width, height)
+        # The beat-scoped handles prepare() hoisted, if any. Their node
+        # definitions drop out of the graph and run_graph resolves the wires
+        # from these instead -- and it adds them to `keep`, so the
+        # free_after_use pass below cannot evict a handle the NEXT segment
+        # still needs. A caller that prepared nothing gets {} and the
+        # single-clip path is byte-identical to before.
+        external = (prepared.get("external_results")
+                    if isinstance(prepared, dict) else None) or {}
+        graph = self._build_graph(request, image_name, plan, length, width, height,
+                                  external_results=external)
         # free_after_use (2026-06-09, the LTX capstone catch applied here
         # preemptively): umt5-fp8 + the 14B fp8 Wan UNET must not stay
         # co-resident through the sampler on a 16 GB card. "unet" is kept for
@@ -513,7 +668,8 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         probe = _MC.VramPeakProbe(interval_s=1.0).start()
         try:
             results = _wb.run_graph(graph, classes, free_after_use=True,
-                                    keep={"unet", "vae", self._TERMINAL})
+                                    keep={"unet", "vae", self._TERMINAL},
+                                    external_results=external)
             images = results[self._TERMINAL][0]               # VAEDecode IMAGE batch
         finally:
             render_peak = probe.stop()
