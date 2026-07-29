@@ -3,6 +3,94 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 -- WINDOW CODER -- C1 OF "THE WRITER NEVER VETOES": THE P0 REPAIR ENVELOPE TRIMS TO FIT
+
+**The operator's ruling** ("the writer should never veto, the writers should
+keep on passing in a loop to agents to clean up the ledger") is queued in
+GO_FORWARD as the next step after the engines. C1 is the first chunk of it and
+the one that was safe to take while the campaign runs: it touches the P0 repair
+envelope only, and leaves the pass topology alone.
+
+**HOW THE PLAN WAS BUILT (operator-directed, 2026-07-29).** Fable constructed
+it from a grounded evidence base, with a Sonnet-5 fan-out doing the grounding,
+a local panel reviewing it -- Codex `gpt-5.6-sol` at high reasoning and
+Antigravity `gemini-3.6-flash-high`, both crawling the real repo -- and every
+panel claim verified against source before it was folded in. The plan and both
+panel reviews live at `docs/2026-07-29-writer-never-vetoes/` and
+`kibitz-runs/2026-07-29-writer-never-vetoes/`, which `.gitignore:246` keeps
+local by convention; this entry is the tracked record.
+
+**THE PANEL CHANGED THE PLAN IN THREE PLACES, AND TWO OF THEM CORRECTED THINGS
+THIS REPO HAD ALREADY WRITTEN DOWN AS FACT:**
+
+1. **PROD_BUG_LOG was wrong about the runaway trap.** It recorded that making
+   `PromptContextOverflowError` recoverable would hand the typed repair
+   ~14,700 tokens of truncated output. It would not. `last_raw = ""` is set at
+   `_otr_structured_call.py:983` and only rebound if the call RETURNS; the
+   raise at `OTR_LedgerScriptWriter.py:959` fires before `tokenizer.decode` at
+   `:992`. The repair would receive an EMPTY string. Corrected in the entry.
+2. **PBUG-20260729-03 conflated two different failures.** `still_flat` (16796)
+   hit the INNER check in `compact_p0_repair_context`; `still_pan` (16735) hit
+   the OUTER one in `structured_call`, which is a different bound (16384)
+   measured after the schema contract is appended. And `mesh_stage`/
+   `viz_camera` are not this bug at all -- `repair_owner_exhausted` means the
+   context FIT, the alternate model RAN, and its output was rejected. Live
+   count corrected from 4 to 2. The original wrong text is kept in the entry so
+   the error is auditable.
+3. **The seed plan's "just wire the existing trim helpers" was architecturally
+   dead.** `p0_source_chunks` says in its own docstring "NOT a trim" -- it
+   partitions the whole body into offset-preserving windows for a multi-window
+   extraction (aggregation, dedupe, offset rebasing) that does not exist. Zero
+   callers. C1 does its own bounded trim instead and explicitly bans wiring
+   those helpers.
+
+**WHAT C1 CHANGED:**
+- `compact_p0_repair_context` TRIMS to fit, then checks, instead of assembling
+  and refusing. `failed_artifact` is head-sliced to 400 chars (the discipline
+  `default_repair_prompt_factory` has always applied to its own echo);
+  `source_evidence` is trimmed LONGEST-FIELD-FIRST, never below a 200-char
+  floor, with a `[...TRIMMED]` marker in the prompt and a receipt naming every
+  field and byte removed. `rejection`, `source_digest` and
+  `allowed_source_fields` are never trimmed -- they are the instruction and the
+  coordinate system, and trimming them corrupts the handoff rather than
+  shrinking it. The fit CONVERGES (bounded re-render loop) rather than trusting
+  one pass of character arithmetic against JSON-escaped multibyte bytes.
+- The reserve is MEASURED, not guessed. `max_bytes - 2048` became
+  `max_bytes - p0_repair_overhead_bytes(system_text)`, a new module-level
+  public helper computing the real appended bytes from the very functions that
+  produce them. The old literal was wrong by 2064 bytes, which made any inner
+  render above ~12,272 bytes pass the inner check BY CONSTRUCTION and then fail
+  the outer one.
+- BOTH hard checks stay, fail-loud. After C1 they can only fire on an
+  arithmetic regression -- a bug detector, not a veto.
+
+**TWO THINGS THE MUTATION ROUND TAUGHT, WORTH KEEPING:**
+- A first draft floored the field length twice (when sizing the cut and again
+  after the sentence-boundary rewind). BOTH mutants survived, each masked by
+  the other: the floor looked tested and was not. The unreachable second guard
+  was DELETED. One reachable guard beats two that hide each other.
+- The interaction test first computed the overhead itself, which made it
+  self-consistent and blind -- a mutation setting the reserve back to 2048
+  shrank both sides together and sailed through. It now takes the BUDGET from
+  production and measures the TRUTH independently.
+
+GATE: suite 7800 passed / 130 skipped / 1 xfailed (was 7786); Bible 17;
+`build_variants --check` 11 variants 0 failures; `validate_workflow_links
+--strict-types` 0 violations; hygiene clean. Mutation `tmp\_c1_mutate.py`:
+**10 killed, 2 survived of 12.** Both survivors documented rather than chased:
+C1-4 (the convergence loop is insurance against content no constructed case
+reaches once the trim marker pays for itself) and C1-11 (the builder is a
+nested closure inside `run_scifi_codex_episode` that only a live lane run
+reaches; C1-10 covers the helper where the logic actually lives, and the live
+campaign is the remaining proof).
+
+CAMPAIGN AT WRITE TIME: pass 1 finished 09:57 with 2 of 18 local engines
+producing output (`still_motion`, `viz_mxc_cpu`). Pass 2 is running over the
+17 that did not. **The watchdog's own re-run had a bug and re-ran NOTHING** --
+a PowerShell array does not bind through `-File`, so the campaign exited
+instantly with "Cannot process argument", the no-progress guard fired, and the
+watchdog stopped having done nothing. Fixed to build the call under `-Command`.
+
 ## 2026-07-29 -- WINDOW CODER -- SESSION IDENTITY FOR THE LAST TWO LOCAL SPLITTERS + THE CAMPAIGN WAS COUNTING THE WRONG FOLDER
 
 **1. `ltx_video` and `ltx_audio_in` can name their handles.**

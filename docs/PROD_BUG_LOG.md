@@ -2874,15 +2874,57 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- same portable rule as PBUG-20260729-02, seen from the
   other side: **a bound that refuses is not a budget, it is a veto.** A limit
   on a repair context has to come with the trim that makes the context fit it.
+- **CORRECTION 2026-07-29 (this entry's first draft was wrong on two counts;
+  the original text is kept below so the error is auditable).** A grounded read
+  of the source established:
+  1. **There are TWO checks with TWO different bounds, not one.** INNER bound
+     **14336** in `compact_p0_repair_context`
+     (`nodes/_otr_scifi_p0_contract.py:223-226`) -- and 14336 is not a constant
+     at all, it is `max(1024, max_bytes - 2048)` computed at
+     `nodes/_otr_scifi_codex.py:2253` from
+     `P0_REPAIR_CONTEXT_MAX_BYTES = 16_384`. OUTER bound **16384** at
+     `nodes/_otr_structured_call.py:1197-1201`, measured AFTER
+     `_prompt_with_schema_contract` appends the schema instruction (`:1192`).
+     `still_flat` (16796) hit the INNER check; `still_pan` (16735) hit the
+     OUTER one. They are NOT the same failure, and the original claim that both
+     sat "within 61 bytes of each other against a fixed 14336 bound" was an
+     artifact of reading two different bounds as one.
+  2. **`mesh_stage` and `viz_camera` are a DIFFERENT ROOT CAUSE and do not
+     belong to this bug.** `disposition=repair_owner_exhausted` is set when
+     `repair_attempted = True` (`nodes/_otr_structured_call.py:1180`) and the
+     ALTERNATE owner's own output then fails validation -- meaning the repair
+     context FIT, the alternate model ran, and its answer was rejected. That is
+     model quality. `still_flat`/`still_pan` never reach the alternate model:
+     their raw `ValueError`s skip the `except StructuredCallFailedError` clause
+     (`nodes/_otr_scifi_codex.py:1685`) and land in the generic handler
+     (`:1698-1712`), where the journal disposition resolves to a THIRD value,
+     `repair_context_builder_failed` (`:1703-1706`).
+  So this bug's live count is **2 occurrences, not 4**.
+- **THE ACTUAL STRUCTURAL DEFECT, measured rather than inferred:** the reserve
+  at `nodes/_otr_scifi_codex.py:2253` is a literal `2048`, but the overhead it
+  is reserving for is `schema_shape_instruction(FactIndexV4)` at **3809 bytes**
+  plus the fixed CRITICAL P0 REPAIR system text at **302 bytes** plus a join
+  newline = **4112 bytes**. The reserve under-provisions by **2064 bytes**.
+  Arithmetically certain: any inner render above ~12,272 bytes passes the inner
+  check BY CONSTRUCTION and is then guaranteed to fail the outer one. A guessed
+  literal reserve drifted out of sync with the thing it reserves for.
+- **AND THE TRIM HELPERS ALREADY EXIST, UNWIRED.** `p0_source_char_budget`
+  (`nodes/_otr_scifi_p0_contract.py:58-70`) and `p0_source_chunks` (`:72-121`)
+  are defined, documented and exported, with **ZERO call sites** in the
+  non-vendored codebase. `_p0_evidence_projection`
+  (`nodes/_otr_scifi_codex.py:1104-1138`) dedupes by substring containment only
+  and caps nothing, and `nodes/_otr_source_payload.py:317` collapses whitespace
+  "without truncating authored source text" -- so a long RSS article body
+  reaches the repair context unbounded. `failed_artifact` is likewise echoed
+  untruncated, where the generic `default_repair_prompt_factory` truncates to
+  `failed_output[:400]`.
 - status: **OPEN -- diagnosed, parked under the 2026-07-29 operator ruling.
-  Live: 4 occurrences in 13 legs** -- `mesh_stage` 182s and `viz_camera` 165s
-  (`disposition=repair_owner_exhausted`), `still_flat` 208s (`repair context is
-  16796 bytes, over the hard limit 14336`) and `still_pan` 173s (`alternate
-  repair context is 16735 bytes`). The two measured sizes land within 61 bytes
-  of each other against a fixed 14336 bound, which is the tell: this is not
-  flakiness in the model, it is a repair context that is STRUCTURALLY larger
-  than the budget it must fit. Any leg whose P0 needs a repair at all dies
-  here, so the fast legs (165-208s) are all this bug.
+  Live: 2 occurrences in 17 legs** (`still_flat` 208s, inner check;
+  `still_pan` 173s, outer check).
+  ORIGINAL (WRONG) TEXT, kept for the record: "Live: 4 occurrences in 13 legs
+  -- mesh_stage 182s and viz_camera 165s (disposition=repair_owner_exhausted),
+  still_flat 208s and still_pan 173s. The two measured sizes land within 61
+  bytes of each other against a fixed 14336 bound."
 - **CAMPAIGN-WIDE RATE, 2026-07-29 (the number that should inform when this
   gets unparked):** across the first 13 legs of the live 45-word run, SEVEN
   died inside the writer -- 2x PBUG-...-02 and 4x PBUG-...-03 plus one
