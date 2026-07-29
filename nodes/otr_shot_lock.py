@@ -1476,7 +1476,21 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     # plans do not exist until the loop above has finished. It runs BEFORE the
     # rows reach the ledger, so an episode that breaks the look contract never
     # becomes a lock a downstream phase would honour.
-    _faces, _long_takes = _audit_episode_faces(shots)
+    _faces, _long_takes, _demoted = _audit_episode_faces(shots)
+    for _cid, _bids in _demoted:
+        # THE CAP ROUTED RATHER THAN REFUSING. Say so LOUDLY and by name: the
+        # episode asked for more overheard faces than the house rule allows,
+        # and these characters were handed the cabinet instead. This is the
+        # remedy the rule's own message used to demand of the operator by hand
+        # ("give the other character(s) the cabinet"), now performed. It is a
+        # LOOK decision the operator must be able to see and reverse, so it is
+        # never silent.
+        log.warning(
+            "[OTR_ShotLock] LOOK: %r speaks from the CABINET on %s -- the "
+            "episode asked for more than %d overheard human face(s), so the "
+            "house rule kept the face the episode leans on hardest and gave "
+            "this character the set. THE SET SPEAKS BY DEFAULT; A FACE MUST "
+            "BE OVERHEARD.", _cid, ", ".join(_bids), _MOUTH_MAX_FACES)
     for _bid, _cid in _long_takes:
         # LOUD, because it is a look defect the operator can see and judge, and
         # the remedy is his: "shorten the line, or let the cabinet speak it".

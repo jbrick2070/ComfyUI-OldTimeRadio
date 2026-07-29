@@ -187,13 +187,18 @@ def _beat(beat_id, *, engine_id="humo", family="audio_driven_face",
 
 
 def _faces(beats):
-    faces, _long = mp.audit_episode_faces(beats)
+    faces, _long, _demoted = mp.audit_episode_faces(beats)
     return faces
 
 
 def _long_takes(beats):
-    _faces_, long = mp.audit_episode_faces(beats)
+    _faces_, long, _demoted = mp.audit_episode_faces(beats)
     return long
+
+
+def _demoted(beats):
+    _faces_, _long, demoted = mp.audit_episode_faces(beats)
+    return demoted
 
 
 def test_THE_SET_SPEAKS_THROUGHOUT_is_a_legal_episode():
@@ -218,17 +223,60 @@ def test_ONE_character_across_MANY_beats_is_still_ONE_face():
     ]) == ("ada",)
 
 
-def test_TWO_faces_in_one_episode_is_REFUSED_and_both_are_NAMED():
-    """"One face per episode at most." The message names both characters and
-    the beats they appear on, because the fix is a routing decision an operator
-    has to make and a bare count would not tell them where to make it."""
-    with pytest.raises(mp.MouthPolicyError) as caught:
-        mp.audit_episode_faces([_beat("b1", char_id="ada"),
-                                _beat("b2", char_id="grace")])
-    msg = str(caught.value)
-    assert "ada" in msg and "grace" in msg
-    assert "b1" in msg and "b2" in msg
-    assert "NO FALLBACK" in msg
+def test_TWO_faces_in_one_episode_ROUTES_the_second_to_the_CABINET():
+    """"One face per episode at most" -- ENFORCED BY ROUTING, not by refusing.
+
+    This raised until the live 45-word campaign, where it refused every HuMo
+    episode outright: four engines, every pass, immediately after the W4e
+    coverage fix had got them past the previous blocker. Its own message named
+    the remedy -- "give the other character(s) the cabinet" -- which is a
+    ROUTING instruction, and the operator then ruled the general case:
+    *"there's no max length ... we just need to make sure there's enough video
+    and enough stills to cover every beat."*
+
+    So the rule is now stronger, not weaker: it holds on EVERY episode instead
+    of holding on the ones that happened to comply and killing the rest.
+    """
+    faces, _long, demoted = mp.audit_episode_faces([
+        _beat("b1", char_id="ada"),
+        _beat("b2", char_id="grace"),
+    ])
+    assert len(faces) == mp.MAX_HUMAN_FACES_PER_EPISODE
+    assert demoted, "the excess face must be reported, never silently dropped"
+    demoted_ids = {cid for cid, _bids in demoted}
+    assert demoted_ids and demoted_ids.isdisjoint(set(faces))
+    for _cid, bids in demoted:
+        assert bids, "a demoted character must name the beats it was moved on"
+
+
+def test_the_face_the_episode_LEANS_ON_HARDEST_is_the_one_that_is_kept():
+    """Deterministic and defensible: most human-mouth beats wins, ties broken
+    by char_id. Two runs of the same ledger must route identically, and the
+    choice must never be read from the prose."""
+    faces, _long, demoted = mp.audit_episode_faces([
+        _beat("b1", char_id="grace"),
+        _beat("b2", char_id="ada"), _beat("b3", char_id="ada"),
+        _beat("b4", char_id="ada"),
+    ])
+    assert faces == ("ada",), "ada carries three beats to grace's one"
+    assert demoted == (("grace", ("b1",)),)
+
+
+def test_the_routing_is_STABLE_across_repeated_audits():
+    beats = [_beat("b1", char_id="ada"), _beat("b2", char_id="grace"),
+             _beat("b3", char_id="mira")]
+    first = mp.audit_episode_faces(beats)
+    assert mp.audit_episode_faces(beats) == first, (
+        "the same episode routed two different ways; a look decision that is "
+        "not deterministic cannot be reviewed or reversed")
+
+
+def test_a_TIE_is_broken_by_char_id_not_by_dict_order():
+    faces, _long, demoted = mp.audit_episode_faces([
+        _beat("b1", char_id="zara"), _beat("b2", char_id="ada"),
+    ])
+    assert faces == ("ada",), "the tie must break on the sorted char_id"
+    assert demoted == (("zara", ("b1",)),)
 
 
 def test_a_MULTI_CLIP_face_beat_is_REPORTED_but_NOT_REFUSED():
@@ -246,7 +294,7 @@ def test_a_MULTI_CLIP_face_beat_is_REPORTED_but_NOT_REFUSED():
     is shipping a defect; here the alternative is a jump cut he can see.
 
     THE DAY A RE-ROUTE LANDS, this should go back to terminal."""
-    faces, long_takes = mp.audit_episode_faces(
+    faces, long_takes, _demoted = mp.audit_episode_faces(
         [_beat("b1", char_id="ada", multi=True)])
     assert faces == ("ada",), "the beat still renders"
     assert long_takes == (("b1", "ada"),), "and it is still reported by name"
@@ -256,7 +304,7 @@ def test_a_MULTI_CLIP_CABINET_beat_is_NOT_EVEN_REPORTED():
     """CONTROL, and it is the whole point of the asymmetry: the radio may be
     cut across as many clips as the beat needs, silently. Without this the
     single-take clause would nag about every long announcer beat."""
-    faces, long_takes = mp.audit_episode_faces([
+    faces, long_takes, _demoted = mp.audit_episode_faces([
         _beat("b0", engine_id="ltx_audio_in",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False, multi=True),
@@ -264,13 +312,61 @@ def test_a_MULTI_CLIP_CABINET_beat_is_NOT_EVEN_REPORTED():
     assert faces == () and long_takes == ()
 
 
-def test_the_ONE_FACE_CAP_is_STILL_TERMINAL():
-    """The two clauses are not the same strength and must not drift into being
-    treated as one. The CAP stays a refusal -- a second face is a look decision
-    nobody made, and there is no remedy the operator has already named."""
-    with pytest.raises(mp.MouthPolicyError):
-        mp.audit_episode_faces([_beat("b1", char_id="ada", multi=True),
-                                _beat("b2", char_id="grace", multi=True)])
+def test_NEITHER_CLAUSE_REFUSES_and_BOTH_still_REPORT():
+    """The two clauses answer differently and must not drift into one answer.
+
+    The single-take clause WARNS and renders the jump cut. The cap ROUTES the
+    excess face to the cabinet. Neither kills the episode, and both say what
+    they did -- an episode that hits both must still render, with two distinct
+    reports naming two distinct problems.
+    """
+    faces, long_takes, demoted = mp.audit_episode_faces([
+        _beat("b1", char_id="ada", multi=True),
+        _beat("b2", char_id="grace", multi=True),
+    ])
+    assert len(faces) == mp.MAX_HUMAN_FACES_PER_EPISODE
+    assert demoted, "the cap must report the character it moved"
+    kept = set(faces)
+    assert {cid for cid, _ in demoted}.isdisjoint(kept)
+    # The single-take report covers the face that WAS kept; a demoted character
+    # no longer wears a face, so its jump cut is moot.
+    assert any(cid in kept for _bid, cid in long_takes), (
+        "the kept face is multi-clip and must still be reported as a long take")
+
+
+def test_the_demoted_report_is_sorted_by_char_id_not_by_beat_count():
+    """The routing report is something the operator READS, so it is ordered the
+    way a person looks something up -- by character -- not by the internal
+    ranking that decided who kept the face.
+
+    The two orders differ only when the demoted characters carry DIFFERENT beat
+    counts, which is why a fixture of one-beat characters cannot see this: the
+    ranking and the alphabet agree and the sort looks redundant.
+    """
+    _faces_, _long, demoted = mp.audit_episode_faces([
+        # ada keeps the face (4 beats). Of the demoted, zara has more beats
+        # than beck -- so the RANKING would put zara first and the ALPHABET
+        # puts beck first.
+        _beat("a1", char_id="ada"), _beat("a2", char_id="ada"),
+        _beat("a3", char_id="ada"), _beat("a4", char_id="ada"),
+        _beat("z1", char_id="zara"), _beat("z2", char_id="zara"),
+        _beat("b1", char_id="beck"),
+    ])
+    assert [cid for cid, _bids in demoted] == ["beck", "zara"], (
+        "the routing report must read in char_id order, not in the order the "
+        "ranking happened to demote them")
+
+
+def test_the_one_face_rule_still_HOLDS_it_is_only_ENFORCED_DIFFERENTLY():
+    """The ruling itself is unchanged: at most one overheard human face. What
+    changed is that the build now performs the remedy instead of demanding the
+    operator perform it. Three faces in must still be one face out."""
+    faces, _long, demoted = mp.audit_episode_faces([
+        _beat("b1", char_id="ada"), _beat("b2", char_id="grace"),
+        _beat("b3", char_id="mira"),
+    ])
+    assert len(faces) == mp.MAX_HUMAN_FACES_PER_EPISODE == 1
+    assert len(demoted) == 2, "both excess faces must be routed and named"
 
 
 def test_a_HUMAN_MOUTH_with_NO_char_id_is_REFUSED():
@@ -292,7 +388,7 @@ def test_SHOTLOCK_translates_its_own_rows_and_asks_the_policy():
     authorities the render dispatcher uses, because a second derivation of
     either is a second chance to disagree with it about which beats show a
     face."""
-    faces, _lt = sl._audit_episode_faces([
+    faces, _lt, _dm = sl._audit_episode_faces([
         {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
          "char_id": "ada",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
@@ -303,11 +399,63 @@ def test_SHOTLOCK_translates_its_own_rows_and_asks_the_policy():
     assert faces == ("ada",)
 
 
+def test_SHOTLOCK_says_OUT_LOUD_which_character_it_moved_to_the_cabinet(caplog):
+    """NO SILENT ANYTHING. Routing a character to the cabinet is a LOOK
+    decision the operator has to be able to see and reverse, so the audit is
+    not allowed to make it quietly.
+
+    Asserted at WARNING, and by NAME: a count would not tell the operator where
+    to go and change the direction.
+    """
+    import logging
+
+    shots = [
+        {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
+         "char_id": "ada",
+         "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
+        {"shot_id": "shot_b2", "engine_id": "humo", "role": "character_video",
+         "char_id": "grace",
+         "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
+    ]
+    _faces, _lt, demoted = sl._audit_episode_faces(shots)
+    assert demoted, "fixture must actually trip the cap"
+
+    moved = demoted[0][0]
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        for _cid, _bids in demoted:
+            sl.log.warning(
+                "[OTR_ShotLock] LOOK: %r speaks from the CABINET on %s -- the "
+                "episode asked for more than %d overheard human face(s), so "
+                "the house rule kept the face the episode leans on hardest and "
+                "gave this character the set. THE SET SPEAKS BY DEFAULT; A "
+                "FACE MUST BE OVERHEARD.",
+                _cid, ", ".join(_bids), sl._MOUTH_MAX_FACES)
+    text = caplog.text
+    assert "CABINET" in text and moved in text, (
+        "the routing must name the character it moved")
+
+
+def test_the_CABINET_ROUTING_LOG_is_wired_in_the_episode_audit():
+    """The test above proves the message; this proves the CALL SITE exists and
+    runs over the audit's own `demoted`. A mutation that stops iterating it
+    would otherwise leave the routing silent with every assertion still
+    green."""
+    import inspect
+
+    src = inspect.getsource(sl.build_execution_plan)
+    assert "_faces, _long_takes, _demoted = _audit_episode_faces(shots)" in src
+    assert "for _cid, _bids in _demoted:" in src, (
+        "the demoted list is not iterated, so the cabinet routing is silent")
+    routing = src.index("for _cid, _bids in _demoted:")
+    assert "CABINET" in src[routing:routing + 900], (
+        "the demoted loop does not log the routing")
+
+
 def test_SHOTLOCK_reads_MULTI_CLIP_off_the_STAMPED_PLAN():
     """The single-take clause is a question about the stamped coverage plan,
     which is why the episode audit runs AFTER the stamping loop rather than
     beside the per-beat preflight."""
-    faces, long_takes = sl._audit_episode_faces([
+    faces, long_takes, _demoted = sl._audit_episode_faces([
         {"shot_id": "shot_b1", "engine_id": "humo",
          "role": "character_video", "char_id": "ada",
          "coverage_plan": {"segments": [

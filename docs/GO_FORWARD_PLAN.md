@@ -929,6 +929,40 @@ across `_otr_structured_call.py`, `_otr_scifi_codex.py` and
 `OTR_LedgerScriptWriter.py`, and the engines are the thing being proven right
 now.
 
+### COVERAGE IS THE ANSWER, NOT A LENGTH CAP (operator ruling, 2026-07-29)
+
+**In the operator's words:** *"there's no max length. We just... I'm not putting
+length requirements in. Whatever words that we get, we just need to make sure
+there's enough video and enough stills to cover every beat."*
+
+This is THE LAW stated from the render side, and it settles a question the
+"writer never vetoes" plan had open.
+
+**WHAT IT CUTS.** The plan's C2 -- a `max_length` on
+`ScriptTextDraftLineV4.text` -- is **CUT, not deferred.** It was the plan's own
+declared weakest seam and both panel agents flagged it: Codex said the corpus
+criterion did not prove the distinction from a word gate, Antigravity asked for
+a docstring insisting it was only an infrastructure ceiling. A cap that needs
+a paragraph explaining why it is not a length requirement is a length
+requirement. The P5 runaway must be answered by the retry/degrade topology
+(C3/C4), never by refusing to let the writer write.
+
+**WHAT IT REQUIRES INSTEAD.** However many words arrive, the render side owes
+enough clips and enough stills to cover them:
+
+- A line too long for one clip means MORE CLIPS. That is what `partition_beat`
+  and the coverage plan are for, and it is a normal outcome, not a defect.
+- No render-side gate may refuse a beat for being long. The single-take clause
+  in `mouth_policy` was already corrected from terminal to warning on exactly
+  this reasoning; the one-face-per-episode cap is the remaining refusal of this
+  shape and must ROUTE rather than refuse.
+- "Enough stills" is the same contract on the still spine: every beat that owes
+  a still gets one, whatever the line length.
+
+**THE TEST OF ANY FUTURE GATE:** if the remedy it names is a routing decision,
+the build owes the routing, not the refusal. Refusing is only honest when the
+alternative is shipping a defect.
+
 **LANDED 2026-07-29 (CODER window, HEAD == origin `a14ecdfa`; suite
 7551 passed / 27 skipped / 1 xfailed; Bible 17; `build_variants --check` 11
 variants / 0 failures; canonical `9872624A` byte-identical across all three --

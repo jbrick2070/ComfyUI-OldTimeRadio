@@ -191,16 +191,37 @@ def audit_episode_faces(beats):
             # corrected the same day it was written -- see the note below).
             long_takes.append((beat_id, char_id))
         faces.setdefault(char_id, []).append(beat_id)
+
+    # THE CAP ROUTES; IT DOES NOT REFUSE (2026-07-29, second correction).
+    #
+    # This raised, and it refused every HuMo episode of the live campaign --
+    # four engines, every pass, after the W4e coverage fix had already got them
+    # past the previous blocker. Its own message named the remedy: "give the
+    # other character(s) the cabinet." That is a ROUTING instruction, and the
+    # operator has since ruled the general case: *"there's no max length ... we
+    # just need to make sure there's enough video and enough stills to cover
+    # every beat."* A gate whose remedy is a routing decision owes the routing.
+    #
+    # So the cap is ENFORCED, not relaxed: at most one character keeps a human
+    # mouth and every other character is handed the cabinet, which is the
+    # house default and what the operator would have done by hand. The rule
+    # ("THE SET SPEAKS BY DEFAULT; A FACE MUST BE OVERHEARD") now holds on
+    # every episode instead of holding on the episodes that happened to comply
+    # and killing the rest.
+    #
+    # WHO KEEPS THE FACE is decided deterministically and defensibly: the
+    # character with the MOST human-mouth beats, ties broken by char_id. The
+    # face the episode leans on hardest is the one worth overhearing, and a
+    # deterministic rule means two runs of the same ledger route identically.
+    # It is NOT read from the prose -- that constraint is unchanged.
+    demoted = []
     if len(faces) > MAX_HUMAN_FACES_PER_EPISODE:
-        raise MouthPolicyError(
-            "this episode shows %d human faces (%s) and the house rule allows "
-            "at most %d: THE SET SPEAKS BY DEFAULT; A FACE MUST BE OVERHEARD. "
-            "NO FALLBACK -- give the other character(s) the cabinet."
-            % (len(faces),
-               ", ".join("%s on %s" % (cid, ", ".join(bids))
-                         for cid, bids in sorted(faces.items())),
-               MAX_HUMAN_FACES_PER_EPISODE))
-    return tuple(sorted(faces)), tuple(long_takes)
+        ranked = sorted(faces.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        for char_id, beat_ids in ranked[MAX_HUMAN_FACES_PER_EPISODE:]:
+            demoted.append((char_id, tuple(beat_ids)))
+            faces.pop(char_id, None)
+        demoted.sort()
+    return tuple(sorted(faces)), tuple(long_takes), tuple(demoted)
 
 
 __all__ = [
