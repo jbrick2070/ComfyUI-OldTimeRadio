@@ -866,6 +866,37 @@ or block an episode. Same-story LLM cleanup is allowed.
 ## swapped 2026-07-30 with the reason grounded below).** Section 0 is an OPEN
 ## OPERATOR DECISION and gates Window B.**
 
+### A-7 IS HALF LANDED, AND THE OTHER HALF IS BLOCKED BY A DIRTY REPO (2026-07-30)
+
+`3bbf9757` landed the OTR half: `docs/PRODUCTION_SPRINT_LESSONS.md` lessons 34
+and 35 carry dated A-4 amendments. **Correction to the plan's premise:** lesson
+35 already argued the right doctrine ("only deterministic impossibility may fail
+loud") -- the code simply did not implement it until A-4, so the amendment names
+the phase vocabulary and points at it rather than rewriting the lesson. Lesson
+34's "measurable delivery exhaustion raises a typed error" needed the qualifier
+that exhaustion is the END of the ladder, not the first thing that goes wrong
+on it.
+
+**The Bible half is APPLIED BUT NOT COMMITTED, on purpose.** Entries 11.50 and
+12.68 in `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`
+now carry the capacity-phase rule (12.68 gets the rule plus a `verify` clause
+including the fixture-collision trap; 11.50 gets one clause saying its pre-call
+refusal is correctly terminal and must not be generalized). `tests\bug_bible_regression.py`
+is green at 17 passed / 24 skipped / 3 xfailed.
+
+It is not committed because **that repo has 1,226 uncommitted lines on `main`
+that are not mine**: `BUG_BIBLE.yaml` +679, `tests/bug_bible_regression.py`
++546, `README.md` +8. My ~40 lines sit inside the same file, so a pathspec
+commit cannot separate them and committing would sweep in someone else's
+in-flight work. Whoever owns that work should commit it; my lines ride along and
+are described here so they are not a surprise in the diff. **Do not `git
+checkout` or reset that file to "clean up" -- that destroys both.**
+
+Also recorded so nobody re-derives it: `yaml.safe_load` on `BUG_BIBLE.yaml`
+fails at line 834 (an unquoted JSON snippet in an entry) and fails IDENTICALLY
+at HEAD, so it is pre-existing and not a parse regression. The authoritative
+gate is `tests\bug_bible_regression.py`, not a naive safe_load.
+
 ### A-5 AND A-6, GROUNDED AT HEAD 2026-07-30 (read this before coding either)
 
 Every anchor below was re-grepped at `41683fc9`; the plan's line numbers had
