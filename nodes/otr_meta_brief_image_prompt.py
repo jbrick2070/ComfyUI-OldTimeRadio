@@ -1115,6 +1115,43 @@ def derive_scene_still_targets(lines, fps: int = 25,
                  char_id=str(ln.get("char_id") or ""))
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
+    if not any(
+            str(ln.get("speaker_role") or "").strip().lower() == "music_open"
+            for _bid, ln in _iter_beat_lines(lines)):
+        # THE OPENING OWES THE SAME RESERVATION THE CLOSING GETS BELOW, AND FOR
+        # THE SAME REASON. Found live, 2026-07-29, profile otr_w45_word_razzle.
+        #
+        # The open target minted above carries the SYNTHETIC id
+        # OPENING_MUSIC_BEAT_ID ("b000_music_open"). EpisodeAssembler then
+        # mirrors the opening cue into ledger.lines with start_s=0.0, so by
+        # ShotLock time derive_opening_music_beat returns None (0.0 is inside
+        # the 2.0s head gap it requires) and NO synthetic beat is inserted --
+        # the mirrored line becomes an ordinary beat named "music_opening_001".
+        # The producer was therefore the sole owner of a still for a beat id
+        # that no shot in the finished episode ever carries.
+        #
+        # Render-side consumers papered the split over with a hardcoded alias
+        # (render_driver._canonical_visual_beat_id), but the alias is applied
+        # INCONSISTENTLY, which is what made the split reachable two ways:
+        #   - merge_jump_still_requests does not canonicalize, so a JUMP
+        #     coverage plan on the opening beat asked for a jump-segment still
+        #     whose base scene still was filed under the other id, and the
+        #     episode died LOUD at the image boundary.
+        #   - mesh_stage hit the same split quietly: its plate was minted as
+        #     plate_b000_music_open, never joined to music_opening_001, and the
+        #     textured hero composited over the floor fallback instead.
+        # One state, two id spaces, and only some readers held the map.
+        #
+        # Reserving the assembler's deterministic id gives that beat a
+        # producer-owned target under the name it will actually have. The b000
+        # target STAYS: when there is a real head gap and no mirrored opening
+        # cue, ShotLock does insert the synthetic beat and that target is the
+        # correct one. Which of the two gets used is decided downstream by
+        # which beat id the episode ends up with -- and now either answer has a
+        # still waiting for it. An unused still costs one render; a missing one
+        # reaches video dispatch too late to repair safely.
+        _add("music_opening_001", "scene_beat", "music_visual",
+             "scene_open_pretiming")
     if include_synthetic_closing and not any(
             str(ln.get("speaker_role") or "").strip().lower() == "music_close"
             for _bid, ln in _iter_beat_lines(lines)):

@@ -90,13 +90,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -169,13 +171,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -248,13 +252,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -327,13 +333,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -406,13 +414,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -485,13 +495,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -564,13 +576,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -643,13 +657,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -722,13 +738,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -801,13 +819,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -880,13 +900,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -959,13 +981,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1040,13 +1064,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1121,13 +1147,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1202,13 +1230,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1283,13 +1313,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1362,13 +1394,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1443,13 +1477,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": true,
@@ -1522,13 +1558,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1602,20 +1640,24 @@
       "meshfodder_b001|mesh_fodder|832x1216",
       "meshfodder_b002|mesh_fodder|832x1216",
       "meshfodder_b005|mesh_fodder|832x1216",
+      "meshfodder_music_opening_001|mesh_fodder|832x1216",
       "plate_b000_music_open|scene_background_plate|1472x832",
       "plate_b001|scene_background_plate|1472x832",
       "plate_b002|scene_background_plate|1472x832",
-      "plate_b005|scene_background_plate|1472x832"
+      "plate_b005|scene_background_plate|1472x832",
+      "plate_music_opening_001|scene_background_plate|1472x832"
      ],
      "required_target_ids": [
       "meshfodder_b000_music_open",
       "meshfodder_b001",
       "meshfodder_b002",
       "meshfodder_b005",
+      "meshfodder_music_opening_001",
       "plate_b000_music_open",
       "plate_b001",
       "plate_b002",
-      "plate_b005"
+      "plate_b005",
+      "plate_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1692,13 +1734,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1771,13 +1815,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1850,13 +1896,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -1929,13 +1977,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2260,13 +2310,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2339,13 +2391,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2418,13 +2472,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2501,13 +2557,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2582,13 +2640,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2663,13 +2723,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2744,13 +2806,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2825,13 +2889,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2906,13 +2972,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -2987,13 +3055,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3068,13 +3138,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3149,13 +3221,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3230,13 +3304,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3311,13 +3387,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3392,13 +3470,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3473,13 +3553,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3554,13 +3636,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3635,13 +3719,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3716,13 +3802,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3797,13 +3885,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -3878,13 +3968,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": true,
@@ -3959,13 +4051,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4040,13 +4134,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4121,13 +4217,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4202,13 +4300,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4283,13 +4383,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4364,13 +4466,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4445,13 +4549,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4526,13 +4632,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4607,13 +4715,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4688,13 +4798,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4769,13 +4881,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4850,13 +4964,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -4931,13 +5047,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -6967,13 +7085,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7046,13 +7166,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7125,13 +7247,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7204,13 +7328,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7283,13 +7409,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7362,13 +7490,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7441,13 +7571,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7520,13 +7652,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7599,13 +7733,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7678,13 +7814,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7757,13 +7895,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7836,13 +7976,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7915,13 +8057,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -7994,13 +8138,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8073,13 +8219,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8152,13 +8300,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8231,13 +8381,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8312,13 +8464,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": true,
@@ -8391,13 +8545,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8471,14 +8627,16 @@
       "plate_b002|scene_background_plate|1472x832",
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "meshfodder_b002",
       "plate_b002",
       "still_b000_music_open",
       "still_b001",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8553,13 +8711,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8632,13 +8792,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8711,13 +8873,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8790,13 +8954,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8867,12 +9033,14 @@
       "announcer|portrait|832x480",
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -8942,12 +9110,14 @@
       "announcer|portrait|832x480",
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9017,12 +9187,14 @@
       "announcer|portrait|832x480",
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9092,12 +9264,14 @@
       "announcer|portrait|832x480",
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9169,13 +9343,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9248,13 +9424,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9327,13 +9505,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9409,13 +9589,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9488,13 +9670,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9567,13 +9751,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9646,13 +9832,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9725,13 +9913,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9804,13 +9994,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9883,13 +10075,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -9962,13 +10156,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10041,13 +10237,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10120,13 +10318,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10199,13 +10399,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10278,13 +10480,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10358,13 +10562,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10438,13 +10644,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10518,13 +10726,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10598,13 +10808,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10677,13 +10889,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10758,13 +10972,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": true,
@@ -10837,13 +11053,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -10917,20 +11135,24 @@
       "meshfodder_b001|mesh_fodder|832x1216",
       "meshfodder_b002|mesh_fodder|832x1216",
       "meshfodder_b005|mesh_fodder|832x1216",
+      "meshfodder_music_opening_001|mesh_fodder|832x1216",
       "plate_b000_music_open|scene_background_plate|1472x832",
       "plate_b001|scene_background_plate|1472x832",
       "plate_b002|scene_background_plate|1472x832",
-      "plate_b005|scene_background_plate|1472x832"
+      "plate_b005|scene_background_plate|1472x832",
+      "plate_music_opening_001|scene_background_plate|1472x832"
      ],
      "required_target_ids": [
       "meshfodder_b000_music_open",
       "meshfodder_b001",
       "meshfodder_b002",
       "meshfodder_b005",
+      "meshfodder_music_opening_001",
       "plate_b000_music_open",
       "plate_b001",
       "plate_b002",
-      "plate_b005"
+      "plate_b005",
+      "plate_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11007,13 +11229,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11086,13 +11310,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11165,13 +11391,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11244,13 +11472,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11575,13 +11805,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11654,13 +11886,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11733,13 +11967,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11814,13 +12050,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11893,13 +12131,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -11972,13 +12212,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12051,13 +12293,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12130,13 +12374,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12209,13 +12455,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12288,13 +12536,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12367,13 +12617,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12446,13 +12698,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12525,13 +12779,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12604,13 +12860,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12683,13 +12941,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12762,13 +13022,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12841,13 +13103,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12920,13 +13184,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -12999,13 +13265,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13078,13 +13346,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13157,13 +13427,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13236,13 +13508,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13316,20 +13590,24 @@
       "meshfodder_b001|mesh_fodder|832x1216",
       "meshfodder_b002|mesh_fodder|832x1216",
       "meshfodder_b005|mesh_fodder|832x1216",
+      "meshfodder_music_opening_001|mesh_fodder|832x1216",
       "plate_b000_music_open|scene_background_plate|1472x832",
       "plate_b001|scene_background_plate|1472x832",
       "plate_b002|scene_background_plate|1472x832",
-      "plate_b005|scene_background_plate|1472x832"
+      "plate_b005|scene_background_plate|1472x832",
+      "plate_music_opening_001|scene_background_plate|1472x832"
      ],
      "required_target_ids": [
       "meshfodder_b000_music_open",
       "meshfodder_b001",
       "meshfodder_b002",
       "meshfodder_b005",
+      "meshfodder_music_opening_001",
       "plate_b000_music_open",
       "plate_b001",
       "plate_b002",
-      "plate_b005"
+      "plate_b005",
+      "plate_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13406,13 +13684,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13485,13 +13765,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13564,13 +13846,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13643,13 +13927,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -13974,13 +14260,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14053,13 +14341,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14132,13 +14422,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14213,13 +14505,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14292,13 +14586,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14371,13 +14667,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14450,13 +14748,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14529,13 +14829,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14608,13 +14910,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14687,13 +14991,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14766,13 +15072,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14845,13 +15153,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -14924,13 +15234,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15003,13 +15315,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15082,13 +15396,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15163,13 +15479,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15244,13 +15562,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15325,13 +15645,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15406,13 +15728,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15485,13 +15809,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15566,13 +15892,15 @@
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
       "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
       "still_music_visual_radio_face_169|portrait|832x480"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": true,
@@ -15645,13 +15973,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15725,20 +16055,24 @@
       "meshfodder_b001|mesh_fodder|832x1216",
       "meshfodder_b002|mesh_fodder|832x1216",
       "meshfodder_b005|mesh_fodder|832x1216",
+      "meshfodder_music_opening_001|mesh_fodder|832x1216",
       "plate_b000_music_open|scene_background_plate|1472x832",
       "plate_b001|scene_background_plate|1472x832",
       "plate_b002|scene_background_plate|1472x832",
-      "plate_b005|scene_background_plate|1472x832"
+      "plate_b005|scene_background_plate|1472x832",
+      "plate_music_opening_001|scene_background_plate|1472x832"
      ],
      "required_target_ids": [
       "meshfodder_b000_music_open",
       "meshfodder_b001",
       "meshfodder_b002",
       "meshfodder_b005",
+      "meshfodder_music_opening_001",
       "plate_b000_music_open",
       "plate_b001",
       "plate_b002",
-      "plate_b005"
+      "plate_b005",
+      "plate_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15815,13 +16149,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15894,13 +16230,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -15973,13 +16311,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -16052,13 +16392,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -16383,13 +16725,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -16462,13 +16806,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -16541,13 +16887,15 @@
       "still_b000_music_open|scene_open|1472x832",
       "still_b001|scene_beat|1472x832",
       "still_b002|scene_character|1472x832",
-      "still_b005|scene_beat|1472x832"
+      "still_b005|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
      ],
      "required_target_ids": [
       "still_b000_music_open",
       "still_b001",
       "still_b002",
-      "still_b005"
+      "still_b005",
+      "still_music_opening_001"
      ],
      "talking": {
       "announcer_visual": false,
@@ -16630,6 +16978,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "cloud_seedance_2": [
@@ -16652,6 +17005,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "cloud_vidu_q2_pro_fast_720p": [
@@ -16674,6 +17032,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "cloud_vidu_q2_pro_fast_720p_sfx": [
@@ -16696,6 +17059,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "cloud_wan_i2v": [
@@ -16718,6 +17086,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "cloud_wan_i2v_audio": [
@@ -16740,6 +17113,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_omni_video": [
@@ -16762,6 +17140,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_veo_video": [
@@ -16784,6 +17167,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_vid_sfx_omni": [
@@ -16806,6 +17194,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_vid_sfx_veo_fast": [
@@ -16828,6 +17221,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_vid_sfx_veo_lite": [
@@ -16850,6 +17248,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "google_vid_sfx_veo_pro": [
@@ -16872,6 +17275,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "humo": [
@@ -16894,6 +17302,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "humo_1.7B": [
@@ -16916,6 +17329,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "humo_1.7B_169": [
@@ -16938,6 +17356,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "humo_14B_169": [
@@ -16960,6 +17383,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "ltx_8gb": [
@@ -16982,6 +17410,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "ltx_audio_in": [
@@ -17004,6 +17437,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "ltx_video": [
@@ -17026,6 +17464,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "mesh_stage": [
@@ -17068,6 +17511,16 @@
     "beat_id": "b005",
     "kind": "scene_background_plate",
     "object_id": "plate_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "mesh_fodder",
+    "object_id": "meshfodder_music_opening_001"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_background_plate",
+    "object_id": "plate_music_opening_001"
    }
   ],
   "still_flat": [
@@ -17090,6 +17543,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "still_motion": [
@@ -17112,6 +17570,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "still_pan": [
@@ -17134,6 +17597,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "still_word": [
@@ -17156,6 +17624,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "viz_camera": [],
@@ -17182,6 +17655,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "wan_ti2v": [
@@ -17204,6 +17682,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ],
   "word_razzle": [
@@ -17226,6 +17709,11 @@
     "beat_id": "b005",
     "kind": "scene_beat",
     "object_id": "still_b005"
+   },
+   {
+    "beat_id": "music_opening_001",
+    "kind": "scene_beat",
+    "object_id": "still_music_opening_001"
    }
   ]
  },

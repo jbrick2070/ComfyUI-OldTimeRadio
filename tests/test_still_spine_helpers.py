@@ -295,11 +295,16 @@ class TestSceneStillObjects:
         # BUG 1 (2026-06-20): a CHARACTER beat gets kind=scene_character (a 16:9
         # character shot) carrying its char_id, NOT a generic scene_beat radio still.
         from nodes import otr_meta_brief_image_prompt as mbp
+        # music_opening_001 trails the per-beat targets because it is a
+        # RESERVATION, not a beat the producer can see: EpisodeAssembler mints
+        # that line after this node runs. It sits with the closing reservation
+        # at the end for the same reason (live fix 2026-07-29).
         targets, _w = mbp.derive_scene_still_targets(_lines_timed())
         assert [t["beat_id"] for t in targets] == [
-            "b000_music_open", "b001", "b002", "b005"]
+            "b000_music_open", "b001", "b002", "b005", "music_opening_001"]
         assert [t["kind"] for t in targets] == [
-            "scene_open", "scene_beat", "scene_character", "scene_beat"]
+            "scene_open", "scene_beat", "scene_character", "scene_beat",
+            "scene_beat"]
         assert targets[1]["role"] == "announcer_visual"
         assert targets[2]["role"] == "character_video"   # dialogue beat now covered
         assert targets[2]["char_id"] == "c01"            # carried for the wide shot
@@ -323,6 +328,47 @@ class TestSceneStillObjects:
         targets, _w = mbp.derive_scene_still_targets(
             _lines_timed(), include_synthetic_closing=True)
         assert [row["beat_id"] for row in targets].count("music_closing_001") == 0
+
+    def test_image_producer_reserves_future_opening_music_target(self):
+        """The mirror of the closing reservation, and the live bug that proved
+        the opening was owed one too (2026-07-29, profile otr_w45_word_razzle).
+
+        The open still is minted under the SYNTHETIC id b000_music_open. Once
+        EpisodeAssembler mirrors the opening cue into ledger.lines at
+        start_s=0.0, derive_opening_music_beat no longer sees a head gap, so
+        ShotLock inserts NO synthetic beat and the beat it stamps is
+        music_opening_001. The producer therefore owned a still for an id no
+        shot in the episode carried, and a JUMP coverage plan on that beat died
+        at the image boundary with no base still to derive its jump segment
+        from. BOTH ids must have a producer-owned target, because which one the
+        episode ends up with is not decided until after this node has run."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        payload, _w = mbp.derive_image_prompts(
+            [], _meta_ok(), llm_fn=None, lines=_lines_timed())
+        by_beat = {row["beat_id"]: row
+                   for row in payload["required_scene_targets"]}
+        # the synthetic id KEEPS its target: a real head gap with no mirrored
+        # opening cue still resolves to b000_music_open at ShotLock time
+        assert "b000_music_open" in by_beat
+        opening = by_beat["music_opening_001"]
+        assert opening["object_id"] == "still_music_opening_001"
+        assert opening["kind"] == "scene_beat"
+        assert opening["role"] == "music_visual"
+
+    def test_existing_open_line_is_not_duplicated(self):
+        """A ledger that already carries the mirrored opening cue owns that
+        beat through the normal per-beat path; the reservation must not mint a
+        second target for it."""
+        from nodes import otr_meta_brief_image_prompt as mbp
+        lines = [{"line_id": "music_opening_001", "speaker_role": "music_open",
+                  "char_id": "music_open", "start_s": 0.0, "dur_s": 6.0}]
+        lines.extend(_lines_timed())
+        targets, _w = mbp.derive_scene_still_targets(lines)
+        assert [row["beat_id"]
+                for row in targets].count("music_opening_001") == 1
+        row = next(r for r in targets if r["beat_id"] == "music_opening_001")
+        # the REAL line won it, not the reservation
+        assert row["source"] == "scene_role_map"
 
     def test_canonical_character_speaker_role_maps_to_scene_character(self):
         """BUG 1 (2026-06-20): the writer's CANONICAL dialogue speaker_role is
