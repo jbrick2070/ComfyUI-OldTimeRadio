@@ -1,0 +1,7 @@
+<!-- requested_model: deepseek/deepseek-v4-pro | resolved_model: deepseek/deepseek-v4-pro -->
+
+VERDICT: yes-with-fixes — the plan claims to reuse existing sentence-boundary windowing that does not exist; multi-window P0 retry orchestration is underspecified; the quality review introduces an unbounded new subsystem without clear necessity.
+
+MUST-FIX BEFORE BUILD (severity order):
+1. [Sec 3] The plan states “Partition only `full_text` on sentence boundaries using the existing `p0_source_char_budget` and `p0_source_chunks`.”  The grounding shows `p0_source_chunks` does fixed-size character slicing (`window = body[offset:offset + allowance]`), not sentence boundaries.  No sentence-boundary chunker exists.  The design must either specify a new sentence-partitioning implementation or explicitly change the windowing strategy (e.g., overlapping sentences within fixed windows).  As written, the implementation premise is false.
+2. [Sec 4] The retry-until-valid loop for P0 after multi-window merge is undefined.  The plan says “P0 retries P0 only” and “On recoverable … post-validation … start another cycle,” but it does not state what failure is recoverable (e.g., final merged FactIndex validation failure) or what exactly is retried (all per‑

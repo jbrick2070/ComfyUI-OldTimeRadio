@@ -59,11 +59,23 @@ def p0_source_char_budget(
     *,
     extra_root_fields: int = 0,
     context_cap: int = _P0_LOCAL_CONTEXT_CAP,
+    prompt_reserve_tokens: int = 0,
 ) -> int:
     """How many characters of source evidence provably fit the P0 prompt."""
+    if (
+        not isinstance(prompt_reserve_tokens, int)
+        or isinstance(prompt_reserve_tokens, bool)
+        or prompt_reserve_tokens < 0
+    ):
+        raise ValueError("prompt_reserve_tokens must be a non-negative integer")
     reserved = p0_output_token_budget(extra_root_fields=extra_root_fields)
     usable = int(context_cap) - reserved
-    headroom = usable - _P0_PROMPT_OVERHEAD_TOKENS - _P0_FIT_MARGIN_TOKENS
+    headroom = (
+        usable
+        - _P0_PROMPT_OVERHEAD_TOKENS
+        - _P0_FIT_MARGIN_TOKENS
+        - prompt_reserve_tokens
+    )
     if headroom <= 0:
         return 0
     return int(headroom / _P0_TOKENS_PER_CHAR)
@@ -73,6 +85,7 @@ def p0_source_chunks(
     payload: Mapping[str, str],
     *,
     budget_chars: int,
+    overlap_chars: int = 0,
 ) -> "list[tuple[int, dict[str, str]]]":
     """Split the article body into windows the P0 prompt can actually hold.
 
@@ -101,23 +114,48 @@ def p0_source_chunks(
         # The frame alone exceeds the window; there is nothing honest to do but
         # hand back one window and let `prompt_must_fit` refuse it out loud.
         return [(0, dict(payload))]
+    if (
+        not isinstance(overlap_chars, int)
+        or isinstance(overlap_chars, bool)
+        or overlap_chars < 0
+        or overlap_chars >= allowance
+    ):
+        raise ValueError(
+            "overlap_chars must be a non-negative integer smaller than the "
+            f"body allowance ({allowance})"
+        )
     if len(body) <= allowance:
         return [(0, dict(payload))]
 
     offset = 0
     while offset < len(body):
-        window = body[offset:offset + allowance]
-        if offset + allowance < len(body):
+        hard_end = min(len(body), offset + allowance)
+        end = hard_end
+        window = body[offset:hard_end]
+        if hard_end < len(body):
             boundary = max(window.rfind(mark) for mark in _SENTENCE_END)
             # Honour a sentence boundary only if it keeps most of the window --
             # otherwise a period near the start would shred the article into
             # slivers and multiply the call count.
             if boundary > allowance // 2:
-                window = window[: boundary + 1]
+                candidate_end = offset + boundary + 1
+                if candidate_end - offset > overlap_chars:
+                    end = candidate_end
+                    window = body[offset:end]
         fitted = dict(payload)
         fitted[_P0_TRIMMABLE_FIELD] = window
         windows.append((offset, fitted))
-        offset += len(window)
+        if end == len(body):
+            break
+        next_offset = end - overlap_chars
+        if next_offset <= offset:
+            # Defensive invariant: a sentence rewind may never stall progress.
+            end = hard_end
+            fitted[_P0_TRIMMABLE_FIELD] = body[offset:end]
+            next_offset = end - overlap_chars
+        if next_offset <= offset:
+            raise ValueError("P0 source windowing could not make progress")
+        offset = next_offset
     return windows
 
 

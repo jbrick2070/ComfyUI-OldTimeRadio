@@ -561,6 +561,7 @@ def _rss_source_fetch_result(
     payload: dict,
     *,
     fetcher_kind: str,
+    news_seed_receipt: Mapping[str, Any] | None = None,
 ) -> SourceFetchResult:
     """Wrap a selected RSS item without changing the seven-key payload.
 
@@ -575,15 +576,18 @@ def _rss_source_fetch_result(
     link = str(clean_payload.get("link") or "").strip()
     label = str(clean_payload.get("source") or "").strip()
     date = str(clean_payload.get("date") or "").strip()
+    source_meta = {
+        "kind": str(fetcher_kind),
+        "source_ref": link,
+        "source_url": link,
+        "source_label": label,
+        "source_date": date,
+    }
+    if news_seed_receipt:
+        source_meta["_news_seed_receipt"] = dict(news_seed_receipt)
     return SourceFetchResult(
         payload=clean_payload,
-        source_meta={
-            "kind": str(fetcher_kind),
-            "source_ref": link,
-            "source_url": link,
-            "source_label": label,
-            "source_date": date,
-        },
+        source_meta=source_meta,
         source_rights={
             "license_status": "unknown",
             "source_url": link,
@@ -608,10 +612,16 @@ def _fetch_science_rss(*, bank, technical_model: str,
         from . import OTR_LedgerScriptWriter as _writer
     except ImportError:  # pragma: no cover -- flat-import test harnesses
         import OTR_LedgerScriptWriter as _writer  # type: ignore
+    receipt: dict[str, Any] = {}
     payload = _writer._fetch_rss_seed_or_die(
         technical_model, load_config=load_config, policy=policy,
+        receipt_sink=receipt,
     )
-    return _rss_source_fetch_result(payload, fetcher_kind="science_rss")
+    return _rss_source_fetch_result(
+        payload,
+        fetcher_kind="science_rss",
+        news_seed_receipt=receipt,
+    )
 
 
 def _interpret_news(*, bank, payload: dict, technical_fn,

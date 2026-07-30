@@ -162,6 +162,104 @@ _PRODUCTION_RSS_BLOCK_BOUNDARIES = (
 
 
 class TestRssFragmentTextExtraction:
+    def test_select_rss_content_counts_raw_rows_and_chooses_longest_stably(
+            self):
+        from nodes import story_orchestrator as so
+
+        long_fragment = "<p>" + ("long body " * 20) + "</p>"
+        same_length = "<div>" + ("long body " * 20) + "</div>"
+        entry = {
+            "content": [
+                None,
+                {"value": 17},
+                {},
+                {"value": "<p>short</p>"},
+                {"value": long_fragment},
+                {"value": same_length},
+            ]
+        }
+
+        text, index, count = so._select_rss_content(entry)
+
+        assert text == so._extract_rss_fragment_text(long_fragment)
+        assert (index, count) == (4, 6)
+        assert so._select_rss_content({"content": None}) == ("", None, 0)
+        assert so._select_rss_content({"content": "not-a-list"}) == (
+            "", None, 0,
+        )
+
+    def test_select_rss_content_treats_one_extractor_failure_as_empty(
+            self, monkeypatch):
+        from nodes import story_orchestrator as so
+
+        real_extract = so._extract_rss_fragment_text
+
+        def extract(value):
+            if value == "broken":
+                raise ValueError("malformed fragment")
+            return real_extract(value)
+
+        monkeypatch.setattr(so, "_extract_rss_fragment_text", extract)
+        assert so._select_rss_content({
+            "content": [
+                {"value": "broken"},
+                {"value": "<p>usable later row</p>"},
+            ]
+        }) == ("usable later row", 1, 2)
+
+    @pytest.mark.parametrize(
+        "rss,article,summary,link,expected_text,expected_route",
+        (
+            ("r" * 9, "a" * 8, "s" * 7, "https://e.invalid", "r" * 9, "rss_full"),
+            ("r" * 8, "a" * 9, "s" * 7, "https://e.invalid", "a" * 9, "url_scrape"),
+            ("r" * 7, "a" * 8, "s" * 9, "https://e.invalid", "s" * 9, "summary_fallback"),
+            ("r" * 7, "", "s" * 9, "", "s" * 9, "summary_only"),
+            ("same", "same", "same", "https://e.invalid", "same", "rss_full"),
+            ("r" * 299, "", "s" * 10, "https://e.invalid", "r" * 299, "rss_full"),
+        ),
+    )
+    def test_select_news_body_prefers_completeness_then_stable_route(
+            self, rss, article, summary, link, expected_text, expected_route):
+        from nodes import story_orchestrator as so
+
+        assert so._select_news_body(
+            {"rss_full": rss, "summary": summary, "link": link},
+            article,
+        ) == (expected_text, expected_route)
+
+    def test_fetch_full_article_preserves_tail_past_12000_chars(
+            self, monkeypatch):
+        from nodes import story_orchestrator as so
+
+        body = ("science detail " * 1000) + "TAIL_SENTINEL"
+        monkeypatch.setattr(
+            ff,
+            "fetch_article",
+            lambda *_args, **_kwargs: types.SimpleNamespace(
+                text=f"<article><p>{body}</p></article>",
+            ),
+        )
+
+        result = so._fetch_full_article("https://example.com/article")
+
+        assert len(result) > 12000
+        assert result.endswith("TAIL_SENTINEL")
+
+    def test_body_rerank_preview_is_bounded_head_middle_tail(self):
+        from nodes import story_orchestrator as so
+
+        body = "HEAD_SENTINEL" + ("a" * 1000) + "MIDDLE_SENTINEL" + (
+            "b" * 1000
+        ) + "TAIL_SENTINEL"
+        preview = so._body_rerank_preview(body)
+
+        assert len(preview) <= 800
+        assert "HEAD_SENTINEL" in preview
+        assert "MIDDLE_SENTINEL" in preview
+        assert "TAIL_SENTINEL" in preview
+        assert so._body_rerank_preview("short") == "short"
+        assert body.endswith("TAIL_SENTINEL")
+
     @pytest.mark.parametrize(
         "fragment,expected,_old_fused",
         _PRODUCTION_RSS_BLOCK_BOUNDARIES,
@@ -240,7 +338,6 @@ class TestRssFragmentTextExtraction:
 
     def test_fetch_single_feed_calls_the_rss_fragment_extractor(
             self, monkeypatch):
-        from nodes import production_ledger
         from nodes import story_orchestrator as so
 
         raw_fragment = (
@@ -255,7 +352,10 @@ class TestRssFragmentTextExtraction:
             entries=[
                 {
                     "title": "Boundary-aware source",
-                    "content": [{"value": raw_fragment}],
+                    "content": [
+                        {"value": None},
+                        {"value": raw_fragment},
+                    ],
                     "summary": "Summary <em>stays</em> on its existing path.",
                     "published": "2026-07-30",
                     "link": "",
@@ -289,9 +389,6 @@ class TestRssFragmentTextExtraction:
             "_record_news_usage",
             lambda **_kwargs: None,
         )
-        ledger = types.SimpleNamespace(data={}, save=lambda: None)
-        monkeypatch.setattr(production_ledger, "get_ledger", lambda: ledger)
-
         real_extract = so._extract_rss_fragment_text
         seen = []
 
@@ -311,7 +408,55 @@ class TestRssFragmentTextExtraction:
         assert chosen["rss_full"] == expected
         assert chosen["full_text"] == expected
         assert chosen["_body_source"] == "rss_full"
+        assert chosen["_rss_content_index"] == 1
+        assert chosen["_rss_content_count"] == 2
         assert chosen["summary"] == "Summary stays on its existing path."
+
+    def test_existing_five_candidate_shortlist_fetches_every_link_even_with_rss(
+            self, monkeypatch):
+        from nodes import story_orchestrator as so
+
+        entries = [
+            {
+                "title": f"Candidate {index}",
+                "content": [{"value": "<p>" + ("rss detail " * 50) + "</p>"}],
+                "summary": "summary",
+                "published": "2026-07-30",
+                "link": f"https://example.com/article-{index}",
+            }
+            for index in range(6)
+        ]
+        monkeypatch.setitem(
+            sys.modules,
+            "feedparser",
+            types.SimpleNamespace(parse=lambda _document: types.SimpleNamespace(
+                entries=entries, feed={"title": "Fixture Feed"},
+            )),
+        )
+        monkeypatch.setattr(
+            ff, "fetch_feed",
+            lambda _url: types.SimpleNamespace(text="<rss/>"),
+        )
+        monkeypatch.setattr(
+            so, "SCIENCE_NEWS_FEEDS", ["https://example.com/feed"],
+        )
+        monkeypatch.setattr(so.random, "shuffle", lambda _rows: None)
+        monkeypatch.setattr(so, "_load_news_history", lambda: set())
+        monkeypatch.setattr(so, "_record_news_usage", lambda **_kwargs: None)
+        fetched_links = []
+
+        def fetch_article(link, timeout):
+            assert timeout == 5
+            fetched_links.append(link)
+            return "article detail " * 20
+
+        monkeypatch.setattr(so, "_fetch_full_article", fetch_article)
+        so._fetch_science_news()
+
+        assert set(fetched_links) == {
+            f"https://example.com/article-{index}" for index in range(5)
+        }
+        assert "https://example.com/article-5" not in fetched_links
 
 
 # ---- scheme policy ---------------------------------------------------------

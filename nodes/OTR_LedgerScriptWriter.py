@@ -108,6 +108,7 @@ Notes:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -1353,6 +1354,7 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
 
 def _fetch_rss_seed_or_die(
     model_id: str, *, load_config=None, policy=None,
+    receipt_sink: dict[str, Any] | None = None,
 ) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
@@ -1408,7 +1410,7 @@ def _fetch_rss_seed_or_die(
             "[OTR_LedgerScriptWriter] RSS_FETCH OK: source=%s, len=%d, head=%r",
             article.get("source") or "?", len(seed_text), seed_text[:80],
         )
-        return {
+        payload = {
             "headline":  (article.get("headline") or "").strip(),
             "summary":   (article.get("summary") or "").strip(),
             "full_text": (article.get("full_text") or "").strip(),
@@ -1417,6 +1419,27 @@ def _fetch_rss_seed_or_die(
             "link":      (article.get("link") or "").strip(),
             "seed_text": seed_text,
         }
+        if receipt_sink is not None:
+            selected_body = payload["full_text"]
+            receipt_sink.clear()
+            receipt_sink.update({
+                "headline": payload["headline"][:240],
+                "source": payload["source"][:120],
+                "url": payload["link"],
+                "date": payload["date"],
+                "body_chars": len(selected_body),
+                "body_source": str(article.get("_body_source") or ""),
+                "rss_content_index": article.get("_rss_content_index"),
+                "rss_content_count": int(
+                    article.get("_rss_content_count") or 0
+                ),
+                "body_bytes_utf8": len(selected_body.encode("utf-8")),
+                "body_sha256": hashlib.sha256(
+                    selected_body.encode("utf-8")
+                ).hexdigest(),
+                "selected_at": datetime.now().isoformat(timespec="seconds"),
+            })
+        return payload
     except Exception as exc:
         # Loud raise: the writer requires a real seed to function. The
         # workflow can override via custom_premise if RSS is unavailable.
@@ -1425,6 +1448,61 @@ def _fetch_rss_seed_or_die(
             f"Type a non-empty value into the `custom_premise` widget to "
             f"bypass the RSS pipeline.",
         ) from exc
+
+
+def _stamp_news_seed_receipt(
+    meta: dict[str, Any],
+    resolved: Mapping[str, Any],
+) -> None:
+    """Promote the selected RSS receipt onto the actual episode ledger."""
+    receipt = resolved.get("news_seed_receipt")
+    if not receipt:
+        return
+    if not isinstance(receipt, Mapping):
+        raise RuntimeError("news_seed_receipt must be a mapping")
+    article = resolved.get("news_article")
+    if not isinstance(article, Mapping):
+        raise RuntimeError("news_seed_receipt requires a news_article mapping")
+    body = str(article.get("full_text") or "")
+    expected = {
+        "headline": str(article.get("headline") or "")[:240],
+        "source": str(article.get("source") or "")[:120],
+        "url": str(article.get("link") or ""),
+        "date": str(article.get("date") or ""),
+        "body_chars": len(body),
+        "body_bytes_utf8": len(body.encode("utf-8")),
+        "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+    }
+    for key, value in expected.items():
+        if receipt.get(key) != value:
+            raise RuntimeError(
+                f"news_seed_receipt {key} does not match selected article"
+            )
+    body_source = receipt.get("body_source")
+    if body_source not in {
+        "rss_full", "url_scrape", "summary_fallback", "summary_only",
+    }:
+        raise RuntimeError("news_seed_receipt has an invalid body_source")
+    count = receipt.get("rss_content_count")
+    index = receipt.get("rss_content_index")
+    if (
+        not isinstance(count, int)
+        or isinstance(count, bool)
+        or count < 0
+        or (
+            index is not None
+            and (
+                not isinstance(index, int)
+                or isinstance(index, bool)
+                or index < 0
+                or index >= count
+            )
+        )
+    ):
+        raise RuntimeError("news_seed_receipt has invalid RSS coordinates")
+    if not str(receipt.get("selected_at") or ""):
+        raise RuntimeError("news_seed_receipt selected_at is empty")
+    meta["news_seed"] = dict(receipt)
 
 
 def _resolve_inputs(
@@ -1712,6 +1790,9 @@ def _resolve_inputs(
         news_seed = news_article["seed_text"]
         seed_source = _fetch_entry.seed_source
 
+    source_meta = dict(source_meta or {})
+    news_seed_receipt = source_meta.pop("_news_seed_receipt", {})
+
     # Source identity is selected-source truth, not merely the requested
     # widget value. RSS lanes ignore/leave that widget blank and choose a real
     # item at fetch time; manifest lanes already return the resolved ref in
@@ -1725,7 +1806,6 @@ def _resolve_inputs(
         or ""
     ).strip()
     if _requested_source_ref and _requested_source_ref != _selected_source_ref:
-        source_meta = dict(source_meta or {})
         source_meta.setdefault("requested_source_ref", _requested_source_ref)
 
     return {
@@ -1793,6 +1873,7 @@ def _resolve_inputs(
         "source_ref": _selected_source_ref,
         "source_meta": dict(source_meta),
         "source_rights": dict(source_rights),
+        "news_seed_receipt": dict(news_seed_receipt),
     }
 
 
@@ -3421,6 +3502,7 @@ class OTR_LedgerScriptWriter:
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
+        _stamp_news_seed_receipt(meta, resolved)
         # kibitz r2-r4 provenance: any bank whose defaults define
         # credits_source_line gets it stamped (data-driven -- the
         # original_radio row always defines it, so its credits line is

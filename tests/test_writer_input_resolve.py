@@ -17,6 +17,7 @@ label, defeating two-slot routing.
 from __future__ import annotations
 
 import ast
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -118,6 +119,140 @@ def test_resolve_inputs_rss_uses_technical_model():
         "S31 B6 Fix 1: the wrapper's sole positional must be "
         "technical_model."
     )
+    wrapper_kw = {item.arg: item.value for item in target_call.keywords}
+    assert "receipt_sink" in wrapper_kw
+
+
+def test_news_seed_receipt_is_promoted_after_episode_ledger_creation():
+    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+    run_fn = _find_function(tree, "run")
+    new_ledger_lines = []
+    stamp_lines = []
+    for node in ast.walk(run_fn):
+        if not isinstance(node, ast.Call):
+            continue
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "new_ledger"
+        ):
+            new_ledger_lines.append(node.lineno)
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "_stamp_news_seed_receipt"
+        ):
+            stamp_lines.append(node.lineno)
+    assert len(new_ledger_lines) == 1
+    assert len(stamp_lines) == 1
+    assert stamp_lines[0] > new_ledger_lines[0]
+
+
+def test_news_seed_receipt_matches_and_copies_selected_body():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    body = "complete selected RSS body"
+    article = {
+        "headline": "A headline",
+        "summary": "summary",
+        "full_text": body,
+        "source": "Fixture Feed",
+        "date": "2026-07-30",
+        "link": "https://example.com/item",
+        "seed_text": "A headline summary",
+    }
+    receipt = {
+        "headline": article["headline"],
+        "source": article["source"],
+        "url": article["link"],
+        "date": article["date"],
+        "body_chars": len(body),
+        "body_source": "rss_full",
+        "rss_content_index": 1,
+        "rss_content_count": 2,
+        "body_bytes_utf8": len(body.encode("utf-8")),
+        "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        "selected_at": "2026-07-30T12:00:00",
+    }
+    meta = {}
+
+    writer._stamp_news_seed_receipt(meta, {
+        "news_article": article,
+        "news_seed_receipt": receipt,
+    })
+
+    assert meta["news_seed"] == receipt
+    assert meta["news_seed"] is not receipt
+    receipt["headline"] = "mutated after stamp"
+    assert meta["news_seed"]["headline"] == "A headline"
+
+
+def test_rss_fetch_builds_receipt_from_the_selected_complete_body(
+        monkeypatch):
+    from nodes import OTR_LedgerScriptWriter as writer
+    from nodes import story_orchestrator
+
+    body = "complete body with a tail sentinel: TAIL"
+    monkeypatch.setattr(
+        story_orchestrator,
+        "_fetch_science_news",
+        lambda **_kwargs: [{
+            "headline": "Selected headline",
+            "summary": "Selected summary",
+            "full_text": body,
+            "source": "Fixture Feed",
+            "date": "2026-07-30",
+            "link": "https://example.com/selected",
+            "_body_source": "rss_full",
+            "_rss_content_index": 2,
+            "_rss_content_count": 3,
+        }],
+    )
+    receipt = {}
+
+    payload = writer._fetch_rss_seed_or_die(
+        "fixture-model",
+        receipt_sink=receipt,
+    )
+
+    assert payload["full_text"] == body
+    assert receipt["body_source"] == "rss_full"
+    assert receipt["rss_content_index"] == 2
+    assert receipt["rss_content_count"] == 3
+    assert receipt["body_chars"] == len(body)
+    assert receipt["body_bytes_utf8"] == len(body.encode("utf-8"))
+    assert receipt["body_sha256"] == hashlib.sha256(
+        body.encode("utf-8")
+    ).hexdigest()
+
+
+def test_news_seed_receipt_mismatch_fails_loud():
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    body = "selected body"
+    article = {
+        "headline": "headline",
+        "full_text": body,
+        "source": "source",
+        "date": "2026-07-30",
+        "link": "https://example.com/item",
+    }
+    receipt = {
+        "headline": "headline",
+        "source": "source",
+        "url": article["link"],
+        "date": article["date"],
+        "body_chars": len(body),
+        "body_source": "rss_full",
+        "rss_content_index": 0,
+        "rss_content_count": 1,
+        "body_bytes_utf8": len(body.encode("utf-8")),
+        "body_sha256": "0" * 64,
+        "selected_at": "2026-07-30T12:00:00",
+    }
+    with pytest.raises(RuntimeError, match="body_sha256"):
+        writer._stamp_news_seed_receipt({}, {
+            "news_article": article,
+            "news_seed_receipt": receipt,
+        })
 
 
 def test_resolve_inputs_rss_default_config_baseline():

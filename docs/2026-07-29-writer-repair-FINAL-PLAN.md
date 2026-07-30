@@ -1,5 +1,20 @@
 # OTR WRITER REPAIR -- FINAL HARDENED PLAN
 
+> **SUPERSEDED 2026-07-30.** This document is retained as historical analysis.
+> The operator has now ruled that fictional continuity with an article or an
+> abandoned draft is not required. Recoverable P0/P1/P2/P3/P5 model-output
+> defects retire the candidate and start a fresh complete model-authored
+> candidate until acceptance or operator cancellation; there is no fixed outer
+> candidate ceiling and no deterministic summary/drop/canned-story floor.
+> Complete RSS bodies are covered by overlapping P0 windows and exact rebasing.
+> Therefore Section 0's open listener-floor choice, its rejection of fresh P5
+> candidates, Window B's degrade-ledger design, "C-4 re-roll: CUT", "Cap
+> `_p0_evidence_projection`: CUT", "Never wire `p0_source_chunks`", and the
+> zero-salvage/cancellation conclusions no longer govern implementation.
+> Deterministic configuration, security, provider, I/O, compiler, invariant,
+> freeze, and proof failures still fail loudly. See
+> `docs/2026-07-30-story-never-fails/FINAL_PLAN.md`.
+
 Repo: ComfyUI-OldTimeRadio, branch v2.0-alpha, HEAD 47c554fa. ASCII only.
 Produced by a full 4-round kibitz arc (Codex gpt-5.6-sol high + Antigravity,
 plus a Claude seat in r1), every claim grounded against the real files by the

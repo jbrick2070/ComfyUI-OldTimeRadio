@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-07-30T22:47:10.763483+00:00",
+  "doc": "docs\\2026-07-30-story-never-fails\\roundtable\\pass01_plan.md",
+  "prompt_tokens_est": 5694,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.6-sol",
+      "ok": true,
+      "prompt_tokens": 5053,
+      "completion_tokens": 4970,
+      "cost_usd": 0.1806775,
+      "max_tokens": 6000,
+      "temperature": 0.45,
+      "reasoning_effort": "medium"
+    }
+  ],
+  "total_cost_usd": 0.1807
+}

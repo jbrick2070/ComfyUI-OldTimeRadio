@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ast
 from contextlib import contextmanager
+import hashlib
 import importlib
 import json
 from pathlib import Path
@@ -340,10 +341,27 @@ def test_science_rss_wrapper_forwards_runtime_policy(
     """Both science RSS banks share the same source-fetch contract."""
     calls = {}
 
-    def _fake(model_id, *, load_config=None, policy=None):
+    def _fake(
+        model_id, *, load_config=None, policy=None, receipt_sink=None,
+    ):
         calls["model_id"] = model_id
         calls["load_config"] = load_config
         calls["policy"] = policy
+        calls["receipt_sink"] = receipt_sink
+        if receipt_sink is not None:
+            receipt_sink.update({
+                "headline": "h",
+                "source": "src",
+                "url": "l",
+                "date": "2026-07-05",
+                "body_chars": 1,
+                "body_source": "rss_full",
+                "rss_content_index": 1,
+                "rss_content_count": 2,
+                "body_bytes_utf8": 1,
+                "body_sha256": hashlib.sha256(b"f").hexdigest(),
+                "selected_at": "2026-07-30T12:00:00",
+            })
         return _payload()
 
     import nodes.OTR_LedgerScriptWriter as writer
@@ -360,11 +378,10 @@ def test_science_rss_wrapper_forwards_runtime_policy(
         policy=policy,
     )
 
-    assert calls == {
-        "model_id": "tm-id",
-        "load_config": load_config,
-        "policy": policy,
-    }
+    assert calls["model_id"] == "tm-id"
+    assert calls["load_config"] is load_config
+    assert calls["policy"] is policy
+    assert isinstance(calls["receipt_sink"], dict)
     payload, meta, rights = osp.normalize_fetch_result(
         out, origin=f"{bank_id} wrapper test")
     assert payload == _payload()
@@ -374,6 +391,19 @@ def test_science_rss_wrapper_forwards_runtime_policy(
         "source_url": "l",
         "source_label": "src",
         "source_date": "2026-07-05",
+        "_news_seed_receipt": {
+            "headline": "h",
+            "source": "src",
+            "url": "l",
+            "date": "2026-07-05",
+            "body_chars": 1,
+            "body_source": "rss_full",
+            "rss_content_index": 1,
+            "rss_content_count": 2,
+            "body_bytes_utf8": 1,
+            "body_sha256": hashlib.sha256(b"f").hexdigest(),
+            "selected_at": "2026-07-30T12:00:00",
+        },
     }
     assert rights == {
         "license_status": "unknown",

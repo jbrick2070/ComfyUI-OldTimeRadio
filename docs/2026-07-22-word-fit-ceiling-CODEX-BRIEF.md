@@ -1,5 +1,14 @@
 # CODEX BRIEF -- 2026-07-22
 
+> **HISTORICAL / SUPERSEDED 2026-07-30.** Do not implement this brief's fixed
+> twelve-candidate ceiling, `OTR_MAX_WORD_FIT_CANDIDATES`, or
+> `WordFitCeilingExceeded` proposal on the canonical Sci-Fi candidate route.
+> The current operator ruling requires fresh complete model-authored
+> candidates until a downstream-valid ledger can be accepted or the operator
+> cancels. Deterministic configuration, security, provider, I/O, and invariant
+> failures remain loud. The current plan of record is
+> `docs/2026-07-30-story-never-fails/FINAL_PLAN.md`.
+
 **Word-fit delivery campaign hangs forever (all 6 banks) + kibitz agy model.**
 Author: Claude (Cowork). Branch: v2.0-alpha. Priority: P0 (Task 1), P1 (Task 2).
 

@@ -1052,8 +1052,9 @@ def _fetch_full_article(url, timeout=20):
 
     Fetches through the bounded seam (`_otr_feed_fetch`) and uses
     BeautifulSoup to strip HTML boilerplate and extract the article body.
-    Returns the raw text (up to 12000 chars) so Gemma gets real science
-    content - methodology, findings, implications - not just the RSS teaser.
+    Returns all extracted text admitted by the secure 2 MiB fetch seam so the
+    story engine gets methodology, findings, implications, and the article
+    tail - not just the RSS teaser or an arbitrary local slice.
 
     Wave 5: the fetch is https-only, size-capped, redirect-capped and
     address-checked. The two failure classes are NOT the same thing and are
@@ -1162,7 +1163,7 @@ def _fetch_full_article(url, timeout=20):
         content_tags = body.find_all(["p", "h2", "h3"])
         text = " ".join(tag.get_text(" ", strip=True) for tag in content_tags)
         text = re.sub(r'\s+', ' ', text).strip()
-        return text[:12000]
+        return text
     except Exception:
         return ""
 
@@ -1437,12 +1438,11 @@ def _llm_rerank_with_bodies(
     if len(candidates_with_body) <= 1:
         return list(candidates_with_body)
     try:
-        BODY_PREVIEW_CHARS = 800
         blocks = []
         for i, c in enumerate(candidates_with_body):
             headline = (c.get("headline") or "").strip()[:160]
             body = (c.get("full_text") or c.get("summary") or "").strip()
-            body_preview = body[:BODY_PREVIEW_CHARS].replace("\n", " ")
+            body_preview = _body_rerank_preview(body).replace("\n", " ")
             blocks.append(
                 f"{i + 1}. HEADLINE: {headline}\n   ARTICLE: {body_preview}"
             )
@@ -1560,6 +1560,78 @@ def _extract_rss_fragment_text(fragment: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _select_rss_content(entry) -> tuple[str, int | None, int]:
+    """Choose the longest usable RSS ``content`` alternative.
+
+    Raw list positions are preserved for the source receipt. Malformed rows
+    still count, but cannot displace a usable alternative. A non-list top-level
+    value is not an alternatives collection and is treated as absent.
+    """
+    raw = entry.get("content", []) if hasattr(entry, "get") else []
+    if not isinstance(raw, list):
+        return "", None, 0
+    best_text = ""
+    best_index: int | None = None
+    for index, row in enumerate(raw):
+        if not hasattr(row, "get"):
+            continue
+        value = row.get("value")
+        if not isinstance(value, str):
+            continue
+        try:
+            extracted = _extract_rss_fragment_text(value)
+        except Exception as exc:  # one malformed alternative cannot hide later rows
+            log.debug(
+                "[NewsFetcher] RSS content alternative %d was unusable: %s",
+                index, exc,
+            )
+            continue
+        if extracted and len(extracted) > len(best_text):
+            best_text = extracted
+            best_index = index
+    return best_text, best_index, len(raw)
+
+
+def _select_news_body(candidate: dict, fetched_body: str) -> tuple[str, str]:
+    """Choose the most complete clean body with stable route tie-breaking."""
+    rss = str(candidate.get("rss_full") or "")
+    article = str(fetched_body or "")
+    summary = str(candidate.get("summary") or "")
+    # max() keeps the first member on ties: RSS, then linked article, then
+    # summary. The route for a selected summary records whether a URL existed.
+    choices = (
+        (rss, "rss_full"),
+        (article, "url_scrape"),
+        (
+            summary,
+            "summary_fallback" if candidate.get("link") else "summary_only",
+        ),
+    )
+    return max(choices, key=lambda item: len(item[0]))
+
+
+def _body_rerank_preview(text: str, limit: int = 800) -> str:
+    """Return a bounded head/middle/tail view without modifying source text."""
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+        raise ValueError("body preview limit must be a positive integer")
+    body = str(text or "")
+    if len(body) <= limit:
+        return body
+    separator = " ... "
+    if limit <= 2 * len(separator) + 2:
+        return body[:limit]
+    available = limit - 2 * len(separator)
+    head_chars = available // 3
+    middle_chars = available // 3
+    tail_chars = available - head_chars - middle_chars
+    middle_start = max(0, (len(body) - middle_chars) // 2)
+    return separator.join((
+        body[:head_chars],
+        body[middle_start:middle_start + middle_chars],
+        body[-tail_chars:],
+    ))
+
+
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard",
                          *, load_config=None, policy=None):
@@ -1620,12 +1692,9 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                     continue
 
 
-                content_candidates = entry.get("content", [])
-                rss_full = ""
-                if content_candidates:
-                    rss_full = _extract_rss_fragment_text(
-                        content_candidates[0].get("value", "")
-                    )
+                rss_full, rss_content_index, rss_content_count = (
+                    _select_rss_content(entry)
+                )
                 summary = entry.get("summary", "").strip()
                 summary = re.sub(r'<[^>]+>', '', summary).strip()
                 data.append({
@@ -1635,6 +1704,8 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                     "source": feed.feed.get("title", feed_url.split("/")[2]),
                     "date": entry.get("published", str(datetime.now().date())),
                     "link": entry.get("link", ""),
+                    "_rss_content_index": rss_content_index,
+                    "_rss_content_count": rss_content_count,
                 })
             return data
         except FeedFetchRefused:
@@ -1764,37 +1835,19 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     def _resolve_body(candidate: dict) -> dict:
         """Body resolver for one candidate. Pure; thread-safe."""
         out = dict(candidate)
-        rss_full = out.get("rss_full")
-        has_acceptable_inline_rss = bool(rss_full) and len(rss_full) > 300
-        if has_acceptable_inline_rss:
-            out["full_text"] = rss_full
-            out["_body_source"] = "rss_full"
-            log.info(
-                "[NewsFetcher] [%s] RSS full body: %d chars",
-                (out.get("headline") or "")[:50],
-                len(out["full_text"]),
-            )
-        elif out.get("link"):
-            fetched = _fetch_full_article(out["link"], timeout=5)
-            if fetched and len(fetched) > 300:
-                out["full_text"] = fetched
-                out["_body_source"] = "url_scrape"
-                log.info(
-                    "[NewsFetcher] [%s] scraped article: %d chars",
-                    (out.get("headline") or "")[:50],
-                    len(out["full_text"]),
-                )
-            else:
-                out["full_text"] = out.get("summary", "")
-                out["_body_source"] = "summary_fallback"
-                log.info(
-                    "[NewsFetcher] [%s] scrape blocked - RSS summary (%d chars)",
-                    (out.get("headline") or "")[:50],
-                    len(out["full_text"]),
-                )
-        else:
-            out["full_text"] = out.get("summary", "")
-            out["_body_source"] = "summary_only"
+        fetched_body = (
+            _fetch_full_article(out["link"], timeout=5)
+            if out.get("link") else ""
+        )
+        out["full_text"], out["_body_source"] = _select_news_body(
+            out, fetched_body,
+        )
+        log.info(
+            "[NewsFetcher] [%s] selected %s body: %d chars",
+            (out.get("headline") or "")[:50],
+            out["_body_source"],
+            len(out["full_text"]),
+        )
         return out
 
     attempts = pool[:MAX_ATTEMPTS]
@@ -1856,30 +1909,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
     except Exception as _hist_exc:  # noqa: BLE001
         log.warning("[NewsFetcher] history record failed (non-fatal): %s",
                     _hist_exc)
-
-    # 2026-04-29: stamp the chosen article's identity into the live
-    # ledger's meta.news_seed for per-episode auditability. Anyone
-    # reading the ledger now knows EXACTLY which article seeded the
-    # script, where it came from, and how big the body was. Pairs with
-    # the existing per-episode ledger fields (cast, lines, clips) so a
-    # render's full origin chain is on disk in one file.
-    try:
-        from .production_ledger import get_ledger as _get_led
-        _led = _get_led()
-        _led.data.setdefault("meta", {})["news_seed"] = {
-            "headline":     str(chosen.get("headline", ""))[:240],
-            "source":       str(chosen.get("source", ""))[:120],
-            "url":          str(chosen.get("link", "")),
-            "date":         str(chosen.get("date", "")),
-            "body_chars":   len(chosen.get("full_text", "") or ""),
-            "selected_at":  datetime.now().isoformat(timespec="seconds"),
-        }
-        _led.save()
-        log.info("[NewsFetcher] stamped meta.news_seed in ledger: %s",
-                 (chosen.get("headline") or "")[:60])
-    except Exception as _seed_exc:  # noqa: BLE001
-        log.warning("[NewsFetcher] news_seed ledger stamp failed (non-fatal): %s",
-                    _seed_exc)
 
     return [chosen]
 

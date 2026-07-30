@@ -202,12 +202,16 @@ def test_validate_p5_structure_reports_every_offending_line(monkeypatch):
         ("l002", "character", "A clean spoken line that breaks nothing."),
         ("l003", "announcer", "Ada Sterling: this one wears a role label."),
         ("l004", "character", "   "),
+        ("l005", "character", "A gun waits beside the receiver."),
+        ("l006", "announcer", "The damn relay keeps calling."),
     ])
     error = lane._validate_p5_structure(script, _cast_stub(), _score_stub({}))
     assert error is not None
     assert "l001: spoken text is production markup" in error
     assert "l003: spoken text starts with a role label" in error
     assert "l004: spoken text is empty" in error
+    assert "l005: weapon='gun'" in error
+    assert "l006: profanity='damn'" in error
     assert "l002" not in error
 
 
@@ -289,7 +293,7 @@ def test_raw_scan_reports_every_offending_row():
     draft = lane.ScriptTextDraftV4(lines=[
         {"line_id": "l001", "text": "(SFX: fingers typing)"},
         {"line_id": "l002", "text": "Ada Sterling: I am drowning in data."},
-        {"line_id": "l003", "text": "A clean spoken line."},
+        {"line_id": "l003", "text": "A gun waits by the clean relay."},
     ])
     score = _score_stub({
         "l001": "character", "l002": "character", "l003": "announcer",
@@ -298,6 +302,7 @@ def test_raw_scan_reports_every_offending_row():
     assert findings == [
         "l001: spoken text is production markup",
         "l002: spoken text starts with a role label",
+        "spoken safety: l003: weapon='gun'",
     ]
 
 
@@ -351,7 +356,10 @@ def test_compile_refusal_carries_the_markup_findings_with_it(monkeypatch):
 
     monkeypatch.setattr(lane, "compile_script_text_draft", refuse)
     candidate = lane.ScriptTextDraftV4(lines=[
-        {"line_id": "l001", "text": "(SFX: fingers typing on a keyboard)"},
+        {
+            "line_id": "l001",
+            "text": "(SFX: gun beside the keyboard)",
+        },
         {"line_id": "l002", "text": "A clean spoken line."},
         {"line_id": "l011", "text": "An invented row."},
     ])
@@ -359,6 +367,7 @@ def test_compile_refusal_carries_the_markup_findings_with_it(monkeypatch):
     assert error is not None
     assert "do not exactly cover the accepted graph" in error
     assert "l001: spoken text is production markup" in error
+    assert "l001: weapon='gun'" in error
 
 
 def test_compile_refusal_alone_stays_bare_when_the_rows_are_clean(monkeypatch):
@@ -420,6 +429,92 @@ def test_cleanup_empty_surface_runs_real_p5_reauthor_rung():
         "rejected", "accepted",
     ]
     assert attempts[0]["error_type"] == "PostValidationError"
+
+
+def test_unsafe_p5_candidate_is_abandoned_for_fresh_divergent_fiction(
+        monkeypatch):
+    monkeypatch.setattr(lane, "_poll_processing_interrupt", lambda: None)
+    rejected = lane.ScriptTextDraftV4(
+        lines=[{
+            "line_id": "l001",
+            "text": "REJECTED_PROSE A gun waits beside the receiver.",
+        }],
+    ).model_dump_json()
+    accepted_text = (
+        "Far from the receiver, a gardener teaches moonflowers to sing."
+    )
+    accepted = lane.ScriptTextDraftV4(
+        lines=[{"line_id": "l001", "text": accepted_text}],
+    ).model_dump_json()
+    responses = [rejected, rejected, accepted]
+    prompts = []
+
+    def slot(messages, **_kwargs):
+        prompts.append(messages)
+        return responses[len(prompts) - 1]
+
+    journal = {}
+    script = lane._call_script_text_draft(
+        slot_fn=slot,
+        pack=SimpleNamespace(prompt_stages={
+            "codex_play_system": "Write the spoken line.",
+            "codex_coda_contract_system": "Return only the compact draft.",
+        }),
+        artifact_inputs={},
+        score=_a6_score(),
+        cast=_a6_cast(),
+        max_new_tokens=None,
+        call_journal=journal,
+    )
+
+    assert script.lines[0].text == accepted_text
+    assert len(prompts) == 3
+    assert [entry["status"] for entry in journal["calls"]] == [
+        "failed", "accepted",
+    ]
+    assert "writer_retry" in prompts[2][1]["content"]
+    assert "REJECTED_PROSE" not in prompts[2][1]["content"]
+    assert "REJECTED_PROSE" not in str(journal)
+
+
+def test_canonicalization_defect_retires_candidate_before_acceptance(
+        monkeypatch):
+    monkeypatch.setattr(lane, "_poll_processing_interrupt", lambda: None)
+    rejected_text = "OTHER: Ada Sterling: The signal is clear."
+    accepted_text = "The signal is clear, and the receiver is stable."
+    rejected = lane.ScriptTextDraftV4(
+        lines=[{"line_id": "l001", "text": rejected_text}],
+    ).model_dump_json()
+    accepted = lane.ScriptTextDraftV4(
+        lines=[{"line_id": "l001", "text": accepted_text}],
+    ).model_dump_json()
+    responses = [rejected, rejected, accepted]
+    prompts = []
+
+    def slot(messages, **_kwargs):
+        prompts.append(messages)
+        return responses[len(prompts) - 1]
+
+    journal = {}
+    script = lane._call_script_text_draft(
+        slot_fn=slot,
+        pack=SimpleNamespace(prompt_stages={
+            "codex_play_system": "Write the spoken line.",
+            "codex_coda_contract_system": "Return only the compact draft.",
+        }),
+        artifact_inputs={},
+        score=_a6_score(),
+        cast=_a6_cast(),
+        max_new_tokens=None,
+        call_journal=journal,
+    )
+
+    assert script.lines[0].text == accepted_text
+    assert len(prompts) == 3
+    assert [entry["status"] for entry in journal["calls"]] == [
+        "failed", "accepted",
+    ]
+    assert "starts with a role label" in str(prompts[1])
 
 
 def test_without_empty_surface_finding_cleanup_would_skip_the_line(monkeypatch):

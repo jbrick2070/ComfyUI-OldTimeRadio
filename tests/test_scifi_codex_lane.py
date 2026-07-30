@@ -291,7 +291,9 @@ def _run_lane(
     state: dict[str, Any] | None = None,
 ):
     state = state if state is not None else {}
-    state.update(trace=[], p3_calls=0, p5_calls=0, assemble_calls=0)
+    state.update(
+        trace=[], retry_flags=[], p3_calls=0, p5_calls=0, assemble_calls=0,
+    )
 
     def creative_fn(*_args, **_kwargs) -> str:
         return ""
@@ -307,6 +309,9 @@ def _run_lane(
 
     def fake_invoke(**kwargs):
         pass_id = kwargs["pass_id"]
+        state["retry_flags"].append(
+            (pass_id, kwargs.get("retry_until_valid"))
+        )
         state["trace"].append(
             (
                 pass_id,
@@ -448,6 +453,9 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
     ]
     assert state["trace"][0][4] is state["technical_fn"]
     assert all(row[4] is state["creative_fn"] for row in state["trace"][1:])
+    assert state["retry_flags"] == [
+        ("P0", True), ("P1", True), ("P2", True), ("P3", True), ("P5", True),
+    ]
     assert state["p3_calls"] == state["p5_calls"] == 1
     assert state["p3_score"] is state["p5_score"] is state["assembled_score"]
     assert state["assemble_calls"] == 1
@@ -689,6 +697,29 @@ def test_arbitrary_spoken_prose_length_publishes_with_telemetry_only(
     assert coverage["complete"] is True
 
 
+def test_divergent_fiction_is_canonical_when_ledger_contract_is_intact(
+    monkeypatch, tmp_path,
+):
+    text = (
+        "Far from the observatory, a gardener teaches moonflowers to sing."
+    )
+    state = _run_lane(
+        monkeypatch,
+        tmp_path,
+        line_text=lambda _line_id, _index: text,
+    )
+
+    spoken = [
+        row["text"] for row in state["ledger"].data["lines"]
+        if not row.get("skip")
+    ]
+    assert spoken
+    assert set(spoken) == {text}
+    assert state["assemble_calls"] == 1
+    coverage = state["ledger"].data["meta"]["content_authorship"]["coverage"]
+    assert coverage["complete"] is True
+
+
 def test_post_safety_structure_drift_fails_before_assembly(monkeypatch, tmp_path):
     def drift(script: lane.ScriptArtifactV4) -> lane.ScriptArtifactV4:
         first = script.lines[0].model_copy(update={"beat_id": "b999"})
@@ -710,13 +741,16 @@ def test_post_safety_structure_drift_fails_before_assembly(monkeypatch, tmp_path
     assert state["assemble_calls"] == 0
 
 
-def test_terminal_spoken_safety_residual_fails_before_assembly(
+def test_post_acceptance_spoken_safety_residual_fails_before_assembly(
     monkeypatch, tmp_path,
 ):
-    def prose(_line_id: str, index: int) -> str:
-        if index == 0:
-            return "A gun rests beside the receiver."
-        return "The quiet signal continues across the night."
+    def inject_post_acceptance_drift(
+        script: lane.ScriptArtifactV4,
+    ) -> lane.ScriptArtifactV4:
+        first = script.lines[0].model_copy(
+            update={"text": "A gun rests beside the receiver."}
+        )
+        return script.model_copy(update={"lines": [first, *script.lines[1:]]})
 
     def unavailable(*_args, **_kwargs) -> str:
         raise RuntimeError("safety writer unavailable")
@@ -729,7 +763,7 @@ def test_terminal_spoken_safety_residual_fails_before_assembly(
         _run_lane(
             monkeypatch,
             tmp_path,
-            line_text=prose,
+            transform_script=inject_post_acceptance_drift,
             technical_generator=unavailable,
             state=state,
         )

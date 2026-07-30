@@ -582,7 +582,7 @@ def test_the_production_p0_call_site_passes_the_hook():
     wiring the hook -- which is precisely how repair_literal_source_metadata
     came to be imported twice and called never. Assert the real call site.
     """
-    source = inspect.getsource(lane.run_scifi_codex_episode)
+    source = inspect.getsource(lane._invoke_p0_window)
     assert "deterministic_repair_fn=" in source, (
         "run_scifi_codex_episode no longer wires a deterministic repair; "
         "P0's dominant live failure is back on the LLM repair owner"
@@ -594,12 +594,12 @@ def test_the_production_p0_call_site_passes_the_hook():
     assert "repair_receipt=repair_receipt" in source, (
         "the production repairer no longer fills the pending receipt sink"
     )
-    assert "deterministic_repair_fn=p0_deterministic_repair" in source, (
+    assert "deterministic_repair_fn=deterministic_repair" in source, (
         "the production P0 call no longer wires the receipted repair closure"
     )
     assert (
         "max_quote_chars=MAX_QUOTE_CHARS,\n"
-        "            allowed_source_fields=p0_allowed_fields,\n"
+        "            allowed_source_fields=allowed_source_fields,\n"
         "            repair_receipt=repair_receipt,"
     ) in source, (
         "the production repair closure no longer restricts source rehoming "

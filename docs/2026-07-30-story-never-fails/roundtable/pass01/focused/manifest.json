@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-07-30T22:31:07.445417+00:00",
+  "doc": "docs\\2026-07-30-story-never-fails\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 4451,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "resolved_model": "openai/gpt-5.6-sol",
+      "ok": true,
+      "prompt_tokens": 4021,
+      "completion_tokens": 5716,
+      "cost_usd": 0.1966075,
+      "max_tokens": 6000,
+      "temperature": 0.45,
+      "reasoning_effort": "high"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 4429,
+      "completion_tokens": 4306,
+      "cost_usd": 0.06053,
+      "max_tokens": 6000,
+      "temperature": 0.45,
+      "reasoning_effort": "high"
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "resolved_model": "deepseek/deepseek-v4-pro",
+      "ok": true,
+      "prompt_tokens": 4182,
+      "completion_tokens": 6000,
+      "cost_usd": 0.00703917,
+      "max_tokens": 6000,
+      "temperature": 0.45,
+      "reasoning_effort": "high"
+    }
+  ],
+  "total_cost_usd": 0.2642
+}
