@@ -3,6 +3,74 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-30 -- HEAD f781234c (v2.0-alpha) -- WINDOW CODER (window #8)
+
+Did:
+- **Section 2 of the writer-repair plan, MEASURED, and it falsified its own
+  hypothesis.** Parsed all 50 campaign-day `tmp\otr_headless_*.log` files; the
+  census reproduces exactly (15 P0 / 9 P5 / 1 P3 -- the plan's 8 P5 excludes one
+  of the three PromptContextOverflow runaways). **`_span_ok` already snaps
+  `start`/`end` via `source.find(quote)` inside the validator**, so a literal
+  quote with wrong coordinates cannot produce "non-literal source span":
+  **0 of the 15 P0 deaths are the case `47c554fa` was wired for.** 12 are
+  paraphrase / wrong-region / claim-as-quote (only pruning helps), 2 are
+  character-identical-except-`&nbsp;`, 1 has the entity plus a diverging quote.
+  Prune-survivability is plausible for 10 of 15 (the first failing row is F02+
+  and the validator returns on the first error) but CANNOT be replayed offline:
+  the logs keep only a truncated `raw head` and no source payload.
+- Corrected the plan's "28 decode-message legs": 28 is the whole 17-day tmp/
+  history; the campaign has 8 (4 P0, 4 P3), and the retry-marker conclusion
+  still holds because `49672` and `65401` decode-failed and did not die of it.
+  A-2 therefore folds into A-1 rather than running as its own pass.
+- **`fb400526` A-1** -- `PromptContextOverflowError` carries `raw_completion` +
+  prompt/generated/requested/effective/context counts as FIELDS (never in the
+  message: `args` stays `(message,)`), and the decode moved above the raise.
+  Same commit fixes a second defect in those lines: the OUTPUT_TRUNCATED /
+  OUTPUT_CAP arithmetic sat BELOW the raise, so the one leg that needed it
+  logged nothing. Mutation 4/4; the decode-before-raise ordering is proven
+  structurally (the raise references `decoded`, so it cannot be built unless
+  the decode ran) plus a decode-call counter.
+- **`f781234c` A-3** -- `import html` plus `_HTML_NBSP_ENTITY` (`&nbsp;`,
+  `&#160;`, `&#xA0;` and hex case ONLY) decoded inside
+  `_normalize_span_source_text`, before the whitespace collapse, which stays the
+  sole owner of what a space is. Regression built from the real articles
+  (`otr_headless_65212`, `otr_headless_65452`), plus a digest-stability pin:
+  normalization happens BEFORE the digest, and two payloads differing only by
+  the entity now hash identically. Mutation 5/5, including "widen to
+  `html.unescape` wholesale" -> CAUGHT by the narrowness guard.
+- Filed four new OPEN BUGS rows, the first of which outranks A-3 in live cost:
+  `full_text` carries HTML block joins with NO separator (`PolygonsNASA/JPL-`,
+  `ofEngine`, `.Let's`, `).The`), which is what 12 of the 15 P0 deaths actually
+  tripped over; the deterministic rung prunes SILENTLY (Invariant 3); it is
+  ALL-OR-NOTHING because it gets `a0_payload` while the validator enforces
+  `allowed_source_fields`; and nothing measures whether a pruned index is
+  accepted.
+
+Two things worth not re-deriving:
+- A fake tensor without `__len__` makes the writer report
+  `generated_tokens = None`, because `getattr(ids, "shape", [len(ids)])` builds
+  its default EAGERLY inside a bare `except Exception`. Three of my tests failed
+  on that and the production code was innocent.
+- My cleanup glob `Remove-Item tmp\_a1_*` took an untracked `tmp\_a1_probe.ps1`
+  that was not mine (never tracked; no history lost). Delete tmp scratch by
+  explicit filename, never by pattern.
+
+Receipts: suite **7849 passed / 130 skipped / 1 xfailed** (re-run AFTER each
+commit of a new test file, per the B7 untracked-diff trap); Bible
+**17 passed / 24 skipped / 3 xfailed**; `build_variants --check` 11 variants /
+0 failures; canonical `9872624A` byte-identical; hygiene clean, both new files
+ASCII-only. Preserved another window's three modified `tmp/*.ps1` throughout.
+
+Current step: WRITER REPAIR, Window A item **A-4** (capacity error gets a
+`phase`: `prompt_no_room` | `output_limit`, only `output_limit` may re-roll;
+patch BOTH JSONDecodeError retry gates in `_otr_structured_call.py` -- the
+structural rung and the repair-syntax rung -- and mirror the dual
+relative/absolute import fallback or `tests/test_structured_call.py` fails at
+COLLECTION).
+Next: A-4, then A-5, A-6, A-7. Window B still gated on Section 0.
+Models: Claude only (rung 4). No panel spend: no fix needed a second attempt.
+Commits: fb400526, f781234c (+ this docs commit)
+
 ## 2026-07-29 22:00 -- HEAD 47c554fa (v2.0-alpha) -- WINDOW CODER (inherited from a dead window)
 
 Did:

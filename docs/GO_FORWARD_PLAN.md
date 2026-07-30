@@ -1,6 +1,17 @@
 # OTR Go-Forward Plan
 
-**Updated:** 2026-07-28 06:15 (remote Cowork, RENDER/QA window) -- **THE
+**Updated:** 2026-07-30 (remote Cowork, CODER window) -- **WRITER REPAIR:
+SECTION 2 IS MEASURED, AND WINDOW A'S FIRST TWO CHUNKS ARE IN.** HEAD == origin
+`f781234c`; suite **7849 passed / 130 skipped / 1 xfailed**; Bible 17;
+`build_variants --check` 11 variants / 0 failures; canonical `9872624A`
+byte-identical (no node, widget, link or schema touched). Landed: `fb400526`
+**A-1** (the output-limit raise carries the completion and the arithmetic it was
+raised about), `f781234c` **A-3** (the narrow `&nbsp;` decode, with both
+production fixtures and a digest-stability pin). **NEXT = A-4.** Section 2's
+finding is below under CURRENT STEP; per-chunk detail is in
+`docs/HANDOFF_LOG.md`, not here.
+
+**Superseded header (2026-07-28 06:15, RENDER/QA window) -- **THE
 CREDITS CARD IS LIVE-PROVEN AT 1920x1080 AND A CLOUD ENGINE WAS FOUND SITTING
 IN THE "LOCAL ONLY" ROSTER.** HEAD == origin `72282083`; canonical
 `9872624A` unchanged (pinned by hash at campaign launch). No production code
@@ -848,9 +859,48 @@ or block an episode. Same-story LLM cleanup is allowed.
 ## (operator, 2026-07-29): 24 of 34 failures died in the writer, so the engines
 ## cannot be proven until the writer stops vetoing. Plan of record is
 ## `docs/2026-07-29-writer-repair-FINAL-PLAN.md`, hardened by a full 4-round
-## kibitz arc. Start at its Section 2 (re-classify the 15 P0 deaths against
-## post-47c554fa code -- 1 hour, no code, and it may reorder the plan), then
-## Window A. Section 0 is an OPEN OPERATOR DECISION and gates Window B.**
+## kibitz arc. **Section 2 is DONE and Window A is RUNNING: A-1 and A-3 are
+## landed and pushed; NEXT = A-4.** Section 0 is an OPEN OPERATOR DECISION and
+## gates Window B.**
+
+### SECTION 2 IS MEASURED (2026-07-30) -- THE ORDER HOLDS, THREE PREMISES DO NOT
+
+Method: the 50 campaign-day `tmp\otr_headless_*.log` files, every P0 rejection
+read verbatim and classified, then the code paths re-read. The census
+reproduces exactly: **15 P0, 9 P5, 1 P3** deaths (the plan's 8 P5 excludes one
+of the three `PromptContextOverflowError` runaways).
+
+**The deterministic rung would NOT have saved those 15, and the reason is
+structural: `_span_ok` (`nodes/_otr_scifi_codex.py`, directly above
+`_span_mismatch`) ALREADY does the coordinate repair** -- when a quote does not
+match its declared slice it runs `source.find(quote)` and snaps `start`/`end`
+inside the validator. So "a literal quote with wrong coordinates" can never
+produce this error, and **0 of 15 deaths are that case.** Every one is a quote
+that is not a byte-exact substring of its cited field. `47c554fa`'s own comment
+("arithmetic, not authorship") describes a case that was already handled
+upstream; the rung's only live mechanism on these legs is PRUNING the
+unsupported rows.
+
+Classification of the 15 (verbatim evidence in HANDOFF_LOG):
+
+- **12** -- the quote is real article prose but paraphrased, from the wrong
+  region, or is the model's own claim text. Only pruning can help.
+- **2** -- the quote is character-identical to its source EXCEPT the feed
+  carried `&nbsp;`. **A-3 fixes exactly these** (`otr_headless_65212`,
+  `otr_headless_65452`), and both are now regression fixtures.
+- **1** -- `&nbsp;` in the failing window plus a diverging quote.
+
+**Prune-survivability is PLAUSIBLE, NOT PROVEN.** In 10 of the 15 the first
+failing row is F02 or later and `_validate_fact_index` returns on the FIRST
+error, so at least one earlier fact validated and a pruned index would satisfy
+`facts` `min_length=1`. It cannot be replayed offline: the logs carry only a
+truncated `raw head` of the artifact and no source payload.
+
+**The plan's "28 decode-message legs" is a miscount.** 28 is the count across
+the whole 17-day `tmp/` history (222 logs). On the campaign it is **8 legs** --
+4 at P0, 4 at P3 -- and the conclusion still holds (`otr_headless_49672` and
+`otr_headless_65401` decode-failed and did not die of it), so A-2 has almost
+nothing left to classify and folds into A-1's receipt rather than its own pass.
 
 **THE RUN IS ALREADY EARNING ITS KEEP. Three bugs in the first five legs, none
 of which the 7,700-test suite could see:**
@@ -2448,6 +2498,43 @@ receipt under `tmp/`.
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 That split is why the two eyeball-era entries below are PARKED rather than
 listed as live.
+
+- **NEW 2026-07-30: `full_text` reaches the span coordinate system carrying
+  HTML BLOCK JOINS WITH NO SEPARATOR, and on the live evidence this is the
+  DOMINANT P0 failure cause.** Measured in the campaign logs:
+  `'...Field of Martian PolygonsNASA/JPL-'`, `'...and the School ofEngine'`,
+  `'...what you're doing.Let's s'`, `'...(AMR).The resea'`. The RSS adapter
+  strips tags without inserting whitespace, so two elements fuse into one
+  token. `_normalize_span_source_text` collapses whitespace RUNS but cannot
+  insert a space that was never there, so the model quotes the sentences a
+  reader sees and they are not byte-exact in the stored text -- which is
+  exactly the "non-literal source span" rejection that killed 12 of the 15 P0
+  legs. **Deliberately NOT fixed by A-3:** A-3 is the narrow `&nbsp;` decode
+  the plan ratified, and inserting separators is a WIDER change to the
+  coordinate system `source_digest` pins -- an operator decision, and it
+  belongs in the source adapter rather than the codex normalizer. Owed: which
+  adapter builds `full_text`, whether a separator can be inserted at admission
+  without breaking any accepted ledger, and a fixture from these four strings.
+- **NEW 2026-07-30: the deterministic P0 rung PRUNES SILENTLY, which violates
+  the plan's own Invariant 3.** `repair_literal_source_metadata` drops an
+  unsupported span, then its evidence row, then the fact -- and emits no
+  receipt. An accepted P0 index simply has fewer facts than the model wrote,
+  and nothing says which were dropped or why. Under "fail loud, not fatal" the
+  degrade is the right direction and the silence is not.
+- **NEW 2026-07-30: the deterministic P0 rung is ALL-OR-NOTHING across an
+  artifact, and can poison its own good work.** It is handed `a0_payload` (all
+  seven keys) while `_validate_fact_index` restricts spans to
+  `allowed_source_fields` (the projection). A quote rehomed into a field the
+  projection omitted makes `post_validator` reject the WHOLE repaired
+  artifact -- "cites source field ... outside the supplied P0 evidence" -- so
+  one unlucky rehome discards every correct prune in the same pass. Either give
+  the repairer the allowlist or prune per row.
+- **NEW 2026-07-30 (recorded, no action owed yet): nothing measures whether a
+  pruned P0 index is ACCEPTED.** No live leg has ever run with the
+  deterministic rung reachable (it became reachable at `47c554fa`, after the
+  campaign stopped), and the rejection logs carry only a truncated `raw head`
+  plus no source payload, so the question cannot be answered offline. A-1's
+  instrumentation is what makes the next campaign able to answer it.
 
 - **NEW 2026-07-29 (LATENT, no shipped contract can reach it): the
   fewest-segments partitioner can accept a disproportionate trim on a WIDE
