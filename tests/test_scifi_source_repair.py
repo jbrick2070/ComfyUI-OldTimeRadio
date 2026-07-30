@@ -265,6 +265,57 @@ def test_repair_rehomes_exact_quote_only_when_field_label_is_wrong():
     assert payload[span.field][span.start:span.end] == span.quote
 
 
+def test_repair_rehomes_only_within_the_supplied_source_field_allowlist():
+    payload = {
+        "seed_text": "Project Apollo summary evidence",
+        "headline": "Project Apollo",
+        "summary": "summary evidence",
+        "full_text": "distinct retained full text",
+    }
+    raw = json.dumps({
+        "facts": [
+            {
+                "fact_id": "F01",
+                "claim": "unsupported sibling",
+                "source_spans": [{
+                    "field": "full_text",
+                    "start": 0,
+                    "end": 5,
+                    "quote": "not literal anywhere",
+                }],
+            },
+            {
+                "fact_id": "F02",
+                "claim": "retained sibling",
+                "source_spans": [{
+                    "field": "headline",
+                    "start": 0,
+                    "end": 14,
+                    "quote": "Project Apollo",
+                }],
+            },
+        ],
+        "entities": [],
+        "numbers": [],
+        "tone": "measured",
+        "payload_sha256": "digest",
+    })
+
+    repaired = repair_literal_source_metadata(
+        raw,
+        FactIndexV4,
+        payload,
+        zero_padded_ids=True,
+        allowed_source_fields=("seed_text", "full_text"),
+    )
+
+    assert repaired is not None
+    assert [fact.fact_id for fact in repaired.facts] == ["F02"]
+    span = repaired.facts[0].source_spans[0]
+    assert span.field == "seed_text"
+    assert payload[span.field][span.start:span.end] == "Project Apollo"
+
+
 def test_repair_bounds_an_exact_oversized_quote_without_changing_the_claim():
     payload = {"full_text": "literal evidence " + ("x" * 300)}
     raw = json.dumps({

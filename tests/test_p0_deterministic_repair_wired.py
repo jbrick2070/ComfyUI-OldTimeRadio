@@ -31,12 +31,18 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from nodes import _otr_scifi_codex as lane
-from nodes._otr_scifi_codex import FactIndexV4, _validate_fact_index
+from nodes._otr_scifi_codex import (
+    FactIndexV4,
+    _p0_evidence_projection,
+    _validate_fact_index,
+    validate_payload_envelope,
+)
 from nodes._otr_scifi_p0_contract import MAX_QUOTE_CHARS
 from nodes._otr_scifi_source_repair import repair_literal_source_metadata
 
@@ -137,6 +143,32 @@ RECEIPT_PRIMARY = json.dumps({
     "payload_sha256": DIGEST,
 })
 
+ALLOWLIST_PAYLOAD = {
+    "seed_text": "Project Apollo summary evidence",
+    "headline": "Project Apollo",
+    "summary": "summary evidence",
+    "full_text": "distinct retained full text",
+}
+ALLOWLIST = frozenset(("seed_text", "full_text"))
+ALLOWLIST_PRIMARY = _index([
+    _fact(
+        "F01",
+        "unsupported sibling",
+        "full_text",
+        0,
+        5,
+        "not literal anywhere",
+    ),
+    _fact(
+        "F02",
+        "retained sibling",
+        "headline",
+        0,
+        14,
+        "Project Apollo",
+    ),
+])
+
 
 def _p0_validator(value):
     return _validate_fact_index(
@@ -168,6 +200,40 @@ def _receipt_repair(failed_output, repair_receipt):
         failed_output,
         FactIndexV4,
         RECEIPT_PAYLOAD,
+        zero_padded_ids=True,
+        max_quote_chars=MAX_QUOTE_CHARS,
+        repair_receipt=repair_receipt,
+    )
+
+
+def _allowlist_validator(value):
+    return _validate_fact_index(
+        value,
+        ALLOWLIST_PAYLOAD,
+        allowed_source_fields=ALLOWLIST,
+        expected_payload_sha256=DIGEST,
+    )
+
+
+def _allowlist_repair(failed_output, repair_receipt):
+    return repair_literal_source_metadata(
+        failed_output,
+        FactIndexV4,
+        ALLOWLIST_PAYLOAD,
+        zero_padded_ids=True,
+        max_quote_chars=MAX_QUOTE_CHARS,
+        allowed_source_fields=ALLOWLIST,
+        repair_receipt=repair_receipt,
+    )
+
+
+def _unrestricted_allowlist_counterfactual(
+    failed_output, repair_receipt,
+):
+    return repair_literal_source_metadata(
+        failed_output,
+        FactIndexV4,
+        ALLOWLIST_PAYLOAD,
         zero_padded_ids=True,
         max_quote_chars=MAX_QUOTE_CHARS,
         repair_receipt=repair_receipt,
@@ -317,6 +383,140 @@ def test_without_the_wire_the_wrong_field_label_dies():
         _invoke(None, WRONG_FIELD)
 
 
+def test_allowlist_aware_repair_keeps_correct_sibling_prunes():
+    envelope, _steer = validate_payload_envelope(
+        {
+            **ALLOWLIST_PAYLOAD,
+            "source": "fixture",
+            "date": "2026-07-30",
+            "link": "https://example.invalid/apollo",
+        },
+        {"seed_source": "rss_fetch", "target_words": 45},
+    )
+    projected, allowed = _p0_evidence_projection(envelope)
+    assert projected == {
+        "seed_text": ALLOWLIST_PAYLOAD["seed_text"],
+        "full_text": ALLOWLIST_PAYLOAD["full_text"],
+    }
+    assert allowed == ALLOWLIST
+
+    result, seen, journal = _invoke(
+        _allowlist_repair,
+        ALLOWLIST_PRIMARY,
+        post_validator=_allowlist_validator,
+    )
+
+    assert [fact.fact_id for fact in result.facts] == ["F02"]
+    assert result.facts[0].claim == "retained sibling"
+    span = result.facts[0].source_spans[0]
+    assert span.field == "seed_text"
+    assert ALLOWLIST_PAYLOAD[span.field][span.start:span.end] == (
+        "Project Apollo"
+    )
+    assert seen == {"primary": 1, "alternate": 0}
+    call = journal["calls"][0]
+    assert call["terminal_disposition"] == (
+        "accepted_after_deterministic_repair"
+    )
+    assert call["deterministic_repair_receipt"][
+        "allowed_source_fields"
+    ] == ["full_text", "seed_text"]
+
+
+def test_ignoring_the_allowlist_discards_the_correct_sibling_prune():
+    unrestricted = _unrestricted_allowlist_counterfactual(
+        ALLOWLIST_PRIMARY, {},
+    )
+    assert unrestricted is not None
+    assert [fact.fact_id for fact in unrestricted.facts] == ["F02"]
+    assert unrestricted.facts[0].source_spans[0].field == "headline"
+    assert "outside the supplied P0 evidence" in (
+        _allowlist_validator(unrestricted) or ""
+    )
+
+    with pytest.raises(lane.CodexPassError):
+        _invoke(
+            _unrestricted_allowlist_counterfactual,
+            ALLOWLIST_PRIMARY,
+            post_validator=_allowlist_validator,
+        )
+
+
+def test_production_p0_closure_fires_with_the_projection_allowlist(
+    monkeypatch, tmp_path: Path,
+):
+    payload = {
+        **ALLOWLIST_PAYLOAD,
+        "source": "fixture",
+        "date": "2026-07-30",
+        "link": "https://example.invalid/apollo",
+    }
+    resolved = {
+        "seed_source": "rss_fetch",
+        "target_words": 45,
+        "technical_model": "technical",
+        "creative_writing_model": "creative",
+    }
+    envelope, _steer = validate_payload_envelope(payload, resolved)
+    primary_data = json.loads(ALLOWLIST_PRIMARY)
+    primary_data["payload_sha256"] = envelope.source_digest
+    primary_output = json.dumps(primary_data)
+    calls = {"technical": 0, "creative": 0}
+
+    def technical(_messages, **_kwargs):
+        calls["technical"] += 1
+        return primary_output
+
+    def creative(_messages, **_kwargs):
+        calls["creative"] += 1
+        raise AssertionError("allowlist repair must not call the LLM owner")
+
+    class StopAfterP0(RuntimeError):
+        pass
+
+    real_invoke = lane.invoke_codex_structured
+
+    def invoke_then_stop(**kwargs):
+        if kwargs["pass_id"] == "P0":
+            return real_invoke(**kwargs)
+        raise StopAfterP0
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", invoke_then_stop)
+    meta = {}
+
+    with pytest.raises(StopAfterP0):
+        lane.run_scifi_codex_episode(
+            payload=payload,
+            pack=SimpleNamespace(
+                prompt_stages={"codex_fact_index_system": "seam"},
+            ),
+            resolved=resolved,
+            led=SimpleNamespace(),
+            meta=meta,
+            creative_fn=creative,
+            technical_fn=technical,
+            slot_scheduler=None,
+            source_bank_row=None,
+            episode_root=tmp_path,
+            episode_id="allowlist-fixture",
+        )
+
+    assert calls == {"technical": 1, "creative": 0}
+    p0_call = meta["scifi_codex"]["call_journal"]["calls"][0]
+    assert p0_call["terminal_disposition"] == (
+        "accepted_after_deterministic_repair"
+    )
+    assert [row["fact_id"] for row in p0_call["accepted"]["facts"]] == [
+        "F02",
+    ]
+    assert p0_call["accepted"]["facts"][0]["source_spans"][0][
+        "field"
+    ] == "seed_text"
+    assert p0_call["deterministic_repair_receipt"][
+        "allowed_source_fields"
+    ] == ["full_text", "seed_text"]
+
+
 def test_a_deterministic_repair_gets_no_privileges_an_llm_repair_lacks():
     """A repair that does not satisfy the pass's real validator is refused.
     The rung is a shortcut past the LLM, never past the contract."""
@@ -396,4 +596,12 @@ def test_the_production_p0_call_site_passes_the_hook():
     )
     assert "deterministic_repair_fn=p0_deterministic_repair" in source, (
         "the production P0 call no longer wires the receipted repair closure"
+    )
+    assert (
+        "max_quote_chars=MAX_QUOTE_CHARS,\n"
+        "            allowed_source_fields=p0_allowed_fields,\n"
+        "            repair_receipt=repair_receipt,"
+    ) in source, (
+        "the production repair closure no longer restricts source rehoming "
+        "to the P0 evidence projection"
     )

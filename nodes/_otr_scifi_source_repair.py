@@ -11,7 +11,7 @@ import copy
 import hashlib
 import json
 import re
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Collection, Mapping, MutableMapping
 
 from pydantic import BaseModel
 
@@ -83,17 +83,19 @@ def repair_literal_source_metadata(
     *,
     zero_padded_ids: bool,
     max_quote_chars: int | None = None,
+    allowed_source_fields: Collection[str] | None = None,
     repair_receipt: MutableMapping[str, Any] | None = None,
 ) -> BaseModel | None:
     """Return a validated metadata-only repair, or ``None`` to keep retry loud.
 
     A source span is repaired only when its existing quote is an exact
-    substring of one unambiguous declared payload field. If it is paraphrased
-    or absent, its evidence row is dropped; if no supported fact remains, the
-    schema validation still fails loudly. An exact literal quote that is wider
-    than a finite schema cap may be narrowed only to the corresponding source
-    prefix at its repaired coordinate. Claims and every other model-authored
-    field remain byte-identical.
+    substring of one unambiguous allowed payload field. The optional allowlist
+    constrains both same-field acceptance and cross-field rehoming. If a quote
+    is paraphrased or absent, its evidence row is dropped; if no supported fact
+    remains, schema validation still fails loudly. An exact literal quote that
+    is wider than a finite schema cap may be narrowed only to the corresponding
+    source prefix at its repaired coordinate. Claims and every other
+    model-authored field remain byte-identical.
     """
     if (
         max_quote_chars is not None
@@ -112,6 +114,11 @@ def repair_literal_source_metadata(
         return None
     repaired = copy.deepcopy(data)
     before_counts = _collection_counts(repaired)
+    candidate_source_fields = tuple(
+        field
+        for field in _SOURCE_FIELDS
+        if allowed_source_fields is None or field in allowed_source_fields
+    )
     changed = False
     invalid_span_reasons: dict[int, str] = {}
     drops: list[dict[str, Any]] = []
@@ -129,7 +136,10 @@ def repair_literal_source_metadata(
                 field = node.get("field")
                 quote = node.get("quote")
                 start = node.get("start")
-                source = payload.get(field) if isinstance(field, str) else None
+                source = (
+                    payload.get(field)
+                    if field in candidate_source_fields else None
+                )
                 if isinstance(quote, str) and isinstance(start, int):
                     same_field_positions = (
                         _occurrences(source, quote)
@@ -140,7 +150,7 @@ def repair_literal_source_metadata(
                     else:
                         candidate_fields = [
                             (candidate, positions)
-                            for candidate in _SOURCE_FIELDS
+                            for candidate in candidate_source_fields
                             if isinstance(payload.get(candidate), str)
                             and (positions := _occurrences(payload[candidate], quote))
                         ]
@@ -327,7 +337,7 @@ def repair_literal_source_metadata(
             "span_index_base": 0,
             "allowed_source_fields": [
                 field
-                for field in _SOURCE_FIELDS
+                for field in candidate_source_fields
                 if isinstance(payload.get(field), str)
             ],
             "before_counts": before_counts,

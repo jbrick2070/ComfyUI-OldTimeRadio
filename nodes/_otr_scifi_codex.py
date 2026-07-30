@@ -2430,22 +2430,15 @@ def run_scifi_codex_episode(
         failed_output: str,
         repair_receipt: MutableMapping[str, Any],
     ) -> BaseModel | None:
-        repaired = repair_literal_source_metadata(
+        return repair_literal_source_metadata(
             failed_output,
             FactIndexV4,
             a0_payload,
             zero_padded_ids=True,
             max_quote_chars=MAX_QUOTE_CHARS,
+            allowed_source_fields=p0_allowed_fields,
             repair_receipt=repair_receipt,
         )
-        if repaired is not None:
-            # The helper searches the full canonical A0 payload in Item 3.
-            # Record the narrower P0 projection that the real validator
-            # accepts. Item 4 will make this same allowlist behavioral.
-            repair_receipt["allowed_source_fields"] = list(
-                p0_inputs["allowed_source_fields"],
-            )
-        return repaired
 
     p0 = invoke_codex_structured(
         pass_id="P0",
