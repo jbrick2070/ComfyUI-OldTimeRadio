@@ -245,9 +245,12 @@ def make_dispatching_repair_factory(
 
     JSON syntax, pydantic schema, null payload, and locked-roster membership
     have typed repair prompts. A caller-supplied deterministic repair is tried
-    first on ANY post-validation failure and may short-circuit the model
-    entirely. Every other post-validation error uses the generic structural
-    repair prompt; prose semantics never select a repair path.
+    first on any schema or post-validation failure and may short-circuit the
+    model entirely. This lets a caller remove malformed rows before Pydantic
+    can construct the typed artifact, while the repaired artifact still has
+    to pass both schema validation and the caller's real post-validator.
+    Every unresolved failure uses its typed prompt; prose semantics never
+    select a repair path.
     """
 
     def factory(
@@ -265,6 +268,15 @@ def make_dispatching_repair_factory(
                 failed_output=failed_output,
                 error=error,
             )
+        if isinstance(error, (ValidationError, PostValidationError)):
+            # A caller-owned deterministic repair can remove unsupported or
+            # malformed metadata before either validation boundary. The
+            # finished model is validated again by structured_call, so this
+            # is a repair rung, never a bypass.
+            if deterministic_repair is not None:
+                resolved = deterministic_repair(failed_output, error)
+                if resolved is not None:
+                    return resolved
         if isinstance(error, ValidationError):
             # Sprint 7C / BUG-LOCAL-275: a null `payload` rejection
             # gets a dedicated directive; the generic field-repair
@@ -299,12 +311,6 @@ def make_dispatching_repair_factory(
             # cannot help), and structured_call still puts whatever it returns
             # through the pass's real post_validator before accepting it. A
             # pass that supplied no deterministic repair is unaffected.
-            if deterministic_repair is not None:
-                resolved = deterministic_repair(failed_output, error)
-                if resolved is not None:
-                    # structured_call accepts a schema instance as
-                    # a finished result -- no LLM repair call.
-                    return resolved
             message = str(error).lower()
             if "locked cast" in message:
                 return cast_membership_repair(

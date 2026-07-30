@@ -1,4 +1,5 @@
 import json
+import hashlib
 
 from nodes._otr_scifi_codex import FactIndexV4
 from nodes._otr_scifi_codex import RadioScoreV4, ScriptArtifactV4, _schema_instruction as codex_schema_instruction
@@ -40,15 +41,213 @@ def test_repair_refuses_paraphrased_quote():
 
 def test_repair_drops_unsupported_fact_but_keeps_literal_fact():
     payload = {"full_text": "literal supported evidence"}
+    receipt = {}
     raw = (
         '{"facts":['
         '{"fact_id":"F0","claim":"unsupported", "source_spans":[{"field":"full_text","start":0,"end":5,"quote":"paraphrase"}]},'
         '{"fact_id":"F1","claim":"supported", "source_spans":[{"field":"full_text","start":0,"end":7,"quote":"literal"}]}],'
         '"entities":[],"numbers":[],"tone":"measured","payload_sha256":"digest"}'
     )
-    repaired = repair_literal_source_metadata(raw, FactIndexV4, payload, zero_padded_ids=True)
+    repaired = repair_literal_source_metadata(
+        raw,
+        FactIndexV4,
+        payload,
+        zero_padded_ids=True,
+        repair_receipt=receipt,
+    )
     assert repaired is not None
     assert [fact.fact_id for fact in repaired.facts] == ["F02"]
+    assert receipt["before_counts"]["facts"] == 2
+    assert receipt["after_counts"]["facts"] == 1
+    assert receipt["drops"] == [
+        {
+            "action": "dropped_source_span",
+            "collection": "facts",
+            "row_id": "F01",
+            "span_index": 0,
+            "field": "full_text",
+            "quote_sha256": hashlib.sha256(
+                b"paraphrase"
+            ).hexdigest(),
+            "reason": "quote_not_literal",
+        },
+        {
+            "action": "dropped_evidence_row",
+            "collection": "facts",
+            "row_id": "F01",
+            "reason": "no_literal_source_spans_remain",
+        },
+    ]
+    assert "paraphrase" not in json.dumps(receipt, sort_keys=True)
+
+
+def test_repair_receipts_every_prune_reason_without_persisting_quotes():
+    payload = {
+        "headline": "shared evidence",
+        "full_text": (
+            "prefix exact evidence suffix shared evidence "
+            "number evidence"
+        ),
+    }
+    raw = json.dumps({
+        "facts": [
+            {
+                "fact_id": "F01",
+                "claim": "supported",
+                "source_spans": [{
+                    "field": "full_text",
+                    "start": 0,
+                    "end": 5,
+                    "quote": "exact evidence",
+                }],
+            },
+            {
+                "fact_id": "F02",
+                "claim": "absent",
+                "source_spans": [{
+                    "field": "full_text",
+                    "start": 0,
+                    "end": 5,
+                    "quote": "not literal anywhere",
+                }],
+            },
+            {
+                "fact_id": "F03",
+                "claim": "ambiguous",
+                "source_spans": [{
+                    "field": "summary",
+                    "start": 0,
+                    "end": 5,
+                    "quote": "shared evidence",
+                }],
+            },
+            {
+                "fact_id": "F04",
+                "claim": "malformed",
+                "source_spans": "not-a-list",
+            },
+        ],
+        "entities": [],
+        "numbers": [
+            {
+                "number_id": "N01",
+                "verbatim": "number",
+                "fact_id": "F02",
+                "source_span": {
+                    "field": "full_text",
+                    "start": 0,
+                    "end": 6,
+                    "quote": "number evidence",
+                },
+            },
+            {
+                "number_id": "N02",
+                "verbatim": "missing",
+                "fact_id": "F01",
+                "source_span": {
+                    "field": "full_text",
+                    "start": 0,
+                    "end": 7,
+                    "quote": "missing number evidence",
+                },
+            },
+        ],
+        "tone": "measured",
+        "payload_sha256": "digest",
+    })
+    receipt = {}
+
+    repaired = repair_literal_source_metadata(
+        raw,
+        FactIndexV4,
+        payload,
+        zero_padded_ids=True,
+        repair_receipt=receipt,
+    )
+
+    assert repaired is not None
+    assert [fact.fact_id for fact in repaired.facts] == ["F01"]
+    assert repaired.numbers == []
+    assert receipt["schema_version"] == (
+        "scifi_codex.literal_source_repair_receipt.v1"
+    )
+    assert receipt["span_index_base"] == 0
+    assert receipt["allowed_source_fields"] == [
+        "headline", "full_text",
+    ]
+    assert receipt["before_counts"] == {
+        "facts": 4, "entities": 0, "numbers": 2,
+    }
+    assert receipt["after_counts"] == {
+        "facts": 1, "entities": 0, "numbers": 0,
+    }
+    events = {
+        (
+            event["action"],
+            event["row_id"],
+            event["reason"],
+        )
+        for event in receipt["drops"]
+    }
+    assert events == {
+        ("dropped_source_span", "F02", "quote_not_literal"),
+        (
+            "dropped_evidence_row",
+            "F02",
+            "no_literal_source_spans_remain",
+        ),
+        ("dropped_source_span", "F03", "ambiguous_source_field"),
+        (
+            "dropped_evidence_row",
+            "F03",
+            "no_literal_source_spans_remain",
+        ),
+        ("dropped_evidence_row", "F04", "malformed_evidence_row"),
+        ("dropped_dependent_row", "N01", "fact_removed"),
+        ("dropped_source_span", "N02", "quote_not_literal"),
+        (
+            "dropped_dependent_row",
+            "N02",
+            "no_literal_source_spans_remain",
+        ),
+    }
+    serialized = json.dumps(receipt, sort_keys=True)
+    for quote in (
+        "not literal anywhere",
+        "shared evidence",
+        "missing number evidence",
+    ):
+        assert quote not in serialized
+
+
+def test_schema_rejected_repair_does_not_publish_pending_receipt():
+    payload = {"full_text": "literal source"}
+    raw = json.dumps({
+        "facts": [{
+            "fact_id": "F01",
+            "claim": "unsupported",
+            "source_spans": [{
+                "field": "full_text",
+                "start": 0,
+                "end": 4,
+                "quote": "not present",
+            }],
+        }],
+        "entities": [],
+        "numbers": [],
+        "tone": "measured",
+        "payload_sha256": "digest",
+    })
+    receipt = {"sentinel": "unchanged"}
+
+    assert repair_literal_source_metadata(
+        raw,
+        FactIndexV4,
+        payload,
+        zero_padded_ids=True,
+        repair_receipt=receipt,
+    ) is None
+    assert receipt == {"sentinel": "unchanged"}
 
 
 def test_repair_rehomes_exact_quote_only_when_field_label_is_wrong():

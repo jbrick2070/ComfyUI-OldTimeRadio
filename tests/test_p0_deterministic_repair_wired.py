@@ -84,6 +84,59 @@ WRONG_FIELD = _index([
           "exact evidence"),
 ])
 
+RECEIPT_PAYLOAD = {
+    "headline": "shared evidence",
+    "full_text": (
+        "prefix exact evidence suffix shared evidence number evidence"
+    ),
+}
+RECEIPT_PRIMARY = json.dumps({
+    "facts": [
+        _fact(
+            "F01", "supported", "full_text", 0, 5, "exact evidence",
+        ),
+        _fact(
+            "F02", "absent", "full_text", 0, 5,
+            "not literal anywhere",
+        ),
+        _fact(
+            "F03", "ambiguous", "summary", 0, 5, "shared evidence",
+        ),
+        {
+            "fact_id": "F04",
+            "claim": "malformed",
+            "source_spans": "not-a-list",
+        },
+    ],
+    "entities": [],
+    "numbers": [
+        {
+            "number_id": "N01",
+            "verbatim": "number",
+            "fact_id": "F02",
+            "source_span": {
+                "field": "full_text",
+                "start": 0,
+                "end": 6,
+                "quote": "number evidence",
+            },
+        },
+        {
+            "number_id": "N02",
+            "verbatim": "missing",
+            "fact_id": "F01",
+            "source_span": {
+                "field": "full_text",
+                "start": 0,
+                "end": 7,
+                "quote": "missing number evidence",
+            },
+        },
+    ],
+    "tone": "measured",
+    "payload_sha256": DIGEST,
+})
+
 
 def _p0_validator(value):
     return _validate_fact_index(
@@ -93,15 +146,36 @@ def _p0_validator(value):
     )
 
 
-def _p0_repair(failed_output):
+def _p0_repair(failed_output, repair_receipt):
     return repair_literal_source_metadata(
         failed_output, FactIndexV4, PAYLOAD,
         zero_padded_ids=True, max_quote_chars=MAX_QUOTE_CHARS,
+        repair_receipt=repair_receipt,
+    )
+
+
+def _receipt_validator(value):
+    return _validate_fact_index(
+        value,
+        RECEIPT_PAYLOAD,
+        allowed_source_fields=frozenset(RECEIPT_PAYLOAD),
+        expected_payload_sha256=DIGEST,
+    )
+
+
+def _receipt_repair(failed_output, repair_receipt):
+    return repair_literal_source_metadata(
+        failed_output,
+        FactIndexV4,
+        RECEIPT_PAYLOAD,
+        zero_padded_ids=True,
+        max_quote_chars=MAX_QUOTE_CHARS,
+        repair_receipt=repair_receipt,
     )
 
 
 def _invoke(deterministic_repair_fn, primary_output,
-            post_validator=_p0_validator):
+            post_validator=_p0_validator, alternate_output=None):
     """Run the REAL ladder (structured_call is not stubbed) and report which
     rungs were reached."""
     seen = {"primary": 0, "alternate": 0}
@@ -112,8 +186,12 @@ def _invoke(deterministic_repair_fn, primary_output,
 
     def alternate(_messages, **_kwargs):
         seen["alternate"] += 1
-        return primary_output
+        return (
+            primary_output
+            if alternate_output is None else alternate_output
+        )
 
+    journal = {}
     result = lane.invoke_codex_structured(
         pass_id="P0",
         slot="technical",
@@ -127,20 +205,20 @@ def _invoke(deterministic_repair_fn, primary_output,
         base_temperature=.20,
         structural_retry_temperature=.10,
         max_new_tokens=None,
-        call_journal={},
+        call_journal=journal,
         repair_slot_fn=alternate,
         repair_ledger_builder=lambda **_kw: [
             {"role": "user", "content": "repair"}],
         repair_owner_id="creative",
         deterministic_repair_fn=deterministic_repair_fn,
     )
-    return result, seen
+    return result, seen, journal
 
 
 def test_one_unsupported_row_no_longer_kills_the_whole_index():
     """The operator's ruling in miniature: drop what cannot be supported,
     keep what can, let the episode live."""
-    result, seen = _invoke(_p0_repair, ONE_BAD_ROW)
+    result, seen, journal = _invoke(_p0_repair, ONE_BAD_ROW)
 
     assert isinstance(result, FactIndexV4)
     assert [f.fact_id for f in result.facts] == ["F02"]
@@ -148,6 +226,13 @@ def test_one_unsupported_row_no_longer_kills_the_whole_index():
     span = result.facts[0].source_spans[0]
     assert PAYLOAD[span.field][span.start:span.end] == span.quote
     assert seen["alternate"] == 0, "the deterministic rung must win first"
+    call = journal["calls"][0]
+    assert call["terminal_disposition"] == (
+        "accepted_after_deterministic_repair"
+    )
+    assert call["repair_attempted"] is False
+    assert call["deterministic_repair_receipt"]["drops"]
+    assert call["accepted"] == result.model_dump(mode="json")
 
 
 def test_without_the_wire_that_same_index_dies():
@@ -157,15 +242,74 @@ def test_without_the_wire_that_same_index_dies():
         _invoke(None, ONE_BAD_ROW)
 
 
+def test_every_deterministic_prune_reason_is_durable_in_the_journal():
+    result, seen, journal = _invoke(
+        _receipt_repair,
+        RECEIPT_PRIMARY,
+        post_validator=_receipt_validator,
+    )
+
+    assert [fact.fact_id for fact in result.facts] == ["F01"]
+    assert result.numbers == []
+    assert seen == {"primary": 1, "alternate": 0}
+    call = journal["calls"][0]
+    assert call["terminal_disposition"] == (
+        "accepted_after_deterministic_repair"
+    )
+    receipt = call["deterministic_repair_receipt"]
+    assert receipt["before_counts"] == {
+        "facts": 4, "entities": 0, "numbers": 2,
+    }
+    assert receipt["after_counts"] == {
+        "facts": 1, "entities": 0, "numbers": 0,
+    }
+    events = {
+        (
+            event["action"],
+            event["row_id"],
+            event["reason"],
+        )
+        for event in receipt["drops"]
+    }
+    assert events == {
+        ("dropped_source_span", "F02", "quote_not_literal"),
+        (
+            "dropped_evidence_row",
+            "F02",
+            "no_literal_source_spans_remain",
+        ),
+        ("dropped_source_span", "F03", "ambiguous_source_field"),
+        (
+            "dropped_evidence_row",
+            "F03",
+            "no_literal_source_spans_remain",
+        ),
+        ("dropped_evidence_row", "F04", "malformed_evidence_row"),
+        ("dropped_dependent_row", "N01", "fact_removed"),
+        ("dropped_source_span", "N02", "quote_not_literal"),
+        (
+            "dropped_dependent_row",
+            "N02",
+            "no_literal_source_spans_remain",
+        ),
+    }
+    serialized = json.dumps(receipt, sort_keys=True)
+    assert "not literal anywhere" not in serialized
+    assert "missing number evidence" not in serialized
+
+
 def test_a_literal_quote_under_the_wrong_field_label_is_rehomed():
     """_span_ok searches only the declared field, so this is dead to it."""
-    result, seen = _invoke(_p0_repair, WRONG_FIELD)
+    result, seen, journal = _invoke(_p0_repair, WRONG_FIELD)
 
     span = result.facts[0].source_spans[0]
     assert span.field == "full_text"
     assert PAYLOAD[span.field][span.start:span.end] == span.quote
     assert result.facts[0].claim == "the claim the model authored"
     assert seen["alternate"] == 0
+    assert journal["calls"][0]["terminal_disposition"] == (
+        "accepted_after_deterministic_repair"
+    )
 
 
 def test_without_the_wire_the_wrong_field_label_dies():
@@ -179,6 +323,44 @@ def test_a_deterministic_repair_gets_no_privileges_an_llm_repair_lacks():
     with pytest.raises(lane.CodexPassError):
         _invoke(_p0_repair, ONE_BAD_ROW,
                 post_validator=lambda _value: "rejected anyway")
+
+
+def test_rejected_deterministic_candidate_does_not_publish_its_receipt():
+    clean_alternate = _index([
+        _fact(
+            "F02",
+            "alternate accepted claim",
+            "full_text",
+            7,
+            21,
+            "exact evidence",
+        ),
+    ])
+    clean_candidate_checks = 0
+
+    def validator(value):
+        nonlocal clean_candidate_checks
+        error = _p0_validator(value)
+        if error is not None:
+            return error
+        clean_candidate_checks += 1
+        if clean_candidate_checks == 2:
+            return "reject the deterministic candidate on final validation"
+        return None
+
+    result, seen, journal = _invoke(
+        _p0_repair,
+        ONE_BAD_ROW,
+        post_validator=validator,
+        alternate_output=clean_alternate,
+    )
+
+    assert result.facts[0].claim == "alternate accepted claim"
+    assert seen == {"primary": 1, "alternate": 1}
+    call = journal["calls"][0]
+    assert call["terminal_disposition"] == "accepted_after_repair"
+    assert call["repair_attempted"] is True
+    assert "deterministic_repair_receipt" not in call
 
 
 def test_an_index_with_no_supportable_row_stays_loud():
@@ -208,4 +390,10 @@ def test_the_production_p0_call_site_passes_the_hook():
     assert "repair_literal_source_metadata(" in source, (
         "the deterministic hook is wired to something other than the tested "
         "literal-source repairer"
+    )
+    assert "repair_receipt=repair_receipt" in source, (
+        "the production repairer no longer fills the pending receipt sink"
+    )
+    assert "deterministic_repair_fn=p0_deterministic_repair" in source, (
+        "the production P0 call no longer wires the receipted repair closure"
     )

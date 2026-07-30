@@ -8,14 +8,23 @@ dropped; the helper never changes claims, spoken text, or other prose.
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, MutableMapping
 
 from pydantic import BaseModel
 
 
 _PADDED_ID = re.compile(r"^(?P<prefix>[FEN])(?P<number>\d{1,2})$")
 _SOURCE_FIELDS = ("headline", "summary", "full_text", "seed_text")
+_EVIDENCE_COLLECTIONS = (
+    "facts", "verified_facts", "entities", "named_entities",
+)
+_DEPENDENT_COLLECTIONS = ("numbers", "key_numbers")
+_RECEIPT_SCHEMA_VERSION = (
+    "scifi_codex.literal_source_repair_receipt.v1"
+)
 
 
 def _occurrences(text: str, needle: str) -> list[int]:
@@ -48,6 +57,25 @@ def _normalize_id(value: Any, *, zero_padded: bool) -> Any:
     return f"{match.group('prefix')}{number:02d}"
 
 
+def _collection_counts(data: Mapping[str, Any]) -> dict[str, int]:
+    return {
+        name: len(collection)
+        for name in (*_EVIDENCE_COLLECTIONS, *_DEPENDENT_COLLECTIONS)
+        if isinstance((collection := data.get(name)), list)
+    }
+
+
+def _row_id(row: Mapping[str, Any]) -> Any:
+    for key in ("number_id", "entity_id", "fact_id"):
+        if key in row:
+            return row.get(key)
+    return None
+
+
+def _quote_sha256(quote: str) -> str:
+    return hashlib.sha256(quote.encode("utf-8")).hexdigest()
+
+
 def repair_literal_source_metadata(
     failed_output: str,
     schema: type[BaseModel],
@@ -55,6 +83,7 @@ def repair_literal_source_metadata(
     *,
     zero_padded_ids: bool,
     max_quote_chars: int | None = None,
+    repair_receipt: MutableMapping[str, Any] | None = None,
 ) -> BaseModel | None:
     """Return a validated metadata-only repair, or ``None`` to keep retry loud.
 
@@ -76,16 +105,16 @@ def repair_literal_source_metadata(
     ):
         raise ValueError("max_quote_chars must be a positive integer or None")
     try:
-        import json
-
         data = json.loads(failed_output)
     except Exception:
         return None
     if not isinstance(data, dict):
         return None
     repaired = copy.deepcopy(data)
+    before_counts = _collection_counts(repaired)
     changed = False
-    invalid_span_ids: set[int] = set()
+    invalid_span_reasons: dict[int, str] = {}
+    drops: list[dict[str, Any]] = []
 
     def visit(node: Any) -> None:
         nonlocal changed
@@ -116,7 +145,11 @@ def repair_literal_source_metadata(
                             and (positions := _occurrences(payload[candidate], quote))
                         ]
                         if len(candidate_fields) != 1:
-                            invalid_span_ids.add(id(node))
+                            invalid_span_reasons[id(node)] = (
+                                "quote_not_literal"
+                                if not candidate_fields
+                                else "ambiguous_source_field"
+                            )
                             changed = True
                             candidate_fields = []
                     if not candidate_fields:
@@ -138,7 +171,7 @@ def repair_literal_source_metadata(
                             new_start:new_start + max_quote_chars
                         ]
                     if not corrected_quote:
-                        invalid_span_ids.add(id(node))
+                        invalid_span_reasons[id(node)] = "quote_not_literal"
                         changed = True
                         for value in node.values():
                             visit(value)
@@ -163,19 +196,62 @@ def repair_literal_source_metadata(
 
     def prune_unsupported_evidence() -> None:
         nonlocal changed
-        for collection_name in ("facts", "verified_facts", "entities", "named_entities"):
+        for collection_name in _EVIDENCE_COLLECTIONS:
             collection = repaired.get(collection_name)
             if not isinstance(collection, list):
                 continue
             kept: list[Any] = []
             for row in collection:
                 if not isinstance(row, dict) or not isinstance(row.get("source_spans"), list):
+                    drops.append({
+                        "action": "dropped_evidence_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row) if isinstance(row, dict) else None,
+                        "reason": "malformed_evidence_row",
+                    })
+                    changed = True
                     continue
-                spans = [span for span in row["source_spans"] if id(span) not in invalid_span_ids]
+                spans: list[Any] = []
+                malformed = False
+                for span_index, span in enumerate(row["source_spans"]):
+                    if (
+                        not isinstance(span, dict)
+                        or not {"field", "start", "end", "quote"}.issubset(span)
+                    ):
+                        malformed = True
+                        break
+                    reason = invalid_span_reasons.get(id(span))
+                    if reason is None:
+                        spans.append(span)
+                        continue
+                    drops.append({
+                        "action": "dropped_source_span",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "span_index": span_index,
+                        "field": span.get("field"),
+                        "quote_sha256": _quote_sha256(span["quote"]),
+                        "reason": reason,
+                    })
+                if malformed:
+                    drops.append({
+                        "action": "dropped_evidence_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "reason": "malformed_evidence_row",
+                    })
+                    changed = True
+                    continue
                 if spans:
                     row["source_spans"] = spans
                     kept.append(row)
                 else:
+                    drops.append({
+                        "action": "dropped_evidence_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "reason": "no_literal_source_spans_remain",
+                    })
                     changed = True
             if len(kept) != len(collection):
                 repaired[collection_name] = kept
@@ -185,17 +261,55 @@ def repair_literal_source_metadata(
             for row in repaired.get("facts", [])
             if isinstance(row, dict)
         }
-        for collection_name in ("numbers", "key_numbers"):
+        for collection_name in _DEPENDENT_COLLECTIONS:
             collection = repaired.get(collection_name)
             if not isinstance(collection, list):
                 continue
             kept = []
             for row in collection:
                 span = row.get("source_span") if isinstance(row, dict) else None
-                if not isinstance(row, dict) or not isinstance(span, dict) or id(span) in invalid_span_ids:
+                if (
+                    not isinstance(row, dict)
+                    or not isinstance(span, dict)
+                    or not {"field", "start", "end", "quote"}.issubset(span)
+                ):
+                    drops.append({
+                        "action": "dropped_dependent_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row) if isinstance(row, dict) else None,
+                        "fact_id": row.get("fact_id") if isinstance(row, dict) else None,
+                        "reason": "malformed_evidence_row",
+                    })
+                    changed = True
+                    continue
+                reason = invalid_span_reasons.get(id(span))
+                if reason is not None:
+                    drops.append({
+                        "action": "dropped_source_span",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "span_index": 0,
+                        "field": span.get("field"),
+                        "quote_sha256": _quote_sha256(span["quote"]),
+                        "reason": reason,
+                    })
+                    drops.append({
+                        "action": "dropped_dependent_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "fact_id": row.get("fact_id"),
+                        "reason": "no_literal_source_spans_remain",
+                    })
                     changed = True
                     continue
                 if row.get("fact_id") not in facts:
+                    drops.append({
+                        "action": "dropped_dependent_row",
+                        "collection": collection_name,
+                        "row_id": _row_id(row),
+                        "fact_id": row.get("fact_id"),
+                        "reason": "fact_removed",
+                    })
                     changed = True
                     continue
                 kept.append(row)
@@ -206,6 +320,23 @@ def repair_literal_source_metadata(
         prune_unsupported_evidence()
         if not changed:
             return None
-        return schema.model_validate(repaired)
+        result = schema.model_validate(repaired)
+        receipt = {
+            "schema_version": _RECEIPT_SCHEMA_VERSION,
+            "repairer": "repair_literal_source_metadata",
+            "span_index_base": 0,
+            "allowed_source_fields": [
+                field
+                for field in _SOURCE_FIELDS
+                if isinstance(payload.get(field), str)
+            ],
+            "before_counts": before_counts,
+            "after_counts": _collection_counts(repaired),
+            "drops": drops,
+        }
+        if repair_receipt is not None:
+            repair_receipt.clear()
+            repair_receipt.update(receipt)
+        return result
     except Exception:
         return None

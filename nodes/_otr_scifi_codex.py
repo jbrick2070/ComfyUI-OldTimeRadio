@@ -1498,17 +1498,21 @@ def invoke_codex_structured(
     primary_backend_id: str | None = None,
     repair_owner_id: str | None = None,
     repair_backend_id: str | None = None,
-    deterministic_repair_fn: Callable[[str], BaseModel | None] | None = None,
+    deterministic_repair_fn: Callable[
+        [str, MutableMapping[str, Any]], BaseModel | None
+    ] | None = None,
 ) -> BaseModel:
     """Shared typed ladder for the fixed P0/P1/P2/P3/P5 topology.
 
     ``deterministic_repair_fn`` lets a CALLER own a non-LLM repair for its own
-    pass. It takes the failed raw output and returns a repaired model or
-    ``None`` to keep the failure loud. The caller closes over whatever context
-    the repair needs -- source payloads, caps, id conventions -- so this shared
-    ladder never has to learn a single pass's vocabulary. Whatever it returns
-    still has to satisfy this pass's real ``post_validator`` before it is
-    accepted; a deterministic repair gets no privileges an LLM repair lacks.
+    pass. It takes the failed raw output plus a fresh pending-receipt sink and
+    returns a repaired model or ``None`` to keep the failure loud. The caller
+    closes over whatever context the repair needs -- source payloads, caps, id
+    conventions -- so this shared ladder never has to learn a single pass's
+    vocabulary. Whatever it returns still has to satisfy this pass's real
+    ``post_validator`` before it is accepted; a deterministic repair gets no
+    privileges an LLM repair lacks. Pending receipt data becomes durable only
+    when that exact deterministic model is the final accepted result.
     """
     if not seam_refs:
         raise CodexPackContractError(f"{pass_id} has no prompt seam")
@@ -1592,6 +1596,10 @@ def invoke_codex_structured(
     )
     last_raw = [""]
     repair_handoff: dict[str, str | None] = {"nonce": None}
+    deterministic_acceptance: dict[str, Any] = {
+        "candidate": None,
+        "receipt": None,
+    }
 
     def bounded_repair_ledger_builder(
         failed_output: str,
@@ -1689,6 +1697,8 @@ def invoke_codex_structured(
         if pass_id == "P2" and result_type is CastPlanV4:
             repaired = repair_cast_plan_metadata(failed_output)
             if repaired is not None and post_validator(repaired) is None:
+                deterministic_acceptance["candidate"] = repaired
+                deterministic_acceptance["receipt"] = None
                 return repaired
         # A CALLER-OWNED deterministic rung, same acceptance bar as P2's.
         # Until 2026-07-29 P2 was the ONLY pass with a non-LLM repair, while
@@ -1697,8 +1707,15 @@ def invoke_codex_structured(
         # coordinates -- routed straight to an LLM repair owner with a tested,
         # purpose-built span repairer sitting imported and never called.
         if deterministic_repair_fn is not None:
-            repaired = deterministic_repair_fn(failed_output)
+            pending_receipt: dict[str, Any] = {}
+            repaired = deterministic_repair_fn(
+                failed_output, pending_receipt,
+            )
             if repaired is not None and post_validator(repaired) is None:
+                deterministic_acceptance["candidate"] = repaired
+                deterministic_acceptance["receipt"] = copy.deepcopy(
+                    pending_receipt,
+                )
                 return repaired
         return None
 
@@ -1759,10 +1776,21 @@ def invoke_codex_structured(
     journal_entry["status"] = "accepted"
     journal_entry["repair_nonce"] = repair_handoff["nonce"]
     journal_entry["repair_attempted"] = repair_handoff["nonce"] is not None
-    journal_entry["terminal_disposition"] = (
-        "accepted_after_repair"
-        if repair_handoff["nonce"] is not None else "accepted_primary"
+    accepted_deterministic = (
+        result is deterministic_acceptance["candidate"]
     )
+    if repair_handoff["nonce"] is not None:
+        journal_entry["terminal_disposition"] = "accepted_after_repair"
+    elif accepted_deterministic:
+        journal_entry["terminal_disposition"] = (
+            "accepted_after_deterministic_repair"
+        )
+        if deterministic_acceptance["receipt"]:
+            journal_entry["deterministic_repair_receipt"] = copy.deepcopy(
+                deterministic_acceptance["receipt"],
+            )
+    else:
+        journal_entry["terminal_disposition"] = "accepted_primary"
     journal_entry["accepted"] = result.model_dump(mode="json")
     return result
 
@@ -2398,6 +2426,27 @@ def run_scifi_codex_episode(
             {"role": "user", "content": context},
         ]
 
+    def p0_deterministic_repair(
+        failed_output: str,
+        repair_receipt: MutableMapping[str, Any],
+    ) -> BaseModel | None:
+        repaired = repair_literal_source_metadata(
+            failed_output,
+            FactIndexV4,
+            a0_payload,
+            zero_padded_ids=True,
+            max_quote_chars=MAX_QUOTE_CHARS,
+            repair_receipt=repair_receipt,
+        )
+        if repaired is not None:
+            # The helper searches the full canonical A0 payload in Item 3.
+            # Record the narrower P0 projection that the real validator
+            # accepts. Item 4 will make this same allowlist behavioral.
+            repair_receipt["allowed_source_fields"] = list(
+                p0_inputs["allowed_source_fields"],
+            )
+        return repaired
+
     p0 = invoke_codex_structured(
         pass_id="P0",
         slot="technical",
@@ -2430,15 +2479,7 @@ def run_scifi_codex_episode(
         # when it changed nothing, and its result must still clear
         # _validate_fact_index. It cannot invent evidence, and if pruning
         # empties `facts` the schema's min_length=1 still fails the pass loudly.
-        deterministic_repair_fn=lambda failed_output: (
-            repair_literal_source_metadata(
-                failed_output,
-                FactIndexV4,
-                a0_payload,
-                zero_padded_ids=True,
-                max_quote_chars=MAX_QUOTE_CHARS,
-            )
-        ),
+        deterministic_repair_fn=p0_deterministic_repair,
         primary_backend_id=str(resolved.get("technical_model") or ""),
         repair_owner_id="creative",
         repair_backend_id=str(
