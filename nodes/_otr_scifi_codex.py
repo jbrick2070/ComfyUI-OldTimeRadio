@@ -1927,6 +1927,32 @@ def _script_digest(script: ScriptArtifactV4) -> str:
     return hashlib.sha256(json.dumps(script.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+_SCRIPT_TEXT_IDENTITY_GENERATION = "clean_spoken_text.v1"
+
+
+def _canonicalize_script_spoken_text(
+    script: ScriptArtifactV4,
+) -> ScriptArtifactV4:
+    """Copy the accepted script onto the exact spoken-text identity surface."""
+    return script.model_copy(
+        deep=True,
+        update={
+            "lines": [
+                line.model_copy(
+                    deep=True,
+                    update={"text": clean_spoken_text(line.text)}
+                    if (
+                        not line.skip
+                        and line.speaker_role in ("character", "announcer")
+                    )
+                    else {},
+                )
+                for line in script.lines
+            ],
+        },
+    )
+
+
 class _CodexTailFinalizer:
     def __init__(self, expected: Mapping[str, str]):
         self.expected = dict(expected)
@@ -2510,6 +2536,13 @@ def run_scifi_codex_episode(
             + structural_error
         )
 
+    script = _canonicalize_script_spoken_text(script)
+    # Additive generation marker only. Its absence on an existing frozen
+    # ledger means raw-text identity; no reader may use this field to re-pin
+    # or mutate historical accepted text.
+    lane_meta["script_text_identity_generation"] = (
+        _SCRIPT_TEXT_IDENTITY_GENERATION
+    )
     expected = _assemble_ledger(led, score, p2, script, meta)
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_codex_assembled"

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import copy
+import hashlib
 from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
 
 from nodes import _otr_scifi_codex as lane
+from nodes import _otr_content_authorship as content_authorship
+from nodes import _otr_freeze_cascade as freeze_cascade
 from nodes import production_ledger as PL
 
 
@@ -135,6 +139,54 @@ def _score_draft(advisory: lane.AdvisoryWordPlanV4) -> lane.RadioScoreDraftV4:
 
 def _default_line_text(_line_id: str, _index: int) -> str:
     return "A quiet signal crosses the dark observatory."
+
+
+def _identity_line(
+    line_id: str,
+    text: str,
+    *,
+    char_id: str = "c01",
+    speaker_role: str = "character",
+    skip: bool = False,
+    tts_skip_reason: str | None = None,
+) -> lane.ScriptLineV4:
+    return lane.ScriptLineV4(
+        line_id=line_id,
+        beat_id="b001",
+        shot_id="shot_001",
+        char_id=char_id,
+        speaker_role=speaker_role,
+        text=text,
+        skip=skip,
+        tts_skip_reason=tts_skip_reason,
+        boundary="shot_start",
+        arc_phase="arrival",
+        beat_intent="Answer the signal.",
+        dialogue_slot_id=None,
+    )
+
+
+def _identity_script(
+    lines: list[lane.ScriptLineV4],
+) -> lane.ScriptArtifactV4:
+    return lane.ScriptArtifactV4(
+        schema_version="scifi_codex.script_artifact.v4",
+        title="Signal at Meridian",
+        scenes=[{
+            "scene_id": "scene_001",
+            "env": "Observatory",
+            "description": "Receivers glow.",
+        }],
+        lines=lines,
+        music_cues=[{
+            "cue_id": "music_open",
+            "placement": "open",
+            "description": "A low radio pulse.",
+            "generation_prompt": "Low radio pulse.",
+            "anchor_line_id": lines[0].line_id,
+            "anchor_beat_id": "b001",
+        }],
+    )
 
 
 def test_structured_codex_pass_reads_seams_from_prompt_stages(monkeypatch):
@@ -401,6 +453,209 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
     assert state["assemble_calls"] == 1
     assert state["parts"].final_title_override == "Signal at Meridian"
     assert state["parts"].run_story_spine is False
+
+
+def test_spoken_identity_canonicalization_fans_out_from_one_copied_artifact(
+    monkeypatch, tmp_path,
+):
+    raw_text = "(softly) A quiet signal crosses the dark observatory."
+    clean_text = "A quiet signal crosses the dark observatory."
+    observed: dict[str, Any] = {"calls": 0}
+    real_canonicalize = lane._canonicalize_script_spoken_text
+
+    def tracked_canonicalize(
+        script: lane.ScriptArtifactV4,
+    ) -> lane.ScriptArtifactV4:
+        observed["calls"] += 1
+        observed["input"] = script
+        observed["input_before"] = script.model_dump(mode="json")
+        result = real_canonicalize(script)
+        observed["result"] = result
+        return result
+
+    monkeypatch.setattr(
+        lane, "_canonicalize_script_spoken_text", tracked_canonicalize,
+    )
+    state = _run_lane(
+        monkeypatch,
+        tmp_path,
+        line_text=lambda _line_id, _index: raw_text,
+    )
+
+    canonical = observed["result"]
+    original = observed["input"]
+    assert observed["calls"] == 1
+    assert canonical is not original
+    assert original.model_dump(mode="json") == observed["input_before"]
+    assert {line.text for line in original.lines} == {raw_text}
+    assert {line.text for line in canonical.lines} == {clean_text}
+    assert state["assembled_script"] is canonical
+
+    expected = {
+        str(row["line_id"]): clean_text
+        for row in state["ledger"].data["lines"]
+        if not row.get("skip")
+    }
+    for row in state["ledger"].data["lines"]:
+        if row.get("line_id") in expected:
+            assert row["text"] == clean_text
+            assert row["char_count"] == len(clean_text)
+            assert row["word_count"] == lane.canonical_word_count(clean_text)
+    lane_meta = state["meta"]["scifi_codex"]
+    assert lane_meta["script_text_identity_generation"] \
+        == "clean_spoken_text.v1"
+    assert lane_meta["accepted_lines"] == expected
+    assert lane_meta["line_text_sha256"] == {
+        line_id: hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for line_id, text in expected.items()
+    }
+    assert lane_meta["script_digest"] == lane._script_digest(canonical)
+    assert lane_meta["script_digest"] != lane._script_digest(original)
+    assert lane_meta["actual_split_words"] == sum(
+        lane.canonical_word_count(text) for text in expected.values()
+    )
+    word_receipt = lane_meta["word_receipt"]
+    assert word_receipt["actual_character_text_sha256"] \
+        == lane._OTRWD.character_text_sha256(state["ledger"].data)
+    assert word_receipt["actual_announcer_text_sha256"] \
+        == lane._OTRWD.announcer_text_sha256(state["ledger"].data)
+    assert word_receipt["actual_total_voiced_text_sha256"] \
+        == lane._OTRWD.total_voiced_text_sha256(state["ledger"].data)
+
+    authorship = state["ledger"].data["meta"]["content_authorship"]
+    artifact = next(
+        row for row in authorship["accepted_artifacts"]
+        if row["artifact_id"] == "final_script"
+    )
+    assert artifact["sha256"] == lane._script_digest(canonical)
+    assert {
+        row["line_id"]: row["text_sha256"]
+        for row in authorship["line_proofs"]
+    } == lane_meta["line_text_sha256"]
+
+    finalizer = state["parts"].tail_finalizer
+    assert finalizer.expected == expected
+    finalizer._proof(state["ledger"].data)
+    raw_ledger = copy.deepcopy(state["ledger"].data)
+    raw_ledger["lines"][0]["text"] = raw_text
+    with pytest.raises(
+        lane.CodexPreTailAuditError, match="line receipt mismatch",
+    ):
+        finalizer._proof(raw_ledger)
+
+
+def test_spoken_identity_counterfactual_retains_raw_text_hashes(
+    monkeypatch, tmp_path,
+):
+    raw_text = "(softly) A quiet signal crosses the dark observatory."
+    monkeypatch.setattr(
+        lane, "_canonicalize_script_spoken_text", lambda script: script,
+    )
+    state = _run_lane(
+        monkeypatch,
+        tmp_path,
+        line_text=lambda _line_id, _index: raw_text,
+    )
+
+    raw_expected = {
+        str(row["line_id"]): raw_text
+        for row in state["ledger"].data["lines"]
+        if not row.get("skip")
+    }
+    lane_meta = state["meta"]["scifi_codex"]
+    assert lane_meta["accepted_lines"] == raw_expected
+    assert lane_meta["line_text_sha256"] == {
+        line_id: hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for line_id, text in raw_expected.items()
+    }
+    assert lane_meta["script_digest"] == lane._script_digest(
+        state["assembled_script"]
+    )
+    artifact = next(
+        row
+        for row in state["ledger"].data["meta"]["content_authorship"][
+            "accepted_artifacts"
+        ]
+        if row["artifact_id"] == "final_script"
+    )
+    assert artifact["sha256"] == lane._script_digest(
+        state["assembled_script"]
+    )
+    assert state["parts"].tail_finalizer.expected == raw_expected
+
+
+def test_spoken_identity_copy_preserves_skipped_and_music_rows():
+    script = _identity_script([
+        _identity_line("l001", "(softly) Spoken character line."),
+        _identity_line(
+            "l002", "(aside) Preserve this skipped row.",
+            skip=True, tts_skip_reason="editorial_skip",
+        ),
+        _identity_line(
+            "l003", "(music bed) Preserve this music row.",
+            char_id="music_open", speaker_role="music_open",
+            skip=True, tts_skip_reason="music_cue",
+        ),
+        _identity_line(
+            "l004", "(calmly) Spoken announcer line.",
+            char_id="announcer", speaker_role="announcer",
+        ),
+    ])
+    before = script.model_dump(mode="json")
+
+    canonical = lane._canonicalize_script_spoken_text(script)
+
+    assert script.model_dump(mode="json") == before
+    assert canonical is not script
+    assert [line.text for line in canonical.lines] == [
+        "Spoken character line.",
+        "(aside) Preserve this skipped row.",
+        "(music bed) Preserve this music row.",
+        "Spoken announcer line.",
+    ]
+    assert all(
+        copied is not original
+        for copied, original in zip(canonical.lines, script.lines)
+    )
+
+
+def test_frozen_raw_text_grandfather_without_marker_validates_unchanged():
+    raw_text = "(softly) A grandfathered raw spoken line."
+    raw_script = _identity_script([_identity_line("l001", raw_text)])
+    raw_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+    frozen = {
+        "meta": {
+            "source_bank": "scifi_news",
+            "freeze_verdict": "frozen_clean",
+            "scifi_codex": {
+                "accepted_lines": {"l001": raw_text},
+                "line_text_sha256": {"l001": raw_hash},
+            },
+        },
+        "lines": [{
+            "line_id": "l001",
+            "text": raw_text,
+            "skip": False,
+        }],
+    }
+    content_authorship.stamp_receipt(
+        frozen,
+        owner_bank="scifi_news",
+        accepted_artifacts={"final_script": raw_script},
+    )
+    before = copy.deepcopy(frozen)
+
+    content_authorship.validate_receipt(frozen)
+    assert freeze_cascade._readonly_structural_validation(frozen) == []
+    lane._CodexTailFinalizer({"l001": raw_text})._proof(frozen)
+
+    assert frozen == before
+    assert "script_text_identity_generation" not in frozen["meta"][
+        "scifi_codex"
+    ]
+    assert frozen["meta"]["scifi_codex"]["line_text_sha256"] == {
+        "l001": raw_hash,
+    }
 
 
 @pytest.mark.parametrize(
