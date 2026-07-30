@@ -3,6 +3,14 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-30 (latest) -- HEAD c0d1e297 (v2.0-alpha) -- WINDOW CODER
+- Landed/pushed `0f4cbc17` A-6 and `e79062ee` A-5; cleanup-empty speech now re-authors, and every accepted identity consumer uses one copied cleaned-text artifact.
+- Landed/pushed `7b3543dc`; deterministic P0 pruning durably receipts every span/evidence/dependent drop only when that exact candidate is accepted.
+- Landed/pushed `c0d1e297`; P0 repair now restricts same-field retention and cross-field rehoming to the real evidence allowlist, with a production firing test and counterfactual.
+- Receipts: 7881 passed / 130 skipped / 1 xfailed; Bible 17 / 24 / 3; variants 11/0; mutations caught; workflow `9872624A` unchanged; HEAD == origin.
+- Item 5 was investigated only: current RSS stripping fused 4/4 block boundaries; a non-landed block-aware prototype passed 7/7 while preserving inline tags/entities.
+- NEXT WINDOW: obtain the operator ruling on the future-only RSS `full_text` coordinate migration; do not implement it, widen to summary/seed_text, or start Window B first.
+
 ## 2026-07-30 (later) -- HEAD 41683fc9 (v2.0-alpha) -- WINDOW CODER (window #8, same session)
 
 Did:

@@ -1,5 +1,48 @@
 # OTR Go-Forward Plan
 
+**Newest update: 2026-07-30 (CODER closeout) -- SAFE WRITER REPAIR IS LANDED
+THROUGH A-6, A-5, THE P0 PRUNING RECEIPT, AND THE P0 EVIDENCE ALLOWLIST.**
+HEAD == origin `c0d1e297`; landed `0f4cbc17` (A-6 cleanup-empty spoken rows
+enter typed P5 re-authoring), `e79062ee` (A-5 one copied cleaned-text identity
+artifact), `7b3543dc` (accepted deterministic P0 pruning gets a durable
+drop-by-drop receipt), and `c0d1e297` (same-field and cross-field P0 repair
+both obey the evidence projection). Final code gate: **7881 passed / 130
+skipped / 1 xfailed**; Bible **17 passed / 24 skipped / 3 xfailed**;
+`build_variants --check` **11 variants / 0 failures**; canonical workflow
+SHA-256 remains
+`9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`.
+
+**ITEM 5 WAS INVESTIGATED ONLY; NO SEPARATOR OR COORDINATE CHANGE LANDED.**
+The responsible seam is `story_orchestrator._fetch_science_news`, nested
+`_fetch_single_feed`: `content[0].value` is stripped by
+`re.sub(r"<[^>]+>", "", rss_full)`, then `_resolve_body` promotes `rss_full`
+to `full_text`. A non-landed fixture reproduced all four production joins:
+`PolygonsNASA/JPL-`, `School ofEngine`, `doing.Let's`, and `(AMR).The`; the
+current regex failed **4/4**. It also pinned the required counterfactuals:
+`H<sub>2</sub>O -> H2O`, `anti-<em>microbial</em> -> anti-microbial`, and a
+literal `&nbsp;` spelling remains untouched. The URL-scrape route is not
+responsible; it already uses `get_text(" ", strip=True)`.
+
+The smallest prospective fix, if ratified, is a block-aware RSS-fragment
+extractor used only for `content[0].value`: replace explicit block/break tags
+with one space, remove inline tags with no inserted space, preserve entity
+spellings, then collapse whitespace. The non-landed prototype passed **7/7**.
+Do not widen `_normalize_span_source_text`, and do not change the similar
+summary regex or derived `seed_text` in the same migration.
+
+**OPERATOR RULING REQUIRED BEFORE ANY ITEM 5 IMPLEMENTATION:** approve or
+reject a future-only coordinate migration limited to RSS
+`content[0].value -> rss_full -> full_text`. Approval explicitly accepts
+changed live `source_digest` values, shifted later P0 offsets, possible
+preview/reranking and 300/400-character-floor decisions, and effects on
+`scifi_news`, `scifi_news_pro`, and clients sharing the fetcher. Frozen
+ledgers/snapshots remain byte-identical and are never re-pinned. Expanding the
+migration to summary/derived `seed_text` requires a separate wider ruling.
+Until that ruling: **do not implement Item 5, do not start Window B/degrade,
+and do not touch the canonical workflow.** A-7's survival-guide half also
+remains with that separate repo's owner; its unrelated dirty work must not be
+committed, reset, stashed, or cleaned here.
+
 **Updated:** 2026-07-30 (remote Cowork, CODER window) -- **WRITER REPAIR:
 SECTION 2 IS MEASURED, AND WINDOW A IS THREE CHUNKS IN.** HEAD == origin
 `41683fc9`; suite **7865 passed / 130 skipped / 1 xfailed**; Bible 17;
