@@ -3,6 +3,62 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-29 22:00 -- HEAD 47c554fa (v2.0-alpha) -- WINDOW CODER (inherited from a dead window)
+
+Did:
+- Picked up a window that died on an API 500 mid-build. Its campaign was still
+  alive; nothing was lost.
+- Landed THREE render-side fixes, each gated green (suite + Bible + hygiene)
+  and pushed: `a3ab071c` the opening beat gets the producer-owned still the
+  closing beat already had (closes the word_razzle ImageRenderError AND the
+  silent mesh_stage plate degradation -- one beat, two id spaces,
+  b000_music_open vs music_opening_001); `5aacc97a` the LTX loop-fill stops
+  overriding a coverage-plan segment length (193 frames for a 169 ask; the
+  eng_wan_ti2v multi_clip narrowing that eng_ltx_video never got); `47c554fa`
+  P0's deterministic span repair is reachable at last -- it was imported twice,
+  called never, AND undispatchable because the dispatcher gated it on the
+  literal string "locked cast". Suite 7822.
+- Ran a 45-leg census over the whole campaign. CORRECTED the earlier figure:
+  45 legs / 34 failures, of which 24 died in the WRITER (15 P0, 8 P5, 1 P3) --
+  65% of all failures. Nine engines produced BOTH a pass and a fail on
+  byte-identical code, so the writer failure is stochastic, not a bad input.
+- Operator stopped the GPU campaign to focus on the writer. Selective CIM kill,
+  VRAM back to baseline 1140 MiB. The watchdog had already retired itself
+  ("MaxPasses reached"). Final: 11 of 19 engines landed episodes, 8 outstanding.
+- Ran a full 4-round kibitz arc on the writer (8 agent calls; Codex
+  gpt-5.6-sol high + Antigravity + a Claude seat in r1). Judge grounded every
+  claim; the arc killed several confident hallucinations and corrected three
+  things THIS window had told the operator. Plan of record:
+  `docs/2026-07-29-writer-repair-FINAL-PLAN.md`. Run artifacts in
+  `kibitz-runs/2026-07-29-writer-never-vetoes/` (gitignored, local only).
+- Raised the campaign leg timeout 5400 -> 9000s: humo ran 5431s and was still
+  rendering when the harness cut it, so the 90 minutes bought nothing.
+
+What the arc overturned (worth not re-deriving):
+- P0 is NOT an unread artifact -- P3 hard-rejects beats citing a fact_id absent
+  from accepted P0. Relax span handling only; never the fact-ID set.
+- Both writer model widgets resolve to google/gemma-4-12b-it, so the
+  "alternate owner" rung has never been a second opinion.
+- The degrade guard CANNOT live at OTR_LedgerScriptWriter.py:3473 -- passes are
+  locals and the ledger assembles at :2485, so a guard there yields an EMPTY
+  ledger.
+- A re-roll is not codable today: no seed param on the slot interface and the
+  GGUF ordinal resets per call.
+- The degradation receipt must be stamped into ledger `meta`; node 62 never
+  parses script_json.
+- An allowlist at the caller is useless: invoke_codex_structured flattens every
+  exception to CodexPassError.
+
+Current step: WRITER REPAIR, Section 2 of the final plan (re-classify the 15
+P0 deaths against post-47c554fa code) -- then Window A.
+Next: the operator owes ONE decision, Section 0 of the final plan: what a
+listener hears when the writer cannot produce a line. The panel split; the
+judge recommends the announcer reading a deterministic summary built from the
+already-accepted P0 facts, in plain prose (never bracketed -- the cleaner
+strips short brackets and TTS raises on the empty result).
+Models: Claude (code + judge) + 1 full kibitz arc (codex gpt-5.6-sol high + agy)
+Commits: a3ab071c, 5aacc97a, 47c554fa (+ this docs commit)
+
 ## 2026-07-29 -- WINDOW CODER -- C1 OF "THE WRITER NEVER VETOES": THE P0 REPAIR ENVELOPE TRIMS TO FIT
 
 **The operator's ruling** ("the writer should never veto, the writers should

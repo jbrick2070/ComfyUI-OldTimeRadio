@@ -844,11 +844,13 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **THE 45-WORD RUN IS LIVE AND IS NOW THE WORK. The wiring
-## block (W1, W2, W6, W3a, W3b, W4a, W4b, W4c, W4d, W4e, W7, W5) is landed and
-## pushed. The job now is BABYSITTING the campaign until every local still and
-## every local video path lands output in `output\otr\obs\` -- fix what the run
-## surfaces, re-run the failed legs, repeat.**
+## CURRENT STEP -- **THE WRITER IS THE WORK. The 45-word campaign is STOPPED
+## (operator, 2026-07-29): 24 of 34 failures died in the writer, so the engines
+## cannot be proven until the writer stops vetoing. Plan of record is
+## `docs/2026-07-29-writer-repair-FINAL-PLAN.md`, hardened by a full 4-round
+## kibitz arc. Start at its Section 2 (re-classify the 15 P0 deaths against
+## post-47c554fa code -- 1 hour, no code, and it may reorder the plan), then
+## Window A. Section 0 is an OPEN OPERATOR DECISION and gates Window B.**
 
 **THE RUN IS ALREADY EARNING ITS KEEP. Three bugs in the first five legs, none
 of which the 7,700-test suite could see:**
