@@ -3,6 +3,63 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-30 (newest) -- CODE 3bc3d8a0 (v2.0-alpha) -- WINDOW CODER
+
+- Implemented the operator contract that fiction may be wholly re-authored while
+  the final canonical ledger remains internally valid, exact-hash coherent, and
+  safe for downstream consumers. The article is evidence/inspiration, not a
+  continuity contract for fictional characters, events, dialogue, or plot.
+- Complete-source ingress now examines every list-valued RSS content row, keeps
+  the longest usable extraction with deterministic ties, fetches the linked
+  article for every existing shortlist member, chooses the longest RSS/article/
+  summary body, and removes the local 12,000-character article slice. The actual
+  episode ledger receives the selected route, raw RSS index/count, character and
+  UTF-8 byte counts, and SHA-256 receipt only after `new_ledger()`.
+- Long RSS A0 is projected full-text-first and covered by overlapping P0 windows.
+  Each window validates local exact spans, rebases only `full_text` coordinates,
+  merges with deterministic balancing/deduplication/parent remapping, and clears
+  the complete-A0 validator. Operator-pinned A0 keeps its historical contract.
+- P0/P1/P2/P3/P5 opt into fresh complete candidates after recoverable JSON,
+  Pydantic, post-validation, or `output_limit` exhaustion. There is no fixed
+  outer candidate cap. Cancellation exits. Other deterministic configuration,
+  source/security, provider, I/O, compiler, ownership, graph, freeze, and proof
+  failures remain loud.
+- Rejected prose is excluded from retry prompts and durable journals. Pydantic
+  feedback carries counts/codes only. P5 aggregates every raw defect, then
+  canonicalizes and revalidates inside the candidate boundary. Only the accepted
+  canonical artifact enters the once-assembled ledger; final graph, safety,
+  delivery/authorship, freeze, reopen, line, and hash proofs remain strict.
+- Code/tests touched:
+  `nodes/{story_orchestrator.py,OTR_LedgerScriptWriter.py,_otr_source_payload.py,
+  _otr_scifi_p0_contract.py,_otr_scifi_codex.py}`,
+  `tests/{test_feed_fetch_seam.py,test_source_payload_chunk3.py,
+  test_writer_input_resolve.py,test_p0_deterministic_repair_wired.py,
+  test_p5_repair_sees_every_defect.py,test_scifi_codex_lane.py,
+  test_p0_source_windows.py,test_scifi_candidate_liveness.py}`.
+  The superseded plan banners, final plan, and complete four-round panel record
+  landed with the code.
+- Firing mutations proved article-tail preservation, nested RSS selection, P0
+  overlap wiring, P5 fresh-candidate wiring, Pydantic no-leak behavior, P5
+  canonicalization revalidation, and actual-ledger receipt lifecycle. Every
+  mutation went red and production files were restored before the green gate.
+- Gates: focused **242 passed**; full suite **7936 passed / 130 skipped / 1
+  xfailed**; Bug Bible **17 / 24 / 3** read-only; variants **11/0**;
+  UTF-8/no-BOM/nonzero/AST/diff hygiene green. Canonical workflow remains
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`.
+- No GPU/headless run, workflow/frozen rewrite, Window B/degrade implementation,
+  or survival-guide write. No new PBUG was admitted because this was not a live
+  artifact; older live PBUGs are not claimed requalified. The exact test scratch
+  root was removed. Unrelated dirty/untracked work and the three pre-existing
+  modified `tmp/*.ps1` files were preserved.
+- Roundtable: four rounds, Codex grounded panelist/judge plus GPT/Gemini/
+  DeepSeek-family lanes; actual spend **$1.3127**. R3/R4 DeepSeek calls hit
+  output-length failures; the grounded GPT/Gemini evidence was sufficient for
+  convergence and the failures are retained in the manifests.
+- CURRENT/NEXT: code is pushed. Plan of record:
+  `docs/2026-07-30-story-never-fails/FINAL_PLAN.md`. Separate follow-ups are
+  live GPU requalification and removal of `scifi_news_pro_multipass`'s own
+  3,600-character dossier cap. Do not start Window B/degrade from this handoff.
+
 ## 2026-07-30 (latest) -- CODE 331f46ea (v2.0-alpha) -- WINDOW CODER
 
 - Treated the operator's direction -- produce the story and fill the ledger as

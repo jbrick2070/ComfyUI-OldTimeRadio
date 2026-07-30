@@ -143,6 +143,14 @@ An explicit `source_ref` that cannot be resolved fails closed. Automatic
 selection may try another eligible candidate only through a declared policy,
 and must record the actual selection.
 
+For a selected RSS/article body, record the route, raw RSS content index and
+count when applicable, character count, UTF-8 byte count, and SHA-256 of the
+exact admitted text. Do not silently clip that selected body after retrieval.
+If one model context cannot contain it, cover the complete normalized body with
+overlapping coordinate windows, validate spans in each local window, rebase
+them exactly, merge deterministically, and prove that the window union has no
+gap.
+
 Every source-backed runner currently enters through the writer's exact
 seven-key `SOURCE_PAYLOAD_KEYS` envelope. A registered fetcher implements
 `fetch(*, bank, technical_model, source_ref="")` and returns that dict or a
@@ -182,9 +190,18 @@ Apply the same ownership rule to titles, premises, character descriptions,
 visual prompts, and music prompts unless a live shared component explicitly
 owns that field.
 
-Invalid creative output goes back through a bounded model repair. Exhausted
-repair fails closed. Never ship canned story text or fall back to another
-bank or pipeline.
+Invalid creative output goes back through a finite model repair ladder. On a
+designated liveness route such as canonical Sci-Fi, exhausting that ladder
+retires the candidate, not the episode: request a fresh complete model-authored
+candidate until one is accepted or the operator cancels. Do not impose a fixed
+outer model-output ceiling. Deterministic configuration, source/security,
+provider, I/O, compiler, ownership, graph, freeze, and proof failures remain
+loud. Never ship canned story text or fall back to another bank or pipeline.
+
+An accepted fictional story may replace an abandoned draft, including its
+characters, events, dialogue, and plot. This latitude does not weaken evidence:
+claims presented as factual and the factual coda still trace to the admitted
+source.
 
 `target_words` is an advisory scale request and a receipt. It must not cause
 deterministic trimming, padding, line deletion, or a production gate.
@@ -193,6 +210,12 @@ deterministic trimming, padding, line deletion, or a production gate.
 
 Use the provided `Ledger`; never create a parallel ledger. The table below
 lists the minimum authored inputs, not the full normalized row schemas:
+
+Assemble the production ledger once from accepted artifacts. Its canonical
+spoken rows are the audible downstream authority; rejected candidate prose and
+candidate-local hashes, seals, or readiness state never enter it. Final graph,
+safety, recount, authorship, freeze, and hash checks prove the accepted ledger's
+integrity, not semantic fidelity to an earlier fictional draft.
 
 | table | minimum authored inputs |
 |---|---|

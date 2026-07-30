@@ -104,6 +104,12 @@ Creative quality remains a taste decision, not a runtime validator.
   upstream of any offset computation, so a dirty-source (leading whitespace/tabs)
   cannot shift a literal span. **N/A** only for a no-source bank. This is the
   most-hit source-backed P0 (literal-span / offset-integrity).
+- [ ] **Hard:** The exact selected body is preserved without silent post-fetch
+  clipping and receipted with its route, raw RSS content index/count when
+  applicable, character count, UTF-8 byte count, and SHA-256. If it exceeds one
+  model context, overlapping windows cover the complete normalized body with no
+  gaps; every local span is validated before exact rebasing, and the merged
+  artifact validates against complete A0. **N/A** only for a no-source bank.
 - [ ] **Hard:** A no-source bank stamps honest original/synthetic provenance
   and contains no fabricated citation, URL, author, or license. **N/A** for a
   source-backed bank.
@@ -146,8 +152,13 @@ Creative quality remains a taste decision, not a runtime validator.
   references, enums, counts, hashes, and validated routing metadata. It does
   not create or alter spoken prose; mechanical serialization of already
   accepted verbatim rows is allowed.
-- [ ] **Hard:** Invalid creative content returns to a model through a bounded
-  repair. Exhaustion fails closed; there is no canned story fallback.
+- [ ] **Hard:** Invalid creative content returns to a model through a finite
+  per-candidate repair ladder. A designated liveness route declares whether
+  exhaustion retires that candidate and requests a fresh complete model-authored
+  candidate until acceptance or operator cancellation. Such a route has no
+  fixed outer model-output ceiling and no canned story fallback. Deterministic
+  configuration, source/security, provider, I/O, compiler, ownership, graph,
+  freeze, and proof failures remain loud.
 - [ ] **Hard:** Every rejection names the item, evidence, defect, and allowed
   correction. A model reviewer cannot create a fatal finding that
   deterministic code cannot corroborate.
@@ -198,6 +209,10 @@ Creative quality remains a taste decision, not a runtime validator.
   transition.
 - [ ] **Hard:** Counts and hashes are stamped from final canonical content,
   after all accepted model repairs.
+- [ ] **Hard:** The ledger is assembled once from accepted artifacts. Rejected
+  candidate prose, hashes, seals, and readiness state never enter ledger
+  metadata. Final line/hash proofs establish the accepted ledger's identity and
+  downstream integrity, not fidelity to an abandoned fictional draft.
 - [ ] **Hard:** Evidence maps and authorship receipts live in typed artifacts
   or namespaced `meta`; the fixed line schema contains no ad hoc provenance
   fields.

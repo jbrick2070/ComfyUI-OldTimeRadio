@@ -640,6 +640,37 @@ captions, credits, mux, and publication stay downstream of the hard final stamp.
 Never manufacture prose, facts, products, advertisements, or numeric claims to
 satisfy the counter.
 
+## 36. A rejected fiction candidate is not a damaged episode ledger
+
+**Operator ruling 2026-07-30.** On the canonical Sci-Fi route, a recoverable
+JSON, schema, content-validation, safety, or output-limit defect exhausts and
+retires only that finite candidate ladder. The producer then requests a fresh
+complete model-authored candidate, with cancellation as the operator-controlled
+stop. There is no fixed outer model-output ceiling and no deterministic canned,
+summary, drop, or patch-in-place story floor. This is the controlling amendment
+to conflicting readings of Lessons 3, 11, 26, 34, and 35.
+
+The source article is evidence and inspiration, not a fictional continuity
+contract. Accepted characters, events, dialogue, and plot may diverge completely
+from the article or any discarded draft. Claims presented as factual and the
+factual coda still resolve to validated source evidence. The accepted canonical
+spoken artifact is the only prose admitted to the ledger; rejected prose, hashes,
+seals, and readiness state never become authoritative.
+
+Complete source access is a coverage problem, not a clipping permission. Preserve
+the exact selected body and its route/index/count/UTF-8 byte count/hash receipt.
+When it exceeds one P0 context, use overlapping windows whose union covers the
+complete normalized source, validate locally, rebase exact offsets, merge
+deterministically, and validate again against the complete A0.
+
+Assemble and stamp the production ledger once, from the accepted canonical
+artifact. The final line identity, graph, safety, recount, authorship, freeze, and
+hash checks remain strict corruption and downstream-consumer guards; they do not
+prove fidelity to an abandoned work of fiction. Cancellation and deterministic
+configuration, source/security, provider, I/O, compiler, ownership, graph,
+freeze, and proof failures remain loud. A raw unsafe candidate is retryable;
+unsafe text that somehow remains after acceptance is an invariant failure.
+
 
 ## Sprint receipt
 

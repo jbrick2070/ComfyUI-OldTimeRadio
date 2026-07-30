@@ -1,5 +1,47 @@
 # OTR Go-Forward Plan
 
+**Newest update: 2026-07-30 (CODER closeout) -- COMPLETE-SOURCE SCI-FI
+AUTHORING AND CANDIDATE-LOCAL RECOVERY ARE LANDED AND PUSHED.** The operator's
+controlling contract is now implemented: the RSS/article is a factual
+springboard, while the accepted canonical ledger is the audible downstream
+authority. Fiction may replace an abandoned draft completely. Facts represented
+as facts and the factual coda still require validated evidence. Recoverable
+JSON/schema/content/safety/output-limit defects retire a candidate, not the
+episode; fresh complete model-authored candidates continue until acceptance or
+operator cancellation. No canned story, patch-in-place ledger, or fixed outer
+candidate ceiling was added.
+
+Code commit `3bc3d8a0` preserves the complete selected RSS/article body, chooses
+the richest usable RSS row and richest available body, records exact
+route/index/count/byte/hash provenance in the actual episode ledger, and removes
+the local 12,000-character article clip. P0 covers long RSS text with overlapping
+windows, validates locally, rebases exact coordinates, merges deterministically,
+and validates against complete A0. P0/P1/P2/P3/P5 use fresh-candidate recovery;
+rejected prose is excluded from prompts and journals; P5 validates raw and
+canonicalized text before acceptance; the production ledger is assembled and
+stamped once from the winner.
+
+Receipts: focused **242 passed**; seven production mutations fired red and were
+restored; full Windows suite **7936 passed / 130 skipped / 1 xfailed**; read-only
+Bug Bible **17 passed / 24 skipped / 3 xfailed**; variants **11 / 0 failures**;
+UTF-8/no-BOM/nonzero/AST/diff hygiene green. Canonical workflow SHA-256 remains
+`9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`.
+The four-round live panel record and final plan are under
+`docs/2026-07-30-story-never-fails/`; actual panel spend was **$1.3127**.
+
+No GPU/headless campaign, Window B/degrade implementation, workflow/frozen
+artifact rewrite, or survival-guide edit was performed. This was an offline root
+fix, so no new PBUG was admitted and older live PBUGs are not claimed
+requalified. `scifi_news_pro_multipass` still has its separate 3,600-character
+dossier cap; complete-source Pro support and live GPU requalification remain
+explicit follow-ups. Preserve unrelated dirty/untracked work and the three
+pre-existing modified `tmp/*.ps1` files.
+
+**CURRENT STEP:** the implementation is closed. The plan of record is
+`docs/2026-07-30-story-never-fails/FINAL_PLAN.md`. A later explicitly scoped
+window may do live GPU requalification and the separate Pro whole-source
+follow-up; do not infer authority here to start Window B/degrade.
+
 **Newest update: 2026-07-30 (CODER closeout) -- ITEM 5'S LIMITED RSS
 `full_text` COORDINATE MIGRATION IS LANDED AND PUSHED.** The operator directed
 that the story engine produce the story and fill the ledger as best it can
@@ -892,14 +934,14 @@ noun/POS heuristics, casing/title/honorific style, craft, and quality are
 guidance or telemetry only -- they may never reject, reroll, retire, replace,
 or block an episode. Same-story LLM cleanup is allowed.
 
-## CURRENT STEP -- **THE WRITER IS THE WORK. The 45-word campaign is STOPPED
-## (operator, 2026-07-29): 24 of 34 failures died in the writer, so the engines
-## cannot be proven until the writer stops vetoing. Plan of record is
-## `docs/2026-07-29-writer-repair-FINAL-PLAN.md`, hardened by a full 4-round
-## kibitz arc. **Section 2 is DONE and Window A is RUNNING: A-1, A-3 and A-4
-## are landed and pushed, A-2 folded into A-1; NEXT = A-6, THEN A-5 (order
-## swapped 2026-07-30 with the reason grounded below).** Section 0 is an OPEN
-## OPERATOR DECISION and gates Window B.**
+## HISTORICAL WRITER PLAN -- SUPERSEDED 2026-07-30
+
+The former Section 0 operator gate, Window A ordering, and Window B/degrade
+proposal below are retained as history. They are no longer current instructions.
+The operator resolved the gate in favor of fresh complete model-authored
+candidates before ledger assembly, without a canned or degraded ledger floor.
+The current plan of record is
+`docs/2026-07-30-story-never-fails/FINAL_PLAN.md`; code landed in `3bc3d8a0`.
 
 ### A-7 IS HALF LANDED, AND THE OTHER HALF IS BLOCKED BY A DIRTY REPO (2026-07-30)
 
@@ -1050,14 +1092,15 @@ the box -- each leg kills other OTR ComfyUI servers at start):
 **CLEANUP OWED at the end:** `Remove-Item config\profiles\otr_w45_*.json` --
 nineteen scratch profiles in a tracked set; they must never be committed.
 
-## NEXT STEP AFTER THE ENGINES -- **THE WRITER NEVER VETOES** (operator ruling, 2026-07-29)
+## HISTORICAL DESIGN INPUT -- WRITER NEVER VETOES (LANDED/SUPERSEDED 2026-07-30)
 
 **The ruling, in the operator's words:** "the writer should not be allowed to
 kill the run, it just needs to fix the ledger" -- and, restated: "the writer
 should never veto, the writers should keep on passing in a loop to agents to
-clean up the ledger." PARKED by the operator: do not build it until the video
-pipe engines work as expected. It is the NEXT step after them, not a
-someday-item.
+clean up the ledger." This historical design block led to the later ruling and
+implementation in `docs/2026-07-30-story-never-fails/FINAL_PLAN.md`: invalid
+pre-ledger candidates are abandoned and freshly authored, rather than degrading
+or patching an assembled ledger.
 
 **Why it is now the top of the forward queue.** The live 45-word campaign spent
 its first ten legs proving the writer is the run's dominant failure mode, not
