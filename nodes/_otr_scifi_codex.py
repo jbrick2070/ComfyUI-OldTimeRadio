@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import html
 import json
 import logging
 import math
@@ -1046,8 +1047,27 @@ def _digest(payload: Mapping[str, str]) -> str:
 _SPAN_SOURCE_FIELDS = ("headline", "summary", "full_text", "seed_text")
 
 
+# Only these three spellings of ONE entity -- the no-break space -- are decoded,
+# and the replacement text is not ours to invent: `html.unescape` supplies
+# U+00A0 and the whitespace collapse below (already the sole owner of "what is
+# a space") turns it into one space. A wider entity set is a DIFFERENT change:
+# every decoded entity shifts source offsets, so it silently redefines the
+# coordinate system that `source_digest` pins and that every accepted P0 span
+# is measured in. That is an operator-visible decision, not a coder's.
+_HTML_NBSP_ENTITY = re.compile(r"&(?:nbsp|#160|#[xX][aA]0);")
+
+
 def _normalize_span_source_text(text: str) -> str:
     """Collapse every whitespace run to a single space and strip the ends.
+
+    A-3 (2026-07-30, writer repair): an HTML no-break-space ENTITY reaches
+    this text as the six literal characters `&nbsp;`, which no whitespace
+    rule can see, so it stays in the coordinate system and the model cannot
+    reproduce it -- it writes the space a reader sees. Measured in the live
+    45-word campaign: 2 of the 15 P0 deaths quoted their source
+    CHARACTER-FOR-CHARACTER except for this entity (the MIT Genesis Mission
+    and open-source-models articles), and one more failing window carried it.
+    A literal U+00A0 was never the problem: `\\s` already matches it.
 
     PBUG-20260717: RSS/HTML payloads carry ``\\n``/``\\t`` runs, so a literal
     source-span offset can land mid-whitespace or mid-word -- a slice no model
@@ -1059,7 +1079,10 @@ def _normalize_span_source_text(text: str) -> str:
     purpose: the shared ``validate_source_payload`` stays byte-identical for the
     science ledger stamps.
     """
-    return re.sub(r"\s+", " ", text or "").strip()
+    decoded = _HTML_NBSP_ENTITY.sub(
+        lambda match: html.unescape(match.group(0)), text or "",
+    )
+    return re.sub(r"\s+", " ", decoded).strip()
 
 
 def validate_payload_envelope(
