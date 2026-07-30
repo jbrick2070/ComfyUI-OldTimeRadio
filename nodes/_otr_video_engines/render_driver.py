@@ -3258,13 +3258,28 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                     "is a failed verification, not a zero."
                     % (shot.get("shot_id"), index, raw_count,
                        int(segment.render_frames)))
-            if got != int(segment.render_frames):
+            # NAME THE DIRECTION, AND DO NOT EXPLAIN A SHORTFALL THAT DID NOT
+            # HAPPEN. This message read "assembling a SHORT segment would make
+            # the beat drift" for both directions, and the first live firing
+            # (2026-07-29, ltx_video) was a SURPLUS -- 193 frames against a
+            # planned 169, because the boomerang loop-fill ignored the ask.
+            # A reader chasing that log was told to look for a shortfall.
+            # Both directions are still terminal and for one reason: the
+            # plan's count is what this segment's audio slice was cut against
+            # (segment_render_window), so a segment of ANY other length drifts
+            # the beat against its own audio. The leading clause is unchanged
+            # so existing receipts and assertions still match.
+            planned = int(segment.render_frames)
+            if got != planned:
+                delta = ("a surplus of %d" % (got - planned)) if got > planned \
+                    else ("short by %d" % (planned - got))
                 raise RenderError(
                     "shot %s segment %d rendered %d frame(s) but its plan asked "
-                    "for %d. NO FALLBACK -- assembling a short segment would "
-                    "make the beat drift against its own audio."
-                    % (shot.get("shot_id"), index, got,
-                       int(segment.render_frames)))
+                    "for %d (%s). NO FALLBACK -- the plan's count is what this "
+                    "segment's audio slice was cut against, so assembling a "
+                    "segment of any other length makes the beat drift against "
+                    "its own audio."
+                    % (shot.get("shot_id"), index, got, planned, delta))
             rendered.append((path, int(segment.drop_head),
                              int(segment.render_frames)
                              - int(segment.drop_head)

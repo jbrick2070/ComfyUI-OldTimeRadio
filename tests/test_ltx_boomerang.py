@@ -149,3 +149,76 @@ def test_the_boomerang_is_on_by_default_which_is_why_the_violation_is_reachable(
         pytest.skip("box pins OTR_LTX_LOOP_VIA_REVERSE; the default is what "
                     "this test is about")
     assert LtxVideoEngine()._loop_via_reverse() is True
+
+
+# ---- THE COVERAGE-PLAN NARROWING (live fix, 2026-07-29) ---------------------
+#
+# The tripwire above stays TRUE and stays PASSING: a SINGLE-clip render still
+# overshoots its declared ceiling, and retiring the boomerang outright is still
+# 7c's job. What follows closes the OTHER half -- the one a coverage plan can
+# reach, which took down the live otr_w45_ltx_video leg on 2026-07-29 with
+# "shot shot_music_opening_001 segment 0 rendered 193 frame(s) but its plan
+# asked for 169".
+#
+# Inside a coverage plan the boomerang's own justification evaporates. The
+# PLAN covers the beat, and it partitions against this engine's declared 169
+# ceiling, so no loop-fill is owed. And render_beat_coverage refuses to
+# truncate -- it proves each segment against segment.render_frames -- so the
+# surplus the boomerang assumes will be absorbed is instead a hard failure.
+# eng_wan_ti2v reached this conclusion first for its own ping-pong and narrows
+# on the same discriminator; LTX never got the narrowing.
+
+def _prepared(multi_clip):
+    return {"session_ctx": {"multi_clip": multi_clip}}
+
+
+def test_loop_fill_suppressed_inside_a_coverage_plan():
+    """THE LIVE BUG. A multi-clip beat must render its planned length."""
+    assert LtxVideoEngine()._loop_fill_allowed(_prepared(True)) is False
+
+
+def test_loop_fill_still_runs_for_a_single_clip_beat():
+    """The narrowing is scoped: single-clip loop-fill is untouched, because
+    there the composite DOES truncate the surplus to the beat window."""
+    assert LtxVideoEngine()._loop_fill_allowed(_prepared(False)) is True
+
+
+def test_loop_fill_allowed_when_the_caller_prepared_nothing():
+    """A caller with no session (the bare-adapter path) is not a coverage
+    plan, so it keeps the shipped default rather than silently losing it."""
+    for prepared in (None, {}, "not-a-dict", {"session_ctx": None}):
+        assert LtxVideoEngine()._loop_fill_allowed(prepared) is True, prepared
+
+
+def test_env_off_still_wins_inside_and_outside_a_coverage_plan(monkeypatch):
+    """The narrowing ADDS a suppression; it never revives a disabled loop."""
+    monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "off")
+    eng = LtxVideoEngine()
+    assert eng._loop_fill_allowed(_prepared(False)) is False
+    assert eng._loop_fill_allowed(_prepared(True)) is False
+
+
+def test_the_169_segment_now_renders_169_not_193():
+    """The exact live numbers, from the other side of the fix.
+
+    The tripwire above proves _ltx_loop_source_length(169) still yields a
+    193-frame mirror. This proves a coverage-plan segment never reaches it:
+    loop-fill is suppressed, so the length in play is _ltx_frame_length, which
+    returns the ask EXACTLY -- which is what render_beat_coverage demands.
+    """
+    from nodes._otr_video_engines.eng_ltx_video import _ltx_frame_length
+
+    planned = 169
+    assert LtxVideoEngine()._loop_fill_allowed(_prepared(True)) is False
+    assert _ltx_frame_length(planned, 25) == planned
+    # and the path NOT taken is still the overshoot the tripwire pins
+    assert 2 * _ltx_loop_source_length(planned, 25) - 1 == 193
+
+
+def test_the_shorter_second_segment_was_doomed_too():
+    """Segment 1 of the same live beat planned 89 frames; the loop floor of 97
+    would have mirrored it to 193 as well -- the same 193 for a different ask,
+    which is what proves the loop-fill ignores the plan rather than rounding
+    it."""
+    assert 2 * _ltx_loop_source_length(89, 25) - 1 == 193
+    assert LtxVideoEngine()._loop_fill_allowed(_prepared(True)) is False

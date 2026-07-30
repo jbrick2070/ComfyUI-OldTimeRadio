@@ -430,6 +430,58 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                      self._LOOP_VIA_REVERSE_DEFAULT)
         return bool(self._LOOP_VIA_REVERSE_DEFAULT)
 
+    def _loop_fill_allowed(self, prepared) -> bool:
+        """Whether the boomerang loop-fill may run for THIS request.
+
+        THE LOOP-FILL IS A SINGLE-CLIP DEVICE AND MUST NOT RUN INSIDE A
+        COVERAGE PLAN. Found live 2026-07-29 (profile otr_w45_ltx_video):
+        ``shot shot_music_opening_001 segment 0 rendered 193 frame(s) but its
+        plan asked for 169``.
+
+        ``_ltx_loop_source_length`` deliberately IGNORES the ask -- it renders
+        a half-source floored at 97 frames and mirrors it to ``2*97-1 = 193``,
+        whatever was requested. That is sound for a SINGLE clip, where the
+        adapter's contract is "cover the beat window" and the composite
+        truncates the surplus (see the module note at the top of this file:
+        "Short asks are RAISED to the floor (safe: the composite TRUNCATES
+        long sources to the beat window)").
+
+        Inside a coverage plan BOTH halves of that reasoning fail. The plan --
+        not the adapter -- is what covers the beat, and it partitions the beat
+        into segments that already respect this engine's declared 169 ceiling,
+        so there is nothing left for a loop-fill to cover. And
+        ``render_beat_coverage`` REFUSES to truncate: it proves every segment
+        against ``segment.render_frames`` precisely so a beat cannot drift
+        against its own audio, which means the surplus the boomerang counts on
+        being absorbed is instead a hard failure.
+
+        ``eng_wan_ti2v`` already reached this conclusion for its own ping-pong
+        and narrows on exactly this discriminator (``eng_wan_ti2v.py:946``);
+        its comment names this gate by name. LTX simply never got the same
+        narrowing. ``BeatSession`` sets ``multi_clip`` from the STAMPED plan's
+        segment count, and it is the only honest signal available here -- a
+        segment's request is shaped exactly like a single-clip beat's, so the
+        request cannot be asked.
+
+        NOTE the scope: this does NOT retire the boomerang. Single-clip
+        renders still overshoot their declared ceiling, which remains the
+        deferred 7c item its tripwire in ``tests/test_ltx_boomerang.py``
+        guards. This closes only the half that a coverage plan can reach --
+        the half that is failing legs today.
+        """
+        if not self._loop_via_reverse():
+            return False
+        session = prepared if isinstance(prepared, dict) else {}
+        if bool((session.get("session_ctx") or {}).get("multi_clip")):
+            _LOG.warning(
+                "[eng_ltx_video] loop_via_reverse SUPPRESSED for this "
+                "request: the beat is a multi-clip coverage plan, which owns "
+                "beat coverage itself and proves each segment against its "
+                "planned frame count -- a mirrored 2N-1 source would fail "
+                "that proof rather than being truncated to fit")
+            return False
+        return True
+
     # ---- config resolution (env override -> folder_paths -> join) ----
     # The GGUF mini recipe's weight artifacts (defaults = the frozen mini's
     # filenames, workflows/ltx_bookend_mini_repro_gguf_mit.json); each resolves
@@ -1243,7 +1295,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # below doubles it back to >= the beat window. Leaves the global
         # _ltx_frame_length / 169 decode floor UNTOUCHED (this path has its own
         # proven native-canvas floor).
-        loop_via_reverse = self._loop_via_reverse()
+        loop_via_reverse = self._loop_fill_allowed(prepared)
         if loop_via_reverse:
             length = _ltx_loop_source_length(plan["target_frame_count"],
                                              self.target_fps)
@@ -1320,7 +1372,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
-        loop_via_reverse = self._loop_via_reverse()
+        loop_via_reverse = self._loop_fill_allowed(prepared)
         if loop_via_reverse:
             length = _ltx_loop_source_length(plan["target_frame_count"],
                                              self.target_fps)
