@@ -862,18 +862,63 @@ or block an episode. Same-story LLM cleanup is allowed.
 ## cannot be proven until the writer stops vetoing. Plan of record is
 ## `docs/2026-07-29-writer-repair-FINAL-PLAN.md`, hardened by a full 4-round
 ## kibitz arc. **Section 2 is DONE and Window A is RUNNING: A-1, A-3 and A-4
-## are landed and pushed, A-2 folded into A-1; NEXT = A-5.** Section 0 is an
-## OPEN OPERATOR DECISION and gates Window B.**
+## are landed and pushed, A-2 folded into A-1; NEXT = A-6, THEN A-5 (order
+## swapped 2026-07-30 with the reason grounded below).** Section 0 is an OPEN
+## OPERATOR DECISION and gates Window B.**
 
-**A-5 IS THE NEXT CHUNK AND IT IS THE FIRST ONE THAT TOUCHES LEDGER IDENTITY.**
-Canonicalise spoken text at acceptance: build a COPIED `ScriptArtifactV4`
-before `_assemble_ledger` so all four identity consumers read ONE object
-(`expected`, `line_text_sha256`, `stamp_receipt`, `_script_digest`). The
-grandfather rule is not optional -- existing frozen ledgers keep their raw-text
-hash and are never re-pinned; only ledgers produced after that commit use the
-cleaned-text hash, and the receipt records which generation produced it. Note
-`clean_spoken_text` also strips speaker labels, which is a SEPARATE P5
-rejection: do not conflate the two.
+### A-5 AND A-6, GROUNDED AT HEAD 2026-07-30 (read this before coding either)
+
+Every anchor below was re-grepped at `41683fc9`; the plan's line numbers had
+all drifted, as its own Section 8 warns.
+
+**A-5 -- canonicalise spoken text at acceptance. RECOMMENDED ORDER: AFTER A-6.**
+The four identity consumers today all read the SAME `script` object, so the
+plan's "make them read one object" is already true in the narrow sense; the
+real change is WHICH TEXT the identity is taken over. Verified sites, all in
+`nodes/_otr_scifi_codex.py`:
+
+- `_assemble_ledger` (`def` at `:2187`) writes the ledger row's
+  `"text": src.text` AND `expected[lid] = src.text` from one loop (`:2207-2213`)
+  -- so today they cannot disagree.
+- `line_text_sha256` + `accepted_lines` are stamped from `expected` at
+  `:2257-2258`.
+- `_CodexTailFinalizer._proof` (`:1932-1939`) re-derives those hashes and
+  raises `CodexPreTailAuditError` if the in-memory ledger has moved.
+- `_script_digest` (`def :1924`) hashes `script.model_dump()`; the call is at
+  `:2521`, beside `stamp_receipt(..., accepted_artifacts={"final_script":
+  script})` at `:2513-2517`.
+
+So A-5's work is: build a COPIED artifact whose spoken rows carry
+`clean_spoken_text(...)` output, hand THAT to `_assemble_ledger` and to both
+receipt sites, and record the generation. **The grandfather rule is not
+optional** -- frozen ledgers keep their raw-text hash and are never re-pinned;
+only ledgers produced after that commit use the cleaned-text hash, and the
+receipt says which. `clean_spoken_text` (`nodes/_otr_script_prep.py:21`) also
+strips a leading speaker label, which is a SEPARATE P5 rejection: do not
+conflate them.
+
+**A-6 FIRST, and the plan's premise for it is WRONG in one word.** The plan
+says `_otr_ledger_cleanup.py` "SILENTLY sets `skip=True` on a voiced row that
+cleans to empty". It is not silent: the real site (`:254-269`) sets `skip`,
+zeroes the text through `set_line_text_metrics` (the atomic owner -- a direct
+`row["text"]` assignment is forbidden by
+`tests/test_text_metric_ownership.py`), sets `tts_skip_reason`, and APPENDS
+`{"action": "marked_explicit_skip_no_spoken_surface"}` to the cleanup receipt.
+Its own comment defends the choice: an explicit skip is completion, and a
+silent hole is what broke slicing and captions downstream.
+
+What is still wrong is the OUTCOME, not the silence: a voiced line disappears
+from the episode instead of being re-authored, which is Invariant 7. So A-6
+must turn it into a P5 **finding** at `_spoken_text_finding`
+(`nodes/_otr_scifi_codex.py:2046`) that sends the row back to be re-authored --
+never an assert, which would itself be a veto -- and it must not simply delete
+the cleanup branch, because that branch is holding a real downstream contract
+until the re-author path exists.
+
+**Why A-6 before A-5:** A-5 canonicalises with the same cleaner, so a row that
+cleans to empty becomes A-5's problem the moment it lands. With A-6 in first,
+that row is already a finding that goes back for re-authoring, and A-5 cannot
+create a silent empty by construction.
 
 ### SECTION 2 IS MEASURED (2026-07-30) -- THE ORDER HOLDS, THREE PREMISES DO NOT
 
