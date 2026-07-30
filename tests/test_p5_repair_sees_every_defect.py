@@ -31,6 +31,8 @@ from types import SimpleNamespace
 import pytest
 
 from nodes import _otr_scifi_codex as lane
+from nodes import _otr_ledger_cleanup as ledger_cleanup
+from nodes import _otr_structured_call as structured_call
 
 
 def _cast_stub() -> SimpleNamespace:
@@ -68,6 +70,75 @@ def _script_stub(rows: list[tuple[str, str, str]]) -> SimpleNamespace:
     )
 
 
+def _a6_cast() -> lane.CastPlanV4:
+    return lane.CastPlanV4(cast=[
+        {
+            "char_id": "announcer",
+            "name": "ANNOUNCER",
+            "character_description": "A calm witness.",
+            "gender": "neutral",
+            "role_in_conflict": "Frames the signal.",
+            "voice_slot": "announcer",
+        },
+        {
+            "char_id": "c01",
+            "name": "Ada Sterling",
+            "character_description": "A careful radio astronomer.",
+            "gender": "female",
+            "role_in_conflict": "Must answer the signal.",
+            "voice_slot": "c01",
+        },
+    ])
+
+
+def _a6_score() -> lane.RadioScoreV4:
+    return lane.RadioScoreV4(
+        title="Signal at Meridian",
+        premise="A signal asks for an answer.",
+        setting="Meridian observatory.",
+        advisory_word_plan=lane.AdvisoryWordPlanV4(
+            advisory_total_center=6,
+            per_beat=[{
+                "beat_id": "b001",
+                "advisory_word_center": 6,
+            }],
+        ),
+        scenes=[{
+            "scene_id": "scene_001",
+            "env": "Observatory",
+            "description": "Receivers glow.",
+            "shots": [{
+                "shot_id": "shot_001",
+                "scene_id": "scene_001",
+                "description": "Ada at the receiver.",
+                "visual_prompt": "A radio astronomer at a blue receiver.",
+            }],
+            "beats": [{
+                "beat_id": "b001",
+                "scene_id": "scene_001",
+                "shot_id": "shot_001",
+                "speaker": "Ada Sterling",
+                "char_id": "c01",
+                "speaker_role": "character",
+                "line_ids": ["l001"],
+                "order": 1,
+                "intent": "Answer the signal.",
+                "arc_phase": "arrival",
+                "fact_ids": [],
+                "advisory_voiced_word_center": 6,
+            }],
+        }],
+        music_cues=[{
+            "cue_id": "music_open",
+            "placement": "open",
+            "description": "A low radio pulse.",
+            "generation_prompt": "Low radio pulse.",
+            "anchor_line_id": "l001",
+            "anchor_beat_id": "b001",
+        }],
+    )
+
+
 # --------------------------------------------------------------------------
 # _spoken_text_finding -- the shared per-line rule
 # --------------------------------------------------------------------------
@@ -86,6 +157,11 @@ def _script_stub(rows: list[tuple[str, str, str]]) -> SimpleNamespace:
         ),
         ("SFX: a door closes", "l001: spoken text starts with a role label"),
         ("```json", "l001: spoken text starts with a role label"),
+        (
+            "[breath catches] (a long pause)",
+            "l001: spoken text cleans to an empty spoken surface",
+        ),
+        ("(softly) The signal is still there.", None),
         # The label rule keys on the LOCKED cast label exactly. An
         # abbreviated or parenthesised prefix -- "ADA (V.O.):" against a cast
         # row named "Ada Sterling" -- is NOT caught, and this pins that
@@ -295,6 +371,100 @@ def test_compile_refusal_alone_stays_bare_when_the_rows_are_clean(monkeypatch):
     ])
     error = _capture_validator(monkeypatch, candidate)
     assert error == "P5 compact draft has duplicate line IDs"
+
+
+def test_cleanup_empty_surface_runs_real_p5_reauthor_rung():
+    bad_text = "[breath catches] (a long pause)"
+    good_text = "The signal is still there."
+    responses = [
+        lane.ScriptTextDraftV4(
+            lines=[{"line_id": "l001", "text": bad_text}],
+        ).model_dump_json(),
+        lane.ScriptTextDraftV4(
+            lines=[{"line_id": "l001", "text": good_text}],
+        ).model_dump_json(),
+    ]
+    calls = []
+
+    def slot(messages, **kwargs):
+        calls.append((kwargs["temperature"], messages))
+        return responses[len(calls) - 1]
+
+    journal = {}
+    script = lane._call_script_text_draft(
+        slot_fn=slot,
+        pack=SimpleNamespace(prompt_stages={
+            "codex_play_system": "Write the spoken line.",
+            "codex_coda_contract_system": "Return only the compact draft.",
+        }),
+        artifact_inputs={},
+        score=_a6_score(),
+        cast=_a6_cast(),
+        max_new_tokens=None,
+        call_journal=journal,
+    )
+
+    assert [call[0] for call in calls] == pytest.approx([
+        .72, structured_call._REPAIR_TEMPERATURE,
+    ])
+    assert structured_call._REPAIR_TEMPERATURE != pytest.approx(.32)
+    assert script.lines[0].text == good_text
+    assert script.lines[0].skip is False
+    repair_text = "\n".join(
+        str(message.get("content") or "") for message in calls[1][1]
+    )
+    assert "CRITICAL:" in repair_text
+    assert "l001: spoken text cleans to an empty spoken surface" in repair_text
+    attempts = journal["calls"][0]["attempts"]
+    assert [attempt["status"] for attempt in attempts] == [
+        "rejected", "accepted",
+    ]
+    assert attempts[0]["error_type"] == "PostValidationError"
+
+
+def test_without_empty_surface_finding_cleanup_would_skip_the_line(monkeypatch):
+    bad_text = "[breath catches] (a long pause)"
+    monkeypatch.setattr(lane, "clean_spoken_text", lambda text: text)
+    calls = []
+
+    def slot(_messages, **_kwargs):
+        calls.append(True)
+        if len(calls) > 1:
+            pytest.fail("counterfactual P5 unexpectedly tried to re-author")
+        return lane.ScriptTextDraftV4(
+            lines=[{"line_id": "l001", "text": bad_text}],
+        ).model_dump_json()
+
+    accepted = lane._call_script_text_draft(
+        slot_fn=slot,
+        pack=SimpleNamespace(prompt_stages={
+            "codex_play_system": "Write the spoken line.",
+            "codex_coda_contract_system": "Return only the compact draft.",
+        }),
+        artifact_inputs={},
+        score=_a6_score(),
+        cast=_a6_cast(),
+        max_new_tokens=None,
+        call_journal={},
+    )
+    assert len(calls) == 1
+    assert accepted.lines[0].text == bad_text
+
+    row = accepted.lines[0].model_dump(mode="json")
+    row.update({"char_count": 999, "word_count": 999})
+    actions = ledger_cleanup._complete_deterministic({
+        "cast": [],
+        "lines": [row],
+    })
+    assert row["skip"] is True
+    assert row["text"] == ""
+    assert row["char_count"] == 0
+    assert row["word_count"] == 0
+    assert row["tts_skip_reason"] == ledger_cleanup._EMPTY_TEXT_SKIP_REASON
+    assert {
+        "field": "line_id=l001.skip",
+        "action": "marked_explicit_skip_no_spoken_surface",
+    } in actions
 
 
 def test_validator_still_refuses_a_non_draft_result(monkeypatch):

@@ -36,6 +36,7 @@ try:
         format_safety_hits,
         scan_spoken_ledger,
     )
+    from ._otr_script_prep import clean_spoken_text
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import ProviderCapacityMessages
     from ._otr_scifi_p0_contract import (
@@ -74,6 +75,7 @@ except ImportError:  # pragma: no cover
         format_safety_hits,
         scan_spoken_ledger,
     )
+    from _otr_script_prep import clean_spoken_text  # type: ignore
     from _otr_text_metrics import (  # type: ignore
         canonical_word_count,
         set_line_text_metrics,
@@ -2057,6 +2059,8 @@ def _spoken_text_finding(
         return f"{line_id}: spoken text is production markup"
     if re.match(r"^\s*(?:```|\*)", text) or label_pattern.match(text):
         return f"{line_id}: spoken text starts with a role label"
+    if not clean_spoken_text(text).strip():
+        return f"{line_id}: spoken text cleans to an empty spoken surface"
     return None
 
 
