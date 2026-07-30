@@ -3,6 +3,35 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-30 (latest) -- CODE 331f46ea (v2.0-alpha) -- WINDOW CODER
+
+- Treated the operator's direction -- produce the story and fill the ledger as
+  best the engine can without failing -- as approval of the recommended,
+  limited, future-only RSS `full_text` coordinate migration.
+- Landed and pushed `331f46ea`: `_extract_rss_fragment_text` inserts a
+  separator only for an explicit block/break-tag allowlist, strips inline tags
+  without one, preserves entity spellings, and collapses whitespace. The only
+  production call is `content[0].value -> rss_full`; summary, derived
+  `seed_text`, URL scraping, normalization, frozen artifacts, and the workflow
+  are untouched.
+- Added all four production boundary regressions, the three required inline
+  and entity counterfactuals, exact-tag and quoted-attribute edges, the old
+  fusing-regex counterfactual, and a behavioral proof that nested
+  `_fetch_single_feed` fires the helper.
+- Mutation receipt: reverting the production invocation to the old two-regex
+  strip made the wiring test red; the file was restored byte-identically to
+  SHA-256
+  `2D076104E80278CC3F9969342EE6D24D9BDE8DC9D940F63EC1CB580FBB8E84F6`.
+- Gates: focused 94 passed; full suite **7898 passed / 130 skipped / 1
+  xfailed**; Bible **17 / 24 / 3** read-only; variants **11/0**; UTF-8/no
+  BOM/AST/nonzero/diff hygiene green. Canonical workflow remains
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`.
+- No GPU/headless run, Window B/degrade work, survival-guide write, frozen
+  artifact rewrite, or workflow edit. Exact scratch paths were removed; the
+  operator's three pre-existing modified `tmp/*.ps1` files remain.
+- CURRENT/NEXT: Item 5 is closed. Stop here; a later window must receive its
+  own authority before starting Window B/degrade or a GPU campaign.
+
 ## 2026-07-30 (latest) -- HEAD c0d1e297 (v2.0-alpha) -- WINDOW CODER
 - Landed/pushed `0f4cbc17` A-6 and `e79062ee` A-5; cleanup-empty speech now re-authors, and every accepted identity consumer uses one copied cleaned-text artifact.
 - Landed/pushed `7b3543dc`; deterministic P0 pruning durably receipts every span/evidence/dependent drop only when that exact candidate is accepted.
