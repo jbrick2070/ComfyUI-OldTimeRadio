@@ -578,6 +578,14 @@ fake commercials or products, invented numeric claims, markup, stage directions,
 and new visual/canon claims. Subjective taste remains fail-open; measurable
 delivery exhaustion raises a typed error before hashes, readiness, or media.
 
+**Amended 2026-07-30 (A-4).** "Exhaustion raises a typed error" is the end of
+the ladder, not the first thing that goes wrong on it. A capacity failure now
+carries a PHASE and only one of the two is terminal: a PRE-CALL refusal, where
+the measured prompt leaves no room for the artifact, is deterministic and stays
+loud on the spot; a call that RAN and used its whole output allowance without
+stopping is stochastic and advances the ladder instead. The typed error is what
+the ladder raises when it has actually spent its attempts.
+
 Place each adapter at its last safe authoring boundary. Content-owned lanes fit
 and rebuild their own proofs and hashes before assembly. Shared inline lanes fit
 after story QA and spoken hygiene, re-scour the accepted rows, then stamp the
@@ -609,7 +617,24 @@ non-ready until a legal candidate arrives or the operator cancels.
 
 Only deterministic impossibility may fail loud: invalid configuration, a graph
 whose declared capacity cannot reach the band, corrupt schema ownership, or a
-mechanical safety violation. The final in-band ledger recount and text hash are
+mechanical safety violation.
+
+**Amended 2026-07-30 (A-4): this doctrine was right and the code did not
+implement it.** The rule "only deterministic impossibility may fail loud" now
+has a name in the transport -- a capacity failure carries a PHASE, and
+`prompt_no_room` (the pre-call refusal, deterministic arithmetic) is the only
+one that is terminal. `output_limit` -- the call ran and used its whole output
+allowance without reaching a stop condition -- is the stochastic case this
+lesson always meant to protect, and it advances the ladder. Before A-4 it
+escaped as an unhandled error on attempt 1 of 3, which is how a three-call
+budget spent one call and killed three legs of the live 45-word campaign. Two
+things keep it honest: the phase lives in the module that owns capacity
+arithmetic, so the transport and the retry policy cannot hold two opinions
+about one failure; and being CATCHABLE is not being RETRYABLE -- both phases
+are caught at the attempt boundary and the deterministic one is re-raised
+untouched.
+
+The final in-band ledger recount and text hash are
 the acceptance judge. Subjective quality remains fail-open, and audio, video,
 captions, credits, mux, and publication stay downstream of the hard final stamp.
 Never manufacture prose, facts, products, advertisements, or numeric claims to
