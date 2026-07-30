@@ -244,9 +244,10 @@ def make_dispatching_repair_factory(
     """Build a repair factory for structural machine-output failures.
 
     JSON syntax, pydantic schema, null payload, and locked-roster membership
-    have typed repair prompts. A deterministic locked-roster repair may
-    short-circuit the model. Every other post-validation error uses the generic
-    structural repair prompt; prose semantics never select a repair path.
+    have typed repair prompts. A caller-supplied deterministic repair is tried
+    first on ANY post-validation failure and may short-circuit the model
+    entirely. Every other post-validation error uses the generic structural
+    repair prompt; prose semantics never select a repair path.
     """
 
     def factory(
@@ -280,14 +281,32 @@ def make_dispatching_repair_factory(
                 error=error,
             )
         if isinstance(error, PostValidationError):
+            # THE DETERMINISTIC RUNG IS NOT A P2 FEATURE, though it shipped as
+            # one. Until 2026-07-29 this attempt lived INSIDE the "locked
+            # cast" prose test below, so a caller-supplied deterministic
+            # repair was undispatchable for every other pass. P0's literal-
+            # source repairer was therefore unreachable even once wired --
+            # its errors say "non-literal source span", never "locked cast".
+            #
+            # Selecting a repair MECHANISM by matching the wording of an error
+            # message also contradicts this factory's own docstring ("prose
+            # semantics never select a repair path"). The prose test below now
+            # chooses only the fallback PROMPT, which is all it was ever fit
+            # for.
+            #
+            # Trying the deterministic repair for ANY PostValidationError is
+            # safe by construction: it is fail-closed (returns None when it
+            # cannot help), and structured_call still puts whatever it returns
+            # through the pass's real post_validator before accepting it. A
+            # pass that supplied no deterministic repair is unaffected.
+            if deterministic_repair is not None:
+                resolved = deterministic_repair(failed_output, error)
+                if resolved is not None:
+                    # structured_call accepts a schema instance as
+                    # a finished result -- no LLM repair call.
+                    return resolved
             message = str(error).lower()
             if "locked cast" in message:
-                if deterministic_repair is not None:
-                    resolved = deterministic_repair(failed_output, error)
-                    if resolved is not None:
-                        # structured_call accepts a schema instance as
-                        # a finished result -- no LLM repair call.
-                        return resolved
                 return cast_membership_repair(
                     original_prompt=original_prompt,
                     failed_output=failed_output,

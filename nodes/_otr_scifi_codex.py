@@ -1473,8 +1473,18 @@ def invoke_codex_structured(
     primary_backend_id: str | None = None,
     repair_owner_id: str | None = None,
     repair_backend_id: str | None = None,
+    deterministic_repair_fn: Callable[[str], BaseModel | None] | None = None,
 ) -> BaseModel:
-    """Shared typed ladder for the fixed P0/P1/P2/P3/P5 topology."""
+    """Shared typed ladder for the fixed P0/P1/P2/P3/P5 topology.
+
+    ``deterministic_repair_fn`` lets a CALLER own a non-LLM repair for its own
+    pass. It takes the failed raw output and returns a repaired model or
+    ``None`` to keep the failure loud. The caller closes over whatever context
+    the repair needs -- source payloads, caps, id conventions -- so this shared
+    ladder never has to learn a single pass's vocabulary. Whatever it returns
+    still has to satisfy this pass's real ``post_validator`` before it is
+    accepted; a deterministic repair gets no privileges an LLM repair lacks.
+    """
     if not seam_refs:
         raise CodexPackContractError(f"{pass_id} has no prompt seam")
     if repair_slot_fn is not None and repair_ledger_builder is None:
@@ -1653,6 +1663,16 @@ def invoke_codex_structured(
     ) -> BaseModel | None:
         if pass_id == "P2" and result_type is CastPlanV4:
             repaired = repair_cast_plan_metadata(failed_output)
+            if repaired is not None and post_validator(repaired) is None:
+                return repaired
+        # A CALLER-OWNED deterministic rung, same acceptance bar as P2's.
+        # Until 2026-07-29 P2 was the ONLY pass with a non-LLM repair, while
+        # P0 -- which owns 15 of the 24 writer deaths in the live 45-word
+        # campaign, and whose dominant failure is literally non-literal span
+        # coordinates -- routed straight to an LLM repair owner with a tested,
+        # purpose-built span repairer sitting imported and never called.
+        if deterministic_repair_fn is not None:
+            repaired = deterministic_repair_fn(failed_output)
             if repaired is not None and post_validator(repaired) is None:
                 return repaired
         return None
@@ -2346,6 +2366,26 @@ def run_scifi_codex_episode(
         prompt_must_fit=True,
         repair_slot_fn=creative_fn,
         repair_ledger_builder=p0_repair_ledger_builder,
+        # THE DETERMINISTIC RUNG COMES BEFORE THE ALTERNATE OWNER, and for
+        # P0's dominant live failure it should win outright: a quote that IS
+        # literal source text but carries wrong coordinates is arithmetic, not
+        # authorship, and asking a second model to re-derive it is how a
+        # correct index gets thrown away for a transcription slip.
+        # repair_literal_source_metadata is fail-CLOSED by construction -- it
+        # only repairs a quote that is an exact substring of ONE unambiguous
+        # declared field, drops evidence rows it cannot support, returns None
+        # when it changed nothing, and its result must still clear
+        # _validate_fact_index. It cannot invent evidence, and if pruning
+        # empties `facts` the schema's min_length=1 still fails the pass loudly.
+        deterministic_repair_fn=lambda failed_output: (
+            repair_literal_source_metadata(
+                failed_output,
+                FactIndexV4,
+                a0_payload,
+                zero_padded_ids=True,
+                max_quote_chars=MAX_QUOTE_CHARS,
+            )
+        ),
         primary_backend_id=str(resolved.get("technical_model") or ""),
         repair_owner_id="creative",
         repair_backend_id=str(
