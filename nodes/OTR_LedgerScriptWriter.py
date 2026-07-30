@@ -333,7 +333,41 @@ _OPTIMIZATION_PROFILE_CHOICES = [
 
 
 class PromptContextOverflowError(RuntimeError):
-    """A caller marked its prompt as unsliceable and it exceeded context."""
+    """A caller marked its prompt as unsliceable and it exceeded context.
+
+    A-1 (2026-07-30, writer repair): the output-limit raise carries the
+    completion the model actually produced plus the token arithmetic, as
+    FIELDS. Never in the message -- a ~14,000-token artifact inside an
+    exception string floods every log and receipt that formats it, and the
+    ladder's disposition lines are read by humans. `args` stays
+    ``(message,)`` so ``str(exc)`` and every existing raise site are
+    unchanged; a caller that wants the evidence asks for it by name.
+
+    Every field is optional: the prompt-side re-wrap in
+    ``_build_truncating_generate_fn`` knows none of them, and reports
+    ``None`` rather than a guess.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw_completion: str | None = None,
+        prompt_tokens: int | None = None,
+        generated_tokens: int | None = None,
+        requested_output_tokens: int | None = None,
+        effective_output_tokens: int | None = None,
+        context_cap: int | None = None,
+        ended_with_eos: bool | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.raw_completion = raw_completion
+        self.prompt_tokens = prompt_tokens
+        self.generated_tokens = generated_tokens
+        self.requested_output_tokens = requested_output_tokens
+        self.effective_output_tokens = effective_output_tokens
+        self.context_cap = context_cap
+        self.ended_with_eos = ended_with_eos
 
 
 # Tier 2 fix #16 (2026-05-11): rolling-buffer StoppingCriteria
@@ -954,14 +988,18 @@ def _build_truncating_generate_fn(
             ended_with_eos = last_token in eos_values
         except Exception:  # pragma: no cover - exotic token container
             pass
-        if (generated_tokens == effective_max_new_tokens
-                and fail_on_output_limit and not ended_with_eos):
-            raise PromptContextOverflowError(
-                "prose generation exhausted the full remaining provider/context "
-                f"capacity ({effective_max_new_tokens} output tokens after a "
-                f"{prompt_len}-token prompt); the partial artifact is not eligible "
-                "for a prose or structural reroll"
-            )
+        # A-1 (2026-07-30, writer repair): DECODE BEFORE THE RAISE.
+        # The output-limit raise used to fire HERE, above the decode, so a
+        # fail-closed leg threw away the only copy of what the model actually
+        # produced -- the ladder received an exception with no artifact, and the
+        # OUTPUT_TRUNCATED / OUTPUT_CAP arithmetic below never printed either,
+        # because the raise jumped over it. Whoever debugs a truncation needs
+        # the completion AND the arithmetic, and both were unreachable at the
+        # one moment they exist. Decoding here costs a decode on a leg that is
+        # already dying; the success path decodes exactly once, as before.
+        decoded = tokenizer.decode(
+            generated_ids, skip_special_tokens=True,
+        )
         if generated_tokens == effective_max_new_tokens:
             # The model stopped because it ran OUT OF ROOM, not because it was
             # finished. When the room it was given is also LESS than the room
@@ -989,9 +1027,21 @@ def _build_truncating_generate_fn(
                     "truncated.",
                     prompt_len, generated_tokens, effective_max_new_tokens,
                 )
-        decoded = tokenizer.decode(
-            generated_ids, skip_special_tokens=True,
-        )
+        if (generated_tokens == effective_max_new_tokens
+                and fail_on_output_limit and not ended_with_eos):
+            raise PromptContextOverflowError(
+                "prose generation exhausted the full remaining provider/context "
+                f"capacity ({effective_max_new_tokens} output tokens after a "
+                f"{prompt_len}-token prompt); the partial artifact is not eligible "
+                "for a prose or structural reroll",
+                raw_completion=decoded,
+                prompt_tokens=prompt_len,
+                generated_tokens=generated_tokens,
+                requested_output_tokens=requested_max_new_tokens,
+                effective_output_tokens=effective_max_new_tokens,
+                context_cap=context_cap,
+                ended_with_eos=ended_with_eos,
+            )
         # Tier 1 fix #5 (2026-05-11): StoppingCriteria halts
         # generation but leaves the trigger bytes in the output
         # buffer. Slice at the first stop substring so leaked
