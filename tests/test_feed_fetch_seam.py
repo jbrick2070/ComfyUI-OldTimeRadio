@@ -18,6 +18,9 @@ import ast
 import email.message
 import ipaddress
 import pathlib
+import re
+import sys
+import types
 import zlib
 
 import pytest
@@ -124,6 +127,191 @@ def transport(monkeypatch):
                         lambda url, infos, host, deadline: object())
     monkeypatch.setattr(ff.time, "sleep", lambda _s: None)
     return _FakeConnection
+
+
+# The fused tokens are byte-observed in production logs. Raw feed tags were
+# recoverable for NASA, the MIT LLM article, and MIT AMR; the older School of
+# Engineering fragment was not retained, so that row reconstructs the same
+# logged text boundary with an allowlisted block pair.
+_PRODUCTION_RSS_BLOCK_BOUNDARIES = (
+    pytest.param(
+        'Field of Martian Polygons</div><div class="hds-credits">NASA/JPL-',
+        "Field of Martian Polygons NASA/JPL-",
+        "Field of Martian PolygonsNASA/JPL-",
+        id="martian-polygons",
+    ),
+    pytest.param(
+        "and the School of</DIV><DIV>Engineering",
+        "and the School of Engineering",
+        "and the School ofEngineering",
+        id="school-of-engineering",
+    ),
+    pytest.param(
+        'what you\'re doing.</p><p dir="ltr">Let\'s see',
+        "what you're doing. Let's see",
+        "what you're doing.Let's see",
+        id="doing-lets",
+    ),
+    pytest.param(
+        "(AMR).</p><p>The researchers",
+        "(AMR). The researchers",
+        "(AMR).The researchers",
+        id="amr-researchers",
+    ),
+)
+
+
+class TestRssFragmentTextExtraction:
+    @pytest.mark.parametrize(
+        "fragment,expected,_old_fused",
+        _PRODUCTION_RSS_BLOCK_BOUNDARIES,
+    )
+    def test_production_block_boundaries_are_not_fused(
+            self, fragment, expected, _old_fused):
+        from nodes import story_orchestrator as so
+
+        assert so._extract_rss_fragment_text(fragment) == expected
+
+    @pytest.mark.parametrize(
+        "fragment,expected",
+        (
+            pytest.param("H<sub>2</sub>O", "H2O", id="subscript"),
+            pytest.param(
+                "anti-<em>microbial</em>",
+                "anti-microbial",
+                id="emphasis",
+            ),
+        ),
+    )
+    def test_inline_tags_do_not_invent_spaces(self, fragment, expected):
+        from nodes import story_orchestrator as so
+
+        assert so._extract_rss_fragment_text(fragment) == expected
+
+    def test_literal_html_entity_spelling_is_preserved(self):
+        from nodes import story_orchestrator as so
+
+        assert so._extract_rss_fragment_text(
+            "<p>alpha&nbsp;beta</p>"
+        ) == "alpha&nbsp;beta"
+
+    @pytest.mark.parametrize(
+        "fragment,expected",
+        (
+            pytest.param(
+                "left<p-note>right</p-note>",
+                "leftright",
+                id="hyphenated-custom-tag",
+            ),
+            pytest.param(
+                "left<p:note>right</p:note>",
+                "leftright",
+                id="namespaced-custom-tag",
+            ),
+            pytest.param(
+                'left<P class="a>b">right</P>',
+                "left right",
+                id="block-attribute-containing-angle",
+            ),
+            pytest.param(
+                'left<em title="a>b">right</em>',
+                "leftright",
+                id="inline-attribute-containing-angle",
+            ),
+            pytest.param(
+                "left<br/>right",
+                "left right",
+                id="self-closing-break",
+            ),
+        ),
+    )
+    def test_only_exact_block_tags_create_spaces(self, fragment, expected):
+        from nodes import story_orchestrator as so
+
+        assert so._extract_rss_fragment_text(fragment) == expected
+
+    @pytest.mark.parametrize(
+        "fragment,_expected,old_fused",
+        _PRODUCTION_RSS_BLOCK_BOUNDARIES,
+    )
+    def test_previous_tag_strip_fuses_each_production_boundary(
+            self, fragment, _expected, old_fused):
+        assert re.sub(r"<[^>]+>", "", fragment).strip() == old_fused
+
+    def test_fetch_single_feed_calls_the_rss_fragment_extractor(
+            self, monkeypatch):
+        from nodes import production_ledger
+        from nodes import story_orchestrator as so
+
+        raw_fragment = (
+            "<p>"
+            + "A grounded science sentence with enough detail. " * 12
+            + "what you're doing.</p><p>Let's see what follows.</p>"
+        )
+        expected = so._extract_rss_fragment_text(raw_fragment)
+        assert len(expected) >= 400
+
+        parsed_feed = types.SimpleNamespace(
+            entries=[
+                {
+                    "title": "Boundary-aware source",
+                    "content": [{"value": raw_fragment}],
+                    "summary": "Summary <em>stays</em> on its existing path.",
+                    "published": "2026-07-30",
+                    "link": "",
+                }
+            ],
+            feed={"title": "Fixture Feed"},
+        )
+
+        def parse_fetched_document(document):
+            assert document == "<rss/>"
+            return parsed_feed
+
+        monkeypatch.setitem(
+            sys.modules,
+            "feedparser",
+            types.SimpleNamespace(parse=parse_fetched_document),
+        )
+        monkeypatch.setattr(
+            ff,
+            "fetch_feed",
+            lambda _url: types.SimpleNamespace(text="<rss/>"),
+        )
+        monkeypatch.setattr(
+            so,
+            "SCIENCE_NEWS_FEEDS",
+            ["https://example.com/feed"],
+        )
+        monkeypatch.setattr(so, "_load_news_history", lambda: set())
+        monkeypatch.setattr(
+            so,
+            "_record_news_usage",
+            lambda **_kwargs: None,
+        )
+        ledger = types.SimpleNamespace(data={}, save=lambda: None)
+        monkeypatch.setattr(production_ledger, "get_ledger", lambda: ledger)
+
+        real_extract = so._extract_rss_fragment_text
+        seen = []
+
+        def recording_extract(fragment):
+            seen.append(fragment)
+            return real_extract(fragment)
+
+        monkeypatch.setattr(
+            so,
+            "_extract_rss_fragment_text",
+            recording_extract,
+        )
+
+        chosen, = so._fetch_science_news()
+
+        assert seen == [raw_fragment]
+        assert chosen["rss_full"] == expected
+        assert chosen["full_text"] == expected
+        assert chosen["_body_source"] == "rss_full"
+        assert chosen["summary"] == "Summary stays on its existing path."
 
 
 # ---- scheme policy ---------------------------------------------------------

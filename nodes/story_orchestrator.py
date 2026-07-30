@@ -1533,6 +1533,33 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
+_RSS_FRAGMENT_BLOCK_OR_BREAK_RE = re.compile(
+    r"</?(?:address|article|aside|blockquote|br|dd|details|dialog|div|dl|dt|"
+    r"fieldset|figcaption|figure|footer|form|h[1-6]|header|hgroup|hr|li|main|"
+    r"""nav|ol|p|pre|section|table|tbody|td|tfoot|th|thead|tr|ul)(?=[\s/>])"""
+    r"""(?:[^"'<>]|"[^"]*"|'[^']*')*>""",
+    re.IGNORECASE,
+)
+_RSS_FRAGMENT_ANY_TAG_RE = re.compile(
+    r"""<(?:[^"'<>]|"[^"]*"|'[^']*')*>"""
+)
+
+
+def _extract_rss_fragment_text(fragment: str) -> str:
+    """Extract text from an inline RSS HTML fragment without fusing blocks.
+
+    Only explicit block/break tags create a separator. Remaining inline tags
+    are removed without one so ``H<sub>2</sub>O`` and
+    ``anti-<em>microbial</em>`` retain their literal spelling. HTML entity
+    spellings are deliberately left untouched for the downstream coordinate
+    normalizer.
+    """
+    text = fragment or ""
+    text = _RSS_FRAGMENT_BLOCK_OR_BREAK_RE.sub(" ", text)
+    text = _RSS_FRAGMENT_ANY_TAG_RE.sub("", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard",
                          *, load_config=None, policy=None):
@@ -1596,8 +1623,9 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
                 content_candidates = entry.get("content", [])
                 rss_full = ""
                 if content_candidates:
-                    rss_full = content_candidates[0].get("value", "")
-                    rss_full = re.sub(r'<[^>]+>', '', rss_full).strip()
+                    rss_full = _extract_rss_fragment_text(
+                        content_candidates[0].get("value", "")
+                    )
                 summary = entry.get("summary", "").strip()
                 summary = re.sub(r'<[^>]+>', '', summary).strip()
                 data.append({
