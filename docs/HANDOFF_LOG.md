@@ -3,6 +3,63 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-07-30 (later) -- HEAD 41683fc9 (v2.0-alpha) -- WINDOW CODER (window #8, same session)
+
+Did:
+- **`41683fc9` A-4** -- a capacity failure now carries a PHASE, and the phase
+  decides the retry. `prompt_no_room` (refused BEFORE the call by deterministic
+  arithmetic) never retries; `output_limit` (the call RAN and used its whole
+  allowance without stopping) does. PBUG-20260729-02 closed: the ladder's
+  attempt handlers caught only JSON/schema/content failures, so the capacity
+  raise escaped through `except Exception: raise` on attempt 1 of 3 -- a
+  three-call budget that spent one, 24 minutes for one dead leg.
+- **The vocabulary has ONE owner.** `PromptContextOverflowError` MOVED to
+  `_otr_generation_budget` (the module that owns capacity arithmetic) beside
+  `GenerationContextOverflowError`, both on a shared `_CapacityError` base with
+  a closed phase enum, plus `CAPACITY_ERRORS` and the single predicate
+  `is_rerollable_capacity_error`. The writer RE-EXPORTS the name, so
+  `writer.PromptContextOverflowError` is the same object it always was -- a
+  test pins the identity. The ladder needed this: it is documented pure and may
+  not import the writer, so it could not otherwise name the type it decides
+  about. Dual relative/absolute import guard mirrored from the `_otr_json`
+  import one block above, or the module fails at COLLECTION.
+- **BOTH gates patched, as the plan required**: the structural rung (same
+  prompt, lower temperature -- a real re-roll) and the repair-syntax rung (a
+  repair call that ran out of room produced no shape, so the same repair prompt
+  gets the last swing). The capacity error is NOT fed to the typed repair:
+  `last_raw` is bound to "" before every call and only rebound when a call
+  RETURNS, so there is no artifact to repair, and A-1's attached completion is
+  deliberately not piped into a repair prompt.
+- The truncation message lost its old tail, "not eligible for a prose or
+  structural reroll" -- A-4 makes the second half of that false. What stays
+  said is that the partial artifact is never repaired as prose. Every other
+  transport's capacity refusal carries no phase, so it stays terminal and its
+  own message stays accurate.
+
+The mutation round earned its keep again, on my own test: 5/6 caught on the
+first pass and **`structural_gate_reverted` SURVIVED** because I had picked
+`structural_retry_temperature=0.1`, which is also `_REPAIR_TEMPERATURE` -- so
+"the second call ran at 0.1" was true whether the structural rung or the
+typed-repair rung made it. Fixture moved to 0.05 and a guard test now fails if
+the two constants ever collide again; 6/6 caught after that. **A fixture value
+that collides with the constant under test is the "test verifies what it
+constructs" trap wearing a number.**
+
+Receipts: suite **7865 passed / 130 skipped / 1 xfailed** (re-run after the
+commit per the B7 trap); Bible **17 / 24 / 3**; `build_variants --check` 11
+variants / 0 failures; canonical `9872624A` byte-identical; hygiene PASS on all
+five touched files. Preserved another window's three modified `tmp/*.ps1`.
+
+Current step: WRITER REPAIR, Window A item **A-5** -- canonicalise spoken text
+at acceptance, ONE copied `ScriptArtifactV4` before `_assemble_ledger` for all
+four identity consumers, WITH the grandfather rule (frozen ledgers keep their
+raw-text hash and are never re-pinned).
+Next: A-5, then A-6 (re-author-never-skip as a P5 FINDING, never an assert),
+then A-7 (doc supersession -- two commits, two repos). Window B still gated on
+Section 0.
+Models: Claude only (rung 4). No panel spend; nothing needed a second attempt.
+Commits: 41683fc9 (+ this docs commit)
+
 ## 2026-07-30 -- HEAD f781234c (v2.0-alpha) -- WINDOW CODER (window #8)
 
 Did:

@@ -1,15 +1,17 @@
 # OTR Go-Forward Plan
 
 **Updated:** 2026-07-30 (remote Cowork, CODER window) -- **WRITER REPAIR:
-SECTION 2 IS MEASURED, AND WINDOW A'S FIRST TWO CHUNKS ARE IN.** HEAD == origin
-`f781234c`; suite **7849 passed / 130 skipped / 1 xfailed**; Bible 17;
+SECTION 2 IS MEASURED, AND WINDOW A IS THREE CHUNKS IN.** HEAD == origin
+`41683fc9`; suite **7865 passed / 130 skipped / 1 xfailed**; Bible 17;
 `build_variants --check` 11 variants / 0 failures; canonical `9872624A`
 byte-identical (no node, widget, link or schema touched). Landed: `fb400526`
 **A-1** (the output-limit raise carries the completion and the arithmetic it was
 raised about), `f781234c` **A-3** (the narrow `&nbsp;` decode, with both
-production fixtures and a digest-stability pin). **NEXT = A-4.** Section 2's
-finding is below under CURRENT STEP; per-chunk detail is in
-`docs/HANDOFF_LOG.md`, not here.
+production fixtures and a digest-stability pin), `41683fc9` **A-4** (a capacity
+failure carries a PHASE, and an `output_limit` phase spends the ladder budget it
+was always advertised -- PBUG-20260729-02). **A-2 is folded into A-1** (its
+premise was a miscount; see below). **NEXT = A-5.** Section 2's finding is below
+under CURRENT STEP; per-chunk detail is in `docs/HANDOFF_LOG.md`, not here.
 
 **Superseded header (2026-07-28 06:15, RENDER/QA window) -- **THE
 CREDITS CARD IS LIVE-PROVEN AT 1920x1080 AND A CLOUD ENGINE WAS FOUND SITTING
@@ -859,9 +861,19 @@ or block an episode. Same-story LLM cleanup is allowed.
 ## (operator, 2026-07-29): 24 of 34 failures died in the writer, so the engines
 ## cannot be proven until the writer stops vetoing. Plan of record is
 ## `docs/2026-07-29-writer-repair-FINAL-PLAN.md`, hardened by a full 4-round
-## kibitz arc. **Section 2 is DONE and Window A is RUNNING: A-1 and A-3 are
-## landed and pushed; NEXT = A-4.** Section 0 is an OPEN OPERATOR DECISION and
-## gates Window B.**
+## kibitz arc. **Section 2 is DONE and Window A is RUNNING: A-1, A-3 and A-4
+## are landed and pushed, A-2 folded into A-1; NEXT = A-5.** Section 0 is an
+## OPEN OPERATOR DECISION and gates Window B.**
+
+**A-5 IS THE NEXT CHUNK AND IT IS THE FIRST ONE THAT TOUCHES LEDGER IDENTITY.**
+Canonicalise spoken text at acceptance: build a COPIED `ScriptArtifactV4`
+before `_assemble_ledger` so all four identity consumers read ONE object
+(`expected`, `line_text_sha256`, `stamp_receipt`, `_script_digest`). The
+grandfather rule is not optional -- existing frozen ledgers keep their raw-text
+hash and are never re-pinned; only ledgers produced after that commit use the
+cleaned-text hash, and the receipt records which generation produced it. Note
+`clean_spoken_text` also strips speaker labels, which is a SEPARATE P5
+rejection: do not conflate the two.
 
 ### SECTION 2 IS MEASURED (2026-07-30) -- THE ORDER HOLDS, THREE PREMISES DO NOT
 
