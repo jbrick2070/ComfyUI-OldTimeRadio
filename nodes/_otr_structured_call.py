@@ -57,6 +57,24 @@ except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
 
 
+# A-4 (2026-07-30, writer repair): the ladder must know WHICH capacity
+# failures a retry could fix. It asks the module that owns capacity
+# arithmetic; it does not keep its own opinion, and it still imports no
+# writer -- `_otr_generation_budget` is pure (stdlib typing only). Same dual
+# guard as the `_otr_json` import above: without the flat fallback this module
+# fails at COLLECTION under a standalone/test load.
+try:
+    from ._otr_generation_budget import (
+        CAPACITY_ERRORS,
+        is_rerollable_capacity_error,
+    )
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_generation_budget import (  # type: ignore
+        CAPACITY_ERRORS,
+        is_rerollable_capacity_error,
+    )
+
+
 # `T` is the validated-instance type the caller gets back: whatever
 # pydantic model class they pass as `schema`.
 T = TypeVar("T", bound=BaseModel)
@@ -184,6 +202,34 @@ class PostValidationError(ValueError):
     schema failure, and is fed to the typed-repair factory as the
     typed-repair error.
     """
+
+
+# A-4 (2026-07-30, writer repair): the failures ONE attempt of the ladder may
+# absorb rather than let escape. A capacity failure is in this tuple so it can
+# be CAUGHT instead of escaping as an unhandled Exception on attempt 1 of 3 --
+# which is what killed three 45-word legs (PBUG-20260729-02: "the ladder
+# advertised a budget it never spent", 24 minutes for one leg).
+#
+# Being CAUGHT is not the same as being RETRIED. `_attempt_is_retryable` below
+# refuses a `prompt_no_room` phase and the ladder re-raises it untouched, so a
+# prompt that cannot fit still fails on the spot instead of burning two more
+# calls on arithmetic that cannot change.
+_ATTEMPT_ERRORS = (
+    json.JSONDecodeError,
+    ValidationError,
+    PostValidationError,
+) + CAPACITY_ERRORS
+
+
+def _attempt_is_retryable(error: Any) -> bool:
+    """Return False for a caught failure the ladder must re-raise instead.
+
+    Only capacity failures can answer False: a JSON, schema or content
+    failure has always advanced the ladder and still does.
+    """
+    if isinstance(error, CAPACITY_ERRORS):
+        return is_rerollable_capacity_error(error)
+    return True
 
 
 def schema_required_paths(schema: type[BaseModel]) -> tuple[str, ...]:
@@ -993,7 +1039,10 @@ def structured_call(
             )
             notify_attempt(None)
             return result
-        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
+        except _ATTEMPT_ERRORS as exc:
+            if not _attempt_is_retryable(exc):
+                notify_attempt(exc)
+                raise
             last_error = exc
             notify_attempt(exc)
             log.warning(
@@ -1014,7 +1063,19 @@ def structured_call(
     # structural rung never helped, it only spent tokens). So on a non-syntax
     # failure skip straight to the typed repair; spend the structural retry only
     # on json.JSONDecodeError. attempts_run advances ONLY when this branch runs.
-    if attempts_run < max_attempts and isinstance(last_error, json.JSONDecodeError):
+    # A-4: an `output_limit` capacity failure joins the syntax failure here.
+    # It is the SAME remedy for the same shape of problem -- the model did not
+    # finish, and the same prompt at a lower temperature is a real second
+    # chance rather than a re-emission of an identical wrong shape. It is NOT
+    # given to the typed repair for the reason the rung's own comment gives:
+    # `last_raw` is bound to "" before every call and only rebound when the
+    # call RETURNS, so a capacity raise leaves no artifact to repair, and the
+    # completion A-1 attached to the exception is deliberately not fed into a
+    # repair prompt (bounding that is a separate, unratified change).
+    if attempts_run < max_attempts and (
+        isinstance(last_error, json.JSONDecodeError)
+        or is_rerollable_capacity_error(last_error)
+    ):
         attempts_run += 1
         log.info(
             "[OTR_StructuredCall] '%s' attempt %d/%d: structural retry at "
@@ -1036,7 +1097,10 @@ def structured_call(
             )
             notify_attempt(None)
             return result
-        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
+        except _ATTEMPT_ERRORS as exc:
+            if not _attempt_is_retryable(exc):
+                notify_attempt(exc)
+                raise
             last_error = exc
             notify_attempt(exc)
             log.warning(
@@ -1106,7 +1170,10 @@ def structured_call(
             )
             notify_attempt(None)
             return result
-        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
+        except _ATTEMPT_ERRORS as exc:
+            if not _attempt_is_retryable(exc):
+                notify_attempt(exc)
+                raise
             last_error = exc
             notify_attempt(exc)
             log.warning(
@@ -1124,10 +1191,19 @@ def structured_call(
     # on the exact same repair prompt. Do not rebuild it from the incomplete
     # response (which would enlarge the prompt), and do not retry a repair that
     # was itself schema-valid but content-invalid.
+    # A-4: and here too, for the same reason one rung up -- a repair call that
+    # ran out of output room did not produce a wrong shape, it produced no
+    # shape, so re-sending the SAME repair prompt is the honest last swing.
+    # The rung's existing discipline is unchanged: the prompt is never rebuilt
+    # from the incomplete response, and a repair that was schema-valid but
+    # content-invalid still does not come back here.
     if (
         attempts_run < max_attempts
         and repair_messages is not None
-        and isinstance(last_error, json.JSONDecodeError)
+        and (
+            isinstance(last_error, json.JSONDecodeError)
+            or is_rerollable_capacity_error(last_error)
+        )
     ):
         attempts_run += 1
         retry_temperature = min(
@@ -1153,7 +1229,10 @@ def structured_call(
             )
             notify_attempt(None)
             return result
-        except (json.JSONDecodeError, ValidationError, PostValidationError) as exc:
+        except _ATTEMPT_ERRORS as exc:
+            if not _attempt_is_retryable(exc):
+                notify_attempt(exc)
+                raise
             last_error = exc
             notify_attempt(exc)
             log.warning(
@@ -1221,11 +1300,10 @@ def structured_call(
             )
             notify_attempt(None)
             return result
-        except (
-            json.JSONDecodeError,
-            ValidationError,
-            PostValidationError,
-        ) as exc:
+        except _ATTEMPT_ERRORS as exc:
+            if not _attempt_is_retryable(exc):
+                notify_attempt(exc)
+                raise
             last_error = exc
             notify_attempt(exc)
             log.warning(

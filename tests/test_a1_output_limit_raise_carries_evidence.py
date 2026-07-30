@@ -157,6 +157,9 @@ def test_output_limit_raise_carries_the_completion_and_the_arithmetic(monkeypatc
     assert exc.effective_output_tokens == FITTED_OUTPUT
     assert exc.context_cap == CONTEXT_CAP
     assert exc.ended_with_eos is False
+    # A-4: the phase is stamped where it is decided. This raise is the one a
+    # re-roll can fix, and the ladder reads the phase, not the message.
+    assert exc.phase == "output_limit"
 
 
 def test_the_completion_never_reaches_the_message(monkeypatch):

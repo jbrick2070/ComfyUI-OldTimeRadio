@@ -122,7 +122,9 @@ from typing import Any, Mapping, Protocol
 # transformers / GPU work -- safe at module-import time.
 from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
 from ._otr_generation_budget import (
+    CAPACITY_PHASE_OUTPUT_LIMIT,
     GenerationContextOverflowError,
+    PromptContextOverflowError,
     fit_output_tokens,
 )
 from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
@@ -332,42 +334,17 @@ _OPTIMIZATION_PROFILE_CHOICES = [
 # ---------------------------------------------------------------------------
 
 
-class PromptContextOverflowError(RuntimeError):
-    """A caller marked its prompt as unsliceable and it exceeded context.
-
-    A-1 (2026-07-30, writer repair): the output-limit raise carries the
-    completion the model actually produced plus the token arithmetic, as
-    FIELDS. Never in the message -- a ~14,000-token artifact inside an
-    exception string floods every log and receipt that formats it, and the
-    ladder's disposition lines are read by humans. `args` stays
-    ``(message,)`` so ``str(exc)`` and every existing raise site are
-    unchanged; a caller that wants the evidence asks for it by name.
-
-    Every field is optional: the prompt-side re-wrap in
-    ``_build_truncating_generate_fn`` knows none of them, and reports
-    ``None`` rather than a guess.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        raw_completion: str | None = None,
-        prompt_tokens: int | None = None,
-        generated_tokens: int | None = None,
-        requested_output_tokens: int | None = None,
-        effective_output_tokens: int | None = None,
-        context_cap: int | None = None,
-        ended_with_eos: bool | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.raw_completion = raw_completion
-        self.prompt_tokens = prompt_tokens
-        self.generated_tokens = generated_tokens
-        self.requested_output_tokens = requested_output_tokens
-        self.effective_output_tokens = effective_output_tokens
-        self.context_cap = context_cap
-        self.ended_with_eos = ended_with_eos
+# A-4 (2026-07-30, writer repair): `PromptContextOverflowError` now lives in
+# `_otr_generation_budget`, the module that owns capacity arithmetic, and is
+# imported above. It is RE-EXPORTED here on purpose: this name is what every
+# caller and test in the tree reaches for, and the retry ladder -- documented
+# pure, forbidden from importing the writer -- has to be able to name the same
+# object to decide whether a capacity failure may re-roll. Two definitions of
+# one error would be two policies over one state.
+#
+# No `__all__` is declared for the re-export: this module's public surface is
+# its node classes, and narrowing it to one name to document one import would
+# be a lie about the rest. The module-level import above IS the re-export.
 
 
 # Tier 2 fix #16 (2026-05-11): rolling-buffer StoppingCriteria
@@ -887,7 +864,15 @@ def _build_truncating_generate_fn(
             # same error, so the flag decided nothing here; the honest guard is
             # unconditional. `prompt_must_fit` still selects fail-loud behavior
             # at the lane preflights that own an artifact's provenance.
-            raise PromptContextOverflowError(str(exc)) from exc
+            # A-4: the phase travels with the re-wrap rather than being
+            # re-derived. `fit_output_tokens` refuses BEFORE the call, so this
+            # is always `prompt_no_room` and the ladder must not re-roll it --
+            # but the phase is read off the error, not assumed here, so a
+            # future pre-call refusal that IS retryable cannot be mislabelled
+            # by this line.
+            raise PromptContextOverflowError(
+                str(exc), phase=exc.phase,
+            ) from exc
         if (not reserve_remaining
                 and effective_max_new_tokens != requested_max_new_tokens):
             log.warning(
@@ -1032,8 +1017,19 @@ def _build_truncating_generate_fn(
             raise PromptContextOverflowError(
                 "prose generation exhausted the full remaining provider/context "
                 f"capacity ({effective_max_new_tokens} output tokens after a "
-                f"{prompt_len}-token prompt); the partial artifact is not eligible "
-                "for a prose or structural reroll",
+                f"{prompt_len}-token prompt); the partial artifact is discarded, "
+                "never repaired as prose",
+                # A-4: THIS is the phase a re-roll can actually fix -- the call
+                # RAN, and sampling is stochastic (nine engines in the live
+                # 45-word campaign produced both a pass and a fail on
+                # byte-identical code). The message lost its old tail, "not
+                # eligible for a prose or structural reroll", because A-4 makes
+                # the second half of that false: the ladder may now re-roll
+                # this pass. What stays true, and stays said, is that the
+                # partial artifact is never handed to a prose repair. Every
+                # OTHER transport's capacity refusal carries no phase, so it
+                # stays terminal and its own message stays accurate.
+                phase=CAPACITY_PHASE_OUTPUT_LIMIT,
                 raw_completion=decoded,
                 prompt_tokens=prompt_len,
                 generated_tokens=generated_tokens,

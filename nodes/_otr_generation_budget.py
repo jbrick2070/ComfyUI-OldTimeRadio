@@ -26,8 +26,107 @@ class ProviderCapacityMessages(list):
     _otr_strict_remote_output_budget = True
 
 
-class GenerationContextOverflowError(RuntimeError):
+# A-4 (2026-07-30, writer repair): a capacity failure has a PHASE, and the
+# phase decides whether a retry is honest. Both spellings live here because
+# this module owns capacity arithmetic; the retry ladder asks this module
+# rather than keeping its own opinion.
+#
+#   prompt_no_room -- refused BEFORE the call: the measured prompt leaves less
+#                     room than the artifact needs. Deterministic. Re-rolling
+#                     re-derives the identical refusal, so it never retries.
+#   output_limit   -- the call RAN and consumed its whole output allowance
+#                     without reaching a stop condition. Sampling is
+#                     stochastic (the live 45-word campaign had nine engines
+#                     produce both a pass and a fail on byte-identical code),
+#                     so a re-roll at a lower temperature is a real second
+#                     chance, not a wasted call.
+CAPACITY_PHASE_PROMPT_NO_ROOM = "prompt_no_room"
+CAPACITY_PHASE_OUTPUT_LIMIT = "output_limit"
+CAPACITY_PHASES = (CAPACITY_PHASE_PROMPT_NO_ROOM, CAPACITY_PHASE_OUTPUT_LIMIT)
+
+
+class _CapacityError(RuntimeError):
+    """Shared phase contract for the two capacity failures.
+
+    ``args`` stays ``(message,)`` so ``str(exc)`` and every existing raise
+    site are unchanged. An unknown phase is a coding error and fails loudly
+    here rather than silently becoming un-retryable at the ladder.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str = CAPACITY_PHASE_PROMPT_NO_ROOM,
+    ) -> None:
+        super().__init__(message)
+        if phase not in CAPACITY_PHASES:
+            raise ValueError(
+                f"unknown capacity phase {phase!r}; expected one of "
+                f"{CAPACITY_PHASES}"
+            )
+        self.phase = phase
+
+
+class GenerationContextOverflowError(_CapacityError):
     """The prompt leaves no honest room for a usable artifact."""
+
+
+class PromptContextOverflowError(_CapacityError):
+    """A transport could not honour its caller's output contract.
+
+    Moved here from ``OTR_LedgerScriptWriter`` by A-4 so the retry ladder --
+    which is documented pure and may not import the writer -- can name the
+    type it is deciding about. The writer re-exports it, so
+    ``writer.PromptContextOverflowError`` is the same object it always was.
+
+    A-1 (2026-07-30): the output-limit raise carries the completion the model
+    actually produced plus the token arithmetic, as FIELDS. Never in the
+    message -- a ~14,000-token artifact inside an exception string floods
+    every log and receipt that formats it, and the ladder's disposition lines
+    are read by humans. A caller that wants the evidence asks for it by name.
+
+    Every field is optional: the prompt-side re-wrap knows none of them, and
+    reports ``None`` rather than a guess.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str = CAPACITY_PHASE_PROMPT_NO_ROOM,
+        raw_completion: str | None = None,
+        prompt_tokens: int | None = None,
+        generated_tokens: int | None = None,
+        requested_output_tokens: int | None = None,
+        effective_output_tokens: int | None = None,
+        context_cap: int | None = None,
+        ended_with_eos: bool | None = None,
+    ) -> None:
+        super().__init__(message, phase=phase)
+        self.raw_completion = raw_completion
+        self.prompt_tokens = prompt_tokens
+        self.generated_tokens = generated_tokens
+        self.requested_output_tokens = requested_output_tokens
+        self.effective_output_tokens = effective_output_tokens
+        self.context_cap = context_cap
+        self.ended_with_eos = ended_with_eos
+
+
+CAPACITY_ERRORS = (GenerationContextOverflowError, PromptContextOverflowError)
+
+
+def is_rerollable_capacity_error(error: Any) -> bool:
+    """Return True only for a capacity failure a re-roll could actually fix.
+
+    ONE predicate, one owner: the transports raise the phase and the ladder
+    asks this. A `prompt_no_room` failure answers False forever -- the
+    arithmetic that refused it is deterministic.
+    """
+    return (
+        isinstance(error, CAPACITY_ERRORS)
+        and getattr(error, "phase", None) == CAPACITY_PHASE_OUTPUT_LIMIT
+    )
 
 
 def estimate_prompt_tokens(messages: Any) -> int:
@@ -76,12 +175,16 @@ def fit_output_tokens(
         raise GenerationContextOverflowError(
             f"{label} cannot fit: prompt requires {prompt} input tokens, "
             f"context_cap={cap} leaves {max(0, available)} output tokens "
-            f"but at least {minimum} are required"
+            f"but at least {minimum} are required",
+            phase=CAPACITY_PHASE_PROMPT_NO_ROOM,
         )
     if require_full and requested_tokens > available:
         raise GenerationContextOverflowError(
             f"{label} cannot fit the complete requested output: prompt requires "
             f"{prompt} input tokens, requested_output={requested_tokens}, "
-            f"context_cap={cap} leaves only {available} output tokens"
+            f"context_cap={cap} leaves only {available} output tokens",
+            # Still PRE-call and still deterministic: the prompt is the reason
+            # the complete artifact has no room. A re-roll cannot change it.
+            phase=CAPACITY_PHASE_PROMPT_NO_ROOM,
         )
     return min(requested_tokens, available)
