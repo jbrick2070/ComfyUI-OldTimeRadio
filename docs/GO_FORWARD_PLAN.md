@@ -3023,10 +3023,27 @@ the only honest engine comparison in this tree is A vs D at 512x288.
    coefficient tweak: the estimator cannot see the clamp, and items 2 and 6 say
    both of its scaling terms are near-zero in reality, so decide what it should
    be MEASURING before deciding what the numbers should be.
-4. **Adding a model is now data entry, not engineering.** One `ArmSpec` row plus
-   one video-only graph file gets any candidate a render and a VRAM number
-   through this harness. Three arms ran clean on the first attempt; the cost
-   this time was the grader around them, and that is fixed.
+4. **Adding a model is data entry ONLY when it reuses an existing recipe
+   shape.** One `ArmSpec` row plus one video-only graph file gets a candidate a
+   render and a VRAM number *if* it samples the way an arm already in the table
+   samples -- swap `unet_name`, keep `KSampler{steps, cfg, euler, simple}`. That
+   is how arms A / B-partial / B relate to each other, and all three ran clean
+   on the first attempt.
+   **It does NOT hold for a candidate that brings a new sampling contract.**
+   Falsified 2026-07-31 on arm C (FastWan, 3-step DMD): expressing its schedule
+   needs `KSamplerSelect` + `ManualSigmas` + `SamplerCustom` in place of
+   `KSampler`, and the change set is a new graph file, a NEW required-class
+   tuple (`_WAN_CLASSES` pins `KSampler` and omits all three), an `ArmSpec` row,
+   a graph SHA pin, an `ARM_LICENCE` row, the arm-absence tests inverted, and a
+   recipe contract in `offline_preflight` so the sigma literal cannot drift
+   silently. Budget that as engineering, not data entry.
+   **And a candidate is not admitted by having a file on disk.** The FastWan
+   GGUF acquired 2026-07-31 has byte-perfect tensor-key parity with the
+   incumbent and still fails to load -- 32 tensors are rank-2 where ComfyUI
+   declares rank-3, and the norm vectors are the wrong length. Load-probe a new
+   substrate through `gguf_sd_loader` -> `load_diffusion_model_state_dict`
+   BEFORE writing a row for it; it is the cheapest falsifier there is and it
+   costs no GPU.
 
 Do NOT: re-run arm B, promote 14B, lower the greenlight bar, or start per-stage
 measurement. The first is refuted, the next two are standing operator rulings,

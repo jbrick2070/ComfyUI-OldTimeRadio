@@ -42,10 +42,40 @@ def test_offline_preflight_passes_for_every_shipped_arm():
 
 
 def test_arm_c_has_no_entry_by_design():
-    """Arm C is CUT: licence passes, but no ComfyUI base graph exists at any
-    priority. A blocked arm must not add dead branching."""
+    """Arm C is CUT: licence passes and the 3-step DMD schedule IS expressible
+    in stock core nodes, but the only FastWan GGUF acquired does not load.
+    A blocked arm must not add dead branching."""
     assert "C" not in B.ARMS_BY_LABEL
     assert [a.label for a in B.ARMS] == ["A", "B-partial", "B", "D"]
+
+
+def test_arm_c_cut_reason_is_the_executed_one_not_the_superseded_one():
+    """The cut reason is load-tested fact, not the 2026-07-31 morning guess.
+
+    The original reason ("no ComfyUI base graph exists at any priority -- the
+    weights are Diffusers layout and the 3-step DMD schedule is not ordinary
+    KSampler steps=3") was falsified in BOTH halves: a GGUF repack exists, and
+    core ManualSigmas/SamplerCustom express the schedule. What actually blocks
+    the arm is that the repack FAILS TO LOAD. If someone re-opens arm C, they
+    must not re-inherit the superseded justification."""
+    import inspect
+
+    src = inspect.getsource(B)
+    head = src[:src.index("ARMS = (")]
+    assert "DOES NOT LOAD" in head
+    assert "modulation" in head
+    assert "Key parity is NOT shape parity." in head
+    # The superseded phrase is still QUOTED, on purpose, so a future reader sees
+    # what was retired. What must hold is that it survives only as a quotation
+    # marked dead -- never as the operative reason. A bare absence check would
+    # be the wrong instrument and would pass on a comment that simply deleted
+    # the history.
+    superseded = "no ComfyUI base graph exists at any"
+    assert superseded in head, "keep the retired reason visible, marked dead"
+    quoted_at = head.index(superseded)
+    context = head[max(0, quoted_at - 400):quoted_at + 400]
+    assert "ORIGINAL cut reason" in context
+    assert "WRONG IN BOTH HALVES" in context
 
 
 def test_arm_d_is_the_only_cross_family_arm():

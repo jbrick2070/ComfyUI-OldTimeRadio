@@ -304,10 +304,41 @@ _WAN_CLASSES = ("ModelSamplingSD3", "CLIPTextEncode", "VAELoader", "LoadImage",
 
 #: THE ARMS. Arm C (FastWan 5B) is CUT and arm C has no entry BY DESIGN: a
 #: blocked arm must not add dead branching. Its licence PASSES (apache-2.0 at
-#: both levels) but no ComfyUI base graph exists at any priority -- the weights
-#: are Diffusers layout and the 3-step DMD schedule (timesteps 1000,757,522) is
-#: not ordinary ``KSampler steps=3``. Re-open it as a separate research probe
-#: behind a conversion/loader receipt (spec 6.4, operator decision O2).
+#: both levels). The ORIGINAL cut reason -- "no ComfyUI base graph exists at any
+#: priority" -- is now WRONG IN BOTH HALVES and is replaced by a narrower,
+#: EXECUTED one (2026-07-31):
+#:
+#:   * SCHEDULE: expressible in stock core nodes. ``ManualSigmas`` parses the
+#:     literal "1.0, 0.757, 0.522, 0.0" and ``ModelSamplingDiscreteFlow.timestep``
+#:     is ``sigma * 1000`` and never reads ``shift``, so those sigmas yield
+#:     timesteps [1000, 757, 522, 0] under arm A's own ``ModelSamplingSD3
+#:     {shift: 5.0}``. Guidance is PINNED at cfg 1.0: FastVideo's
+#:     ``DmdDenoisingStage.forward`` runs the transformer ONCE per timestep on
+#:     positive embeds only -- no ``do_classifier_free_guidance`` branch, never
+#:     reads ``guidance_scale``, never consumes ``negative_prompt_embeds`` --
+#:     and ComfyUI's ``sampling_function`` drops the uncond batch at
+#:     ``math.isclose(cond_scale, 1.0)``, which is the same single-forward shape.
+#:     (The ``fast_wan_2_2_ti2v_5b`` preset's guidance_scale 5.0 /
+#:     num_inference_steps 50 are INERT on that path -- a stale copy of the
+#:     non-distilled preset. The code path is the authority, not the table.)
+#:   * WEIGHTS: this is the live blocker, and it is a FILE defect, not a format
+#:     one. The only FastWan GGUF acquired -- Green-Sky/FastWan2.2-TI2V-5B-
+#:     FullAttn-GGUF q6_k, sha256 416A87E3...6121CC -- DOES NOT LOAD. Driving
+#:     the real path (``gguf_sd_loader`` -> ``load_diffusion_model_state_dict``)
+#:     raises: 31 ``blocks.N.modulation`` + ``head.modulation`` arrive rank-2
+#:     (6, 3072) where ComfyUI declares (1, 6, 3072) at
+#:     ``comfy/ldm/wan/model.py:215``, and every ``norm_q``/``norm_k`` weight
+#:     arrives 2520-long against 3072. It carries ZERO kv fields (no
+#:     ``general.architecture``, so it loads in sd.cpp compatibility mode, and no
+#:     ``comfy.gguf.orig_shape.*`` to repair the rank) -- a different toolchain's
+#:     output, not a ComfyUI-GGUF conversion. Key parity is NOT shape parity.
+#:
+#: Re-open arm C behind a LOADING receipt on a substrate that is not this file.
+#: Two verified candidates exist (both apache-2.0, both proved ComfyUI-format by
+#: header read): Kijai/WanVideo_comfy FastWan rank-128 LoRA over the incumbent
+#: GGUF, or hum-ma/Wan2.2-TI2V-5B-Turbo-GGUF Q5_K_M (a DIFFERENT distillation,
+#: +4.6 MiB vs the incumbent, so no headroom risk). Choosing between them is an
+#: operator decision, not a code change (spec 6.4, operator decision O2).
 ARMS = (
     ArmSpec(
         label="A", engine_id="wan_ti2v",
