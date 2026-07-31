@@ -1,4 +1,26 @@
-# PROBLEM STATEMENT -- our 8 GB video tier cannot render, and we think we know why
+# PROBLEM STATEMENT -- ~~our 8 GB video tier cannot render~~ our 8 GB video tier REFUSES to render, and we now know why
+
+> **THE TITLE'S ORIGINAL CLAIM IS REFUTED BY MEASUREMENT, 2026-07-31 @
+> `8bd82efb`.** The four-arm clamped bench rendered `wan_ti2v` at 832x480 under
+> `--reserve-vram 8` at 17 / 49 / 81 frames -- all PASS, peak VRAM delta
+> 6568.2 / 6563.1 / 6563.1 MiB against a 7168 MiB bar. `ltx_8gb` at 512x288
+> passed too, at 6691.1 / 6755.3 / 6819.1 MiB. Nine assets, all decode-validated
+> by `ffprobe -count_frames`. Receipts:
+> `output/otr/episodes/_bench_4arm/`; full framing in `docs/GO_FORWARD_PLAN.md`
+> under "MEASURED -- the 8 GiB-clamped video bench".
+>
+> **The tier does not lack the VRAM. It is refused by a predictor whose
+> per-frame term is wrong.** Measured delta across 17 -> 81 frames is -5.1 MiB;
+> `FRAME_COST_MODEL` charges 60.33 MB/frame at that canvas and so predicts
+> +3,861 MB that does not exist. Correction 1 in the older header below said
+> "a broken estimator does not prove Wan is impossible on 8 GB" -- that is now
+> not a caution but a measurement. Scope, exactly: PREQUALIFICATION on a 16 GB
+> card told to reserve 8 GiB; a render on a PHYSICAL 8 GB card is still owed.
+>
+> Corrections 2, 3 and 4 below are UNAFFECTED -- in particular the writer is
+> still the proximate blocker, and this bench deliberately bypassed it by
+> submitting direct-node graphs. Fixing video does not make the tier shippable
+> on its own.
 
 > **SUPERSEDED IN PART, 2026-07-31 @ `aff09bde`. Judgment of record is
 > `docs/2026-07-31-wan-8gb-adversarial-review/report.md` (Codex, final judge).

@@ -2907,6 +2907,87 @@ The coordinator keeps one canonical API prompt active at a time, reloads
 `workflows/otr_canonical.json` for every case, and records each prompt and
 receipt under `tmp/`.
 
+## MEASURED -- the 8 GiB-clamped video bench (2026-07-31, `8bd82efb`)
+
+Nine cells ran live: arms A (`wan_ti2v` 832x480, 30 steps, recipe v1),
+B-partial (same graph, fp8 safetensors text encoder) and D (`ltx_8gb` 512x288,
+8 steps, `LTX8_RECIPE_V2`), each at 17 / 49 / 81 frames, seed 42,
+`--reserve-vram 8`, selective box reset between every leg. Receipts, per-cell
+server logs and all nine assets live at
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_bench_4arm\`
+(`video_arm_bench_results.json` is the machine record;
+`video_arm_bench_table.md` is the printed table).
+
+**READ THE NUMBERS THE RIGHT WAY.** The table prints ABSOLUTE machine-wide NVML
+peaks; the grading bar is on the DELTA. Every cell measures its own desktop
+baseline (2181.6 - 2221.9 MiB across the nine) and records
+`peak_delta_mib = peak - that cell's own baseline`. Subtracting one shared
+baseline from the printed absolutes is close but wrong -- use the
+`peak_delta_mib` field. The bar is
+`GREENLIGHT_PEAK_DELTA_MIB = 8192 - DISPLAY_ALLOWANCE_MIB = 7168 MiB`, i.e.
+8 GiB minus a 1 GiB display allowance.
+
+1. **`wan_ti2v` at 832x480 FITS the clamp.** Arm A peak_delta
+   6568.2 / 6563.1 / 6563.1 MiB at 17 / 49 / 81 frames -- PASS on all three,
+   roughly 600 MiB under the 7168 bar. This discharges the "no live
+   8-GB-clamped WAN render receipt" obligation, and ONLY that: it is a
+   PREQUALIFICATION on a 16 GB card told to reserve 8 GiB, not a render on a
+   physical 8 GB card. The harness says so itself
+   (`run_video_arm_bakeoff.py:1247`): results are never worded as
+   "8 GB qualified".
+
+2. **Frame count is very nearly free, and the estimator says otherwise.** A's
+   delta across 17 -> 81 frames moves -5.1 MiB. Negative, i.e. inside
+   run-to-run noise, so the measured marginal cost of a frame is
+   indistinguishable from zero. `FRAME_COST_MODEL["wan_ti2v"] = (7000.0, 185.0)`
+   at `_FRAME_COST_REF_PIXELS = 1472*832` scales to 60.3 MB/frame at 832x480 --
+   a predicted +3,861 MB over that same span. The OVERHEAD term is roughly right
+   (7000 MB predicted against a ~6565 MiB measured intercept); the PER-FRAME
+   term is the entire error. D is not zero but is also tiny: +128.0 MiB over 64
+   frames, about 2.0 MiB/frame. **Do not re-fit from these nine points** -- see
+   the open items below.
+
+3. **Arm B is dead: the fp8 text encoder costs MORE, not less.** B-partial
+   peak_delta 7907.1 / 7811.1 / 7715.3 MiB -- FAIL on all three, over the bar by
+   547 - 739 MiB, and about 1.25 GiB WORSE than arm A on the same graph, canvas
+   and step count. The hypothesis that a scaled-fp8 encoder buys headroom is
+   REFUTED by measurement on this box. Do not re-run it hoping for a different
+   answer; if it is ever revisited, the receipt above is the number to beat.
+
+4. **`ltx_8gb` recipe v2 rendered clamped AT ITS PRODUCTION CANVAS.** Arm D
+   peak_delta 6691.1 / 6755.3 / 6819.1 MiB, PASS on all three, 15.4 - 20.4 s
+   wall. 512x288 is the shipped `render_canvas`, and it had never rendered live
+   before this bench.
+
+**All nine assets were validated by DECODE, not by container header.**
+`ffprobe -count_frames` reports exactly 17 / 49 / 81 read frames per arm, at
+832x480 (A, B-partial) and 512x288 (D), 24/1 fps. Nothing here is an empty or
+truncated file.
+
+**D is not "faster than WAN" as an engine property.** D ran 8 steps at 512x288
+against A's 30 steps at 832x480 -- 3.75x fewer steps over 2.71x fewer pixels,
+about 10x, which is the whole gap. Per iteration D is SLOWER
+(s/it 1.74 / 1.19 / 1.20 against A's 1.15 / 3.02 / 5.06), and D's 17-frame leg
+reads slowest of its three because fixed load cost dominates a 15-20 s wall.
+Do not cite the seconds column as an engine ranking.
+
+**Still open, and NOT closed by this bench:**
+
+- No render on a physical 8 GB card. `--reserve-vram` sets
+  `comfy.model_management.EXTRA_RESERVED_VRAM`, a Python integer that allocates
+  nothing; it changes what ComfyUI BELIEVES it has, and that belief is what was
+  tested.
+- `FRAME_COST_MODEL` is measurably wrong in its per-frame term, but must not be
+  re-fit off nine points at two canvases with no per-stage breakdown. The clamp
+  is also invisible to the estimator by construction --
+  `EXTRA_RESERVED_VRAM` is an integer while `free_vram_mb()` is a
+  `torch.cuda.mem_get_info` driver read -- so the predictor structurally cannot
+  observe the experiment's independent variable. Re-fitting is its own task with
+  its own design, not a coefficient tweak.
+- Per-stage VRAM measurement was DECLINED (operator ruling O7); whole-window
+  peak is what this build has, and no per-stage primitive exists on the video
+  path. The stage probe in the harness is ADVISORY for exactly that reason.
+
 ## OPEN BUGS / DEFECTS (live, not yet closed)
 
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
@@ -3048,12 +3129,18 @@ listed as live.
   policy-admission calculation before BOTH cache reuse and loading**, tested for
   permissive-cache -> stricter-request at the same load identity, plus the case
   where physical free VRAM exceeds the ceiling.
-- **A CLAMPED confirmation of recipe v2 is owed** (RENDER window, 2026-07-27).
-  The sweep ran unclamped because the profile-free writer is gemma-4-12b at
-  Q8_0 (~13 GB), which cannot coexist with an 8 GiB reservation.
-  `VramPeakProbe` is machine-wide, so the absolutes are not an 8 GB fit proof.
-  Re-run the WINNER alone with `OTR_HEADLESS_RESERVE_VRAM_GB=8` once the writer
-  question above is settled. The RANKING does not need re-proving.
+- ~~**A CLAMPED confirmation of recipe v2 is owed**~~ (RENDER window,
+  2026-07-27) -- **DISCHARGED 2026-07-31 by the four-arm bench @ `8bd82efb`;
+  see MEASURED above.** The original sweep ran unclamped because the
+  profile-free writer is gemma-4-12b at Q8_0 (~13 GB), which cannot coexist
+  with an 8 GiB reservation; the bench sidesteps the writer entirely by
+  submitting direct-node graphs, so the clamp and the recipe could finally be
+  observed together. Arm D ran `LTX8_RECIPE_V2` at the shipped 512x288 canvas
+  under `--reserve-vram 8` and PASSED at 17 / 49 / 81 frames (peak_delta
+  6691.1 / 6755.3 / 6819.1 MiB against a 7168 MiB bar). `VramPeakProbe` is
+  still machine-wide, which is exactly why the bench grades on
+  `peak_delta_mib` against each cell's own baseline rather than on the
+  absolute. The RANKING never needed re-proving and was not re-run.
 - ~~**All prequalification cells share ONE receipt**~~ -- **CLOSED by LANE 2**
   @ `71e231ec` + `8424f369`, on all three adapters. Record:
   `docs/2026-07-27-lane2-prequalification-receipt-qa-findings.md`.
@@ -3369,8 +3456,12 @@ listed as live.
   `build_request`, which never reaches the canvas seam and defaults to
   `OTR_VIDEO_RENDER_CANVAS` (832x480). So the "GPU IS PROVEN" leg
   (`ltx_8gb`, 25 frames, 3004 MB) exercised 832x480, not the production
-  canvas. **The production canvas for `ltx_8gb` has never rendered live.**
-  Prequalification is the first time it will. `render_single` parity is
+  canvas. ~~**The production canvas for `ltx_8gb` has never rendered live.**~~
+  -- **NO LONGER TRUE as of 2026-07-31 @ `8bd82efb`.** Bench arm D rendered
+  `ltx_8gb` at 512x288 three times (17 / 49 / 81 frames) under
+  `--reserve-vram 8`, all PASS, assets decode-validated. That was a DIRECT-NODE
+  graph, so it proves the CANVAS and the RECIPE, not the seam -- everything
+  below still stands unchanged. `render_single` parity is
   explicitly deferred by the O1 judgment; what must NOT happen is another
   "proof" through that harness being read as a production proof.
 
@@ -3461,13 +3552,17 @@ listed as live.
   can), so it is NOT being written on assumption. Ratify the shape first.
 
   **Also open, all PROOF obligations rather than build work:** (1) `:224` the
-  18-engine GPU campaign is engine COVERAGE, NOT an 8-GB qualification; (2)
-  `:731-734` / `:2912-2917` a CLAMPED confirmation is owed --
-  `OTR_HEADLESS_RESERVE_VRAM_GB=8`, because `VramPeakProbe` samples machine-wide
-  NVML and the sweep ran unclamped, so those absolutes rank recipes but do not
-  prove 8-GB fit; (3) nothing in the tree is a live 8-GB-clamped WAN render
-  receipt -- no test or artifact proves 17 frames at 832x480 actually fits 8 GB on
-  real hardware; (4) `:2843-2858` every 8-GB profile INCLUDING `otr_8gb_wan`
+  18-engine GPU campaign is engine COVERAGE, NOT an 8-GB qualification;
+  ~~(2) a CLAMPED confirmation is owed~~ and ~~(3) nothing in the tree is a live
+  8-GB-clamped WAN render receipt~~ -- **BOTH DISCHARGED 2026-07-31 by the
+  four-arm bench @ `8bd82efb`; see MEASURED above.** Arm A rendered
+  `wan_ti2v` at 832x480, 17 / 49 / 81 frames, under `--reserve-vram 8`, and
+  PASSED all three at peak_delta 6568.2 / 6563.1 / 6563.1 MiB against a
+  7168 MiB bar; arm D did the same for `ltx_8gb` at 512x288. **Read the scope
+  exactly:** that is a PREQUALIFICATION on a 16 GB card told to reserve 8 GiB.
+  A render on a PHYSICAL 8 GB card is still owed and is the only thing that
+  would make "fits 8 GB on real hardware" true without qualification; (4)
+  `:2843-2858` every 8-GB profile INCLUDING `otr_8gb_wan`
   cannot run its own writer (12B GGUF, 8.13 GB needed under a declared 6.8 GB
   ceiling) -- largely mooted by profile retirement, but "fix the profiles or
   finish retiring them; do not leave both" still stands.

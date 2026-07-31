@@ -1,5 +1,34 @@
 # WAN 8-GB (`wan_ti2v`) -- parameter analysis for the low-VRAM tier
 
+> **CORRECTED BY MEASUREMENT, 2026-07-31 @ `8bd82efb`. Read this before the
+> headline below.** The four-arm clamped bench rendered `wan_ti2v` at 832x480
+> under `--reserve-vram 8` at 17 / 49 / 81 frames. All three PASSED, at a
+> peak VRAM delta of 6568.2 / 6563.1 / 6563.1 MiB against a 7168 MiB bar
+> (8 GiB minus a 1 GiB display allowance). Receipts:
+> `output/otr/episodes/_bench_4arm/video_arm_bench_results.json`.
+> Numbers and framing in `docs/GO_FORWARD_PLAN.md` under
+> "MEASURED -- the 8 GiB-clamped video bench".
+>
+> Two things this changes, and one it does not.
+>
+> 1. **"This tier cannot render at all" is FALSE as a statement about the
+>    hardware.** The model fits with roughly 600 MiB to spare under the bar.
+> 2. **The per-frame term of the cost model is the specific defect.** Measured
+>    delta across 17 -> 81 frames is **-5.1 MiB** -- inside noise, so the
+>    marginal cost of a frame is indistinguishable from zero. The table below
+>    charges 60.33 MB per frame, which over that span predicts +3,861 MB that
+>    does not exist. The OVERHEAD term (7000 MB) is roughly right; every row in
+>    the table below is wrong in proportion to its frame count.
+> 3. **The REFUSAL described below is still real.** `compute_real_frame_budget`
+>    still computes those numbers, so on a real 8 GB card the engine still
+>    raises `MotionBudgetError` before rendering. The tier is blocked by a wrong
+>    predictor, not by physics -- which makes this a FIX, not an abandonment.
+>    Do not re-fit the coefficients off nine points; see the open item in
+>    GO_FORWARD.
+>
+> Scope, stated exactly: that bench is a PREQUALIFICATION on a 16 GB card told
+> to reserve 8 GiB. A render on a PHYSICAL 8 GB card is still owed.
+
 Operator question, 2026-07-31: *"methodically analyze what the parameters should
 be for the wan 8gb video engine -- think just like the other engines. What are
 the inputs? Recommended steps or temperatures? What is the minimum frame count,
@@ -11,7 +40,14 @@ is a GUESS rather than a measurement, it says so.
 
 ---
 
-## THE HEADLINE: on a real 8 GB card this tier cannot render at all today
+## ~~THE HEADLINE: on a real 8 GB card this tier cannot render at all today~~
+
+**REFUTED IN PART 2026-07-31 @ `8bd82efb` -- see the correction at the top of
+this file. The ARITHMETIC below is a correct account of what the estimator
+computes, and the REFUSAL it produces is real. The conclusion drawn from it --
+that the hardware cannot do this -- is false: measured peak delta is
+6563-6568 MiB, comfortably inside 8 GiB. Read the rest of this section as
+"why the predictor refuses", not "why the card can't".**
 
 `compute_real_frame_budget` (`motion_common.py:323-379`) predicts:
 

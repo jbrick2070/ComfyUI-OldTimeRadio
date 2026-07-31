@@ -1,5 +1,30 @@
 # Low-VRAM video under ComfyUI -- what an 8 GB (and 6 GB) tier can actually do
 
+> **CONFIRMED BY MEASUREMENT, 2026-07-31 @ `8bd82efb`.** This document's two
+> load-bearing calls were right, and are now numbers rather than reasoning.
+>
+> - **"KEEP Wan 2.2 TI2V-5B" was correct.** The four-arm clamped bench rendered
+>   `wan_ti2v` at 832x480 under `--reserve-vram 8` at 17 / 49 / 81 frames, all
+>   PASS, peak VRAM delta 6568.2 / 6563.1 / 6563.1 MiB against a 7168 MiB bar.
+>   Replacing Wan was never the fix.
+> - **"Our estimator is structurally wrong" was correct, and the defect is now
+>   localised to the PER-FRAME term.** Measured delta across 17 -> 81 frames is
+>   -5.1 MiB -- inside noise. `FRAME_COST_MODEL` charges 60.33 MB/frame at that
+>   canvas, predicting +3,861 MB that does not exist. The OVERHEAD term is
+>   roughly right. Section 4's max-over-stages argument is not contradicted by
+>   this, but it is also not what the nine points measure: whole-window peak is
+>   all this build has (operator ruling O7), so the staging hypothesis remains
+>   UNMEASURED. Do not re-fit coefficients off these nine points.
+>
+> One correction to this document's own framing: the fp8 encoder route was
+> TESTED and is DEAD. Bench arm B-partial, same graph and canvas and steps as
+> arm A but with the fp8 safetensors text encoder, cost peak delta
+> 7907.1 / 7811.1 / 7715.3 MiB -- FAIL on all three, about 1.25 GiB WORSE than
+> arm A. Receipts: `output/otr/episodes/_bench_4arm/`; framing in
+> `docs/GO_FORWARD_PLAN.md` under "MEASURED -- the 8 GiB-clamped video bench".
+> Scope: PREQUALIFICATION on a 16 GB card told to reserve 8 GiB, not a physical
+> 8 GB card.
+
 > **PARTIALLY SUPERSEDED 2026-07-31 @ `aff09bde`. Judgment of record is
 > `docs/2026-07-31-wan-8gb-adversarial-review/report.md` (Codex, final judge).**
 > What survives: the estimator is the wrong SHAPE (max-over-stages, not a sum);
