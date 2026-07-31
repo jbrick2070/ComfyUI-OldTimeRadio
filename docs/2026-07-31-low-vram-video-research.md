@@ -1,5 +1,30 @@
 # Low-VRAM video under ComfyUI -- what an 8 GB (and 6 GB) tier can actually do
 
+> **PARTIALLY SUPERSEDED 2026-07-31 @ `aff09bde`. Judgment of record is
+> `docs/2026-07-31-wan-8gb-adversarial-review/report.md` (Codex, final judge).**
+> What survives: the estimator is the wrong SHAPE (max-over-stages, not a sum);
+> keep Wan; reject LTX-2.3; cache the text embeddings; the canvas bug is real.
+> What was corrected:
+>
+> - **Section 2 overstates the GGUF finding.** Stock GGUF misses AIMDO Dynamic
+>   VRAM, but **still supports legacy partial loading and offload** -- it is not
+>   left with nothing, and this section reads as if it were. The official ComfyUI
+>   path is an **FP16 UNet + scaled-FP8 encoder**, not "fp8 scaled safetensors"
+>   for both as written here and in section 6b.
+> - **Recommendation 7 (a 14B + Lightning second tier) is REJECTED.** Do not
+>   lower the guard, do not promote 14B, do not call the tier qualified. It rested
+>   on two blog reports and no measurement of ours.
+> - **The 5B's missing step-distillation now has a candidate answer:**
+>   **FastWan 5B** (`FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers`) is the
+>   leading potentially shippable accelerator. Turbo-GGUF is research-only
+>   (CC BY-NC-SA upstream) and its sampling contract is not ordinary four-step
+>   KSampler execution -- do not ship it.
+> - **The proximate blocker is upstream of video entirely:** the configured
+>   writer is refused at ~8.13 GiB against a declared 6.8 GB ceiling, so the
+>   canonical 8 GB profile never reaches Wan. Qualification must therefore cover
+>   EVERY heavy pipeline phase with fail-closed cleanup receipts -- a render-only
+>   sweep would qualify a tier that still dies in the writer.
+
 Operator question, 2026-07-31: *"deep research on what 8gb model for video we can
 support -- maybe that means we load 3gb of such and such, save that, offload
 them, load 6gb of that, but all while remaining under 8gb... how do we support

@@ -1,5 +1,41 @@
 # PROBLEM STATEMENT -- our 8 GB video tier cannot render, and we think we know why
 
+> **SUPERSEDED IN PART, 2026-07-31 @ `aff09bde`. Judgment of record is
+> `docs/2026-07-31-wan-8gb-adversarial-review/report.md` (Codex, final judge).
+> Read that first.** This document did its job -- it was written to be proven
+> wrong and it was, in four places:
+>
+> 1. **The cited failure is miscited here.** The 2026-07-23
+>    `wan_8gb__lumina_image__media_archive` leg was **177 frames on a 16 GB RTX
+>    5080** -- NOT a 17-frame test on physical 8 GB. The arithmetic below is
+>    sound as arithmetic ABOUT THE ESTIMATOR, but it has never been observed on
+>    real 8 GB hardware, and "the tier can never render, by construction" claims
+>    more than the evidence supports. A broken estimator does not prove Wan is
+>    impossible on 8 GB.
+> 2. **This is not today's first blocker.** The configured writer is REFUSED
+>    before video is reached -- gemma-4-12b needs ~8.13 GiB against the profile's
+>    declared 6.8 GB ceiling. The canonical 8 GB profile therefore cannot reach
+>    Wan at all right now, so the video estimator is not the proximate failure.
+> 3. **CLAIM 2 overstates the GGUF finding.** Stock GGUF misses AIMDO Dynamic
+>    VRAM (that part holds) but **still supports legacy partial loading and
+>    offload** -- it is not left with nothing. And the official ComfyUI path is
+>    an **FP16 UNet + scaled-FP8 encoder**, not "fp8 safetensors" wholesale as
+>    written below.
+> 4. **CLAIM 3 is real but demoted.** The canvas-authority bug is confirmed and
+>    does not cause today's refusal.
+>
+> Also corrected: the 4-cell sweep proposed at the end is **insufficient**.
+> Qualification must cover EVERY heavy pipeline phase with fail-closed cleanup
+> receipts, not a render-only Wan test -- otherwise it would qualify a tier that
+> still dies in the writer. And the 14B suggestion is REJECTED: do not lower the
+> guard, do not promote 14B, do not call the tier qualified.
+>
+> New candidate on the table: **FastWan 5B**
+> (`FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers`) is the leading potentially
+> shippable accelerator for the 5B's missing step-distillation. Turbo-GGUF is
+> research-only -- CC BY-NC-SA upstream, and its sampling contract is not
+> ordinary four-step KSampler execution.
+
 Pasteable, self-contained, code-grounded. Written 2026-07-31 for a cross-check
 window (kibitz / roundtable / another model). **Goal: find where we are WRONG.**
 

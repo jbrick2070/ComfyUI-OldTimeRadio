@@ -65,8 +65,33 @@ Live GPU requalification IS still owed.
 **CURRENT STEP (operator directive 2026-07-31, revised same day):
 GET WAN 8-GB READY *FIRST*, THEN the 30-word randomizer sweep.**
 
-**RESCOPED SAME DAY BY RESEARCH -- read
-`docs/2026-07-31-low-vram-video-research.md` FIRST, then the parameter analysis.**
+**JUDGMENT OF RECORD (2026-07-31 @ `aff09bde`, Codex as final judge):
+`docs/2026-07-31-wan-8gb-adversarial-review/report.md`. READ THAT FIRST** -- it
+adjudicates this window's research against the actual repo and corrects it in
+four places. Headline rulings:
+
+- **A broken estimator does NOT prove Wan is impossible on 8 GB.** The
+  2026-07-23 failure this window cited was **177 frames on a 16 GB RTX 5080**,
+  not a 17-frame test on physical 8 GB. The arithmetic holds as arithmetic about
+  the ESTIMATOR; it has never been observed on real 8 GB hardware.
+- **The proximate blocker is the WRITER, not the video estimator.** The
+  configured writer is refused at ~8.13 GiB against the profile's declared 6.8 GB
+  ceiling, so the canonical 8 GB profile cannot reach Wan at all today.
+- **Stock GGUF misses AIMDO Dynamic VRAM but STILL has legacy partial
+  loading/offload** -- this window overstated it. The official ComfyUI path is an
+  **FP16 UNet + scaled-FP8 encoder**, not fp8 safetensors throughout.
+- **The canvas-authority bug is real but does NOT cause today's refusal.**
+- **Qualification must cover EVERY heavy pipeline phase with fail-closed cleanup
+  receipts** -- the render-only 4-cell sweep this window proposed would qualify a
+  tier that still dies in the writer.
+- **DO NOT lower the guard, DO NOT promote 14B, DO NOT call the tier qualified.**
+- **FastWan 5B** (`FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers`) is the
+  leading potentially shippable answer to the 5B's missing step-distillation.
+  Turbo-GGUF is research-only (CC BY-NC-SA) with a non-standard sampling
+  contract -- do not ship it.
+
+Supporting research, now read SECOND and with the corrections above applied:
+`docs/2026-07-31-low-vram-video-research.md`, then the parameter analysis.
 Three independent passes (this window, a live web-research pass, and the
 operator's ChatGPT pass) converged: **our VRAM estimator is the wrong SHAPE.**
 `overhead + per_frame*frames` is a CO-RESIDENT model; the real low-VRAM technique
