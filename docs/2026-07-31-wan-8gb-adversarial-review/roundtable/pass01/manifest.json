@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-07-31T16:43:39.237632+00:00",
+  "doc": "docs\\2026-07-31-wan-8gb-adversarial-review\\roundtable\\pass00_plan.md",
+  "prompt_tokens_est": 5246,
+  "models": [
+    {
+      "requested_model": "~openai/gpt-latest",
+      "ok": false,
+      "error": "URLError(ConnectionRefusedError(10061, 'No connection could be made because the target machine actively refused it', None, 10061, None))",
+      "max_tokens": 2200,
+      "temperature": 0.5,
+      "reasoning_effort": "high"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "ok": false,
+      "error": "URLError(ConnectionRefusedError(10061, 'No connection could be made because the target machine actively refused it', None, 10061, None))",
+      "max_tokens": 2200,
+      "temperature": 0.5,
+      "reasoning_effort": "high"
+    },
+    {
+      "requested_model": "deepseek/deepseek-v4-pro",
+      "ok": false,
+      "error": "URLError(ConnectionRefusedError(10061, 'No connection could be made because the target machine actively refused it', None, 10061, None))",
+      "max_tokens": 2200,
+      "temperature": 0.5,
+      "reasoning_effort": "high"
+    }
+  ],
+  "total_cost_usd": 0.0
+}

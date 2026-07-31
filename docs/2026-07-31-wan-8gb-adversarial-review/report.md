@@ -33,7 +33,8 @@ The defensible decision is:
    requests through the canonical workflow.
 3. Measure the continuous lifetime/transition envelope, not an assumed set of
    disjoint stages.
-4. Keep the Wan profile draft until a physical-8-GB artifact qualifies it.
+4. Keep the Wan profile draft until a full canonical episode on physical 8 GB
+   produces the required artifact and receipts.
 
 No code or workflow was changed in this review, and no GPU render was run. A
 static audit cannot create a production bug entry or qualify hardware.
@@ -71,6 +72,19 @@ The 7,000 MiB intercept divided by the 0.85 margin is 8,235.3 MiB. The present
 guard therefore cannot admit any honest free-memory report at or below 8,192
 MiB. That proves the **guard is unusable for the tier**. It says nothing about
 whether the underlying graph would succeed after admission.
+
+### The full tier has an earlier writer blocker
+
+At HEAD, the draft profile selects local Gemma-4-12B Q4 on CUDA with a 6.8 GiB
+ceiling. The shipped policy test asserts that this exact writer is refused.
+Even if selector admission were bypassed, the backend prices its pinned
+7,121,860,000-byte weights plus the 2,048-token context at about 8.13 GiB,
+before WDDM/display use. The unmodified profile therefore cannot reach video on
+physical 8 GB as a full canonical run.
+
+This is a draft-profile qualification blocker, not a new production bug. Gate 0
+must select and receipt a viable remote, CPU, or smaller local writer lane
+without weakening the writer guard.
 
 ### There is no honest frame/resolution floor yet
 
@@ -119,6 +133,12 @@ The proposed replacement is also premature. The current graph:
 - hoists the UNet before the render probe, so the probe counts its residency but
   not its load transient.
 
+The internal `run_graph()` path also bypasses ComfyUI's ordinary per-node
+finalizer. AIMDO cast buffers and prefetch state are reset only after the outer
+OTR batch, so they can span nominal stages or sequential beats. A real lifetime
+split needs separate precompute/sample/decode executions plus an explicit
+quiescence barrier that resets cast buffers, prefetch queues, and VBAR state.
+
 The quantity to measure is:
 
 `peak = max over time t of all resources live at t, including transition scratch`
@@ -148,6 +168,13 @@ reload/unload, and GGUF's per-layer move/dequantization. The precise statement
 is: **stock GGUF lacks AIMDO's allocator-pressure adaptation and async
 demand-loading path**. Whether that raises or lowers the OTR peak is a benchmark
 question.
+
+There is also a historical causal error in Claim 2. ComfyUI published the 5B
+8 GB guidance in July 2025, while Dynamic VRAM became the default in March 2026.
+AIMDO therefore cannot be the mechanism that originally established that claim;
+the native legacy offload path already existed. Dynamic VRAM may improve the
+current native path, but that is a new benchmark hypothesis, not the explanation
+for the original support statement.
 
 The official 5B workflow is also misdescribed. Its **UNet is FP16**;
 `umt5_xxl_fp8_e4m3fn_scaled.safetensors` is the scaled-FP8 component. There is no
@@ -182,6 +209,12 @@ proposal is invalid under OTR's current rule requiring both axes divisible by
 quality decision, profile update, code update, and canonical workflow update in
 one change.
 
+
+This canvas defect is not what triggers today's preflight refusal: the poisoned
+7,000 MiB fixed term rejects the tier at either canvas. Canvas authority still
+controls actual execution feasibility, output semantics, and every trustworthy
+calibration, so it must be corrected before measuring.
+
 ## Does Grok's critique help?
 
 | Grok point | Judgment | Why |
@@ -203,6 +236,24 @@ shipping Wan as an 8 GB tier.
 
 ## Why the proposed four cells do not settle it
 
+### Later supplied critiques
+
+The third critique is the strongest: it adds the pre-AIMDO history, rejects the
+affine/co-residency inference, catches the official FP16 UNet, and proposes a
+time-indexed live-set model. Its SANA-Video suggestion belongs in research, not
+release qualification. The fourth critique contributes the canvas/preflight
+causal distinction and the need for a guarded diagnostic bypass, but is wrong
+about `--lowvram`, forced GGUF encoder placement, an official FP8 5B UNet, clamp
+fidelity, a fixed pairwise/1 GiB reserve, and CogVideoX's license/8 GB evidence.
+
+The independent Claude/Cowork cross-check largely concurs and adds two material
+omissions: qualification must include whole-pipeline phase teardown, and the
+frozen negative prompt is the first deterministic cache target. It understates
+the writer blocker: the current profile is refused before GGUF dispatch and its
+backend prices the configured writer above physical 8 GiB. Its Turbo-GGUF lead
+is technically real but commercially blocked by conflicting license metadata
+and lacks a reproducible 4 GB receipt.
+
 1. **The T5 device axis does not bind.** The Wan recipe exposes no independent
    `t5_device`; `CLIPLoaderGGUF` has no device input. Global boot flags change
    allocator behavior as well, so they confound the intended axis.
@@ -212,13 +263,17 @@ shipping Wan as an 8 GB tier.
    `--reserve-vram` as loader headroom. OTR's `torch.cuda.mem_get_info()`
    preflight reads raw physical free memory and does not subtract that reserve.
    A clamped 16 GB run can therefore exercise loader policy while the guard sees
-   capacity unavailable on a real 8 GB card.
+   capacity unavailable on a real 8 GB card. It also does not constrain OTR's
+   out-of-band writer/TTS allocators; those are visible only in whole-leg
+   telemetry. The shared image/video lease does not cover writer/TTS or prove
+   that residual residency was released.
 4. **The present guard blocks calibration.** Longer diagnostic rungs are refused
    by the very seed being replaced. Qualification needs an explicit audited
    diagnostic override that is unreachable in production, not a temporary
    global coefficient edit or an ad-hoc graph.
 5. **Current telemetry cannot emit stage triples.** It yields one machine-wide
-   peak, has no phase markers, and misses the hoisted-UNet load transient.
+   peak, has no phase markers, and misses the hoisted-UNet load transient. Its
+   100 ms polling interval can also miss short workspace/transfer spikes.
 6. **One canvas and too few lengths cannot identify the terms.** Decode tiling,
    pixel scaling, frame scaling, transition overlap, and fixed reserve are
    confounded.
@@ -241,50 +296,114 @@ expensive Cartesian sweep.
   reserved where meaningful; system RAM and pagefile; wall time; actual patcher
   class; AIMDO state; async stream count; loaded/offloaded bytes; server log;
   and canonical asset/OBS proof.
+- Record whole-leg writer, Bark, Kokoro, Stable Audio, Z-Image, and Wan phase
+  peaks with continuous machine-wide NVML. Require a fail-closed cleanup receipt
+  and post-clean baseline at every heavy-phase boundary, including immediately
+  before Wan.
+- Resolve the profile's writer blocker before any full-leg cell: the current
+  local Gemma path requires about 8.13 GiB by its own backend and is refused at
+  the configured 6.8 GiB ceiling. Select and receipt a remote, CPU, or smaller
+  local lane; do not weaken the writer guard.
+- Make qualification cleanup fail closed. Current writer/TTS/image/video cleanup
+  paths can log and continue, so a whole-leg maximum alone cannot prove release.
 - Add a test-only admission override and frame ceiling that travel through the
   canonical request. Fail closed outside qualification mode.
+- Add a separately gated, prequalification-only diagnostic-canvas override so
+  alternate-resolution cells cannot silently lose to the static production
+  canvas. Stamp both requested and effective canvas in every receipt.
 - Fresh-boot every cold cell after the mandated selective reset. Pin ComfyUI,
   plugin, recipe, and model hashes. Replay identical still/audio/prompt/seed.
+- Add a purpose-built canonical replay input for fixed prompt, negative prompt,
+  init-image hash, seed, canvas, frames, and recipe. The current creative `--set`
+  path is not sufficient to prove identical causal inputs.
 
 ### Gate 1 — execution mechanism shootout
 
+Before M1, acquire the official native FP16 UNet through a recorded provenance
+preflight: source, license, SHA-256, file size, and loader visibility. It is not
+installed in the current model inventory, so M1/M2 are blocked until that
+receipt exists.
+
+The receipt must preserve resolved model basenames, SHA-256 and sizes; patcher
+classes and `is_dynamic`; requested/native/emitted frames; canvas; admission
+decision and the counterfactual old-seed decision; free-before and any hoist
+correction; cache key/hit/miss; phase peaks; and ComfyUI/AIMDO/GGUF versions.
+Current single-mode clip summaries discard several of these fields, so the
+receipt path itself is a prerequisite.
 Start with the smallest legal production request, fixed canvas, fixed 30-step
 OTR recipe, tiled decode on, and at least three cold repeats:
 
 | Cell | UNet / encoder | Runtime purpose |
 |---|---|---|
-| M1 | Q5 GGUF / Q5 GGUF | Current stock legacy-patcher baseline |
-| M2 | Official FP16 native / scaled-FP8 native | ComfyUI's stated Dynamic VRAM path |
-| M3 | Same native artifacts, Dynamic VRAM disabled | Mechanism control, only if viable |
-| M4 | GGUF with explicit DisTorch/block placement | Optional dependency candidate only if M1/M2 fail or justify it |
+| M1 | Official FP16 native / scaled-FP8 native, Dynamic | ComfyUI's current stated path |
+| M2 | Same native artifacts forced onto legacy patching | Isolate Dynamic-versus-legacy on the same files |
+| M3 | Q5 GGUF / Q5 GGUF with global Dynamic disabled | Legacy-format/product comparison |
+| M4 | Q5 GGUF / Q5 GGUF under the normal Dynamic-enabled server | Actual stock OTR system; GGUF patchers remain legacy while native components/global policy can differ |
 
-This is a format-plus-runtime product comparison, not a pure quantization A/B.
-If selecting a winner, add same-input blind output quality; peak alone cannot
-justify a model change.
+M1-versus-M2 is the cleanest global Dynamic-versus-legacy policy contrast on
+identical assets; it may change native UNet, encoder, VAE, and runtime behavior
+together. M2-versus-M3 remains a format/quantization/loader product contrast,
+not a pure quantization A/B. Component crossover cells are warranted only if
+attribution remains necessary.
+
+Do not put Turbo-GGUF in the shippable M1-M4 decision. The quantizer card says
+Apache-2.0, but the upstream distilled derivative is CC BY-NC-SA. Its exact
+`[1000,750,500,250]` plus re-noising sampling contract is also not proved
+equivalent to ordinary Comfy `steps=4`. At most, with explicit operator
+approval, it is a segregated noncommercial research probe; it cannot qualify
+the product or lower the guard. Four steps reduce denoiser work, not a proved
+per-step peak, and its Q5 weight footprint is essentially the current Q5's.
+
+Any such research receipt must add repository revision, GGUF/source hashes,
+quant, UNet filename, loader commit, sampler, scheduler, shift, steps, CFG, and
+license status; the current durable recipe receipt lacks UNet identity.
+
+DisTorch/block placement is a later optional arm, not M1-M4. If selecting a
+winner, add same-input blind output quality; peak alone cannot justify a model
+change.
 
 ### Gate 2 — encoder lifetime and cache
 
-On viable mechanisms, compare:
+This gate starts only after implementing and proving two first-class seams: a
+per-request encoder-placement control, and an OTR-native cache whose provenance,
+atomicity, corruption handling, and cache-only no-model-input path have tests.
+Global `--lowvram` is not a placement substitute. On the Gate-1 winner, the
+smallest useful sequence is:
 
-- cold default encoder execution;
-- a real explicit CPU-only encoder path; and
-- precomputed native conditioning loaded by a cache-only source with **no model
-  input**.
+1. explicit CPU encoder, cache off, tiled decode;
+2. explicit GPU/default encoder, cache off, tiled decode;
+3. chosen placement, cold cache miss/precompute, tiled decode;
+4. fresh-boot cache-only hit, tiled decode; and
+5. chosen placement, cache off, untiled decode.
+
+A placement-by-cache Cartesian is wasteful because encoder placement is inert on
+a genuine cache-only hit. Precomputed native conditioning must come from a
+source with **no model input**.
 
 Measure cold miss, warm hit, and observed hit rate from real OTR prompt traces.
 Do not infer placement from `--lowvram`.
 
+Cache the frozen default negative prompt first because it repeats across Wan
+clips; continue to key its actual bytes and full encoder provenance. A warm
+negative hit removes one encoder forward, not the shared encoder load. Size
+positive-prompt caching only from observed trace reuse.
+
 ### Gate 3 — decode, frames, and pixels
 
-For each surviving mechanism:
+Alternate-canvas cells require the prequalification-only, receipted diagnostic
+canvas override from Gate 0; production authority remains 832x480.
 
-- tiled versus regular decode;
-- legal frame rungs such as 17, 33, and 65, extending toward the maximum clip
-  request only while prior rungs pass;
-- the product canvas plus a second legal canvas only if pixel scaling will be a
-  model input; and
-- at least three cold repeats of boundary/worst cells, with interleaved order
-  where practical.
+For each surviving mechanism, reuse the 832x480/17/tiled baseline, then add a
+compact interaction cross: 512x288 at 17 and 129 frames; 832x480 at 65 and 129
+frames; and 832x480 at 129 frames untiled. Run increasing rungs sequentially and
+stop/reset after a terminal OOM. These five additional cells expose frame slope,
+pixel interaction, and whether tiling matters only at long length without a
+full Cartesian sweep. A different ladder is acceptable if the product maximum
+changes, but every rung must remain structurally legal and receipted.
+
+Add 1280x704/17/tiled as a model-native quality reference; try 33 frames only
+if 17 passes. Compare canvases with a same-input blind quality gate. A reference
+cell is not a tier candidate unless it also meets the memory contract.
 
 Use the real recipe for qualification. A cheap low-step screen can find obvious
 OOMs but cannot qualify a 30-step OTR recipe. Preserve every continuous
@@ -292,13 +411,23 @@ transition peak and report cold/warm host-cache state separately for wall time.
 
 ### Gate 4 — stability and transfer
 
-Run a canonical multi-clip soak to detect retained patchers, host-memory spill,
-fragmentation, and monotonic growth. Episode length itself remains non-gating;
-the soak tests resource stability.
+Run three randomized cold repeats of the final 17-frame recipe, then an 8-10
+sequential-beat same-server soak. Wan normally emits one capped clip and
+ping-pongs it; the soak should exercise that production behavior, not invent a
+coverage-planned multi-clip mode. Record per-beat peak, latency, cache state,
+host RAM/pagefile, and post-teardown baseline drift. Episode length itself
+remains non-gating; the soak tests resource stability.
 
-Dev-card clamp results may be labelled **“16 GB card, 8 GiB loader-headroom
-prequalification.”** They must not be labelled “8 GB qualified.” A physical
-8 GB run with canonical output proof remains the release gate.
+Dev-card clamp results may be labelled **“16 GB card, 8 GiB
+loader-headroom prequalification.”**
+
+Then run one full canonical episode on physical 8 GB and capture writer, Bark,
+Kokoro, Stable Audio, Z-Image, and Wan phase peaks. Require a passing fail-closed
+cleanup receipt and post-clean NVML baseline at every heavy-phase boundary,
+including immediately before Wan; fail qualification if any teardown step
+fails. A render-only success does not qualify the product tier.
+Clamp results must not be labelled **8 GB qualified**. A physical
+8 GB full-canonical run with canonical output proof remains the release gate.
 
 ### Acceptance contract
 
@@ -307,6 +436,9 @@ prequalification.”** They must not be labelled “8 GB qualified.” A physica
   uncontrolled system-memory thrash is a failure.
 - Exact requested canvas, native frame count, steps, scheduler, model hashes,
   patcher, tiling, and placement in the receipt.
+- Passing fail-closed phase-boundary cleanup receipts and post-clean NVML
+  baselines, including immediately before Wan, plus whole-pipeline phase peaks
+  and canonical output proof from physical 8 GB hardware.
 - Measured upper envelope plus explicit reserve admits every qualified request
   and rejects every out-of-domain request with a named error.
 
@@ -319,8 +451,11 @@ prequalification.”** They must not be labelled “8 GB qualified.” A physica
 | Official Wan TI2V-5B native | **First experiment** | Matches ComfyUI's stated 8 GB path; still lacks a published physical-8-GB receipt. |
 | Current Wan TI2V-5B Q5 GGUF | **Keep as comparator** | Smaller files and legacy offload may work; AIMDO absence is not a verdict. |
 | FastWan TI2V-5B three-step | **Second experiment / leading accelerator** | Apache-2.0 and same 5B TI2V family; exact DMD schedule, lower-resolution quality, merge scratch, and Comfy integration must be qualified. |
+| Turbo-GGUF TI2V-5B | **Noncommercial research only** | Four-step derivative has a nonstandard schedule/re-noising contract, no reproducible physical-8-GB receipt, and upstream CC BY-NC-SA conflicts with the quantizer card's Apache tag. |
 | A14B Q4/Q5 + Lightning | **Separate, lower-priority bakeoff** | Four steps may help, but dual-expert topology, host transfer, and no controlled 8 GB comparison make promotion premature. LightX2V's TI2V-5B item remains a TODO, but FastWan disproves “no 5B accelerator.” |
-| LTX-Video 2B | **Strongest existing physical-8-GB evidence, license-qualified** | Its official repo reports RTX 4060 8 GB operation, but newer weights use the custom LTXV 0.X license and larger entities may need a commercial license. |
+| LTX-Video 2B | **Strongest existing physical-8-GB evidence, license-qualified** | Its official repo reports RTX 4060 8 GB operation, but v0.9.6+ weights use the custom LTXV 0.X license; entities with at least $10M annual revenue need a separate paid commercial license. |
+| SANA-Video 2B | **Research backlog, not an 8 GB candidate yet** | Apache-tagged T2V/I2V with a 832x480x81 example and constant-memory KV design, but no physical-8-GB result, mature OTR/Comfy integration, or completed provenance/legal review. |
+| CogVideoX-5B | **Reject for this slot today** | Its model uses the custom CogVideoX license, not Apache-2.0; current Diffusers guidance puts quantized use around 16 GB unless very slow sequential CPU offload is used. |
 | Motif 2B / MobileWan / Hunyuan 1.5 / LingBot 1.3B | **Reject for this slot today** | Published peaks/minimums exceed 8 GB, integration is absent, or licensing fails the stated product gate. |
 
 Do not replace 5B with 14B based on anecdotes. Keep 5B as the incumbent
@@ -342,6 +477,8 @@ node has that loader as an upstream input.
 A first-class OTR design should:
 
 - precompute positive/negative native conditioning in a distinct phase;
+- prioritize the frozen default negative prompt, while recognizing that a hit
+  saves one encode forward rather than the shared encoder load;
 - expose a cache-only source node with no CLIP/model input;
 - key exact prompt bytes and role plus encoder/tokenizer/config/precision/schema
   provenance;
@@ -359,14 +496,24 @@ The current wrapper cache should not be wired into OTR.
 - [ComfyUI official 5B workflow template](https://raw.githubusercontent.com/Comfy-Org/workflow_templates/refs/heads/main/templates/video_wan2_2_5B_ti2v.json)
 - [Wan 2.2 official repository](https://github.com/Wan-Video/Wan2.2)
 - [ComfyUI-GGUF source](https://github.com/city96/ComfyUI-GGUF/blob/main/nodes.py)
+- [Original July 2025 ComfyUI Wan guide discussion](https://github.com/Comfy-Org/docs/discussions/291)
 - [Dynamic GGUF PR 427](https://github.com/city96/ComfyUI-GGUF/pull/427)
 - [ComfyUI Dynamic GGUF issue 13953](https://github.com/Comfy-Org/ComfyUI/issues/13953)
 - [FastWan TI2V-5B model card](https://huggingface.co/FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers)
+- [Turbo diffusion upstream license](https://github.com/quanhaol/Wan2.2-TI2V-5B-Turbo/blob/main/LICENSE.md)
+- [Turbo reference schedule](https://github.com/quanhaol/Wan2.2-TI2V-5B-Turbo/blob/main/configs/inference/wan22.yaml)
+- [Turbo reference inference loop](https://github.com/quanhaol/Wan2.2-TI2V-5B-Turbo/blob/main/pipeline/wan22_fewstep_inference.py)
+- [Turbo-GGUF quantizer card](https://huggingface.co/hum-ma/Wan2.2-5B-Turbo-GGUF)
 - [LightX2V Wan2.2-Lightning model card](https://huggingface.co/lightx2v/Wan2.2-Lightning)
+- [LTX-Video official repository](https://github.com/Lightricks/LTX-Video)
+- [LTX-Video license](https://github.com/Lightricks/LTX-Video/blob/main/LICENSE)
 - [WanVideoWrapper cache/source code](https://github.com/kijai/ComfyUI-WanVideoWrapper/blob/main/nodes.py)
 - [DisTorch2/MultiGPU documentation](https://github.com/pollockjj/ComfyUI-MultiGPU#distorch-how-it-works)
 - [Motif-Video-2B model card](https://huggingface.co/Motif-Technologies/Motif-Video-2B)
 - [MobileWan model card](https://huggingface.co/Qualcomm-AI-Research/mobilewan)
+- [SANA-Video official instructions](https://github.com/NVlabs/Sana/blob/main/asset/docs/sana_video.md)
+- [CogVideoX Diffusers memory guide](https://huggingface.co/docs/diffusers/main/api/pipelines/cogvideox)
+- [CogVideoX-5B model/license](https://huggingface.co/zai-org/CogVideoX-5b)
 
 ## Review process receipt
 
@@ -375,4 +522,8 @@ lanes independently audited the repository/runtime, GGUF/Dynamic VRAM, and
 models/licensing. The requested live GPT/Gemini/DeepSeek OpenRouter pass was
 attempted, but the security boundary rejected transmitting internal repository
 text without payload-specific approval. No text was sent and actual spend was
-$0.00; the failed manifest is preserved under `roundtable/pass01/`.
+$0.00; the failed manifest is preserved under `roundtable/pass01/`. A separate
+Claude/Cowork cross-check was then grounded against the same Windows files. Its
+valid whole-pipeline teardown and negative-cache findings are incorporated;
+its Turbo recommendation was narrowed after checking the upstream license and
+sampling contract.
