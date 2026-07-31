@@ -603,3 +603,138 @@ def test_watchdog_exit_two_is_the_only_failing_code():
     assert B.Watchdog.verdict(2)["dead"] is True
     assert B.Watchdog.verdict(0)["dead"] is False
     assert B.Watchdog.verdict(None)["dead"] is False
+
+
+# --------------------------------------------------------------------------
+# per-arm shipped canvas (operator reframe 2026-07-31): each arm answers "does
+# this engine run on a small GPU and how much does it eat", at ITS OWN canvas.
+# The arms are NOT matched and must never be read as a comparison.
+# --------------------------------------------------------------------------
+def test_each_arm_runs_at_its_own_shipped_canvas():
+    assert B.ARMS_BY_LABEL["A"].canvas == (832, 480)
+    assert B.ARMS_BY_LABEL["B-partial"].canvas == (832, 480)
+    # eng_ltx_8gb.render_canvas -- the number the shipped tier actually uses
+    assert B.ARMS_BY_LABEL["D"].canvas == (512, 288)
+
+
+def test_every_arm_canvas_is_structurally_legal():
+    for arm in B.ARMS:
+        w, h = arm.canvas
+        assert w % 32 == 0 and h % 32 == 0, arm.label
+
+
+def test_graph_file_canvas_agrees_with_the_armspec():
+    """A reader of either the ArmSpec or the graph must see the same canvas."""
+    for arm in B.ARMS:
+        latent = B.load_graph(arm)[arm.length_node]["inputs"]
+        assert (latent["width"], latent["height"]) == arm.canvas, arm.label
+
+
+def test_a_graph_that_disagrees_with_its_armspec_canvas_is_refused():
+    arm = B.ARMS_BY_LABEL["D"]
+    wrong = B.ArmSpec(label="D2", engine_id=arm.engine_id, graph=arm.graph,
+                      graph_sha256=arm.graph_sha256, steps=arm.steps,
+                      canvas=(832, 480), lengths=arm.lengths,
+                      required_classes=arm.required_classes, models=arm.models,
+                      length_node=arm.length_node, save_node=arm.save_node,
+                      notes="n")
+    with pytest.raises(B.BenchError) as ei:
+        B.offline_preflight([wrong])
+    assert "declares canvas" in str(ei.value)
+
+
+def test_build_cell_prompt_stamps_the_arms_own_canvas():
+    arm = B.ARMS_BY_LABEL["D"]
+    resolved = {p.role: p.filename for p in arm.models}
+    out = B.build_cell_prompt(arm, B.load_graph(arm), 49, resolved, "p")
+    assert (out["8"]["inputs"]["width"], out["8"]["inputs"]["height"]) == (512, 288)
+    assert out["8"]["inputs"]["length"] == 49
+    # LTX keeps its own shipped recipe -- 8 steps, cfg 1.0, not Wan's 30/5.0
+    assert out["16"]["inputs"]["steps"] == 8
+    assert out["9"]["inputs"]["cfg"] == 1.0
+    assert out["3"]["inputs"]["device"] == "cpu"
+
+
+def test_validate_asset_checks_the_arms_own_canvas(tmp_path, monkeypatch):
+    """Arm D's asset must be 512x288; the Wan canvas would be a failure."""
+    out = tmp_path / "o"
+    out.mkdir()
+    f = out / "D__17f.mp4"
+    f.write_bytes(b"x" * 2048)
+    monkeypatch.setattr(B, "OUTPUT_BASE", str(tmp_path))
+    monkeypatch.setattr(B, "_history_outputs",
+                        lambda pid, node: [{"filename": "D__17f.mp4",
+                                            "subfolder": "o", "type": "output"}])
+    monkeypatch.setattr(B, "ffprobe_video",
+                        lambda p: _probe_ok(width=512, height=288))
+    t = os.path.getmtime(str(f))
+    got = B.validate_asset("pid", B.ARMS_BY_LABEL["D"], 17, t - 1, t + 1)
+    assert (got["width"], got["height"]) == (512, 288)
+    monkeypatch.setattr(B, "ffprobe_video",
+                        lambda p: _probe_ok(width=832, height=480))
+    with pytest.raises(B.BenchError) as ei:
+        B.validate_asset("pid", B.ARMS_BY_LABEL["D"], 17, t - 1, t + 1)
+    assert "expected 512x288" in str(ei.value)
+
+
+# --------------------------------------------------------------------------
+# seed, estimator neutralization, and the deliverable table
+# --------------------------------------------------------------------------
+def test_every_arm_graph_carries_one_replayable_seed():
+    for arm in B.ARMS:
+        assert B.graph_seed(B.load_graph(arm)) == 42, arm.label
+
+
+def test_a_graph_with_no_seed_or_a_split_seed_is_refused():
+    with pytest.raises(B.BenchError) as ei:
+        B.graph_seed({"9": {"class_type": "KSampler", "inputs": {"steps": 30}}})
+    assert "no seed" in str(ei.value)
+    with pytest.raises(B.BenchError) as ei:
+        B.graph_seed({"9": {"class_type": "KSampler", "inputs": {"seed": 1}},
+                      "10": {"class_type": "SamplerCustom",
+                             "inputs": {"noise_seed": 2}}})
+    assert "conflicting seeds" in str(ei.value)
+
+
+def test_the_estimator_is_disarmed_not_merely_recorded():
+    """per_frame 0 makes compute_real_frame_budget skip its refusal branch
+    (`if per_frame_at_res > 0`), so nothing can refuse a leg on the poisoned
+    coefficients -- belt and braces, since the estimator is not in this path."""
+    assert B.NEUTRALIZED_ESTIMATOR["OTR_VIDEO_COST_PER_FRAME_MB"] == "0"
+    assert B.NEUTRALIZED_ESTIMATOR["OTR_VIDEO_COST_OVERHEAD_MB"] == "0"
+    assert float(B.NEUTRALIZED_ESTIMATOR["OTR_VIDEO_BUDGET_MARGIN"]) == 1.0
+    assert set(B.NEUTRALIZED_ESTIMATOR) == set(B.ESTIMATOR_SEAMS)
+
+
+def test_results_table_is_the_deliverable_and_carries_no_verdict_language():
+    rows = [_clean_cell("A", 17, engine_id="wan_ti2v", canvas=[832, 480],
+                        peak_vram_mib=6400.0, wall_s=182.4,
+                        asset={"path": "otr/episodes/_bench_4arm/A/x.mp4"}),
+            _clean_cell("D", 17, engine_id="ltx_8gb", canvas=[512, 288],
+                        status="error", error="CUDA out of memory")]
+    table, failures = B.results_table(rows)
+    header = table.splitlines()[0]
+    for col in ("arm", "engine", "canvas", "frames", "PASS/FAIL",
+                "peak VRAM MB", "seconds", "asset path"):
+        assert col in header
+    assert "| A | wan_ti2v | 832x480 | 17 | PASS | 6400.0 | 182.4 |" in table
+    assert "| D | ltx_8gb | 512x288 | 17 | FAIL |" in table
+    assert failures == ["D @ 512x288 17f: CUDA out of memory"]
+    lowered = table.lower()
+    for banned in ("qualified", "verdict", "floor-only", "tier"):
+        assert banned not in lowered
+
+
+def test_a_failed_arm_does_not_stop_the_other_arms():
+    """The sweep records a FAIL and moves on: a dead arm must not suppress the
+    numbers the surviving arms produced."""
+    rows = [_clean_cell("A", 17, engine_id="wan_ti2v", canvas=[832, 480]),
+            _clean_cell("A", 49, status="error", error="OOM"),
+            _clean_cell("D", 17, engine_id="ltx_8gb", canvas=[512, 288])]
+    table, failures = B.results_table(rows)
+    lines = table.splitlines()
+    assert len(lines) == 2 + len(rows)          # header + separator + one row each
+    assert lines[2].startswith("| A |") and "PASS" in lines[2]
+    assert lines[3].startswith("| A |") and "FAIL" in lines[3]
+    assert lines[4].startswith("| D |") and "PASS" in lines[4]
+    assert len(failures) == 1

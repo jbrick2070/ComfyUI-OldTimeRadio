@@ -117,6 +117,16 @@ CAMPAIGN_LENGTHS = (17, 49, 81)
 ESTIMATOR_SEAMS = ("OTR_VIDEO_COST_OVERHEAD_MB", "OTR_VIDEO_COST_PER_FRAME_MB",
                    "OTR_VIDEO_BUDGET_MARGIN")
 
+#: The values the server is booted with. ``per_frame = 0`` makes
+#: ``motion_common.compute_real_frame_budget`` skip its refusal branch entirely
+#: (``if per_frame_at_res > 0``), so nothing anywhere can refuse a leg on the
+#: coefficients we already know are poisoned.
+NEUTRALIZED_ESTIMATOR = {
+    "OTR_VIDEO_COST_OVERHEAD_MB": "0",
+    "OTR_VIDEO_COST_PER_FRAME_MB": "0",
+    "OTR_VIDEO_BUDGET_MARGIN": "1.0",
+}
+
 RESULT_LABEL = "16 GB card, 8 GiB-reserve direct-node prequalification"
 
 #: NVML must settle to within this of the recorded desktop baseline before a
@@ -320,8 +330,8 @@ ARMS = (
     ArmSpec(
         label="D", engine_id="ltx_8gb",
         graph="arm_d_ltx_8gb.json",
-        graph_sha256="03026b71ab838306cbaeb8265fde4773d9937343151a20b9c3d1fb03cb06d52f",
-        steps=8, canvas=(832, 480), lengths=CAMPAIGN_LENGTHS,
+        graph_sha256="55cd4a60c45c9966a13d36a123d2ceddaeca65c3d750b9bc8d29cb0bdb1f2db0",
+        steps=8, canvas=(512, 288), lengths=CAMPAIGN_LENGTHS,
         required_classes=("CheckpointLoaderSimple", "CLIPLoader",
                           "CLIPTextEncode", "LoadImage", "ModelSamplingLTXV",
                           "LTXVImgToVideo", "LTXVConditioning", "LTXVScheduler",
@@ -333,19 +343,16 @@ ARMS = (
                 ModelPin("3", "CLIPLoader", "clip_name",
                          "t5xxl_fp16.safetensors", "clip")),
         length_node="8", save_node="12",
-        notes="THE OTHER ENGINE, and the only genuine cross-family arm. NOT "
-              "settings-matched to Wan and cannot be: SamplerCustom + "
-              "LTXVScheduler + max_shift/base_shift/terminal, 8 steps, cfg 1.0 "
-              "versus Wan's KSampler + simple + shift, 30 steps, cfg 5.0. There "
-              "is no shared recipe vocabulary. What IS matched: seed, init "
-              "image, prompt, negative, canvas, frame lengths, clamp. ALSO: "
-              "t5_device=cpu is a real placement intervention Wan has no knob "
-              "for -- never average this arm against a Wan arm. AND 832x480 is "
-              "2.708x the pixels of this engine's shipped render_canvas "
-              "(512, 288), so a failure here is NOT a failure of the shipped "
-              "ltx_8gb tier; it needs its own 512x288 ladder before any tier "
-              "conclusion. Licence: LTX-Video Open Weights 0.X, revenue-capped "
-              "-- gates SHIPPING, not measuring (operator decision O4)."),
+        notes="RUNS AT ITS OWN SHIPPED CANVAS, 512x288 (eng_ltx_8gb:518), on "
+              "its own shipped recipe LTX8_RECIPE_V2 (8 steps, cfg 1.0, "
+              "t5_device=cpu, tiled VAE 512/64/16/8). This is deliberately NOT "
+              "settings-matched to the Wan arms and is not comparable to them: "
+              "different canvas, different sampler, different step count, and a "
+              "T5 placement lever Wan has no knob for. The question each arm "
+              "answers is only 'does this engine run on a small GPU, and how "
+              "much VRAM does it eat' -- read the arms as three separate "
+              "answers, never as a ranking. Licence: LTX-Video Open Weights "
+              "0.X, revenue-capped -- gates SHIPPING, not measuring (O4)."),
 )
 
 ARMS_BY_LABEL = {a.label: a for a in ARMS}
@@ -458,6 +465,24 @@ UNET_TO_GGUF = Substitution(
     "1", "UnetLoaderGGUF",
     set_inputs={"unet_name": "Wan2.2-TI2V-5B-Q5_K_M.gguf"},
     drop_inputs=("weight_dtype",))
+
+
+def graph_seed(prompt):
+    """The seed the graph actually submits. Wan's KSampler calls it ``seed``,
+    LTX's SamplerCustom calls it ``noise_seed``; both are recorded so a leg can
+    be replayed."""
+    seeds = []
+    for nid in sorted(prompt, key=lambda k: (len(k), k)):
+        inputs = prompt[nid].get("inputs", {})
+        for key in ("seed", "noise_seed"):
+            if isinstance(inputs.get(key), (int, float)):
+                seeds.append(int(inputs[key]))
+    if not seeds:
+        raise BenchError("graph carries no seed / noise_seed -- a leg that "
+                         "cannot be replayed is not a measurement")
+    if len(set(seeds)) != 1:
+        raise BenchError("graph carries conflicting seeds: %s" % sorted(set(seeds)))
+    return seeds[0]
 
 
 def graph_shape(prompt):
@@ -660,6 +685,11 @@ def boot_server(server_log_path, reserve_gib):
     env["OTR_HEADLESS_PORT"] = str(PORT)
     env["COMFYUI_OUTPUT"] = OUTPUT_BASE
     env["OTR_HEADLESS_RESERVE_VRAM_GB"] = str(reserve_gib)
+    # Disarm the admission predictor. It is not in this path at all (stock nodes
+    # bypass the adapters), but setting it means no code path anywhere can refuse
+    # a leg for a reason we already know is wrong. per_frame 0 makes
+    # compute_real_frame_budget skip its refusal branch outright.
+    env.update(NEUTRALIZED_ESTIMATOR)
     log("booting ComfyUI :%d --reserve-vram %s -> %s"
         % (PORT, reserve_gib, server_log_path))
     proc = subprocess.Popen([SOAK_LAUNCH_CMD, server_log_path, "FLOOR"],
@@ -966,6 +996,16 @@ def build_cell_prompt(arm, base_prompt, length, resolved_models, filename_prefix
         raise BenchError("arm %s: length %d is illegal for %s"
                          % (arm.label, length, arm.engine_id))
     node["inputs"]["length"] = int(length)
+    # CANVAS IS ARM-OWNED. Each arm renders at ITS OWN shipped canvas -- this is
+    # not a controlled comparison, it is "does this engine run on a small GPU and
+    # how much does it eat". The ArmSpec is the single authority; the graph file
+    # agrees with it, and offline_preflight proves they agree.
+    w, h = arm.canvas
+    for axis, value in (("width", w), ("height", h)):
+        if axis not in node["inputs"]:
+            raise BenchError("arm %s: length node %r has no %r input"
+                             % (arm.label, arm.length_node, axis))
+        node["inputs"][axis] = int(value)
     for pin in arm.models:
         enum = resolved_models.get(pin.role)
         if enum is None:
@@ -1248,8 +1288,10 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         base_prompt = load_graph(arm)
         prefix = "otr/episodes/_bench_4arm/%s/%s" % (arm.label, cell_id)
         prompt = build_cell_prompt(arm, base_prompt, length, resolved, prefix)
-        log("CELL %s | %s | %d frames | reserve %d GiB"
-            % (cell_id, arm.label, length, CAMPAIGN_CLAMP_GIB))
+        receipt["seed"] = graph_seed(prompt)
+        log("CELL %s | %s | %dx%d | %d frames | %d steps | seed %d | reserve %d GiB"
+            % (cell_id, arm.label, arm.canvas[0], arm.canvas[1], length,
+               arm.steps, receipt["seed"], CAMPAIGN_CLAMP_GIB))
 
         with open(server_log, "r", encoding="utf-8", errors="replace") as f:
             f.seek(0, os.SEEK_END)
@@ -1415,71 +1457,53 @@ def write_atomic(path, text):
     os.replace(tmp, path)
 
 
+def results_table(receipts):
+    """THE deliverable: one row per cell, and one line per failure. Nothing else.
+
+    Deliberately carries no verdict, no ranking and no tier language. Each arm
+    ran at ITS OWN shipped canvas and recipe, so the rows are three separate
+    answers to 'does this engine run on a small GPU and how much does it eat' --
+    they are not a comparison and must not be read as one."""
+    lines = [
+        "| arm | engine | canvas | frames | PASS/FAIL | peak VRAM MB | seconds "
+        "| asset path |",
+        "|---|---|---|---|---|---:|---:|---|",
+    ]
+    failures = []
+    for r in receipts:
+        ok = r.get("status") == "ok" and not cell_blocks_pass(r)
+        canvas = "x".join(str(v) for v in (r.get("canvas") or ["?", "?"]))
+        asset = (r.get("asset") or {}).get("path") or "-"
+        lines.append("| %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            r.get("arm", "?"), r.get("engine_id", "?"), canvas,
+            r.get("length", "-"), "PASS" if ok else "FAIL",
+            r.get("peak_vram_mib", "-"), r.get("wall_s", "-"), asset))
+        if not ok:
+            why = r.get("error") or "; ".join(cell_blocks_pass(r)) or "unknown"
+            failures.append("%s @ %s %sf: %s"
+                            % (r.get("arm", "?"), canvas, r.get("length", "?"),
+                               why))
+    return "\n".join(lines), failures
+
+
 def write_results(receipts, manifest, arms):
     os.makedirs(BENCH_DIR, exist_ok=True)
     grades = [grade_arm(a, receipts) for a in arms]
     payload = {"manifest": manifest, "grades": grades, "cells": receipts}
     write_atomic(os.path.join(BENCH_DIR, "video_arm_bench_results.json"),
                  json.dumps(payload, indent=2) + "\n")
-
-    L = ["# Four-arm clamped video bench", "",
-         "**%s.** NOT '8 GB qualified'." % RESULT_LABEL, "",
-         "This bench smokes the VIDEO STAGE IN ISOLATION under an 8 GiB loader",
-         "clamp on a 16 GB card. It does not qualify the 8 GB tier, does not",
-         "license lowering `FRAME_COST_MODEL`, does not promote 14B, does not",
-         "refit the estimator, and does not prove teardown.", "",
-         "**The admission estimator is NOT in this path.** Driving stock nodes",
-         "directly bypasses the OTR engine adapters, so `motion_common`'s",
-         "estimator never runs. The `OTR_VIDEO_COST_*` / `OTR_VIDEO_BUDGET_MARGIN`",
-         "seams are recorded in every receipt but are **INERT** here -- do not",
-         "read a bypassed predictor as a working one.", "",
-         "**The arms are not settings-matched, and cannot be.** Wan runs KSampler",
-         "+ scheduler `simple` + shift, 30 steps, cfg 5.0. LTX runs SamplerCustom",
-         "+ LTXVScheduler + max_shift/base_shift/terminal, 8 steps, cfg 1.0. There",
-         "is no shared recipe vocabulary. What IS matched: seed, init image,",
-         "prompt, negative, canvas, frame lengths and clamp.", "",
-         "Bar: `peak_delta_mib <= %d` at EVERY required length "
-         "(8192 - %d MiB display allowance, a declared assumption)."
-         % (GREENLIGHT_PEAK_DELTA_MIB, DISPLAY_ALLOWANCE_MIB), "",
-         "## Verdicts", "",
-         "| arm | verdict | clean lengths | required | blockers |",
-         "|---|---|---|---|---|"]
-    for g in grades:
-        L.append("| %s | **%s** | %s | %s | %s |"
-                 % (g["arm"], g["verdict"],
-                    ", ".join(str(x) for x in g["clean_lengths"]) or "-",
-                    ", ".join(str(x) for x in g["required_lengths"]),
-                    ("; ".join(g["blockers"])[:180] or "-")))
-    L += ["", "## Cells", "",
-          "| cell | arm | frames | peak MiB | delta MiB | s/it | sysRAM d | "
-          "torch alloc | asset | status |",
-          "|---|---|---:|---:|---:|---:|---:|---:|---|---|"]
-    for r in receipts:
-        probe = r.get("stage_probe") or {}
-        asset = r.get("asset") or {}
-        L.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
-                 % (r.get("cell_id", "?"), r.get("arm", "?"), r.get("length", "-"),
-                    r.get("peak_vram_mib", "-"), r.get("peak_delta_mib", "-"),
-                    r.get("s_per_it", "-"), r.get("sysram_delta_mib", "-"),
-                    probe.get("torch_max_allocated_mib", "-"),
-                    os.path.basename(asset.get("path", "")) or "-",
-                    r.get("status", "?") + ("" if r.get("status") == "ok"
-                                            else " (%s)" % str(r.get("error", ""))[:120])))
-    L += ["", "## Arm notes", ""]
-    for a in arms:
-        L += ["### Arm %s (%s)" % (a.label, a.engine_id), "", a.notes, ""]
-        lic = ARM_LICENCE.get(a.label, {})
-        L += ["Licence: %s (%s)%s" % (lic.get("licence", "?"), lic.get("source", "?"),
-                                      " -- " + lic["note"] if lic.get("note") else ""), ""]
-    L += ["## Arms not in this campaign", "",
-          "- **Arm C (FastWan 5B)** -- CUT. Licence PASSES (apache-2.0 at both "
-          "levels), but no ComfyUI base graph exists at any priority: the weights "
-          "are Diffusers layout and the 3-step DMD schedule (timesteps "
-          "1000,757,522) is not ordinary `KSampler steps=3`. Re-open as a "
-          "separate research probe behind a conversion/loader receipt and a "
-          "same-input blind quality check.", ""]
-    write_atomic(os.path.join(BENCH_DIR, "video_arm_bench_results.md"),
-                 "\n".join(L) + "\n")
+    table, failures = results_table(receipts)
+    out = ["# Video arm bench -- results", "",
+           "%s. Seed %s. Clamp --reserve-vram %d. Each arm at ITS OWN shipped "
+           "canvas and recipe; the rows are separate answers, not a comparison."
+           % (RESULT_LABEL,
+              (receipts[0].get("seed") if receipts else "?"),
+              CAMPAIGN_CLAMP_GIB),
+           "", table, ""]
+    if failures:
+        out += ["## Failures", ""] + ["- " + f for f in failures] + [""]
+    write_atomic(os.path.join(BENCH_DIR, "video_arm_bench_table.md"),
+                 "\n".join(out) + "\n")
 
 
 # --------------------------------------------------------------------------
@@ -1504,6 +1528,16 @@ def offline_preflight(arms):
             if pin.input_name not in node.get("inputs", {}):
                 raise BenchError("arm %s: node %s has no input %r"
                                  % (arm.label, pin.node_id, pin.input_name))
+        # the graph file's canvas must agree with the ArmSpec, so a reader of
+        # either one sees the canvas the arm actually renders at
+        latent = prompt.get(arm.length_node, {}).get("inputs", {})
+        declared = (latent.get("width"), latent.get("height"))
+        if declared != arm.canvas:
+            raise BenchError(
+                "arm %s: %s declares canvas %sx%s but the ArmSpec says %dx%d"
+                % (arm.label, arm.graph, declared[0], declared[1],
+                   arm.canvas[0], arm.canvas[1]))
+        graph_seed(prompt)
         classes = {nd.get("class_type") for nd in prompt.values()}
         undeclared = classes - set(arm.required_classes)
         if undeclared:

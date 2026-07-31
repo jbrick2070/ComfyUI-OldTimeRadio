@@ -1,5 +1,5 @@
 {
-  "_comment": "ISOLATED bench graph -- arm D, ltx_8gb. Resolves eng_ltx_8gb's alias graph (_node_candidates, :1086-1101) to concrete classes and freezes LTX8_RECIPE_V2 (steps 8, cfg 1.0, max_shift 2.05, base_shift 0.95, terminal 0.1, euler, tiled VAE 512/64/16/8, t5_device cpu). Shared bench controls: seed 42, same still, same positive/negative, 832x480. NOTE 832x480 is 2.708x the pixels of this engine's shipped render_canvas (512, 288) -- a failure here is NOT a failure of the shipped ltx_8gb tier. LTXVConditioning frame_rate 25.0 = the engine's target_fps; CreateVideo fps 24.0 = the bench constant, recorded not corrected.",
+  "_comment": "ISOLATED bench graph -- arm D, ltx_8gb. Resolves eng_ltx_8gb's alias graph (_node_candidates, :1086-1101) to concrete classes and freezes LTX8_RECIPE_V2 (steps 8, cfg 1.0, max_shift 2.05, base_shift 0.95, terminal 0.1, euler, tiled VAE 512/64/16/8, t5_device cpu). Shared bench controls: seed 42, same still, same positive/negative. RENDERS AT ITS OWN SHIPPED CANVAS 512x288 (eng_ltx_8gb render_canvas, :518), NOT the Wan arms' 832x480 -- this bench asks 'does this engine run on a small GPU and how much does it eat', per engine, and never compares the arms to each other. LTXVConditioning frame_rate 25.0 = the engine's target_fps; CreateVideo fps 24.0 = the bench constant, recorded not corrected.",
   "1": {
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -91,8 +91,8 @@
         "7",
         0
       ],
-      "width": 832,
-      "height": 480,
+      "width": 512,
+      "height": 288,
       "length": 49,
       "batch_size": 1,
       "strength": 1.0
