@@ -432,6 +432,23 @@ def test_parse_timing_reports_unavailable_rather_than_inventing_a_number():
     assert source == "unavailable"
 
 
+def test_an_inverted_it_per_s_carries_the_same_precision_as_every_other_path():
+    """Fast cells log it/s, not s/it. The raw reciprocal wrote
+    0.47393364928909953 into a receipt whose neighbours read 1.07 and 1.42 --
+    same field, same run, three different precisions."""
+    sit, source, _ = B.parse_timing(
+        "100%|###| 30/30 [00:14<00:00,  2.11it/s]\n")
+    assert sit == 0.474
+    assert source == "log"
+    assert len(str(sit).split(".")[1]) <= 3
+
+
+def test_a_zero_it_per_s_does_not_divide_by_zero():
+    sit, source, _ = B.parse_timing("100%|###| 30/30 [00:14<00:00,  0it/s]\n")
+    assert sit is None
+    assert source == "unavailable"
+
+
 # --------------------------------------------------------------------------
 # asset validation -- from /history, never a glob
 # --------------------------------------------------------------------------

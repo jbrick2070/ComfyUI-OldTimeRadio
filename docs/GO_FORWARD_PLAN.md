@@ -2959,17 +2959,43 @@ baseline from the printed absolutes is close but wrong -- use the
    wall. 512x288 is the shipped `render_canvas`, and it had never rendered live
    before this bench.
 
-**All nine assets were validated by DECODE, not by container header.**
-`ffprobe -count_frames` reports exactly 17 / 49 / 81 read frames per arm, at
-832x480 (A, B-partial) and 512x288 (D), 24/1 fps. Nothing here is an empty or
-truncated file.
+5. **THE LIKE-FOR-LIKE LEG SETTLES IT: D's speed is the recipe, not the
+   engine.** Arm A re-run at D's canvas, everything else unchanged (30 steps,
+   seed 42, `--reserve-vram 8`), three more PASS cells, assets decode-validated:
+   `output/otr/episodes/_bench_4arm/diagnostic_512x288/`.
 
-**D is not "faster than WAN" as an engine property.** D ran 8 steps at 512x288
-against A's 30 steps at 832x480 -- 3.75x fewer steps over 2.71x fewer pixels,
-about 10x, which is the whole gap. Per iteration D is SLOWER
-(s/it 1.74 / 1.19 / 1.20 against A's 1.15 / 3.02 / 5.06), and D's 17-frame leg
-reads slowest of its three because fixed load cost dominates a 15-20 s wall.
-Do not cite the seconds column as an engine ranking.
+   | frames | A @ 832x480 | A @ 512x288 | D @ 512x288 (8 steps) |
+   |---:|---|---|---|
+   | 17 | 6568.2 MiB / 76.2 s / 1.15 s/it | 6524.6 MiB / 40.4 s / 0.474 s/it | 6691.1 MiB / 20.4 s / 1.74 s/it |
+   | 49 | 6563.1 MiB / 145.7 s / 3.02 s/it | 6578.5 MiB / 60.3 s / 1.07 s/it | 6755.3 MiB / 15.4 s / 1.19 s/it |
+   | 81 | 6563.1 MiB / 221.5 s / 5.06 s/it | 6486.9 MiB / 81.1 s / 1.42 s/it | 6819.1 MiB / 20.4 s / 1.20 s/it |
+
+   At the SAME canvas, Wan is FASTER per iteration than LTX at 17 and 49 frames
+   (0.474 vs 1.74; 1.07 vs 1.19) and 18% slower at 81 (1.42 vs 1.20). The
+   wall-clock ratio at 81 frames is 81.1 / 20.4 = 3.98x against a step ratio of
+   30 / 8 = 3.75x. **The entire "10x" in the headline table was 3.75x steps
+   times 2.71x pixels.** Nothing about `ltx_8gb` is intrinsically fast, and
+   nothing about `wan_ti2v` is intrinsically slow.
+
+   It also settles the cheaper engine at a fixed canvas: at 512x288 **Wan uses
+   LESS VRAM than LTX** -- 166 / 177 / 332 MiB less at 17 / 49 / 81.
+
+6. **PIXELS ARE AS FREE AS FRAMES, so the estimator is wrong in BOTH scaling
+   terms.** A's delta at 512x288 minus its delta at 832x480 is
+   -43.6 / +15.4 / -76.2 MiB -- it straddles zero, so 2.71x fewer pixels bought
+   nothing. The estimator scales `per_frame` by the pixel ratio (60.33 MB/frame
+   at 832x480, 22.27 at 512x288), which at 81 frames predicts the smaller canvas
+   should need **3,083 MB less**. Across this whole range the measured cost is
+   the resident model and essentially nothing else.
+
+**All twelve assets were validated by DECODE, not by container header.**
+`ffprobe -count_frames` reports exactly 17 / 49 / 81 read frames per arm, at
+832x480 (A, B-partial), 512x288 (D) and 512x288 (the A diagnostic leg), 24/1 fps.
+Nothing here is an empty or truncated file.
+
+**Never cite the seconds column as an engine ranking.** Item 5 is why: two arms
+at different canvases and different step counts are two different questions, and
+the only honest engine comparison in this tree is A vs D at 512x288.
 
 **Still open, and NOT closed by this bench:**
 
@@ -2977,9 +3003,9 @@ Do not cite the seconds column as an engine ranking.
   `comfy.model_management.EXTRA_RESERVED_VRAM`, a Python integer that allocates
   nothing; it changes what ComfyUI BELIEVES it has, and that belief is what was
   tested.
-- `FRAME_COST_MODEL` is measurably wrong in its per-frame term, but must not be
-  re-fit off nine points at two canvases with no per-stage breakdown. The clamp
-  is also invisible to the estimator by construction --
+- `FRAME_COST_MODEL` is measurably wrong in BOTH its frame term and its pixel
+  scaling, but must not be re-fit off twelve points with no per-stage
+  breakdown. The clamp is also invisible to the estimator by construction --
   `EXTRA_RESERVED_VRAM` is an integer while `free_vram_mb()` is a
   `torch.cuda.mem_get_info` driver read -- so the predictor structurally cannot
   observe the experiment's independent variable. Re-fitting is its own task with
@@ -2990,17 +3016,17 @@ Do not cite the seconds column as an engine ranking.
 
 **NEXT, in order, when this reopens:**
 
-1. **The like-for-like leg -- coded, not run, one GPU step.** `--canvas` landed
-   with the bench (`14421983`), so
-   `python scripts/run_video_arm_bakeoff.py --arms A --canvas 512x288` answers
-   the one question the sweep as designed cannot: whether D's speed is an engine
-   property or a canvas one. Results land in their own `diagnostic_512x288/`
-   tree and can never be read as arm A's shipped number.
+1. ~~The like-for-like leg~~ -- **DONE 2026-07-31, item 5 above.**
 2. **A physical 8 GB card.** Everything above is a clamp on a 16 GB card. Until
    this exists, "8 GB qualified" stays unsaid.
 3. **Re-fit `FRAME_COST_MODEL` -- its own task, its own design.** Not a
-   coefficient tweak: the estimator cannot see the clamp, so decide what it
-   should be measuring before deciding what the numbers should be.
+   coefficient tweak: the estimator cannot see the clamp, and items 2 and 6 say
+   both of its scaling terms are near-zero in reality, so decide what it should
+   be MEASURING before deciding what the numbers should be.
+4. **Adding a model is now data entry, not engineering.** One `ArmSpec` row plus
+   one video-only graph file gets any candidate a render and a VRAM number
+   through this harness. Three arms ran clean on the first attempt; the cost
+   this time was the grader around them, and that is fixed.
 
 Do NOT: re-run arm B, promote 14B, lower the greenlight bar, or start per-stage
 measurement. The first is refuted, the next two are standing operator rulings,
@@ -3905,7 +3931,16 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-31 @ `f3bc01cc`, the diagnostic canvas
+- Current whole-tree receipt (2026-07-31, the A@512x288 like-for-like leg + the
+  `parse_timing` precision fix): full Windows suite
+  `8135 passed / 130 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical (no node, widget, link or schema touched); AST/BOM/zero-byte/
+  UTF-8/ASCII clean; HEAD == origin verified after the push. Three new GPU cells
+  under `_bench_4arm/diagnostic_512x288/`, all PASS, all decode-validated.
+- Prior receipt (2026-07-31 @ `f3bc01cc`, the diagnostic canvas
   override + the measured 8 GiB-clamped bench written into the record): full
   Windows suite `8133 passed / 130 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`

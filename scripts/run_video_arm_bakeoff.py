@@ -973,7 +973,10 @@ def parse_timing(log_slice):
     if sit is None:
         for m in re.finditer(r"(\d+\.?\d*)\s*it/s", log_slice):
             its = float(m.group(1))
-            sit = (1.0 / its) if its else None
+            # rounded HERE so every path out of this function carries the same
+            # precision -- the raw reciprocal wrote 0.47393364928909953 into a
+            # receipt beside neighbours reading 1.07 and 1.42
+            sit = round(1.0 / its, 3) if its else None
     if sit is None:
         sit, source = None, "unavailable"
     prompt_exec = None
