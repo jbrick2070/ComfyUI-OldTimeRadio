@@ -65,8 +65,44 @@ Live GPU requalification IS still owed.
 **CURRENT STEP (operator directive 2026-07-31, revised same day):
 GET WAN 8-GB READY *FIRST*, THEN the 30-word randomizer sweep.**
 
-**WAN 8-GB is NOT a ceiling problem -- the analysis is
-`docs/2026-07-31-wan-8gb-parameter-analysis.md`. Read it before touching this.**
+**RESCOPED SAME DAY BY RESEARCH -- read
+`docs/2026-07-31-low-vram-video-research.md` FIRST, then the parameter analysis.**
+Three independent passes (this window, a live web-research pass, and the
+operator's ChatGPT pass) converged: **our VRAM estimator is the wrong SHAPE.**
+`overhead + per_frame*frames` is a CO-RESIDENT model; the real low-VRAM technique
+is STAGED, so peak is `max(text_encode, image_encode, sample, vae_decode) +
+reserve`, not a sum. Proof that addition is wrong: ComfyUI's official Wan 2.2
+workflow is ~18 GB of model files and its own docs say it "fits well on 8GB vram
+with the ComfyUI native offloading".
+
+**And the finding that outranks everything else: our GGUF opts OUT of Dynamic
+VRAM.** `ComfyUI-GGUF` defines `GGUFModelPatcher(ModelPatcher)`, NOT
+`ModelPatcherDynamic` (Comfy-Org/ComfyUI#13953, 18 May 2026), so our
+`Q5_K_M` UNET + encoder run on the legacy 2025 path while the official 8 GB
+workflow that "fits well" uses fp8 scaled SAFETENSORS -- which do get the dynamic
+patcher. Also: `--lowvram` is now INERT when Dynamic VRAM is on.
+
+KEEP Wan 2.2 TI2V-5B -- Wan 2.5/2.6/2.7 are not open weights (verified against
+the Wan-AI HF org; the "Wan 2.7 local" articles are SEO fiction), and LTX-2.3 is
+22B + a Gemma-3-12B encoder (~20 GB of weights, 12 GB community floor, and
+ComfyUI rates it 5.5 vs Wan's ~1.38 on activation cost). The problem was never
+the model.
+
+Revised order: (1) cache text embeddings -- `WanVideoTextEncodeCached` already
+exists with `use_disk_cache=True` by default, and OTR's bounded repetitive prompt
+set is the ideal case; it removes 3.9 GiB (the umt5 encoder is LARGER than the
+UNET) plus minutes per leg; (2) A/B fp8 safetensors vs our GGUF -- verified
+mechanism, unmeasured consequence, possibly the biggest structural win;
+(3) replace the estimator with the max-over-stages shape; (4) declare
+`render_canvas` (still unfixed, still 3.07x); (5) then measure.
+
+**Nobody anywhere has published a real peak-VRAM number for Wan 2.2 TI2V-5B on an
+8 GB card. We are the best-positioned party to measure and publish it.**
+
+**The older ceiling-first analysis is
+`docs/2026-07-31-wan-8gb-parameter-analysis.md` -- its canvas and t5_device
+findings still stand; its framing of the cost model as merely miscalibrated does
+not.**
 The headline: with the shipped cost model
 (`FRAME_COST_MODEL["wan_ti2v"] = (7000.0, 185.0)`, margin 0.85) an 8 GB card
 needs **9,442 MB free** to render even the 17-frame motion floor at 832x480 --
