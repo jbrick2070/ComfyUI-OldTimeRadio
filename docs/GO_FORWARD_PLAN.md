@@ -2988,6 +2988,24 @@ Do not cite the seconds column as an engine ranking.
   peak is what this build has, and no per-stage primitive exists on the video
   path. The stage probe in the harness is ADVISORY for exactly that reason.
 
+**NEXT, in order, when this reopens:**
+
+1. **The like-for-like leg -- coded, not run, one GPU step.** `--canvas` landed
+   with the bench (`14421983`), so
+   `python scripts/run_video_arm_bakeoff.py --arms A --canvas 512x288` answers
+   the one question the sweep as designed cannot: whether D's speed is an engine
+   property or a canvas one. Results land in their own `diagnostic_512x288/`
+   tree and can never be read as arm A's shipped number.
+2. **A physical 8 GB card.** Everything above is a clamp on a 16 GB card. Until
+   this exists, "8 GB qualified" stays unsaid.
+3. **Re-fit `FRAME_COST_MODEL` -- its own task, its own design.** Not a
+   coefficient tweak: the estimator cannot see the clamp, so decide what it
+   should be measuring before deciding what the numbers should be.
+
+Do NOT: re-run arm B, promote 14B, lower the greenlight bar, or start per-stage
+measurement. The first is refuted, the next two are standing operator rulings,
+and the last was declined.
+
 ## OPEN BUGS / DEFECTS (live, not yet closed)
 
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
@@ -3887,7 +3905,19 @@ fixture creates a row.
 
 ## Validation and handoff law
 
-- Current whole-tree receipt (2026-07-28 @ `1959fb49`, the encoder arc + the
+- Current whole-tree receipt (2026-07-31 @ `f3bc01cc`, the diagnostic canvas
+  override + the measured 8 GiB-clamped bench written into the record): full
+  Windows suite `8133 passed / 130 skipped / 1 xfailed`; Bug Bible
+  `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
+  11 variants / 0 failures; canonical
+  `9872624A311AB52D6A7112BFF5E3C7BB83B85103331E4455DECB64AA2325D25D`
+  byte-identical across both commits (no node, widget, link or schema touched --
+  a bench script, its tests, and four docs); AST/BOM/zero-byte/UTF-8/ASCII clean
+  on every touched file, verified after the push with HEAD == origin. Measured
+  with the tree exactly as found: another window's three modified `tmp/*.ps1`
+  (the `bake420e` leg) and the untracked `docs/*.log.err` + `docs/*.pdf`
+  scratch were preserved and NOT committed.
+- Prior receipt (2026-07-28 @ `1959fb49`, the encoder arc + the
   credits-card ladder): full Windows suite
   `7464 passed / 27 skipped / 1 xfailed`; Bug Bible
   `17 passed / 24 skipped / 3 xfailed`; `scripts/build_variants.py --check`
