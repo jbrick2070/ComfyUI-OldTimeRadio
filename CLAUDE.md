@@ -42,6 +42,24 @@ IS my workflow.
   value slot AND gains an input with `"widget": {"name": ...}`.
 - After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + a link/widget audit
   (widget-count vs live INPUT_TYPES, every wired input-name in INPUT_TYPES, link referential integrity).
+### 0A. ISOLATED-BENCH CARVE-OUT (operator ruling 2026-07-31, decision O6 -- NARROW)
+The "EVERY API / headless / soak run MUST LOAD this real JSON" rule above has exactly ONE
+exemption, and this is it. `scripts/run_wan_ti2v_bakeoff.py` has submitted a stock-node API
+graph since 2026-07-08 and shipped; that unwritten practice is now written down, and bounded.
+- **Who:** `scripts/run_video_arm_bakeoff.py` and `scripts/run_wan_ti2v_bakeoff.py`. No other runner.
+- **What:** ONLY the API-format graphs under `scripts/bench_graphs/` (+ the legacy
+  `scripts/otr_wan_ti2v_bakeoff_gguf.json`). Each is pinned by SHA-256 in the campaign manifest;
+  a graph whose digest does not match its pin FAILS the cell. No `.gen.json`, ever.
+- **Where the outputs go:** `otr/episodes/_bench_4arm/<arm>/` only -- diagnostic measurements,
+  never a deliverable, never `otr/obs/`, never quotable as a published episode.
+- **Validation gates that replace canonical loading:** every required node class and every model
+  filename confirmed live in `/object_info` before submit; graph JSON round-trip; asset validated
+  from `/history` (not a glob) then ffprobe'd for canvas, frame count, fps, codec and duration.
+- **What it does NOT license:** the exemption covers MEASUREMENT ONLY. No production render, no
+  soak, no published episode, and no engine/profile/tier change may ride a bench graph. Any
+  behaviour a bench discovers must be re-proved through `workflows/otr_canonical.json` before it
+  ships. A bench result may never be worded as qualification (see the SPEC, section 2).
+- Rationale + the full gate list: `docs/2026-07-31-four-arm-clamped-video-bench-SPEC.md` (G1/O6).
 ## 1. HOW COWORK ACTUALLY WORKS HERE (read this first)
 - **Two separate filesystems.** The file tools (Read / Write / Edit) operate on the REAL Windows files --
   that is your primary editor. **Desktop Commander** (`mcp__Desktop_Commander__*`) runs PowerShell on the

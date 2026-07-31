@@ -336,13 +336,16 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
     source = (Path(__file__).resolve().parents[1]
               / "nodes" / "_otr_rolls.py").read_text(encoding="utf-8")
     imported: set[str] = set()
+    # loop var named `imp` NOT `alias` -- the B7 forbidden sweep flags `alias`
+    # as a runtime marker (CW-6 gotcha), same as test_visual_styles_3a.py and
+    # test_wire_w2_deferred_image_gap.py.
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
-            imported.update(alias.name.split(".")[0] for alias in node.names)
+            imported.update(imp.name.split(".")[0] for imp in node.names)
         elif isinstance(node, ast.ImportFrom):
             if node.module:
                 imported.add(node.module.split(".")[0])
-            imported.update(alias.name for alias in node.names)
+            imported.update(imp.name for imp in node.names)
     allowed = {
         # stdlib
         "__future__", "annotations",
