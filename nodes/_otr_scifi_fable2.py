@@ -30,7 +30,7 @@ import warnings
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Mapping, Sequence
 
 from pydantic import (
     BaseModel,
@@ -52,6 +52,10 @@ try:
     )
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import ProviderCapacityMessages
+    from ._otr_scifi_p0_contract import (
+        MAX_QUOTE_CHARS,
+        p0_source_chunks,
+    )
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -78,6 +82,10 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         set_line_text_metrics,
     )
     from _otr_generation_budget import ProviderCapacityMessages  # type: ignore
+    from _otr_scifi_p0_contract import (  # type: ignore
+        MAX_QUOTE_CHARS,
+        p0_source_chunks,
+    )
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
@@ -183,6 +191,16 @@ def _MARKUP_LADDER_TEMPS(t: float) -> "tuple[float, ...]":
 
 
 _DIGEST_CHAR_CAP = 3600
+_DOSSIER_WINDOW_OVERLAP_CHARS = MAX_QUOTE_CHARS - 1
+_DOSSIER_FACTS_MAX = 20
+_DOSSIER_NUMBERS_MAX = 20
+_DOSSIER_ENTITIES_PER_BUCKET_MAX = 10
+_DOSSIER_VECTORS_MAX = 10
+_DIGEST_HEADLINE_CHAR_CAP = 240
+_DIGEST_SOURCE_CHAR_CAP = 120
+_DIGEST_DATE_CHAR_CAP = 64
+_DIGEST_SUMMARY_CHAR_CAP = 720
+_DIGEST_FRAME_TRIM_MARK = " [...TRIMMED]"
 
 # Advisory scene-count guidance. It never participates in acceptance.
 _SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
@@ -213,18 +231,43 @@ _DECK_PATH = (
 # ---------------------------------------------------------------------------
 
 class NamedEntities(BaseModel):
-    people: list[str] = Field(default_factory=list, max_length=10)
-    places: list[str] = Field(default_factory=list, max_length=10)
-    things: list[str] = Field(default_factory=list, max_length=10)
+    people: list[str] = Field(
+        default_factory=list,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+    )
+    places: list[str] = Field(
+        default_factory=list,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+    )
+    things: list[str] = Field(
+        default_factory=list,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+    )
 
 
 class DossierLLM(BaseModel):
     """Source-grounding artifact; prose length is never judged."""
 
-    facts_to_keep: list[str] = Field(min_length=1, max_length=20)
-    allowed_numbers: list[str] = Field(default_factory=list, max_length=20)
+    facts_to_keep: list[str] = Field(
+        min_length=1,
+        max_length=_DOSSIER_FACTS_MAX,
+    )
+    allowed_numbers: list[str] = Field(
+        default_factory=list,
+        max_length=_DOSSIER_NUMBERS_MAX,
+    )
     named_entities: NamedEntities
-    dramatizable_vectors: list[str] = Field(default_factory=list, max_length=10)
+    dramatizable_vectors: list[str] = Field(
+        default_factory=list,
+        max_length=_DOSSIER_VECTORS_MAX,
+    )
+
+    @field_validator("facts_to_keep")
+    @classmethod
+    def _facts_must_be_nonblank(cls, values):
+        if any(not str(value).strip() for value in values):
+            raise ValueError("facts_to_keep entries must be nonblank")
+        return values
 
 
 class Pitch(BaseModel):
@@ -864,15 +907,486 @@ def _make_casting_validator(menu: VoiceMenu, speakers: "list[str]"):
 # LLM passes (doc s3/s8/s10)
 # ---------------------------------------------------------------------------
 
-def _build_digest(payload: "dict[str, Any]") -> str:
-    """Python-capped source digest for P0/P3 (never the raw feed)."""
-    head = (
+@dataclass(frozen=True)
+class _DossierWindow:
+    index: int
+    body_start: int
+    body_end: int
+    digest: str
+
+
+def _raw_digest_header(payload: "Mapping[str, Any]") -> str:
+    return (
         f"HEADLINE: {payload.get('headline', '')}\n"
         f"SOURCE: {payload.get('source', '')} {payload.get('date', '')}\n"
         f"SUMMARY: {payload.get('summary', '')}\n\n"
     )
+
+
+def _bounded_frame_value(value: Any, *, limit: int) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    keep = limit - len(_DIGEST_FRAME_TRIM_MARK)
+    return text[:keep].rstrip() + _DIGEST_FRAME_TRIM_MARK
+
+
+def _digest_header(payload: "Mapping[str, Any]") -> str:
+    """Bound repeated framing while leaving the selected body untouched."""
+    raw = _raw_digest_header(payload)
     body = str(payload.get("full_text") or payload.get("seed_text") or "")
-    return (head + body)[:_DIGEST_CHAR_CAP]
+    if len(raw) + len(body) <= _DIGEST_CHAR_CAP:
+        return raw
+    return (
+        "HEADLINE: "
+        + _bounded_frame_value(
+            payload.get("headline"),
+            limit=_DIGEST_HEADLINE_CHAR_CAP,
+        )
+        + "\nSOURCE: "
+        + _bounded_frame_value(
+            payload.get("source"),
+            limit=_DIGEST_SOURCE_CHAR_CAP,
+        )
+        + " "
+        + _bounded_frame_value(
+            payload.get("date"),
+            limit=_DIGEST_DATE_CHAR_CAP,
+        )
+        + "\nSUMMARY: "
+        + _bounded_frame_value(
+            payload.get("summary"),
+            limit=_DIGEST_SUMMARY_CHAR_CAP,
+        )
+        + "\n\n"
+    )
+
+
+def _source_body(payload: "Mapping[str, Any]") -> "tuple[str, str]":
+    full_text = str(payload.get("full_text") or "")
+    if full_text:
+        return "full_text", full_text
+    return "seed_text", str(payload.get("seed_text") or "")
+
+
+def _build_source_preview(payload: "Mapping[str, Any]") -> str:
+    """Bounded raw-text preview; the merged dossier owns full coverage."""
+    _route, body = _source_body(payload)
+    return (_digest_header(payload) + body)[:_DIGEST_CHAR_CAP]
+
+
+def _validate_dossier_windows(
+    payload: "Mapping[str, Any]",
+    windows: "Sequence[_DossierWindow]",
+    *,
+    overlap_chars: int,
+) -> None:
+    """Prove that a proposed window set covers the selected body exactly."""
+    if not windows:
+        raise Fable2DossierError(
+            "dossier", "complete-source window set is empty")
+    header = _digest_header(payload)
+    _route, body = _source_body(payload)
+    covered_end = 0
+    previous: "_DossierWindow | None" = None
+    for expected_index, window in enumerate(windows):
+        if window.index != expected_index:
+            raise Fable2DossierError(
+                "dossier",
+                "complete-source windows have non-sequential indices",
+            )
+        if (
+            window.body_start < 0
+            or window.body_end < window.body_start
+            or window.body_end > len(body)
+        ):
+            raise Fable2DossierError(
+                "dossier",
+                f"source window {window.index} has invalid body coordinates",
+            )
+        if expected_index == 0 and window.body_start != 0:
+            raise Fable2DossierError(
+                "dossier", "complete-source coverage does not start at zero")
+        if previous is not None:
+            if window.body_start > covered_end:
+                raise Fable2DossierError(
+                    "dossier",
+                    f"source window {window.index} leaves a coverage gap",
+                )
+            if previous.body_end - window.body_start != overlap_chars:
+                raise Fable2DossierError(
+                    "dossier",
+                    f"source window {window.index} overlap drifted from "
+                    f"{overlap_chars} characters",
+                )
+        if body and window.body_end <= covered_end:
+            raise Fable2DossierError(
+                "dossier",
+                f"source window {window.index} does not advance coverage",
+            )
+        expected_digest = header + body[window.body_start:window.body_end]
+        if window.digest != expected_digest:
+            raise Fable2DossierError(
+                "dossier",
+                f"source window {window.index} digest is not its exact slice",
+            )
+        if len(window.digest) > _DIGEST_CHAR_CAP:
+            raise Fable2DossierError(
+                "dossier",
+                f"source window {window.index} exceeds "
+                f"{_DIGEST_CHAR_CAP} characters",
+            )
+        covered_end = max(covered_end, window.body_end)
+        previous = window
+    if covered_end != len(body):
+        raise Fable2DossierError(
+            "dossier",
+            f"complete-source coverage ends at {covered_end}, "
+            f"not {len(body)}",
+        )
+
+
+def _build_digest_windows(
+    payload: "Mapping[str, Any]",
+) -> "tuple[_DossierWindow, ...]":
+    """Split the complete selected body into bounded overlapping digests."""
+    header = _digest_header(payload)
+    _route, body = _source_body(payload)
+    allowance = _DIGEST_CHAR_CAP - len(header)
+    if allowance < 1 and body:
+        raise Fable2DossierError(
+            "dossier",
+            "source framing leaves no room for the selected article body",
+        )
+    overlap = min(
+        _DOSSIER_WINDOW_OVERLAP_CHARS,
+        max(0, allowance - 1),
+    )
+    pairs = p0_source_chunks(
+        {"frame": header, "full_text": body},
+        budget_chars=_DIGEST_CHAR_CAP,
+        overlap_chars=overlap,
+    )
+    windows = tuple(
+        _DossierWindow(
+            index=index,
+            body_start=offset,
+            body_end=offset + len(str(window_payload["full_text"])),
+            digest=(
+                str(window_payload["frame"])
+                + str(window_payload["full_text"])
+            ),
+        )
+        for index, (offset, window_payload) in enumerate(pairs)
+    )
+    _validate_dossier_windows(payload, windows, overlap_chars=overlap)
+    return windows
+
+
+def _window_value_key(value: str) -> str:
+    return _norm_ws(value).casefold()
+
+
+def _evenly_spaced_positions(count: int, limit: int) -> "list[int]":
+    if count <= limit:
+        return list(range(count))
+    if limit == 1:
+        return [0]
+    return [
+        (position * (count - 1)) // (limit - 1)
+        for position in range(limit)
+    ]
+
+
+def _balanced_window_values(
+    values_by_window: "Sequence[Sequence[str]]",
+    *,
+    limit: int,
+) -> "tuple[list[str], dict[str, int]]":
+    """Deduplicate overlap repeats and retain stable cross-window breadth."""
+    groups: "list[tuple[int, list[str]]]" = []
+    seen: "set[str]" = set()
+    seen_count = 0
+    for window_index, values in enumerate(values_by_window):
+        group: "list[str]" = []
+        for value in values:
+            seen_count += 1
+            key = _window_value_key(value)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            group.append(value)
+        if group:
+            groups.append((window_index, group))
+
+    selected: "list[str]" = []
+    if len(groups) > limit:
+        selected = [
+            groups[position][1][0]
+            for position in _evenly_spaced_positions(len(groups), limit)
+        ]
+    else:
+        depth = 0
+        while len(selected) < limit:
+            moved = False
+            for _window_index, values in groups:
+                if depth < len(values):
+                    selected.append(values[depth])
+                    moved = True
+                    if len(selected) == limit:
+                        break
+            if not moved:
+                break
+            depth += 1
+    return selected, {
+        "seen": seen_count,
+        "unique": len(seen),
+        "retained": len(selected),
+    }
+
+
+def _merge_dossiers(
+    window_dossiers: "Sequence[DossierLLM]",
+) -> "tuple[DossierLLM, dict[str, dict[str, int]]]":
+    """Merge complete-source extractions without widening the schema."""
+    if not window_dossiers:
+        raise Fable2DossierError(
+            "dossier", "complete-source extraction produced no dossiers")
+
+    facts, facts_count = _balanced_window_values(
+        [row.facts_to_keep for row in window_dossiers],
+        limit=_DOSSIER_FACTS_MAX,
+    )
+    numbers, numbers_count = _balanced_window_values(
+        [row.allowed_numbers for row in window_dossiers],
+        limit=_DOSSIER_NUMBERS_MAX,
+    )
+    vectors, vectors_count = _balanced_window_values(
+        [row.dramatizable_vectors for row in window_dossiers],
+        limit=_DOSSIER_VECTORS_MAX,
+    )
+    entity_values: "dict[str, list[str]]" = {}
+    counts: "dict[str, dict[str, int]]" = {
+        "facts_to_keep": facts_count,
+        "allowed_numbers": numbers_count,
+        "dramatizable_vectors": vectors_count,
+    }
+    for field_name in ("people", "places", "things"):
+        values, field_count = _balanced_window_values(
+            [
+                getattr(row.named_entities, field_name)
+                for row in window_dossiers
+            ],
+            limit=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+        )
+        entity_values[field_name] = values
+        counts[f"named_entities.{field_name}"] = field_count
+
+    if len(window_dossiers) == 1:
+        return window_dossiers[0], counts
+    return DossierLLM(
+        facts_to_keep=facts,
+        allowed_numbers=numbers,
+        named_entities=NamedEntities(**entity_values),
+        dramatizable_vectors=vectors,
+    ), counts
+
+
+def _dossier_sha256(dossier: DossierLLM) -> str:
+    return _sha256(json.dumps(
+        dossier.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ))
+
+
+def _ordered_unique(values: "Sequence[str]") -> "list[str]":
+    selected: "list[str]" = []
+    seen: "set[str]" = set()
+    for value in values:
+        key = _window_value_key(value)
+        if key and key not in seen:
+            selected.append(value)
+            seen.add(key)
+    return selected
+
+
+def _source_coverage_receipt(
+    payload: "Mapping[str, Any]",
+    windows: "Sequence[_DossierWindow]",
+    *,
+    overlap_chars: int,
+    attempts_by_window: "Sequence[int]",
+    local_dossiers: "Sequence[DossierLLM]",
+    merged_dossier: DossierLLM,
+    merge_counts: "Mapping[str, Mapping[str, int]]",
+    news_seed_receipt: "Mapping[str, Any] | None" = None,
+) -> "dict[str, Any]":
+    """Validate and receipt complete selected-body extraction."""
+    _validate_dossier_windows(
+        payload, windows, overlap_chars=overlap_chars)
+    if not (
+        len(windows)
+        == len(attempts_by_window)
+        == len(local_dossiers)
+    ):
+        raise Fable2DossierError(
+            "dossier", "source-window extraction receipt lengths disagree")
+    if any(
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or value < 1
+        for value in attempts_by_window
+    ):
+        raise Fable2DossierError(
+            "dossier", "every source window requires a completed model call")
+
+    route, body = _source_body(payload)
+    header = _digest_header(payload)
+    raw_header = _raw_digest_header(payload)
+    body_sha = _sha256(body)
+    receipt_match: "bool | None" = None
+    body_source: "str | None" = None
+    rss_content_index: "int | None" = None
+    rss_content_count: "int | None" = None
+    if news_seed_receipt:
+        receipt_body_source = news_seed_receipt.get("body_source")
+        receipt_index = news_seed_receipt.get("rss_content_index")
+        receipt_count = news_seed_receipt.get("rss_content_count")
+        if receipt_body_source not in {
+            "rss_full", "url_scrape", "summary_fallback", "summary_only",
+        }:
+            raise Fable2DossierError(
+                "dossier", "meta.news_seed has an invalid body_source")
+        if (
+            type(receipt_count) is not int
+            or receipt_count < 0
+            or (
+                receipt_index is not None
+                and (
+                    type(receipt_index) is not int
+                    or receipt_index < 0
+                    or receipt_index >= receipt_count
+                )
+            )
+        ):
+            raise Fable2DossierError(
+                "dossier", "meta.news_seed has invalid RSS coordinates")
+        expected = {
+            "body_chars": len(body),
+            "body_bytes_utf8": len(body.encode("utf-8")),
+            "body_sha256": body_sha,
+        }
+        if any(news_seed_receipt.get(key) != value
+               for key, value in expected.items()):
+            raise Fable2DossierError(
+                "dossier",
+                "complete-source coverage disagrees with meta.news_seed",
+            )
+        body_source = str(receipt_body_source)
+        rss_content_index = receipt_index
+        rss_content_count = receipt_count
+        receipt_match = True
+
+    return {
+        "schema_version": "fable2_source_coverage_v1",
+        "coverage_complete": True,
+        "source_field": route,
+        "body_source": body_source,
+        "rss_content_index": rss_content_index,
+        "rss_content_count": rss_content_count,
+        "body_chars": len(body),
+        "body_bytes_utf8": len(body.encode("utf-8")),
+        "body_sha256": body_sha,
+        "framing_truncated": raw_header != header,
+        "framing_original_chars": len(raw_header),
+        "framing_original_sha256": _sha256(raw_header),
+        "framing_used_chars": len(header),
+        "framing_used_sha256": _sha256(header),
+        "canonical_source_chars": len(header + body),
+        "canonical_source_bytes_utf8": len(
+            (header + body).encode("utf-8")
+        ),
+        "canonical_source_sha256": _sha256(header + body),
+        "digest_char_cap": _DIGEST_CHAR_CAP,
+        "window_overlap_chars": overlap_chars,
+        "window_count": len(windows),
+        "news_seed_receipt_match": receipt_match,
+        "windows": [
+            {
+                "index": window.index,
+                "body_start": window.body_start,
+                "body_end": window.body_end,
+                "body_sha256": _sha256(
+                    body[window.body_start:window.body_end]
+                ),
+                "digest_sha256": _sha256(window.digest),
+                "dossier_sha256": _dossier_sha256(dossier),
+                "attempts": attempts,
+            }
+            for window, attempts, dossier in zip(
+                windows, attempts_by_window, local_dossiers
+            )
+        ],
+        "merge_counts": {
+            key: dict(value) for key, value in merge_counts.items()
+        },
+        "merged_dossier_sha256": _dossier_sha256(merged_dossier),
+    }
+
+
+def _extract_complete_source_dossier(
+    technical_fn,
+    pack,
+    payload: "Mapping[str, Any]",
+    *,
+    slot_scheduler: Any,
+    news_seed_receipt: "Mapping[str, Any] | None" = None,
+) -> "tuple[DossierLLM, list[str], dict[str, Any], int]":
+    """Extract every bounded source window, then merge deterministically."""
+    windows = _build_digest_windows(payload)
+    allowance = _DIGEST_CHAR_CAP - len(_digest_header(payload))
+    overlap = min(
+        _DOSSIER_WINDOW_OVERLAP_CHARS,
+        max(0, allowance - 1),
+    )
+    # Revalidate here so a replaced or monkeypatched builder cannot silently
+    # omit the tail before any model call fires.
+    _validate_dossier_windows(payload, windows, overlap_chars=overlap)
+
+    fn, box = _counting(technical_fn)
+    local_dossiers: "list[DossierLLM]" = []
+    attempts_by_window: "list[int]" = []
+    dropped: "list[str]" = []
+    for window in windows:
+        before = box["calls"]
+        with _helper_ctx(slot_scheduler, "fable2_dossier"):
+            local = _pass_dossier(fn, pack, window.digest)
+        attempts = box["calls"] - before
+        local, local_dropped = _filter_dossier_entities(
+            local, window.digest)
+        local_dossiers.append(local)
+        attempts_by_window.append(attempts)
+        dropped.extend(local_dropped)
+
+    dossier, merge_counts = _merge_dossiers(local_dossiers)
+    coverage = _source_coverage_receipt(
+        payload,
+        windows,
+        overlap_chars=overlap,
+        attempts_by_window=attempts_by_window,
+        local_dossiers=local_dossiers,
+        merged_dossier=dossier,
+        merge_counts=merge_counts,
+        news_seed_receipt=news_seed_receipt,
+    )
+    return (
+        dossier,
+        _ordered_unique(dropped),
+        coverage,
+        box["calls"],
+    )
 
 
 def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
@@ -981,7 +1495,8 @@ def _pass_news_read(
         + json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)
         + "\n\nPROVENANCE: "
         + json.dumps(provenance, ensure_ascii=False)
-        + "\n\nSOURCE STORY TEXT (names and numbers may be quoted):\n"
+        + "\n\nBOUNDED SOURCE PREVIEW (names and numbers may be quoted; "
+        + "the dossier above owns complete-source coverage):\n"
         + digest
         + "\n\nFICTIONAL CAST NAMES (never use these in the factual read): "
         + (", ".join(cast_names) or "(none)")
@@ -1029,7 +1544,8 @@ def _script_user_prompt(
         )
         + "\n\nCAST (the only legal speakers besides ANNOUNCER; use these "
         + f"canonical roster labels):\n{cast_block}\n\n"
-        + f"SOURCE DIGEST (fiction fuel, never quoted as news):\n{digest}\n\n"
+        + "BOUNDED SOURCE PREVIEW (fiction fuel; the treatment's dossier "
+        + f"owns complete-source coverage):\n{digest}\n\n"
         + "DURATION GUIDANCE: the request is approximately "
         + f"{envelope.total_words} character-spoken words. Treat that only as "
         + "creative pacing guidance; never count, pad, compress, or mention a "
@@ -2288,17 +2804,27 @@ def run_scifi_fable2_episode(
     meta["fable2"] = f2
     meta["news"] = None
 
-    digest = _build_digest(payload)
-    fn, box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_dossier"):
-        dossier = _pass_dossier(fn, pack, digest)
-    receipt("dossier", technical_model, box["calls"],
+    source_preview = _build_source_preview(payload)
+    dossier, dropped, source_coverage, dossier_calls = (
+        _extract_complete_source_dossier(
+            technical_fn,
+            pack,
+            payload,
+            slot_scheduler=slot_scheduler,
+            news_seed_receipt=(
+                meta.get("news_seed")
+                if isinstance(meta.get("news_seed"), Mapping)
+                else None
+            ),
+        )
+    )
+    receipt("dossier", technical_model, dossier_calls,
             _TEMP["dossier"], _MAX_NEW_TOKENS["dossier"])
-    dossier, dropped = _filter_dossier_entities(dossier, digest)
     provenance = {
         key: str(payload.get(key) or "")
         for key in ("headline", "source", "date", "link")
     }
+    f2["source_coverage"] = source_coverage
     f2["dossier"] = {
         **dossier.model_dump(), "provenance": provenance,
         "dropped_entities": dropped,
@@ -2318,7 +2844,7 @@ def run_scifi_fable2_episode(
     with _helper_ctx(slot_scheduler, "fable2_treatment"):
         treatment = _pass_treatment(
             fn, pack, dossier, pitch, stance, n_max=n_max,
-            provenance=provenance, digest=digest,
+            provenance=provenance, digest=source_preview,
         )
     receipt("treatment", creative_model, box["calls"],
             _TEMP["treatment"], None)
@@ -2328,7 +2854,7 @@ def run_scifi_fable2_episode(
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "fable2_news_read"):
         read = _pass_news_read(
-            fn, pack, dossier, provenance, digest, cast_names
+            fn, pack, dossier, provenance, source_preview, cast_names
         )
     receipt("news_read", technical_model, box["calls"], 0.20, None)
     treatment = treatment.model_copy(
@@ -2344,7 +2870,7 @@ def run_scifi_fable2_episode(
     fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_script"):
         script_text, parsed, p3_meta = _pass_script(
-            fn, pack, treatment, digest, envelope, cast_names
+            fn, pack, treatment, source_preview, envelope, cast_names
         )
     p3_attempts = tuple(p3_meta["attempt_trace"])
     if box["calls"] != len(p3_attempts):
@@ -2395,6 +2921,9 @@ def run_scifi_fable2_episode(
         led, final_draft, treatment, cast_rows, payload,
         owner_bank=source_bank_row.source_bank_id,
     )
+    # `_assemble` saves incrementally and Ledger.save() rebinds `led.data`.
+    # Reacquire the live mapping and preserve the complete-source receipt.
+    _fable2_meta(led)["source_coverage"] = source_coverage
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_news_pro_assembled"
     )
