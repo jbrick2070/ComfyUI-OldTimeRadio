@@ -48,6 +48,10 @@ log = logging.getLogger(__name__)
 _REASONING_EFFORT_LOGGED = False
 _MANDATORY_REASONING_SLUGS: set[str] = set()
 _MANDATORY_REASONING_OVERRIDE_LOGGED: set[str] = set()
+# An upstream can select a different provider endpoint for a structured request
+# than for an ordinary completion. Capability learning belongs to the resolved
+# slug and structured-output mode, not the slug globally.
+_TEMPERATURE_UNSUPPORTED_ROUTES: set[tuple[str, bool]] = set()
 
 # ---------------------------------------------------------------------------
 # Reasoning-wrapper strip (BUG-306 / BUG-LOCAL-308 family)
@@ -452,6 +456,26 @@ def is_mandatory_reasoning_error(status: int, snippet: str) -> bool:
         or "cannot be disabled" in low
         or "can't be disabled" in low
         or "must be enabled" in low
+    )
+
+
+def is_temperature_parameter_error(status: int, snippet: str) -> bool:
+    """Recognize an upstream's exact rejection of the optional temperature.
+
+    OpenRouter's model-level catalog can advertise ``temperature`` while the
+    only endpoint satisfying a simultaneous structured-output requirement has
+    deprecated it.  That disagreement is safe to negotiate by omitting only
+    the optional sampling knob and retrying the same model once.  Generic 400s
+    remain fail-fast.
+    """
+    if int(status or 0) != 400:
+        return False
+    low = (snippet or "").lower()
+    return "temperature" in low and (
+        "deprecated" in low
+        or "not supported" in low
+        or "unsupported" in low
+        or "does not support" in low
     )
 
 
@@ -1218,8 +1242,7 @@ class OpenRouterBackend:
             "messages": messages,
             "max_tokens": out_tokens,
         }
-        if temp is not None:
-            payload["temperature"] = float(temp)
+
         if stop:
             payload["stop"] = [s for s in stop if s]
         # Reasoning control (gemma-4 / thinking-model lane). The OpenAI-standard
@@ -1274,6 +1297,12 @@ class OpenRouterBackend:
             provider_opts["require_parameters"] = True
         if provider_opts:
             payload["provider"] = provider_opts
+        if (
+            temp is not None
+            and (slug, response_format is not None)
+            not in _TEMPERATURE_UNSUPPORTED_ROUTES
+        ):
+            payload["temperature"] = float(temp)
 
         try:
             text = self._post_with_retries(
@@ -1356,7 +1385,9 @@ class OpenRouterBackend:
         last_status: int = 0
         last_snippet: str = ""
         transient_retries_left = max_retries
-        capability_retry_used = False
+        reasoning_retry_used = False
+        temperature_retry_used = False
+        pending_temperature_route: tuple[str, bool] | None = None
         total_attempts = 0
         payload = dict(payload)
         while True:
@@ -1381,6 +1412,10 @@ class OpenRouterBackend:
 
             status = int(result.get("status_code") or 0)
             if status == 200:
+                if pending_temperature_route is not None:
+                    _TEMPERATURE_UNSUPPORTED_ROUTES.add(
+                        pending_temperature_route
+                    )
                 return self._extract_text(
                     result, slug=slug,
                     fail_on_output_limit=fail_on_output_limit,
@@ -1390,11 +1425,11 @@ class OpenRouterBackend:
             last_status = status
             last_err = f"HTTP {status}: {last_snippet}"
             if (
-                not capability_retry_used
+                not reasoning_retry_used
                 and payload.get("reasoning_effort") == "none"
                 and is_mandatory_reasoning_error(status, last_snippet)
             ):
-                capability_retry_used = True
+                reasoning_retry_used = True
                 _MANDATORY_REASONING_SLUGS.add(slug)
                 effective = _mandatory_reasoning_effort(slug)
                 payload["reasoning_effort"] = effective
@@ -1404,6 +1439,23 @@ class OpenRouterBackend:
                     "remembering the capability for this process.",
                     slug,
                     effective,
+                )
+                continue
+            if (
+                not temperature_retry_used
+                and "temperature" in payload
+                and is_temperature_parameter_error(status, last_snippet)
+            ):
+                temperature_retry_used = True
+                pending_temperature_route = (
+                    slug,
+                    payload.get("response_format") is not None,
+                )
+                payload.pop("temperature", None)
+                log.warning(
+                    "[OpenRouter] %s rejected the optional temperature "
+                    "parameter; retrying the same model once without it.",
+                    slug,
                 )
                 continue
             if status in _RETRYABLE_STATUS and transient_retries_left > 0:
@@ -1499,8 +1551,23 @@ class OpenRouterBackend:
         body = result.get("json")
         if isinstance(body, dict):
             err = body.get("error")
-            if isinstance(err, dict) and err.get("message"):
-                return str(err["message"])[:200]
+            if isinstance(err, dict):
+                metadata = err.get("metadata")
+                raw = metadata.get("raw") if isinstance(metadata, dict) else None
+                if isinstance(raw, str) and raw:
+                    try:
+                        provider_body = json.loads(raw)
+                    except (TypeError, ValueError):
+                        provider_body = None
+                    if isinstance(provider_body, dict):
+                        provider_error = provider_body.get("error")
+                        if (
+                            isinstance(provider_error, dict)
+                            and provider_error.get("message")
+                        ):
+                            return str(provider_error["message"])[:200]
+                if err.get("message"):
+                    return str(err["message"])[:200]
         text = result.get("text") or ""
         return str(text)[:200]
 

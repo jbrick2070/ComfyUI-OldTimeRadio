@@ -30,12 +30,14 @@ def _reset_and_silence(monkeypatch):
     orb.clear_slot_bindings()
     orb._MANDATORY_REASONING_SLUGS.clear()
     orb._MANDATORY_REASONING_OVERRIDE_LOGGED.clear()
+    orb._TEMPERATURE_UNSUPPORTED_ROUTES.clear()
     monkeypatch.setattr(orb.time, "sleep", lambda *_a, **_k: None)
     yield
     orb.reset_run_budget()
     orb.clear_slot_bindings()
     orb._MANDATORY_REASONING_SLUGS.clear()
     orb._MANDATORY_REASONING_OVERRIDE_LOGGED.clear()
+    orb._TEMPERATURE_UNSUPPORTED_ROUTES.clear()
 
 
 @pytest.fixture
@@ -813,6 +815,219 @@ def test_stale_cache_learns_mandatory_reasoning_from_exact_400(
         temperature=0.5, max_new_tokens=16,
     ) == "recovered"
     assert sent_efforts == ["low"]
+
+
+def test_provider_temperature_deprecation_retries_without_it_and_remembers(
+    enabled_env, monkeypatch,
+):
+    """A structured-output provider can reject a catalog-advertised knob.
+
+    The live Opus 4.8 JSON route returned a generic OpenRouter error whose
+    nested Azure detail said ``temperature`` was deprecated.  Preserve the
+    same model and response format, remove only that optional parameter, and
+    learn the capability for later calls in this process.
+    """
+    monkeypatch.setenv("OPENROUTER_MAX_RETRIES", "0")
+    sent_temperatures = []
+
+    def deprecated_then_ok(**kw):
+        temperature = kw["payload"].get("temperature")
+        sent_temperatures.append(temperature)
+        if temperature is not None:
+            return {
+                "status_code": 400,
+                "json": {
+                    "error": {
+                        "message": "Provider returned error",
+                        "metadata": {
+                            "raw": (
+                                '{"type":"error","error":{'
+                                '"type":"invalid_request_error",'
+                                '"message":"`temperature` is deprecated '
+                                'for this model."}}'
+                            ),
+                        },
+                    },
+                },
+                "text": "",
+            }
+        return _ok_result("recovered")
+
+    monkeypatch.setattr(orb, "_post_chat_completion", deprecated_then_ok)
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+
+    assert backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.85, max_new_tokens=16,
+    ) == "recovered"
+    assert sent_temperatures == [0.85, None]
+
+    sent_temperatures.clear()
+    assert backend.generate(
+        entry, [{"role": "user", "content": "x"}],
+        temperature=0.4, max_new_tokens=16,
+    ) == "recovered"
+    assert sent_temperatures == [None]
+
+
+def test_structured_temperature_retry_preserves_route_and_learns_only_it(
+    enabled_env, monkeypatch,
+):
+    """Retry only the rejected JSON route and preserve its other controls."""
+    monkeypatch.setenv("OPENROUTER_MAX_RETRIES", "0")
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    sent_payloads = []
+
+    def deprecated_then_ok(**kw):
+        payload = dict(kw["payload"])
+        sent_payloads.append(payload)
+        if payload.get("temperature") is not None:
+            return {
+                "status_code": 400,
+                "json": {
+                    "error": {
+                        "message": "Provider returned error",
+                        "metadata": {
+                            "raw": (
+                                '{"error":{"message":"temperature is '
+                                'deprecated for this model"}}'
+                            ),
+                        },
+                    },
+                },
+                "text": "",
+            }
+        return _ok_result("recovered")
+
+    monkeypatch.setattr(orb, "_post_chat_completion", deprecated_then_ok)
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+    response_format = {"type": "json_object"}
+
+    assert backend.generate(
+        entry,
+        [{"role": "user", "content": "x"}],
+        temperature=0.85,
+        max_new_tokens=16,
+        response_format=response_format,
+    ) == "recovered"
+    assert [payload.get("temperature") for payload in sent_payloads] == [0.85, None]
+    for payload in sent_payloads:
+        assert payload["model"] == "anthropic/claude-3.5-sonnet"
+        assert payload["response_format"] == response_format
+        assert payload["provider"] == {"require_parameters": True}
+        assert payload["reasoning_effort"] == "none"
+
+    sent_payloads.clear()
+    assert backend.generate(
+        entry,
+        [{"role": "user", "content": "x"}],
+        temperature=0.4,
+        max_new_tokens=16,
+        response_format=response_format,
+    ) == "recovered"
+    assert [payload.get("temperature") for payload in sent_payloads] == [None]
+
+    # The learning is restricted to the structured route that actually failed.
+    sent_payloads.clear()
+    assert backend.generate(
+        entry,
+        [{"role": "user", "content": "x"}],
+        temperature=0.4,
+        max_new_tokens=16,
+    ) == "recovered"
+    assert [payload.get("temperature") for payload in sent_payloads] == [0.4, None]
+
+
+def test_failed_temperature_retry_does_not_learn_a_route_capability(
+    enabled_env, monkeypatch,
+):
+    monkeypatch.setenv("OPENROUTER_MAX_RETRIES", "0")
+    calls = []
+
+    def deprecated_then_unrelated_400(**kw):
+        payload = dict(kw["payload"])
+        calls.append(payload)
+        if len(calls) == 1:
+            return {
+                "status_code": 400,
+                "json": {
+                    "error": {
+                        "message": "Provider returned error",
+                        "metadata": {
+                            "raw": (
+                                '{"error":{"message":"temperature is '
+                                'not supported for this model"}}'
+                            ),
+                        },
+                    },
+                },
+                "text": "",
+            }
+        return {
+            "status_code": 400,
+            "json": {"error": {"message": "The JSON schema is invalid."}},
+            "text": "",
+        }
+
+    monkeypatch.setattr(
+        orb, "_post_chat_completion", deprecated_then_unrelated_400,
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+
+    with pytest.raises(orb.OpenRouterCallFailedError, match="JSON schema"):
+        backend.generate(
+            entry,
+            [{"role": "user", "content": "x"}],
+            temperature=0.85,
+            max_new_tokens=16,
+            response_format={"type": "json_object"},
+        )
+
+    assert [payload.get("temperature") for payload in calls] == [0.85, None]
+    assert not orb._TEMPERATURE_UNSUPPORTED_ROUTES
+
+def test_generic_nested_provider_400_does_not_drop_temperature(
+    enabled_env, monkeypatch,
+):
+    monkeypatch.setenv("OPENROUTER_MAX_RETRIES", "0")
+    attempts = {"n": 0}
+
+    def invalid_schema(**kw):
+        attempts["n"] += 1
+        return {
+            "status_code": 400,
+            "json": {
+                "error": {
+                    "message": "Provider returned error",
+                    "metadata": {
+                        "raw": (
+                            '{"type":"error","error":{'
+                            '"type":"invalid_request_error",'
+                            '"message":"The JSON schema is invalid."}}'
+                        ),
+                    },
+                },
+            },
+            "text": "",
+        }
+
+    monkeypatch.setattr(orb, "_post_chat_completion", invalid_schema)
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row())
+
+    with pytest.raises(
+        orb.OpenRouterCallFailedError,
+        match="The JSON schema is invalid",
+    ):
+        backend.generate(
+            entry, [{"role": "user", "content": "x"}],
+            temperature=0.85, max_new_tokens=16,
+        )
+    assert attempts["n"] == 1
+    assert not orb._TEMPERATURE_UNSUPPORTED_ROUTES
 
 
 def test_transport_exception_is_retried_then_aborts(enabled_env, monkeypatch):
