@@ -3,7 +3,75 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-31 (newest) -- CODE e577f9ef (v2.0-alpha) -- WINDOW CODER
+## 2026-07-31 (newest) -- CODE 6d90bad0 (v2.0-alpha) -- WINDOW CODER
+
+- **THE TWO RANDOMIZERS.** Operator, mid-session: "source bank and visual style
+  are TWO separate randomizers that can be turned on or off individually." Both
+  shipped in one commit. Design B (the visual roll) had been PARKED behind
+  Design A since 2026-07-12; this directive un-parked it.
+- Each dropdown carries its OWN sentinel as choice 0 -- `roll (any eligible
+  bank)` / `roll (any style)` -- so the two are switched independently. The
+  sentinel is a UI COMMAND prepended to an existing combo: no new widget, no
+  positional `widgets_values` shift, and the canonical workflow is untouched BY
+  DESIGN (a graph persists the selected VALUE, not the choice list; defaults are
+  still `scifi_news` / `sci_fi_radio`; the guardrail test proves it).
+- `nodes/_otr_rolls.py` is pure with ZERO LLM calls: eligibility -> sorted-by-id
+  pool -> seeded draw -> receipt. BANK eligibility = `runnable` + the lane's
+  declared request compatibility, two filters and no more (the 2026-07-12 no-
+  rights-gate ruling stands; `banks.json` untouched). STYLE eligibility = every
+  registered style, by DESIGN not omission -- a style has no execution lane to be
+  missing, so inventing a predicate would be inventing a gate the data cannot
+  answer. Pools come from the LIVE registry, so an activated client bank is an
+  ordinary peer. Separate seeds (`OTR_BANK_SEED` / `OTR_VISUAL_STYLE_SEED`, never
+  `OTR_STYLE_SEED`) so either roll replays alone; a malformed override RAISES.
+  Receipts at `meta.bank_roll` / `meta.style_roll`, ABSENT on a manual pick.
+  Sentinel + a pinned `source_ref` is refused loudly.
+- **The lane authority left the writer** (`nodes/_otr_lane_specs.py`).
+  `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`, `_resolve_lane_runner`,
+  `_run_fable2_lane`, `_run_scifi_codex_lane` are GONE, not aliased -- a test
+  asserts the writer holds no second table. Specs store NAMES resolved lazily, so
+  runner modules still stay out of ComfyUI startup. Two entry points, deliberately
+  different contracts: `assert_supported` (writer gate, NATIVE error unwrapped)
+  and `is_roll_compatible` (roll filter, bool, catches ONLY declared errors so a
+  broken runner propagates instead of silently shrinking the pool). One lane is
+  constrained today: `scifi_news_circuit`'s 30..900, hoisted out of the runner as
+  `assert_supported_target_words` sharing `WordSteerV4` as the one source of
+  truth. CAPABILITY, not a length verdict.
+- **What re-grounding at HEAD killed from the 2026-07-12 plan.** The plan's whole
+  refine-carry apparatus (`_bank_roll_receipt` run() param, `_core` exclusion,
+  the memoized `RefineConfig`, `effective_passes`) was written against machinery
+  that NO LONGER EXISTS: `_otr_story_select.py` is gone, `resolve_refine_passes`
+  and `_refine_active` have zero occurrences repo-wide, and `refine_target_grade`
+  is an inert widget the body never reads. Building the carry would have been
+  dead code. Instead the hazard is WRITTEN DOWN at the seam and in GO_FORWARD:
+  whoever rebuilds a loop that re-enters `run()` must carry the receipts back in
+  or every pass re-rolls. Also killed: the hardcoded fable2 `<120` word gate and
+  the dispatched-lanes-reject-refine block the plan said to replace -- neither
+  exists at HEAD.
+- Incidental repairs found while editing: the dead `_selected_pipeline_id` local
+  (assigned, never read; the dispatch re-derived it) is gone, and three comments
+  claiming run() sits "AFTER the bank / word-count / refine gates" now describe
+  the gates that actually exist.
+- **`scifi_news_pro_multipass`'s 3,600-char dossier cap: CLOSED BY ASSESSMENT, no
+  rip owed.** GO_FORWARD listed it as an open follow-up; that text predates
+  `33e6a276` ("Read complete Pro sources in bounded windows", +573 runner / +739
+  test lines). `_DIGEST_CHAR_CAP` is now the WINDOW SIZE of an overlapping window
+  set whose coverage of the selected body is PROVEN (`_validate_dossier_windows`;
+  `test_digest_windows_cover_complete_source`,
+  `test_partial_window_coverage_fails_before_any_model_call`,
+  `test_old_prefix_counterfactual_loses_tail`). The doc was stale, not the code.
+  Corrected in GO_FORWARD. Live GPU requalification IS still owed.
+- Receipts: focused 95 passed, then 27 (lane specs) + 42 (rolls); full Windows
+  suite **8036 passed / 130 skipped / 1 xfailed** (EXIT=0, 225s); Bug Bible **17
+  passed / 24 skipped / 3 xfailed**; UTF-8 / no-BOM / nonzero / AST green on all
+  14 touched files; HEAD == origin `6d90bad0`.
+- NOTHING RAN LIVE. Both randomizers are suite/contract-proven only. Owed live
+  proofs: a seeded bank roll, a seeded style roll, both in one run, and an
+  unseeded roll proved by REPLAY. No GPU run, no new PBUG (offline root fix).
+  Preserved: the three pre-existing modified `tmp/*.ps1` and the untracked
+  `config/profiles/otr_*.json` set.
+
+## 2026-07-31 -- CODE e577f9ef (v2.0-alpha) -- WINDOW CODER
 
 - Two operator directives from the 320-word test session, landed together as one
   offline root fix. Base and origin were both `6e2c9b2f`; HEAD == origin
