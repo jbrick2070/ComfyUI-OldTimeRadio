@@ -115,25 +115,26 @@ def test_markup_repair_explicitly_handles_standalone_stage_direction():
     assert "folding" in repair_user
 
 
-def test_p3_transport_has_finite_schema_and_output_reservation():
+def test_p3_transport_keeps_prose_open_and_uses_provider_capacity():
     schema = codex.RadioScoreDraftV4.model_json_schema()
-    # Authored prose is deliberately not a Pydantic length gate.  The
-    # transport is still finite through its structural graph bounds and fixed
-    # output reservation; overlong creative text must remain representable and
-    # cannot be silently clipped by the typed boundary.
+    # Authored prose is deliberately not a Pydantic length gate. The
+    # transport is still finite through structural graph bounds and provider
+    # capacity; overlong creative text remains representable and cannot be
+    # silently clipped by the typed boundary.
     assert "maxLength" not in schema["properties"]["premise"]
     scene = schema["$defs"]["RadioScoreDraftSceneV4"]
     assert "maxLength" not in scene["properties"]["description"]
     assert schema["properties"]["scenes"]["maxItems"] == 3
     assert scene["properties"]["shots"]["maxItems"] == 2
     assert scene["properties"]["beats"]["maxItems"] == 4
-    assert codex._RADIO_SCORE_CONTEXT_CAP_TOKENS == 8192
-    assert codex._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS == 1829
     receipt = codex._radio_score_draft_surface_receipt()
-    assert receipt["output_budget_mode"] == "fixed_reservation"
-    assert receipt["input_token_reservation"] == 8192 - 1829
+    assert receipt["output_budget_mode"] == "provider_capacity"
+    assert receipt["requested_max_new_tokens"] is None
+    assert receipt["authored_text_bounds"] == "provider_capacity_only"
+    assert "context_cap_tokens" not in receipt
+    assert "input_token_reservation" not in receipt
 
-def test_p3_call_uses_bounded_prompt_transport(monkeypatch):
+def test_p3_call_uses_provider_capacity_prompt_transport(monkeypatch):
     observed = {}
     draft = codex.RadioScoreDraftV4.model_validate({
         "title": "Signal",
@@ -183,11 +184,13 @@ def test_p3_call_uses_bounded_prompt_transport(monkeypatch):
         post_validator=lambda _value: None,
         base_temperature=0.72,
         structural_retry_temperature=0.32,
-        max_new_tokens=codex._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        max_new_tokens=None,
         call_journal={},
         prompt_must_fit=True,
         include_result_json_schema=False,
     )
     assert result == draft
-    assert isinstance(observed["prompt"], codex._PromptMustFitMessages)
-    assert observed["max_new_tokens"] == codex._RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+    assert isinstance(observed["prompt"], codex.ProviderCapacityMessages)
+    assert observed["prompt"]._otr_reserve_remaining_output_capacity is True
+    assert observed["prompt"]._otr_fail_on_output_limit is True
+    assert observed["max_new_tokens"] is None

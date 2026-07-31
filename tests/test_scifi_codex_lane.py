@@ -363,6 +363,7 @@ def _run_lane(
 
     def tracked_p3(**kwargs):
         state["p3_calls"] += 1
+        state["p3_max_new_tokens"] = kwargs["max_new_tokens"]
         score = real_p3(**kwargs)
         state["p3_score"] = score
         return score
@@ -457,6 +458,7 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
         ("P0", True), ("P1", True), ("P2", True), ("P3", True), ("P5", True),
     ]
     assert state["p3_calls"] == state["p5_calls"] == 1
+    assert state["p3_max_new_tokens"] is None
     assert state["p3_score"] is state["p5_score"] is state["assembled_score"]
     assert state["assemble_calls"] == 1
     assert state["parts"].final_title_override == "Signal at Meridian"

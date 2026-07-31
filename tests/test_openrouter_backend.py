@@ -15,6 +15,11 @@ import pytest
 
 from nodes import _otr_openrouter_backend as orb
 from nodes import _otr_model_runtime as runtime
+from nodes._otr_generation_budget import (
+    CAPACITY_PHASE_OUTPUT_LIMIT,
+    PromptContextOverflowError,
+    ProviderCapacityMessages,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1057,6 +1062,40 @@ def test_empty_choices_aborts(enabled_env, monkeypatch):
     with pytest.raises(orb.OpenRouterCallFailedError):
         backend.generate(entry, [{"role": "user", "content": "x"}],
                          temperature=0.5, max_new_tokens=16)
+
+
+def test_provider_capacity_length_is_a_typed_rerollable_capacity_error(
+    enabled_env, monkeypatch,
+):
+    """A partial provider-capacity artifact must never enter JSON repair."""
+    seen = {}
+    monkeypatch.setattr(
+        orb, "_post_chat_completion",
+        lambda **kwargs: seen.update(kwargs) or {
+            "status_code": 200,
+            "json": {
+                "choices": [{
+                    "finish_reason": "length",
+                    "message": {"content": '{"partial":true}'},
+                }],
+                "usage": {"completion_tokens": 16384},
+            },
+            "text": "",
+        },
+    )
+    backend = orb.OpenRouterBackend()
+    entry = backend.load(orb.SLOT_A_ID, _row(context_window=131072))
+    messages = ProviderCapacityMessages([{"role": "user", "content": "x"}])
+
+    with pytest.raises(PromptContextOverflowError) as caught:
+        backend.generate(entry, messages, temperature=0.5, max_new_tokens=None)
+
+    error = caught.value
+    assert seen["payload"]["max_tokens"] == orb.DEFAULT_OUTPUT_TOKENS_CAP
+    assert error.phase == CAPACITY_PHASE_OUTPUT_LIMIT
+    assert error.raw_completion == '{"partial":true}'
+    assert error.generated_tokens == 16384
+    assert error.ended_with_eos is False
 
 
 # ---------------------------------------------------------------------------

@@ -128,6 +128,44 @@ def test_adaptation_lanes_use_source_character_names():
     assert names[2].isupper() and " " in names[2]
 
 
+@pytest.mark.parametrize("source_bank_id", [
+    "public_domain", "shakespeare",
+    # Bake-off variants inherit the family's fidelity rule.
+    "shakespeare_v2", "public_domain_v3", "  Shakespeare  ",
+])
+def test_source_fidelity_banks_skip_lemmy_even_when_forced(source_bank_id):
+    """Adaptation casts cannot gain Lemmy from the random or forced cameo."""
+    pre_locked, open_slots, lemmy_hit = _OTRC.assemble_pre_locked_rows(
+        num_characters=3,
+        rng=random.Random("source-fidelity"),
+        force_lemmy=True,
+        source_bank_id=source_bank_id,
+        source_character_names=["Macbeth", "Lemmy", "Banquo"],
+    )
+
+    assert lemmy_hit is False
+    assert all(row["name"] != "LEMMY" for row in pre_locked)
+    assert all(slot.name != "LEMMY" for slot in open_slots)
+    assert [slot.name for slot in open_slots[:2]] == ["MACBETH", "BANQUO"]
+
+
+@pytest.mark.parametrize(
+    "source_bank_id",
+    ["scifi_news", "scifi_news_pro", "media_archive", "original", "", None],
+)
+def test_invention_banks_keep_the_operator_cameo(source_bank_id):
+    """Only the fidelity families lose the cameo -- everything else keeps it."""
+    pre_locked, _open_slots, lemmy_hit = _OTRC.assemble_pre_locked_rows(
+        num_characters=3,
+        rng=random.Random("operator-cameo"),
+        force_lemmy=True,
+        source_bank_id=source_bank_id,
+    )
+
+    assert lemmy_hit is True
+    assert any(row["name"] == "LEMMY" for row in pre_locked)
+
+
 def test_source_names_none_is_byte_identical_to_pool():
     """C7: invention lanes pass source_character_names=None -> pool path unchanged.
 

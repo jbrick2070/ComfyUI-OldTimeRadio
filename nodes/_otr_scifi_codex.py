@@ -284,8 +284,7 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
     return cast.model_copy(update={"cast": rows}) if changed else None
 
 
-_RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192
-_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS = 1829
+
 _RADIO_SCORE_MAX_SCENES = 3
 _RADIO_SCORE_MAX_SHOTS_PER_SCENE = 2
 _RADIO_SCORE_MAX_BEATS_PER_SCENE = 4
@@ -451,17 +450,12 @@ class RadioScoreDraftCompileError(ScifiCodexError):
         super().__init__(f"draft.{self.code} at {self.path}: {self.detail}")
 
 
-def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool]:
-    """Return the finite model-visible P3 structural surface and reservation."""
+def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool | None]:
+    """Return the finite model-visible P3 structural surface and capacity policy."""
     return {
         "schema": "RadioScoreDraftV4",
-        "output_budget_mode": "fixed_reservation",
-        "context_cap_tokens": _RADIO_SCORE_CONTEXT_CAP_TOKENS,
-        "max_new_tokens": _RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
-        "input_token_reservation": (
-            _RADIO_SCORE_CONTEXT_CAP_TOKENS
-            - _RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
-        ),
+        "output_budget_mode": "provider_capacity",
+        "requested_max_new_tokens": None,
         "full_result_json_schema_in_prompt": False,
         "max_scenes": _RADIO_SCORE_MAX_SCENES,
         "max_shots_per_scene": _RADIO_SCORE_MAX_SHOTS_PER_SCENE,
@@ -482,8 +476,8 @@ _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     "\nRadioScoreDraftV4 compact contract: return one JSON object only, "
     "rooted at exactly title, premise, setting, scenes, music_cues. Every "
     "prose field must be a non-empty JSON string. Do not truncate, clip, or "
-    "reject authored wording for length; keep the model-facing output within "
-    "the provider capacity reservation. scenes has 1..3 items. Each scene has exactly env, "
+    "reject authored wording for length; use the available provider capacity. "
+    "scenes has 1..3 items. Each scene has exactly env, "
     "description, shots, beats; shots has 1..2 items with exactly description "
     "and visual_prompt; beats has 1..4 items with exactly shot_index, char_id, "
     "line_count, intent, arc_phase, fact_ids. shot_index is zero-based within "
@@ -1924,10 +1918,8 @@ def _invoke_codex_structured_once(
             ),
         },
     ]
-    if pass_id == "P3" and prompt_must_fit:
-        prompt: Any = _PromptMustFitMessages(messages)
-    elif pass_id in {"P1", "P2", "P5"}:
-        prompt = ProviderCapacityMessages(messages)
+    if pass_id in {"P1", "P2", "P3", "P5"}:
+        prompt: Any = ProviderCapacityMessages(messages)
     elif prompt_must_fit:
         prompt = _PromptMustFitMessages(messages)
     else:
@@ -3112,7 +3104,7 @@ def run_scifi_codex_episode(
         fact_index=p0,
         base_temperature=.72,
         structural_retry_temperature=.32,
-        max_new_tokens=_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS,
+        max_new_tokens=None,
         call_journal=journal,
     )
 

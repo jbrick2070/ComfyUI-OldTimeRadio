@@ -124,6 +124,14 @@ except ImportError:  # pragma: no cover - standalone / test load
     import _otr_castplanner as _CASTPLAN  # type: ignore
     import _otr_cast_validator as _CASTVAL  # type: ignore
 
+# Bake-off variant -> base bank id. Source-fidelity casting is FAMILY
+# behaviour, so `shakespeare_v2` must cast exactly like `shakespeare`.
+# Dependency-free leaf module; safe to import from the cast contract.
+try:
+    from ._otr_bank_variants import base_source_bank_id
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_bank_variants import base_source_bank_id  # type: ignore
+
 log = logging.getLogger(__name__)
 
 
@@ -1172,6 +1180,23 @@ class CastSlot:
     name: str
 
 
+# Source-faithful adaptations must use their own cast, never the recurring
+# Lemmy cameo. This overrides both the entropy roll and the operator cameo
+# setting; invention and archive banks retain the existing cameo behavior.
+_LEMMY_EXCLUDED_SOURCE_BANK_IDS = frozenset({"public_domain", "shakespeare"})
+
+
+def _source_bank_excludes_lemmy(source_bank_id: str | None) -> bool:
+    """True when the bank's family is a source-faithful adaptation.
+
+    Normalized through ``base_source_bank_id`` so bake-off variants
+    (``shakespeare_v2``, ``public_domain_v3``) inherit the exclusion --
+    fidelity is a family behaviour, not a per-row opt-in.
+    """
+    normalized = base_source_bank_id(str(source_bank_id or "").strip().lower())
+    return normalized in _LEMMY_EXCLUDED_SOURCE_BANK_IDS
+
+
 def assemble_pre_locked_rows(
     *,
     num_characters: int,
@@ -1179,6 +1204,7 @@ def assemble_pre_locked_rows(
     force_lemmy: Optional[bool] = None,
     taken_names: Optional[set[str]] = None,
     source_character_names: Optional[List[str]] = None,
+    source_bank_id: str | None = None,
 ) -> tuple[List[dict], List[CastSlot], bool]:
     """Roll ANNOUNCER + (maybe LEMMY) + open-slot names. Pure Python,
     no LLM.
@@ -1206,6 +1232,9 @@ def assemble_pre_locked_rows(
             path (C7: the invention lanes are untouched). When the source
             names run out (fewer than num_characters), the remaining
             slots fall through to pick_first_last as before.
+        source_bank_id: canonical source-bank identifier. Shakespeare and
+            public-domain adaptations exclude Lemmy even when the global cameo
+            control requests him, preserving source fidelity.
 
     Returns:
         (pre_locked_rows, open_slots, lemmy_hit)
@@ -1235,10 +1264,13 @@ def assemble_pre_locked_rows(
     # roll_lemmy() always uses OS entropy, never the seeded `rng` --
     # the cameo is decoupled from the C7 seed so it stays a genuine
     # ~11% surprise (BUG-LOCAL-260: a fixed seed otherwise pinned
-    # LEMMY to 100% or 0%). force_lemmy still forces the cameo in
-    # (True) or out (False) deterministically for tests and the
-    # writer's operator-facing cameo control.
-    if force_lemmy is None:
+    # LEMMY to 100% or 0%). Source-faithful Shakespeare and public-domain
+    # adaptations override both the entropy roll and the operator cameo control:
+    # their casts must contain only source-appropriate people.
+    source_fidelity_excludes_lemmy = _source_bank_excludes_lemmy(source_bank_id)
+    if source_fidelity_excludes_lemmy:
+        lemmy_hit = False
+    elif force_lemmy is None:
         lemmy_hit = _POOLS.roll_lemmy()
     else:
         lemmy_hit = bool(force_lemmy)
@@ -1262,8 +1294,15 @@ def assemble_pre_locked_rows(
     source_queue: list[str] = []
     for raw in (source_character_names or []):
         nm = str(raw or "").strip().upper()
-        # Skip blanks, ANNOUNCER (always pre-locked), and anything already taken.
-        if nm and nm != "ANNOUNCER" and nm not in taken_names and nm not in source_queue:
+        # Skip blanks, ANNOUNCER (always pre-locked), Lemmy on fidelity-bound
+        # adaptations, and anything already taken.
+        if (
+            nm
+            and nm != "ANNOUNCER"
+            and (not source_fidelity_excludes_lemmy or nm != "LEMMY")
+            and nm not in taken_names
+            and nm not in source_queue
+        ):
             source_queue.append(nm)
 
     open_slots: list[CastSlot] = []
@@ -1438,6 +1477,7 @@ def lock_cast(
     max_attempts_per_call: int = 3,
     casting_brief: str = "",
     source_character_names: Optional[List[str]] = None,
+    source_bank_id: str | None = None,
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -1487,6 +1527,7 @@ def lock_cast(
         rng=cast_rng,
         force_lemmy=force_lemmy,
         source_character_names=source_character_names,
+        source_bank_id=source_bank_id,
     )
 
     cast: list[dict] = list(pre_locked)
@@ -1728,6 +1769,11 @@ def lock_cast(
 
     meta.update({
         "lemmy_hit":              lemmy_hit,
+        "lemmy_policy": (
+            "source_fidelity_exclusion"
+            if _source_bank_excludes_lemmy(source_bank_id)
+            else "operator_cameo"
+        ),
         "casting_attempts":       casting_attempts,
         "num_characters_request": num_characters,
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER

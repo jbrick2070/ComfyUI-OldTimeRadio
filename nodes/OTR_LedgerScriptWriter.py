@@ -3913,6 +3913,9 @@ class OTR_LedgerScriptWriter:
                 force_lemmy=lemmy_force,
                 # Adaptation lanes only; None everywhere else (byte-identical C7).
                 source_character_names=meta.get("_adaptation_character_names"),
+                source_bank_id=str(
+                    getattr(_source_bank_row, "source_bank_id", "") or ""
+                ),
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
@@ -3920,6 +3923,7 @@ class OTR_LedgerScriptWriter:
         meta["cast_contract_version"] = "cast-v1"
         meta["cast_contract"] = {
             "lemmy_hit":              cast_meta["lemmy_hit"],
+            "lemmy_policy":           cast_meta.get("lemmy_policy", "operator_cameo"),
             "casting_attempts":       cast_meta["casting_attempts"],
             "num_characters_request": cast_meta["num_characters_request"],
             "num_characters_locked":  cast_meta["num_characters_locked"],

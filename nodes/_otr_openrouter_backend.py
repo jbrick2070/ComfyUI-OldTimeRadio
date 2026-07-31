@@ -37,7 +37,9 @@ from pathlib import Path
 from typing import Any
 
 from ._otr_generation_budget import (
+    CAPACITY_PHASE_OUTPUT_LIMIT,
     GenerationContextOverflowError,
+    PromptContextOverflowError,
     estimate_prompt_tokens,
     fit_output_tokens,
 )
@@ -1509,18 +1511,6 @@ class OpenRouterBackend:
                 f"OpenRouter {slug} returned no choices: "
                 f"{str(body)[:300]}"
             )
-        if choices[0].get("finish_reason") == "length":
-            if fail_on_output_limit:
-                raise OpenRouterCallFailedError(
-                    f"OpenRouter {slug} exhausted the provider output capacity; "
-                    "the partial artifact is not eligible for reroll"
-                )
-            log.warning(
-                "[OpenRouter] %s hit finish_reason=length -- output truncated "
-                "at the token ceiling; a downstream JSON parse may fail. Raise "
-                "OPENROUTER_MIN_OUTPUT_TOKENS or the slot max-tokens cap.",
-                slug,
-            )
         message = choices[0].get("message") or {}
         content = message.get("content")
         # Defect D: content may be a list of typed parts (Anthropic-style
@@ -1539,6 +1529,24 @@ class OpenRouterBackend:
         # output -- a no-op for non-thinking models (BUG-306/308 family).
         if isinstance(content, str):
             content = _strip_reasoning_tags(content)
+        if choices[0].get("finish_reason") == "length":
+            if fail_on_output_limit:
+                raise PromptContextOverflowError(
+                    f"OpenRouter {slug} exhausted the provider output capacity; "
+                    "the partial artifact is discarded rather than repaired",
+                    phase=CAPACITY_PHASE_OUTPUT_LIMIT,
+                    raw_completion=content if isinstance(content, str) else None,
+                    generated_tokens=(body.get("usage") or {}).get(
+                        "completion_tokens"
+                    ),
+                    ended_with_eos=False,
+                )
+            log.warning(
+                "[OpenRouter] %s hit finish_reason=length -- output truncated "
+                "at the token ceiling; a downstream JSON parse may fail. Raise "
+                "OPENROUTER_MIN_OUTPUT_TOKENS or the slot max-tokens cap.",
+                slug,
+            )
         if not isinstance(content, str) or not content:
             raise OpenRouterCallFailedError(
                 f"OpenRouter {slug} returned empty message content "
