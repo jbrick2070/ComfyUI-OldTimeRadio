@@ -181,7 +181,10 @@ class ArmSpec(object):
 
     def __init__(self, label, engine_id, graph, graph_sha256, steps, canvas,
                  lengths, required_classes, models, length_node, save_node,
-                 notes, gated_reason=None):
+                 notes, gated_reason=None, canvas_overridden=False,
+                 armspec_canvas=None):
+        self.canvas_overridden = bool(canvas_overridden)
+        self.armspec_canvas = tuple(armspec_canvas or canvas)
         self.label = label
         self.engine_id = engine_id
         self.graph = graph
@@ -213,6 +216,11 @@ class ArmSpec(object):
             raise BenchError("arm %s: steps must be a positive int, got %r"
                              % (self.label, self.steps))
         w, h = self.canvas
+        # positive FIRST: 0 % 32 == 0, so the grid rule alone admits 0x0 and a
+        # zero-area latent is a nonsense render rather than a refusal
+        if w <= 0 or h <= 0:
+            raise BenchError("arm %s: canvas %dx%d must be positive on both "
+                             "axes" % (self.label, w, h))
         if w % 32 or h % 32:
             raise BenchError("arm %s: canvas %dx%d violates OTR's both-axes/32 "
                              "rule" % (self.label, w, h))
@@ -245,6 +253,10 @@ class ArmSpec(object):
         """Unique per (arm, length, repeat). Repeats get their OWN id so a
         winner's three cold measurements can never overwrite each other."""
         base = "%s__%df" % (self.label, int(length))
+        if self.canvas_overridden:
+            # a diagnostic-canvas cell may never collide with the shipped-canvas
+            # cell's id or its asset filename
+            base += "__%dx%d" % self.canvas
         return base if repeat == 0 else "%s__r%d" % (base, int(repeat))
 
     def as_dict(self):
@@ -255,7 +267,34 @@ class ArmSpec(object):
                 "required_classes": list(self.required_classes),
                 "models": [m.as_dict() for m in self.models],
                 "length_node": self.length_node, "save_node": self.save_node,
-                "notes": self.notes, "gated_reason": self.gated_reason}
+                "notes": self.notes, "gated_reason": self.gated_reason,
+                "canvas_overridden": self.canvas_overridden,
+                "armspec_canvas": list(self.armspec_canvas)}
+
+
+def derive_arm_at_canvas(arm, canvas, lengths=None):
+    """A copy of ``arm`` rendering at a DIAGNOSTIC canvas instead of its shipped
+    one, with both canvases stamped so no receipt can be misread.
+
+    The judgment of record requires that alternate-resolution cells be
+    receipted and never silently lose to the static production canvas -- so the
+    effective canvas and the arm's own declared canvas both travel in the
+    receipt, and the label says which is which."""
+    w, h = (int(canvas[0]), int(canvas[1]))
+    lengths = tuple(lengths or arm.lengths)
+    if (w, h) == tuple(arm.canvas) and lengths == tuple(arm.lengths):
+        return arm
+    return ArmSpec(
+        label=arm.label, engine_id=arm.engine_id, graph=arm.graph,
+        graph_sha256=arm.graph_sha256, steps=arm.steps, canvas=(w, h),
+        lengths=lengths, required_classes=arm.required_classes,
+        models=arm.models, length_node=arm.length_node,
+        save_node=arm.save_node, gated_reason=arm.gated_reason,
+        canvas_overridden=True, armspec_canvas=arm.canvas,
+        notes=("DIAGNOSTIC CANVAS %dx%d -- NOT this arm's shipped canvas "
+               "(%dx%d). Recorded as a deliberate override, never as the arm's "
+               "own number. || %s" % (w, h, arm.canvas[0], arm.canvas[1],
+                                      arm.notes)))
 
 
 _WAN_CLASSES = ("ModelSamplingSD3", "CLIPTextEncode", "VAELoader", "LoadImage",
@@ -1277,6 +1316,8 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         "cell_id": cell_id, "arm": arm.label, "engine_id": arm.engine_id,
         "length": int(length), "repeat": int(repeat),
         "canvas": list(arm.canvas), "steps": arm.steps,
+        "canvas_source": "override" if arm.canvas_overridden else "armspec",
+        "armspec_canvas": list(arm.armspec_canvas),
         "graph": arm.graph, "graph_sha256": arm.graph_sha256,
         "clamp_reserve_gib": CAMPAIGN_CLAMP_GIB,
         "label": RESULT_LABEL,
@@ -1301,7 +1342,10 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         _, pre_submit = nvml_mib()
         receipt["pre_submit_nvml_mib"] = round(pre_submit, 1)
         base_prompt = load_graph(arm)
-        prefix = "otr/episodes/_bench_4arm/%s/%s" % (arm.label, cell_id)
+        # derived from the ACTIVE bench dir, so a diagnostic run's asset lands
+        # beside its own results instead of in the shipped-canvas tree
+        prefix = os.path.relpath(os.path.join(arm_dir, cell_id),
+                                 OUTPUT_BASE).replace("\\", "/")
         prompt = build_cell_prompt(arm, base_prompt, length, resolved, prefix)
         receipt["seed"] = graph_seed(prompt)
         log("CELL %s | %s | %dx%d | %d frames | %d steps | seed %d | reserve %d GiB"
@@ -1547,7 +1591,16 @@ def offline_preflight(arms):
         # either one sees the canvas the arm actually renders at
         latent = prompt.get(arm.length_node, {}).get("inputs", {})
         declared = (latent.get("width"), latent.get("height"))
-        if declared != arm.canvas:
+        if arm.canvas_overridden:
+            # a diagnostic-canvas cell deliberately differs from the graph file;
+            # it must still agree with the arm's OWN declared canvas
+            if declared != arm.armspec_canvas:
+                raise BenchError(
+                    "arm %s: %s declares canvas %sx%s but the arm's own canvas "
+                    "is %dx%d" % (arm.label, arm.graph, declared[0],
+                                  declared[1], arm.armspec_canvas[0],
+                                  arm.armspec_canvas[1]))
+        elif declared != arm.canvas:
             raise BenchError(
                 "arm %s: %s declares canvas %sx%s but the ArmSpec says %dx%d"
                 % (arm.label, arm.graph, declared[0], declared[1],
@@ -1669,6 +1722,12 @@ def main(argv=None):
                          "the named acquisition blocker")
     ap.add_argument("--no-watchdog", action="store_true",
                     help="do not attach otr_render_watchdog.ps1")
+    ap.add_argument("--canvas", default="",
+                    help="DIAGNOSTIC canvas override, WxH (e.g. 512x288). Both "
+                         "axes must be /32. Results land in their own "
+                         "diagnostic_<WxH>/ directory so they can never be read "
+                         "as an arm's shipped number, and every receipt stamps "
+                         "both the effective and the arm's own canvas.")
     args = ap.parse_args(argv)
 
     sel = set(s.strip() for s in args.arms.split(",") if s.strip())
@@ -1685,9 +1744,32 @@ def main(argv=None):
     lengths = sorted([int(x) for x in args.lengths.split(",") if x.strip()]
                      or list(CAMPAIGN_LENGTHS))
 
+    # The diagnostic canvas resolves BEFORE any early-return branch. --regrade,
+    # --dry-validate and --offline-only must every one of them see the arms and
+    # the BENCH_DIR the LIVE run would use; resolving after them meant
+    # `--canvas WxH --regrade` silently re-graded the shipped tree and
+    # `--canvas WxH --dry-validate` validated a canvas the run would not submit.
+    diag = None
+    if args.canvas:
+        m = re.fullmatch(r"(\d+)\s*[xX]\s*(\d+)", args.canvas.strip())
+        if not m:
+            raise BenchError("--canvas must be WxH, got %r" % args.canvas)
+        diag = (int(m.group(1)), int(m.group(2)))
+        # the both-axes/32 rule the help text promises is NOT re-checked here --
+        # ArmSpec.validate() owns it, and a second copy is a second authority
+        arms = [derive_arm_at_canvas(a, diag, lengths) for a in arms]
+        # its OWN directory: a diagnostic number must never be filed where a
+        # reader would take it for the arm's shipped result
+        global BENCH_DIR
+        BENCH_DIR = os.path.join(BENCH_DIR, "diagnostic_%dx%d" % diag)
+        log("DIAGNOSTIC CANVAS %dx%d -- results under %s" % (diag[0], diag[1],
+                                                             BENCH_DIR))
+
     if args.offline_only:
-        offline_preflight(ARMS)
-        log("offline preflight PASS for all %d arms" % len(ARMS))
+        every = ([derive_arm_at_canvas(a, diag, lengths) for a in ARMS]
+                 if diag else list(ARMS))
+        offline_preflight(every)
+        log("offline preflight PASS for all %d arms" % len(every))
         return 0
     if args.regrade:
         regrade(arms)

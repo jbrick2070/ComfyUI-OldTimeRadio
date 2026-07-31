@@ -599,7 +599,7 @@ def test_vendored_helper_is_tracked_in_this_repo_and_exports_the_probes():
     for cls in ("OTR_BakeoffVramReset", "OTR_BakeoffVramProbe",
                 "OTR_BakeoffReclaim"):
         assert cls in text
-    assert not text.startswith("﻿"), "no BOM"
+    assert not text.startswith("\ufeff"), "no BOM"
 
 
 def test_helper_install_verifies_byte_identity(tmp_path, monkeypatch):
@@ -762,3 +762,135 @@ def test_a_failed_arm_does_not_stop_the_other_arms():
     assert lines[3].startswith("| A |") and "FAIL" in lines[3]
     assert lines[4].startswith("| D |") and "PASS" in lines[4]
     assert len(failures) == 1
+
+
+# --------------------------------------------------------------------------
+# diagnostic canvas override
+# --------------------------------------------------------------------------
+def test_derive_arm_at_canvas_stamps_both_canvases():
+    arm = B.ARMS_BY_LABEL["A"]
+    diag = B.derive_arm_at_canvas(arm, (512, 288))
+    assert diag.canvas == (512, 288)
+    assert diag.armspec_canvas == (832, 480)      # the arm's OWN number survives
+    assert diag.canvas_overridden is True
+    assert "DIAGNOSTIC CANVAS 512x288" in diag.notes
+    assert "NOT this arm's shipped canvas" in diag.notes
+    assert arm.canvas == (832, 480)               # the original is untouched
+    assert arm.canvas_overridden is False
+
+
+def test_a_diagnostic_cell_id_cannot_collide_with_the_shipped_one():
+    arm = B.ARMS_BY_LABEL["A"]
+    diag = B.derive_arm_at_canvas(arm, (512, 288))
+    assert arm.cell_id(81) == "A__81f"
+    assert diag.cell_id(81) == "A__81f__512x288"
+    assert arm.cell_id(81) != diag.cell_id(81)
+
+
+def test_an_illegal_diagnostic_canvas_is_still_refused():
+    """The override is not an escape hatch from the grid rule."""
+    with pytest.raises(B.BenchError):
+        B.derive_arm_at_canvas(B.ARMS_BY_LABEL["A"], (768, 432))
+
+
+def test_a_diagnostic_arm_passes_preflight_against_its_own_graph():
+    """The graph file still declares the SHIPPED canvas; preflight checks the
+    override against armspec_canvas, not against the effective one."""
+    diag = B.derive_arm_at_canvas(B.ARMS_BY_LABEL["A"], (512, 288))
+    assert B.offline_preflight([diag]) is True
+    out = B.build_cell_prompt(diag, B.load_graph(diag), 81,
+                              {p.role: p.filename for p in diag.models}, "p")
+    assert (out["8"]["inputs"]["width"], out["8"]["inputs"]["height"]) == (512, 288)
+
+
+def test_derive_arm_at_canvas_can_narrow_the_ladder():
+    arm = B.ARMS_BY_LABEL["A"]
+    diag = B.derive_arm_at_canvas(arm, (512, 288), lengths=(81,))
+    assert diag.lengths == (81,)
+    assert arm.lengths == B.CAMPAIGN_LENGTHS
+    g = B.grade_arm(diag, [_clean_cell("A", 81)])
+    assert g["required_lengths"] == [81]
+
+
+def test_no_override_is_a_no_op():
+    arm = B.ARMS_BY_LABEL["D"]
+    assert B.derive_arm_at_canvas(arm, (512, 288)) is arm
+
+
+def test_a_zero_canvas_is_refused_even_though_it_satisfies_the_grid_rule():
+    """0 % 32 == 0, so the both-axes/32 check alone admits 0x0. A zero-area
+    latent is a nonsense render, so positivity is checked FIRST."""
+    with pytest.raises(B.BenchError, match="positive on both"):
+        B.derive_arm_at_canvas(B.ARMS_BY_LABEL["A"], (0, 0))
+    with pytest.raises(B.BenchError, match="positive on both"):
+        B.derive_arm_at_canvas(B.ARMS_BY_LABEL["A"], (512, 0))
+
+
+def _canvas_argv(*extra):
+    return ["--canvas", "512x288"] + list(extra)
+
+
+def test_canvas_override_resolves_before_regrade(monkeypatch):
+    """--canvas WxH --regrade must re-grade the DIAGNOSTIC tree. Resolving the
+    override after the early return silently re-graded the shipped tree, which
+    is a wrong answer with no error -- the exact shape this bench forbids."""
+    seen = {}
+
+    def _spy(arms):
+        seen["dir"] = B.BENCH_DIR
+        seen["canvases"] = [tuple(a.canvas) for a in arms]
+
+    monkeypatch.setattr(B, "regrade", _spy)
+    shipped = B.BENCH_DIR
+    try:
+        assert B.main(_canvas_argv("--regrade")) == 0
+    finally:
+        B.BENCH_DIR = shipped
+    assert seen["dir"].endswith("diagnostic_512x288")
+    assert set(seen["canvases"]) == {(512, 288)}
+
+
+def test_canvas_override_resolves_before_dry_validate(monkeypatch):
+    """Same defect on the other early return: a dry-validate that checks the
+    shipped canvas is not validating what the run would submit."""
+    seen = {}
+
+    def _spy(arms):
+        seen["flags"] = {a.label: (tuple(a.canvas), a.canvas_overridden)
+                         for a in arms}
+        return 0
+
+    monkeypatch.setattr(B, "dry_validate", _spy)
+    shipped = B.BENCH_DIR
+    try:
+        assert B.main(_canvas_argv("--dry-validate")) == 0
+    finally:
+        B.BENCH_DIR = shipped
+    assert seen.get("flags"), "dry_validate was never reached"
+    # every arm renders at the diagnostic canvas ...
+    assert {c for c, _ in seen["flags"].values()} == {(512, 288)}
+    # ... and only the ones it actually MOVED carry the override flag. D ships
+    # 512x288, so for D this is the documented no-op and flagging it would file
+    # a shipped number as a diagnostic one.
+    assert seen["flags"]["A"][1] is True
+    assert seen["flags"]["D"][1] is False
+
+
+def test_canvas_override_reaches_offline_only_across_every_arm(monkeypatch):
+    """--offline-only covers ARMS, not the selection, so the override has to be
+    applied there too or it preflights a canvas the run would not use."""
+    seen = {}
+
+    def _spy(arms):
+        seen["canvases"] = [tuple(a.canvas) for a in arms]
+        seen["n"] = len(arms)
+        return True
+
+    monkeypatch.setattr(B, "offline_preflight", _spy)
+    shipped = B.BENCH_DIR
+    try:
+        assert B.main(_canvas_argv("--offline-only")) == 0
+    finally:
+        B.BENCH_DIR = shipped
+    assert seen["n"] == len(B.ARMS)
+    assert set(seen["canvases"]) == {(512, 288)}
