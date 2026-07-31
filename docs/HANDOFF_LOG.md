@@ -3,7 +3,31 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-31 (newest) -- CODE 6d90bad0 (v2.0-alpha) -- WINDOW CODER
+## 2026-07-31 05:0x -- HEAD 6da72c92+ (v2.0-alpha) -- WINDOW CODER (overnight)
+Did: shipped the Lemmy source-fidelity exclusion + ripped P3's fixed output
+  reservation (e577f9ef); shipped BOTH randomizers -- source_bank and
+  visual_style as independent per-dropdown sentinels -- plus the lane-authority
+  rip out of the writer (6d90bad0); re-grounded WAN 8-GB and found it
+  code-complete/proof-incomplete (c8cc3e0f); logged the SceneSequencer
+  music-socket NEWBUG (b00b047f); ran the full kibitz r1->r4 arc on the SFX plan
+  and wrote its tracked spec (6da72c92); then analysed the WAN 8-GB parameter
+  envelope on operator request.
+Current step: GET WAN 8-GB READY FIRST, then the 30-word all-local-video-model
+  sweep with the randomizers on (seeds PINNED so the engine is the only
+  variable). WAN's real defects are NOT the frame ceiling: the engine declares no
+  render_canvas (so it renders at 1472x832, 3.07x intended), it has no t5_device
+  knob (the umt5 encoder is 3.861 GiB, LARGER than the UNET), and its cost model
+  is one 2026-06 data point that makes 8 GB arithmetically impossible. Full
+  analysis in docs/2026-07-31-wan-8gb-parameter-analysis.md.
+Next: CODER window -- declare render_canvas (recommend 768x432, exactly 16:9 and
+  17% cheaper than 832x480) and add t5_device defaulting to cpu. Both offline.
+  Then a RENDER window for the 4-cell clamped sweep.
+Models: Claude (anchor + judge) + one full kibitz arc (codex gpt-5.6-sol high +
+  agy Gemini 3.6 Flash High; agy hit a 429 quota wall on r4, so r4 is one-seat).
+Commits: e577f9ef, 40f82645, 6d90bad0, a13225bd, c8cc3e0f, b00b047f, 6da72c92
+  (+ this handoff)
+
+## 2026-07-31 -- CODE 6d90bad0 (v2.0-alpha) -- WINDOW CODER
 
 - **THE TWO RANDOMIZERS.** Operator, mid-session: "source bank and visual style
   are TWO separate randomizers that can be turned on or off individually." Both

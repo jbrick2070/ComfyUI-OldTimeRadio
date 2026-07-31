@@ -62,11 +62,89 @@ coverage of the selected body is PROVEN (`_validate_dossier_windows`, and tests
 `test_old_prefix_counterfactual_loses_tail`), not a source clip. No rip is owed.
 Live GPU requalification IS still owed.
 
-**CURRENT STEP:** the randomizers are suite-proven only -- NEITHER HAS RUN LIVE.
-Next in the operator's stated order is the WAN 8-GB contract. The live proofs
-owed, whenever a GPU window opens: a seeded bank roll, a seeded style roll, both
-rolling in one run, and an unseeded roll proved by REPLAY
-(`draw(receipt.eligible_order, receipt.seed) == receipt.selected`).
+**CURRENT STEP (operator directive 2026-07-31, revised same day):
+GET WAN 8-GB READY *FIRST*, THEN the 30-word randomizer sweep.**
+
+**WAN 8-GB is NOT a ceiling problem -- the analysis is
+`docs/2026-07-31-wan-8gb-parameter-analysis.md`. Read it before touching this.**
+The headline: with the shipped cost model
+(`FRAME_COST_MODEL["wan_ti2v"] = (7000.0, 185.0)`, margin 0.85) an 8 GB card
+needs **9,442 MB free** to render even the 17-frame motion floor at 832x480 --
+more than the card HAS. The overhead term alone is 8,235 MB. The tier raises
+`MotionBudgetError` before rendering a frame, which is exactly the recorded
+2026-07-23 failure.
+
+Three real defects, in order:
+
+1. **`wan_ti2v` declares NO `render_canvas`**, so a plain canonical run falls
+   through to `render_driver.py:2494`'s `1472x832` default -- **3.07x the
+   intended pixels**. `ltx_8gb` fixed this class in B5 by declaring
+   `render_canvas = (512, 288)` statically. **Recommend declaring 768x432**: it
+   is exactly 16:9 and /16-clean, and 17% cheaper than 832x480 (which is 26:15
+   and pillarboxes).
+2. **No `t5_device` knob exists.** `umt5-xxl-encoder-Q5_K_M` is 3.861 GiB --
+   LARGER than the 3.549 GiB UNET; all three required weights total 8.722 GiB.
+   ltx MEASURED that this is the decisive lever (t5 on GPU -> 16.0-16.1 GB peak,
+   i.e. an 8 GB box does not render). Porting `t5_device: "cpu"` is the single
+   highest-value change available.
+3. **The cost model is ONE 2026-06 data point** (10,277 MB @ 17 frames @
+   1472x832) taken on a 16 GB card with machine-wide NVML. It charges 7,000 MB
+   overhead for a path whose peak resident weights are ~4,980 MB; the ~2 GB gap
+   has no provenance. Must be re-fit from a real sweep.
+
+Order: (1) declare the canvas + pin the profile with a test; (2) add the
+`t5_device` knob defaulting to `cpu`; both are OFFLINE code. Then (3) the 4-cell
+clamped sweep (`OTR_HEADLESS_RESERVE_VRAM_GB=8`) copying ltx's B6 shape --
+judge on the SPREAD, not the minimum -- and (4) re-fit the cost model and set the
+tier ceiling from it (17 stays until the data says 33).
+
+Sampler settings need no change: `steps=30` is a TIME knob and will not make the
+tier fit; `cfg=5.0` / `shift=5.0` are correct for a non-distilled 5B (do NOT copy
+ltx's `cfg=1.0`, that is a distilled-model artifact).
+
+**THEN, once WAN renders on 8 GB: RE-TEST EVERY LOCAL VIDEO MODEL AT 30 WORDS
+WITH THE RANDOMIZERS ON.** RENDER window. It doubles as the live proof both
+randomizers still owe, and 30 words is the cheapest leg that exercises the whole
+chain.
+
+**PIN THE SEEDS -- this is the difference between a sweep and a mess.** If both
+rolls run free, the bank AND the visual style change per leg, and no difference
+between two legs can be attributed to the video engine: that is the channel-
+isolation failure `PRODUCTION_SPRINT_LESSONS` s12 exists to prevent. Set
+`OTR_BANK_SEED` and `OTR_VISUAL_STYLE_SEED` to fixed values for the sweep. The
+roll still runs end to end -- sentinel resolved, pool built from the live
+registry, draw executed, `meta.bank_roll` / `meta.style_roll` stamped -- but
+every leg draws the SAME bank and style, so the ENGINE is the only variable.
+
+Order of operations:
+
+1. **One unseeded pilot leg first**, to prove the entropy path and the replay
+   contract: assert `draw(receipt.eligible_order, receipt.seed) == receipt.selected`
+   for both surfaces, and confirm both receipts are present with
+   `seed_source = "OS entropy"`.
+2. **Then the seeded sweep** across every local video engine at 30 words.
+   RE-PIN THE ROSTER AT HEAD from the engine registry -- do NOT trust a
+   remembered count (past campaigns were variously described as 18 and 19
+   engines, and the roster has changed since).
+3. **One leg with a fidelity bank pinned** (`shakespeare` or `public_domain`,
+   picked directly, not rolled) to close the OTHER outstanding live proof:
+   no LEMMY in the locked cast and
+   `meta.cast_contract.lemmy_policy == "source_fidelity_exclusion"`.
+
+Per-leg acceptance is the standing bar: `RESULT SUCCESS` + `obs_publish OK` +
+the asset on disk at `otr/episodes/<ep>/`, final under `otr/obs/`. Word count
+NEVER gates a leg. Reset the box per CLAUDE.md s4 before every headless run
+(selective CIM kill by CommandLine, never a blanket python kill).
+
+Record per leg: engine, resolved bank + style (from the receipts, not the
+widget), both seeds, render time, peak VRAM, and the asset path. That table is
+the deliverable.
+
+**Deferred by this directive, not cancelled:** the WAN 8-GB block (already
+re-grounded as code-complete / proof-incomplete, blocked on one operator
+decision -- see OPEN BUGS) and the SFX engine lane
+(`docs/2026-07-31-sfx-engine-lane-SPEC.md`, contracts settled, blocked on a
+checkpoint that does not exist on this host). Neither is a keyboard item.
 
 ---
 
