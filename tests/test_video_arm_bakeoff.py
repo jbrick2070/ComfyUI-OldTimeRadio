@@ -314,8 +314,6 @@ def test_a_clean_cell_blocks_nothing():
     ({"status": "error", "error": "boom"}, "status=error"),
     ({"telemetry": {"valid": False, "invalid_reasons": ["no NVML peak recorded"]}},
      "telemetry invalid"),
-    ({"stage_probe": {"valid": False, "reason": "expected exactly one reset"}},
-     "stage probe invalid"),
     ({"watchdog": {"ran": True, "dead": True}}, "watchdog declared the leg dead"),
     ({"spill_signatures": ["cuda_oom"]}, "named spill signature"),
     ({"peak_delta_mib": 7169.0}, "exceeds the 7168 MiB bar"),
@@ -357,18 +355,44 @@ def test_peak_sampler_validity_requires_samples_peaks_and_a_tight_gap():
     assert s.valid is False
 
 
-def test_stage_probe_fails_closed_on_zero_or_duplicate_markers():
-    reset = "[OTR_BakeoffVramReset] marker=aabbccdd1122 reset_peak_memory_stats OK"
-    probe = ("[OTR_BakeoffVramProbe] marker=99887766aabb "
-             "max_allocated_mb=4210.5 max_reserved_mb=5120.0")
-    good = B.parse_stage_probe(reset + "\n" + probe)
-    assert good["valid"] is True
-    assert good["torch_max_allocated_mib"] == 4210.5
-    assert good["torch_max_reserved_mib"] == 5120.0
-    assert B.parse_stage_probe(probe)["valid"] is False          # no reset
-    assert B.parse_stage_probe(reset)["valid"] is False          # no probe
-    assert B.parse_stage_probe(reset + "\n" + probe + "\n" + reset
-                               + "\n" + probe)["valid"] is False  # spans cells
+_RESET_LINE = "[OTR_BakeoffVramReset] marker=aabbccdd1122 reset_peak_memory_stats OK"
+_PROBE_LINE = ("[OTR_BakeoffVramProbe] marker=99887766aabb "
+               "max_allocated_mb=4210.5 max_reserved_mb=5120.0")
+
+
+def test_stage_probe_counts_distinct_markers_not_lines():
+    """The helper emits every marker TWICE by design -- once through print and
+    once through _LOG.warning -- so a real server log carries two copies of ONE
+    execution. Counting lines called that a failure; counting distinct uuid
+    markers is the honest count."""
+    doubled = "\n".join([_RESET_LINE, _RESET_LINE, _PROBE_LINE, _PROBE_LINE])
+    got = B.parse_stage_probe(doubled)
+    assert got["valid"] is True
+    assert got["torch_max_allocated_mib"] == 4210.5
+    assert got["torch_max_reserved_mib"] == 5120.0
+
+
+def test_stage_probe_still_fails_closed_on_zero_or_two_executions():
+    assert B.parse_stage_probe(_PROBE_LINE)["valid"] is False       # no reset
+    assert B.parse_stage_probe(_RESET_LINE)["valid"] is False       # no probe
+    assert B.parse_stage_probe("")["valid"] is False                # neither
+    # two DISTINCT markers = the slice spans cells, so the numbers are not this
+    # cell's -- still rejected
+    second = "\n".join([
+        _RESET_LINE.replace("aabbccdd1122", "ffeeddcc3344"),
+        _PROBE_LINE.replace("99887766aabb", "1122334455aa")])
+    spans = B.parse_stage_probe("\n".join([_RESET_LINE, _PROBE_LINE, second]))
+    assert spans["valid"] is False
+    assert spans["probes"] == 2
+
+
+def test_the_stage_probe_is_advisory_and_never_gates_a_cell():
+    """Per-stage measurement was declined (operator ruling O7 -- whole-window
+    peak is enough). A broken advisory probe must not be able to FAIL a cell
+    that rendered a valid asset."""
+    broken = _clean_cell(stage_probe={"valid": False, "reason": "no markers"})
+    assert B.cell_blocks_pass(broken) == []
+    assert B.parse_stage_probe(_RESET_LINE + "\n" + _PROBE_LINE)["advisory"] is True
 
 
 # --------------------------------------------------------------------------

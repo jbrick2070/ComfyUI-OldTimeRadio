@@ -955,20 +955,35 @@ def parse_stage_probe(log_slice):
 
     ``OTR_BakeoffVramReset`` opens it on the latent edge immediately before the
     sampler; ``OTR_BakeoffVramProbe`` closes it on the image edge immediately
-    after decode. FAIL CLOSED: exactly one of each must appear. Zero means the
-    probes did not execute (a cached node, a graph that lost them); more than one
-    means the slice spans cells and the numbers are not this cell's."""
-    resets = _RESET_RE.findall(log_slice)
-    probes = _PROBE_RE.finditer(log_slice)
-    found = [{"marker": m.group("marker"),
-              "torch_max_allocated_mib": float(m.group("alloc")),
-              "torch_max_reserved_mib": float(m.group("resv"))} for m in probes]
+    after decode.
+
+    COUNT DISTINCT MARKERS, NOT LINES. Each probe emits its line TWICE by design
+    -- once through ``print`` and once through ``_LOG.warning`` -- so the server
+    log carries two copies of one execution. The marker is a fresh uuid per call,
+    so distinct markers is the honest count of executions. Still fail-closed:
+    zero markers means the probes did not run (a cached node, a graph that lost
+    them), and two distinct markers means the slice spans cells and the numbers
+    are not this cell's.
+
+    ADVISORY ONLY. Per-stage measurement was declined (operator ruling O7:
+    whole-window peak is enough), so this does NOT gate a cell -- the gating
+    telemetry is the whole-window NVML sampler."""
+    resets = set(_RESET_RE.findall(log_slice))
+    by_marker = {}
+    for m in _PROBE_RE.finditer(log_slice):
+        by_marker[m.group("marker")] = {
+            "marker": m.group("marker"),
+            "torch_max_allocated_mib": float(m.group("alloc")),
+            "torch_max_reserved_mib": float(m.group("resv"))}
+    found = list(by_marker.values())
     if len(resets) != 1 or len(found) != 1:
         return {"valid": False, "resets": len(resets), "probes": len(found),
-                "reason": "expected exactly one reset and one probe in this "
-                          "cell's log slice, got %d and %d"
-                          % (len(resets), len(found))}
+                "advisory": True,
+                "reason": "expected exactly one distinct reset marker and one "
+                          "distinct probe marker in this cell's log slice, got "
+                          "%d and %d" % (len(resets), len(found))}
     out = dict(found[0])
+    out["advisory"] = True
     out["valid"] = True
     out["segment"] = "sample+decode (order-safe half only; the text-encode / "
     out["segment"] += "image-encode boundaries need forced ordering, which "
@@ -1383,9 +1398,9 @@ def cell_blocks_pass(receipt):
     if not tel.get("valid"):
         why.append("telemetry invalid: " + "; ".join(tel.get("invalid_reasons")
                                                      or ["unknown"]))
-    probe = receipt.get("stage_probe") or {}
-    if not probe.get("valid"):
-        why.append("stage probe invalid: %s" % probe.get("reason", "unknown"))
+    # The per-stage torch probe is ADVISORY, never gating: per-stage measurement
+    # was declined (operator ruling O7 -- whole-window peak is enough). The
+    # gating telemetry is the whole-window NVML sampler checked above.
     if receipt.get("watchdog", {}).get("dead"):
         why.append("watchdog declared the leg dead")
     spills = receipt.get("spill_signatures") or []
@@ -1590,6 +1605,36 @@ def dry_validate(arms, boot=True):
             log("teardown reset error: %r" % e)
 
 
+def regrade(arms):
+    """Re-derive the table from receipts already on disk. NO GPU, NO re-render.
+
+    Each cell booted its own server into its own log, so that whole log IS the
+    cell's slice -- the advisory stage probe is re-parsed from it rather than
+    left stale. Measured values (peak, wall, asset) are never recomputed: they
+    are what the run observed and this must not be able to launder them."""
+    path = os.path.join(BENCH_DIR, "video_arm_bench_results.json")
+    if not os.path.exists(path):
+        raise BenchError("nothing to regrade: %s does not exist" % path)
+    with open(path, encoding="utf-8") as f:
+        payload = json.load(f)
+    receipts = payload.get("cells") or []
+    if not receipts:
+        raise BenchError("nothing to regrade: %s has no cells" % path)
+    for r in receipts:
+        arm_dir = os.path.join(BENCH_DIR, str(r.get("arm")))
+        log_path = os.path.join(arm_dir,
+                                "comfy_server_%s.log" % r.get("cell_id"))
+        if not os.path.exists(log_path):
+            r.setdefault("stage_probe", {})["regrade_note"] = (
+                "server log absent; advisory probe left as recorded")
+            continue
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            r["stage_probe"] = parse_stage_probe(f.read())
+    write_results(receipts, payload.get("manifest") or {}, arms)
+    log("regraded %d cells from receipts on disk (no GPU)" % len(receipts))
+    return receipts
+
+
 def git_head():
     try:
         r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO,
@@ -1610,6 +1655,9 @@ def main(argv=None):
                          "loader enums per arm; renders NOTHING")
     ap.add_argument("--offline-only", action="store_true",
                     help="offline checks only -- no server, no GPU")
+    ap.add_argument("--regrade", action="store_true",
+                    help="re-derive the table from receipts already on disk; "
+                         "no server, no GPU, measured values never recomputed")
     ap.add_argument("--arms", default="",
                     help="comma list of arm labels (default: every arm that is "
                          "not gated). Known: %s" % ", ".join(a.label for a in ARMS))
@@ -1640,6 +1688,9 @@ def main(argv=None):
     if args.offline_only:
         offline_preflight(ARMS)
         log("offline preflight PASS for all %d arms" % len(ARMS))
+        return 0
+    if args.regrade:
+        regrade(arms)
         return 0
     if args.dry_validate:
         return dry_validate(arms)
