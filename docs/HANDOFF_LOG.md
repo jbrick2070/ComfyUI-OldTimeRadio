@@ -3,7 +3,55 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-07-30 (newest) -- CODE 3bc3d8a0 (v2.0-alpha) -- WINDOW CODER
+## 2026-07-31 (newest) -- CODE e577f9ef (v2.0-alpha) -- WINDOW CODER
+
+- Two operator directives from the 320-word test session, landed together as one
+  offline root fix. Base and origin were both `6e2c9b2f`; HEAD == origin
+  `e577f9ef` after the push.
+- **Lemmy source-fidelity exclusion.** Operator, stated twice: "public domain and
+  shakespeare should never have a random lemmy roll." `_otr_casting` now carries
+  `_LEMMY_EXCLUDED_SOURCE_BANK_IDS = {public_domain, shakespeare}` and
+  `_source_bank_excludes_lemmy()`, normalized through
+  `_otr_bank_variants.base_source_bank_id` so `shakespeare_v2` / `public_domain_v3`
+  inherit the rule -- fidelity is a FAMILY behaviour. The check runs inside
+  `assemble_pre_locked_rows` AHEAD of both the OS-entropy ~11% roll and the
+  `force_lemmy` branch, so it overrides the operator-facing `lemmy_cameo` widget
+  as well as the roll, and it filters LEMMY out of any source-supplied character
+  list. The writer threads the resolved `_source_bank_row.source_bank_id` into
+  `lock_cast` and stamps `cast_contract.lemmy_policy`
+  (`source_fidelity_exclusion` | `operator_cameo`) so the ledger records which
+  rule applied. `replay_voice_assignment` needed no change: it already replays the
+  frozen `lemmy_hit` via `force_lemmy=bool(lemmy_hit)`, so bark-voice replay stays
+  byte-identical. Invention/archive banks are untouched.
+- **P3 stops reserving output capacity.** Operator: "we don't chase word count --
+  whatever the LLM comes up with; we can only do our best to suggest the initial
+  word count." The RadioScoreDraft pass carried a fixed
+  `_RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192` / `_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+  = 1829` reservation, which is chasing a word count by another name. Both
+  constants are gone; P3 now routes through `ProviderCapacityMessages` with
+  `max_new_tokens=None`, and its surface receipt reports
+  `output_budget_mode=provider_capacity` / `requested_max_new_tokens=None`.
+  Finiteness still comes from the structural graph bounds (scenes<=3, shots<=2,
+  beats<=4), never from a prose length gate. The compact-contract instruction no
+  longer mentions a reservation.
+- **OpenRouter capacity signal is typed and correctly ordered.**
+  `finish_reason=length` now raises `PromptContextOverflowError(phase=output_limit)`
+  carrying the partial completion, `completion_tokens`, and `ended_with_eos=False`
+  -- and it is raised AFTER reasoning-tag stripping, so the receipt reflects the
+  real text. A partial artifact is therefore a re-rollable capacity signal instead
+  of something JSON repair tries to salvage.
+- Receipts: focused **181 passed**; full Windows suite **7966 passed / 130 skipped
+  / 1 xfailed** (EXIT=0, 235s); Bug Bible **17 passed / 24 skipped / 3 xfailed**;
+  UTF-8 / no-BOM / nonzero / AST-parse green on all eight touched files;
+  HEAD == origin verified after push.
+- No workflow JSON, node, widget, link or schema was touched -- this is a pure
+  code + tests change, so the canonical `otr_canonical.json` is untouched by
+  design. No GPU run, no headless render, no survival-guide edit, no new PBUG
+  (offline root fix, no live artifact). Preserved: the three pre-existing modified
+  `tmp/*.ps1` files and the untracked `config/profiles/otr_*.json` set from other
+  windows.
+
+## 2026-07-30 -- CODE 3bc3d8a0 (v2.0-alpha) -- WINDOW CODER
 
 - Implemented the operator contract that fiction may be wholly re-authored while
   the final canonical ledger remains internally valid, exact-hash coherent, and

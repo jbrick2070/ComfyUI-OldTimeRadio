@@ -1,5 +1,44 @@
 # OTR Go-Forward Plan
 
+**Newest update: 2026-07-31 (CODER closeout) -- TWO OPERATOR DIRECTIVES FROM THE
+320-WORD TEST ARE LANDED AND PUSHED.** Commit `e577f9ef`; HEAD == origin on
+`v2.0-alpha`.
+
+(1) **Source-faithful banks never roll the Lemmy cameo.** `public_domain` and
+`shakespeare` -- plus their bake-off `_v2`/`_v3` variants, normalized through
+`base_source_bank_id` -- force `lemmy_hit=False` inside
+`assemble_pre_locked_rows`, AHEAD of both the OS-entropy ~11% roll and the
+`force_lemmy` branch, so the exclusion overrides the operator-facing
+`lemmy_cameo` widget as well as the roll. LEMMY is also filtered out of any
+source-supplied character list. The writer threads
+`_source_bank_row.source_bank_id` into `lock_cast` and stamps
+`cast_contract.lemmy_policy`. Bark-voice replay is unaffected:
+`replay_voice_assignment` already replays the frozen `lemmy_hit`.
+
+(2) **P3 stops reserving output capacity.** The fixed
+`_RADIO_SCORE_CONTEXT_CAP_TOKENS = 8192` / `_RADIO_SCORE_DRAFT_MAX_OUTPUT_TOKENS
+= 1829` reservation is RIPPED -- that is chasing a word count by another name.
+RadioScoreDraft now runs on `ProviderCapacityMessages` with
+`max_new_tokens=None` and reports `output_budget_mode=provider_capacity`.
+Finiteness comes from the structural graph bounds (scenes<=3, shots<=2,
+beats<=4), never a prose length gate. OpenRouter `finish_reason=length` now
+raises the typed `PromptContextOverflowError(phase=output_limit)` -- after
+reasoning-tag stripping -- carrying the partial completion and token count, so a
+truncated artifact is re-rollable capacity signal rather than JSON-repair input.
+
+Receipts: focused **181 passed**; full Windows suite **7966 passed / 130 skipped
+/ 1 xfailed**; Bug Bible **17 passed / 24 skipped / 3 xfailed**; UTF-8 / no-BOM /
+nonzero / AST green on all eight touched files. No workflow JSON, node, widget,
+link or schema was touched, so canonical `otr_canonical.json` is unchanged BY
+DESIGN (pure code + tests). No GPU/headless run, no new PBUG (offline root fix).
+
+**CURRENT STEP:** this chunk is closed. Both directives are suite-proven only --
+neither has run LIVE. The natural next proofs are a `shakespeare` or
+`public_domain` leg (confirm no LEMMY in the locked cast and
+`cast_contract.lemmy_policy == "source_fidelity_exclusion"`) and a long-form
+sci-fi leg through the now-unreserved P3. Preserve the three pre-existing
+modified `tmp/*.ps1` files and the untracked `config/profiles/otr_*.json` set.
+
 **Newest update: 2026-07-30 (CODER closeout) -- COMPLETE-SOURCE SCI-FI
 AUTHORING AND CANDIDATE-LOCAL RECOVERY ARE LANDED AND PUSHED.** The operator's
 controlling contract is now implemented: the RSS/article is a factual
