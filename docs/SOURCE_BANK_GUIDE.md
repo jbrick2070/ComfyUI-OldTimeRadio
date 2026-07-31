@@ -312,8 +312,9 @@ are recorded without becoming hidden fatal gates.
 ## 9. Integrate into the canonical workflow
 
 A runnable custom lane needs a validated pack, bank registry row, pipeline
-registry row, execution runner, explicit `_RUNNER_BY_PIPELINE` dispatch,
-and tests in the same change. Register every required fetcher and interpreter.
+registry row, execution runner, an explicit `_otr_lane_specs.LANE_SPECS`
+entry (module + runner attribute by NAME, plus that lane's declared
+request-compatibility policy), and tests in the same change. Register every required fetcher and interpreter.
 Set `runnable=true` only when the lane exists. A custom non-source-contract
 pipeline must also set `executable=true` when its runner lands.
 

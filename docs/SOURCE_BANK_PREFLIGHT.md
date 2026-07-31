@@ -252,7 +252,10 @@ Creative quality remains a taste decision, not a runtime validator.
   **N/A** only for a valid no-source or independent-runner contract that
   deliberately declares neither.
 - [ ] **Hard:** The execution runner exists and is registered explicitly in
-  `_RUNNER_BY_PIPELINE`; no plugin-style discovery or fallback is assumed.
+  `_otr_lane_specs.LANE_SPECS` (by MODULE + ATTRIBUTE NAME, resolved lazily),
+  with that lane's request-compatibility policy DECLARED -- `compat_attr=""`
+  means "accepts any request", stated on purpose, never left blank by
+  omission. No plugin-style discovery or fallback is assumed.
 - [ ] **Hard:** `runnable=true` lands only with the runnable lane. A custom
   non-source-contract pipeline has `executable=true` in the same change.
 - [ ] **Hard:** `resolve_story_pack` and `require_runnable_bank` succeed
@@ -376,11 +379,11 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 **Surfaces to clean (each: PASS + a file:line / test / grep evidence):**
 - [ ] **Hard:** Bank row deleted from `nodes/story_packs/banks.json`.
 - [ ] **Hard:** Pack dir `nodes/story_packs/<id>/` and `nodes/story_rules/<id>.json` deleted.
-- [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- `_RUNNER_BY_PIPELINE` in
-  `nodes/OTR_LedgerScriptWriter.py` AND the JSON catalog `nodes/story_packs/pipelines.json`
+- [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- `LANE_SPECS` in
+  `nodes/_otr_lane_specs.py` AND the JSON catalog `nodes/story_packs/pipelines.json`
   (**the easy-to-miss one** -- a retired pipeline left in the JSON is a semantic registry failure even
   with no bank pointing at it). KEEP any pipeline a surviving bank still uses (e.g. `legacy_many_pass_adapt`).
-- [ ] **Hard:** Runner + routes -- delete the bank's `_run_*_lane` registry entry and any
+- [ ] **Hard:** Runner + routes -- delete the bank's `LANE_SPECS` entry and any
   `if base == "<family>":` route. **Full-family only:** delete the lane module `nodes/_otr_<family>.py`
   and its `validate_source_payload("<family>")` / interpreter registration; grep the family id across
   `nodes/` and clean every orphaned import.

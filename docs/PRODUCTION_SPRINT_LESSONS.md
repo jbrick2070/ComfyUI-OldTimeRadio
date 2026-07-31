@@ -362,10 +362,11 @@ string.
 
 (2026-07-18: the Sonnet bake-off retired 4 banks; the hard part was rediscovering where a bank is
 wired, not the decision. Runbook: the Teardown protocol in `SOURCE_BANK_PREFLIGHT.md`; proven by the
-`499386aa` roster trim and `docs/2026-07-18-rip-4-banks-plan.md`.)
+`499386aa` roster trim and `docs/2026-07-18-rip-4-banks-plan.md`. 2026-07-31: the runner table left
+the writer for `nodes/_otr_lane_specs.py` -- same surface, new address.)
 
 A source bank is not just its `banks.json` row -- it is wired across ~10 surfaces: the row, the pack
-dir, the `story_rules` file, the runner entry in `_RUNNER_BY_PIPELINE`, the pipeline object in
+dir, the `story_rules` file, the runner entry in `_otr_lane_specs.LANE_SPECS`, the pipeline object in
 `pipelines.json` (a SECOND registry -- the one hand-removal always forgets), the lane runner module, a
 possible `if base == "<family>"` route, the runnable<->executable registry law in `_otr_story_routing`,
 the roster/bijection + bank-enumerating guard tests, and any PBUG the bank's live failures earned. Two

@@ -198,6 +198,28 @@ class WordSteerV4(_Strict):
     requested_words: int = Field(ge=30, le=900)
 
 
+def assert_supported_target_words(target_words) -> None:
+    """Target-only preflight for this lane, hoisted out of the runner.
+
+    `_otr_lane_specs` calls this so the writer's entry gate and the bank
+    randomizer can both ask "would this lane refuse this target?" WITHOUT
+    importing the runner's whole execution path or duplicating the band.
+    `WordSteerV4` stays the single source of truth for the numbers -- this
+    is a reachable spelling of it, not a second copy -- and the runner keeps
+    its own defensive construction of the same model.
+
+    This is NOT a word-count quality gate: the lane's structural contract
+    simply cannot be built outside 30..900, so a request outside it fails
+    here rather than after the source work.
+    """
+    try:
+        WordSteerV4(requested_words=target_words)
+    except Exception as exc:
+        raise CodexTargetRangeError(
+            "target_words must be an integer from 30 through 900"
+        ) from exc
+
+
 class FactV4(_Strict):
     fact_id: str = Field(pattern=r"^F0[1-6]$")
     claim: str = Field(min_length=1, max_length=MAX_CLAIM_CHARS)

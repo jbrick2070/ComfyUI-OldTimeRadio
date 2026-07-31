@@ -68,10 +68,20 @@ class TestWidgetSurface:
         assert order[26] == "google_api_slot_b_model"
         assert order[27] == "source_ref"
 
-    def test_choices_are_exactly_the_registry_in_order(self):
+    def test_choices_are_the_roll_sentinel_then_the_registry_in_order(self):
+        """2026-07-31: the randomizer command is PREPENDED as choice 0.
+
+        It is a UI command, not a registry row -- everything after it is
+        still exactly the registry, in registry order.
+        """
+        from nodes import _otr_rolls as rolls
+
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         choices, meta = spec["optional"]["source_bank"]
-        assert choices == list(routing.list_bank_ids())
+        assert choices[0] == rolls.BANK_SENTINEL
+        assert choices[1:] == list(routing.list_bank_ids())
+        assert rolls.BANK_SENTINEL not in routing.list_bank_ids()
+        # The saved graph still stores a concrete id, so no canonical diff.
         assert meta["default"] == "scifi_news"
         # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
@@ -348,7 +358,12 @@ class TestClientBankReachesTheWidget:
         assert _PUBLIC_DOMAIN_BANK in choices
         assert _NON_RUNNABLE_BANK in choices
         assert meta["default"] == "scifi_news"
-        assert choices == list(routing.list_bank_ids())
+        # Choice 0 is the roll command (a UI command, never a registry row);
+        # everything after it is exactly the registry, client row included.
+        from nodes import _otr_rolls as rolls
+
+        assert choices[0] == rolls.BANK_SENTINEL
+        assert choices[1:] == list(routing.list_bank_ids())
 
     def test_widget_value_routes_to_the_clients_own_pack(self, client_bank):
         """No pack widget exists or is needed: the row's default resolves,

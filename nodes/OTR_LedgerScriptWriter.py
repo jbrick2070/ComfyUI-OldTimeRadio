@@ -152,6 +152,20 @@ from . import _otr_visual_styles as _otr_visual_styles
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_bank_variants as _otr_bank_variants
 
+# The ONE story-lane authority (2026-07-31): pipeline id -> dispatched runner
+# (by NAME, resolved lazily) or the writer's own inline body, plus each
+# dispatched lane's declared request-compatibility policy. This table used to
+# live in this file, which meant nothing outside the writer could ask a
+# question about lanes without importing ComfyUI. Stdlib-only + lazy, same
+# posture as the routing import; it never imports back into this module.
+from . import _otr_lane_specs as _LANES
+
+# The two operator randomizers (2026-07-31): the `source_bank` roll and the
+# `visual_style` roll, each switched on by its OWN dropdown sentinel and
+# therefore controllable independently. Pure + stdlib-only + lazy (registry
+# reads happen on call, never at import); zero LLM calls.
+from . import _otr_rolls as _ROLLS
+
 # Bake-off source-snapshot replay (2026-07-15, r3 ruling B7): a frozen source
 # for a base bank, replayed across the base/_v2/_v3 triplet so the pack is the
 # only variable. Stdlib-only leaf (imports only _otr_bank_variants) -- safe at
@@ -2002,48 +2016,14 @@ def _apply_intro_rewrite_result(
         )
 
 
-def _run_fable2_lane(**kwargs):
-    """Lane entry for `scifi_news_pro_multipass` (scifi_fable2 S2, doc s11).
-
-    Late-imports the PURE runner module (r4/M3: the runner never imports
-    this writer; the import points one way only) and returns its
-    Fable2TailParts. All failures are Fable2Error subclasses naming the
-    pass -- NO fallback to legacy_many_pass, ever."""
-    try:
-        from . import _otr_scifi_fable2 as _F2
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        import _otr_scifi_fable2 as _F2  # type: ignore
-    return _F2.run_scifi_fable2_episode(**kwargs)
-
-
-def _run_scifi_codex_lane(**kwargs):
-    """Lazy dispatch for the additive Codex v4 bake-off lane."""
-    try:
-        from . import _otr_scifi_codex as _SC
-    except ImportError:  # pragma: no cover
-        import _otr_scifi_codex as _SC  # type: ignore
-    return _SC.run_scifi_codex_episode(**kwargs)
-
-
-# scifi_fable2 S2 (doc s11): pipeline-id -> lane runner. Consulted
-# exactly ONCE per run, after the shared front (bank resolve -> runnable
-# gate -> fetch -> validate -> D.1 ledger + meta stamps) and BEFORE the
-# D.2 news-interpreter branch. legacy_many_pass and original_multi_pass
-# are deliberately NOT in the map -- their execution lanes are the
-# writer's own inline branches (byte-identical on a map miss).
-_RUNNER_BY_PIPELINE = {
-    "scifi_news_pro_multipass": _run_fable2_lane,
-    # 2026-07-19: base scifi_codex (v1) was retired and the v4 lane
-    # became the direct scifi_news runner.
-    "scifi_news_circuit": _run_scifi_codex_lane,
-}
-
-# The pipelines whose execution lane is this writer's inline body.
-_LEGACY_INLINE_PIPELINES = frozenset({
-    "legacy_many_pass",
-    "legacy_many_pass_adapt",
-    "original_multi_pass",
-})
+# The pipeline -> lane authority moved OUT of this file to
+# `nodes/_otr_lane_specs.py` (2026-07-31). `_run_fable2_lane`,
+# `_run_scifi_codex_lane`, `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`
+# and `_resolve_lane_runner` all lived here; they are GONE, not aliased.
+# Lazy runner import is unchanged -- `_LANES.runner_for()` resolves the
+# module by name at dispatch time, exactly as the old wrappers did.
+# Use `_LANES.is_dispatched(pipeline_id)` for membership and
+# `_LANES.runner_for(pipeline_id)` for the callable (None = inline body).
 
 
 def _stamp_final_slot_telemetry(
@@ -2060,7 +2040,7 @@ def _stamp_final_slot_telemetry(
     meta["slot_transitions_by_phase"] = [
         dict(record) for record in slot_scheduler.slot_transitions_by_phase
     ]
-    if pipeline_id in _RUNNER_BY_PIPELINE:
+    if _LANES.is_dispatched(pipeline_id):
         # Custom runners name every structured pass through helper_context.
         # Derive rows from that executed journal; never claim legacy phases.
         params = {}
@@ -2100,27 +2080,6 @@ def _stamp_final_slot_telemetry(
             "slot": "creative", "model": resolved["creative_writing_model"],
         }
     meta["gen_params_by_phase"] = params
-
-
-def _resolve_lane_runner(pipeline_id: str):
-    """Map hit -> the lane runner; known inline lane -> None (existing
-    branches run byte-identically); anything else -> RAISE (r3/S1: a
-    runnable bank whose pipeline has no registered execution lane is a
-    wiring bug -- routing's `executable` stays metadata-only and never
-    gates this; there is NO fallback)."""
-    runner = _RUNNER_BY_PIPELINE.get(pipeline_id)
-    if runner is not None:
-        return runner
-    if pipeline_id in _LEGACY_INLINE_PIPELINES:
-        return None
-    raise RuntimeError(
-        f"[OTR_LedgerScriptWriter] source bank pipeline {pipeline_id!r} "
-        f"reached run() with no registered lane runner "
-        f"(_RUNNER_BY_PIPELINE) and it is not a legacy inline lane "
-        f"{sorted(_LEGACY_INLINE_PIPELINES)}. The pipeline's execution "
-        f"lane is not built; there is no fallback. Register the runner in "
-        f"the SAME change that flips the bank runnable."
-    )
 
 
 def _bank_has_no_source_contract(bank) -> bool:
@@ -2916,8 +2875,13 @@ class OTR_LedgerScriptWriter:
                 # with a baked-in choice list. Non-runnable banks ARE listed
                 # -- picking one raises a loud StoryBankNotRunnableError at
                 # run() before any story work (honest error on use).
+                # 2026-07-31: the ROLL SENTINEL is PREPENDED as choice 0. It
+                # is a UI command, not a registry row -- no new widget, no
+                # positional slot shift, and ZERO canonical-JSON diff (a
+                # graph persists the selected VALUE, never the choice list).
                 "source_bank": (
-                    list(_otr_story_routing.list_bank_ids()),
+                    [_ROLLS.BANK_SENTINEL]
+                    + list(_otr_story_routing.list_bank_ids()),
                     {
                         "default": "scifi_news",
                         "tooltip": (
@@ -2938,7 +2902,18 @@ class OTR_LedgerScriptWriter:
                             "your bank joins this list as its own entry "
                             "(contract: docs/EXTENDING_OTR.md). A bank's own "
                             "default_story_model picks its story pack -- there "
-                            "is no separate pack widget."
+                            "is no separate pack widget. "
+                            "ROLL: pick 'roll (any eligible bank)' to let the "
+                            "run choose for you, uniformly, from every "
+                            "runnable bank whose lane can build the requested "
+                            "shape. This is INDEPENDENT of the visual_style "
+                            "roll -- rolling one does not roll the other. The "
+                            "choice is recorded in the ledger at "
+                            "meta.bank_roll (selected id, seed, and the exact "
+                            "pool it drew from); set OTR_BANK_SEED to replay a "
+                            "past roll. A pinned source_ref cannot be combined "
+                            "with the roll -- a pinned source belongs to one "
+                            "bank."
                         ),
                     },
                 ),
@@ -2950,8 +2925,13 @@ class OTR_LedgerScriptWriter:
                 # pack dir fails node registration LOUD). Unlike story banks,
                 # every listed style is FULLY LIVE (styles rewrite prompt
                 # tails only -- no execution lane needed).
+                # 2026-07-31: this dropdown gets its OWN roll sentinel,
+                # prepended as choice 0 -- the SECOND randomizer, switched
+                # independently of the source_bank roll. Same UI-command
+                # posture: no new widget, no slot shift, no canonical diff.
                 "visual_style": (
-                    list(_otr_visual_styles.list_style_ids()),
+                    [_ROLLS.STYLE_SENTINEL]
+                    + list(_otr_visual_styles.list_style_ids()),
                     {
                         "default": "sci_fi_radio",
                         "tooltip": (
@@ -2965,7 +2945,17 @@ class OTR_LedgerScriptWriter:
                             "storybook_engraving / video_art are live "
                             "immediately. "
                             "Unknown id fails LOUD before any "
-                            "story work."
+                            "story work. "
+                            "ROLL: pick 'roll (any style)' to let the run "
+                            "choose the look for you, uniformly, from every "
+                            "registered style (they are all fully live, so "
+                            "there is nothing to exclude). This is a SEPARATE "
+                            "randomizer from the source_bank roll -- either, "
+                            "both, or neither. The choice is recorded at "
+                            "meta.style_roll; set OTR_VISUAL_STYLE_SEED to "
+                            "replay a past roll (that is its own seed -- "
+                            "OTR_STYLE_SEED is the narrative arc-shape seed "
+                            "and is unrelated)."
                         ),
                     },
                 ),
@@ -3213,6 +3203,36 @@ class OTR_LedgerScriptWriter:
         # the ONLY runtime gate; unknown id = UnknownBankError (no fallback).
         # Chunk 3: the returned bank row is BOUND -- D.2.5 resolves the
         # bank's interpreter contract from it (r2 codex M1).
+        # THE TWO RANDOMIZERS (2026-07-31), resolved before their gates.
+        #
+        # Each dropdown carries its OWN roll sentinel, so the two are
+        # switched independently: roll the bank and pin the style, pin the
+        # bank and roll the style, roll both, or roll neither. There is no
+        # shared "randomize" flag and neither roll can enable the other.
+        #
+        # Both REBIND the local (`source_bank` / `visual_style`) to a
+        # concrete id, so everything downstream -- the gates below,
+        # _resolve_inputs, resolved[...], meta[...], pack routing, HUD and
+        # credits -- sees an ordinary manual pick and needs no change.
+        # A non-sentinel value returns unchanged with NO receipt, which is
+        # what keeps the manual path byte-identical.
+        #
+        # HAZARD FOR WHOEVER REBUILDS THE REFINE LOOP: this resolves once
+        # per run() entry. There is no refine re-entry at HEAD (the refine
+        # machinery was removed; `refine_target_grade` is an inert widget),
+        # so nothing re-rolls today. If a loop that re-enters run() ever
+        # returns, it MUST carry these receipts back in and short-circuit --
+        # otherwise every pass re-rolls and the shipped ledger records a
+        # bank the episode never used. Both kibitz panelists found exactly
+        # that bug in the r2 draft, independently.
+        source_bank, _bank_roll = _ROLLS.resolve_bank_selection(
+            source_bank,
+            request_factory=lambda: _LANES.RollRequest(
+                target_words=_resolve_target_words(target_words)),
+            source_ref=source_ref,
+        )
+        visual_style, _style_roll = _ROLLS.resolve_style_selection(
+            visual_style)
         _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
         # Stage 3C visual-style gate -- beside the bank gate, same zero-side-
         # effect contract: an unknown visual_style id raises
@@ -3220,11 +3240,30 @@ class OTR_LedgerScriptWriter:
         # Every REGISTERED style is valid to run (styles are prompt-tail
         # deltas; no execution lane to gate).
         _otr_visual_styles.resolve_visual_style(visual_style)
-        _selected_pipeline_id = str(getattr(
-            _source_bank_row, "default_story_pipeline", "",
-        ) or "")
+        # Lane request gate (2026-07-31) -- beside the other two, same
+        # zero-side-effect contract. A dispatched lane that STRUCTURALLY
+        # cannot build the requested shape (today: scifi_news_circuit's
+        # 30..900 band, which its RadioScore graph cannot express outside)
+        # raises its OWN native error HERE, before the RSS fetch, instead
+        # of after the source work. The gate moves WHEN the failure lands,
+        # never WHAT it is -- a direct pick still gets the identical
+        # exception type and message. An inline lane is a no-op.
+        #
+        # This is NOT a word-count quality gate, and nothing here may grow
+        # into one: episode length is a recorded property, never pass/fail.
+        # The clamped value is used because that is exactly what the runner
+        # will read out of `resolved`, so the gate can never disagree with
+        # the lane it speaks for.
+        _LANES.assert_supported(
+            _source_bank_row,
+            _LANES.RollRequest(
+                target_words=_resolve_target_words(target_words)),
+        )
         # target_words and refine_target_grade remain compatibility/guidance
-        # inputs only. Neither can reject a bank or author a competing story.
+        # inputs. Neither authors a competing story, and neither judges one:
+        # the ONLY thing target_words can do is decline a lane whose
+        # structure cannot be built at that shape (the gate directly above),
+        # which is a capability statement, not a length verdict.
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -3487,6 +3526,12 @@ class OTR_LedgerScriptWriter:
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        # Randomizer receipt (2026-07-31). Written ONLY when the bank
+        # actually rolled: on a manual pick the key is ABSENT -- not null,
+        # not a stub -- so the frozen ledger answers "was this rolled?"
+        # without a convention about empty values.
+        if _bank_roll is not None:
+            meta["bank_roll"] = _bank_roll.to_meta()
         # v4 campaign (2026-07-17): stamp the resolved VISUAL-STYLE pool class so
         # the style catalog (select_style) picks the right pool WITHOUT a family
         # base-map -- each _v4 bank is fully independent. Default 'generic'. This
@@ -3540,6 +3585,10 @@ class OTR_LedgerScriptWriter:
         # get_visual_style(meta) off the serialized ledger (stamp precedes
         # all of them by construction -- verified 2026-07-05).
         meta["visual_style"] = resolved["visual_style"]
+        # Randomizer receipt for the OTHER surface -- separate key, separate
+        # seed, separate presence. A run may carry one, both, or neither.
+        if _style_roll is not None:
+            meta["style_roll"] = _style_roll.to_meta()
         # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
         # disk NOW, before the style-picker / news-interpreter / cast /
         # outline LLM phases run. Those phases are several minutes and the
@@ -3594,10 +3643,10 @@ class OTR_LedgerScriptWriter:
         # r4/M3 acyclic import graph). Miss (legacy_many_pass / the
         # original bank-shape branch) -> everything below runs
         # byte-identically. An unknown pipeline raises LOUD inside
-        # _resolve_lane_runner (r3/S1).
+        # _LANES.runner_for (r3/S1).
         _pipeline_id = str(getattr(
             _source_bank_row, "default_story_pipeline", "") or "")
-        _lane_runner = _resolve_lane_runner(_pipeline_id)
+        _lane_runner = _LANES.runner_for(_pipeline_id)
         if _lane_runner is not None:
             _parts = _lane_runner(
                 payload=dict(resolved["news_article"]),

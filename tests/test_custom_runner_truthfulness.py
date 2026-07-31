@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from nodes import OTR_LedgerScriptWriter as writer
+from nodes import _otr_lane_specs as lanes
 from nodes import _otr_story_routing as routing
 
 
@@ -32,14 +33,36 @@ def test_custom_slot_receipt_comes_only_from_executed_helpers():
     assert meta["slot_calls_by_slot"] == {"creative": 2, "technical": 1}
 
 
-def test_runnable_custom_pipelines_and_writer_map_are_bijective():
+def test_runnable_custom_pipelines_and_lane_table_are_bijective():
+    """Every runnable bank's pipeline is EITHER a dispatched lane or inline.
+
+    The authority moved out of the writer into `_otr_lane_specs`; the
+    bijection it enforces did not change. A new runnable bank whose
+    pipeline lands in neither set fails here rather than at run().
+    """
     routing._REGISTRY = None
     registry = routing._ensure_loaded()
     expected = {
         bank.default_story_pipeline
         for bank in registry.banks.values()
         if bank.runnable
-    } - writer._LEGACY_INLINE_PIPELINES
-    assert set(writer._RUNNER_BY_PIPELINE) == expected
-    for pipeline_id in writer._RUNNER_BY_PIPELINE:
+    } - lanes.INLINE_PIPELINES
+    assert set(lanes.LANE_SPECS) == expected
+    for pipeline_id in lanes.LANE_SPECS:
         assert registry.pipelines[pipeline_id].executable is True
+
+
+def test_writer_no_longer_owns_a_second_lane_table():
+    """The writer keeps NO copy, alias or view of the lane authority.
+
+    Two tables keyed by the same pipeline ids is the drift hazard this
+    move exists to remove -- a shim left behind would recreate it.
+    """
+    for dead in (
+        "_RUNNER_BY_PIPELINE", "_LEGACY_INLINE_PIPELINES",
+        "_resolve_lane_runner", "_run_fable2_lane", "_run_scifi_codex_lane",
+    ):
+        assert not hasattr(writer, dead), (
+            f"{dead} is back in the writer; _otr_lane_specs is the ONE "
+            f"lane authority"
+        )

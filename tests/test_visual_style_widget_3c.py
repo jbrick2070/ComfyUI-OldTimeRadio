@@ -58,10 +58,21 @@ class TestWidgetSurface:
         assert order[26] == "google_api_slot_b_model"
         assert order[27] == "source_ref"
 
-    def test_choices_are_exactly_the_registry(self):
+    def test_choices_are_the_roll_sentinel_then_the_registry(self):
+        """2026-07-31: this dropdown owns the SECOND randomizer's command,
+        prepended as choice 0 -- independent of the source_bank roll.
+
+        It is a UI command, not a style row; everything after it is still
+        exactly the registry.
+        """
+        from nodes import _otr_rolls as rolls
+
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         choices, meta = spec["optional"]["visual_style"]
-        assert choices == list(vs.list_style_ids())
+        assert choices[0] == rolls.STYLE_SENTINEL
+        assert choices[1:] == list(vs.list_style_ids())
+        assert rolls.STYLE_SENTINEL not in vs.list_style_ids()
+        # The saved graph still stores a concrete id, so no canonical diff.
         assert meta["default"] == "sci_fi_radio"
         # ALL styles are live (no execution lane); known non-defaults listed.
         for sid in ("anime", "cartoon", "paper_origami",

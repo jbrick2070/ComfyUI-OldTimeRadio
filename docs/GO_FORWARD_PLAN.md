@@ -1,6 +1,76 @@
 # OTR Go-Forward Plan
 
-**Newest update: 2026-07-31 (CODER closeout) -- TWO OPERATOR DIRECTIVES FROM THE
+**Newest update: 2026-07-31 (CODER closeout) -- THE TWO RANDOMIZERS ARE LANDED
+AND PUSHED, AND THE LANE AUTHORITY LEFT THE WRITER.**
+
+Operator directive: `source_bank` and `visual_style` are **TWO SEPARATE
+randomizers that can be turned on or off individually**. Both ship.
+
+Each dropdown carries its OWN roll sentinel as choice 0 -- `roll (any eligible
+bank)` and `roll (any style)`. Picking the sentinel rolls that surface; picking a
+concrete row pins it. Roll both, one, or neither; neither roll can enable the
+other. Because the sentinel is a UI COMMAND prepended to an existing combo,
+there is **no new widget, no positional `widgets_values` shift (BUG-LOCAL-097 is
+not engaged), and ZERO canonical-JSON diff** -- a graph persists the selected
+VALUE, never the choice list, and the shipped defaults are still `scifi_news` /
+`sci_fi_radio`. `workflows/otr_canonical.json` is therefore correctly untouched;
+the guardrail test proves it.
+
+Mechanics (`nodes/_otr_rolls.py`, pure, ZERO LLM calls): eligibility ->
+sorted-by-id pool -> seeded draw -> receipt. Bank eligibility is TWO filters and
+only two -- `bank.runnable` and the lane's declared request compatibility (no
+rights filter: operator ruling 2026-07-12 stands, and `banks.json` is untouched).
+Style eligibility is EVERY registered style, by design not omission: a style has
+no execution lane to be missing. Pools come from the LIVE registry, so an
+activated client bank is an ordinary peer. Separate seeds -- `OTR_BANK_SEED` and
+`OTR_VISUAL_STYLE_SEED` (NOT `OTR_STYLE_SEED`, which is narrative arc shape) --
+so either roll replays alone; a malformed override RAISES. Receipts land at
+`meta.bank_roll` / `meta.style_roll` and are ABSENT (not null) on a manual pick.
+Sentinel + a pinned `source_ref` is refused loudly: a pinned source belongs to
+one bank.
+
+Supporting rip, same commit: the pipeline->runner table left the writer for
+`nodes/_otr_lane_specs.py` -- `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`,
+`_resolve_lane_runner`, `_run_fable2_lane` and `_run_scifi_codex_lane` are GONE,
+not aliased (a test asserts the writer holds no second table). It stores NAMES
+resolved lazily, so runner modules still stay out of ComfyUI startup. It also
+carries each lane's request-compatibility policy through two entry points with
+deliberately different contracts: `assert_supported` (writer gate, re-raises the
+lane's NATIVE error unwrapped) and `is_roll_compatible` (roll filter, bool,
+catches ONLY declared errors so a broken runner propagates instead of silently
+shrinking the pool). Today exactly one lane is constrained --
+`scifi_news_circuit`'s 30..900 band, hoisted out of the runner as
+`assert_supported_target_words` sharing `WordSteerV4` as the one source of truth.
+That is a CAPABILITY statement, not a length verdict; we still never chase word
+count.
+
+**Known hazard, written down on purpose:** the rolls resolve once per `run()`
+entry, and there is no refine re-entry at HEAD (the refine machinery is gone;
+`refine_target_grade` is an inert widget). Whoever rebuilds a loop that re-enters
+`run()` MUST carry these receipts back in and short-circuit, or every pass
+re-rolls and the ledger records a bank the episode never used. Both kibitz
+panelists found exactly that bug in the r2 draft.
+
+**CORRECTION to the 2026-07-30 closeout below:** it lists "`scifi_news_pro_multipass`
+still has its separate 3,600-character dossier cap; complete-source Pro support
+remains an explicit follow-up". That is STALE -- commit `33e6a276` ("Read
+complete Pro sources in bounded windows", +573 runner / +739 test lines) closed
+it. `_DIGEST_CHAR_CAP` is now the WINDOW SIZE of an overlapping window set whose
+coverage of the selected body is PROVEN (`_validate_dossier_windows`, and tests
+`test_digest_windows_cover_complete_source`,
+`test_partial_window_coverage_fails_before_any_model_call`,
+`test_old_prefix_counterfactual_loses_tail`), not a source clip. No rip is owed.
+Live GPU requalification IS still owed.
+
+**CURRENT STEP:** the randomizers are suite-proven only -- NEITHER HAS RUN LIVE.
+Next in the operator's stated order is the WAN 8-GB contract. The live proofs
+owed, whenever a GPU window opens: a seeded bank roll, a seeded style roll, both
+rolling in one run, and an unseeded roll proved by REPLAY
+(`draw(receipt.eligible_order, receipt.seed) == receipt.selected`).
+
+---
+
+**2026-07-31 (CODER closeout) -- TWO OPERATOR DIRECTIVES FROM THE
 320-WORD TEST ARE LANDED AND PUSHED.** Commit `e577f9ef`; HEAD == origin on
 `v2.0-alpha`.
 

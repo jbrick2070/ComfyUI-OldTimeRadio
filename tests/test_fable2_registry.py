@@ -9,7 +9,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nodes import OTR_LedgerScriptWriter as WRITER
+from nodes import _otr_lane_specs as LANES
+from nodes import _otr_scifi_fable2 as FABLE2
 from nodes import _otr_story_routing as ROUTING
 
 
@@ -38,8 +39,10 @@ def test_bank_routes_to_dedicated_runner():
     bank = ROUTING.require_runnable_bank("scifi_news_pro")
     assert bank.fetcher == "science_rss"
     assert bank.default_story_pipeline == "scifi_news_pro_multipass"
-    assert WRITER._RUNNER_BY_PIPELINE[bank.default_story_pipeline] is (
-        WRITER._run_fable2_lane
+    # The lane authority resolves the runner by NAME, lazily -- assert on
+    # the resolved callable so a renamed entry point cannot pass silently.
+    assert LANES.runner_for(bank.default_story_pipeline) is (
+        FABLE2.run_scifi_fable2_episode
     )
 
 
