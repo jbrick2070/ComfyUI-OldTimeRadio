@@ -3281,7 +3281,68 @@ listed as live.
   are the base; the residual fix is now unblocked. Related independent items: the P9 8K
   structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do
   not raise the minimum word target as a capacity workaround.
-- **WAN 8-GB low-VRAM launch contract** -- FIRST item of the rescoped order.
+- **WAN 8-GB low-VRAM launch contract** -- **RE-GROUNDED AT HEAD 2026-07-31: this
+  block is CODE-COMPLETE and PROOF-INCOMPLETE. It is not a coding item, and the
+  one thing blocking it is an OPERATOR DECISION, not a keyboard.** Read this
+  before opening a coder window on it -- the old one-line entry named no files,
+  no seams and no acceptance criteria, and two nearby lines contradicted it
+  (`:965` "WAN is already canonically qualified and remains closed" and the
+  "needs no GPU to write" instruction, both stale).
+
+  **What is already BUILT and WIRED end to end** (verified hop by hop at HEAD):
+  `otr_8gb_wan.json` `video.max_render_frames=17` -> `capability_profiles`
+  optional-key validator -> `_otr_workflow_apply.py:532` flatten ->
+  `workflows/variants/otr_8gb_wan.json` node-87 widget slot 14 = 17 ->
+  `otr_video_director.py:423` policy stamp -> `otr_shot_lock.py:1722`
+  `ledger.video.max_render_frames` -> `render_driver.py:3328` per-adapter policy
+  -> `motion_common.profile_max_render_frames()` -> `eng_wan_ti2v._floor_length`
+  hard cap (`:730`) and `_planned_length` refusal (`:785`), with
+  `render_driver.py:3845` refusing on drift. Landed `f914f0a4` (2026-07-24),
+  dead node-87 widget repaired `7f4644a1` + `8f41af27`, WAN deliberately excluded
+  from `frame_contract.PLANNING_CAP_ENGINES` by `b23fc035`, recipe frozen
+  `71753cb4`/`8424f369`, whole-beat single-UNET-load `439ce8c7`. Regression net:
+  `tests/test_remaining_video_contracts.py:16-194` (nine hop-by-hop tests) plus
+  `tests/test_multiclip_effective_contract.py:216,234`.
+
+  **THE ONE OPERATOR DECISION (this is the actual blocker).** The ceiling reaches
+  a leg ONLY through a variant workflow or a hand-set widget: `otr_canonical.json`
+  node 87 ships `max_render_frames=0`, so a plain canonical WAN run is UNPINNED
+  and inherits `_TI2V_MAX_FRAMES = 177` -- exactly the 2026-07-23 failure shape.
+  The obvious patch (pin 17 in the canonical) is WRONG: the canonical serves every
+  tier, and 17 is the 8-GB tier's number, so pinning it would cap LTX/HuMo 16-GB
+  legs too. The channel that carries 17 today is `config/profiles/*.json`, which
+  `:749-753` puts on the RETIREMENT list -- so writing new behaviour onto it is
+  explicitly forbidden. **Decision needed: after profile retirement, who owns a
+  tier's native render ceiling?** The shape that fits the per-adapter-ownership
+  doctrine is that `eng_wan_ti2v` DECLARES its own tier ceiling (a capability-row
+  field), the widget becomes an operator OVERRIDE with 0 meaning "use the
+  adapter's own contract", and the profile channel simply stops mattering. That is
+  a real design change with a live-behaviour blast radius on any card with
+  headroom (the VRAM predictor currently gets to ask for more than 17 and often
+  can), so it is NOT being written on assumption. Ratify the shape first.
+
+  **Also open, all PROOF obligations rather than build work:** (1) `:224` the
+  18-engine GPU campaign is engine COVERAGE, NOT an 8-GB qualification; (2)
+  `:731-734` / `:2912-2917` a CLAMPED confirmation is owed --
+  `OTR_HEADLESS_RESERVE_VRAM_GB=8`, because `VramPeakProbe` samples machine-wide
+  NVML and the sweep ran unclamped, so those absolutes rank recipes but do not
+  prove 8-GB fit; (3) nothing in the tree is a live 8-GB-clamped WAN render
+  receipt -- no test or artifact proves 17 frames at 832x480 actually fits 8 GB on
+  real hardware; (4) `:2843-2858` every 8-GB profile INCLUDING `otr_8gb_wan`
+  cannot run its own writer (12B GGUF, 8.13 GB needed under a declared 6.8 GB
+  ceiling) -- largely mooted by profile retirement, but "fix the profiles or
+  finish retiring them; do not leave both" still stands.
+
+  **One untested edge, cheap to close whenever this reopens:** WAN is out of
+  `PLANNING_CAP_ENGINES`, so a tier ceiling and a multi-clip plan CAN contradict
+  by design, and `_planned_length` hard-refuses mid-episode when they do -- but no
+  test asserts a 17-frame tier survives a multi-segment beat. `:216`/`:234` in
+  `test_multiclip_effective_contract.py` pin the topology, not that outcome.
+
+  **Sibling defect, unchanged, ltx side:** `eng_ltx_8gb` reads
+  `OTR_LTX_8GB_MAX_FRAMES` and NOT the profile ceiling, `otr_8gb_ltx.json` leaves
+  `video.max_render_frames` absent, and `otr_8gb_ltx.env.json` ships `97` that
+  nothing loads -- the two-owner split already written up at `:3155-3171`.
 - **Image-phase still ownership** -- bug-first item 2 above.
 - ~~**`eng_ltx_video._use_i2v` contradicts fail-closed**~~ -- **CLOSED @
   `c9b89769`** (A4). The adapter now REFUSES instead of degrading, holding the
