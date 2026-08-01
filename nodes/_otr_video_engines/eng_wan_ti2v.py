@@ -273,6 +273,18 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: the consent act is: one key for two tiers would let the WAN tier's ceiling
     #: silently cap a different engine that never opted into it.
     max_frames_env = "OTR_WAN_TI2V_MAX_FRAMES"
+    #: The graph node id whose slot 0 carries LATENT into the VAE decode. Named
+    #: rather than hardcoded in ``_vaedecode_inputs`` so a subclass can swap the
+    #: sampler node without duplicating the frozen tile geometry: fastwan_8gb
+    #: replaces KSampler with a SamplerCustom chain, and a decode still wired to
+    #: ``"ksampler"`` would point at a node that is not in the graph.
+    _samples_node = "ksampler"
+    #: The graph node id whose slot 0 carries MODEL into ModelSamplingSD3. The
+    #: bare UNET here; fastwan_8gb points it at its LoRA loader so the patched
+    #: model -- not the base -- is what gets sampled. Wiring the base by mistake
+    #: renders a 3-step clip through an un-distilled model: no error, just a
+    #: ruined render wearing a FastWan receipt.
+    _model_source_node = "unet"
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). ``_TI2V_MIN_FRAMES`` /
     #: ``_TI2V_MAX_FRAMES`` are this adapter's own named constants; the 4-frame
     #: quantum is Wan's 4n+1 latent stride (17 = 4*4+1, 177 = 4*44+1).
@@ -464,22 +476,16 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                     bucket.append(model)
                     seen.add(id(model))
 
-            if self._loader_mode() == "gguf":
-                unet_inputs = {"unet_name": names["unet"]}
-            else:
-                unet_inputs = {"unet_name": names["unet"],
-                               "weight_dtype": "default"}
             free_before = _MC.free_vram_mb()
             results = _wb.run_graph(
-                {"unet": {"class": "unet", "inputs": unet_inputs}},
-                classes, on_result=_register)
+                self._hoist_graph(names), classes, on_result=_register)
             free_after = _MC.free_vram_mb()
             out = results.get("unet") or ()
             if not out:
                 raise _wb.GraphExecutionError(
-                    "wan_ti2v hoisted UNET %r returned no output; the beat "
+                    "%s hoisted UNET %r returned no output; the beat "
                     "session has nothing to reuse and every segment would "
-                    "silently reload" % (names["unet"],))
+                    "silently reload" % (self.name, names["unet"]))
             prepared["external_results"] = results
             prepared["hoisted_vram_mb"] = self._hoist_cost_mb(
                 free_before, free_after)
@@ -490,6 +496,25 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 pass
             raise
         return prepared
+
+    def _unet_inputs(self, names):
+        """The UNET loader's inputs. ONE implementation: ``prepare`` hoists with
+        it and ``_build_graph`` would otherwise build the same dict a second time
+        and drift from it. GGUF's loader takes no ``weight_dtype``."""
+        if self._loader_mode() == "gguf":
+            return {"unet_name": names["unet"]}
+        return {"unet_name": names["unet"], "weight_dtype": "default"}
+
+    def _hoist_graph(self, names):
+        """The loader-only mini-graph :meth:`prepare` runs once per beat.
+
+        A SEAM, not a constant: every node returned here is hoisted, registered
+        through ``on_result`` and torn down by ``_detach_patchers``, so an engine
+        whose model needs more than the bare UNET -- fastwan_8gb routes it through
+        a LoRA loader -- extends the graph HERE rather than reimplementing the
+        beat-session lifecycle. Whatever this returns must also be popped from
+        ``_build_graph``'s graph (``external_results`` does that automatically)."""
+        return {"unet": {"class": "unet", "inputs": self._unet_inputs(names)}}
 
     @staticmethod
     def _hoist_cost_mb(free_before, free_after):
@@ -858,10 +883,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         scheduler = cfg_knobs["scheduler"]
         positive = get("text_prompt") or "subtle natural motion"
         negative = self._negative_prompt()               # frozen, fail-closed
-        if self._loader_mode() == "gguf":
-            unet_inputs = {"unet_name": names["unet"]}
-        else:
-            unet_inputs = {"unet_name": names["unet"], "weight_dtype": "default"}
+        unet_inputs = self._unet_inputs(names)
         # CLIPLoaderGGUF takes clip_name + type ONLY (no `device` arg, verified vs
         # /object_info 2026-06-18); the core CLIPLoader also takes device.
         if self._clip_loader_mode() == "gguf":
@@ -872,7 +894,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         graph = {
             "unet": {"class": "unet", "inputs": unet_inputs},
             "modelsampling": {"class": "modelsampling",
-                              "inputs": {"model": W("unet", 0), "shift": shift}},
+                              "inputs": {"model": W(self._model_source_node, 0),
+                                         "shift": shift}},
             "clip": {"class": "clip", "inputs": clip_inputs},
             "pos": {"class": "pos",
                     "inputs": {"text": positive, "clip": W("clip", 0)}},
@@ -904,7 +927,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """VAEDecode inputs; the tiled path adds the schema-verified tile/temporal
         knobs (FROZEN; temporal_size = frames decoded at a time = the big
         video-VAE peak lever)."""
-        base = {"samples": W("ksampler", 0), "vae": W("vae", 0)}
+        base = {"samples": W(self._samples_node, 0), "vae": W("vae", 0)}
         if not self._tiled_vae():
             return base
         # ``_tile_geometry`` is the ONE implementation (LANE 2). It used to be a

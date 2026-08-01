@@ -418,6 +418,19 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["wan2.2-ti2v-5b"]},
+    # fastwan_8gb (2026-08-01): the FastWan 2.2 TI2V-5B 3-step DMD distillation.
+    # Same capability shape as wan_ti2v because it is the SAME base weights --
+    # cuda, no vendor gate, no fp8/fp4 (the base is the Q5_K_M GGUF wan_ti2v
+    # already ships). It differs only by the rank-128 LoRA, which is a SEPARATE
+    # model requirement so preflight fails CLOSED when it is absent: without it
+    # the graph would render 3 steps through the UN-distilled base model, which
+    # produces no error -- just ruined output wearing a FastWan receipt.
+    "fastwan_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["wan2.2-ti2v-5b", "fastwan-2.2-5b-lora"]},
     # ltx_8gb (video-tiers, 2026-07-20): the 8GB-tier LTX-Video 0.9.8 distilled 2B
     # I2V engine. Modeled on wan_ti2v -- cuda, NO vendor gate, NO fp8/fp4 (the 0.9.8
     # distilled all-in-one is bf16; the LTXQ8Patch quantizer is deliberately NOT

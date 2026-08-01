@@ -49,6 +49,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | cloud_vidu_q2_pro_fast_720p_sfx | provider | image_to_video | wide | 720p (fixed) | 25-250 step 25 | 1-10 s | 25 | soft_reference | yes |
 | cloud_wan_i2v | provider | image_to_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | cloud_wan_i2v_audio | provider | audio_conditioned_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
+| fastwan_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 17-177 step 4 | 0.68-7.08 s | 25 | strict_first_frame | yes |
 | google_omni_video | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
 | google_veo_video | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | google_vid_sfx_omni | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
@@ -85,6 +86,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | cloud_vidu_q2_pro_fast_720p_sfx | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v_audio | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
+| fastwan_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | google_omni_video | text_prompt | text_prompt REQUIRED |
 | google_veo_video | text_prompt | text_prompt REQUIRED |
 | google_vid_sfx_omni | text_prompt | text_prompt REQUIRED |
@@ -125,6 +127,7 @@ the engine's own `aspect` column above.
 | cloud_vidu_q2_pro_fast_720p_sfx | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v_audio | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
+| fastwan_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_omni_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_veo_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_vid_sfx_omni | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -153,7 +156,7 @@ the engine's own `aspect` column above.
 
 ## Counts
 
-* registered engine names: **31**
+* registered engine names: **32**
 * provider-side: **13**
-* local: **18**
-* can chain (strict_first_frame): **4**
+* local: **19**
+* can chain (strict_first_frame): **5**

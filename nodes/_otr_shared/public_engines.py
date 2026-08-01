@@ -30,6 +30,10 @@ from __future__ import annotations
 _PUBLIC_ENGINES = {
     "ltx_8gb": "ltx_8gb",
     "wan_8gb": "wan_ti2v",
+    # fastwan_8gb maps to ITSELF, like ltx_8gb: its internal id IS its public id.
+    # ADDITIVE -- wan_8gb keeps pointing at wan_ti2v, so the incumbent's saved
+    # dropdown value is unchanged and every existing graph still resolves.
+    "fastwan_8gb": "fastwan_8gb",
     "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
 }
@@ -53,6 +57,10 @@ _INTERNAL_TO_PUBLIC = {v: k for k, v in _PUBLIC_ENGINES.items()}
 _PUBLIC_LABEL = {
     "ltx_8gb": "LTX 0.9.8 2B - 8GB",
     "wan_8gb": "Wan 2.2 TI2V 5B - 8GB",
+    # "3-step" rather than "fast" or "better": this tier renders the SAME motion at
+    # the SAME canvas for the SAME VRAM as wan_8gb, about 2.7x sooner. Naming it a
+    # quality or longer-clip upgrade would mis-sell it.
+    "fastwan_8gb": "FastWan 2.2 TI2V 5B - 8GB (3-step)",
     "ltx23_16gb_audio_in": "LTX 2.3 - 16GB Audio In",
     "ltx23_16gb_video": "LTX 2.3 - 16GB Video",
 }

@@ -154,6 +154,10 @@ _ENGINES_WITH_A_SESSION = {
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29
+    "fastwan_8gb",             # 2026-08-01 -- inherits WanTi2vEngine's, and its
+                               # LoRA rides it for free: _wan_session_receipts is
+                               # built from _loader_names() + _aux_loader_files(),
+                               # so a swapped or resized LoRA opens a new session.
     "humo",                    # WIRE-W4a, 2026-07-29
     "humo_1.7B",               # WIRE-W4a -- inherits HuMoEngine's
     "humo_1.7B_169",           # WIRE-W4a -- inherits HuMoEngine's

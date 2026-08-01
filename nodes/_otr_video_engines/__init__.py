@@ -66,6 +66,19 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# fastwan_8gb (2026-08-01): the FastWan 2.2 TI2V-5B 3-step DMD distillation --
+# a SUBCLASS of eng_wan_ti2v sharing its whole 5B substrate (beat hoist, teardown,
+# frame ladder, tiled decode) and overriding only the recipe seam, the LoRA route
+# and the sampler chain. ADDITIVE: wan_ti2v keeps its menu row untouched. It is a
+# THROUGHPUT tier -- identical VRAM and identical motion to the incumbent, ~2.7x
+# sooner -- not a quality or longer-clip upgrade. Fails CLOSED (ordinary asset
+# preflight, including the LoRA) until the weights are on disk. Cold-import clean.
+# Guarded so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_fastwan_8gb as _eng_fastwan_8gb  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # 2026-06-15: register the LTX-2.3 AUDIO-INPUT (A2V) lane -- ltx_av_talk
 # (audio_driven_face) + ltx_av_music (audio_conditioned_video). ADDITIVE + DARK:

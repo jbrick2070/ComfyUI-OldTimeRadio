@@ -24,6 +24,9 @@ from nodes._otr_workflow_apply import (
 _TIER = {
     "ltx_8gb": "ltx_8gb",
     "wan_8gb": "wan_ti2v",
+    # fastwan_8gb, 2026-08-01 -- ADDITIVE. Maps to itself like ltx_8gb. wan_8gb
+    # still points at wan_ti2v, so every saved dropdown value keeps resolving.
+    "fastwan_8gb": "fastwan_8gb",
     "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
 }
