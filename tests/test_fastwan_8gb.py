@@ -245,3 +245,59 @@ def test_incumbent_declares_no_canvas_this_build():
 @pytest.mark.parametrize("attr", ["frame_contract", "target_fps", "family"])
 def test_substrate_is_inherited_unchanged(attr):
     assert getattr(_FW.FastWan8gbEngine, attr) == getattr(_WT.WanTi2vEngine, attr)
+
+
+# --------------------------------------------------------------------------- #
+# licence + profile
+# --------------------------------------------------------------------------- #
+def test_commercial_clean_is_false_and_not_inherited():
+    """The LoRA actually loaded is a Kijai extraction from a repo with NO
+    repo-level licence file. "Both upstreams say apache-2.0" and "this artifact
+    is notice-compliant" are different claims; commercial_clean reads as the
+    second. Under-claim until the notice chain resolves."""
+    assert _FW.FastWan8gbEngine.commercial_clean is False
+    assert _WT.WanTi2vEngine.commercial_clean is True     # incumbent unchanged
+
+
+def _profile():
+    import json
+    import pathlib
+    p = (pathlib.Path(__file__).resolve().parent.parent
+         / "config" / "profiles" / "otr_8gb_fastwan.json")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def test_profile_routes_every_video_role_to_fastwan():
+    prof = _profile()
+    assert prof["id"] == "otr_8gb_fastwan"
+    for role in ("announcer_visual", "music_visual", "character_visual"):
+        assert prof["role_overrides"][role] == "fastwan_8gb"
+    assert prof["slot_overrides"]["video_render_engine"] == "fastwan_8gb"
+
+
+def test_profile_canvas_agrees_with_the_declaration():
+    """THE DRIFT GUARD the O1 judgment says the profile channel owes.
+
+    The ADAPTER's declaration is the authority (render_driver applies it last);
+    the profile is not. This asserts they agree, so a profile edit that silently
+    disagrees with what actually renders is caught here rather than in a ledger."""
+    prof = _profile()
+    w, h = _FW.FastWan8gbEngine.render_canvas
+    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (w, h)
+    assert prof["launch"]["env"]["OTR_VIDEO_LANDSCAPE_CANVAS"] == "%dx%d" % (w, h)
+
+
+def test_profile_ships_at_the_floor_not_the_bench_rung():
+    """81 frames is a BENCH result, and a bench cell never qualifies an engine.
+    The cap moves only after a canonical render proves the rung."""
+    prof = _profile()
+    assert prof["video"]["max_render_frames"] == 17
+    assert prof["launch"]["env"]["OTR_FASTWAN_8GB_MAX_FRAMES"] == "17"
+    # ...through its OWN key, never the incumbent's.
+    assert "OTR_WAN_TI2V_MAX_FRAMES" not in prof["launch"]["env"]
+
+
+def test_profile_preflight_requires_the_lora():
+    required = _profile()["preflight"]["required_models"]
+    assert "fastwan-2.2-5b-lora" in required
+    assert set(_REG.CAPABILITIES["fastwan_8gb"]["model_requirements"]) <= set(required)

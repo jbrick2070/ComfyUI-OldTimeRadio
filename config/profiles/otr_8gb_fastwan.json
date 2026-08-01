@@ -1,0 +1,118 @@
+{
+  "id": "otr_8gb_fastwan",
+  "display_name": "8 GB - FastWan 2.2 TI2V 5B 3-step (fastwan_8gb)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "fastwan_8gb",
+    "music_visual": "fastwan_8gb",
+    "character_visual": "fastwan_8gb",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "voice_bank": "bark_legacy",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "bark",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "fastwan_8gb"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 6.8,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "unsloth/gemma-4-12b-it-GGUF",
+    "technical_model": "unsloth/gemma-4-12b-it-GGUF",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "fp8_ok",
+    "max_render_frames": 17
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "wan2.2-ti2v-5b",
+      "fastwan-2.2-5b-lora",
+      "umt5-xxl-encoder",
+      "wan2.2_vae"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {
+      "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
+      "OTR_FASTWAN_8GB_MAX_FRAMES": "17"
+    }
+  },
+  "notes": [
+    "THROUGHPUT TIER, NOT A QUALITY TIER. Same base weights, same 832x480 canvas,",
+    "same VRAM and the same amount of motion as otr_8gb_wan -- about 2.7x sooner.",
+    "The four-arm bench measured arm A and arm C at an identical peak delta",
+    "(6563.1 / 6531.1 / 6563.1 MiB at 17 / 49 / 81 frames) because step count does",
+    "not change peak activation. Choose this to render more clips per hour, not to",
+    "get better or longer clips.",
+    "",
+    "max_render_frames is 17 DELIBERATELY. The 81-frame bench cell is a bench-graph",
+    "measurement and a bench cell never qualifies an engine (CLAUDE.md s0A). This",
+    "cap moves only after a canonical-workflow render proves the higher rung with",
+    "RESULT SUCCESS + obs_publish OK.",
+    "",
+    "The canvas is ALSO declared on the adapter (render_canvas = (832, 480)), which",
+    "is what actually binds. The launch.env line here agrees with it and is a DRIFT",
+    "GUARD, not the authority: launch.env applies to the server process, so a leg",
+    "submitted to an already-booted server never sees it (PBUG-20260723-02).",
+    "",
+    "OTR_FASTWAN_8GB_MAX_FRAMES is this engine's OWN ceiling key. It deliberately",
+    "does not read OTR_WAN_TI2V_MAX_FRAMES: one key for two tiers would let the WAN",
+    "tier's ceiling silently cap an engine that never opted into it.",
+    "",
+    "LICENCE: the loaded LoRA is a Kijai extraction from a repo carrying NO",
+    "repo-level licence file. FastVideo and the Wan base both declare apache-2.0,",
+    "but that notice gap is unresolved, so the adapter ships commercial_clean=false.",
+    "Resolve the notice chain before treating output as commercially clear."
+  ]
+}

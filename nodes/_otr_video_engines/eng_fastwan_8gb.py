@@ -123,6 +123,17 @@ class FastWan8gbEngine(_WT.WanTi2vEngine):
     name = "fastwan_8gb"
     engine_version = "1"
 
+    #: FALSE, and NOT inherited (kibitz r4). The incumbent declares True because
+    #: its GGUF and VAE are Apache-2.0 at the source. FastWan's base weights are
+    #: the SAME file, and FastVideo itself declares apache-2.0 -- but the LoRA
+    #: actually loaded is a Kijai extraction from a repo with NO repo-level
+    #: licence file (docs/2026-07-31-arm-c-fastwan-BUILD-SPEC.md s6A). "Both
+    #: upstreams say apache-2.0" is not the same claim as "this artifact is
+    #: notice-compliant", and a commercial_clean flag is read as the second.
+    #: Under-claim until the notice chain is resolved; flipping this is a
+    #: one-line change once it is.
+    commercial_clean = False
+
     # ---- the recipe seam ------------------------------------------------- #
     recipe_id = RECIPE_FASTWAN_8GB
     recipe_data = FASTWAN_8GB_RECIPE
