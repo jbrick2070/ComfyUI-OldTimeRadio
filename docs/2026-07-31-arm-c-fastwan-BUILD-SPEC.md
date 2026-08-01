@@ -22,11 +22,20 @@ a render and a VRAM number under the same clamp as arms A / B-partial / D.
 | 4 | cfg is an open question | **ANSWERED: cfg 1.0.** Section 3 below. |
 | 5 | Adding arm C is "one ArmSpec row plus one graph file" | **FALSE.** Section 5. |
 | 6 | The GGUF repack will load, because tensor keys match | **FALSE, AND THIS IS THE LIVE BLOCKER.** Section 4. |
+| 7 | `ManualSigmas` expresses the DMD schedule | **FALSE.** It fixes the evaluation coordinates, not the transition. Section 2A. |
+| 8 | C-2 (Turbo) is a plain few-step Euler, so it needs no custom sampler | **FALSE.** It is Self-Forcing/DMD with the same restart loop, plus a warp step. Section 2B. |
 
-Rows 1-3 and 5 are the r1 panel's work (Codex `gpt-5.6-sol` + Antigravity,
-Claude anchor and sole judge); the full judgment log is local-only at
-`kibitz-runs/2026-07-31-arm-c-fastwan/r1/final.md`. Rows 4 and 6 are this
-document's own executed work.
+Rows 1-3 and 5 are the r1 panel's work; row 7 is r2's (codex MUST-FIX 1). Panel
+= Codex `gpt-5.6-sol` + Antigravity, Claude anchor and sole judge throughout;
+judgment logs are local-only at
+`kibitz-runs/2026-07-31-arm-c-fastwan/{r1,r2}/final.md`. Rows 4, 6 and 8 are
+this document's own executed work.
+
+**Note that row 1 and row 7 are the same mistake at two scales, made by me both
+times: check the part that is easy to check, then write the conclusion for the
+part you did not check.** Row 6 is a third instance from the other direction
+(tensor NAMES compared, shape parity concluded). The standing correction is in
+section 2A and in `docs/GO_FORWARD_PLAN.md` NEXT item 4.
 
 ## 1. WHY ARM C WAS CUT, AND WHY THAT REASON IS NOW WRONG
 
@@ -139,12 +148,61 @@ reference implementation. The vendored `otr_bakeoff_helper` is already
 SHA-pinned and installed by the runner, so a helper SAMPLER is admissible under
 the s0A carve-out without touching an engine module.
 
-**Corollary that may decide the substrate.** This requirement binds a DMD
-recipe. If the C-2 candidate's reference recipe is a plain deterministic
-few-step Euler at cfg 1 -- common for step/CFG-distilled models -- then C-2 is
-expressible in stock nodes and C-1 is not. That asymmetry is an engineering
-reason of a different order than anything in section 6, and settling it is the
-next action.
+**Corollary that might have decided the substrate -- CHECKED, AND IT DOES NOT.**
+The hope was that C-2's reference recipe would be a plain deterministic few-step
+Euler at cfg 1, making C-2 expressible in stock nodes while C-1 is not. **It is
+not.** See section 2B.
+
+## 2B. GATE 1 ANSWERED -- BOTH CANDIDATES ARE RESTART SAMPLERS
+
+Pinned from the reference code path, not the model card and not community
+practice.
+
+`quanhaol/Wan2.2-TI2V-5B-Turbo` is "efficient step distillation and CFG
+distillation ... **leveraging the Self-Forcing framework**", trained by
+`running_scripts/train/Wan2.2/dmd.sh`. Its shipped inference config
+`configs/inference/wan22.yaml` is:
+
+    warp_denoising_step: true
+    model_name: Wan2.2-TI2V-5B
+    denoising_step_list: [1000, 750, 500, 250]
+
+and its own `pipeline/wan22_fewstep_inference.py` loop is:
+
+    _, pred_image_or_video = self.generator(...)
+    if index < len(self.denoising_step_list) - 1:
+        next_timestep = self.denoising_step_list[index + 1] * ...
+        noisy_image_or_video = self.scheduler.add_noise(
+            pred_image_or_video.flatten(0, 1),
+            torch.randn_like(pred_image_or_video.flatten(0, 1)),
+            next_timestep.flatten(0, 1)).unflatten(0, noise.shape[:2])
+
+Predict x0, re-noise with **fresh** `randn_like` to the next timestep, zero
+carry-over -- **the identical restart transition FastWan uses**, and the same
+structure as the acknowledged upstream `guandeh17/Self-Forcing`
+`pipeline/causal_inference.py`.
+
+**Consequences, and one runs against C-2:**
+
+1. **Neither candidate is expressible in stock ComfyUI nodes.** The custom
+   SAMPLER of section 2A is required either way. Cheaper than it sounds: ONE
+   helper implementation serves both, differing only in the timestep list.
+2. **C-2 carries an EXTRA contract C-1 does not: `warp_denoising_step: true`.**
+   The listed timesteps are not used raw -- they are warped through the
+   scheduler's own timestep table (`timesteps[1000 - denoising_steps]` in the
+   Self-Forcing lineage). So the naive `sigma = t/1000` mapping that is correct
+   for FastWan is **wrong for Turbo**, and reproducing Turbo means reproducing
+   the warp exactly.
+3. Turbo is 4 steps `[1000, 750, 500, 250]`; FastWan is 3 steps
+   `[1000, 757, 522]`.
+
+**TRAP, named because it is the one that would tempt a shortcut.** The GGUF
+repacker's README quotes community advice: "4 steps is enough. CFG 1, sampler is
+Euler or SA_Solver or Uni_PC, scheduler is simple or normal or beta." That is
+what people run and like -- it is NOT the reference recipe, and the reference
+code above contradicts it. Plausible output is not recipe fidelity. Adopting the
+civitai line would hand this bench a VRAM number for a recipe the model's
+authors never ran, which is precisely the failure section 2A exists to prevent.
 
 ## 3. CFG -- PINNED AT 1.0 (the r1 open question, now closed)
 
@@ -353,20 +411,46 @@ residency.
 "which recipe can this bench express honestly, and at what measured cost". Two
 gates decide it, in order:
 
-1. **Which candidate's reference TRANSITION is expressible?** C-1 is DMD and
-   needs a full-restart sampler no stock ComfyUI sampler provides. If C-2's
-   reference recipe is a plain deterministic few-step Euler at cfg 1, C-2 needs
-   no custom sampler and C-1 does. Settle it from the `quanhaol` source the same
-   way cfg was settled -- from the code path, not the model card.
-2. **What does each actually cost under the clamp?** One 17-frame clamped render
-   per surviving candidate. For C-1 that is the only instrument that prices the
-   per-forward patch term; for either it is the first honest `peak_delta_mib`.
+**GATE 1 -- which candidate's reference TRANSITION is expressible? ANSWERED
+(section 2B): NEITHER.** Turbo is Self-Forcing/DMD with the identical
+predict-x0-then-restart loop, so the custom SAMPLER is required either way and
+one helper implementation serves both. This gate was expected to favour C-2 and
+instead **runs mildly against it**: Turbo adds `warp_denoising_step: true`, an
+extra contract C-1 does not carry, which invalidates the naive `sigma = t/1000`
+mapping for Turbo alone.
 
-Standing costs, unchanged by r2:
+**GATE 2 -- what does each actually cost under the clamp? OPEN.** One 17-frame
+clamped render per surviving candidate, recording NVML, torch
+allocated/reserved, system RAM and pagefile. For C-1 this is the only instrument
+that prices the per-forward patch term; for either it is the first honest
+`peak_delta_mib`.
+
+**Where that leaves the balance.** C-1's two objections have both weakened: the
+headroom claim is refuted (+14.0 MiB resident) and the sampler cost is now
+shared rather than C-1-specific. C-2's two advantages have both narrowed: the
+recipe is no longer cheaper to express, it is dearer by one warp contract, and
+its remaining edge is the settled headroom (+4.6 MiB). **Gate 2 is now the only
+thing that can disqualify C-1**, and it is a measurement, not an argument. Run
+it before recommending anything -- I have already reversed this recommendation
+once on reasoning that a measurement then refuted.
+
+Standing costs:
 - C-1 is FastWan and keeps sections 2/3 intact; C-2 is a DIFFERENT distillation
-  (`quanhaol/Wan2.2-TI2V-5B-Turbo`, 4 steps at cfg 1) whose upstream licence
-  this project has already flagged UNSTATED, so it must carry
-  `shippable: None` in `ARM_LICENCE` exactly like arm D.
+  (`quanhaol/Wan2.2-TI2V-5B-Turbo`, 4 steps) that must carry `shippable: None`
+  in `ARM_LICENCE` exactly like arm D. **The licence is not merely "unstated in
+  passing" -- `quanhaol`'s README frontmatter carries only `datasets` and
+  `base_model`, with NO licence field at all.** `hum-ma`'s apache-2.0 tag is the
+  repacker's assertion about an upstream that says nothing. Base
+  `Wan-AI/Wan2.2-TI2V-5B` is apache-2.0, so inheritance is plausible and it is
+  not established. Gates SHIPPING, not measuring (arm-D precedent).
+- **C-2's FILE provenance, by contrast, is the best of any candidate here and
+  strictly better than the repack that failed.** `hum-ma` documents the whole
+  chain: converted with `city96/ComfyUI-GGUF/tools` from Kijai's
+  `Wan22-Turbo/Wan2_2-TI2V-5B-Turbo_fp16.safetensors`, quantized, "and finally
+  fixed 5d tensors". Named converter, named source, named post-step -- which is
+  exactly what the Green-Sky 31-byte README lacked, and it is corroborated by
+  the load probe. Conversion IDENTITY and shipping RIGHTS are separate
+  questions, and C-2 now scores well on the first and open on the second.
 - C-2 is +4.6 MiB against the incumbent, so its headroom question is settled
   before it starts; C-1's is not, pending gate 2.
 - Kijai's merged `Wan2_2-TI2V-5B-FastWanFullAttn_bf16.safetensors` (9.3 GiB)
