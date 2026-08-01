@@ -1104,11 +1104,54 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return {"out_path": path, "frame_count": n, "vram_peak_mb": render_peak,
                 "recipe": self._recipe_receipt(),
                 "native_frame_count": n_native,
-                "extension_mode": extension_mode}
+                "extension_mode": extension_mode,
+                **self._clip_telemetry(width, height)}
+
+    def _clip_telemetry(self, width, height):
+        """``quant`` / ``use_lora`` / ``render_canvas`` for the manifest row.
+
+        THE GAP THIS CLOSES. `render_driver` has carried these three onto the
+        manifest since S-B/E5 and `otr_video_render_batch` rolls them up as
+        IDENTITY fields -- but no WAN adapter ever PRODUCED them, so every clip
+        shipped `null` for all three. The first live `fastwan_8gb` episode
+        stamped its recipe correctly and still reported `quant: null`, which is
+        how the hole was found: the plumbing was complete except for the source.
+
+        Why it matters: `render_canvas` is exactly the field that would have
+        answered the 2026-07-23 live-vs-bench VRAM question immediately instead
+        of costing a separate investigation.
+
+        ``use_lora`` is a BOOL and stays one -- `eng_ltx_av` sets it True/False,
+        `_ROLLUP_IDENTITY_FIELDS` groups on it and `otr_credits_roll`
+        truthiness-tests it, so a filename here would make the rollup incoherent
+        ACROSS engines. The artifact's identity lives in the recipe receipt and
+        the model manifest, which is where a reader can act on it."""
+        return {
+            "quant": self._quant_label(),
+            "use_lora": bool(self._loader_names().get("lora")),
+            "render_canvas": "%dx%d" % (int(width), int(height)),
+        }
+
+    def _quant_label(self):
+        """The quant token of the UNET actually loaded, e.g. ``'Q5_K_M'``.
+
+        Read off the resolved basename rather than assumed, so a swapped GGUF
+        cannot leave a receipt describing the file it replaced. ``None`` when the
+        loader is not a GGUF (a safetensors UNET has no quant) or the basename
+        carries no recognizable token -- an honest absence, never a guess."""
+        if self._loader_mode() != "gguf":
+            return None
+        base = str(self._loader_names().get("unet") or "")
+        stem = base.rsplit(".", 1)[0]
+        for token in reversed(stem.split("-")):
+            t = token.strip()
+            if t.upper().startswith("Q") and any(c.isdigit() for c in t):
+                return t
+        return None
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
 
 
-__all__ = ["WanTi2vEngine", "self.recipe_id", "self.recipe_data",
-           "self.prequalification_env"]
+__all__ = ["WanTi2vEngine", "RECIPE_WAN_TI2V", "WAN_TI2V_RECIPE",
+           "PREQUALIFICATION_ENV"]

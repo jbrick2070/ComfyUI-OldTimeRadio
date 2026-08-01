@@ -569,6 +569,16 @@ class WanInitImageMixin:
             # None on a raw that predates the stamp -- consumers use .get().
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
+            # THE THREE IDENTITY FIELDS the manifest has always read and no WAN
+            # adapter ever produced (render_driver.py:4296-4299 reads all three;
+            # otr_video_render_batch._ROLLUP_IDENTITY_FIELDS groups on them).
+            # Threaded HERE, beside recipe and vram_peak_mb, for the same reason
+            # those are: a passthrough written twice is a passthrough that drifts
+            # once. None for a raw that did not carry them -- every consumer
+            # already uses clip.get().
+            "quant": raw.get("quant"),
+            "use_lora": raw.get("use_lora"),
+            "render_canvas": raw.get("render_canvas"),
         }
 
     @staticmethod

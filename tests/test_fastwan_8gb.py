@@ -281,6 +281,44 @@ def test_refusals_and_scratch_files_name_FASTWAN_not_the_incumbent(monkeypatch):
     assert 'otr_engine_tmp_mp4("otr_%s_" % self.name)' in src
 
 
+def test_clip_telemetry_populates_the_three_identity_fields(monkeypatch):
+    """FOUND BY A LIVE EPISODE, not by a test. The first full fastwan_8gb run
+    published correctly and still reported quant/use_lora/render_canvas as null:
+    render_driver has read those three onto the manifest since S-B/E5, but no WAN
+    adapter ever PRODUCED them. The plumbing was complete except for the source."""
+    fw = _engine(monkeypatch)._clip_telemetry(832, 480)
+    assert fw["quant"] == "Q5_K_M"
+    assert fw["render_canvas"] == "832x480"
+    # BOOLEAN, not a filename: eng_ltx_av sets it True/False,
+    # _ROLLUP_IDENTITY_FIELDS groups on it, credits truthiness-tests it.
+    assert fw["use_lora"] is True
+
+    inc = _WT.WanTi2vEngine()._clip_telemetry(832, 480)
+    assert inc["use_lora"] is False, "the incumbent loads no LoRA"
+    assert inc["quant"] == "Q5_K_M"
+    assert inc["render_canvas"] == "832x480"
+
+
+def test_clip_from_raw_carries_the_identity_fields_through(monkeypatch):
+    """_clip_from_raw is the ONE passthrough both WAN adapters ride."""
+    eng = _engine(monkeypatch)
+    raw = dict({"out_path": "x.mp4", "frame_count": 81},
+               **eng._clip_telemetry(832, 480))
+    clip = eng._clip_from_raw(raw, {"shot_id": "s1"})
+    assert clip["quant"] == "Q5_K_M"
+    assert clip["use_lora"] is True
+    assert clip["render_canvas"] == "832x480"
+
+
+def test_quant_label_is_read_not_assumed(monkeypatch):
+    """A swapped GGUF must not leave a receipt describing the file it replaced."""
+    monkeypatch.setenv("OTR_WAN_TI2V_UNET_NAME", "Wan2.2-TI2V-5B-Q8_0.gguf")
+    assert _FW.FastWan8gbEngine()._quant_label() == "Q8_0"
+    # a non-GGUF loader has no quant -- an honest absence, never a guess
+    monkeypatch.setenv("OTR_WAN_TI2V_LOADER", "safetensors")
+    assert _FW.FastWan8gbEngine()._quant_label() is None
+
+
 def test_commercial_clean_is_false_and_not_inherited():
     """The LoRA actually loaded is a Kijai extraction from a repo with NO
     repo-level licence file. "Both upstreams say apache-2.0" and "this artifact
