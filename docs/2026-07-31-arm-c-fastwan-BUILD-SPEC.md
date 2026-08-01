@@ -43,7 +43,13 @@ reason in the runner has been rewritten to the executed one, and
 `tests/test_video_arm_bakeoff.py` now pins it so the superseded justification
 cannot be re-inherited.
 
-## 2. THE SCHEDULE -- SOLVED, IN STOCK CORE NODES
+## 2. THE SCHEDULE -- COORDINATES SOLVED, TRANSITION *NOT* SOLVED
+
+> **r2 CORRECTION (2026-07-31, codex `gpt-5.6-sol`).** This section originally
+> read "SOLVED, IN STOCK CORE NODES" and it over-claimed. `ManualSigmas` fixes
+> **where** the model is evaluated. It says nothing about **how the latent moves
+> between evaluations**, and that is a separate contract this spec never
+> checked. See section 2A. The node plan below is necessary and NOT sufficient.
 
 FastWan is DMD-distilled: 3 steps at timesteps 1000, 757, 522, i.e. normalised
 sigmas `[1.000, 0.757, 0.522]` then 0.
@@ -98,6 +104,47 @@ Planned replacement for node `9`, three nodes for one:
 `ManualSigmas` is flagged `is_experimental=True`. Contain that by pinning the
 ComfyUI revision and validating the live `/object_info` schema before submit --
 NOT by taking a KJNodes dependency for a node core already provides.
+
+## 2A. THE TRANSITION -- NO STOCK SAMPLER REPRODUCES DMD (r2, CONFIRMED)
+
+DMD's multi-step loop is a **full restart**, not an ODE march. FastVideo
+`DmdDenoisingStage.forward`: predict x0, then for every non-terminal step draw
+**fresh** noise and re-noise x0 to the NEXT timestep --
+
+    latents = self.scheduler.add_noise(pred_video, torch.randn(...), next_timestep)
+
+with **zero carry-over of the previous latent**. Against
+`comfy/k_diffusion/sampling.py`:
+
+- **`sample_euler` (:189)** -- `d = to_d(x, sigma_hat, denoised); x = x + d*dt`.
+  Deterministic. Its only noise injection sits behind `s_churn > 0`, and the
+  default is 0. **No restart at all.**
+- **`sample_euler_ancestral` (:215)** dispatches to `sample_euler_ancestral_RF`
+  (:239) for `CONST` model sampling, which `ModelSamplingDiscreteFlow` is. At
+  eta=1 it gives `sigma_down = sigma_{i+1}^2 / sigma_i` and
+  `x = (sigma_down/sigma_i)*x + (1 - sigma_down/sigma_i)*denoised` plus a
+  partial re-noise -- it **retains a fraction of the previous x**, reaching
+  `x = denoised` only at the terminal `sigmas[i+1] == 0`.
+
+So the correct sigma coordinates fed to `euler` produce a DIFFERENT trajectory
+than the reference. This is the exact failure class the bench forbids: it does
+not error, it renders something plausible and hands back a VRAM number for a
+recipe nobody ran.
+
+**Requirement.** Arm C's sampler must be PROVED, not assumed -- either a
+bench-helper SAMPLER implementing the reference transition exactly (owning
+generator device, seed and draw order, and logging its own evaluated timesteps
+and transition mode), or documented numerical parity against the pinned
+reference implementation. The vendored `otr_bakeoff_helper` is already
+SHA-pinned and installed by the runner, so a helper SAMPLER is admissible under
+the s0A carve-out without touching an engine module.
+
+**Corollary that may decide the substrate.** This requirement binds a DMD
+recipe. If the C-2 candidate's reference recipe is a plain deterministic
+few-step Euler at cfg 1 -- common for step/CFG-distilled models -- then C-2 is
+expressible in stock nodes and C-1 is not. That asymmetry is an engineering
+reason of a different order than anything in section 6, and settling it is the
+next action.
 
 ## 3. CFG -- PINNED AT 1.0 (the r1 open question, now closed)
 
@@ -213,9 +260,62 @@ load-probes.
 
 ## 6. WHAT ARM C NEEDS NEXT -- AN OPERATOR DECISION
 
-The schedule is solved and cfg is pinned. What arm C lacks is a substrate that
-loads. Two candidates were verified ComfyUI-format by direct header read (not by
-reputation), both apache-2.0 on the quant repo:
+cfg is pinned; the schedule's COORDINATES are solved and its TRANSITION is not
+(section 2A). Two candidates were acquired and **LOAD-PROBED**, both apache-2.0
+on the quant repo.
+
+> **Header verification does not count, by operator directive 2026-07-31.**
+> Header verification is exactly what gave the Green-Sky repack a false pass:
+> 825 tensor keys, zero differences, and it does not load. Every candidate below
+> was driven through the real path -- `gguf_sd_loader` ->
+> `comfy.sd.load_diffusion_model_state_dict` with `GGMLOps`, i.e. what
+> `UnetLoaderGGUF.load_unet` runs -- and survived it. A name-only or header-only
+> check is not a load probe.
+
+### Load-probe results (2026-07-31)
+
+| | incumbent | C-2 Turbo Q5_K_M | C-1 FastWan LoRA |
+|---|---|---|---|
+| bytes on disk | 3,810,603,360 | 3,815,414,496 | 660,874,456 |
+| state-dict entries | 825 | **825** | 1099 tensors |
+| `blocks.0.modulation` | (1, 6, 3072) | **(1, 6, 3072)** | n/a |
+| `self_attn.norm_q.weight` | (3072,) | **(3072,)** | n/a |
+| result | LOADED OK | **LOADED OK** | **793 patched, 0 unmatched** |
+
+C-2 matches the incumbent in every dimension that killed the repack, measured on
+the state dict BEFORE `load_diffusion_model_state_dict` consumes it. C-1's LoRA
+resolves 306 low-rank pairs + 487 dense diffs = 793 keys through core
+`load_lora_for_models` with **zero** unmatched, so its `diffusion_model.`
+namespace is correct and BUG-070's KJ-wrapper exclusion is not triggered.
+"No exception raised" is not the pass condition -- `load_lora_for_models` warns
+on unmatched keys and still returns a model. The pass condition is the coverage
+invariant: 793 patched, 0 unmatched.
+
+### The LoRA VRAM question, measured -- and the earlier claim withdrawn
+
+A matched control (separate processes, identical path, `patch_on_device=False`):
+
+| | incumbent only | + FastWan LoRA | delta |
+|---|---|---|---|
+| GGML layers carrying patches | 0 | 300 | |
+| NVML delta after load | 3954.0 MiB | 3968.0 MiB | **+14.0 MiB** |
+| torch peak | 3634.1 MiB | 3647.2 MiB | +13.1 MiB |
+
+**WITHDRAWN:** any claim that the LoRA's 630 MiB goes resident and consumes the
+599.8 MiB headroom. It does not -- `move_patch_to_device` keeps patch data off
+the device until needed, and the measured resident cost is +14.0 MiB.
+
+**CONFIRMED by execution:** the patches do NOT fold once at load. After a device
+load, `get_weight` on `diffusion_model.blocks.0.self_attn.q` (stored
+`tensor_type=13` Q5_K, `dtype=uint8`) returns `float16 (3072, 3072)` -- the
+patch is applied to a DEQUANTIZED tensor inside the on-the-fly dequant path
+(`ComfyUI-GGUF/ops.py:166-190`), per call. So C-1 carries a SAMPLING-TIME term
+that a load measurement cannot see and that lands on the whole-window NVML peak
+this bench grades. It cannot be settled by argument in either direction. **One
+clamped 17-frame render is the gate**, recording NVML, torch
+allocated/reserved, system RAM and pagefile.
+
+### The candidates
 
 **C-1. FastWan as a LoRA over the incumbent.**
 `Kijai/WanVideo_comfy/FastWan/Wan2_2_5B_FastWanFullAttn_lora_rank_128_bf16.safetensors`,
@@ -232,25 +332,53 @@ Q5_K_M ourselves and settle conversion identity permanently.
 
 **C-2. A different distillation that is already a clean GGUF.**
 `hum-ma/Wan2.2-TI2V-5B-Turbo-GGUF`, `Wan2_2-TI2V-5B-Turbo-Q5_K_M.gguf`,
-3,815,414,496 bytes. Header-verified: `general.architecture = wan`,
-`blocks.0.modulation` -> `(1, 6, 3072)`, `head.modulation` -> `(1, 2, 3072)`,
-norms unquantized, type histogram 519 F32 + 6 F16 + 210 Q5_K + 90 Q6_K --
-structurally the incumbent's twin. **It is +4.6 MiB against the incumbent, so
+3,815,414,496 bytes. LOAD-PROBED (above), and additionally header-consistent:
+`general.architecture = wan`, `blocks.0.modulation` -> `(1, 6, 3072)`,
+`head.modulation` -> `(1, 2, 3072)`, norms unquantized, type histogram
+519 F32 + 6 F16 + 210 Q5_K + 90 Q6_K -- structurally the incumbent's twin. **It is +4.6 MiB against the incumbent, so
 the headroom question disappears entirely** (versus +381.1 MiB for q6_k against
 599.8 MiB of measured headroom). 36.4K downloads. But it is Turbo, not FastWan:
 a different distillation on `quanhaol/Wan2.2-TI2V-5B-Turbo`, 4 steps at cfg 1,
 whose upstream licence this project has already flagged as UNSTATED. Its recipe
 would have to be pinned from scratch -- none of section 3 transfers.
 
-**Recommendation: C-1.** It is what the operator asked for (FastWan), it
-preserves the pinned recipe, and same-base-weights is the strongest form of the
-comparison. C-2 is the better answer to the looser question "does any
-step-distilled 5B fit under the clamp", and is cheaper, but it is not FastWan
-and it re-opens a licence thread.
+**NO RECOMMENDATION YET, and the earlier one is withdrawn.** This section
+originally recommended C-1 on the grounds that "it is what the operator asked
+for". That is deference, not engineering, and r2 dissolved the technical case on
+both sides of it: the LoRA headroom objection is refuted (+14.0 MiB), and the
+single-axis claim is weakened by the compute-time patch term rather than by
+residency.
 
-Until one is chosen, **arm C stays CUT with the section 4 reason**, and no
-`ArmSpec`, graph file or licence row is written for it -- a blocked arm must not
-add dead branching (spec 1).
+**The question is no longer "which model file".** Section 2A changed it to
+"which recipe can this bench express honestly, and at what measured cost". Two
+gates decide it, in order:
+
+1. **Which candidate's reference TRANSITION is expressible?** C-1 is DMD and
+   needs a full-restart sampler no stock ComfyUI sampler provides. If C-2's
+   reference recipe is a plain deterministic few-step Euler at cfg 1, C-2 needs
+   no custom sampler and C-1 does. Settle it from the `quanhaol` source the same
+   way cfg was settled -- from the code path, not the model card.
+2. **What does each actually cost under the clamp?** One 17-frame clamped render
+   per surviving candidate. For C-1 that is the only instrument that prices the
+   per-forward patch term; for either it is the first honest `peak_delta_mib`.
+
+Standing costs, unchanged by r2:
+- C-1 is FastWan and keeps sections 2/3 intact; C-2 is a DIFFERENT distillation
+  (`quanhaol/Wan2.2-TI2V-5B-Turbo`, 4 steps at cfg 1) whose upstream licence
+  this project has already flagged UNSTATED, so it must carry
+  `shippable: None` in `ARM_LICENCE` exactly like arm D.
+- C-2 is +4.6 MiB against the incumbent, so its headroom question is settled
+  before it starts; C-1's is not, pending gate 2.
+- Kijai's merged `Wan2_2-TI2V-5B-FastWanFullAttn_bf16.safetensors` (9.3 GiB)
+  through `ComfyUI-GGUF/tools/convert.py` remains the named FALLBACK if gate 2
+  shows C-1 thrashing: it removes the patch term entirely by folding the
+  distillation into the weights. Note `tools/convert.py:160` asserts
+  reference-vs-Diffusers layout and Wan's 5-D `patch_embedding` needs the
+  `fix_5d_tensors` path, so it is not an afternoon.
+
+Until both gates are answered, **arm C stays CUT with the section 4 reason**,
+and no `ArmSpec`, graph file or licence row is written for it -- a blocked arm
+must not add dead branching (spec 1).
 
 ## 7. CONSTRAINTS THAT DO NOT BEND
 
