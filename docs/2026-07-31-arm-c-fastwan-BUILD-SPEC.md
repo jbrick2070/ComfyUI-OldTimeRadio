@@ -24,6 +24,7 @@ a render and a VRAM number under the same clamp as arms A / B-partial / D.
 | 6 | The GGUF repack will load, because tensor keys match | **FALSE, AND THIS IS THE LIVE BLOCKER.** Section 4. |
 | 7 | `ManualSigmas` expresses the DMD schedule | **FALSE.** It fixes the evaluation coordinates, not the transition. Section 2A. |
 | 8 | C-2 (Turbo) is a plain few-step Euler, so it needs no custom sampler | **FALSE.** It is Self-Forcing/DMD with the same restart loop, plus a warp step. Section 2B. |
+| 9 | C-2's licence is merely "unstated" | **FALSE, AND WORSE.** The author publishes **CC BY-NC-SA 4.0** (NonCommercial) in the GitHub `LICENSE.md`; the HF weights repo grants nothing. C-2 is SHIPPING-BLOCKED. Section 6A. |
 
 Rows 1-3 and 5 are the r1 panel's work; row 7 is r2's (codex MUST-FIX 1). Panel
 = Codex `gpt-5.6-sol` + Antigravity, Claude anchor and sole judge throughout;
@@ -434,23 +435,88 @@ thing that can disqualify C-1**, and it is a measurement, not an argument. Run
 it before recommending anything -- I have already reversed this recommendation
 once on reasoning that a measurement then refuted.
 
-Standing costs:
-- C-1 is FastWan and keeps sections 2/3 intact; C-2 is a DIFFERENT distillation
-  (`quanhaol/Wan2.2-TI2V-5B-Turbo`, 4 steps) that must carry `shippable: None`
-  in `ARM_LICENCE` exactly like arm D. **The licence is not merely "unstated in
-  passing" -- `quanhaol`'s README frontmatter carries only `datasets` and
-  `base_model`, with NO licence field at all.** `hum-ma`'s apache-2.0 tag is the
-  repacker's assertion about an upstream that says nothing. Base
-  `Wan-AI/Wan2.2-TI2V-5B` is apache-2.0, so inheritance is plausible and it is
-  not established. Gates SHIPPING, not measuring (arm-D precedent).
-- **C-2's FILE provenance, by contrast, is the best of any candidate here and
-  strictly better than the repack that failed.** `hum-ma` documents the whole
-  chain: converted with `city96/ComfyUI-GGUF/tools` from Kijai's
-  `Wan22-Turbo/Wan2_2-TI2V-5B-Turbo_fp16.safetensors`, quantized, "and finally
-  fixed 5d tensors". Named converter, named source, named post-step -- which is
-  exactly what the Green-Sky 31-byte README lacked, and it is corroborated by
-  the load probe. Conversion IDENTITY and shipping RIGHTS are separate
-  questions, and C-2 now scores well on the first and open on the second.
+### 6A. LICENCE -- C-2 IS SHIPPING-BLOCKED. This is not a tiebreaker, it is a gate.
+
+**Correction to this document's own earlier framing.** C-2 was filed as
+"provenance best, licence worse", as though those were comparable axes on one
+scale. They are not. A missing licence field is not a weaker grant than
+apache-2.0; it is the ABSENCE of a grant. Default copyright reserves rights, and
+a downstream repacker cannot convey rights the upstream never conveyed --
+`hum-ma`'s apache-2.0 tag is a claim ABOUT `quanhaol`, not a licence FROM
+`quanhaol`. Excellent file provenance with no licence chain is a candidate you
+can MEASURE and cannot SHIP.
+
+Chains traced to the source, file by file, not by tag (2026-08-01):
+
+| level | C-1 (FastWan) | C-2 (Turbo) |
+|---|---|---|
+| base model | `Wan-AI/Wan2.2-TI2V-5B` **apache-2.0** | `Wan-AI/Wan2.2-TI2V-5B` **apache-2.0** |
+| distillation framework | FastVideo's own DMD | `guandeh17/Self-Forcing` **Apache-2.0** |
+| distilled model | `FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers` **apache-2.0** (verified at the repo, not from a note) | `quanhaol/Wan2.2-TI2V-5B-Turbo` -- **HF weights repo states NOTHING**; GitHub repo's `LICENSE.md` is **CC BY-NC-SA 4.0** |
+| ComfyUI conversion | `Kijai/WanVideo_comfy` -- no repo-level licence | `Kijai/WanVideo_comfy` -- no repo-level licence |
+| GGUF repack | n/a | `hum-ma` tags **apache-2.0** |
+
+**The decisive facts for C-2:**
+
+1. The HF weights repo `quanhaol/Wan2.2-TI2V-5B-Turbo` is FOUR files --
+   `.gitattributes`, `README.md`, `config.json`, `model.pt`. **No LICENSE file.
+   No `license:` field in the card frontmatter. No licence section in the README
+   body.** Checked the tree, not just the card.
+2. The author's GitHub repo DOES publish terms, and they are
+   **CC BY-NC-SA 4.0 -- Attribution-NonCommercial-ShareAlike**. Cards lie by
+   omission; files usually do not.
+3. That NonCommercial term is **`quanhaol`'s own choice, not inherited**: the
+   acknowledged framework `guandeh17/Self-Forcing` is Apache-2.0 and the base is
+   apache-2.0. Nothing upstream imposed NC. It is a deliberate, bespoke
+   restriction by the model's author.
+4. So `hum-ma`'s apache-2.0 tag does not merely lack a foundation -- it
+   **contradicts the only terms the author actually published**.
+
+Against the standing operator rule -- *MIT preferred, apache/BSD acceptable, no
+bespoke or unstated terms* -- C-2 fails twice: the weights are unstated, and the
+author's published terms are both bespoke and NonCommercial. **C-2 is
+SHIPPING-BLOCKED, recorded here up front so that a gate-2 win cannot quietly
+promote it.** If C-2 wins on measurement and still has no licence chain, that is
+a finding for the research brief, NOT a candidate for the workflow. Its
+`ARM_LICENCE` row is `shippable: False` -- not arm D's `None`, because arm D's
+question is an ambiguous clause while C-2's is an explicit NC term plus an
+ungranted artifact.
+
+**C-1's chain, stated precisely** (correcting a loose earlier claim of
+"apache-2.0 verified at both levels"): the MODEL is apache-2.0 at both levels
+and that is now verified at the source -- `FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers`
+carries `license:apache-2.0`, and so does the Wan base. The FILE we load-probed
+is Kijai's rank-128 extraction, and `Kijai/WanVideo_comfy` states no repo-level
+licence (its only LICENSE file is `LoRAs/Ditto/ditto_LICENSE.txt`, a per-artifact
+one for an unrelated LoRA). The distinction that matters: for C-1 a grant EXISTS
+upstream and apache-2.0 expressly permits preparing and redistributing
+derivatives, so Kijai's silence is a notice-compliance gap on Kijai's side
+rather than a missing grant. For C-2 there is no grant at the origin at all, so
+nothing can flow. Every level of C-1 that states terms states apache-2.0; no
+level states restrictive or bespoke terms.
+
+*This is a policy determination against the operator's stated rule, not legal
+advice.*
+
+**Consequence for gate 2, and it is a simplification.** If C-2 can never be the
+substrate, a gate-2 render on C-2 is no longer decision-relevant -- it would be
+a research data point, not a choice between candidates. **The decision-relevant
+gate 2 is C-1 alone: does FastWan-via-LoRA fit under the clamp?** Run C-2 only
+if the operator wants the research number.
+
+### 6B. Conversion identity -- separate question, and C-2 still scores well
+
+Worth keeping distinct from rights, because conflating them is what produced the
+"provenance best, licence worse" error above. `hum-ma` documents the whole
+conversion chain: converted with `city96/ComfyUI-GGUF/tools` from Kijai's
+`Wan22-Turbo/Wan2_2-TI2V-5B-Turbo_fp16.safetensors`, quantized, "and finally
+fixed 5d tensors" -- named converter, named source, named post-step, which is
+exactly what the Green-Sky 31-byte README lacked, and it is corroborated by the
+load probe. Conversion IDENTITY gates admission to the comparative matrix;
+shipping RIGHTS gate the workflow. C-2 passes the first and fails the second.
+
+### 6C. Remaining standing facts
+
 - C-2 is +4.6 MiB against the incumbent, so its headroom question is settled
   before it starts; C-1's is not, pending gate 2.
 - Kijai's merged `Wan2_2-TI2V-5B-FastWanFullAttn_bf16.safetensors` (9.3 GiB)
@@ -458,7 +524,9 @@ Standing costs:
   shows C-1 thrashing: it removes the patch term entirely by folding the
   distillation into the weights. Note `tools/convert.py:160` asserts
   reference-vs-Diffusers layout and Wan's 5-D `patch_embedding` needs the
-  `fix_5d_tensors` path, so it is not an afternoon.
+  `fix_5d_tensors` path, so it is not an afternoon. Its licence position is
+  C-1's -- apache-2.0 at the model level -- so this fallback does not inherit
+  C-2's problem.
 
 Until both gates are answered, **arm C stays CUT with the section 4 reason**,
 and no `ArmSpec`, graph file or licence row is written for it -- a blocked arm
