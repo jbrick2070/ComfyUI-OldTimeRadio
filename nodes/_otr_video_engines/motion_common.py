@@ -267,10 +267,27 @@ FRAME_COST_MODEL = {
 #: 5B figure -- the conservative low-VRAM tier the budget mainly guards).
 _DEFAULT_FRAME_COST = (7000.0, 185.0)
 
-#: Per-engine MOTION floor (4n+1 minimum): a beat must carry at least this many
-#: frames of motion even when VRAM is tight -- the floor WINS over the budget (if
-#: the floor itself OOMs, the render-window NVML probe catches it LOUD). LTX has
-#: its own decode floor; the generic default is 1.
+#: Per-engine MOTION floor (4n+1 minimum): the fewest frames of motion a beat may
+#: carry. It is the LOWER BOUND handed to ``quantize_frames_4n1``; it is NOT an
+#: override of the VRAM budget.
+#:
+#: CORRECTED 2026-08-01 (kibitz r4, verified against this file). This comment used
+#: to claim "the floor WINS over the budget (if the floor itself OOMs, the
+#: render-window NVML probe catches it LOUD)". BOTH HALVES WERE FALSE, and the
+#: pair of them nearly bought a real defect:
+#:   * The floor does NOT win. ``compute_real_frame_budget`` raises
+#:     :class:`MotionBudgetError` whenever ``affordable < snapped``, and ``snapped``
+#:     carries the floor -- so an unaffordable floor REFUSES the render rather than
+#:     rendering short.
+#:   * ``VramPeakProbe`` catches nothing. Its own contract above is explicit:
+#:     "there is no ceiling assert -- the peak is sampled + logged, never enforced."
+#: A plan written against the old wording proposed bypassing the refusal on the
+#: strength of a probe that would not have caught the resulting CUDA OOM. Preflight
+#: refusal is the ONLY guard on this path; keep it that way.
+#:
+#: NOTE ``snapped`` CAN fall below the floor: ``quantize_frames_4n1`` applies
+#: ``max_frames`` AFTER the minimum, so a target under the floor stays under it.
+#: LTX has its own decode floor; the generic default is 1.
 FRAME_MOTION_FLOOR = {"wan_ti2v": 17}
 _DEFAULT_MOTION_FLOOR = 1
 

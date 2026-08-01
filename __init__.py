@@ -161,6 +161,15 @@ _NODE_MODULES = {
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
+    # The DMD / Self-Forcing restart transition (kibitz r2 F2, moved 2026-08-01).
+    # PRODUCTION machinery: fastwan_8gb's adapter builds it into its render graph,
+    # and the four-arm bench's API graphs name this same registered key -- one
+    # implementation, two consumers. It used to live in the DIAGNOSTIC bench helper
+    # (scripts/bench_helper/otr_bakeoff_helper), which a production engine may not
+    # depend on; that copy is deleted rather than kept in sync. The bench's VRAM
+    # probes stay OUT of the pack -- they are measurement machinery, and that
+    # asymmetry is deliberate.
+    "OTR_DMDRestartSamplerSelect": (".nodes._otr_video_engines.dmd_sampler", "OTR_DMDRestartSamplerSelect", " OTR DMD Restart Sampler (predict-x0 + renoise)"),
     "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      " Project State Loader"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            " VRAM Guardian"),
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
