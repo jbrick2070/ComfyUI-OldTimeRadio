@@ -355,9 +355,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "wan_ti2v UNET not found at %s; fetch the Wan2.2 TI2V-5B GGUF and "
+                "%s UNET not found at %s; fetch the Wan2.2 TI2V-5B GGUF and "
                 "set OTR_WAN_TI2V_CKPT (or drop it in models/diffusion_models)"
-                % self._ckpt_path(), kind="video")
+                % (self.name, self._ckpt_path()), kind="video")
         # M8: the 5B REQUIRES the Wan2.2 VAE -- an empty / 2.1 / any other
         # wrong-but-present VAE silently corrupts the decode. Fail CLOSED unless the
         # resolved basename is in the approved Wan2.2 whitelist (2026-06-18 roundtable
@@ -369,20 +369,20 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                     else "empty" if not vae_base else "not an approved Wan2.2 VAE")
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "wan_ti2v requires the Wan2.2 VAE; resolved basename %r is %s -- the "
+                "%s requires the Wan2.2 VAE; resolved basename %r is %s -- the "
                 "5B decode needs one of %s (M8). Set OTR_WAN_TI2V_VAE_NAME"
                 "=wan2.2_vae.safetensors"
-                % (vae_base, _why, sorted(_WAN22_VAE_ALLOWED)), kind="video")
+                % (self.name, vae_base, _why, sorted(_WAN22_VAE_ALLOWED)), kind="video")
         missing = self._missing_loaders()
         if missing:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "wan_ti2v required loader file(s) absent: %s -- the 5B graph needs "
+                "%s required loader file(s) absent: %s -- the 5B graph needs "
                 "the umt5 CLIP and the Wan2.2 VAE on disk too, not just the UNET "
                 "(offline invariant, no runtime fetch); fix the *_NAME envs or "
                 "point OTR_WAN_TI2V_CLIP_DIR / OTR_WAN_TI2V_VAE_DIR at the "
                 "installed basenames"
-                % ", ".join("%s=%r" % (lbl, nm) for lbl, nm in missing),
+                % (self.name, ", ".join("%s=%r" % (lbl, nm) for lbl, nm in missing)),
                 kind="video")
         return self.name
 
@@ -948,8 +948,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         classes. Weights load when the loader nodes execute in render_clip."""
         if not self._installed():
             raise RuntimeError(
-                "wan_ti2v not installed: UNET missing at %s -- fetch the Wan2.2 "
-                "TI2V-5B GGUF, set OTR_ENABLE_WAN_TI2V=1" % self._ckpt_path())
+                "%s not installed: UNET missing at %s -- fetch the Wan2.2 "
+                "TI2V-5B GGUF, set OTR_ENABLE_WAN_TI2V=1"
+                % (self.name, self._ckpt_path()))
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._loaded = True
@@ -984,7 +985,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         plan = self._build_render_request(request)            # pure, CPU-tested
         if not plan["init_image"]:
             raise _wb.GraphExecutionError(
-                "wan_ti2v requires init_image (got %r)" % plan["init_image"])
+                "%s requires init_image (got %r)" % (self.name, plan["init_image"]))
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
@@ -1042,9 +1043,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # one that did what it was told.
         if n_native != length:
             raise _wb.GraphExecutionError(
-                "wan_ti2v asked its graph for %d frame(s) and decoded %d. NO "
+                "%s asked its graph for %d frame(s) and decoded %d. NO "
                 "FALLBACK -- padding the difference is how a render that did "
-                "not happen gets counted as one." % (length, n_native))
+                "not happen gets counted as one." % (self.name, length, n_native))
         extension_mode = "none"
         if target_frames > n_native:
             if multi_clip:
@@ -1054,12 +1055,12 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 # claim about today's callers. If it ever fires, the beat is
                 # about to be assembled from part-real, part-mirrored segments.
                 raise _wb.GraphExecutionError(
-                    "wan_ti2v segment rendered %d real frame(s) of a planned "
+                    "%s segment rendered %d real frame(s) of a planned "
                     "%d. NO FALLBACK -- ping-pong padding a COVERAGE-PLANNED "
                     "segment puts mirrored frames inside a beat that claims "
                     "real multi-clip coverage, and hands the next chained "
                     "segment a mirrored frame to continue from."
-                    % (n_native, target_frames))
+                    % (self.name, n_native, target_frames))
             # CLIP-FILL, SINGLE-CLIP ONLY: ping-pong-extend the VRAM-bounded
             # short render up to the beat's audio-derived target so the
             # composite fills the beat with motion instead of holding the last
@@ -1067,11 +1068,16 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             frames = _wb.extend_frames_to_target(frames, target_frames)
             extension_mode = "ping_pong"
             _LOG.warning(
-                "[OTR video] wan_ti2v CLIP-FILL: rendered %d frame(s) -> "
+                "[OTR video] %s CLIP-FILL: rendered %d frame(s) -> "
                 "ping-pong extended to %d (beat target %d) @ %dx%d so the beat "
                 "is FILLED with motion (no hold-last-frame freeze)",
-                n_native, len(frames), target_frames, width, height)
-        out_path = otr_engine_tmp_mp4("otr_wan_ti2v_")
+                self.name, n_native, len(frames), target_frames, width, height)
+        # NAMED FOR THE ENGINE THAT RENDERED IT (2026-08-01). This was a literal
+        # "otr_wan_ti2v_", so the first live fastwan_8gb render wrote
+        # otr_wan_ti2v_<hash>.mp4 -- a scratch file whose name attributes the work
+        # to the wrong engine, which is exactly the thread you pull when a render
+        # looks wrong and the filename sends you to the other adapter.
+        out_path = otr_engine_tmp_mp4("otr_%s_" % self.name)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)

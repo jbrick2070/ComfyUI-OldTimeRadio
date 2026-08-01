@@ -59,7 +59,7 @@
   "video": {
     "device_policy": "cuda",
     "dtype_policy": "fp8_ok",
-    "max_render_frames": 17
+    "max_render_frames": 81
   },
   "image": {
     "dtype_policy": "fp8_ok"
@@ -74,7 +74,7 @@
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,
-    "frame_budget": 17,
+    "frame_budget": 81,
     "beats": 40
   },
   "preflight": {
@@ -91,7 +91,7 @@
     "extra_args": [],
     "env": {
       "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
-      "OTR_FASTWAN_8GB_MAX_FRAMES": "17"
+      "OTR_FASTWAN_8GB_MAX_FRAMES": "81"
     }
   }
 }

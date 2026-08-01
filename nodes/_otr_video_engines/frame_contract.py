@@ -289,7 +289,25 @@ def can_chain(engine) -> bool:
 #: Adding an id here is a per-engine decision with a live proof attached, never
 #: a convenience. ``tests/test_multiclip_effective_contract.py`` pins WAN's
 #: topology as unmoved by a pinned ceiling.
-PLANNING_CAP_ENGINES = ("ltx_8gb",)
+#: ``fastwan_8gb`` ADDED 2026-08-01, with the live proof this comment demands.
+#: The WAN reasoning above holds for ``wan_ti2v`` and is deliberately left alone,
+#: but it does NOT survive contact with a COVERAGE-PLANNED beat. Both adapters
+#: declare ``strict_first_frame`` continuity, which makes them CHAINABLE, so
+#: ``partition_beat`` plans multi-clip segments up to the contract max (177) --
+#: and a multi-clip beat never reaches ``_floor_length``, so the ping-pong that
+#: makes the ceiling harmless on the single-clip path never runs.
+#:
+#: THE LIVE PROOF (canonical run, 2026-08-01, this profile): the render refused
+#: by name -- "fastwan_8gb was handed a coverage-planned segment of 177 frame(s)
+#: but this tier pins its render ceiling at 17" -- exactly the contradiction
+#: ``_planned_length`` documents and exactly the remedy it names ("Raise
+#: max_render_frames for this tier or route the beat to a single-clip engine").
+#: The tier now pins 81, the highest rung the four-arm bench MEASURED at this
+#: canvas (6563.1 / 6531.1 / 6563.1 MiB at 17 / 49 / 81 -- flat), and listing the
+#: engine here lets the planner SEE that cap so plan and contract cannot disagree.
+#: Capping the planner at 81 is not the "pile of 17-frame renders" the WAN note
+#: warns about: 81 frames is 3.24 s of real motion per segment.
+PLANNING_CAP_ENGINES = ("ltx_8gb", "fastwan_8gb")
 
 
 class PlanningCapError(ValueError):

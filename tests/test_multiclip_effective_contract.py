@@ -287,11 +287,25 @@ def test_a_discrete_menu_is_UNTOUCHED_by_a_ceiling_it_never_reaches():
     assert fc.coverage_contract_receipt("ltx_8gb", veo_shaped, 240) is None
 
 
-def test_the_derivation_is_an_allowlist_of_one():
-    """Pinned as a NUMBER, not a spirit: adding an engine here is a per-engine
-    decision with a live proof attached, and this fails until someone updates
-    it deliberately."""
-    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb",)
+def test_the_derivation_is_a_NAMED_allowlist():
+    """Pinned as an EXACT TUPLE, not a spirit: adding an engine here is a
+    per-engine decision with a live proof attached, and this fails until someone
+    updates it deliberately.
+
+    Was an allowlist of ONE until 2026-08-01. ``fastwan_8gb`` joined with the
+    live proof the constant's own comment demands: a canonical run refused by
+    name -- "fastwan_8gb was handed a coverage-planned segment of 177 frame(s)
+    but this tier pins its render ceiling at 17". Both WAN-family adapters are
+    CHAINABLE (strict_first_frame), so partition_beat plans multi-clip coverage
+    for them, and a multi-clip beat never reaches ``_floor_length`` -- the
+    ping-pong that makes a low ceiling harmless on the single-clip path never
+    runs. Listing the engine lets the planner see the cap.
+
+    ``wan_ti2v`` is deliberately NOT here. Its ceiling stays a RENDER cap and
+    its topology stays unmoved (pinned below); the same contradiction is latent
+    for it and is logged as its own defect rather than fixed inside this build."""
+    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb", "fastwan_8gb")
+    assert "wan_ti2v" not in fc.PLANNING_CAP_ENGINES
 
 
 # ---------------------------------------------------------------------------

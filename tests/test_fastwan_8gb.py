@@ -5,6 +5,8 @@ vacuously before the recipe seam landed -- see
 ``test_recipe_is_fastwans_not_the_incumbents``.
 """
 
+import io
+
 import pytest
 
 from nodes._otr_shared import public_engines as _PE
@@ -250,6 +252,35 @@ def test_substrate_is_inherited_unchanged(attr):
 # --------------------------------------------------------------------------- #
 # licence + profile
 # --------------------------------------------------------------------------- #
+def test_refusals_and_scratch_files_name_FASTWAN_not_the_incumbent(monkeypatch):
+    """Inherited identity leaks send you to the wrong adapter.
+
+    The first live fastwan_8gb render wrote its scratch mp4 as
+    ``otr_wan_ti2v_<hash>.mp4`` -- work attributed to the other engine in the
+    one artifact a human looks at first. The refusal strings had the same bug:
+    every one began with a literal "wan_ti2v", so a FastWan failure would name
+    the incumbent and cost a debugging detour into the wrong file."""
+    eng = _engine(monkeypatch)
+    # A length off the 4n+1 ladder -- the cheapest refusal that needs no weights.
+    with pytest.raises(Exception) as exc:
+        eng._planned_length(18)
+    msg = str(exc.value)
+    assert "fastwan_8gb was handed" in msg
+    assert "wan_ti2v was handed" not in msg
+
+    # EVERY refusal in the shared parent must be engine-parameterized, not just
+    # the one above. A literal "wan_ti2v X" at the head of a message is the bug.
+    src = io.open(_WT.__file__, encoding="utf-8").read()
+    for leak in ('"wan_ti2v UNET not found', '"wan_ti2v requires',
+                 '"wan_ti2v required loader', '"wan_ti2v not installed',
+                 '"wan_ti2v asked its graph', '"wan_ti2v segment rendered'):
+        assert leak not in src, "refusal hardcodes the incumbent: %s" % leak
+
+    assert 'otr_engine_tmp_mp4("otr_wan_ti2v_")' not in src, (
+        "scratch mp4 prefix is hardcoded to the incumbent again")
+    assert 'otr_engine_tmp_mp4("otr_%s_" % self.name)' in src
+
+
 def test_commercial_clean_is_false_and_not_inherited():
     """The LoRA actually loaded is a Kijai extraction from a repo with NO
     repo-level licence file. "Both upstreams say apache-2.0" and "this artifact
@@ -299,14 +330,38 @@ def test_profile_canvas_agrees_with_the_declaration():
     assert prof["launch"]["env"]["OTR_VIDEO_LANDSCAPE_CANVAS"] == "%dx%d" % (w, h)
 
 
-def test_profile_ships_at_the_floor_not_the_bench_rung():
-    """81 frames is a BENCH result, and a bench cell never qualifies an engine.
-    The cap moves only after a canonical render proves the rung."""
+def test_profile_caps_at_the_highest_MEASURED_rung():
+    """81, and the reason 17 was abandoned is a live refusal, not a preference.
+
+    A canonical run on 2026-08-01 refused by name: "fastwan_8gb was handed a
+    coverage-planned segment of 177 frame(s) but this tier pins its render
+    ceiling at 17." A multi-clip beat never reaches _floor_length, so the
+    ping-pong that makes a low ceiling harmless on the single-clip path never
+    runs -- 17 is simply not a shippable cap for a CHAINABLE engine.
+
+    81 is the highest rung the four-arm bench measured at this canvas, where
+    VRAM was FLAT across 17 / 49 / 81 (6563.1 / 6531.1 / 6563.1 MiB)."""
     prof = _profile()
-    assert prof["video"]["max_render_frames"] == 17
-    assert prof["launch"]["env"]["OTR_FASTWAN_8GB_MAX_FRAMES"] == "17"
+    assert prof["video"]["max_render_frames"] == 81
+    assert prof["launch"]["env"]["OTR_FASTWAN_8GB_MAX_FRAMES"] == "81"
+    assert prof["render"]["frame_budget"] == 81
     # ...through its OWN key, never the incumbent's.
     assert "OTR_WAN_TI2V_MAX_FRAMES" not in prof["launch"]["env"]
+    # 81 must be ON the 4n+1 ladder, or _planned_length refuses as a build error.
+    assert (81 - 1) % 4 == 0
+    assert _FW.FastWan8gbEngine.frame_contract.is_legal_length(81)
+
+
+def test_planner_sees_the_cap_so_plan_and_contract_cannot_disagree():
+    """The engine is CHAINABLE (strict_first_frame), so partition_beat plans
+    multi-clip coverage for it. Without the engine listed here the planner plans
+    up to the contract max (177) and the tier ceiling refuses it -- which is
+    exactly how the live run failed."""
+    from nodes._otr_video_engines import frame_contract as _FC
+    assert "fastwan_8gb" in _FC.PLANNING_CAP_ENGINES
+    # wan_ti2v is deliberately NOT added: its ceiling stays a render cap, and
+    # this build does not touch the shipped tier.
+    assert "wan_ti2v" not in _FC.PLANNING_CAP_ENGINES
 
 
 def test_profile_preflight_requires_the_lora():
