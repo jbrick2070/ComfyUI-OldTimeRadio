@@ -239,6 +239,25 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
     return False
 
 
+#: The two LLM picker widgets whose menu options now carry a VRAM badge
+#: (``'google/gemma-4-12b-it (11.9 GB)'``). Profiles, CLI flags and saved graphs
+#: store the BARE repo id, so both the validator and the writer need the same
+#: bare<->badged tolerance the video director already has for ``'wan_8gb (16:9)'``.
+_LLM_MODEL_WIDGETS = frozenset({"creative_writing_model", "technical_model"})
+
+
+def _is_llm_model_admissible(widget_name: str, value: Any, type_def: Any) -> bool:
+    """A BARE repo id is admissible against a VRAM-badged choice list.
+
+    Without this, adding the badge would reject every profile that names a
+    creative model -- the badge is display text, not a new identity."""
+    if widget_name not in _LLM_MODEL_WIDGETS or not isinstance(value, str):
+        return False
+    from ._otr_model_catalog import _strip_label_suffix
+    bare = _strip_label_suffix(value)
+    return any(_strip_label_suffix(str(c)) == bare for c in (type_def or ()))
+
+
 def _is_comfy_admissible(widget_name: str, value: Any) -> bool:
     if not isinstance(value, str) or not value:
         return False
@@ -259,6 +278,8 @@ def _validate_widget_value(node_type: str, widget_name: str, spec: Any, value: A
             if _is_comfy_admissible(widget_name, value):
                 return
             if _is_engine_director_admissible(widget_name, value):
+                return
+            if _is_llm_model_admissible(widget_name, value, type_def):
                 return
             raise ValueError(
                 f"widget {widget_name!r} on node_type {node_type!r} is a COMBO "
@@ -565,6 +586,40 @@ def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
     return exact_menu_option_for(internal)
 
 
+def _llm_option_value(node_type: str, widget: str, value: Any,
+                      schemas: Optional[dict]) -> Any:
+    """Write the EXACT live menu option for an LLM picker, badge included.
+
+    The sibling of :func:`_director_option_value`. A profile stores the bare
+    repo id (``'google/gemma-4-12b-it'``); the picker now shows it with its VRAM
+    cost (``'google/gemma-4-12b-it (11.9 GB)'``). Storing the bare form would
+    leave a saved graph carrying a value ComfyUI's own COMBO validation does not
+    recognize, so resolve it to the live choice.
+
+    Falls through UNCHANGED whenever the choice list is unavailable or nothing
+    matches -- a remote handle (``openrouter:slot-a``), an uncurated id with no
+    estimate, or an offline-schema gap must all keep working."""
+    if widget not in _LLM_MODEL_WIDGETS or not isinstance(value, str) or not value:
+        return value
+    inp = ((schemas or {}).get(node_type) or {}).get("input") or {}
+    spec = None
+    for section in ("required", "optional"):
+        spec = (inp.get(section) or {}).get(widget)
+        if spec is not None:
+            break
+    type_def = spec[0] if isinstance(spec, (list, tuple)) and spec else None
+    if not isinstance(type_def, (list, tuple)):
+        return value
+    if value in type_def:
+        return value
+    from ._otr_model_catalog import _strip_label_suffix
+    bare = _strip_label_suffix(value)
+    for choice in type_def:
+        if _strip_label_suffix(str(choice)) == bare:
+            return choice
+    return value
+
+
 def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
                   schemas: Optional[dict] = None) -> dict:
     """PURE semantic widget patching: return a DEEP COPY of ``workflow`` with
@@ -600,6 +655,7 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
         for node_type, widget in entry["targets"]:
             node = _node_by_type(out, node_type)
             value = _director_option_value(node_type, widget, flat[dotted])
+            value = _llm_option_value(node_type, widget, value, schemas)
             _patch_node_widget(node, widget, value, schemas)
             applied.append(f"{dotted} -> {node_type}.{widget} = {value!r}")
     log.info(

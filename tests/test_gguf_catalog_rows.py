@@ -12,7 +12,8 @@ def test_row_present_by_default(monkeypatch, tmp_path):
         monkeypatch.delenv(key, raising=False)
     ids = cat._by_repo_id()
     assert gguf.ROW_ID in ids
-    assert gguf.ROW_ID in cat.dropdown_choices(hub_root=tmp_path)
+    assert (gguf.ROW_ID + cat.vram_badge_for(gguf.ROW_ID)
+            ) in cat.dropdown_choices(hub_root=tmp_path)
     assert cat.validate_model_id(gguf.ROW_ID) == gguf.ROW_ID
 
 
@@ -32,14 +33,20 @@ def test_virtual_row_schema():
 
 
 def test_dropdown_gguf_row_is_bare_and_validates(tmp_path):
-    """The GGUF row shows the bare repo id -- no [LOCAL GGUF] / download
-    badge. A value saved by an older badge-bearing workflow still normalizes."""
+    """The GGUF row carries NO STATE badge -- no [LOCAL GGUF], no download
+    marker. It DOES carry the VRAM figure (operator, 2026-08-01: the picker must
+    say what a model needs so only runnable ones get chosen), which is a property
+    of the model and identical on every machine. Values saved by an older
+    workflow -- bare, or bearing the retired state badge -- still normalize."""
     choices = cat.dropdown_choices(hub_root=tmp_path)
-    assert gguf.ROW_ID in choices
+    assert (gguf.ROW_ID + cat.vram_badge_for(gguf.ROW_ID)) in choices
     assert (gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX) not in choices
     assert (gguf.ROW_ID + cat.NOT_DOWNLOADED_SUFFIX) not in choices
+    # every stored spelling resolves back to the one canonical id
     assert cat.validate_model_id(gguf.ROW_ID) == gguf.ROW_ID
     assert cat.validate_model_id(gguf.ROW_ID + cat.LOCAL_GGUF_SUFFIX) == gguf.ROW_ID
+    assert cat.validate_model_id(
+        gguf.ROW_ID + cat.vram_badge_for(gguf.ROW_ID)) == gguf.ROW_ID
 
 
 def test_dropdown_orders_row_as_gemma_peer(tmp_path):

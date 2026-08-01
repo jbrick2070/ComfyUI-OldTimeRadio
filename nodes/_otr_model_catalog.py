@@ -733,7 +733,9 @@ def build_dropdown_choices(
             on_disk = True
         else:
             on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
-        entries.append(DropdownEntry(m.repo_id, m.repo_id, on_disk, curated=True))
+        entries.append(DropdownEntry(
+            m.repo_id + vram_badge_for(m.repo_id), m.repo_id,
+            on_disk, curated=True))
     curated_ids = {m.repo_id for m in active}
     for repo_id, result in scan.items():
         if repo_id in curated_ids:
@@ -1171,7 +1173,18 @@ def _structural_reject(model_id: str) -> str | None:
 
 
 def _strip_label_suffix(model_id: str) -> str:
-    """Strip UI-only dropdown suffixes from a selected model id."""
+    """Strip UI-only dropdown suffixes from a selected model id.
+
+    Also removes a trailing PARENTHETICAL badge -- the VRAM figure the picker
+    shows so an operator can tell at a glance whether a model fits the card in
+    front of them (``'google/gemma-4-12b-it (11.9 GB)'`` -> the bare repo id).
+    Safe because a Hugging Face repo id cannot contain ``' ('``; this mirrors
+    ``public_engines.resolve_engine_id``, which does the same for the video
+    picker's ``'wan_8gb (16:9)'``.
+
+    IDEMPOTENT AND BACKWARD-COMPATIBLE, which is the whole point: a bare id
+    from a saved graph, a profile, a CLI flag or an older workflow passes
+    through untouched, so adding the badge cannot break a stored selection."""
     s = model_id.strip()
     for suffix in (
         NOT_DOWNLOADED_SUFFIX,
@@ -1183,7 +1196,32 @@ def _strip_label_suffix(model_id: str) -> str:
     for suffix in (LOCAL_HF_SUFFIX, LOCAL_GGUF_SUFFIX):
         if s.endswith(suffix):
             s = s[: -len(suffix)].rstrip()
+    if s.endswith(")") and " (" in s:
+        s = s.rsplit(" (", 1)[0].rstrip()
     return s
+
+
+def vram_badge_for(repo_id: str) -> str:
+    """``' (11.9 GB)'`` for a model whose resident cost is known, else ``''``.
+
+    WHY THE PICKER CARRIES A NUMBER (operator, 2026-08-01): "all dropdowns
+    should state the name of the model and how much VRAM it needs so users
+    select only the one they can use." A dropdown that offers a model the box
+    cannot load is a broken menu, and the failure arrives minutes later as a
+    VRAMFitFailedError rather than at the moment of choosing.
+
+    This deliberately reports the SAME number the admission gate will compute
+    (:func:`_estimate_resident_gb`), so the badge and the refusal can never
+    disagree. Remote handles and un-estimable rows get no badge rather than a
+    guess -- the download-state badge was removed for exactly that reason, and
+    a wrong number is worse than none."""
+    try:
+        est = _estimate_resident_gb(repo_id)
+    except Exception:  # noqa: BLE001 -- a badge must never break the picker
+        return ""
+    if not est or est <= 0:
+        return ""
+    return " (%.1f GB)" % float(est)
 
 
 def _top_installed_alternatives(hub_root: Path | None = None) -> list[str]:
