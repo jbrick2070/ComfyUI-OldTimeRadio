@@ -444,7 +444,33 @@ class MotionEngineBase:
 
         Also captures the episode's v2 render policy (WAN 8GB launch contract,
         2026-07-24) so an engine can read its tier's ``max_render_frames``
-        ceiling at render time. Read-only; never mutated."""
+        ceiling at render time. Read-only; never mutated.
+
+        ``session_ctx`` IS RETURNED IN ``prepared`` (2026-08-01). It used to be
+        accepted and DROPPED, which is a regression the multi-clip work
+        introduced and which took a live campaign to surface:
+
+        * ``BeatSession`` passes it in (``beat_session.py:165-167``) because it
+          is the ONLY channel that tells ``render_clip`` whether its output will
+          be concatenated with other segments into one beat -- a coverage-planned
+          segment's request is shaped exactly like a single-clip beat's.
+        * Dropping it left ``prepared["session_ctx"]`` absent, so every consumer
+          reading ``multi_clip`` saw nothing and took the single-clip branch.
+        * ``eng_wan_ti2v`` and ``eng_humo`` each re-added it LOCALLY and worked;
+          ``ltx_video`` / ``ltx_8gb`` / ``ltx_av`` / ``wan_i2v`` never did, so
+          ``ltx_video``'s loop-fill enabled the boomerang on a beat whose length a
+          coverage plan had already decided.
+        * ``ltx_video`` last delivered episode clips 2026-07-06; the beat session
+          landed 2026-07-25 (``4fa992e6`` / ``e90dedf1``). It worked before
+          multi-clip existed, which is exactly why "it always worked" and "it
+          fails now" are both true.
+
+        THE BASE OWNS THIS, not each adapter. Two adapters carrying a private
+        workaround for a shared-base gap is how the sibling adapters were left
+        broken in the first place -- the same failure class as the ``eng_wan_i2v``
+        VRAM-peak lesson. A single-clip render (``render_single``) never opens a
+        ``BeatSession``, so it passes ``None`` and gets ``{}`` here: absent and
+        empty must stay indistinguishable to callers."""
         self._active_profile = dict(profile or {})
         lease = _GR.acquire(
             timeout_s=float(os.getenv("OTR_GPU_LEASE_TIMEOUT_S", "120")))
@@ -454,7 +480,8 @@ class MotionEngineBase:
             _GR.release(lease)              # never strand the lease on a failure
             raise
         return {"engine_id": self.name, "lease": lease,
-                "patchers": self._patchers}
+                "patchers": self._patchers,
+                "session_ctx": dict(session_ctx or {})}
 
     def profile_max_render_frames(self):
         """The tier's ABSOLUTE render-length ceiling in frames from the captured

@@ -454,8 +454,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """
         from . import wrapper_bridge as _wb
         self._resolve_render_config()           # range-checked, fail-closed
+        # session_ctx comes back IN `prepared` from the base now (2026-08-01).
+        # This adapter used to re-add it locally; so did eng_humo, and the four
+        # adapters that did NOT is how ltx_video's boomerang regression shipped.
         prepared = super().prepare(host_caps, profile, session_ctx)
-        prepared["session_ctx"] = dict(session_ctx or {})
         try:
             classes = getattr(self, "_classes", None) \
                 or _wb.resolve_graph_classes(self._node_candidates())

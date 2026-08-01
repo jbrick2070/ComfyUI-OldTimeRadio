@@ -448,8 +448,9 @@ class HuMoEngine(_MC.MotionEngineBase):
         forcing inter-node eviction on this stack fragments the allocator into
         an OOM."""
         from . import wrapper_bridge as _wb
+        # session_ctx comes back IN `prepared` from the base now (2026-08-01) --
+        # the local re-add that used to live here is the base's job.
         prepared = super().prepare(host_caps, profile, session_ctx)
-        prepared["session_ctx"] = dict(session_ctx or {})
         try:
             classes = getattr(self, "_classes", None) \
                 or _wb.resolve_graph_classes(self._node_candidates())
