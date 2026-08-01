@@ -43,6 +43,37 @@ Its regression test fabricates the missing structure instead of driving `BeatSes
 This is the repo's own documented failure class: a fix that landed on one adapter and
 never reached its siblings. **Zero GPU to diagnose; it was readable all along.**
 
+#### It is a DATED REGRESSION, not an ancient defect (operator challenge, verified)
+
+The operator pushed back: "ltx_video always worked, check a week ago." Correct, and
+it sharpens the diagnosis. `ltx_video` last DELIVERED episode clips on **2026-07-06**
+(4 episodes total, newest `signal_lost_static_spark_20260706_173244`). The
+beat-session / multi-clip architecture landed AFTER that:
+
+    4fa992e6  2026-07-25  chunk 5: the beat session -- one load per beat
+    e90dedf1  2026-07-25  multi-clip chunk 7a: every engine declares a frame
+                          contract; the opt-in is gone
+    b23fc035  2026-07-26  the tier ceiling PLANS, for one lane only
+    5aacc97a  2026-07-29  the LTX loop-fill stops overriding the length a
+                          coverage plan asked for
+
+So `ltx_video` worked -- BEFORE multi-clip existed. `BeatSession` began passing
+`session_ctx` on 07-25; `wan_ti2v` and `humo` were given the local workaround for the
+base class dropping it; `ltx_video` never was.
+
+That reconciles all three observations, which are NOT in conflict:
+
+| evidence | why |
+|---|---|
+| delivered episodes through 2026-07-06 | pre-multi-clip |
+| single-engine smoke PASSES today (83.8 s, 193 frames) | `render_single` never opens a `BeatSession` (`render_driver.py:3022` is the only construction site, inside `render_beat_coverage`) -- so there is no `session_ctx` to drop |
+| campaign leg FAILS | `render_beat_coverage` -> `BeatSession` -> `session_ctx` dropped -> `_loop_fill_allowed` sees no `multi_clip` -> boomerang |
+
+**Consequence for the fix:** this is a regression with a date and a blast radius of
+four adapters (`ltx_video`, `ltx_8gb`, `ltx_av`, `wan_i2v`), not a one-engine quirk.
+Fix it in the BASE so every adapter sees `session_ctx`, rather than adding a third
+local workaround.
+
 ---
 
 ## MY DOC WAS WRONG IN FIVE PLACES
