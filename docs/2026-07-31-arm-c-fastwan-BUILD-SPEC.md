@@ -1,8 +1,32 @@
-# ARM C (FastWan 5B) -- build spec, r1 judgment, and the EXECUTED result
+# ARM C (FastWan 5B) -- build spec, r1/r2 judgment, and the SHIPPED result
 
-**Status:** the blocking question is ANSWERED and the build is BLOCKED on a new,
-narrower, PROVEN reason. Arm C stays CUT. An operator decision is owed on the
-substrate before it can be re-opened.
+> **RESOLVED 2026-08-01 at `1a49fdb0`. ARM C IS BUILT AND PASSES.** On the
+> substrate this document argued toward -- FastWan as Kijai's rank-128 DMD LoRA
+> over the incumbent Q5_K_M GGUF, NOT the Green-Sky repack (which does not load)
+> and NOT the Turbo GGUF (which is licence-blocked, section 6A).
+>
+> Four-arm campaign, twelve cells, one baseline, one manifest, bar 7168 MiB:
+>
+> | arm | canvas | steps | worst delta | 81f wall | verdict |
+> |---|---|---:|---:|---:|---|
+> | A incumbent | 832x480 | 30 | 6563.1 | 171.2 s | PASS |
+> | B-partial | 832x480 | 30 | **7907.1** | 156.1 s | **FAIL** |
+> | **C FastWan LoRA** | 832x480 | **3** | **6563.1** | **62.1 s** | **PASS** |
+> | D ltx_8gb | 512x288 | 8 | 6819.1 | 13.9 s | PASS |
+>
+> **A and C are VRAM-identical to the decimal at every rung**, and C is 2.76x
+> faster at 81 frames. Recipe fidelity is proven at runtime, not asserted: the
+> sampler logs `transition=restart(predict_x0->renoise_fresh)
+> sigmas=1,0.757,0.522,0 timesteps=1000,757,522,0` on every cell. Full result in
+> `docs/GO_FORWARD_PLAN.md`, MEASURED item 7.
+>
+> The sections below are the reasoning that got here, kept because the traps are
+> reusable. Where a section says "arm C stays CUT", read it as the state at the
+> time of that round.
+
+**Status:** SHIPPED. The blocking questions are ANSWERED, the substrate is
+chosen and load-probed, the recipe is pinned from the reference code path, and
+the arm passes every mandatory rung.
 **Written:** 2026-07-31 at HEAD `4872b1f6`. **Superseded/extended:** 2026-07-31
 at HEAD `04ae4f0c` with the r1 judgment and the load probe result.
 **Owns:** standing arm C up in `scripts/run_video_arm_bakeoff.py` so it produces

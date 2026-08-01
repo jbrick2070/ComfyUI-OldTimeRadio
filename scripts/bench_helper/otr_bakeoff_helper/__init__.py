@@ -316,6 +316,8 @@ def _dmd_restart_sampler(model, x, sigmas, extra_args=None, callback=None,
     rectified-flow CONST sampling that is ``sigma*noise + (1-sigma)*x0``, which
     is what a flow scheduler's ``add_noise`` computes.
     """
+    from tqdm.auto import trange
+
     from comfy.k_diffusion.sampling import default_noise_sampler
 
     extra_args = {} if extra_args is None else extra_args
@@ -343,7 +345,12 @@ def _dmd_restart_sampler(model, x, sigmas, extra_args=None, callback=None,
 
     s_in = x.new_ones([x.shape[0]])
     n = len(sigmas) - 1
-    for i in range(n):
+    # trange, exactly as the stock k_diffusion samplers do, for two reasons that
+    # are not cosmetic: the harness parses ``s/it`` out of this bar (a plain
+    # loop silently degrades ``s_per_it`` to the wall/steps FALLBACK, which is
+    # not comparable against a log-parsed figure from another arm), and
+    # otr_render_watchdog.ps1 treats absent progress as a heartbeat stall.
+    for i in trange(n, disable=disable):
         denoised = model(x, sigmas[i] * s_in, **extra_args)
         if callback is not None:
             callback({"x": x, "i": i, "sigma": sigmas[i],

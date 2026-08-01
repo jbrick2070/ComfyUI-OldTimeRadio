@@ -2993,6 +2993,52 @@ baseline from the printed absolutes is close but wrong -- use the
 832x480 (A, B-partial), 512x288 (D) and 512x288 (the A diagnostic leg), 24/1 fps.
 Nothing here is an empty or truncated file.
 
+### 7. ARM C EXISTS NOW, AND IT IS THE RESULT WORTH READING (2026-08-01)
+
+A FOUR-arm campaign, all twelve cells in ONE run against ONE campaign baseline
+and ONE manifest, at `1a49fdb0`. Every `s/it` below is log-parsed
+(`s_per_it_source = "log"` on all twelve), so the seconds columns are
+comparable within the caveat of item 5.
+
+| arm | canvas | steps | 17f delta | 49f delta | 81f delta | **worst** | 81f wall | verdict |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| A -- Wan Q5_K_M incumbent | 832x480 | 30 | 6563.1 | 6531.1 | 6563.1 | **6563.1** | 171.2 s | PASS |
+| B-partial -- safetensors encoder | 832x480 | 30 | 7715.1 | 7715.1 | 7907.1 | **7907.1** | 156.1 s | **FAIL** |
+| C -- FastWan DMD LoRA | 832x480 | **3** | 6563.1 | 6531.1 | 6563.1 | **6563.1** | **62.1 s** | PASS |
+| D -- ltx_8gb v2 | 512x288 | 8 | 6467.1 | 6723.0 | 6819.1 | **6819.1** | 13.9 s | PASS |
+
+**A and C are VRAM-IDENTICAL at every rung -- 6563.1 / 6531.1 / 6563.1, to the
+decimal.** Same canvas, same base GGUF, same encoder, same VAE. The only
+difference is the FastWan distillation LoRA and its 3-step restart recipe. So
+the LoRA's peak-VRAM cost is exactly zero, and C is **2.76x faster end-to-end at
+81 frames** (62.1 s vs 171.2 s), 2.40x at 49, 1.73x at 17.
+
+Per-step, C is 1.16 / 1.58 / 2.37 s/it against A's 1.02 / 2.29 / 3.85. At 81
+frames **C is faster per step as well as running a tenth as many**, because
+cfg 1.0 runs ONE forward per step where A's cfg 5.0 runs two. The LoRA's real
+compute cost shows only at 17 frames (1.16 vs 1.02, ~14%), where the patched
+matmuls are not yet amortised over enough sequence.
+
+The LoRA is NOT free -- its cost is in HOST RAM, not VRAM: C's sysram delta is
+14.7-15.2 GB against A's 10.5-11.1 GB, roughly +4 GB for the patch data and the
+dequant staging. Well inside the 24576 MiB ceiling, and worth knowing before
+anyone runs this beside a resident writer LLM.
+
+**B-partial got WORSE with a complete ladder and is decisively out.** It failed
+every rung, and its 81-frame cell is 7907.1 MiB -- 739 MiB over the bar, and 192
+MiB above its own 17/49 figure. Swapping the GGUF encoder for
+`umt5_xxl_fp8_e4m3fn_scaled.safetensors` costs ~1.2-1.3 GB of peak. **The GGUF
+encoder is load-bearing for this tier**, which is the one thing the encoder-only
+arm existed to isolate.
+
+**What this does NOT say.** Arm C's advantage is measured in VRAM and seconds
+ONLY. A 3-step distilled render versus a 30-step render is a QUALITY question
+this bench deliberately does not answer -- the automated visual discriminator
+was cut unanimously, and schedule correctness is telemetry, not a picture. Arm
+C's recipe fidelity IS proven (the sampler logs
+`transition=restart(predict_x0->renoise_fresh) timesteps=1000,757,522,0` every
+run); whether the output looks good enough to ship is an operator eyeball.
+
 **Never cite the seconds column as an engine ranking.** Item 5 is why: two arms
 at different canvases and different step counts are two different questions, and
 the only honest engine comparison in this tree is A vs D at 512x288.
@@ -3017,6 +3063,14 @@ the only honest engine comparison in this tree is A vs D at 512x288.
 **NEXT, in order, when this reopens:**
 
 1. ~~The like-for-like leg~~ -- **DONE 2026-07-31, item 5 above.**
+1b. ~~Arm C (a step-distilled 5B)~~ -- **DONE 2026-08-01, item 7 above.** Built,
+   passing, VRAM-identical to the incumbent at 2.76x the speed.
+   **The live question is now a QUALITY eyeball, not a measurement:** is a
+   3-step distilled render good enough to ship against the 30-step incumbent?
+   This bench cannot answer that by design. Two candidates survive for the
+   under-8 GB tier -- A (incumbent, known-good output) and C (same VRAM, 2.76x
+   faster, output unreviewed) -- with D a third at a smaller canvas and an
+   unresolved licence. Pick between A and C by looking at the renders.
 2. **A physical 8 GB card.** Everything above is a clamp on a 16 GB card. Until
    this exists, "8 GB qualified" stays unsaid.
 3. **Re-fit `FRAME_COST_MODEL` -- its own task, its own design.** Not a
