@@ -41,23 +41,33 @@ def test_offline_preflight_passes_for_every_shipped_arm():
     assert B.offline_preflight(B.ARMS) is True
 
 
-def test_arm_c_has_no_entry_by_design():
-    """Arm C is CUT: licence passes and the 3-step DMD schedule IS expressible
-    in stock core nodes, but the only FastWan GGUF acquired does not load.
-    A blocked arm must not add dead branching."""
-    assert "C" not in B.ARMS_BY_LABEL
-    assert [a.label for a in B.ARMS] == ["A", "B-partial", "B", "D"]
+def test_arm_c_is_built_on_the_lora_substrate_not_the_dead_repack():
+    """Arm C is OPEN, on the substrate that load-probes clean.
+
+    The Green-Sky q6_k GGUF does not load (rank-2 modulation, wrong-length
+    norms, zero kv fields). Arm C is instead FastWan expressed as Kijai's
+    rank-128 DMD LoRA over arm A's own Q5_K_M GGUF, which resolves 793 patched
+    keys with zero unmatched."""
+    assert "C" in B.ARMS_BY_LABEL
+    assert [a.label for a in B.ARMS] == ["A", "B-partial", "B", "C", "D"]
+    arm = B.ARMS_BY_LABEL["C"]
+    assert arm.graph == "arm_c_fastwan_lora_gguf.json"
+    assert arm.gated_reason is None
+    # the base UNet is BIT-IDENTICAL to arm A -- that is the whole point
+    unet = {p.role: p.filename for p in arm.models}["unet"]
+    assert unet == {p.role: p.filename
+                    for p in B.ARMS_BY_LABEL["A"].models}["unet"]
+    assert "FastWan" in {p.role: p.filename for p in arm.models}["lora"]
 
 
 def test_arm_c_cut_reason_is_the_executed_one_not_the_superseded_one():
-    """The cut reason is load-tested fact, not the 2026-07-31 morning guess.
+    """The retired reasons stay visible and stay marked dead.
 
-    The original reason ("no ComfyUI base graph exists at any priority -- the
-    weights are Diffusers layout and the 3-step DMD schedule is not ordinary
-    KSampler steps=3") was falsified in BOTH halves: a GGUF repack exists, and
-    core ManualSigmas/SamplerCustom express the schedule. What actually blocks
-    the arm is that the repack FAILS TO LOAD. If someone re-opens arm C, they
-    must not re-inherit the superseded justification."""
+    Two justifications have now been retired: the 2026-07-31 morning guess
+    ("no ComfyUI base graph exists at any priority"), falsified in both halves,
+    and the repack itself, which was the live blocker until the substrate
+    changed. A future reader re-opening this area must not re-inherit either,
+    and must not re-propose the licence-blocked Turbo substrate."""
     import inspect
 
     src = inspect.getsource(B)
@@ -65,23 +75,89 @@ def test_arm_c_cut_reason_is_the_executed_one_not_the_superseded_one():
     assert "DOES NOT LOAD" in head
     assert "modulation" in head
     assert "Key parity is NOT shape parity." in head
-    # The superseded phrase is still QUOTED, on purpose, so a future reader sees
-    # what was retired. What must hold is that it survives only as a quotation
-    # marked dead -- never as the operative reason. A bare absence check would
-    # be the wrong instrument and would pass on a comment that simply deleted
-    # the history.
+    # the superseded phrase survives only as a quotation marked dead
     superseded = "no ComfyUI base graph exists at any"
     assert superseded in head, "keep the retired reason visible, marked dead"
     quoted_at = head.index(superseded)
     context = head[max(0, quoted_at - 400):quoted_at + 400]
     assert "ORIGINAL cut reason" in context
     assert "WRONG IN BOTH HALVES" in context
+    # and the rejected alternative carries its reason, so it is not re-proposed
+    assert "CC BY-NC-SA 4.0" in head
+    assert "absence of a grant" in head
+
+
+def test_arm_c_recipe_contract_is_the_reference_one():
+    """Sigmas, timesteps, cfg and the TRANSITION are all pinned."""
+    rc = B.ARMS_BY_LABEL["C"].recipe
+    assert rc is not None
+    assert rc.sigmas == (1.0, 0.757, 0.522, 0.0)
+    assert rc.timesteps == (1000, 757, 522, 0)
+    assert rc.cfg == 1.0
+    assert rc.lora_strength == 1.0
+    # euler is NOT admissible: the reference transition is a full restart
+    assert rc.sampler_class == "OTR_DMDRestartSamplerSelect"
+    assert B.ARMS_BY_LABEL["C"].steps == len(rc.sigmas) - 1 == 3
+
+
+@pytest.mark.parametrize("mutate,fragment", [
+    (lambda p: p["9b"]["inputs"].__setitem__("sigmas", "1.0, 0.667, 0.333, 0.0"),
+     "sigma literal"),
+    (lambda p: p["9b"]["inputs"].__setitem__("sigmas", "1.0, 0.757, 0.0"),
+     "sigma literal"),
+    (lambda p: p["9"]["inputs"].__setitem__("cfg", 5.0), "recipe pins cfg"),
+    (lambda p: p["9"]["inputs"].__setitem__("add_noise", False), "add_noise"),
+    (lambda p: p["9a"].__setitem__("class_type", "KSamplerSelect"),
+     "the TRANSITION is part of the contract"),
+    (lambda p: p["1c"]["inputs"].__setitem__("strength_model", 0.5),
+     "strength_model"),
+    (lambda p: p["9"]["inputs"].__setitem__("sampler", ["9zz", 0]),
+     "unwired contract"),
+])
+def test_recipe_contract_rejects_drift(mutate, fragment):
+    """Every field of the contract fails the cell OFFLINE when it drifts.
+
+    This is the guard that class-presence checking could not provide: a wrong
+    transition or a drifted sigma renders plausibly and reports a VRAM number
+    for a recipe nobody trained."""
+    arm = B.ARMS_BY_LABEL["C"]
+    prompt = B.load_graph(arm)
+    mutate(prompt)
+    with pytest.raises(B.BenchError) as ei:
+        B.assert_recipe_contract(arm, prompt)
+    assert fragment in str(ei.value)
+
+
+def test_recipe_contract_is_a_noop_for_arms_without_one():
+    """Arms reusing an existing recipe shape are unchanged."""
+    for label in ("A", "B-partial", "D"):
+        arm = B.ARMS_BY_LABEL[label]
+        assert arm.recipe is None
+        assert B.assert_recipe_contract(arm, B.load_graph(arm)) is True
+
+
+def test_missing_licence_row_blocks_pass():
+    """An arm with NO ARM_LICENCE receipt must not sail through condition 6.
+
+    `.get(label, {})` used to make 'no receipt' indistinguishable from 'receipt
+    says fine'."""
+    arm = B.ARMS_BY_LABEL["A"]
+    monkey = dict(B.ARM_LICENCE)
+    monkey.pop("A")
+    orig = B.ARM_LICENCE
+    try:
+        B.ARM_LICENCE = monkey
+        g = B.grade_arm(arm, [_clean_cell("A", n) for n in arm.lengths])
+    finally:
+        B.ARM_LICENCE = orig
+    assert g["verdict"] == "FAIL"
+    assert any("no ARM_LICENCE receipt" in b for b in g["blockers"])
 
 
 def test_arm_d_is_the_only_cross_family_arm():
     engines = {a.label: a.engine_id for a in B.ARMS}
     assert engines == {"A": "wan_ti2v", "B-partial": "wan_ti2v",
-                       "B": "wan_ti2v", "D": "ltx_8gb"}
+                       "B": "wan_ti2v", "C": "wan_ti2v", "D": "ltx_8gb"}
 
 
 def test_campaign_ladder_is_legal_on_both_frame_contracts():

@@ -182,7 +182,11 @@ class ArmSpec(object):
     def __init__(self, label, engine_id, graph, graph_sha256, steps, canvas,
                  lengths, required_classes, models, length_node, save_node,
                  notes, gated_reason=None, canvas_overridden=False,
-                 armspec_canvas=None):
+                 armspec_canvas=None, recipe=None):
+        #: Optional declared sampling contract. An arm that brings a recipe
+        #: shape the table does not already have MUST carry one -- class
+        #: presence alone cannot catch a wrong transition or a drifted sigma.
+        self.recipe = recipe
         self.canvas_overridden = bool(canvas_overridden)
         self.armspec_canvas = tuple(armspec_canvas or canvas)
         self.label = label
@@ -269,7 +273,8 @@ class ArmSpec(object):
                 "length_node": self.length_node, "save_node": self.save_node,
                 "notes": self.notes, "gated_reason": self.gated_reason,
                 "canvas_overridden": self.canvas_overridden,
-                "armspec_canvas": list(self.armspec_canvas)}
+                "armspec_canvas": list(self.armspec_canvas),
+                "recipe": self.recipe.as_dict() if self.recipe else None}
 
 
 def derive_arm_at_canvas(arm, canvas, lengths=None):
@@ -290,6 +295,7 @@ def derive_arm_at_canvas(arm, canvas, lengths=None):
         lengths=lengths, required_classes=arm.required_classes,
         models=arm.models, length_node=arm.length_node,
         save_node=arm.save_node, gated_reason=arm.gated_reason,
+        recipe=arm.recipe,
         canvas_overridden=True, armspec_canvas=arm.canvas,
         notes=("DIAGNOSTIC CANVAS %dx%d -- NOT this arm's shipped canvas "
                "(%dx%d). Recorded as a deliberate override, never as the arm's "
@@ -301,6 +307,77 @@ _WAN_CLASSES = ("ModelSamplingSD3", "CLIPTextEncode", "VAELoader", "LoadImage",
                 "Wan22ImageToVideoLatent", "KSampler", "VAEDecodeTiled",
                 "CreateVideo", "SaveVideo", "OTR_BakeoffVramReset",
                 "OTR_BakeoffVramProbe")
+
+#: Arm C samples with a DIFFERENT RECIPE SHAPE, so it may not reuse
+#: ``_WAN_CLASSES``: that tuple pins ``KSampler`` and omits every class a
+#: distilled restart recipe needs. Sharing it was the concrete reason the
+#: GO_FORWARD claim "adding a model is one ArmSpec row plus one graph file" is
+#: false for a candidate bringing a new sampling contract.
+_WAN_ARM_C_CLASSES = ("ModelSamplingSD3", "CLIPTextEncode", "VAELoader",
+                      "LoadImage", "Wan22ImageToVideoLatent",
+                      "LoraLoaderModelOnly", "ManualSigmas", "SamplerCustom",
+                      "OTR_DMDRestartSamplerSelect", "VAEDecodeTiled",
+                      "CreateVideo", "SaveVideo", "OTR_BakeoffVramReset",
+                      "OTR_BakeoffVramProbe")
+
+#: THE RECIPE CONTRACT for a distilled arm, validated OFFLINE by
+#: ``offline_preflight``. ``offline_preflight`` used to check class PRESENCE
+#: only, which cannot catch the failure this arm exists to avoid: correct sigma
+#: COORDINATES fed to the wrong TRANSITION render something plausible and report
+#: a VRAM number for a recipe nobody trained. Every field here is pinned from
+#: the reference code path, never from a model card and never from community
+#: usage advice.
+class RecipeContract(object):
+    """Declared sampling contract for an arm. Drift fails the cell OFFLINE."""
+
+    __slots__ = ("sampler_node", "sampler_class", "sigmas_node", "sigmas",
+                 "sampler_input_node", "cfg", "add_noise", "lora_strength",
+                 "source")
+
+    def __init__(self, sampler_node, sampler_class, sigmas_node, sigmas,
+                 sampler_input_node, cfg, add_noise, source,
+                 lora_strength=None):
+        self.sampler_node = str(sampler_node)
+        self.sampler_class = sampler_class
+        self.sigmas_node = str(sigmas_node)
+        self.sigmas = tuple(float(s) for s in sigmas)
+        self.sampler_input_node = str(sampler_input_node)
+        self.cfg = float(cfg)
+        self.add_noise = bool(add_noise)
+        self.lora_strength = lora_strength
+        self.source = source
+
+    @property
+    def timesteps(self):
+        """The timesteps these sigmas land on. ``ModelSamplingDiscreteFlow.
+        timestep`` is ``sigma * 1000`` and never reads ``shift``, so this holds
+        under the arm's own ``ModelSamplingSD3``."""
+        return tuple(round(s * 1000.0) for s in self.sigmas)
+
+    def as_dict(self):
+        return {"sampler_node": self.sampler_node,
+                "sampler_class": self.sampler_class,
+                "sigmas_node": self.sigmas_node, "sigmas": list(self.sigmas),
+                "timesteps": list(self.timesteps),
+                "sampler_input_node": self.sampler_input_node,
+                "cfg": self.cfg, "add_noise": self.add_noise,
+                "lora_strength": self.lora_strength, "source": self.source}
+
+
+#: FastWan's published contract. Sigmas are the official
+#: ``--dmd-denoising-steps "1000,757,522"`` over 1000, then the terminal 0.
+#: cfg 1.0 because ``DmdDenoisingStage.forward`` runs the transformer ONCE per
+#: timestep on positive embeds only -- no CFG branch, never reads
+#: ``guidance_scale``, never consumes ``negative_prompt_embeds`` -- and
+#: ComfyUI's ``sampling_function`` drops the uncond batch at
+#: ``math.isclose(cond_scale, 1.0)``, which is the same single-forward shape.
+FASTWAN_DMD_CONTRACT = RecipeContract(
+    sampler_node="9a", sampler_class="OTR_DMDRestartSamplerSelect",
+    sigmas_node="9b", sigmas=(1.0, 0.757, 0.522, 0.0),
+    sampler_input_node="9", cfg=1.0, add_noise=True, lora_strength=1.0,
+    source="FastVideo 0.2.0 DmdDenoisingStage + FastWan2.2-TI2V-5B-FullAttn "
+           "README (--num-inference-steps 3, --dmd-denoising-steps "
+           "1000,757,522); scheduler_config flow_shift 5.0")
 
 #: THE ARMS. Arm C (FastWan 5B) is CUT and arm C has no entry BY DESIGN: a
 #: blocked arm must not add dead branching. Its licence PASSES (apache-2.0 at
@@ -333,12 +410,33 @@ _WAN_CLASSES = ("ModelSamplingSD3", "CLIPTextEncode", "VAELoader", "LoadImage",
 #:     ``comfy.gguf.orig_shape.*`` to repair the rank) -- a different toolchain's
 #:     output, not a ComfyUI-GGUF conversion. Key parity is NOT shape parity.
 #:
-#: Re-open arm C behind a LOADING receipt on a substrate that is not this file.
-#: Two verified candidates exist (both apache-2.0, both proved ComfyUI-format by
-#: header read): Kijai/WanVideo_comfy FastWan rank-128 LoRA over the incumbent
-#: GGUF, or hum-ma/Wan2.2-TI2V-5B-Turbo-GGUF Q5_K_M (a DIFFERENT distillation,
-#: +4.6 MiB vs the incumbent, so no headroom risk). Choosing between them is an
-#: operator decision, not a code change (spec 6.4, operator decision O2).
+#: ARM C IS NOW BUILT, on a DIFFERENT SUBSTRATE (2026-08-01). The dead file
+#: above is replaced by Kijai's rank-128 FastWan DMD LoRA applied over the
+#: INCUMBENT Q5_K_M GGUF, which load-probes clean: 793 patched keys (306
+#: low-rank pairs + 487 dense ``.diff``/``.diff_b``) and ZERO unmatched through
+#: core ``load_lora_for_models``. "No exception raised" is NOT the pass
+#: condition there -- that call warns on unmatched keys and still returns a
+#: model -- so the gate is the coverage count.
+#:
+#: The rejected alternative, recorded so it is not re-proposed:
+#: ``hum-ma/Wan2.2-TI2V-5B-Turbo-GGUF`` Q5_K_M also load-probes clean and is
+#: only +4.6 MiB against the incumbent, but it is SHIPPING-BLOCKED. Its author
+#: ``quanhaol/Wan2.2-TI2V-5B-Turbo`` publishes CC BY-NC-SA 4.0 (NonCommercial)
+#: in the GitHub ``LICENSE.md`` while the HF weights repo -- four files, no
+#: LICENSE, no ``license:`` field -- grants nothing at all. The repacker's
+#: apache-2.0 tag is a claim ABOUT that upstream, not a licence FROM it, and it
+#: contradicts the only terms the author published. Absence of a licence is not
+#: a weaker grant than apache-2.0; it is the absence of a grant.
+#:
+#: A SECOND TRAP, also recorded: arm C may NOT sample with ``euler``. The
+#: reference transition is a full restart (predict x0, re-noise to the next
+#: timestep with FRESH noise, zero carry-over) and no stock ComfyUI sampler
+#: implements it -- ``sample_euler`` is deterministic and
+#: ``sample_euler_ancestral_RF`` retains a fraction of the previous latent.
+#: ``ManualSigmas`` fixes WHERE the model is evaluated, never HOW the latent
+#: moves between evaluations. Hence ``OTR_DMDRestartSamplerSelect`` in the
+#: vendored bench helper, and hence ``RecipeContract``, which validates the
+#: sigma literal, count, sampler class, cfg and LoRA strength OFFLINE.
 ARMS = (
     ArmSpec(
         label="A", engine_id="wan_ti2v",
@@ -397,6 +495,39 @@ ARMS = (
                      "Comfy-Org/Wan_2.2_ComfyUI_Repackaged with an immutable "
                      "revision, licence, SHA-256, byte size and live UNETLoader "
                      "dropdown visibility before this arm may render."),
+    ArmSpec(
+        label="C", engine_id="wan_ti2v",
+        graph="arm_c_fastwan_lora_gguf.json",
+        graph_sha256="26839a0e0105989ed507a170f45188885c1ac5d4acda570ef7344a9d72444b26",
+        steps=3, canvas=(832, 480), lengths=CAMPAIGN_LENGTHS,
+        required_classes=("UnetLoaderGGUF", "CLIPLoaderGGUF")
+                         + _WAN_ARM_C_CLASSES,
+        models=(ModelPin("1", "UnetLoaderGGUF", "unet_name",
+                         "Wan2.2-TI2V-5B-Q5_K_M.gguf", "unet"),
+                ModelPin("1c", "LoraLoaderModelOnly", "lora_name",
+                         "Wan2_2_5B_FastWanFullAttn_lora_rank_128_bf16"
+                         ".safetensors", "lora"),
+                ModelPin("3", "CLIPLoaderGGUF", "clip_name",
+                         "umt5-xxl-encoder-Q5_K_M.gguf", "clip"),
+                ModelPin("6", "VAELoader", "vae_name",
+                         "wan2.2_vae.safetensors", "vae")),
+        length_node="8", save_node="12", recipe=FASTWAN_DMD_CONTRACT,
+        notes="THE DISTILLED ARM. FastWan 5B as Kijai's rank-128 DMD LoRA over "
+              "arm A's OWN Q5_K_M GGUF -- base weights BIT-IDENTICAL to arm A, "
+              "so the axis is the distillation plus its recipe and nothing "
+              "else. 3 steps, not 30. Recipe pinned from the FastVideo CODE "
+              "PATH, never a model card: sigmas 1.0/0.757/0.522/0 -> timesteps "
+              "1000/757/522/0, cfg 1.0, shift 5.0, and a RESTART transition "
+              "(predict x0 -> re-noise with fresh noise) that no stock ComfyUI "
+              "sampler implements. CAVEAT CARRIED INTO EVERY RECEIPT: the LoRA "
+              "does NOT fold at load -- ComfyUI-GGUF applies patches inside the "
+              "on-the-fly dequant path (ops.py:166-190), measured as 300 GGML "
+              "layers carrying patches and get_weight returning dequantized "
+              "fp16 from a Q5_K uint8 tensor. Resident cost is only +14.0 MiB "
+              "(3968.0 vs 3954.0 MiB NVML, matched control), but the per-forward "
+              "term is a SAMPLING-TIME cost a load measurement cannot see, and "
+              "it lands on the peak this bench grades. That is what this arm "
+              "measures."),
     ArmSpec(
         label="D", engine_id="ltx_8gb",
         graph="arm_d_ltx_8gb.json",
@@ -1454,6 +1585,21 @@ ARM_LICENCE = {
                   "source": "Wan-AI/Wan2.2-TI2V-5B + Comfy-Org repackaged encoder"},
     "B": {"shippable": True, "licence": "apache-2.0",
           "source": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged"},
+    "C": {"shippable": True, "licence": "apache-2.0",
+          "source": "FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers "
+                    "(license:apache-2.0, verified at the repo) over "
+                    "Wan-AI/Wan2.2-TI2V-5B (apache-2.0); LoRA artifact from "
+                    "Kijai/WanVideo_comfy",
+          "note": "Every level that STATES terms states apache-2.0, and no "
+                  "level states restrictive or bespoke terms. Kijai's repo "
+                  "carries no repo-level licence, but the grant exists upstream "
+                  "and apache-2.0 expressly permits preparing and "
+                  "redistributing derivatives, so that silence is a notice "
+                  "gap on the redistributor's side, not a missing grant. "
+                  "CONTRAST the rejected Turbo substrate, whose author "
+                  "publishes CC BY-NC-SA 4.0 and whose weights repo grants "
+                  "nothing -- absence of a licence is not a weaker grant, it "
+                  "is the absence of a grant."},
     "D": {"shippable": None, "licence": "LTX-Video Open Weights License 0.X",
           "source": "Lightricks/LTX-Video (HF license: other)",
           "note": "UNRESOLVED (operator decision O4): the >= $10,000,000 annual "
@@ -1521,8 +1667,16 @@ def grade_arm(arm, receipts):
             blockers.append("length %d: %s" % (length, "; ".join(why)))
         else:
             clean_lengths.append(length)
-    licence = ARM_LICENCE.get(arm.label, {})
-    if licence.get("shippable") is False:
+    licence = ARM_LICENCE.get(arm.label)
+    if licence is None:
+        # An arm with NO licence row used to sail through greenlight condition
+        # 6, because `.get(label, {})` made "no receipt" indistinguishable from
+        # "receipt says fine". A missing licence receipt is a missing receipt.
+        blockers.append(
+            "no ARM_LICENCE receipt for arm %s -- greenlight condition 6 "
+            "requires one, and an absent row is not a passing row" % arm.label)
+        licence = {}
+    elif licence.get("shippable") is False:
         blockers.append("licence is not shippable: %s" % licence.get("licence"))
     verdict = "PASS" if not blockers else "FAIL"
     if verdict == "PASS" and clean_lengths == [min(arm.lengths)]:
@@ -1602,6 +1756,100 @@ def write_results(receipts, manifest, arms):
 # --------------------------------------------------------------------------
 # preflights
 # --------------------------------------------------------------------------
+_SIGMA_TOKEN_RE = re.compile(r"[-+]?(?:\d*\.\d+|\d+)")
+
+
+def assert_recipe_contract(arm, prompt):
+    """Validate an arm's declared sampling contract against its graph, OFFLINE.
+
+    The old preflight checked node-class PRESENCE only. Presence cannot catch
+    the failure a distilled arm is exposed to: the right sigma COORDINATES fed
+    through the wrong TRANSITION do not error -- they render something
+    plausible and hand back a VRAM number for a recipe nobody trained. So an
+    arm carrying a ``RecipeContract`` has its sampler class, sigma literal,
+    sigma count, cfg, noise flag and LoRA strength pinned here, and drift fails
+    before a GPU is touched.
+
+    An arm with no contract is unchanged: arms A / B-partial / B / D reuse a
+    recipe shape the table already had."""
+    rc = getattr(arm, "recipe", None)
+    if rc is None:
+        return True
+
+    def node(nid, what):
+        nd = prompt.get(nid)
+        if nd is None:
+            raise BenchError("arm %s: recipe names %s node %r, absent from %s"
+                             % (arm.label, what, nid, arm.graph))
+        return nd
+
+    sampler = node(rc.sampler_node, "sampler")
+    if sampler.get("class_type") != rc.sampler_class:
+        raise BenchError(
+            "arm %s: recipe pins sampler node %s as %r but the graph has %r -- "
+            "the TRANSITION is part of the contract, not just the sigmas"
+            % (arm.label, rc.sampler_node, rc.sampler_class,
+               sampler.get("class_type")))
+
+    sig_node = node(rc.sigmas_node, "sigmas")
+    raw = sig_node.get("inputs", {}).get("sigmas")
+    if not isinstance(raw, str):
+        raise BenchError("arm %s: sigmas node %s has no string 'sigmas' input"
+                         % (arm.label, rc.sigmas_node))
+    # parse EXACTLY as ManualSigmas does, so the contract cannot pass on a
+    # literal the node would read differently
+    parsed = tuple(float(t) for t in _SIGMA_TOKEN_RE.findall(raw))
+    if parsed != rc.sigmas:
+        raise BenchError(
+            "arm %s: sigma literal %r parses to %s but the recipe pins %s "
+            "(timesteps %s)" % (arm.label, raw, list(parsed), list(rc.sigmas),
+                                list(rc.timesteps)))
+    if len(parsed) - 1 != int(arm.steps):
+        raise BenchError(
+            "arm %s: %d sigmas implies %d steps but the ArmSpec declares %d -- "
+            "s/it and every per-step figure would be wrong"
+            % (arm.label, len(parsed), len(parsed) - 1, arm.steps))
+    if parsed[-1] != 0.0:
+        raise BenchError(
+            "arm %s: the sigma ladder must end at 0.0 (final_sigmas_type zero), "
+            "got %s" % (arm.label, parsed[-1]))
+
+    smp_in = node(rc.sampler_input_node, "sampler consumer")
+    inputs = smp_in.get("inputs", {})
+    for wired, expect in (("sampler", rc.sampler_node),
+                          ("sigmas", rc.sigmas_node)):
+        edge = inputs.get(wired)
+        if not (isinstance(edge, list) and str(edge[0]) == expect):
+            raise BenchError(
+                "arm %s: node %s input %r must come from node %s, got %r -- an "
+                "unwired contract is not a contract"
+                % (arm.label, rc.sampler_input_node, wired, expect, edge))
+    if float(inputs.get("cfg", -1)) != rc.cfg:
+        raise BenchError(
+            "arm %s: recipe pins cfg %s, graph has %r. For a distilled model "
+            "this is not a taste knob: the reference runs ONE forward per step "
+            "and any cfg > 1.0 adds a second."
+            % (arm.label, rc.cfg, inputs.get("cfg")))
+    if bool(inputs.get("add_noise")) != rc.add_noise:
+        raise BenchError("arm %s: recipe pins add_noise %s, graph has %r"
+                         % (arm.label, rc.add_noise, inputs.get("add_noise")))
+
+    if rc.lora_strength is not None:
+        strengths = [nd.get("inputs", {}).get("strength_model")
+                     for nd in prompt.values()
+                     if nd.get("class_type") == "LoraLoaderModelOnly"]
+        if not strengths:
+            raise BenchError(
+                "arm %s: recipe pins a LoRA strength but the graph has no "
+                "LoraLoaderModelOnly" % arm.label)
+        for s in strengths:
+            if float(s if s is not None else -1) != float(rc.lora_strength):
+                raise BenchError(
+                    "arm %s: recipe pins LoRA strength_model %s, graph has %r"
+                    % (arm.label, rc.lora_strength, s))
+    return True
+
+
 def offline_preflight(arms):
     """Everything checkable with NO server and NO GPU. Raises on the first
     failure; this is what the unit tests drive."""
@@ -1640,6 +1888,7 @@ def offline_preflight(arms):
                 % (arm.label, arm.graph, declared[0], declared[1],
                    arm.canvas[0], arm.canvas[1]))
         graph_seed(prompt)
+        assert_recipe_contract(arm, prompt)
         classes = {nd.get("class_type") for nd in prompt.values()}
         undeclared = classes - set(arm.required_classes)
         if undeclared:

@@ -289,19 +289,120 @@ class OTR_BakeoffVramProbe:
         return (images,)
 
 
+def _dmd_restart_sampler(model, x, sigmas, extra_args=None, callback=None,
+                         disable=None, noise_sampler=None, **kwargs):
+    """The DMD / Self-Forcing multi-step transition, as a ComfyUI SAMPLER.
+
+    NOT an ODE march. At every non-terminal step the reference implementations
+    predict x0 and then RE-NOISE x0 to the NEXT timestep with FRESH noise, with
+    zero carry-over of the previous latent:
+
+        FastVideo DmdDenoisingStage.forward / quanhaol
+        pipeline/wan22_fewstep_inference.py / guandeh17 Self-Forcing
+        pipeline/causal_inference.py:
+            pred = generator(x, t)
+            x = scheduler.add_noise(pred, torch.randn_like(pred), t_next)
+
+    No stock ComfyUI sampler does this. ``sample_euler`` is deterministic
+    (``x = x + d*dt``; its noise injection is behind ``s_churn > 0``, default 0)
+    and ``sample_euler_ancestral_RF`` retains ``sigma_down/sigma_i`` of the
+    previous x, reaching ``x = denoised`` only at the terminal sigma. Feeding
+    the right sigma COORDINATES to the wrong TRANSITION renders something
+    plausible and reports a VRAM number for a recipe nobody trained -- exactly
+    the failure this bench forbids.
+
+    The re-noise uses the model's OWN ``model_sampling.noise_scaling`` so the
+    parameterization can never drift from the loaded model. For a
+    rectified-flow CONST sampling that is ``sigma*noise + (1-sigma)*x0``, which
+    is what a flow scheduler's ``add_noise`` computes.
+    """
+    from comfy.k_diffusion.sampling import default_noise_sampler
+
+    extra_args = {} if extra_args is None else extra_args
+    if noise_sampler is None:
+        noise_sampler = default_noise_sampler(x, seed=extra_args.get("seed"))
+
+    model_sampling = None
+    try:
+        model_sampling = model.inner_model.model_patcher.get_model_object(
+            "model_sampling")
+    except Exception:  # noqa: BLE001
+        model_sampling = None
+
+    marker = uuid.uuid4().hex[:12]
+    steps = [float(s) for s in sigmas.tolist()]
+    msg = ("[OTR_DMDRestart] marker=%s transition=restart(predict_x0->renoise_"
+           "fresh) sigmas=%s timesteps=%s noise_scaling=%s"
+           % (marker,
+              ",".join("%.6g" % s for s in steps),
+              ",".join("%.6g" % (s * 1000.0) for s in steps),
+              type(model_sampling).__name__ if model_sampling is not None
+              else "FALLBACK-flow"))
+    print(msg, flush=True)
+    _LOG.warning(msg)
+
+    s_in = x.new_ones([x.shape[0]])
+    n = len(sigmas) - 1
+    for i in range(n):
+        denoised = model(x, sigmas[i] * s_in, **extra_args)
+        if callback is not None:
+            callback({"x": x, "i": i, "sigma": sigmas[i],
+                      "sigma_hat": sigmas[i], "denoised": denoised})
+        s_next = sigmas[i + 1]
+        if float(s_next) <= 0.0:
+            # terminal step: the x0 prediction IS the result, never re-noised
+            x = denoised
+            continue
+        noise = noise_sampler(sigmas[i], s_next)
+        if model_sampling is not None:
+            x = model_sampling.noise_scaling(s_next, noise, denoised)
+        else:
+            # flow fallback, identical to CONST.noise_scaling
+            sn = s_next.view(s_next.shape[:1] + (1,) * (x.ndim - 1)) \
+                if s_next.nelement() > 1 else s_next.view(())
+            x = sn * noise + (1.0 - sn) * denoised
+    return x
+
+
+class OTR_DMDRestartSamplerSelect:
+    """Emit the DMD/Self-Forcing restart transition as a SAMPLER.
+
+    Drop-in for ``KSamplerSelect`` on the ``SamplerCustom.sampler`` input. Pair
+    it with ``ManualSigmas`` carrying the reference denoising_step_list divided
+    by 1000. The node takes no widgets on purpose: the schedule lives in the
+    sigmas and the guidance lives in ``SamplerCustom.cfg``, so there is exactly
+    one owner for each and nothing here to drift."""
+
+    CATEGORY = "OTR/bakeoff"
+    FUNCTION = "get_sampler"
+    RETURN_TYPES = ("SAMPLER",)
+    RETURN_NAMES = ("SAMPLER",)
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {}}
+
+    def get_sampler(self):
+        import comfy.samplers
+        return (comfy.samplers.KSAMPLER(_dmd_restart_sampler),)
+
+
 NODE_CLASS_MAPPINGS = {
     "OTR_BakeoffReclaim": OTR_BakeoffReclaim,
     "OTR_BakeoffVramReset": OTR_BakeoffVramReset,
     "OTR_BakeoffVramProbe": OTR_BakeoffVramProbe,
+    "OTR_DMDRestartSamplerSelect": OTR_DMDRestartSamplerSelect,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "OTR_BakeoffReclaim": "OTR Bakeoff Reclaim (encoder evict)",
     "OTR_BakeoffVramReset": "OTR Bakeoff VRAM Reset (peak stats)",
     "OTR_BakeoffVramProbe": "OTR Bakeoff VRAM Probe (true peak)",
+    "OTR_DMDRestartSamplerSelect": "OTR DMD Restart Sampler (predict-x0 + renoise)",
 }
 
 __all__ = [
     "OTR_BakeoffReclaim", "OTR_BakeoffVramReset", "OTR_BakeoffVramProbe",
+    "OTR_DMDRestartSamplerSelect",
     "NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS",
     "classify_loaded_model", "evict_encoders_only",
 ]
