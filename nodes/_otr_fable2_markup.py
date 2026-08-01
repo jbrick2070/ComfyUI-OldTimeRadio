@@ -42,14 +42,91 @@ _RE_END = re.compile(r"^END\.\s*$", re.IGNORECASE)
 _RE_SPEAKER = re.compile(r"^([^:\r\n]+):\s*(\S(?:.*\S)?)$")
 
 
+#: The ONLY emphasis markers this canonicalizer will remove, longest first so
+#: ``**`` is tried before ``*``. A CLOSED grammar on purpose (kibitz r1): a
+#: general Markdown sanitizer would be exactly the "silent massaging" the ladder
+#: exists to prevent. Backticks, headings, bullets and HTML stay LOUD defects.
+_TRANSPORT_MARKERS = ("**", "__", "*", "_")
+
+
+def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
+    """Strip a BALANCED emphasis wrapper from a structural label. Report it.
+
+    THE DEFECT THIS CLOSES (live, 2026-08-01). A local model emitted its markup
+    wrapped in Markdown -- ``**TITLE:** ...``, ``**ANNOUNCER:** ...``,
+    ``**END.**``. Every classifier here is ``^``-anchored, so a decorated line
+    misses ``_RE_TITLE`` and then MATCHES the ``_RE_SPEAKER`` catch-all, whose
+    group(1) becomes a character literally named ``**TITLE``. That is not in the
+    cast, so each line raised UNKNOWN_SPEAKER *and* SKELETON_BREAK -- 106 of each
+    across one campaign, and three of six episodes died in the writer.
+
+    WHAT IS AND IS NOT AUTHORSHIP. ``_normalize_line`` already owns "transport"
+    normalization, and emphasis wrapped around a DELIMITER is transport: it
+    carries no story. Emphasis inside a spoken line IS authorship and is left
+    byte-identical -- ``**BO NI:** Hello **world**`` canonicalizes to
+    ``BO NI: Hello **world**``, keeping the payload's own markers.
+
+    BALANCED ONLY. Three recognized shapes:
+
+        <M>LABEL:<M> payload   ->  LABEL: payload      (wrapper spans the colon)
+        <M>LABEL<M>: payload   ->  LABEL: payload      (wrapper before the colon)
+        <M>TOKEN<M>            ->  TOKEN               (standalone, e.g. END.)
+
+    An unbalanced, mixed or payload-internal marker is NOT touched and stays a
+    loud defect. Roster-independent by design: it never consults the cast, so a
+    genuinely unknown speaker still reaches UNKNOWN_SPEAKER after decoration is
+    removed, and the closed-roster diagnostic keeps its meaning.
+
+    Returns ``(line, notes)``; every removal is reported, never hidden.
+    """
+    s = str(line).strip()
+    if not s:
+        return s, ()
+    for marker in _TRANSPORT_MARKERS:
+        if not s.startswith(marker):
+            continue
+        body = s[len(marker):]
+        colon = body.find(":")
+        if colon < 0:
+            # standalone token -- the whole line is wrapped (``**END.**``)
+            if body.endswith(marker):
+                inner = body[:-len(marker)].strip()
+                if inner:
+                    return inner, (
+                        "removed balanced %s around standalone %r"
+                        % (marker, inner),)
+            return s, ()
+        label, rest = body[:colon], body[colon + 1:]
+        if rest.startswith(marker):                     # <M>LABEL:<M> payload
+            out = (label + ":" + rest[len(marker):]).strip()
+            return out, ("removed balanced %s around label %r (wrapper spanned "
+                         "the colon)" % (marker, label.strip()),)
+        if label.endswith(marker):                      # <M>LABEL<M>: payload
+            out = (label[:-len(marker)] + ":" + rest).strip()
+            return out, ("removed balanced %s around label %r"
+                         % (marker, label[:-len(marker)].strip()),)
+        return s, ()
+    return s, ()
+
+
 def _normalize_line(line: str) -> "tuple[str, tuple[str, ...]]":
-    """Normalize transport whitespace only; authored content is untouched."""
-    return str(line).strip(), ()
+    """Normalize transport whitespace and balanced label emphasis.
+
+    Authored content is untouched: see :func:`_canonicalize_transport_line` for
+    the exact, closed grammar and why a spoken word can never be rewritten."""
+    return _canonicalize_transport_line(line)
 
 
 def normalize_fable2_markup_text(text: str) -> str:
-    """Return the parser's whitespace-normalized proof artifact."""
-    return "\n".join(str(raw).strip() for raw in str(text).splitlines())
+    """Return the parser's normalized proof artifact.
+
+    SHARES ``_canonicalize_transport_line`` WITH THE PARSER ON PURPOSE (kibitz
+    r1 MUST-FIX 3). This text is what ``normalized_source``, its sha256 and the
+    proof map are built from, while ``_normalize_line`` decides classification.
+    Two independent normalizers would let the accepted script diverge from the
+    artifact hashed beside it -- a receipt describing a document nobody parsed."""
+    return "\n".join(
+        _canonicalize_transport_line(raw)[0] for raw in str(text).splitlines())
 
 
 class Fable2ParseDefect(enum.Enum):
