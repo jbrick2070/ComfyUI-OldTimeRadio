@@ -267,6 +267,18 @@ def _profile():
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def test_profile_passes_the_real_shape_validator():
+    """Reading keys out of the JSON is NOT proof the profile loads.
+
+    My first draft carried a top-level ``notes`` block for rationale; every
+    key-reading test below passed while ``load_profile`` rejected the file
+    outright (the shape validator fails closed on unknown top-level keys). Only
+    a dry run caught it. This test is that dry run, made cheap."""
+    from nodes._otr_shared import capability_profiles as _CP
+    prof = _CP.load_profile("otr_8gb_fastwan")
+    assert prof["id"] == "otr_8gb_fastwan"
+
+
 def test_profile_routes_every_video_role_to_fastwan():
     prof = _profile()
     assert prof["id"] == "otr_8gb_fastwan"

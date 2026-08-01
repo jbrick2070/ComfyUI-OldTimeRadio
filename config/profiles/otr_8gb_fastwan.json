@@ -48,7 +48,13 @@
     "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
-    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
   },
   "video": {
     "device_policy": "cuda",
@@ -87,32 +93,5 @@
       "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
       "OTR_FASTWAN_8GB_MAX_FRAMES": "17"
     }
-  },
-  "notes": [
-    "THROUGHPUT TIER, NOT A QUALITY TIER. Same base weights, same 832x480 canvas,",
-    "same VRAM and the same amount of motion as otr_8gb_wan -- about 2.7x sooner.",
-    "The four-arm bench measured arm A and arm C at an identical peak delta",
-    "(6563.1 / 6531.1 / 6563.1 MiB at 17 / 49 / 81 frames) because step count does",
-    "not change peak activation. Choose this to render more clips per hour, not to",
-    "get better or longer clips.",
-    "",
-    "max_render_frames is 17 DELIBERATELY. The 81-frame bench cell is a bench-graph",
-    "measurement and a bench cell never qualifies an engine (CLAUDE.md s0A). This",
-    "cap moves only after a canonical-workflow render proves the higher rung with",
-    "RESULT SUCCESS + obs_publish OK.",
-    "",
-    "The canvas is ALSO declared on the adapter (render_canvas = (832, 480)), which",
-    "is what actually binds. The launch.env line here agrees with it and is a DRIFT",
-    "GUARD, not the authority: launch.env applies to the server process, so a leg",
-    "submitted to an already-booted server never sees it (PBUG-20260723-02).",
-    "",
-    "OTR_FASTWAN_8GB_MAX_FRAMES is this engine's OWN ceiling key. It deliberately",
-    "does not read OTR_WAN_TI2V_MAX_FRAMES: one key for two tiers would let the WAN",
-    "tier's ceiling silently cap an engine that never opted into it.",
-    "",
-    "LICENCE: the loaded LoRA is a Kijai extraction from a repo carrying NO",
-    "repo-level licence file. FastVideo and the Wan base both declare apache-2.0,",
-    "but that notice gap is unresolved, so the adapter ships commercial_clean=false.",
-    "Resolve the notice chain before treating output as commercially clear."
-  ]
+  }
 }
