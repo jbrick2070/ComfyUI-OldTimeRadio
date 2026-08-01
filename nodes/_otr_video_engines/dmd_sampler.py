@@ -77,17 +77,13 @@ def _dmd_restart_sampler(model, x, sigmas, extra_args=None, callback=None,
     reimplemented here, and its absence is a refusal (see
     :class:`DmdModelSamplingError`) rather than an inline approximation.
     """
-    from tqdm.auto import trange
-
-    from comfy.k_diffusion.sampling import default_noise_sampler
-
     extra_args = {} if extra_args is None else extra_args
-    if noise_sampler is None:
-        noise_sampler = default_noise_sampler(x, seed=extra_args.get("seed"))
 
-    # REFUSE BEFORE STEP 1, not mid-trajectory: the transition is defined by the
-    # model's own noise scaling, and with only three steps a single approximated
-    # re-noise is a third of the whole trajectory.
+    # REFUSE FIRST -- before the noise sampler, before tqdm, before any tensor
+    # work. "Before step 1" is meant literally: nothing is set up on behalf of a
+    # transition that cannot run faithfully, and the refusal is reachable without
+    # torch or comfy so a unit test can pin it. With only three steps a single
+    # approximated re-noise is a third of the whole trajectory.
     try:
         model_sampling = model.inner_model.model_patcher.get_model_object(
             "model_sampling")
@@ -106,6 +102,12 @@ def _dmd_restart_sampler(model, x, sigmas, extra_args=None, callback=None,
             "no callable noise_scaling(). The DMD restart transition cannot run "
             "without it. NO FALLBACK -- see this class's docstring."
             % (model_sampling,))
+
+    from tqdm.auto import trange
+
+    if noise_sampler is None:
+        from comfy.k_diffusion.sampling import default_noise_sampler
+        noise_sampler = default_noise_sampler(x, seed=extra_args.get("seed"))
 
     marker = uuid.uuid4().hex[:12]
     steps = [float(s) for s in sigmas.tolist()]

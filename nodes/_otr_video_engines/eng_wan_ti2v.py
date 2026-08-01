@@ -251,6 +251,28 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     roles = ROLES
     default_roles = ()
     required_inputs = ("init_image",)
+    # ---- THE RECIPE SEAM (kibitz r2 MF2 / r4, 2026-08-01) ----------------- #
+    #: These five name the module-level constants this adapter's recipe accessors
+    #: used to read DIRECTLY. They are CLASS-LEVEL on purpose: a subclass (see
+    #: eng_fastwan_8gb) shares this adapter's whole 5B substrate -- prepare, the
+    #: beat hoist, teardown, the graph, tiled decode -- but owns a DIFFERENT
+    #: recipe, and a module global cannot be overridden by declaring a class
+    #: attribute. Before this seam, `_tiled_vae`, `_negative_prompt`,
+    #: `_tile_geometry`, `_resolve_render_config` and `_recipe_departures` all
+    #: read the module names, so a subclass declaring its own recipe would have
+    #: SILENTLY rendered with wan_ti2v's -- and stamped its own receipt on it.
+    #:
+    #: BEHAVIOUR-PRESERVING for wan_ti2v: each points at the same object the
+    #: methods read before, so the resolved config, the receipt, the graph and
+    #: every refusal message are unchanged. That is pinned by test.
+    recipe_id = RECIPE_WAN_TI2V
+    recipe_data = WAN_TI2V_RECIPE
+    recipe_env_keys = _RECIPE_ENV_KEYS
+    prequalification_env = PREQUALIFICATION_ENV
+    #: The render-length CEILING's env channel. Per-adapter for the same reason
+    #: the consent act is: one key for two tiers would let the WAN tier's ceiling
+    #: silently cap a different engine that never opted into it.
+    max_frames_env = "OTR_WAN_TI2V_MAX_FRAMES"
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). ``_TI2V_MIN_FRAMES`` /
     #: ``_TI2V_MAX_FRAMES`` are this adapter's own named constants; the 4-frame
     #: quantum is Wan's 4n+1 latent stride (17 = 4*4+1, 177 = 4*44+1).
@@ -527,13 +549,13 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         unrecognised value fails CLOSED rather than collapsing to False -- a
         sweep must not be able to mistype the knob it is varying, decode the
         other way, and stamp a receipt saying it had measured this one."""
-        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
-            return bool(WAN_TI2V_RECIPE["tiled_vae"])
+        if not _WR.prequalification_active(self.prequalification_env):
+            return bool(self.recipe_data["tiled_vae"])
         # The prequalification DEFAULT is the FROZEN value, not a literal: a
         # sweep that opens the knobs but re-exports only some of them must
         # measure the recipe it is validating, not a third configuration.
-        return _WR.config_flag(self, _RECIPE_ENV_KEYS["tiled_vae"],
-                               WAN_TI2V_RECIPE["tiled_vae"])
+        return _WR.config_flag(self, self.recipe_env_keys["tiled_vae"],
+                               self.recipe_data["tiled_vae"])
 
     def _negative_prompt(self):
         """The FROZEN negative conditioning.
@@ -543,10 +565,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         environment was the SOLE author of the negative conditioning, and two
         boxes rendered visibly different clips from the same episode while both
         stamped the same (empty) receipt."""
-        frozen = str(WAN_TI2V_RECIPE["negative"])
-        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+        frozen = str(self.recipe_data["negative"])
+        if not _WR.prequalification_active(self.prequalification_env):
             return frozen
-        return _WR.config_text(self, _RECIPE_ENV_KEYS["negative"], frozen,
+        return _WR.config_text(self, self.recipe_env_keys["negative"], frozen,
                                strip=False)
 
     def _node_candidates(self):
@@ -602,39 +624,39 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         PREQUALIFICATION: the knobs are open, every value is range-checked and
         fails CLOSED with a named MALFORMED_CONFIG, and each honoured override
         is announced so a sweep's log says what it actually measured."""
-        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
-            _WR.warn_ignored(_LOG, self.name, RECIPE_WAN_TI2V,
-                             _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
-                             PREQUALIFICATION_ENV)
+        if not _WR.prequalification_active(self.prequalification_env):
+            _WR.warn_ignored(_LOG, self.name, self.recipe_id,
+                             _WR.ignored_override_keys(self.recipe_env_keys),
+                             self.prequalification_env)
             # SPELLED OUT rather than a dict slice so BOTH legs return the SAME
             # KEY SET: the recipe also carries the tiled-decode fields, whose
             # owners are _tiled_vae() / _vaedecode_inputs(), and a return shape
             # that varied by mode would hand the next reader a KeyError that
             # only reproduces under the consent act.
             return {
-                "steps": WAN_TI2V_RECIPE["steps"],
-                "cfg": WAN_TI2V_RECIPE["cfg"],
-                "shift": WAN_TI2V_RECIPE["shift"],
-                "sampler": WAN_TI2V_RECIPE["sampler"],
-                "scheduler": WAN_TI2V_RECIPE["scheduler"],
+                "steps": self.recipe_data["steps"],
+                "cfg": self.recipe_data["cfg"],
+                "shift": self.recipe_data["shift"],
+                "sampler": self.recipe_data["sampler"],
+                "scheduler": self.recipe_data["scheduler"],
             }
-        _WR.warn_honoured(_LOG, self.name, RECIPE_WAN_TI2V,
-                          _WR.ignored_override_keys(_RECIPE_ENV_KEYS),
-                          PREQUALIFICATION_ENV)
+        _WR.warn_honoured(_LOG, self.name, self.recipe_id,
+                          _WR.ignored_override_keys(self.recipe_env_keys),
+                          self.prequalification_env)
         _num = _WR.config_number
         return {
-            "steps": _num(self, _RECIPE_ENV_KEYS["steps"],
-                          WAN_TI2V_RECIPE["steps"], 1, 100, int),
-            "cfg": _num(self, _RECIPE_ENV_KEYS["cfg"],
-                        WAN_TI2V_RECIPE["cfg"], 0.0, 30.0, float),
-            "shift": _num(self, _RECIPE_ENV_KEYS["shift"],
-                          WAN_TI2V_RECIPE["shift"], 0.1, 20.0, float),
+            "steps": _num(self, self.recipe_env_keys["steps"],
+                          self.recipe_data["steps"], 1, 100, int),
+            "cfg": _num(self, self.recipe_env_keys["cfg"],
+                        self.recipe_data["cfg"], 0.0, 30.0, float),
+            "shift": _num(self, self.recipe_env_keys["shift"],
+                          self.recipe_data["shift"], 0.1, 20.0, float),
             "sampler": _WR.config_text(
-                self, _RECIPE_ENV_KEYS["sampler"], WAN_TI2V_RECIPE["sampler"],
+                self, self.recipe_env_keys["sampler"], self.recipe_data["sampler"],
                 allowed=self._PORTABLE_SAMPLERS, hint=self._SAMPLER_HINT),
             "scheduler": _WR.config_text(
-                self, _RECIPE_ENV_KEYS["scheduler"],
-                WAN_TI2V_RECIPE["scheduler"],
+                self, self.recipe_env_keys["scheduler"],
+                self.recipe_data["scheduler"],
                 allowed=self._PORTABLE_SCHEDULERS),
         }
 
@@ -648,11 +670,11 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         adapter that failed OPEN: a sweep could mistype the value it was
         measuring, render at something else, and stamp a receipt saying it had
         measured it."""
-        dflt = int(WAN_TI2V_RECIPE[key])
-        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+        dflt = int(self.recipe_data[key])
+        if not _WR.prequalification_active(self.prequalification_env):
             return dflt
         lo, hi = _WR.VAE_TILE_BOUNDS[key]
-        return _WR.config_number(self, _RECIPE_ENV_KEYS[key], dflt, lo, hi, int)
+        return _WR.config_number(self, self.recipe_env_keys[key], dflt, lo, hi, int)
 
     def _recipe_departures(self, knobs=None):
         """Which frozen knobs THIS CELL actually changed. ``{}`` on production.
@@ -668,7 +690,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
         The tile geometry is reported ONLY when tiled decode ran: a knob the
         render never reached is not a departure that describes the clip."""
-        if not _WR.prequalification_active(PREQUALIFICATION_ENV):
+        if not _WR.prequalification_active(self.prequalification_env):
             return {}
         knobs = self._resolve_render_config() if knobs is None else knobs
         resolved = {
@@ -681,13 +703,13 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if resolved["tiled_vae"]:
             for key in _WR.VAE_TILE_BOUNDS:
                 resolved[key] = self._tile_geometry(key)
-        return _RD.departures(WAN_TI2V_RECIPE, resolved)
+        return _RD.departures(self.recipe_data, resolved)
 
     def _recipe_receipt(self, knobs=None):
         """THE stamp. The single stamp site goes through here and nowhere else
         -- a second site reaching for the bare constant would put an unmarked,
         or an unnamed, sweep clip into the durable ledger."""
-        return _WR.recipe_receipt(RECIPE_WAN_TI2V, PREQUALIFICATION_ENV,
+        return _WR.recipe_receipt(self.recipe_id, self.prequalification_env,
                                   self._recipe_departures(knobs))
 
     def _floor_length(self, target_frame_count, width=None, height=None,
@@ -701,7 +723,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         never react-to-OOM. The render then ping-pong-extends this (possibly short)
         render up to the full target so the beat is FILLED with motion. The motion
         floor (17) always wins; an absolute hard cap for a tiny/8GB card comes
-        from ``OTR_WAN_TI2V_MAX_FRAMES`` or, on a production leg, the tier's
+        from this adapter's own ``max_frames_env`` key (``OTR_WAN_TI2V_MAX_FRAMES``
+        here; a subclass declares its own) or, on a production leg, the tier's
         ledger-stamped ``max_render_frames`` (default = the engine max, not 17).
 
         ``hoisted_vram_mb`` (WIRE-W3b) is what :meth:`prepare` MEASURED the
@@ -721,7 +744,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # in the cost model (2026-07-23 wan_8gb__lumina_image__media_archive).
         # Order: explicit env pin (operator override) -> the tier's
         # profile-carried ceiling (ledger-stamped, the normal path) -> engine max.
-        _raw_env = (os.environ.get("OTR_WAN_TI2V_MAX_FRAMES") or "").strip()
+        _raw_env = (os.environ.get(self.max_frames_env) or "").strip()
         try:
             hard_cap = int(_raw_env) if _raw_env else 0
         except (TypeError, ValueError):
@@ -775,15 +798,15 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         contract = self.frame_contract
         if not contract.is_legal_length(target):
             raise _wb.GraphExecutionError(
-                "wan_ti2v was handed a coverage-planned segment of %d frame(s), "
+                "%s was handed a coverage-planned segment of %d frame(s), "
                 "which is not on its declared ladder (min %d, max %d, quantum "
                 "%d). The stamped plan and the adapter's frame_contract "
                 "disagree. NO FALLBACK -- snapping to a nearby rung would make "
                 "the assembled beat a different length than the plan says."
-                % (target, int(contract.min_frames), int(contract.max_frames),
+                % (self.name, target, int(contract.min_frames), int(contract.max_frames),
                    int(contract.quantum)))
         ceiling = self.profile_max_render_frames()
-        _raw_env = (os.environ.get("OTR_WAN_TI2V_MAX_FRAMES") or "").strip()
+        _raw_env = (os.environ.get(self.max_frames_env) or "").strip()
         try:
             env_cap = int(_raw_env) if _raw_env else 0
         except (TypeError, ValueError):
@@ -792,7 +815,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             ceiling = env_cap
         if 0 < ceiling < target:
             raise _wb.GraphExecutionError(
-                "wan_ti2v was handed a coverage-planned segment of %d frame(s) "
+                "%s was handed a coverage-planned segment of %d frame(s) "
                 "but this tier pins its render ceiling at %d. WAN's ceiling is "
                 "a RENDER cap, not a planning cap (frame_contract."
                 "PLANNING_CAP_ENGINES), so the planner never saw it and the "
@@ -800,7 +823,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "and mirroring the rest would put padded frames inside a beat "
                 "claiming real multi-clip coverage. Raise max_render_frames "
                 "for this tier or route the beat to a single-clip engine."
-                % (target, ceiling, ceiling))
+                % (self.name, target, ceiling, ceiling))
         return target
 
     def _build_graph(self, request, image_name, plan, length, width, height,
@@ -1058,5 +1081,5 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return self._clip_from_raw(raw, request)
 
 
-__all__ = ["WanTi2vEngine", "RECIPE_WAN_TI2V", "WAN_TI2V_RECIPE",
-           "PREQUALIFICATION_ENV"]
+__all__ = ["WanTi2vEngine", "self.recipe_id", "self.recipe_data",
+           "self.prequalification_env"]
