@@ -3103,6 +3103,75 @@ Do NOT: re-run arm B, promote 14B, lower the greenlight bar, or start per-stage
 measurement. The first is refuted, the next two are standing operator rulings,
 and the last was declined.
 
+### 8. `wan_ti2v` IS PRODUCTION-PROVEN, AND ITS LIVE VRAM IS NOT ITS BENCH VRAM (2026-08-01)
+
+Asked whether the incumbent had ever rendered a live episode. **My first probe
+said no, and my first probe was wrong.** It matched the string `wan_ti2v` in
+filenames, then read `.meta.voice_cast_decision.*.engine` -- an AUDIO field,
+which is why it reported `indextts2` and `z_image_turbo`. The video field is
+`meta.render_engines`. Scanning all **1474** episode ledgers under
+`output/otr/episodes` for a literal `"wan_ti2v"` VALUE:
+
+| episode | wan_ti2v clips | all clips | ledger `vram_peak_mb` |
+|---|---:|---:|---:|
+| breathing_between_verses 2026-06-21 | 5 | 19 | 3734 |
+| the_warming_knife 2026-06-21 | 5 | 19 | 4046 |
+| illuminating_doubt 2026-06-25 | 19 | 19 | 3467 |
+| bells_beneath_sardis 2026-06-25 | 19 | 19 | 3464 |
+| breath_of_aethelgard 2026-06-30 | 7 | 7 | 3372 |
+| unwrapped_secrets 2026-06-30 | 6 | 6 | 3435 |
+| the_damp_grave_of_julian_vane 2026-07-23 | 7 | 7 | **9811** |
+
+**68 clips delivered across 7 episodes, 2026-06-21 to 2026-07-23**, in all three
+video roles (`music_visual`, `announcer_visual`, `character_video`). The most
+recent episode's final asset decodes: 1920x1080, 25/1 fps, 118.80 s,
+47,932,471 bytes. There is also an older single-clip receipt,
+`output/otr/episodes/_shared/state/node_single_wan_ti2v.json` (2026-06-17):
+`engine wan_ti2v`, 33 frames, 57.8 s, `vram_used_mb 8193` -- its scratch mp4 has
+since been swept, but the receipt records `exists: true, size: 194278` at write
+time. **The incumbent is proven live. Treat any claim that it is not as
+refuted.**
+
+**The live peak is NOT the bench peak, and that is the finding that matters.**
+The 2026-07-23 ledger reports per-clip `vram_peak_mb` of 8251 / 9747 / 9778 /
+9778 / 9810 / 9811 / 9811 against the bench's 6563.1 MiB for the same engine.
+The six June episodes report 3372-4046 MB in the same field. `render_canvas` is
+`null` in every per-clip row, so **the spread is measured and UNEXPLAINED** --
+do not attribute it to canvas, to frame count, or to a measurement-scope change
+without a probe that shows which. What it does establish: the bench's
+`peak_delta_mib` is a property of the BENCH GRAPH, and the shipped adapter at
+production settings has been observed 3.2 GB above it. No under-8-GB claim for
+the live path survives this row.
+
+**Arm C has ZERO episode receipts.** It exists as a bench arm only. So the two
+candidates are not symmetric: C wins every measured axis (item 7) and A owns all
+of the production history. Whatever ships, C earns its receipts before A loses
+its menu row -- a swap in the other order trades a proven engine for an
+unproven one on the strength of a bench that measures no quality axis.
+
+### 9. ARM D'S BENCH GRAPH IS FAITHFUL TO THE SHIPPED RECIPE (2026-08-01)
+
+Operator observation: arm D's render "looks like a fuzzy mess -- either it's bad
+or you got the recipe wrong." Checked: **the recipe is not wrong.** Every
+sampling-relevant value in `scripts/bench_graphs/arm_d_ltx_8gb.json` matches
+`LTX8_RECIPE_V2` in `nodes/_otr_video_engines/eng_ltx_8gb.py` exactly -- steps 8,
+cfg 1.0, `max_shift` 2.05, `base_shift` 0.95, `terminal` 0.1, sampler `euler`,
+T5 on `cpu`, tiled VAE 512 / 64 / 16 / 8, checkpoint
+`ltxv-2b-0.9.8-distilled.safetensors`.
+
+So the softness is the CANVAS, not a drift: D renders **512x288 = 147,456 px**
+against A/C's **832x480 = 399,360 px**, i.e. **36.9%** of the pixels. Viewed at
+the same size, it is a 2.7x upscale. That was a deliberate campaign choice (D is
+the only cross-family arm and 512x288 is its shipped tier), and it is exactly
+why item 7 says never to read the seconds column across canvases.
+
+One open discrepancy found while checking, NOT a fuzziness cause and NOT yet
+run down: node 15 `LTXVConditioning` sets `frame_rate 25.0` while node 11
+`CreateVideo` writes `fps 24.0`. 24/1 is the campaign-wide container constant
+for cross-arm comparability; whether the shipped `ltx_8gb` adapter conditions at
+25 and writes at 24 the same way is unverified. If it does, live LTX output is
+running ~4% slow. Owed: read the adapter's own fps plumbing.
+
 ## OPEN BUGS / DEFECTS (live, not yet closed)
 
 MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
