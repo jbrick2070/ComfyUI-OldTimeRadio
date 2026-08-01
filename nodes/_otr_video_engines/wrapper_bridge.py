@@ -743,6 +743,91 @@ def ffmpeg_terminal_frame_cmd(clip_path, out_path, *, ffmpeg="ffmpeg"):
     ]
 
 
+#: Beats needing at least this many segments get the surreal flip (operator
+#: 2026-08-01, "for beats that need 4 or more clips").
+FEAR_CAPE_MIN_SEGMENTS = 4
+
+
+def fear_cape_enabled():
+    """Is the FEAR CAPE on? DEFAULT: YES.
+
+    THE FEAR CAPE (operator's name, 2026-08-01): on a beat long enough to need
+    several clips, the still handed to the FINAL segment is colour-INVERTED, so
+    that last stretch is GENERATED from an inverted frame instead of having a
+    filter painted over it. The model animates the surreal turn itself.
+
+    The name is the operator's, after the negative-image treatment Scorsese uses
+    in Cape Fear -- colour inversion as dread rather than as a glitch. Recorded
+    here because "fear cape" tells a future reader nothing on its own, and the
+    reference is the whole intent: this is a deliberate stylistic choice, not a
+    debugging artifact someone left switched on.
+
+    Operator 2026-08-01: "a flag but defaulted on would be good so people can
+    easily turn it off". So this is opt-OUT, not opt-in --
+    ``OTR_FEAR_CAPE=0`` (or ``false`` / ``off`` / ``no``) disables it.
+    An unset or unrecognised value leaves the effect ON, because the default is
+    the shipped creative choice and a typo must not silently remove it."""
+    raw = (os.environ.get("OTR_FEAR_CAPE") or "").strip().lower()
+    return raw not in ("0", "false", "off", "no")
+
+
+def fear_cape_min_segments():
+    """The segment-count threshold for the penultimate-still inversion.
+
+    Env ``OTR_FEAR_CAPE_MIN_SEGMENTS`` (default 4). A beat split into fewer
+    segments than this is left alone -- the flip is meant for a LONG beat, where
+    there is enough runway for the surreal turn to read as deliberate."""
+    raw = (os.environ.get("OTR_FEAR_CAPE_MIN_SEGMENTS") or "").strip()
+    try:
+        value = int(raw) if raw else FEAR_CAPE_MIN_SEGMENTS
+    except (TypeError, ValueError):
+        return FEAR_CAPE_MIN_SEGMENTS
+    return max(2, value)          # a flip needs a predecessor and a successor
+
+
+def ffmpeg_negate_image_cmd(src_path, out_path, *, ffmpeg="ffmpeg"):
+    """ffmpeg arg list: one image -> its colour-inverted twin."""
+    return [ffmpeg, "-y", "-i", src_path, "-vf", "negate", out_path]
+
+
+def negate_image(src_path, out_path, *, ffmpeg="ffmpeg"):
+    """Write the colour INVERSE of ``src_path`` to ``out_path``. Prove it landed.
+
+    THE FEAR CAPE (operator's name, 2026-08-01). On a long chained beat the
+    still handed to the FINAL segment is inverted, so that segment is GENERATED
+    from an inverted frame rather than having a filter painted over it -- the
+    model animates the surreal look instead of the compositor faking it.
+
+    DELIBERATELY BREAKS THE SEAMLESS CUT. Every other chained successor begins
+    exactly on its predecessor's terminal frame; this one begins on that frame's
+    inverse, so there IS a visible flip at that seam. That is the effect, not a
+    defect -- but it is the one place the chain invariant is knowingly violated,
+    so it is written down here rather than discovered later.
+
+    THE PROMPT IS DELIBERATELY NOT TOUCHED (operator, 2026-08-01). Only the init
+    image changes; the text prompt, the recipe and every other input go through
+    exactly as they would for any other segment. The model has no notion of what
+    the "normal" colour of this scene was, so there is nothing to warn it about
+    and nothing to compensate for -- it simply animates the frame it is given.
+    Hinting the prompt would be steering the result toward what we imagined
+    instead of letting the model answer the image. That is the art, and it is
+    why there is no companion prompt tweak to look for.
+
+    Same proof discipline as :func:`extract_terminal_frame`: ffmpeg can exit 0
+    having written nothing, and a 0-byte still handed on as the next segment's
+    init image is a black frame at the cut with a clean exit code in front of it.
+    """
+    run_ffmpeg(ffmpeg_negate_image_cmd(src_path, out_path, ffmpeg=ffmpeg))
+    if not os.path.exists(out_path) or os.path.getsize(out_path) <= 0:
+        raise GraphExecutionError(
+            "chain-still inversion produced no usable image from %r (ffmpeg "
+            "exited 0 but wrote %s). The final segment would have begun on "
+            "nothing. NO FALLBACK."
+            % (src_path,
+               "no file" if not os.path.exists(out_path) else "0 bytes"))
+    return out_path
+
+
 def extract_terminal_frame(clip_path, out_path, *, ffmpeg="ffmpeg"):
     """Write ``clip_path``'s LAST frame to ``out_path`` and PROVE it landed.
 

@@ -408,9 +408,26 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
-    #: BUG-LOCAL-117d boomerang: ltx_video LOOPS by default (forward+reverse,
-    #: the 5/09-6/05 "more motion" look).
-    _LOOP_VIA_REVERSE_DEFAULT = True
+    #: BUG-LOCAL-117d boomerang: ltx_video used to LOOP by default (half-render
+    #: + forward/reverse, the 5/09-6/05 "more motion" look).
+    #:
+    #: DEFAULT FLIPPED TO OFF, 2026-08-01 (operator, explicit): "there should be
+    #: no mirror ... no boomerangs, we need to remove all boomerangs in place of
+    #: native clips, except for credits which is a black background."
+    #:
+    #: This was the SECOND, independent mirror in the tree and it is the one that
+    #: is easy to miss: the ping-pong on the WAN path is a VRAM fallback, but this
+    #: one is a deliberate STYLE device that fired on every single-clip LTX beat
+    #: regardless of VRAM. A rollout that only removed the VRAM fallback would
+    #: have left half the re-used frames in place and looked like a fix.
+    #:
+    #: It is already suppressed inside a coverage plan, so this default only ever
+    #: governed the single-clip remainder -- which is exactly the case the
+    #: operator's rule covers: a beat that fits one native render is 1/1, done.
+    #: ``OTR_LTX_LOOP_VIA_REVERSE=on`` still opts back in per-run.
+    #: Credits are untouched -- they render a black background and call neither
+    #: this nor ``extend_frames_to_target``.
+    _LOOP_VIA_REVERSE_DEFAULT = False
 
     def _loop_via_reverse(self) -> bool:
         """Whether render_clip renders the boomerang (half-render + forward/reverse
@@ -422,7 +439,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             return bool(self._LOOP_VIA_REVERSE_DEFAULT)
         v = raw.strip().lower()
         if v in ("on", "1", "true", "yes"):
-            return bool(self._LOOP_VIA_REVERSE_DEFAULT)
+            # EXPLICIT TRUE, not the engine default (2026-08-01). This used to
+            # return ``_LOOP_VIA_REVERSE_DEFAULT``, which was indistinguishable
+            # from True only because the default WAS True. The moment the default
+            # flipped to False, an operator setting the knob to "on" would have
+            # silently got the boomerang OFF -- an opt-in that cannot opt in.
+            return True
         if v in ("off", "0", "false", "no"):
             return False
         _LOG.warning("[eng_ltx_video] OTR_LTX_LOOP_VIA_REVERSE=%r invalid "

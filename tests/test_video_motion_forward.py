@@ -258,9 +258,13 @@ def test_ltx_render_clip_to_silent_mp4(monkeypatch):
 
 
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_ltx_render_clip_boomerang_default_on(monkeypatch):
-    # BUG-LOCAL-117d: loop_via_reverse is the ltx_video DEFAULT -> render_clip
-    # mirrors the decoded frames end-to-end (4 -> 2*4-1 = 7) through the encoder.
+def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
+    # DEFAULT FLIPPED 2026-08-01 (operator): "no boomerangs, remove all
+    # boomerangs in place of native clips". BUG-LOCAL-117d's loop_via_reverse was
+    # the ltx_video default and render_clip mirrored the decoded frames
+    # end-to-end (4 -> 2*4-1 = 7). Now 4 decoded frames stay 4: no reused frames,
+    # 1/1 and done. This is the END-TO-END proof through the encoder, which is
+    # why it is worth more than the unit pin on the flag.
     # S5: pin single_pass (frozen mechanics; hq_two_stage has its own tests).
     # A4 (2026-07-27): same as above -- stillless request, text path declared
     # explicitly now that the silent i2v degrade is gone.
@@ -275,12 +279,34 @@ def test_ltx_render_clip_boomerang_default_on(monkeypatch):
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
     prepared = {"patchers": []}
     raw = eng.render_clip(req, prepared)
+    assert raw["ltx_loop_via_reverse"] is False
+    clip = eng.canonicalize(raw, req, {})
+    p = pathlib.Path(clip["path"])
+    try:
+        assert p.exists() and clip["frame_count"] == 4    # NOT 7 -- no mirror
+        assert clip["engine_id"] == "ltx_video"
+    finally:
+        p.unlink(missing_ok=True)
+
+
+def test_ltx_render_clip_still_boomerangs_when_explicitly_opted_in(monkeypatch):
+    """The device is retired as a DEFAULT, not deleted. Opting back in must
+    still work end-to-end -- the flag flip broke exactly this once already."""
+    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+    monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
+    monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "on")
+    np = pytest.importorskip("numpy")
+    eng = LtxVideoEngine()
+    eng._classes = _ltx_fakes(np, n=4)
+    req = {"shot_id": "s1", "text_prompt": "a neon diner",
+           "canvas": {"w": 768, "h": 512, "fps": 25},
+           "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
+    raw = eng.render_clip(req, {"patchers": []})
     assert raw["ltx_loop_via_reverse"] is True
     clip = eng.canonicalize(raw, req, {})
     p = pathlib.Path(clip["path"])
     try:
         assert p.exists() and clip["frame_count"] == 7    # 2*4 - 1, mirrored
-        assert clip["engine_id"] == "ltx_video"
     finally:
         p.unlink(missing_ok=True)
 

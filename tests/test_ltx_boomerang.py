@@ -70,9 +70,13 @@ def test_loop_min_env_override(monkeypatch):
 
 
 # ---- env + per-engine gate --------------------------------------------------
-def test_video_loops_by_default(monkeypatch):
+def test_video_does_NOT_loop_by_default(monkeypatch):
+    """DEFAULT FLIPPED 2026-08-01 (operator): "no boomerangs, we need to remove
+    all boomerangs in place of native clips". The boomerang was the SECOND,
+    independent mirror in the tree -- the WAN ping-pong is a VRAM fallback, this
+    one fired on every single-clip LTX beat as a style device."""
     monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
-    assert LtxVideoEngine()._loop_via_reverse() is True
+    assert LtxVideoEngine()._loop_via_reverse() is False
 
 
 @pytest.mark.parametrize("val,expect", [
@@ -86,7 +90,7 @@ def test_env_parse(monkeypatch, val, expect):
 
 def test_env_invalid_falls_back_to_default(monkeypatch):
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "banana")
-    assert LtxVideoEngine()._loop_via_reverse() is True   # LOUD warn + default
+    assert LtxVideoEngine()._loop_via_reverse() is False  # LOUD warn + default
 
 
 # ---- THE DEFERRAL TRIPWIRE (chunk 7b, 2026-07-27) ---------------------------
@@ -135,20 +139,21 @@ def test_the_boomerang_violates_its_own_declared_ceiling_TODAY():
         "rather than relaxing it")
 
 
-def test_the_boomerang_is_on_by_default_which_is_why_the_violation_is_reachable():
-    """The overshoot above is not an opt-in path; it is the shipped default.
+def test_the_boomerang_is_OFF_by_default_so_the_overshoot_is_opt_in_only():
+    """The tripwire above now measures an OPT-IN path, which is the point.
 
-    ``_LOOP_VIA_REVERSE_DEFAULT`` is True (eng_ltx_video.py:412), so every
-    ltx_video beat that takes the loop path renders 2N-1. If this ever becomes
-    False the violation stops being reachable by default and the tripwire above
-    is measuring a path nobody runs.
+    ``_LOOP_VIA_REVERSE_DEFAULT`` was True until 2026-08-01; every ltx_video beat
+    on the loop path rendered 2N-1 and overshot its declared max_frames=169. With
+    the default OFF that overshoot is no longer reachable unless an operator sets
+    OTR_LTX_LOOP_VIA_REVERSE=on, so the declaration is honest by default and the
+    tripwire documents what opting back in costs.
     """
     import os
 
     if os.environ.get("OTR_LTX_LOOP_VIA_REVERSE"):
         pytest.skip("box pins OTR_LTX_LOOP_VIA_REVERSE; the default is what "
                     "this test is about")
-    assert LtxVideoEngine()._loop_via_reverse() is True
+    assert LtxVideoEngine()._loop_via_reverse() is False
 
 
 # ---- THE COVERAGE-PLAN NARROWING (live fix, 2026-07-29) ---------------------
@@ -178,16 +183,18 @@ def test_loop_fill_suppressed_inside_a_coverage_plan():
 
 
 def test_loop_fill_still_runs_for_a_single_clip_beat():
-    """The narrowing is scoped: single-clip loop-fill is untouched, because
-    there the composite DOES truncate the surplus to the beat window."""
-    assert LtxVideoEngine()._loop_fill_allowed(_prepared(False)) is True
+    """The COVERAGE narrowing is still scoped to coverage: it is not what turns
+    the loop off now. `_loop_fill_allowed` reports the engine default, which is
+    False since 2026-08-01 -- so a single-clip beat is 1/1 and done, no fill."""
+    assert LtxVideoEngine()._loop_fill_allowed(_prepared(False)) is False
 
 
 def test_loop_fill_allowed_when_the_caller_prepared_nothing():
-    """A caller with no session (the bare-adapter path) is not a coverage
-    plan, so it keeps the shipped default rather than silently losing it."""
+    """A caller with no session (the bare-adapter path) is not a coverage plan,
+    so it keeps the shipped default rather than silently gaining or losing a
+    loop. That default is now False."""
     for prepared in (None, {}, "not-a-dict", {"session_ctx": None}):
-        assert LtxVideoEngine()._loop_fill_allowed(prepared) is True, prepared
+        assert LtxVideoEngine()._loop_fill_allowed(prepared) is False, prepared
 
 
 def test_env_off_still_wins_inside_and_outside_a_coverage_plan(monkeypatch):
@@ -222,3 +229,15 @@ def test_the_shorter_second_segment_was_doomed_too():
     it."""
     assert 2 * _ltx_loop_source_length(89, 25) - 1 == 193
     assert LtxVideoEngine()._loop_fill_allowed(_prepared(True)) is False
+
+
+def test_opting_back_in_actually_works_after_the_default_flip(monkeypatch):
+    """REGRESSION GUARD for a bug introduced BY the flip.
+
+    `_loop_via_reverse` used to return ``_LOOP_VIA_REVERSE_DEFAULT`` for a truthy
+    env value -- indistinguishable from True only because the default WAS True.
+    The moment the default flipped, "on" would have silently meant OFF: an opt-in
+    that cannot opt in. It now returns an explicit True."""
+    for val in ("on", "1", "true", "yes"):
+        monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", val)
+        assert LtxVideoEngine()._loop_via_reverse() is True, val

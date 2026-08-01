@@ -3287,6 +3287,24 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             if chains and position + 1 < len(plan.segments):
                 terminal = _wb2.extract_terminal_frame(
                     path, _tmp_path("otr_terminal_", ".png"))
+                # THE FEAR CAPE (operator's name, 2026-08-01). On a beat long enough
+                # to need several clips, the still handed to the FINAL segment is
+                # inverted, so that segment is GENERATED from an inverted frame
+                # rather than having a filter painted over it. Defaulted ON;
+                # OTR_FEAR_CAPE=0 turns it off.
+                #
+                # `position + 2 == len(plan.segments)` means "this extraction
+                # feeds the last segment". It knowingly breaks the seamless cut
+                # at that one seam -- that IS the effect.
+                if (_wb2.fear_cape_enabled()
+                        and len(plan.segments) >= _wb2.fear_cape_min_segments()
+                        and position + 2 == len(plan.segments)):
+                    terminal = _wb2.negate_image(
+                        terminal, _tmp_path("otr_fearcape_", ".png"))
+                    _LOG.info(
+                        "[OTR video] FEAR CAPE: beat %s has %d segments, so "
+                        "the final segment begins on an INVERTED still",
+                        shot.get("shot_id"), len(plan.segments))
 
     assembled = _ws.assemble_beat_segments(
         rendered, _tmp_path("otr_beat_", ".mp4"),
