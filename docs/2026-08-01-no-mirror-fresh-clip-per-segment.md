@@ -225,3 +225,76 @@ of guessed.
 3. Prove on a live leg, then add a test asserting `extend_frames_to_target` is
    unreachable from any production render path.
 4. Only then may any document claim the no-mirror invariant holds.
+
+---
+
+## 8. THE MIRROR IS LOAD-BEARING FOR wan_ti2v (live proof, 2026-08-02 07:17)
+
+**This is the finding that decides the whole no-mirror question, and it needs an
+operator ruling rather than a quiet fix.**
+
+`wan_ti2v` ran 268 minutes and died:
+
+    MotionBudgetError: engine wan_ti2v: static frame budget 173 (snapped 173)
+    exceeds the cost-model's affordable 24 frames (free=13481 MB, margin=0.85).
+    NO silent resize -- lower the frame_count widget, free VRAM, or pick a
+    lighter engine.
+
+Not a leak, and not an OOM. Free VRAM was 13.5 GB and post-render residency was
+stable all night (4160-4485 MB across eight renders). The COST MODEL refused:
+
+    FRAME_COST_MODEL["wan_ti2v"] = (7000.0, 185.0)   # overhead MB, per-frame MB
+    budget     = 13481 * 0.85          = 11459 MB
+    affordable = (11459 - 7000) / 185  = 24 frames
+
+**So wan_ti2v has always been priced at ~24 frames per render on this box, and
+the ping-pong mirror is what made it appear to deliver 173-frame beats.** Remove
+the mirror and it cannot cover a beat in the 25-177 frame band at all.
+
+### Why that band is a trap
+
+* A beat ABOVE the contract max (177) already splits, and a planned segment goes
+  through `_planned_length`, which deliberately does NOT consult the predictor.
+  That is why `fastwan_8gb` passes: its beats are ~245 frames, so they split.
+* A beat BELOW 25 is affordable outright.
+* A beat BETWEEN THEM -- 173, here -- is too small to trigger a split and too
+  big for the predictor. Single-clip, predictor consulted, refused.
+
+### The codebase deliberately protects the current behaviour
+
+`tests/test_multiclip_effective_contract.py` pins all three of:
+
+    assert "wan_ti2v" not in fc.PLANNING_CAP_ENGINES
+    test_a_pinned_ceiling_does_not_move_wan_ti2v_coverage_topology
+    test_wan_ti2v_keeps_its_adapter_side_ping_pong
+
+So the operator's "no mirror, 1/1, one and done" ruling OVERRIDES a deliberate
+prior design. That is a design decision with three protective tests, not a bug,
+and `frame_contract.py:289` requires a LIVE PROOF for the change.
+
+### The two candidate fixes, with what each still needs
+
+1. **Coverage-plan `wan_ti2v`** -- add it to `PLANNING_CAP_ENGINES` and pin a
+   measured `max_render_frames`, exactly as `fastwan_8gb` was on 2026-08-01.
+   Beats then split into planned segments that bypass the predictor, with no
+   mirror. PRECEDENT IS STRONG: fastwan shares base weights with the incumbent
+   ("bit-identical ... which is why the two measure the same peak") and its
+   bench measured VRAM FLAT at 6563.1 / 6531.1 / 6563.1 MiB for 17 / 49 / 81
+   frames. STILL NEEDS: the three tests above rewritten to the new ruling, and a
+   live wan_ti2v leg.
+2. **Correct the cost model** -- `(7000, 185)` predicts 22 GB for 81 frames
+   where the bench measured 6.5 GB FLAT, so per-frame is wildly overstated for
+   this family. If the row matched reality the predictor would afford the whole
+   beat and no topology change would be needed. STILL NEEDS: a real per-frame
+   measurement for `wan_ti2v` itself. Tonight's peaks (10648-12128 MB over eight
+   renders) are peaks, not a per-frame curve. **Guessing a VRAM constant is
+   precisely how the ltx_video contract lie was written; do not guess this one.**
+
+Fix 1 is the operator's stated direction. Fix 2 is the narrower change and may
+make fix 1 unnecessary. They are not exclusive: a correct cost model is worth
+having either way.
+
+### NOT ATTEMPTED, and why
+
+07:20, operator asleep, and either fix overrides a deliberate design or invents
+a hardware constant. Every other engine is proven; this one is one ruling away.
