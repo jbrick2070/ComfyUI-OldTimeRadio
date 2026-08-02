@@ -622,3 +622,43 @@ def test_source_is_ascii_no_em_dash():
     src = pathlib.Path(__file__).read_text(encoding="utf-8")
     src.encode("ascii")
     assert chr(0x2014) not in src  # no em-dash (repo ASCII convention)
+
+
+# --- PBUG-20260801-01 regression -------------------------------------------
+# The gemma row declared context_window=4096 (a DEFAULT_CONTEXT_WINDOW
+# placeholder) while its own GGUF file declares gemma4.context_length=262144,
+# and the lane capped OUTPUT at 512 against P0's 2800 request. Either one alone
+# makes the story writer STRUCTURALLY impossible on the row -- no caller-side
+# setting can reach past a row that cannot host the pass. Both defects cost live
+# GPU minutes to find because nothing asserted the row against the contract it
+# has to satisfy. These two tests are that assertion.
+
+def test_every_gguf_row_can_host_the_p0_pass():
+    """A row the writer may be pointed at must fit P0's prompt AND its output."""
+    from nodes import _otr_scifi_p0_contract as P0
+
+    need = P0._P0_PROMPT_OVERHEAD_TOKENS + P0._P0_BASE_OUTPUT_TOKENS
+    for row in GGF.GGUF_ROWS:
+        repo_id = row.repo_id
+        assert row.context_window >= need, (
+            "GGUF row %s declares context_window=%d, below the %d tokens the P0 "
+            "pass requires (%d prompt overhead + %d output). A row that cannot "
+            "host the pipeline's own pass refuses every render on it, and no "
+            "n_ctx or max_new_tokens setting can reach past the row."
+            % (repo_id, row.context_window, need,
+               P0._P0_PROMPT_OVERHEAD_TOKENS, P0._P0_BASE_OUTPUT_TOKENS))
+
+
+def test_gguf_output_cap_covers_the_p0_output_budget():
+    """The lane's OUTPUT ceiling must clear what P0 asks for, with no env set.
+
+    Until 2026-08-01 this only passed when GEMMA4_12B_MAX_NEW_TOKENS was
+    exported at server boot -- a dead channel (PBUG-20260723-02 class) one
+    forgotten restart away from silently restoring the failure.
+    """
+    from nodes import _otr_scifi_p0_contract as P0
+
+    assert GGF.DEFAULT_OUTPUT_TOKENS_CAP >= P0.p0_output_token_budget(), (
+        "DEFAULT_OUTPUT_TOKENS_CAP=%d is below P0's %d-token output budget, so "
+        "the writer is refused unless an env var happens to be set at boot."
+        % (GGF.DEFAULT_OUTPUT_TOKENS_CAP, P0.p0_output_token_budget()))

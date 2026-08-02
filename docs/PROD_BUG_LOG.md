@@ -2936,3 +2936,52 @@ out until they independently meet the same production-only admission rule.
   available; it is not being taken because the operator parked writer work
   until the engines are proven, and that call stands until the operator changes
   it. Recorded here so whoever unparks it does not have to re-derive the cost.
+
+## PBUG-20260801-01 -- the gemma row understated its own model by 32x, so the writer could never fit
+- surfaced: the live 45-word campaign, every `otr_g4_*` leg, headless canonical
+  runs. Six engines, zero episodes -- each leg died at `OTR_LedgerScriptWriter`
+  before any video engine was reached.
+- symptom: `GGUF unsloth/gemma-4-12b-it-GGUF cannot fit the complete requested
+  output: requested_output=2800, provider_output_cap=512`, and when the context
+  was raised to compensate, `effective n_ctx 8192 (from policy.gguf_n_ctx) is
+  outside [512, 4096] for this row -- NO clamp`.
+- root cause: TWO placeholder defaults, each below the pipeline's own contract.
+  1. The catalog row declared `context_window=DEFAULT_CONTEXT_WINDOW` (4096)
+     while the GGUF file itself declares `gemma4.context_length = 262144` -- the
+     row understated the model by 32x. P0 needs `_P0_PROMPT_OVERHEAD_TOKENS`
+     2600 + `_P0_BASE_OUTPUT_TOKENS` 2800 = 5400, so P0 was STRUCTURALLY
+     impossible on this row: no setting could satisfy it.
+  2. `DEFAULT_OUTPUT_TOKENS_CAP` was 512 against P0's 2800 request. The other
+     backends never had this -- `_otr_comfy_backend` 8192, `_otr_openrouter_backend`
+     16384. 512 was the outlier, not the rule.
+- fix: row `context_window` 4096 -> 8192 (P0's own `_P0_LOCAL_CONTEXT_CAP`, the
+  value its contract was written against, not a guess), and
+  `DEFAULT_OUTPUT_TOKENS_CAP` 512 -> 4096 (bounded by the window: 8192 - 2600
+  overhead = 5592 usable). Cost checked rather than assumed: KV at 0.7 GB/1k is
+  5.60 GB, plus 6.63 GB of Q4_K_M weights = 12.23 GB, ~2.3 GB under the 14.5 GB
+  tier ceiling. Commits 805123ea + 76c9f565.
+- verified: `fastwan_8gb` 45-word canonical leg, RESULT SUCCESS in 2433 s,
+  published 1920x1080 / 3036 frames / 121.44 s / AAC stereo, coverage 70.68 s
+  audio vs 71.72 s video across 7 clips.
+- **the part worth remembering:** between the first fix and the second, the ONLY
+  thing keeping the writer alive was exporting `GEMMA4_12B_MAX_NEW_TOKENS=3072`
+  at server boot. That is a dead channel of the PBUG-20260723-02 class -- the
+  env binds at BOOT, so the next restart that forgets it silently restores the
+  failure, and the symptom comes back looking like a NEW bug. A live pass that
+  depends on remembering an export is not a fixed bug. The second boot was run
+  deliberately WITHOUT the var to prove the default carries it alone.
+- also worth remembering: two fixes failed before this one because both turned
+  knobs that could not bind -- `n_ctx` when the limit was the output cap, then
+  `n_ctx` past a ceiling the row would not allow. The row was never questioned
+  until the GGUF metadata was read directly. **When two settings in a row fail
+  to move a limit, stop tuning and go read what the artifact itself declares.**
+- bible-worthy: yes -- **a placeholder default that sits below the caller's own
+  contract is a structural refusal, not a configuration problem.** Any registry
+  row describing a model's capacity must be derived from, or checked against,
+  the artifact's declared metadata; a hand-set default silently caps a model at
+  a fraction of what it can do, and no amount of caller-side tuning can reach
+  past it.
+- verify idea: assert every GGUF catalog row's `context_window` is <= the
+  context length its own file declares AND >= what the P0 contract requires, so
+  a row that cannot host the pipeline's own pass fails at test time rather than
+  on live GPU minutes.
