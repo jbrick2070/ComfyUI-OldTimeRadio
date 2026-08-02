@@ -492,11 +492,13 @@ def _check_per_cast_invariants(
         # in voice-path-cleanbreak Gate 2 and the shim is long gone;
         # the comment was carrying forensic history that's now in the
         # git log instead.
-        is_announcer = (
-            isinstance(char_id, str) and char_id.strip().lower() == "announcer"
-        ) or (
-            isinstance(name, str) and name.strip().upper() == "ANNOUNCER"
-        )
+        # ONE predicate, shared with the pre-mint voice gate. These two layers
+        # disagreed for a few hours on 2026-08-02 -- the gate matched
+        # name-or-role, this matched char_id-or-name -- so a row with
+        # role="announcer" and any other name passed the gate and then hard-
+        # failed HERE for owning no line under its own roster id.
+        from ._otr_cast_voice_coverage import is_announcer_cast_row
+        is_announcer = is_announcer_cast_row(row)
         if is_announcer:
             # Kokoro namespace -- voice_preset still must be non-empty
             # but the v2/ prefix does not apply.
@@ -537,14 +539,21 @@ def _check_per_cast_invariants(
         cid = ln.get("char_id")
         if isinstance(cid, str) and cid:
             referenced.add(cid)
+    from ._otr_cast_voice_coverage import is_announcer_cast_row
     name_by_id = {
         str(row.get("char_id") or ""): str(row.get("name") or "")
         for row in cast if isinstance(row, dict)
     }
-    announcer_voiced = "announcer" in referenced
+    announcer_ids = {
+        str(row.get("char_id") or "") for row in cast
+        if isinstance(row, dict) and is_announcer_cast_row(row)
+    }
+    # Case-insensitive: `referenced` holds raw line char_ids, and a line
+    # carrying "ANNOUNCER" or "Announcer" is still the announcer sentinel.
+    announcer_voiced = any(str(cid).strip().lower() == "announcer"
+                           for cid in referenced)
     for char_id in seen_char_ids:
-        row_name = name_by_id.get(char_id, "").strip().upper()
-        if char_id == "announcer" or row_name == "ANNOUNCER":
+        if char_id in announcer_ids:
             # The announcer CAST row carries a roster id (c01) while its LINES
             # carry the sentinel "announcer" (production_ledger.py:114-139) --
             # so a raw-id comparison can never mark it referenced. The old

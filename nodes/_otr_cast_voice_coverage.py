@@ -47,7 +47,37 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-__all__ = ["CastVoiceCoverageError", "require_voice_coverage"]
+__all__ = ["CastVoiceCoverageError", "is_announcer_cast_row",
+           "require_voice_coverage"]
+
+#: The announcer's LINES carry the sentinel char_id ``"announcer"`` while its
+#: CAST row carries an ordinary roster id (production_ledger.py:114-139), so
+#: every consumer needs a way to recognise the row itself.
+ANNOUNCER_SENTINEL = "announcer"
+
+
+def is_announcer_cast_row(row: "Mapping[str, Any]") -> bool:
+    """ONE definition of "this cast row is the announcer", shared by every
+    layer that has to answer the question.
+
+    It exists because the two layers shipped on 2026-08-02 answered it
+    DIFFERENTLY: this module matched on name-or-role, while
+    ``_otr_ledger_freeze`` matched on char_id-or-name. A row with
+    ``role="announcer"`` and any other name was therefore an announcer to the
+    gate (skipped, credited via the sentinel) and a CHARACTER to the freeze --
+    which then hard-refused it for owning no line under its own roster id. Two
+    predicates for one concept is how the layers drift apart; there is now one.
+
+    Matches on any of the three signals a real ledger carries: the sentinel in
+    ``char_id``, the canonical display name, or an explicit announcer role.
+    Role is what a localised roster should rely on.
+    """
+    char_id = str(row.get("char_id") or "").strip().lower()
+    name = str(row.get("name") or "").strip().upper()
+    role = str(row.get("role") or row.get("speaker_role") or "").strip().lower()
+    return (char_id == ANNOUNCER_SENTINEL
+            or name == "ANNOUNCER"
+            or role == ANNOUNCER_SENTINEL)
 
 
 class CastVoiceCoverageError(ValueError):
@@ -111,11 +141,6 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
     lines = [r for r in (ledger_data.get("lines") or [])
              if isinstance(r, Mapping)]
 
-    def _is_announcer(row: Mapping[str, Any]) -> bool:
-        name = str(row.get("name") or "").strip().upper()
-        role = str(row.get("role") or row.get("speaker_role") or "").strip()
-        return name == "ANNOUNCER" or role.lower() == "announcer"
-
     voiced_ids: "set[str]" = set()
     announcer_voiced = False
     for row in lines:
@@ -124,7 +149,7 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
         if not _sayable(row.get("text")):
             continue
         cid = str(row.get("char_id") or "").strip()
-        if cid.lower() == "announcer":
+        if cid.lower() == ANNOUNCER_SENTINEL:
             announcer_voiced = True
         elif cid:
             voiced_ids.add(cid)
@@ -134,7 +159,7 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
         cid = str(row.get("char_id") or "").strip()
         if not cid:
             continue
-        if _is_announcer(row):
+        if is_announcer_cast_row(row):
             if not announcer_voiced:
                 missing.append({"char_id": cid,
                                 "name": str(row.get("name") or "ANNOUNCER")})

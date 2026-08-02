@@ -158,3 +158,71 @@ def test_typed_error_carries_the_facts_a_retry_prompt_needs():
     assert err.owner_bank == "somebank"
     assert err.missing == [{"char_id": "c03", "name": "The Relay"}]
     assert err.cast_total == 3 and err.voiced_total == 1
+
+
+# ---------------------------------------------------------------------------
+# QA-round regressions (Antigravity + Sonnet 5 on the shipped code, 2026-08-02)
+# ---------------------------------------------------------------------------
+
+def test_ONE_announcer_predicate_shared_by_both_layers():
+    """The two layers disagreed for a few hours and would hard-fail a valid row.
+
+    The gate matched name-or-role; the freeze matched char_id-or-name. So a
+    cast row with role='Announcer' and an ordinary NAME was an announcer to the
+    gate (credited via the line sentinel) and a CHARACTER to the freeze, which
+    then refused it for owning no line under its own roster id. A localised
+    announcer name is exactly this shape, so this was a live landmine.
+    """
+    from nodes import _otr_ledger_freeze as FZ
+
+    row = {"char_id": "c01", "name": "Bob", "role": "Announcer",
+           "traits": "warm", "voice_preset": "v2/en_speaker_1"}
+    led = _ledger([row, {"char_id": "c02", "name": "Elias"}],
+                  [ANN, _line("c02", "Read it back to me.")])
+
+    require_voice_coverage(led, owner_bank="testbank")   # gate: announcer
+    errs = FZ.run_gap_audit(led, label="qa").errors
+    assert not any("c01" in e for e in errs), (
+        "the freeze must agree with the gate about who the announcer is: %r"
+        % errs)
+
+
+def test_a_line_the_pipeline_SKIPS_never_earns_an_authorship_proof():
+    """`_voiced_rows` read only `skip_tts` -- a field production never writes.
+
+    Measured: zero writers outside a test fixture, and 0 of 16,435 real line
+    rows carry it. So the filter never excluded anything and a row the whole
+    rest of the pipeline treats as skipped could still receive a proof. `skip`
+    is the authoritative field (_otr_ledger_consumers.py:86).
+    """
+    from nodes._otr_content_authorship import build_receipt
+
+    led = _ledger(
+        _cast({"char_id": "c02", "name": "Elias"}),
+        [ANN,
+         _line("c02", "A real spoken line."),
+         # skipped, but still carrying text -- the shape the old filter missed
+         {"line_id": "l_skipped", "char_id": "c02", "skip": True,
+          "text": "Cut from the broadcast.", "speaker_role": "character"}])
+    receipt = build_receipt(led, owner_bank="testbank",
+                            accepted_artifacts={"script": "bytes"})
+    proof_ids = {p["line_id"] for p in receipt["line_proofs"]}
+    assert "l_skipped" not in proof_ids, (
+        "a skipped line must not earn a proof: %r" % proof_ids)
+    assert "l_ann" in proof_ids
+
+
+def test_legacy_skip_tts_rows_are_still_honoured():
+    """Older ledgers may carry the legacy name; widening the proof set on load
+    would be its own defect, so both fields exclude."""
+    from nodes._otr_content_authorship import build_receipt
+
+    led = _ledger(
+        _cast({"char_id": "c02", "name": "Elias"}),
+        [ANN,
+         _line("c02", "A real spoken line."),
+         {"line_id": "l_legacy", "char_id": "c02", "skip_tts": True,
+          "text": "Legacy skip field.", "speaker_role": "character"}])
+    receipt = build_receipt(led, owner_bank="testbank",
+                            accepted_artifacts={"script": "bytes"})
+    assert "l_legacy" not in {p["line_id"] for p in receipt["line_proofs"]}
