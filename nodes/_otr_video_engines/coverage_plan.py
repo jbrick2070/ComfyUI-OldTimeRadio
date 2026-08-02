@@ -99,6 +99,32 @@ class CoveragePlan:
     def is_multi_clip(self) -> bool:
         return len(self.segments) > 1
 
+    @property
+    def requires_coverage_execution(self) -> bool:
+        """Does this plan need the coverage EXECUTOR, not the historical path?
+
+        ``is_multi_clip`` was used for this and is not the same question. A
+        ONE-segment plan is still a planned render whenever its length had to be
+        rounded up to a legal rung: the planner stamps ``render_frames`` above
+        ``visible_frames`` and records the surplus in ``trim_tail``, leaving the
+        trim to the assembler -- and the assembler only runs on the coverage
+        path. Routed by segment count alone, such a beat rendered its extra
+        frames and kept every one of them, so the clip outran its own audio.
+
+        Not an exotic case. `ltx_audio_in` at a 442-frame beat renders 449 and
+        owes a 7-frame trim; `humo` at 100 renders 101 and owes 1. Any beat
+        whose audio-derived length misses the engine's ladder is affected, which
+        is most of them.
+
+        So the question is what the plan OWES, not how many pieces it is in:
+        more than one segment, or any segment carrying head/tail work.
+        """
+        if len(self.segments) > 1:
+            return True
+        return any(int(getattr(s, "drop_head", 0) or 0)
+                   or int(getattr(s, "trim_tail", 0) or 0)
+                   for s in self.segments)
+
     def to_dict(self) -> dict:
         """JSON-safe form for the durable ledger stamp."""
         return {

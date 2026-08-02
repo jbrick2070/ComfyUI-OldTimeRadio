@@ -2865,8 +2865,29 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _apply_visual_safety_prompt(req, shot)
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
+    # PER SEGMENT, not per shot (2026-08-02). The seed was derived from the
+    # request hash and the shot id alone, so every segment of a multi-clip beat
+    # sampled from the SAME seed. HuMo starts each call from fresh noise and
+    # carries no motion state, so an identical seed plus an identical reference
+    # portrait regenerates a near-identical opening -- which is precisely the
+    # snap-back-to-the-same-pose signature at every cut.
+    #
+    # External research (2026-08-02, HuMo/LTX report, grade A): a fixed seed
+    # buys REPEATABILITY, not continuity, and re-using it "may make the reset
+    # more visibly repetitive". Identity is carried by HuMo's native reference
+    # conditioning -- the shared portrait on ``ref_image`` -- and not by the
+    # seed, so varying the seed per segment costs no identity and breaks up the
+    # repeated opening.
+    #
+    # Segment 0 keeps the historical value, so every single-clip beat in the
+    # archive re-renders byte-identically; only successors move.
+    _seg_index = int(segment_index or 0)
     _video_seed = _seed_from_hash(req_hash, shot.get("shot_id"))
+    if _seg_index:
+        _video_seed = _seed_from_hash(req_hash, "%s#seg%d"
+                                      % (shot.get("shot_id"), _seg_index))
     req["seed_bundle"] = {"request_seed": _video_seed}
+    req["observability"]["video_seed_segment_index"] = _seg_index
     # Operator 2026-06-12: surface the per-beat LTX/video sampler seed (the
     # deterministic request-hash seed the engines render with) in the trace so
     # future renders are apples-to-apples with the 6/5 baseline.
@@ -3028,6 +3049,78 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
         return eng.canonicalize(raw, request, _prof)
 
 
+def _assert_beat_affordable(shot, prebuilt):
+    """ONE admission boundary for a coverage-planned beat, before any load.
+
+    THE HOLE THIS CLOSES. ``_planned_length`` deliberately never consults the
+    VRAM predictor -- a planned segment's length is arithmetic the rest of the
+    beat was built around, not a preference it may re-negotiate. That was
+    survivable while planned segments were rare. Once ``wan_ti2v``,
+    ``fastwan_8gb`` and ``ltx_8gb`` became planning-capped it meant the only
+    ENFORCING guard was bypassed on the path doing most of the rendering, and
+    ``VramPeakProbe`` does not cover it ("sampled + logged, never enforced").
+    An in-process CUDA OOM corrupts the allocator, so this is the direction that
+    must never be left open.
+
+    WHY HERE. Every segment's request now exists with its final frame count and
+    canvas, and nothing has been loaded yet. So free VRAM is read ONCE, clean,
+    with no hoist correction -- there is nothing hoisted to correct for. That is
+    a different accounting from ``_floor_length``, which runs AFTER ``prepare()``
+    and must add ``hoisted_vram_mb`` back precisely because the weights it is
+    about to use are already resident and would otherwise be charged twice.
+    Mixing those two conventions is what produced a refusal at "affordable 20
+    frames (free=9675 MB)" on an engine that had shipped a published episode.
+
+    WHY A MISSING COST ROW DOES NOT SILENTLY PASS. ``_DEFAULT_FRAME_COST`` makes
+    an unmeasured engine look exactly like a calibrated one: the prediction runs,
+    returns a limit, and the limit describes a different model. Enforcing a
+    borrowed number is worse than not enforcing -- it refuses good renders and
+    admits bad ones with equal confidence. So engines WITHOUT a measured row are
+    reported as unenforced rather than judged against someone else's cost.
+
+    Returns the admission record for the beat receipt. Raises
+    :class:`motion_common.MotionBudgetError` when a measured row says a planned
+    segment does not fit.
+    """
+    engine_id = str(shot.get("engine_id") or "")
+    record = {"engine_id": engine_id, "checked": [], "enforced": False,
+              "reason": "", "free_vram_mb": None}
+    if not prebuilt:
+        record["reason"] = "no segments"
+        return record
+
+    if not _mc.has_measured_cost_row(engine_id):
+        # Named, visible, and NOT a refusal: most engines have no measured row
+        # yet, and refusing them would ground the whole roster to guard three.
+        # What it must never do is look guarded.
+        record["reason"] = (
+            "no measured cost row for %r -- admission NOT enforced for this "
+            "beat (a borrowed row would refuse and admit with equal confidence)"
+            % engine_id)
+        return record
+
+    free_mb = _mc.free_vram_mb()
+    record["free_vram_mb"] = free_mb
+    if not free_mb or float(free_mb) <= 0:
+        # No NVML / no torch (the CPU box). Geometry only, and say so.
+        record["reason"] = "free VRAM unreadable -- admission not enforced"
+        return record
+
+    for segment, request in prebuilt:
+        canvas = (request or {}).get("canvas") or {}
+        width = int(canvas.get("w") or 0)
+        height = int(canvas.get("h") or 0)
+        frames = int(getattr(segment, "render_frames", 0) or 0)
+        if not (width and height and frames):
+            continue
+        _mc.assert_frame_affordable(free_mb, frames, width, height, engine_id)
+        record["checked"].append(
+            {"segment_index": int(getattr(segment, "index", 0) or 0),
+             "render_frames": frames, "canvas": "%dx%d" % (width, height)})
+    record["enforced"] = bool(record["checked"])
+    return record
+
+
 def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
                 host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
@@ -3105,11 +3198,19 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     plan = None
     if isinstance(raw_plan, dict) and raw_plan:
         plan = _cp.CoveragePlan.from_dict(raw_plan)
-    if plan is None or not plan.is_multi_clip:
+    if plan is None or not plan.requires_coverage_execution:
         # THE HISTORICAL PATH, byte for byte. The caller has usually already
         # built this request (it needs it for the trace and the audio-motion
         # profile), so it is used as-is rather than rebuilt -- rebuilding it
         # here would be a second derivation of one request.
+        #
+        # The predicate was ``is_multi_clip`` until 2026-08-02, which asked the
+        # wrong question: a ONE-segment plan still owes a tail trim whenever its
+        # length was rounded up to a legal rung, and the trim is the coverage
+        # assembler's job. Such beats came down here and kept their surplus
+        # frames, so the video outran its audio. See
+        # ``CoveragePlan.requires_coverage_execution`` for why the question is
+        # what the plan OWES rather than how many pieces it is in.
         single = request if request is not None else request_builder(
             shot, ledger, canvas=canvas)
         return render_shot(shot, single, oom_engines=oom_engines,
@@ -3173,6 +3274,8 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         prebuilt.append(
             (segment, request_builder(shot, ledger, canvas=canvas,
                                       segment_index=int(segment.index))))
+
+    admission = _assert_beat_affordable(shot, prebuilt)
 
     rendered = []            # (path, drop_head, keep_frames) in play order
     out_shot = dict(shot)
@@ -3368,6 +3471,12 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # audio" checkable after the fact instead of merely intended: sum the
     # visible_frames and it must equal the beat's target.
     beat_clip["segments"] = segment_rows
+    # Whether this beat's lengths were actually CHECKED against VRAM before any
+    # weights loaded, and against a row measured for THIS engine. Stamped even
+    # when unenforced, because "the guard did not run here" is the fact a reader
+    # needs; a receipt that records only successful checks reads identically
+    # whether the guard covered the beat or skipped it.
+    beat_clip["vram_admission"] = admission
     _LOG.warning(
         "[OTR video] BEAT %s assembled from %d %s segment(s) -> %d frame(s) "
         "at %s", beat_id or shot.get("shot_id"), plan.segment_count,

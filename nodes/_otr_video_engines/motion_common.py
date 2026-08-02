@@ -336,6 +336,22 @@ class MotionBudgetError(RuntimeError):
     lower the frame_count widget, free VRAM, or pick a lighter engine."""
 
 
+def has_measured_cost_row(engine_name) -> bool:
+    """Is there a cost row MEASURED for this engine, or only the fallback?
+
+    The distinction is the whole point. ``_DEFAULT_FRAME_COST`` makes an engine
+    nobody has ever measured look exactly like an engine that passed a
+    calibration, because the prediction runs either way and returns a number.
+    That is how a guard becomes theatre: the check executes, reports a limit,
+    and the limit describes a different engine.
+
+    Callers that want a REAL guard ask this first and say plainly when the
+    answer is no, rather than enforcing a borrowed number against hardware it
+    was never measured on.
+    """
+    return str(engine_name or "") in FRAME_COST_MODEL
+
+
 def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
                             canvas_h, engine_name):
     """Refuse an UNAFFORDABLE length. The guard the planned path never had.

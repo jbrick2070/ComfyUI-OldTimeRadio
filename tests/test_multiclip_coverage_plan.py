@@ -856,3 +856,43 @@ def test_a_trimmed_plan_never_starves_its_LAST_segment():
     assert seen_trims > 200, (
         "only %d trimmed plans in the sweep -- this property is not being "
         "exercised" % seen_trims)
+
+
+def test_one_segment_plan_owing_a_trim_needs_the_coverage_executor():
+    """A ONE-segment plan is still planned work when its length was rounded up.
+
+    The router asked ``is_multi_clip``, which is a different question. A beat
+    whose audio-derived length misses the engine's ladder gets a single segment
+    with ``render_frames > visible_frames`` and the surplus recorded in
+    ``trim_tail`` -- and the trim belongs to the coverage assembler, which only
+    runs on the coverage path. Routed by segment count, those beats rendered
+    their extra frames and kept every one, so the clip outran its own audio.
+
+    Not exotic: `ltx_audio_in` at 442 renders 449, `humo` at 100 renders 101.
+    """
+    from nodes._otr_video_engines import coverage_plan as cp
+    from nodes._otr_video_engines import frame_contract as fc
+
+    # 9 + 8k ladder: 442 has no legal rung, 449 is the next one up.
+    ladder = fc.FrameContract(min_frames=9, max_frames=497, quantum=8,
+                              native_fps=25, allow_tail_trim=True)
+    plan = cp.partition_beat(442, ladder)
+    assert plan.segment_count == 1
+    assert not plan.is_multi_clip, "still one clip -- that was never the issue"
+    seg = plan.segments[0]
+    assert (seg.render_frames, seg.visible_frames, seg.trim_tail) == (449, 442, 7)
+    assert plan.requires_coverage_execution, (
+        "a single segment rendering 449 frames against 442 frames of audio owes "
+        "a 7-frame trim; sending it down the historical path keeps the surplus")
+
+    # An EXACT fit owes nothing, so it must still take the historical path --
+    # this fix must not reroute beats whose behaviour was already correct.
+    exact = cp.partition_beat(449, ladder)
+    assert exact.segment_count == 1
+    assert exact.segments[0].trim_tail == 0
+    assert not exact.requires_coverage_execution
+
+    # And multi-clip is unconditionally coverage work, trim or no trim.
+    multi = cp.partition_beat(900, ladder)
+    assert multi.segment_count > 1
+    assert multi.requires_coverage_execution
