@@ -3094,3 +3094,32 @@ out until they independently meet the same production-only admission rule.
   from rows that are voiced AT THAT MOMENT; nothing stops a later pass emptying
   one. The portable rule is to build such a proof at the same barrier that
   freezes the state it describes, or to re-derive it at the gate.
+
+## PBUG-20260802-02 CORRECTION (same day, before any fix was written)
+The entry above claims the two legs were "the same fault, which is why this is
+one entry". **That is not established, and the difference changes the fix.**
+Grounded from the ledgers and the server log:
+
+* `wan_ti2v` ran the **`scifi_fable2`** lane. It failed with `UNKNOWN_SPEAKER`
+  plus `CAST_MEMBER_SILENT` -- and that lane's own gate is what caught it
+  (`_otr_scifi_fable2.py:2306`, "speaker set != cast rows", plus the parser
+  defect). The gate WORKED. What failed upstream of it was the writer producing
+  a play in which a cast member never speaks, and the repair ladder exhausting.
+* `ltx_video` ran the **`scifi_news_pro`** lane, whose ledger meta says in as
+  many words: `"pack for bank 'scifi_news_pro' declares NO line_composer_system
+  seam -- the lane owns its own content loop"`. There is NO equivalent gate on
+  that path, so the empty rows travelled all the way to the freeze gate and
+  surfaced as a line-proof coverage mismatch naming `shot_001_b2`.
+
+And the cast row that was silent is the tell: `c01=ANNOUNCER, c02=Elias,
+c03=**The Relay**`. The lane cast a RELAY -- a machine, not a speaking part --
+and then, reasonably, wrote it no dialogue. So the `scifi_news_pro` root cause
+is most likely CASTING a non-speaking entity, not a composition pass dropping
+lines it was asked to write.
+
+What survives from the original entry: an artifact minted from state a later
+stage can still invalidate is a proof of nothing, and the named-gate verify
+condition is right and lane-agnostic. What does not survive: "one fault, two
+doors", and the implication that fixing the fable2 parser gap had anything to do
+with the `scifi_news_pro` failure. Two lanes, two mechanisms, one shared
+symptom.
