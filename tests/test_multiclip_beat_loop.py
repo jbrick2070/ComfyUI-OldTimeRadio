@@ -571,3 +571,111 @@ def test_a_WRONG_but_readable_count_still_names_the_mismatch(monkeypatch):
         assert "is not a length" not in msg, (
             "a readable-but-wrong count must take the mismatch path, not the "
             "unreadable-count path: %s" % msg)
+
+
+# ---------------------------------------------------------------------------
+# PER-SEGMENT IDENTITY (operator ask, 2026-08-01)
+#
+# A split beat used to record only its aggregate, while the real renders behind
+# it landed on disk under random hex. These tests pin the receipt that makes a
+# split beat auditable: one row per render, in order, each naming itself and
+# where its first frame came from.
+# ---------------------------------------------------------------------------
+
+def test_every_segment_of_a_split_beat_gets_an_ID_and_the_frames_ADD_UP(monkeypatch):
+    """The receipt has to be checkable, not merely present.
+
+    ``sum(visible_frames)`` over the rows must equal the beat's target, which is
+    the arithmetic behind "a fresh clip for every second of audio" -- if the
+    rows summed to less, some of the beat's audio would be playing over frames
+    no row accounts for.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_JUMP, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 2, "render_frames": 25, "drop_head": 0, "trim_tail": 5},
+        ], 70)
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        rows = clip["segments"]
+        assert len(rows) == 3
+        assert [r["segment_index"] for r in rows] == [0, 1, 2]
+        # Ids are stable, ordered, and derived from the beat -- not random hex.
+        assert [r["segment_id"] for r in rows] == [
+            "b001_seg00", "b001_seg01", "b001_seg02"]
+        assert all(r["beat_id"] == "b001" for r in rows)
+        assert all(r["segment_count"] == 3 for r in rows)
+        # The whole point: the rows account for the beat, frame for frame.
+        assert sum(r["visible_frames"] for r in rows) == clip["frame_count"] == 70
+        # Each row names a real file on disk, and the names are distinct.
+        assert len({r["path"] for r in rows}) == 3
+
+
+def test_a_CHAIN_beats_rows_say_WHERE_each_first_frame_CAME_FROM(monkeypatch):
+    """Only segment 0 is minted from a still; every successor chains.
+
+    Without this the ledger could not distinguish a real chain from a beat that
+    silently re-minted a still at each cut.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_CHAIN, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+            {"index": 2, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+        ], 73)
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        rows = clip["segments"]
+        assert [r["init_source"] for r in rows] == [
+            "still", "chain_terminal_frame", "chain_terminal_frame"]
+        assert sum(r["visible_frames"] for r in rows) == clip["frame_count"] == 73
+
+
+def test_the_FEAR_CAPE_is_stamped_on_the_segment_that_WEARS_it(monkeypatch):
+    """The cape is painted on the still feeding the LAST segment, so the row
+    that carries the flag must be the last one -- not the one that produced the
+    frame. A receipt naming the wrong clip is worse than no receipt.
+    """
+    monkeypatch.delenv("OTR_FEAR_CAPE", raising=False)
+    monkeypatch.delenv("OTR_FEAR_CAPE_MIN_SEGMENTS", raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        # 4 segments == the default fear-cape threshold.
+        plan = _plan(cp.JOIN_CHAIN, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+            {"index": 2, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+            {"index": 3, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+        ], 97)
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        rows = clip["segments"]
+        assert [r["fear_cape"] for r in rows] == [False, False, False, True], (
+            "the cape must be stamped on the FINAL segment, the one rendered "
+            "from the inverted still")
+
+
+def test_a_SHORT_beat_stays_below_the_cape_threshold(monkeypatch):
+    """Three segments is under the 4-segment rule of thumb, so no cape."""
+    monkeypatch.delenv("OTR_FEAR_CAPE", raising=False)
+    monkeypatch.delenv("OTR_FEAR_CAPE_MIN_SEGMENTS", raising=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_CHAIN, [
+            {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+            {"index": 1, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+            {"index": 2, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+        ], 73)
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+        assert not any(r["fear_cape"] for r in clip["segments"])

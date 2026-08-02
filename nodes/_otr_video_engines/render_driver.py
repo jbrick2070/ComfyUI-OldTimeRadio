@@ -3180,11 +3180,36 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # exists to carry.
     peak_used = 0
     terminal = None
+    # PER-SEGMENT IDENTITY (operator ask, 2026-08-01). A beat that renders as
+    # one clip has always been traceable -- it IS the beat, and the ledger's
+    # shot_id names it. A beat that splits did not: the ledger recorded only the
+    # beat's aggregate (b001, rendered_frame_count=410) while the six real
+    # renders behind it landed on disk as otr_beat_zx0zqd05.mp4 -- random hex
+    # naming nothing. Nothing tied a file to its beat, its position in the
+    # sequence, or its neighbours, which made four things unanswerable: which
+    # clip a visible defect came from, whether segment N+1 actually began on
+    # segment N's terminal frame, which segment wore the fear cape, and who
+    # owned any given orphan in scratch.
+    #
+    # Every segment now gets a stable id -- <beat>_seg00, _seg01, ... -- that
+    # names its temp file AND is stamped in the ledger. Purely ADDITIVE: no
+    # existing field changes meaning, so every downstream consumer that reads
+    # the beat row keeps reading exactly what it read before.
+    beat_key = str(beat_id or shot.get("shot_id") or "beat")
+    segment_rows = []
+    # The cape is painted on the still that FEEDS the next segment, so the
+    # segment that wears it is the one rendered on the following pass. Carry
+    # the fact forward rather than stamping the segment that merely produced
+    # the frame -- otherwise the receipt names the wrong clip.
+    cape_pending = False
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
                          segment_count=plan.segment_count) as session:
         for position, (segment, request) in enumerate(prebuilt):
             index = int(segment.index)
+            segment_id = "%s_seg%02d" % (beat_key, position)
+            init_source = "chain_terminal_frame" if (chains and terminal) \
+                else "still"
             if chains and terminal:
                 # THE TERMINAL TRANSACTION. A chained successor does not get a
                 # minted still at all -- it begins on the real frame its
@@ -3280,13 +3305,28 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                     "segment of any other length makes the beat drift against "
                     "its own audio."
                     % (shot.get("shot_id"), index, got, planned, delta))
-            rendered.append((path, int(segment.drop_head),
-                             int(segment.render_frames)
-                             - int(segment.drop_head)
-                             - int(segment.trim_tail)))
+            visible = (int(segment.render_frames)
+                       - int(segment.drop_head)
+                       - int(segment.trim_tail))
+            rendered.append((path, int(segment.drop_head), visible))
+            segment_row = {
+                "segment_id": segment_id,
+                "beat_id": beat_key,
+                "segment_index": position,
+                "segment_count": int(plan.segment_count),
+                "render_frames": int(segment.render_frames),
+                "drop_head": int(segment.drop_head),
+                "trim_tail": int(segment.trim_tail),
+                "visible_frames": visible,
+                "init_source": init_source,
+                "fear_cape": bool(cape_pending),
+                "path": os.path.basename(path),
+            }
+            segment_rows.append(segment_row)
+            cape_pending = False
             if chains and position + 1 < len(plan.segments):
                 terminal = _wb2.extract_terminal_frame(
-                    path, _tmp_path("otr_terminal_", ".png"))
+                    path, _tmp_path("otr_terminal_%s_" % segment_id, ".png"))
                 # THE FEAR CAPE (operator's name, 2026-08-01). On a beat long enough
                 # to need several clips, the still handed to the FINAL segment is
                 # inverted, so that segment is GENERATED from an inverted frame
@@ -3300,14 +3340,15 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                         and len(plan.segments) >= _wb2.fear_cape_min_segments()
                         and position + 2 == len(plan.segments)):
                     terminal = _wb2.negate_image(
-                        terminal, _tmp_path("otr_fearcape_", ".png"))
+                        terminal, _tmp_path("otr_fearcape_%s_" % segment_id, ".png"))
+                    cape_pending = True
                     _LOG.info(
                         "[OTR video] FEAR CAPE: beat %s has %d segments, so "
                         "the final segment begins on an INVERTED still",
                         shot.get("shot_id"), len(plan.segments))
 
     assembled = _ws.assemble_beat_segments(
-        rendered, _tmp_path("otr_beat_", ".mp4"),
+        rendered, _tmp_path("otr_beat_%s_" % beat_key, ".mp4"),
         expect_frames=int(plan.target_visible_frames),
         expect_fps=int((clip or {}).get("fps") or 25))
     beat_clip = dict(clip or {})
@@ -3318,6 +3359,12 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # reverse-engineered from a log.
     beat_clip["segment_count"] = int(plan.segment_count)
     beat_clip["join_mode"] = str(plan.join_mode)
+    # The per-segment receipt. One row per REAL render, in render order, each
+    # naming itself, where its first frame came from, and how many of its frames
+    # survive the seam. This is what makes "a fresh clip for every second of
+    # audio" checkable after the fact instead of merely intended: sum the
+    # visible_frames and it must equal the beat's target.
+    beat_clip["segments"] = segment_rows
     _LOG.warning(
         "[OTR video] BEAT %s assembled from %d %s segment(s) -> %d frame(s) "
         "at %s", beat_id or shot.get("shot_id"), plan.segment_count,

@@ -40,21 +40,35 @@ OBS = pathlib.Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/obs")
 EPISODES = pathlib.Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes")
 LOCK = REPO / "tmp" / "_w45_campaign.lock"
 
-# Engine -> profile. Order puts the already-proven engine last so a fresh
-# failure surfaces early rather than after hours of known-good work.
+# Engine -> profile, ordered CHEAPEST-AND-LEAST-PROVEN FIRST.
+#
+# The first ordering ran wan_ti2v first, which is backwards: it is the slowest
+# engine on the box (~12 min/clip, 13-15 clips per leg) AND it already has a
+# shipped episode, so it spent the first three hours re-proving something known
+# while five untested engines waited. Information per hour is what matters in an
+# unattended run -- an engine that is going to fail should fail in the first
+# hour, not the twentieth. fastwan_8gb sits second-to-last as a re-confirmation
+# of the engine that already shipped, and the slow incumbent goes last.
 LEGS = [
-    ("wan_ti2v", "otr_g4_wan_ti2v"),
     ("ltx_8gb", "otr_g4_ltx_8gb"),
     ("ltx_video", "otr_g4_ltx_video"),
-    ("humo", "otr_g4_humo"),
     ("ltx_audio_in", "otr_g4_ltx_audio_in"),
+    ("humo", "otr_g4_humo"),
     ("fastwan_8gb", "otr_g4_fastwan"),
+    ("wan_ti2v", "otr_g4_wan_ti2v"),
 ]
 
-# The slowest engine measured on this box is the wan_ti2v incumbent at roughly
-# twice fastwan's 2433 s. 5400 s (the api_run default) leaves almost no margin,
-# and a timeout here is expensive: it strands a live server job.
-LEG_TIMEOUT_S = 10800
+# MEASURED on this box, 2026-08-01, rather than estimated from the fastwan leg:
+# a 45-word episode is ~66.7 s of audio = 1666 frames at 25 fps, and wan_ti2v
+# renders at most 177 frames (7.08 s) per segment, so a leg is 13-15 clips. Two
+# consecutive clips landed 12 minutes apart (22:25:32 -> 22:37:29), on top of
+# ~45 min of writer + audio. That is a ~3.5-4 h leg for the incumbent.
+#
+# 10800 s (3 h) was still too small and would have killed the first leg about
+# four clips from the end, after burning the whole three hours -- the expensive
+# failure, because a client timeout does not cancel the server job. Sized to the
+# measurement with headroom instead of to a round number.
+LEG_TIMEOUT_S = 21600
 VRAM_BASELINE_MB = 2600
 VRAM_SETTLE_S = 240
 
