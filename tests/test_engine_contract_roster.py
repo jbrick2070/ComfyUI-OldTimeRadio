@@ -498,15 +498,20 @@ def test_the_refusal_is_wired_into_the_render_path_not_merely_defined():
         "occurrence(s)" % text.count("assert_env_matches_contract("))
 
 
-def test_every_ltx_video_profile_renders_at_the_canvas_the_floor_was_measured_at():
+def test_every_ltx_video_profile_renders_at_the_canvas_the_engine_declares():
     """The mechanism by which the frozen 169 could become a SECOND lie.
 
-    The decode floor's own comment ties it to "this canvas" -- the wrapper
-    VAEDecode fails outside its tiled band AT THIS CANVAS. So a profile that
-    moves ltx_video's canvas can invalidate the static contract without
-    touching a line of engine code. Every shipped profile renders 832x480 and
-    the live leg confirmed it; this pins that so a canvas change fails HERE
-    rather than as a plan-vs-render surplus 12 minutes into a leg.
+    The decode floor is canvas-dependent, so a profile that moves ltx_video's
+    canvas can invalidate the static frame contract without touching a line of
+    engine code. Every shipped profile renders 832x480 and the live leg
+    confirmed it; this pins that so a canvas change fails HERE rather than as a
+    plan-vs-render surplus 12 minutes into a leg.
+
+    NOTE the name is deliberately "the canvas the engine DECLARES", not "the
+    canvas the floor was measured at" -- those are DIFFERENT canvases and an
+    earlier version of this test conflated them. The 169 floor was measured at
+    1472x832; 832x480 is where production renders. See the contract comment on
+    LtxVideoEngine.
     """
     import json
     from pathlib import Path

@@ -178,3 +178,52 @@ re-deriving them later would cost the same review again.
 
 Source: `kibitz-runs/2026-08-01-contract-vs-runtime/r2/` (codex `gpt-5.6-sol`
 high MUST-FIX 3/4, SHOULD-FIX 2; grounded and deferred in `judgment.md` R1).
+
+---
+
+## 7. THE OPEN QUESTION r3 SURFACED: THE FLOOR MAY NOT BELONG AT THIS CANVAS
+
+Found by the antigravity lane, 2026-08-02, and it is the most valuable single
+claim either panel produced -- because it says the CURRENT fix, while honest, is
+more restrictive than the hardware requires.
+
+Read `_LTX_DECODE_FLOOR_DEFAULT`'s own comment (`eng_ltx_video.py:140`):
+
+> at the **1472x832** landscape canvas the installed wrapper's VAEDecode
+> survives ONLY in its tiled band -- 169f and 233f decode clean, 121f and 137f
+> raise the tensor 256-vs-128 (dim 1) mismatch
+
+And ten lines below, the loop path's own note:
+
+> 97f decodes clean at **832x480** in 12s
+
+So the two canvases behave DIFFERENTLY, and the 169 floor was measured at
+1472x832 -- **not** at 832x480, which is where all three shipped profiles and the
+live leg actually render. At the production canvas there is direct evidence that
+a 97-frame decode is clean, i.e. the floor is very likely not required there at
+all.
+
+But `_ltx_frame_length` applies the floor UNCONDITIONALLY, whatever the canvas.
+
+**Consequences, separated carefully:**
+
+* The shipped fix is still CORRECT. A declaration must describe what the runtime
+  DOES, and the runtime does raise every ask to 169 at every canvas. Declaring
+  169 is what stops the plan-vs-render disagreement that killed the leg.
+* The shipped fix is also more restrictive than the hardware. Every ltx_video
+  beat now renders 6.76 s and trims back to its audio, which on a short beat is
+  a lot of discarded work.
+* The real improvement is a CANVAS-AWARE floor: 169 at 1472x832, something
+  lower (97 is evidenced, but only for the loop path) at 832x480. That would let
+  the contract widen and cut the waste.
+
+**Deliberately NOT done tonight.** It needs its own decode measurements at
+832x480 -- which lengths actually survive the band at that canvas -- and those
+cost GPU time on a box that is mid-campaign. Guessing a floor is exactly how the
+original defect got written. Tracked here so the next session inherits the
+evidence instead of re-deriving it.
+
+**Corrected in the same pass:** a comment and a test name added earlier on
+2026-08-02 both claimed the 169 floor was measured at 832x480. That was false --
+they conflated the canvas production renders at with the canvas the floor was
+measured at. Both now say which is which.

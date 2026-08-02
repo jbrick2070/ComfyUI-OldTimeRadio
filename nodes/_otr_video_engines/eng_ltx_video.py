@@ -218,14 +218,15 @@ def assert_env_matches_contract(contract):
         if want is not None and want != tuple(declared_canvas):
             raise ContractEnvConflict(
                 "ltx_video: OTR_LTX_RENDER_CANVAS=%s disagrees with the "
-                "declared render canvas %dx%d. The 169-frame decode floor was "
-                "MEASURED at %dx%d and is only true there, so rendering at "
-                "another canvas would invalidate the frame contract the beat "
-                "was already partitioned against. NO FALLBACK -- unset the "
-                "variable, or re-measure the decode floor at the new canvas "
-                "and move the declaration with it."
-                % (raw_canvas, declared_canvas[0], declared_canvas[1],
-                   declared_canvas[0], declared_canvas[1]))
+                "declared render canvas %dx%d. The decode floor that fixes this "
+                "adapter's frame contract at a single length is CANVAS-"
+                "DEPENDENT, and the beat was already partitioned against that "
+                "contract, so moving the canvas can invalidate the plan without "
+                "changing a single frame number. NO FALLBACK -- unset the "
+                "variable, or re-measure the decode band at the new canvas and "
+                "move BOTH the render_canvas declaration and the frame contract "
+                "with it."
+                % (raw_canvas, declared_canvas[0], declared_canvas[1]))
 
 
 def _ltx_frame_length(target_frame_count, fallback):
@@ -507,26 +508,30 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         allow_tail_trim=True,
         continuity=CONTINUITY_STRICT_FIRST_FRAME,
     )
-    #: THE CANVAS THE 169 FLOOR WAS MEASURED AT (kibitz r3, 2026-08-02).
-    #: This contract is only true at one canvas -- the decode floor's own
-    #: comment says the wrapper VAEDecode "fails outside its tiled band AT THIS
-    #: CANVAS" -- so an unpinned canvas is a live channel for invalidating a
-    #: STATIC declaration without touching a line of engine code.
+    #: THE CANVAS PRODUCTION ACTUALLY RENDERS AT (kibitz r3, 2026-08-02).
+    #: All three shipped ltx_video profiles declare 832x480 and the live leg
+    #: rendered at it. Declared here so the canvas cannot move underneath the
+    #: frame contract: the canvas also arrives through ``OTR_LTX_RENDER_CANVAS``
+    #: (``render_driver.py:2510``), which a profile test cannot see because it is
+    #: set at BOOT. ``declared_render_canvas`` is applied LAST in
+    #: ``build_request_from_shot`` precisely so a declaration wins ("nothing can
+    #: clobber this and this clobbers nothing", B5 2026-07-27).
     #:
-    #: r2 pinned this with a test over the shipped profiles and called it done.
-    #: That was insufficient and the panel was right to say so: the canvas also
-    #: arrives through ``OTR_LTX_RENDER_CANVAS`` (``render_driver.py:2510``),
-    #: which a profile test cannot see because it is set at BOOT, not in a
-    #: profile. Declaring it closes that channel -- ``declared_render_canvas``
-    #: is applied LAST in ``build_request_from_shot`` precisely so it wins
-    #: ("nothing can clobber this and this clobbers nothing", B5 2026-07-27).
-    #: The r2 worry about colliding with the existing env branch was misplaced:
-    #: the chain is ordered to make the declaration authoritative.
+    #: READ ``_LTX_DECODE_FLOOR_DEFAULT``'s comment before changing either
+    #: number. THE 169 FLOOR WAS MEASURED AT 1472x832, NOT HERE -- "at the
+    #: 1472x832 landscape canvas the installed wrapper's VAEDecode survives ONLY
+    #: in its tiled band; 169f and 233f decode clean, 121f and 137f raise the
+    #: tensor 256-vs-128 mismatch". At 832x480 the loop path's own note records
+    #: that 97f "decodes clean", so the floor is very likely NOT required at the
+    #: canvas production actually uses.
     #:
-    #: 832x480 is MEASURED, not chosen: all three shipped ltx_video profiles
-    #: declare it and the live leg rendered at it. (An earlier reviewer proposed
-    #: 1472x832; that is the DELIVERABLE canvas the composite scales up to, and
-    #: this engine's own note is that 0.75 "re-noises into mush" there.)
+    #: The contract still declares 169 because ``_ltx_frame_length`` applies that
+    #: floor UNCONDITIONALLY, whatever the canvas -- so 169 is what this adapter
+    #: really renders today, and a declaration must describe the runtime rather
+    #: than the intent. Making the floor canvas-aware would let this engine take
+    #: shorter beats at 832x480 and cut a lot of trimmed work, but it needs its
+    #: own decode measurements at this canvas, which cost GPU time and are not a
+    #: thing to guess at while a campaign is running. Tracked, not assumed.
     render_canvas = (832, 480)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
