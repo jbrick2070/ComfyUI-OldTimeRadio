@@ -39,13 +39,42 @@ def _voiced_rows(ledger_data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     # Both are honoured -- `skip` because it is the truth, `skip_tts` because a
     # ledger saved by an older tree may still carry it and a proof set that
     # silently widens is exactly the bug this file exists to prevent.
+    # AND THE TEXT TEST IS SAYABILITY, NOT "non-empty" (QA 2026-08-02). This is
+    # the ROOT of PBUG-20260802-02, and the cast-voice gate did not close it --
+    # that gate proves every CHARACTER has a voice, this proves every PROOF is
+    # STABLE, and they are different guarantees. Reproduced on an ordinary
+    # script shape (one real line + one stage-direction beat, same character):
+    #     proofs minted   ['l0', 'l1', 'l2']      <- l2 is "(static crackles)"
+    #     after cleanup   l2 skip=True text=''
+    #     re-validate     line proof coverage mismatch: extra=['l2']
+    # -- the literal error the fix was written to eliminate. Minting on RAW
+    # text promises a row the writer-tail cleanup is about to withdraw.
+    # `_sayable` is the same `clean_spoken_text` surface the cleanup decides on,
+    # so a row that earns a proof here is one the cleanup cannot empty: the
+    # proof set is stable BY CONSTRUCTION rather than by luck of ordering.
     return [
         row for row in rows
         if isinstance(row, Mapping)
         and not bool(row.get("skip"))
         and not bool(row.get("skip_tts"))
-        and str(row.get("text") or "")
+        and _sayable(row.get("text"))
     ]
+
+
+def _sayable(text: Any) -> bool:
+    """Does this row survive the stripper TTS and the cleanup both use?
+
+    Imported function-locally, matching `_otr_ledger_cleanup`, so this module
+    stays import-light and the two can never disagree about the surface.
+    """
+    raw = str(text or "")
+    if not raw.strip():
+        return False
+    try:
+        from ._otr_script_prep import clean_spoken_text
+    except ImportError:  # pragma: no cover -- flat test/standalone load
+        from _otr_script_prep import clean_spoken_text  # type: ignore
+    return bool(clean_spoken_text(raw).strip())
 
 
 def build_receipt(

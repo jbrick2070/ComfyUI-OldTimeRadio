@@ -544,10 +544,13 @@ def _check_per_cast_invariants(
         str(row.get("char_id") or ""): str(row.get("name") or "")
         for row in cast if isinstance(row, dict)
     }
-    announcer_ids = {
-        str(row.get("char_id") or "") for row in cast
-        if isinstance(row, dict) and is_announcer_cast_row(row)
-    }
+    # ONLY THE FIRST announcer-matching row is credited by the sentinel; any
+    # further row whose name/role merely says "Announcer" is an ordinary
+    # character and must own a line. Matching them all let a second one ship
+    # silent through both layers (QA 2026-08-02).
+    _ann = [row for row in cast
+            if isinstance(row, dict) and is_announcer_cast_row(row)]
+    announcer_ids = {str(_ann[0].get("char_id") or "")} if _ann else set()
     # Case-insensitive: `referenced` holds raw line char_ids, and a line
     # carrying "ANNOUNCER" or "Announcer" is still the announcer sentinel.
     announcer_voiced = any(str(cid).strip().lower() == "announcer"

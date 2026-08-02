@@ -154,12 +154,23 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
         elif cid:
             voiced_ids.add(cid)
 
+    # ONLY ONE ROW MAY RIDE THE SENTINEL (QA 2026-08-02). The exemption is a
+    # STRING test, so it matched every row whose name or role said "Announcer"
+    # -- and all of them rode the single shared `announcer_voiced` boolean. A
+    # cast that legitimately contains a second announcer-ish character (a
+    # sentient PA system, say) shipped it SILENT through both layers with
+    # freeze_verdict='frozen_clean' and zero warnings. The sentinel credits ONE
+    # row; every other announcer-named row is an ordinary character and must
+    # own a line of its own.
+    announcer_rows = [r for r in cast_rows if is_announcer_cast_row(r)]
+    credited = announcer_rows[0] if announcer_rows else None
+
     missing: "list[dict[str, str]]" = []
     for row in cast_rows:
         cid = str(row.get("char_id") or "").strip()
         if not cid:
             continue
-        if is_announcer_cast_row(row):
+        if row is credited:
             if not announcer_voiced:
                 missing.append({"char_id": cid,
                                 "name": str(row.get("name") or "ANNOUNCER")})

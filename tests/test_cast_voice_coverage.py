@@ -226,3 +226,66 @@ def test_legacy_skip_tts_rows_are_still_honoured():
     receipt = build_receipt(led, owner_bank="testbank",
                             accepted_artifacts={"script": "bytes"})
     assert "l_legacy" not in {p["line_id"] for p in receipt["line_proofs"]}
+
+
+def test_a_SECOND_announcer_named_row_cannot_ride_the_sentinel():
+    """QA 2026-08-02: the exemption was a STRING test, so every row whose name
+    or role said "Announcer" rode the one shared sentinel credit. A cast that
+    legitimately contains a second announcer-ish character -- a sentient PA
+    system -- shipped it SILENT through both layers, freeze_verdict clean, zero
+    warnings. The sentinel credits exactly ONE row.
+    """
+    from nodes import _otr_ledger_freeze as FZ
+
+    led = _ledger(
+        [{"char_id": "c01", "name": "ANNOUNCER", "role": "announcer",
+          "traits": "warm", "voice_preset": "v2/en_speaker_1"},
+         {"char_id": "c02", "name": "Elias", "traits": "dry",
+          "voice_preset": "v2/en_speaker_2"},
+         {"char_id": "c04", "name": "Announcer", "traits": "PA system",
+          "voice_preset": "v2/en_speaker_4"}],
+        [ANN, _line("c02", "Read it back to me.")])
+
+    with pytest.raises(CastVoiceCoverageError) as exc:
+        require_voice_coverage(led, owner_bank="testbank")
+    assert [m["char_id"] for m in exc.value.missing] == ["c04"]
+    assert any("c04" in e for e in FZ.run_gap_audit(led, label="qa").errors), (
+        "the backstop must refuse it too, not only the gate")
+
+
+def test_a_proof_is_never_minted_from_text_the_cleanup_will_withdraw():
+    """THE ROOT of PBUG-20260802-02, which the cast-voice gate did NOT close.
+
+    The gate proves every CHARACTER has a voice; this proves every PROOF is
+    STABLE -- different guarantees. On an ordinary script shape (one real line
+    plus one stage-direction beat, same character) the character passes the
+    gate, a proof was minted for the stage-direction row on RAW text, the
+    writer-tail cleanup then emptied it, and re-validation raised the literal
+    error the whole fix was written to eliminate:
+        line proof coverage mismatch: missing=[] extra=['l2']
+    """
+    from nodes import _otr_ledger_cleanup as CL
+    from nodes._otr_content_authorship import validate_receipt
+
+    led = {"meta": {"source_bank": "testbank", "episode_title": "T"},
+           "cast": _cast({"char_id": "c02", "name": "Elias"}),
+           "lines": [ANN,
+                     {"line_id": "l1", "char_id": "c02", "skip": False,
+                      "text": "Coordinates confirmed.",
+                      "speaker_role": "character"},
+                     {"line_id": "l2", "char_id": "c02", "skip": False,
+                      "text": "(static crackles)",
+                      "speaker_role": "character"}]}
+    require_voice_coverage(led, owner_bank="testbank")
+    receipt = stamp_receipt(led, owner_bank="testbank",
+                            accepted_artifacts={"script": "bytes"})
+    assert "l2" not in {p["line_id"] for p in receipt["line_proofs"]}, (
+        "a stage-direction row must never earn a proof -- the cleanup is "
+        "about to withdraw it")
+
+    try:
+        CL.run_ledger_cleanup(led)
+    except Exception:            # unrelated fixture gaps are not the subject
+        pass
+    assert led["lines"][2].get("skip") is True
+    validate_receipt(led)        # must NOT raise: the proof set is stable

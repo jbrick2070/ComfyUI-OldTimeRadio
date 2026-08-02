@@ -2213,6 +2213,24 @@ def main(argv=None):
         # ps.peak_vram_mib - that cell's own desktop baseline.
         points = [(r["length"], r["peak_delta_mib"])
                   for r in ok_cells if r.get("peak_delta_mib") is not None]
+        # A PARTIAL LADDER MAY NOT PRODUCE A RECEIPT (r3 MUST-FIX 1). The arm
+        # stops at the first rung it cannot carry, and this run is EXPECTED to
+        # hit the VRAM ceiling before 177 -- so without this the most likely
+        # outcome is an authoritative-looking estimator_fit.json fitted to
+        # whatever happened to fit, which is exactly how (7000, 185) got
+        # written. Every declared rung, every repeat, or no receipt at all.
+        want = {(int(n), int(r)) for n in ESTIMATOR_FIT_LENGTHS
+                for r in range(ESTIMATOR_FIT_REPEATS)}
+        got = {(int(c["length"]), int(c["repeat"])) for c in ok_cells}
+        if got != want:
+            missing = sorted(want - got)
+            log("ESTIMATOR FIT WITHHELD: %d/%d cells succeeded; missing "
+                "(length, repeat) = %s" % (len(got), len(want), missing[:12]))
+            log("The ladder is INCOMPLETE, so no fit is written. The rung it "
+                "stopped at is still the useful result: it is the measured "
+                "ceiling for this engine at this canvas. Receipts for every "
+                "successful cell are in video_arm_bench_results.json.")
+            return 1
         fit = fit_cost_row(points)
         fit["engine_id"] = "wan_ti2v"
         fit["arm"] = "A"
@@ -2224,6 +2242,37 @@ def main(argv=None):
         fit["label"] = ("UNCLAMPED estimator fit on the 16 GB card; demand "
                         "above quiescent baseline; envelope row, not mean")
         fit["current_row_mib"] = {"overhead": 7000.0, "per_frame": 185.0}
+
+        # THE RESOLUTION BASIS (r3 MUST-FIX 2). FRAME_COST_MODEL's per_frame is
+        # defined at _FRAME_COST_REF_PIXELS = 1472*832 and SCALED DOWN at
+        # runtime by (canvas_pixels / ref_pixels). This fit measures at
+        # 832x480 -- 32.6% of the reference -- so copying the fitted slope into
+        # the row raw would make the runtime scale it down a SECOND time and
+        # under-price every frame by ~3.07x. That is not a rounding error; it
+        # is an unguarded OOM, and it is the single easiest way to misuse this
+        # receipt. Both numbers are stamped, and the row takes the NORMALIZED
+        # one.
+        ref_pixels = 1472.0 * 832.0
+        measured_pixels = float(arms[0].canvas[0]) * float(arms[0].canvas[1])
+        scale = measured_pixels / ref_pixels
+        fit["resolution_basis"] = {
+            "measured_canvas": list(arms[0].canvas),
+            "measured_pixels": int(measured_pixels),
+            "frame_cost_ref_canvas": [1472, 832],
+            "frame_cost_ref_pixels": int(ref_pixels),
+            "measured_over_reference": round(scale, 6),
+            "note": ("per_frame_mib below is AT THE MEASURED CANVAS; "
+                     "FRAME_COST_MODEL stores per-frame AT THE REFERENCE "
+                     "canvas and scales down by this ratio at runtime"),
+        }
+        fit["row_ready_mib"] = {
+            "overhead": fit["envelope"]["overhead_mib"],
+            "per_frame": round(fit["envelope"]["per_frame_mib"] / scale, 3),
+            "note": ("THESE are the numbers FRAME_COST_MODEL['wan_ti2v'] takes. "
+                     "overhead is resolution-independent by the model's own "
+                     "contract; per_frame is the measured slope normalized TO "
+                     "the 1472x832 reference (divided by %.6f)." % scale),
+        }
         write_atomic(os.path.join(BENCH_DIR, "estimator_fit.json"),
                      json.dumps(fit, indent=2) + "\n")
         log("ESTIMATOR FIT: least-squares (%.0f, %.3f) -> envelope (%.0f, %.3f)"
