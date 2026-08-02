@@ -62,7 +62,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-49 step 4 | 1.32-1.96 s | 25 | soft_reference | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
-| ltx_video | local | text_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
+| ltx_video | local | text_to_video | wide | canvas | 169-169 step 8 | 6.76-6.76 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_flat | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_motion | local | static_motion | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |

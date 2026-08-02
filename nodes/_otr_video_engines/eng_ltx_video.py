@@ -395,8 +395,37 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: this declaration is what replaces it.
     #: CONTINUITY: the i2v graph uses LTXVImgToVideoConditionOnly at
     #: strength=1.0, which locks frame 0 to the supplied still (BUG-LOCAL-095).
+    #: MIN IS THE DECODE FLOOR, NOT THE LADDER'S FIRST RUNG (2026-08-01).
+    #: This read ``min_frames=9`` and that was a LIE about this adapter: nothing
+    #: in this engine can render 9 frames. ``_ltx_frame_length`` raises ANY ask
+    #: below ``_LTX_DECODE_FLOOR_DEFAULT`` up to it, because the wrapper
+    #: VAEDecode fails outside its tiled band at this canvas -- so 169 is the
+    #: only length this adapter actually produces (the floor equals the cap).
+    #:
+    #: The planner believed the 9 and it killed a live leg. It split a beat and
+    #: asked for an 89-frame segment, which the engine dutifully raised to 169,
+    #: and render_beat_coverage refused the surplus exactly as designed:
+    #:   "shot shot_music_opening_001 segment 1 rendered 169 frame(s) but its
+    #:    plan asked for 89 (a surplus of 80). NO FALLBACK"
+    #: The refusal was right; the declaration it was checking was wrong. A
+    #: contract exists so the planner never asks for a length the adapter
+    #: cannot deliver, so a contract that overstates its own range is worse
+    #: than none -- it converts a plannable engine into a guaranteed late
+    #: failure, after the writer and the audio have already been paid for.
+    #:
+    #: THE LITERAL, DELIBERATELY -- not ``_LTX_DECODE_FLOOR_DEFAULT``. A first
+    #: draft of this fix derived the bound from the constant "so the two cannot
+    #: drift", and ``test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides``
+    #: rejected it for a better reason than the one behind the draft: a
+    #: FrameContract is STATIC because stills are minted against it before the
+    #: render phase begins, so it must not track a value that can be moved
+    #: underneath it. Drift between this literal and the runtime floor is caught
+    #: by a TEST, which is the visible failure; derivation would have absorbed
+    #: the drift silently.
+    #: ltx_8gb never had this defect: it has no decode floor, its declaration
+    #: matches its runtime, and its leg passes.
     frame_contract = FrameContract(
-        min_frames=9,
+        min_frames=169,
         max_frames=169,
         quantum=8,
         native_fps=25,

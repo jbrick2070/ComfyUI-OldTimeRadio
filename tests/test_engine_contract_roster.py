@@ -158,7 +158,13 @@ def test_the_local_ladders_match_their_adapters_named_constants():
     assert bounds("wan_ti2v") == (_wt._TI2V_MIN_FRAMES, _wt._TI2V_MAX_FRAMES)
     assert bounds("humo") == (_humo._HUMO_MIN_FRAMES, _humo._HUMO_MAX_FRAMES)
     assert bounds("ltx_8gb") == (_l8._LTX8_MIN_FRAMES, 161)
-    assert bounds("ltx_video") == (_lv._LTX_MIN_FRAMES, 169)
+    # ltx_video's minimum is its DECODE FLOOR, not the ladder's first rung
+    # (2026-08-01). _LTX_MIN_FRAMES is 9, but nothing in this adapter can
+    # render 9 frames: _ltx_frame_length raises every shorter ask to the decode
+    # floor, so 169 is the only length it produces. Declaring 9 killed a live
+    # leg -- the planner asked for an 89-frame segment and the engine returned
+    # 169, which render_beat_coverage refused as a surplus.
+    assert bounds("ltx_video") == (169, 169)
     assert bounds("ltx_audio_in") == (_lav._LTX_AV_MIN_FRAMES, 497)
 
 
@@ -384,3 +390,48 @@ def test_the_sfx_lanes_share_their_base_adapters_ladder_object():
     omni = fc.frame_contract_for(vreg.get_engine("google_omni_video"))
     sfx = fc.frame_contract_for(vreg.get_engine("google_vid_sfx_omni"))
     assert (sfx.min_frames, sfx.max_frames) == (omni.min_frames, omni.max_frames)
+
+
+def test_a_declared_MINIMUM_is_a_length_the_adapter_can_actually_render():
+    """The defect that killed the 2026-08-01 ltx_video leg, as a tripwire.
+
+    A contract exists so the planner never asks for a length the adapter cannot
+    deliver. ``ltx_video`` declared ``min_frames=9`` while ``_ltx_frame_length``
+    raised every ask below its decode floor up to 169, so the planner split a
+    beat into 89-frame segments the engine could not produce:
+
+        shot shot_music_opening_001 segment 1 rendered 169 frame(s) but its
+        plan asked for 89 (a surplus of 80). NO FALLBACK
+
+    An overstated contract is worse than no contract -- it turns a plannable
+    engine into a guaranteed LATE failure, after the writer and the audio have
+    already been paid for. So: feed each adapter's own declared minimum through
+    its own length resolver, and the resolver must hand it straight back.
+    """
+    from nodes._otr_video_engines import eng_ltx_video as _lv
+
+    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
+    resolved = _lv._ltx_frame_length(contract.min_frames, 25)
+    assert resolved == contract.min_frames, (
+        "ltx_video declares min_frames=%d but _ltx_frame_length turns that ask "
+        "into %d, so every planned segment at the declared minimum renders the "
+        "wrong length and render_beat_coverage refuses the beat."
+        % (contract.min_frames, resolved))
+    # And the same at the ceiling, which is where the cap could lie instead.
+    assert _lv._ltx_frame_length(contract.max_frames, 25) == contract.max_frames
+
+
+def test_the_ltx_video_declaration_still_matches_its_runtime_decode_floor():
+    """EQUALITY, never identity -- the literal is deliberate.
+
+    The declaration must not READ ``_LTX_DECODE_FLOOR_DEFAULT`` (a FrameContract
+    is static because stills are minted against it before the render phase), but
+    it must still AGREE with it. This is the check that makes the drift visible
+    instead of silent, which is the whole reason the literal is allowed to be a
+    literal.
+    """
+    from nodes._otr_video_engines import eng_ltx_video as _lv
+
+    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
+    assert contract.min_frames == _lv._LTX_DECODE_FLOOR_DEFAULT
+    assert "_LTX_DECODE_FLOOR_DEFAULT" not in _contract_source("eng_ltx_video.py")
