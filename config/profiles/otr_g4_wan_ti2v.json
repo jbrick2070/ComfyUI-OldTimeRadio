@@ -38,7 +38,7 @@
     "attn_impl": "sdpa",
     "quant_policy": "bnb_nf4",
     "vram_ceiling_gb": 14.5,
-    "gguf_n_ctx": 4096,
+    "gguf_n_ctx": 8192,
     "gguf_quant": "Q4_K_M",
     "creative_model": "unsloth/gemma-4-12b-it-GGUF",
     "technical_model": "unsloth/gemma-4-12b-it-GGUF",
@@ -83,6 +83,8 @@
   "launch": {
     "sage_attention": true,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "GEMMA4_12B_MAX_NEW_TOKENS": "3072"
+    }
   }
 }

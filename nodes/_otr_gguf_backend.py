@@ -252,7 +252,29 @@ GGUF_ROWS: tuple[GGUFRow, ...] = (
         repo_id=ROW_ID,  # unsloth/gemma-4-12b-it-GGUF
         subdir="gemma-4-12b-it",
         artifacts=dict(GGUF_ARTIFACTS),
-        context_window=DEFAULT_CONTEXT_WINDOW,  # 4096
+        # 8192, NOT the 4096 default (2026-08-01). The default was a placeholder
+        # that understated this model by 32x and made the P0 pass structurally
+        # impossible to run on it:
+        #
+        #   the FILE declares      gemma4.context_length = 262144  (read from the
+        #                          real Q4_K_M GGUF metadata on this box)
+        #   P0 needs               _P0_PROMPT_OVERHEAD_TOKENS 2600
+        #                        + _P0_BASE_OUTPUT_TOKENS     2800  = 5400
+        #   the row allowed        4096                             -> REFUSED
+        #
+        # P0's own contract is written against _P0_LOCAL_CONTEXT_CAP = 8192
+        # (_otr_scifi_p0_contract.py:45), measured on Mistral-Nemo -- so 8192 is
+        # the number the pass was designed for, not a guess. The live failure was
+        # "GGUF ... cannot fit the complete requested output: requested_output=
+        # 2800, provider_output_cap=512", and raising n_ctx alone could never fix
+        # it because the ROW capped n_ctx at 4096 in the first place.
+        #
+        # COST, so this is not free-lunch reasoning: KV is 0.7 GB per 1k cells,
+        # so 8192 costs 5.60 GB against 2.80 at 4096. With Q4_K_M weights at
+        # 6.63 GB that is 12.23 GB resident -- under the 14.5 GB tier ceiling the
+        # campaign profiles declare, with ~2.3 GB of headroom. Going higher is
+        # possible for the model but not for this card.
+        context_window=8192,
         kv_gb_per_1k=KV_GB_PER_1K_CTX,          # 0.7
         vram_fit_tier="PASS",
         license="apache_2_0",
