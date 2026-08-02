@@ -133,9 +133,24 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     req_flux = rd.build_request_from_shot(shot("still_pan", "static_image_gen"),
                                           ledger)
     assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
+    # ltx_video's canvas STOPPED being env-overridable on 2026-08-02, and that
+    # is the fix rather than a regression. Its frame contract is now the single
+    # length 169, which is only true at the canvas the decode floor was measured
+    # at -- so an env-moved canvas would invalidate a STATIC contract the beat
+    # was already partitioned against, with no code change and no warning.
+    # A declared render canvas wins (it is applied last, by design), and the
+    # engine REFUSES at render time rather than quietly handing back a canvas
+    # the operator did not ask for. still_pan, which declares nothing, keeps its
+    # env branch untouched -- see the assertion above.
     monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
     req2 = rd.build_request_from_shot(shot("ltx_video", "text_to_video"), ledger)
-    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (768, 432)
+    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (832, 480), (
+        "a declared render canvas must beat OTR_LTX_RENDER_CANVAS")
+
+    from nodes._otr_video_engines import eng_ltx_video as _lv
+    from nodes._otr_video_engines import frame_contract as _fc
+    with pytest.raises(_fc.ContractEnvConflict):
+        _lv.assert_env_matches_contract(_lv.LtxVideoEngine.frame_contract)
 
 
 def test_still_flat_character_beat_uses_landscape_scene_still_not_portrait():

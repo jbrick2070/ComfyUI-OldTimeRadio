@@ -527,3 +527,62 @@ def test_every_ltx_video_profile_renders_at_the_canvas_the_floor_was_measured_at
             "measured at 832x480. Re-measure the floor at the new canvas before "
             "moving this." % (path.name, w, h))
     assert checked >= 3, "expected to check the shipped ltx_video profiles"
+
+
+def test_ltx_video_DECLARES_the_canvas_its_169_floor_was_measured_at():
+    """kibitz r3: the profile-only pin from r2 was not enough.
+
+    The canvas also arrives through OTR_LTX_RENDER_CANVAS, read at render time
+    in build_request_from_shot. A test over shipped profiles cannot see a
+    variable set at BOOT, so the static 169 contract stayed invalidatable by an
+    export. ``declared_render_canvas`` is applied LAST in the chain on purpose
+    ("nothing can clobber this and this clobbers nothing", B5 2026-07-27), so
+    declaring it is what actually closes the channel.
+    """
+    import os
+
+    from nodes._otr_video_engines import render_driver as rd
+
+    saved = os.environ.get("OTR_LTX_RENDER_CANVAS")
+    try:
+        # Hostile: the deliverable canvas, which this engine's own note says
+        # "re-noises into mush", and at which the 169 floor was never measured.
+        os.environ["OTR_LTX_RENDER_CANVAS"] = "1472x832"
+        assert rd.declared_render_canvas("ltx_video") == (832, 480), (
+            "the declaration must not follow OTR_LTX_RENDER_CANVAS -- it is the "
+            "channel the declaration exists to overrule")
+    finally:
+        if saved is None:
+            os.environ.pop("OTR_LTX_RENDER_CANVAS", None)
+        else:
+            os.environ["OTR_LTX_RENDER_CANVAS"] = saved
+
+
+def test_the_declared_canvas_and_the_shipped_profiles_AGREE():
+    """Two channels naming one canvas must not be allowed to disagree.
+
+    ltx_8gb already has this guard (tests/test_ltx_8gb_canonical_canvas.py);
+    ltx_video now has a declaration, so it needs the same one.
+    """
+    import json
+    from pathlib import Path
+
+    from nodes._otr_video_engines import render_driver as rd
+
+    declared = rd.declared_render_canvas("ltx_video")
+    assert declared is not None
+    root = Path(__file__).resolve().parents[1] / "config" / "profiles"
+    checked = 0
+    for path in sorted(root.glob("*.json")):
+        raw = path.read_text(encoding="utf-8")
+        if '"ltx_video"' not in raw:
+            continue
+        render = (json.loads(raw).get("render") or {})
+        w, h = render.get("canvas_w"), render.get("canvas_h")
+        if w is None or h is None:
+            continue
+        checked += 1
+        assert (int(w), int(h)) == declared, (
+            "%s renders ltx_video at %sx%s but the adapter declares %s"
+            % (path.name, w, h, declared))
+    assert checked >= 3

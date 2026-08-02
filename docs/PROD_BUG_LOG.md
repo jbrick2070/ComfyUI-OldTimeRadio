@@ -2985,3 +2985,63 @@ out until they independently meet the same production-only admission rule.
   context length its own file declares AND >= what the P0 contract requires, so
   a row that cannot host the pipeline's own pass fails at test time rather than
   on live GPU minutes.
+
+## PBUG-20260802-01 -- ltx_video declared 21 legal lengths for an engine that renders exactly one
+- surfaced: the live 45-word campaign, leg `ltx_video` (2026-08-01 23:20, headless
+  canonical run). Died at 11.8 minutes -- AFTER the writer, the cast, the TTS and
+  the music had all been rendered and paid for. No obs asset.
+- symptom: `RenderError: shot shot_music_opening_001 segment 1 rendered 169
+  frame(s) but its plan asked for 89 (a surplus of 80). NO FALLBACK -- the plan's
+  count is what this segment's audio slice was cut against, so assembling a
+  segment of any other length makes the beat drift against its own audio.`
+  Preceded in the same log by the engine's own warning:
+  `[eng_ltx_video] frame ask 89 below the decode floor 169 -- raising`.
+- root cause: the adapter's DECLARATION disagreed with its own RUNTIME.
+  `frame_contract` declared `min_frames=9, max_frames=169, quantum=8` -- 21 legal
+  rungs -- while `_ltx_frame_length` raises every ask below
+  `_LTX_DECODE_FLOOR_DEFAULT` (169) up to it, and `_LTX_MAX_FRAMES_DEFAULT` is
+  ALSO 169. The floor equals the cap, so the adapter emits exactly ONE length and
+  20 of its 21 declared rungs do not exist. The planner believed the declaration,
+  split a beat into 89-frame segments, and the engine could not produce them.
+  The refusal was CORRECT; what it was checking against was wrong.
+- why it read as a regression: `ltx_video` shipped for months in single-clip
+  mode, where nothing ever asked it for a non-169 length. Only coverage planning
+  (2026-07-25) can ask, so only coverage planning could expose it. The operator's
+  "ltx_video always worked, check a week ago" was accurate.
+- fix: declare the truth -- `min_frames=169, max_frames=169`, as LITERALS. Not
+  derived from the constants: a FrameContract is STATIC because stills are minted
+  against it before the render phase, so it must never track a value that can
+  move underneath it (`test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides`
+  rejected a first draft that did exactly that). Commit 53fcebff.
+  Then TWO more channels that could reintroduce it, both found by the kibitz
+  panel (codex gpt-5.6-sol + antigravity), both closed:
+  1. `assert_env_matches_contract` raises `ContractEnvConflict` when
+     `OTR_LTX_MAX_FRAMES` / `OTR_LTX_MIN_DECODE_FRAMES` disagree with the
+     declaration -- wired into BOTH graph builders, since either can resolve a
+     length. Commit 8c5449db.
+  2. `render_canvas = (832, 480)` declared, because the decode floor's own
+     comment ties it to "this canvas". Without a declaration,
+     `OTR_LTX_RENDER_CANVAS` could move the canvas at boot and invalidate the
+     static contract with no code change; `declared_render_canvas` is applied
+     LAST in `build_request_from_shot` precisely so a declaration wins.
+- verified: plan-vs-engine agreement on the PRODUCTION call path (`join_mode_for`,
+  not a forced mode) -- beats 17/89/168/169 take `single`, 170/250/338/442/530
+  take `chain` with 2-4 segments, and every segment satisfies
+  `_ltx_frame_length(render_frames) == render_frames`. Suite 8253 passed.
+  **A live leg has NOT yet re-run -- the fix lands in code the running server
+  loaded hours earlier, so it is proven in arithmetic only until the overnight
+  driver restarts the server and re-runs it.**
+- bible-worthy: yes. **A capability declaration is a promise the runtime must
+  keep, and an OVERSTATED one is worse than none.** An understated contract
+  merely wastes capability; an overstated one converts a plannable component
+  into a GUARANTEED late failure, because the planner commits work against the
+  declaration and only the render discovers the lie. Three channels can break the
+  promise and all three need closing: the declaration itself, an environment
+  override read at runtime, and a second dimension (here canvas) the bound
+  silently depends on.
+- verify condition (automatable, and implemented): feed each adapter's own
+  declared minimum and maximum through its own length resolver and require them
+  to come back unchanged -- `test_a_declared_MINIMUM_is_a_length_the_adapter_can_actually_render`.
+  Currently covers `ltx_video` only, because each adapter resolves length
+  privately; the general version needs the shared `resolve_render_frames`
+  interface both panel lanes converged on.

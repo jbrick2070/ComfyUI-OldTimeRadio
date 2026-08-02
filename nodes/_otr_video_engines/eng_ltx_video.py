@@ -198,6 +198,35 @@ def assert_env_matches_contract(contract):
             "declaration exists to prevent. NO FALLBACK."
             % (floor, declared_min))
 
+    # THE CANVAS IS PART OF THE SAME PROMISE. The 169 floor is only true at the
+    # canvas it was measured at, so OTR_LTX_RENDER_CANVAS can invalidate the
+    # frame contract without touching a frame number.
+    #
+    # REFUSE rather than silently win. `render_canvas` already beats the env
+    # mechanically (declared_render_canvas is applied last), but quietly handing
+    # back 832x480 to an operator who explicitly asked for 768x432 is its own
+    # small lie -- and this repo's rule is that the environment disagreeing with
+    # a declaration is a REFUSAL, not a quiet re-plan. Same doctrine as the two
+    # checks above; the operator gets told which variable to unset.
+    raw_canvas = (os.environ.get("OTR_LTX_RENDER_CANVAS") or "").strip()
+    declared_canvas = getattr(LtxVideoEngine, "render_canvas", None)
+    if raw_canvas and declared_canvas:
+        try:
+            want = tuple(int(x) for x in raw_canvas.lower().split("x", 1))
+        except (ValueError, AttributeError):
+            want = None
+        if want is not None and want != tuple(declared_canvas):
+            raise ContractEnvConflict(
+                "ltx_video: OTR_LTX_RENDER_CANVAS=%s disagrees with the "
+                "declared render canvas %dx%d. The 169-frame decode floor was "
+                "MEASURED at %dx%d and is only true there, so rendering at "
+                "another canvas would invalidate the frame contract the beat "
+                "was already partitioned against. NO FALLBACK -- unset the "
+                "variable, or re-measure the decode floor at the new canvas "
+                "and move the declaration with it."
+                % (raw_canvas, declared_canvas[0], declared_canvas[1],
+                   declared_canvas[0], declared_canvas[1]))
+
 
 def _ltx_frame_length(target_frame_count, fallback):
     """The FINAL LTX graph length for a shot's frame ask: floor to
@@ -478,6 +507,27 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         allow_tail_trim=True,
         continuity=CONTINUITY_STRICT_FIRST_FRAME,
     )
+    #: THE CANVAS THE 169 FLOOR WAS MEASURED AT (kibitz r3, 2026-08-02).
+    #: This contract is only true at one canvas -- the decode floor's own
+    #: comment says the wrapper VAEDecode "fails outside its tiled band AT THIS
+    #: CANVAS" -- so an unpinned canvas is a live channel for invalidating a
+    #: STATIC declaration without touching a line of engine code.
+    #:
+    #: r2 pinned this with a test over the shipped profiles and called it done.
+    #: That was insufficient and the panel was right to say so: the canvas also
+    #: arrives through ``OTR_LTX_RENDER_CANVAS`` (``render_driver.py:2510``),
+    #: which a profile test cannot see because it is set at BOOT, not in a
+    #: profile. Declaring it closes that channel -- ``declared_render_canvas``
+    #: is applied LAST in ``build_request_from_shot`` precisely so it wins
+    #: ("nothing can clobber this and this clobbers nothing", B5 2026-07-27).
+    #: The r2 worry about colliding with the existing env branch was misplaced:
+    #: the chain is ordered to make the declaration authoritative.
+    #:
+    #: 832x480 is MEASURED, not chosen: all three shipped ltx_video profiles
+    #: declare it and the live leg rendered at it. (An earlier reviewer proposed
+    #: 1472x832; that is the DELIVERABLE canvas the composite scales up to, and
+    #: this engine's own note is that 0.75 "re-noises into mush" there.)
+    render_canvas = (832, 480)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"

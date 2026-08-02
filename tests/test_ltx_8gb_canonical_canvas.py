@@ -104,7 +104,12 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     """The seam is per-adapter opt-in by declaration. An engine that declares
     no canvas keeps whatever the existing chain gives it -- this is not a
     global canvas rewrite wearing one engine's name."""
-    for other in ("ltx_video", "ltx_audio_in", "wan_ti2v", "wan_i2v", "humo",
+    # ltx_video LEFT this group deliberately on 2026-08-02 (kibitz r3): its
+    # 169-frame decode floor is only true at one canvas, so an undeclared canvas
+    # was a live channel for invalidating a static contract via
+    # OTR_LTX_RENDER_CANVAS. It now declares (832, 480). The invariant this test
+    # guards is unchanged -- an engine that declares NOTHING is still untouched.
+    for other in ("ltx_audio_in", "wan_ti2v", "wan_i2v", "humo",
                   "still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None
