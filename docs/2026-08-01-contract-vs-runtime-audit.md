@@ -121,3 +121,60 @@ all. A string grep is not an audit.
 - 16 GB RTX 5080 laptop; models at `C:\ComfyUI-Models`.
 - **A GPU campaign is running right now -- do NOT launch renders or boot a
   server.** Read the files; reason about them.
+
+---
+
+## 6. THE CLOUD LANES -- DEFERRED, NOT DISMISSED (operator ruling 2026-08-02)
+
+**Operator:** "once we get local only we need to be sure all cloud models get
+the same treatment so they work -- but they usually have more frame
+flexibility."
+
+Both halves are right, and the second half changes the FIX SHAPE. Measured from
+the live registry:
+
+| engine | declared |
+|---|---|
+| `cloud_kling_avatar` | range 50-7500 step 1 (up to 300 s) |
+| `google_omni_video` | range 75-250 **step 1** (any integer) |
+| `cloud_seedance_2` | range 100-375 step 25 |
+| `google_veo_video` | menu (100, 150, 200) |
+| `word_razzle` | menu (125, 200) |
+| -- local, for contrast -- | |
+| `ltx_video` | 169 only |
+| `wan_ti2v` / `fastwan_8gb` | 17-177 step 4 |
+
+So cloud lanes really do have far more frame range than anything local.
+
+**But the cloud defect is the INVERSE of the local one, and copying the local
+rule across would not fix it.** Local adapters declare MORE than they can render
+(`ltx_video` claimed 21 rungs, had 1). The cloud adapters declare a length
+range they do not actually CONTROL: `google_omni_video` declares any integer
+75-250, yet its request payload sends no duration at all and canonicalization
+merely reports whatever duration the provider returned -- while `render_driver`
+requires the measured length to equal `segment.render_frames` EXACTLY. The
+declared flexibility is unbacked: the PROVIDER picks, not us.
+
+`google_veo_video` fails a third way -- its menu is conditional at RUNTIME.
+Reference images, or 1080p/4K, force eight seconds, so planning can select 100
+or 150 while execution requests 200.
+
+**Therefore the cloud fix is a different mechanism, not the same one:**
+1. A **provider-variable contract** that plans only after delivery, or
+2. a **deterministic guaranteed length** plus exact canonical trimming, or
+3. **splitting engine identities by capability** so a configuration that forces
+   8 s is a different engine id from one that does not.
+
+The env-conflict refusal built for `ltx_video` is still necessary here (the
+cloud adapters prioritize duration env vars over `timing.target_frame_count`,
+and `word_razzle` already raises `ContractEnvConflict` for exactly this) -- but
+it is not SUFFICIENT, because refusing a bad env does not make an adapter
+control a length the provider owns.
+
+**Sequencing (operator's, and correct):** local first. Cloud is not touched
+until the six local engines are proven on live legs. Recorded here so the
+findings survive the wait -- they came from the r2 panel and are grounded, and
+re-deriving them later would cost the same review again.
+
+Source: `kibitz-runs/2026-08-01-contract-vs-runtime/r2/` (codex `gpt-5.6-sol`
+high MUST-FIX 3/4, SHOULD-FIX 2; grounded and deferred in `judgment.md` R1).

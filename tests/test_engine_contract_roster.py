@@ -435,3 +435,95 @@ def test_the_ltx_video_declaration_still_matches_its_runtime_decode_floor():
     contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
     assert contract.min_frames == _lv._LTX_DECODE_FLOOR_DEFAULT
     assert "_LTX_DECODE_FLOOR_DEFAULT" not in _contract_source("eng_ltx_video.py")
+
+
+# ---------------------------------------------------------------------------
+# kibitz r2 (2026-08-01), codex gpt-5.6-sol + antigravity, both lanes converging
+# with the driver anchor: a contract that the ENVIRONMENT can move is not a
+# contract. The doctrine is already this repo's, on eng_ltx_8gb line 531 --
+# ltx_video simply never enforced it.
+# ---------------------------------------------------------------------------
+
+def test_ltx_video_REFUSES_when_the_env_moves_what_the_contract_froze():
+    """The back door the 2026-08-01 contract fix would otherwise leave open.
+
+    ``_ltx_frame_length`` reads OTR_LTX_MAX_FRAMES and OTR_LTX_MIN_DECODE_FRAMES
+    at RENDER time. The planner has already partitioned the beat against the
+    STATIC declaration, so obeying the env would reproduce the exact failure the
+    declaration was corrected to prevent:
+        segment 1 rendered 169 frame(s) but its plan asked for 89
+    """
+    import os
+
+    from nodes._otr_video_engines import eng_ltx_video as _lv
+
+    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
+    saved = {k: os.environ.get(k)
+             for k in ("OTR_LTX_MAX_FRAMES", "OTR_LTX_MIN_DECODE_FRAMES")}
+    try:
+        for k in saved:
+            os.environ.pop(k, None)
+        # Clean environment agrees with the declaration -> no refusal.
+        _lv.assert_env_matches_contract(contract)
+
+        os.environ["OTR_LTX_MAX_FRAMES"] = str(int(contract.max_frames) + 80)
+        with pytest.raises(fc.ContractEnvConflict):
+            _lv.assert_env_matches_contract(contract)
+        os.environ.pop("OTR_LTX_MAX_FRAMES")
+
+        os.environ["OTR_LTX_MIN_DECODE_FRAMES"] = str(int(contract.min_frames) - 72)
+        with pytest.raises(fc.ContractEnvConflict):
+            _lv.assert_env_matches_contract(contract)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def test_the_refusal_is_wired_into_the_render_path_not_merely_defined():
+    """A guard nothing calls is not a guard.
+
+    ltx_video has TWO graph builders (the i2v branch and the base branch) and
+    both resolve their length through ``_ltx_frame_length``, so both must check
+    first -- a check on only one path leaves the other silently obeying the env.
+    """
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "nodes" / "_otr_video_engines"
+            / "eng_ltx_video.py").read_text(encoding="utf-8")
+    assert text.count("assert_env_matches_contract(") >= 3, (
+        "expected the definition plus a call on BOTH render paths; found %d "
+        "occurrence(s)" % text.count("assert_env_matches_contract("))
+
+
+def test_every_ltx_video_profile_renders_at_the_canvas_the_floor_was_measured_at():
+    """The mechanism by which the frozen 169 could become a SECOND lie.
+
+    The decode floor's own comment ties it to "this canvas" -- the wrapper
+    VAEDecode fails outside its tiled band AT THIS CANVAS. So a profile that
+    moves ltx_video's canvas can invalidate the static contract without
+    touching a line of engine code. Every shipped profile renders 832x480 and
+    the live leg confirmed it; this pins that so a canvas change fails HERE
+    rather than as a plan-vs-render surplus 12 minutes into a leg.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "config" / "profiles"
+    checked = 0
+    for path in sorted(root.glob("*.json")):
+        raw = path.read_text(encoding="utf-8")
+        if '"ltx_video"' not in raw:
+            continue
+        render = (json.loads(raw).get("render") or {})
+        w, h = render.get("canvas_w"), render.get("canvas_h")
+        if w is None or h is None:
+            continue
+        checked += 1
+        assert (int(w), int(h)) == (832, 480), (
+            "%s renders ltx_video at %sx%s, but its 169-frame decode floor was "
+            "measured at 832x480. Re-measure the floor at the new canvas before "
+            "moving this." % (path.name, w, h))
+    assert checked >= 3, "expected to check the shipped ltx_video profiles"

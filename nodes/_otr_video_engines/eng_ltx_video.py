@@ -52,7 +52,8 @@ import os
 
 from . import motion_common as _MC
 from .._otr_shared.still_plan_helpers import StillPlanRow
-from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
+from .frame_contract import (CONTINUITY_STRICT_FIRST_FRAME, ContractEnvConflict,
+                             FrameContract)
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
@@ -151,6 +152,51 @@ _LTX_DECODE_FLOOR_DEFAULT = 169
 #: 832x480 in 12s). This is the LOOP path's OWN floor and deliberately does NOT
 #: touch the 169 landscape floor above (which still guards the 1472x832 tiled band).
 _LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT = 97
+
+
+def assert_env_matches_contract(contract):
+    """REFUSE when the environment moves what the declaration froze.
+
+    The doctrine is already this repo's, written on ``eng_ltx_8gb`` (line 531):
+    "a contract that moves with the environment is not a contract. When the env
+    disagrees with this number the engine must REFUSE, not quietly re-plan."
+    ``ltx_8gb`` enforces it; ``ltx_video`` never did.
+
+    That gap is how the defect fixed on 2026-08-01 re-enters through the back
+    door. The contract is now the literal 169 because that is what
+    ``_ltx_frame_length`` produces -- but that function reads
+    ``OTR_LTX_MIN_DECODE_FRAMES`` and ``OTR_LTX_MAX_FRAMES`` at RENDER time, so
+    setting either one makes the adapter render a length its own contract
+    forbids, and the planner has already partitioned the beat against the
+    contract. Silently obeying the env would reproduce exactly the failure the
+    declaration was corrected to prevent:
+
+        segment 1 rendered 169 frame(s) but its plan asked for 89
+
+    Raised BEFORE any staging or GPU work, and caught by nothing --
+    ``ContractEnvConflict`` is an operator-caused runtime condition an operator
+    can fix, so it names the variable and the legal value.
+    """
+    declared_min = int(contract.min_frames)
+    declared_max = int(contract.max_frames)
+    cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
+    floor = _env_int("OTR_LTX_MIN_DECODE_FRAMES", _LTX_DECODE_FLOOR_DEFAULT,
+                     _LTX_MIN_FRAMES)
+    if cap != declared_max:
+        raise ContractEnvConflict(
+            "ltx_video: OTR_LTX_MAX_FRAMES=%d disagrees with the declared "
+            "max_frames=%d. The beat was already partitioned against the "
+            "declaration, so honouring the environment would render segments "
+            "the plan did not ask for. NO FALLBACK -- unset the variable or "
+            "move the declaration." % (cap, declared_max))
+    if floor != declared_min:
+        raise ContractEnvConflict(
+            "ltx_video: OTR_LTX_MIN_DECODE_FRAMES=%d disagrees with the "
+            "declared min_frames=%d. This adapter renders exactly one length "
+            "and the planner partitioned the beat around it, so a moved decode "
+            "floor silently reintroduces the plan-vs-render surplus this "
+            "declaration exists to prevent. NO FALLBACK."
+            % (floor, declared_min))
 
 
 def _ltx_frame_length(target_frame_count, fallback):
@@ -1338,6 +1384,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # floored/capped/snapped by the pure helper (round 5 F1: a >cap ask is
         # rendered AT the cap and the composite hold-fills the beat window).
         # The decode floor governs BOTH paths (i2v included -- do not touch).
+        # REFUSE FIRST: the env may not move what the contract froze, or the
+        # planner's partition and this render disagree (kibitz r2, A2).
+        assert_env_matches_contract(type(self).frame_contract)
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
@@ -1420,6 +1469,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         classes.setdefault("sigmas", _SigmasFromValues)
         classes.setdefault("sigmas_refine", _SigmasFromValues)
         width, height = self._dims(request)
+        assert_env_matches_contract(type(self).frame_contract)
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)

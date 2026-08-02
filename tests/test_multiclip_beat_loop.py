@@ -679,3 +679,53 @@ def test_a_SHORT_beat_stays_below_the_cape_threshold(monkeypatch):
         clip, _s, _a, _u = rd.render_beat_coverage(
             _shot(plan), {}, request_builder=_request_builder)
         assert not any(r["fear_cape"] for r in clip["segments"])
+
+
+def test_the_FEAR_CAPE_does_not_change_the_beats_FRAME_ARITHMETIC(monkeypatch):
+    """kibitz r2, codex MUST-FIX 2 -- downgraded, but the gap was real.
+
+    Codex argued the cape "invalidates JOIN_CHAIN semantics": under CHAIN a
+    successor drops its head frame because that frame DUPLICATES the
+    predecessor's terminal frame, and the cape replaces that terminal frame with
+    an inverted one, so the dropped frame is new content rather than a duplicate.
+
+    The semantic point is fair; the correctness claim is not. ``drop_head``
+    removes one frame whatever that frame contains, so the visible total is
+    unchanged and the beat cannot drift against its own audio -- which is the
+    only thing the chain proof guarantees. The broken seam IS the intended
+    effect.
+
+    What was genuinely missing: nothing pinned the ARITHMETIC with the cape ON.
+    The existing cape test asserts the flag, not the frame total. This asserts
+    the total, cape on vs cape off, so a future change to the cape cannot
+    silently shorten a beat.
+    """
+    monkeypatch.delenv("OTR_FEAR_CAPE_MIN_SEGMENTS", raising=False)
+    segments = [
+        {"index": 0, "render_frames": 25, "drop_head": 0, "trim_tail": 0},
+        {"index": 1, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+        {"index": 2, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+        {"index": 3, "render_frames": 25, "drop_head": 1, "trim_tail": 0},
+    ]
+    target = 25 + 24 + 24 + 24
+
+    totals = {}
+    for cape in ("1", "0"):
+        monkeypatch.setenv("OTR_FEAR_CAPE", cape)
+        with tempfile.TemporaryDirectory() as tmp:
+            eng = _BeatStub(tmp)
+            _install(monkeypatch, eng)
+            plan = _plan(cp.JOIN_CHAIN, segments, target)
+            clip, _s, _a, _u = rd.render_beat_coverage(
+                _shot(plan), {}, request_builder=_request_builder)
+            # Counted by DECODING, not read off a header.
+            assert ws.ffprobe_counted_frames(clip["path"]) == target
+            assert sum(r["visible_frames"] for r in clip["segments"]) == target
+            totals[cape] = clip["frame_count"]
+            caped = [r["fear_cape"] for r in clip["segments"]]
+            assert caped == ([False, False, False, True] if cape == "1"
+                             else [False, False, False, False])
+
+    assert totals["1"] == totals["0"] == target, (
+        "the fear cape changed the beat's length: cape-on %d vs cape-off %d "
+        "against a target of %d" % (totals["1"], totals["0"], target))
