@@ -13,8 +13,13 @@ Judgment of record: ``docs/2026-07-31-wan-8gb-adversarial-review/report.md``.
 BENCH != QUALIFICATION (spec s2). This measures the VIDEO STAGE IN ISOLATION on
 a 16 GB card under a loader clamp. It cannot reproduce an 8 GB address space, a
 real WDDM/display baseline, fragmentation, PCIe pressure or another GPU
-architecture; it does not prove teardown; it may not lower the admission guard,
-refit ``FRAME_COST_MODEL`` or promote 14B. Every result carries the mandatory
+architecture; it does not prove teardown; it may not lower the admission guard
+or promote 14B. A CLAMPED campaign cell may never refit ``FRAME_COST_MODEL``
+either -- but the separate, operator-authorized ``--estimator-fit`` mode
+(2026-08-02, r2 panel MUST-FIX 3) MAY produce a fit RECEIPT for it: unclamped,
+arm A only, the full 4n+1 ladder, three fresh-boot repeats per length, the
+demand-above-baseline unit, upper-envelope coefficients. The receipt is the
+mode's entire output; the row edit stays a separate reviewed commit. Every result carries the mandatory
 label ``16 GB card, 8 GiB-reserve direct-node prequalification`` -- NEVER
 "8 GB qualified".
 
@@ -48,6 +53,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -100,6 +106,21 @@ BENCH_DIR = os.path.join(OUTPUT_BASE, "otr", "episodes", "_bench_4arm")
 #: trying to observe. It is NOT a physical partition and is NOT visible to OTR's
 #: admission check.
 CAMPAIGN_CLAMP_GIB = 8
+
+# --- ESTIMATOR-FIT MODE (operator-authorized amendment, 2026-08-02) ---------
+# The campaign contract above stands: a CLAMPED campaign cell may never refit
+# FRAME_COST_MODEL (spec s9.1), because an 8 GiB-reserve number describes a
+# simulated box. --estimator-fit is the AMENDED, separate mode the r2 panel
+# required (codex MUST-FIX 3, 2026-08-02): UNCLAMPED (reserve 0), arm A only,
+# the full legal 4n+1 ladder, three fresh-boot repeats per length, quiescent
+# baseline per cell, NVML sampled at 0.1 s -- and its output is a FIT RECEIPT,
+# never a code change. The row edit itself stays a separate, reviewed commit.
+# Results land under _estimator_fit/ so no fit cell can ever be read as a
+# clamped campaign number.
+ACTIVE_CLAMP_GIB = CAMPAIGN_CLAMP_GIB
+ACTIVE_SAMPLER_INTERVAL = 0.25
+ESTIMATOR_FIT_LENGTHS = (17, 49, 81, 113, 145, 177)
+ESTIMATOR_FIT_REPEATS = 3
 
 #: The greenlight bar (spec s12). ``peak_delta_mib + display_allowance <= 8192``.
 #: The 1024 MiB allowance is a DECLARED CONSERVATIVE ASSUMPTION, not a
@@ -1122,6 +1143,64 @@ _RESET_RE = re.compile(
     r"reset_peak_memory_stats OK")
 
 
+def fit_cost_row(points):
+    """(length, demand_mib) samples -> a conservative (overhead, per_frame) row.
+
+    THE UNIT CONTRACT (r2 panel, codex MUST-FIX 2): one quantity, everywhere --
+    ADDITIONAL ENGINE DEMAND ABOVE THE QUIESCENT DESKTOP BASELINE, in MiB.
+    Each cell's demand is ``peak_vram_mib - desktop_baseline_nvml_mib``, both
+    measured in the same cell, so desktop residency and hoisted state cannot
+    leak into the coefficients.
+
+    THE ENVELOPE (codex SHOULD-FIX 1): least squares gives the shape; the row
+    ships the UPPER envelope -- overhead inflated by the largest positive
+    residual -- because ``compute_real_frame_budget`` is the ONLY enforcing
+    guard on this path and a mean fit converts normal run-to-run variance into
+    an unguarded CUDA OOM. Slope is clamped at >= 0: a negative per-frame is
+    measurement noise wearing a trend costume, and the cost model's shape
+    (overhead + per_frame * frames) does not admit it.
+
+    Pure and CPU-tested; raises BenchError rather than extrapolating from a
+    degenerate sample.
+    """
+    pts = [(int(l), float(d)) for l, d in points]
+    if len(pts) < 4:
+        raise BenchError("estimator fit needs >= 4 points, got %d" % len(pts))
+    if len({l for l, _ in pts}) < 2:
+        raise BenchError("estimator fit needs >= 2 distinct lengths")
+    n = float(len(pts))
+    sx = sum(l for l, _ in pts)
+    sy = sum(d for _, d in pts)
+    sxx = sum(l * l for l, _ in pts)
+    sxy = sum(l * d for l, d in pts)
+    denom = n * sxx - sx * sx
+    slope = (n * sxy - sx * sy) / denom
+    intercept = (sy - slope * sx) / n
+    fitted_slope = max(0.0, slope)
+    if fitted_slope != slope:
+        # re-anchor the flat line at the mean so the envelope still covers
+        intercept = sy / n
+    residuals = [d - (intercept + fitted_slope * l) for l, d in pts]
+    envelope_overhead = intercept + max([r for r in residuals] + [0.0])
+    # AN ENVELOPE MAY ONLY EVER ROUND UP. round() took 0.05 MiB off the
+    # overhead and put a measured point ABOVE the stored bound -- caught by
+    # test_the_envelope_covers_every_noisy_point before it could ship. ceil at
+    # the stored precision keeps the receipt readable without letting the
+    # printed row undercut a single sample.
+    env_overhead = math.ceil(envelope_overhead * 10.0) / 10.0
+    env_per_frame = math.ceil(fitted_slope * 1000.0) / 1000.0
+    return {
+        "unit": "MiB of demand above the quiescent desktop baseline",
+        "points": [{"length": l, "demand_mib": round(d, 1)} for l, d in pts],
+        "least_squares": {"overhead_mib": round(intercept, 1),
+                          "per_frame_mib": round(slope, 3)},
+        "envelope": {"overhead_mib": env_overhead,
+                     "per_frame_mib": env_per_frame},
+        "max_positive_residual_mib": round(max(residuals + [0.0]), 1),
+        "residuals_mib": [round(r, 1) for r in residuals],
+    }
+
+
 def parse_timing(log_slice):
     """s/it and the executed-in line, read from the log alone.
 
@@ -1391,8 +1470,8 @@ def build_manifest(arms, helper_sha, git_head=None):
         "git_head": git_head,
         "python": sys.version.split()[0],
         "board_total_mib": round(total_mib, 1),
-        "clamp_reserve_gib": CAMPAIGN_CLAMP_GIB,
-        "clamp": clamp_triple(CAMPAIGN_CLAMP_GIB),
+        "clamp_reserve_gib": ACTIVE_CLAMP_GIB,
+        "clamp": clamp_triple(ACTIVE_CLAMP_GIB),
         "greenlight_peak_delta_mib": GREENLIGHT_PEAK_DELTA_MIB,
         "display_allowance_mib": DISPLAY_ALLOWANCE_MIB,
         "display_allowance_note":
@@ -1484,7 +1563,7 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         "canvas_source": "override" if arm.canvas_overridden else "armspec",
         "armspec_canvas": list(arm.armspec_canvas),
         "graph": arm.graph, "graph_sha256": arm.graph_sha256,
-        "clamp_reserve_gib": CAMPAIGN_CLAMP_GIB,
+        "clamp_reserve_gib": ACTIVE_CLAMP_GIB,
         "label": RESULT_LABEL,
         "arm_notes": arm.notes,
         "estimator_status": manifest["estimator_status"],
@@ -1499,7 +1578,7 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
     try:
         baseline = reset_box(PORT, settle_to_mib=campaign_baseline_mib)
         receipt["desktop_baseline_nvml_mib"] = round(baseline, 1)
-        boot_server(server_log, CAMPAIGN_CLAMP_GIB)
+        boot_server(server_log, ACTIVE_CLAMP_GIB)
         schemas = wait_ready()
         assert_classes_live(schemas, arm)
         resolved = assert_models_visible(schemas, arm)
@@ -1515,7 +1594,7 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         receipt["seed"] = graph_seed(prompt)
         log("CELL %s | %s | %dx%d | %d frames | %d steps | seed %d | reserve %d GiB"
             % (cell_id, arm.label, arm.canvas[0], arm.canvas[1], length,
-               arm.steps, receipt["seed"], CAMPAIGN_CLAMP_GIB))
+               arm.steps, receipt["seed"], ACTIVE_CLAMP_GIB))
 
         with open(server_log, "r", encoding="utf-8", errors="replace") as f:
             f.seek(0, os.SEEK_END)
@@ -1524,7 +1603,7 @@ def run_cell(arm, length, repeat, manifest, campaign_baseline_mib,
         import _run_baseline as RB
         t0 = time.time()
         with Watchdog(server_log, enabled=use_watchdog) as wd:
-            with PeakSampler() as ps:
+            with PeakSampler(ACTIVE_SAMPLER_INTERVAL) as ps:
                 prompt_id = RB._submit_prompt(prompt, BASE_URL)
                 RB._poll_for_completion(prompt_id, BASE_URL, timeout_s=2400.0)
         t1 = time.time()
@@ -1921,7 +2000,7 @@ def dry_validate(arms, boot=True):
     try:
         baseline = reset_box(PORT)
         log("desktop baseline NVML %.0f MiB" % baseline)
-        boot_server(server_log, CAMPAIGN_CLAMP_GIB)
+        boot_server(server_log, ACTIVE_CLAMP_GIB)
         schemas = wait_ready()
         for arm in arms:
             try:
@@ -1984,8 +2063,16 @@ def git_head():
 # main
 # --------------------------------------------------------------------------
 def main(argv=None):
+    global ACTIVE_CLAMP_GIB, ACTIVE_SAMPLER_INTERVAL, BENCH_DIR
     ap = argparse.ArgumentParser(
         description="Clamped multi-arm video bench. BENCH != QUALIFICATION.")
+    ap.add_argument("--estimator-fit", action="store_true",
+                    help="UNCLAMPED estimator-fit mode (operator-authorized "
+                         "amendment 2026-08-02): arm A only, the full legal "
+                         "4n+1 ladder, %d fresh-boot repeats per length, NVML "
+                         "at 0.1 s, reserve 0. Output is estimator_fit.json "
+                         "under _estimator_fit/ -- a FIT RECEIPT, never a code "
+                         "change." % ESTIMATOR_FIT_REPEATS)
     ap.add_argument("--dry-validate", action="store_true",
                     help="offline checks + one boot to confirm node classes and "
                          "loader enums per arm; renders NOTHING")
@@ -2013,15 +2100,37 @@ def main(argv=None):
                          "both the effective and the arm's own canvas.")
     args = ap.parse_args(argv)
 
-    sel = set(s.strip() for s in args.arms.split(",") if s.strip())
-    unknown = sel - set(ARMS_BY_LABEL)
-    if unknown:
-        raise BenchError("unknown arm label(s): %s (known: %s)"
-                         % (", ".join(sorted(unknown)),
-                            ", ".join(a.label for a in ARMS)))
-    arms = [a for a in ARMS if not sel or a.label in sel]
-    if not args.include_gated and not sel:
-        arms = [a for a in arms if not a.gated_reason]
+    if args.estimator_fit:
+        # The mode is deliberately rigid: the fit's authority comes from every
+        # cell sharing one shape. A canvas or arm override would produce a row
+        # measured on something other than what production runs.
+        if args.canvas or args.arms:
+            raise BenchError("--estimator-fit fixes arm A at its shipped "
+                             "canvas; --arms/--canvas cannot combine with it")
+        ACTIVE_CLAMP_GIB = 0
+        ACTIVE_SAMPLER_INTERVAL = 0.1
+        BENCH_DIR = os.path.join(BENCH_DIR, "_estimator_fit")
+        base_arm = ARMS_BY_LABEL["A"]
+        fit_lengths = sorted(
+            [int(x) for x in args.lengths.split(",") if x.strip()]
+            or list(ESTIMATOR_FIT_LENGTHS))
+        arms = [derive_arm_at_canvas(base_arm, base_arm.canvas, fit_lengths)]
+        args.lengths = ",".join(str(x) for x in fit_lengths)
+        log("ESTIMATOR-FIT MODE: arm A, lengths %s, %d repeats/length, "
+            "reserve 0 GiB, NVML %.1fs -- results under %s"
+            % (fit_lengths, ESTIMATOR_FIT_REPEATS,
+               ACTIVE_SAMPLER_INTERVAL, BENCH_DIR))
+
+    if not args.estimator_fit:
+        sel = set(s.strip() for s in args.arms.split(",") if s.strip())
+        unknown = sel - set(ARMS_BY_LABEL)
+        if unknown:
+            raise BenchError("unknown arm label(s): %s (known: %s)"
+                             % (", ".join(sorted(unknown)),
+                                ", ".join(a.label for a in ARMS)))
+        arms = [a for a in ARMS if not sel or a.label in sel]
+        if not args.include_gated and not sel:
+            arms = [a for a in arms if not a.gated_reason]
     # ascending, always: rungs ascend within an arm so a terminal OOM stops that
     # arm's ladder at the first length it cannot carry
     lengths = sorted([int(x) for x in args.lengths.split(",") if x.strip()]
@@ -2043,7 +2152,6 @@ def main(argv=None):
         arms = [derive_arm_at_canvas(a, diag, lengths) for a in arms]
         # its OWN directory: a diagnostic number must never be filed where a
         # reader would take it for the arm's shipped result
-        global BENCH_DIR
         BENCH_DIR = os.path.join(BENCH_DIR, "diagnostic_%dx%d" % diag)
         log("DIAGNOSTIC CANVAS %dx%d -- results under %s" % (diag[0], diag[1],
                                                              BENCH_DIR))
@@ -2073,21 +2181,58 @@ def main(argv=None):
     log("campaign desktop baseline: %.0f MiB" % campaign_baseline)
 
     receipts = []
+    repeats = tuple(range(ESTIMATOR_FIT_REPEATS)) if args.estimator_fit else (0,)
     for arm in arms:
         for length in lengths:
             if length not in arm.lengths:
                 log("arm %s: length %d is not in its ladder -- skipped"
                     % (arm.label, length))
                 continue
-            receipts.append(run_cell(arm, length, 0, manifest,
-                                     campaign_baseline,
-                                     use_watchdog=not args.no_watchdog))
-            write_results(receipts, manifest, arms)     # incremental
-            if receipts[-1].get("status") != "ok":
+            rung_failed = False
+            for repeat in repeats:
+                receipts.append(run_cell(arm, length, repeat, manifest,
+                                         campaign_baseline,
+                                         use_watchdog=not args.no_watchdog))
+                write_results(receipts, manifest, arms)     # incremental
+                if receipts[-1].get("status") != "ok":
+                    rung_failed = True
+                    break
+            if rung_failed:
                 log("arm %s: rung %d did not pass -- stopping this arm's ladder"
                     % (arm.label, length))
                 break
     write_results(receipts, manifest, arms)
+    if args.estimator_fit:
+        # THE FIT RECEIPT -- the mode's entire output. Never a code change:
+        # the FRAME_COST_MODEL row edit is a separate, reviewed commit that
+        # cites this file. Points use the one contracted unit (demand above
+        # the cell's own quiescent baseline); anything short of a full-ladder
+        # sample fails loudly rather than fitting a partial curve.
+        ok_cells = [r for r in receipts if r.get("status") == "ok"]
+        # peak_delta_mib IS the contracted unit, computed in-cell by run_cell:
+        # ps.peak_vram_mib - that cell's own desktop baseline.
+        points = [(r["length"], r["peak_delta_mib"])
+                  for r in ok_cells if r.get("peak_delta_mib") is not None]
+        fit = fit_cost_row(points)
+        fit["engine_id"] = "wan_ti2v"
+        fit["arm"] = "A"
+        fit["canvas"] = list(arms[0].canvas)
+        fit["steps"] = arms[0].steps
+        fit["cells_ok"] = len(ok_cells)
+        fit["cells_total"] = len(receipts)
+        fit["clamp_reserve_gib"] = ACTIVE_CLAMP_GIB
+        fit["label"] = ("UNCLAMPED estimator fit on the 16 GB card; demand "
+                        "above quiescent baseline; envelope row, not mean")
+        fit["current_row_mib"] = {"overhead": 7000.0, "per_frame": 185.0}
+        write_atomic(os.path.join(BENCH_DIR, "estimator_fit.json"),
+                     json.dumps(fit, indent=2) + "\n")
+        log("ESTIMATOR FIT: least-squares (%.0f, %.3f) -> envelope (%.0f, %.3f)"
+            % (fit["least_squares"]["overhead_mib"],
+               fit["least_squares"]["per_frame_mib"],
+               fit["envelope"]["overhead_mib"],
+               fit["envelope"]["per_frame_mib"]))
+        log("DONE. %d cells. Fit receipt under %s" % (len(receipts), BENCH_DIR))
+        return 0
     for g in [grade_arm(a, receipts) for a in arms]:
         log("ARM %-10s %s (%s)" % (g["arm"], g["verdict"], RESULT_LABEL))
     log("DONE. %d cells. Results under %s" % (len(receipts), BENCH_DIR))
