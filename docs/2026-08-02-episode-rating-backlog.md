@@ -27,19 +27,23 @@ compresses several dimensions into one opaque token, and an open rubric can say
 
 ## WHAT THIS PIPELINE ACTUALLY VARIES OVER
 
-Worth stating early, because it changes the design: `CLAUDE.md` already binds
-every episode to "Safe for work. Non-violent. No curse words anywhere." So the
-rater is NOT policing a wide range -- everything shipped should already sit in
-the mildest couple of bands.
+**CORRECTED 2026-08-02, same day.** This section originally argued the rater
+was near-pointless because `CLAUDE.md` bound every episode to "Safe for work.
+Non-violent." The operator removed that line as a remnant -- it described a
+constraint that never actually bit, since nothing in the pipeline was producing
+violent content anyway. So the premise is gone and the argument built on it
+does not hold: there is no standing rule flattening every episode into the
+mildest band.
 
 What DOES vary, and is worth signalling, is TONE and INTENSITY:
 suspense, dread, peril, loss and grief, moral weight, supernatural or body
 strangeness, loudness/startle in the audio mix. The fear-cape inversion exists
 precisely because some beats are meant to unsettle.
 
-So the honest product is closer to **viewer guidance** than to a gate: an
-episode of this show is not going to be unsuitable, but one may be markedly
-more unsettling than another, and the credits are a reasonable place to say so.
+So the honest product is closer to **viewer guidance** than to a gate -- one
+episode may be markedly more unsettling than another, and the credits are a
+reasonable place to say so. That conclusion survives the correction above: it
+rests on what this show IS, not on a rule that no longer exists.
 
 ## SHAPE (for the panel to break later, not settled)
 
@@ -71,9 +75,34 @@ more unsettling than another, and the credits are a reasonable place to say so.
   seed/temperature discipline the other passes use, plus a deterministic
   fallback.
 
+## PRIOR ART -- the shape to borrow (operator asked 2026-08-02)
+
+"Isn't there a public open source rating system people can use that's
+self-governed?" Close, with one consistent catch: **the METHODOLOGIES are
+public; the MARKS are controlled.**
+
+* **IARC** (International Age Rating Coalition) -- exactly the self-governed
+  model: the creator answers a standard questionnaire and ratings are computed
+  automatically for several regions. Administered by a coalition, and the marks
+  are theirs.
+* **Kijkwijzer** (NL) -- questionnaire-driven self-classification with a
+  documented, research-based methodology. The best published rubric to study.
+* **RTA** -- genuinely free to self-apply, but a single binary adults-only
+  flag, not a scale.
+* **PEGI / ESRB** -- published criteria and self-declaration at the lower
+  tiers, controlled marks.
+
+So the pattern to adopt is theirs and the vocabulary must be ours:
+**descriptors -> computed band**, which is the shape this document already
+proposes. IARC and Kijkwijzer are the precedent that it is a legitimate,
+well-tested structure rather than something invented here.
+
+VERIFY LICENSING before adopting any of them directly -- this was written from
+model knowledge with a cutoff, and these bodies revise their terms.
+
 ## OPEN QUESTION FOR THE OPERATOR (when this is scheduled)
 
-Given everything is SFW by rule, is the rating meant to be **informative**
+Is the rating meant to be **informative**
 (tone/intensity guidance, which is what this document assumes) or
 **gatekeeping** (a band that could block publication)? The two produce very
 different designs, and the second one needs a policy decision that is yours,
