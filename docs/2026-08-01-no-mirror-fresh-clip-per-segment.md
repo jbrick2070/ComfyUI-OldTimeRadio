@@ -165,3 +165,63 @@ continuity.
 - Fail loud, never silently degrade.
 - The only workflow JSON is `workflows/otr_canonical.json`.
 - 16 GB RTX 5080 laptop; models at `C:\ComfyUI-Models`.
+
+---
+
+## 7. STATUS CORRECTION, 2026-08-02 -- THE WAN MIRROR IS STILL LIVE
+
+**Found by the kibitz r4 codex lane, and it is a FALSE CLAIM I made, not a new
+defect.** My r2 and r3 kibitz `final.md` documents both ended with "INVARIANTS
+HELD: ... no mirror/ping-pong/re-used frames". That was wrong. The path is live:
+
+    eng_wan_ti2v.py:1070
+        frames = _wb.extend_frames_to_target(frames, target_frames)
+        extension_mode = "ping_pong"
+
+The LTX boomerang was retired (01155e10) and the compositor loop-fill was
+measured as a 1-frame artifact on one music beat. This third one was never
+closed, and I should not have written that the invariant held.
+
+### What is actually true, measured
+
+The mirror is SINGLE-CLIP ONLY, and it is a **VRAM-pressure fallback**, not a
+default:
+
+* A beat longer than the declared `max_frames` (177) already splits -- coverage
+  planning handles it and `_planned_length` never mirrors.
+* For a beat that FITS one render, `_floor_length` asks the VRAM predictor how
+  much it can afford. When that comes back SHORTER than the beat's audio-derived
+  target, the short render is ping-pong-extended up to the target rather than
+  freezing on the last frame (the 0.68s-then-freeze bug, PBUG-20260723-02).
+
+So the mirror fires exactly when VRAM cannot afford the whole short beat. That
+is narrower than "every WAN beat", and wider than "never".
+
+### Why it was NOT fixed tonight
+
+`PLANNING_CAP_ENGINES` is the obvious-looking lever and it is the WRONG one --
+it governs whether a *profile ceiling* narrows the planning contract, not
+whether a beat splits. Splitting is already driven by the declared `max_frames`.
+
+The real fix is: when `_floor_length` would return less than the beat target,
+route the beat to COVERAGE PLANNING (several affordable native segments) instead
+of rendering short and mirroring. That is a planning-topology change on the
+operator's primary engine, and `frame_contract.py:289` states the rule for this
+class of change in as many words:
+
+> Adding an id here is a per-engine decision with a LIVE PROOF attached, never
+> a convenience.
+
+There is no live proof available at 01:00 with the GPU mid-campaign and the
+operator asleep, and a wrong fix here degrades every WAN beat. Recorded instead
+of guessed.
+
+### What the next session should do
+
+1. Reproduce: force a WAN beat whose target exceeds the VRAM-affordable length
+   and confirm `extension_mode == "ping_pong"` in the receipt.
+2. Route that case to `partition_beat` instead, with the segment count coming
+   from the affordable length rather than the contract max.
+3. Prove on a live leg, then add a test asserting `extend_frames_to_target` is
+   unreachable from any production render path.
+4. Only then may any document claim the no-mirror invariant holds.
