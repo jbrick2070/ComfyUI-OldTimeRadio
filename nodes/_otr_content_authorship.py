@@ -93,6 +93,14 @@ def stamp_receipt(
     ledger_data: dict[str, Any], *, owner_bank: str,
     accepted_artifacts: Mapping[str, Any],
 ) -> dict[str, Any]:
+    # VOICE COVERAGE GATES THE MINT (PBUG-20260802-02). Both content-owned
+    # lanes pass through here -- the ONE shared pre-proof boundary -- so this
+    # is where "every cast member gets a voice" is enforced, by SAYABLE text
+    # rather than raw text. A row that passes this gate is a row the
+    # writer-tail cleanup will never empty, which is what makes the proofs
+    # minted below stable instead of "a proof of nothing".
+    from ._otr_cast_voice_coverage import require_voice_coverage
+    require_voice_coverage(ledger_data, owner_bank=owner_bank)
     receipt = build_receipt(
         ledger_data, owner_bank=owner_bank,
         accepted_artifacts=accepted_artifacts,
