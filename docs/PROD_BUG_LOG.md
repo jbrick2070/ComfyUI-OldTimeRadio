@@ -3045,3 +3045,52 @@ out until they independently meet the same production-only admission rule.
   Currently covers `ltx_video` only, because each adapter resolves length
   privately; the general version needs the shared `resolve_render_frames`
   interface both panel lanes converged on.
+
+## PBUG-20260802-02 -- the writer casts two characters and writes lines for one
+- surfaced: the live 45-word campaign, 2026-08-02. TWO legs, two different
+  symptoms, one underlying fault:
+  * `wan_ti2v` (02:35, 2.7 min): `[scifi_fable2] pass 'script' failed after 4
+    attempt(s): markup ladder exhausted`, with `UNKNOWN_SPEAKER` on every line
+    of both characters AND `CAST_MEMBER_SILENT: Commander Vance` /
+    `CAST_MEMBER_SILENT: Pilot Elara`.
+  * `ltx_video` (02:47, 2.2 min): `OTR_CastLock: freeze cascade stamped
+    freeze_verdict='needs_full_rerun'`, from
+    `[LFC] read-only structural validation failed under content_owned_readonly:
+    content_authorship: line proof coverage mismatch: missing=[]
+    extra=['shot_001_b2', 'shot_001_b4', 'shot_002_b2', 'shot_002_b4',
+    'shot_003_b2']`.
+- root cause: the ledger shows those five "extra" rows are EXACTLY the second
+  character's lines, and every one carries `len(text)==0`:
+      shot_001_b1  len=111  speaker=c02
+      shot_001_b2  len=0    speaker=c03   <- extra proof
+      shot_001_b3  len=196  speaker=c02
+      shot_001_b4  len=0    speaker=c03   <- extra proof
+  The phase-2B skeleton allocates dialogue slots for BOTH cast members, the
+  composition fills only c02, and c03's rows are left empty. `_voiced_rows`
+  (`_otr_content_authorship.py:28`) excludes a row with empty text, so the
+  authorship proofs -- minted while those rows still had text -- no longer
+  match the live voiced set, and the read-only structural validation refuses.
+  So the writer produces an effectively SINGLE-character play from a TWO-
+  character cast, and two different downstream gates catch it in two different
+  ways.
+- **the two symptoms are the same fault, which is why this is one entry.** The
+  `UNKNOWN_SPEAKER` half was a separate, real parser gap (the role parenthetical,
+  fixed in afe53c7c); fixing it did not fix this, it merely let a script that
+  previously died at the parser reach the freeze gate, where the silent second
+  character is what fails. Fixing a blocker upstream does not fix the thing it
+  was hiding.
+- fix: **NOT FIXED.** Recorded at 03:00 with the operator asleep and the GPU
+  mid-campaign. It is a story-QUALITY defect in the composition pass, not a
+  renderability bug, and the right fix is upstream of everything touched
+  tonight.
+- verify idea (automatable): after composition and before the freeze gate,
+  assert every cast member the skeleton allocated a slot for has at least one
+  non-empty line -- and fail there, by name, rather than letting an empty row
+  reach an authorship proof and surface as a coverage mismatch five stages
+  later. The current failure names `shot_001_b2` when the real answer is
+  "character c03 never got any dialogue".
+- bible-worthy: probably -- **an artifact minted from state that a later stage
+  can still invalidate is a proof of nothing.** The authorship receipt is built
+  from rows that are voiced AT THAT MOMENT; nothing stops a later pass emptying
+  one. The portable rule is to build such a proof at the same barrier that
+  freezes the state it describes, or to re-derive it at the gate.
