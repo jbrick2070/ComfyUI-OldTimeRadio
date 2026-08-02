@@ -56,8 +56,15 @@ def test_registry_has_two_rows_gemma_and_qwen():
 
 
 def test_gemma_row_shape():
+    # PROMOTED 2026-08-01, same evidence shape as the qwen promotion below:
+    # 4096 -> 8192 after a live leg (fastwan_8gb 45-word canonical run, RESULT
+    # SUCCESS, published obs asset). 4096 was a DEFAULT_CONTEXT_WINDOW
+    # placeholder, not a property of the model -- the GGUF file itself declares
+    # gemma4.context_length = 262144 -- and it sat below the pipeline's own
+    # contract (_P0_PROMPT_OVERHEAD_TOKENS 2600 + _P0_BASE_OUTPUT_TOKENS 2800
+    # = 5400), so the story writer could never fit on this row.
     row = GGF.gguf_row_for_repo(GEMMA)
-    assert row.context_window == 4096
+    assert row.context_window == 8192
     assert row.kv_gb_per_1k == 0.7
     assert row.vram_fit_tier == "PASS"
     assert row.think_policy == "none"
@@ -145,8 +152,12 @@ def test_n_ctx_validate_not_clamp(monkeypatch):
     monkeypatch.setenv("OTR_GGUF_N_CTX", "2048")
     lc = GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY, seed=1)
     assert lc.n_ctx == 2048
-    # Over the gemma row's 4096 window -> RAISE, never clamp to 4096.
+    # At the gemma row's window -> accepted (promoted to 8192 on 2026-08-01).
     monkeypatch.setenv("OTR_GGUF_N_CTX", "8192")
+    lc = GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY, seed=1)
+    assert lc.n_ctx == 8192
+    # Over the window -> RAISE, never clamp down to the window.
+    monkeypatch.setenv("OTR_GGUF_N_CTX", "16384")
     with pytest.raises(GGF.GGUFNativeConfigError):
         GGF.build_gguf_load_config(repo_id=GEMMA, policy=BASELINE_POLICY, seed=1)
     # Below the 512 floor -> RAISE.
@@ -266,7 +277,7 @@ def test_vram_estimate_no_halve_plus_kv():
     # gemma gguf: real on-disk artifact size (no /2) + per-row KV at ctx window.
     est = cat._estimate_resident_gb(GEMMA)
     weights = round(GGF.EXPECTED_Q8_0_SIZE_BYTES / (1024 ** 3), 1)
-    kv = (4096 / 1024.0) * 0.7
+    kv = (8192 / 1024.0) * 0.7          # row window promoted 4096 -> 8192
     assert est == pytest.approx(weights + kv, abs=1e-6)
     # A curated transformers row is still halved (BF16 download heuristic).
     mistral = cat._estimate_resident_gb("mistralai/Mistral-Nemo-Instruct-2407")

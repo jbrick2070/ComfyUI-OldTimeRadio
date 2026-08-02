@@ -44,7 +44,24 @@ DEFAULT_CONTEXT_WINDOW = 4096
 # divide) -- a guessed constant that blocks a good config is as bad as one that lets a
 # bad config through.
 KV_GB_PER_1K_CTX = 0.7
-DEFAULT_OUTPUT_TOKENS_CAP = 512
+
+# The GGUF lane's own OUTPUT ceiling. 512 until 2026-08-01, which was below the
+# pipeline's own contract and made the story writer structurally impossible on
+# this backend: P0 asks for _P0_BASE_OUTPUT_TOKENS = 2800 and got refused with
+#   "cannot fit the complete requested output: requested_output=2800,
+#    provider_output_cap=512"
+# The other two backends never had this problem -- _otr_comfy_backend caps at
+# 8192, _otr_openrouter_backend at 16384. 512 was the outlier, not the rule.
+#
+# Until now the only thing keeping the writer alive was exporting
+# GEMMA4_12B_MAX_NEW_TOKENS at server boot, which is a dead channel waiting to
+# happen (PBUG-20260723-02): the env binds at boot only, so any restart that
+# forgot it silently restored the failure. The default itself has to be right.
+#
+# 4096 is bounded by the window, not guessed: context_window 8192 minus
+# _P0_PROMPT_OVERHEAD_TOKENS 2600 leaves 5592 usable, so 4096 fits with room to
+# spare while clearing P0's 2800 plus its per-extra-root-field allowance.
+DEFAULT_OUTPUT_TOKENS_CAP = 4096
 DEFAULT_N_BATCH = 512
 DEFAULT_N_GPU_LAYERS = -1
 

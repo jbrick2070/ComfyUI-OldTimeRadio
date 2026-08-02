@@ -29,7 +29,7 @@ def test_virtual_row_schema():
         gguf.EXPECTED_Q8_0_SIZE_BYTES / (1024 ** 3), 1
     )
     assert row.requires_auth is False
-    assert row.context_window == 4096
+    assert row.context_window == 8192   # promoted 2026-08-01; see test_gemma_row_shape
 
 
 def test_dropdown_gguf_row_is_bare_and_validates(tmp_path):
