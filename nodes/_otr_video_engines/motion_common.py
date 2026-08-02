@@ -26,6 +26,7 @@ shared GPU lease + the dep-free registry error types. torch / diffusers / the LT
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 
@@ -335,6 +336,27 @@ class MotionBudgetError(RuntimeError):
     lower the frame_count widget, free VRAM, or pick a lighter engine."""
 
 
+def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
+                            canvas_h, engine_name):
+    """Refuse an UNAFFORDABLE length. The guard the planned path never had.
+
+    ``_planned_length`` deliberately does not consult the VRAM predictor -- a
+    planned segment's length is arithmetic the rest of the beat was built
+    around, not a preference. That was survivable while planned segments were
+    rare; with ``wan_ti2v`` now coverage-planned it means the ONLY enforcing
+    guard was bypassed on the path that does most of the rendering
+    (``VramPeakProbe`` samples and never enforces).
+
+    So: same cost model, same refusal, no re-snapping. The caller passes the
+    length it already decided on and the SAME free-VRAM accounting
+    ``_floor_length`` uses (live free + hoisted, so resident weights are not
+    charged twice). Raises :class:`MotionBudgetError`; returns ``frame_count``.
+    """
+    compute_real_frame_budget(free_vram_mb_value, frame_count,
+                              canvas_w, canvas_h, engine_name)
+    return int(frame_count)
+
+
 def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
                               canvas_w, canvas_h, engine_name):
     """S4 platform-portability REWRITE (2026-07-10): the frame budget is the
@@ -367,6 +389,39 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
     except (TypeError, ValueError):
         margin = _BUDGET_MARGIN
     budget_mb = float(free_vram_mb_value) * margin
+
+    # ---- THE ZERO-SLOPE HOLE (kibitz r3, found INDEPENDENTLY by both lanes;
+    # control flow specified by r2 MUST-FIX 3). Until 2026-08-02 BOTH the
+    # fixed-overhead admission and the frame admission lived under
+    # `if per_frame_at_res > 0`, so a cost row whose per-frame measured ZERO
+    # disabled the ONLY enforcing guard on this path entirely -- no refusal
+    # ever fired, even when the resident model alone did not fit. It could not
+    # fire while the shipped row was (7000, 185); it arms itself the moment a
+    # MEASURED row lands, and the estimator fit clamps slope at >= 0 precisely
+    # because the low end of the ladder is nearly flat. So this is a
+    # PREREQUISITE of the cost-row commit, not a follow-up to it.
+    #
+    # 1. a malformed cost model is a configuration error, not a budget answer
+    for label, value in (("overhead", overhead),
+                         ("per_frame", per_frame_at_res),
+                         ("margin", margin)):
+        if not math.isfinite(value) or value < 0:
+            raise MotionBudgetError(
+                "engine %s: cost model %s is %r -- a cost model must be finite "
+                "and non-negative. Check FRAME_COST_MODEL and the "
+                "OTR_VIDEO_COST_* / OTR_VIDEO_BUDGET_MARGIN overrides."
+                % (engine_name, label, value))
+    # 2. the FIXED overhead must fit, whatever the slope. Unconditional.
+    if budget_mb < overhead:
+        raise MotionBudgetError(
+            "engine %s: the model's fixed overhead alone (%.0f MB) exceeds the "
+            "usable budget %.0f MB (free=%.0f MB, margin=%.2f). No frame count "
+            "is affordable -- free VRAM or pick a lighter engine."
+            % (engine_name, overhead, budget_mb,
+               float(free_vram_mb_value), margin))
+    # 3. zero slope is legal ONLY now that the overhead has been proven to fit:
+    #    frames are free, so any length is affordable.
+    # 4. a positive slope prices the frames.
     if per_frame_at_res > 0:
         affordable = int((budget_mb - overhead) / per_frame_at_res)
         if affordable < snapped:
@@ -557,5 +612,6 @@ __all__ = [
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
     "VramPeakProbe",
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
-    "compute_real_frame_budget", "MotionEngineBase",
+    "assert_frame_affordable", "compute_real_frame_budget",
+    "MotionEngineBase",
 ]

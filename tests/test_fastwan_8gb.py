@@ -399,7 +399,10 @@ def test_planner_sees_the_cap_so_plan_and_contract_cannot_disagree():
     assert "fastwan_8gb" in _FC.PLANNING_CAP_ENGINES
     # wan_ti2v is deliberately NOT added: its ceiling stays a render cap, and
     # this build does not touch the shipped tier.
-    assert "wan_ti2v" not in _FC.PLANNING_CAP_ENGINES
+    # wan_ti2v JOINED 2026-08-02: its mirror was deleted under the
+    # no-mirror ruling, so it needs the planner to split beats it
+    # cannot render in one affordable pass.
+    assert "wan_ti2v" in _FC.PLANNING_CAP_ENGINES
 
 
 def test_profile_preflight_requires_the_lora():

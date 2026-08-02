@@ -307,7 +307,13 @@ def can_chain(engine) -> bool:
 #: engine here lets the planner SEE that cap so plan and contract cannot disagree.
 #: Capping the planner at 81 is not the "pile of 17-frame renders" the WAN note
 #: warns about: 81 frames is 3.24 s of real motion per segment.
-PLANNING_CAP_ENGINES = ("ltx_8gb", "fastwan_8gb")
+#: ``wan_ti2v`` ADDED 2026-08-02. Its adapter-side ping-pong was deleted under
+#: the operator's no-mirror ruling, and that mirror was load-bearing: without
+#: coverage planning the engine simply REFUSES any beat it cannot render in one
+#: VRAM-affordable pass. Listing it lets the planner split those beats into
+#: affordable NATIVE segments, which is what "original video for every second of
+#: audio" requires.
+PLANNING_CAP_ENGINES = ("ltx_8gb", "fastwan_8gb", "wan_ti2v")
 
 
 class PlanningCapError(ValueError):

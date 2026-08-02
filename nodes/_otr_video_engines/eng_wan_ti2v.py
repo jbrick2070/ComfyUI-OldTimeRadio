@@ -792,7 +792,8 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return _wb.quantize_frames_4n1(
             budget, min_frames=_TI2V_MIN_FRAMES, max_frames=hard_cap)
 
-    def _planned_length(self, target_frame_count):
+    def _planned_length(self, target_frame_count, width=None, height=None,
+                        hoisted_vram_mb=None):
         """The render length for a COVERAGE-PLANNED segment: its own, whole.
 
         A planned segment's length came off ``coverage_plan.partition_beat``,
@@ -851,6 +852,18 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "claiming real multi-clip coverage. Raise max_render_frames "
                 "for this tier or route the beat to a single-clip engine."
                 % (self.name, target, ceiling, ceiling))
+        # AND IT MUST FIT. The planned path used to skip the VRAM predictor
+        # entirely -- survivable while planned segments were rare, not now that
+        # this engine is coverage-planned and the mirror that hid an
+        # unaffordable render is gone. Same accounting as the single-clip
+        # branch: live free + hoisted, so resident weights are not charged
+        # twice. Skipped only when the caller has no canvas to price.
+        if width and height:
+            free_mb = _MC.free_vram_mb()
+            if free_mb is not None and hoisted_vram_mb is not None:
+                free_mb = float(free_mb) + float(hoisted_vram_mb)
+            _MC.assert_frame_affordable(free_mb, target, int(width),
+                                        int(height), self.name)
         return target
 
     def _build_graph(self, request, image_name, plan, length, width, height,
@@ -999,7 +1012,9 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # knowable from pure numbers, so the refusal must not arrive after an
         # init image has been written -- and never after the GPU work.
         if multi_clip:
-            length = self._planned_length(target_frames)
+            length = self._planned_length(
+                target_frames, width, height,
+                session.get("hoisted_vram_mb"))
         else:
             # CLIP-FILL: PREDICT the VRAM-affordable render length for THIS
             # canvas (never react-to-OOM); the short render is ping-pong-
@@ -1063,17 +1078,19 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                     "real multi-clip coverage, and hands the next chained "
                     "segment a mirrored frame to continue from."
                     % (self.name, n_native, target_frames))
-            # CLIP-FILL, SINGLE-CLIP ONLY: ping-pong-extend the VRAM-bounded
-            # short render up to the beat's audio-derived target so the
-            # composite fills the beat with motion instead of holding the last
-            # frame (the 0.68s-then-freeze bug, PBUG-20260723-02).
-            frames = _wb.extend_frames_to_target(frames, target_frames)
-            extension_mode = "ping_pong"
-            _LOG.warning(
-                "[OTR video] %s CLIP-FILL: rendered %d frame(s) -> "
-                "ping-pong extended to %d (beat target %d) @ %dx%d so the beat "
-                "is FILLED with motion (no hold-last-frame freeze)",
-                self.name, n_native, len(frames), target_frames, width, height)
+            # NO MIRRORS (operator ruling 2026-08-02). Every second of audio
+            # gets ORIGINAL video, so a short render is a refusal, never a
+            # ping-pong. Coverage planning below routes the beat to several
+            # affordable NATIVE segments; once it does, this is unreachable.
+            raise _wb.GraphExecutionError(
+                "%s rendered %d real frame(s) of a %d-frame beat and REFUSES to "
+                "ping-pong the difference. Every second of audio gets ORIGINAL "
+                "video -- a mirrored tail is re-used video wearing a new "
+                "timestamp. The render was VRAM-bounded to %d frames at %dx%d; "
+                "route this beat through coverage planning so it is covered by "
+                "several affordable NATIVE segments, or free VRAM so the whole "
+                "beat fits one render. NO FALLBACK."
+                % (self.name, n_native, target_frames, n_native, width, height))
         # NAMED FOR THE ENGINE THAT RENDERED IT (2026-08-01). This was a literal
         # "otr_wan_ti2v_", so the first live fastwan_8gb render wrote
         # otr_wan_ti2v_<hash>.mp4 -- a scratch file whose name attributes the work

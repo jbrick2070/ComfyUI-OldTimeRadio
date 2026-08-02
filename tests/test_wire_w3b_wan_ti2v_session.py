@@ -284,17 +284,22 @@ def test_a_failure_DURING_the_hoist_does_not_strand_the_lease(monkeypatch,
 # THE PING-PONG: still there for the tier, forbidden inside a plan
 # ---------------------------------------------------------------------------
 
-def test_a_SINGLE_CLIP_beat_STILL_PING_PONGS(wired, monkeypatch):
-    """THE HALF THAT MUST NOT MOVE. The 8 GB tier pins a 17-frame render
-    ceiling and fills the rest of the beat with a mirror extension -- that is
-    ``PBUG-20260723-02``, shipped and load-bearing. If this goes red the chunk
-    has ripped the low-VRAM tier instead of narrowing it."""
+def test_a_SINGLE_CLIP_beat_REFUSES_rather_than_mirroring(wired, monkeypatch):
+    """INVERTED 2026-08-02 (operator ruling): "I don't want any mirrors or
+    ping-pongs -- we need ORIGINAL video for every second of audio."
+
+    This asserted the opposite -- that a 17-frame ceiling renders SHORT and
+    mirrors the rest to fill the beat. That mirror was load-bearing, which is
+    exactly why removing it makes this engine REFUSE instead of quietly
+    shipping re-used frames. Coverage planning is what makes the beat
+    renderable again, with native segments.
+    """
     eng, _counts, tmp_path = wired
     monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "17")
-    raw = eng.render_clip(_request(tmp_path, frames=33), {"patchers": []})
-    assert raw["native_frame_count"] == 17, "the tier renders SHORT on purpose"
-    assert raw["extension_mode"] == "ping_pong"
-    assert raw["frame_count"] == 33, "and the beat is still FILLED"
+    with pytest.raises(Exception) as exc:
+        eng.render_clip(_request(tmp_path, frames=33), {"patchers": []})
+    assert "REFUSES to ping-pong" in str(exc.value) or "ORIGINAL" in str(exc.value), (
+        "the refusal must name the rule it is enforcing: %s" % exc.value)
 
 
 def test_a_COVERAGE_PLANNED_segment_RENDERS_ITS_WHOLE_LENGTH(wired):
@@ -389,7 +394,8 @@ def test_the_PING_PONG_GUARD_holds_even_if_the_length_decision_is_wrong(
     produce -- and the pad must still refuse rather than mirror its way to the
     right frame count inside a beat claiming real multi-clip coverage."""
     eng, _counts, tmp_path = wired
-    monkeypatch.setattr(eng, "_planned_length", lambda target: 17)
+    monkeypatch.setattr(eng, "_planned_length",
+                        lambda target, *a, **k: 17)
     prepared = eng.prepare(host_caps={}, profile={}, session_ctx=_ctx(2))
     try:
         with pytest.raises(Exception) as caught:
@@ -429,14 +435,16 @@ def test_the_receipt_SURVIVES_canonicalisation_into_the_manifest_dict(
     grader never sees. Both WAN adapters share that method, which is why the
     passthrough lives there and not in each adapter."""
     eng, _counts, tmp_path = wired
-    monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "17")
-    req = _request(tmp_path, frames=33)
+    # A beat the engine CAN render natively: the receipt must still carry the
+    # fields, and now they say "none"/equal, which is the only honest answer
+    # once mirroring is gone (2026-08-02).
+    req = _request(tmp_path, frames=17)
     clip = eng.canonicalize(eng.render_clip(req, {"patchers": []}), req, {})
     assert clip["native_frame_count"] == 17
-    assert clip["extension_mode"] == "ping_pong"
-    assert clip["frame_count"] == 33, (
-        "frame_count ALONE cannot answer the question -- a padded clip and a "
-        "real one carry the same number, which is what the new fields are for")
+    assert clip["extension_mode"] == "none"
+    assert clip["frame_count"] == 17, (
+        "frame_count ALONE cannot answer the question -- the extension fields "
+        "are what prove a clip is real rather than padded")
 
 
 def test_BOTH_wan_adapters_ANSWER_the_extension_question():
