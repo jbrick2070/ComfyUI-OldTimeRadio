@@ -537,16 +537,48 @@ def _check_per_cast_invariants(
         cid = ln.get("char_id")
         if isinstance(cid, str) and cid:
             referenced.add(cid)
+    name_by_id = {
+        str(row.get("char_id") or ""): str(row.get("name") or "")
+        for row in cast if isinstance(row, dict)
+    }
+    announcer_voiced = "announcer" in referenced
     for char_id in seen_char_ids:
-        if char_id == "announcer":
-            # Announcer cast row commonly auto-stamped; missing
-            # reference is OK if there are non-skipped announcer
-            # lines OR the writer chose not to use it.
+        row_name = name_by_id.get(char_id, "").strip().upper()
+        if char_id == "announcer" or row_name == "ANNOUNCER":
+            # The announcer CAST row carries a roster id (c01) while its LINES
+            # carry the sentinel "announcer" (production_ledger.py:114-139) --
+            # so a raw-id comparison can never mark it referenced. The old
+            # `char_id == "announcer"` skip matched no real cast row, which
+            # meant this check WARNED on c01 for every episode ever frozen,
+            # into a warning list nobody reads. Match the row by NAME, credit
+            # it via the sentinel, and keep the no-announcer-lines case a
+            # WARNING (the original comment's "the writer chose not to use
+            # it" is a legitimate episode shape; a mime CHARACTER is not).
+            if not announcer_voiced:
+                warnings.append(
+                    f"cast char_id={char_id!r} (ANNOUNCER) has no non-skipped "
+                    f"sentinel-announcer line"
+                )
             continue
         if char_id not in referenced:
-            warnings.append(
-                f"cast char_id={char_id!r} is not referenced by any "
-                f"non-skipped line"
+            # ESCALATED warning -> ERROR (operator ruling 2026-08-02,
+            # PBUG-20260802-02): "every cast member needs a voice -- it's a
+            # radio drama, not a mime show." This is the UNIVERSAL backstop:
+            # every bank converges on this cascade, while the sayable-text
+            # gate at stamp_receipt only covers the two content-owned lanes
+            # (five of seven banks never mint an authorship receipt). By the
+            # time this runs, the writer-tail cleanup has already converted
+            # "nothing sayable" into skip=True, so non-skipped IS the sayable
+            # predicate here -- the two checks share one meaning at two
+            # moments. A cast member no non-skipped line references is an
+            # unrenderable ghost: no voice, no dialogue, but a portrait, a
+            # credit and a caption slot all still pointing at them.
+            errors.append(
+                f"cast char_id={char_id!r} "
+                f"(name={name_by_id.get(char_id, '')!r}) has no non-skipped "
+                f"line. Every cast member gets a VOICE: write real dialogue "
+                f"for them or reroll the cast so they never enter the ledger. "
+                f"(operator ruling 2026-08-02; PBUG-20260802-02)"
             )
 
 

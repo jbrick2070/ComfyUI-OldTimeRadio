@@ -443,7 +443,16 @@ class TestPerCastInvariants:
         assert rep.is_clean or not rep.errors
         assert data["meta"]["cleanup_locked"] is True
 
-    def test_unreferenced_char_id_is_warning_not_error(self):
+    def test_unreferenced_char_id_now_BLOCKS_the_freeze(self):
+        """INVERTED 2026-08-02 (operator ruling, PBUG-20260802-02). This test
+        used to pin the warn-only behaviour -- "soft gap, freeze still
+        completes" -- which is precisely how a mime shipped: a cast member
+        with no line got a portrait, a credit and a caption slot, and the
+        episode froze with a warning nobody reads. "Every cast member needs a
+        voice -- it's a radio drama, not a mime show." The cascade is the one
+        gate EVERY bank converges on (five of seven banks never mint an
+        authorship receipt), so this is where the ruling binds universally.
+        """
         data = _clean_ledger_data()
         # Add an extra cast member nobody speaks for.
         data["cast"].append({
@@ -452,11 +461,24 @@ class TestPerCastInvariants:
             "traits": "never appears",
             "voice_preset": "v2/en_speaker_4",
         })
+        with pytest.raises(_LFC.FreezeAssertionError) as ei:
+            _LFC.phase_10_gap_audit_post_and_freeze(data)
+        joined = " ".join(ei.value.errors)
+        assert "c99" in joined and "GHOST" in joined, (
+            "the refusal must name the silent character, not a row index")
+        assert "VOICE" in joined
+
+    def test_the_announcer_roster_row_is_credited_via_its_SENTINEL(self):
+        """The escalation exposed a latent mismatch: the announcer CAST row is
+        c01 while announcer LINES carry the sentinel 'announcer', so a raw-id
+        comparison warned on c01 for every episode ever frozen. The row is
+        credited through the sentinel and must NOT block."""
+        data = _clean_ledger_data()
         rep = _LFC.phase_10_gap_audit_post_and_freeze(data)
-        # Soft gap -> freeze still completes.
         assert rep.errors == []
-        assert any("c99" in w for w in rep.warnings)
-        assert data["meta"]["freeze_verdict"] == "frozen_with_warns"
+        assert not any("ANNOUNCER" in w and "no non-skipped" in w
+                       for w in rep.warnings), (
+            "a voiced announcer must not even warn: %r" % rep.warnings)
 
     def test_traits_wrong_type_raises(self):
         data = _clean_ledger_data()
