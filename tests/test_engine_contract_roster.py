@@ -528,13 +528,14 @@ def test_every_ltx_video_profile_renders_at_the_canvas_the_engine_declares():
             continue
         checked += 1
         assert (int(w), int(h)) == (832, 480), (
-            "%s renders ltx_video at %sx%s, but its 169-frame decode floor was "
-            "measured at 832x480. Re-measure the floor at the new canvas before "
-            "moving this." % (path.name, w, h))
+            "%s renders ltx_video at %sx%s, but the adapter declares 832x480 "
+            "and its frame contract describes what it produces THERE. The "
+            "decode floor is canvas-dependent, so re-measure the decode band "
+            "at the new canvas before moving this." % (path.name, w, h))
     assert checked >= 3, "expected to check the shipped ltx_video profiles"
 
 
-def test_ltx_video_DECLARES_the_canvas_its_169_floor_was_measured_at():
+def test_ltx_video_DECLARES_its_render_canvas_so_the_env_cannot_move_it():
     """kibitz r3: the profile-only pin from r2 was not enough.
 
     The canvas also arrives through OTR_LTX_RENDER_CANVAS, read at render time
@@ -550,8 +551,10 @@ def test_ltx_video_DECLARES_the_canvas_its_169_floor_was_measured_at():
 
     saved = os.environ.get("OTR_LTX_RENDER_CANVAS")
     try:
-        # Hostile: the deliverable canvas, which this engine's own note says
-        # "re-noises into mush", and at which the 169 floor was never measured.
+        # Hostile: the DELIVERABLE canvas the composite scales up to, which
+        # this engine's own note says "re-noises into mush". (It IS where the
+        # 169 floor was measured -- but it is not where production renders,
+        # and the declaration is what the contract was written against.)
         os.environ["OTR_LTX_RENDER_CANVAS"] = "1472x832"
         assert rd.declared_render_canvas("ltx_video") == (832, 480), (
             "the declaration must not follow OTR_LTX_RENDER_CANVAS -- it is the "

@@ -444,3 +444,49 @@ class TestProperties:
             assert script is None
             assert expected in [d.code for d in defects], (
                 f"expected {expected} in {render_defects(defects)}")
+
+
+# ---------------------------------------------------------------------------
+# The ROLE PARENTHETICAL, from the live wan_ti2v leg (2026-08-02)
+# ---------------------------------------------------------------------------
+
+def test_a_speaker_restated_with_its_ROLE_still_resolves_to_the_cast():
+    """The defect that killed a leg 2.7 minutes in, before any video ran.
+
+    gemma re-stated each speaker with the role it had been cast in --
+    "Commander Vance (Space Force Tactician)" against a roster holding
+    "Commander Vance" -- so EVERY line of both characters raised
+    UNKNOWN_SPEAKER, the repair ladder burned its four attempts, and
+    OTR_LedgerScriptWriter failed the whole episode:
+
+        [scifi_fable2] pass 'script' failed after 4 attempt(s):
+        markup ladder exhausted; last defects:
+        - UNKNOWN_SPEAKER: Commander Vance (Space Force Tactician) (line 5)
+
+    It is a restatement of the cast, not a different character, so it must
+    resolve -- and resolve to the ROSTER spelling, since that is what every
+    downstream consumer keys on.
+    """
+    text = GOLDEN.replace("MARA:", "MARA (Chief Astronomer):").replace(
+        "IVO:", "IVO (Committee Liaison):")
+    script, defects = _parse(text)
+    assert D.UNKNOWN_SPEAKER not in _codes(defects), (
+        "a speaker re-stated with its role must resolve to the cast, got %s"
+        % _codes(defects))
+    assert script is not None
+    spoken = {ln.speaker for sc in script.scenes for ln in sc.lines}
+    assert spoken == {"MARA", "IVO"}, (
+        "the parsed artifact must carry the ROSTER spelling, not the "
+        "role-decorated one, or every downstream key misses: %s" % spoken)
+
+
+def test_a_GENUINELY_unknown_speaker_still_fails_after_the_strip():
+    """The fallback must not turn the guard off.
+
+    Stripping a trailing parenthetical is a way to RECOGNISE a cast member, not
+    a way to accept anyone. A name that is not on the roster with or without its
+    parenthetical is still UNKNOWN_SPEAKER.
+    """
+    text = GOLDEN.replace("MARA:", "STRANGER (Passing Visitor):", 1)
+    _script, defects = _parse(text)
+    assert D.UNKNOWN_SPEAKER in _codes(defects)

@@ -2550,10 +2550,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # mechanisms cannot disagree if a family mapping ever moves.
     #
     # Declared today: `ltx_8gb` (512x288) and, since 2026-08-02, `ltx_video`
-    # (832x480). ltx_video joined because its 169-frame decode floor is only
-    # true at the canvas it was measured at, so leaving the canvas to the env
-    # branch above left `OTR_LTX_RENDER_CANVAS` able to invalidate a STATIC
-    # frame contract without touching engine code. `ltx_audio_in` keeps its env
+    # (832x480). ltx_video joined because its 169-frame decode floor is
+    # CANVAS-DEPENDENT, so leaving the canvas to the env branch above left
+    # `OTR_LTX_RENDER_CANVAS` able to invalidate a STATIC frame contract
+    # without touching engine code. `ltx_audio_in` keeps its env
     # branch until the general resolver lands (the O1 judgment's own scoping).
     _declared = declared_render_canvas(str(shot.get("engine_id") or ""))
     if _declared is not None:

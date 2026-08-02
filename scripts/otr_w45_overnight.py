@@ -89,23 +89,43 @@ def passed_engines() -> set:
     return out
 
 
-def restart_server() -> bool:
-    """Boot a fresh server so code fixed since the last boot is actually live."""
-    say("restarting the server so post-boot code fixes become live")
-    try:
-        proc = subprocess.run(
-            ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(BOOT)],
-            capture_output=True, text=True, timeout=600)
-    except subprocess.TimeoutExpired:
-        say("server boot TIMED OUT")
-        return False
-    tail = (proc.stdout or "").strip().splitlines()[-4:]
-    for line in tail:
-        say("  boot: %s" % line)
-    if "SERVER UP" not in (proc.stdout or ""):
-        say("server did NOT come up -- stopping, this needs a human")
-        return False
-    return True
+def restart_server(attempts: int = 3) -> bool:
+    """Boot a fresh server so code fixed since the last boot is actually live.
+
+    RETRIES, because a single failure here is not evidence the box is broken.
+    On 2026-08-02 this gave up after one try at 02:39 and parked the whole night
+    with two engines unproven -- and the identical boot script, run by hand five
+    minutes later, brought the server up first time. The failure was transient:
+    the boot ran seconds after the previous server was killed at the end of a
+    leg, and the launcher never wrote a byte to its log, so the .cmd died before
+    even redirecting rather than the server failing to start.
+
+    A boot costs ~20 s. A false "this needs a human" costs the rest of the
+    night. Retry with a widening settle, and only then stop.
+    """
+    for attempt in range(1, attempts + 1):
+        say("restarting the server so post-boot code fixes become live "
+            "(attempt %d/%d)" % (attempt, attempts))
+        try:
+            proc = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(BOOT)],
+                capture_output=True, text=True, timeout=600)
+        except subprocess.TimeoutExpired:
+            say("server boot TIMED OUT on attempt %d" % attempt)
+            proc = None
+        if proc is not None and "SERVER UP" in (proc.stdout or ""):
+            return True
+        for line in (proc.stdout or "").strip().splitlines()[-3:] if proc else []:
+            say("  boot: %s" % line)
+        if attempt < attempts:
+            settle = 30 * attempt
+            say("boot attempt %d failed -- settling %ds before retrying "
+                "(a just-killed server can still be releasing the port)"
+                % (attempt, settle))
+            time.sleep(settle)
+    say("server did NOT come up after %d attempts -- stopping, this needs a "
+        "human" % attempts)
+    return False
 
 
 def run_campaign(engines: list) -> list:

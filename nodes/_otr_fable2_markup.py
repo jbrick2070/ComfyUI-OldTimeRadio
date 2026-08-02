@@ -109,6 +109,25 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     return s, ()
 
 
+#: A speaker label that re-states the character's ROLE after the name --
+#: "Commander Vance (Space Force Tactician)". The writer does this when the
+#: cast card is fresh in its context, and every such line used to raise
+#: UNKNOWN_SPEAKER against a roster holding the bare name.
+_RE_ROLE_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
+
+
+def _strip_role_parenthetical(name: str) -> str:
+    """``"Vance (Tactician)"`` -> ``"Vance"``. Strips ONE trailing group.
+
+    Only a TRAILING parenthetical, and only one, so a name that is entirely
+    parenthesised or carries an interior group is left alone rather than being
+    mangled into something that might collide with a different cast member. The
+    caller keeps the exact-match attempt first; this is the fallback.
+    """
+    stripped = _RE_ROLE_PARENTHETICAL.sub("", str(name)).strip()
+    return stripped or str(name).strip()
+
+
 def _normalize_line(line: str) -> "tuple[str, tuple[str, ...]]":
     """Normalize transport whitespace and balanced label emphasis.
 
@@ -341,6 +360,26 @@ class _Parse:
         canonical_name = self.speaker_by_key.get(
             self._speaker_key(supplied_name)
         )
+        if canonical_name is None:
+            # THE ROLE PARENTHETICAL (2026-08-02, live wan_ti2v leg).
+            # The writer re-states a speaker with the role it was cast in --
+            # "Commander Vance (Space Force Tactician)" against a roster that
+            # says "Commander Vance" -- and every one of that character's lines
+            # then raised UNKNOWN_SPEAKER. Four repair attempts later the markup
+            # ladder exhausted and the leg died in the writer, 2.7 minutes in,
+            # having never reached a video engine at all.
+            #
+            # It is a restatement of the cast, not a different character, so it
+            # resolves rather than fails. Deliberately a FALLBACK and never the
+            # primary key: a roster that genuinely carries parentheses still
+            # matches exactly first, and this cannot merge two distinct cast
+            # members because it only rewrites the SUPPLIED name before looking
+            # it up in the roster map that was already built from exact keys.
+            bare = _strip_role_parenthetical(supplied_name)
+            if bare != supplied_name:
+                canonical_name = self.speaker_by_key.get(
+                    self._speaker_key(bare)
+                )
         if canonical_name is None:
             self.defect(
                 Fable2ParseDefect.UNKNOWN_SPEAKER, supplied_name, no

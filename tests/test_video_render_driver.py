@@ -110,7 +110,12 @@ def test_assert_soak_ok_rejects_violations(mutate):
 def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     """BUG-LOCAL-412 (6/5 parity): ltx_video renders at its native 832x480
     (LTX-2B mushes above 480p; the composite scales it up) while still_pan
-    keeps the full 1472x832 landscape canvas. Both env-overridable."""
+    keeps the full 1472x832 landscape canvas.
+
+    still_pan stays env-overridable. ltx_video STOPPED being so on 2026-08-02:
+    it declares a render_canvas, which wins, because its frame contract is a
+    single canvas-dependent length that an env-moved canvas would invalidate.
+    """
     monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
     # This test isolates canvas selection. Explicitly exercise LTX's documented
@@ -135,9 +140,9 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
     # ltx_video's canvas STOPPED being env-overridable on 2026-08-02, and that
     # is the fix rather than a regression. Its frame contract is now the single
-    # length 169, which is only true at the canvas the decode floor was measured
-    # at -- so an env-moved canvas would invalidate a STATIC contract the beat
-    # was already partitioned against, with no code change and no warning.
+    # length 169. That bound is CANVAS-DEPENDENT, so an env-moved canvas would
+    # invalidate a STATIC contract the beat was already partitioned against,
+    # with no code change and no warning.
     # A declared render canvas wins (it is applied last, by design), and the
     # engine REFUSES at render time rather than quietly handing back a canvas
     # the operator did not ask for. still_pan, which declares nothing, keeps its
