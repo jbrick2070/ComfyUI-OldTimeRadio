@@ -69,6 +69,16 @@ LEGS = [
 # failure, because a client timeout does not cancel the server job. Sized to the
 # measurement with headroom instead of to a round number.
 LEG_TIMEOUT_S = 21600
+
+# The engines a failing adapter falls BACK to. Their appearance in a leg's
+# delivered_engine set is the silent-degrade signature: the episode publishes,
+# looks fine, and never touched the engine under test. A real video engine
+# appearing alongside the one under test is NOT this -- it is role
+# specialisation (humo cannot render a music beat; it has no face to drive).
+PROCEDURAL_FLOOR = frozenset({
+    "still_parallax", "still_flat", "still_pan", "still_motion", "still_word",
+    "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala", "mesh_stage",
+})
 VRAM_BASELINE_MB = 2600
 VRAM_SETTLE_S = 240
 
@@ -251,17 +261,42 @@ def run_leg(engine: str, profile: str, words: int) -> dict:
 
     # The engine under test must be the engine that actually rendered. A
     # published file proves the pipeline ran; only the ledger proves WHICH
-    # engine ran, and a silent fall-back to still_parallax would otherwise be
-    # scored as a pass for an engine that never loaded.
+    # engine ran, and a silent fall-back to the procedural floor would
+    # otherwise be scored as a pass for an engine that never loaded.
+    #
+    # "ONLY this engine" was the FIRST version of this rule and it was WRONG.
+    # It failed the humo leg after a 97-minute render that had actually
+    # succeeded: humo is an audio-driven FACE engine, so its profile correctly
+    # routes the beats with no face -- music_visual and announcer_visual -- to
+    # ltx_audio_in, and the ledger showed exactly that:
+    #     character_video x5 -> humo
+    #     music_visual, announcer_visual -> ltx_audio_in
+    # That is role specialisation working, not a fallback. ltx_8gb and
+    # ltx_audio_in passed the strict rule only because they are general-purpose
+    # enough to cover every role themselves.
+    #
+    # What the check is actually FOR is the silent degrade: an engine that fails
+    # to load and quietly hands its beats to the procedural floor, publishing a
+    # perfectly valid episode that never touched the engine under test (the
+    # 2026-06-12 mesh_stage catch: "PASS but engine NOT in the trace"). So:
+    # the engine under test must have delivered at least one clip, and no
+    # procedural-floor engine may appear at all.
     if verdict.get("ok"):
         delivered = verdict.get("delivered") or []
+        floor_used = sorted(set(delivered) & PROCEDURAL_FLOOR)
         if not delivered:
             verdict.update(ok=False, why="ledger records no delivered_engine")
-        elif delivered != [engine]:
+        elif engine not in delivered:
             verdict.update(
                 ok=False,
-                why="wrong engine delivered: expected %s, ledger says %s"
-                    % (engine, ", ".join(delivered)))
+                why="engine under test never delivered a clip: expected %s, "
+                    "ledger says %s" % (engine, ", ".join(delivered)))
+        elif floor_used:
+            verdict.update(
+                ok=False,
+                why="silent fall-back to the procedural floor: %s also "
+                    "delivered (ledger says %s)"
+                    % (", ".join(floor_used), ", ".join(delivered)))
 
     verdict.update(engine=engine, profile=profile, exit=code,
                    minutes=round(elapsed / 60.0, 1), log=log_path.name)
