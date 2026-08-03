@@ -52,6 +52,15 @@ SERVER = "http://127.0.0.1:8000"
 #: The 14.5 GB real-world target from CLAUDE.md, in MB.
 CEILING_MB = 14848
 
+#: MEASURED run-to-run spread for an IDENTICAL configuration, not a guess.
+#: Three cold portrait 49-frame runs on 2026-08-02 gave 15,624 / 15,904 / 15,914
+#: MB. Any orientation delta at or under this is indistinguishable from simply
+#: running the same cell twice, and must not be reported as a difference. The
+#: first version of this comparison used a guessed 300 MB and duly labelled the
+#: noisiest rung on the ladder "DIVERGENT" -- a threshold invented ahead of the
+#: data will manufacture exactly the finding it was guessed into.
+REPEATABILITY_MB = 290
+
 PEAK_RE = re.compile(
     r"\[(?P<engine>[\w.]+)\] render-window VRAM peak:\s*(?P<mb>\d+)\s*MB"
     r"\s*\(length=(?P<length>\d+)\s+canvas=(?P<canvas>\d+x\d+)\)")
@@ -296,7 +305,8 @@ def main(argv=None):
             db = pair[b]["peak_used_mb"]
             print("  %3d frames: %s %s MB vs %s %s MB -> delta %+d MB %s"
                   % (frames, a, da, b, db, db - da,
-                     "(MATCH)" if abs(db - da) < 300 else "(DIVERGENT)"))
+                     "(MATCH)" if abs(db - da) <= REPEATABILITY_MB
+                     else "(beyond repeatability -- look, do not conclude)"))
         else:
             print("  %3d frames: incomplete pair, no comparison" % frames)
 
