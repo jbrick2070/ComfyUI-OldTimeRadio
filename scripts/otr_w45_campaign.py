@@ -741,7 +741,18 @@ def run_leg(engine: str, profile: str, words: int) -> dict:
     # procedural-floor engine may appear at all.
     if verdict.get("ok"):
         delivered = verdict.get("delivered") or []
-        floor_used = sorted(set(delivered) & PROCEDURAL_FLOOR)
+        # EXCLUDE THE ENGINE UNDER TEST. The comment on PROCEDURAL_FLOOR has
+        # claimed this since the roster went to nineteen engines; the code did
+        # not do it, and it named a floor_violation() helper that was never
+        # written. The first procedural leg to run under the new roster --
+        # still_flat, 2026-08-03 00:09 -- duly failed with "silent fall-back to
+        # the procedural floor: still_flat also delivered", i.e. failed for
+        # being itself. All eight procedural legs would have followed.
+        #
+        # A comment describing a fix is not a fix. This is the same
+        # documentation-reality gap the repo's own rules exist to catch, and it
+        # shipped inside the very change that was correcting one.
+        floor_used = sorted((set(delivered) & PROCEDURAL_FLOOR) - {engine})
         if not delivered:
             verdict.update(ok=False, why="ledger records no delivered_engine")
         elif engine not in delivered:
