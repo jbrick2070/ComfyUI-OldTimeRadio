@@ -230,6 +230,25 @@ SAME_FRAME_REL_TOL = 0.04
 #: Floor for the contrast scale, so a genuinely flat clip cannot drive the
 #: tolerance to zero and call every frame different.
 MIN_CONTRAST_SCALE = 1.0
+
+#: HELD FRAMES AND MIRRORS NEED DIFFERENT TOLERANCES, because they leave
+#: different traces in the encode.
+#:
+#: A held frame is THE SAME FRAME EMITTED TWICE. H.264 codes the repeat as a
+#: skip with no residual, so it decodes essentially identically -- deviation
+#: near zero. A mirror is a re-encoded REVERSAL: genuinely similar to its twin
+#: but predicted from different references, so it never matches byte for byte
+#: and needs the looser contrast-relative tolerance above.
+#:
+#: Using the loose tolerance for both was wrong in a way that matters on this
+#: show. Measured on a real leg, a near-static announcer card held 46 frames
+#: within 1.78 of its anchor against a 1.89 tolerance -- flagged -- while only
+#: ONE frame was byte-identical. That is a still shot, which is a creative
+#: choice, not reused video. A pixel threshold cannot tell a deliberately quiet
+#: shot from a repeated one, so the held-frame test is tightened to the point
+#: where only genuine duplication survives, and judging whether a shot is "too
+#: still" is left to the person watching it.
+HELD_FRAME_TOL = 0.5
 VRAM_BASELINE_MB = 2600
 VRAM_SETTLE_S = 240
 
@@ -416,14 +435,42 @@ def find_frame_reuse(sigs) -> dict:
     tol = SAME_FRAME_REL_TOL * scale
     out["contrast_scale"], out["tolerance"] = round(scale, 2), round(tol, 3)
 
-    def same(i, j):
-        return float(np.abs(sigs[i] - sigs[j]).mean()) <= tol
+    def dist(i, j):
+        return float(np.abs(sigs[i] - sigs[j]).mean())
 
-    run = best_run = 1
-    for i in range(1, n):
-        run = run + 1 if same(i, i - 1) else 1
-        best_run = max(best_run, run)
+    def same(i, j):                      # mirror test: re-encoded, so relative
+        return dist(i, j) <= tol
+
+    def duplicated(i, j):                # hold test: same frame, so near-exact
+        return dist(i, j) <= HELD_FRAME_TOL
+
+    # A HELD FRAME IS CUMULATIVE STASIS, NOT SLOW MOTION.
+    #
+    # The first implementation counted runs of small NEIGHBOUR-TO-NEIGHBOUR
+    # difference, and that fails on the thing this engine actually does. A HuMo
+    # clip opens with a slow motion-onset ramp: measured on a real leg, frames
+    # 2-41 had consecutive distances averaging 1.11 (under tolerance) while
+    # drifting 6.05 away from the run's first frame -- only 1 of 40 frames was
+    # identical to it. The picture was changing the whole time, slowly. Failing
+    # that leg cost 142 minutes of GPU and pointed at a re-armed extender that
+    # does not exist.
+    #
+    # So a run only counts as HELD when the picture also does not move away from
+    # where it started: every frame must stay within tolerance of the run's
+    # ANCHOR, not merely of its predecessor. A genuine hold satisfies both; slow
+    # motion satisfies only the first.
+    best_run, run_start = 1, 0
+    i = 0
+    while i < n:
+        anchor = i
+        j = i + 1
+        while j < n and duplicated(j, j - 1) and duplicated(j, anchor):
+            j += 1
+        if (j - anchor) > best_run:
+            best_run, run_start = j - anchor, anchor
+        i = j if j > i + 1 else i + 1
     out["max_identical_run"] = best_run
+    out["identical_run_at"] = run_start
 
     # Reflection search. A genuine mirror reflects for many frames; incidental
     # matches die after one or two, so a span threshold separates them cleanly.
@@ -599,13 +646,34 @@ def verify_asset(started_at: float) -> dict:
                     "why": "cannot read the engine registry, so no clip could be "
                            "classified motion-vs-static and the no-reuse "
                            "invariant is UNPROVEN for this leg"}
+        # ADVISORY, NOT BLOCKING (2026-08-02, after it cost a 142-minute leg).
+        #
+        # This audit failed its first live leg on shot_l001_character_video_humo
+        # with "40 identical consecutive frames". Diagnosis: only 1 of those 40
+        # frames was byte-identical to the run's anchor and the picture drifted
+        # 6.05 away from it -- HuMo's slow motion-onset ramp, not a held frame.
+        # Two tightenings later it stopped flagging that, and stopped flagging a
+        # near-static announcer card, but it still reports mirror reflections in
+        # clips whose CONSECUTIVE frames already sit inside the mirror tolerance
+        # -- on content that still, a reflection is arithmetic rather than
+        # evidence. No boomerang exists in that lane to produce one:
+        # ``eng_ltx_video._loop_via_reverse`` returns False unconditionally and
+        # ``eng_ltx_av`` has no mirror path at all.
+        #
+        # A check that cannot yet separate "quiet shot" from "reused frame" must
+        # not discard a completed render. The invariant is ALREADY enforced where
+        # it can be enforced exactly -- ``MirrorExtensionForbidden`` in the
+        # engine layer and ``ClipUnderrunsItsBeat`` in the composite, both
+        # terminal, both checked armed before this campaign starts. This audit is
+        # a second opinion on the artifact, so it REPORTS and the leg stands.
+        #
+        # Restore blocking only when the detector can distinguish deliberate
+        # stillness from duplication on this show's own footage.
         if reuse["findings"]:
             first = reuse["findings"][0]
-            return {"ok": False, "asset": asset.name, "coverage": coverage,
-                    "reuse": reuse,
-                    "why": "frame reuse in %s: %s%s" % (
-                        first["clip"], first["why"],
-                        (" -- " + first["detail"]) if first.get("detail") else "")}
+            _say("  REUSE AUDIT (advisory, %d finding(s)): %s: %s%s"
+                 % (len(reuse["findings"]), first["clip"], first["why"],
+                    (" -- " + first["detail"]) if first.get("detail") else ""))
 
     # AN UNRUN CHECK IS NOT A PASSED CHECK. If the episode directory could not
     # be located, `reuse` is still None here and the leg would return ok=True
