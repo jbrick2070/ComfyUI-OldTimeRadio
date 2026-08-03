@@ -5,18 +5,42 @@
 
 Branch `v2.0-alpha`, HEAD `350ab0f0`, pushed. Suite 8286 / Bug Bible green.
 
+## THE SWEEP IS DONE -- 16 EPISODES, AND THE VIDEO LAYER NEVER FAILED
+
+`docs/2026-08-03-SWEEP-30word-all-local-engines.md`. **13/17 legs passed, plus
+the two HuMo legs before it, so 15 of 19 local engines published a real episode
+in one night.** Every passing leg reports COVERS -- video meets or exceeds its
+audio -- which is the no-mirror invariant holding across thirteen consecutive
+episodes on the canonical path. Both randomizers ran live with seeds pinned at
+4242 and the shipped recipes untouched, which is the live proof they have owed
+since 2026-07-31.
+
+**Not one of the four failures was an engine.** All four are upstream, and they
+are four different causes, so `viz_mxc_cpu` and `ltx_audio_in` are UNPROVEN
+rather than broken.
+
 ## THE NEXT CONCRETE ACTION
 
-1. **Read the overnight sweep.** 17 local engines, 30 words, seeds pinned
-   (`OTR_BANK_SEED` = `OTR_VISUAL_STYLE_SEED` = 4242), shipped recipes untouched.
-   Chain: `tmp/_w45_chain_remaining.ps1`; log: `tmp/_w45_chain_remaining.log`;
-   per-leg logs `tmp/_w45_<engine>.log`. Four episodes were already published
-   before it started. **Read the LEG lines, not the exit code.**
-2. **Do NOT build the HuMo pre-roll fix.** M1 killed its premise -- see below.
-3. **The reuse detector goes to the panel before it is touched again.** Two
+1. **Fix the markup parser -- the one real code defect the night found.** The
+   writer emitted `**SCENE 5**`-style markdown headings and the parser read each
+   as a speaker (`UNKNOWN_SPEAKER: **SCENE 5`, then `**MUSIC`, `**CODA`),
+   exhausting all four ladder attempts and killing the `ltx_audio_in` leg. Then
+   re-run that leg.
+2. **Re-run `viz_mxc_cpu`** -- its writer failure was a different cause (an
+   invented cast member, `DR. MOURKIOTI`) and non-deterministic.
+3. **Download `wan2.2-i2v.safetensors`**, then re-run `wan_i2v`. Its failure was
+   the fail-closed contract working: the checkpoint is simply absent.
+4. **Investigate the `OTR_CastLock` freeze cascade** that stamped
+   `freeze_verdict='needs_full_rerun'` and killed `wan_ti2v`.
+5. **Do NOT build the HuMo pre-roll fix.** M1 killed its premise -- see below.
+6. **The reuse detector goes to the panel before it is touched again.** Two
    strikes are already spent on it (three false-positive classes in one night).
-4. **The section 0A carve-out ruling is still owed** before any M2 number moves
+7. **The section 0A carve-out ruling is still owed** before any M2 number moves
    a cap, tier or profile.
+
+**Writer and cast failures cost 3 of 17 legs (18%). That is the highest-value
+thing to harden for unattended runs -- higher than anything in the video layer,
+which did not fail once.**
 
 ## WHAT M1 AND M2 SETTLED
 
