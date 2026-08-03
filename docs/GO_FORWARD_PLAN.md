@@ -1,6 +1,87 @@
 # OTR Go-Forward Plan
 
-**Newest update: 2026-07-31 (CODER closeout) -- THE TWO RANDOMIZERS ARE LANDED
+**Newest update: 2026-08-02 -- THE MIRROR IS DEAD, THE HUMO CAP FOLLOWS THE
+MODEL, AND THE NEXT ACTION IS GPU VALIDATION.**
+
+Branch `v2.0-alpha`, HEAD `392a86f7`, pushed, suite **8289 passed / 0 failures**.
+
+## THE NEXT CONCRETE ACTION (for the `/rc` window with the GPU)
+
+Validate today's spec changes on the real GPU, **locals first**, before any
+campaign. Three jobs, in this order:
+
+1. **M1 -- classify the lip-sync error.** `BUG_BIBLE.yaml:2343` says HuMo audio
+   leads the lips by 100-200 ms with the face static for the first 3-6 frames.
+   **The prescribed fix cannot be built until this is classified**, because
+   pre-roll + equal trim is algebraically a NO-OP if the lag is constant rather
+   than onset-only. Render clear frontal lines with sharp plosive onsets, mux a
+   zero-based CFR-25 / 16 kHz diagnostic, read the offset in EARLY, MIDDLE and
+   LATE speech windows (validate the sign on a deliberately shifted control
+   first). Early-only -> pre-roll fix. Constant -> advance the 25 Hz conditioning
+   features instead. Growing -> a rate/timestamp bug, not a pad. Run a matched
+   no-LoRA control: Kijai reports the lightx2v distill is not fully HuMo-
+   compatible, so the defect may be ours rather than HuMo's.
+2. **M2 -- the paired HuMo ladder**, `49 -> 65 -> 81 -> 97` in BOTH orientations,
+   everything else identical, cold and warm recorded separately. HuMo now carries
+   a `VramPeakProbe` (it was the only heavy lane without one), so this finally
+   produces data. **Prediction: the two orientations match at every rung** --
+   equal pixels, equal token grid. If they do not, the defect is tiling or kernel
+   selection, not the model. Stop at the first rung breaching 14.5 GiB cold.
+3. **The 30-45 word randomizer, one episode per LOCAL engine.** Cloud cannot run
+   (no keys, offline-first) and is qualified statically only.
+
+**M3 is already answered -- do not spend GPU hours on it.**
+`ltx23_16gb_audio_in` has rendered **497 frames at 832x480, peak 12,999 MB**, and
+79 production samples show peak is FLAT against frame count (the 400-499 bucket
+has the LOWEST mean). See `docs/2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames.md`.
+
+## WHAT CHANGED TODAY -- the invariants a GPU run will exercise
+
+* **No mirrors, no ping-pong, no boomerang.** `extend_frames_to_target` DELETED;
+  `fit_frames_to_target` lost `allow_mirror`; `OTR_LTX_LOOP_VIA_REVERSE` is inert
+  for every value. A short render is TERMINAL. Coverage planning splits instead.
+  Credits untouched (black background, called neither path).
+* **The HuMo 14B cap follows the CHECKPOINT, not the orientation** -- both 14B
+  routes share 97 (the trained length); the 1.7B pair declares its own 33-177 and
+  stays uncapped. `humo_14B_169` drops from TEN cuts to five on a 17.68 s beat.
+  **97 is a reasoned bound, not a measured ceiling** -- that is what M2 settles.
+* **One-segment coverage plans now execute as coverage.** The router asked
+  `is_multi_clip`; a one-segment plan owing a tail trim rendered its surplus and
+  kept it. Same fix applied to `BeatSession`'s discriminator and to the
+  per-segment AUDIO window.
+* **VRAM admission boundary** before `prepare()`, free VRAM read once with no
+  hoist correction. It enforces NOTHING today and says so: `QUALIFIED_COST_ROWS`
+  is empty, because `wan_ti2v`'s row is present but disqualified and would refuse
+  every ordinary beat.
+* **Per-segment video seed** (segment 0 unchanged, so archives re-render
+  identically).
+* **`ENGINE_MATRIX.md` is generated** with effective canvas, multi-clip maths and
+  an EVIDENCE column. It found five adapters citing docs that are not in the repo.
+
+## KNOWN OPEN -- do not rediscover these
+
+* The admission guard covers coverage-executed beats only; the single-clip path
+  returns via `render_shot()` first, and `ltx_audio_in` is not in
+  `PLANNING_CAP_ENGINES` -- so the hottest-peaking engine is unguarded.
+* `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA/reserve are
+  env-configurable; a measured row needs a calibration IDENTITY.
+* Four adapters still cite missing receipts (`ltx_audio_in`, `mesh_stage`,
+  `viz_green`, `viz_mxc_mandala`).
+* The lip-sync onset fix is SPECIFIED but unbuilt, blocked on M1.
+* Cap authority is not yet collapsed to one (`video.max_render_frames` should be
+  sole; env twins must be absent-or-equal).
+* `otr_w45_campaign.py` runs SIX engines while claiming all local ones, and its
+  acceptance would not reject a mirror. Fix before trusting a campaign result.
+
+## RESET BEFORE ANY HEADLESS RUN
+
+Per `CLAUDE.md` section 4: kill selectively by CommandLine (never a blanket
+python kill -- it severs the MCP tools), confirm port 8000 is not listening and
+`nvidia-smi` is back to ~1.5 GB, then boot fresh.
+
+---
+
+**Previous update: 2026-07-31 (CODER closeout) -- THE TWO RANDOMIZERS ARE LANDED
 AND PUSHED, AND THE LANE AUTHORITY LEFT THE WRITER.**
 
 Operator directive: `source_bank` and `visual_style` are **TWO SEPARATE
