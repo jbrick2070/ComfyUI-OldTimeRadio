@@ -113,9 +113,6 @@ class CreditsDataError(RuntimeError):
     the no-fallback contract forbids a quiet placeholder."""
 
 
-_STORY_STYLE_STATUS_SCAFFOLD_OFF = "story_scaffold_off"
-
-
 def _require(container, key, source):
     v = (container or {}).get(key)
     if v is None or v == "" or v == {} or v == []:
@@ -125,24 +122,13 @@ def _require(container, key, source):
     return v
 
 
-def _story_style_receipt(meta: dict) -> str:
-    """Return the durable story-style receipt for credits.
-
-    Normal runs require ``meta.style``. A story-scaffold-off run has no story
-    contract by design, so the writer stamps a separate explicit status. That
-    status is accepted only when paired with ``story_scaffold_enabled is False``;
-    a plain missing ``meta.style`` remains a hard data error.
-    """
-    style = (meta or {}).get("style")
-    if style is not None and style != "":
-        return str(style).strip()
-    if (
-        (meta or {}).get("story_scaffold_enabled") is False
-        and (meta or {}).get("story_style_status")
-        == _STORY_STYLE_STATUS_SCAFFOLD_OFF
-    ):
-        return _STORY_STYLE_STATUS_SCAFFOLD_OFF
-    return str(_require(meta, "style", "meta")).strip()
+# _story_style_receipt (and its _STORY_STYLE_STATUS_SCAFFOLD_OFF constant) were
+# DELETED here (2026-08-03; both QA lanes confirmed zero callers after the
+# display swap). If archive regeneration is ever built, the rescue recipe they
+# encoded is: visual_style falls back to legacy meta.style; source_bank has no
+# legacy twin and needs an explicit "legacy" placeholder. 676 of 1178 named
+# on-disk episodes predate the new stamps -- reviving old credits is an
+# OPERATOR decision, never a silent fallback.
 
 
 # --------------------------------------------------------------------------- #
@@ -288,7 +274,18 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
 
     # --- hero / subtitle (title tweak: episode title is the HERO) -----------
     title = str(_require(meta, "episode_title", "meta")).strip()
-    style = _story_style_receipt(meta)
+    # THE META STRIP SHOWS THE LOOK, NOT THE DICE (operator ruling 2026-08-03:
+    # "maybe this story scaffold should not be in the credits but something
+    # else" / "visual style is more downstream of the story"). meta.style is
+    # the PRE-story catalog draw -- two live specimens showed it lying about
+    # the episode on screen ('asteroid_mining_labor_dispute' over a
+    # cartographer's-guild tale, 'pirate_radio_resistance_drama' over a
+    # film-reel story). meta.visual_style is the look that actually governs
+    # image work today and becomes story-derived under the dynamic-visual
+    # design, so it is truthful in both worlds. The scaffold stays in the
+    # ledger (meta.story_contract) as provenance; it just stops being billed
+    # as the episode's identity.
+    style = str(_require(meta, "visual_style", "meta")).strip()
 
     # --- COL 1 -------------------------------------------------------------
     gp = meta.get("gen_params_initial") or {}
@@ -396,6 +393,9 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if gp.get("temperature") is not None or gp.get("top_p") is not None:
         writer_grid.append(("Temp / top_p:", "%s / %s" % (
             gp.get("temperature"), gp.get("top_p"))))
+    if gp.get("num_characters") is not None:
+        # A first-order dropdown (recipe card): how many characters were asked.
+        writer_grid.append(("Characters:", str(gp.get("num_characters"))))
     if gp.get("target_words") is not None:
         writer_grid.append(("Words:", "target %s / actual %s (char %s / ann %s)" % (
             gp.get("target_words"), meta.get("total_word_count"),
@@ -424,14 +424,39 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         spine.append(("Premise:", str(produced["logline"])))
     elif news.get("script_brief"):
         spine.append(("Premise:", str(news["script_brief"])))
-    if ds.get("dramatic_question"):
-        spine.append(("Question:", str(ds["dramatic_question"])))
-    if ds.get("character_a_wants"):
-        spine.append(("A wants:", str(ds["character_a_wants"])))
-    if ds.get("character_b_wants"):
-        spine.append(("B wants:", str(ds["character_b_wants"])))
-    if ds.get("ending_change"):
-        spine.append(("Ending:", str(ds["ending_change"])))
+    if produced.get("subject"):
+        spine.append(("Subject:", str(produced["subject"])))
+    # CONTENT PASS (operator ruling 2026-08-03: keep the UI, improve what it
+    # says). The four dramatic_state rows (Question / A wants / B wants /
+    # Ending) are GONE from the scroll: they are derived BEFORE any dialogue
+    # exists, from the pre-generation brief, and the tempests_chart specimen
+    # scrolled them naming characters who are not in the delivered episode.
+    # They remain in the treatment file, which is a production document. In
+    # their place, the fields the post-script reflection derives FROM the
+    # aired story -- every one live-verified truthful on the 2026-08-03
+    # specimens:
+    if meta.get("story_brief"):
+        spine.append(("Brief:", str(meta["story_brief"])))
+    if meta.get("arc_shape"):
+        spine.append(("Arc:", str(meta["arc_shape"]).replace("_", " ")))
+    _palette = meta.get("visual_palette")
+    if isinstance(_palette, (list, tuple)) and _palette:
+        spine.append(("Palette:", " · ".join(str(p) for p in _palette[:6])))
+    _terms = (meta.get("story_brief_terms")
+              if isinstance(meta.get("story_brief_terms"), dict) else {})
+    _atmo = list(_terms.get("atmosphere") or []) + list(_terms.get("lighting") or [])
+    if _atmo:
+        spine.append(("Atmosphere:", " · ".join(str(a) for a in _atmo[:6])))
+    # The credits are the RECIPE CARD (operator, 2026-08-03: "we should see
+    # the major things a user may tune -- 'oh, what if I change this
+    # dropdown'"). When a surface was ROLLED rather than picked, say so: that
+    # is precisely the dropdown a viewer could set differently next run. The
+    # roll receipts are stamped only when the sentinel actually rolled.
+    _rolled = [label for label, key in (("source bank", "bank_roll"),
+                                        ("visual style", "style_roll"))
+               if isinstance(meta.get(key), dict)]
+    if _rolled:
+        spine.append(("Rolled:", " · ".join(_rolled)))
     if spine:
         flow.append(("spine", {"header": "[ STORY SPINE ]", "rows": spine}))
 
@@ -465,8 +490,20 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
                   "tag": "EPISODE // %s · SCENE 1" % title.upper(),
                   "lines": dialog}))
 
-    # SOURCE INTERCEPT (news, optional)
-    if news.get("script_brief"):
+    # SOURCE INTERCEPT (optional). CONTENT PASS 2026-08-03: this used to scroll
+    # news.script_brief -- the PRE-generation brief, which on the
+    # tempests_chart specimen still named the pitch cast the episode replaced.
+    # The intercept now carries the source's KEY TERMS: the true atoms the
+    # story was actually built from (for the original bank, the spark nouns;
+    # for source banks, the interpreter's extraction). Compact, truthful, and
+    # it reads like an intercept rather than a paragraph of stale prose.
+    _key_terms = news.get("key_terms")
+    if isinstance(_key_terms, (list, tuple)) and _key_terms:
+        flow.append(("intercept",
+                     {"text": ">> SOURCE INTERCEPT: %s"
+                              % " · ".join(str(t) for t in _key_terms[:8])}))
+    elif news.get("script_brief"):
+        # Legacy ledgers without key_terms keep the old read.
         flow.append(("intercept",
                      {"text": ">> SOURCE INTERCEPT: %s" % news["script_brief"]}))
 
@@ -493,7 +530,12 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         "hero": title.upper(),
         "subtitle": "SIGNAL LOST",
         "subtitle_tag": "EPISODE TREATMENT",
-        "meta_strip": "%s · %dx%d · %s" % (
+        # Operator ruling 2026-08-03: "the credits should show the source bank,
+        # definitely" -- the bank leads the strip, then the look. The fuller
+        # story block (brief / arc / source headline / key terms) is the scoped
+        # credits increment, not this line.
+        "meta_strip": "%s · %s · %dx%d · %s" % (
+            str(_require(meta, "source_bank", "meta")).strip(),
             style, w, h, _today()),
         "col1": col1,
         "col2": col2,
@@ -550,6 +592,31 @@ def _fw(draw, s, font) -> int:
         return int(draw.textlength(s, font=font))
     except Exception:  # noqa: BLE001
         return len(s) * font.size
+
+
+def _fit_text(d, s, font, max_w):
+    """Trim ``s`` to ``max_w`` pixels, ending in a visible "...".
+
+    HOISTED module-level 2026-08-03 (QA): the meta strip gained a source_bank
+    prefix and, measured with the real font, overflowed its column at three
+    shipped canvases (720p was -22px on media_archive + shakespeare_stage_
+    realism; 832x480 and 2160p worst pairs also spilled). The same binary
+    search `_draw_models` already used now serves both sites -- a cut is
+    always MARKED, because a value silently shortened to fit reads as the
+    whole value.
+    """
+    if max_w <= 0:
+        return ""
+    if _fw(d, s, font) <= max_w:
+        return s
+    lo, hi = 0, len(s)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _fw(d, s[:mid] + "...", font) <= max_w:
+            lo = mid
+        else:
+            hi = mid - 1
+    return (s[:lo] + "...") if _fw(d, "...", font) <= max_w else ""
 
 
 def _fh(font) -> int:
@@ -825,7 +892,10 @@ def _flow_col1(d, x, top, layout, w, h, note_lines, gaps=1.0):
            fill=_rgba(_GREEN, _A_TAG), font=ft)
     y += _fh(fs) + _gap(6)
     ffine = _load_font(_sc(_PT_FOOTER, h))
-    d.text((x, y), layout["meta_strip"], fill=_rgba(_BRIGHT, 150), font=ffine)
+    # Clamped: bank + style + resolution + date can exceed the column on the
+    # narrow shipped canvases (QA-measured overflow at 720p/480p worst pairs).
+    d.text((x, y), _fit_text(d, layout["meta_strip"], ffine, int(_COL1_W * sx)),
+           fill=_rgba(_BRIGHT, 150), font=ffine)
     y += _fh(ffine) + _gap(24)
 
     for kind, block in layout["col1"]:
@@ -865,25 +935,9 @@ def _draw_models(d, x, y, m, w, h, note_lines=_NOTE_LINES_MAX, gaps=1.0):
     gap = _gap(12)
 
     def _fit(s, font, max_w):
-        """Trim ``s`` to ``max_w`` pixels, ending in a visible "...".
-
-        Binary search rather than a per-character walk: the credits card is
-        drawn per frame, and a ~90-character LANE 2 receipt would otherwise
-        cost ~90 textlength calls a row. Returns "" only when even the ellipsis
-        does not fit -- above that the cut is always MARKED, because a value
-        silently shortened to fit reads as the whole value."""
-        if max_w <= 0:
-            return ""
-        if _fw(d, s, font) <= max_w:
-            return s
-        lo, hi = 0, len(s)
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            if _fw(d, s[:mid] + "...", font) <= max_w:
-                lo = mid
-            else:
-                hi = mid - 1
-        return (s[:lo] + "...") if _fw(d, "...", font) <= max_w else ""
+        """Delegates to the module-level :func:`_fit_text` (hoisted 2026-08-03
+        so the meta strip shares the same marked-cut clamp)."""
+        return _fit_text(d, s, font, max_w)
 
     def _row(label, value, suffix=""):
         d.text((x, cur_y[0]), label, fill=_rgba(_GREEN, _A_LABEL), font=fbody)
@@ -1047,7 +1101,9 @@ def _scroll_render_ops(d, flow, col_w, h, *, measure):
         if kind in ("system", "spine"):
             # bracket header + dim-label / bright-value grid (SYSTEM leads the
             # scroll; STORY SPINE follows -- same shape).
-            _lw = _sc(110, h) if kind == "spine" else _sc(72, h)
+            # 120 not 110 (QA): "Atmosphere:" at 11 monospace chars measured
+            # within a few px of the old 110 budget at 1080p.
+            _lw = _sc(120, h) if kind == "spine" else _sc(72, h)
             T(0, y, block["header"], fh1, _rgba(_TEAL))
             y += _fh(fh1) + _sc(8, h)
             for label, val in block["rows"]:

@@ -2139,7 +2139,12 @@ class SignalLostVideoRenderer:
         led = _OTRSL.overlay_audio_timing(led)
         _meta = led.get("meta") or {}
         voice_assignments = _OTRLC.voice_assignments_from_cast(led)
-        style = _meta.get("style") or ""
+        # HUD + treatment show the LOOK, never the pre-story catalog draw
+        # (operator ruling 2026-08-03). meta.style is the scaffold and lied on
+        # screen twice in one day; meta.visual_style is the channel that
+        # actually governs the picture and is stamped on every run. The
+        # scaffold remains in the ledger as provenance only.
+        style = _meta.get("visual_style") or ""
         genre = (_meta.get("visual_plan") or {}).get("genre") or ""
 
         # Title chain (Path B; slot 1 live since the J.5 title pass):

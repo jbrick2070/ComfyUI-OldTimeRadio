@@ -56,6 +56,8 @@ def _led():
         "meta": {
             "episode_title": "Neon Truth",
             "style": "silent_scientific_protest",
+            "visual_style": "sci_fi_radio",
+            "source_bank": "scifi_news",
             "episode_seed": 42,
             "cast_contract": {"cast_seed": 70303, "seed_source": "os-entropy"},
             "gen_params_initial": {
@@ -136,27 +138,49 @@ def test_hero_is_episode_title_subtitle_is_signal_lost():
     lay = _layout()
     assert lay["hero"] == "NEON TRUTH"                 # episode title = hero
     assert lay["subtitle"] == "SIGNAL LOST"            # 50% subtitle below
-    assert "silent_scientific_protest" in lay["meta_strip"]
+    # The strip shows BANK and LOOK (operator ruling 2026-08-03), never the
+    # story scaffold -- which lied on screen twice in one day
+    # ('asteroid_mining_labor_dispute' over a cartographer's-guild tale,
+    # 'pirate_radio_resistance_drama' over a film-reel story).
+    assert "scifi_news" in lay["meta_strip"]
+    assert "sci_fi_radio" in lay["meta_strip"]
+    assert "silent_scientific_protest" not in lay["meta_strip"]
     assert "1920x1080" in lay["meta_strip"]
 
 
-def test_missing_title_or_style_raises():
-    for key in ("episode_title", "style"):
+def test_missing_title_or_identity_raises():
+    # The no-fallback contract, updated for the display swap: the strip's
+    # inputs are episode_title, visual_style and source_bank. meta.style (the
+    # scaffold) is deliberately NOT required -- a scaffold-off episode has
+    # none, by the bank's own definition.
+    for key in ("episode_title", "visual_style", "source_bank"):
         led = _led()
         del led["meta"][key]
         with pytest.raises(cr.CreditsDataError):
             cr.build_credits_layout(led, w=1920, h=1080, manifest={})
 
 
-def test_scaffold_off_style_receipt_is_explicit_not_visual_fallback():
+def test_scaffold_absence_never_reaches_the_strip():
+    """INVERTED 2026-08-03 (operator: the scaffold does not belong in the
+    credits). The previous pin demanded the strip show the
+    'story_scaffold_off' status token and REFUSE visual_style. The ruling is
+    the opposite: the strip always shows the LOOK, and neither the scaffold
+    slug nor its status token is display content. The status pair remains a
+    ledger receipt (the old _story_style_receipt helper was deleted with the
+    swap -- zero callers)."""
     led = _led()
     del led["meta"]["style"]
     led["meta"]["visual_style"] = "recur_frac"
     led["meta"]["story_scaffold_enabled"] = False
     led["meta"]["story_style_status"] = "story_scaffold_off"
     lay = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
-    assert "story_scaffold_off" in lay["meta_strip"]
-    assert "recur_frac" not in lay["meta_strip"]
+    assert "recur_frac" in lay["meta_strip"]
+    assert "story_scaffold_off" not in lay["meta_strip"]
+    # And a scaffold-ON ledger's slug still never leaks into the strip.
+    led2 = _led()
+    led2["meta"]["visual_style"] = "recur_frac"
+    lay2 = cr.build_credits_layout(led2, w=1920, h=1080, manifest={"clips": []})
+    assert "silent_scientific_protest" not in lay2["meta_strip"]
 
 
 # --------------------------------------------------------------------------- #
@@ -247,11 +271,68 @@ def test_col3_flow_system_spine_full_transcript_intercept_diagnostic():
     assert any("CPU" in r[0] for r in system["rows"])   # SYSTEM in the scroll
     assert any("GPU" in r[0] for r in system["rows"])
     spine = dict(lay["col3_flow"])["spine"]
-    assert "protect the lab" in _flat(spine) and "ship the product" in _flat(spine)
+    # CONTENT PASS 2026-08-03: the dramatic_state rows (Question / A wants /
+    # B wants / Ending) are OUT of the scroll -- they are derived BEFORE any
+    # dialogue exists and the tempests_chart specimen scrolled them naming
+    # characters the delivered episode replaced. The spine now carries only
+    # story-derived fields (premise from the produced logline; brief / arc /
+    # palette / atmosphere when the reflection stamped them).
+    assert "protect the lab" not in _flat(spine)
+    assert "ship the product" not in _flat(spine)
+    assert any("Premise:" in r[0] for r in spine["rows"])
     transcript = dict(lay["col3_flow"])["transcript"]
     # FULL transcript -- every dialogue line present, nothing dropped
     assert len(transcript["lines"]) == 3
     assert "expose my sources" in _flat(transcript["lines"])
+
+
+def test_meta_strip_is_clamped_with_a_marked_cut_at_narrow_canvases():
+    """QA 2026-08-03 (measured with the real font): the source_bank prefix
+    pushed the strip past its column at 720p/480p worst-case pairs. The strip
+    now goes through _fit_text, whose cut is always MARKED with an ellipsis --
+    a value silently shortened to fit reads as the whole value."""
+    from PIL import Image, ImageDraw
+    d = ImageDraw.Draw(Image.new("RGB", (64, 64)))
+    font = cr._load_font(18)
+    long = "media_archive · shakespeare_stage_realism · 1280x720 · 2026-08-03"
+    fitted = cr._fit_text(d, long, font, 200)
+    assert fitted.endswith("...")
+    assert cr._fw(d, fitted, font) <= 200
+    short = cr._fit_text(d, "original · anime", font, 10_000)
+    assert short == "original · anime"          # untouched when it fits
+    assert cr._fit_text(d, long, font, 0) == ""  # degenerate budget
+
+
+def test_spine_carries_the_story_derived_fields_when_stamped():
+    """The reflection's fields -- live-verified truthful on the 2026-08-03
+    specimens -- are the spine's content now: brief, arc (underscores
+    humanized), palette and atmosphere. All optional; absent fields add no
+    row."""
+    led = _led()
+    led["meta"]["story_brief"] = "A standoff over lab data in a midnight tower"
+    led["meta"]["arc_shape"] = "investigation_without_answer"
+    led["meta"]["visual_palette"] = ["glass", "rain", "monitors"]
+    led["meta"]["story_brief_terms"] = {
+        "atmosphere": ["hum", "static"], "lighting": ["sodium"]}
+    lay = cr.build_credits_layout(led, w=1920, h=1080,
+                                  manifest={"clips": []})
+    spine = dict(lay["col3_flow"])["spine"]
+    flat = _flat(spine)
+    assert "A standoff over lab data" in flat
+    assert "investigation without answer" in flat      # humanized, no underscores
+    assert "glass" in flat and "rain" in flat
+    assert "hum" in flat and "sodium" in flat
+
+
+def test_intercept_prefers_key_terms_over_stale_brief():
+    """The intercept scrolls the source's true atoms when key_terms exist;
+    the pre-generation script_brief remains only as the legacy fallback."""
+    led = _led()
+    led["meta"]["news"]["key_terms"] = ["lighthouse", "map", "storm"]
+    lay = cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+    texts = [b.get("text", "") for k, b in lay["col3_flow"] if k == "intercept"]
+    assert any("lighthouse" in t and "storm" in t for t in texts)
+    assert not any("UCLA lab integrity" in t for t in texts)
 
 
 def test_transcript_voice_resolves_announcer_role_tag_alias():
