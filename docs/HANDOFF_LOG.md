@@ -3,6 +3,72 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-02/03 -- HEAD 350ab0f0 (v2.0-alpha) -- WINDOW RC (GPU, M1+M2+sweep)
+
+Did: answered M1 and M2 with measurements, fixed the campaign twice, published
+  three episodes end to end, and left a 17-engine sweep running overnight.
+
+**M1 -- CLOSED, and the answer is that the premise fails.** BUG-07.13 claims
+  audio leads the lips by a CONSTANT 100-200 ms, every clip, every episode. Its
+  CAUSE (a 3-6 frame leading freeze) is absent from two-thirds of 27 clips
+  (median 0 static frames, 4% in the claimed band). Its SYMPTOM does not appear
+  either: across 20 measured segments, ZERO land in +100..+200 ms at any
+  confidence gate, and the sign is predominantly opposite. Residual is about
+  -30 to -60 ms, roughly one frame with the video slightly AHEAD, stable while
+  dispersion collapses from 497 ms to 8 ms as the gate tightens.
+  **DO NOT BUILD THE PRE-ROLL FIX.** Docs:
+  `docs/2026-08-02-MEASUREMENT-humo-static-onset.md`,
+  `docs/2026-08-02-MEASUREMENT-M1-humo-lipsync-offset.md`.
+  Three framings had to die first: the analysis unit was the assembled beat
+  rather than the SEGMENT (operator: each audio clip takes its own journey, to
+  keep VRAM low), the audio window was reconstructed from the ledger rather than
+  RECOVERED from `episodes/_shared/tmp/audio_slices/` (12,475 slices survive on
+  disk), and the video proxy was frame-difference energy that failed its own
+  shifted control. Instrument is `scripts/otr_measure_av_offset.py` -- validated
+  both ways, synthetic to <0.3 ms and a real +120 ms injection moving the reading
+  exactly -120.0 ms. Real landmarks come from mediapipe in `latentsync/.venv`.
+
+**M2 -- ANSWERED, then CORRECTED TWICE by review.**
+  `docs/2026-08-02-MEASUREMENT-M2-humo-vram-ladder.md`. 16 cells, both
+  orientations, cold+warm, server restart before every cold cell. Findings that
+  survive: peak declines as frames RISE (49 -> 97 frames costs ~1 GB LESS, all
+  four series), and no consistent orientation difference (deltas 374/47/1/65 MB
+  at 49/65/81/97 against a 290 MB repeatability). Withdrawn after a kibitz r1
+  panel: it is a RENDER-WINDOW peak not a lifecycle peak (`prepare()` loads
+  handles at `eng_humo.py:490`, the probe starts at `:811`); the
+  coverage-splitting recommendation (production reuses handles ONCE PER BEAT,
+  the ladder used fresh sessions per cell); a bogus "1 in 331,000" (fixed
+  ascending rung order, not independent series); and, after the operator noted
+  "recipes stable for a while, no OOM", the entire ceiling-breach framing --
+  ComfyUI stages 16,531 MB against a 16,303 MB card, so a peak near capacity is
+  a dynamic loader working, not a near miss.
+
+**Campaign -- fixed, then fixed again.** It ran SIX engines while claiming all
+  local ones; there are NINETEEN. Roster now derives from the registry, a
+  missing profile is a loud refusal, and the summary names what it did not run.
+  Its acceptance summed clip DURATIONS, which a mirror satisfies perfectly, so a
+  frame-level reuse audit was added. That audit then false-failed a good
+  142-minute leg on HuMo's slow motion-onset ramp; two tightenings later
+  (cumulative stasis vs an anchor; separate tolerances for holds and mirrors) it
+  is ADVISORY, not blocking. Sonnet QA also found the tolerance was contrast-blind
+  (a noir scene read as frozen) and that `build_legs()` stranded the lock. And at
+  00:09 `still_flat` failed for BEING ITSELF: the PROCEDURAL_FLOOR comment claimed
+  a `floor_violation()` helper that was never written.
+
+Current step: the 17-engine 30-word sweep is RUNNING (chain
+  `tmp/_w45_chain_remaining.ps1`, log `tmp/_w45_chain_remaining.log`), seeds
+  pinned `OTR_BANK_SEED=OTR_VISUAL_STYLE_SEED=4242`, shipped recipes untouched.
+Next: read the sweep results; take the reuse-detector design to the panel before
+  touching it again (two strikes already spent); credits roll wants halving from
+  ~49 s; and the section 0A carve-out ruling is still owed before ANY M2 number
+  moves a cap.
+Published: `the_hidden_force` (HuMo portrait, 142.5 min), `the_unraveled_secret`
+  (HuMo landscape, 49.9 min), `echoes_of_blackwood`, `quantum_leap`.
+Models: Claude (anchor + judge) + two kibitz r1 arcs (codex gpt-5.6-sol +
+  agy gemini-3.6-flash-high) + a Sonnet QA pass + live web research for Mac.
+Commits: 1ccaddad, 537bb9d3, eb7ca9f7, 4ca98444, c09f33cb, 5eb41c50, d8a39995,
+  350ab0f0.
+
 ## 2026-07-31 05:0x -- HEAD 6da72c92+ (v2.0-alpha) -- WINDOW CODER (overnight)
 Did: shipped the Lemmy source-fidelity exclusion + ripped P3's fixed output
   reservation (e577f9ef); shipped BOTH randomizers -- source_bank and

@@ -1,6 +1,87 @@
 # OTR Go-Forward Plan
 
-**Newest update: 2026-08-02 -- THE MIRROR IS DEAD, THE HUMO CAP FOLLOWS THE
+**Newest update: 2026-08-03 -- M1 AND M2 ARE ANSWERED, AND BOTH ANSWERS ARE
+"THE ASSUMPTION WAS WRONG".**
+
+Branch `v2.0-alpha`, HEAD `350ab0f0`, pushed. Suite 8286 / Bug Bible green.
+
+## THE NEXT CONCRETE ACTION
+
+1. **Read the overnight sweep.** 17 local engines, 30 words, seeds pinned
+   (`OTR_BANK_SEED` = `OTR_VISUAL_STYLE_SEED` = 4242), shipped recipes untouched.
+   Chain: `tmp/_w45_chain_remaining.ps1`; log: `tmp/_w45_chain_remaining.log`;
+   per-leg logs `tmp/_w45_<engine>.log`. Four episodes were already published
+   before it started. **Read the LEG lines, not the exit code.**
+2. **Do NOT build the HuMo pre-roll fix.** M1 killed its premise -- see below.
+3. **The reuse detector goes to the panel before it is touched again.** Two
+   strikes are already spent on it (three false-positive classes in one night).
+4. **The section 0A carve-out ruling is still owed** before any M2 number moves
+   a cap, tier or profile.
+
+## WHAT M1 AND M2 SETTLED
+
+**M1 -- the lip-sync premise fails, twice over.** `BUG_BIBLE.yaml` entry
+BUG-07.13 claims audio leads the lips by a CONSTANT 100-200 ms, every clip,
+every episode. Its stated CAUSE, a 3-6 frame leading freeze, is absent from
+two-thirds of 27 production clips (median 0). Its SYMPTOM does not appear
+either: of 20 measured segments, **zero** land in +100..+200 ms at any
+confidence gate, and the sign is predominantly OPPOSITE -- about -30 to -60 ms,
+one frame with the video slightly ahead. **The prescribed pre-roll would move
+sync the wrong way.** Rewrite BUG-07.13 rather than implement it.
+Docs: `docs/2026-08-02-MEASUREMENT-humo-static-onset.md` and
+`docs/2026-08-02-MEASUREMENT-M1-humo-lipsync-offset.md`.
+
+**M2 -- peak VRAM FALLS as frames rise, and the orientations match.** 16 cells,
+both orientations, cold and warm, server restart before every cold cell: 49 ->
+97 frames costs about a GIGABYTE LESS peak, in all four series, while render
+time stays linear. Orientation deltas are 374/47/1/65 MB at 49/65/81/97 against
+a 290 MB repeatability -- no consistent difference. **97 is a QUALITY bound, as
+`eng_humo.py:106` always said; it is not buying memory safety.**
+`docs/2026-08-02-MEASUREMENT-M2-humo-vram-ladder.md`.
+
+**READ THE CORRECTIONS BLOCK IN THAT DOC BEFORE QUOTING IT.** Four claims were
+withdrawn under review: it is a RENDER-WINDOW peak (the probe starts after
+`prepare()` loads the handles), the coverage-splitting recommendation does not
+follow (production reuses handles once per BEAT; the ladder used fresh sessions),
+the "1 in 331,000" statistic assumed independence a fixed ascending order does
+not provide, and **the whole ceiling-breach framing is withdrawn** -- ComfyUI
+stages 16,531 MB against a 16,303 MB card, so a peak near capacity is a dynamic
+loader working, not a near miss. Operator: recipes have been stable, no OOM.
+
+## OPERATOR DIRECTIVES FROM THIS WINDOW (hard)
+
+* **The recipes are not on the table.** "We spent a lot of time perfecting the
+  recipes to look good and we can't lose that." No VRAM, speed or cap finding
+  justifies a recipe change; measurement runs the SHIPPED recipe unchanged. This
+  specifically forbids reading "peak falls as frames rise" as a reason to raise
+  the 97 trained-length cap, and makes the deferred no-LoRA HuMo control a
+  recipe change rather than a control.
+* **Per-segment rendering is BY DESIGN** -- "each audio clip takes its own
+  journey, to keep VRAM low." Never classify an assembled beat as one render.
+* **The ending credits roll should be halved**, ~49 s -> ~25 s. Check whether the
+  duration is a scroll rate, a per-entry dwell or a fixed clip length, and keep
+  the text legible at 2x. (The 35-48% share measured on sweep legs is a 30-word
+  test artifact -- "30-word episodes are an anomaly anyway" -- do not quote it as
+  a production problem.)
+
+## STILL OPEN
+
+* The reuse detector cannot separate a deliberately quiet shot from a duplicated
+  frame; it is ADVISORY in `otr_w45_campaign.py` until that is solved. The
+  engine-layer and composite guards (`MirrorExtensionForbidden`,
+  `ClipUnderrunsItsBeat`) are terminal and unaffected.
+* `docs/2026-08-02-IDEA-hardware-compatibility-matrix.md` -- captured, not
+  scoped. Includes the Mac research: Metal has no `Float8_e4m3fn`, ComfyUI+MPS
+  video is impractical (82 min for a 2-second clip), Draw Things and MLX are
+  ~100x faster and DO support LTX-2.3 with joint audio, and the `viz_*`/`still_*`
+  lanes need no GPU at all.
+* `humo_1.7B` and `ltx_8gb` are marked CUDA-only with no fp8, no fp4 and no
+  stated reason. Unexamined, not proven.
+* M2's raw rows sit in swept `tmp/` with no pinned digest or config manifest.
+
+---
+
+**Previous update: 2026-08-02 -- THE MIRROR IS DEAD, THE HUMO CAP FOLLOWS THE
 MODEL, AND THE NEXT ACTION IS GPU VALIDATION.**
 
 Branch `v2.0-alpha`, HEAD `392a86f7`, pushed, suite **8289 passed / 0 failures**.
