@@ -92,9 +92,17 @@ def test_fit_frames_trims_when_over():
     assert np.array_equal(out, _frames(49)[:30])  # trim keeps the leading frames
 
 
-def test_fit_frames_extends_when_short():
-    out = wb.fit_frames_to_target(_frames(49), 120)
-    assert out.shape[0] == 120                     # mirror-extended to the target
+def test_fit_frames_REFUSES_when_short():
+    """Was "extends when short" -- it mirror-extended 49 frames to 120.
+
+    The mirror is gone (operator directive 2026-08-02: original video for every
+    second of audio), so a render that cannot cover its beat is terminal. The
+    49-to-120 case this used to assert is precisely a capped tier being asked
+    for more than it can render, which coverage planning now answers by
+    splitting the beat instead of doubling frames back on themselves.
+    """
+    with pytest.raises(wb.MirrorExtensionForbidden):
+        wb.fit_frames_to_target(_frames(49), 120)
 
 
 def test_fit_frames_identity_on_match_and_empty():

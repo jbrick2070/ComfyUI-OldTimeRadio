@@ -496,35 +496,34 @@ def images_to_uint8(images):
     return np.ascontiguousarray(arr)
 
 
-def extend_frames_to_target(frames, target_frame_count):
-    """PING-PONG / mirror-extend a short frame batch up to ``target_frame_count``.
-
-    The clip-fill companion to the dynamic-VRAM budget (GO_FORWARD 2026-06-18): an
-    engine that can only afford a SHORT render (e.g. wan_ti2v's VRAM-predicted
-    length) extends here so the beat is FILLED with continuous motion instead of
-    the composite holding the last frame (the 0.68s-then-freeze bug). Generalizes
-    LTX's one-shot boomerang into a tiled mirror cycle
-    (``[0,1,..,N-1,N-2,..,1]``, period ``2N-2``) tiled and trimmed to the target,
-    so the loop has NO hard seam (the cycle joins frame 1 -> 0 -> 1, symmetric).
-
-    Returns ``frames`` UNCHANGED when it already has >= target frames (or target
-    <= 0). A single frame cannot mirror into motion, so it is repeated (the caller
-    surfaces that LOUD). ``frames`` is the uint8 ``[N,H,W,C]`` array from
-    :func:`images_to_uint8`; numpy is imported lazily (cold-import V-12). Pure;
-    CPU-testable."""
-    import numpy as np
-    arr = np.asarray(frames)
-    n = int(arr.shape[0]) if arr.ndim else 0
-    target = int(target_frame_count or 0)
-    if n == 0 or target <= n:
-        return arr
-    if n < 2:                                   # no motion to mirror -> repeat
-        reps = (target + n - 1) // n
-        return np.ascontiguousarray(np.concatenate([arr] * reps, axis=0)[:target])
-    cycle = np.concatenate([arr, arr[-2:0:-1]], axis=0)   # period 2N-2, seamless
-    reps = (target + len(cycle) - 1) // len(cycle)
-    tiled = np.concatenate([cycle] * reps, axis=0)
-    return np.ascontiguousarray(tiled[:target])
+# ``extend_frames_to_target`` -- THE PING-PONG / MIRROR EXTENDER -- WAS DELETED
+# HERE on 2026-08-02, under the operator's standing directive: "no mirrors, no
+# ping-pongs -- we need original video for every second of audio."
+#
+# What it did: tiled a short render into a mirror cycle
+# ``[0,1,..,N-1,N-2,..,1]`` and trimmed it to the beat length, so a beat the
+# engine could not afford in one pass was FILLED rather than left holding its
+# last frame. That solved a real bug (the 0.68s-then-freeze) and it was the
+# honest answer available in June, when the alternative was a frozen frame.
+#
+# Why it had to go rather than stay as an option: the back half of every cycle
+# is the render played in REVERSE. On a lip-synced lane that is a mouth speaking
+# backwards over forward speech. On a scene lane it is motion running backwards
+# under dialogue that keeps going forward. It ships as a finished episode either
+# way, and it looks like an artifact rather than a shot.
+#
+# WHAT OWNS THE PROBLEM NOW -- the field this rip had to fill. A beat the engine
+# cannot render in one affordable pass is SPLIT by coverage planning into
+# multiple native segments, each rendered forward, joined by chain or jump. That
+# is the replacement, and it is strictly better: every frame is original, and no
+# second of audio is covered by a frame that was already used. Where a render
+# still comes up short, the answer is now TERMINAL and LOUD
+# (:class:`MirrorExtensionForbidden`) with the remedy named in the message --
+# route the beat, shorten the line, or raise the tier's cap -- rather than a
+# quiet mirror nobody sees until the episode plays.
+#
+# The credits lane is untouched and never used this: it renders a black
+# background and calls neither this nor the LTX boomerang.
 
 
 class MirrorExtensionForbidden(ValueError):
@@ -544,26 +543,25 @@ class MirrorExtensionForbidden(ValueError):
             "the mouth backwards)" % (self.rendered, self.target))
 
 
-def fit_frames_to_target(frames, target_frame_count, *, allow_mirror=True):
-    """EXACT-FIT ``frames`` to ``target_frame_count``: TRIM when over,
-    mirror-extend (:func:`extend_frames_to_target`) when short, identity on a
-    match. The capped render tiers (e.g. HuMo-14B's VRAM frame cap) need this so
-    the encoded clip's frame_count EQUALS the audio-derived target -- a short clip
-    would otherwise make the composite hold the last frame, and a long one would
-    drift the manifest timing. ``frames`` is the uint8 ``[N,H,W,C]`` array from
-    :func:`images_to_uint8`; numpy is imported lazily (cold-import V-12). Pure;
-    CPU-testable.
+def fit_frames_to_target(frames, target_frame_count):
+    """EXACT-FIT ``frames`` to ``target_frame_count``: TRIM when over, RAISE when
+    short, identity on a match.
 
-    ``allow_mirror=False`` (operator directive 2026-07-25: "lip sync needs
-    continuity, no render backwards, that doesn't work") makes a SHORT render
-    TERMINAL instead of mirrored. :func:`extend_frames_to_target` builds the
-    cycle ``[0,1,..,N-1,N-2,..,1]`` -- the back half of every cycle is the
-    render played in REVERSE. On a scene lane that is decorative motion and
-    the loop is seamless by design. On an AUDIO-SYNCED lane (an
-    ``audio_driven_face`` talking head, anything lip-synced) it plays the
-    mouth backwards against forward speech, which is a sync defect that ships
-    as a finished episode. TRIMMING stays legal under this flag -- trimming
-    never reverses time.
+    Trimming is always legal -- it never reverses time, and a render that
+    overshot its ladder rung is exactly what the coverage planner expects to
+    hand back. A SHORT render is TERMINAL: :class:`MirrorExtensionForbidden`,
+    with the remedy in the caller's message.
+
+    The ``allow_mirror`` parameter is GONE (2026-08-02). It defaulted to True and
+    had exactly one caller, which passed False -- so the mirror was already
+    unreachable in practice, and leaving the flag in place meant the next caller
+    could re-arm it by simply not thinking about it. The operator's directive is
+    unconditional ("no mirrors, no ping-pongs -- original video for every second
+    of audio"), so the capability is removed rather than defaulted off. A rule
+    enforced by a default is a rule with a hole in it.
+
+    ``frames`` is the uint8 ``[N,H,W,C]`` array from :func:`images_to_uint8`;
+    numpy is imported lazily (cold-import V-12). Pure; CPU-testable.
     """
     import numpy as np
     arr = np.asarray(frames)
@@ -573,9 +571,7 @@ def fit_frames_to_target(frames, target_frame_count, *, allow_mirror=True):
         return arr
     if n > target:
         return np.ascontiguousarray(arr[:target])
-    if not allow_mirror:
-        raise MirrorExtensionForbidden(n, target)
-    return extend_frames_to_target(arr, target)
+    raise MirrorExtensionForbidden(n, target)
 
 
 # --------------------------------------------------------------------------- #
@@ -1023,7 +1019,6 @@ __all__ = [
     "Wire", "run_graph",
     "reclaim_idle_models",
     "quantize_frames_4n1", "even_dim", "images_to_uint8",
-    "extend_frames_to_target",
     "ffmpeg_silent_mp4_cmd", "ffmpeg_still_motion_cmd", "ffmpeg_lavfi_floor_cmd",
     "ffmpeg_terminal_frame_cmd", "extract_terminal_frame",
     "run_ffmpeg", "encode_frames_to_silent_mp4",

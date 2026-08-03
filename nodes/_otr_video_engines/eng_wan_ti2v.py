@@ -298,6 +298,17 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         allow_tail_trim=True,
         continuity=CONTINUITY_STRICT_FIRST_FRAME,
     )
+    #: THE CANVAS, DECLARED (2026-08-02). Its profile has always said 832x480,
+    #: but nothing carried that to the render: no launch.env pin on
+    #: otr_g4_wan_ti2v and no declaration here, so build_request_from_shot fell
+    #: through to the 1472x832 landscape default -- 3.07x the pixels the tier
+    #: was configured for. That is what priced a beat at 29 affordable frames
+    #: and refused it. fastwan_8gb, this class's own SUBCLASS on bit-identical
+    #: base weights, has declared it since 2026-08-01; the parent never did.
+    #: declared_render_canvas is applied LAST in build_request_from_shot, so
+    #: this is the one channel a boot cannot lose. Both axes /32-legal (26 x 15).
+    render_canvas = (832, 480)
+
     commercial_clean = True             # GGUF + VAE are Apache-2.0 (see MODEL_MANIFEST)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
@@ -852,18 +863,27 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "claiming real multi-clip coverage. Raise max_render_frames "
                 "for this tier or route the beat to a single-clip engine."
                 % (self.name, target, ceiling, ceiling))
-        # AND IT MUST FIT. The planned path used to skip the VRAM predictor
-        # entirely -- survivable while planned segments were rare, not now that
-        # this engine is coverage-planned and the mirror that hid an
-        # unaffordable render is gone. Same accounting as the single-clip
-        # branch: live free + hoisted, so resident weights are not charged
-        # twice. Skipped only when the caller has no canvas to price.
-        if width and height:
-            free_mb = _MC.free_vram_mb()
-            if free_mb is not None and hoisted_vram_mb is not None:
-                free_mb = float(free_mb) + float(hoisted_vram_mb)
-            _MC.assert_frame_affordable(free_mb, target, int(width),
-                                        int(height), self.name)
+        # NO AFFORDABILITY ASSERT HERE YET -- deliberately, and this is the
+        # second time the ordering has had to be learned.
+        #
+        # Adding one looks obviously right: the planned path skips the VRAM
+        # predictor, and the mirror that used to hide an unaffordable render is
+        # gone. But the predictor's cost row is MEASURABLY WRONG. It prices this
+        # canvas at 60.3 MiB/frame, which allows 91 frames -- while fastwan_8gb,
+        # this class's own subclass on bit-identical weights, has SHIPPED a
+        # published episode rendering 177-frame segments at exactly that canvas.
+        # Enforcing the row therefore refuses renders the hardware performs
+        # happily, and it refuses them on the engine that was already green.
+        #
+        # An assert was added on 2026-08-02 and reverted the same hour when the
+        # operator asked whether the coverage math had been checked across ALL
+        # local models -- it had not, and fastwan_8gb was broken by it. The
+        # panel had already given the order (r3: "update motion_common with the
+        # measured fit coefficients BEFORE enabling the planning cap or planned
+        # path budget checking") and it was not followed.
+        #
+        # So: measure the row first, then enforce. A guard built on a known-bad
+        # model is not a guard, it is an outage with a good conscience.
         return target
 
     def _build_graph(self, request, image_name, plan, length, width, height,

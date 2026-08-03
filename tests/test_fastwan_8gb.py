@@ -238,10 +238,14 @@ def test_incumbent_graph_still_uses_ksampler(monkeypatch):
     assert tuple(g["vaedecode"]["inputs"]["samples"]) == ("ksampler", 0)
 
 
-def test_incumbent_declares_no_canvas_this_build():
-    """r4 CUT the incumbent canvas declaration from this promotion: FastWan owns
-    its canvas, and wan_ti2v's is a separate measured campaign."""
-    assert getattr(_WT.WanTi2vEngine, "render_canvas", None) is None
+def test_the_incumbent_NOW_declares_its_canvas_too():
+    """That separate campaign happened (2026-08-02). Leaving the incumbent
+    undeclared meant it rendered at the 1472x832 landscape default -- 3.07x its
+    profile's own 832x480 -- which priced a beat at 29 affordable frames and
+    refused it. Both adapters now declare the same canvas on the same base
+    weights."""
+    assert getattr(_WT.WanTi2vEngine, "render_canvas", None) == (832, 480)
+    assert _FW.FastWan8gbEngine.render_canvas == _WT.WanTi2vEngine.render_canvas
 
 
 @pytest.mark.parametrize("attr", ["frame_contract", "target_fps", "family"])

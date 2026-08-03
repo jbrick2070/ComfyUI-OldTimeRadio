@@ -2268,7 +2268,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except ImportError:  # pragma: no cover -- flat test imports
             import coverage_plan as _cpv  # type: ignore
         _vplan = _cpv.CoveragePlan.from_dict(shot.get("coverage_plan") or {})
-        if _vplan.is_multi_clip:
+        # ``requires_coverage_execution``, not ``is_multi_clip``: a ONE-segment
+        # plan that rounded its length up to a legal rung still renders MORE
+        # frames than the beat's audio covers, so it needs the same windowed,
+        # silence-padded conditioning slice a successor does. Gated on segment
+        # count, such a beat was handed the whole raw line against a longer
+        # render -- the same defect the router fix closed for video, one layer
+        # down. ``segment_render_window`` already handles a single segment.
+        if _vplan.requires_coverage_execution:
             _vfps = int(((ledger or {}).get("video") or {}).get("fps")
                         or 25) or 25
             _vwin = _cpv.segment_render_window(
@@ -2365,7 +2372,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 except ImportError:  # pragma: no cover -- flat test imports
                     import coverage_plan as _cp  # type: ignore
                 _seg_plan = _cp.CoveragePlan.from_dict(_seg_plan_raw)
-                if _seg_plan.is_multi_clip:
+                # See the sibling gate above: a one-segment plan owing a tail
+                # trim needs its windowed slice too, for the same reason.
+                if _seg_plan.requires_coverage_execution:
                     _sfps = int(((ledger or {}).get("video") or {}).get("fps")
                                 or 25) or 25
                     _win = _cp.segment_render_window(
@@ -3316,9 +3325,15 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # the fact forward rather than stamping the segment that merely produced
     # the frame -- otherwise the receipt names the wrong clip.
     cape_pending = False
+    # ``coverage_planned`` is passed EXPLICITLY rather than inferred from the
+    # segment count. Reaching this function at all means the plan owes coverage
+    # work, and a one-segment plan carrying a tail trim owes exactly that --
+    # but ``segment_count > 1`` would call it single-clip and route it to the
+    # ping-pong path.
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
-                         segment_count=plan.segment_count) as session:
+                         segment_count=plan.segment_count,
+                         coverage_planned=True) as session:
         for position, (segment, request) in enumerate(prebuilt):
             index = int(segment.index)
             segment_id = "%s_seg%02d" % (beat_key, position)

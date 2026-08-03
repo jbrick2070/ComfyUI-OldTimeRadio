@@ -560,27 +560,34 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     _LOOP_VIA_REVERSE_DEFAULT = False
 
     def _loop_via_reverse(self) -> bool:
-        """Whether render_clip renders the boomerang (half-render + forward/reverse
-        mirror). ``OTR_LTX_LOOP_VIA_REVERSE``: truthy {on,1,true,yes}, false
-        {off,0,false,no}, invalid -> LOUD warn + engine default
-        (``_LOOP_VIA_REVERSE_DEFAULT``)."""
-        raw = os.environ.get("OTR_LTX_LOOP_VIA_REVERSE")
-        if raw is None:
-            return bool(self._LOOP_VIA_REVERSE_DEFAULT)
-        v = raw.strip().lower()
-        if v in ("on", "1", "true", "yes"):
-            # EXPLICIT TRUE, not the engine default (2026-08-01). This used to
-            # return ``_LOOP_VIA_REVERSE_DEFAULT``, which was indistinguishable
-            # from True only because the default WAS True. The moment the default
-            # flipped to False, an operator setting the knob to "on" would have
-            # silently got the boomerang OFF -- an opt-in that cannot opt in.
-            return True
-        if v in ("off", "0", "false", "no"):
-            return False
-        _LOG.warning("[eng_ltx_video] OTR_LTX_LOOP_VIA_REVERSE=%r invalid "
-                     "(use on/off) -- using engine default %s", raw,
-                     self._LOOP_VIA_REVERSE_DEFAULT)
-        return bool(self._LOOP_VIA_REVERSE_DEFAULT)
+        """RETIRED 2026-08-02. Always False. The boomerang cannot be re-armed.
+
+        This is the deferred half the 2026-08-01 change named and left open:
+        "NOTE the scope: this does NOT retire the boomerang. Single-clip renders
+        still overshoot their declared ceiling, which remains the deferred 7c
+        item." The operator's directive closes it -- "kill mirrors and
+        ping-pong, true video for every second of audio" -- and it is
+        unconditional, so the knob goes rather than the default.
+
+        WHY THE ENV HATCH HAD TO GO WITH IT. ``OTR_LTX_LOOP_VIA_REVERSE=on``
+        opted back into rendering half a beat and mirroring it. The back half of
+        that mirror is the render played in REVERSE, under dialogue that keeps
+        running forward. A rule that survives only while nobody sets a variable
+        is not a rule, and this one had already been re-armed once by a default
+        flip going the other way.
+
+        WHAT OWNS THE PROBLEM NOW. A beat ``ltx23_16gb_video`` cannot cover in
+        one native render is SPLIT by coverage planning into chained segments,
+        each rendered forward from its predecessor's real terminal frame. That
+        path is live and is strictly better than a mirror: every frame is
+        original and no second of audio is covered twice.
+
+        The method is kept, rather than deleted with its four call sites, so the
+        retirement is visible at the choke point a future reader will look at --
+        and so ``_loop_fill_allowed``'s coverage-plan suppression keeps its own
+        reasoning intact underneath it.
+        """
+        return False
 
     def _loop_fill_allowed(self, prepared) -> bool:
         """Whether the boomerang loop-fill may run for THIS request.

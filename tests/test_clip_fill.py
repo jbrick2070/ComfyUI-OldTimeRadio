@@ -125,35 +125,41 @@ def _frames(n):
     return np.stack([np.full((1, 1, 3), i, dtype=np.uint8) for i in range(n)])
 
 
-def test_extend_noop_when_already_long_enough():
+#: PIECE 3 IS GONE (2026-08-02). ``extend_frames_to_target`` -- the
+#: ping-pong/mirror extender these four tests covered -- was DELETED under the
+#: operator's directive: "kill mirrors and ping-pong, true video for every second
+#: of audio." The tests are replaced rather than removed, because what they
+#: proved (a short render always ends up covering its beat) still has to be true;
+#: only the mechanism changed. Coverage planning now splits a beat the engine
+#: cannot afford into native forward-rendered segments, and a render that still
+#: falls short is terminal.
+def test_the_pingpong_extender_is_gone():
+    assert not hasattr(wb, "extend_frames_to_target")
+
+
+def test_a_short_render_no_longer_fills_itself():
+    """The exact case the deleted extender existed for: 7 frames against a
+    280-frame beat. It used to tile a mirror cycle to 280. It now refuses, and
+    the beat is covered by splitting rather than by reusing frames."""
+    with pytest.raises(wb.MirrorExtensionForbidden):
+        wb.fit_frames_to_target(_frames(7), 280)
+
+
+def test_a_single_frame_cannot_become_motion():
+    """A still repeated five times was the extender's degenerate branch -- five
+    frames of a frozen image standing in for five frames of a beat. That is the
+    freeze this whole area was built to remove, so it refuses too."""
+    with pytest.raises(wb.MirrorExtensionForbidden):
+        wb.fit_frames_to_target(_frames(1), 5)
+
+
+def test_over_length_renders_still_trim():
+    """Trimming never reverses time and is the normal path for any engine whose
+    ladder overshoots the target, so it is untouched by the rip."""
     import numpy as np
     f = _frames(10)
-    out = wb.extend_frames_to_target(f, 5)
-    assert np.array_equal(out, f)            # target <= n -> unchanged
-    out2 = wb.extend_frames_to_target(f, 10)
-    assert np.array_equal(out2, f)
-
-
-def test_extend_reaches_exact_target():
-    out = wb.extend_frames_to_target(_frames(7), 280)
-    assert len(out) == 280
-
-
-def test_extend_is_seamless_pingpong():
-    # cycle [0,1,2,3,2,1] (period 2N-2=6) tiled -> indices ping-pong, no jump > 1.
-    import numpy as np
-    out = wb.extend_frames_to_target(_frames(4), 20)
-    vals = [int(x.flat[0]) for x in out]
-    assert len(out) == 20
-    assert vals[:6] == [0, 1, 2, 3, 2, 1]
-    assert max(abs(a - b) for a, b in zip(vals, vals[1:])) == 1   # seamless
-    # the join wraps cleanly (…1 -> 0 -> 1…), still a step of 1.
-    assert vals[5] == 1 and vals[6] == 0
-
-
-def test_extend_single_frame_repeats():
-    out = wb.extend_frames_to_target(_frames(1), 5)
-    assert len(out) == 5                     # a still cannot mirror -> repeated
+    assert np.array_equal(wb.fit_frames_to_target(f, 10), f)
+    assert len(wb.fit_frames_to_target(f, 5)) == 5
 
 
 # --------------------------------------------------------------------------- #

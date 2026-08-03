@@ -283,7 +283,25 @@ def test_prepare_learns_the_segment_count_BEFORE_it_loads():
     with bs.BeatSession(eng, beat_id="b042", segment_count=4):
         pass
     assert eng.seen_ctx == [{"beat_id": "b042", "segment_count": 4,
-                             "multi_clip": True}]
+                             "multi_clip": True, "coverage_planned": True}]
+
+
+def test_a_ONE_segment_coverage_plan_still_reads_as_planned():
+    """The discriminator means "coverage-planned", not "more than one segment".
+
+    A one-segment plan that rounded its length up to a legal rung is fully
+    coverage-planned, and `WanTi2vEngine.render_clip` branches on this flag to
+    choose `_planned_length` over the clip-fill path. Derived from the segment
+    count, such a beat read as single-clip -- which was the branch that used to
+    ping-pong-extend a short render. Passed in explicitly for that reason.
+    """
+    eng = _StubEngine()
+    with bs.BeatSession(eng, beat_id="b043", segment_count=1,
+                        coverage_planned=True):
+        pass
+    assert eng.seen_ctx[0]["multi_clip"] is True
+    assert eng.seen_ctx[0]["coverage_planned"] is True
+    assert eng.seen_ctx[0]["segment_count"] == 1
 
 
 def test_a_single_clip_beat_says_so_in_its_context():

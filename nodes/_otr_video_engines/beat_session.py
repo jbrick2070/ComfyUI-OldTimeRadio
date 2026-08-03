@@ -110,12 +110,18 @@ class BeatSession:
     """
 
     def __init__(self, engine, *, host_caps=None, profile=None, beat_id="",
-                 segment_count=1):
+                 segment_count=1, coverage_planned=None):
         self.engine = engine
         self.host_caps = dict(host_caps or {})
         self.profile = dict(profile or {})
         self.beat_id = str(beat_id or "")
         self.segment_count = max(1, int(segment_count or 1))
+        #: Is this beat COVERAGE-PLANNED? Distinct from "does it have more than
+        #: one segment", and adapters need the former. ``None`` falls back to
+        #: the segment count, which is what every caller meant before a
+        #: one-segment plan could exist. See :meth:`session_ctx`.
+        self.coverage_planned = (bool(coverage_planned)
+                                 if coverage_planned is not None else None)
         self.prepared = None
         self.identity = None
         self.segment_index = -1
@@ -133,10 +139,28 @@ class BeatSession:
         to know it is about to render four clips rather than one -- and it
         must learn that BEFORE it loads, which is the only reason this is a
         prepare-time argument rather than a render-time one.
+
+        ``multi_clip`` MEANS "coverage-planned", not "more than one segment"
+        (corrected 2026-08-02). Every consumer uses it for the former:
+        ``WanTi2vEngine.render_clip`` branches on it to choose ``_planned_length``
+        over ``_floor_length``, and the clip-fill path it selects when False
+        PING-PONG-EXTENDS a short render -- which that method's own docstring
+        calls forbidden for a coverage-planned segment, since a mirrored tail
+        would hand the next segment a mirrored frame to chain from.
+
+        The two questions were the same until a ONE-segment plan carrying a tail
+        trim became reachable. Such a beat is fully coverage-planned, and
+        deriving the flag from ``segment_count > 1`` would have routed it to the
+        mirror the operator ruled out unconditionally. So the flag is now passed
+        in, and falls back to the segment count only when a caller does not say
+        -- which is what every pre-existing caller meant.
         """
+        planned = (self.coverage_planned if self.coverage_planned is not None
+                   else self.is_multi_segment)
         return {"beat_id": self.beat_id,
                 "segment_count": self.segment_count,
-                "multi_clip": self.is_multi_segment}
+                "multi_clip": planned,
+                "coverage_planned": planned}
 
     def open(self):
         """Take the handles ONCE. Raises before loading anything if a

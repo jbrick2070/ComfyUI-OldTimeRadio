@@ -273,10 +273,10 @@ and it read exactly like a measured number until someone looked.
 | google_vid_sfx_veo_fast | - | contract max | none cited |
 | google_vid_sfx_veo_lite | - | contract max | none cited |
 | google_vid_sfx_veo_pro | - | contract max | none cited |
-| humo | 97 | safe_render_frames | **MISSING: docs/2026-06-27-humo-bakeoff** |
-| humo_1.7B | - | contract max | **MISSING: docs/2026-06-27-humo-bakeoff** |
-| humo_1.7B_169 | - | contract max | **MISSING: docs/2026-06-27-humo-bakeoff** |
-| humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/2026-06-27-humo-bakeoff** |
+| humo | 97 | safe_render_frames | none cited |
+| humo_1.7B | - | contract max | none cited |
+| humo_1.7B_169 | - | contract max | none cited |
+| humo_14B_169 | 97 | safe_render_frames | none cited |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | none cited |
@@ -285,7 +285,7 @@ and it read exactly like a measured number until someone looked.
 | still_motion | - | contract max | none cited |
 | still_pan | - | contract max | none cited |
 | still_word | - | contract max | none cited |
-| viz_camera | - | contract max | docs/2026-07-25-still-plans-locked-build-spec.md |
+| viz_camera | - | contract max | none cited |
 | viz_green | - | contract max | **MISSING: docs/2026-06-18-coverage-arch-wiring** |
 | viz_mxc_cpu | - | contract max | none cited |
 | viz_mxc_mandala | - | contract max | **MISSING: docs/2026-06-30-viz-rainbow** |

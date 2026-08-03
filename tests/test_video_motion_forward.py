@@ -289,9 +289,19 @@ def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
         p.unlink(missing_ok=True)
 
 
-def test_ltx_render_clip_still_boomerangs_when_explicitly_opted_in(monkeypatch):
-    """The device is retired as a DEFAULT, not deleted. Opting back in must
-    still work end-to-end -- the flag flip broke exactly this once already."""
+def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch):
+    """Was "still boomerangs when explicitly opted in" -- the device was retired
+    as a DEFAULT but kept behind ``OTR_LTX_LOOP_VIA_REVERSE=on``.
+
+    Retired outright on 2026-08-02: the operator's rule is unconditional, and a
+    mirror reachable by setting one variable is a mirror that ships. The
+    end-to-end assertion is inverted rather than deleted, because "does the flag
+    still reach the frames?" is exactly the question worth pinning -- it just
+    has the opposite answer now.
+
+    4 decoded frames used to become 7 (2N-1, the forward-then-reverse cycle).
+    They stay 4, and the clip is trimmed or refused rather than doubled back.
+    """
     monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "on")
@@ -302,11 +312,13 @@ def test_ltx_render_clip_still_boomerangs_when_explicitly_opted_in(monkeypatch):
            "canvas": {"w": 768, "h": 512, "fps": 25},
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
     raw = eng.render_clip(req, {"patchers": []})
-    assert raw["ltx_loop_via_reverse"] is True
+    assert raw["ltx_loop_via_reverse"] is False, (
+        "the env hatch must not arm the boomerang")
     clip = eng.canonicalize(raw, req, {})
     p = pathlib.Path(clip["path"])
     try:
-        assert p.exists() and clip["frame_count"] == 7    # 2*4 - 1, mirrored
+        assert p.exists() and clip["frame_count"] == 4, (
+            "4 decoded frames stay 4 -- no forward/reverse doubling")
     finally:
         p.unlink(missing_ok=True)
 

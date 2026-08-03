@@ -840,7 +840,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         if cap is not None and target_fc > 0:
             try:
                 frames = _wb.fit_frames_to_target(
-                    frames, target_fc, allow_mirror=False)
+                    frames, target_fc)
             except _wb.MirrorExtensionForbidden as exc:
                 raise _wb.GraphExecutionError(
                     "%s: %s. This tier's VRAM-safe cap is %d frame(s) and the "

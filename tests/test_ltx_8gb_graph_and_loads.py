@@ -1170,7 +1170,14 @@ def test_the_ping_pong_helper_is_never_called_on_this_lane(staged,
     def _boom(*_a, **_k):
         raise AssertionError("ltx_8gb reached the ping-pong extender")
 
-    monkeypatch.setattr(wb, "extend_frames_to_target", _boom)
+    # `extend_frames_to_target` was DELETED on 2026-08-02, so there is nothing
+    # left to detonate there. The behavioural proof moves to the surviving
+    # entry point: `fit_frames_to_target` is where a short render would have
+    # been extended, and this lane must not reach it either. `raising=False`
+    # keeps the test honest if the name ever returns -- it would be patched and
+    # detonated rather than silently skipped.
+    monkeypatch.setattr(wb, "extend_frames_to_target", _boom, raising=False)
+    monkeypatch.setattr(wb, "fit_frames_to_target", _boom)
     counter = _Counter()
     eng = Ltx8gbEngine()
     eng._classes = _ltx8_fakes(np, counter, n=9)
@@ -1184,8 +1191,19 @@ def test_the_ping_pong_helper_is_never_called_on_this_lane(staged,
             path.unlink(missing_ok=True)
 
 
-def test_the_shared_extender_still_EXISTS_for_the_lanes_that_need_it():
-    """The rip is lane-specific. `wrapper_bridge.extend_frames_to_target` is
-    WAN's mechanism for filling a beat from a deliberately short native render,
-    and deleting it would take the shipped 8GB WAN tier with it."""
-    assert callable(getattr(wb, "extend_frames_to_target", None))
+def test_the_shared_extender_is_GONE_from_every_lane():
+    """Was "still EXISTS for the lanes that need it" (2026-07-25).
+
+    That test was correct when written: the rip then was lane-specific, and
+    `extend_frames_to_target` was WAN's mechanism for filling a beat from a
+    deliberately short native render -- deleting it would have taken the shipped
+    8 GB tier with it.
+
+    The operator's 2026-08-02 directive is unconditional ("kill mirrors and
+    ping-pong, true video for every second of audio"), and WAN no longer needs
+    it: a beat it cannot afford in one pass is now SPLIT by coverage planning
+    into native segments rendered forward, which is what the mirror was
+    approximating. So the lane that justified keeping it is the same lane that
+    made it unnecessary.
+    """
+    assert not hasattr(wb, "extend_frames_to_target")

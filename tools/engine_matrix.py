@@ -156,6 +156,13 @@ REFERENCE_BEAT_FRAMES = 442
 #: open, and nothing surfaced that until a human went looking.
 _DOC_CITATION = re.compile(r"docs/[A-Za-z0-9._-]+")
 
+#: Wording that marks a doc path as REFUTED rather than relied upon, so a
+#: comment explaining that a receipt is missing does not itself get counted as
+#: a claim that the receipt exists.
+_REFUTES = re.compile(
+    r"\b(has never existed|does not exist|is not in this repo|never been in"
+    r"|no longer exists|MISSING|debunk|absent from)\b", re.IGNORECASE)
+
 
 def _effective_canvas(engine, name):
     """The canvas this engine ACTUALLY renders at, and where that comes from.
@@ -271,9 +278,27 @@ def _cap_and_evidence(engine, name):
     if path and os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as handle:
-                cited = set(_DOC_CITATION.findall(handle.read()))
+                text = handle.read()
         except OSError:
-            cited = set()
+            text = ""
+        lines = text.splitlines()
+        for number, line in enumerate(lines):
+            # The refutation rarely shares a line with the path it refutes --
+            # prose wraps. Read a small window either side so "`docs/x`\n has
+            # never existed here" is recognised as one statement.
+            window = "\n".join(lines[max(0, number - 2):number + 3])
+            for ref in _DOC_CITATION.findall(line):
+                # A line that DEBUNKS a missing receipt is not a line that
+                # relies on it. Once the HuMo comment was rewritten to explain
+                # that `docs/2026-06-27-humo-bakeoff` has never existed here,
+                # the scanner went on reporting that path as MISSING -- turning
+                # a RESOLVED problem into a permanent red mark, which is the
+                # same false-confidence failure this column exists to prevent,
+                # only inverted. A citation surrounded by its own refutation is
+                # documentation, not evidence.
+                if _REFUTES.search(window):
+                    continue
+                cited.add(ref)
     for ref in sorted(cited):
         target = ROOT / ref
         if not (target.exists() or list(ROOT.glob(ref + "*"))):

@@ -79,18 +79,24 @@ def test_video_does_NOT_loop_by_default(monkeypatch):
     assert LtxVideoEngine()._loop_via_reverse() is False
 
 
-@pytest.mark.parametrize("val,expect", [
-    ("on", True), ("1", True), ("true", True), ("yes", True),
-    ("off", False), ("0", False), ("false", False), ("no", False),
-])
-def test_env_parse(monkeypatch, val, expect):
+@pytest.mark.parametrize("val", ["on", "1", "true", "yes", "off", "0",
+                                 "false", "no", "banana", ""])
+def test_the_env_hatch_can_no_longer_arm_the_boomerang(monkeypatch, val):
+    """RETIRED 2026-08-02. The knob is inert for EVERY value.
+
+    These cases used to parse ``on/1/true/yes`` into True. The operator's
+    directive is unconditional, so the capability was removed rather than
+    defaulted off: a rule that survives only while nobody sets a variable is not
+    a rule, and this one had already been re-armed once by a default flipping
+    the other way.
+    """
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", val)
-    assert LtxVideoEngine()._loop_via_reverse() is expect
+    assert LtxVideoEngine()._loop_via_reverse() is False, val
 
 
-def test_env_invalid_falls_back_to_default(monkeypatch):
-    monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "banana")
-    assert LtxVideoEngine()._loop_via_reverse() is False  # LOUD warn + default
+def test_the_boomerang_is_off_with_no_env_at_all(monkeypatch):
+    monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
+    assert LtxVideoEngine()._loop_via_reverse() is False
 
 
 # ---- THE DEFERRAL TRIPWIRE (chunk 7b, 2026-07-27) ---------------------------
@@ -231,13 +237,19 @@ def test_the_shorter_second_segment_was_doomed_too():
     assert LtxVideoEngine()._loop_fill_allowed(_prepared(True)) is False
 
 
-def test_opting_back_in_actually_works_after_the_default_flip(monkeypatch):
-    """REGRESSION GUARD for a bug introduced BY the flip.
+def test_there_is_no_opting_back_in(monkeypatch):
+    """Was "opting back in actually works after the default flip".
 
-    `_loop_via_reverse` used to return ``_LOOP_VIA_REVERSE_DEFAULT`` for a truthy
-    env value -- indistinguishable from True only because the default WAS True.
-    The moment the default flipped, "on" would have silently meant OFF: an opt-in
-    that cannot opt in. It now returns an explicit True."""
+    That guard existed because the opt-in had genuinely broken: a truthy env
+    value returned the DEFAULT, which was indistinguishable from True only
+    while the default was True, so the moment it flipped, "on" silently meant
+    OFF -- an opt-in that could not opt in.
+
+    The opt-in is now gone entirely, which makes that whole class of bug
+    unreachable. Inverted rather than deleted, because the reason this knob
+    needed a guard at all is the reason it should not exist: it was subtle
+    enough to break silently, and what it turned on was backwards video.
+    """
     for val in ("on", "1", "true", "yes"):
         monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", val)
-        assert LtxVideoEngine()._loop_via_reverse() is True, val
+        assert LtxVideoEngine()._loop_via_reverse() is False, val

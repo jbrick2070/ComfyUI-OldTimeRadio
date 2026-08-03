@@ -1,20 +1,28 @@
-"""LIP SYNC NEVER RUNS BACKWARDS (operator directive 2026-07-25).
+"""NOTHING RUNS BACKWARDS. THE MIRROR IS GONE (operator directive 2026-08-02).
 
-``wrapper_bridge.extend_frames_to_target`` builds the mirror cycle
-``[0,1,..,N-1,N-2,..,1]`` so a VRAM-bounded short render can fill a beat with
-seamless motion. On a scene lane that is decorative and correct -- it is the
-fix for the 0.68s-then-freeze bug. On an AUDIO-SYNCED lane it is a defect:
-the back half of every cycle is the render in REVERSE, so a talking head's
-mouth speaks forwards and then unspeaks backwards against forward speech.
+This file used to hold a boundary from BOTH sides: mirroring stayed legal on
+scene lanes, and was terminal only on audio-synced ones. That boundary is
+retired. The operator's rule is unconditional -- "kill mirrors and ping-pong,
+true video for every second of audio" -- so
+``wrapper_bridge.extend_frames_to_target`` was DELETED and
+``fit_frames_to_target`` lost its ``allow_mirror`` parameter.
 
-Operator, verbatim: "lip synch needs to have continuity, no render backwards,
-that doesn't work."
+The distinction the old tests defended was real, but it does not survive the
+rule. The back half of every mirror cycle is the render played in REVERSE. On a
+talking head that is a mouth unspeaking; on a scene lane it is motion running
+backwards under dialogue that keeps going forward. The second case is subtler,
+not absent.
 
-These pins hold the boundary from both sides -- mirroring stays legal where it
-was designed to be, and is terminal where it corrupts sync. Pure/CPU; no GPU,
-no wrapper nodes.
+WHAT COVERS THE BEAT NOW: coverage planning splits a beat the engine cannot
+afford in one pass into multiple NATIVE segments, each rendered forward. Every
+frame is original and no second of audio is covered twice -- which is what the
+mirror was approximating, and what these tests pin instead.
+
+Pure/CPU; no GPU, no wrapper nodes.
 """
 from __future__ import annotations
+
+import inspect
 
 import numpy as np
 import pytest
@@ -34,55 +42,73 @@ def _frames(n, h=4, w=4, c=3):
 
 
 # --------------------------------------------------------------------------- #
-# The mirror is still exactly what it was on the lanes that want it.
+# The mirror does not exist, and cannot be asked for.
 # --------------------------------------------------------------------------- #
-def test_mirror_still_allowed_by_default_and_reverses():
-    """Default behaviour is UNCHANGED -- and the reversal is real, which is
-    precisely why an audio lane must not use it."""
-    out = wb.fit_frames_to_target(_frames(3), 5)
-    assert len(out) == 5
-    # cycle = [0,1,2,1] -> tiled/trimmed to 5 = [0,1,2,1,0]
-    assert [int(f[0, 0, 0]) for f in out] == [0, 1, 2, 1, 0]
+def test_the_mirror_extender_is_gone():
+    """Deleted, not defaulted off. A capability that still exists behind a flag
+    is one forgotten keyword argument away from shipping backwards video -- and
+    this one had already been re-armed once by a default flipping the other
+    way."""
+    assert not hasattr(wb, "extend_frames_to_target")
+    assert "extend_frames_to_target" not in getattr(wb, "__all__", ())
 
 
-def test_extend_frames_to_target_untouched_by_the_flag():
-    """The scene-lane extender keeps its own signature and behaviour."""
-    out = wb.extend_frames_to_target(_frames(3), 5)
-    assert [int(f[0, 0, 0]) for f in out] == [0, 1, 2, 1, 0]
+def test_fit_frames_to_target_takes_no_mirror_flag():
+    """``allow_mirror`` is gone from the signature, so no caller can re-arm the
+    mirror by passing True -- deliberately, or by copying an older call."""
+    assert "allow_mirror" not in inspect.signature(
+        wb.fit_frames_to_target).parameters
+    with pytest.raises(TypeError):
+        wb.fit_frames_to_target(_frames(2), 4, allow_mirror=True)
 
 
 # --------------------------------------------------------------------------- #
-# On an audio-synced lane a SHORT render is terminal, never mirrored.
+# A short render is terminal on EVERY lane, not only the lip-synced ones.
 # --------------------------------------------------------------------------- #
-def test_short_render_is_terminal_when_mirror_forbidden():
+def test_short_render_is_terminal():
     with pytest.raises(wb.MirrorExtensionForbidden) as exc:
-        wb.fit_frames_to_target(_frames(3), 9, allow_mirror=False)
+        wb.fit_frames_to_target(_frames(3), 9)
     assert exc.value.rendered == 3
     assert exc.value.target == 9
     assert "backwards" in str(exc.value)
 
 
-def test_trim_is_still_legal_when_mirror_forbidden():
-    """Trimming never reverses time, so the flag must not block it -- a beat
-    quantized UP to the render floor still has to fit back down."""
-    out = wb.fit_frames_to_target(_frames(9), 4, allow_mirror=False)
-    assert [int(f[0, 0, 0]) for f in out] == [0, 1, 2, 3]
+def test_one_frame_short_still_raises():
+    """No "close enough" tolerance. One frame short is 40 ms of audio with no
+    video, and inventing that frame is exactly what was removed."""
+    with pytest.raises(wb.MirrorExtensionForbidden):
+        wb.fit_frames_to_target(_frames(7), 8)
 
 
-def test_exact_match_is_identity_when_mirror_forbidden():
-    out = wb.fit_frames_to_target(_frames(5), 5, allow_mirror=False)
+# --------------------------------------------------------------------------- #
+# Trimming never reverses time, so it is untouched.
+# --------------------------------------------------------------------------- #
+def test_trim_is_still_legal():
+    """A beat quantized UP to a legal render rung still has to fit back down --
+    this is the normal path for every engine whose ladder misses the target."""
+    out = wb.fit_frames_to_target(_frames(9), 4)
+    assert [int(f[0, 0, 0]) for f in out] == [0, 1, 2, 3], (
+        "trim keeps the FIRST n frames, in forward order")
+
+
+def test_exact_match_is_identity():
+    src = _frames(5)
+    out = wb.fit_frames_to_target(src, 5)
     assert len(out) == 5
+    assert np.array_equal(out, src)
 
 
-def test_degenerate_inputs_do_not_raise_when_mirror_forbidden():
-    """A zero-length batch or a non-positive target is not a sync defect --
+def test_degenerate_inputs_do_not_raise():
+    """A zero-length batch or a non-positive target is not a coverage defect --
     it is a different failure, and this guard must not steal it."""
-    assert len(wb.fit_frames_to_target(_frames(0), 5, allow_mirror=False)) == 0
-    out = wb.fit_frames_to_target(_frames(3), 0, allow_mirror=False)
+    assert len(wb.fit_frames_to_target(_frames(0), 5)) == 0
+    out = wb.fit_frames_to_target(_frames(3), 0)
     assert len(out) == 3
+    assert len(wb.fit_frames_to_target(_frames(3), -2)) == 3
 
 
 def test_forbidden_error_is_a_valueerror_subclass():
-    """Callers that only catch ValueError still fail closed rather than
-    sailing past a sync defect."""
+    """Callers catch it by name to add routing advice; it stays a ValueError so
+    a caller that does not know the name still fails closed rather than sailing
+    past a coverage defect."""
     assert issubclass(wb.MirrorExtensionForbidden, ValueError)
