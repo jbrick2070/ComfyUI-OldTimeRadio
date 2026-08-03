@@ -143,6 +143,60 @@ def test_shape_four_refuses_non_transport_and_unbalanced(raw):
     assert notes == ()
 
 
+@pytest.mark.parametrize("raw", [
+    # The outer wrapper is the SHORT marker, the payload hides an unclosed LONG
+    # one. A `"*"` count sees `**` as two and calls it even.
+    "*SCENE 5: **bold thing*",
+    "_SCENE 5: __vault door_",
+    # The mirror: LONG wrapper, lone SHORT marker inside -- invisible to a
+    # `"**"` substring count.
+    "**SCENE 5: a *lonely marker here**",
+    "__SCENE 5: a _lonely marker here__",
+])
+def test_shape_four_rejects_cross_length_marker_mismatch(raw):
+    """QA 2026-08-03: `*` and `**` are the same family, and one is a substring
+    of the other. Counting only the outer marker let a genuinely unbalanced
+    marker ride into `parsed.title` / `scenes[].setting`, which feed the final
+    title override and the shot-direction description."""
+    got, notes = _canonicalize_transport_line(raw)
+    assert got == raw
+    assert notes == ()
+
+
+def test_shape_four_still_accepts_a_legitimately_nested_pair():
+    """The balance check must do real work, not just refuse everything."""
+    got, notes = _canonicalize_transport_line("**SCENE 5: The **vault** deep**")
+    assert got == "SCENE 5: The **vault** deep"
+    assert notes
+
+
+def test_a_wrapped_reserved_keyword_line_is_transport_not_dialogue():
+    """PINNED BEHAVIOUR, and a documented residual risk (QA 2026-08-03).
+
+    `**MUSIC: what does it mean**` mid-scene becomes a MUSIC cue, not dialogue.
+    That is the grammar's pre-existing ambiguity, NOT something shape 4
+    introduced: the UNWRAPPED `MUSIC: ...` behaves identically, because
+    `_RE_MUSIC` is tried before `_RE_SPEAKER` unconditionally. What shape 4 does
+    change is that the wrapped form used to fail LOUDLY as
+    `UNKNOWN_SPEAKER: **MUSIC`, and now resolves quietly.
+
+    Narrowing shape 4 to exclude bare MUSIC/TITLE/CODA is NOT the fix -- those
+    exact forms are in the live failure this change exists to repair. Pinned
+    here so the behaviour cannot drift further without someone deciding to.
+    """
+    wrapped = "\n".join(
+        "**MUSIC: what does it mean**" if line.startswith("SCENE 1:") else line
+        for line in _script().splitlines()
+    )
+    bare = wrapped.replace("**MUSIC: what does it mean**",
+                           "MUSIC: what does it mean")
+    _, wrapped_defects = parse_fable2_markup(wrapped, ["SELA"])
+    _, bare_defects = parse_fable2_markup(bare, ["SELA"])
+    assert [str(d) for d in wrapped_defects] == [str(d) for d in bare_defects], (
+        "wrapped and bare reserved-keyword lines must behave identically; if "
+        "they diverge, shape 4 has changed the grammar rather than the surface")
+
+
 def test_shape_one_still_wins_over_shape_four():
     """Ordering is load-bearing.
 

@@ -60,6 +60,34 @@ def _is_transport(line: str) -> bool:
     return any(rx.match(line) for rx in _TRANSPORT_CLASSIFIERS)
 
 
+def _family_balanced(inner: str, marker: str) -> bool:
+    """Both LENGTHS of ``marker``'s family are balanced inside ``inner``.
+
+    THE DEFECT THIS CLOSES (QA, 2026-08-03). The first shape-4 draft asked
+    ``inner.count(marker) % 2 == 0``, which cannot tell ``*`` from ``**``
+    because one is a substring of the other. A single unclosed ``**`` is TWO
+    ``*`` characters, so it counted as EVEN and passed; a lone ``*`` inside a
+    ``**`` wrapper was invisible to a ``"**"`` substring count and also passed.
+    Measured escapes, each verified to reach an accepted field:
+
+        *SCENE 5: **bold thing*            -> SCENE 5: **bold thing
+        **SCENE 5: a *lonely marker here** -> SCENE 5: a *lonely marker here
+        _SCENE 5: __vault door_            -> SCENE 5: __vault door
+
+    Those strays land in ``parsed.title`` and ``scenes[].setting``, which feed
+    the final title override and the shot-direction description -- exactly the
+    "silently rewritten into accepted prose carrying a stray marker" outcome
+    this module's docstring promises never happens.
+
+    Count the DOUBLE form first, remove it, then count what single characters
+    remain. A legitimately nested pair (``The **vault** deep``) still passes.
+    """
+    long_form = marker[0] * 2
+    if inner.count(long_form) % 2:
+        return False
+    return inner.replace(long_form, "").count(marker[0]) % 2 == 0
+
+
 def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     """Strip a BALANCED emphasis wrapper from a structural label. Report it.
 
@@ -142,7 +170,7 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
         # SHAPE 4, LAST and TRANSPORT-GATED -- see the docstring.
         if body.endswith(marker):                       # <M>LABEL: payload<M>
             inner = body[:-len(marker)].strip()
-            if inner and inner.count(marker) % 2 == 0 and _is_transport(inner):
+            if inner and _family_balanced(inner, marker) and _is_transport(inner):
                 return inner, (
                     "removed balanced %s around whole transport line %r"
                     % (marker, inner),)
