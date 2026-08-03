@@ -95,7 +95,34 @@ Nothing here contradicts the 2026-08-02 change collapsing the
 orientation-specific 49/177 rules into one shared cap, and nothing here is
 strong enough to have justified it on its own.
 
-## Only the 97-frame rung stays under the ceiling
+## THE "CEILING BREACH" FRAMING IS WITHDRAWN (2026-08-02, second correction)
+
+**Operator: "our recipes have been stable for a while, no OOM."** That
+operational record outranks any inference drawn here, and it exposes a bad test.
+
+The canonical run logs the reason:
+
+    Model WAN21_HuMo prepared for dynamic VRAM loading. 16531MB Staged.
+
+ComfyUI stages **16,531 MB against a 16,303 MB card** and streams weights in and
+out on demand. Under a dynamic loader, machine-wide used-VRAM near capacity is
+the allocator consuming headroom that exists -- the intended steady state -- not
+demand pressing against a limit. A high peak is therefore NOT evidence of risk,
+and the renders that produced these numbers all succeeded.
+
+So **comparing an NVML machine-wide PEAK against the 14.5 GiB target is the
+wrong comparison**, and the "OVER CEILING" column below should be read as "used
+this much VRAM", never as "nearly failed". This is exactly the error
+`docs/2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames.md` recorded against itself --
+a USED-VRAM figure substituted into a model meant to compare against FREE VRAM --
+and it was repeated here after being quoted.
+
+What survives: the ORDERING (shorter renders report higher peaks) and the
+ORIENTATION comparison, both of which are internal to this dataset and do not
+depend on any ceiling. What does not survive: any claim that a rung is unsafe,
+close to OOM, or in need of a cap.
+
+## Peak vs the 14.5 GiB target -- reported, not interpreted as risk
 
 Twelve of sixteen cells exceed the 14,848 MB (14.5 GiB) target on machine-wide
 peak. **All four that do not are at 97 frames.**
@@ -105,9 +132,14 @@ peak. **All four that do not are at 97 frames.**
     81 frames: 14,871 - 14,999 MB   all four cells over
     97 frames: 14,582 - 14,652 MB   all four cells UNDER
 
-Every render succeeded. This is headroom, not failure. But the direction is the
-point: **the cheapest rung is the riskiest one, and the capped rung is the
-safest measured configuration.**
+**Every render succeeded, and the operator reports no OOM on these recipes over a
+long period.** Read this table as "how much VRAM was in use", nothing more. The
+word "riskiest" appeared here in an earlier draft and is withdrawn: under a
+dynamic loader that stages more than the card holds, a higher peak does not mean
+closer to failure.
+
+The only durable statement is the ORDERING -- shorter renders report higher
+peaks than longer ones, consistently.
 
 ## What this means for the cap, and for splitting
 
