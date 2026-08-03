@@ -241,67 +241,83 @@ def _probe_audio_duration(path):
 _CLIP_UNDERRUN_FRAC = 0.5
 
 
+class ClipUnderrunsItsBeat(RuntimeError):
+    """A real clip is SHORTER than the beat it must cover, at composite time.
+
+    Terminal since 2026-08-02. This is the last place frames were reused to
+    cover audio, and it survived the engine-layer mirror rip precisely because
+    it lives in the assembler rather than in any adapter -- the mirror was
+    deleted from ``wrapper_bridge``, the boomerang retired in ``eng_ltx_video``,
+    and the composite went on stream-looping the same short clip.
+
+    Its own docstring named the real fix and called itself the interim: "the
+    real fix is phrase-chunking -- render the beat's correct duration so it
+    never underruns -- tracked as a follow-up; this is the safe interim
+    behavior." Coverage planning IS that follow-up and it is live, so the
+    interim can go.
+    """
+
+    def __init__(self, shot_id, engine_id, real, target):
+        self.shot_id, self.engine_id = shot_id, engine_id
+        self.real, self.target = int(real), int(target)
+        super().__init__(
+            "beat %s (%s) rendered %d frame(s) but must cover %d -- a %d-frame "
+            "shortfall. NO FILL: looping replays earlier frames against later "
+            "audio and holding freezes the picture, and every second of audio "
+            "gets ORIGINAL video. Fix the RENDER, not the timeline: let coverage "
+            "planning split this beat, shorten the line, or raise the tier's cap."
+            % (shot_id or "?", engine_id or "?", int(real), int(target),
+               int(target) - int(real)))
+
+
 def _should_loop_fill(row, target_n):
-    """S-A clip-fill: a real clip that UNDERRUNS its beat target loops to fill
-    (the composite's own recommendation) instead of holding the last frame (the
-    HuMo 177/434 murk). Decision reads the RAW engine-output ``frame_count``
-    (``build_clip_manifest`` keeps it raw) vs the beat ``target_frame_count``;
-    ANY shortfall fills. A frame-DIRECTORY clip (the 3D alpha handoff) is exempt
-    -- it has its own dir encoder. Env ``OTR_CLIP_FILL=0`` restores the legacy
-    held-last-frame behavior.
+    """RETIRED 2026-08-02 -- always False. See :class:`ClipUnderrunsItsBeat`.
 
-    ``audio_driven_face`` (HuMo) is ALSO exempt (2026-06-30 HuMo-improve plan):
-    looping a talking/lip-synced face DESYNCS the mouth from its own audio (the
-    loop replays an earlier mouth shape against later audio) -- WORSE than a
-    static hold. A held-last-frame beat is honest (the LOUD ``held_last_frame``
-    legibility status in :func:`timeline_quality_report`, never silenced) while
-    a loop-filled one would masquerade as an OK-ish ``looped_fill``. The real
-    fix is phrase-chunking (render the beat's correct duration so it never
-    underruns) -- tracked as a follow-up; this is the safe interim behavior.
-    Reads ``row["family"]`` (stamped onto every manifest clip row by
-    render_driver, e.g. ``clip.get("family") or shot.get("family")``) -- no
-    registry import needed here (this module stays dep-free / pure).
+    Kept as a named no-op rather than deleted at its two call sites, so the
+    retirement is visible where the decision used to be made and the underrun
+    CHECK stays wired in one place.
 
-    Pure (a single os.path.isdir probe)."""
-    if os.environ.get("OTR_CLIP_FILL", "1") == "0":
-        return False
-    if str((row or {}).get("family") or "") == "audio_driven_face":
-        return False
-    real = int((row or {}).get("frame_count") or 0)
-    tgt = int(target_n or 0)
-    if real <= 0 or tgt <= 0 or real >= tgt:
-        return False
-    p = str((row or {}).get("path") or "")
-    if p and os.path.isdir(p):
-        return False
-    return True
+    What it did: a real clip shorter than its beat was stream-looped to fill,
+    except on ``audio_driven_face`` lanes, which held the last frame instead --
+    because looping a lip-synced mouth desyncs it from its own audio, and a
+    held frame at least fails honestly. Both branches covered audio with
+    something other than original video, which is the rule this closes.
+
+    Pure."""
+    return False
 
 
 def _warn_clip_underrun(row, target_n, *, will_loop=False):
-    """LOUD-warn (never raise -- no-loud-fail rule) when a real clip row carries
-    far fewer on-disk frames than its beat target, so the composite WOULD hold
-    the last frame for most of the beat. A loop-fill row is exempt -- once
-    clip-fill is on (``will_loop``) the clip REPEATS to fill, so the held-frame
-    murk can no longer happen and the LOUD warning is silenced. Pure except for
-    the warning; clip-fill Piece 5."""
-    try:
-        frac = float(os.environ.get("OTR_CLIP_UNDERRUN_FRAC",
-                                    _CLIP_UNDERRUN_FRAC))
-    except (TypeError, ValueError):
-        frac = _CLIP_UNDERRUN_FRAC
-    if frac <= 0 or will_loop or (row or {}).get("loop"):
-        return
+    """RAISES on a real clip shorter than its beat. Was a LOUD warning.
+
+    The warning existed under a no-loud-fail rule, and it was honest about what
+    happened next: "the composite will HOLD the last frame for the rest of the
+    beat. A motion engine should loop/ping-pong-extend to the target." Both of
+    those remedies are now forbidden, which leaves nothing for a warning to warn
+    ABOUT -- the shortfall has no legal outcome, so it is terminal.
+
+    It also had a fractional threshold (``OTR_CLIP_UNDERRUN_FRAC``): only a clip
+    below some percentage of its beat was worth mentioning. That made sense when
+    the question was "is this bad enough to look at". It does not survive the
+    rule, because a one-frame shortfall is still 40 ms of audio with no original
+    video behind it. Any shortfall raises.
+
+    A frame-DIRECTORY clip (the 3D alpha handoff) is exempt -- its frames are
+    counted by its own dir encoder, not by this row's ``frame_count``.
+
+    ``will_loop`` is vestigial and always False; the parameter stays so the two
+    call sites keep their shape while ``_should_loop_fill`` is a named no-op.
+    """
     real = int((row or {}).get("frame_count") or 0)
     tgt = int(target_n or 0)
-    if real > 0 and tgt > 0 and real < frac * tgt:
-        log.warning(
-            "[OTR.composite] CLIP UNDERRUN (LOUD): beat %s engine %r rendered "
-            "%d frame(s) for a %d-frame target (%.0f%%) -- the composite will "
-            "HOLD the last frame for the rest of the beat. A motion engine should "
-            "loop/ping-pong-extend to the target (clip-fill); investigate %r.",
-            (row or {}).get("shot_id") or (row or {}).get("beat_id"),
-            (row or {}).get("engine_id"), real, tgt,
-            100.0 * real / tgt, (row or {}).get("engine_id"))
+    if real <= 0 or tgt <= 0 or real >= tgt:
+        return
+    path = str((row or {}).get("path") or "")
+    if path and os.path.isdir(path):
+        return
+    raise ClipUnderrunsItsBeat(
+        (row or {}).get("shot_id") or (row or {}).get("beat_id"),
+        (row or {}).get("engine_id"), real, tgt)
 
 
 def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,

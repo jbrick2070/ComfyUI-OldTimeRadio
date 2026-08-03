@@ -323,180 +323,131 @@ def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path
 def _manifest(rows, fps=25):
     return {"fps": fps, "clips": rows}
 
-
-def test_underrun_loops_and_suppresses_warn(monkeypatch, caplog):
-    # S-A: default clip-fill ON -> a short clip LOOPS to fill the beat (never
-    # holds the last frame), and the LOUD underrun warning is SILENCED because
-    # the fill has handled it.
+# --------------------------------------------------------------------------- #
+# Piece 5 -- THE COMPOSITE'S OWN COVERAGE MECHANISMS, RETIRED 2026-08-02
+#
+# This block used to pin loop-fill and held-last-frame: a real clip shorter than
+# its beat was ffmpeg stream-looped to fill (every family except HuMo's
+# audio_driven_face, which held its last frame instead, because looping a mouth
+# desyncs it from its own audio).
+#
+# Both were frame REUSE, and they lived in the assembler rather than in any
+# adapter -- which is exactly why they survived the engine-layer mirror rip:
+# `extend_frames_to_target` was deleted, `eng_ltx_video`'s boomerang retired,
+# and the composite went on looping the same short clip afterwards. Two
+# independent review lanes found it in the same pass, and GO_FORWARD_PLAN had
+# tracked it as chunk 7c "still open" since 2026-07-27.
+#
+# `_should_loop_fill`'s own docstring named the replacement and called itself
+# interim: "the real fix is phrase-chunking -- render the beat's correct
+# duration so it never underruns -- tracked as a follow-up". Coverage planning
+# IS that follow-up and it is live, so a shortfall is now terminal.
+# --------------------------------------------------------------------------- #
+def test_a_short_clip_is_terminal_at_composite_time(monkeypatch):
+    """The headline inversion: 17 frames against a 280-frame beat used to LOOP."""
     from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
     monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
              "exists": True, "frame_count": 17, "target_frame_count": 280,
              "start_s": None}]
-    with caplog.at_level(logging.WARNING, logger="OTR"):
-        segs, total = sc.plan_timeline_segments(_manifest(rows))
-    assert total == 280                      # the segment still spans the beat
-    clip_segs = [s for s in segs if s["source"] == "clip"]
-    assert clip_segs and all(s["loop"] for s in clip_segs)   # loop-filled
-    assert not any("CLIP UNDERRUN" in r.message for r in caplog.records)
+    with pytest.raises(sc.ClipUnderrunsItsBeat) as exc:
+        sc.plan_timeline_segments(_manifest(rows))
+    assert exc.value.real == 17 and exc.value.target == 280
+    assert "shot_b001" in str(exc.value) and "wan_ti2v" in str(exc.value)
+    # The message must name the REMEDY, not just the number: the fix is always
+    # in the render, never in the timeline.
+    assert "coverage planning" in str(exc.value)
 
 
-def test_underrun_warns_when_fill_disabled(monkeypatch, caplog):
-    # OTR_CLIP_FILL=0 restores the legacy held-last-frame behavior -> the LOUD
-    # underrun warning fires again and the segment does NOT loop.
+def test_the_fill_env_switch_can_no_longer_bring_looping_back(monkeypatch):
+    """`OTR_CLIP_FILL=0` used to select held-last-frame instead of looping.
+
+    Neither outcome is legal now, so the knob is inert -- the same reasoning
+    that removed `allow_mirror` rather than defaulting it off.
+    """
     from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
-    monkeypatch.setenv("OTR_CLIP_FILL", "0")
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
              "exists": True, "frame_count": 17, "target_frame_count": 280,
              "start_s": None}]
-    with caplog.at_level(logging.WARNING, logger="OTR"):
-        segs, total = sc.plan_timeline_segments(_manifest(rows))
-    assert any("CLIP UNDERRUN" in r.message for r in caplog.records)
-    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
+    for val in ("0", "1"):
+        monkeypatch.setenv("OTR_CLIP_FILL", val)
+        with pytest.raises(sc.ClipUnderrunsItsBeat):
+            sc.plan_timeline_segments(_manifest(rows))
 
 
-def test_no_underrun_warn_when_clip_fills_target(monkeypatch, caplog):
-    # 277/280 is above the 50% underrun threshold -> no LOUD warn either way.
+def test_a_ONE_frame_shortfall_still_raises(monkeypatch):
+    """The old guard only warned below a FRACTION of the target
+    (`OTR_CLIP_UNDERRUN_FRAC`) -- sensible when the question was "is this bad
+    enough to look at", but 40 ms of audio with no original video behind it is
+    the whole thing being forbidden."""
     from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_UNDERRUN_FRAC", raising=False)
+    monkeypatch.setenv("OTR_CLIP_UNDERRUN_FRAC", "0.5")
+    rows = [{"shot_id": "shot_b002", "engine_id": "ltx_8gb", "path": "x.mp4",
+             "exists": True, "frame_count": 279, "target_frame_count": 280,
+             "start_s": None}]
+    with pytest.raises(sc.ClipUnderrunsItsBeat):
+        sc.plan_timeline_segments(_manifest(rows))
+
+
+def test_a_face_lane_is_no_longer_exempt(monkeypatch):
+    """`audio_driven_face` was exempt from LOOPING because a looped mouth
+    desyncs -- and then held its last frame instead, which covers the same audio
+    with a frozen picture. The exemption bought the honest failure; the rule now
+    forbids both outcomes, so the family no longer changes the answer."""
+    from nodes import otr_silent_composite as sc
+    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [{"shot_id": "shot_b003", "engine_id": "humo", "path": "x.mp4",
+             "family": "audio_driven_face", "exists": True,
+             "frame_count": 49, "target_frame_count": 280, "start_s": None}]
+    with pytest.raises(sc.ClipUnderrunsItsBeat):
+        sc.plan_timeline_segments(_manifest(rows))
+
+
+def test_should_loop_fill_is_a_named_no_op():
+    """Kept as a no-op rather than deleted at its call sites, so the retirement
+    is visible where the decision used to be made."""
+    from nodes import otr_silent_composite as sc
+    assert sc._should_loop_fill(
+        {"frame_count": 1, "target_frame_count": 999, "path": "x.mp4"},
+        999) is False
+    assert sc._should_loop_fill({}, 0) is False
+
+
+def test_a_clip_that_covers_its_beat_is_untouched(monkeypatch):
+    """The normal path. Exact coverage plans one clip segment, no loop flag."""
+    from nodes import otr_silent_composite as sc
     monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
     rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
-             "exists": True, "frame_count": 277, "target_frame_count": 280,
-             "start_s": None}]
-    with caplog.at_level(logging.WARNING, logger="OTR"):
-        sc.plan_timeline_segments(_manifest(rows))
-    assert not any("CLIP UNDERRUN" in r.message for r in caplog.records)
-
-
-def test_underrun_guard_disabled_by_env(monkeypatch, caplog):
-    from nodes import otr_silent_composite as sc
-    monkeypatch.setenv("OTR_CLIP_UNDERRUN_FRAC", "0")
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [{"shot_id": "shot_b001", "engine_id": "wan_ti2v", "path": "x.mp4",
-             "exists": True, "frame_count": 1, "target_frame_count": 280,
-             "start_s": None}]
-    with caplog.at_level(logging.WARNING, logger="OTR"):
-        sc.plan_timeline_segments(_manifest(rows))
-    assert not any("CLIP UNDERRUN" in r.message for r in caplog.records)
-
-
-# --------------------------------------------------------------------------- #
-# S-A -- clip-fill loop decision + delivered-frames QA + freezedetect parse
-# --------------------------------------------------------------------------- #
-def test_full_clip_does_not_loop(monkeypatch):
-    from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [{"shot_id": "s", "engine_id": "ltx_video", "path": "x.mp4",
              "exists": True, "frame_count": 280, "target_frame_count": 280,
              "start_s": None}]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
+    segs, total = sc.plan_timeline_segments(_manifest(rows))
+    assert total == 280
+    clip_segs = [s for s in segs if s["source"] == "clip"]
+    assert clip_segs and not any(s.get("loop") for s in clip_segs)
 
 
-def test_dir_clip_not_loop_filled(monkeypatch, tmp_path):
-    # A frame-DIRECTORY clip (3D alpha handoff) has its own fill -> never looped.
+def test_an_OVER_long_clip_is_fine(monkeypatch):
+    """Rendering MORE than the beat needs is normal -- a ladder rung overshoots
+    and the assembler trims. Only a shortfall is a coverage failure."""
     from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
+    rows = [{"shot_id": "shot_b001", "engine_id": "ltx_audio_in", "path": "x.mp4",
+             "exists": True, "frame_count": 449, "target_frame_count": 442,
+             "start_s": None}]
+    segs, total = sc.plan_timeline_segments(_manifest(rows))
+    assert total == 442
+
+
+def test_a_frame_DIRECTORY_clip_is_still_exempt(monkeypatch, tmp_path):
+    """The 3D alpha handoff counts its frames with its own dir encoder, so this
+    row's `frame_count` is not the authority for it."""
+    from nodes import otr_silent_composite as sc
     d = tmp_path / "frames"
     d.mkdir()
-    rows = [{"shot_id": "s", "engine_id": "character_3d", "path": str(d),
-             "exists": True, "frame_count": 10, "target_frame_count": 280,
+    rows = [{"shot_id": "shot_b001", "engine_id": "mesh_stage", "path": str(d),
+             "exists": True, "frame_count": 3, "target_frame_count": 280,
              "start_s": None}]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
-
-
-def test_timeline_quality_report_statuses(monkeypatch):
-    # NOTE 2026-06-30: row "b" (ltx / no family / not audio_driven_face) is the
-    # generic loop-fill case; row "a" (humo) is now EXCLUDED from loop-fill (the
-    # audio_driven_face lip-sync guard below), so it holds instead.
-    from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [
-        {"shot_id": "a", "engine_id": "humo", "family": "audio_driven_face",
-         "path": "a.mp4", "exists": True,
-         "frame_count": 100, "target_frame_count": 280, "start_s": None},
-        {"shot_id": "b", "engine_id": "ltx", "path": "b.mp4", "exists": True,
-         "frame_count": 280, "target_frame_count": 280, "start_s": None},
-        {"shot_id": "c", "engine_id": "still", "path": "", "exists": False,
-         "frame_count": 0, "target_frame_count": 120, "start_s": None},
-    ]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    qa = sc.timeline_quality_report(_manifest(rows), segs)
-    st = {b["shot_id"]: b["quality_status"] for b in qa["beats"]}
-    assert st["a"] == "held_last_frame"        # audio_driven_face: never loop
-    assert st["b"] == "ok"
-    assert st["c"] == "no_clip_segment"
-    assert not qa["delivered_frames_ok"]        # row "a" IS a legibility failure
-    da = next(b for b in qa["beats"] if b["shot_id"] == "a")
-    # the segment plan still spans the FULL target either way (loop vs hold is
-    # an ENCODING-time distinction, not a segment-length one) -- only the raw
-    # engine-reported frame_count differs from the target.
-    assert da["delivered_frame_count"] == 280 and da["frame_count"] == 100
-
-
-def test_audio_driven_face_excluded_from_loop_fill(monkeypatch):
-    # 2026-06-30 HuMo-improve plan: looping a talking/lip-synced face desyncs
-    # the mouth from its own audio (the loop replays an earlier mouth shape
-    # against later audio) -- worse than a static hold. audio_driven_face
-    # (HuMo) rows are excluded from loop-fill even with OTR_CLIP_FILL=1
-    # (default) -- they fall to the pre-existing held-last-frame path, which
-    # the LOUD legibility guard (timeline_quality_report) still flags.
-    from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [{"shot_id": "s", "engine_id": "humo_1.7B",
-             "family": "audio_driven_face", "path": "x.mp4", "exists": True,
-             "frame_count": 100, "target_frame_count": 280, "start_s": None}]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    assert not any(s.get("loop") for s in segs if s["source"] == "clip")
-
-
-def test_non_face_engine_still_loop_fills_alongside_excluded_face(monkeypatch):
-    # The exclusion is PER-ROW family, not global: a non-audio_driven_face
-    # engine in the SAME manifest still gets the loop-fill benefit.
-    from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    rows = [
-        {"shot_id": "face", "engine_id": "humo", "family": "audio_driven_face",
-         "path": "a.mp4", "exists": True, "frame_count": 100,
-         "target_frame_count": 280, "start_s": None},
-        {"shot_id": "broll", "engine_id": "wan_ti2v", "family": "image_to_video",
-         "path": "b.mp4", "exists": True, "frame_count": 100,
-         "target_frame_count": 280, "start_s": None},
-    ]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    by_shot = {s["shot_id"]: s for s in segs if s["source"] == "clip"}
-    assert by_shot["face"]["loop"] is False
-    assert by_shot["broll"]["loop"] is True
-
-
-def test_should_loop_fill_reads_family_not_engine_name(monkeypatch):
-    # Direct unit coverage of the new gate: keyed on "family", not on any
-    # engine-name substring match (robust to a future audio_driven_face engine
-    # that isn't literally named "humo*").
-    from nodes import otr_silent_composite as sc
-    monkeypatch.delenv("OTR_CLIP_FILL", raising=False)
-    assert sc._should_loop_fill(
-        {"frame_count": 10, "family": "audio_driven_face"}, 100) is False
-    assert sc._should_loop_fill(
-        {"frame_count": 10, "family": "image_to_video"}, 100) is True
-    # no family key at all (an incomplete/legacy row) -> not excluded, matches
-    # the pre-2026-06-30 behavior for rows that predate the family stamp.
-    assert sc._should_loop_fill({"frame_count": 10}, 100) is True
-
-
-def test_timeline_quality_report_held_when_fill_off(monkeypatch):
-    from nodes import otr_silent_composite as sc
-    monkeypatch.setenv("OTR_CLIP_FILL", "0")
-    rows = [{"shot_id": "a", "engine_id": "humo", "path": "a.mp4",
-             "exists": True, "frame_count": 100, "target_frame_count": 280,
-             "start_s": None}]
-    segs, _ = sc.plan_timeline_segments(_manifest(rows))
-    qa = sc.timeline_quality_report(_manifest(rows), segs)
-    assert qa["beats"][0]["quality_status"] == "held_last_frame"
-    assert not qa["delivered_frames_ok"]
+    segs, total = sc.plan_timeline_segments(_manifest(rows))
+    assert total == 280
 
 
 def test_parse_freezedetect():
