@@ -44,8 +44,27 @@ BOOT = REPO / "scripts" / "_otr_w45_boot.ps1"
 LOCK = REPO / "tmp" / "_w45_campaign.lock"
 RESULTS = REPO / "tmp" / "_w45_results.json"
 LEDGER = REPO / "tmp" / "_w45_overnight.json"
-ALL_ENGINES = ["ltx_8gb", "ltx_video", "ltx_audio_in", "humo",
-               "fastwan_8gb", "wan_ti2v"]
+
+def _all_engines() -> list:
+    """The engines the CAMPAIGN will actually run -- asked, never hardcoded.
+
+    This list used to be a hardcoded six: ltx_8gb, ltx_video, ltx_audio_in,
+    humo, fastwan_8gb, wan_ti2v. The campaign was corrected on 2026-08-02 to
+    cover all NINETEEN registered local engines, and this file was not, so the
+    unattended overnight driver went on trying to prove six of nineteen and
+    reporting completion -- the same "coverage that hides its denominator"
+    defect, one file downstream.
+
+    Deriving it from ``otr_w45_campaign.build_legs()`` means the two can no
+    longer disagree. If the campaign refuses to build a roster (a local engine
+    with no profile), that refusal surfaces here too rather than being papered
+    over with a stale list.
+    """
+    scripts_dir = str(REPO / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import otr_w45_campaign as _campaign
+    return [engine for engine, _profile in _campaign.build_legs()]
 
 MAX_ROUNDS = 4
 MAX_FAILURES_PER_ENGINE = 2
@@ -165,11 +184,14 @@ def main() -> int:
         if isinstance(row, dict) and row.get("engine") and not row.get("ok"):
             failures[row["engine"]] = failures.get(row["engine"], 0) + 1
 
+    all_engines = _all_engines()
+    say("roster from the campaign: %d local engine(s)" % len(all_engines))
+
     for round_no in range(1, MAX_ROUNDS + 1):
         done = {r["engine"] for r in history
                 if isinstance(r, dict) and r.get("ok") and r.get("engine")}
         done |= passed_engines()
-        todo = [e for e in ALL_ENGINES
+        todo = [e for e in all_engines
                 if e not in done
                 and failures.get(e, 0) < MAX_FAILURES_PER_ENGINE]
 
@@ -202,7 +224,7 @@ def main() -> int:
     done = {r["engine"] for r in history
             if isinstance(r, dict) and r.get("ok") and r.get("engine")}
     print("\n=========== OVERNIGHT SUMMARY ===========")
-    for engine in ALL_ENGINES:
+    for engine in all_engines:
         rows = [r for r in history
                 if isinstance(r, dict) and r.get("engine") == engine]
         if not rows:
@@ -213,9 +235,13 @@ def main() -> int:
         detail = last.get("coverage") if last.get("ok") else last.get("why")
         print("%-14s %-4s (%s attempt(s), %s min)  %s"
               % (engine, state, len(rows), last.get("minutes"), detail))
-    print("\n%d/%d engines proven" % (len(done), len(ALL_ENGINES)))
+    proven = {e for e in done if e in set(all_engines)}
+    print("\n%d/%d local engines proven" % (len(proven), len(all_engines)))
+    not_run = [e for e in all_engines if e not in proven]
+    if not_run:
+        print("NOT PROVEN (%d): %s" % (len(not_run), ", ".join(not_run)))
     LEDGER.write_text(json.dumps(history, indent=2), encoding="utf-8")
-    return 0 if len(done) == len(ALL_ENGINES) else 1
+    return 0 if len(proven) == len(all_engines) else 1
 
 
 if __name__ == "__main__":

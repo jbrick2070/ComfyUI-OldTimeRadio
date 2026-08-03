@@ -348,6 +348,162 @@ def report(res):
     print("  VERDICT: %s -- %s" % (res["verdict"], res["why"]))
 
 
+#: Where render_driver caches the per-segment conditioning WAVs it feeds the
+#: engine. These are THE audio the model actually received, which is why they
+#: beat any window reconstructed from ledger timings.
+SLICE_CACHE = pathlib.Path(
+    r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/_shared/tmp/audio_slices")
+
+#: A slice pairs with a clip when their durations agree to within this. The
+#: clip is an integer number of frames and the slice may carry tail padding, so
+#: exact equality is the wrong test.
+PAIR_TOL_S = 0.20
+
+
+def _duration_s(path):
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(path)], capture_output=True, text=True).stdout
+    try:
+        return float(out.strip().split(",")[0])
+    except ValueError:
+        return 0.0
+
+
+def pair_clip_to_slice(clip, slices):
+    """The conditioning WAV a clip was rendered against, or None.
+
+    Matched on (a) the slice being written BEFORE the clip finished, and (b)
+    duration agreement. A clip whose duration matches no single slice is almost
+    always a MULTI-SEGMENT concatenation -- the segments each have their own
+    slice -- and returning None for it is correct: an assembled beat must never
+    be classified as if it were one render.
+    """
+    clip_dur = _duration_s(clip)
+    clip_mtime = clip.stat().st_mtime
+    if clip_dur <= 0:
+        return None, clip_dur, "unreadable clip"
+
+    cands = [s for s in slices
+             if s.stat().st_size > 1024
+             and s.stat().st_mtime <= clip_mtime
+             and abs(_duration_s(s) - clip_dur) <= PAIR_TOL_S]
+    if not cands:
+        return None, clip_dur, "no single slice matches this duration (multi-segment?)"
+    # Nearest preceding write wins: the slice is made immediately before its render.
+    best = max(cands, key=lambda s: s.stat().st_mtime)
+    return best, clip_dur, "matched %d candidate(s)" % len(cands)
+
+
+def run_batch_segments(episodes_root, engine="humo", limit=None, window_h=6.0):
+    """Measure every SINGLE-SEGMENT clip that can be paired to its exact slice.
+
+    One clip is not a classification. The research report's standing rule is the
+    median across lines and seeds, never one attractive clip, so this walks every
+    episode on disk and reports the distribution over everything that clears the
+    articulation gate.
+    """
+    root = pathlib.Path(episodes_root)
+    all_slices = [p for p in SLICE_CACHE.glob("slice_*.wav")] if SLICE_CACHE.is_dir() else []
+    if not all_slices:
+        raise SystemExit("no slice cache at %s" % SLICE_CACHE)
+
+    eps = sorted((d for d in root.iterdir() if d.is_dir()),
+                 key=lambda d: d.stat().st_mtime, reverse=True)
+    rows, scanned = [], 0
+    for ep in eps:
+        clips = sorted((ep / "clips").glob("*%s*.mp4" % engine)) \
+            if (ep / "clips").is_dir() else []
+        if not clips:
+            continue
+        scanned += 1
+        lo = min(c.stat().st_mtime for c in clips) - window_h * 3600
+        hi = max(c.stat().st_mtime for c in clips)
+        near = [s for s in all_slices if lo <= s.stat().st_mtime <= hi]
+
+        for clip in clips:
+            wav, dur, why = pair_clip_to_slice(clip, near)
+            if wav is None:
+                rows.append({"episode": ep.name, "clip": clip.name,
+                             "verdict": "UNPAIRED", "why": why,
+                             "clip_dur_s": round(dur, 3)})
+                print("  UNPAIRED  %-44s %s" % (clip.name[:44], why))
+                continue
+            try:
+                res = measure_segment(clip, wav)
+            except Exception as exc:
+                rows.append({"episode": ep.name, "clip": clip.name,
+                             "verdict": "ERROR", "why": str(exc)[:90]})
+                continue
+            res["episode"] = ep.name
+            rows.append(res)
+            whole = res.get("whole") or {}
+            print("  %-16s %-44s face %3.0f%%  lag %+8s ms  corr %.2f" % (
+                res["verdict"], clip.name[:44], res["face_tracked_frac"] * 100,
+                ("%.1f" % whole["lag_ms"]) if whole else "n/a",
+                whole.get("corr", 0.0)))
+        if limit and scanned >= limit:
+            break
+
+    usable = [r for r in rows
+              if r.get("verdict") not in ("UNPAIRED", "ERROR", "NO-ARTICULATION")
+              and (r.get("whole") or {}).get("corr", 0) >= MIN_PEAK_CORR]
+
+    print("\n=========== M1 SEGMENT MEASUREMENT ===========")
+    print("episodes scanned      : %d" % scanned)
+    print("clips seen            : %d" % len(rows))
+    for label in ("UNPAIRED", "NO-ARTICULATION", "ERROR"):
+        n = sum(1 for r in rows if r.get("verdict") == label)
+        print("%-22s: %d" % (label, n))
+    print("USABLE measurements   : %d" % len(usable))
+
+    if usable:
+        lags = np.array([r["whole"]["lag_ms"] for r in usable])
+        print("\nwhole-segment lag (ms), positive = VIDEO LAGS AUDIO:")
+        print("  n=%d  min %+.1f  median %+.1f  mean %+.1f  max %+.1f  sd %.1f"
+              % (len(lags), lags.min(), np.median(lags), lags.mean(),
+                 lags.max(), lags.std()))
+        early = np.array([r["windows"][0]["lag_ms"] for r in usable
+                          if r.get("windows") and r["windows"][0].get("lag_ms") is not None])
+        late = np.array([r["windows"][-1]["lag_ms"] for r in usable
+                         if r.get("windows") and r["windows"][-1].get("lag_ms") is not None])
+        if early.size and late.size:
+            print("  EARLY window median %+.1f ms | LATE window median %+.1f ms"
+                  % (np.median(early), np.median(late)))
+        verdicts = {}
+        for r in usable:
+            verdicts[r["verdict"]] = verdicts.get(r["verdict"], 0) + 1
+        print("  per-segment verdicts: %s"
+              % ", ".join("%s=%d" % kv for kv in sorted(verdicts.items())))
+    else:
+        print("\nNO USABLE MEASUREMENTS -- M1 remains unclassified.")
+    return rows
+
+
+def report_segment(res):
+    """Print one landmark-based segment measurement."""
+    print("\n=== %s ===" % res["label"])
+    print("  %d frames @ %.3g fps | face tracked %.0f%% | aperture std %.5f"
+          % (res["frames"], res["fps"], res["face_tracked_frac"] * 100,
+             res["aperture_std"]))
+    print("  audio: %s" % pathlib.Path(res["wav"]).name)
+    if res.get("shift_ms"):
+        print("  CONTROL: audio envelope shifted %+.0f ms" % res["shift_ms"])
+    whole = res.get("whole")
+    if whole:
+        print("  WHOLE SEGMENT  lag %+7.1f ms (%+.2f frames)  corr %.3f"
+              % (whole["lag_ms"], whole["lag_frames"], whole["corr"]))
+    for w in res.get("windows", []):
+        if w.get("lag_ms") is None:
+            print("  %-6s        (no measurement)" % w["window"])
+            continue
+        flag = "" if w["corr"] >= MIN_PEAK_CORR else "   <-- weak, ignored"
+        print("  %-6s %4.1f-%4.1fs  lag %+7.1f ms  corr %.3f%s"
+              % (w["window"], w["from_s"], w["to_s"], w["lag_ms"],
+                 w["corr"], flag))
+    print("  VERDICT: %s -- %s" % (res["verdict"], res.get("why", "")))
+
+
 def episode_clips(episode, engine):
     """[(clip_path, line_start_s, line_dur_s)] for one engine, from the ledger."""
     episode = pathlib.Path(episode)
@@ -374,6 +530,122 @@ def episode_clips(episode, engine):
             continue
         out.append((clip, float(start), float(dur), masters[0]))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# the LANDMARK instrument (M1 step 3) -- replaces the rejected proxy
+# --------------------------------------------------------------------------- #
+#: MediaPipe FaceMesh inner-lip landmarks. 13 is the centre of the upper inner
+#: lip and 14 the lower, so their vertical gap IS mouth aperture. 10 (glabella)
+#: and 152 (chin) give a face height to normalise by, which makes the signal
+#: invariant to the head moving toward or away from camera -- the exact motion
+#: that dominated, and ruined, the frame-difference proxy.
+LIP_UPPER_INNER, LIP_LOWER_INNER = 13, 14
+FACE_TOP, FACE_BOTTOM = 10, 152
+
+#: Below this fraction of frames carrying a usable face, the clip is not a
+#: measurement -- it is NO-ARTICULATION, which is a finding, not an offset.
+MIN_FACE_TRACK_FRAC = 0.60
+
+#: Aperture must actually vary. A face held with a closed mouth correlates with
+#: nothing, and reporting its argmax would be noise with a decimal point.
+MIN_APERTURE_STD = 0.004
+
+
+def mouth_aperture_signal(clip_path):
+    """Per-frame normalised mouth aperture via MediaPipe FaceMesh.
+
+    Returns ``(signal, tracked_fraction)``. Frames with no face carry the last
+    known value (held, not zeroed -- a dropout is missing data, not a closed
+    mouth), and the tracked fraction is reported so a mostly-untracked clip can
+    be refused rather than quietly measured.
+
+    Requires ``mediapipe``, which lives in the LatentSync venv
+    (``latentsync/.venv``), not the ComfyUI venv. It ships its own tflite
+    weights, so this is fully offline -- nothing is downloaded.
+    """
+    import cv2
+    import mediapipe as mp
+
+    cap = cv2.VideoCapture(str(clip_path))
+    mesh = mp.solutions.face_mesh.FaceMesh(
+        static_image_mode=False, max_num_faces=1, refine_landmarks=True,
+        min_detection_confidence=0.4, min_tracking_confidence=0.4)
+
+    values, tracked, last = [], 0, 0.0
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            res = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            if res.multi_face_landmarks:
+                lm = res.multi_face_landmarks[0].landmark
+                gap = abs(lm[LIP_LOWER_INNER].y - lm[LIP_UPPER_INNER].y)
+                height = abs(lm[FACE_BOTTOM].y - lm[FACE_TOP].y) or 1e-6
+                last = float(gap / height)
+                tracked += 1
+            values.append(last)
+    finally:
+        cap.release()
+        mesh.close()
+
+    n = len(values)
+    return np.asarray(values, dtype=np.float64), (tracked / n if n else 0.0)
+
+
+def audio_rms_signal(wav_path, fps, sr=16000):
+    """Loudness envelope at exactly ``fps`` values per second.
+
+    RMS rather than onset strength: mouth APERTURE tracks how loud the voice is
+    far more directly than it tracks note onsets, so pairing aperture with
+    loudness is the physically meaningful comparison. The first instrument
+    paired motion energy with onset strength, which is two derivatives away from
+    the thing being measured.
+    """
+    import librosa
+
+    y, _ = librosa.load(str(wav_path), sr=sr, mono=True)
+    if y.size == 0:
+        raise SystemExit("empty audio: %s" % wav_path)
+    hop = int(round(sr / float(fps)))
+    rms = librosa.feature.rms(y=y, frame_length=hop * 2, hop_length=hop)[0]
+    return rms.astype(np.float64)
+
+
+def measure_segment(clip, wav, label=""):
+    """Measure ONE segment against the EXACT wav it was conditioned on.
+
+    Gated in two stages, and the first is never skipped: a clip with no usable
+    face track or no aperture variation returns NO-ARTICULATION rather than an
+    offset. An offset computed from a face that was never tracked is a number
+    with no referent.
+    """
+    fps, _w, _h, _n = probe_video(clip)
+    aperture, tracked = mouth_aperture_signal(clip)
+    result = {"label": label or pathlib.Path(clip).name,
+              "clip": str(clip), "wav": str(wav), "fps": fps,
+              "frames": int(aperture.size), "face_tracked_frac": tracked,
+              "aperture_std": float(aperture.std()) if aperture.size else 0.0}
+
+    if tracked < MIN_FACE_TRACK_FRAC:
+        result.update(verdict="NO-ARTICULATION",
+                      why="face tracked in only %.0f%% of frames (need %.0f%%)"
+                          % (tracked * 100, MIN_FACE_TRACK_FRAC * 100))
+        return result
+    if result["aperture_std"] < MIN_APERTURE_STD:
+        result.update(verdict="NO-ARTICULATION",
+                      why="mouth aperture barely varies (std %.5f < %.5f) -- the "
+                          "face is tracked but is not speaking"
+                          % (result["aperture_std"], MIN_APERTURE_STD))
+        return result
+
+    audio = audio_rms_signal(wav, fps)
+    result["whole"] = measure_lag(aperture, audio, fps)
+    result["windows"] = windowed_lags(aperture, audio, fps)
+    verdict, why = classify(result["windows"], result["whole"])
+    result.update(verdict=verdict, why=why)
+    return result
 
 
 def static_onset_frames(frames, roi=None):
@@ -499,10 +771,65 @@ def main(argv=None):
                          "no audio, no GPU -- tests BUG-07.13's cause field.")
     ap.add_argument("--limit", type=int, default=None,
                     help="with --static-onset, stop after this many episodes")
+    ap.add_argument("--segment", metavar="CLIP",
+                    help="M1 step 3: measure ONE segment with MediaPipe mouth "
+                         "landmarks against the EXACT conditioning wav. Needs "
+                         "the LatentSync venv python (mediapipe).")
+    ap.add_argument("--segment-audio", metavar="WAV",
+                    help="the exact slice_*.wav the segment was conditioned on")
+    ap.add_argument("--batch-segments", metavar="EPISODES_ROOT",
+                    help="M1 step 3 at scale: pair every clip of --engine to its "
+                         "exact conditioning slice and measure the distribution. "
+                         "Needs the LatentSync venv python.")
     args = ap.parse_args(argv)
 
     if args.self_test:
         return self_test()
+
+    if args.batch_segments:
+        rows = run_batch_segments(args.batch_segments, args.engine, args.limit)
+        if args.json_out:
+            pathlib.Path(args.json_out).write_text(
+                json.dumps(rows, indent=2, default=str), encoding="utf-8")
+            print("\nwrote %s" % args.json_out)
+        return 0
+
+    if args.segment:
+        if not args.segment_audio:
+            ap.error("--segment needs --segment-audio (the EXACT conditioning wav)")
+        res = measure_segment(args.segment, args.segment_audio)
+        report_segment(res)
+        rows = [res]
+        if args.control_shift_ms:
+            ctl = measure_segment(args.segment, args.segment_audio,
+                                  label=pathlib.Path(args.segment).name
+                                        + " [SHIFTED CONTROL]")
+            # Shift the ENVELOPE rather than re-reading the file, so the control
+            # differs from the measurement in exactly one way.
+            fps = res["fps"]
+            k = int(round(args.control_shift_ms / 1000.0 * fps))
+            aperture, _ = mouth_aperture_signal(args.segment)
+            audio = np.roll(audio_rms_signal(args.segment_audio, fps), k)
+            ctl["whole"] = measure_lag(aperture, audio, fps)
+            ctl["windows"] = windowed_lags(aperture, audio, fps)
+            ctl["shift_ms"] = args.control_shift_ms
+            # Re-derive the control's own verdict. Without this it reprints the
+            # unshifted measurement's verdict beside the shifted numbers, which
+            # reads as though the shift changed nothing.
+            _v, _w = classify(ctl["windows"], ctl["whole"])
+            ctl.update(verdict=_v, why=_w)
+            report_segment(ctl)
+            rows.append(ctl)
+            if res.get("whole") and ctl.get("whole"):
+                moved = ctl["whole"]["lag_ms"] - res["whole"]["lag_ms"]
+                print("\n  CONTROL CHECK: injected %+.0f ms -> reading moved "
+                      "%+.1f ms (expect %+.0f)"
+                      % (args.control_shift_ms, moved, -args.control_shift_ms))
+        if args.json_out:
+            pathlib.Path(args.json_out).write_text(
+                json.dumps(rows, indent=2, default=str), encoding="utf-8")
+            print("\nwrote %s" % args.json_out)
+        return 0
 
     if args.static_onset:
         rows = run_static_onset(args.static_onset, args.engine, args.limit)

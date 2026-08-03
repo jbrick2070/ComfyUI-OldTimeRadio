@@ -49,11 +49,21 @@ def main(argv=None) -> int:
     ap.add_argument("--expect-fail", default="",
                     help="substring the named failure must carry; the render "
                          "must NOT succeed")
+    ap.add_argument("--cache-buster", type=int, default=0,
+                    help="vary this to force ComfyUI to re-execute an otherwise "
+                         "IDENTICAL prompt. It is written to oom_index, which "
+                         "the node documents as inert in mode=single, so it "
+                         "cannot affect the render. Needed because resubmitting "
+                         "the same graph returns the CACHED history -- including "
+                         "the original elapsed_s -- in about five seconds, which "
+                         "reads exactly like a successful second render and is "
+                         "how a repeat measurement silently becomes a copy of "
+                         "the first.")
     args = ap.parse_args(argv)
 
     started = time.time()
     api = {"1": {"class_type": "OTR_VideoRenderBatch", "inputs": {
-        "mode": "single", "beats": 1, "oom_index": 0,
+        "mode": "single", "beats": 1, "oom_index": int(args.cache_buster),
         "frame_count": int(args.frames), "engine": args.engine,
         "portrait_path": args.portrait, "audio_path": args.audio,
     }}}

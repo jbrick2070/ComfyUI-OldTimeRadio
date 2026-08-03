@@ -212,10 +212,24 @@ HASH_DIM = 32
 #: detects a frozen clip (whose repeated frames really are identical, being
 #: residual-free P-frames) while missing the ping-pong it was written to catch.
 #:
-#: 2.0 on the 0-255 scale is well above observed encoder jitter between a frame
-#: and its mirror twin, and far below the distance between two genuinely
-#: different frames.
-SAME_FRAME_TOL = 2.0
+#: THE TOLERANCE IS RELATIVE TO THE CLIP'S OWN CONTRAST, not a fixed number on
+#: the 0-255 scale. A fixed 2.0 was the second implementation and it was WRONG in
+#: a way that matters for this show specifically: inter-frame differences scale
+#: with a scene's dynamic range, so a dark scene's real motion produces smaller
+#: pixel deltas than a bright scene's. Measured on real footage, the same clip
+#: with only its contrast reduced went from 21 identical-run frames to 177 -- the
+#: entire clip -- and archived near-black clips scored their full length. OTR is
+#: a noir radio drama; low-key scenes are the house style, not an edge case, so a
+#: fixed threshold would have failed good legs and sent the reader hunting a
+#: re-armed extender that was never there.
+#:
+#: 0.04 of the clip's own pixel standard deviation reproduces the old 2.0 on
+#: ordinary footage (std ~50) and tightens automatically as a scene darkens.
+SAME_FRAME_REL_TOL = 0.04
+
+#: Floor for the contrast scale, so a genuinely flat clip cannot drive the
+#: tolerance to zero and call every frame different.
+MIN_CONTRAST_SCALE = 1.0
 VRAM_BASELINE_MB = 2600
 VRAM_SETTLE_S = 240
 
@@ -244,10 +258,21 @@ def _server_post(path: str, payload: dict) -> None:
 
 
 def _vram_used_mb() -> int:
-    out = subprocess.run(
-        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-        capture_output=True, text=True,
-    ).stdout.strip().splitlines()
+    """GPU MB in use, or -1 when it cannot be read.
+
+    Guarded because this is called in a poll loop -- roughly two dozen times per
+    leg across nineteen legs -- and it is the only subprocess call in this file
+    that was unprotected. A missing nvidia-smi would otherwise abort the whole
+    remaining campaign with a raw traceback. Every caller already treats -1 as
+    "unknown", so failing soft here loses nothing.
+    """
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True,
+        ).stdout.strip().splitlines()
+    except (OSError, ValueError):
+        return -1
     return int(out[0]) if out and out[0].strip().isdigit() else -1
 
 
@@ -382,12 +407,17 @@ def find_frame_reuse(sigs) -> dict:
 
     n = 0 if sigs is None else int(sigs.shape[0])
     out = {"frames": n, "max_identical_run": 0, "mirror_span": 0,
-           "mirror_at": None, "mirror_dist": None}
+           "mirror_at": None, "contrast_scale": None, "tolerance": None}
     if n < 4:
         return out
 
+    # Scale the tolerance to this clip's own contrast -- see SAME_FRAME_REL_TOL.
+    scale = max(float(np.asarray(sigs).std()), MIN_CONTRAST_SCALE)
+    tol = SAME_FRAME_REL_TOL * scale
+    out["contrast_scale"], out["tolerance"] = round(scale, 2), round(tol, 3)
+
     def same(i, j):
-        return float(np.abs(sigs[i] - sigs[j]).mean()) <= SAME_FRAME_TOL
+        return float(np.abs(sigs[i] - sigs[j]).mean()) <= tol
 
     run = best_run = 1
     for i in range(1, n):
@@ -577,6 +607,16 @@ def verify_asset(started_at: float) -> dict:
                         first["clip"], first["why"],
                         (" -- " + first["detail"]) if first.get("detail") else "")}
 
+    # AN UNRUN CHECK IS NOT A PASSED CHECK. If the episode directory could not
+    # be located, `reuse` is still None here and the leg would return ok=True
+    # having never tested the invariant it exists to prove. Silence and success
+    # must not look the same.
+    if reuse is None:
+        return {"ok": False, "asset": asset.name, "coverage": coverage,
+                "why": "could not locate the episode directory for this leg, so "
+                       "the no-reuse audit never ran -- the invariant is "
+                       "UNPROVEN, not satisfied"}
+
     return {"ok": True, "asset": asset.name, "dims": dims,
             "seconds": round(seconds, 2), "audio": audio, "coverage": coverage,
             "reuse": reuse, "delivered": sorted(set(engines))}
@@ -681,20 +721,32 @@ def main(argv=None) -> int:
               "results. Stop the other run, then delete the lock." % LOCK,
               file=sys.stderr)
         return 2
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
-    LOCK.write_text("pid=%d start=%s\n" % (os.getpid(), _now()), encoding="utf-8")
 
+    # RESOLVE THE LEGS BEFORE TAKING THE LOCK. build_legs() raises SystemExit
+    # when a local engine has no profile, and when the lock was written first
+    # that exception escaped before the try/finally existed -- stranding the
+    # lock so every LATER run refused with "a campaign is already running"
+    # until someone deleted the file by hand. The roster is derived precisely so
+    # a newly registered engine joins automatically, which is exactly when a
+    # missing profile (and so this refusal) becomes likely. Nothing in leg
+    # resolution needs the lock, so the ordering fixes it outright.
     all_legs = build_legs()
     legs = all_legs
     if args.only:
         wanted = {n.strip() for n in args.only.split(",") if n.strip()}
-        legs = [leg for leg in all_legs if leg[0] in wanted]
+        if not wanted:
+            raise SystemExit("REFUSING: --only was given but names no engine. "
+                             "A campaign that runs zero legs and exits 0 reads "
+                             "as a pass.")
         unknown = wanted - {leg[0] for leg in all_legs}
         if unknown:
-            LOCK.unlink(missing_ok=True)
             raise SystemExit("REFUSING: --only names engines that are not "
                              "registered local engines: %s"
                              % ", ".join(sorted(unknown)))
+        legs = [leg for leg in all_legs if leg[0] in wanted]
+
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    LOCK.write_text("pid=%d start=%s\n" % (os.getpid(), _now()), encoding="utf-8")
 
     results = []
     try:
