@@ -102,6 +102,78 @@ def test_leaves_everything_else_byte_identical(raw):
     assert notes == ()
 
 
+# --------------------------------------------------------------------------- #
+# SHAPE 4 -- the whole-line wrapper (2026-08-03, live)
+#
+# The 30-word sweep lost `ltx_audio_in` and `viz_mxc_cpu` in the writer to a
+# model that wrapped its structure end to end: `**SCENE 5: The vault**`,
+# `**TITLE: ...**`, `**MUSIC**`, `**CODA**`. Shapes 1-3 all miss it -- the body
+# opens with a space after the colon and the label does not end with the marker
+# -- so the line fell to the speaker catch-all and produced a character named
+# `**SCENE 5`. Four repair attempts later the ladder exhausted and the leg died
+# having never reached a video engine.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("raw,want", [
+    ("**SCENE 5: The vault**", "SCENE 5: The vault"),      # the live defect
+    ("**TITLE: The Hidden Force**", "TITLE: The Hidden Force"),
+    ("**CODA: fade to static**", "CODA: fade to static"),
+    ("**MUSIC: low drone**", "MUSIC: low drone"),
+    ("*SCENE 6: Corridor*", "SCENE 6: Corridor"),
+    ("__SCENE 7: Deck__", "SCENE 7: Deck"),
+])
+def test_shape_four_unwraps_a_whole_line_transport_wrapper(raw, want):
+    got, notes = _canonicalize_transport_line(raw)
+    assert got == want
+    assert notes, "a removal must be REPORTED, never silent"
+
+
+@pytest.mark.parametrize("raw", [
+    # NOT transport -- unwrapping would turn a closed grammar into a general
+    # Markdown sanitizer, and this line must stay a LOUD defect.
+    "**She turns, slowly: the room is empty**",
+    # Unbalanced INTERIOR: stripping the outer pair would smuggle a stray
+    # marker into accepted prose.
+    "**BO NI: Hello **world**",
+    # Unbalanced outer -- no closing marker at all.
+    "**SCENE 5: The vault",
+])
+def test_shape_four_refuses_non_transport_and_unbalanced(raw):
+    got, notes = _canonicalize_transport_line(raw)
+    assert got == raw
+    assert notes == ()
+
+
+def test_shape_one_still_wins_over_shape_four():
+    """Ordering is load-bearing.
+
+    `**BO NI:** Hello **world**` both starts and ends with `**`. Checked as a
+    whole-line wrapper FIRST it would yield `BO NI:** Hello **world` -- mangling
+    the exact case this module promises to preserve. Shape 1 must match first.
+    """
+    got, _ = _canonicalize_transport_line("**BO NI:** Hello **world**")
+    assert got == "BO NI: Hello **world**"
+
+
+def test_shape_four_defect_line_now_parses_as_a_scene():
+    """End to end: the live-failure line reaches the SCENE classifier.
+
+    Before shape 4 this produced ``UNKNOWN_SPEAKER: **SCENE 1``. Built on the
+    shared ``_script()`` skeleton for the reason its own docstring gives -- a
+    hand-rolled minimal script fails for reasons that have nothing to do with
+    Markdown, which is exactly the trap this file already documents.
+    """
+    script = "\n".join(
+        "**%s**" % line if line.startswith("SCENE ") else line
+        for line in _script().splitlines()
+    )
+    assert "**SCENE 1: the mountain relay room**" in script
+
+    parsed, defects = parse_fable2_markup(script, ["SELA"])
+    assert not defects, f"expected a clean parse, got {defects}"
+    assert parsed is not None
+    assert parsed.scenes[0].setting == "the mountain relay room"
+
+
 def test_spoken_payload_is_never_rewritten():
     """The parser's purity promise: it 'never rewrites a spoken word'.
 

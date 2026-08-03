@@ -73,7 +73,19 @@ _COL3_VIEW_Y = 128
 _COL3_VIEW_H = 908
 
 # scroll / hold (seconds)
-_SCROLL_PPS = 60.0
+#: Scroll speed, pixels per second. DOUBLED 60 -> 120 on 2026-08-03 (operator:
+#: "we need credits to go faster, twice as fast as now").
+#:
+#: The tail duration is `_LEAD_HOLD_S + roll_px / pps + _TAIL_HOLD_S`, and the
+#: scroll dominates it: a measured 49.2 s roll was 42.2 s of travel against 7 s
+#: of holds, so this one constant owns 86% of the runtime. Doubling it takes a
+#: 49.2 s tail to ~28.1 s. It is deliberately the ONLY change -- the holds are
+#: left alone because `_FADE_IN_S` / `_FADE_OUT_S` live inside them, and one
+#: number is easy to re-tune after watching an episode.
+#:
+#: Legibility is the only reason to scroll slowly, so this is a LOOK decision:
+#: every line is on screen half as long as before.
+_SCROLL_PPS = 120.0
 _LEAD_HOLD_S = 3.0
 _TAIL_HOLD_S = 4.0
 _MAX_HOLD_S = 120.0             # ceiling -> speed up, never truncate

@@ -48,6 +48,17 @@ _RE_SPEAKER = re.compile(r"^([^:\r\n]+):\s*(\S(?:.*\S)?)$")
 #: exists to prevent. Backticks, headings, bullets and HTML stay LOUD defects.
 _TRANSPORT_MARKERS = ("**", "__", "*", "_")
 
+#: The structural delimiters a WHOLE-LINE emphasis wrapper is allowed to hide.
+#: Shape 4 (below) unwraps only when the result matches one of these, so the
+#: rule stays "balanced emphasis around TRANSPORT is transport" rather than
+#: becoming a general Markdown sanitizer. Ordered as the parser tries them.
+_TRANSPORT_CLASSIFIERS = (_RE_TITLE, _RE_MUSIC, _RE_SCENE, _RE_CODA, _RE_END)
+
+
+def _is_transport(line: str) -> bool:
+    """True iff ``line`` is one of the structural delimiters."""
+    return any(rx.match(line) for rx in _TRANSPORT_CLASSIFIERS)
+
 
 def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     """Strip a BALANCED emphasis wrapper from a structural label. Report it.
@@ -66,11 +77,34 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     byte-identical -- ``**BO NI:** Hello **world**`` canonicalizes to
     ``BO NI: Hello **world**``, keeping the payload's own markers.
 
-    BALANCED ONLY. Three recognized shapes:
+    BALANCED ONLY. Four recognized shapes:
 
         <M>LABEL:<M> payload   ->  LABEL: payload      (wrapper spans the colon)
         <M>LABEL<M>: payload   ->  LABEL: payload      (wrapper before the colon)
         <M>TOKEN<M>            ->  TOKEN               (standalone, e.g. END.)
+        <M>LABEL: payload<M>   ->  LABEL: payload      (wrapper spans the LINE)
+
+    SHAPE 4 (2026-08-03, live). The 30-word sweep lost two legs to a model that
+    wrote its structure as whole-line markdown -- ``**SCENE 5: The vault**``,
+    ``**MUSIC**``, ``**CODA**``, ``**TITLE: ...**``. The wrapper spans label AND
+    payload, so shapes 1-3 all miss: the body opens with a space after the colon
+    (not the marker) and the label does not end with the marker. The line then
+    fell to the ``_RE_SPEAKER`` catch-all and produced a character literally
+    named ``**SCENE 5``, i.e. ``UNKNOWN_SPEAKER`` four attempts running until
+    the markup ladder exhausted and the leg died in the writer having never
+    reached a video engine.
+
+    Shape 4 is ORDERED LAST and GATED ON TRANSPORT. Last, because checked
+    earlier it would mangle the case this function exists to preserve:
+    ``**BO NI:** Hello **world**`` also starts and ends with ``**``, and a naive
+    outer strip yields ``BO NI:** Hello **world``. Gated, because unwrapping
+    anything whose result is not a structural delimiter would turn this closed
+    grammar into the general Markdown sanitizer the ladder exists to prevent --
+    so ``**She turns: the room is empty**`` is left ALONE and stays loud.
+
+    It also requires the REMAINDER to carry an EVEN number of that marker, so a
+    line like ``**BO NI: Hello **world**`` (unbalanced interior) is never
+    silently rewritten into accepted prose carrying a stray marker.
 
     An unbalanced, mixed or payload-internal marker is NOT touched and stays a
     loud defect. Roster-independent by design: it never consults the cast, so a
@@ -105,6 +139,13 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
             out = (label[:-len(marker)] + ":" + rest).strip()
             return out, ("removed balanced %s around label %r"
                          % (marker, label[:-len(marker)].strip()),)
+        # SHAPE 4, LAST and TRANSPORT-GATED -- see the docstring.
+        if body.endswith(marker):                       # <M>LABEL: payload<M>
+            inner = body[:-len(marker)].strip()
+            if inner and inner.count(marker) % 2 == 0 and _is_transport(inner):
+                return inner, (
+                    "removed balanced %s around whole transport line %r"
+                    % (marker, inner),)
         return s, ()
     return s, ()
 
