@@ -61,10 +61,10 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | google_vid_sfx_veo_fast | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | google_vid_sfx_veo_lite | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | google_vid_sfx_veo_pro | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
-| humo | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
+| humo | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | humo_1.7B | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_1.7B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
-| humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-49 step 4 | 1.32-1.96 s | 25 | soft_reference | yes |
+| humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
 | ltx_video | local | text_to_video | wide | canvas | 169-169 step 8 | 6.76-6.76 s | 25 | strict_first_frame | yes |
@@ -229,10 +229,10 @@ JUMP plan on a still-consuming lane ever re-mints.
 | google_vid_sfx_veo_fast | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
 | google_vid_sfx_veo_lite | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
 | google_vid_sfx_veo_pro | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
-| humo | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
+| humo | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | humo_1.7B | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_1.7B_169 | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
-| humo_14B_169 | jump | 10: 49, 49, 49, 49, 49, 49, 49, 33, 33, 33 | 442 | 442 | 0 |
+| humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
 | ltx_audio_in | single | 1: 449 | 449 | 442 | 0 |
 | ltx_video | chain | 3: 169, 169, 169 | 507 | 442 | 0 |
@@ -273,10 +273,10 @@ and it read exactly like a measured number until someone looked.
 | google_vid_sfx_veo_fast | - | contract max | none cited |
 | google_vid_sfx_veo_lite | - | contract max | none cited |
 | google_vid_sfx_veo_pro | - | contract max | none cited |
-| humo | - | contract max | **MISSING: docs/2026-06-27-humo-bakeoff** |
+| humo | 97 | safe_render_frames | **MISSING: docs/2026-06-27-humo-bakeoff** |
 | humo_1.7B | - | contract max | **MISSING: docs/2026-06-27-humo-bakeoff** |
 | humo_1.7B_169 | - | contract max | **MISSING: docs/2026-06-27-humo-bakeoff** |
-| humo_14B_169 | 49 | safe_render_frames | **MISSING: docs/2026-06-27-humo-bakeoff** |
+| humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/2026-06-27-humo-bakeoff** |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | none cited |

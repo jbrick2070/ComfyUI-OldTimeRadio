@@ -597,12 +597,27 @@ def test_the_pinned_humo_ladder_is_still_what_the_engine_declares():
     from nodes._otr_video_engines import frame_contract as live_fc
     from nodes._otr_video_engines import registry as vreg
 
-    declared = live_fc.frame_contract_for(vreg.get_engine("humo"))
+    # Checked against `humo_1.7B`, not `humo`. The pinned vectors below describe
+    # the 33-177/q4 HuMo ladder, and that ladder is still exactly what the 1.7B
+    # tiers declare. The two 14B routes were capped to a shared ceiling on
+    # 2026-08-02 (the orientation-specific 49-vs-177 split had no architectural
+    # basis and cited a receipt absent from this repo), so `humo` no longer
+    # carries 177 -- but the partitioner behaviour these vectors pin is a
+    # property of the LADDER, not of which engine happens to declare it.
+    declared = live_fc.frame_contract_for(vreg.get_engine("humo_1.7B"))
     assert declared.min_frames == HUMO.min_frames == 33
     assert declared.max_frames == HUMO.max_frames == 177
     assert declared.quantum == HUMO.quantum == 4
     assert declared.allow_tail_trim is True
     assert declared.continuity == HUMO.continuity
+
+    # And the 14B pair shares ONE ceiling, keyed on the checkpoint rather than
+    # on the orientation -- the invariant that replaced the split.
+    from nodes._otr_video_engines import eng_humo as _eh
+    for name in ("humo", "humo_14B_169"):
+        capped = live_fc.frame_contract_for(vreg.get_engine(name))
+        assert capped.max_frames == _eh._HUMO_14B_SAFE_RENDER_FRAMES
+        assert capped.min_frames == 33 and capped.quantum == 4
 
 
 def test_a_184_frame_humo_beat_is_TWO_segments_not_four():

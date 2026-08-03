@@ -126,7 +126,15 @@ def test_humo_render_clip_drives_graph_to_silent_mp4(tmp_path, monkeypatch):
     (src / "p.png").write_bytes(b"\x89PNGfakeportrait")
     monkeypatch.setattr(wb, "comfy_input_dir", lambda: str(in_dir))
     eng = HuMoEngine()
-    eng._classes = _humo_fakes(np, n_frames=4)
+    # The fake must return as many frames as the beat asks for. It used to
+    # return 4 against a 33-frame target, which only passed because the Route-A
+    # exact-fit branch is gated on `cap is not None` and `HuMoEngine` was the
+    # UNCAPPED tier. Once both 14B routes gained the shared cap (2026-08-02),
+    # that branch started running here and correctly refused a 4-frame render of
+    # a 33-frame beat -- the "short render is TERMINAL and LOUD" rule doing
+    # exactly its job. A fake that under-delivers frames was never realistic;
+    # a real engine renders what it was asked for.
+    eng._classes = _humo_fakes(np, n_frames=33)
     req = {"shot_id": "s1",
            "asset_refs": {"init_image": str(src / "p.png")},
            "audio_ref": {"path": str(src / "a.wav")},
@@ -141,7 +149,7 @@ def test_humo_render_clip_drives_graph_to_silent_mp4(tmp_path, monkeypatch):
     p = pathlib.Path(clip["path"])
     try:
         assert p.exists() and p.stat().st_size > 0
-        assert clip["frame_count"] == 4 and clip["has_audio"] is False
+        assert clip["frame_count"] == 33 and clip["has_audio"] is False
         assert clip["engine_id"] == "humo" and clip["pixel_format"] == "yuv420p"
         assert (in_dir / "a.wav").exists() and (in_dir / "p.png").exists()  # staged
         # V-4: the three MODEL patchers were retained for teardown.detach()

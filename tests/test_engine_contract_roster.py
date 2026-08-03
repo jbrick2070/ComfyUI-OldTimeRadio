@@ -156,7 +156,12 @@ def test_the_local_ladders_match_their_adapters_named_constants():
 
     assert bounds("wan_i2v") == (_wi._WAN_MIN_FRAMES, _wi._WAN_MAX_FRAMES)
     assert bounds("wan_ti2v") == (_wt._TI2V_MIN_FRAMES, _wt._TI2V_MAX_FRAMES)
-    assert bounds("humo") == (_humo._HUMO_MIN_FRAMES, _humo._HUMO_MAX_FRAMES)
+    # `humo` is the 14B PORTRAIT route, so its ceiling is the shared 14B cap --
+    # not `_HUMO_MAX_FRAMES`, which is the ladder the lighter 1.7B tiers keep.
+    assert bounds("humo") == (_humo._HUMO_MIN_FRAMES,
+                              _humo._HUMO_14B_SAFE_RENDER_FRAMES)
+    assert bounds("humo_1.7B") == (_humo._HUMO_MIN_FRAMES,
+                                   _humo._HUMO_MAX_FRAMES)
     assert bounds("ltx_8gb") == (_l8._LTX8_MIN_FRAMES, 161)
     # ltx_video's minimum is its DECODE FLOOR, not the ladder's first rung
     # (2026-08-01). _LTX_MIN_FRAMES is 9, but nothing in this adapter can
@@ -242,14 +247,24 @@ def test_a_capped_subclass_declares_its_OWN_ceiling():
     """
     from nodes._otr_video_engines import eng_humo as _humo
 
-    for name in ("humo", "humo_1.7B", "humo_1.7B_169"):
+    # The 1.7B pair is the uncapped one -- a different, far lighter checkpoint,
+    # which is the whole reason it is the downgrade target. `humo` LEFT this
+    # list on 2026-08-02: it loads the same 14B weights as `humo_14B_169` at the
+    # same pixel count, so it now carries the same cap. The cap follows the
+    # MODEL; it never followed the orientation, though the code said it did.
+    for name in ("humo_1.7B", "humo_1.7B_169"):
         engine = vreg.get_engine(name)
         assert getattr(engine, "safe_render_frames", None) is None, name
         assert fc.frame_contract_for(engine).max_frames == _humo._HUMO_MAX_FRAMES
 
+    for name in ("humo", "humo_14B_169"):
+        capped = vreg.get_engine(name)
+        cap = capped.safe_render_frames
+        assert cap == _humo._HUMO_14B_SAFE_RENDER_FRAMES
+        assert fc.frame_contract_for(capped).max_frames == cap, name
+
     capped = vreg.get_engine("humo_14B_169")
     cap = capped.safe_render_frames
-    assert cap == _humo._HUMO_14B_SAFE_RENDER_FRAMES == 49
     assert fc.frame_contract_for(capped).max_frames == cap, (
         "humo_14B_169 renders at most %d frames but declares a different "
         "ceiling" % cap)
@@ -276,7 +291,7 @@ def test_every_engine_with_a_safe_render_cap_declares_it_as_its_ceiling():
     # ever renamed or refactored away, this loop would run zero times and go on
     # reporting green across all 31 engines while checking nothing -- the shape
     # two "exhaustive" sweeps in this build already turned out to have.
-    assert checked == ["humo_14B_169"], (
+    assert sorted(checked) == ["humo", "humo_14B_169"], (
         "the safe_render_frames sweep checked %r. If a tier gained or lost a "
         "cap that is fine -- update this list. If it is EMPTY, the mechanism "
         "moved and this test is now theatre." % (checked,))

@@ -106,13 +106,38 @@ def test_fit_frames_identity_on_match_and_empty():
 # --------------------------------------------------------------------------- #
 # HuMo-14B frame cap -- class override ONLY on the 14B tier
 # --------------------------------------------------------------------------- #
-def test_only_humo_14b_169_is_frame_capped():
-    assert eng_humo.HuMo14BLandscapeEngine.safe_render_frames == \
-        eng_humo._HUMO_14B_SAFE_RENDER_FRAMES
-    # base + the 1.7B tiers stay uncapped (None -> legacy 177 ceiling)
-    assert eng_humo.HuMoEngine.safe_render_frames is None
+def test_the_frame_cap_follows_the_MODEL_not_the_orientation():
+    """BOTH 14B routes share one cap; both 1.7B routes are uncapped.
+
+    This test used to assert that ONLY ``humo_14B_169`` was capped -- which
+    encoded the defect rather than an invariant. ``HuMoEngine`` loads the SAME
+    14B checkpoint at the SAME 399,360 pixels, and was uncapped to 177 while its
+    landscape twin was pinned to 49. Nothing but orientation separated them, and
+    orientation cannot separate them: HuMo/Wan use square patching, a global
+    attention window, and RoPE reshaped to ``f*h*w``, so 480x832 and 832x480
+    produce an identical 1,560-token grid per latent time.
+
+    The cap is a property of the CHECKPOINT, so that is what it keys on.
+    """
+    cap = eng_humo._HUMO_14B_SAFE_RENDER_FRAMES
+    # The 14B pair -- same model, same pixels, same cap.
+    assert eng_humo.HuMoEngine.safe_render_frames == cap
+    assert eng_humo.HuMo14BLandscapeEngine.safe_render_frames == cap
+
+    # The 1.7B pair loads a different, far lighter checkpoint and must NOT
+    # inherit a bound measured on a model roughly eight times its size -- it is
+    # the downgrade target reached precisely because the 14B did not fit.
     assert eng_humo.HuMo17BEngine.safe_render_frames is None
     assert eng_humo.HuMo17BLandscapeEngine.safe_render_frames is None
+
+    # And each declares a ceiling matching what render_clip will actually
+    # produce, so no contract advertises frames its engine cannot render.
+    assert eng_humo.HuMoEngine.frame_contract.max_frames == cap
+    assert eng_humo.HuMo14BLandscapeEngine.frame_contract.max_frames == cap
+    assert eng_humo.HuMo17BEngine.frame_contract.max_frames == \
+        eng_humo._HUMO_MAX_FRAMES
+    assert eng_humo.HuMo17BLandscapeEngine.frame_contract.max_frames == \
+        eng_humo._HUMO_MAX_FRAMES
 
 
 # --------------------------------------------------------------------------- #

@@ -177,14 +177,27 @@ def test_an_audio_driven_beat_INSIDE_its_cap_is_STILL_ONE_CLIP(engine):
     assert plan.total_visible_frames == int(contract.max_frames)
 
 
-def test_humo_14B_169_is_the_tier_this_actually_bites():
-    """Its cap is 49 frames -- under two seconds. Worth stating outright, so
-    the next reader knows the SPLIT above is routine for this tier and rare
-    for its three siblings rather than uniformly rare."""
-    capped = fc.frame_contract_for(vreg.get_engine("humo_14B_169"))
-    assert capped.max_frames == 49
-    assert capped.max_frames / 25.0 < 2.0
-    for sibling in ("humo", "humo_1.7B", "humo_1.7B_169"):
+def test_the_14B_pair_splits_routinely_and_the_1_7B_pair_rarely():
+    """Splitting is routine for the 14B tiers and rare for the 1.7B tiers.
+
+    Was "humo_14B_169 is the tier this actually bites", pinning a 49-frame cap
+    that applied to ONE orientation of a checkpoint that also ran uncapped to
+    177 in the other -- at an identical 399,360 pixels. That split had no
+    architectural basis (square patching, global attention, RoPE reshaped to
+    ``f*h*w``: both canvases give the same 1,560-token grid per latent time) and
+    its stated evidence, ``docs/2026-06-27-humo-bakeoff``, is not in this repo.
+
+    Both 14B routes now share one ceiling, so the tier that bites is the MODEL,
+    which is the honest statement of the same fact.
+    """
+    from nodes._otr_video_engines import eng_humo as _eh
+
+    for name in ("humo", "humo_14B_169"):
+        capped = fc.frame_contract_for(vreg.get_engine(name))
+        assert capped.max_frames == _eh._HUMO_14B_SAFE_RENDER_FRAMES
+        # Still well under a typical dialogue beat, so the split stays routine.
+        assert capped.max_frames / 25.0 < 4.0
+    for sibling in ("humo_1.7B", "humo_1.7B_169"):
         assert fc.frame_contract_for(vreg.get_engine(sibling)).max_frames == 177
 
 

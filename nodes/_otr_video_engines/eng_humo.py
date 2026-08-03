@@ -34,6 +34,7 @@ MODEL+CLIP+VAE+AUDIO_ENCODER load is confirmed on the GPU box).
 """
 from __future__ import annotations
 
+import logging
 import os
 
 from . import motion_common as _MC
@@ -41,6 +42,17 @@ from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
+
+#: Module logger, matching the other video engines' naming.
+#:
+#: ADDED 2026-08-02, and it was overdue: ``_LOG`` was already referenced in the
+#: beat-teardown handler below but never defined anywhere in this module. That
+#: handler only runs when ``reclaim_idle_models`` raises during a MULTI-CLIP
+#: teardown, so the missing name sat harmless until multi-clip went live -- at
+#: which point a failed reclaim would have raised ``NameError`` from inside the
+#: ``except`` block and thrown away the real exception it was trying to report.
+#: A broken error path is invisible precisely until the moment it is needed.
+_LOG = logging.getLogger("OTR.video.humo")
 
 _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
@@ -54,13 +66,44 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # 2.1 VAE 4n+1 length rule is enforced via wrapper_bridge.quantize_frames_4n1.
 _HUMO_MIN_FRAMES = 33          # below this has hung this hardware (legacy floor)
 _HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp8
-# Route-A (2026-06-28): the 14B fp8 tier rides ~15.9 GB at 832x480 -- thin
-# headroom ACCEPTED by the operator, BOUNDED by a per-beat render-frame cap. 49
-# (4n+1) is the bakeoff-proven safe length (docs/2026-06-27-humo-bakeoff: zero
-# OOM at 832x480/<=49f, single + cross-engine resident). Beats longer than the
-# cap render at the cap then mirror-extend to the audio target (exact-fit);
-# raise it ONLY after a higher-frame GPU probe. env: OTR_HUMO_14B_SAFE_FRAMES.
-_HUMO_14B_SAFE_RENDER_FRAMES = 49
+# THE 14B CAP, UNIFIED ACROSS ORIENTATIONS (2026-08-02).
+#
+# WHAT IT USED TO SAY, and why it is gone: "the 14B fp8 tier rides ~15.9 GB at
+# 832x480 ... 49 (4n+1) is the bakeoff-proven safe length
+# (docs/2026-06-27-humo-bakeoff)". Two things were wrong with that.
+#
+#   1. THE CITED RECEIPT IS NOT IN THIS REPO. `docs/2026-06-27-humo-bakeoff`
+#      has never existed here -- only the scripts that would have produced it.
+#      A number nobody can check gated the heaviest engine, and it asserted
+#      15.9 GB against a 14.5 GB working ceiling, which is a breach on its face.
+#   2. IT APPLIED TO ONE ORIENTATION ONLY. The same checkpoint ran uncapped to
+#      177 in PORTRAIT and was pinned to 49 in LANDSCAPE -- at an identical
+#      399,360 pixels. External research (2026-08-02, grade A) settles the
+#      architecture: HuMo/Wan use square patch `[1,2,2]`, a GLOBAL attention
+#      window `[-1,-1]`, and RoPE reshaped to `f*h*w`, so 480x832 and 832x480
+#      both yield a 1,560-token DiT grid per latent time. Swapping height and
+#      width changes positional VALUES, not allocation SIZES. There is no
+#      published counterexample and no mechanism for a 3.6x frame-cap ratio.
+#
+# So the orientation split was never physics. Both 14B routes now share ONE cap.
+#
+# WHY 97, and not 177 or 49. 97 is the length HuMo was TRAINED at, and its
+# authors warn that longer generation may degrade -- a quality bound with a real
+# citation, which is more than either previous number had. It also moves each
+# route in its safe direction: portrait comes DOWN from an unqualified 177, and
+# landscape comes UP from a cap whose evidence is missing.
+#
+# WHAT IS STILL OWED. 97 is a QUALITY-supported target, not a measured memory
+# ceiling -- nobody has published a peak for this checkpoint on a 16 GB card at
+# either orientation. This engine now carries a `VramPeakProbe` (it was the only
+# heavy lane without one), so the paired ladder 49/65/81/97 in BOTH orientations
+# can finally be measured on this box. The prediction is that the two
+# orientations match at every rung; if they do not, the defect is in tiling or
+# kernel selection, not in the model. Until that ladder runs, this number is a
+# reasoned bound, and it says so.
+#
+# env override: OTR_HUMO_14B_SAFE_FRAMES.
+_HUMO_14B_SAFE_RENDER_FRAMES = 97
 # (HuMo render dims live in _otr_shared.aspect now -- portrait 480x832 / wide
 # 832x480 -- selected by each engine's render_aspect, so the constants moved out.)
 # An ASCII negative (CLAUDE.md: ASCII-only source). HuMo's best negative is the
@@ -216,9 +259,15 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: WanHuMoImageToVideo ``ref_image``, NOT ``start_image``: per the Bug
     #: Bible the reference is an identity hint, not a first-frame lock. These
     #: beats take an honest jump cut rather than a pretended chain.
+    #: THE CONTRACT MUST MATCH WHAT ``render_clip`` WILL ACTUALLY RENDER. This
+    #: is the inheritance trap ``HuMo14BLandscapeEngine`` documents below and it
+    #: applied here too: ``render_clip`` does
+    #: ``render_max = cap if cap is not None else _HUMO_MAX_FRAMES``, so once the
+    #: 14B portrait route carries a cap, advertising 177 would promise 1.8x the
+    #: frames it can produce and every beat above the cap would raise.
     frame_contract = FrameContract(
         min_frames=_HUMO_MIN_FRAMES,
-        max_frames=_HUMO_MAX_FRAMES,
+        max_frames=_HUMO_14B_SAFE_RENDER_FRAMES,
         quantum=4,
         native_fps=25,
         allow_tail_trim=True,
@@ -235,7 +284,16 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: integer; render_clip then renders at the cap and EXACT-FITS the decoded
     #: frames to the audio-derived target (trim/mirror-extend) so frame_count
     #: still matches.
-    safe_render_frames = None
+    #: THIS CLASS IS THE 14B PORTRAIT ROUTE -- it loads the same
+    #: ``Wan2_1-HuMo-14B_fp8`` checkpoint as ``humo_14B_169``, at the same
+    #: 399,360 pixels. Until 2026-08-02 it was ``None`` (uncapped to 177) while
+    #: its landscape twin was pinned to 49, and nothing but orientation
+    #: separated them. Both now share the 14B cap.
+    #:
+    #: The 1.7B subclasses declare their OWN ladder and their own ``None``
+    #: (see ``HuMo17BEngine``): they load a different, far lighter checkpoint,
+    #: so inheriting a 14B memory bound would be a bound about the wrong model.
+    safe_render_frames = _HUMO_14B_SAFE_RENDER_FRAMES
     #: Render aspect == this engine's IDENTITY (the operator picks the look with
     #: one dropdown choice): 'portrait' 480x832 (the classic pillarbox) here on
     #: the base; the humo_1.7B_169 variant overrides to 'wide' 832x480. The
@@ -740,7 +798,26 @@ class HuMoEngine(_MC.MotionEngineBase):
         # on a 16 GB card. (No free_after_use: forcing inter-node model eviction
         # only fragmented the allocator into an OOM -- it is NOT what the working
         # OTR_BatchHumoRender does.)
-        results = _wb.run_graph(graph, classes, external_results=external)
+        # PEAK TELEMETRY (2026-08-02). HuMo was the ONLY heavy lane with no
+        # ``VramPeakProbe``, which is why its frame ceilings have never been
+        # checkable: the 49-frame landscape cap asserts ~15.9 GB and cites
+        # `docs/2026-06-27-humo-bakeoff`, a file that is not in this repo, and
+        # nothing this engine ever ran could confirm or refute it. Every other
+        # heavy engine reports its render-window peak, and `ltx_audio_in`'s 79
+        # logged samples are what finally settled ITS frame question -- from
+        # data already on disk. Telemetry only, no enforcement (the admission
+        # boundary in ``render_driver`` owns refusal), and the log line matches
+        # the other engines' wording so one grep harvests them all.
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
+        try:
+            results = _wb.run_graph(graph, classes, external_results=external)
+        finally:
+            render_peak = probe.stop()
+            if render_peak:
+                _LOG.info("[%s] render-window VRAM peak: %d MB  "
+                          "(length=%d canvas=%dx%d)",
+                          self.name, int(render_peak), int(length),
+                          int(width), int(height))
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
@@ -918,6 +995,21 @@ class HuMo17BEngine(HuMoEngine):
     name = "humo_1.7B"
     engine_version = "1"
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
+    #: ITS OWN LADDER AND ITS OWN CAP, because it is its own MODEL (2026-08-02).
+    #: The 14B base now carries a 14B-sized cap, and this tier must not inherit
+    #: a memory bound measured on a checkpoint roughly eight times its size --
+    #: this is the downgrade target a heavy episode falls to precisely because
+    #: the 14B did not fit. Uncapped to the shared ``_HUMO_MAX_FRAMES`` ceiling,
+    #: which is where these two tiers have always run.
+    safe_render_frames = None
+    frame_contract = FrameContract(
+        min_frames=_HUMO_MIN_FRAMES,
+        max_frames=_HUMO_MAX_FRAMES,
+        quantum=4,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
     #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` -- shared HuMo shape,
     #: portrait REQUIRED for the audio-driven-face lane).
     still_plan = _HUMO_STILL_PLAN
