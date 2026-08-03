@@ -20,6 +20,22 @@ GPU time on 2026-08-01:
 Success is the ASSET, never the exit code: each leg is verified by ffprobe on
 the published file and by audio-vs-video coverage, per the standing rule that a
 render is only done when the file is on disk.
+
+Two further defects were fixed on 2026-08-02, both of which made a green result
+mean less than it appeared to:
+
+4. IT RAN SIX ENGINES AND CALLED THAT "EVERY LOCAL ENGINE". Nineteen local
+   engines are registered. The roster is now DERIVED FROM THE REGISTRY, a local
+   engine with no profile is a loud refusal rather than a silent skip, and the
+   summary names every engine it did not run instead of printing "6/6 passed".
+
+5. ITS ACCEPTANCE COULD NOT REJECT A MIRROR. Coverage was
+   ``sum(clip durations) >= master duration`` -- a test that a ping-ponged clip
+   passes perfectly, because mirroring yields exactly the right number of
+   seconds out of frames that were already used. Acceptance now audits FRAMES:
+   held-frame runs and mirror reflections are detected per clip on the motion
+   lanes, and the engine-layer and composite guards are confirmed still armed
+   before the campaign starts.
 """
 from __future__ import annotations
 
@@ -40,23 +56,99 @@ OBS = pathlib.Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/obs")
 EPISODES = pathlib.Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes")
 LOCK = REPO / "tmp" / "_w45_campaign.lock"
 
-# Engine -> profile, ordered CHEAPEST-AND-LEAST-PROVEN FIRST.
+# THE ROSTER IS DERIVED FROM THE REGISTRY, NOT HAND-LISTED (2026-08-02).
 #
-# The first ordering ran wan_ti2v first, which is backwards: it is the slowest
-# engine on the box (~12 min/clip, 13-15 clips per leg) AND it already has a
-# shipped episode, so it spent the first three hours re-proving something known
-# while five untested engines waited. Information per hour is what matters in an
-# unattended run -- an engine that is going to fail should fail in the first
-# hour, not the twentieth. fastwan_8gb sits second-to-last as a re-confirmation
-# of the engine that already shipped, and the slow incumbent goes last.
-LEGS = [
-    ("ltx_8gb", "otr_g4_ltx_8gb"),
-    ("ltx_video", "otr_g4_ltx_video"),
-    ("ltx_audio_in", "otr_g4_ltx_audio_in"),
-    ("humo", "otr_g4_humo"),
-    ("fastwan_8gb", "otr_g4_fastwan"),
-    ("wan_ti2v", "otr_g4_wan_ti2v"),
-]
+# This file used to carry a six-entry LEGS list while its own docstring claimed
+# "every local video engine". There are NINETEEN registered local engines. The
+# thirteen it silently skipped were humo_1.7B, humo_1.7B_169, humo_14B_169,
+# mesh_stage, still_flat, still_motion, still_pan, still_word, viz_camera,
+# viz_green, viz_mxc_cpu, viz_mxc_mandala and wan_i2v -- so "6/6 engines passed"
+# read as total coverage and was a third of it.
+#
+# A hand-list drifts the moment an engine is added; the registry cannot, because
+# "the registry IS the menu" is already the project invariant (registry.py, C0).
+# So the roster is built from ``all_engine_names()`` at run time and the profile
+# for each engine is looked up by convention. A local engine with no profile is a
+# LOUD refusal, never a silent skip -- that is the whole defect being fixed.
+#
+# Ordering is CHEAPEST-AND-LEAST-PROVEN FIRST. Information per hour is what
+# matters in an unattended run: an engine that is going to fail should fail in
+# the first minutes, not the twentieth hour. The CPU/procedural lanes run first
+# (they cost minutes and catch config breakage immediately), then the heavy GPU
+# lanes least-proven first, with the slow incumbent wan_ti2v last.
+
+#: Cloud engines render provider-side and cannot run offline (no keys,
+#: offline-first). They are qualified STATICALLY and are never campaign legs.
+#: word_razzle is the trap here -- it reads like a local word-card engine and it
+#: is a Pixverse partner row, and an ``otr_w45_word_razzle.json`` profile exists
+#: on disk that would have pulled it into a "local" sweep.
+CLOUD_PREFIXES = ("cloud_", "google_")
+CLOUD_BY_NAME = frozenset({"word_razzle"})
+
+#: Engine -> profile stem. Convention first, exceptions named explicitly.
+PROFILE_PREFIX = "otr_w45_"
+PROFILE_EXCEPTIONS = {
+    "fastwan_8gb": "otr_w45_fastwan",
+    "humo_1.7B": "otr_w45_humo_1_7b",
+    "humo_1.7B_169": "otr_w45_humo_1_7b_169",
+    "humo_14B_169": "otr_w45_humo_14b_169",
+}
+
+#: Run order. Cheap CPU lanes first, then heavy GPU lanes least-proven first.
+LEG_ORDER = (
+    "still_flat", "still_pan", "still_motion", "still_word",
+    "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
+    "mesh_stage", "ltx_8gb", "fastwan_8gb", "ltx_video", "ltx_audio_in",
+    "humo_1.7B", "humo_1.7B_169", "humo", "humo_14B_169",
+    "wan_i2v", "wan_ti2v",
+)
+
+
+def is_cloud_engine(name: str) -> bool:
+    return name.startswith(CLOUD_PREFIXES) or name in CLOUD_BY_NAME
+
+
+def profile_for(engine: str) -> str:
+    return PROFILE_EXCEPTIONS.get(engine, PROFILE_PREFIX + engine)
+
+
+def local_engine_roster() -> list:
+    """Every REGISTERED local video engine, in run order.
+
+    Imports the video registry directly. If that import fails this function
+    RAISES rather than returning a shorter list: a campaign that cannot see the
+    roster must refuse, because silently running a subset while reporting
+    "N/N engines passed" is exactly the defect this replaced.
+    """
+    import sys as _sys
+    for path in (str(REPO), str(REPO.parent)):
+        if path not in _sys.path:
+            _sys.path.insert(0, path)
+    from nodes._otr_video_engines import registry as _registry  # noqa: WPS433
+
+    local = [n for n in _registry.all_engine_names() if not is_cloud_engine(n)]
+    ordered = [n for n in LEG_ORDER if n in local]
+    # Anything registered but absent from LEG_ORDER still runs -- appended, never
+    # dropped, so a newly added engine joins the campaign the day it registers.
+    ordered += sorted(n for n in local if n not in LEG_ORDER)
+    return ordered
+
+
+def build_legs() -> list:
+    """[(engine, profile)] for every local engine. Missing profile = REFUSE."""
+    legs, missing = [], []
+    for engine in local_engine_roster():
+        stem = profile_for(engine)
+        if not (REPO / "config" / "profiles" / (stem + ".json")).is_file():
+            missing.append("%s -> %s.json" % (engine, stem))
+            continue
+        legs.append((engine, stem))
+    if missing:
+        raise SystemExit(
+            "REFUSING: %d local engine(s) have no campaign profile:\n  %s\n"
+            "Add the profile or the campaign cannot claim to cover every local "
+            "engine." % (len(missing), "\n  ".join(missing)))
+    return legs
 
 # MEASURED on this box, 2026-08-01, rather than estimated from the fastwan leg:
 # a 45-word episode is ~66.7 s of audio = 1666 frames at 25 fps, and wan_ti2v
@@ -75,10 +167,55 @@ LEG_TIMEOUT_S = 21600
 # looks fine, and never touched the engine under test. A real video engine
 # appearing alongside the one under test is NOT this -- it is role
 # specialisation (humo cannot render a music beat; it has no face to drive).
+#
+# ``still_parallax`` was REMOVED from this set 2026-08-02: it has been
+# UNREGISTERED since 2026-06-30 (registry.py, item 2 rip-out), so it cannot
+# deliver a clip and listing it was checking for a ghost.
+#
+# THE FLOOR IS NOT A FLOOR WHEN IT IS THE ENGINE UNDER TEST. Now that the
+# campaign covers all nineteen local engines, eight of these ARE legs. Testing
+# still_flat and then failing it for "falling back to still_flat" would be
+# nonsense, so ``floor_violation()`` excludes the engine under test.
 PROCEDURAL_FLOOR = frozenset({
-    "still_parallax", "still_flat", "still_pan", "still_motion", "still_word",
+    "still_flat", "still_pan", "still_motion", "still_word",
     "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala", "mesh_stage",
 })
+
+#: Engine families whose output is MOTION, and which therefore must never
+#: contain reused frames. The static families are excluded by design, not by
+#: oversight: ``still_flat`` is a held still and ``viz_*`` lanes may legitimately
+#: repeat a rendered pattern -- for them a duplicate frame is the intended
+#: render, not a clip stretched to cover audio it could not afford.
+MOTION_FAMILIES = frozenset({
+    "audio_driven_face", "audio_conditioned_video",
+    "image_to_video", "text_to_video",
+})
+
+#: A run of identical frames longer than this in a MOTION clip is a held frame.
+#: One or two repeats can occur naturally (a still moment, an encoder decision);
+#: eight at 25 fps is a third of a second of frozen picture, which is the
+#: 0.68s-then-freeze signature this invariant exists to kill.
+MAX_IDENTICAL_RUN = 8
+
+#: Frames are compared as downscaled grayscale thumbnails. 32x32 is coarse
+#: enough to ignore encoder noise and fine enough that two genuinely different
+#: frames of a talking head never collide.
+HASH_DIM = 32
+
+#: Frames are compared by MEAN ABSOLUTE DIFFERENCE, not by exact equality.
+#:
+#: Exact hashing was the first implementation and it silently failed the only
+#: test that mattered: a deliberately mirrored clip scored a reflection span of
+#: ZERO. H.264 is lossy and direction-dependent -- the encoder predicts the
+#: reversed half from different reference frames, so a mirrored frame decodes to
+#: *nearly* the same pixels, never the same bytes. A byte-compare therefore
+#: detects a frozen clip (whose repeated frames really are identical, being
+#: residual-free P-frames) while missing the ping-pong it was written to catch.
+#:
+#: 2.0 on the 0-255 scale is well above observed encoder jitter between a frame
+#: and its mirror twin, and far below the distance between two genuinely
+#: different frames.
+SAME_FRAME_TOL = 2.0
 VRAM_BASELINE_MB = 2600
 VRAM_SETTLE_S = 240
 
@@ -158,6 +295,197 @@ def _duration(path: pathlib.Path) -> float:
         return 0.0
 
 
+def guards_armed() -> list:
+    """Confirm the no-reuse guards still EXIST before trusting a green campaign.
+
+    The invariant is enforced in two places -- the engine layer
+    (``wrapper_bridge``) and the assembler (``otr_silent_composite``) -- and both
+    enforce it by RAISING. A campaign therefore proves the invariant mostly by
+    what did NOT happen, and "nothing raised" is also what you see when somebody
+    has quietly re-armed a fill path. So check the guards directly.
+
+    Returns a list of failure strings; empty means armed.
+    """
+    import sys as _sys
+    for path in (str(REPO), str(REPO.parent)):
+        if path not in _sys.path:
+            _sys.path.insert(0, path)
+
+    failures = []
+    try:
+        from nodes._otr_video_engines import wrapper_bridge as _wb
+        if hasattr(_wb, "extend_frames_to_target"):
+            failures.append("wrapper_bridge.extend_frames_to_target is BACK -- "
+                            "the ping-pong mirror extender was deleted 2026-08-02")
+        if not hasattr(_wb, "MirrorExtensionForbidden"):
+            failures.append("wrapper_bridge.MirrorExtensionForbidden is GONE -- "
+                            "a short render no longer fails closed")
+    except Exception as exc:
+        failures.append("cannot import wrapper_bridge to check guards: %s" % exc)
+
+    try:
+        from nodes import otr_silent_composite as _sc
+        if not hasattr(_sc, "ClipUnderrunsItsBeat"):
+            failures.append("otr_silent_composite.ClipUnderrunsItsBeat is GONE -- "
+                            "the composite may loop-fill again")
+        elif _sc._should_loop_fill({"frame_count": 5}, 100) is not False:
+            failures.append("otr_silent_composite._should_loop_fill no longer "
+                            "returns False -- stream-loop fill is re-armed")
+    except Exception as exc:
+        failures.append("cannot import otr_silent_composite to check guards: %s" % exc)
+
+    return failures
+
+
+def frame_signatures(path: pathlib.Path):
+    """A float32 [N, HASH_DIM*HASH_DIM] thumbnail stack for one clip.
+
+    Decoding at 32x32 makes a whole clip a few hundred KB and makes the
+    comparison immune to encoder noise, which a compare of full frames would
+    trip over constantly. Returns None when the clip cannot be decoded.
+    """
+    import numpy as np
+
+    proc = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path),
+         "-vf", "scale=%d:%d" % (HASH_DIM, HASH_DIM),
+         "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+        capture_output=True)
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+    stride = HASH_DIM * HASH_DIM
+    buf = np.frombuffer(proc.stdout, dtype=np.uint8)
+    n = buf.size // stride
+    if n == 0:
+        return None
+    return buf[:n * stride].reshape(n, stride).astype(np.float32)
+
+
+def find_frame_reuse(sigs) -> dict:
+    """Detect the two ways video gets reused to cover audio it did not earn.
+
+    HELD FRAME -- a run of near-identical consecutive frames. The composite used
+    to hold the last frame for the rest of a beat; that is now terminal, and a
+    long identical run in a delivered clip means it came back.
+
+    PING-PONG / MIRROR -- the deleted extender built the cycle
+    ``[0,1,..,N-1,N-2,..,1]``, a palindrome about frame N-1. So look for a
+    reflection point p where frame ``p-i`` matches frame ``p+i`` for a long run.
+    Searching for a reflection POINT rather than testing whether the whole clip
+    is a palindrome is what makes this survive the tail trim that always follows
+    the extension.
+
+    Comparison is mean-absolute-difference against SAME_FRAME_TOL, never exact
+    equality -- see that constant for why exact matching provably missed this.
+    """
+    import numpy as np
+
+    n = 0 if sigs is None else int(sigs.shape[0])
+    out = {"frames": n, "max_identical_run": 0, "mirror_span": 0,
+           "mirror_at": None, "mirror_dist": None}
+    if n < 4:
+        return out
+
+    def same(i, j):
+        return float(np.abs(sigs[i] - sigs[j]).mean()) <= SAME_FRAME_TOL
+
+    run = best_run = 1
+    for i in range(1, n):
+        run = run + 1 if same(i, i - 1) else 1
+        best_run = max(best_run, run)
+    out["max_identical_run"] = best_run
+
+    # Reflection search. A genuine mirror reflects for many frames; incidental
+    # matches die after one or two, so a span threshold separates them cleanly.
+    # Frame 0 and the final frame are skipped as centres (a 1-frame reflection
+    # at the very edge is meaningless).
+    best_span, best_at = 0, None
+    for p in range(2, n - 2):
+        span = 0
+        while p - span - 1 >= 0 and p + span + 1 < n:
+            if not same(p - span - 1, p + span + 1):
+                break
+            span += 1
+        if span > best_span:
+            best_span, best_at = span, p
+    out["mirror_span"], out["mirror_at"] = best_span, best_at
+    return out
+
+
+def _engine_families() -> dict:
+    """{engine_name: family} from the live registry, {} if it cannot be read."""
+    import sys as _sys
+    for path in (str(REPO), str(REPO.parent)):
+        if path not in _sys.path:
+            _sys.path.insert(0, path)
+    try:
+        from nodes._otr_video_engines import registry as _registry
+        return {n: getattr(_registry.get_engine(n), "family", "")
+                for n in _registry.all_engine_names()}
+    except Exception:
+        return {}
+
+
+def engine_of_clip(clip_name: str, families: dict):
+    """The engine a clip was rendered by, from its filename.
+
+    Clips are named ``shot_<id>_<role>_<engine>.mp4``. Matching by longest known
+    engine name rather than by splitting on '_' is deliberate: the engine names
+    themselves contain underscores (``ltx_audio_in``, ``viz_mxc_mandala``), so
+    positional parsing picks up the wrong token.
+    """
+    stem = clip_name.rsplit(".", 1)[0]
+    hits = [name for name in families if stem.endswith("_" + name)]
+    return max(hits, key=len) if hits else None
+
+
+def audit_clip_reuse(episode: pathlib.Path) -> dict:
+    """Every MOTION clip checked for held frames and mirror cycles.
+
+    This is the check the old acceptance could not make. It compared SUMMED
+    CLIP DURATIONS against the master length -- a test a mirrored clip passes
+    perfectly, because mirroring produces exactly the right duration out of
+    exactly the wrong frames.
+
+    Static-family clips are skipped, and skipping them is REPORTED rather than
+    silent: a still lane's repeated frames are its intended render, but a reader
+    should be able to see how much of the episode this check actually covered.
+    """
+    families = _engine_families()
+    clips = sorted((episode / "clips").glob("*.mp4"))
+    findings, checked, skipped = [], [], []
+
+    for clip in clips:
+        engine = engine_of_clip(clip.name, families)
+        family = families.get(engine or "", "")
+        if family and family not in MOTION_FAMILIES:
+            skipped.append("%s (%s/%s)" % (clip.name, engine, family))
+            continue
+        if engine is None and families:
+            # Unknown engine: check it rather than trust it.
+            findings.append({"clip": clip.name, "why": "engine not identifiable "
+                                                       "from filename"})
+
+        sigs = frame_signatures(clip)
+        if sigs is None:
+            findings.append({"clip": clip.name, "why": "undecodable"})
+            continue
+        checked.append(clip.name)
+        got = find_frame_reuse(sigs)
+        if got["max_identical_run"] > MAX_IDENTICAL_RUN:
+            findings.append({"clip": clip.name, "why": "held frames",
+                             "detail": "%d identical consecutive frames"
+                                       % got["max_identical_run"]})
+        if got["mirror_span"] >= MAX_IDENTICAL_RUN:
+            findings.append({"clip": clip.name, "why": "mirror/ping-pong",
+                             "detail": "%d-frame reflection about frame %s"
+                                       % (got["mirror_span"], got["mirror_at"])})
+
+    return {"clips_checked": len(checked), "clips_skipped_static": len(skipped),
+            "skipped": skipped, "findings": findings,
+            "registry_readable": bool(families)}
+
+
 def delivered_engines(episode: pathlib.Path) -> list[str]:
     """Which engine ACTUALLY rendered each clip, per the ledger.
 
@@ -209,7 +537,15 @@ def verify_asset(started_at: float) -> dict:
         return {"ok": False, "why": "no audio stream", "asset": asset.name}
 
     # Coverage: every second of audio must have real video behind it.
+    #
+    # DURATION COVERAGE ALONE CANNOT PROVE THIS, and until 2026-08-02 it was the
+    # only test here. Summing clip durations and comparing against the master
+    # asks "is there enough video?" -- and a mirrored clip answers yes, because
+    # ping-ponging a short render produces exactly the right NUMBER of seconds
+    # out of frames that were already used. The invariant is about WHICH frames,
+    # so the frame-level audit below is the part that actually tests it.
     coverage = "not measured"
+    reuse = None
     engines: list[str] = []
     episode_dirs = [d for d in EPISODES.iterdir()
                     if d.is_dir() and d.stat().st_mtime >= started_at]
@@ -227,9 +563,23 @@ def verify_asset(started_at: float) -> dict:
                 return {"ok": False, "why": "video short of audio",
                         "asset": asset.name, "coverage": coverage}
 
+        reuse = audit_clip_reuse(ep)
+        if not reuse["registry_readable"]:
+            return {"ok": False, "asset": asset.name, "coverage": coverage,
+                    "why": "cannot read the engine registry, so no clip could be "
+                           "classified motion-vs-static and the no-reuse "
+                           "invariant is UNPROVEN for this leg"}
+        if reuse["findings"]:
+            first = reuse["findings"][0]
+            return {"ok": False, "asset": asset.name, "coverage": coverage,
+                    "reuse": reuse,
+                    "why": "frame reuse in %s: %s%s" % (
+                        first["clip"], first["why"],
+                        (" -- " + first["detail"]) if first.get("detail") else "")}
+
     return {"ok": True, "asset": asset.name, "dims": dims,
             "seconds": round(seconds, 2), "audio": audio, "coverage": coverage,
-            "delivered": sorted(set(engines))}
+            "reuse": reuse, "delivered": sorted(set(engines))}
 
 
 def run_leg(engine: str, profile: str, words: int) -> dict:
@@ -314,6 +664,17 @@ def main(argv=None) -> int:
                     help="comma-separated engine names to run instead of all")
     args = ap.parse_args(argv)
 
+    # Check the guards BEFORE taking the lock, so a disarmed invariant fails
+    # instantly and leaves nothing to clean up. A campaign proves "no mirrors,
+    # no ping-pong, no held frames" largely by what did not happen -- and a
+    # disarmed guard produces the same silence as a clean run.
+    disarmed = guards_armed()
+    if disarmed:
+        print("REFUSING: the no-reuse invariant is not armed:", file=sys.stderr)
+        for line in disarmed:
+            print("  - %s" % line, file=sys.stderr)
+        return 3
+
     if LOCK.exists():
         print("REFUSING: %s exists -- a campaign is already running.\n"
               "Two campaigns on one 16 GB GPU thrash and corrupt each other's\n"
@@ -323,10 +684,17 @@ def main(argv=None) -> int:
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     LOCK.write_text("pid=%d start=%s\n" % (os.getpid(), _now()), encoding="utf-8")
 
-    legs = LEGS
+    all_legs = build_legs()
+    legs = all_legs
     if args.only:
         wanted = {n.strip() for n in args.only.split(",") if n.strip()}
-        legs = [leg for leg in LEGS if leg[0] in wanted]
+        legs = [leg for leg in all_legs if leg[0] in wanted]
+        unknown = wanted - {leg[0] for leg in all_legs}
+        if unknown:
+            LOCK.unlink(missing_ok=True)
+            raise SystemExit("REFUSING: --only names engines that are not "
+                             "registered local engines: %s"
+                             % ", ".join(sorted(unknown)))
 
     results = []
     try:
@@ -338,13 +706,25 @@ def main(argv=None) -> int:
     finally:
         LOCK.unlink(missing_ok=True)
 
-    print("\n=========== 45-WORD CAMPAIGN ===========")
+    print("\n=========== %d-WORD CAMPAIGN ===========" % args.words)
     for r in results:
-        print("%-14s %-5s exit=%-4s %5s min  %s" % (
+        print("%-16s %-5s exit=%-4s %6s min  %s" % (
             r["engine"], "PASS" if r["ok"] else "FAIL", r["exit"],
             r["minutes"], r.get("why", r.get("coverage", ""))))
     passed = sum(1 for r in results if r["ok"])
-    print("%d/%d engines passed" % (passed, len(results)))
+
+    # SAY WHAT WAS AND WAS NOT COVERED. The previous summary printed
+    # "6/6 engines passed" for a six-engine subset of a nineteen-engine roster,
+    # which reads as total coverage. A campaign that cannot state its own scope
+    # honestly cannot be used to qualify anything.
+    print("%d/%d legs passed" % (passed, len(results)))
+    ran = {r["engine"] for r in results}
+    skipped = [e for e, _p in all_legs if e not in ran]
+    print("local engines registered: %d | run this campaign: %d"
+          % (len(all_legs), len(ran)))
+    if skipped:
+        print("NOT RUN (%d): %s" % (len(skipped), ", ".join(skipped)))
+        print("This campaign does NOT qualify the engines above.")
     return 0 if passed == len(results) else 1
 
 
