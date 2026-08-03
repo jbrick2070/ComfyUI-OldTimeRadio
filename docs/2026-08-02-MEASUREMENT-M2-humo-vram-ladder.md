@@ -1,4 +1,20 @@
-# M2 MEASUREMENT: HuMo peak VRAM FALLS as frames rise, and the orientations match
+# M2 MEASUREMENT: HuMo ISOLATED RENDER-WINDOW peak falls as frames rise
+
+> **CORRECTED 2026-08-02 after a kibitz r1 panel (Codex + Antigravity).**
+> Four claims in the first version of this document were overstated and are
+> withdrawn below. The numbers are unchanged; what they support is narrower.
+>
+> 1. **This is not a lifecycle peak.** `prepare()` (`eng_humo.py:490`) loads
+>    every heavy handle, and `VramPeakProbe` only starts afterwards inside
+>    `render_clip` (`eng_humo.py:811`). So this measures the RENDER WINDOW with
+>    handles already resident -- not the full cold `prepare -> render ->
+>    teardown` peak, and not any transient spike during loading. Every
+>    "cold-lifecycle", ceiling-safety and admission implication is withdrawn.
+> 2. **The coverage-splitting recommendation is WITHDRAWN entirely.** See below.
+> 3. **The "1 in 331,000" statistic is withdrawn.** The four series are not
+>    independent.
+> 4. **"No orientation effect exists" is withdrawn** in favour of "no consistent
+>    orientation difference was detected".
 
 **16 cells: 49/65/81/97 frames x portrait/landscape x cold/warm. Every cold cell
 preceded by a server restart.** Branch `v2.0-alpha`, HEAD `537bb9d3`, 2026-08-02.
@@ -30,10 +46,23 @@ Incremental cost, `peak_used - pre_used`, in MB:
 | 97 | **13,325** | **13,026** | **13,260** | **13,020** |
 | **49 -> 97** | **-1,161** | **-959** | **-963** | **-1,264** |
 
-**All four independent series decline monotonically across all four rungs.** One
-series ordering by chance is 1 in 24; four independent series is about 1 in
-331,000. This is not noise, and it is not merely flat -- it is a real inverse
-relationship. Doubling the frame count buys back roughly a gigabyte of peak.
+**All four series decline monotonically across all four rungs.** The ordering is
+consistent and the magnitude is large -- roughly a gigabyte from 49 to 97.
+
+**The "1 in 331,000" claim from the first version is WITHDRAWN.** It assumed the
+four series were independent, and they are not: the runner walks the rungs in
+FIXED ASCENDING ORDER, cold and warm are paired on the same session, and both
+orientations share one portrait, one WAV and one campaign order
+(`otr_humo_vram_ladder.py`). Any influence that varies monotonically with
+position in the run would print this exact pattern in all four series at once.
+Restarting the server before every cold cell resets process state, and the
+desktop baseline was verified flat, so the obvious confounds are excluded -- but
+**a fixed-order design cannot separate "longer renders cost less" from "later
+cells cost less"**, and that is what the claim needed.
+
+The honest statement is: **an inverse ordering was observed, consistently, over
+sixteen cells.** Establishing it as causal requires counterbalanced order --
+descending and interleaved runs -- and repeated endpoint pairs.
 
 Render TIME meanwhile scales linearly: 3.18, 3.17, 3.41, 3.46 s/frame at
 49/65/81/97. **Compute tracks frames; memory does the opposite.**
@@ -55,11 +84,16 @@ run three times gave 15,624 / 15,904 / 15,914 MB -- a **290 MB spread on
 identical inputs**. A 374 MB gap is barely outside that, it is the shortest and
 therefore noisiest render on the ladder, and the deltas converge to 1 MB by 81.
 
-**Conclusion: no orientation effect exists in the range tested.** Equal pixels
-and an equal token grid cost equal memory, to the limit of what this instrument
-resolves. There is no tiling or kernel-selection divergence. The 2026-08-02
-change collapsing the orientation-specific 49/177 rules into one shared cap was
-correct.
+**Conclusion: no CONSISTENT orientation difference was detected in the range
+tested.** That is weaker than "no effect exists", and deliberately so -- absence
+of a detected difference across four rungs is not proof of absence, and the
+290 MB repeatability figure comes from only three repeats, which is a weak
+estimate of spread. What can be said is that the deltas are small, they do not
+point consistently in one direction, and they converge to 1 MB at 81 frames.
+
+Nothing here contradicts the 2026-08-02 change collapsing the
+orientation-specific 49/177 rules into one shared cap, and nothing here is
+strong enough to have justified it on its own.
 
 ## Only the 97-frame rung stays under the ceiling
 
@@ -87,13 +121,48 @@ safest measured configuration.**
    and `ltx_audio_in` (flat across 79 production samples, 25 to 497 frames) --
    and the first where the coefficient is clearly the wrong SIGN rather than
    merely zero.
-3. **Coverage splitting should prefer LONGER segments, not shorter ones.** A beat
-   is split into segments each rendered independently, and peak is per segment.
-   On this data a 97-frame segment costs ~1.2 GB LESS peak than a 49-frame one,
-   so filling to the cap is cheaper per segment than splitting finer. The
-   current planner already fills toward the cap -- **that behaviour is correct,
-   but for the opposite reason to the one assumed.** Anyone later "reducing VRAM
-   risk" by shortening segments would increase it.
+3. **THE COVERAGE-SPLITTING RECOMMENDATION IS WITHDRAWN.** The first version of
+   this document said splitting should prefer LONGER segments because a
+   97-frame segment costs ~1.2 GB less peak than a 49-frame one. **That does not
+   follow from this data, because production does not render segments the way
+   this ladder does.**
+
+   `HuMoEngine.prepare()` states it in its own docstring: *"Load every heavy
+   handle ONCE PER BEAT instead of once per segment"* (`eng_humo.py:490-491`).
+   A production multi-segment beat runs under ONE `BeatSession`, reusing the
+   handles loaded for the first segment and tearing down once at the end. Every
+   cell in this ladder was a FRESH single-clip session with its own load and
+   teardown. The two lifecycles are different, so a per-segment cost measured
+   here cannot be added up to predict a multi-segment beat.
+
+   Deciding split policy needs a canonical multi-segment comparison. Until then
+   **no split-policy change is supported in either direction**, and the existing
+   planner behaviour stands on its existing rationale.
+
+## THE RECIPE IS NOT ON THE TABLE (operator directive 2026-08-02)
+
+**"We spent a lot of time perfecting the recipes to look good and we can't lose
+that."**
+
+The render recipe -- steps, cfg, quant, LoRA choice and strength, canvas, and the
+trained frame length -- was tuned by eye over a long time and is the expensive,
+hard-to-recover part of this project. VRAM numbers are cheap to re-measure; a
+recipe that made the picture good is not.
+
+So nothing in this document licenses a recipe change:
+
+* **"Peak falls as frames rise" is NOT a reason to raise the 97 cap.** 97 is the
+  TRAINED length and a QUALITY bound. This measurement says the cap is not
+  buying memory safety; it says nothing whatever about what the picture looks
+  like above it, and the operator's directive is that quality wins.
+* **The deferred no-LoRA control is a recipe change, not a control.** Dropping
+  the distill LoRA requires raising `OTR_HUMO_STEPS` and `OTR_HUMO_CFG` off
+  their tuned defaults, so it cannot be run casually "for attribution".
+* **Every cell in this ladder ran the SHIPPED recipe unchanged**, which is what
+  makes the numbers comparable to production in the first place.
+
+A measurement that suggests a recipe could change gets REPORTED, and the
+operator decides against the picture. It never gets acted on here.
 
 ## Mechanism: observed, not explained
 
@@ -137,6 +206,19 @@ which `VramPeakProbe` does not currently separate.
   measurement that was silently a copy of the cold one. Repeats now vary
   `oom_index` (documented inert in `mode=single`), and any cell returning under
   20 s is marked as not having rendered.
+
+## The reproducibility receipt this measurement still owes
+
+Raw rows live in `tmp/_m2_humo_ladder.json`, and `tmp/` is swept. There is no
+pinned digest of the submitted graph, no runner hash, and no model/config
+identity manifest -- none of the receipt machinery section 0A requires of the
+bench runners it does exempt. The aggregate tables above survive in this
+document; the dataset does not.
+
+This is the same debt `docs/2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames.md`
+recorded against itself, and it is recorded here for the same reason: a number
+that lives only in a swept directory is one cleanup away from being the next
+`docs/2026-06-27-humo-bakeoff`.
 
 ## Open ruling owed before this is used
 
