@@ -1,6 +1,67 @@
 # OTR Go-Forward Plan
 
-**Newest update: 2026-08-03 -- M1 AND M2 ARE ANSWERED, AND BOTH ANSWERS ARE
+**Newest update: 2026-08-03 (afternoon) -- ORIGINAL MEANS "MAKE A RANDOM RADIO
+DRAMA", AND THE LEDGER NOW TELLS THE TRUTH ABOUT IT.**
+
+Branch `v2.0-alpha`, HEAD `de6b2ce2+`, pushed. Suite 8312 / Bible green.
+
+## WHAT LANDED TODAY (afternoon window)
+
+* **The premise catalog no longer runs on the original bank** (operator
+  definition: "make a random radio drama" -- it may INVENT a premise and tag
+  it, never CHOOSE from a list). Bank-level `defaults.story_scaffold: "off"` in
+  banks.json, validated in `_otr_story_routing`, FOLDED into
+  `_style_grammar_on` at the contract site so every scaffold branch takes the
+  documented byte-identical off path. **Live-proven on
+  `signal_lost_fogbound_rails`**: no `meta.style`, `story_style_status =
+  story_scaffold_off`, `visual_plan.style` empty, `canon.sound_palette` empty,
+  and cast bios story-native (a Timekeeper and a Station Master, not a
+  hard-hatted miner).
+* **Shape 4 + family-balanced markers** in `_canonicalize_transport_line`
+  (whole-line wrappers, transport-gated), live-proven on `tempests_chart`.
+* **Credits scroll doubled** (`_SCROLL_PPS` 60 -> 120, ~49s -> ~28s), operator
+  confirmed the speed on a real episode.
+* **The four-agent identity forensics** (cast chain / scaffold consumption /
+  visual style / brief order) -- reports in the 2026-08-03 session; diagram
+  delivered. Sweep report CORRECTED: seeds were NOT pinned (OS-entropy
+  receipts); pinning requires env at SERVER BOOT.
+
+## THE STYLE / IDENTITY DECISION WORK (next CODER window, one campaign)
+
+Grounded by the forensics; every line has a file:line in the session traces:
+
+1. **"Invent one and tag it"**: add a derived style/genre field to
+   `run_story_brief_reflection` (`_otr_story_brief.py:446` -- proven
+   content-loyal on both specimens), stamp beside `story_brief`, repoint the
+   treatment `Style:` line (`video_engine.py:1762`) and the HUD
+   (`video_engine.py:1336` -> `_build_left` `:1466`) at it.
+2. **Rename `meta.style` -> `meta.story_scaffold`** (operator: too many metas;
+   the field is neither scifi nor a description). Consumers move in one
+   change: writer stamps, credits `_story_style_receipt`, `visual_plan.style`,
+   `video_engine.py:1336`, tests.
+3. **Ghost-name reconciliation fork**: pitch cast never reaches `lock_cast`
+   (names are a pure pool draw; `source_character_names` deliberately None for
+   invention lanes). Decide: scrub briefs after cast lock, or propagate pitch
+   names. Evidence: Evelyn/Leonard as offscreen lore; Fogbound Rails bio still
+   opens "Lizzie Gray".
+4. **Dead fields found**: `ending_template` computed but zero LineRequest call
+   sites pass it; `seed_policy.style_seed_env` validated but unconsumed;
+   `dramatic_state` derived PRE-dialogue goes stale in the treatment.
+5. **`meta` is a 120-key drawer** -- the cleanup the operator keeps asking for.
+   Scope as its own rip with the ledger law (every field one owner).
+
+## STILL OPEN (carried from the morning block below)
+
+Writer scaffolding repair increments 1-5 (r3-corrected spec in
+`docs/2026-08-03-script-parse-repair-CODE-READY.md`); the reuse detector to the
+panel; section 0A carve-out ruling before M2 numbers move caps; Wan 2.2 I2V
+checkpoint download + `wan_i2v` re-run; the `OTR_CastLock` freeze cascade
+(`wan_ti2v`); TTS parenthetical stripping (documented as BUG-07.12, never
+wired); credits shows `visual_style` never the scaffold (rides item 1 above).
+
+---
+
+**Previous update: 2026-08-03 -- M1 AND M2 ARE ANSWERED, AND BOTH ANSWERS ARE
 "THE ASSUMPTION WAS WRONG".**
 
 Branch `v2.0-alpha`, HEAD `350ab0f0`, pushed. Suite 8286 / Bug Bible green.
