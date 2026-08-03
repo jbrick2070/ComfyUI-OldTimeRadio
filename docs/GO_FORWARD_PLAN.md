@@ -26,6 +26,26 @@ Branch `v2.0-alpha`, HEAD `de6b2ce2+`, pushed. Suite 8312 / Bible green.
   delivered. Sweep report CORRECTED: seeds were NOT pinned (OS-entropy
   receipts); pinning requires env at SERVER BOOT.
 
+## THE FIVE-BANK 30-WORD BEAT TEST (2026-08-03 afternoon; logs `tmp/_beat_*.log`)
+
+5 legs, bank PINNED per leg, cheap viz engine, after the scaffold-gate fold:
+
+| bank | result | credits style surface | reading |
+|---|---|---|---|
+| original (earlier, Fogbound Rails) | PASS | `story_scaffold_off` status | the fix, live |
+| media_archive | PASS | `pirate_radio_resistance_drama` | MEDIA pool mechanically -- **content-FALSE**: the story is a film-reel standoff seeded by a real Library of Congress item on 'Midnight' (1939). Operator caught it on screen. Second specimen of the content-blind-draw class. |
+| public_domain | PASS | `lamplit_road_and_threshold` | adaptation STAGING slug -- defensible by design |
+| shakespeare | PASS | `lamplit_road_and_threshold` | same (4-pool collision is unremarkable) |
+| scifi_news | PASS | `story_scaffold_off` status | **ANSWERS the dispatched-lane question**: dispatched lanes hardcode scaffold off, so their credits show the status token and never a premise -- and always have |
+| scifi_news_pro | **FAIL** | -- | writer, THIRD distinct markup class: bare prose stage directions as unlabelled lines (`BAD_LINE_SHAPE` -> skeleton cascade). NOT shape-4 -- that fix held. Exactly the class the repair increments 1-5 target. |
+
+Consequences: (1) the derived-tag + display-repoint increment fixes the credits
+line for ALL SIX banks uniformly -- it is the highest-leverage item below;
+(2) OPEN OPERATOR QUESTION: does media_archive want the catalog premise at all,
+or the same scaffold-off treatment as original? Same two-generators-fighting
+shape, but the rule so far was stated only for original; (3) the raw-text
+fable2 lane still dies on markup classes increment 0 cannot reach.
+
 ## THE STYLE / IDENTITY DECISION WORK (next CODER window, one campaign)
 
 Grounded by the forensics; every line has a file:line in the session traces:
