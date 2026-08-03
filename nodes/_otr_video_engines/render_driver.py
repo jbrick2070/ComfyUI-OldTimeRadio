@@ -3089,14 +3089,22 @@ def _assert_beat_affordable(shot, prebuilt):
         record["reason"] = "no segments"
         return record
 
-    if not _mc.has_measured_cost_row(engine_id):
-        # Named, visible, and NOT a refusal: most engines have no measured row
-        # yet, and refusing them would ground the whole roster to guard three.
-        # What it must never do is look guarded.
+    if not _mc.cost_row_may_refuse(engine_id):
+        # Named, visible, and NOT a refusal.
+        #
+        # This asks whether a row may REFUSE, not whether one exists -- a
+        # distinction that cost a live campaign leg. ``wan_ti2v`` HAS a row and
+        # that row is disqualified: at every realistic free-VRAM level it
+        # refuses every segment length the coverage planner produces. Gating on
+        # mere existence re-armed, at this new call site, the exact refusal that
+        # ``_planned_length`` had already stopped issuing.
+        #
+        # Most engines have no row at all, and refusing those would ground the
+        # roster to guard none. What this must never do is look guarded.
         record["reason"] = (
-            "no measured cost row for %r -- admission NOT enforced for this "
-            "beat (a borrowed row would refuse and admit with equal confidence)"
-            % engine_id)
+            "no QUALIFIED cost row for %r -- admission NOT enforced for this "
+            "beat (a row that is absent, or present but disqualified, refuses "
+            "and admits with equal confidence)" % engine_id)
         return record
 
     free_mb = _mc.free_vram_mb()

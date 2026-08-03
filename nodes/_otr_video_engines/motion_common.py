@@ -336,20 +336,51 @@ class MotionBudgetError(RuntimeError):
     lower the frame_count widget, free VRAM, or pick a lighter engine."""
 
 
-def has_measured_cost_row(engine_name) -> bool:
-    """Is there a cost row MEASURED for this engine, or only the fallback?
+#: Cost rows that are QUALIFIED to refuse a render.
+#:
+#: Membership of :data:`FRAME_COST_MODEL` is NOT the same question, and the
+#: difference is not academic -- it is the difference between a guard and a
+#: 268-minute wasted campaign leg.
+#:
+#: ``wan_ti2v`` HAS a row, ``(7000.0, 185.0)``, and that row is DISQUALIFIED in
+#: writing by this repo's own evidence:
+#:   * It refused a real production leg -- "static frame budget 173 ... affordable
+#:     24 frames (free=13481 MB)" -- on an engine that had already shipped.
+#:   * It is wrong in BOTH directions: it under-predicts at 1472x832 (10,145
+#:     predicted vs 12,181-12,614 measured) and over-predicts at 832x480 (11,887
+#:     predicted for 81 frames vs ~6,563 measured).
+#:   * ``_planned_length`` already stopped consulting it for exactly this reason.
+#: At every realistic free-VRAM level it refuses EVERY segment length the
+#: coverage planner produces, including 93 frames at 14,500 MB free.
+#:
+#: So an "is there a row?" test admits a row whose own author disqualified it.
+#: The question a refusal must answer is "may this row REFUSE a render?", and
+#: today the honest answer for every engine is no. Empty is the correct value
+#: until a row is re-measured through the real ``prepare()`` + ``render_clip()``
+#: lifecycle -- which the standing ruling requires and no bench may substitute
+#: for.
+#:
+#: This is deliberately a separate, explicit registry rather than deleting the
+#: row: the seed values still document the model's SHAPE for non-enforcing
+#: readers, and a disqualification that is written down teaches more than a
+#: deletion that leaves no trace.
+QUALIFIED_COST_ROWS = frozenset()
 
-    The distinction is the whole point. ``_DEFAULT_FRAME_COST`` makes an engine
-    nobody has ever measured look exactly like an engine that passed a
-    calibration, because the prediction runs either way and returns a number.
-    That is how a guard becomes theatre: the check executes, reports a limit,
-    and the limit describes a different engine.
 
-    Callers that want a REAL guard ask this first and say plainly when the
-    answer is no, rather than enforcing a borrowed number against hardware it
-    was never measured on.
+def cost_row_may_refuse(engine_name) -> bool:
+    """May this engine's cost row REFUSE a render?
+
+    Not "does a row exist". ``_DEFAULT_FRAME_COST`` makes an engine nobody has
+    measured look exactly like a calibrated one -- the prediction runs either
+    way and returns a number -- and a PRESENT row can still be a disqualified
+    one. Both cases produce a check that executes, reports a limit, and
+    describes something other than the engine in front of it.
+
+    Callers that want a real guard ask this and say plainly when the answer is
+    no, rather than enforcing a number nothing stands behind. See
+    :data:`QUALIFIED_COST_ROWS`.
     """
-    return str(engine_name or "") in FRAME_COST_MODEL
+    return str(engine_name or "") in QUALIFIED_COST_ROWS
 
 
 def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
@@ -628,6 +659,7 @@ __all__ = [
     "resolve_aspect_transform", "assert_no_silent_stretch", "vram_used_mb",
     "VramPeakProbe",
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
-    "assert_frame_affordable", "compute_real_frame_budget",
+    "assert_frame_affordable", "cost_row_may_refuse", "QUALIFIED_COST_ROWS",
+    "compute_real_frame_budget",
     "MotionEngineBase",
 ]
