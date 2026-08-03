@@ -4,11 +4,23 @@
 the two HuMo legs run before it -- so 15 of 19 local engines produced a real
 episode in one night.** Branch `v2.0-alpha`, HEAD `6855190a`, 2026-08-02/03.
 
-Both randomizers ON with seeds PINNED (`OTR_BANK_SEED` =
-`OTR_VISUAL_STYLE_SEED` = 4242) so the ENGINE is the only variable, and the
-shipped recipes untouched -- every override variable verified unset before
-launch. This is the live proof both randomizers have owed since 2026-07-31,
-when they shipped suite-proven but never actually run.
+Both randomizers ON, and the shipped recipes untouched -- every override
+variable verified unset before launch. This is the live proof both randomizers
+have owed since 2026-07-31, when they shipped suite-proven but never actually
+run.
+
+**CORRECTION (2026-08-03): the seeds were NOT pinned.** The launch set
+`OTR_BANK_SEED` = `OTR_VISUAL_STYLE_SEED` = 4242 in the CAMPAIGN process, but
+the rolls execute inside the SERVER process, which was booted without those
+variables -- and every roll receipt proves it: `seed_source: "OS entropy"` in
+each episode's `bank_roll` / `style_roll`. So bank and style varied per leg,
+and the sweep's channel isolation claim ("the engine is the only variable")
+does not hold. What the sweep still proves: each engine rendered a complete
+episode end to end, video covered audio on every passing leg, and both
+randomizers ran live. What it cannot prove: any cross-engine comparison where
+the bank or style could be the explanation. Pinning seeds requires setting the
+env at SERVER BOOT (the profile field `seed_policy.style_seed_env` is validated
+but unconsumed -- a dead channel, recorded in the visual-style trace).
 
 ## Results
 

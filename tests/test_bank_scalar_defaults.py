@@ -66,6 +66,48 @@ class TestScalarDefaultsMigration:
         assert a == b  # sha256(cast_seed)-keyed, C7-safe
 
 
+class TestStoryScaffoldDefault:
+    """defaults.story_scaffold (2026-08-03): the bank decides whether the
+    pre-outline premise scaffold runs.
+
+    Operator definition of the original bank: "make a random radio drama" --
+    it may INVENT a premise and tag it, but never CHOOSE from the catalog.
+    The specimen defect: tempests_chart (original, spark-deck lighthouse tale)
+    carried meta.style='asteroid_mining_labor_dispute' and a cast member
+    dressed as a "Mining Union Representative... hard hat with a union pin",
+    because lock_cast was handed the catalog label as style."""
+
+    def test_original_declares_scaffold_off(self):
+        bank = SR.require_runnable_bank("original")
+        assert (bank.defaults or {}).get("story_scaffold") == "off"
+
+    def test_every_other_runnable_bank_keeps_the_scaffold(self):
+        # Absent means "on" -- today's behaviour for every non-original bank.
+        # Enumerated from the LIVE registry rather than the EXPECTED table,
+        # which predates this key and omits scifi_news (QA 2026-08-03) -- a
+        # hand-list drifts, the registry cannot.
+        others = [b for b in SR.runnable_bank_ids() if b != "original"] \
+            if hasattr(SR, "runnable_bank_ids") else None
+        if others is None:
+            others = [bid for bid in
+                      ("media_archive", "scifi_news", "scifi_news_pro",
+                       "public_domain", "shakespeare")]
+        assert others, "registry returned no non-original runnable banks"
+        for bank_id in others:
+            bank = SR.require_runnable_bank(bank_id)
+            assert (bank.defaults or {}).get("story_scaffold", "on") == "on", (
+                f"{bank_id} unexpectedly declares story_scaffold off")
+
+    def test_gate_semantics_absent_means_on(self):
+        # The writer's gate: _style_grammar_on AND bank != "off". Absent/junk
+        # values must not silently disable the scaffold for other banks.
+        for defaults, expect_active in (({}, True),
+                                        ({"story_scaffold": "on"}, True),
+                                        ({"story_scaffold": "off"}, False)):
+            bank_scaffold = str(defaults.get("story_scaffold", "on")).strip().lower()
+            assert (bank_scaffold != "off") is expect_active
+
+
 class TestParserValidation:
     @staticmethod
     def _row(defaults):
@@ -96,6 +138,16 @@ class TestParserValidation:
     def test_absent_keys_ok(self):
         b = SR._parse_bank(self._row({}), "test")
         assert b.defaults == {}
+
+    def test_bad_story_scaffold_rejected(self):
+        # Junk must fail LOUD at registry parse, not silently read as "on".
+        with pytest.raises(SR.RegistryValidationError):
+            SR._parse_bank(self._row({"story_scaffold": "sometimes"}), "test")
+
+    @pytest.mark.parametrize("value", ["on", "off"])
+    def test_valid_story_scaffold_accepted(self, value):
+        b = SR._parse_bank(self._row({"story_scaffold": value}), "test")
+        assert b.defaults["story_scaffold"] == value
 
 
 if __name__ == "__main__":  # pragma: no cover

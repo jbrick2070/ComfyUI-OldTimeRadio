@@ -3907,6 +3907,31 @@ class OTR_LedgerScriptWriter:
         # => no style anywhere => byte-identical. build_story_contract
         # never raises on a missing style, but the call is wrapped LOUD
         # per CLAUDE.md so a defect can never break the writer.
+        # BANK-LEVEL SCAFFOLD GATE (operator definition, 2026-08-03). "Make a
+        # random radio drama" IS the original bank: its spark deck supplies the
+        # randomness, and a catalog premise injected beside the pitch fought it
+        # inside one prompt, lost the story, and still dressed the cast -- the
+        # tempests_chart specimen locked a "Mining Union Representative...
+        # hard hat with a union pin" into a Cartographer's Guild tale because
+        # lock_cast was told style="asteroid-mining labor dispute". The bank
+        # row now decides whether the scaffold runs at all
+        # (banks.json defaults.story_scaffold, validated by _otr_story_routing;
+        # absent means "on"). Bank OFF outranks the widget/env: the definition
+        # of the bank lives with the bank, not with a per-run switch.
+        # The gate FOLDS INTO _style_grammar_on rather than living beside it.
+        # Every scaffold branch downstream -- the OutlineRequest style fields,
+        # the safe-open capture, the news coda, the ctx handoff to the writer
+        # tail (rebound at the top of _run_writer_tail), BOTH style-receipt
+        # stamps -- keys on this one
+        # variable (KILL 2's whole point), and bank-off must take the exact
+        # documented byte-identical OFF path everywhere at once. A separate
+        # flag would leave eight branches on the env value with contract=None,
+        # and the second stamp lives in the ctx-rebound tail scope where a new
+        # local would simply not exist.
+        _bank_scaffold = str(
+            (_source_bank_row.defaults or {}).get("story_scaffold", "on")
+        ).strip().lower()
+        _style_grammar_on = _style_grammar_on and _bank_scaffold != "off"
         contract = None
         if _style_grammar_on:
             try:
@@ -5729,6 +5754,11 @@ class OTR_LedgerScriptWriter:
             # story-style receipt stamped below.
             "style":      (contract.slug if contract else ""),
         }
+        # scaffold_enabled is the EFFECTIVE flag: the bank gate is folded into
+        # _style_grammar_on at the contract site and rides here through
+        # ctx.style_grammar_on, so a bank-off run stamps enabled=False and
+        # reads as "off by the bank's own definition", never as a style-build
+        # failure.
         _stamp_story_style_receipt(
             meta, contract=contract, scaffold_enabled=_style_grammar_on)
 

@@ -249,6 +249,19 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
             f"{origin}: defaults.style_pool_class must be one of "
             f"'media'|'adaptation'|'generic', got {_spc!r}"
         )
+    # defaults.story_scaffold (2026-08-03): the BANK decides whether the
+    # pre-outline premise scaffold (StoryContract) runs at all. Operator
+    # definition of the original bank: "make a random radio drama" -- its spark
+    # deck is the randomness, and a catalog premise injected beside it fought
+    # the pitch inside one prompt, lost the story, and still dressed the cast
+    # (a "Mining Union Representative" in a Cartographer's Guild tale). Absent
+    # means "on" -- every other bank keeps today's behaviour.
+    _ssc = defaults.get("story_scaffold")
+    if _ssc is not None and _ssc not in ("on", "off"):
+        raise RegistryValidationError(
+            f"{origin}: defaults.story_scaffold must be 'on'|'off', "
+            f"got {_ssc!r}"
+        )
     for _bkey in (
         "propagate_adaptation_cast",
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer
