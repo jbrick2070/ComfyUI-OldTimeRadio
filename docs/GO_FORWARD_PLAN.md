@@ -51,6 +51,66 @@ sources.
   TOUCHSTONE, ROSALIND, CELIA, JAQUES. Every gap the reviews predicted is
   confirmed real: LUCE, LEONATO, QUINCE, FABIAN, the NURSE.
 
+## THE PASSAGE LANE (operator ruling, evening)
+
+> "For shakespeare I'm open to a version that is very strict and finds, based on
+> word count and random choice, hones in on a specific part of a play to get real
+> specific dialogue, no paraphrasing."
+
+So a play episode is a contiguous WINDOW of consecutive speeches, carried verbatim,
+chosen to fit the word budget, the cast ceiling and the beat topology. Built as
+`nodes/_otr_passage_selector.py` (`a82460ec`), 24 tests, proven on all 14 vendored
+scenes: every selected line is verbatim from its source file.
+
+**The number that governs everything:** a passage is performed against VOICED
+BEATS, and beats step with the ACT TOPOLOGY, not the word count --
+`voiced_beat_count()` in `_otr_episode_budget` is now the one owner. 30-120 target
+words buy THREE beats, 150-200 six, 300-1200 fourteen. Measured consequence: at 120
+words a passage is a two-or-three speech fragment; at 300 it is an eleven-to-thirteen
+speech exchange. **The fidelity floor should be 300, not the operator's initial 120**
+-- three beats cannot hold a change of mind, and every manifest already recommends
+300. A long speech spans consecutive beats in the same voice (`ceil(words/80)`,
+`BEAT_WORD_HARD_MAX`); without that the lane silently loses Lear's love test,
+Prospero's history and Juliet's balcony speeches.
+
+**Four defects the reviews caught in this module, all proven before fixing:**
+Fable found that one-beat-per-speech produced UNPERFORMABLE passages (the Macbeth
+pick carried a 91-word Banquo speech over the schema cap). Codex QA found three
+parser corruptions: `BOTTOM [sings]` has no comma so Bottom's song was delivered by
+TITANIA; multiline and inline stage directions ("[Jaques exits.]", "[As Ganymede.]")
+sat inside spoken text where TTS would read them aloud; and `ALL` was charged a cast
+slot, minting a phantom voice. Also `len(text.split())` re-created Bug Bible 12.67 --
+now `canonical_word_count`. The lesson: substring assertions proved a line existed
+somewhere in the file, never that the directions were gone or the speaker was right.
+
+**Craft criteria for selection, from the Fable review, NOT yet implemented:** keep
+windows inside one French scene (never cross an `[Enter ...]` that adds a speaker);
+prefer starts on an entrance or a question, penalise openings on continuation words
+(And/But/Nay/'Tis) and speeches under 4 words (Folger prints shared verse lines
+separately, so those start mid-breath); prefer ends on an exit, a scene end or a
+rhymed couplet, avoid ending on a question or a trailing dash. Score, keep the top
+K, then apply the seeded hash within that class. Its showcase example: Romeo and
+Juliet 2.2 lines 257-318, `[Enter Juliet above again.]` "Hist, Romeo, hist!" through
+"Sleep dwell upon thine eyes... [He exits.]" -- 14 speeches, ~250 words, entrance
+start, couplet-and-exit end, a complete arc that maps 1:1 onto the 14-beat topology.
+
+**Prose is a different lane and the review was blunt about it.** Wells' chapter is
+~70% narration; a characters-only performance discards the book's actual asset. The
+faithful prose lane should be a NARRATOR/READER role speaking the author's own
+sentences, abridged by CUTTING ONLY with every dropped span logged in provenance --
+"abridged verbatim", which is also the period-correct radio form. Defer the
+paraphrased variant until a dialogue-poor source genuinely needs it: as specced it
+is indistinguishable to a listener from the existing original lane with borrowed
+names, and it reopens the failure class just closed. If built, the announcer must
+say "freely adapted from".
+
+Also flagged, unfixed: the per-beat word FLOOR (20 at three acts) excludes
+stichomythia -- "Nothing, my lord." / "Nothing?" / "Nothing." cannot be three beats
+-- so rapid exchanges need a merge rule or a floor exemption; `[aside]` and
+`[within]` are machine-readable delivery hints worth carrying into per-beat
+metadata; and the Wells manifest synopsis says the traveller "returns with a strange
+machine" when in the real chapter he returns limping and the machine never appears.
+
 ## THE DESIGN, AFTER TWO KIBITZ ROUNDS + FABLE + SONNET
 
 Hardened plan: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md`.
