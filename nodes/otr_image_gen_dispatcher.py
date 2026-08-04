@@ -208,18 +208,78 @@ def resolve_engine_for_role(image_policy, role):
     return fb, slot, slot != "character_image_model" and bool(fb)
 
 
+#: Excerpt half-width around a path-guard match. The old report was
+#: ``prompt[:60]``, which shows nothing useful when the offending character sits
+#: late in a long prompt -- the excerpt is centred on the match instead.
+_PATH_GUARD_EXCERPT_RADIUS = 90
+
+_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def path_guard_arm(prompt: str) -> "dict | None":
+    """Which arm of the path guard a prompt trips, or ``None`` if it is clean.
+
+    Returns ``{arm, token, index, excerpt, prompt_len, prompt_sha1_12}``.
+
+    Split out of ``_assert_not_path`` (2026-08-04) because the guard's own
+    verdict was unrecoverable: it raised one generic sentence and the caller
+    turned that into a wire-only warning, so a silently skipped still could not
+    say WHY. The arms are reported separately because they mean different
+    things -- ``alternate_separator`` is a bare ``/``, which on Windows
+    (``os.altsep == '/'``) refuses ordinary prose like "black/white", while
+    ``extension_suffix`` really does look like a filename.
+
+    The excerpt is ``repr``-escaped: a prompt is LLM-authored text and may
+    contain newlines, which would otherwise forge extra log records.
+    """
+    p = str(prompt or "")
+    if not p:
+        return None
+    # PRECEDENCE IS THE ORIGINAL PREDICATE'S, NOT "earliest match". The guard
+    # evaluated `os.sep or os.altsep or endswith(ext)` as a short-circuit chain;
+    # reporting a different winner would describe a decision the guard did not
+    # make. Likewise NO rstrip() here -- the original tested `endswith` on the
+    # raw lowered string, so adding one would newly reject "foo.png   " and this
+    # change is observability-only.
+    arm = token = None
+    index = -1
+    lowered = p.lower()
+    if os.sep and os.sep in p:
+        arm, token, index = "separator", os.sep, p.index(os.sep)
+    elif os.altsep and os.altsep in p:
+        arm, token, index = "alternate_separator", os.altsep, p.index(os.altsep)
+    else:
+        for ext in _IMAGE_EXTENSIONS:
+            if lowered.endswith(ext):
+                arm, token, index = "extension_suffix", ext, len(p) - len(ext)
+                break
+    if arm is None:
+        return None
+    start = max(0, index - _PATH_GUARD_EXCERPT_RADIUS)
+    end = min(len(p), index + _PATH_GUARD_EXCERPT_RADIUS)
+    return {
+        "arm": arm,
+        "token": token,
+        "index": index,
+        "excerpt": repr(p[start:end]),
+        "prompt_len": len(p),
+        # The dispatcher's CANONICAL prompt hash (sha256), so this correlates
+        # with the ledger's own prompt_hash rather than inventing a second
+        # digest nothing else can join on.
+        "prompt_hash": _prompt_content_hash(p),
+    }
+
+
 def _assert_not_path(prompt: str) -> None:
     """Fail-closed prompt-STRING vs path-STRING guard (PASS-IMG SHOULD-FIX)."""
-    p = str(prompt or "")
-    looks_pathy = (
-        os.sep in p or (os.altsep and os.altsep in p)
-        or p.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
-    )
-    if looks_pathy:
+    hit = path_guard_arm(prompt)
+    if hit is not None:
         raise ValueError(
             "OTR_ImageGenDispatcher: image prompt looks like a PATH, not prompt "
-            f"text ({p[:60]!r}); the prompt-STRING and path-STRING sockets must "
-            "not be crossed"
+            "text (arm=%s token=%r at index %d of %d; excerpt %s); the "
+            "prompt-STRING and path-STRING sockets must not be crossed"
+            % (hit["arm"], hit["token"], hit["index"], hit["prompt_len"],
+               hit["excerpt"])
         )
 
 
@@ -820,6 +880,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # stamp, so stamp_portrait must not fail-closed on them (cast stays
     # CastLock's frozen authority; never added to here).
     cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
+    #: object_id -> why this object was SKIPPED without a ledger row. Keyed, not
+    #: substring-matched against free-text warnings: "still_b1" is a prefix of
+    #: "still_b12", so matching on text would cross-associate their evidence.
+    #: Read by the completion contract below, which raises BEFORE the images
+    #: section (and its warnings) is stamped to the ledger.
+    skip_evidence_by_oid: dict = {}
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -879,6 +945,17 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 "character_image_model (LOUD)")
         if not engine_id:
             warnings.append(f"{oid}: no image engine selected; skipped (fail-closed)")
+            # The wire-only warning above is discarded by the completion gate's
+            # own raise (the gate runs BEFORE the images section is stamped), so
+            # the reason must reach the server log at skip time and the
+            # structured map at the same moment.
+            skip_evidence_by_oid[oid] = {
+                "reason": "no_engine", "role": role, "slot": slot,
+            }
+            log.warning(
+                "[OTR_ImageGenDispatcher] SKIP %s (role=%s slot=%s): no image "
+                "engine selected; fail-closed, no still generated",
+                oid, role, slot)
             continue
         # Credits (operator 2026-06-21): the per-slot IMAGE model never reached
         # the credits dossier because the ledger['images'] section does not
@@ -892,7 +969,23 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         try:
             _assert_not_path(prompt)
         except ValueError as exc:
-            warnings.append(str(exc))
+            # THE BRANCH THAT COST AN EPISODE AND COULD NOT SAY SO (2026-08-04).
+            # This skip was invisible three ways: the warning carried no object
+            # id (so nothing could correlate it), it was wire-only (and the
+            # completion gate raises before the wire is stamped), and nothing
+            # reached the server log. A 320-word leg lost two stills here and
+            # the evidence was gone by the time anyone looked.
+            warnings.append(f"{oid}: {exc}")
+            hit = path_guard_arm(prompt) or {}
+            skip_evidence_by_oid[oid] = dict(hit, reason="prompt_path_guard",
+                                             role=role, engine_id=engine_id)
+            log.warning(
+                "[OTR_ImageGenDispatcher] SKIP %s (role=%s engine=%s): prompt "
+                "tripped the path guard -- arm=%s token=%r at index %s of %s, "
+                "prompt_sha1=%s, excerpt %s. NO still generated.",
+                oid, role, engine_id, hit.get("arm"), hit.get("token"),
+                hit.get("index"), hit.get("prompt_len"),
+                hit.get("prompt_hash"), hit.get("excerpt"))
             continue
         seed = resolve_object_seed(seed_cfg, oid, prompt_hash, kind=kind)
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
@@ -1107,13 +1200,33 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             str(row.get("object_id") or ""): row
             for row in images if isinstance(row, dict)
         }
+        # A row appended THIS dispatch, not one inherited from a prior image
+        # revision: ``images`` is seeded from the incoming ledger section above,
+        # so a stale row would let a genuinely missing still read as present.
+        this_dispatch_ids = {
+            str(row.get("object_id") or "")
+            for row in ep_rows if isinstance(row, dict)
+        }
         missing_targets = []
         for target in required_scene_targets:
             oid = str(target["object_id"])
             row = rows_by_object.get(oid)
             path = str((row or {}).get("path") or "")
             if not row or not path or not os.path.isfile(path):
-                missing_targets.append(oid)
+                # ONE deterministic status per target, so logs and tests can
+                # assert on it instead of parsing a sentence.
+                if not row:
+                    status = "no_row"
+                elif oid not in this_dispatch_ids:
+                    status = "historical_row_only"
+                elif not path:
+                    status = "dead_path"
+                else:
+                    status = "dead_path"
+                missing_targets.append({
+                    "object_id": oid, "status": status, "path": path,
+                    "evidence": skip_evidence_by_oid.get(oid),
+                })
                 continue
             required_target_receipt.append({
                 "object_id": oid,
@@ -1125,9 +1238,49 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "portrait_content_hash"),
             })
         if missing_targets:
-            raise ImageRenderError(
+            # THE RAISE CARRIES ITS OWN EVIDENCE (2026-08-04). It used to report
+            # only the object ids, while the reason sat in ``warnings`` -- which
+            # is stamped into the ledger BELOW this line and therefore died with
+            # the exception. A 320-word leg failed here and took its own
+            # explanation with it.
+            detail = []
+            for miss in missing_targets:
+                part = "%s (%s" % (miss["object_id"], miss["status"])
+                if miss["status"] in ("dead_path", "historical_row_only"):
+                    part += ", path=%r" % (miss["path"],)
+                ev = miss.get("evidence")
+                if ev:
+                    part += ", skipped: reason=%s" % (ev.get("reason"),)
+                    if ev.get("arm"):
+                        part += (" arm=%s token=%r index=%s of %s "
+                                 "prompt_hash=%s excerpt=%s"
+                                 % (ev.get("arm"), ev.get("token"),
+                                    ev.get("index"), ev.get("prompt_len"),
+                                    ev.get("prompt_hash"),
+                                    ev.get("excerpt")))
+                else:
+                    part += ", no skip evidence recorded"
+                detail.append(part + ")")
+            # THE SERVER LOG IS THE PRODUCTION CHANNEL, NOT THE EXCEPTION.
+            # The canonical runner renders a failure as
+            # `str(status["messages"])[:500]` (scripts/otr_api.py), so a rich
+            # message is TRUNCATED before an operator ever reads it. Emit one
+            # compact JSON record per missing target, in target order, BEFORE
+            # raising -- that survives independently of the exception and of the
+            # ledger stamp further below.
+            for miss in missing_targets:
+                log.error(
+                    "[OTR_ImageGenDispatcher] MISSING_TARGET %s",
+                    json.dumps(miss, ensure_ascii=True, sort_keys=True,
+                               default=str))
+            err = ImageRenderError(
                 "required scene image targets missing or unmaterialized before "
-                "video dispatch: " + ", ".join(missing_targets))
+                "video dispatch: " + "; ".join(detail))
+            # Structured attribute consumed by the D1 regression tests, which
+            # assert the evidence SCHEMA rather than substring-matching a
+            # sentence. Not a production transport -- see the log record above.
+            err.missing_targets = missing_targets
+            raise err
 
     ledger["images"] = {
         "image_revision": rev,

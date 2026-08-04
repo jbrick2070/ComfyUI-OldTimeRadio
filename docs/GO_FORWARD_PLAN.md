@@ -125,6 +125,35 @@ discarding them, boot-log truncation). **Fix direction D1-D3 in the postmortem:
 observability first, then reproduce (~1-in-6), then fix the named branch. Do
 not weaken the gate; do not revive the portrait-init fallback.**
 
+**D1 IS SHIPPED (2026-08-04).** Record:
+`docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md` (the kibitz working copy
+under `kibitz-runs/` is GITIGNORED, so the tracked doc is the durable one;
+scoped r2->r3 kibitz, Claude anchor + Codex, Antigravity down on quota). The
+gate now raises
+with a per-target status and keyed skip evidence; the path guard names its arm,
+token, index, canonical `prompt_hash` and a repr-escaped excerpt centred on the
+match; both silent skips log at skip time; and the gate emits one compact JSON
+`MISSING_TARGET` record per target BEFORE raising, because the canonical runner
+truncates the exception to 500 chars (`scripts/otr_api.py:749`). The launcher
+rotates the prior server log instead of truncating it
+(`scripts/_otr_rotate_log.ps1`), preserving the `%1` contract that EIGHT
+harnesses depend on. Cover: `tests/test_d1_still_skip_evidence.py`.
+
+**D2 is the next step and it is CHEAP:** run 320-word Shakespeare still legs
+until one fails (~1 in 6). The failure now names its own branch in the server
+log, and that log survives the next reboot. Accept EITHER a publish OR a
+fail-closed with complete evidence -- the second is the proof D1 works.
+
+Four things were deliberately NOT fixed in D1 and are D3/follow-up work:
+(1) `rows_by_object` is built from the historical `images` list rather than
+`ep_rows`, so a stale row whose file still exists can satisfy the gate without
+being minted this dispatch -- a real defect, but fixing it changes which
+episodes fail; (2) `OTRImageGenDispatcher` has no `IS_CHANGED` while depending
+on external file existence; (3) rotated-log retention is unbounded; (4) the
+`extension_suffix` guard arm is unreachable inside `dispatch_images` because
+`append_visual_safety_clause` appends after the prompt -- which also narrows the
+live suspect to a SEPARATOR arm.
+
 Also from the postmortem: the four 30w sweep failures are FOUR separate causes
 (two story-side rolls, the `wan_i2v` boot-env gap in `_otr_w45_boot.ps1`,
 `viz_mxc_cpu` uncharacterized) -- the section below on "four engines fail the
