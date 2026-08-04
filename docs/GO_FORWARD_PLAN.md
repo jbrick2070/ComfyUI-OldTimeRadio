@@ -12,6 +12,45 @@ Everything below was verified against the real files on 2026-08-04, is
 non-GPU, and is provable by the suite alone. Work them in order; each ends
 green and pushed on its own.
 
+### HARD GATE FOR THIS SPRINT -- NO CODE SHIPS WITHOUT A FULL KIBITZ (operator directive 2026-08-04)
+
+Operator: "for the next coding sprint be sure any coding work has a full
+`/kibitz-plugin:kibitz` review." **This is a gate, not a suggestion.** Now also
+written into `CLAUDE.md` above the two-strikes rule, because that older rule says
+a first-try root fix does not need a panel and would otherwise win the conflict.
+
+* **FULL = the default four-round arc.** r1 arc -> r2 coding -> r3 wiring -> r4
+  convergence; 8 external calls (two reviewers x four rounds). Not a scoped tail,
+  not one round, not a continuation receipt. If a round genuinely cannot run, say
+  which one and why -- a partial campaign is NEVER reported as a full arc.
+* **Invoke `kibitz-plugin:kibitz` by name.** `anthropic-skills:kibitz` is the
+  older duplicate; it is not what was asked for.
+* **Panel = Codex + Antigravity.** Claude drives from Cowork, so the driver's own
+  family is excluded -- do not launch a second `claude -p` lane against yourself.
+* **Use the ComfyUI profile.** `.kibitz/comfyui.local.md` is already in the repo
+  (written 2026-07-11). Regenerate via `kibitz/scripts/comfyui_profile.py` if the
+  tree has moved past it. Node contract, widget/`widgets_values` drift and
+  `IS_CHANGED` are exactly the defect classes this sprint can produce.
+* **Anchor first, judge last.** Write `driver_anchor.md` from the REAL Windows
+  files (Desktop Commander -- never the lagging Linux mount) BEFORE the fan-out,
+  then ground every panel claim and discard the misreads. A panel run on a false
+  premise is worse than no panel.
+* **When it binds:** the campaign runs on the item's plan BEFORE the code, and its
+  MUST-FIX list is answered BEFORE the commit. The panel does not replace the
+  suite and the suite does not replace the panel -- both, every item.
+* **Batching (default; override freely):** one campaign per item, EXCEPT items 2
+  and 3 may share one if they ship in one commit. Item 1 gets its own, no
+  exceptions -- it is the 90-minute prompt-and-plumbing change and is precisely
+  what a panel is for. Item 4 gets its own.
+* **Artifacts:** `docs/2026-08-05-<topic>/kibitz/` with the per-round
+  `input.md`, `driver_anchor.md`, reviewer files, `judgment.md`, `final.md`.
+  UTF-8, no BOM.
+
+Kibitz is CPU/API only and costs the operator nothing, so it never competes with
+work for the GPU -- but it does cost wall-clock. Four campaigns is real time on
+top of the ~2h40m of coding below. If the session runs short, finish FEWER items
+fully reviewed rather than more items unreviewed.
+
 ### 1. THE FIDELITY LANES ARE TOLD TO CARRY WORDS THEY ARE NEVER SHOWN (~90 min)
 
 The headline defect, and the one that manufactured "Arkham, Massachusetts" over
@@ -136,6 +175,20 @@ passes that ALL published).
 
 Record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
 `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
+
+## BATON -- 2026-08-04 final close (docs only)
+
+**Branch** `v2.0-alpha`, **HEAD `dcd5a53b` + this docs commit**, pushed, HEAD == origin.
+**No code touched, no suite run needed** -- this session changed `CLAUDE.md`,
+`docs/GO_FORWARD_PLAN.md` and `docs/HANDOFF_LOG.md` only, and none of them is
+executable. The last green suite stands: **8398 passed / 131 skipped / 1 xfailed**,
+Bug Bible green, at `dcd5a53b`.
+Working tree still carries the operator's own untracked `tmp/`, `kibitz/` and
+`config/profiles/otr_sbcov_*.json`, plus modified `config/profiles/otr_g4_wan_ti2v.json`
+and three `tmp/*.ps1` -- **all left alone, none staged.**
+
+One change only: the full-kibitz gate above, written into both the sprint plan and
+`CLAUDE.md` so the older two-strikes rule cannot override it.
 
 ## BATON -- 2026-08-04 late close
 

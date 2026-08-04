@@ -19,6 +19,21 @@
   manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only
   real ceiling is structural (the beat topology tops out near 1,520 spoken words), and a
   request beyond it simply delivers the closest performable episode.
+- **EVERY CODING ITEM GETS A FULL KIBITZ (operator directive 2026-08-04 -- hard, stands until
+  the operator withdraws it).** Operator: "for the next coding sprint be sure any coding work
+  has a full `/kibitz-plugin:kibitz` review." **FULL means the default four-round arc** --
+  r1 arc -> r2 coding -> r3 wiring -> r4 convergence, 8 external calls (two reviewers x four
+  rounds). Not a scoped tail, not one round, not a continuation receipt; a partial campaign
+  may never be reported as a full arc. **Invoke the PLUGIN skill by name:
+  `kibitz-plugin:kibitz`** -- `anthropic-skills:kibitz` is the older duplicate and is not what
+  the operator asked for. Panel is driver-aware: Claude drives from Cowork, so **Codex +
+  Antigravity** review and you do NOT launch a second `claude -p` lane against your own family.
+  Use the ComfyUI profile overlay already in the repo, `.kibitz/comfyui.local.md` (written
+  2026-07-11 -- regenerate with `kibitz/scripts/comfyui_profile.py` if the tree has moved past
+  it). You still write the code-grounded `driver_anchor.md` FIRST and remain the sole judge:
+  the panel proposes, Claude disposes, and every panel claim is checked against the real
+  Windows files before it is folded in. This RAISES the two-strikes rule below -- a first-try
+  root fix now gets a panel too. It is local, it is $0, and it costs a wait, not a budget.
 - **TWO STRIKES, THEN THE PANEL (operator directive 2026-07-14 -- hard).** You get **two**
   attempts to fix a given problem on your own. If the **third** attempt is about to begin --
   i.e. the same bug/failure survived two of your fixes -- you MUST `/kibitz` (local, $0,
@@ -26,8 +41,9 @@
   the model of the problem is wrong, and a third guess from the same wrong model just burns a
   live roll. The panel's job is to break your framing, not to bless your patch. You remain the
   judge: ground every panel claim against the real files and discard what does not survive.
-  (Supersedes the older "kibitz on EVERY live failure" habit -- a first-try root fix does not
-  need a panel; a third try always does.)
+  (This is the FLOOR and it never lapses -- a third try ALWAYS gets a panel. The 2026-08-04
+  directive above is stricter while it stands: coding work gets a full panel on the first
+  swing too. The older "kibitz on EVERY live failure" wording is what this replaced.)
 - **RIPPING AN LLM IS ALLOWED. A HOLE IN THE LEDGER IS NOT (operator directive 2026-07-14 --
   hard, non-negotiable).** Removing or repurposing an LLM pass is a legitimate and sometimes
   necessary hard decision. But the LEDGER MUST STILL BE FILLED COMPLETELY for downstream

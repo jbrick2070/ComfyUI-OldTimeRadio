@@ -3,6 +3,43 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 close -- HEAD dcd5a53b (v2.0-alpha) -- WINDOW HANDOFF (docs only)
+
+Did: took one operator directive and wired it into the two docs that can enforce
+  it. No code touched, no runs, no GPU.
+
+- **Operator directive: every coding item in the next sprint gets a FULL
+  `/kibitz-plugin:kibitz` review.** Full means the default four-round arc
+  (r1 arc -> r2 coding -> r3 wiring -> r4 convergence, 8 external calls), not a
+  scoped tail and not a continuation receipt.
+- **Written in TWO places on purpose.** GO_FORWARD "ON DECK" gets the gate with
+  its operational detail, and `CLAUDE.md` gets the directive itself -- because
+  the 2026-07-14 two-strikes rule explicitly says "a first-try root fix does not
+  need a panel", and CLAUDE.md wins over any handoff that disagrees. Left in
+  GO_FORWARD alone, the new gate would have LOST that conflict on any first-try
+  fix, which is most of this queue. The two-strikes rule is kept as the floor and
+  its parenthetical now points at the newer, stricter line instead of
+  contradicting it.
+- **Named the plugin skill exactly.** `kibitz-plugin:kibitz`, not the older
+  `anthropic-skills:kibitz` duplicate that would also answer to "/kibitz".
+- **Panel shape recorded:** Claude drives from Cowork, so the panel is Codex +
+  Antigravity -- the driver's own family is excluded, no second `claude -p` lane.
+- **Pointed the next window at the ComfyUI profile it already has.**
+  `.kibitz/comfyui.local.md` exists (22 KB, written 2026-07-11) and covers the
+  node contract, widget/`widgets_values` drift and `IS_CHANGED` -- the defect
+  classes this queue can actually produce. Flagged as possibly stale with the
+  regeneration command rather than assumed current.
+- **One judgment call, stated so it can be overridden:** default is one campaign
+  per queue item, with items 2 and 3 allowed to share one IF they ship in a
+  single commit. Item 1 (the 90-minute prompt-and-plumbing change) and item 4 get
+  their own. Also wrote down the honest trade -- four campaigns is real
+  wall-clock on top of ~2h40m of coding, so finish fewer items fully reviewed
+  rather than more items unreviewed.
+
+Current step: unchanged -- CODING (no GPU), the four-item queue in GO_FORWARD
+  "ON DECK", now gated on a full kibitz per item.
+Not now: D2 and the Shakespeare verbatim executor, both still parked.
+
 ## 2026-08-04 late -- HEAD 518e11c8 (v2.0-alpha) -- WINDOW HANDOFF
 
 Did: answered the operator's "what decision?", took both rulings, and closed the
