@@ -3,6 +3,48 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-03 22:15 -- HEAD c7f71b4f (v2.0-alpha) -- WINDOW CODER -> RENDER
+
+Did: resumed on the baton, took two operator rulings, and launched an overnight
+  Shakespeare run instead of coding.
+
+- **Operator ruling: `same_story_safety_cleanup` STAYS AS IS.** The repurpose to
+  ledger-format hygiene is deferred, not cancelled; the hard-won enumeration is
+  kept in GO_FORWARD but explicitly parked. Recorded the consequence: the
+  stage-direction-in-captions defect lost its planned owner and is now an open
+  defect. Noted the asymmetry in the operator's own report (markup reaches
+  CAPTIONS but not AUDIO), which points at a caption/TTS divergence downstream
+  of the ledger rather than unclean spoken rows -- so the repurpose may have
+  been the wrong fix for it regardless.
+- **Grounded the baton's enumeration before trusting it.** A name-grep finds the
+  pass in 7 node files and 8 test files, not the 9 and 12 the baton listed: five
+  named files never mention it, and `_otr_content_safety.py` +
+  `_otr_text_delivery.py` do and were missing. The list is the SFW authority the
+  pass SERVES, not a literal reference list. Written into GO_FORWARD so a future
+  revival does not strip the G9 ship-stop of its only remediation step.
+- **Read the 30-word sweep** (the prior baton's open item): 13/17 pass, 2 not
+  run. Four fail identically with "no new file in otr/obs" -- ltx_audio_in,
+  wan_ti2v, wan_i2v, viz_mxc_cpu -- all dying in 2.7-7.9 min against 7-43 min
+  for passing legs. `wan_ti2v` failing contradicts this plan's own section 8
+  ("production-proven"); resolve that contradiction before opening engine code.
+- **Reset the box selectively** (nothing to kill; MCP pythons spared, port
+  clear, VRAM 1369 MiB baseline) and launched `tmp/_sh_overnight.ps1`: five
+  320-word Shakespeare stills cycling all four still lanes with the visual style
+  rolled per leg, then 120-word Shakespeare video cheapest-first until a 07:30
+  cutoff. Validated the leg arguments with a `--dry-run` first. First leg
+  QUEUED and rendering at 22:11.
+
+Current step: overnight render in flight; coding resumes tomorrow.
+Next: read `tmp/_sh_overnight.log`; then the four identical engine failures;
+  then GO_FORWARD item (2) public_domain authenticity. Coder window owns all three.
+Models: Claude only (rung 4). No kibitz, no Codex, no roundtable spend.
+Commits: 8fb21597, c7f71b4f.
+
+Note for the next window: the session that produced a82460ec..5f315e70 (the
+  authentic-source work) never wrote its own entry here -- its record lives in
+  the GO_FORWARD baton instead. That is why this file skips from 350ab0f0 to
+  c7f71b4f, and part of why GO_FORWARD has grown to ~300 KB. It wants a trim.
+
 ## 2026-08-02/03 -- HEAD 350ab0f0 (v2.0-alpha) -- WINDOW RC (GPU, M1+M2+sweep)
 
 Did: answered M1 and M2 with measurements, fixed the campaign twice, published
