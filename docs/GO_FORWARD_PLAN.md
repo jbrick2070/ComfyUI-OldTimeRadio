@@ -106,42 +106,30 @@ Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
   and tests are correct; the GO_FORWARD entry in it describes the real change.
 
 
-### NEWBUG (live, 2026-08-03 22:27): A WHIFFED SHOT DIRECTIVE STRANDS A SCENE-INIT ENGINE
+### OPEN BUG (live, 2026-08-03 22:27): still_b007/b008 UNMATERIALIZED AT VIDEO DISPATCH
+### -- POSTMORTEM `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md` IS THE RECORD
 
-**PROD_BUG_LOG-eligible** -- verified by a live headless leg, not a static read.
-Leg `tmp/_sh_p1_still_motion_a.log`, prompt `14c8230d`, profile
-`otr_w45_still_motion`, 320 words, bank `shakespeare`. FAILED at 16.1 min:
+The original causal chain written here (whiff -> collapse guard -> no still ->
+scene-init fail) was DISPROVED by the 2026-08-04 postmortem: the 11-pass night
+logged 70 whiffs and 69 cast-time deferrals in episodes that ALL PUBLISHED, so
+both warnings are routine and neither strands a still. That chain came from a
+`b007|b008`-filtered grep -- the base rate refutes it. The candidate fix it
+proposed ("give the collapse guard a still owner") is WITHDRAWN; do not build it.
 
-    OTR_ImageGenDispatcher / ImageRenderError:
-      required scene image targets missing or unmaterialized before video
-      dispatch: still_b007, still_b008
+What stands: a stochastic ~1-in-6 failure of 320-word still legs where 2 of 21
+scene stills resolve but never materialize, and the completion gate (correctly)
+fails the episode closed. Branch algebra narrows the skip to
+`_assert_not_path` (`otr_image_gen_dispatcher.py:893`) or an unmapped exit; the
+per-object explanation was destroyed three ways (wire-only warnings, the raise
+discarding them, boot-log truncation). **Fix direction D1-D3 in the postmortem:
+observability first, then reproduce (~1-in-6), then fix the named branch. Do
+not weaken the gate; do not revive the portrait-init fallback.**
 
-Causal chain, all four links in `tmp/_w45_server.log`:
-
-1. `[OTR_ShotLock] writer LLM produced no usable directive for beat b007 after
-   2 reseeds; using deterministic template collapse guard` (same for b008).
-2. The collapse guard supplies a directive but **does NOT mint a scene still**.
-3. `still_motion` is static_motion-family = SCENE-INIT: `[OTR.render_driver]
-   ... has NO scene still in the ledger. NO portrait-init fallback (no-fallback
-   rip) -- a scene-init engine MUST have its per-beat scene still minted
-   upstream`.
-4. `OTR_ImageGenDispatcher` fails the whole episode closed.
-
-So the collapse guard and the no-fallback rip are individually correct and
-mutually incompatible: one is a soft recovery, the other refuses soft input.
-Nothing owns "the writer whiffed AND the engine requires a still".
-
-**Why it showed up now: beat count.** 320 words builds 19 beats (b000-b018,
-plus opening/closing music stills = 21 image targets). Every prior sweep ran 30
-or 45 words = ~7 beats. More beats, more independent chances for the writer to
-whiff, and ONE whiff on a scene-init engine kills the episode. This is very
-likely the same family as the four engines that fail "no new file in otr/obs" --
-check whether they are all scene-init before treating them as four bugs.
-
-**Do not fix by re-adding a portrait-init fallback** -- the no-fallback rip was
-deliberate. The candidate fix is to give the collapse guard an owner for the
-scene still (mint a deterministic one from the beat's own text), which keeps the
-rip intact. Enumerate the ledger fields before touching it.
+Also from the postmortem: the four 30w sweep failures are FOUR separate causes
+(two story-side rolls, the `wan_i2v` boot-env gap in `_otr_w45_boot.ps1`,
+`viz_mxc_cpu` uncharacterized) -- the section below on "four engines fail the
+same way" is superseded on that point. And the shakespeare bank ships EMPTY
+cast `appearance` strings -- feeds the roster work.
 
 ### NOT A BUG: "recursive fractal HuMo all slots" AS AN EPISODE TITLE (triaged 2026-08-03 22:4x)
 
