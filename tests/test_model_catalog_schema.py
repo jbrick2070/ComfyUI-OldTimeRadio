@@ -113,8 +113,19 @@ def _writer_creative_and_technical_slot_values(
         if n.get("type") != "OTR_LedgerScriptWriter":
             continue
         for v in n.get("widgets_values") or []:
-            if isinstance(v, str) and v in curated_ids:
-                out.append((n["id"], v))
+            if not isinstance(v, str) or not v:
+                continue
+            # NORMALIZE THE WAY THE RUNTIME DOES (2026-08-04). A saved widget
+            # value carries the picker's VRAM badge -- "google/gemma-4-12b-it
+            # (11.9 GB)" -- and the loader strips it via
+            # catalog._strip_label_suffix before resolving the row. Matching
+            # the RAW string here meant a correctly-badged value resolved to
+            # NO curated row, this helper returned empty, and the licence
+            # guard below stopped guarding anything. Its `assert bindings`
+            # is what caught that, which is the whole reason that line exists.
+            bare = catalog._strip_label_suffix(v)
+            if bare in curated_ids:
+                out.append((n["id"], bare))
     return out
 
 

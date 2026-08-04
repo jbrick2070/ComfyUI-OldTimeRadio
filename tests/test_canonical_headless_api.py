@@ -269,10 +269,17 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     # 2026-07-20: the canonical writer uses official Gemma4Unified on the
     # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
     # lane binds LMFE schema constraints; this is not the Q8 GGUF path.
+    #
+    # 2026-08-04: THE SIZE SUFFIX IS PART OF THE VALUE. The COMBO choice list
+    # is 'google/gemma-4-12b-it (11.9 GB)', so the bare id matched no choice:
+    # the operator saw both dropdowns render RED on opening the graph, and an
+    # unmatched COMBO can resolve to index 0 -- which on this widget is
+    # Mistral-Nemo. A graph that said Gemma could run Mistral. Asserted in
+    # full here so the suffix cannot be dropped again.
     assert writer["inputs"]["creative_writing_model"] == \
-        "google/gemma-4-12b-it"
+        "google/gemma-4-12b-it (11.9 GB)"
     assert writer["inputs"]["technical_model"] == \
-        "google/gemma-4-12b-it"
+        "google/gemma-4-12b-it (11.9 GB)"
     assert str(director["inputs"]["announcer_video_model"]).startswith("viz_")
 
 

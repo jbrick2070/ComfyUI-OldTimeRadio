@@ -71,8 +71,14 @@ class TestWriterCanonicalModelSlots:
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane, not the independent GGUF Q8 row whose
         # context downgrade motivated the earlier Mistral canvas pin.
-        expected_creative = "google/gemma-4-12b-it"
-        expected_technical = "google/gemma-4-12b-it"
+        # 2026-08-04: THE SIZE SUFFIX IS PART OF THE COMBO VALUE. The live
+        # choice list offers 'google/gemma-4-12b-it (11.9 GB)', so the bare id
+        # matched nothing: the operator reported both dropdowns rendering RED
+        # on opening the graph, and an unmatched COMBO can resolve to index 0
+        # of the list -- which here is Mistral-Nemo. The canvas said Gemma and
+        # could have run Mistral. Pinned in full so the suffix cannot be lost.
+        expected_creative = "google/gemma-4-12b-it (11.9 GB)"
+        expected_technical = "google/gemma-4-12b-it (11.9 GB)"
         assert widgets[3] == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "
             f"got {widgets[3]!r}."
