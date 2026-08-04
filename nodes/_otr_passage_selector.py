@@ -206,12 +206,20 @@ def eligible_windows(
     tolerance: float = 0.25,
     min_speakers: int = 2,
     beat_word_cap: int = BEAT_WORD_HARD_MAX,
+    min_words: int | None = None,
+    max_words: int | None = None,
 ) -> tuple[tuple[int, int], ...]:
     """Every contiguous window that fits the word, cast and beat budgets.
 
     Returned as (first_index, last_index) pairs, inclusive. A window's beat cost
     is the sum of each speech's own cost, so one long speech can consume several
     beats -- see ``beats_for_words``.
+
+    ``min_words`` / ``max_words`` override the tolerance band with explicit
+    inclusive bounds; ``max_words=None`` with ``min_words=0`` means "words do not
+    constrain this search at all", which is how the caller falls back when the
+    requested length cannot be met. Beats and cast are never relaxed -- those are
+    physical limits, not preferences.
     """
     if target_words <= 0:
         raise PassageError("target_words must be positive")
@@ -225,8 +233,12 @@ def eligible_windows(
             f"a passage needs at least one voiced beat per speech"
         )
 
-    low = target_words * (1.0 - tolerance)
-    high = target_words * (1.0 + tolerance)
+    low = target_words * (1.0 - tolerance) if min_words is None else float(min_words)
+    high = (
+        target_words * (1.0 + tolerance)
+        if max_words is None and min_words is None
+        else (float("inf") if max_words is None else float(max_words))
+    )
     found: list[tuple[int, int]] = []
     for start in range(len(speeches)):
         words = 0
@@ -288,12 +300,37 @@ def select_passage(
         beat_word_cap=beat_word_cap,
     )
     if not windows:
+        # The word target is a REQUEST, not a gate (operator ruling): never refuse
+        # a render because nothing landed inside the preferred band. Fall back to
+        # the windows that satisfy the HARD limits -- beats and cast, which are
+        # physical -- and take the one closest to the request. The passage is
+        # still verbatim; only its length drifts from what was asked.
+        windows = eligible_windows(
+            speeches,
+            target_words=target_words,
+            cast_ceiling=cast_ceiling,
+            max_beats=max_beats,
+            min_speakers=min_speakers,
+            beat_word_cap=beat_word_cap,
+            min_words=0,
+            max_words=None,
+        )
+        if windows:
+            def _distance(window: tuple[int, int]) -> tuple[int, int]:
+                first, last = window
+                words = sum(s.word_count for s in speeches[first:last + 1])
+                return (abs(words - target_words), first)
+
+            best = min(_distance(w) for w in windows)[0]
+            windows = tuple(w for w in windows if _distance(w)[0] == best)
+    if not windows:
+        # Nothing at all is performable: the source has no two-speaker exchange
+        # that fits even one beat budget. That is a broken source, not a budget
+        # disagreement, so it still raises.
         raise PassageError(
-            f"no passage of ~{target_words} words fits {max_beats} voiced "
-            f"beat(s) and {cast_ceiling} cast slot(s) in a {len(speeches)}-speech "
-            f"source. Raise the word budget -- more words buy more beats. Do not "
-            f"trim the source to fit and do not loosen the bounds to force a "
-            f"match; a passage stretched to fit is no longer the source's own."
+            f"no performable passage in a {len(speeches)}-speech source at "
+            f"{max_beats} voiced beat(s) and {cast_ceiling} cast slot(s) -- no "
+            f"window holds {min_speakers} speakers within the beat budget."
         )
     digest = hashlib.sha256(str(seed).encode("utf-8")).digest()
     first, last = windows[int.from_bytes(digest[:8], "big") % len(windows)]

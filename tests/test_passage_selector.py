@@ -109,11 +109,30 @@ class TestSelection:
         again = select_passage(text, seed="episode-a", **kwargs)
         assert (first.first_index, first.last_index) == (again.first_index, again.last_index)
 
-    def test_no_fitting_window_raises_rather_than_stretching(self):
-        with pytest.raises(PassageError, match="no passage of"):
+    def test_an_unreachable_word_target_still_returns_a_passage(self):
+        # The word target is a REQUEST, not a gate: asking for more words than
+        # the source can supply must not refuse the render. It returns the
+        # closest performable passage, still verbatim, just shorter.
+        passage = select_passage(
+            SAMPLE, target_words=5000, cast_ceiling=6, max_beats=3, seed="x",
+        )
+        assert passage.speech_count >= 2
+        assert passage.word_count > 0
+
+    def test_a_tiny_word_target_still_returns_a_passage(self):
+        passage = select_passage(
+            SAMPLE, target_words=1, cast_ceiling=6, max_beats=3, seed="x",
+        )
+        assert len(passage.speakers) >= 2
+
+    def test_a_source_with_no_performable_exchange_still_raises(self):
+        # A budget disagreement is not a failure; a source that cannot field two
+        # speakers within the beat budget is.
+        one_voice = "ORLANDO\nHang there, my verse.\n"
+        with pytest.raises(PassageError, match="no performable passage"):
             select_passage(
-                SAMPLE, target_words=5000, cast_ceiling=6,
-                max_beats=3, seed="x",
+                one_voice, target_words=100, cast_ceiling=6,
+                max_beats=14, seed="x",
             )
 
     def test_a_passage_needs_at_least_a_beat_per_speech(self):
