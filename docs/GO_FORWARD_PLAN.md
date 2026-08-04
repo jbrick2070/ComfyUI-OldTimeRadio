@@ -1,5 +1,94 @@
 # OTR Go-Forward Plan
 
+## BATON -- 2026-08-03 evening close
+
+**Branch** `v2.0-alpha`, **HEAD `9c4a0e20`**, pushed, HEAD == origin.
+**Suite 8374 passed / 131 skipped / 1 xfailed.** Bug Bible green earlier in session.
+Working tree clean apart from the operator's own pre-existing untracked files
+(`config/profiles/otr_sbcov_*.json`, `kibitz/`, `tmp/*`) -- **leave those alone.**
+
+### NEXT ACTION (start here)
+
+**Repurpose `same_story_safety_cleanup` from content policing to LEDGER FORMAT
+hygiene.** Operator's own idea and the right shape: the pass keeps its registry
+row, its freeze-cascade phase and its `meta["same_story_safety_cleanup"]` receipt,
+so there is NO ledger hole and no risky rip -- only the scan predicate and the
+patch prompt change. It also lands on a defect the operator hit tonight: stage
+directions and markup surviving into spoken rows ("lots of stage direction in the
+captions but not in the audio -- I don't know how it survives the ledger").
+
+New job: scan every spoken row for material that is not speech -- markdown
+markup, bracketed stage directions, leaked speaker labels, empty/malformed rows --
+and propose an atomic same-story patch removing ONLY that, never altering what a
+character says. Keep the existing hash-checked atomic apply.
+
+Enumeration already done, do not redo it. Nine consumers:
+`_otr_freeze_cascade` (:660 apply + :670 receipt + phase rows :311/:333/:359/:840),
+`_otr_ledger_cleanup` (:306-332, :466-472), `_otr_ledger_freeze` (:714-727, the
+**G9 terminal ship-stop**), `_otr_ledger_scrub` (:13, :239), `_otr_scifi_codex`
+(:2644-2731), `_otr_scifi_fable2` (:2627-2937), `_otr_public_domain_sources`
+(:570), `_otr_shakespeare_sources` (:603), `_otr_stage3_validators` (:123-128).
+Twelve test files assert on it, incl. exact-roster contracts:
+`test_bug_local_288_sfw_validator`, `test_fable2_artifacts`, `test_fable2_registry`,
+`test_fable2_source_windows`, `test_freeze_policy_readonly`, `test_g9_sfw_ship_stop`,
+`test_ledger_cleanup_contracts`, `test_ledger_cleanup_pass`,
+`test_ledger_merge_ownership`, `test_p5_repair_sees_every_defect`,
+`test_public_domain_interpreter`, `test_shakespeare_interpreter`.
+Registered as a pass twice in `nodes/story_packs/pipelines.json` (:187, :414).
+
+### THEN (2) public_domain authenticity
+
+`_otr_compose_exchange.py` has **ZERO** source references yet its pack says
+"Where the source gives these characters words, CARRY THEM" -- an instruction
+bound to an absent document, which is the prompt shape that manufactured
+"Arkham, Massachusetts" over H.G. Wells. Two legs, both required: deterministic
+world anchors (new manifest `world_line` + `anchor_terms` flowing through the
+existing `source_meta` / `key_terms` owners) AND a source-text window injected
+into the outline and exchange prompts through the seam that already exists
+(`OTR_LedgerScriptWriter.py:4943` resolves the pack string before passing it).
+Full craft brief incl. paste-ready prompt strings is in the 2026-08-03 session
+transcript. Two rules from it worth keeping: never name the feared failure
+(writing "no Arkham" implants it -- forbid by category), and every fidelity
+instruction must be PAIRED with the material it binds to.
+
+### THEN (3) the Shakespeare verbatim executor
+
+`nodes/_otr_passage_selector.py` has no production caller yet. Needs one shared
+`verbatim_play` runner registered in `_otr_lane_specs.LANE_SPECS`, ledger rows
+COMPILED from the passage rather than composed, and these four overwrite paths
+closed first: `run_post_script_spine` -> `strip_line_formatting` can rewrite
+spoken text; `custom_premise` (`:1738-1760`) bypasses the authenticated fetcher;
+the count-match invariant (`:4061-4067`) hard-raises when locked != requested
+cast; `compute_episode_budget` (`:4099-4104`) still reads the stale widget value.
+Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
+
+### OPEN OPERATOR DECISIONS
+
+* The **20 public_domain episodes** generated from the fabricated Wells fixture --
+  regenerate, relabel, or leave with the defect recorded? Not valid adaptation
+  evidence either way.
+* The **fabricated fixture** `public_domain_story/fixtures/time_machine_arrival.txt`
+  is still on disk, unreferenced, kept as evidence. Delete?
+* **Invention-lane SFW clauses** (`original`, `scifi_news`, `scifi_news_pro`) were
+  deliberately NOT touched -- they read as the show's own voice, not a conflict
+  with a source. Operator to say whether they go too.
+* `visual_style_policy` is schema-required on every scene and read by NO code,
+  and now contradicts the confirmed ruling that the randomized visual style
+  stays. Delete it in a coordinated schema migration (both validators + manifests
+  + tests together), do not wire it.
+
+### KNOWN RISKS
+
+* `canonicalize_*` still collapses all whitespace, so `payload["full_text"]` loses
+  the line boundaries `parse_speeches` needs -- the verbatim executor must load
+  raw text at the lane boundary and verify against the provenance SHA-256.
+* Midsummer (1/12) and Comedy of Errors (1/7) speakers remain ungendered; their
+  mechanics/servants use roster shapes not yet read. Recorded `unknown`, never
+  guessed. Operator is open to a vendor-time LLM/web lookup as the final tier.
+* Commit `106bfbcf` carries a duplicate of `d8752d69`'s message (my error). Code
+  and tests are correct; the GO_FORWARD entry in it describes the real change.
+
+
 **Newest update: 2026-08-03 (evening) -- THE ADAPTATION LANES WERE PERFORMING
 FICTION ABOUT REAL BOOKS. THEY NOW PERFORM THE BOOKS.**
 
