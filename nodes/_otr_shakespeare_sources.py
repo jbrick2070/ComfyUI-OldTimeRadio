@@ -132,11 +132,15 @@ def _require_bool(obj: dict[str, Any], key: str, origin: str) -> bool:
     return bool(val)
 
 
-def _require_int(obj: dict[str, Any], key: str, origin: str, *, min_value: int, max_value: int) -> int:
+def _require_int(obj: dict[str, Any], key: str, origin: str, *, min_value: int, max_value: int | None = None) -> int:
     val = obj.get(key)
     if not isinstance(val, int) or isinstance(val, bool):
         raise ShakespeareManifestError(f"{origin}: {key} must be an integer")
-    if val < min_value or val > max_value:
+    if val < min_value:
+        raise ShakespeareManifestError(
+            f"{origin}: {key} must be at least {min_value}"
+        )
+    if max_value is not None and val > max_value:
         raise ShakespeareManifestError(
             f"{origin}: {key} must be between {min_value} and {max_value}"
         )
@@ -172,7 +176,14 @@ def _validate_scene(raw: Any, origin: str) -> dict[str, Any]:
         "commercial_use_allowed": _require_bool(raw, "commercial_use_allowed", origin),
         "adapter_type": _require_str(raw, "adapter_type", origin),
         "recommended_word_budget": _require_int(
-            raw, "recommended_word_budget", origin, min_value=30, max_value=320
+            # No upper bound: this is a RECOMMENDATION the operator may
+            # exceed, and the word target is a request rather than a gate.
+            # A 320-word ceiling pinned these episodes at roughly two
+            # minutes, too short for the scenes worth vendoring. The real
+            # limit is structural, not declarative -- the beat topology
+            # tops out near 1,520 spoken words -- and a request beyond it
+            # simply delivers the closest performable episode.
+            raw, "recommended_word_budget", origin, min_value=30
         ),
         "cast_hints": _require_str_list(raw, "cast_hints", origin),
         "visual_style_policy": _require_str(raw, "visual_style_policy", origin),
@@ -269,6 +280,10 @@ def select_shakespeare_scene_ref(manifest: dict[str, Any], *, rng: Any | None = 
     except AttributeError:  # pragma: no cover -- defensive for minimal RNG shims
         scene = scenes[chooser.randrange(len(scenes))]
     return str(scene["source_ref"])
+
+
+# The interpreter reads the whole canonicalized body, not a prefix of it.
+INTERPRETER_TEXT_WINDOW: int = 12000
 
 
 def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
@@ -522,7 +537,15 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
             f"URL: {payload.get('link', '').strip()}",
             f"Synopsis: {payload.get('summary', '').strip()}",
             "Scene text:",
-            str(payload.get("full_text", ""))[:5000],
+        # The interpreter is the ONE pass that reads the source, and it is
+        # instructed to preserve the ending -- so a window shorter than the
+        # canonicalized body means it is asked to preserve an ending it
+        # cannot see. The Wells arrival unit is 11,410 bytes against a
+        # 5,000-char window: the press ridicule, "Story be damned!" and the
+        # closing image of listeners' faces in the dark all fell outside it.
+        # canonicalize_* already caps the body at INTERPRETER_TEXT_WINDOW,
+        # so this reads whatever survived that cap and truncates nothing further.
+            str(payload.get("full_text", ""))[:INTERPRETER_TEXT_WINDOW],
         )
         if part
     )

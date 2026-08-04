@@ -4303,18 +4303,31 @@ class OTR_LedgerScriptWriter:
             # get different shapes -> the smoke distribution is not single-
             # valued). Stamped on meta["arc_shape"] (additive) and passed into
             # the dramatic-state derivation to steer prompt/validator/fallback.
-            try:
-                _arc_style_seed = os.environ.get("OTR_STYLE_SEED", "").strip()
-                _arc_news_hash = str(
-                    (meta.get("news") or {}).get("source_hash") or ""
-                )
-                _arc_seed = (
-                    _arc_style_seed + "|" + _arc_news_hash
-                    + "|" + str((meta.get("news") or {}).get("script_brief") or "")[:64]
-                )
-                _arc_shape = _pick_arc_shape(_arc_seed)
-            except Exception:  # noqa: BLE001 -- never break audio
-                _arc_shape = ""
+            # ADAPTATION lanes do not roll an arc. The source already made that
+            # choice, and a rolled shape actively steers the dramatic-state
+            # prompt AWAY from it -- "ARC SHAPE: heist" was injected over a man
+            # demonstrating a time machine, and "betrayal" over a courtship
+            # comedy, both reaching the listener through the credits scroll.
+            # Gated on style_pool_class rather than the scaffold switch: bank
+            # `original` is scaffold-off precisely so it can invent freely, and
+            # its genre variety is wanted. This class is stamped well before
+            # this point and is true ONLY for shakespeare + public_domain.
+            _arc_lane_rolls = str(meta.get("style_pool_class") or "") != "adaptation"
+            _arc_shape = ""
+            if _arc_lane_rolls:
+                try:
+                    _arc_style_seed = os.environ.get("OTR_STYLE_SEED", "").strip()
+                    _arc_news_hash = str(
+                        (meta.get("news") or {}).get("source_hash") or ""
+                    )
+                    _arc_seed = (
+                        _arc_style_seed + "|" + _arc_news_hash
+                        + "|"
+                        + str((meta.get("news") or {}).get("script_brief") or "")[:64]
+                    )
+                    _arc_shape = _pick_arc_shape(_arc_seed)
+                except Exception:  # noqa: BLE001 -- never break audio
+                    _arc_shape = ""
             if _arc_shape:
                 meta["arc_shape"] = _arc_shape
             # F2 (story-engine v1): the costly choice must land on a

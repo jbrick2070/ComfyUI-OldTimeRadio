@@ -2,6 +2,23 @@
 **Operator directives -- these win over any handoff, doc, or memory that disagrees.**
 - **Fix bugs properly, at the root cause -- never a shim or band-aid.** Don't wait for me to
   fix anything: make the fix yourself, without asking. If it works, it's fine.
+- **NO CONTENT GUARDRAILS ON GENERATED EPISODES (operator directive 2026-08-03 -- supersedes
+  the older "no curse words anywhere / SFW always" line for EPISODE CONTENT).** Operator:
+  "we [have] too [many] guardrails, no violence or swearing guardrails, they just cause
+  problems" and "I've given up chasing profanity." Do not add profanity or violence filtering
+  to the generation path, and do not reintroduce prompt clauses that forbid the source's own
+  content -- the adaptation packs were literally instructing the model to avoid "blood, guns,
+  knives, and graphic violence" while adapting MACBETH and KING LEAR, which is a fidelity
+  defect, not a safety win. On the adaptation lanes the author's own language is carried as
+  written; Wells' Editor may shout "Story be damned!" because Wells wrote it.
+  **Still true, and a different thing:** authoring style stays clean -- no curse words in
+  CODE, COMMENTS, LOGS or commit messages, and never the name "dummy". That rule is about what
+  WE write, not about what the pipeline generates from a source.
+- **NO WORD-COUNT CHASING (operator directive 2026-08-03).** "We never chase word count."
+  The target words value is a REQUEST, not a gate: no refusals, no hard caps, no shunts. The
+  manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only
+  real ceiling is structural (the beat topology tops out near 1,520 spoken words), and a
+  request beyond it simply delivers the closest performable episode.
 - **TWO STRIKES, THEN THE PANEL (operator directive 2026-07-14 -- hard).** You get **two**
   attempts to fix a given problem on your own. If the **third** attempt is about to begin --
   i.e. the same bug/failure survived two of your fixes -- you MUST `/kibitz` (local, $0,
