@@ -1457,6 +1457,492 @@
           "text_path": "sources/oz_wicked_witch.txt"
         }
       ]
+    },
+    {
+      "source_id": "gertrude_governess",
+      "title": "Nonsense Novels",
+      "author": "Stephen Leacock",
+      "year": "1911",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/4682/pg4682.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "melodramatic",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "Gertrude",
+        "Lord Ronald",
+        "the Earl of Nosh"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Gertrude the Governess",
+          "synopsis": "A Victorian romance played entirely straight while every cliche collides, and Lord Ronald rides madly off in all directions.",
+          "text_path": "sources/gertrude_governess.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "defective_detective",
+      "title": "Nonsense Novels",
+      "author": "Stephen Leacock",
+      "year": "1911",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/4682/pg4682.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "deadpan",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "the Great Detective",
+        "the Prime Minister"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Maddened by Mystery, or The Defective Detective",
+          "synopsis": "A Great Detective deduces everything wrong with absolute confidence, escalating through disguises.",
+          "text_path": "sources/defective_detective.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "buggam_grange",
+      "title": "Winsome Winnie and Other New Nonsense Novels",
+      "author": "Stephen Leacock",
+      "year": "1920",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/20633/pg20633.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "portentous",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "Horrod the butler",
+        "the phantasm"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Buggam Grange: A Good Old Ghost Story",
+          "synopsis": "Every ghost-story trope announced solemnly and then overdone by ten percent, sinister butler included.",
+          "text_path": "sources/buggam_grange.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "miss_mix",
+      "title": "Condensed Novels",
+      "author": "Bret Harte",
+      "year": "1867",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/2277/pg2277.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "lurid",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Miss Mix",
+        "Mr. Rawjester",
+        "the housekeeper"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Miss Mix, by Ch--l--tte Br--nte",
+          "synopsis": "Jane Eyre compressed to its tropes: a governess swoons over a man's rudeness and a burning house, unaware any of it is odd.",
+          "text_path": "sources/miss_mix.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "mote_middle_distance",
+      "title": "A Christmas Garland",
+      "author": "Max Beerbohm",
+      "year": "1912",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/14667/pg14667.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "fussy",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Keith Tantalus",
+        "Eva",
+        "the narrator"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Mote in the Middle Distance (after Henry James)",
+          "synopsis": "Two children decide whether to peek at their Christmas stockings, narrated in full late-James syntax.",
+          "text_path": "sources/mote_middle_distance.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "pc_x_36",
+      "title": "A Christmas Garland",
+      "author": "Max Beerbohm",
+      "year": "1912",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/14667/pg14667.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "jaunty",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Constable X 36",
+        "Santa Claus",
+        "the narrator"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "P.C., X, 36 (after Kipling)",
+          "synopsis": "A tough Kipling copper arrests Santa Claus coming down the chimney, and books him.",
+          "text_path": "sources/pc_x_36.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "cannibalism_in_the_cars",
+      "title": "Sketches New and Old",
+      "author": "Mark Twain",
+      "year": "1868",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/3189/pg3189.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "solemn",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "the courtly stranger",
+        "Mr. Bascom",
+        "Mr. Gaston"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Cannibalism in the Cars",
+          "synopsis": "Snowbound passengers apply full parliamentary procedure to deciding whom to eat, with amendments.",
+          "text_path": "sources/cannibalism_in_the_cars.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "journalism_in_tennessee",
+      "title": "Sketches New and Old",
+      "author": "Mark Twain",
+      "year": "1871",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/3189/pg3189.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "unflappable",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the new associate editor",
+        "the chief editor",
+        "armed callers"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Journalism in Tennessee",
+          "synopsis": "The chief editor calmly revises copy while being shot, bombed and scalped by aggrieved readers.",
+          "text_path": "sources/journalism_in_tennessee.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "stolen_white_elephant",
+      "title": "The Stolen White Elephant",
+      "author": "Mark Twain",
+      "year": "1882",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/3181/pg3181.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "procedural",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the Siamese functionary",
+        "Inspector Blunt",
+        "the detectives"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Stolen White Elephant",
+          "synopsis": "Detectives mount a full procedural manhunt for an elephant that is in the cellar the whole time.",
+          "text_path": "sources/stolen_white_elephant.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "canterville_ghost",
+      "title": "The Canterville Ghost",
+      "author": "Oscar Wilde",
+      "year": "1887",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/14522/pg14522.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "impish",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the Ghost",
+        "Mr. Otis",
+        "Mrs. Otis",
+        "the twins",
+        "Virginia"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Canterville Ghost",
+          "synopsis": "An American family moves into a haunted house and offers the ghost lubricator for his clanking chains.",
+          "text_path": "sources/canterville_ghost.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "tobermory",
+      "title": "The Chronicles of Clovis",
+      "author": "Saki",
+      "year": "1911",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/3688/pg3688.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "catty",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Tobermory",
+        "Mr. Appin",
+        "Lady Blemley",
+        "Mrs. Cornett"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Tobermory",
+          "synopsis": "A cat learns English at a house party and repeats aloud what everyone has been saying privately.",
+          "text_path": "sources/tobermory.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "pigs_is_pigs",
+      "title": "Pigs Is Pigs",
+      "author": "Ellis Parker Butler",
+      "year": "1905",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/2004/pg2004.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "exasperated",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Flannery",
+        "Mr. Morehouse",
+        "the head-office clerk"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Pigs Is Pigs",
+          "synopsis": "An express agent insists two guinea pigs are livestock-rate pigs, and they multiply while head office answers by memo.",
+          "text_path": "sources/pigs_is_pigs.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "great_sermon_handicap",
+      "title": "The Inimitable Jeeves",
+      "author": "P. G. Wodehouse",
+      "year": "1923",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/59254/pg59254.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "breezy",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Bertie Wooster",
+        "Jeeves",
+        "Bingo Little",
+        "Steggles"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Great Sermon Handicap",
+          "synopsis": "Racing-form argot applied to rural clergy, complete with a betting card on the local vicars.",
+          "text_path": "sources/great_sermon_handicap.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "water_ghost",
+      "title": "The Water Ghost and Others",
+      "author": "John Kendrick Bangs",
+      "year": "1891",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/8377/pg8377.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "practical",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the water ghost",
+        "the heir of Harrowby",
+        "the narrator"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Water Ghost of Harrowby Hall",
+          "synopsis": "A dripping ghost haunts on schedule and is defeated by engineering, having first lodged her complaints.",
+          "text_path": "sources/water_ghost.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "told_after_supper",
+      "title": "Told After Supper",
+      "author": "Jerome K. Jerome",
+      "year": "1891",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/1993/pg1993.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "tipsy",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "the uncle",
+        "the doctor",
+        "the curate"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Told After Supper",
+          "synopsis": "The Christmas ghost-story ritual itself parodied, each narrator tipsier than the last.",
+          "text_path": "sources/told_after_supper.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "munchausen",
+      "title": "The Surprising Adventures of Baron Munchausen",
+      "author": "Rudolf Erich Raspe",
+      "year": "1785",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/3154/pg3154.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "braggart",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Baron Munchausen",
+        "a credulous listener"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Baron's tallest tales",
+          "synopsis": "A horse tied to a church steeple, half a horse drinking forever, and a post-horn that thaws out its tunes.",
+          "text_path": "sources/munchausen.txt"
+        }
+      ]
     }
   ]
 }

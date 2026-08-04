@@ -35,8 +35,13 @@ def test_the_library_is_actually_stocked():
     authors = {s["author"] for s in sources}
     assert len(authors) >= 20, f"only {len(authors)} distinct authors"
     # The point of the bank is variety; one author must not dominate it.
+    # PROPORTIONAL, not a fixed cap: the first version allowed 3, which was
+    # sensible at 28 sources and wrong at 64 -- it would have blocked a fourth
+    # Twain that is 6% of the shelf. Share is what "dominate" actually means.
     counts = collections.Counter(s["author"] for s in sources)
-    assert counts.most_common(1)[0][1] <= 3
+    author, top = counts.most_common(1)[0]
+    assert top <= max(3, len(sources) // 8), (
+        f"{author} holds {top} of {len(sources)} sources")
 
 
 def test_the_authentic_wells_survives_a_manifest_regeneration():

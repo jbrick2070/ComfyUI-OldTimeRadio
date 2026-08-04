@@ -386,6 +386,138 @@ WORKS: list[dict] = [
          cast=["Dorothy", "the Wicked Witch of the West", "the Lion",
                "the Scarecrow", "the Tin Woodman"]),
 
+    # ----------------------------------------------------------------- #
+    # THIRD PASS: COMEDY, and specifically PARODY. The library had drifted
+    # heavily toward doom -- ghosts, apocalypse, cosmic dread -- and could
+    # not draw funny. Weird Al's method is the target: take a form everyone
+    # knows and play it dead straight while it goes ridiculous.
+    #
+    # The best of it is the STRAIGHT/PARODY PAIRING: the bank already owns
+    # the originals, so it can draw Jane Eyre one night and Harte's "Miss
+    # Mix" the next, The Speckled Band then Leacock's Defective Detective,
+    # Turn of the Screw then Beerbohm's Henry James pastiche, Kipling then
+    # the Kipling story where a policeman arrests Santa Claus. The existing
+    # doom is what makes the parodies land.
+    #
+    # Headings below are quoted BYTE-FOR-BYTE from the etexts, including
+    # the ones carrying curly quotes -- _norm_punct straightens both sides.
+    # ----------------------------------------------------------------- #
+    dict(slug="gertrude_governess", gid=4682, title="Nonsense Novels",
+         author="Stephen Leacock", year="1911",
+         chunk=("story", "Gertrude the Governess:", "A Hero in Homespun:"),
+         tag="melodramatic",
+         label="Gertrude the Governess",
+         synopsis="A Victorian romance played entirely straight while every cliche collides, and Lord Ronald rides madly off in all directions.",
+         cast=["the narrator", "Gertrude", "Lord Ronald", "the Earl of Nosh"]),
+    dict(slug="defective_detective", gid=4682, title="Nonsense Novels",
+         author="Stephen Leacock", year="1911",
+         chunk=("story", "Maddened by Mystery:", "A Psychic Pstory of the Psupernatural"),
+         tag="deadpan",
+         label="Maddened by Mystery, or The Defective Detective",
+         synopsis="A Great Detective deduces everything wrong with absolute confidence, escalating through disguises.",
+         cast=["the narrator", "the Great Detective", "the Prime Minister"]),
+    dict(slug="buggam_grange", gid=20633, title="Winsome Winnie and Other New Nonsense Novels",
+         author="Stephen Leacock", year="1920",
+         chunk=("story", "BUGGAM GRANGE", "THE END"), tag="portentous",
+         label="Buggam Grange: A Good Old Ghost Story",
+         synopsis="Every ghost-story trope announced solemnly and then overdone by ten percent, sinister butler included.",
+         cast=["the narrator", "Horrod the butler", "the phantasm"]),
+    dict(slug="miss_mix", gid=2277, title="Condensed Novels", author="Bret Harte",
+         year="1867",
+         chunk=("story", "MISS MIX.", "GUY HEAVYSTONE;"), tag="lurid",
+         label="Miss Mix, by Ch--l--tte Br--nte",
+         synopsis="Jane Eyre compressed to its tropes: a governess swoons over a man's rudeness and a burning house, unaware any of it is odd.",
+         cast=["Miss Mix", "Mr. Rawjester", "the housekeeper"]),
+    dict(slug="mote_middle_distance", gid=14667, title="A Christmas Garland",
+         author="Max Beerbohm", year="1912",
+         chunk=("story", "THE MOTE IN THE MIDDLE DISTANCE", "P.C., X, 36"),
+         tag="fussy",
+         label="The Mote in the Middle Distance (after Henry James)",
+         synopsis="Two children decide whether to peek at their Christmas stockings, narrated in full late-James syntax.",
+         cast=["Keith Tantalus", "Eva", "the narrator"]),
+    dict(slug="pc_x_36", gid=14667, title="A Christmas Garland",
+         author="Max Beerbohm", year="1912",
+         chunk=("story", "P.C., X, 36", "OUT OF HARM'S WAY"), tag="jaunty",
+         label="P.C., X, 36 (after Kipling)",
+         synopsis="A tough Kipling copper arrests Santa Claus coming down the chimney, and books him.",
+         cast=["Constable X 36", "Santa Claus", "the narrator"]),
+    dict(slug="cannibalism_in_the_cars", gid=3189, title="Sketches New and Old",
+         author="Mark Twain", year="1868",
+         # The body heading carries a "--[Written about ...]" suffix; the bare
+         # title appears ONLY in the table of contents, so dropping the suffix
+         # sliced 29 words of TOC instead of the sketch.
+         # BOTH anchors need their full form. The bare end title matched
+         # nothing, so the all-caps fallback fired and stopped at the first
+         # shouted line of convention dialogue, 259 words in.
+         chunk=("story", "CANNIBALISM IN THE CARS--[Written about 1867.]",
+                'THE KILLING OF JULIUS CAESAR "LOCALIZED"--[Written about 1865.]'),
+         tag="solemn",
+         label="Cannibalism in the Cars",
+         synopsis="Snowbound passengers apply full parliamentary procedure to deciding whom to eat, with amendments.",
+         cast=["the narrator", "the courtly stranger", "Mr. Bascom", "Mr. Gaston"]),
+    dict(slug="journalism_in_tennessee", gid=3189, title="Sketches New and Old",
+         author="Mark Twain", year="1871",
+         # Note the missing period inside the closing bracket -- sic, that is
+         # what the etext contains.
+         chunk=("story", "JOURNALISM IN TENNESSEE--[Written about 1871.]",
+                "THE STORY OF THE BAD LITTLE BOY--[Written about 1865]"),
+         tag="unflappable",
+         label="Journalism in Tennessee",
+         synopsis="The chief editor calmly revises copy while being shot, bombed and scalped by aggrieved readers.",
+         cast=["the new associate editor", "the chief editor", "armed callers"]),
+    dict(slug="stolen_white_elephant", gid=3181, title="The Stolen White Elephant",
+         author="Mark Twain", year="1882",
+         chunk=("whole",), tag="procedural",
+         label="The Stolen White Elephant",
+         synopsis="Detectives mount a full procedural manhunt for an elephant that is in the cellar the whole time.",
+         cast=["the Siamese functionary", "Inspector Blunt", "the detectives"]),
+    dict(slug="canterville_ghost", gid=14522, title="The Canterville Ghost",
+         author="Oscar Wilde", year="1887",
+         chunk=("whole",), tag="impish", max_words=25000,
+         label="The Canterville Ghost",
+         synopsis="An American family moves into a haunted house and offers the ghost lubricator for his clanking chains.",
+         cast=["the Ghost", "Mr. Otis", "Mrs. Otis", "the twins", "Virginia"]),
+    dict(slug="tobermory", gid=3688, title="The Chronicles of Clovis", author="Saki",
+         year="1911",
+         chunk=("story", "TOBERMORY", "MRS. PACKLETIDE'S TIGER"), tag="catty",
+         label="Tobermory",
+         synopsis="A cat learns English at a house party and repeats aloud what everyone has been saying privately.",
+         cast=["Tobermory", "Mr. Appin", "Lady Blemley", "Mrs. Cornett"]),
+    dict(slug="pigs_is_pigs", gid=2004, title="Pigs Is Pigs",
+         author="Ellis Parker Butler", year="1905",
+         chunk=("whole",), tag="exasperated",
+         label="Pigs Is Pigs",
+         synopsis="An express agent insists two guinea pigs are livestock-rate pigs, and they multiply while head office answers by memo.",
+         cast=["Flannery", "Mr. Morehouse", "the head-office clerk"]),
+    dict(slug="great_sermon_handicap", gid=59254, title="The Inimitable Jeeves",
+         author="P. G. Wodehouse", year="1923",
+         chunk=("story", "THE GREAT SERMON HANDICAP", "THE PURITY OF THE TURF"),
+         tag="breezy",
+         label="The Great Sermon Handicap",
+         synopsis="Racing-form argot applied to rural clergy, complete with a betting card on the local vicars.",
+         cast=["Bertie Wooster", "Jeeves", "Bingo Little", "Steggles"]),
+    dict(slug="water_ghost", gid=8377, title="The Water Ghost and Others",
+         author="John Kendrick Bangs", year="1891",
+         chunk=("story", "THE WATER GHOST OF HARROWBY HALL",
+                "THE SPECTRE COOK OF BANGLETOP"), tag="practical",
+         label="The Water Ghost of Harrowby Hall",
+         synopsis="A dripping ghost haunts on schedule and is defeated by engineering, having first lodged her complaints.",
+         cast=["the water ghost", "the heir of Harrowby", "the narrator"]),
+    dict(slug="told_after_supper", gid=1993, title="Told After Supper",
+         author="Jerome K. Jerome", year="1891",
+         chunk=("story", "INTRODUCTORY", "INTERLUDE--THE DOCTOR'S STORY"),
+         tag="tipsy",
+         label="Told After Supper",
+         synopsis="The Christmas ghost-story ritual itself parodied, each narrator tipsier than the last.",
+         cast=["the narrator", "the uncle", "the doctor", "the curate"]),
+    dict(slug="munchausen", gid=3154,
+         title="The Surprising Adventures of Baron Munchausen",
+         author="Rudolf Erich Raspe", year="1785",
+         chunk=("chapters", 2, 6), tag="braggart",
+         label="The Baron's tallest tales",
+         synopsis="A horse tied to a church steeple, half a horse drinking forever, and a post-horn that thaws out its tunes.",
+         cast=["Baron Munchausen", "a credulous listener"]),
+
     dict(slug="beleaguered_city", gid=11521, title="A Beleaguered City",
          author="Margaret Oliphant", year="1880",
          chunk=("chapters", 2, 3), tag="processional",
@@ -561,7 +693,11 @@ _PG_LEGACY_END = re.compile(
     re.IGNORECASE | re.MULTILINE)
 _PG_CREDIT_LINES = re.compile(
     r"^[ \t]*(?:Produced by .*|Transcriber'?s? Note.*|"
-    r"Updated editions will replace.*|.*Distributed Proofread.*)$",
+    r"Updated editions will replace.*|.*Distributed Proofread.*|"
+    # An editorial aside that sits just BELOW the start marker, so header
+    # trimming steps over it. Caught by the leak guard on The Canterville
+    # Ghost rather than by anyone reading the file.
+    r"Note:\s*Project Gutenberg.*)$",
     re.IGNORECASE | re.MULTILINE)
 
 
