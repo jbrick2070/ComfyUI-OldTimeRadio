@@ -106,6 +106,35 @@ Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
   and tests are correct; the GO_FORWARD entry in it describes the real change.
 
 
+### NOT A BUG: "recursive fractal HuMo all slots" AS AN EPISODE TITLE (triaged 2026-08-03 22:4x)
+
+Operator hit a published episode whose title card read `=== SIGNAL LOST ===` /
+`"recursive fractal HuMo all slots"` and asked, correctly in principle, why the
+visual style was defining the episode title. **It was not.** Ledger of
+`otr/episodes/signal_lost_recursive_fractal_humo_all_slots_20260709_043822`:
+
+    episode_title  : recursive fractal HuMo all slots
+    title_source   : user           <-- hand-supplied, not derived
+    visual_style   : recur_frac
+    style          : call_in_show_confession_spiral
+
+`title_source: user` is the answer: a 2026-07-09 style-by-engine matrix passed
+`--title` to label the CONFIG under test (siblings: `..._scene_still`,
+`..._word_still_f/l/z`). `visual_style` stayed `recur_frac` and never reached the
+title. The code is correct too -- `otr_credits_roll.py:276` uses
+`meta.episode_title` as the hero and `visual_style` only feeds the meta strip,
+which is the 2026-08-03 ruling ("the credits should show the source bank").
+**Do not "fix" the title path. There is nothing wrong with it.**
+
+**The REAL defect is placement, and it is open.** Seven config-labelled bench
+episodes from 2026-07-08/09 are sitting in `otr/obs/` -- the PUBLISHED
+deliverables tree (CLAUDE.md section 6: obs is deliverables only). That is how a
+test artifact reaches a viewer, which is exactly how the operator met this one.
+Next window: audit `otr/obs/` for episodes whose `meta.title_source == "user"`,
+and decide with the operator whether they move to a bench tier or are deleted.
+A `title_source` check is the cheap, exact discriminator -- do not pattern-match
+on names.
+
 ### THE 30-WORD SWEEP IS READ -- 13/17, AND FOUR ENGINES FAIL THE SAME WAY
 
 Closes the prior baton's open "read the sweep results" item. Source:
