@@ -147,6 +147,13 @@ def write_source(
     text_path = root / f"{stem}.txt"
     sidecar_path = root / f"{stem}.provenance.json"
 
+    # Newlines are normalized to LF BEFORE hashing, and the bytes are written
+    # without platform translation. Gutenberg serves CRLF; git normalizes line
+    # endings on commit and may hand a clone something different again. A
+    # provenance hash that a checkout can invalidate would be worse than no
+    # hash at all -- it would fail exactly when someone tried to verify an
+    # attribution. Canonical LF makes the digest stable on every platform.
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
     body_bytes = body.encode("utf-8")
     digest = hashlib.sha256(body_bytes).hexdigest()
 
