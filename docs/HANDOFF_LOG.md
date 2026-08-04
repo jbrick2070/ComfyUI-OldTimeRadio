@@ -30,10 +30,30 @@ Note: `test_public_domain_interpreter::test_empty_cast_is_rejected_and_retried_t
   That is the PRE-EXISTING ordering pollution already recorded in GO_FORWARD, not
   this change.
 
-Current step: unchanged -- D2, reproduce the still-skip at 320 words.
-Next: the non-commercial notice reaches no printed surface; then public_domain
-  authenticity (`_otr_compose_exchange` still has zero source references); then
-  the Shakespeare verbatim executor.
+- **Operator directive, late: NO RUNS, CODING SESSIONS.** "I don't think we need
+  any runs right now, I want coding sessions" + "I need about 2-3 hours of coding
+  on deck". D2 is PARKED (render task) and GO_FORWARD's ON DECK section was
+  rewritten as a ~2h40m non-GPU coding queue, every item verified against the
+  real files first rather than copied forward from the old next-actions list.
+- **Verifying that queue corrected one stale item and found one new defect.**
+  The "credits roll twice as fast" task is ALREADY DONE -- `_SCROLL_PPS` was
+  doubled 60 -> 120 on 08-03 (`otr_credits_roll.py:76-88`), taking a measured
+  49.2 s tail to ~28.1 s; it was removed from the queue rather than planned
+  again. NEW: both fidelity packs end their forbid-list with a dangling `,.`
+  (`faithful_radio_adaptation.json:13`, `folger_scene_adaptation.json:13`) --
+  residue from the 08-03 guardrail rip, where the clause went and its comma
+  stayed. Live prompt text, now queued as item 3.
+- Also re-confirmed for the queue: `_otr_compose_exchange.py` has literally ZERO
+  hits for `source_text|full_text|source_meta|excerpt` across 994 lines, while
+  both packs order the model to CARRY the author's words.
+
+Current step: CODING (no GPU). Queue in GO_FORWARD "ON DECK": (1) fidelity
+  source-window + world anchors ~90m, (2) non-commercial notice to printed
+  credits ~30m, (3) dangling-comma prompt residue ~10m, (4) test-ordering
+  pollution ~30m. Bench: 3 failing vendor works (needs a fetch), IS_CHANGED,
+  log retention.
+Not now: D2 and the Shakespeare verbatim executor (multi-session, gated on the
+  ownership table).
 
 ## 2026-08-04 16:0x -- HEAD cec758c3 (v2.0-alpha) -- WINDOW CODER + RENDER
 

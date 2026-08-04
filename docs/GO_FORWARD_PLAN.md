@@ -1,53 +1,141 @@
 # OTR Go-Forward Plan
 
-## ON DECK -- START HERE
+## ON DECK -- A CODING SESSION, ~2h40m (operator directive 2026-08-04)
 
-**D2: reproduce the still-skip.** It is a RENDER task, not a coding task -- the
-code you need already shipped. Reset per AGENTS.md section 4, boot headless, and
-run **320-word `public_domain` or `shakespeare` still legs until one fails**
-(~1 in 6). Three legs on 08-04 all published, which at that rate is a ~58%
-chance of zero -- so the bug is neither confirmed nor cleared, and only more
-legs settle it.
+**NO RENDER RUNS THIS SESSION.** The operator wants coding, not GPU time:
+"I don't think we need any runs right now, I want coding sessions." **D2 is
+PARKED** -- it is a render task and it waits. Do not boot the headless server,
+do not reset the box, do not start a leg. The D2 brief is preserved further down
+under "PARKED -- D2" for whenever renders resume.
 
-**Either outcome is a valid result. Accept BOTH:**
-* a **publish** -- another clean leg, bank the sample, keep rolling; or
-* a **fail-closed with complete evidence** -- that is the PROOF D1 WORKS, and it
-  is the outcome you actually want. Do not treat it as a setback.
+Everything below was verified against the real files on 2026-08-04, is
+non-GPU, and is provable by the suite alone. Work them in order; each ends
+green and pushed on its own.
 
-When it fails, the server log now names the branch itself: arm, token, index,
-canonical `prompt_hash` and a repr-escaped excerpt centred on the match, plus a
-compact JSON `MISSING_TARGET` record emitted BEFORE the raise (the canonical
-runner truncates the exception at 500 chars, `scripts/otr_api.py:749`). The log
-survives the next boot -- `scripts/_otr_rotate_log.ps1` rotates instead of
-truncating. Read the record, then D3 fixes THAT branch at its root: either where
-the separator enters the prompt, or by making the predicate detect real paths
-rather than any separator. `PROD_BUG_LOG.md` gets its entry then -- a mechanism,
-not a guess.
+### 1. THE FIDELITY LANES ARE TOLD TO CARRY WORDS THEY ARE NEVER SHOWN (~90 min)
+
+The headline defect, and the one that manufactured "Arkham, Massachusetts" over
+H. G. Wells. Both fidelity packs order the model to carry the author's language:
+
+* `nodes/story_packs/public_domain/faithful_radio_adaptation.json:13`
+  (`exchange_system`) -- "Where the source gives these characters words, CARRY
+  THEM. Keep their diction, their rhythm, their argument."
+* `nodes/story_packs/shakespeare/folger_scene_adaptation.json:13` -- the same
+  instruction in the Folger voice.
+
+And `nodes/_otr_compose_exchange.py` (994 lines) has **ZERO** references to
+`source_text`, `full_text`, `source_meta` or `excerpt` -- verified by grep, count
+is literally 0. **The instruction is bound to an absent document.** A model told
+to carry words it cannot see will invent words and believe it complied. That is
+the whole mechanism.
+
+Two legs, BOTH required -- one without the other just moves the guess:
+
+**(a) Put the source text in front of the composer.** The window threads
+`build_exchange_prompt` (`:292`, with `_grounding_pool` at `:270`) <-
+`compose_exchange` (`:550`) <- `run_exchange_prepass` (`:881`) <-
+`OTR_LedgerScriptWriter`. The material already exists and already arrives: the
+payload carries `full_text`, PROVEN on 2026-08-04 when 1,988 words of authentic
+Wells reached `fetch_public_domain_source` through the production seam. Nothing
+needs fetching -- it needs passing.
+
+**(b) Deterministic world anchors.** New manifest `world_line` + `anchor_terms`
+flowing through the EXISTING `source_meta` / `key_terms` owners
+(`OTR_LedgerScriptWriter.py:1725`, `:1807`, `:1888`), so place and era arrive as
+FACT rather than as something the model reconstructs from a 2-3 sentence brief.
+
+**Two rules from the 08-03 craft brief, both hard-won, both easy to violate:**
+1. **Never name the feared failure.** Writing "no Arkham" into a prompt IMPLANTS
+   Arkham. Forbid by CATEGORY, never by example.
+2. **Every fidelity instruction must be PAIRED with the material it binds to.**
+   An unpaired "carry the words" is the bug, not the fix.
+
+**Ceiling to be honest about:** this can be built and unit-tested here, but its
+real proof is a render, and renders are parked. Ship it green and UNPROVEN, and
+say so in the handoff. Do not write "fixed" where "built, not yet proven on a
+leg" is the truth.
+
+### 2. THE NON-COMMERCIAL NOTICE REACHES NO HUMAN SURFACE (~30 min)
+
+Fully scoped, ledger-clean, and the smallest real win on the board.
+`nodes/OTR_LedgerScriptWriter.py:3590` stamps `meta["noncommercial_notice"]` (via
+`_otr_provenance.noncommercial_notice`, `:124`) and logs it. **Nothing renders
+it.** `nodes/otr_credits_roll.py:516` reads only `credits_source_line`.
+
+Add a sibling printed-credits item beside that block -- `:516-518` is the exact
+three-line shape to copy -- plus an integration test. The ledger field already
+exists and already has an owner, so this adds a CONSUMER, not a field: no
+ownership question to answer. Fires on Folger sources.
+
+### 3. THE GUARDRAIL RIP LEFT A DANGLING COMMA IN BOTH PROMPTS (~10 min)
+
+Found 2026-08-04 while reading the packs for item 1. Both forbid-lists end mid-
+sentence with a stray `,.`:
+
+* public_domain: `"Do NOT introduce a new protagonist, unrelated framing story,
+  changed ending,."`
+* shakespeare: `"Do NOT introduce a modern mystery, new protagonist, unrelated
+  framing story,."`
+
+That is residue from the 08-03 removal of the "blood, guns, knives, and graphic
+violence" clause -- the item was deleted, its comma was not. It is not cosmetic:
+this is a LIVE prompt string a model reads on every fidelity episode, and a
+sentence that stops at a dangling comma reads as truncated instruction. Close
+both sentences. Do NOT restore the removed clause -- the rip was the operator's
+directive and it stands.
+
+### 4. THE TEST-ORDERING POLLUTION (~30 min)
+
+`tests/test_public_domain_sources.py` pollutes
+`tests/test_public_domain_interpreter.py::test_empty_cast_is_rejected_and_retried_to_failure`.
+Confirmed 2026-08-04: fails when the two run adjacently, passes **11/11** when
+the interpreter file runs alone, invisible in full-suite order. Pre-existing --
+already proven by stashing and reproducing at the prior commit.
+
+Worth the half hour because it costs a real signal: any targeted run touching
+those two files reports a red line that has to be re-diagnosed as benign every
+time. Find the leaked module/global state, isolate it with a fixture, and delete
+the standing footnote.
+
+### BENCH -- only if the four above land early
+
+* **The three works that refuse to vendor:** `ghost_ship` (gid 11045),
+  `purple_cloud` (11229), `beleaguered_city` (11521) --
+  `scripts/otr_vendor_public_domain_library.py:303/341/542`, unusual heading
+  formats against the parser at `:594-686`. **Needs one Gutenberg fetch**, so it
+  is not purely offline; take it only if a fetch is acceptable.
+* `OTRImageGenDispatcher` has no `IS_CHANGED` while depending on external file
+  existence.
+* Rotated server logs have no retention policy.
+
+**Do NOT start the Shakespeare verbatim executor in this session.** It is a
+multi-session structural change gated on the ownership table
+(`docs/2026-08-03-fidelity-pass-ownership.md`) with four overwrite paths to close
+first, and starting it half-way is worse than not starting it.
+
+## PARKED -- D2 (resume when the operator wants renders again)
+
+Reset per AGENTS.md section 4, boot headless, run **320-word `public_domain` or
+`shakespeare` still legs until one fails** (~1 in 6). Three legs on 08-04 all
+published, which at that rate is a ~58% chance of zero -- neither confirmed nor
+cleared.
+
+**Either outcome is valid.** A publish is a clean leg; a **fail-closed with
+complete evidence is the PROOF D1 WORKS** and is the outcome you want. When it
+fails the server log names the branch itself -- arm, token, index, canonical
+`prompt_hash`, repr-escaped excerpt -- plus a compact JSON `MISSING_TARGET`
+record emitted BEFORE the raise (the canonical runner truncates the exception at
+500 chars, `scripts/otr_api.py:749`). The log survives reboot;
+`scripts/_otr_rotate_log.ps1` rotates instead of truncating. D3 then fixes THAT
+branch at its root and `PROD_BUG_LOG.md` gets a mechanism, not a guess.
 
 **Do NOT:** weaken the completion gate, revive the portrait-init fallback, or
-rebuild the withdrawn "give the collapse guard a still owner" fix. The 08-04
-postmortem disproved that chain -- 70 whiffs and 69 cast-time deferrals across
-11 passes that ALL published, so both warnings are routine.
+rebuild the withdrawn "give the collapse guard a still owner" fix -- the 08-04
+postmortem disproved that chain (70 whiffs and 69 cast-time deferrals across 11
+passes that ALL published).
 
-Full record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md` and
+Record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
 `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
-
-### IF YOU WANT A CODING TASK INSTEAD (D2 needs the GPU)
-
-**The non-commercial notice reaches no human surface.** Smallest real win on the
-board, and fully scoped: `OTR_LedgerScriptWriter.py:3590` stamps
-`meta["noncommercial_notice"]`, and NOTHING renders it --
-`nodes/otr_credits_roll.py:516` reads only `credits_source_line`. Add a sibling
-printed-credits item right beside that block (`:516-518` is the exact shape to
-copy) plus an integration test. Ledger field exists and is owned; only the
-printed consumer is missing. Fires on Folger sources.
-
-Then, in order: **public_domain authenticity** (`_otr_compose_exchange.py` has
-ZERO source references while its pack orders the model to carry the author's
-words -- the prompt shape that manufactured "Arkham, Massachusetts" over Wells),
-then **the Shakespeare verbatim executor** (`_otr_passage_selector.py` still has
-no production caller; four overwrite paths must close first -- see the 08-03
-baton below).
 
 ## BATON -- 2026-08-04 late close
 
