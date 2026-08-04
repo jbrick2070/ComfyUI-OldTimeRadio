@@ -56,7 +56,6 @@ _SCENE_KEYS = frozenset({
     "adapter_type",
     "recommended_word_budget",
     "cast_hints",
-    "visual_style_policy",
     "text_path",
 })
 _ADAPTER_TYPES = frozenset({"curated_scene_text", "folger_txt", "folger_xml"})
@@ -186,7 +185,6 @@ def _validate_scene(raw: Any, origin: str) -> dict[str, Any]:
             raw, "recommended_word_budget", origin, min_value=30
         ),
         "cast_hints": _require_str_list(raw, "cast_hints", origin),
-        "visual_style_policy": _require_str(raw, "visual_style_policy", origin),
         "text_path": _require_str(raw, "text_path", origin),
     }
     if scene["adapter_type"] not in _ADAPTER_TYPES:
@@ -408,7 +406,6 @@ def source_meta_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
         "year": scene["year"],
         "recommended_word_budget": scene["recommended_word_budget"],
         "cast_hints": list(scene["cast_hints"]),
-        "visual_style_policy": scene["visual_style_policy"],
     }
 
 

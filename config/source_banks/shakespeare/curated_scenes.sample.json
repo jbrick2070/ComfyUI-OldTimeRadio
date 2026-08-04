@@ -22,7 +22,6 @@
         "Banquo",
         "First Witch"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/macbeth__act1_scene3.txt"
     },
     {
@@ -46,7 +45,6 @@
         "Miranda",
         "Ariel"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/tempest__act1_scene2.txt"
     },
     {
@@ -70,7 +68,6 @@
         "Ferdinand",
         "Prospero"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/tempest__act3_scene1.txt"
     },
     {
@@ -94,7 +91,6 @@
         "Titania",
         "Puck"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/midsummer__act3_scene1.txt"
     },
     {
@@ -119,7 +115,6 @@
         "Lysander",
         "Demetrius"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/midsummer__act3_scene2.txt"
     },
     {
@@ -143,7 +138,6 @@
         "Olivia",
         "Malvolio"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/twelfth_night__act1_scene5.txt"
     },
     {
@@ -167,7 +161,6 @@
         "Maria",
         "Toby"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/twelfth_night__act2_scene5.txt"
     },
     {
@@ -191,7 +184,6 @@
         "Don Pedro",
         "Claudio"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/much_ado__act2_scene3.txt"
     },
     {
@@ -215,7 +207,6 @@
         "Hero",
         "Ursula"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/much_ado__act3_scene1.txt"
     },
     {
@@ -239,7 +230,6 @@
         "Celia",
         "Orlando"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/as_you_like_it__act3_scene2.txt"
     },
     {
@@ -263,7 +253,6 @@
         "Marcellus",
         "Barnardo"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/hamlet__act1_scene1.txt"
     },
     {
@@ -287,7 +276,6 @@
         "Cordelia",
         "Kent"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/king_lear__act1_scene1.txt"
     },
     {
@@ -310,7 +298,6 @@
         "Romeo",
         "Juliet"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/romeo_juliet__act2_scene2.txt"
     },
     {
@@ -334,7 +321,6 @@
         "Dromio",
         "Adriana"
       ],
-      "visual_style_policy": "derive_from_source",
       "text_path": "sources/comedy_errors__act3_scene1.txt"
     }
   ]

@@ -57,7 +57,6 @@ _SOURCE_KEYS = frozenset({
     "search_tags",
     "recommended_word_budget",
     "cast_hints",
-    "visual_style_policy",
     "units",
 })
 _UNIT_KEYS = frozenset({"unit_id", "label", "synopsis", "text_path"})
@@ -193,7 +192,6 @@ def _validate_source(raw: Any, origin: str) -> dict[str, Any]:
             raw, "recommended_word_budget", origin, min_value=30
         ),
         "cast_hints": _require_str_list(raw, "cast_hints", origin),
-        "visual_style_policy": _require_str(raw, "visual_style_policy", origin),
     }
     if source["license_status"] not in _LICENSE_STATUSES:
         raise PublicDomainManifestError(
@@ -415,7 +413,6 @@ def source_meta_from_unit(resolved: PublicDomainUnit) -> dict[str, Any]:
         "unit_label": unit["label"],
         "recommended_word_budget": source["recommended_word_budget"],
         "cast_hints": list(source["cast_hints"]),
-        "visual_style_policy": source["visual_style_policy"],
     }
 
 

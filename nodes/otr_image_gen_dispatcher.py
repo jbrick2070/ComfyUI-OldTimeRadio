@@ -219,7 +219,9 @@ _IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 def path_guard_arm(prompt: str) -> "dict | None":
     """Which arm of the path guard a prompt trips, or ``None`` if it is clean.
 
-    Returns ``{arm, token, index, excerpt, prompt_len, prompt_sha1_12}``.
+    Returns ``{arm, token, index, excerpt, prompt_len, prompt_hash}``, where
+    ``prompt_hash`` is the dispatcher's canonical sha256 (``_prompt_content_hash``)
+    so the evidence joins the ledger's field of the same name.
 
     Split out of ``_assert_not_path`` (2026-08-04) because the guard's own
     verdict was unrecoverable: it raised one generic sentence and the caller
@@ -274,13 +276,17 @@ def _assert_not_path(prompt: str) -> None:
     """Fail-closed prompt-STRING vs path-STRING guard (PASS-IMG SHOULD-FIX)."""
     hit = path_guard_arm(prompt)
     if hit is not None:
-        raise ValueError(
+        exc = ValueError(
             "OTR_ImageGenDispatcher: image prompt looks like a PATH, not prompt "
             "text (arm=%s token=%r at index %d of %d; excerpt %s); the "
             "prompt-STRING and path-STRING sockets must not be crossed"
             % (hit["arm"], hit["token"], hit["index"], hit["prompt_len"],
                hit["excerpt"])
         )
+        # Carry the structured verdict on the exception so the caller does not
+        # have to re-run the predicate (and its hash) to recover it.
+        exc.path_guard_hit = hit
+        raise exc
 
 
 def _coerce_pixels(result, *, min_bytes: int = _MIN_PNG_BYTES,
@@ -976,13 +982,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # reached the server log. A 320-word leg lost two stills here and
             # the evidence was gone by the time anyone looked.
             warnings.append(f"{oid}: {exc}")
-            hit = path_guard_arm(prompt) or {}
+            # `exc` already carries the guard's verdict; reuse it rather than
+            # re-running the (pure) predicate and its hash a second time.
+            hit = getattr(exc, "path_guard_hit", None) or {}
             skip_evidence_by_oid[oid] = dict(hit, reason="prompt_path_guard",
                                              role=role, engine_id=engine_id)
             log.warning(
                 "[OTR_ImageGenDispatcher] SKIP %s (role=%s engine=%s): prompt "
                 "tripped the path guard -- arm=%s token=%r at index %s of %s, "
-                "prompt_sha1=%s, excerpt %s. NO still generated.",
+                "prompt_hash=%s, excerpt %s. NO still generated.",
                 oid, role, engine_id, hit.get("arm"), hit.get("token"),
                 hit.get("index"), hit.get("prompt_len"),
                 hit.get("prompt_hash"), hit.get("excerpt"))
@@ -1219,9 +1227,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     status = "no_row"
                 elif oid not in this_dispatch_ids:
                     status = "historical_row_only"
-                elif not path:
-                    status = "dead_path"
                 else:
+                    # Row was appended this dispatch but its file is empty or
+                    # absent -- one status, whichever of the two it is.
                     status = "dead_path"
                 missing_targets.append({
                     "object_id": oid, "status": status, "path": path,

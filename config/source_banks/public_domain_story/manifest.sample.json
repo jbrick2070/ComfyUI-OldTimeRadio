@@ -21,7 +21,6 @@
         "traveler",
         "skeptical witness"
       ],
-      "visual_style_policy": "derive_from_source",
       "units": [
         {
           "unit_id": "arrival",

@@ -137,11 +137,22 @@ rem The caller's log path is unchanged -- eight harnesses read exactly %1.
 rem If the rotation FAILS (a locked log), we append to the old file and say so
 rem rather than truncating it: losing evidence must be loud, and it must never
 rem kill a boot.
+rem SUCCESS IS TESTED BY OUTCOME, NOT BY EXIT CODE. `if errorlevel N` is a
+rem SIGNED >= test, and `powershell -File <missing path>` exits -196608 -- a
+rem NEGATIVE code, which `if errorlevel 1` reads as SUCCESS. Trusting it meant
+rem that a missing rotate script would silently truncate the prior log: the very
+rem bug this rotation exists to prevent, via its own missing-dependency path.
+rem Asking "is the old log still there?" is immune to every exit-code quirk.
 set _OTR_ROT_FAILED=
 if exist "%~1" (
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0otr_rotate_log.ps1" "%~1"
-  if errorlevel 1 set _OTR_ROT_FAILED=1
+  if exist "%~dp0otr_rotate_log.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0otr_rotate_log.ps1" "%~1"
+  ) else (
+    echo [launch] rotate helper missing at "%~dp0otr_rotate_log.ps1"
+  )
 )
+rem Still present => rotation did not happen, whatever the reason.
+if exist "%~1" set _OTR_ROT_FAILED=1
 if not defined _OTR_ROT_FAILED type nul > "%~1"
 if defined _OTR_ROT_FAILED echo [launch] LOG ROTATION FAILED -- prior log could not be moved; this run is APPENDED below and the earlier content is preserved above.>> "%~1"
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
@@ -152,7 +163,7 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   --disable-metadata ^
   %_OTR_RESERVE% ^
   %_OTR_VERBOSE% ^
-  >> "%1" 2>&1
+  >> "%~1" 2>&1
 rem --disable-metadata (2026-06-12): the core V3 SaveGLB node (mesh_stage) does
 rem `if cls.hidden.prompt is not None:` -- but cls.hidden is None when the node
 rem runs via OTR's in-process wrapper_bridge (ComfyUI only injects the hidden

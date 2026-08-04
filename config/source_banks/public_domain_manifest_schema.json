@@ -18,7 +18,6 @@
     "search_tags",
     "recommended_word_budget",
     "cast_hints",
-    "visual_style_policy",
     "units"
   ],
   "unit_required_keys": [

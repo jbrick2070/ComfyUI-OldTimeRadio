@@ -204,14 +204,20 @@ def test_evidence_is_keyed_not_substring_matched(tmp_path):
             != by_id["still_b12"]["evidence"]["prompt_hash"])
 
 
-def test_extension_arm_is_unreachable_once_the_safety_clause_is_appended():
+def test_extension_arm_is_near_unreachable_once_the_safety_clause_is_appended():
     """A finding, pinned so it is not rediscovered.
 
     `dispatch_images` runs `append_visual_safety_clause` BEFORE the guard, and
-    that helper appends text. So a prompt ending in '.png' no longer ends in
-    '.png' by the time the guard sees it: inside the dispatcher the
-    `extension_suffix` arm cannot fire. It remains reachable for direct callers
-    of the guard, which is why the arm still exists and is still tested."""
+    that helper normally appends text -- so a prompt ending in '.png' no longer
+    ends in '.png' by the time the guard sees it, and the `extension_suffix` arm
+    effectively cannot fire inside the dispatcher. Practically this means the
+    live suspect for the 2026-08-03 incident was a SEPARATOR arm.
+
+    NOT absolute, and the exception is pinned below: the helper is idempotent
+    and returns the text UNCHANGED when the clause is already present, so a
+    prompt that already carries it and still ends in an image extension does
+    reach the guard intact. The arm therefore stays live, and stays tested.
+    """
     from nodes._otr_story_brief_helpers import append_visual_safety_clause
 
     raw = "a portrait of the radio host.png"
@@ -220,6 +226,11 @@ def test_extension_arm_is_unreachable_once_the_safety_clause_is_appended():
     dispatched = append_visual_safety_clause(raw)
     assert not dispatched.lower().endswith(".png")
     assert disp.path_guard_arm(dispatched) is None
+
+    # The idempotent short-circuit: clause already present AND an image tail.
+    already = (dispatched.rstrip(", ") + ", a portrait of the radio host.png")
+    assert append_visual_safety_clause(already) == already
+    assert disp.path_guard_arm(already)["arm"] == "extension_suffix"
 
 
 def test_skip_is_logged_at_skip_time_not_only_on_the_wire(tmp_path, caplog):

@@ -38,6 +38,12 @@ try {
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($Path)
     $ext  = [System.IO.Path]::GetExtension($Path)
     if ([string]::IsNullOrEmpty($ext)) { $ext = '.log' }
+    # A bare filename ("server.log") has no directory component, and
+    # Join-Path THROWS on an empty -Path -- which would make rotation fail
+    # forever for that caller shape instead of just once. Resolve it against
+    # the current directory, the same place the caller's own relative path
+    # would land.
+    if ([string]::IsNullOrEmpty($dir)) { $dir = (Get-Location).Path }
 
     # Sortable, locale-independent, millisecond resolution. %DATE%/%TIME% are
     # locale-dependent and contain '/' and ':' on many locales, which are
