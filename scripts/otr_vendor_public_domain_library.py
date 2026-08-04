@@ -360,6 +360,32 @@ WORKS: list[dict] = [
          label="The War Savings Committee",
          synopsis="A witch disrupts a wartime committee meeting, and the minutes do not know what to do with her.",
          cast=["the Witch", "Sarah Brown", "two committee ladies"]),
+    # ----------------------------------------------------------------- #
+    # Operator picks. Buck Rogers' first appearance (1928, public domain --
+    # the ID was VERIFIED by fetch: three plausible neighbouring ids turned
+    # out to be Yeats, Lafferty and Vonnegut), and more Oz, because one
+    # chapter of Baum was too thin a presence for the show's warmest world.
+    # ----------------------------------------------------------------- #
+    dict(slug="buck_rogers", gid=32530, title="Armageddon 2419 A.D.",
+         author="Philip Francis Nowlan", year="1928",
+         chunk=("chapters", 1, 2), tag="pulp",
+         label="Anthony Rogers wakes in 2419",
+         synopsis="A surveyor is sealed in a mine by radioactive gas and wakes nearly five centuries later into an occupied America.",
+         cast=["Anthony Rogers", "Wilma Deering", "a Han patrol"]),
+    dict(slug="oz_cyclone", gid=55, title="The Wonderful Wizard of Oz",
+         author="L. Frank Baum", year="1900",
+         chunk=("chapters", 1, 2), tag="fable",
+         label="The cyclone and the Munchkins",
+         synopsis="A cyclone carries a Kansas farmhouse into a country of Munchkins, and it lands on somebody.",
+         cast=["Dorothy", "Aunt Em", "the Good Witch of the North", "a Munchkin"]),
+    dict(slug="oz_wicked_witch", gid=55, title="The Wonderful Wizard of Oz",
+         author="L. Frank Baum", year="1900",
+         chunk=("chapters", 12, 12), tag="fable",
+         label="The search for the Wicked Witch",
+         synopsis="The Witch of the West sends wolves, crows, bees and winged monkeys, and is undone by a bucket of water.",
+         cast=["Dorothy", "the Wicked Witch of the West", "the Lion",
+               "the Scarecrow", "the Tin Woodman"]),
+
     dict(slug="beleaguered_city", gid=11521, title="A Beleaguered City",
          author="Margaret Oliphant", year="1880",
          chunk=("chapters", 2, 3), tag="processional",

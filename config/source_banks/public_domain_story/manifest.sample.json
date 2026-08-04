@@ -1364,6 +1364,99 @@
           "text_path": "sources/living_alone.txt"
         }
       ]
+    },
+    {
+      "source_id": "buck_rogers",
+      "title": "Armageddon 2419 A.D.",
+      "author": "Philip Francis Nowlan",
+      "year": "1928",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/32530/pg32530.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "pulp",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Anthony Rogers",
+        "Wilma Deering",
+        "a Han patrol"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Anthony Rogers wakes in 2419",
+          "synopsis": "A surveyor is sealed in a mine by radioactive gas and wakes nearly five centuries later into an occupied America.",
+          "text_path": "sources/buck_rogers.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "oz_cyclone",
+      "title": "The Wonderful Wizard of Oz",
+      "author": "L. Frank Baum",
+      "year": "1900",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/55/pg55.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "fable",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Dorothy",
+        "Aunt Em",
+        "the Good Witch of the North",
+        "a Munchkin"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The cyclone and the Munchkins",
+          "synopsis": "A cyclone carries a Kansas farmhouse into a country of Munchkins, and it lands on somebody.",
+          "text_path": "sources/oz_cyclone.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "oz_wicked_witch",
+      "title": "The Wonderful Wizard of Oz",
+      "author": "L. Frank Baum",
+      "year": "1900",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/55/pg55.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "fable",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Dorothy",
+        "the Wicked Witch of the West",
+        "the Lion",
+        "the Scarecrow",
+        "the Tin Woodman"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The search for the Wicked Witch",
+          "synopsis": "The Witch of the West sends wolves, crows, bees and winged monkeys, and is undone by a bucket of water.",
+          "text_path": "sources/oz_wicked_witch.txt"
+        }
+      ]
     }
   ]
 }
