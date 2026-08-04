@@ -193,6 +193,17 @@ def resolve_creative_system_prompt(
             f"unknown creative phase {phase!r}; expected one of "
             f"{sorted(_MODERN_BY_PHASE)}"
         )
+    # The picker's VRAM badge is part of the widget value the graph now saves,
+    # so normalize BEFORE the lookup -- the same strip the loader performs.
+    # Done as a rebind rather than inline so the lookup below stays the exact
+    # `rows.get(repo_id)` idiom this module is pinned on: still one exact dict
+    # access keyed on a full repo_id, never substring dispatch.
+    #
+    # Behaviourally a no-op today: no curated row carries prompt_profile
+    # 'otr_1940s_v1', so the period branch cannot fire either way. This is
+    # hardening -- the moment such a row is added, a badged binding would
+    # otherwise lose its period voice in silence.
+    repo_id = _otr_model_catalog._strip_label_suffix(str(repo_id or ""))
     rows = {m.repo_id: m for m in _otr_model_catalog.CURATED_LLM_MODELS}
     row = rows.get(repo_id)
     if row is not None and row.prompt_profile == "otr_1940s_v1":

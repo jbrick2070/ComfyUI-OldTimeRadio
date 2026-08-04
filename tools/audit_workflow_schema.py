@@ -151,6 +151,27 @@ class WorkflowSchemaError(RuntimeError):
     Sprint D D3 license-equivalence or prompt-profile gate."""
 
 
+def _strip_badge(value: str) -> str:
+    """Drop the picker's VRAM badge from a saved widget value.
+
+    Deliberately NOT taken from ``catalog_module``: that parameter exists so
+    tests can inject a FAKE catalog, and a fake has rows but no label helpers.
+    Reaching through it for the stripper broke exactly that injection. The
+    badge is a label convention, so it is stripped here, and the real
+    catalog's implementation is preferred when it can be imported.
+    """
+    s = str(value or "")
+    try:
+        import sys as _sys
+        repo_root = Path(__file__).resolve().parent.parent
+        if str(repo_root) not in _sys.path:
+            _sys.path.insert(0, str(repo_root))
+        from nodes import _otr_model_catalog as _cat  # noqa: PLC0415
+        return _cat._strip_label_suffix(s)
+    except Exception:  # noqa: BLE001 -- an audit tool must not die on import
+        return s.rsplit(" (", 1)[0].rstrip() if s.endswith(")") and " (" in s else s
+
+
 def check_default_workflow_creative_binding(
     workflow_json: dict, catalog_module=None,
 ) -> list[str]:
@@ -191,9 +212,20 @@ def check_default_workflow_creative_binding(
         # We don't try to be clever about widget-index -- if it's a
         # repo_id, it's bound to a slot (creative or technical).
         for v in widgets:
-            if not (isinstance(v, str) and v in rows_by_id):
+            if not isinstance(v, str) or not v:
                 continue
-            row = rows_by_id[v]
+            # NORMALIZE THE WAY THE RUNTIME DOES (2026-08-04). A saved widget
+            # value carries the picker's VRAM badge --
+            # "google/gemma-4-12b-it (11.9 GB)" -- and the loader strips it
+            # before resolving the row. Matching the RAW string meant a
+            # correctly-badged binding matched no curated row and this gate
+            # inspected NOTHING: a non-mit_equivalent model could ship
+            # default-bound and the licence check would pass in silence. The
+            # same blindness was found in the test-side helper.
+            bare = _strip_badge(v)
+            if bare not in rows_by_id:
+                continue
+            v, row = bare, rows_by_id[bare]
             if row.license_audit_status != "mit_equivalent":
                 violations.append(
                     f"writer node id={n.get('id')} binds {v!r} "
