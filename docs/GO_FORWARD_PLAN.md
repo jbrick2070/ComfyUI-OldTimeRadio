@@ -1,5 +1,99 @@
 # OTR Go-Forward Plan
 
+## BATON -- 2026-08-04 close
+
+**Branch** `v2.0-alpha`, **HEAD `cec758c3`**, pushed, HEAD == origin.
+**Suite 8398 passed / 131 skipped / 1 xfailed.** Bug Bible green.
+Working tree clean apart from the operator's own untracked `tmp/`, `kibitz/`
+and `config/profiles/otr_sbcov_*.json` -- **leave those alone.**
+
+### WHAT LANDED TODAY
+
+* **The public-domain bank went from ONE book to 65 sources / 50 authors**
+  (1605-2026). It had two faults, not one: an empty shelf AND no selector at
+  all -- a blank `source_ref` fell through to the pinned default, and
+  `selection_mode` was read only by the Shakespeare lane. Both fixed.
+  `scripts/otr_vendor_public_domain_library.py` is resumable and reports every
+  failure by name.
+* **PROVEN ON REAL RENDERS (16:00):** three 320-word `public_domain` still legs
+  drew THREE DIFFERENT works -- `queer_feet`, `pigs_is_pigs`,
+  `kipling_wireless` -- 3/3 published, Gemma writing, styles rolled
+  independently. That closes "why is it always The Time Machine".
+* **`visual_style_policy` RIPPED.** Schema-required, read by no code, and the
+  cause of a Folger comedy rendering `archival_documentary`. Removed from both
+  loaders, both key sets, the schema and both manifests in one change --
+  `_check_unknown_keys` rejects unknown keys, so a half migration hard-fails.
+* **Licence text moved out of the drama.** The provenance normalizer was
+  switched OFF for every bank, so the announcer read "CC BY-NC 3.0" aloud. Now
+  on for both fidelity banks: spoken line names the source only, licence rides
+  the printed credit, and `noncommercial_notice` warns on Folger.
+* **D1 observability** on the silent still-skip; **the canonical graph's writer
+  model binding** fixed (saved value lacked the VRAM badge, so the graph said
+  Gemma and could have run Mistral); **two copies of the licence guard**
+  un-blinded (both matched raw strings while the runtime strips the badge).
+
+### NEXT ACTIONS, in order
+
+1. **D2 -- reproduce the still-skip.** Did NOT fire in three legs; at ~1-in-6
+   that is a ~58% chance of zero, so it is neither confirmed nor cleared. Run
+   more 320-word still legs. The instrumentation is in place and the failure
+   will now name its own branch, token, index, prompt hash and excerpt in the
+   server log, and that log survives the next boot.
+2. **The non-commercial notice reaches no human surface.** Confirmed by the
+   Codex panel: `OTR_LedgerScriptWriter` stamps `meta["noncommercial_notice"]`
+   and logs it, but `otr_credits_roll.py` renders only `credits_source_line`.
+   Add it as a separate printed credits item + an integration test.
+3. **public_domain authenticity** (unchanged, still item 2 from yesterday):
+   `_otr_compose_exchange.py` has ZERO source references while its pack tells
+   the model to carry the author's words.
+4. **The Shakespeare verbatim executor** -- `_otr_passage_selector.py` still
+   has no production caller.
+
+### OPEN DEFECTS (recorded, not fixed)
+
+* Three works still refuse to vendor and fail BY NAME rather than silently:
+  `ghost_ship`, `purple_cloud`, `beleaguered_city` (unusual heading formats).
+* `rows_by_object` is built from the historical `images` list, not `ep_rows`,
+  so a stale row whose file still exists satisfies the completion gate. Real;
+  deferred because fixing it changes WHICH episodes fail (D3, not D1).
+* `OTRImageGenDispatcher` has no `IS_CHANGED` while depending on external file
+  existence.
+* `test_public_domain_sources` pollutes
+  `test_public_domain_interpreter::test_empty_cast_is_rejected_and_retried_to_failure`
+  in some orderings. PRE-EXISTING -- proven by stashing today's work and
+  reproducing at the prior commit. Invisible in full-suite order.
+* Rotated server logs have no retention policy.
+
+### OPERATOR RULINGS MADE TODAY (hard)
+
+* **No new gates.** "I don't want any gates, it works or fails." The Codex
+  recommendation to wire the licence check into both production validators as
+  a hard-fail was DECLINED on this. Restoring an existing check's correctness
+  is fine; adding gating is not.
+* `same_story_safety_cleanup` STAYS AS IS -- the ledger-hygiene repurpose is
+  deferred, not cancelled.
+* Invention-lane SFW clauses stay.
+* `visual_style_policy` deleted (done).
+* Cradle Protocol, written by the operator and dedicated by him to the public
+  domain, belongs in the `public_domain` bank alongside the found works. It
+  needed no schema change: `cc0` + `local_text_fixture` were already valid.
+  NOTE: `custom_premise` is a user-fillable widget, not a bank -- nothing can
+  be stored in it.
+
+### STILL AWAITING AN OPERATOR DECISION
+
+* The **20 public_domain episodes** generated from the fabricated Wells
+  fixture -- regenerate, relabel, or leave with the defect recorded?
+* The fabricated fixture `public_domain_story/fixtures/time_machine_arrival.txt`
+  is still on disk, unreferenced, kept as evidence. Delete?
+
+### UK COPYRIGHT FLAG (carried in the vendoring script)
+
+All picks are pre-1930 and US public domain, which governs this offline US rig.
+FOUR authors remain in UK copyright under life+70 -- **Forster (2041), Onions
+(2032), Dunsany (2028), Beerbohm (2027)**. Re-check before any distribution
+outside the US.
+
 ## BATON -- 2026-08-03 evening close
 
 **Branch** `v2.0-alpha`, **HEAD `9c4a0e20`**, pushed, HEAD == origin.

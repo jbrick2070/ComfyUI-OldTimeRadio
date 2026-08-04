@@ -3,6 +3,52 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 16:0x -- HEAD cec758c3 (v2.0-alpha) -- WINDOW CODER + RENDER
+
+Did: shipped D1 observability, ripped a dead schema field, moved the licence
+  out of the drama, grew the public-domain bank from 1 source to 65, and proved
+  it on the GPU.
+
+- **D1** -- the silent still-skip now names its own branch (arm, token, index,
+  canonical prompt_hash, repr-escaped excerpt centred on the match) and emits a
+  compact JSON MISSING_TARGET record BEFORE raising, because the canonical
+  runner truncates the exception to 500 chars. `otr_rotate_log.ps1` stops the
+  boot truncating the log that would prove it.
+- **The rip** -- `visual_style_policy` was schema-required, read by nothing, and
+  the cause of a Folger comedy rendering `archival_documentary`.
+- **Provenance** -- the normalizer was built and left switched OFF for every
+  bank, so the announcer spoke "CC BY-NC 3.0" aloud. On now for both fidelity
+  banks; licence in print, `noncommercial_notice` for Folger.
+- **The library** -- 65 sources, 50 authors, 1605-2026, across three curation
+  passes (classics, the BBC weird/SF repertoire, comedy) plus Buck Rogers, more
+  Oz, and the operator's own Cradle Protocol dedicated to the public domain.
+  The best of it is the straight/parody pairing: the bank can draw Jane Eyre,
+  then Harte's parody of Jane Eyre.
+- **PROVEN LIVE** -- three 320-word public_domain still legs drew three
+  DIFFERENT works (queer_feet, pigs_is_pigs, kipling_wireless), 3/3 published,
+  Gemma writing, 23.7-29.3 min each.
+- **The operator's red dropdown was a real binding fault**: the canonical graph
+  saved a model id without its VRAM badge, so it named Gemma and could have run
+  Mistral. Chasing it found TWO copies of the licence guard matching raw
+  strings while the runtime strips the badge -- both were inspecting nothing.
+
+Reviews: 3 Sonnet QA lenses (1 MAJOR + 5 MINOR, all mine, all fixed), one agy
+  pass (found the Gutenberg boilerplate leak in 2 of 45 texts), and a kibitz r3
+  with Codex gpt-5.6-sol + agy 3.6 -- both lanes ran once KIBITZ_AGY_MODEL was
+  set correctly. I disproved one agy MUST-FIX (the period-prompt misrouting
+  cannot fire: no curated row carries that profile) and declined one Codex
+  MUST-FIX (wiring the licence check into production as a hard-fail) on the
+  operator's "no gates" directive.
+
+Current step: D2 -- reproduce the still-skip at 320 words; it did not fire in
+  three legs and at ~1-in-6 that clears nothing.
+Next: the non-commercial notice reaches no printed surface (Codex-confirmed);
+  then public_domain authenticity; then the Shakespeare verbatim executor.
+Models: Claude (anchor + judge) + 3 Sonnet QA + 2 Fable curation passes + agy
+  3.6 + Codex gpt-5.6-sol. Production writer: gemma-4-12b.
+Commits: 14b0e9a9, 76bd00ac, 74f11967, 36c97d55, bd3c0eb2, 043470fd, 08b8638f,
+  ef96e4a0, a012874c, 1e7d8aa4, cec758c3.
+
 ## 2026-08-03 22:15 -- HEAD c7f71b4f (v2.0-alpha) -- WINDOW CODER -> RENDER
 
 Did: resumed on the baton, took two operator rulings, and launched an overnight
