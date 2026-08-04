@@ -3,6 +3,54 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 final -- HEAD 8330805c (v2.0-alpha) -- WINDOW HANDOFF (GO_FORWARD leaned)
+
+Did: cut GO_FORWARD_PLAN.md from 5,392 lines to 1,117 -- 342 KB to 74 KB -- so it
+  holds only work that is NOT done. Operator: "clean out done stuff from GO
+  FORWARD so it's truly stuff that is not done... we need lean but detailed."
+  No code touched.
+
+- **The file had drifted from its own stated contract.** This log's header says
+  "GO_FORWARD_PLAN.md stays lean and forward-only", and 97% of it was history --
+  61 top-level sections, of which only the first two were live. That is what made
+  it unreadable: the operator asked what was left to code and could not tell.
+- **Audited before deleting, not bulk-cut.** Read every section that could hide
+  open work -- OPEN BUGS (657 lines), KNOWN OPEN, STILL OPEN (x3), KNOWN AND NOT
+  FIXED, Open risks, the coder queue, the campaign queue, SCOPE FOR v2.0, the
+  operator-directive blocks -- and checked the 102 HANDOFF_LOG entries cover the
+  history being dropped. They do.
+- **What went:** four session batons, thirteen `SUPERSEDED` blocks, every
+  struck-through/CLOSED bug row, eight superseded validation receipts, the
+  measurement and "WHAT LANDED" narratives, and the window-letter table for slots
+  that were dissolved, removed or retired (CODER B/C/D/E/G).
+- **What was carried across, in full:** every live bug row with its cites, both
+  PARKED story bugs, the flagged operator decisions, THE LAW, the MODEL & CREDIT
+  BUDGET ladder, the re-ground gate, Bug Bible pending actions, Open risks,
+  Tombstones and Pointers. Live rows were REGROUPED into named clusters (P0 /
+  source-span, 8 GB / profile, coverage-canvas-clip, routing-env-credits,
+  test-harness) because a flat 60-row list is its own kind of unreadable.
+- **Five things the audit found were already DONE and are now tombstoned rather
+  than sitting in the plan as open:** the credits-roll speed request (shipped
+  08-03, `_SCROLL_PPS` 60 -> 120), `visual_style_policy` (ripped 08-04), the two
+  fabricated-fixture operator decisions (closed 08-04), and the schema-migration
+  item's `visual_style_policy` half.
+- **Two stale claims corrected on the way through:** the `CanonicalClip.frame_count`
+  row pointed at two "still self-declared" rows that were both closed afterwards,
+  so it now says re-verify before acting rather than asserting an open surface;
+  and the WAN 8-GB row's two proof obligations that the four-arm bench discharged
+  are stated as discharged, with the bench's real scope (a 16 GB card told to
+  reserve 8 GiB, NOT a physical 8 GB card) preserved as the still-owed proof.
+- **The live sprint block is byte-identical** -- verified by diffing ON DECK
+  through PARKED-D2 against `HEAD:docs/GO_FORWARD_PLAN.md`. The lean pass could
+  not have edited the current queue by accident.
+- Nothing intra-file dangles: the old rows cited each other by line number
+  (`:2843-2858`, `:749-753`, "see the header", "see MEASURED above") and every one
+  was either rewritten to stand alone or given a compact kept section (the 8 GiB
+  bench summary survives for exactly that reason).
+
+Current step: unchanged -- CODING (no GPU), the four-item ON DECK queue, each item
+  gated on a full `kibitz-plugin:kibitz` review.
+
 ## 2026-08-04 close -- HEAD dcd5a53b (v2.0-alpha) -- WINDOW HANDOFF (docs only)
 
 Did: took one operator directive and wired it into the two docs that can enforce
