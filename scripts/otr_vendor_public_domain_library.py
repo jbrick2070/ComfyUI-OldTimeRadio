@@ -59,6 +59,27 @@ MAX_UNIT_WORDS = 20000
 #   ("chapters", first, last)       -- inclusive chapter range, by number
 #   ("story", title, next_title)    -- one story out of a collection
 # --------------------------------------------------------------------------- #
+#: Works written for this show and DEDICATED to the public domain by their
+#: author, rather than found in it. No fetch step: the text already lives in
+#: the corpus, so these are manifest rows only.
+LOCAL_WORKS: list[dict] = [
+    dict(slug="cradle_protocol", title="Cradle Protocol",
+         author="Jeffrey A. Brick", year="2026", tag="satire",
+         license_url="https://creativecommons.org/publicdomain/zero/1.0/",
+         # The manifest requires a non-empty provenance pointer, and for a work
+         # that was written HERE the honest one is the file itself. An empty
+         # string was refused at load, correctly.
+         source_url=("repo:config/source_banks/public_domain_story/"
+                     "sources/cradle_protocol.txt"),
+         source_label="an original dedicated to the public domain",
+         label="The Boy Who Answered in Tokens",
+         synopsis=("A lonely relay operator activates a companion that presents "
+                   "itself as a holographic infant, and it begins behaving "
+                   "exactly like a language model that has decided it is a toddler."),
+         cast=["Elias Voss", "Toby", "Dr. Lira Kell", "ARIA", "the Announcer"],
+         text_path="sources/cradle_protocol.txt"),
+]
+
 WORKS: list[dict] = [
     # I. Gothic and ghost
     dict(slug="dracula", gid=345, title="Dracula", author="Bram Stoker", year="1897",
@@ -754,6 +775,33 @@ def write_manifest(vendored: list[dict]) -> None:
     # manifest from this table alone would silently drop it. That is also why
     # the curation brief excluded Wells: he is already here.
     sources = []
+    # LOCALLY AUTHORED, DEDICATED TO THE PUBLIC DOMAIN. Not fetched from
+    # anywhere, so it has no Gutenberg id and no crawl step -- the schema's
+    # `local_text_fixture` adapter and `cc0` licence status exist for exactly
+    # this, and the provenance normalizer already renders cc0 as "adapted from
+    # a work dedicated to the public domain".
+    for local in LOCAL_WORKS:
+        if (DEST / pathlib.Path(local["text_path"]).name).is_file():
+            sources.append({
+                "source_id": local["slug"],
+                "title": local["title"],
+                "author": local["author"],
+                "year": local["year"],
+                "license_status": "cc0",
+                "license_url": local["license_url"],
+                "source_url": local["source_url"],
+                "source_label": local["source_label"],
+                "adapter_type": "local_text_fixture",
+                "search_tags": [local["tag"], "original", "radio_adaptation"],
+                "recommended_word_budget": 320,
+                "cast_hints": list(local["cast"]),
+                "units": [{
+                    "unit_id": "main",
+                    "label": local["label"],
+                    "synopsis": local["synopsis"],
+                    "text_path": local["text_path"],
+                }],
+            })
     wells_text = DEST / "time_machine__arrival.txt"
     if wells_text.is_file():
         sources.append({

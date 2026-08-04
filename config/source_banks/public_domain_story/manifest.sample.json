@@ -2,6 +2,38 @@
   "schema_version": "v1",
   "sources": [
     {
+      "source_id": "cradle_protocol",
+      "title": "Cradle Protocol",
+      "author": "Jeffrey A. Brick",
+      "year": "2026",
+      "license_status": "cc0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "source_url": "repo:config/source_banks/public_domain_story/sources/cradle_protocol.txt",
+      "source_label": "an original dedicated to the public domain",
+      "adapter_type": "local_text_fixture",
+      "search_tags": [
+        "satire",
+        "original",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Elias Voss",
+        "Toby",
+        "Dr. Lira Kell",
+        "ARIA",
+        "the Announcer"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Boy Who Answered in Tokens",
+          "synopsis": "A lonely relay operator activates a companion that presents itself as a holographic infant, and it begins behaving exactly like a language model that has decided it is a toddler.",
+          "text_path": "sources/cradle_protocol.txt"
+        }
+      ]
+    },
+    {
       "source_id": "time_machine",
       "title": "The Time Machine",
       "author": "H. G. Wells",

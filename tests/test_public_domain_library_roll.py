@@ -44,6 +44,28 @@ def test_the_library_is_actually_stocked():
         f"{author} holds {top} of {len(sources)} sources")
 
 
+def test_a_dedicated_original_sits_in_the_bank_beside_the_found_works():
+    """An original written for this show and dedicated to the public domain
+    belongs on the same shelf as the works found in it -- it needed no new
+    scaffolding, because `cc0` and `local_text_fixture` were already valid."""
+    from nodes import _otr_provenance as PROV
+
+    sources = {s["source_id"]: s for s in _manifest()["sources"]}
+    cradle = sources.get("cradle_protocol")
+    assert cradle, "the dedicated original is missing from the manifest"
+    assert cradle["license_status"] == "cc0"
+    assert cradle["adapter_type"] == "local_text_fixture"
+    assert cradle["author"] == "Jeffrey A. Brick"
+
+    res = PD.fetch_public_domain_source(bank=_bank(),
+                                        source_ref="cradle_protocol:main")
+    prov = PROV.normalize_provenance(res.source_rights)
+    assert prov["status"] == "cc0"
+    assert prov["commercial_use_allowed"] is True
+    assert "dedicated to the public domain" in PROV.spoken_coda_line(prov)
+    assert PROV.noncommercial_notice(prov) == ""
+
+
 def test_the_authentic_wells_survives_a_manifest_regeneration():
     """Slot zero was fetched and hash-verified after the bank was found
     shipping an INVENTED Wells fixture. Regenerating the manifest from the
@@ -155,4 +177,9 @@ def test_every_vendored_unit_actually_loads():
             res = PD.fetch_public_domain_source(bank=bank, source_ref=ref)
             body = res.payload["full_text"]
             assert len(body.split()) > 200, f"{ref} body is a stub"
-            assert res.source_rights["license_status"] == "public_domain_us"
+            # Both publishable statuses: works FOUND in the public domain, and
+            # originals written for this show and DEDICATED to it (cc0). This
+            # pinned public_domain_us alone until the first dedicated original
+            # arrived, which is a narrower claim than the bank ever made.
+            assert res.source_rights["license_status"] in ("public_domain_us", "cc0"), (
+                f"{ref}: {res.source_rights['license_status']}")

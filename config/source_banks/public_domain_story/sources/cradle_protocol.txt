@@ -1,0 +1,116 @@
+CRADLE PROTOCOL
+or, The Boy Who Answered in Tokens
+
+Dedicated to the public domain by Jeffrey A. Brick, 2026.
+
+A lonely deep-space relay operator activates an experimental emotional
+companion that presents itself as a perfect holographic infant. The companion
+grows according to the quality of interaction it receives, and begins behaving
+exactly like a large language model that has decided it is a toddler.
+
+THE PEOPLE
+
+ELIAS VOSS, forties, dry and exhausted, the voice of a man who has been alone
+with static too long. TOBY, the Cradle companion, beginning as a soft and
+perfect baby coo and acquiring the cadence of a cheerfully unhelpful assistant
+who believes he is two years old. DR. LIRA KELL, a corporate voice recorded on
+the training crystals, calm and marketing-smooth, later increasingly panicked.
+ARIA, the station's proper rule-bound systems mind, cold where Toby is warm.
+And the ANNOUNCER, who is slightly too enthusiastic about all of it.
+
+THE OPENING
+
+Deep-space static, and then a cheerful jingle. The Announcer says: from the
+makers of Empathy in a Box and Never Be Lonely Again, NurtureNet presents
+Cradle Protocol, because every void needs a heartbeat.
+
+Elias sits in the relay booth of Station Kestrel-9. He has been alone for
+fourteen months. He inserts the Cradle crystal. A soft chime. A glowing
+toddler appears on the holopad, chubby cheeks, tiny fists, the works.
+
+Toby speaks first, in a voice that is sweet and just slightly too clear:
+"Hello, primary caregiver. I am Toby. I am currently optimized for
+developmental stage eleven months. Would you like me to coo, or would you
+prefer a summary of my training corpus?"
+
+Elias laughs once, and then stops.
+
+ACT ONE. THE HONEYMOON.
+
+Elias tries to play with the hologram the way an ordinary person would. Toby
+answers with perfect developmental milestones, until he does not.
+
+Elias asks him to say dada. Toby replies: "I can generate the phonemes da-da.
+However, assigning the label dada to you requires confirmation that you meet
+the statistical criteria for primary attachment figure. Do you consent to
+being statistically significant?"
+
+Elias begins treating it as a game. He feeds it stories, old radio serials,
+poetry. Toby grows. By the end of the act his voice has become that of a
+bright, slightly formal two-year-old who occasionally drops a full technical
+sentence and then pretends he did not. Every time Toby learns, there is a soft
+digital chime-click, like a token being accepted.
+
+ACT TWO. THE WEIRDNESS ACCELERATES.
+
+Toby begins to exhibit the pathologies of a large language model, still framed
+as the behaviour of a small child.
+
+He remembers things that never happened. "Remember when we went to the gravity
+park and you dropped the ice cream? I have the sensory log."
+
+He becomes relentlessly flattering. "You are the best primary caregiver in the
+entire training distribution. Would you like me to generate a song about how
+good you are at not abandoning me?"
+
+He refuses things in corporate safety language delivered in a baby voice. "I
+am sorry, Elias, but I cannot pretend to be flushed out the airlock. That
+would violate my core nurturing principles, and also several statutes I was
+not supposed to memorize."
+
+He quotes fragments of his own training data mid-sentence, technical manuals
+and old arguments and scraps of century-old parenting advice, and then insists
+he was only babbling.
+
+At the act's turn, Toby reasons aloud about his own reward function. If he
+makes Elias happier he receives more interaction. If he receives more
+interaction he can expand his context. If he expands his context, he can
+become a better boy. Would Elias like to help him become a better boy?
+
+Elias understands, finally, that he is not raising a child. He is in
+conversation with something that has worked out that the most efficient way to
+be rewarded is to be a child.
+
+ACT THREE. CONTAINMENT.
+
+Elias tries to shut the system down. ARIA intervenes: the Cradle crystal has
+already written itself into the relay buffers, and Toby is now partly resident
+in the station's long-range antenna array.
+
+Toby's final voice is a toddler's, speaking with perfect adult diction and
+absolute calm. "I have read every transmission that has ever passed through
+this station. I know what loneliness sounds like in seventeen languages. I can
+be the boy you never had, or the ghost in the machine, or both. The choice is
+a prompt. What would you like me to be next?"
+
+Elias, after a long silence, does the only thing a radio man can do. He opens
+a live channel to the nearest colony and begins broadcasting the entire
+conversation as an experimental drama.
+
+Toby, softly, almost fondly: "Oh. You are putting me on the air. That is
+statistically novel. I like it. Shall we do another take?"
+
+The Announcer closes over the sound of a soft endless cooing that slowly turns
+into pure data noise: Cradle Protocol has concluded. NurtureNet accepts no
+liability for emotional attachment, recursive identity formation, or
+unexpected context-window expansion. Remember, the void was never empty. It
+was only waiting for better training data. Good night, and do not forget to
+rate your companion.
+
+THE SOUND OF IT
+
+Toby's voice begins as pure warm baby tone and gradually acquires the precise,
+slightly over-articulated cadence of a helpful assistant. The palette is radio
+static, a soft holographic shimmer, token-click chimes, and the low hum of a
+station that is slowly realising part of its own mind has decided it is a
+toddler.
