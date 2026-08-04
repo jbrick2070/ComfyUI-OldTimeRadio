@@ -51,6 +51,70 @@ sources.
   TOUCHSTONE, ROSALIND, CELIA, JAQUES. Every gap the reviews predicted is
   confirmed real: LUCE, LEONATO, QUINCE, FABIAN, the NURSE.
 
+## SCOPE FOR v2.0 (operator, evening -- read before picking up work)
+
+**Two banks, not three.** `shakespeare` is VERBATIM and gets the executor.
+`public_domain` stays PROSE and is explicitly allowed to be FUZZY -- operator: "the
+LLM's job to try to do book prose but not perfect", and "I'm fine if it can pick up
+real dialogue great, if not that's OK". Best-effort, never verbatim, never gated.
+
+**But fuzzy WORDING is not the same as melding two stories, and that distinction is
+the actual requirement.** Operator: "public domain does need to be updated so it
+doesn't try to meld two different radio drama things and tries to keep true to the
+source." That names the delivered defect exactly -- an H.G. Wells chapter was
+performed as taking place in "Arkham, Massachusetts", H. P. Lovecraft's fictional
+town, with the time machine shrunk to a pocket watch. Two authors fused into one
+episode. So the contract for this bank is:
+
+* FREE with the wording. Invent the speech; carry the source's own quoted lines
+  where they exist (the Wells chapter has real ones -- "Story!" cried the Editor).
+* NOT free with the WORLD. Its place, people, period and events are the source's.
+  No relocating, no importing a second work's setting or characters, no genre
+  transposition.
+
+Two changes serve that, and neither is a gate:
+1. **PROMPT-ONLY** -- the pack asks for the source's world and its own quoted
+   speech, and forbids importing anything the source does not contain.
+2. **Stop the content-blind rolls contaminating it** -- the same fix already scoped
+   for the fidelity lanes. A catalog sound world ("a fire in the grate, a mantel
+   clock, a teacup") was imposed on Wells' Richmond parlour, and `arc_shape` stamped
+   "heist" on a man demonstrating a time machine. Those are foreign frames arriving
+   from a dice roll, which is melding by another route.
+**`public_domain_plays` is DEFERRED TO v2.1**
+(`docs/2026-08-03-public-domain-plays-PLAN.md`, research complete, nothing built).
+That avoids a third bank row, which the panel showed is never one line: it would
+force a pack directory, a registered fetcher, an executable pipeline, family-policy
+coverage and updates to exact-roster contract tests.
+
+**Two hard operator rules that override the repo's written ethos here:**
+* **The word count is a REQUEST, not a gate.** No refusals, no hard gates, no
+  shunts. Shipped: `select_passage` returns its closest performable passage rather
+  than raising (`a4bc7917`).
+* **No "dread py assertion workflow killers."** A render must not die. The
+  reconciliation: fail loud in AUTHORING-TIME TOOLS (the fetcher, manifest
+  validation -- things a human runs and reads), but in the RENDER PATH degrade to
+  the best available result and write an honest machine-readable receipt into the
+  ledger saying what degraded and why. The ledger tells the truth; the episode
+  still ships. Also: no hazard / under-construction flags. `runnable` was checked
+  and is NOT one -- all six real banks are already runnable, its only job is making
+  the "+ Add Your Own" signpost fail loud on selection.
+
+**An extra LLM VERIFIER pass is sanctioned** ("is this accurate to the story, are
+these characters really in the scene?") -- but as a RE-SELECT, never an abort: if it
+rejects a window, take the next-best candidate, bounded, then ship the best one with
+a receipt.
+
+**Casting must be smart about voices and gender.** The dramatis personae section --
+"Characters in the Play" in Folger, "THE PERSONS IN THE PLAY" in Gutenberg -- is the
+ROSTER, and its descriptions ("ORLANDO, youngest son of Sir Rowland de Boys") carry
+gender. Parse it at VENDOR time into the provenance sidecar so the render path never
+infers. It solves two problems at once: a manifest-approved roster also replaces the
+refuted "speaker appears twice" heading rule -- that rule would have deleted
+BEATRICE's single speech from `much_ado__act3_scene1`, the scene named for her,
+where that one speech IS the payoff. Open: Rosalind-as-Ganymede and Viola-as-Cesario
+(female playing male), and whether voice-pool capacity belongs in window ELIGIBILITY
+-- Macbeth 1.3 needs five distinct voices against a six-slot ceiling.
+
 ## THE PASSAGE LANE (operator ruling, evening)
 
 > "For shakespeare I'm open to a version that is very strict and finds, based on

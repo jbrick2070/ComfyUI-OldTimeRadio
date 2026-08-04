@@ -1,5 +1,22 @@
 # `public_domain_plays`: a new verbatim bank for non-Shakespeare plays
 
+> **DEFERRED TO v2.1 (operator, 2026-08-03 evening).** "I'm OK with
+> public_domain_plays being for 2.1. We can leave public_domain be more prose for
+> now." Nothing in this document is being built now. It is kept because the
+> research behind it is done and load-bearing: the Gutenberg-layout findings, the
+> refuted frequency rule, and the roster proposal all apply to the v2.0 Shakespeare
+> work already in flight.
+>
+> **What v2.0 does instead:** `shakespeare` gets the verbatim executor;
+> `public_domain` stays exactly as it is -- prose, adapted by the LLM, not
+> expected to be perfect. Two banks, no new bank row, and none of the exact-roster
+> contract churn that a third bank would force.
+>
+> **The one finding here that v2.0 DOES need:** the manifest-approved speaker
+> roster. A parsed label outside the roster is rejected; a label inside it is kept
+> however rarely it speaks. That replaces the frequency rule refuted below, and the
+> same roster carries the character descriptions that gender-match the voices.
+
 Operator rulings (2026-08-03 evening), which govern:
 
 1. **`shakespeare` stays as its own bank and is VERBATIM. That is settled.**
