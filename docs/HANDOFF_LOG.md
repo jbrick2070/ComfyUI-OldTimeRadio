@@ -3,6 +3,38 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 late -- HEAD 518e11c8 (v2.0-alpha) -- WINDOW HANDOFF
+
+Did: answered the operator's "what decision?", took both rulings, and closed the
+  fabricated-Wells thread for good.
+
+- **Operator ruling: the 20 fabricated-fixture episodes are DROPPED.** "I don't
+  care about faulty past episodes, I care about NEW episodes." No regenerate, no
+  relabel, no cleanup pass -- they simply may not be cited as adaptation
+  evidence. Struck from all three places GO_FORWARD was still asking.
+- **Operator ruling: The Time Machine must be a good source.** It already was --
+  proven through the PRODUCTION seam (`fetch_public_domain_source` against the
+  real `banks.json` defaults, not by reading the manifest): `time_machine:arrival`
+  loads **1,988 words of authentic Wells**, Chapter III from Gutenberg pg35;
+  provenance `body_sha256` matches the bytes on disk (`250bb0fb...`); no
+  Gutenberg boilerplate in the payload; none of the fabrication's tells.
+- **Deleted the 145-word fake** at `public_domain_story/fixtures/`. It was already
+  unreferenced -- zero hits across `nodes/`, `config/`, `scripts/`, `tests/`,
+  `workflows/`, nothing globs that dir -- but invented prose wrapped in genuine
+  `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` markers is a live hazard
+  sitting next to a source we want trusted. Git history keeps the evidence; the
+  `fixtures/` directory is gone.
+
+Note: `test_public_domain_interpreter::test_empty_cast_is_rejected_and_retried_to_failure`
+  fails when run right after `test_public_domain_sources` and passes 11/11 alone.
+  That is the PRE-EXISTING ordering pollution already recorded in GO_FORWARD, not
+  this change.
+
+Current step: unchanged -- D2, reproduce the still-skip at 320 words.
+Next: the non-commercial notice reaches no printed surface; then public_domain
+  authenticity (`_otr_compose_exchange` still has zero source references); then
+  the Shakespeare verbatim executor.
+
 ## 2026-08-04 16:0x -- HEAD cec758c3 (v2.0-alpha) -- WINDOW CODER + RENDER
 
 Did: shipped D1 observability, ripped a dead schema field, moved the licence

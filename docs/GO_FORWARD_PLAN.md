@@ -1,5 +1,65 @@
 # OTR Go-Forward Plan
 
+## ON DECK -- START HERE
+
+**D2: reproduce the still-skip.** It is a RENDER task, not a coding task -- the
+code you need already shipped. Reset per AGENTS.md section 4, boot headless, and
+run **320-word `public_domain` or `shakespeare` still legs until one fails**
+(~1 in 6). Three legs on 08-04 all published, which at that rate is a ~58%
+chance of zero -- so the bug is neither confirmed nor cleared, and only more
+legs settle it.
+
+**Either outcome is a valid result. Accept BOTH:**
+* a **publish** -- another clean leg, bank the sample, keep rolling; or
+* a **fail-closed with complete evidence** -- that is the PROOF D1 WORKS, and it
+  is the outcome you actually want. Do not treat it as a setback.
+
+When it fails, the server log now names the branch itself: arm, token, index,
+canonical `prompt_hash` and a repr-escaped excerpt centred on the match, plus a
+compact JSON `MISSING_TARGET` record emitted BEFORE the raise (the canonical
+runner truncates the exception at 500 chars, `scripts/otr_api.py:749`). The log
+survives the next boot -- `scripts/_otr_rotate_log.ps1` rotates instead of
+truncating. Read the record, then D3 fixes THAT branch at its root: either where
+the separator enters the prompt, or by making the predicate detect real paths
+rather than any separator. `PROD_BUG_LOG.md` gets its entry then -- a mechanism,
+not a guess.
+
+**Do NOT:** weaken the completion gate, revive the portrait-init fallback, or
+rebuild the withdrawn "give the collapse guard a still owner" fix. The 08-04
+postmortem disproved that chain -- 70 whiffs and 69 cast-time deferrals across
+11 passes that ALL published, so both warnings are routine.
+
+Full record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md` and
+`docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
+
+### IF YOU WANT A CODING TASK INSTEAD (D2 needs the GPU)
+
+**The non-commercial notice reaches no human surface.** Smallest real win on the
+board, and fully scoped: `OTR_LedgerScriptWriter.py:3590` stamps
+`meta["noncommercial_notice"]`, and NOTHING renders it --
+`nodes/otr_credits_roll.py:516` reads only `credits_source_line`. Add a sibling
+printed-credits item right beside that block (`:516-518` is the exact shape to
+copy) plus an integration test. Ledger field exists and is owned; only the
+printed consumer is missing. Fires on Folger sources.
+
+Then, in order: **public_domain authenticity** (`_otr_compose_exchange.py` has
+ZERO source references while its pack orders the model to carry the author's
+words -- the prompt shape that manufactured "Arkham, Massachusetts" over Wells),
+then **the Shakespeare verbatim executor** (`_otr_passage_selector.py` still has
+no production caller; four overwrite paths must close first -- see the 08-03
+baton below).
+
+## BATON -- 2026-08-04 late close
+
+**Branch** `v2.0-alpha`, **HEAD `518e11c8` + this docs commit**, pushed, HEAD == origin.
+**Suite 8398 passed / 131 skipped / 1 xfailed** (4:07). Bug Bible green.
+Working tree clean apart from the operator's own untracked `tmp/`, `kibitz/`
+and `config/profiles/otr_sbcov_*.json` -- **leave those alone.**
+
+Closing session did two things only: took both outstanding operator rulings
+(above -- the 20 episodes dropped, the fake fixture deleted) and PROVED The Time
+Machine is an authentic source through the production seam. No code changed.
+
 ## BATON -- 2026-08-04 close
 
 **Branch** `v2.0-alpha`, **HEAD `cec758c3`**, pushed, HEAD == origin.
@@ -80,12 +140,39 @@ and `config/profiles/otr_sbcov_*.json` -- **leave those alone.**
   NOTE: `custom_premise` is a user-fillable widget, not a bank -- nothing can
   be stored in it.
 
-### STILL AWAITING AN OPERATOR DECISION
+### OPERATOR DECISIONS -- BOTH CLOSED 2026-08-04 (do not re-ask)
 
-* The **20 public_domain episodes** generated from the fabricated Wells
-  fixture -- regenerate, relabel, or leave with the defect recorded?
-* The fabricated fixture `public_domain_story/fixtures/time_machine_arrival.txt`
-  is still on disk, unreferenced, kept as evidence. Delete?
+* **The 20 fabricated-fixture episodes: DROPPED. Do not raise them again.**
+  Operator: "I don't care about faulty past episodes, I care about NEW
+  episodes." No regenerate, no relabel, no cleanup pass. They are not
+  adaptation evidence and nothing may cite them as such -- that is the whole
+  of their disposition. Effort goes to new renders only.
+* **The fabricated fixture is DELETED** (this commit). Operator: "I still want
+  Time Machine to be a good source." It already is, and the fake was the only
+  thing undermining it -- see below.
+
+### THE TIME MACHINE IS A GOOD SOURCE -- PROVEN 2026-08-04
+
+Verified through the PRODUCTION seam (`fetch_public_domain_source`, the real
+`banks.json` defaults), not by reading the manifest:
+
+* `time_machine:arrival` resolves to **1,988 words of authentic Wells** --
+  Chapter III, "The Time Traveller Returns", from Gutenberg pg35.
+* `body_sha256` in the provenance sidecar **matches the bytes on disk**
+  (`250bb0fb...`), so the text is the one that was fetched and hashed.
+* **No Gutenberg boilerplate leak** in the loaded payload, and none of the
+  fabrication's tells (`brass-and-crystal`, `nervous chairs`, `Arkham`).
+* Manifest carries the real cast -- Time Traveller, Editor, Medical Man,
+  Psychologist -- against a chapter those four are actually in.
+
+What was deleted is the OLD 145-word fake at
+`public_domain_story/fixtures/time_machine_arrival.txt`: invented modern prose
+wrapped in genuine `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` markers.
+It was already unreferenced -- zero hits across `nodes/`, `config/`, `scripts/`,
+`tests/`, `workflows/`, and nothing globs that directory -- so the bank had
+stopped reading it, but a fake wearing real provenance markers is a live hazard
+next to a source we want trusted. Git history keeps it as evidence; the
+`fixtures/` directory is now gone.
 
 ### UK COPYRIGHT FLAG (carried in the vendoring script)
 
@@ -173,13 +260,11 @@ the count-match invariant (`:4061-4067`) hard-raises when locked != requested
 cast; `compute_episode_budget` (`:4099-4104`) still reads the stale widget value.
 Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
 
-### OPEN OPERATOR DECISIONS
+### OPEN OPERATOR DECISIONS -- ALL FOUR ANSWERED, KEPT FOR THE RECORD ONLY
 
-* The **20 public_domain episodes** generated from the fabricated Wells fixture --
-  regenerate, relabel, or leave with the defect recorded? Not valid adaptation
-  evidence either way.
-* The **fabricated fixture** `public_domain_story/fixtures/time_machine_arrival.txt`
-  is still on disk, unreferenced, kept as evidence. Delete?
+* ~~The **20 public_domain episodes** from the fabricated Wells fixture.~~
+  **CLOSED 2026-08-04: dropped, no action, never raise again.**
+* ~~The **fabricated fixture**.~~ **CLOSED 2026-08-04: deleted.**
 * **Invention-lane SFW clauses** (`original`, `scifi_news`, `scifi_news_pro`) were
   deliberately NOT touched -- they read as the show's own voice, not a conflict
   with a source. Operator to say whether they go too.
@@ -592,13 +677,11 @@ impossible without redesigning beat topology. Build target is the 300-word unit.
    still required by the validators and by `public_domain_manifest_schema.json`,
    so manifests and tests migrate in the same change.
 
-## OPERATOR DECISIONS STILL OPEN
+## OPERATOR DECISIONS -- THE TWO FIXTURE ONES ARE CLOSED
 
-* The **20 public_domain episodes** built from the fabricated fixture --
-  regenerate, relabel, or leave with the defect recorded? They must not count as
-  adaptation evidence either way.
-* The **superseded fabricated fixture** is still on disk, unreferenced, as the
-  evidence. Deleting it is the operator's call.
+* ~~The **20 public_domain episodes** built from the fabricated fixture.~~
+  **CLOSED 2026-08-04: dropped, no action, never raise again.**
+* ~~The **superseded fabricated fixture**.~~ **CLOSED 2026-08-04: deleted.**
 * **PROD_BUG_LOG entries** for both live failures (repo policy requires naming
   the live artifacts before any Bug Bible promotion).
 
