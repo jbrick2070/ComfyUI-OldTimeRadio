@@ -282,18 +282,55 @@ def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
     return cleaned
 
 
+# Authentic Folger plain text marks a speech in one of two ways, and never with a
+# colon -- that was the shape of the hand-written stub fixtures only:
+#   verse -- the name alone on its line, speech beneath:  ORLANDO\nHang there, my verse
+#   prose -- the name inline, two spaces, then speech:    TOBY  Come thy ways, Signior
+# Either may carry a stage qualifier: ROSALIND, [as Ganymede] / BENEDICK, [aside]
+# Recognizing only the colon form returned NO speakers from real Folger text, so
+# payload_from_scene silently fell back to the curated cast_hints -- the list whose
+# ordering dropped Orlando from the scene he is named in and let a writer substitute
+# Romeo from another play. The people in a scene are a fact OF the scene.
+_FOLGER_SPEECH_RE = re.compile(
+    r"^(?P<name>[A-Z][A-Z'’.\-]*(?: [A-Z][A-Z'’.\-]*)*)"
+    r"(?:,\s*\[[^\]]*\])?"
+    r"(?:\s*$|\s{2,}(?=\S))"
+)
+
+# All-caps shapes that are structure or performance direction, never speakers.
+_NON_SPEAKER_TOKENS = frozenset({
+    "ACT", "SCENE", "FINIS", "THE END", "EPILOGUE", "PROLOGUE", "EXIT", "EXEUNT",
+})
+
+
 def _speaker_from_line(line: str) -> str | None:
-    if ":" not in line:
+    """The speaking character named by this line, or None.
+
+    Accepts both authentic Folger layouts and the legacy ``NAME:`` form so a
+    colon-style fixture still parses.
+    """
+    stripped = str(line or "").rstrip()
+    if not stripped or stripped != stripped.lstrip():
+        # Indented lines are continuations of a speech, never a prefix.
         return None
-    candidate = line.split(":", 1)[0].strip()
+    if ":" in stripped:
+        candidate = stripped.split(":", 1)[0].strip()
+    else:
+        match = _FOLGER_SPEECH_RE.match(stripped)
+        if match is None:
+            return None
+        candidate = match.group("name").strip()
     if not candidate or len(candidate) > 40:
         return None
     if candidate.upper() != candidate:
+        return None
+    if candidate in _NON_SPEAKER_TOKENS:
         return None
     return candidate
 
 
 def _speakers_from_text(text: str) -> list[str]:
+    """Every speaking character, in first-appearance order."""
     seen: list[str] = []
     for line in str(text or "").splitlines():
         speaker = _speaker_from_line(line)

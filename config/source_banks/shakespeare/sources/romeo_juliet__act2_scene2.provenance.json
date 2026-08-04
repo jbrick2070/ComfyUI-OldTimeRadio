@@ -1,0 +1,21 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "romeo_juliet",
+  "unit": "act2_scene2",
+  "work_title": "Romeo and Juliet",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/romeo-and-juliet_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:14Z",
+  "body_sha256": "af7ab8166e9fb3d1e1dba6d41f9ecf190497148680b47d64ece3c964d3fbc926",
+  "body_bytes": 8783,
+  "body_words": 1645,
+  "text_path": "config/source_banks/shakespeare/sources/romeo_juliet__act2_scene2.txt",
+  "act": 2,
+  "scene": 2,
+  "speakers": [
+    "ROMEO",
+    "JULIET",
+    "NURSE"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "king_lear",
+  "unit": "act1_scene1",
+  "work_title": "King Lear",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/king-lear_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:14Z",
+  "body_sha256": "1bd23633c788ddb4933c5fc76764a38e31b12a2bfb3bd2cab23ab86c4d889a91",
+  "body_bytes": 14318,
+  "body_words": 2571,
+  "text_path": "config/source_banks/shakespeare/sources/king_lear__act1_scene1.txt",
+  "act": 1,
+  "scene": 1,
+  "speakers": [
+    "KENT",
+    "GLOUCESTER",
+    "EDMUND",
+    "LEAR",
+    "GONERIL",
+    "CORDELIA",
+    "REGAN",
+    "BURGUNDY",
+    "FRANCE"
+  ]
+}

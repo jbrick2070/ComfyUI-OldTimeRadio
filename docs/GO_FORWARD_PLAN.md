@@ -1,6 +1,113 @@
 # OTR Go-Forward Plan
 
-**Newest update: 2026-08-03 (afternoon) -- ORIGINAL MEANS "MAKE A RANDOM RADIO
+**Newest update: 2026-08-03 (evening) -- THE ADAPTATION LANES WERE PERFORMING
+FICTION ABOUT REAL BOOKS. THEY NOW PERFORM THE BOOKS.**
+
+Branch `v2.0-alpha`. Operator ruling, hard: **`public_domain` and `shakespeare`
+are FIDELITY lanes -- true to source, inventing nothing.** Supporting rulings:
+"I'm open to multiple characters" (when a scene needs more speakers than the
+cast widget asks for, THE SCENE WINS); "we don't need cast hints and other
+wired variables for those"; "do its best to summarize the story into X words
+per the user's selection"; and the web may be used to find more public-domain
+sources.
+
+## WHAT WAS WRONG (all verified against the real files)
+
+* **The source text on disk was not the source.** The Wells fixture held 145
+  words containing NO H.G. Wells -- invented modern prose wrapped in genuine
+  `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` markers, under which the
+  bank stamped a Wells attribution. **A false attribution, and 20 episodes on
+  disk were generated from it.** All fourteen Shakespeare fixtures were 93-125
+  word collages (1,603 words for the entire selectable library), with lines
+  reassigned between characters.
+* **No pass that writes spoken words ever saw the source.** `_otr_compose_exchange`
+  has ZERO source-text references; the interpreter compresses to a 2-3 sentence
+  brief and every creative pass works from that, while the pack prompts order the
+  model to "carry" words it is never shown. Hence Verona over Arden and
+  "Arkham, Massachusetts" over Wells' Richmond.
+* **Casting truncated the source's people by list order**, dropping Orlando from
+  "Rosalind tests Orlando"; and the packs *instruct* the model to "fold or drop
+  minor figures", so a code-only fix would have been silently undone.
+* **`visual_style_policy: "derive_from_source"` is declared on every scene,
+  schema-required, and read by nothing** -- the planned consumer module was never
+  merged. That is why a Folger comedy rendered `archival_documentary`.
+
+## WHAT LANDED (evening)
+
+* **`scripts/otr_fetch_public_domain.py`** -- crawls once, vendors locally, keeps
+  the render path offline. Gutenberg by id, Folger by play/act/scene. Provenance
+  sidecar per unit (URL, timestamp, bytes, words, SHA-256 of the LF-normalized
+  body, parsed speakers). Fails loud: refuses a body under 2,000 words as a stub,
+  and refuses a scene whose cast it cannot parse.
+* **Real Wells** (`d6c0bb7e`): authentic Chapter III, "The Time Traveller
+  Returns". Proven through the bank's own fetch path -- Richmond, Filby, the
+  Medical Man, the Psychologist PRESENT; Arkham, "pocket watch" ABSENT.
+* **Real Folger, all fourteen scenes**: 24,243 words reaching the bank.
+* **Two speech-prefix parsers fixed.** Folger marks speeches two ways and neither
+  uses a colon (verse: name alone on its line; prose: `TOBY  Come thy ways`).
+  The repo's `_speaker_from_line` REQUIRED a colon, so on real text it returned
+  nothing and `payload_from_scene` fell back to the curated `cast_hints` -- the
+  mis-ordered list that dropped Orlando. AYL 3.2 now reports ORLANDO, CORIN,
+  TOUCHSTONE, ROSALIND, CELIA, JAQUES. Every gap the reviews predicted is
+  confirmed real: LUCE, LEONATO, QUINCE, FABIAN, the NURSE.
+
+## THE DESIGN, AFTER TWO KIBITZ ROUNDS + FABLE + SONNET
+
+Hardened plan: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md`.
+The keystone correction, which is NOT yet built: **compile source speech, do not
+generate it.** A ledger row that merely POINTS at a source segment proves
+structure, not meaning -- `PRODUCTION_SPRINT_LESSONS.md` lesson 11 already
+documents that exact failure class. Source-owned text must be materialized
+deterministically from an authenticated segmented artifact and verified against
+it. "Summarize into X words" then means SELECTING WHICH REAL SEGMENTS FIT THE
+BUDGET, not paraphrasing -- which also removes the VRAM hazard, since no model
+sits in the source-speech path.
+
+Settled by arithmetic: an episode cannot exceed **1,520 words** (19 voiced beats
+at act_count 7, `BEAT_WORD_HARD_MAX` 80), so full-scene performance is
+impossible without redesigning beat topology. Build target is the 300-word unit.
+
+## NEXT, IN ORDER
+
+1. **The segmented source artifact** (schema, spans, hashes, `body[start:end] ==
+   segment.text`, omission receipts) and the pass-to-field ownership table --
+   nothing else codes until that table exists.
+2. **Cast from the selected cut.** Real scenes carry 3-12 speakers against a
+   6-character ceiling (`_otr_casting.py` 1-6, `OutlineRequest` rejects >6), so
+   which speakers appear must follow from the cut that fits the word budget.
+   Coupled hard to the capacity guard: at act_count 1 there are exactly THREE
+   voiced beats, so a 4-person cast is a mathematically guaranteed
+   `CastVoiceCoverageError` -- the failure that killed `scifi_news` in the
+   six-bank run. `compute_episode_budget` must also receive the TRUE locked cast.
+3. **Loosen the count-match invariant** (`OTR_LedgerScriptWriter.py:4061-4067`
+   hard-raises on any locked != requested) and change the pack text that tells
+   the model to drop figures.
+4. **Extend `_otr_provenance.py`** -- do not add a second attribution owner --
+   and bind its output to the verified body hash.
+5. **Schema migration** to retire `cast_hints` / `visual_style_policy`; both are
+   still required by the validators and by `public_domain_manifest_schema.json`,
+   so manifests and tests migrate in the same change.
+
+## OPERATOR DECISIONS STILL OPEN
+
+* The **20 public_domain episodes** built from the fabricated fixture --
+  regenerate, relabel, or leave with the defect recorded? They must not count as
+  adaptation evidence either way.
+* The **superseded fabricated fixture** is still on disk, unreferenced, as the
+  evidence. Deleting it is the operator's call.
+* **PROD_BUG_LOG entries** for both live failures (repo policy requires naming
+  the live artifacts before any Bug Bible promotion).
+
+## KNOWN AND NOT FIXED
+
+`canonicalize_shakespeare_text` truncates at 12,000 chars and the interpreter
+sees only the first 5,000, so a 3,445-word scene reaches the brief as ~880 words,
+silently. Belongs with the artifact work, where each beat is fed its own segment
+rather than a blind prefix.
+
+---
+
+**Previous update: 2026-08-03 (afternoon) -- ORIGINAL MEANS "MAKE A RANDOM RADIO
 DRAMA", AND THE LEDGER NOW TELLS THE TRUTH ABOUT IT.**
 
 Branch `v2.0-alpha`, HEAD `de6b2ce2+`, pushed. Suite 8312 / Bible green.

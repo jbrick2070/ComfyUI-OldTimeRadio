@@ -1,0 +1,26 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "macbeth",
+  "unit": "act1_scene3",
+  "work_title": "Macbeth",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/macbeth_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:08Z",
+  "body_sha256": "3c43545567602aff2fbe54102c65606b933c1e6bb4663f781771dda30246c561",
+  "body_bytes": 6972,
+  "body_words": 1253,
+  "text_path": "config/source_banks/shakespeare/sources/macbeth__act1_scene3.txt",
+  "act": 1,
+  "scene": 3,
+  "speakers": [
+    "FIRST WITCH",
+    "SECOND WITCH",
+    "THIRD WITCH",
+    "ALL",
+    "MACBETH",
+    "BANQUO",
+    "ROSS",
+    "ANGUS"
+  ]
+}

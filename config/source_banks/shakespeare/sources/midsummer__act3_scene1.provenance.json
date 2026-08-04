@@ -1,0 +1,30 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "midsummer",
+  "unit": "act3_scene1",
+  "work_title": "A Midsummer Night's Dream",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/a-midsummer-nights-dream_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:09Z",
+  "body_sha256": "95f50ae0c2a8cac7b64eae2ad6993783b252c1668f38273a2f45837eea8f3125",
+  "body_bytes": 9167,
+  "body_words": 1638,
+  "text_path": "config/source_banks/shakespeare/sources/midsummer__act3_scene1.txt",
+  "act": 3,
+  "scene": 1,
+  "speakers": [
+    "BOTTOM",
+    "QUINCE",
+    "SNOUT",
+    "STARVELING",
+    "ROBIN",
+    "FLUTE",
+    "TITANIA",
+    "PEASEBLOSSOM",
+    "COBWEB",
+    "MOTE",
+    "MUSTARDSEED",
+    "ALL"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "much_ado",
+  "unit": "act3_scene1",
+  "work_title": "Much Ado About Nothing",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/much-ado-about-nothing_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:12Z",
+  "body_sha256": "f4d84902dd4087aaec297e54fce276aee0566c9c592ffe6440e3b38a01bc063d",
+  "body_bytes": 5368,
+  "body_words": 995,
+  "text_path": "config/source_banks/shakespeare/sources/much_ado__act3_scene1.txt",
+  "act": 3,
+  "scene": 1,
+  "speakers": [
+    "HERO",
+    "MARGARET",
+    "URSULA",
+    "BEATRICE"
+  ]
+}

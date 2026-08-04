@@ -1,0 +1,23 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "tempest",
+  "unit": "act1_scene2",
+  "work_title": "The Tempest",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/the-tempest_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:08Z",
+  "body_sha256": "9c68d7c72d5022f1bc9d5255b304d441e634fd0bd5c80ecf4af6b8d2ee796a42",
+  "body_bytes": 24026,
+  "body_words": 4339,
+  "text_path": "config/source_banks/shakespeare/sources/tempest__act1_scene2.txt",
+  "act": 1,
+  "scene": 2,
+  "speakers": [
+    "MIRANDA",
+    "PROSPERO",
+    "ARIEL",
+    "CALIBAN",
+    "FERDINAND"
+  ]
+}

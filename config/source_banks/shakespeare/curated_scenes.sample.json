@@ -23,7 +23,7 @@
         "First Witch"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/macbeth_act1_scene3_excerpt.txt"
+      "text_path": "sources/macbeth__act1_scene3.txt"
     },
     {
       "source_ref": "folger-tempest:act1-scene2-prospero-miranda",
@@ -47,7 +47,7 @@
         "Ariel"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/tempest_act1_scene2_prospero_miranda.txt"
+      "text_path": "sources/tempest__act1_scene2.txt"
     },
     {
       "source_ref": "folger-tempest:act3-scene1-miranda-ferdinand",
@@ -71,7 +71,7 @@
         "Prospero"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/tempest_act3_scene1_miranda_ferdinand.txt"
+      "text_path": "sources/tempest__act3_scene1.txt"
     },
     {
       "source_ref": "folger-midsummer:act3-scene1-bottom-titania",
@@ -95,7 +95,7 @@
         "Puck"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/midsummer_act3_scene1_bottom_titania.txt"
+      "text_path": "sources/midsummer__act3_scene1.txt"
     },
     {
       "source_ref": "folger-midsummer:act3-scene2-lovers-quarrel",
@@ -120,7 +120,7 @@
         "Demetrius"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/midsummer_act3_scene2_lovers_quarrel.txt"
+      "text_path": "sources/midsummer__act3_scene2.txt"
     },
     {
       "source_ref": "folger-twelfth-night:act1-scene5-viola-olivia",
@@ -144,7 +144,7 @@
         "Malvolio"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/twelfth_night_act1_scene5_viola_olivia.txt"
+      "text_path": "sources/twelfth_night__act1_scene5.txt"
     },
     {
       "source_ref": "folger-twelfth-night:act2-scene5-malvolio-letter",
@@ -168,7 +168,7 @@
         "Toby"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/twelfth_night_act2_scene5_malvolio_letter.txt"
+      "text_path": "sources/twelfth_night__act2_scene5.txt"
     },
     {
       "source_ref": "folger-much-ado:act2-scene3-benedick-overhears",
@@ -192,7 +192,7 @@
         "Claudio"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/much_ado_act2_scene3_benedick_overhears.txt"
+      "text_path": "sources/much_ado__act2_scene3.txt"
     },
     {
       "source_ref": "folger-much-ado:act3-scene1-beatrice-overhears",
@@ -216,7 +216,7 @@
         "Ursula"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/much_ado_act3_scene1_beatrice_overhears.txt"
+      "text_path": "sources/much_ado__act3_scene1.txt"
     },
     {
       "source_ref": "folger-as-you-like-it:act3-scene2-rosalind-orlando",
@@ -240,7 +240,7 @@
         "Orlando"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/as_you_like_it_act3_scene2_rosalind_orlando.txt"
+      "text_path": "sources/as_you_like_it__act3_scene2.txt"
     },
     {
       "source_ref": "folger-hamlet:act1-scene1-platform-watch",
@@ -264,7 +264,7 @@
         "Barnardo"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/hamlet_act1_scene1_platform_watch.txt"
+      "text_path": "sources/hamlet__act1_scene1.txt"
     },
     {
       "source_ref": "folger-lear:act1-scene1-love-test",
@@ -288,7 +288,7 @@
         "Kent"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/king_lear_act1_scene1_love_test.txt"
+      "text_path": "sources/king_lear__act1_scene1.txt"
     },
     {
       "source_ref": "folger-romeo-juliet:act2-scene2-balcony",
@@ -311,7 +311,7 @@
         "Juliet"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/romeo_juliet_act2_scene2_balcony.txt"
+      "text_path": "sources/romeo_juliet__act2_scene2.txt"
     },
     {
       "source_ref": "folger-comedy-errors:act3-scene1-locked-door",
@@ -335,7 +335,7 @@
         "Adriana"
       ],
       "visual_style_policy": "derive_from_source",
-      "text_path": "fixtures/comedy_errors_act3_scene1_locked_door.txt"
+      "text_path": "sources/comedy_errors__act3_scene1.txt"
     }
   ]
 }

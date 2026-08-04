@@ -1,0 +1,23 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "twelfth_night",
+  "unit": "act2_scene5",
+  "work_title": "Twelfth Night",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/twelfth-night_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-08-04T00:40:11Z",
+  "body_sha256": "17f85301a1e3b465a01d7fa9a92280b8746d5256b0ffdbce3eb8f231b3e8afd5",
+  "body_bytes": 9230,
+  "body_words": 1639,
+  "text_path": "config/source_banks/shakespeare/sources/twelfth_night__act2_scene5.txt",
+  "act": 2,
+  "scene": 5,
+  "speakers": [
+    "TOBY",
+    "FABIAN",
+    "ANDREW",
+    "MARIA",
+    "MALVOLIO"
+  ]
+}
