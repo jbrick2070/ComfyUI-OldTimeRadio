@@ -92,12 +92,28 @@ _MALE_TITLE = (
     "governor", "constable", "watchman", "sexton", "signior", "signor",
     "senator", "tribune", "soldier", "sailor", "boatswain", "clown", "fool",
     "steward", "porter", "herald", "apothecary", "schoolmaster", "tutor",
+    "thane", "commander", "murderer", "nobleman", "wrestler", "courtier",
+    # "Scottish Nobles" in this corpus are men; period convention, not a claim
+    # about the word in general.
+    "noble",
 )
 _FEMALE_TITLE = (
     "duchess", "queen", "princess", "lady", "dame", "countess", "baroness",
     "abbess", "nun", "shepherdess", "waiting-woman", "gentlewoman", "goddess",
     "empress", "mistress", "nurse", "maid", "governess", "mrs", "miss", "madam",
+    "witch", "sorceress", "seamstress", "milkmaid", "matron",
 )
+
+# "Three Witches, the Weird Sisters" is ONE roster entry, but the play speaks as
+# FIRST WITCH, SECOND WITCH and THIRD WITCH. The same shape covers "Three
+# Murderers". Expanding it is what gets the prophecy on the heath -- the marquee
+# scene of the corpus -- its cast.
+_COUNTED_ENTRY_RE = re.compile(
+    r"^(?P<count>two|three|four|five|six)\s+(?P<role>[A-Za-z][A-Za-z'\-]*)\b",
+    re.IGNORECASE,
+)
+_ORDINALS = ("FIRST", "SECOND", "THIRD", "FOURTH", "FIFTH", "SIXTH")
+_COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 
 _WORD_RE = re.compile(r"[a-z']+")
 
@@ -135,8 +151,26 @@ class CharacterRecord:
         candidate = str(speech_prefix or "").strip().upper()
         return bool(candidate) and (
             candidate == self.name.upper()
-            or candidate in {alias.upper() for alias in self.aliases}
+            or candidate in {form.upper() for form in self.aliases}
         )
+
+
+def _counted_aliases(entry_text: str) -> tuple[str, ...]:
+    """Ordinal speech prefixes implied by a counted collective entry.
+
+    "Three Witches, the Weird Sisters" -> FIRST WITCH, SECOND WITCH, THIRD WITCH.
+    """
+    match = _COUNTED_ENTRY_RE.match(str(entry_text or "").strip())
+    if match is None:
+        return ()
+    count = _COUNT_WORDS.get(match.group("count").lower(), 0)
+    plural = match.group("role")
+    # The entry names the role in the PLURAL ("Witches", "Murderers") while the
+    # speech prefix uses the singular ("FIRST WITCH"). Take the shortest
+    # singular form, since "Witches" must reduce to "Witch", not "Witche".
+    singular = min(_singular_forms(plural.lower()), key=len)
+    role = singular.upper()
+    return tuple(f"{_ORDINALS[i]} {role}" for i in range(min(count, len(_ORDINALS))))
 
 
 def _aliases_for(name: str) -> tuple[str, ...]:
@@ -151,11 +185,11 @@ def _aliases_for(name: str) -> tuple[str, ...]:
     elif len(words) > 1 and not stripped:
         # An all-honorific name like "FIRST LORD" -- keep it whole.
         out.append(" ".join(words))
-    seen_alias: list[str] = []
-    for alias in out:
-        if alias and alias.upper() != str(name).upper() and alias not in seen_alias:
-            seen_alias.append(alias)
-    return tuple(seen_alias)
+    unique_forms: list[str] = []
+    for form in out:
+        if form and form.upper() != str(name).upper() and form not in unique_forms:
+            unique_forms.append(form)
+    return tuple(unique_forms)
 
 
 def _singular_forms(word: str) -> tuple[str, ...]:
@@ -247,6 +281,27 @@ def parse_character_roster(play_text: str) -> tuple[CharacterRecord, ...]:
             # them Lords.
             group_context = stripped.rstrip(":").strip()
             continue
+        # A counted collective ("Three Witches, the Weird Sisters") is written in
+        # mixed case, so the all-caps entry pattern never sees it. It must be
+        # read first, and it stands for several speakers rather than one.
+        counted = _counted_aliases(stripped)
+        if counted:
+            head, _, tail = stripped.partition(",")
+            gender, source = infer_gender(head, tail.strip() or head)
+            if head not in seen:
+                seen.add(head)
+                records.append(
+                    CharacterRecord(
+                        name=head.strip(),
+                        description=tail.strip(),
+                        gender=gender,
+                        gender_source=source,
+                        aliases=counted,
+                    )
+                )
+            group_context = ""
+            continue
+
         match = _ENTRY_RE.match(stripped)
         if match is None:
             group_context = ""

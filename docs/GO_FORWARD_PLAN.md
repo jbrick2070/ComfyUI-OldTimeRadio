@@ -115,6 +115,60 @@ where that one speech IS the payoff. Open: Rosalind-as-Ganymede and Viola-as-Ces
 (female playing male), and whether voice-pool capacity belongs in window ELIGIBILITY
 -- Macbeth 1.3 needs five distinct voices against a six-slot ceiling.
 
+## CASTING GENDER: FIXED AT THE SOURCE (`d8752d69` + follow-up)
+
+**The defect, measured not suspected:** `gender_of_first_name` returns "unknown"
+for JULIET, ROSALIND, CELIA, TITANIA, BEATRICE -- every name in the corpus, since
+none are in the 1930s first-name lexicon. The statistical 40/40/20 allocator's
+rolled gender therefore stands and the voice picker takes it, so a female lead
+draws a male Bark voice on roughly half of seeds the moment this lane wires up.
+
+**The fix:** `nodes/_otr_character_roster.py` reads the play's own cast list at
+VENDOR time and writes each scene's characters (name, roster_name, description,
+gender, gender_source) into the provenance sidecar. The render path reads a
+recorded answer and never infers. Four real cast-list shapes had to be learned,
+each found by running against the actual texts:
+
+* **Relation outranks title** -- "daughter to Duke Senior" is a woman despite
+  naming a Duke; a relation describes THIS character, a title may belong to
+  someone named in passing.
+* **Group headers describe their indented members**, and are written PLURAL:
+  "Lords attending Duke Senior in exile:" then a bare JAQUES; "Waiting
+  gentlewomen to Hero:" then MARGARET and URSULA.
+* **Back-reference** -- ROMEO and JULIET are listed BARE. Their gender is in the
+  NEXT entries: "MONTAGUE, his father", "CAPULET, her father". Without it the
+  balcony scene resolved 0 of 3 speakers.
+* **Roster names differ from speech prefixes** -- "SIGNIOR BENEDICK" speaks as
+  BENEDICK, "COUNT CLAUDIO" as CLAUDIO. Records carry honorific-stripped aliases,
+  while gender still reads the FULL name because the honorific is what genders it.
+* **Counted collectives** -- "Three Witches, the Weird Sisters" is ONE entry
+  standing for FIRST/SECOND/THIRD WITCH. Expanding it took Macbeth 1.3 from 0/8
+  speakers gendered to 7/8, which matters because the prophecy is the marquee
+  scene.
+
+Corpus after: AYL 6/6, Lear 9/9, R&J 3/3, Much Ado 4/4, Tempest 3/3, Twelfth
+Night 5/6, Macbeth 7/8. **Still weak: Midsummer 1/12 and Comedy of Errors 1/7** --
+mechanicals and servants in shapes not yet read, recorded `unknown` not guessed.
+Operator is open to a vendor-time LLM/web lookup as the final tier for stragglers,
+recorded under its own `gender_source` so it stays auditable.
+
+Voice pool is 6 male / 4 female (Bark) against a 6-character ceiling, so voice
+feasibility likely belongs in window ELIGIBILITY, not just casting. Disguise
+ruling: ROSALIND-as-Ganymede and VIOLA-as-Cesario keep FEMALE voices -- the source
+prefix says who speaks, and the irony depends on the audience hearing her; the
+announcer states the disguise from a manifest field instead.
+
+## VISUAL STYLE: RANDOMIZED IS FINE NOW (operator, evening)
+
+The earlier objection to `archival_documentary` over a Folger comedy was about
+TRUTHFULNESS, not variety -- the credits claimed a story scaffold the episode did
+not have. With the words now genuinely the play's own and the strip naming the
+real source, a randomly drawn look is artistic range. **Consequence:**
+`visual_style_policy: "derive_from_source"` -- schema-required on every scene and
+read by NO code -- should be DELETED rather than wired, or the manifest asserts
+the opposite of intended behaviour. `nodes/visual_styles/shakespeare_stage_realism.json`
+then becomes an ordinary pool member rather than a pin.
+
 ## THE PASSAGE LANE (operator ruling, evening)
 
 > "For shakespeare I'm open to a version that is very strict and finds, based on
