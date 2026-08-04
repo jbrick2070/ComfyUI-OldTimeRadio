@@ -41,6 +41,7 @@ __all__ = [
     "max_act_count",
     "compute_episode_budget",
     "auto_act_count",
+    "voiced_beat_count",
 ]
 
 
@@ -326,6 +327,34 @@ def compute_episode_budget(
         cast_size=num_characters,
         target_words=target_words,
     )
+
+
+def voiced_beat_count(target_words: int, act_count: int | None = None) -> int:
+    """Voiced CHARACTER beats available at this target (announcer rows excluded).
+
+    One source of truth for a number that is easy to assume wrongly: the beat
+    count follows the ACT TOPOLOGY, not the word budget, so it moves in steps.
+    Measured: 30-120 target words give 3, 150-200 give 6, 300-1200 give 14.
+
+    This matters wherever content has to be performed one unit per beat -- a
+    VERBATIM passage from a play carries one speech per voiced beat, so a
+    seven-speech exchange simply cannot be performed at 120 words however well
+    it fits the word budget. It is also the predicate a cast-capacity guard
+    needs: every locked character must have at least one beat to speak in, and
+    at 3 beats a four-person cast is a mathematical guarantee of a coverage
+    failure, not a risk.
+
+    ``act_count=None`` resolves through ``auto_act_count`` (the ``'auto'``
+    widget path). Raises ``InvalidEpisodeBudgetError`` for an infeasible target,
+    exactly as the budget builder does.
+    """
+    acts = auto_act_count(target_words) if act_count is None else int(act_count)
+    if acts not in ACT_COUNT_CONFIG:
+        raise InvalidEpisodeBudgetError(
+            f"act_count {acts} is not a configured topology "
+            f"(have {sorted(ACT_COUNT_CONFIG)})"
+        )
+    return sum(ACT_COUNT_CONFIG[acts]["voiced_beats_per_act"])
 
 
 def auto_act_count(target_words: int) -> int:
