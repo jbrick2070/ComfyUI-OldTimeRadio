@@ -113,11 +113,48 @@ _CURRENT_BANKS = [
 ]
 
 
+#: The FIDELITY banks adapt someone else's text, so their rights data has to
+#: reach a human. They opted in 2026-08-04. Every other bank writes its own
+#: material and stays inert.
+_PROVENANCE_OPTED_IN = frozenset({"shakespeare", "public_domain"})
+
+
 class TestCurrentBanksInert:
+    """The normalizer was built opt-in and left switched off everywhere, which
+    is why the announcer read a raw licence string aloud instead of the clean
+    coda this module composes. These tests pin WHICH banks opt in, so turning
+    the flag on (or losing it) is a deliberate, visible act."""
+
     @pytest.mark.parametrize("bank_id", _CURRENT_BANKS)
-    def test_no_current_bank_opts_in(self, bank_id):
+    def test_only_the_fidelity_banks_opt_in(self, bank_id):
         bank = SR.require_runnable_bank(bank_id)
-        assert not (bank.defaults or {}).get("provenance_normalize")
+        opted = bool((bank.defaults or {}).get("provenance_normalize"))
+        assert opted is (bank_id in _PROVENANCE_OPTED_IN), (
+            f"{bank_id}: provenance_normalize={opted}; expected "
+            f"{bank_id in _PROVENANCE_OPTED_IN}"
+        )
+
+    def test_the_noncommercial_source_warns_and_the_free_one_does_not(self):
+        """Folger is CC BY-NC. Nothing used to tell a publisher that."""
+        folger = PROV.normalize_provenance({
+            "source_label": "Folger Shakespeare",
+            "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+            "commercial_use_allowed": False,
+        })
+        notice = PROV.noncommercial_notice(folger)
+        assert "NON-COMMERCIAL SOURCE" in notice
+        assert "Do not sell it" in notice
+        # The licence identifier belongs in PRINT, never in the audio.
+        assert "CC BY-NC" in PROV.printed_credit_line(folger)
+        assert "CC BY-NC" not in PROV.spoken_coda_line(folger)
+
+        gutenberg = PROV.normalize_provenance({
+            "source_label": "Project Gutenberg",
+            "license_status": "public_domain_us",
+        })
+        assert PROV.noncommercial_notice(gutenberg) == ""
+        # A transcriber is not named aloud when the law does not require it.
+        assert "Gutenberg" not in PROV.spoken_coda_line(gutenberg)
 
 
 # ---------------------------------------------------------------------------

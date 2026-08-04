@@ -3579,6 +3579,16 @@ class OTR_LedgerScriptWriter:
                 _pc = _OTRPROV.printed_credit_line(_prov)
                 if _pc:
                     meta["credits_source_line"] = _pc
+            # A NON-COMMERCIAL SOURCE HAS TO REACH A HUMAN (2026-08-04).
+            # commercial_use_allowed was already validated, carried and
+            # normalized -- and shown to nobody. An operator publishing a
+            # Folger-sourced episode had no way to learn it must not be sold.
+            # Stamped for downstream surfaces AND logged loudly here, because
+            # the ledger is read by machines and the log is read by people.
+            _nc = _OTRPROV.noncommercial_notice(_prov)
+            if _nc:
+                meta["noncommercial_notice"] = _nc
+                log.warning("[OTR_LedgerScriptWriter] %s", _nc)
         meta["story_scaffold"] = _scaffold
         # Stage 3C: stamp the visual style -- THE threading channel: every
         # downstream visual composer reads meta["visual_style"] via

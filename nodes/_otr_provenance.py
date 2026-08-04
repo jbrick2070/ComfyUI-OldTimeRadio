@@ -19,6 +19,12 @@ Durable ledger keys (sole writer = ``OTR_LedgerScriptWriter.run``, opt-in via
   * ``meta["provenance_coda_line"]``  -- the spoken acknowledgement
   * ``meta["credits_source_line"]``   -- the printed credit (only when the bank
                                          default did not already set one)
+  * ``meta["noncommercial_notice"]``  -- a plain warning, present ONLY when the
+                                         source forbids commercial use
+
+The spoken line names the SOURCE, never the licence identifier; the licence
+text rides on the printed credit. Attribution under CC BY is satisfied "in the
+manner specified", which does not mean read aloud mid-drama.
 
 Terminal = ``_otr_ledger_freeze._check_g14_provenance_publish`` (in
 ``run_gap_audit`` -> the one path every family crosses): raises
@@ -34,6 +40,7 @@ __all__ = [
     "normalize_provenance",
     "spoken_coda_line",
     "printed_credit_line",
+    "noncommercial_notice",
 ]
 
 # license_status values the public-domain fetcher emits.
@@ -101,13 +108,44 @@ def spoken_coda_line(provenance: Any) -> str:
     if status in _CODA_BY_STATUS:
         return _CODA_BY_STATUS[status]
     if status in ("licensed_commercial", "licensed_noncommercial"):
-        label = str(prov.get("license_label") or "").strip()
         src = str(prov.get("source_label") or "").strip()
-        if src and label:
-            return f"Tonight's tale was adapted from {src}, used under {label}."
+        # THE SPOKEN LINE NAMES THE EDITION, NEVER THE LICENCE (2026-08-04).
+        # It used to append "used under CC BY-NC 3.0 (Folger Shakespeare
+        # Library)", so a listener heard a licence identifier read aloud in the
+        # middle of a drama. Attribution is still satisfied -- CC BY requires
+        # credit "in the manner specified", not credit in the audio -- and the
+        # full licence text rides on printed_credit_line() below, which is what
+        # the credits roll and the episode description carry.
         if src:
             return f"Tonight's tale was adapted from {src}."
     return ""
+
+
+def noncommercial_notice(provenance: Any) -> str:
+    """A plain-language warning for a source that forbids commercial use.
+
+    Empty unless the source is explicitly non-commercial. This exists because
+    the rights data was already correct and threaded -- ``commercial_use_allowed``
+    is validated, carried, and normalized -- but no HUMAN surface ever showed
+    it, so nothing told a publisher that an episode must not be sold. Operator
+    directive 2026-08-04: "tell people if they do [monetize] they need to not
+    ship and sell shakespeare episodes." Never raises.
+    """
+    prov = provenance if isinstance(provenance, dict) else {}
+    if prov.get("commercial_use_allowed") is not False:
+        return ""
+    src = str(prov.get("source_label") or "").strip()
+    label = str(prov.get("license_label") or "").strip()
+    who = f"{src} " if src else ""
+    # The label often already carries the org in parentheses, so nesting a
+    # second pair reads badly ("Folger Shakespeare text (CC BY-NC 3.0 (Folger
+    # Shakespeare Library))").
+    under = f" licensed {label}" if label else ""
+    return (
+        f"NON-COMMERCIAL SOURCE: this episode adapts {who}text{under}, which "
+        "does NOT permit commercial use. Do not sell it, and do not publish it "
+        "on a monetized channel. Personal and non-commercial sharing is fine."
+    )
 
 
 def printed_credit_line(provenance: Any) -> str:
