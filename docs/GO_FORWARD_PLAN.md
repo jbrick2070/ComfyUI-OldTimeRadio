@@ -106,6 +106,43 @@ Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
   and tests are correct; the GO_FORWARD entry in it describes the real change.
 
 
+### NEWBUG (live, 2026-08-03 22:27): A WHIFFED SHOT DIRECTIVE STRANDS A SCENE-INIT ENGINE
+
+**PROD_BUG_LOG-eligible** -- verified by a live headless leg, not a static read.
+Leg `tmp/_sh_p1_still_motion_a.log`, prompt `14c8230d`, profile
+`otr_w45_still_motion`, 320 words, bank `shakespeare`. FAILED at 16.1 min:
+
+    OTR_ImageGenDispatcher / ImageRenderError:
+      required scene image targets missing or unmaterialized before video
+      dispatch: still_b007, still_b008
+
+Causal chain, all four links in `tmp/_w45_server.log`:
+
+1. `[OTR_ShotLock] writer LLM produced no usable directive for beat b007 after
+   2 reseeds; using deterministic template collapse guard` (same for b008).
+2. The collapse guard supplies a directive but **does NOT mint a scene still**.
+3. `still_motion` is static_motion-family = SCENE-INIT: `[OTR.render_driver]
+   ... has NO scene still in the ledger. NO portrait-init fallback (no-fallback
+   rip) -- a scene-init engine MUST have its per-beat scene still minted
+   upstream`.
+4. `OTR_ImageGenDispatcher` fails the whole episode closed.
+
+So the collapse guard and the no-fallback rip are individually correct and
+mutually incompatible: one is a soft recovery, the other refuses soft input.
+Nothing owns "the writer whiffed AND the engine requires a still".
+
+**Why it showed up now: beat count.** 320 words builds 19 beats (b000-b018,
+plus opening/closing music stills = 21 image targets). Every prior sweep ran 30
+or 45 words = ~7 beats. More beats, more independent chances for the writer to
+whiff, and ONE whiff on a scene-init engine kills the episode. This is very
+likely the same family as the four engines that fail "no new file in otr/obs" --
+check whether they are all scene-init before treating them as four bugs.
+
+**Do not fix by re-adding a portrait-init fallback** -- the no-fallback rip was
+deliberate. The candidate fix is to give the collapse guard an owner for the
+scene still (mint a deterministic one from the beat's own text), which keeps the
+rip intact. Enumerate the ledger fields before touching it.
+
 ### NOT A BUG: "recursive fractal HuMo all slots" AS AN EPISODE TITLE (triaged 2026-08-03 22:4x)
 
 Operator hit a published episode whose title card read `=== SIGNAL LOST ===` /
