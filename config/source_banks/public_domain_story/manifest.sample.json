@@ -848,6 +848,522 @@
           "text_path": "sources/anne_green_gables_apology.txt"
         }
       ]
+    },
+    {
+      "source_id": "machine_stops",
+      "title": "The Eternal Moment and Other Stories",
+      "author": "E. M. Forster",
+      "year": "1909",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/72890/pg72890.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "prophetic",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Vashti",
+        "Kuno",
+        "the voice of the Machine"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Machine Stops",
+          "synopsis": "Vashti lives alone in a hexagonal cell served by the Machine, and her son calls to beg her to come to him in person.",
+          "text_path": "sources/machine_stops.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "the_wendigo",
+      "title": "The Wendigo",
+      "author": "Algernon Blackwood",
+      "year": "1910",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/10897/pg10897.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "primal",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Defago",
+        "Simpson",
+        "Dr. Cathcart",
+        "Hank"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The night camp",
+          "synopsis": "A guide weeps in his sleep, a voice calls him out of the tent, and his cry recedes across the sky.",
+          "text_path": "sources/the_wendigo.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "the_mezzotint",
+      "title": "Ghost Stories of an Antiquary",
+      "author": "M. R. James",
+      "year": "1904",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/8486/pg8486.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "donnish",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Williams",
+        "Nisbet",
+        "a colleague",
+        "Filcher"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Mezzotint",
+          "synopsis": "Scholars examine an engraving in turns across one night, and the figure in it moves between glances.",
+          "text_path": "sources/the_mezzotint.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "green_tea",
+      "title": "Green Tea; Mr. Justice Harbottle",
+      "author": "J. Sheridan Le Fanu",
+      "year": "1872",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/11635/pg11635.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "confessional",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Dr. Hesselius",
+        "Reverend Jennings"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Green Tea",
+          "synopsis": "A clergyman confesses to a doctor that a small red-eyed monkey has followed him since he began taking green tea.",
+          "text_path": "sources/green_tea.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "man_size_in_marble",
+      "title": "Grim Tales",
+      "author": "E. Nesbit",
+      "year": "1893",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/40321/pg40321.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "folkloric",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Jack",
+        "Laura",
+        "Mrs. Dorman",
+        "Dr. Kelly"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Man-Size in Marble",
+          "synopsis": "A housekeeper warns that the marble figures walk on All Saints' Eve, the warning is dismissed, and the slabs are found empty.",
+          "text_path": "sources/man_size_in_marble.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "beckoning_fair_one",
+      "title": "Widdershins",
+      "author": "Oliver Onions",
+      "year": "1911",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/14168/pg14168.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "insidious",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Paul Oleron",
+        "Elsie Bengough",
+        "the landlady"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Beckoning Fair One",
+          "synopsis": "Alone in his rooms, a writer hears a drip resolve into a comb drawn slowly through long hair.",
+          "text_path": "sources/beckoning_fair_one.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "white_people",
+      "title": "The House of Souls",
+      "author": "Arthur Machen",
+      "year": "1904",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/25016/pg25016.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "incantatory",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the girl",
+        "Ambrose",
+        "Cotgrave"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Green Book",
+          "synopsis": "A girl's diary recites half-understood ceremonies taught by her nurse, in a language she never explains.",
+          "text_path": "sources/white_people.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "whistling_room",
+      "title": "Carnacki, the Ghost-Finder",
+      "author": "William Hope Hodgson",
+      "year": "1910",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/10832/pg10832.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "eerie",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Carnacki",
+        "Tassoc",
+        "a club listener"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Whistling Room",
+          "synopsis": "A ghost-finder keeps vigil in a castle room whose haunting is an enormous whistle, and watches the floor purse into lips.",
+          "text_path": "sources/whistling_room.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "idle_days_on_the_yann",
+      "title": "A Dreamer's Tales",
+      "author": "Lord Dunsany",
+      "year": "1910",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/8129/pg8129.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "dreamlike",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the Dreamer",
+        "the Captain",
+        "the helmsman"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Idle Days on the Yann",
+          "synopsis": "A dreamer boards the Bird of the River, and at sunset every sailor prays to a different god.",
+          "text_path": "sources/idle_days_on_the_yann.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "fire_not_quenched",
+      "title": "Uncanny Stories",
+      "author": "May Sinclair",
+      "year": "1922",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/59165/pg59165.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "purgatorial",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Harriott Leigh",
+        "Oscar Wade"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Where Their Fire Is Not Quenched",
+          "synopsis": "A woman dies and finds eternity is the one hotel afternoon she is most ashamed of, recurring.",
+          "text_path": "sources/fire_not_quenched.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "voyage_to_arcturus",
+      "title": "A Voyage to Arcturus",
+      "author": "David Lindsay",
+      "year": "1920",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/1329/pg1329.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "vertiginous",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Maskull",
+        "Krag",
+        "Nightspore",
+        "Backhouse"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Seance",
+          "synopsis": "A drawing-room seance materializes a smiling apparition, and a stranger walks up and breaks its neck.",
+          "text_path": "sources/voyage_to_arcturus.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "poison_belt",
+      "title": "The Poison Belt",
+      "author": "Arthur Conan Doyle",
+      "year": "1913",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/126/pg126.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "valedictory",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Professor Challenger",
+        "Mrs. Challenger",
+        "Summerlee",
+        "Lord John Roxton",
+        "Malone"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The sealed room",
+          "synopsis": "Five people seal themselves in with oxygen cylinders and watch the world go quiet through the window.",
+          "text_path": "sources/poison_belt.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "kipling_wireless",
+      "title": "Traffics and Discoveries",
+      "author": "Rudyard Kipling",
+      "year": "1902",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/9790/pg9790.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "numinous",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the narrator",
+        "Mr. Shaynor",
+        "Mr. Cashell"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Wireless",
+          "synopsis": "An induction coil crackles for signals while a consumptive chemist's assistant slides into trance and writes Keats he has never read.",
+          "text_path": "sources/kipling_wireless.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "theodore_savage",
+      "title": "Theodore Savage",
+      "author": "Cicely Hamilton",
+      "year": "1922",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/65848/pg65848.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "apocalyptic",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Theodore Savage",
+        "Ada",
+        "a camp official"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The air war",
+          "synopsis": "A civil servant watches the northern sky burn and joins the roads of the displaced.",
+          "text_path": "sources/theodore_savage.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "clockwork_man",
+      "title": "The Clockwork Man",
+      "author": "E. V. Odle",
+      "year": "1923",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/60374/pg60374.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "tragicomic",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the Clockwork Man",
+        "Dr. Allingham",
+        "Gregg",
+        "Arthur Withers"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The cricket match",
+          "synopsis": "A man with flapping ears and looping speech interrupts a village cricket match, then sprints into a hedge.",
+          "text_path": "sources/clockwork_man.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "enoch_soames",
+      "title": "Seven Men",
+      "author": "Max Beerbohm",
+      "year": "1916",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/1306/pg1306.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "sardonic",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Max",
+        "Enoch Soames",
+        "the Devil",
+        "Rothenstein"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "Enoch Soames",
+          "synopsis": "A failed poet sells his soul to visit the future and learn whether posterity remembers him.",
+          "text_path": "sources/enoch_soames.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "living_alone",
+      "title": "Living Alone",
+      "author": "Stella Benson",
+      "year": "1919",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/14907/pg14907.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "whimsical",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the Witch",
+        "Sarah Brown",
+        "two committee ladies"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The War Savings Committee",
+          "synopsis": "A witch disrupts a wartime committee meeting, and the minutes do not know what to do with her.",
+          "text_path": "sources/living_alone.txt"
+        }
+      ]
     }
   ]
 }

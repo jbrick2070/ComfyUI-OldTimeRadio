@@ -230,6 +230,142 @@ WORKS: list[dict] = [
          label="Mrs. Rachel Lynde is properly horrified",
          synopsis="Anne answers an insult with interest, then delivers an apology so extravagant it becomes a triumph.",
          cast=["Anne Shirley", "Marilla Cuthbert", "Mrs. Rachel Lynde", "Matthew Cuthbert"]),
+
+    # ----------------------------------------------------------------- #
+    # SECOND PASS: the BBC weird/SF repertoire -- the Home Service and
+    # Third Programme temperament, where the uncanny arrives by committee
+    # minute, cricket match and chemist's shop. Deliberately less famous.
+    #
+    # UK COPYRIGHT FLAG: all are pre-1930 and US public domain, which is the
+    # governing rule for this offline US rig, but four authors remain in UK
+    # copyright under life+70 -- Forster (2041), Onions (2032), Dunsany
+    # (2028), Beerbohm (2027). Re-check those four before any distribution
+    # outside the US. The rest are clear on both sides.
+    # ----------------------------------------------------------------- #
+    dict(slug="machine_stops", gid=72890, title="The Eternal Moment and Other Stories",
+         author="E. M. Forster", year="1909",
+         chunk=("story", "THE MACHINE STOPS", "THE POINT OF IT"), tag="prophetic",
+         label="The Machine Stops",
+         synopsis="Vashti lives alone in a hexagonal cell served by the Machine, and her son calls to beg her to come to him in person.",
+         cast=["Vashti", "Kuno", "the voice of the Machine"]),
+    dict(slug="the_wendigo", gid=10897, title="The Wendigo", author="Algernon Blackwood",
+         year="1910", chunk=("whole",), tag="primal",
+         label="The night camp",
+         synopsis="A guide weeps in his sleep, a voice calls him out of the tent, and his cry recedes across the sky.",
+         cast=["Defago", "Simpson", "Dr. Cathcart", "Hank"]),
+    dict(slug="the_mezzotint", gid=8486, title="Ghost Stories of an Antiquary",
+         author="M. R. James", year="1904",
+         chunk=("story", "THE MEZZOTINT", "THE ASH-TREE"), tag="donnish",
+         label="The Mezzotint",
+         synopsis="Scholars examine an engraving in turns across one night, and the figure in it moves between glances.",
+         cast=["Williams", "Nisbet", "a colleague", "Filcher"]),
+    dict(slug="green_tea", gid=11635, title="Green Tea; Mr. Justice Harbottle",
+         author="J. Sheridan Le Fanu", year="1872",
+         chunk=("story", "GREEN TEA", "MR. JUSTICE HARBOTTLE"), tag="confessional",
+         label="Green Tea",
+         synopsis="A clergyman confesses to a doctor that a small red-eyed monkey has followed him since he began taking green tea.",
+         cast=["Dr. Hesselius", "Reverend Jennings"]),
+    dict(slug="man_size_in_marble", gid=40321, title="Grim Tales", author="E. Nesbit",
+         year="1893",
+         chunk=("story", "MAN-SIZE IN MARBLE", "THE EBONY FRAME"), tag="folkloric",
+         label="Man-Size in Marble",
+         synopsis="A housekeeper warns that the marble figures walk on All Saints' Eve, the warning is dismissed, and the slabs are found empty.",
+         cast=["Jack", "Laura", "Mrs. Dorman", "Dr. Kelly"]),
+    dict(slug="beckoning_fair_one", gid=14168, title="Widdershins",
+         author="Oliver Onions", year="1911",
+         # A genuine ~25k novella, not a slicing runaway -- hence the override.
+         chunk=("story", "THE BECKONING FAIR ONE", "PHANTAS"), max_words=30000,
+         tag="insidious",
+         label="The Beckoning Fair One",
+         synopsis="Alone in his rooms, a writer hears a drip resolve into a comb drawn slowly through long hair.",
+         cast=["Paul Oleron", "Elsie Bengough", "the landlady"]),
+    dict(slug="ghost_ship", gid=11045, title="The Ghost Ship", author="Richard Middleton",
+         year="1912", chunk=("whole",), tag="convivial",
+         label="The Ghost Ship",
+         synopsis="A pirate ghost ship is blown into a turnip field, and the village negotiates with its captain over spectral rum.",
+         cast=["the village narrator", "the parson", "the ghost captain"]),
+    dict(slug="white_people", gid=25016, title="The House of Souls", author="Arthur Machen",
+         year="1904",
+         chunk=("story", "THE WHITE PEOPLE", "THE GREAT GOD PAN"), tag="incantatory",
+         label="The Green Book",
+         synopsis="A girl's diary recites half-understood ceremonies taught by her nurse, in a language she never explains.",
+         cast=["the girl", "Ambrose", "Cotgrave"]),
+    dict(slug="whistling_room", gid=10832, title="Carnacki, the Ghost-Finder",
+         author="William Hope Hodgson", year="1910",
+         chunk=("story", "No. 3--THE WHISTLING ROOM",
+                "No. 4--THE HORSE OF THE INVISIBLE"), tag="eerie",
+         label="The Whistling Room",
+         synopsis="A ghost-finder keeps vigil in a castle room whose haunting is an enormous whistle, and watches the floor purse into lips.",
+         cast=["Carnacki", "Tassoc", "a club listener"]),
+    dict(slug="idle_days_on_the_yann", gid=8129, title="A Dreamer's Tales",
+         author="Lord Dunsany", year="1910",
+         chunk=("story", "IDLE DAYS ON THE YANN", "THE SWORD AND THE IDOL"),
+         tag="dreamlike",
+         label="Idle Days on the Yann",
+         synopsis="A dreamer boards the Bird of the River, and at sunset every sailor prays to a different god.",
+         cast=["the Dreamer", "the Captain", "the helmsman"]),
+    dict(slug="fire_not_quenched", gid=59165, title="Uncanny Stories",
+         author="May Sinclair", year="1922",
+         chunk=("story", "WHERE THEIR FIRE IS NOT QUENCHED",
+                "THE TOKEN"), tag="purgatorial",
+         label="Where Their Fire Is Not Quenched",
+         synopsis="A woman dies and finds eternity is the one hotel afternoon she is most ashamed of, recurring.",
+         cast=["Harriott Leigh", "Oscar Wade"]),
+    dict(slug="voyage_to_arcturus", gid=1329, title="A Voyage to Arcturus",
+         author="David Lindsay", year="1920",
+         chunk=("chapters", 1, 1), tag="vertiginous",
+         label="The Seance",
+         synopsis="A drawing-room seance materializes a smiling apparition, and a stranger walks up and breaks its neck.",
+         cast=["Maskull", "Krag", "Nightspore", "Backhouse"]),
+    dict(slug="purple_cloud", gid=11229, title="The Purple Cloud", author="M. P. Shiel",
+         year="1901", chunk=("chapters", 10, 11), tag="desolate",
+         label="Landfall in a dead Britain",
+         synopsis="The last man walks into a silent London, with two contending voices in his head for company.",
+         cast=["Adam Jeffson", "the Voice of the White", "the Voice of the Black"]),
+    dict(slug="poison_belt", gid=126, title="The Poison Belt", author="Arthur Conan Doyle",
+         year="1913", chunk=("chapters", 3, 3), tag="valedictory",
+         label="The sealed room",
+         synopsis="Five people seal themselves in with oxygen cylinders and watch the world go quiet through the window.",
+         cast=["Professor Challenger", "Mrs. Challenger", "Summerlee",
+               "Lord John Roxton", "Malone"]),
+    dict(slug="kipling_wireless", gid=9790, title="Traffics and Discoveries",
+         author="Rudyard Kipling", year="1902",
+         # Kipling's heading carries curly quotes; _norm_punct straightens both
+         # sides, so the needle is written with plain ones.
+         chunk=("story", '"WIRELESS"', "THE ARMY OF A DREAM"), tag="numinous",
+         label="Wireless",
+         synopsis="An induction coil crackles for signals while a consumptive chemist's assistant slides into trance and writes Keats he has never read.",
+         cast=["the narrator", "Mr. Shaynor", "Mr. Cashell"]),
+    dict(slug="theodore_savage", gid=65848, title="Theodore Savage",
+         author="Cicely Hamilton", year="1922",
+         chunk=("chapters", 4, 5), tag="apocalyptic",
+         label="The air war",
+         synopsis="A civil servant watches the northern sky burn and joins the roads of the displaced.",
+         cast=["Theodore Savage", "Ada", "a camp official"]),
+    dict(slug="clockwork_man", gid=60374, title="The Clockwork Man", author="E. V. Odle",
+         # Odle's chapters are short; the arrival plus the examination is 1-3.
+         year="1923", chunk=("chapters", 1, 3), tag="tragicomic",
+         label="The cricket match",
+         synopsis="A man with flapping ears and looping speech interrupts a village cricket match, then sprints into a hedge.",
+         cast=["the Clockwork Man", "Dr. Allingham", "Gregg", "Arthur Withers"]),
+    dict(slug="enoch_soames", gid=1306, title="Seven Men", author="Max Beerbohm",
+         year="1916",
+         chunk=("story", "ENOCH SOAMES",
+                "HILARY MALTBY AND STEPHEN BRAXTON"), tag="sardonic",
+         label="Enoch Soames",
+         synopsis="A failed poet sells his soul to visit the future and learn whether posterity remembers him.",
+         cast=["Max", "Enoch Soames", "the Devil", "Rothenstein"]),
+    dict(slug="living_alone", gid=14907, title="Living Alone", author="Stella Benson",
+         year="1919", chunk=("chapters", 1, 1), tag="whimsical",
+         label="The War Savings Committee",
+         synopsis="A witch disrupts a wartime committee meeting, and the minutes do not know what to do with her.",
+         cast=["the Witch", "Sarah Brown", "two committee ladies"]),
+    dict(slug="beleaguered_city", gid=11521, title="A Beleaguered City",
+         author="Margaret Oliphant", year="1880",
+         chunk=("chapters", 2, 3), tag="processional",
+         label="The city is put out of its gates",
+         synopsis="A town's dead expel the living through the gates, and the mayor files a deposition about it.",
+         cast=["Martin Dupin", "Paul Lecamus", "Madame Dupin", "the Cure"]),
 ]
 
 
@@ -271,6 +407,8 @@ def to_roman(n: int) -> str:
 
 _SPELLED = {
     1: "ONE", 2: "TWO", 3: "THREE", 4: "FOUR", 5: "FIVE", 6: "SIX", 7: "SEVEN",
+    8: "EIGHT", 9: "NINE", 10: "TEN", 11: "ELEVEN", 12: "TWELVE",
+    13: "THIRTEEN", 14: "FOURTEEN", 15: "FIFTEEN", 16: "SIXTEEN",
 }
 
 
@@ -289,9 +427,11 @@ def chapter_heading_positions(text: str, n: int) -> list[int]:
         rf"^\s*CHAPTER\s+{roman}\b.*$",
         rf"^\s*Chapter\s+{roman}\.?\s*$",
         rf"^\s*{roman}\.?\s*$",
-        # Dickens numbers his by name ("STAVE ONE"), Doyle by adventure.
+        # Dickens numbers his by name ("STAVE ONE"), Doyle by adventure, and
+        # Odle spells his out ("CHAPTER ONE") -- all real formats in the corpus.
         rf"^\s*STAVE\s+(?:{n}|{roman}|{_SPELLED.get(n, '@none@')})\b.*$",
         rf"^\s*ADVENTURE\s+{roman}\.?\s*$",
+        rf"^\s*CHAPTER\s+{_SPELLED.get(n, '@none@')}\s*$",
     ]
     hits: list[int] = []
     for pat in pats:
@@ -497,10 +637,14 @@ def main(argv: list[str] | None = None) -> int:
                 failed.append((slug, f"only {words} words; below {MIN_UNIT_WORDS}"))
                 print(f"  THIN  {slug:<32} {words} words")
                 continue
-            if words > MAX_UNIT_WORDS:
+            # A per-work override, because the ceiling is a BUG DETECTOR and a
+            # few picks are legitimately novella-length. Raising the global
+            # limit to fit them would blind it for everything else.
+            ceiling = int(w.get("max_words") or MAX_UNIT_WORDS)
+            if words > ceiling:
                 # The end marker did not match and the slice ran on. Refuse it:
                 # a wrong-but-plausible unit is worse than a missing one.
-                failed.append((slug, f"{words} words exceeds {MAX_UNIT_WORDS}; "
+                failed.append((slug, f"{words} words exceeds {ceiling}; "
                                      "end marker almost certainly missed"))
                 print(f"  RUNON {slug:<32} {words:>6} words -- refusing")
                 continue
