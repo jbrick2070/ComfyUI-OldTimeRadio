@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/the-tempest_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:09Z",
+  "fetched_utc": "2026-08-04T04:21:25Z",
   "body_sha256": "cd89e071640ac865c017b9ded0c014c557ca1b62d231945b1ff6a9c877d03a89",
   "body_bytes": 4613,
   "body_words": 858,
@@ -17,5 +17,28 @@
     "FERDINAND",
     "MIRANDA",
     "PROSPERO"
+  ],
+  "characters": [
+    {
+      "name": "FERDINAND",
+      "roster_name": "FERDINAND",
+      "description": "prince of Naples",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "MIRANDA",
+      "roster_name": "MIRANDA",
+      "description": "Prospero's daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "PROSPERO",
+      "roster_name": "PROSPERO",
+      "description": "the former duke of Milan, now a magician on a Mediterranean island",
+      "gender": "male",
+      "gender_source": "title"
+    }
   ]
 }

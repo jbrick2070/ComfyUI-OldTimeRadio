@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/the-comedy-of-errors_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:15Z",
+  "fetched_utc": "2026-08-04T04:21:31Z",
   "body_sha256": "827e7397027ac6210bae67041a0c34318c1b639b4edae5f1f9c3f3ca5ff6254e",
   "body_bytes": 7695,
   "body_words": 1408,
@@ -21,5 +21,56 @@
     "LUCE",
     "ADRIANA",
     "ANGELO"
+  ],
+  "characters": [
+    {
+      "name": "ANTIPHOLUS OF EPHESUS",
+      "roster_name": "ANTIPHOLUS OF EPHESUS",
+      "description": "a citizen of Ephesus",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "DROMIO OF EPHESUS",
+      "roster_name": "DROMIO OF EPHESUS",
+      "description": "Antipholus of Ephesus's servant",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "BALTHASAR",
+      "roster_name": "BALTHASAR",
+      "description": "an Ephesian merchant invited to dinner by Antipholus of Ephesus",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "DROMIO OF SYRACUSE",
+      "roster_name": "DROMIO OF SYRACUSE",
+      "description": "Antipholus of Syracuse's servant",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "LUCE",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "ADRIANA",
+      "roster_name": "ADRIANA",
+      "description": "Antipholus of Ephesus's wife",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "ANGELO",
+      "roster_name": "ANGELO",
+      "description": "an Ephesian goldsmith",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    }
   ]
 }

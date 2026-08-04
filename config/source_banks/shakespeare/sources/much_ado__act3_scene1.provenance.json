@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/much-ado-about-nothing_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:12Z",
+  "fetched_utc": "2026-08-04T04:21:28Z",
   "body_sha256": "f4d84902dd4087aaec297e54fce276aee0566c9c592ffe6440e3b38a01bc063d",
   "body_bytes": 5368,
   "body_words": 995,
@@ -18,5 +18,35 @@
     "MARGARET",
     "URSULA",
     "BEATRICE"
+  ],
+  "characters": [
+    {
+      "name": "HERO",
+      "roster_name": "HERO",
+      "description": "his daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "MARGARET",
+      "roster_name": "MARGARET",
+      "description": "",
+      "gender": "female",
+      "gender_source": "group"
+    },
+    {
+      "name": "URSULA",
+      "roster_name": "URSULA",
+      "description": "",
+      "gender": "female",
+      "gender_source": "group"
+    },
+    {
+      "name": "BEATRICE",
+      "roster_name": "BEATRICE",
+      "description": "his niece",
+      "gender": "female",
+      "gender_source": "relation"
+    }
   ]
 }

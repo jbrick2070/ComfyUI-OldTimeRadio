@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/a-midsummer-nights-dream_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:09Z",
+  "fetched_utc": "2026-08-04T04:21:25Z",
   "body_sha256": "95f50ae0c2a8cac7b64eae2ad6993783b252c1668f38273a2f45837eea8f3125",
   "body_bytes": 9167,
   "body_words": 1638,
@@ -26,5 +26,91 @@
     "MOTE",
     "MUSTARDSEED",
     "ALL"
+  ],
+  "characters": [
+    {
+      "name": "BOTTOM",
+      "roster_name": "NICK BOTTOM",
+      "description": "weaver",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "QUINCE",
+      "roster_name": "PETER QUINCE",
+      "description": "carpenter",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "SNOUT",
+      "roster_name": "TOM SNOUT",
+      "description": "tinker",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "STARVELING",
+      "roster_name": "ROBIN STARVELING",
+      "description": "tailor",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "ROBIN",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "FLUTE",
+      "roster_name": "FRANCIS FLUTE",
+      "description": "bellows-mender",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "TITANIA",
+      "roster_name": "TITANIA",
+      "description": "queen of the Fairies",
+      "gender": "female",
+      "gender_source": "title"
+    },
+    {
+      "name": "PEASEBLOSSOM",
+      "roster_name": "PEASEBLOSSOM",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "COBWEB",
+      "roster_name": "COBWEB",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "MOTE",
+      "roster_name": "MOTE",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "MUSTARDSEED",
+      "roster_name": "MUSTARDSEED",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "ALL",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    }
   ]
 }

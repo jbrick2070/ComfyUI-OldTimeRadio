@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/twelfth-night_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:10Z",
+  "fetched_utc": "2026-08-04T04:21:27Z",
   "body_sha256": "f83004d61f2926a990f6ae4cf0b6ec110f8cfc4a47e78dabacc38189aaa888ec",
   "body_bytes": 13898,
   "body_words": 2609,
@@ -20,5 +20,49 @@
     "MALVOLIO",
     "TOBY",
     "VIOLA"
+  ],
+  "characters": [
+    {
+      "name": "MARIA",
+      "roster_name": "MARIA",
+      "description": "her waiting-gentlewoman",
+      "gender": "female",
+      "gender_source": "title"
+    },
+    {
+      "name": "FOOL",
+      "roster_name": "FOOL",
+      "description": "Olivia's jester, named Feste",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "OLIVIA",
+      "roster_name": "OLIVIA",
+      "description": "an Illyrian countess",
+      "gender": "female",
+      "gender_source": "title"
+    },
+    {
+      "name": "MALVOLIO",
+      "roster_name": "MALVOLIO",
+      "description": "steward in Olivia's household",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "TOBY",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "VIOLA",
+      "roster_name": "VIOLA",
+      "description": "a lady of Messaline shipwrecked on the coast of Illyria (later disguised as CESARIO)",
+      "gender": "female",
+      "gender_source": "title"
+    }
   ]
 }

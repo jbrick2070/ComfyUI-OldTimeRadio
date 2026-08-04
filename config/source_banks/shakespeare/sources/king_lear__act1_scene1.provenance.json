@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/king-lear_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:14Z",
+  "fetched_utc": "2026-08-04T04:21:30Z",
   "body_sha256": "1bd23633c788ddb4933c5fc76764a38e31b12a2bfb3bd2cab23ab86c4d889a91",
   "body_bytes": 14318,
   "body_words": 2571,
@@ -23,5 +23,70 @@
     "REGAN",
     "BURGUNDY",
     "FRANCE"
+  ],
+  "characters": [
+    {
+      "name": "KENT",
+      "roster_name": "EARL OF KENT",
+      "description": "",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "GLOUCESTER",
+      "roster_name": "EARL OF GLOUCESTER",
+      "description": "",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "EDMUND",
+      "roster_name": "EDMUND",
+      "description": "his younger and illegitimate son",
+      "gender": "male",
+      "gender_source": "relation"
+    },
+    {
+      "name": "LEAR",
+      "roster_name": "LEAR",
+      "description": "king of Britain",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "GONERIL",
+      "roster_name": "GONERIL",
+      "description": "Lear's eldest daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "CORDELIA",
+      "roster_name": "CORDELIA",
+      "description": "Lear's youngest daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "REGAN",
+      "roster_name": "REGAN",
+      "description": "Lear's second daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "BURGUNDY",
+      "roster_name": "DUKE OF BURGUNDY",
+      "description": "her suitor",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "FRANCE",
+      "roster_name": "KING OF FRANCE",
+      "description": "her suitor and then husband",
+      "gender": "male",
+      "gender_source": "relation"
+    }
   ]
 }

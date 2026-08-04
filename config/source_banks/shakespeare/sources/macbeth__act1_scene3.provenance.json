@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/macbeth_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:08Z",
+  "fetched_utc": "2026-08-04T04:21:24Z",
   "body_sha256": "3c43545567602aff2fbe54102c65606b933c1e6bb4663f781771dda30246c561",
   "body_bytes": 6972,
   "body_words": 1253,
@@ -22,5 +22,63 @@
     "BANQUO",
     "ROSS",
     "ANGUS"
+  ],
+  "characters": [
+    {
+      "name": "FIRST WITCH",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "SECOND WITCH",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "THIRD WITCH",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "ALL",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "MACBETH",
+      "roster_name": "MACBETH",
+      "description": "thane of Glamis",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "BANQUO",
+      "roster_name": "BANQUO",
+      "description": "commander, with Macbeth, of Duncan's army",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "ROSS",
+      "roster_name": "ROSS",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "ANGUS",
+      "roster_name": "ANGUS",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    }
   ]
 }

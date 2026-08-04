@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/a-midsummer-nights-dream_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:10Z",
+  "fetched_utc": "2026-08-04T04:21:26Z",
   "body_sha256": "b79da3deb9b3c1bc8399de63b25df949f3e3c78a5b7a203312ee8f420b27de4a",
   "body_bytes": 21245,
   "body_words": 3888,
@@ -20,5 +20,49 @@
     "HERMIA",
     "LYSANDER",
     "HELENA"
+  ],
+  "characters": [
+    {
+      "name": "OBERON",
+      "roster_name": "OBERON",
+      "description": "king of the Fairies",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "ROBIN",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "DEMETRIUS",
+      "roster_name": "DEMETRIUS",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "HERMIA",
+      "roster_name": "HERMIA",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "LYSANDER",
+      "roster_name": "LYSANDER",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "HELENA",
+      "roster_name": "HELENA",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    }
   ]
 }

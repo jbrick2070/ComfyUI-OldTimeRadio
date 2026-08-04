@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/as-you-like-it_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:07Z",
+  "fetched_utc": "2026-08-04T04:21:23Z",
   "body_sha256": "2b61e46aa0f29887157881636b60ccbcea0aee712809f7b3bc49788791648da9",
   "body_bytes": 19017,
   "body_words": 3445,
@@ -20,5 +20,49 @@
     "ROSALIND",
     "CELIA",
     "JAQUES"
+  ],
+  "characters": [
+    {
+      "name": "ORLANDO",
+      "roster_name": "ORLANDO",
+      "description": "youngest son of Sir Rowland de Boys",
+      "gender": "male",
+      "gender_source": "relation"
+    },
+    {
+      "name": "CORIN",
+      "roster_name": "CORIN",
+      "description": "a shepherd",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "TOUCHSTONE",
+      "roster_name": "TOUCHSTONE",
+      "description": "a court Fool",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "ROSALIND",
+      "roster_name": "ROSALIND",
+      "description": "daughter to Duke Senior",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "CELIA",
+      "roster_name": "CELIA",
+      "description": "Rosalind's cousin, daughter to Duke Frederick",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "JAQUES",
+      "roster_name": "JAQUES",
+      "description": "",
+      "gender": "male",
+      "gender_source": "group"
+    }
   ]
 }

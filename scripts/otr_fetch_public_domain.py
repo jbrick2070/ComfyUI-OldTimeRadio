@@ -47,6 +47,13 @@ import sys
 import urllib.request
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+# Import the roster module DIRECTLY rather than through the `nodes` package: the
+# repo directory name contains a hyphen so it is not importable as a package,
+# and `nodes/__init__.py` registers ComfyUI node classes, which this
+# authoring-time tool must not need.
+sys.path.insert(0, str(REPO_ROOT / "nodes"))
+
+from _otr_character_roster import parse_character_roster  # noqa: E402
 CORPUS_ROOT = REPO_ROOT / "config" / "source_banks" / "_corpus"
 
 GUTENBERG_TEXT_URL = "https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.txt"
@@ -309,6 +316,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[fetch] {url}")
         body = fetch_url(url)
         verify_body(body, origin=origin, min_words=args.min_words)
+        # The cast list lives in the WHOLE play, never in a sliced scene, so it
+        # must be read before slicing. Its descriptions carry the gender that
+        # casting otherwise assigns by dice roll: every Shakespeare name is
+        # absent from the 1930s first-name lexicon, so a female lead draws a
+        # male voice on roughly half of seeds without this.
+        roster = parse_character_roster(body)
         body = slice_folger_scene(
             body, act=args.act, scene=args.scene,
             origin=f"{origin}:act{args.act}-scene{args.scene}",
@@ -330,9 +343,46 @@ def main(argv: list[str] | None = None) -> int:
                 f"from {word_count} words. Refusing to vendor a scene whose cast "
                 f"cannot be derived from its own text."
             )
-        extra = {"act": args.act, "scene": args.scene, "speakers": speakers}
+        def _record_for(prefix: str):
+            # Alias-aware: the cast list writes "SIGNIOR BENEDICK" and
+            # "COUNT CLAUDIO" while the text speaks as BENEDICK and CLAUDIO.
+            return next((r for r in roster if r.matches(prefix)), None)
+
+        characters = []
+        for name in speakers:
+            record = _record_for(name)
+            characters.append({
+                "name": name,
+                "roster_name": record.name if record else "",
+                "description": record.description if record else "",
+                "gender": record.gender if record else "unknown",
+                "gender_source": (
+                    record.gender_source if record else "absent_from_roster"
+                ),
+            })
+        extra = {
+            "act": args.act,
+            "scene": args.scene,
+            "speakers": speakers,
+            # Only the characters who actually speak in THIS scene, so the
+            # render path reads a roster scoped to what it must cast.
+            "characters": characters,
+        }
         print(f"[fetch] ACT {args.act} Scene {args.scene}: {word_count} words")
         print(f"[fetch] speakers in order: {', '.join(speakers) or '(none parsed)'}")
+        _resolved = sum(
+            1 for c in extra["characters"] if c["gender"] in ("male", "female")
+        )
+        print(
+            f"[fetch] roster: {len(roster)} characters in the play; "
+            f"gender resolved for {_resolved}/{len(speakers)} of this scene's speakers"
+        )
+        for entry in extra["characters"]:
+            if entry["gender"] == "unknown":
+                print(
+                    f"[fetch]   UNKNOWN gender: {entry['name']} "
+                    f"({entry['gender_source']}) -- recorded, not guessed"
+                )
     else:
         url = GUTENBERG_TEXT_URL.format(gid=args.gutenberg_id)
         origin = f"gutenberg:{args.gutenberg_id}"

@@ -6,7 +6,7 @@
   "author": "William Shakespeare",
   "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
   "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/the-tempest_TXT_FolgerShakespeare.txt",
-  "fetched_utc": "2026-08-04T00:40:08Z",
+  "fetched_utc": "2026-08-04T04:21:24Z",
   "body_sha256": "9c68d7c72d5022f1bc9d5255b304d441e634fd0bd5c80ecf4af6b8d2ee796a42",
   "body_bytes": 24026,
   "body_words": 4339,
@@ -19,5 +19,42 @@
     "ARIEL",
     "CALIBAN",
     "FERDINAND"
+  ],
+  "characters": [
+    {
+      "name": "MIRANDA",
+      "roster_name": "MIRANDA",
+      "description": "Prospero's daughter",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "PROSPERO",
+      "roster_name": "PROSPERO",
+      "description": "the former duke of Milan, now a magician on a Mediterranean island",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "ARIEL",
+      "roster_name": "ARIEL",
+      "description": "a spirit, servant to Prospero",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "CALIBAN",
+      "roster_name": "CALIBAN",
+      "description": "an inhabitant of the island, servant to Prospero",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "FERDINAND",
+      "roster_name": "FERDINAND",
+      "description": "prince of Naples",
+      "gender": "male",
+      "gender_source": "title"
+    }
   ]
 }
