@@ -1,0 +1,14 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "time_machine",
+  "unit": "arrival",
+  "work_title": "The Time Machine",
+  "author": "H. G. Wells",
+  "license_label": "Public domain (US, 1895)",
+  "source_url": "https://www.gutenberg.org/cache/epub/35/pg35.txt",
+  "fetched_utc": "2026-08-04T00:27:38Z",
+  "body_sha256": "48245f5d921f9bda67f22cf0e8344d22ecac0d2fd18b45c408da60724affb61d",
+  "body_bytes": 11604,
+  "body_words": 1988,
+  "text_path": "config/source_banks/public_domain_story/sources/time_machine__arrival.txt"
+}

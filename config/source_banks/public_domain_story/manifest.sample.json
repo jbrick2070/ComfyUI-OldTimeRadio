@@ -27,7 +27,7 @@
           "unit_id": "arrival",
           "label": "The impossible arrival",
           "synopsis": "A shaken traveler returns with a strange machine and forces skeptical witnesses to confront an impossible journey.",
-          "text_path": "fixtures/time_machine_arrival.txt"
+          "text_path": "sources/time_machine__arrival.txt"
         }
       ]
     }
