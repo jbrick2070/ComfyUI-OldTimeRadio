@@ -110,6 +110,35 @@ def test_fixed_mode_without_a_ref_refuses_rather_than_guessing():
         PD.fetch_public_domain_source(bank=_Bank())
 
 
+def test_no_vendored_text_carries_gutenberg_boilerplate():
+    """Boilerplate is not the author's words, and it reaches the writer LLM and
+    can be SPOKEN by TTS.
+
+    Found by an independent QA pass: two of forty-five leaked, because the
+    stripper only knew the modern asterisked markers. The Cask of Amontillado
+    ends with a possessive "End of Project Gutenberg's <title>" and no
+    asterisks; The Secret Sharer opens with a "Produced by ..." transcriber
+    credit sitting AFTER the start marker, where header-trimming never looked.
+    """
+    import re
+
+    bad = []
+    for source in _manifest()["sources"]:
+        for unit in source["units"]:
+            path = (PD._resolve_repo_relative_path(
+                str((_bank().defaults or {}).get("manifest_path", "")),
+                key="manifest_path").parent / unit["text_path"])
+            body = path.read_text(encoding="utf-8", errors="replace")
+            for pat in (r"Project Gutenberg",
+                        r"^\s*Produced by ",
+                        r"^\s*Transcriber'?s? Note",
+                        r"Distributed Proofread"):
+                m = re.search(pat, body, re.IGNORECASE | re.MULTILINE)
+                if m:
+                    bad.append(f"{source['source_id']}: {m.group(0).strip()[:60]!r}")
+    assert not bad, "boilerplate in vendored text:\n  " + "\n  ".join(bad)
+
+
 def test_every_vendored_unit_actually_loads():
     """A manifest row whose text is missing is a broken draw waiting to happen,
     and the roll would hit it eventually rather than immediately."""

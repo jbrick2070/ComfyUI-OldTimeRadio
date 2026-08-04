@@ -521,8 +521,26 @@ def resolve_chunk(text: str, chunk: tuple) -> str:
     raise ValueError(f"unknown chunk kind {kind!r}")
 
 
+#: Boilerplate that is NOT the author's words. Any of these surviving into a
+#: vendored unit reaches the writer LLM and can be spoken aloud by TTS.
+#:
+#: The asterisked markers are the MODERN Gutenberg format and were all this
+#: handled at first. Older etexts do not use them: The Cask of Amontillado ends
+#: with a possessive "End of Project Gutenberg's <title>, by <author>" and no
+#: asterisks, and The Secret Sharer opens with a "Produced by ..." transcriber
+#: credit that sits AFTER the start marker, so header-trimming never touched it.
+#: Two of forty-five leaked exactly that way.
+_PG_LEGACY_END = re.compile(
+    r"^\s*(?:\*\*\*\s*)?End of (?:the |this )?Project Gutenberg.*$",
+    re.IGNORECASE | re.MULTILINE)
+_PG_CREDIT_LINES = re.compile(
+    r"^[ \t]*(?:Produced by .*|Transcriber'?s? Note.*|"
+    r"Updated editions will replace.*|.*Distributed Proofread.*)$",
+    re.IGNORECASE | re.MULTILINE)
+
+
 def strip_gutenberg_wrapper(text: str) -> str:
-    """Drop the PG header/footer so only the author's words are vendored."""
+    """Drop PG header, footer, and transcriber credits so only the author remains."""
     head = re.search(r"\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*?\*\*\*",
                      text, re.IGNORECASE | re.DOTALL)
     if head:
@@ -531,7 +549,32 @@ def strip_gutenberg_wrapper(text: str) -> str:
                      text, re.IGNORECASE)
     if foot:
         text = text[:foot.start()]
+    # Legacy end marker (no asterisks) -- everything from it on is apparatus.
+    legacy = _PG_LEGACY_END.search(text)
+    if legacy:
+        text = text[:legacy.start()]
+    # Credit lines can appear anywhere above the body; drop the LINES only, so
+    # the author's text around them is untouched.
+    text = _PG_CREDIT_LINES.sub("", text)
     return text
+
+
+def assert_no_boilerplate(unit: str) -> str:
+    """The name of the failure, if any boilerplate survived into a unit.
+
+    Belt AND braces: the stripper above is the fix, this is the check that the
+    fix worked, run per unit at vendor time so a new etext format cannot leak
+    silently the way the last two did.
+    """
+    for pat, name in ((_PG_LEGACY_END, "legacy end marker"),
+                      (_PG_CREDIT_LINES, "transcriber credit")):
+        m = pat.search(unit)
+        if m:
+            return f"{name}: {m.group(0).strip()[:80]!r}"
+    if re.search(r"Project Gutenberg", unit, re.IGNORECASE):
+        m = re.search(r"^.*Project Gutenberg.*$", unit, re.IGNORECASE | re.MULTILINE)
+        return f"gutenberg mention: {m.group(0).strip()[:80]!r}"
+    return ""
 
 
 def write_manifest(vendored: list[dict]) -> None:
@@ -647,6 +690,11 @@ def main(argv: list[str] | None = None) -> int:
                 failed.append((slug, f"{words} words exceeds {ceiling}; "
                                      "end marker almost certainly missed"))
                 print(f"  RUNON {slug:<32} {words:>6} words -- refusing")
+                continue
+            leak = assert_no_boilerplate(unit)
+            if leak:
+                failed.append((slug, f"boilerplate survived -- {leak}"))
+                print(f"  LEAK  {slug:<32} {leak}")
                 continue
             out = DEST / f"{slug}.txt"
             out.write_text(unit + "\n", encoding="utf-8")
