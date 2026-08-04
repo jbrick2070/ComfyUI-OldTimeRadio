@@ -106,6 +106,49 @@ Ownership table: `docs/2026-08-03-fidelity-pass-ownership.md`.
   and tests are correct; the GO_FORWARD entry in it describes the real change.
 
 
+### THE 30-WORD SWEEP IS READ -- 13/17, AND FOUR ENGINES FAIL THE SAME WAY
+
+Closes the prior baton's open "read the sweep results" item. Source:
+`tmp/_w45_chain_remaining.log`, campaign finished 2026-08-03 05:00.
+
+PASS (13): still_flat 15.6m, still_pan 14.9m, still_motion 9.8m, still_word 8.8m,
+viz_camera 7.4m, viz_green 7.0m, viz_mxc_mandala 6.2m, mesh_stage 19.4m,
+ltx_8gb 14.9m, fastwan_8gb 41.3m, ltx_video 38.6m, humo_1.7B 33.2m,
+humo_1.7B_169 42.7m. NOT RUN (2): humo, humo_14B_169.
+
+**FAIL (4), every one with the identical verdict "no new file in otr/obs":
+`ltx_audio_in` (4.0m), `wan_ti2v` (2.7m), `wan_i2v` (7.9m), `viz_mxc_cpu`
+(3.2m).** Operator saw the ltx_audio_in failure and deferred it: "oh well, that
+for tomorrow". OPEN DEFECT, unowned, for the next coder window.
+
+Two things make this worth a real look rather than four separate retries. First,
+all four die FAST -- 2.7 to 7.9 minutes against 7-43 minutes for every passing
+leg -- so they are failing before or early in render, not timing out in it. That
+is one shared cause more likely than four coincidences. Second, **`wan_ti2v`
+failing here directly contradicts this document's own section 8, "`wan_ti2v` IS
+PRODUCTION-PROVEN" (2026-08-01)**. Either the engine regressed since, or the
+campaign's profile/enablement for these four is wrong. Resolve that contradiction
+FIRST -- it decides whether this is an engine bug or a harness bug, and the
+answer changes which file you open. Do not start by editing engine code.
+
+### IN FLIGHT OVERNIGHT 2026-08-03 22:10 -- SHAKESPEARE, OPERATOR REQUEST
+
+Chain `tmp/_sh_overnight.ps1`, log `tmp/_sh_overnight.log`, per-leg logs
+`tmp/_sh_p{1,2}_<tag>.log`, results `tmp/_sh_overnight_results.json`.
+Phase 1 = five 320-word Shakespeare STILL episodes cycling all four still lanes,
+visual style ROLLED per leg. Phase 2 = 120-word Shakespeare VIDEO legs,
+cheapest-first (ltx_8gb, mesh_stage, humo_1.7B, ltx_video, fastwan_8gb,
+humo_1.7B_169), no new leg started after 07:30. Bank PINNED `shakespeare`;
+seeds UNSET so cast and style draw fresh entropy. The four failing engines above
+are deliberately NOT queued.
+
+**Read these as COMPOSED, not verbatim.** The verbatim executor is still unwired
+(baton item 3), so this is the composed shakespeare lane running on authentic
+Folger source for the first time end to end. It is evidence about the
+real-source work and about style variety -- it is NOT evidence about verbatim
+fidelity, and must not be quoted as such.
+
+
 **Newest update: 2026-08-03 (evening) -- THE ADAPTATION LANES WERE PERFORMING
 FICTION ABOUT REAL BOOKS. THEY NOW PERFORM THE BOOKS.**
 
