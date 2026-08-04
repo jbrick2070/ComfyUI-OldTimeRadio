@@ -7,22 +7,39 @@
 Working tree clean apart from the operator's own pre-existing untracked files
 (`config/profiles/otr_sbcov_*.json`, `kibitz/`, `tmp/*`) -- **leave those alone.**
 
-### NEXT ACTION (start here)
+### DEFERRED (operator ruling 2026-08-03, late): LEAVE `same_story_safety_cleanup` ALONE
 
-**Repurpose `same_story_safety_cleanup` from content policing to LEDGER FORMAT
-hygiene.** Operator's own idea and the right shape: the pass keeps its registry
-row, its freeze-cascade phase and its `meta["same_story_safety_cleanup"]` receipt,
-so there is NO ledger hole and no risky rip -- only the scan predicate and the
-patch prompt change. It also lands on a defect the operator hit tonight: stage
-directions and markup surviving into spoken rows ("lots of stage direction in the
-captions but not in the audio -- I don't know how it survives the ledger").
+**"We can keep the `same_story_safety_cleanup` as is for now."** The repurpose
+from content policing to ledger-format hygiene is DEFERRED, not cancelled. Do not
+start it, and do not re-derive the enumeration below -- it is kept because the
+idea is still good, not because it is queued.
 
-New job: scan every spoken row for material that is not speech -- markdown
-markup, bracketed stage directions, leaked speaker labels, empty/malformed rows --
-and propose an atomic same-story patch removing ONLY that, never altering what a
-character says. Keep the existing hash-checked atomic apply.
+Consequence to carry forward: the stage-direction defect the operator reported
+that evening -- "lots of stage direction in the captions but not in the audio, I
+don't know how it survives the ledger" -- LOST its planned owner with this
+deferral and is now an OPEN DEFECT with no fix assigned. Note the asymmetry in
+the report: the markup reaches CAPTIONS but not AUDIO, so the caption text and
+the TTS text are not derived from the same string. That points at a caption/TTS
+divergence downstream of the ledger rather than at unclean spoken rows, which
+would make the cleanup-pass repurpose the wrong fix for it anyway. Diagnose the
+divergence first if this defect is picked up.
 
-Enumeration already done, do not redo it. Nine consumers:
+The shape the repurpose WOULD have taken, if it is ever revived: the pass keeps
+its registry row, its freeze-cascade phase and its `meta["same_story_safety_cleanup"]`
+receipt, so there is no ledger hole and no risky rip -- only the scan predicate
+and the patch prompt change. New job would be to scan every spoken row for
+material that is not speech (markdown markup, bracketed stage directions, leaked
+speaker labels, empty/malformed rows) and propose an atomic same-story patch
+removing ONLY that, never altering what a character says, keeping the existing
+hash-checked atomic apply. **Blast-radius caveat, verified 2026-08-03:** the list
+below is the SFW authority this pass SERVES, not a literal reference list. A
+name-grep finds the string in only 7 node files and 8 test files -- five listed
+below never mention it, while `_otr_content_safety.py` and `_otr_text_delivery.py`
+do and are absent. Repurposing the pass away from content policing would strip the
+G9 terminal ship-stop of its only remediation step, which is an unowned-field
+failure under the ledger rule. Re-verify that ownership before touching a predicate.
+
+Enumeration retained, do not redo it. Nine consumers:
 `_otr_freeze_cascade` (:660 apply + :670 receipt + phase rows :311/:333/:359/:840),
 `_otr_ledger_cleanup` (:306-332, :466-472), `_otr_ledger_freeze` (:714-727, the
 **G9 terminal ship-stop**), `_otr_ledger_scrub` (:13, :239), `_otr_scifi_codex`
@@ -36,7 +53,7 @@ Twelve test files assert on it, incl. exact-roster contracts:
 `test_public_domain_interpreter`, `test_shakespeare_interpreter`.
 Registered as a pass twice in `nodes/story_packs/pipelines.json` (:187, :414).
 
-### THEN (2) public_domain authenticity
+### NEXT ACTION (start here) -- (2) public_domain authenticity
 
 `_otr_compose_exchange.py` has **ZERO** source references yet its pack says
 "Where the source gives these characters words, CARRY THEM" -- an instruction
