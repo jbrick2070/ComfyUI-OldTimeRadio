@@ -106,7 +106,8 @@
         "coda_mode": "source_attribution",
         "provenance_normalize": true,
         "manifest_path": "config/source_banks/public_domain_story/manifest.sample.json",
-        "source_ref": "gutenberg-time-machine-sample:arrival",
+        "selection_mode": "random",
+        "source_ref": "",
         "style_pool_class": "adaptation",
         "propagate_adaptation_cast": true
       },

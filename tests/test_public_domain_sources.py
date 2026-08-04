@@ -13,8 +13,15 @@ from nodes import _otr_public_domain_sources as pd
 from nodes import _otr_source_payload as osp
 
 REPO = Path(__file__).resolve().parents[1]
+# A DEDICATED FIXTURE, NOT THE LIVE MANIFEST (2026-08-04). These tests pin a
+# manifest's exact contents -- ids, labels, word budgets -- which is the right
+# thing to pin for FORMAT tests and the wrong thing to couple to production
+# data. While the bank shipped one book the two were indistinguishable; the
+# moment the library grew to 28 works, eight of these broke for no reason but
+# the shelf being fuller. The live library is asserted separately, on its own
+# terms, in tests/test_public_domain_library_roll.py.
 SAMPLE_MANIFEST = (
-    REPO / "config" / "source_banks" / "public_domain_story" / "manifest.sample.json"
+    REPO / "tests" / "fixtures" / "public_domain_bank" / "manifest.json"
 )
 MODULE_PATH = REPO / "nodes" / "_otr_public_domain_sources.py"
 
@@ -128,9 +135,21 @@ def test_sidecars_are_separate_from_payload():
 
 
 def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
-    from nodes import _otr_story_routing as routing
+    """Fixed-mode selection against the fixture bank.
 
-    bank = routing.get_bank("public_domain")
+    This used to run the LIVE bank with a blank ref and assert The Time
+    Machine, which held only because that bank had one book and no selector.
+    The live bank now deals at random by design, so the deterministic contract
+    is exercised where it is still deterministic: an explicit fixed ref.
+    """
+    from types import SimpleNamespace
+
+    bank = SimpleNamespace(
+        source_bank_id="public_domain",
+        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+                  "selection_mode": "fixed",
+                  "source_ref": "gutenberg-time-machine-sample:arrival"},
+    )
     result = pd.fetch_public_domain_source(bank=bank)
 
     payload, meta, rights = osp.normalize_fetch_result(
@@ -150,9 +169,15 @@ def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
 
 
 def test_fetch_public_domain_source_honors_explicit_ref():
-    from nodes import _otr_story_routing as routing
+    """An explicit ref pins, and it OUTRANKS the bank's selection mode --
+    which is the property that matters now the default mode is random."""
+    from types import SimpleNamespace
 
-    bank = routing.get_bank("public_domain")
+    bank = SimpleNamespace(
+        source_bank_id="public_domain",
+        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+                  "selection_mode": "random"},
+    )
     result = pd.fetch_public_domain_source(
         bank=bank,
         source_ref="gutenberg-time-machine-sample:arrival",
@@ -167,9 +192,13 @@ def test_fetch_public_domain_source_missing_defaults_fail_loud():
     with pytest.raises(pd.PublicDomainManifestError, match="manifest_path"):
         pd.fetch_public_domain_source(bank=bank)
 
+    # A blank ref under FIXED selection still refuses -- there is no fallback.
+    # (Under the default "random" mode a blank ref is legitimate and deals from
+    # the library; that path is covered in test_public_domain_library_roll.py.)
     bank = SimpleNamespace(
         source_bank_id="public_domain_story",
-        defaults={"manifest_path": str(SAMPLE_MANIFEST)},
+        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+                  "selection_mode": "fixed"},
     )
     with pytest.raises(pd.PublicDomainSourceRefError, match="source_ref"):
         pd.fetch_public_domain_source(bank=bank)

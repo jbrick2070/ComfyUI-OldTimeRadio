@@ -9,6 +9,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import random
 import re
 import tempfile
 from dataclasses import dataclass
@@ -299,6 +300,36 @@ def resolve_manifest_unit(manifest: dict[str, Any], source_ref: str) -> PublicDo
     raise PublicDomainSourceRefError(f"unknown public-domain source_ref {ref!r}")
 
 
+def select_public_domain_unit_ref(
+    manifest: dict[str, Any], *, rng: Any | None = None
+) -> str:
+    """Pick one ``source_id:unit_id`` at random from a validated manifest.
+
+    THE LIBRARY IS A DECK, NOT A SHELF WITH ONE BOOK ON IT (2026-08-04). This
+    bank had no selector at all: a blank source_ref fell straight through to
+    ``defaults.source_ref``, so every episode drew the same pinned unit no
+    matter how many were vendored. Mirrors the Shakespeare lane's
+    ``select_shakespeare_scene_ref``, and draws over UNITS rather than sources
+    so a novel contributing three chapters is three chances, not one -- the
+    unit is what an episode actually adapts.
+    """
+    checked = validate_public_domain_manifest(manifest)
+    refs = [
+        f"{source['source_id']}:{unit['unit_id']}"
+        for source in checked["sources"]
+        for unit in source["units"]
+    ]
+    if not refs:
+        raise PublicDomainManifestError(
+            "public-domain manifest declares no units to select from"
+        )
+    chooser = rng if rng is not None else random.SystemRandom()
+    try:
+        return str(chooser.choice(refs))
+    except AttributeError:  # pragma: no cover -- defensive for minimal RNG shims
+        return str(refs[chooser.randrange(len(refs))])
+
+
 # The interpreter reads the whole canonicalized body, not a prefix of it.
 INTERPRETER_TEXT_WINDOW: int = 12000
 
@@ -362,15 +393,33 @@ def fetch_public_domain_source(
         str(defaults.get("manifest_path", "")),
         key="manifest_path",
     )
-    effective_ref = str(source_ref or defaults.get("source_ref", "") or "").strip()
+    manifest = load_public_domain_manifest(manifest_path)
+    # An explicit ref always pins. A blank one consults selection_mode, exactly
+    # as the Shakespeare lane does -- "random" deals from the whole library,
+    # "fixed" honours defaults.source_ref. Default is random: a source BANK
+    # whose every episode is the same book is the defect this closes.
+    effective_ref = str(source_ref or "").strip()
+    selection_mode = str(
+        defaults.get("selection_mode", "random") or "random"
+    ).strip().lower()
+    if not effective_ref:
+        if selection_mode in {"random", "random_unit", "shuffle"}:
+            effective_ref = select_public_domain_unit_ref(manifest)
+        elif selection_mode in {"fixed", "default", "pinned"}:
+            effective_ref = str(defaults.get("source_ref", "") or "").strip()
+        else:
+            bank_id = getattr(bank, "source_bank_id", "public_domain")
+            raise PublicDomainManifestError(
+                f"source_bank {bank_id!r} has unsupported public-domain "
+                f"selection_mode {selection_mode!r}; expected random or fixed"
+            )
     if not effective_ref:
         bank_id = getattr(bank, "source_bank_id", "public_domain")
         raise PublicDomainSourceRefError(
-            f"source_bank {bank_id!r} requires source_ref or "
+            f"source_bank {bank_id!r} fixed selection requires "
             "defaults.source_ref; there is no fallback"
         )
 
-    manifest = load_public_domain_manifest(manifest_path)
     resolved = resolve_manifest_unit(manifest, effective_ref)
     text_path = manifest_path.parent / resolved.unit["text_path"]
     try:

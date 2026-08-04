@@ -169,18 +169,44 @@ def test_public_domain_bank_resolves_both_contracts_and_is_runnable():
     assert callable(entry.fetch)
     assert callable(osp.resolve_interpreter(bank))
     assert bank.runnable is True
-    assert bank.defaults["source_ref"] == "gutenberg-time-machine-sample:arrival"
+    # The bank no longer pins one book. It DEALS: source_ref is deliberately
+    # blank and selection_mode carries the behaviour, which is the whole fix
+    # for "every public_domain episode was The Time Machine".
+    assert bank.defaults["selection_mode"] == "random"
+    assert not str(bank.defaults.get("source_ref") or "").strip()
     assert bank.defaults["manifest_path"].endswith("manifest.sample.json")
 
 
 def test_public_domain_fetcher_wrapper_returns_source_fetch_result():
+    """Contract shape, not which book.
+
+    This used to pin the headline to "The Time Machine", which was accurate
+    only because the bank had exactly ONE vendored source and no selector. The
+    bank now deals from a library, so a blank ref is deliberately
+    nondeterministic; the wrapper contract is what this test owns.
+    """
     bank = routing.get_bank("public_domain")
     entry = osp.resolve_fetcher(bank)
     result = entry.fetch(bank=bank, technical_model="ignored-technical")
     payload, meta, rights = osp.normalize_fetch_result(
         result, origin="public_domain_source")
-    assert payload["headline"] == "The Time Machine - The impossible arrival"
-    assert meta["source_ref"] == "gutenberg-time-machine-sample:arrival"
+    assert payload["headline"] and " - " in payload["headline"]
+    assert payload["full_text"].strip()
+    assert ":" in meta["source_ref"], meta["source_ref"]
+    assert rights["license_status"] == "public_domain_us"
+
+
+def test_public_domain_fetcher_wrapper_is_deterministic_for_a_pinned_ref():
+    """The determinism the old test actually relied on, kept where it belongs:
+    on an EXPLICIT ref rather than on the bank having only one book."""
+    bank = routing.get_bank("public_domain")
+    entry = osp.resolve_fetcher(bank)
+    result = entry.fetch(bank=bank, technical_model="ignored-technical",
+                         source_ref="time_machine:arrival")
+    payload, meta, rights = osp.normalize_fetch_result(
+        result, origin="public_domain_source")
+    assert payload["headline"] == "The Time Machine - The Time Traveller returns"
+    assert meta["source_ref"] == "time_machine:arrival"
     assert rights["license_status"] == "public_domain_us"
 
 
