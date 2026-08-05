@@ -113,8 +113,14 @@ def test_a_repair_quotes_the_same_passage_as_the_attempt_it_repairs():
         seen.append(messages[1]["content"])
         return "nonsense that will not parse"
 
-    def tier_a_check(parsed):
-        return []
+    def tier_a_check(parsed, expected_slots):
+        # The REAL contract is (parsed, expected_slots) -> TierAResult. This
+        # fake never runs today, because generate_fn always fails to parse
+        # and compose_exchange returns before Tier-A -- but a wrong-shaped
+        # fake is a trap for whoever later makes this test force a
+        # Tier-A-driven repair instead of a parse failure.
+        return ce.TierAResult(ok=False, reasons=["forced repair"],
+                              failing_slot_ids=[])
 
     ce.compose_exchange(
         _slots(), {}, [], [],
@@ -126,6 +132,32 @@ def test_a_repair_quotes_the_same_passage_as_the_attempt_it_repairs():
     assert len(seen) >= 2, "expected a first attempt and a repair"
     # Every call in the group quoted the identical passage.
     assert all(block in user for user in seen)
+
+
+def test_the_source_block_sits_immediately_above_the_write_instruction():
+    # A per-line prompt runs many hundreds of tokens; source constraints far
+    # above the generation point compete badly with everything between.
+    prompt = lc._build_user_prompt(_line_request(
+        source_block=_block(),
+        style_descriptor="wry", theme="regret", outline_spine="spine",
+        current_beat_block="beat", continuity_slice="CONTINUITY: x",
+        position="mid", all_voice_cards="cards",
+    ))
+    assert prompt.index("END SOURCE PASSAGE") < prompt.index("WRITE LINE")
+    between = prompt.split("END SOURCE PASSAGE")[-1].split("WRITE LINE")[0]
+    # Nothing of substance separates the passage from the instruction.
+    assert len(between.strip().splitlines()) <= 2, between
+
+
+def test_a_non_string_source_block_is_refused_loudly():
+    # A repr would be body-free by design, so the model would receive a
+    # DESCRIPTION of the passage instead of the passage -- plausible-looking
+    # grounding that grounds nothing.
+    doc = osd.build_source_document("The apparatus and the lever. " * 20)
+    key = osg.window_key_for_line("d001")
+    span = osg.select_grounding(doc, [key]).require_window(key)
+    with pytest.raises(TypeError):
+        ce.build_exchange_prompt(_slots(), {}, [], [], source_block=span)
 
 
 def test_the_group_and_its_line_fallback_can_share_one_passage():

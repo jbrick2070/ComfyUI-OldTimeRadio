@@ -414,6 +414,16 @@ def build_exchange_prompt(
     # must never read as direction to the model. It sits BEFORE the slot
     # instructions so the last thing the model reads is what to write, not
     # what to read.
+    if source_block and not isinstance(source_block, str):
+        # Fail loud rather than coerce. Passing a SourceSpan or SourceGrounding
+        # here would embed a repr in a live prompt -- and because the repr is
+        # deliberately body-free, the model would receive a description of the
+        # passage instead of the passage, which reads as plausible grounding
+        # while grounding nothing.
+        raise TypeError(
+            f"source_block must be a pre-rendered str from "
+            f"render_source_block, got {type(source_block).__name__}"
+        )
     if source_block:
         user_parts.extend([
             "The passage below is the SOURCE this scene adapts. Carry its "
