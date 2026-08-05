@@ -65,7 +65,7 @@ def test_complete_ledger_is_a_no_op_and_costs_no_llm_call():
     assert receipt["status"] == "complete"
     assert receipt["missing"] == []
     assert receipt["prose_fills"] == []
-    assert receipt["safety"]["status"] == "clean"
+    assert receipt["safety"]["status"] == "retired"
     assert slot.calls == 0
     assert ledger["meta"]["ledger_cleanup"]["schema_version"] == (
         lc.LEDGER_CLEANUP_VERSION
@@ -205,36 +205,50 @@ def test_cast_row_without_a_char_id_is_minted_and_stays_referenceable():
 # ---------------------------------------------------------------------------
 
 
-def test_unsafe_spoken_language_is_repaired_in_place_not_failed(monkeypatch):
-    ledger = _complete_ledger()
-    ledger["lines"][1]["text"] = "The damn lamp has not turned since Tuesday."
+def test_spoken_language_is_left_exactly_as_written(monkeypatch):
+    """The safety repair pass is RETIRED -- the author's words survive.
 
-    def _fake_apply(ledger_data, slot_fn):
-        for row in ledger_data["lines"]:
-            if "damn" in row.get("text", ""):
-                row["text"] = row["text"].replace("damn ", "")
+    This test used to assert the opposite: that "damn" was rewritten out of a
+    delivered row. Operator directive 2026-08-05 removed content guardrails
+    from the generation path, so the cleanup must now leave the line alone. It
+    is inverted rather than deleted so a re-armed repair pass fails loudly.
+    """
+    called = {"n": 0}
+
+    def _must_not_run(ledger_data, slot_fn):
+        called["n"] += 1
         return {"status": "patched", "patch_count": 1, "hits": []}
 
     monkeypatch.setattr(
-        "nodes._otr_content_safety.apply_safety_cleanup", _fake_apply)
+        "nodes._otr_content_safety.apply_safety_cleanup", _must_not_run)
+
+    ledger = _complete_ledger()
+    original = "The damn lamp has not turned since Tuesday."
+    ledger["lines"][1]["text"] = original
     receipt = lc.run_ledger_cleanup(ledger, slot_fn=_RecordingSlot())
+
     assert receipt["status"] == "complete"
-    assert receipt["safety"]["residual_hits"] == 0
-    assert "damn" not in ledger["lines"][1]["text"]
+    assert ledger["lines"][1]["text"] == original, "the cleanup edited the author"
+    assert called["n"] == 0, "the retired safety repair pass ran"
+    assert receipt["safety"]["status"] == "retired"
 
 
-def test_unrepairable_unsafe_language_still_does_not_fail_the_story():
-    """Residual hits are REPORTED. The freeze gate's G9 is the backstop.
+def test_the_safety_receipt_key_survives_with_a_defined_value():
+    """A ripped pass may not leave an unowned ledger field.
 
-    If this pass raised on residual unsafe text it would be a second terminal
-    content policy -- exactly what THE LAW forbids.
+    meta.ledger_cleanup.safety is read by the freeze cascade's receipt
+    plumbing, so the key keeps its established shape on EVERY path rather than
+    disappearing with the pass that used to write it.
     """
     ledger = _complete_ledger()
     ledger["lines"][1]["text"] = "The damn lamp has not turned since Tuesday."
     receipt = lc.run_ledger_cleanup(ledger, slot_fn=None)
     assert receipt["status"] == "complete"
-    assert receipt["safety"]["status"] == "no_slot_available"
-    assert receipt["safety"]["residual_hits"] >= 1
+    safety = receipt["safety"]
+    assert safety["status"] == "retired"
+    assert safety["patch_count"] == 0
+    assert safety["residual_hits"] == 0
+    assert ledger["meta"]["ledger_cleanup"]["safety"] == safety
 
 
 def test_length_and_style_never_appear_in_the_gap_report():

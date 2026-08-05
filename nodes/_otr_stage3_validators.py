@@ -119,28 +119,17 @@ def validate_spoken_structure(beat: Any, line_text: Any) -> ValidationFinding | 
 
 
 def validate_sfw(beat: Any, line_text: Any) -> ValidationFinding | None:
-    """Return one blocking finding from the shared narrow safety policy."""
-    from ._otr_content_safety import find_text_hits
+    """Retired 2026-08-05: always None. Kept so callers/exports do not shift.
 
-    beat_id, speaker, role = _beat_identity(beat)
-    if role not in _SPOKEN_ROLES:
-        return None
-    hits = find_text_hits(line_text)
-    if not hits:
-        return None
-    category, term = hits[0]
-    return ValidationFinding(
-        SEVERITY_ERROR,
-        CODE_SFW_VIOLATION,
-        beat_id,
-        speaker,
-        f"Spoken safety violation: {category} term {term!r}.",
-        (
-            "no profanity, explicit guns/knives/weapons, or explicit "
-            "sexual/nudity language"
-        ),
-        term,
-    )
+    This returned a BLOCKING finding whenever a spoken line matched the
+    profanity / weapon / sexual word list. Deleted by operator directive -- no
+    content guardrails on generated episodes, and on the adaptation lanes the
+    author's own language is carried as written. The symbol survives (it is in
+    ``__all__`` and inside ``validate_line``'s finding chain) so removing the
+    policy does not become an API break in the same change.
+    """
+    del beat, line_text
+    return None
 
 
 def validate_line(beat: Any, line_text: Any) -> ValidationResult:

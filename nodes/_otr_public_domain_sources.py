@@ -34,11 +34,6 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
 try:
-    from ._otr_content_safety import find_text_hits
-except ImportError:  # pragma: no cover -- flat import harnesses
-    from _otr_content_safety import find_text_hits  # type: ignore
-
-try:
     from . import _otr_source_document as _osd
 except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_document as _osd  # type: ignore
@@ -660,8 +655,9 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "major turns, and ending. Compression is allowed; replacement is not. "
         "Do not invent an unrelated framing story, a new protagonist, or a "
         "different ending.\n\n"
-        "Keep it SFW: no profanity, explicit guns/knives/weapons, or "
-        "explicit sexual/nudity language in the adapted premise.\n\n"
+        # SFW clause DELETED 2026-08-05 (operator directive): a fidelity lane
+        # must not be told to avoid the source's own content. See the matching
+        # note in _otr_shakespeare_sources.
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
         "  \"casting_brief\": \"source-grounded roles and voices\",\n"
@@ -717,17 +713,11 @@ def build_public_domain_briefs(
         if len(brief.character_names) < 1:
             return ("public-domain briefs require at least one source character "
                     "name (the story's own cast, from its text)")
-        hay = " ".join(
-            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
-            + list(brief.key_terms)
-        ).casefold()
-        safety_hits = find_text_hits(hay)
-        if safety_hits:
-            category, term = safety_hits[0]
-            return (
-                "public-domain brief contains explicit safety term "
-                f"{category}={term!r}"
-            )
+        # The brief-level safety rejection that used to sit here was DELETED
+        # 2026-08-05 (operator directive). It re-rolled the whole brief when the
+        # SOURCE's own vocabulary appeared in it, which on an adaptation lane
+        # means burning a draft for being faithful. Nothing replaces it: a brief
+        # that names what the author named is a correct brief.
         return None
 
     try:

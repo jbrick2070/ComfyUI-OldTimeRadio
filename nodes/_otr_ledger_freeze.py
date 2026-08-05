@@ -686,9 +686,12 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g8_line_id_uniqueness(
             ledger_data, report.errors, report.warnings,
         )
-        _check_g9_sfw_spoken_text(
-            ledger_data, report.errors, report.warnings,
-        )
+        # G9 (terminal spoken-safety) was REMOVED 2026-08-05 (operator
+        # directive: no violence or swearing guardrails on generated episodes).
+        # It rejected an episode outright when a delivered row kept a word from
+        # the profanity / weapon / sexual list -- so a faithful MACBETH failed
+        # the freeze on "dagger". It wrote no ledger field; it only appended to
+        # report.errors, so nothing downstream loses an owner by its removal.
         _check_g14_provenance_publish(
             ledger_data, report.errors, report.warnings,
         )
@@ -698,36 +701,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
     return report
 
 
-# G9: narrow terminal spoken-safety policy. Phase 0 observes; Phase 10
-# raises only when exact delivered character/announcer rows retain profanity,
-# explicit weapon language, or explicit sexual/nudity language.
-
-
-def _check_g9_sfw_spoken_text(
-    ledger_data: dict,
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    """G9: apply the one shared whole-word policy to delivered spoken rows."""
-    del warnings
-    try:
-        from ._otr_content_safety import (
-            format_safety_hits,
-            scan_spoken_ledger,
-        )
-    except ImportError:  # pragma: no cover - flat test/standalone load
-        from _otr_content_safety import (  # type: ignore
-            format_safety_hits,
-            scan_spoken_ledger,
-        )
-    hits = scan_spoken_ledger(ledger_data)
-    if hits:
-        errors.append(
-            "G9: explicit spoken safety violation in "
-            f"{len(hits)} match(es): {format_safety_hits(hits)}. "
-            "Only profanity, explicit guns/knives/weapons, and explicit "
-            "sexual/nudity language are terminal prose policy."
-        )
+# G9 (terminal spoken-safety) was DELETED 2026-08-05 -- operator directive, no
+# content guardrails on generated episodes. The gate code number is retired
+# rather than reused, so an old ledger or log mentioning "G9:" stays readable.
 
 
 

@@ -63,11 +63,23 @@ def test_empty_spoken_row_fails_structural_integrity():
     assert any(row.code == "empty_spoken_line" for row in result.findings)
 
 
-def test_terminal_safety_hit_fails_closed():
+def test_content_no_longer_fails_the_scrub():
+    """Inverted 2026-08-05: content is not a scrub failure any more.
+
+    "safety_violation" was a BLOCKING finding code, so a faithful adaptation
+    failed the scrub on its own author's vocabulary. The directive removed
+    content enforcement; STRUCTURAL blocking codes are untouched (see the
+    empty_spoken_line test above, which still fails closed).
+
+    safety_violations stays on ScrubResult as a permanently-empty list so the
+    dataclass and its to_dict() shape do not change for any existing reader --
+    a ripped pass may not orphan a field.
+    """
     result = scrub_ledger(_ledger("The gun is on the table."))
 
-    assert result.status == "FAIL"
-    assert result.safety_violations
+    assert result.status == "PASS"
+    assert result.safety_violations == []
+    assert not any(row.code == "safety_violation" for row in result.findings)
 
 
 def test_story_spine_records_clean_scrub_without_reauthoring(monkeypatch):

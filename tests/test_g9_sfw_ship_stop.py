@@ -1,14 +1,21 @@
-"""G9 narrow spoken-safety ship stop shared by every story bank."""
+"""G9 is RETIRED. These tests prove the ship stop is gone and stays gone.
+
+G9 was a terminal spoken-safety gate: a delivered character/announcer row whose
+words matched the profanity / weapon / sexual list failed the freeze and killed
+the episode. It was DELETED 2026-08-05 by operator directive -- no content
+guardrails on generated episodes -- because on the adaptation lanes it rejected
+the source's own language. "Is this a dagger which I see before me" is MACBETH,
+and `dagger` was in the terminal list.
+
+This file used to assert the opposite of everything below. It is kept, inverted,
+rather than deleted: a deleted test file is silence, and silence is how a
+guardrail creeps back. If one of these fails, someone re-armed content
+enforcement in the freeze path and that is an operator decision, not a fix.
+"""
 
 import pytest
 
 from nodes import _otr_ledger_freeze as freeze
-from nodes._otr_content_safety import (
-    EXPLICIT_NUDITY_TERMS,
-    EXPLICIT_WEAPON_TERMS,
-    PROFANITY_TERMS,
-    find_text_hits,
-)
 
 
 def _ledger(*texts):
@@ -38,7 +45,14 @@ def _g9_errors(ledger):
     return [error for error in report.errors if error.startswith("G9")]
 
 
-def test_ordinary_visual_language_smoking_and_begun_pass():
+def test_the_gate_function_is_gone():
+    """The symbol itself must not come back under the same name."""
+    assert not hasattr(freeze, "_check_g9_sfw_spoken_text"), (
+        "the G9 spoken-safety gate was reinstated -- operator directive "
+        "2026-08-05 removed content enforcement from the freeze path")
+
+
+def test_ordinary_visual_language_still_passes():
     assert not _g9_errors(
         _ledger(
             "The velvet chair stood beside a smoking chimney.",
@@ -47,27 +61,32 @@ def test_ordinary_visual_language_smoking_and_begun_pass():
     )
 
 
-@pytest.mark.parametrize("term", ["damn", "gun", "knife", "naked"])
-def test_authorized_terminal_categories_are_critical_gaps(term):
-    errors = _g9_errors(_ledger("Fine.", f"The report says {term} tonight."))
-    assert errors
-    assert "line_002" in errors[0]
-    assert term in errors[0]
+@pytest.mark.parametrize("term", ["damn", "gun", "knife", "dagger", "naked"])
+def test_formerly_terminal_words_no_longer_stop_the_ship(term):
+    """The exact words that used to kill an episode now pass the audit."""
+    assert not _g9_errors(_ledger("Fine.", f"The report says {term} tonight.")), (
+        "%r still raises a G9 error" % term)
 
 
-def test_policy_is_whole_word_only():
-    assert not _g9_errors(
-        _ledger("Hello, class; the parcel passed after the work had begun.")
-    )
+def test_phase_10_raises_nothing_about_content():
+    """A line that used to be a terminal CONTENT failure no longer is one.
 
-
-def test_shared_live_vocabulary_is_detected():
-    for term in (*PROFANITY_TERMS, *EXPLICIT_WEAPON_TERMS, *EXPLICIT_NUDITY_TERMS):
-        assert find_text_hits(f"and then {term} happened"), term
-
-
-def test_phase_10_refuses_an_unsafe_episode():
+    This fixture ledger is deliberately minimal, so it can still fail the
+    freeze on STRUCTURE -- that is correct and untouched by this change. The
+    claim under test is narrower and exact: whatever the freeze objects to, it
+    is never the words.
+    """
     ledger = _ledger("Welcome.", "What the hell was that noise?")
-    with pytest.raises(freeze.FreezeAssertionError):
+    try:
         freeze.phase_10_gap_audit_post_and_freeze(ledger)
-    assert ledger["meta"]["freeze_verdict"] == "needs_full_rerun"
+    except freeze.FreezeAssertionError as exc:
+        offending = [e for e in exc.errors if str(e).startswith("G9")]
+        assert not offending, "content is still terminal at freeze: %r" % offending
+
+
+def test_macbeth_keeps_its_dagger():
+    """The line this whole change exists for."""
+    ledger = _ledger(
+        "Is this a dagger which I see before me, the handle toward my hand?",
+    )
+    assert not _g9_errors(ledger)

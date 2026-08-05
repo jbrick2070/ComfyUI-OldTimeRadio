@@ -92,12 +92,16 @@ def test_nonspoken_rows_are_outside_spoken_validation():
         ("The gallery displayed nudity.", "nudity"),
     ],
 )
-def test_shared_terminal_safety_categories_are_reported(text, expected_term):
-    finding = validate_sfw(_beat(), text)
+def test_content_is_never_a_stage3_finding(text, expected_term):
+    """Inverted 2026-08-05: validate_sfw is retired and always returns None.
 
-    assert finding is not None
-    assert finding.code == CODE_SFW_VIOLATION
-    assert finding.got == expected_term
+    These exact strings used to produce a blocking SEVERITY_ERROR finding. The
+    parametrize list is kept verbatim so the retirement is asserted against the
+    same vocabulary the policy used to enforce.
+    """
+    del expected_term
+    assert validate_sfw(_beat(), text) is None
+    assert validate_line(_beat(), text).ok
 
 
 def test_begun_is_not_a_weapon_match():

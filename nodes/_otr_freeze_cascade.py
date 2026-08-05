@@ -1042,12 +1042,13 @@ def run_freeze_cascade(
         # when it raised (when meta was stampable).
         if not meta.get("freeze_verdict"):
             meta["freeze_verdict"] = "needs_full_rerun"
-        safety_only = bool(exc.errors) and all(
-            str(error).startswith("G9:") for error in exc.errors
-        )
-        meta["freeze_block_class"] = (
-            "safety" if safety_only else "structural"
-        )
+        # G9 (terminal spoken-safety) was deleted 2026-08-05 by operator
+        # directive, so a freeze can no longer be blocked on content -- the
+        # "safety" class became unreachable and the branch that computed it is
+        # gone rather than left as dead code. The FIELD stays, with exactly one
+        # owner and a defined value on every path, because soak telemetry and
+        # the disposition readers expect it.
+        meta["freeze_block_class"] = "structural"
         disp = FreezeDisposition(
             verdict="needs_full_rerun",
             cleanup_receipt=cleanup_receipt,

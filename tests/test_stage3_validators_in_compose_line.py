@@ -75,7 +75,14 @@ def test_exact_locked_speaker_label_is_transport_not_prose():
     assert result.validation_findings == ()
 
 
-def test_safety_finding_is_stamped_without_recalling_the_model():
+def test_no_safety_finding_is_stamped_and_the_model_is_not_recalled():
+    """Inverted 2026-08-05: content is no longer a stage3 finding.
+
+    This asserted that "The gun is on the table." stamped an `sfw_violation`
+    row onto the composed line. The policy is retired, so the SAME line now
+    composes clean. The half of the original contract that still matters --
+    a finding never costs a second model call -- is kept: one call, exact text.
+    """
     calls = []
     text = "The gun is on the table."
     result = compose_line(
@@ -88,9 +95,7 @@ def test_safety_finding_is_stamped_without_recalling_the_model():
 
     assert result.text == text
     assert len(calls) == 1
-    assert [row["code"] for row in result.validation_findings] == [
-        "sfw_violation"
-    ]
+    assert [row["code"] for row in result.validation_findings] == []
 
 
 def test_disabled_stage3_preserves_one_call_and_exact_text():

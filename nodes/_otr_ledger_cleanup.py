@@ -18,16 +18,13 @@ cascade -- and it does three things in order:
      owner: mint a missing ``line_id``, resolve a blank ``speaker_role`` from a
      cast ``char_id``, turn an unspeakable row into an EXPLICIT skip carrying
      its reason, re-stamp text metrics. No prose is authored here.
-  2. SAFETY REPAIR IN PLACE. Profanity / explicit weapon / explicit sexual
-     language in a delivered spoken row is REPAIRED by the shared same-story
-     cleanup, never used to reject the story. This closes a real hole: a bank
-     whose story pack declares no ``line_composer_system`` seam resolves to the
-     ``content_owned_readonly`` freeze policy, which SKIPS the cascade's inline
-     safety cleanup because it assumes the producer already cleaned. For a
-     client bank the shared writer IS the producer, and until this pass existed
-     nothing cleaned -- the first unsafe word went straight to G9 and killed
-     the episode. G9 remains the loud last-resort backstop; it should now only
-     ever fire when repair itself failed.
+  2. (RETIRED 2026-08-05.) This step used to be SAFETY REPAIR IN PLACE --
+     rewriting a delivered spoken row whose words matched a profanity / weapon /
+     sexual list. It is GONE by operator directive: no content guardrails on
+     generated episodes, and on an adaptation lane the author's own language is
+     carried as written. The terminal G9 freeze gate it fed was deleted in the
+     same change. The receipt key ``safety`` survives with a retired status so
+     no consumer of ``meta.ledger_cleanup`` loses a field.
   3. PROSE COMPLETION. A required prose field that survives step 1 with no
      value (today: ``meta.episode_title``) gets one bounded same-story LLM
      fill, then a deterministic source-grounded backstop.
@@ -290,61 +287,8 @@ def _complete_deterministic(
 # ---------------------------------------------------------------------------
 
 
-def _repair_safety(
-    ledger_data: MutableMapping[str, Any],
-    slot_fn: "Callable[..., str] | None",
-) -> dict:
-    """Repair explicit unsafe spoken language in place. Never raises.
-
-    THE LAW: an audit may improve a story, it may never fail one. So this is a
-    REPAIR, and a repair that cannot be made is reported -- not escalated. G9
-    at the freeze gate stays the loud last-resort backstop for the case where
-    repair genuinely failed; it should no longer be the FIRST thing a client
-    bank's unsafe word meets.
-    """
-    try:
-        from ._otr_content_safety import apply_safety_cleanup, scan_spoken_ledger
-    except ImportError:  # pragma: no cover -- flat test/standalone load
-        from _otr_content_safety import (  # type: ignore
-            apply_safety_cleanup,
-            scan_spoken_ledger,
-        )
-
-    hits = scan_spoken_ledger(ledger_data)
-    if not hits:
-        return {"status": "clean", "patch_count": 0, "residual_hits": 0}
-    if slot_fn is None:
-        # No technical slot at this boundary (unit harnesses, and any future
-        # caller that runs the deterministic half alone). Say so plainly
-        # rather than pretending the scan came back clean.
-        log.warning(
-            "[ledger_cleanup] %d unsafe spoken hit(s) and no LLM slot to "
-            "repair them; leaving the rows for the freeze-gate backstop",
-            len(hits),
-        )
-        return {
-            "status": "no_slot_available",
-            "patch_count": 0,
-            "residual_hits": len(hits),
-        }
-
-    receipt = dict(apply_safety_cleanup(ledger_data, slot_fn))
-    residual = scan_spoken_ledger(ledger_data)
-    receipt["residual_hits"] = len(residual)
-    if residual:
-        log.warning(
-            "[ledger_cleanup] safety repair left %d unsafe hit(s) "
-            "(status=%s); the freeze gate remains the backstop",
-            len(residual), receipt.get("status"),
-        )
-    else:
-        log.info(
-            "[ledger_cleanup] safety repair applied to %d row(s); "
-            "no residual hits",
-            int(receipt.get("patch_count") or 0),
-        )
-    return receipt
-
+# _repair_safety() was DELETED 2026-08-05 (operator directive). Its receipt
+# key survives with a retired status -- see run_ledger_cleanup.
 
 # ---------------------------------------------------------------------------
 # step 3 -- prose completion (bounded; deterministic backstop)
@@ -462,15 +406,13 @@ def _llm_episode_title(
     ]
 
     def _validate(result: "_EpisodeTitle") -> "str | None":
-        try:
-            from ._otr_content_safety import find_text_hits
-        except ImportError:  # pragma: no cover
-            from _otr_content_safety import find_text_hits  # type: ignore
+        # The unsafe-language rejection here was DELETED 2026-08-05 (operator
+        # directive). A title drawn from the story's own words is a good title;
+        # re-rolling it for containing one of them is the same fidelity defect
+        # as the lane-level clauses. Emptiness is STRUCTURAL and still refuses.
         candidate = " ".join(str(result.episode_title or "").split())
         if not candidate:
             return "episode_title is empty after whitespace normalization"
-        if find_text_hits(candidate):
-            return "episode_title contains explicitly unsafe language"
         return None
 
     try:
@@ -644,7 +586,18 @@ def run_ledger_cleanup(
     deterministic = _complete_deterministic(ledger_data)
     receipt["deterministic_fills"] = deterministic
 
-    receipt["safety"] = _repair_safety(ledger_data, slot_fn)
+    # Safety repair REMOVED 2026-08-05 (operator directive: no content
+    # guardrails on generated episodes). The pass used to rewrite a delivered
+    # spoken row whose words matched the profanity / weapon / sexual list, which
+    # on an adaptation lane meant editing the author. The receipt KEY stays with
+    # its established shape and a defined value on every path -- a ripped pass
+    # may not leave an unowned field, and meta.ledger_cleanup.safety is read by
+    # the freeze cascade's receipt plumbing.
+    receipt["safety"] = {
+        "status": "retired",
+        "patch_count": 0,
+        "residual_hits": 0,
+    }
 
     meta = ledger_data.setdefault("meta", {})
     receipt["prose_fills"] = _complete_prose(ledger_data, slot_fn)

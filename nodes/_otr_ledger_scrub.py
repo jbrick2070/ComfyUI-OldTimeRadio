@@ -236,24 +236,19 @@ def scrub_ledger(ledger: Dict[str, Any]) -> ScrubResult:
         for finding in _shape_findings(ledger)
         if finding not in findings
     )
-    safety_hits = scan_spoken_ledger(ledger)
-    safety_rows = [hit.to_dict() for hit in safety_hits]
-    for hit in safety_hits:
-        findings.append(
-            ScrubFinding(
-                "safety_violation",
-                f"lines[{hit.line_index}]",
-                f"{hit.category} term {hit.term!r}",
-                hit.line_id,
-            )
-        )
+    # The spoken-safety scan was REMOVED 2026-08-05 (operator directive: no
+    # content guardrails on generated episodes). It raised "safety_violation"
+    # findings which were BLOCKING, so a faithful adaptation failed the scrub on
+    # its own author's vocabulary. `safety_violations` stays on ScrubResult as a
+    # permanently-empty field so the dataclass contract and its `to_dict()`
+    # shape do not change for any existing reader.
+    safety_rows: List[dict] = []
 
     blocking_codes = {
         "json_invalid",
         "ledger_shape",
         "cast_binding",
         "empty_spoken_line",
-        "safety_violation",
     }
     status = "FAIL" if any(
         finding.code in blocking_codes for finding in findings

@@ -38,11 +38,6 @@ try:
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
-try:
-    from ._otr_content_safety import find_text_hits
-except ImportError:  # pragma: no cover -- flat import harnesses
-    from _otr_content_safety import find_text_hits  # type: ignore
-
 MANIFEST_SCHEMA_VERSION = "v1"
 PROMPT_VERSION = "shakespeare_interpreter_v1"
 SCHEMA_VERSION = "shakespeare_briefs_v1"
@@ -614,10 +609,14 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         "major turn, and the play-world stakes. Compression is allowed; do "
         "not replace the scene with a modern mystery or unrelated framing "
         "story.\n\n"
+        # The SFW clause that used to sit here was DELETED 2026-08-05 (operator
+        # directive). It told the model to avoid "guns/knives/weapons" while we
+        # handed it MACBETH -- so "Is this a dagger which I see before me" was
+        # being discouraged at the prompt, rewritten if it survived, and finally
+        # rejected at the G9 freeze gate. On a fidelity lane the author's own
+        # language is carried AS WRITTEN; that is the whole point of the lane.
         "Make stage directions audible through spoken implication or concrete "
-        "radio business. Keep it SFW: no profanity, explicit "
-        "guns/knives/weapons, or explicit sexual/nudity language in the "
-        "adapted premise.\n\n"
+        "radio business.\n\n"
         "Return ONE JSON object only with exactly these keys:\n"
         "{\n"
         "  \"casting_brief\": \"source-grounded roles and voices\",\n"
@@ -653,17 +652,12 @@ def build_shakespeare_briefs(
         return technical_fn(msgs, temperature=temperature, max_new_tokens=max_new_tokens)
 
     def _content_validator(brief: ShakespeareBriefs) -> str | None:
-        hay = " ".join(
-            [brief.casting_brief, brief.script_brief, brief.news_close_brief]
-            + list(brief.key_terms)
-        ).casefold()
-        safety_hits = find_text_hits(hay)
-        if safety_hits:
-            category, term = safety_hits[0]
-            return (
-                "shakespeare brief contains explicit safety term "
-                f"{category}={term!r}"
-            )
+        # The brief-level safety rejection that used to sit here was DELETED
+        # 2026-08-05 (operator directive). It re-rolled the brief whenever
+        # Shakespeare's own vocabulary showed up in it -- a draft burned for
+        # being faithful. Nothing replaces it; the validator is kept as a seam
+        # so a future NON-content brief check has somewhere to live.
+        del brief
         return None
 
     try:

@@ -125,7 +125,7 @@ def test_public_domain_briefs_preserve_optional_terms_without_caps():
     assert brief.key_terms == terms
 
 
-def test_public_domain_prompt_carries_narrow_safety_guidance(monkeypatch):
+def test_public_domain_prompt_carries_no_content_guardrail(monkeypatch):
     captured = {}
 
     def _fake_structured_call(**kwargs):
@@ -142,8 +142,13 @@ def test_public_domain_prompt_carries_narrow_safety_guidance(monkeypatch):
         model_id="test-model",
     )
     prompt_text = "\n".join(m["content"] for m in captured["prompt"])
+    # Inverted 2026-08-05 (operator directive): a fidelity lane must not be told
+    # to avoid the source's own content. Kept as an assertion rather than
+    # deleted so the clause cannot quietly return.
     for term in ("no profanity", "guns/knives/weapons", "sexual/nudity"):
-        assert term in prompt_text
+        assert term not in prompt_text, (
+            "a content guardrail returned to the public-domain prompt: %r"
+            % term)
     assert brief.model_id == "test-model"
     assert brief.attempts == 0
     assert brief.source_hash

@@ -124,7 +124,7 @@ def test_shakespeare_briefs_preserve_optional_terms_without_caps():
     assert brief.key_terms == terms
 
 
-def test_shakespeare_prompt_contains_narrow_safety_and_rights_terms(monkeypatch):
+def test_shakespeare_prompt_keeps_rights_terms_and_no_content_guardrail(monkeypatch):
     captured = {}
 
     def _fake_structured_call(**kwargs):
@@ -141,9 +141,16 @@ def test_shakespeare_prompt_contains_narrow_safety_and_rights_terms(monkeypatch)
         model_id="test-model",
     )
     prompt_text = "\n".join(m["content"] for m in captured["prompt"])
-    for term in ("no profanity", "guns/knives/weapons", "sexual/nudity", "CC BY-NC"):
-        assert term in prompt_text
+    # RIGHTS terms stay -- they are a licensing fact about the source.
+    assert "CC BY-NC" in prompt_text
     assert "Folger Shakespeare" in prompt_text
+    # SAFETY terms are GONE (operator directive 2026-08-05). Telling the model
+    # to avoid "guns/knives/weapons" while handing it MACBETH is a fidelity
+    # defect: "Is this a dagger which I see before me" is the play. This
+    # assertion is inverted on purpose so the clause cannot creep back in.
+    for term in ("no profanity", "guns/knives/weapons", "sexual/nudity"):
+        assert term not in prompt_text, (
+            "a content guardrail returned to the shakespeare prompt: %r" % term)
     assert brief.model_id == "test-model"
     assert brief.attempts == 0
     assert brief.source_hash
