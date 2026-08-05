@@ -79,6 +79,10 @@
         "announcer_voice",
         "char_voice"
       ],
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
+      ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bm_george.pt",
       "ref_sha256": "pending",
@@ -1887,7 +1891,12 @@
         "british"
       ],
       "roles": [
+        "announcer_voice",
         "char_voice"
+      ],
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
       ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bf_lily.pt",
@@ -1999,7 +2008,12 @@
         "british"
       ],
       "roles": [
+        "announcer_voice",
         "char_voice"
+      ],
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
       ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bm_fable.pt",
@@ -2223,7 +2237,12 @@
         "british"
       ],
       "roles": [
+        "announcer_voice",
         "char_voice"
+      ],
+      "style_tags": [
+        "preferred_announcer",
+        "british_leaning"
       ],
       "age_band": "adult",
       "ref_path": "models/TTS/KokoroTTS/voices/bf_emma.pt",

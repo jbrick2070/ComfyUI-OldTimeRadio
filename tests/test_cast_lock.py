@@ -17,6 +17,12 @@ NODE_SRC = REPO_ROOT / "nodes" / "cast_lock.py"
 
 _WIDGET_TYPES = frozenset({"INT", "FLOAT", "STRING", "BOOLEAN"})
 
+# The curated kokoro announcer pool (eng_kokoro.ANNOUNCER_VOICE_POOL). Before
+# 2026-08-05 only bm_george carried the announcer_voice role, so every episode
+# opened with the same voice; the announcer is now drawn from all four per
+# episode seed.
+_KOKORO_ANNOUNCERS = frozenset({"bm_george", "bm_fable", "bf_emma", "bf_lily"})
+
 
 def test_announcer_entry_prefers_canonical_char_id_over_display_name():
     from nodes.cast_lock import _is_announcer_entry
@@ -248,9 +254,30 @@ def test_auto_registry_stamps_voice_refs():
         assert isinstance(cast[cid]["commercial_clean"], bool)
     # Distinct references (no reuse across the two characters).
     assert cast["c1"]["voice_ref_id"] != cast["c2"]["voice_ref_id"]
-    # Announcer is pinned to the kokoro reference.
-    assert cast["a1"]["voice_ref_id"] == "bm_george"
+    # Announcer draws from the curated kokoro pool (seeded per episode, no
+    # longer pinned to bm_george on every single episode).
+    assert cast["a1"]["voice_ref_id"] in _KOKORO_ANNOUNCERS
     assert cast["a1"]["voice_engine"] == "kokoro"
+
+
+def test_auto_registry_announcer_varies_across_episode_seeds():
+    """The audible half of the announcer unpin, asserted through the real
+    CastLock path rather than the bank helper: different episodes must not all
+    open with the same voice. Fails on the pre-2026-08-05 code, which returned
+    bm_george for every seed.
+    """
+    from nodes.cast_lock import CastLock
+
+    seen = set()
+    for seed in range(24):
+        out = CastLock().lock(
+            script_json=_ledger(_CHAR_CAST, meta={"episode_seed": seed}),
+            cast_voice_policy="auto_registry",
+        )
+        cast = {e["char_id"]: e for e in json.loads(out[0])["cast"]}
+        seen.add(cast["a1"]["voice_ref_id"])
+    assert seen <= _KOKORO_ANNOUNCERS
+    assert len(seen) > 1, f"announcer still pinned to a single voice: {seen}"
 
 
 def test_auto_registry_is_deterministic():
@@ -282,8 +309,8 @@ def test_auto_registry_bark_legacy_preserves_characters():
     cast = {e["char_id"]: e for e in led["cast"]}
     # bark has no reference entries -> characters preserved...
     assert "voice_ref_id" not in cast["c1"]
-    # ...but the announcer still resolves its kokoro pin.
-    assert cast["a1"]["voice_ref_id"] == "bm_george"
+    # ...but the announcer still resolves a kokoro reference.
+    assert cast["a1"]["voice_ref_id"] in _KOKORO_ANNOUNCERS
 
 
 def test_unknown_delivery_profile_fails_closed():

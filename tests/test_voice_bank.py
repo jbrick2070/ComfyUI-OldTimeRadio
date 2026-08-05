@@ -222,14 +222,62 @@ def test_stable_cast_seed_null_safe():
 # ----------------------------------------------------------------------------
 # Announcer pin (E.1)
 # ----------------------------------------------------------------------------
+_KOKORO_ANNOUNCERS = {"bm_george", "bm_fable", "bf_emma", "bf_lily"}
+
+
 def test_announcer_voice_ref_resolves_for_active_engine():
-    assert announcer_voice_ref("kokoro").voice_ref_id == "bm_george"
+    assert announcer_voice_ref("kokoro").voice_ref_id in _KOKORO_ANNOUNCERS
     assert announcer_voice_ref("chatterbox").voice_ref_id in {
         "cb_announcer_male", "cb_announcer_female",
     }
     assert announcer_voice_ref("dia").voice_ref_id in {
         "dia_announcer_male", "dia_announcer_female",
     }
+
+
+def test_kokoro_announcer_rotates_across_the_whole_curated_pool():
+    """The announcer was pinned to bm_george on EVERY episode: kokoro carried a
+    single announcer_voice row, so the legacy `sorted(...)[0]` branch had one
+    candidate. Every published episode opened with the same voice.
+
+    This asserts the seeded draw reaches all four curated announcers AND that
+    bm_george is still among them -- a data-only fix (adding the role to the
+    other three without the seeded pick) retires bm_george entirely, because
+    the sorted head within each gender is bm_fable / bf_emma.
+    """
+    seen = {
+        announcer_voice_ref("kokoro", episode_seed=s).voice_ref_id
+        for s in range(64)
+    }
+    assert seen == _KOKORO_ANNOUNCERS
+    assert "bm_george" in seen
+
+
+def test_seeded_announcer_draw_leaves_single_candidate_engines_unmoved():
+    """chatterbox / dia / google_tts each expose exactly ONE preferred announcer
+    per gender, so the seeded draw runs over a one-element list and is the
+    identity. Their pick sequences must not move -- this is what keeps the
+    change scoped to kokoro.
+    """
+    for engine, expected in (
+        ("chatterbox", {"cb_announcer_male", "cb_announcer_female"}),
+        ("dia", {"dia_announcer_male", "dia_announcer_female"}),
+        ("google_tts", {"gt_charon_announcer", "gt_sulafat_announcer"}),
+    ):
+        seq = [
+            announcer_voice_ref(engine, episode_seed=s).voice_ref_id
+            for s in range(60)
+        ]
+        assert set(seq) == expected, engine
+
+
+def test_kokoro_announcer_pick_is_deterministic_for_a_seed():
+    for seed in (0, 7, 42, 100003):
+        picks = {
+            announcer_voice_ref("kokoro", episode_seed=seed).voice_ref_id
+            for _ in range(5)
+        }
+        assert len(picks) == 1, seed
 
 
 def test_chatterbox_voice_bank_has_british_gendered_announcers():

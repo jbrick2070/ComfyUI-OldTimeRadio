@@ -48,6 +48,13 @@ VOICE_BANK_SCHEMA_VERSION = "1"
 # this when the card schema or validation contract changes (re-baseline trigger).
 VOICE_FIT_POLICY_VERSION = "1"
 
+# Engines whose announcer comes from a CURATED pool and is drawn per episode
+# rather than pinned to the lowest voice_ref_id. kokoro joined 2026-08-05: it
+# had exactly one announcer-role row (bm_george), so every published episode
+# opened with the same voice. cast_lock.py reads this same tuple -- the two
+# must never drift, which is why it lives here and not as a second literal.
+_SEEDED_ANNOUNCER_ENGINES = ("google_tts", "chatterbox", "dia", "kokoro")
+
 _BANK_FILENAME = "voice_reference_bank.json"
 _SCHEMA_FILENAME = "voice_bank_entry_schema.json"
 
@@ -699,7 +706,18 @@ def _seeded_preferred_announcer_voice_ref(
             "british_leaning" not in tags,
             entry.voice_ref_id,
         )
-    return sorted(pool, key=_key)[0]
+    # Draw WITHIN the selected gender rather than taking the head of the sorted
+    # pool. Sorting first keeps the tie-break order stable, so an engine that
+    # offers exactly one preferred announcer per gender (google_tts, chatterbox,
+    # dia) draws from a one-element list and is byte-identical to the old pin.
+    # Engines with a real pool (kokoro) now reach every voice in it.
+    ordered = sorted(pool, key=_key)
+    pick_seed = hashlib.sha1(
+        ("%s_announcer_pick:%s" % (
+            engine, "" if episode_seed is None else episode_seed,
+        )).encode("utf-8")
+    ).hexdigest()
+    return random.Random(pick_seed).choice(ordered)
 
 
 def announcer_voice_ref(
@@ -714,7 +732,7 @@ def announcer_voice_ref(
     available.
     """
     entries = bank if bank is not None else load_voice_bank()[0]
-    if engine in ("google_tts", "chatterbox", "dia"):
+    if engine in _SEEDED_ANNOUNCER_ENGINES:
         return _seeded_preferred_announcer_voice_ref(
             entries, engine=engine, episode_seed=episode_seed)
     cands = sorted(

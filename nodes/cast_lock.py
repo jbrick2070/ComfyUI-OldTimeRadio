@@ -491,8 +491,9 @@ class CastLock:
                        announcer_voice_engine="auto",
                        voice_device="cuda"):
         from ._otr_voice_bank import (
-            CASTING_POLICY_VERSION, VoiceCastingError, announcer_voice_ref,
-            assign_voice_for_slot, load_voice_bank, voice_ref_usage_keys,
+            CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
+            announcer_voice_ref, assign_voice_for_slot, load_voice_bank,
+            voice_ref_usage_keys,
         )
         from ._otr_voice_node_common import coerce_int_seed
 
@@ -524,7 +525,7 @@ class CastLock:
             isinstance(entry, dict) and _is_announcer_entry(entry)
             for entry in cast
         )
-        if has_announcer and announcer_engine in ("google_tts", "chatterbox", "dia"):
+        if has_announcer and announcer_engine in _SEEDED_ANNOUNCER_ENGINES:
             announcer_ref = announcer_voice_ref(
                 announcer_engine, bank=bank_entries, episode_seed=episode_seed)
 
