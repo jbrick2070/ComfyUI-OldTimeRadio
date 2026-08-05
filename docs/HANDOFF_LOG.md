@@ -3,6 +3,46 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 night -- HEAD b91a2b4a (v2.0-alpha) -- WINDOW PLANNER (story quality CLOSED; continuity ultracode round)
+
+Did: took two operator directives, ran a full ultracode round on the three continuity
+  correctness tracks, and produced three reviewed build-ready plans. No code changed.
+
+- **OPERATOR DIRECTIVE: story/script QUALITY is CLOSED.** "I am not chasing story quality
+  anymore. It works. It works. I will publish it as open source, and if someone else wants
+  to do it, or in six months I wanna chase it again when I've got better tools, I will."
+  Recorded in `CLAUDE.md` above the two-strikes rule and in memory. The boundary is
+  explicit: gender/voice/face/structural faults are CORRECTNESS bugs and stay open;
+  improving prose is closed. This also settles the cloud-writer question -- local stays
+  the default, no paid writer is adopted to raise prose quality.
+- **The continuity diagnostic** (`docs/2026-08-04-continuity-diagnostic-gender-voice-portrait.md`)
+  found gender and voice are ONE defect (voice is picked from a gender-filtered pool) and
+  that the roster parsed at vendor time is read by NOTHING at render time.
+- **Ultracode round:** 3 Fable track designs + 9 Fable adversarial lenses (41 fatal-flaw
+  findings, each with file:line and green baselines) + 3 Opus hardens + 1 Opus critic.
+  ~2.2M subagent tokens. Artifacts in
+  `kibitz-runs/2026-08-04-continuity-ultracode/` -- `opus_hardened_plans.json`,
+  `opus_critic.md`, `snapshot_journal_results.json`, and the three `input_*.json`.
+- **The measurement that sizes the bug:** 44 of 188 character rows across all 94 published
+  adaptation ledgers contradict the shipped sidecar -- 23% of every adaptation character
+  ever shipped.
+- **What every earlier analysis missed:** gender is not a voice field. It feeds the
+  description LLM, the outline prompt, the dialogue cast block AND the image prompt's
+  gender anchor -- so the fix changes the script and the portrait too, and the portrait
+  fix shipped FIRST would lock a confident wrong-sex face for a whole episode.
+- **A mechanism correction that would have failed silently:** all three reviewers proposed
+  feeding pinned genders into `prior_genders`; probing shows that turns a coin flip into a
+  guaranteed error, and the recount variant re-breaks replay parity. Correct design leaves
+  the allocator untouched and overrides at pinned indices.
+- Ship order, cuts and the highest-value step are in GO_FORWARD "ON DECK".
+- Also this session, earlier: chunks 1/2/3a/3b of the source grounding shipped and QA'd,
+  proven on six published legs. 3b-ii is BUILT-BUT-UNWIRED and now parked under the
+  quality directive.
+
+Current step: **kibitz r3 (wiring) then r4 (convergence) on the three hardened plans**, then
+  build in the critic's order. Suite 8566 at last run; canonical workflow byte-identical.
+Not now: SFX (parked), story/script quality (closed), 3b-ii supply line (parked).
+
 ## 2026-08-04 evening -- HEAD 84025367 (v2.0-alpha) -- WINDOW CODER (chunks 1+2 shipped, QA'd 3 ways, proven on renders)
 
 Did: built and shipped chunks 1 and 2 of the public_domain source grounding,

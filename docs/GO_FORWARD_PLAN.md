@@ -11,7 +11,72 @@ went was four session batons, thirteen `SUPERSEDED` blocks, the closed
 (struck-through) bug rows, eight superseded validation receipts, and the
 window-letter table for slots that no longer exist.
 
-## ON DECK -- THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
+## ON DECK -- CONTINUITY CORRECTNESS (operator directive 2026-08-04 evening; supersedes the source-grounding sprint below as the active queue)
+
+**Story/script QUALITY is CLOSED** (see `CLAUDE.md`). These three tracks are CORRECTNESS
+defects and are the live work. Plans are BUILT and REVIEWED -- do not re-derive them:
+`kibitz-runs/2026-08-04-continuity-ultracode/opus_hardened_plans.json` (3 hardened plans)
+and `opus_critic.md` (cross-track order + cuts). Provenance: 3 Fable designs, 9 Fable
+adversarial lenses (41 fatal-flaw findings), 3 Opus hardens + 1 Opus critic.
+
+**THE MEASURED DEFECT:** across all 94 published adaptation ledgers, **44 of 188 character
+rows carry a gender that CONTRADICTS the shipped provenance sidecar -- 23% of every
+adaptation character ever shipped**, including MALVOLIO, MARIA, ROMEO, JULIET, MIRANDA,
+CELIA, ROSALIND and LEAR.
+
+**THE THING EVERY EARLIER ANALYSIS MISSED:** `slot.gender` is NOT a voice field. It feeds
+(a) the description LLM that writes `character_description` (`_otr_casting.py:777-785`),
+(b) the outline prompt (`OTR_LedgerScriptWriter.py:4144`), (c) the dialogue cast block
+(`_otr_line_composer.py:446`), and (d) the image prompt's gender anchor
+(`otr_meta_brief_image_prompt.py:78-90` prepends "adult man, "/"adult woman, "). So the
+gender fix changes the SCRIPT and the PORTRAIT too. Say so in the handoff when it lands --
+a reviewer diffing a script will otherwise think the closed quality directive was violated.
+
+**HARD ORDERING GATE:** the portrait-seed fix must NOT land on adaptation lanes before the
+gender pin. Today a mis-gendered MIRANDA gets three unrelated faces; after the portrait fix
+alone she gets ONE MALE face, seed-locked for the whole episode -- an intermittent defect
+converted into a confident permanent one.
+
+**SHIP ORDER (from the critic):**
+1. Track 3 Step 1 -- announcer unpin (independent, audible night one, touches no character seed)
+2. Track 1 Steps 1-4 -- roster module -> source_meta plumbing -> curated supplement -> pin
+   WITHOUT touching the allocator + no-rename exemption
+3. Track 1 Step 6 merged with Track 3 Step 7 (the `gender='other'` unservable path)
+4. Track 3 Steps 2 + 4 (speaker_id, tier floor = 2)
+5. Track 2 Steps 1-4 -- capture HEAD baselines AFTER Track 1 lands
+6. Track 2 Steps 5-7 + 9 (capability, cache-safe reference, z_image wiring, live A/B)
+7. Track 2 Step 8 (klein) ONLY if Step 9's A/B fails
+
+**HIGHEST VALUE / LOWEST RISK:** Track 2 Step 2+3 -- derive the `scene_character` seed from
+the character's OWN portrait draw. ~6 lines in one pure function, no engine wiring, no VRAM,
+no LLM, no widget, reversible by env var, and it fixes faces on EVERY lane including the
+invention lanes. Gated behind Track 1 on the adaptation lanes only.
+
+**CUT (do not build):** Track 3 Step 5 entirely -- kokoro char_voice is UNREACHABLE in
+production (`config/audio_engine_profiles.yaml:154` allows only `kokoro_builtin` while the
+shipped workflow runs `voice_bank='default'`). Also cut: timbre synonyms, the drift guard,
+and speculative klein wiring. DOWNGRADE Track 1 Step 5 (replay parity) to a `PROD_BUG_LOG`
+entry with its reproducing seed 424242 -- latent while node 80 runs indextts2.
+
+**KEY CORRECTION to an earlier claim:** ANTIPHOLUS and BOTH DROMIOs are `gender='unknown'`
+in the sidecar. "You don't need to know which Dromio to know he's a man" is FALSE -- they
+need the curated supplement, not the join.
+
+**MECHANISM WARNING:** do NOT feed pinned genders into `prior_genders`. Probed: that turns a
+coin flip into a GUARANTEED error. Recounting for unpinned slots also changes the writer's
+draw count and re-breaks replay parity. The correct design leaves `_plan_gender_distribution`
+completely untouched -- same count, same priors, same draws -- and OVERRIDES at pinned
+indices. Verified 200-400 seeds: pinned correct 200/200 where today is wrong 106/200,
+unpinned distribution unchanged, rng call count and post-call stream byte-identical.
+
+## SUPERSEDED AS THE ACTIVE QUEUE -- the source-grounding sprint (chunks 1-3b shipped)
+
+Chunks 1, 2, 3a and 3b are SHIPPED and QA'd; chunk 2 is live and working. The remaining
+piece (3b-ii, the supply line that feeds grounding into the writer) is BUILT-BUT-UNWIRED and
+is parked under the story-quality directive -- the delivery mechanism exists and nothing
+calls it. A contributor may pick it up; see the chunk detail below.
+
+## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
 Item 1 is the session's structural work and consumes most of it; items 2-4 are
 small and share one campaign; item 5 (the guardrail-rip completion, found by
