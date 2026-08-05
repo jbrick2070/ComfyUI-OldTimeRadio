@@ -3,6 +3,70 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 night -- HEAD 72bba32e+ (v2.0-alpha) -- WINDOW PLANNER (SFX parked; queue verified; FULL KIBITZ ARC on the plan)
+
+Did: took the operator's SFX doubt, confirmed the real coding queue against the
+  tree, and ran the full `kibitz-plugin:kibitz` 4-round arc on the optimized
+  GO_FORWARD -- 8 external calls (codex `gpt-5.6-sol` high + agy Gemini 3.6
+  Flash High x r1-r4, models verified per the budget-ladder rule), driver
+  anchor + grounded judgment + final per round, artifacts under
+  `kibitz-runs/2026-08-04-go-forward-optimize/`. No code touched.
+
+- **SFX PARKED (operator doubt).** Operator doubts it works well with the
+  video model and calls it a much bigger lift than imagined -- ROADMAP's own
+  estimate (8-15 coder-days + 2-4 elapsed) is the largest single item on the
+  runway. Parked in GO_FORWARD AND ROADMAP, designs kept as evidence, nothing
+  spends against it (no R4.1, no C0/C1) without explicit revival. The parked
+  story bugs' "re-observe after SFX" gate re-points to the next real render
+  legs.
+- **Queue verification found two STALE claims before the panel even ran:** TTS
+  parenthetical stripping is already wired (`scene_sequencer.py:520` +
+  `_otr_bark_lib`, BUG-LOCAL-101, parity-tested) -- tombstoned; and the
+  script-parse "code-ready" spec says itself that increments 1-5 are draft
+  (r3 returned seven must-fixes) -- queue item 3 is now the SPEC CORRECTION.
+- **The arc paid for itself four rounds running.** r1: ON DECK item 1 was
+  scoped to BOTH fidelity lanes while the ownership table rules
+  `exchange_compose` NOT RUN for Shakespeare -- re-scoped to public_domain
+  only; raw `full_text` injection killed (corpus measured 916-25,200 words vs
+  n_ctx 4096). r2: the plan's own premise was wrong -- `full_text` is
+  TRUNCATED at 12,000 chars (`canonicalize_public_domain_text:337`), so "it
+  needs passing" was false for large sources; only 1/65 units has a provenance
+  sidecar; the GGUF budget is an estimator; the test pollution is
+  reload-induced CLASS IDENTITY breakage (the r1 fixture idea was withdrawn);
+  and the driver's own "Style: no longer greps" claim was a grep miss --
+  `Style    :` is padded, alive at `video_engine.py:1762`. r3: the naive chunk
+  order was CYCLIC (sound world -> grammar -> outline -> beats -> windows ->
+  sound world); FOUR dangling commas, not two (both prompt stages, both
+  packs); the `meta.style` rename must carry the ledger validators
+  (`MatrixRow("style", ...)`). r4: the 08-03 guardrail rip is INCOMPLETE --
+  runtime filters survive, two driver-verified
+  (`_otr_public_domain_sources.py:616-622` rejects a brief on safety terms;
+  `_otr_ledger_freeze.py:689-710` G9 still terminal) -- now ON DECK item 5,
+  own campaign, structural gates kept; THE LAW section marked SUPERSEDED IN
+  PART.
+- **The hardened item 1 now carries:** uncapped `SourceDocument` + pre-outline
+  `SourceOverview` (the interpreter reads the capped payload today);
+  transient typed transport excluded from ledger serialization; canonical
+  body as sole snapshot replay authority with typed legacy refusal SCOPED to
+  public_domain; frozen-window semantics; every-backend capacity with a
+  five-row failure disposition table; announcer routes named in the matrix;
+  version discipline; corpus-wide property test.
+- **Panel misreads discarded with grounds** (each round's judgment.md):
+  e.g. agy's `story_packs/folger/` path (zero grep matches), profile-
+  retirement re-litigation (already routed to the operator), IS_CHANGED
+  pre-commitment (the contract decision stays a decision).
+- ON DECK re-sized honestly: ~2h40m withdrawn; one-to-two sessions, THREE
+  campaigns (item 1; items 2+3+4; item 5). Kibitz artifact location
+  standardized on `kibitz-runs/` (the HARD GATE's `docs/` line was a
+  driver-authored conflict, fixed).
+
+Current step: CODING (no GPU) -- ON DECK item 1 chunk 1 (uncapped
+  SourceDocument + SourceOverview), its campaign already run THIS arc counts
+  as the plan-level review; each chunk still gets its per-item campaign per
+  the gate.
+Not now: D2 (render), SFX (parked), Shakespeare verbatim executor
+  (multi-session, gated).
+
 ## 2026-08-04 final -- HEAD 8330805c (v2.0-alpha) -- WINDOW HANDOFF (GO_FORWARD leaned)
 
 Did: cut GO_FORWARD_PLAN.md from 5,392 lines to 1,117 -- 342 KB to 74 KB -- so it

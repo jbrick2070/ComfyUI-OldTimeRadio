@@ -30,6 +30,14 @@ operator listening are separate elapsed time.
 | 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
 | 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
+**SFX (row 1) IS PARKED BY OPERATOR DOUBT, 2026-08-04.** The operator doubts it
+will work well with the video model and calls it a much bigger lift than
+imagined -- this table's own estimate (8-15 coder-days + 2-4 elapsed live days)
+is the largest single item on the runway. Parked, not killed: the designs below
+stay as evidence, and NOTHING spends against them -- no R4.1 refit, no C0/C1,
+no SFX coding -- until an explicit operator revival. The effective runway while
+the park holds: product expansion -> lean-mean -> RunPod -> release.
+
 **LEAN-MEAN MOVED FROM ORDER 1 TO ORDER 3 ON 2026-07-29 (operator), and moved
 OFF `docs/GO_FORWARD_PLAN.md` entirely at the same time.** Two reasons, and
 they point the same way. First, the operator's: the randomizer and SFX come
@@ -73,9 +81,12 @@ Foundation plan: `docs/2026-07-11-timeline-cue-ledger.md`.
 Generated-SFX architecture evidence:
 `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`.
 
-**Status:** one roadmap campaign; no code; not yet code-ready. Implementation is
-parked until the 720-word runway and everything on `docs/GO_FORWARD_PLAN.md`
-land. The immediate GO_FORWARD work is only a tracked current-HEAD R4.1 refit.
+**Status: PARKED (operator doubt 2026-08-04; see the note above the lean-mean
+paragraph).** No R4.1 refit, no C0/C1, no SFX coding until explicit revival.
+The paragraphs below are the design record for that future decision, not a
+queue. (Superseded status line: implementation parked until the 720-word runway
+and everything on `docs/GO_FORWARD_PLAN.md` land, with a tracked R4.1 refit as
+the immediate work.)
 **This campaign now runs BEFORE lean-mean, not after it** -- the 2026-07-29
 operator direction reversed that dependency, so an older line reading "parked
 until the lean-mean campaign lands" no longer holds anywhere.
