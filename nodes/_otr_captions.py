@@ -10,7 +10,17 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
   * Optional style ``otr_crt``: green-CRT themed, for A/B QA only -- NOT default.
   * Speaker label coloring ONLY: the ``NAME:`` prefix is colored per speaker;
     the dialogue text stays white. No rainbow captions.
-  * Sound/music cues are sparse and bracketed (``[STATIC HISS]`` / music note).
+  * There are NO sound-effect captions. The ``sfx`` speaker_role was removed
+    2026-07-01 (rip-sfx-broll) and a ledger still carrying one is an invariant
+    error (``_otr_ledger_freeze.py:97``); a line is music, announcer, or
+    character. ``_SPEECH_ROLES`` captions the latter two, so the older
+    "sparse bracketed ``[STATIC HISS]`` cue" note described a lane that no
+    longer exists.
+  * A caption shows the SPOKEN surface -- ``clean_spoken_text(text)``, the same
+    stripper the TTS forward runs. The ledger deliberately keeps each line as
+    written, parenthetical performance direction included, so a later motion /
+    shot-direction pass has that material; but direction is acted, not said, and
+    a viewer must never read words the voice does not speak.
   * SDH line rules: <=2 lines, <=44 chars/line, target <=17 CPS (hard cap 20),
     min 1.0 s on screen, no overlap (later cue start clamps earlier cue end).
 
@@ -233,6 +243,12 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         from . import _otr_ledger_consumers as _OTRLC  # type: ignore
     except ImportError:  # pragma: no cover - direct CLI execution
         import _otr_ledger_consumers as _OTRLC  # type: ignore
+    # The SAME stripper TTS speaks through. A caption must show the words the
+    # voice actually says -- see the spoken-surface note in the module docstring.
+    try:
+        from ._otr_script_prep import clean_spoken_text
+    except ImportError:  # pragma: no cover - direct CLI execution
+        from _otr_script_prep import clean_spoken_text  # type: ignore
     events: list[str] = []
     lint: list[str] = []
     prev_char = None
@@ -254,7 +270,15 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
             nxt = float(dlines[li + 1].get("start_s") or end)
             if nxt < end:
                 end = nxt
-        text = _ass_escape(str(ln.get("text") or ""))
+        # Caption the SPOKEN surface, not the raw ledger line. The ledger keeps
+        # the line as written -- parenthetical performance direction and all --
+        # because that direction is the raw material a later motion/shot pass
+        # reads. TTS has always spoken clean_spoken_text(text); the caption used
+        # to burn the raw string, so the viewer READ words nobody SAID (measured
+        # 2026-08-05: 255 cues across 95 episodes, 10 of them entirely direction,
+        # one of which put a Project Gutenberg source URL on screen). One
+        # stripper, one surface: what is heard is what is read.
+        text = _ass_escape(clean_spoken_text(str(ln.get("text") or "")))
         if not text:
             continue
 

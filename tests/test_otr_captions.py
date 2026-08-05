@@ -17,6 +17,15 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CAP = _REPO_ROOT / "nodes" / "_otr_captions.py"
 
+# `_otr_captions` is loaded FLAT (no parent package), so its internal
+# `from . import _otr_ledger_consumers` falls back to a bare import that needs
+# nodes/ on the path. Without this, build_ass_from_ledger raised
+# ModuleNotFoundError whenever this file ran on its own, and only passed when a
+# sibling test module happened to put nodes/ on sys.path first -- a test that
+# depends on another test's import side effects is a test that does not run.
+if str(_REPO_ROOT / "nodes") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "nodes"))
+
 spec = importlib.util.spec_from_file_location("otr_captions", _CAP)
 cap = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cap)
@@ -122,6 +131,95 @@ def test_caption_wrap_is_wider_for_large_sdh_style():
     assert cap.MAX_CHARS_PER_LINE == 44
     cues = cap.chunk_into_cues(" ".join(["archive"] * 12))
     assert all(len(physical) <= 44 for cue in cues for physical in cue.split("\\N"))
+
+
+def _dialogue_bodies(ass_text):
+    """The visible text of each Dialogue: event, style overrides removed."""
+    import re
+    out = []
+    for line in ass_text.splitlines():
+        if not line.startswith("Dialogue:"):
+            continue
+        parts = line.split(",", 9)
+        if len(parts) < 10:
+            continue
+        out.append(re.sub(r"\{\\[^}]*\}", "", parts[9]).replace("\\N", " "))
+    return out
+
+
+def test_caption_shows_only_what_the_voice_speaks(tmp_path):
+    """A caption must never show words TTS strips before it speaks.
+
+    The ledger keeps each line as WRITTEN -- parenthetical performance
+    direction included -- because that direction is what a later motion /
+    shot-direction pass reads. TTS has always voiced clean_spoken_text(text);
+    the caption builder used to burn the raw string, so the viewer read stage
+    direction nobody said (measured 2026-08-05 over the shipped .ass files:
+    255 cues across 95 episodes).
+    """
+    led = {
+        "episode_id": "spoken_surface_ep",
+        "cast": [{"char_id": "c02", "name": "NORA DRAKE"}],
+        "lines": [
+            {"char_id": "c02", "speaker_role": "character", "start_s": 1.0,
+             "dur_s": 8.0,
+             "text": "(a slow drag of something heavy across the boards) "
+                     "You feel that? The floor is giving."},
+        ],
+    }
+    p = tmp_path / "spoken_surface_ep_ledger.json"
+    p.write_text(json.dumps(led), encoding="utf-8")
+
+    out, report = cap.build_ass_from_ledger(p, style="sdh_standard")
+    assert out is not None, report
+    bodies = " ".join(_dialogue_bodies(Path(out).read_text(encoding="utf-8")))
+
+    assert "You feel that?" in bodies, "the spoken dialogue must survive"
+    assert "NORA DRAKE:" in bodies, "the speaker label must survive"
+    assert "slow drag" not in bodies, (
+        "stage direction reached the caption -- TTS strips it, so the viewer "
+        "would read words the voice never speaks")
+    assert "(" not in bodies and ")" not in bodies
+
+
+def test_caption_drops_a_line_that_is_entirely_direction(tmp_path):
+    """A line with nothing sayable must produce NO cue at all.
+
+    Ten shipped cues were entirely stage direction -- a caption on screen with
+    no spoken words under it. One of them put a Project Gutenberg source URL
+    in front of the viewer, which is why this is a publish-facing defect and
+    not a matter of taste.
+    """
+    led = {
+        "episode_id": "silent_cue_ep",
+        "cast": [
+            {"char_id": "c01", "name": "GULLIVER REEVES"},
+            {"char_id": "c02", "name": "ALICE PALMER"},
+        ],
+        "lines": [
+            {"char_id": "c01", "speaker_role": "character", "start_s": 1.0,
+             "dur_s": 4.0,
+             "text": "(pocketing his lighter, then heads for the door)"},
+            {"char_id": "c02", "speaker_role": "character", "start_s": 6.0,
+             "dur_s": 4.0,
+             "text": "(https://www.gutenberg.org/cache/epub/1342/pg1342.txt)"},
+            {"char_id": "c02", "speaker_role": "character", "start_s": 11.0,
+             "dur_s": 4.0, "text": "Rufus, look at the plate."},
+        ],
+    }
+    p = tmp_path / "silent_cue_ep_ledger.json"
+    p.write_text(json.dumps(led), encoding="utf-8")
+
+    out, report = cap.build_ass_from_ledger(p, style="sdh_standard")
+    assert out is not None, report
+    bodies = _dialogue_bodies(Path(out).read_text(encoding="utf-8"))
+
+    assert len(bodies) == 1, (
+        "only the one line with spoken words may become a cue, got %r" % bodies)
+    assert "Rufus, look at the plate." in bodies[0]
+    joined = " ".join(bodies)
+    assert "gutenberg" not in joined.lower(), "a source URL reached the screen"
+    assert "pocketing" not in joined
 
 
 if __name__ == "__main__":
