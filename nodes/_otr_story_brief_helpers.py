@@ -22,35 +22,34 @@ from __future__ import annotations
 from typing import Any
 
 
-VISUAL_SAFETY_POSITIVE_CLAUSE = (
-    "family-safe, no explicit guns, knives, weapons, or nudity"
-)
-VISUAL_SAFETY_NEGATIVE_PROMPT = (
-    "guns, firearms, weapons, knives, blades, nudity, naked, "
-    "pornographic content"
-)
+# RETIRED 2026-08-05 (operator directive: no content guardrails on generated
+# episodes). These carried the SAME weapon/nudity policy the audio path was
+# ripped of, and they were still being appended to every image and video
+# request -- so an episode faithful enough to say "dagger" was still asking the
+# image model not to draw one. Emptied rather than deleted: they are imported
+# by name across the render path, and an empty clause appends nothing.
+VISUAL_SAFETY_POSITIVE_CLAUSE = ""
+VISUAL_SAFETY_NEGATIVE_PROMPT = ""
+# The SFX clause is NOT purely content policy -- "no spoken words / no singing /
+# no narration / no readable text" is a FUNCTIONAL requirement of an ambience
+# bed, and it stays. Only the trailing weapon/nudity content policy is removed.
 SFX_AUDIO_SAFETY_CLAUSE = (
     "environmental ambience and foley only, no spoken words, no singing, "
     "no lyrics, no narration, no voiceover, no intelligible speech, "
-    "no subtitles, no captions, no readable text, no explicit guns, "
-    "knives, weapons, or nudity"
+    "no subtitles, no captions, no readable text"
 )
 
 
 def append_visual_safety_clause(prompt: str) -> str:
-    """Append the operator's image/video safety ask to a provider prompt.
+    """Pass the prompt through unchanged. Retired 2026-08-05.
 
-    Kept as a late handoff helper so existing prompt composers remain stable,
-    while actual render requests still carry the clause.
+    This appended a family-safe / no-weapons / no-nudity clause to every image
+    and video request. The operator's no-content-guardrails directive covers
+    the visual path too, so nothing is appended now. The function survives
+    because it is a named seam on the render path (and because the path guard
+    is being reordered around it), not because it still does anything.
     """
-    text = str(prompt or "").strip()
-    if not text:
-        return ""
-    folded = text.lower()
-    if ("no explicit guns" in folded and "knives" in folded
-            and "weapons" in folded and "nudity" in folded):
-        return text
-    return f"{text}, {VISUAL_SAFETY_POSITIVE_CLAUSE}"
+    return str(prompt or "").strip()
 
 
 def append_sfx_audio_safety_clause(prompt: str) -> str:

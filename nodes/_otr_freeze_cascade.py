@@ -366,7 +366,11 @@ def build_phase_telemetry(meta: dict) -> list:
       }
 
     `skipped` is True when the phase's failures list carries a
-    "stub_bypassed" / "terminal_skipped" / "enable_false" reason.
+    "stub_bypassed" / "terminal_skipped" / "enable_false" /
+    "not_applicable_content_owned" / "retired_no_content_policy" reason.
+    The last two are DELIBERATE non-runs, not faults: without them a retired
+    phase reports skipped=False and raises a warning for doing exactly what it
+    was told to do (kibitz r3, Codex).
     `changed` is True when text_hash_before != text_hash_after.
     """
     out: list = []
@@ -378,9 +382,7 @@ def build_phase_telemetry(meta: dict) -> list:
             if not isinstance(rec, dict):
                 continue
             failures = rec.get("failures") or []
-            skip_reasons = (
-                "stub_bypassed", "terminal_skipped", "enable_false",
-            )
+            skip_reasons = _PHASE_SKIP_REASONS
             skipped = any(
                 isinstance(f, dict)
                 and any(r in (f.get("reason") or "") for r in skip_reasons)
@@ -512,6 +514,21 @@ def _isoformat_utc_now() -> str:
 # _otr_lfc_llm_helpers) deleted in the same commit. All five phases
 # defaulted OFF on every code path; the cascade-side enable widgets
 # were already removed in B3.
+
+
+#: Failure reasons that mark a phase as DELIBERATELY not run rather than faulty.
+#: `build_phase_telemetry` and the capability receipt both derive `skipped` from
+#: this one tuple, so a phase cannot be "skipped" to one reader and a warning to
+#: another. The last two entries were added 2026-08-05 with the content-guardrail
+#: rip: a retired phase that reports skipped=False raises a warning for doing
+#: exactly what it was told to do (kibitz r3, Codex).
+_PHASE_SKIP_REASONS: tuple[str, ...] = (
+    "stub_bypassed",
+    "terminal_skipped",
+    "enable_false",
+    "not_applicable_content_owned",
+    "retired_no_content_policy",
+)
 
 
 def _stamp_stub_or_skipped_phase(

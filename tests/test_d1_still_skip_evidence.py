@@ -204,19 +204,20 @@ def test_evidence_is_keyed_not_substring_matched(tmp_path):
             != by_id["still_b12"]["evidence"]["prompt_hash"])
 
 
-def test_extension_arm_is_near_unreachable_once_the_safety_clause_is_appended():
-    """A finding, pinned so it is not rediscovered.
+def test_extension_arm_is_reachable_now_that_the_safety_clause_is_retired():
+    """The 2026-08-03 finding this pinned has been REPEALED by its own fix.
 
-    `dispatch_images` runs `append_visual_safety_clause` BEFORE the guard, and
-    that helper normally appends text -- so a prompt ending in '.png' no longer
-    ends in '.png' by the time the guard sees it, and the `extension_suffix` arm
-    effectively cannot fire inside the dispatcher. Practically this means the
-    live suspect for the 2026-08-03 incident was a SEPARATOR arm.
+    `dispatch_images` runs `append_visual_safety_clause` before the guard. That
+    helper used to append a family-safe/no-weapons clause, so a prompt ending in
+    '.png' no longer ended in '.png' by the time the guard saw it, and the
+    `extension_suffix` arm effectively could not fire inside the dispatcher --
+    which is why the live suspect for that incident was a SEPARATOR arm.
 
-    NOT absolute, and the exception is pinned below: the helper is idempotent
-    and returns the text UNCHANGED when the clause is already present, so a
-    prompt that already carries it and still ends in an image extension does
-    reach the guard intact. The arm therefore stays live, and stays tested.
+    The clause was retired 2026-08-05 (operator directive: no content guardrails)
+    and the helper is now a passthrough, so the extension arm is reachable again.
+    That is a strict improvement -- the guard's most specific arm is no longer
+    masked by a content policy -- and it is pinned here so the masking cannot
+    return unnoticed.
     """
     from nodes._otr_story_brief_helpers import append_visual_safety_clause
 
@@ -224,13 +225,9 @@ def test_extension_arm_is_near_unreachable_once_the_safety_clause_is_appended():
     assert disp.path_guard_arm(raw)["arm"] == "extension_suffix"
 
     dispatched = append_visual_safety_clause(raw)
-    assert not dispatched.lower().endswith(".png")
-    assert disp.path_guard_arm(dispatched) is None
-
-    # The idempotent short-circuit: clause already present AND an image tail.
-    already = (dispatched.rstrip(", ") + ", a portrait of the radio host.png")
-    assert append_visual_safety_clause(already) == already
-    assert disp.path_guard_arm(already)["arm"] == "extension_suffix"
+    assert dispatched == raw, "the clause helper must no longer rewrite prompts"
+    assert dispatched.lower().endswith(".png")
+    assert disp.path_guard_arm(dispatched)["arm"] == "extension_suffix"
 
 
 def test_skip_is_logged_at_skip_time_not_only_on_the_wire(tmp_path, caplog):

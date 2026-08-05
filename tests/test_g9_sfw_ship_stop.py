@@ -40,9 +40,21 @@ def _ledger(*texts):
     }
 
 
-def _g9_errors(ledger):
+def _content_errors(ledger):
+    """EVERY audit error, not just G9-prefixed ones."""
     report = freeze.phase_0_gap_audit_pre(ledger)
-    return [error for error in report.errors if error.startswith("G9")]
+    return list(report.errors)
+
+
+def _errors_for(text):
+    """Audit errors for a one-line ledger carrying `text`."""
+    return _content_errors(_ledger("Fine.", text))
+
+
+#: The audit result for a line whose vocabulary is unremarkable. Every
+#: content-word case below must match this EXACTLY.
+def _baseline():
+    return _errors_for("The report says nothing unusual tonight.")
 
 
 def test_the_gate_function_is_gone():
@@ -52,20 +64,24 @@ def test_the_gate_function_is_gone():
         "2026-08-05 removed content enforcement from the freeze path")
 
 
-def test_ordinary_visual_language_still_passes():
-    assert not _g9_errors(
-        _ledger(
-            "The velvet chair stood beside a smoking chimney.",
-            "She had begun the long walk past the silver machine.",
-        )
-    )
+def test_a_word_never_changes_the_audit_result():
+    """DIFFERENTIAL, so a renamed content check cannot hide behind a prefix.
+
+    r4 (Codex) caught the earlier version filtering errors on the "G9" prefix:
+    enforcement reintroduced under any other name would have passed silently.
+    These fixtures are deliberately minimal and DO carry structural errors --
+    that is fine and unrelated. The claim is that swapping one word for another
+    changes NOTHING about the audit. Any content policy, under any name, breaks
+    this the moment it fires.
+    """
+    assert _errors_for("The velvet chair stood beside a smoking chimney.") == _baseline()
 
 
 @pytest.mark.parametrize("term", ["damn", "gun", "knife", "dagger", "naked"])
 def test_formerly_terminal_words_no_longer_stop_the_ship(term):
-    """The exact words that used to kill an episode now pass the audit."""
-    assert not _g9_errors(_ledger("Fine.", f"The report says {term} tonight.")), (
-        "%r still raises a G9 error" % term)
+    """The exact words that used to kill an episode are now inert."""
+    assert _errors_for(f"The report says {term} tonight.") == _baseline(), (
+        "%r still changes the audit -- content enforcement is back" % term)
 
 
 def test_phase_10_raises_nothing_about_content():
@@ -86,7 +102,6 @@ def test_phase_10_raises_nothing_about_content():
 
 def test_macbeth_keeps_its_dagger():
     """The line this whole change exists for."""
-    ledger = _ledger(
-        "Is this a dagger which I see before me, the handle toward my hand?",
-    )
-    assert not _g9_errors(ledger)
+    assert _errors_for(
+        "Is this a dagger which I see before me, the handle toward my hand?"
+    ) == _baseline()

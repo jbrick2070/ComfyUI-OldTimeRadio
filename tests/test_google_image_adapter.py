@@ -134,10 +134,11 @@ def test_request_shape_sends_interactions_image_format(monkeypatch):
         "image_size": "2K",
     }
     lower = payload["input"].lower()
-    assert "no explicit guns" in lower
-    assert "knives" in lower
-    assert "weapons" in lower
-    assert "nudity" in lower
+    # Content clause RETIRED 2026-08-05 (operator directive): the visual
+    # path carried the same weapon/nudity policy the audio path was ripped
+    # of. Inverted, not deleted, so it cannot quietly return.
+    assert "no explicit guns" not in lower
+    assert "family-safe" not in lower
     assert seen["kwargs"]["_api_key"] == "KEY"
     assert seen["kwargs"]["timeout_s"] == 300
     assert seen["kwargs"]["max_retries"] == 0

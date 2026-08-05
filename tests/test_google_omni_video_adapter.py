@@ -162,10 +162,11 @@ def test_request_shape_sends_interactions_video_uri_format(monkeypatch, tmp_path
     assert "resolution" not in payload
     assert "tools" not in payload
     lower = payload["input"].lower()
-    assert "no explicit guns" in lower
-    assert "knives" in lower
-    assert "weapons" in lower
-    assert "nudity" in lower
+    # Content clause RETIRED 2026-08-05 (operator directive): the visual
+    # path carried the same weapon/nudity policy the audio path was ripped
+    # of. Inverted, not deleted, so it cannot quietly return.
+    assert "no explicit guns" not in lower
+    assert "family-safe" not in lower
     assert seen["kwargs"]["_api_key"] == "KEY"
     assert seen["kwargs"]["timeout_s"] == 900
     assert seen["kwargs"]["max_retries"] == 0
@@ -197,7 +198,7 @@ def test_request_shape_accepts_init_image_interactions_parts(monkeypatch, tmp_pa
     assert [part["type"] for part in parts] == ["image", "text"]
     assert parts[0]["mime_type"] == "image/png"
     assert base64.b64decode(parts[0]["data"]) == first.read_bytes()
-    assert "no explicit guns" in parts[1]["text"].lower()
+    assert "no explicit guns" not in parts[1]["text"].lower()
 
     with pytest.raises(GoogleAPIRequestShapeError, match="missing/absent"):
         G._interaction_payload(

@@ -3194,3 +3194,46 @@ symptom.
   it. Recorded so the next reader does not re-derive it.
 - confidence: HIGH on the mechanism, N/A on production impact (there is none today).
 - status: OPEN (deliberately unfixed; reproducing seed 424242)
+
+## PBUG-20260805-03 -- the announcer was planned but never scheduled, so scifi_news went 0-for-4
+- surfaced: batch v2 headless run, 2026-08-05, 28 episodes over the canonical
+  workflow. `scifi_news` failed 4 of 4 legs (008, 013, 015, 016) while every
+  other lane was perfect: shakespeare 12/12, public_domain 9/9, original 2/2.
+  Leg 013 burned **45.1 minutes** before dying; the others died at 4-5 minutes.
+- symptom: `RESULT FAIL ... exception_message: "cast voice coverage failed for
+  bank 'scifi_news': 1 of 4 cast member(s) have no SAYABLE line"`, raised from
+  `_otr_cast_voice_coverage` at `stamp_receipt` -- AFTER the whole script had
+  been written. The live server logs name the uncovered member as the ANNOUNCER.
+- root cause: `compile_radio_score_draft` treated an uncovered cast member as
+  ADVISORY -- it logged `cast_coverage advisory: N/M planned cast own a beat`
+  and returned the score, on the reasoning that "an uncovered cast member simply
+  carries no lines". The hole is therefore CREATED at P3 and only DISCOVERED
+  after P5. It cannot be repaired downstream: P5 authors only `line_id` and
+  `text` INTO a graph whose beat/shot/scene ownership is already compiled from
+  the accepted score, so a member with no beat can never be given a line. A
+  P5-level check could only burn the retry ladder and fail anyway -- which is
+  what turned a 5-minute failure into a 45-minute one.
+- fix: the advisory became a RECOVERABLE `RadioScoreDraftCompileError` with the
+  new `cast_coverage` code, naming the missing ids. `validate_draft` converts it
+  to a `PostValidationError`, which `_candidate_error_is_recoverable` already
+  accepts, so the retry ladder and then the fresh-candidate loop redraft the
+  score rather than failing the episode -- preserving the earlier ruling that
+  cast_coverage must not become a fatal successor to the removed beat-count
+  gate. Two prompt surfaces stated the OPPOSITE and were corrected: the pack's
+  `codex_radio_score_system`, and `_RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION`,
+  which is appended LAST and still said "an unused planned cast member is not a
+  story failure" (kibitz r3, Codex).
+- why the loop cannot spin: the invariant is provably satisfiable.
+  `num_characters` is clamped to 1..6 and the announcer makes at most 7;
+  `_RADIO_SCORE_MAX_BEATS` is 3 scenes x 4 beats = 12; `_codex_target_beat_count`
+  is called with `len(p2.cast)` and returns `max(cast_count, 3, min(12, ...))`.
+  7 <= 12, so every planned member can always own a beat.
+- coverage: `tests/test_p3_cast_coverage_invariant.py` (6 tests, mutation-
+  verified: reverting the raise fails exactly the two coverage assertions).
+- generalizable rule for the Bible fan-out: a producer stage that PLANS a
+  resource must not defer the check that the resource was SCHEDULED to a
+  consumer stage that cannot create it. Where the plan and the schedule are
+  written by different passes, the schedule-time check is the only one that can
+  still be repaired.
+- live receipt: OWED. The fix is unproven on a live leg -- the batch v2 server
+  booted before the commit and held the old module in memory.

@@ -510,8 +510,10 @@ _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     "line text, wrapper, pass_id, artifact_inputs, or result_json_schema. "
     "Structural coverage: every declared shot must be referenced by at least "
     "one beat's shot_index; every beat must name an accepted cast ID; each "
-    "cue_id appears at most once. Prefer giving every planned cast member a "
-    "beat, but an unused planned cast member is not a story failure. Python "
+    "cue_id appears at most once. EVERY planned cast member -- the announcer "
+    "included -- MUST own at least one beat; a draft that leaves one uncovered "
+    "is rejected and redrafted, because a cast member with no beat can never "
+    "be given a spoken line later. Python "
     "binds valid cue anchors to the accepted beat graph."
 )
 

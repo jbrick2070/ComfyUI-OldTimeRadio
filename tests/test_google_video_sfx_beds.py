@@ -157,12 +157,12 @@ def test_sfx_prompt_helper_terms_and_idempotency():
         "no subtitles",
         "no captions",
         "no readable text",
-        "no explicit guns",
-        "knives",
-        "weapons",
-        "nudity",
     ):
         assert term in lower
+    # The FUNCTIONAL no-speech requirements above stay -- an ambience bed
+    # with speech talks over the actors. The weapon/nudity CONTENT tail was
+    # retired 2026-08-05 (operator directive).
+    assert "no explicit guns" not in lower
     assert append_sfx_audio_safety_clause(out) == out
 
 

@@ -135,17 +135,26 @@ def _request(tmp_path, **over):
 
 
 def _assert_visual_safety(prompt: str):
+    """Renamed meaning 2026-08-05: assert NO content clause was appended."""
+    # Content clause RETIRED 2026-08-05 (operator directive): the visual
+    # path carried the same weapon/nudity policy the audio path was ripped
+    # of. Inverted, not deleted, so it cannot quietly return.
     lower = prompt.lower()
-    assert "no explicit guns" in lower
-    assert "knives" in lower
-    assert "weapons" in lower
-    assert "nudity" in lower
+    assert "no explicit guns" not in lower
+    assert "family-safe" not in lower
 
 
 def _assert_negative_safety(prompt: str):
+    """Renamed meaning 2026-08-05: the content NEGATIVE prompt is retired.
+
+    VISUAL_SAFETY_NEGATIVE_PROMPT carried the same weapon/nudity policy the
+    audio path was ripped of, so it is now empty and no longer merged in.
+    Engine-specific negatives (motion artifacts, jump cuts) are unaffected --
+    those are quality controls, not content policy.
+    """
     lower = prompt.lower()
     for term in ("guns", "knives", "nudity"):
-        assert term in lower
+        assert term not in lower
 
 
 def test_kling_avatar_partner_inputs(tmp_path, monkeypatch):

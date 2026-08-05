@@ -83,11 +83,13 @@ def _req(**over):
 
 
 def _assert_visual_safety(prompt: str):
+    """Renamed meaning 2026-08-05: assert NO content clause was appended."""
+    # Content clause RETIRED 2026-08-05 (operator directive): the visual
+    # path carried the same weapon/nudity policy the audio path was ripped
+    # of. Inverted, not deleted, so it cannot quietly return.
     lower = prompt.lower()
-    assert "no explicit guns" in lower
-    assert "knives" in lower
-    assert "weapons" in lower
-    assert "nudity" in lower
+    assert "no explicit guns" not in lower
+    assert "family-safe" not in lower
 
 
 def test_flux_pro_inputs(monkeypatch):

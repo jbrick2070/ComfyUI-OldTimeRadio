@@ -892,8 +892,8 @@ def test_dispatch_appends_visual_safety_to_image_requests(
 
     assert done.startswith("image:done:")
     prompt = calls["last"]["prompt"].lower()
-    for term in ("no explicit guns", "knives", "weapons", "nudity"):
-        assert term in prompt
+    # Content clause retired 2026-08-05 (operator directive).
+    assert "no explicit guns" not in prompt
     assert calls["last"]["prompt_hash"] != "oldhash"
     assert led["images"]["images"][0]["prompt_hash"] == calls["last"]["prompt_hash"]
 
