@@ -239,6 +239,13 @@ class LineRequest:
     # drops the block entirely. Default "" keeps every existing caller
     # and test working unchanged.
     continuity_slice: str = ""
+    # Source grounding (2026-08-04). A pre-rendered, delimited source passage
+    # for this beat, built by _otr_source_grounding and frozen for the whole
+    # call including retries. Internal Python field only -- no ComfyUI node
+    # contract, INPUT_TYPES or widget is involved. Empty string means this
+    # lane has no source to carry, which is the normal case for the
+    # invention banks.
+    source_block: str = ""
     # ---- Sprint 3 (2026-05-28): arc-aware line generation ----
     # The line composer's previous diet (style + canon + cast + spine +
     # last 2 lines + intent + mood + word count) reliably reproduced
@@ -706,6 +713,22 @@ def _build_user_prompt(req: LineRequest) -> str:
     if req.continuity_slice:
         parts.append("")
         parts.append(req.continuity_slice)
+
+    # SOURCE PASSAGE -- the per-line half of source grounding. This route is
+    # the FALLBACK the grouped exchange drops to, and it used to carry no
+    # source at all: a grounding fix that reached only the happy path just
+    # moved the guess down here. The block is pre-rendered and delimited by
+    # the caller (_otr_source_grounding.render_source_block) and rides the
+    # USER prompt as quoted DATA, never the system seam. Empty string ->
+    # block dropped, so every existing caller and test is unaffected.
+    if req.source_block:
+        parts.append("")
+        parts.append(
+            "The passage below is the SOURCE this scene adapts. Carry its "
+            "people, place, period and events; where it gives this character "
+            "words, carry those words."
+        )
+        parts.append(req.source_block)
 
     # POSITION supersedes the old generic ARC PHASE block (Commit 4
     # in the v4 plan). Emits the position string verbatim. Legacy

@@ -297,6 +297,7 @@ def build_exchange_prompt(
     *,
     failure_reasons: Optional[Sequence[str]] = None,
     system_prompt: Optional[str] = None,
+    source_block: str = "",
 ) -> List[dict]:
     """Build the chat messages for one exchange over a 2-3 slot group.
 
@@ -404,11 +405,30 @@ def build_exchange_prompt(
         "Scene so far:",
         prior_block,
         "",
+    ]
+
+    # The source passage rides the USER message as delimited DATA, never the
+    # pack-routed system seam. Two reasons, both load-bearing: the seam is a
+    # static, test-pinned constant that must stay byte-identical, and a source
+    # is quoted material whose imperative sentences ("Come thy ways, Signior")
+    # must never read as direction to the model. It sits BEFORE the slot
+    # instructions so the last thing the model reads is what to write, not
+    # what to read.
+    if source_block:
+        user_parts.extend([
+            "The passage below is the SOURCE this scene adapts. Carry its "
+            "people, place, period and events; where it gives these "
+            "characters words, carry those words.",
+            source_block,
+            "",
+        ])
+
+    user_parts.extend([
         "Write these slots as one exchange:",
         slot_block,
         "",
         fmt,
-    ]
+    ])
 
     if failure_reasons:
         user_parts.extend([
@@ -515,6 +535,7 @@ def _run_once(
     max_new_tokens: int,
     failure_reasons: Optional[Sequence[str]],
     system_prompt: Optional[str],
+    source_block: str = "",
 ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """One generate + parse cycle. Returns (parsed_or_None, parse_error).
 
@@ -532,6 +553,7 @@ def _run_once(
         cast,
         failure_reasons=failure_reasons,
         system_prompt=system_prompt,
+        source_block=source_block,
     )
     # LLM slot: creative
     # Reason: exchange dialogue rendering is creative-axis work (rule 6).
@@ -559,6 +581,7 @@ def compose_exchange(
     temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
     system_prompt: Optional[str] = None,
+    source_block: str = "",
 ) -> ExchangeResult:
     """Compose one exchange over a 2-3 voiced beat group.
 
@@ -621,6 +644,7 @@ def compose_exchange(
             max_new_tokens=max_new_tokens,
             failure_reasons=None,
             system_prompt=system_prompt,
+            source_block=source_block,
         )
         result.attempts += 1
         if parsed is None:
@@ -661,6 +685,11 @@ def compose_exchange(
         max_new_tokens=max_new_tokens,
         failure_reasons=last_reasons,
         system_prompt=system_prompt,
+        # THE SAME window as the first attempt. Reselecting here would mean
+        # the repair quoted different material than the attempt whose
+        # failure reasons it is answering, and the receipt could no longer
+        # say which passage the accepted line came from.
+        source_block=source_block,
     )
     result.attempts += 1
     result.repaired = True
