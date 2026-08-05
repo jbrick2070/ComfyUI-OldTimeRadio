@@ -1677,6 +1677,12 @@ def _resolve_inputs(
     _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
         source_bank or "scifi_news",
     )
+    # Only the live fetch branch can produce one: the snapshot envelope is the
+    # seven-key payload whose full_text is already the capped projection, and
+    # the original / custom-premise lanes have no source work to ground in.
+    # None means "no whole-body grounding available", which every consumer
+    # must handle rather than assume.
+    source_document = None
     if _source_snapshot is not None:
         news_article = _otr_source_payload.validate_source_payload(
             _source_snapshot.payload,
@@ -1789,8 +1795,14 @@ def _resolve_inputs(
             f"_resolve_inputs fetch (bank={_fetch_bank.source_bank_id!r}, "
             f"fetcher={_fetch_bank.fetcher!r})"
         )
-        news_article, source_meta, source_rights = (
-            _otr_source_payload.normalize_fetch_result(
+        # The 4-value normalizer additionally carries the TRANSIENT source
+        # document -- the complete uncapped body for source-owned lanes. The
+        # payload's full_text is a 12,000-char projection, so the pre-outline
+        # authors would otherwise read a prefix of a work that can run 25,000
+        # words. The document is deliberately kept OUT of source_meta, which
+        # is copied into durable ledger metadata at :3548.
+        news_article, source_meta, source_rights, source_document = (
+            _otr_source_payload.normalize_fetch_result_with_document(
                 _fetch_entry.fetch(
                     bank=_fetch_bank,
                     technical_model=technical_model,
@@ -1888,6 +1900,10 @@ def _resolve_inputs(
         "source_meta": dict(source_meta),
         "source_rights": dict(source_rights),
         "news_seed_receipt": dict(news_seed_receipt),
+        # TRANSIENT -- deliberately its own key rather than a source_meta
+        # field, because source_meta is copied wholesale into durable ledger
+        # metadata and this holds the complete work. Nothing may stamp it.
+        "source_document": source_document,
     }
 
 
@@ -3434,6 +3450,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_continuity as _OTRCONT
         from . import _otr_config as _OTRCFG
         from . import _otr_style_catalog as _OTRSTYLE
+        from . import _otr_source_world as _OTRWORLD
         # KILL 2 (2026-06-24): hoist the style-grammar gate to ONE variable so every
         # story_scaffold branch below (the pre-outline StoryContract, the
         # OutlineRequest style fields, the safe-open capture, the news coda) reads
@@ -3945,11 +3962,32 @@ class OTR_LedgerScriptWriter:
         contract = None
         if _style_grammar_on:
             try:
+                # Source-owned lanes derive their sound world from the WORK,
+                # not from the cast-seed draw. The drawn palette put "a fire
+                # in the grate, a mantel clock, a teacup" over a Wells time-
+                # travel chapter, and it reached the listener three ways: the
+                # prompt grammar, this meta stamp, and the canon's sound
+                # palette derived from it. Passing the derived world into
+                # build_story_contract replaces all three at once, because
+                # the grammar is rendered inside that call. Gated on
+                # style_pool_class exactly like the arc-shape roll at :4325.
+                _source_sound_world = ""
+                _sound_world_receipt = {}
+                if str(meta.get("style_pool_class") or "") == "adaptation":
+                    _sd = resolved.get("source_document")
+                    if _sd is not None:
+                        _source_sound_world = _OTRWORLD.derive_source_sound_world(
+                            _sd.canonical_body)
+                        _sound_world_receipt = _OTRWORLD.sound_world_receipt(
+                            _sd.canonical_body,
+                            source_ref=str(resolved.get("source_ref", "") or ""),
+                        )
                 contract = _OTRSTYLE.build_story_contract(
                     cast_seed,
                     script_brief,
                     str(resolved.get("news_seed", "") or ""),
                     meta,
+                    source_sound_world=_source_sound_world,
                 )
                 meta["story_contract"] = {
                     "slug": contract.slug,
@@ -3960,6 +3998,16 @@ class OTR_LedgerScriptWriter:
                     # canon's sound_palette (derived from it) was always empty
                     # even though the style had a rich audio world.
                     "sound_world": contract.sound_world,
+                    # Body-free receipt: which elements were heard in the
+                    # source and whether the neutral default was used, so
+                    # "why does this episode sound like that" is auditable
+                    # without the source text. Present only on source-owned
+                    # lanes; folded into THIS literal rather than assigned
+                    # afterwards because the story contract is stamped
+                    # exactly once (KILL 2) and a second statement would be
+                    # a second stamp site.
+                    **({"sound_world_source": _sound_world_receipt}
+                       if _sound_world_receipt else {}),
                 }
             except Exception as _contract_exc:  # noqa: BLE001 -- never break the writer
                 log.warning(
