@@ -3968,24 +3968,16 @@ class OTR_LedgerScriptWriter:
         # produce a per-episode render -- but it means the first run after this
         # lands re-synthesizes rather than reusing cached lines.
         #
-        # Never clobbers a caller-supplied seed, and content-owned lanes (which
-        # never reach this line) keep their own stamp in the writer tail.
-        # OTR_CAST_SEED pins the INLINE lanes for the C7 gate; the content-owned
-        # fable2 runner has its own OTR_FABLE2_SEED.
-        if meta.get("episode_seed") is None:
-            meta["episode_seed"] = int(cast_seed)
-        elif int(meta["episode_seed"]) != int(cast_seed):
-            # Divergence is not fatal, but it must not be silent: credits print
-            # cast_contract.cast_seed while voices and music use this key, so a
-            # mismatch makes the printed receipt describe a render that did not
-            # happen.
-            log.warning(
-                "[OTR_LedgerScriptWriter] meta.episode_seed=%s differs from the "
-                "cast seed %d -- the credits receipt prints the cast seed while "
-                "voices and music use episode_seed, so they now describe "
-                "different draws.",
-                meta.get("episode_seed"), int(cast_seed),
-            )
+        # UNCONDITIONAL, deliberately. `meta` is created fresh a few hundred
+        # lines up (new_ledger -> setdefault("meta", {})), so on this path there
+        # is nothing to preserve -- and a conditional stamp would leave room for
+        # the two keys to diverge, which is worse than clobbering: credits print
+        # cast_contract.cast_seed while voices and music read this one, so a
+        # mismatch would print a receipt for a render that did not happen.
+        # Content-owned lanes never reach this line and keep their own stamp in
+        # the writer tail. OTR_CAST_SEED pins the INLINE lanes for the C7 gate;
+        # the content-owned fable2 runner has its own OTR_FABLE2_SEED.
+        meta["episode_seed"] = int(cast_seed)
         log.info(
             "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast + voices + "
             "music randomized per episode (BUG-LOCAL-269)",

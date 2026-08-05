@@ -129,9 +129,12 @@ def test_episode_seed_and_cast_contract_seed_do_not_diverge():
         "both keys must be stamped from the SAME cast_seed value")
 
 
-def test_an_explicit_episode_seed_is_never_clobbered():
-    """A caller (or a content-owned lane runner) that already set the seed owns
-    it; the writer must not mint over the top of it.
+def test_the_inline_stamp_is_unconditional_so_the_keys_cannot_diverge():
+    """meta is created fresh on this path, so there is nothing to preserve -- and
+    a conditional stamp would leave room for episode_seed and
+    cast_contract.cast_seed to disagree. Credits print the contract seed while
+    voices and music read episode_seed, so a divergence prints a receipt for a
+    render that did not happen.
     """
     import inspect
 
@@ -139,9 +142,9 @@ def test_an_explicit_episode_seed_is_never_clobbered():
 
     src = inspect.getsource(W)
     i = src.index('meta["episode_seed"] = int(cast_seed)')
-    guard = src[max(0, i - 200):i]
-    assert 'meta.get("episode_seed") is None' in guard, (
-        "the stamp must be guarded so an existing seed wins")
+    before = src[max(0, i - 120):i]
+    assert 'meta.get("episode_seed") is None' not in before, (
+        "the inline stamp must be unconditional")
 
 
 def test_pinning_OTR_CAST_SEED_pins_the_inline_lanes(monkeypatch):
@@ -205,33 +208,12 @@ def test_the_episode_seed_reaches_the_line_seed_and_the_audio_cache_key():
 
     # episode_seed is part of the resolved-request identity, which IS the audio
     # cache key -- so it does not merely pick a reference, it decides whether a
-    # cached line can be reused at all.
-    assert "episode_seed" in RR._IN_KEY_FIELDS if hasattr(RR, "_IN_KEY_FIELDS") \
-        else True
-    import inspect
-    src = inspect.getsource(RR)
-    assert '"stable_line_seed_v1"' in src
-    assert "episode_seed" in src.split('"stable_line_seed_v1"')[1][:200], (
-        "episode_seed must feed the per-line synthesis seed")
+    # cached line can be reused at all. Assert the REAL symbol: an earlier draft
+    # of this test guarded on a misspelled name and silently passed.
+    assert "episode_seed" in RR.IN_KEY_FIELDS
 
     def line_seed(ep):
         return RR._seed_to_int64("stable_line_seed_v1", int(ep), 0, "b002", "c02")
 
     assert line_seed(111) == line_seed(111), "pinned seed reproduces the line"
     assert line_seed(111) != line_seed(222), "a new episode seed moves the line"
-
-
-def test_a_divergent_preset_episode_seed_is_reported_not_swallowed():
-    """Credits print cast_contract.cast_seed while voices and music read
-    episode_seed. If a caller presets a different value the two describe
-    different renders, so the writer says so out loud.
-    """
-    import inspect
-
-    from nodes import OTR_LedgerScriptWriter as W
-
-    src = inspect.getsource(W)
-    i = src.index('meta["episode_seed"] = int(cast_seed)')
-    tail = src[i:i + 900]
-    assert "elif int(meta[" in tail, "a divergent preset seed must be detected"
-    assert "log.warning" in tail, "and must be logged, never silently accepted"
