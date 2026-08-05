@@ -776,15 +776,24 @@ def adaptation_slugs() -> List[str]:
     )
 
 
-def render_style_grammar(slug: str) -> str:
+def render_style_grammar(slug: str, *, sound_world: str = "") -> str:
     """Render a style's grammar as a compact prompt block. Empty string for an
-    unknown slug (caller falls back to the bare label => byte-identical)."""
+    unknown slug (caller falls back to the bare label => byte-identical).
+
+    ``sound_world`` overrides the catalog's drawn palette. It exists because
+    the sound world reaches the model through THIS block, and separately
+    reaches the ledger and the episode canon through the contract -- so
+    overriding only the contract field would leave the PROMPT still asking for
+    a fire in the grate while the receipt claimed the source's own world. One
+    value, every surface. Empty string keeps the drawn palette unchanged.
+    """
     s = get_style(slug)
     if not s:
         return ""
+    effective_sound_world = str(sound_world or "") or s["sound_world"]
     return (
         f"Style: {s['label']}.\n"
-        f"Sound world: {s['sound_world']}.\n"
+        f"Sound world: {effective_sound_world}.\n"
         f"Story engine: {s['story_engine']}.\n"
         f"Ending mode: {s['ending_mode']}."
     )
@@ -888,21 +897,33 @@ class StoryContract:
 
 
 def build_story_contract(cast_seed: Any, script_brief: str, news_seed: str,
-                         meta: Any) -> StoryContract:
+                         meta: Any, *, source_sound_world: str = "") -> StoryContract:
     """Select the episode style deterministically (sha256(cast_seed)-keyed via
     select_style) from the script_brief (or the raw news_seed when no brief)
     BEFORE the outline is generated, and freeze its full grammar for the body.
-    Never raises on a missing style (get_style -> {} -> empty fields)."""
+    Never raises on a missing style (get_style -> {} -> empty fields).
+
+    ``source_sound_world`` is the SOURCE-OWNED audio world for adaptation
+    lanes. Passing it replaces the drawn palette in ONE place, here, before
+    the grammar is rendered -- so the prompt block, ``contract.sound_world``
+    (which the writer stamps into meta) and the episode canon's sound palette
+    (derived from that stamp) all carry the same value. This ordering is the
+    whole point: the grammar is rendered inside this function, so a caller
+    that overrode the field afterwards would fix the receipt and leave the
+    prompt still asking for the drawn world.
+    """
     text = script_brief or news_seed or ""
     slug = select_style(text, meta, cast_seed)
     s = get_style(slug) or {}
+    effective_sound_world = (
+        str(source_sound_world or "") or s.get("sound_world", ""))
     return StoryContract(
         slug=slug,
         label=s.get("label", ""),
-        sound_world=s.get("sound_world", ""),
+        sound_world=effective_sound_world,
         story_engine=s.get("story_engine", ""),
         ending_mode=s.get("ending_mode", ""),
         ending_tag=s.get("ending_tag", ""),
         ending_template=ending_template_for(slug),
-        grammar=render_style_grammar(slug),
+        grammar=render_style_grammar(slug, sound_world=effective_sound_world),
     )
