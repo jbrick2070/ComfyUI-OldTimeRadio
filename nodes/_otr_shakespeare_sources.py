@@ -24,6 +24,11 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_payload as _osp  # type: ignore
 
 try:
+    from . import _otr_source_document as _osd
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_source_document as _osd  # type: ignore
+
+try:
     from ._otr_structured_call import StructuredCallFailedError, structured_call
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
@@ -280,19 +285,46 @@ def select_shakespeare_scene_ref(manifest: dict[str, Any], *, rng: Any | None = 
     return str(scene["source_ref"])
 
 
-# The interpreter reads the whole canonicalized body, not a prefix of it.
+# The LEGACY seven-key payload's body cap -- a PROJECTION for that contract,
+# not the source of truth. The complete scene lives in the SourceDocument
+# built from normalize_shakespeare_body below.
 INTERPRETER_TEXT_WINDOW: int = 12000
 
 
-def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
-    """Normalize a curated Shakespeare scene excerpt."""
+def normalize_shakespeare_body(text: Any) -> str:
+    """Canonicalize a Shakespeare scene WITHOUT truncating it.
+
+    The normalization owner, mirroring the public-domain lane: this result is
+    the coordinate system spans and hashes index into, so changing it
+    invalidates stored offsets.
+    """
     raw = html.unescape(str(text or "")).replace("\ufeff", "")
     cleaned = _WS_RE.sub(" ", raw).strip()
+    if not cleaned:
+        raise ShakespeareSourceRefError("shakespeare source text is empty")
+    return cleaned
+
+
+def canonicalize_shakespeare_text(text: Any, *, max_chars: int = 12000) -> str:
+    """Legacy payload projection: the canonical scene, capped at ``max_chars``.
+
+    Returns a PREFIX by design. Callers needing the whole scene use
+    ``normalize_shakespeare_body`` or the SourceDocument built from it.
+    """
+    cleaned = normalize_shakespeare_body(text)
     if len(cleaned) > max_chars:
         cleaned = cleaned[:max_chars].rsplit(" ", 1)[0].rstrip() or cleaned[:max_chars]
     if not cleaned:
         raise ShakespeareSourceRefError("shakespeare source text is empty")
     return cleaned
+
+
+def source_document_from_text(
+    text: Any, *, source_ref: str = "",
+) -> "_osd.SourceDocument":
+    """Build the transient uncapped document for a Shakespeare scene."""
+    return _osd.build_source_document(
+        normalize_shakespeare_body(text), source_ref=source_ref)
 
 
 # Authentic Folger plain text marks a speech in one of two ways, and never with a
@@ -454,6 +486,13 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
         payload=payload_from_scene(resolved, text=text),
         source_meta=source_meta_from_scene(resolved),
         source_rights=source_rights_from_scene(resolved),
+        # Transient: the COMPLETE scene. shakespeare is a style_pool_class
+        # "adaptation" bank, so it is gated into source-derived grounding
+        # exactly like public_domain -- without this it silently kept the
+        # cast-seed drawn palette while the code claimed to have fixed
+        # "the adaptation lanes".
+        source_document=source_document_from_text(
+            text, source_ref=resolved.source_ref),
     )
 
 

@@ -86,6 +86,88 @@ def test_non_string_body_is_refused_by_name():
 
 
 # ---------------------------------------------------------------------------
+# figurative language must not lead the world
+# ---------------------------------------------------------------------------
+
+def test_one_figurative_mention_in_a_long_work_does_not_qualify():
+    # "a storm of protest" opening a drawing-room novel would otherwise LEAD
+    # the sound world, because elements are ordered by first appearance.
+    body = ("A storm of protest greeted him. " + "He sat in the parlour. " * 700)
+    keys = world.detect_environment_elements(body)
+    assert "storm" not in keys
+    assert "house" in keys
+
+
+def test_a_genuine_setting_still_leads_a_long_work():
+    body = ("The sea was grey. " * 60) + ("He sat in the parlour. " * 600)
+    keys = world.detect_environment_elements(body)
+    assert keys[0] == "sea"
+
+
+def test_a_short_excerpt_still_counts_a_single_mention():
+    # In a few hundred words "he sat by the fire" IS the setting.
+    body = "He sat by the fire and waited for the hour to pass."
+    assert "fire" in world.detect_environment_elements(body)
+
+
+def test_the_receipt_reports_the_threshold_it_used():
+    short = world.sound_world_receipt("He sat by the fire.")
+    long_body = "He sat by the fire. " * 700
+    assert short["minimum_hits_required"] == 1
+    assert world.sound_world_receipt(long_body)["minimum_hits_required"] == 2
+
+
+# ---------------------------------------------------------------------------
+# vocabulary collisions found on real corpus text
+# ---------------------------------------------------------------------------
+
+def test_a_domestic_hall_is_a_house_not_a_castle():
+    # "hall" was in BOTH patterns and court sorted first at equal position,
+    # so an entrance hall drew "a great room, cloth and iron".
+    keys = world.detect_environment_elements("The entrance hall was dark. "
+                                             "The hall clock struck.")
+    assert "house" in keys
+    assert "court" not in keys
+
+
+def test_a_real_castle_still_reads_as_a_court():
+    keys = world.detect_environment_elements(
+        "The castle throne room. The castle gate.")
+    assert "court" in keys
+
+
+@pytest.mark.parametrize("figurative", [
+    "a train of gloomy spectres followed him, a train of sorrows",
+    "Silver gave a little whistle, then a whistle again",
+    "the engine of his ambition, the engine of his will",
+])
+def test_polysemous_railway_words_do_not_summon_a_locomotive(figurative):
+    # Dumas' 1815 prison and 18th-century piracy both got a railway platform.
+    assert "rail" not in world.detect_environment_elements(figurative)
+
+
+def test_the_malvolio_garden_scene_derives_a_garden():
+    # From a published leg: Twelfth Night 2.5 shipped with "thunder over a
+    # heath, a guttering torch, a raven, rain on a castle wall" over a comic
+    # garden scene. The derivation then found NOTHING and fell back to the
+    # neutral bed, because the vocabulary was novel-shaped and had no garden.
+    body = ("In the garden, a letter waits where Malvolio must find it. "
+            "MARIA: Get you all three into the box tree. Malvolio's coming "
+            "down this walk.")
+    keys = world.detect_environment_elements(body)
+    assert "garden" in keys
+    derived = world.derive_source_sound_world(body)
+    assert derived != world.NEUTRAL_PERIOD_SOUND_WORLD
+    assert "thunder" not in derived
+
+
+def test_an_actual_railway_still_reads_as_rail():
+    keys = world.detect_environment_elements(
+        "The railway platform was empty. The locomotive waited at the platform.")
+    assert "rail" in keys
+
+
+# ---------------------------------------------------------------------------
 # the contract: ONE value reaches the prompt, the stamp and the canon
 # ---------------------------------------------------------------------------
 

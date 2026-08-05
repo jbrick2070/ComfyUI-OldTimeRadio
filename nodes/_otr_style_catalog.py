@@ -790,7 +790,7 @@ def render_style_grammar(slug: str, *, sound_world: str = "") -> str:
     s = get_style(slug)
     if not s:
         return ""
-    effective_sound_world = str(sound_world or "") or s["sound_world"]
+    effective_sound_world = str(sound_world or "").strip() or s["sound_world"]
     return (
         f"Style: {s['label']}.\n"
         f"Sound world: {effective_sound_world}.\n"
@@ -916,7 +916,7 @@ def build_story_contract(cast_seed: Any, script_brief: str, news_seed: str,
     slug = select_style(text, meta, cast_seed)
     s = get_style(slug) or {}
     effective_sound_world = (
-        str(source_sound_world or "") or s.get("sound_world", ""))
+        str(source_sound_world or "").strip() or s.get("sound_world", ""))
     return StoryContract(
         slug=slug,
         label=s.get("label", ""),

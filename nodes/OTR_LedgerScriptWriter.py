@@ -4267,10 +4267,19 @@ class OTR_LedgerScriptWriter:
         # header (_tbd_canon below) deliberately stays sound_world-free, because
         # sound effects in a line prompt invite stage-direction leak (the
         # _otr_outline design keeps sound_world at the macro prompt only).
+        # Split on BOTH delimiters. The catalog's drawn worlds are flat comma
+        # lists, but a SOURCE-DERIVED world joins per-element phrases with
+        # "; " and each phrase carries its own internal commas -- so a
+        # comma-only split fused the tail of one element onto the head of the
+        # next ("a bell over open water; night quiet" as a single palette
+        # entry). The consistency guard only checks the field is non-empty,
+        # so the garbling passed review while corrupting essentially every
+        # adaptation episode's canon.
         _canon_sound_palette: list = []
         if contract is not None and getattr(contract, "sound_world", ""):
             _canon_sound_palette = [
-                part.strip() for part in str(contract.sound_world).split(",")
+                part.strip()
+                for part in re.split(r"\s*[;,]\s*", str(contract.sound_world))
                 if part.strip()
             ]
         canon = _OTRC.episode_canon_from_outline_dict({

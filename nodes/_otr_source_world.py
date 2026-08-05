@@ -57,18 +57,33 @@ _ENVIRONMENT_VOCABULARY: tuple[tuple[str, str, str], ...] = (
      "a clock marking the hour, a bell at a distance"),
     ("horse", r"\b(horse|hoof|hooves|carriage|coach|cart|stable)s?\b",
      "hooves on stone, harness, a carriage drawing up"),
-    ("rail", r"\b(train|railway|railroad|locomotive|engine|whistle|platform)s?\b",
+    # "train", "engine" and "whistle" are too polysemous to stand alone: a
+    # "train of gloomy spectres" put a locomotive in Dumas' 1815 prison, and
+    # Long John Silver "giving a little whistle" put one in 18th-century
+    # piracy. Only unambiguous railway words qualify.
+    ("rail", r"\b(railway|railroad|locomotive|steam engine|platform)s?\b",
      "an engine breathing at a platform, a whistle, iron on iron"),
     ("machine", r"\b(machine|machinery|lever|dial|apparatus|laboratory|workshop)s?\b",
      "small mechanisms, a lever thrown, glass and metal on a bench"),
     ("crowd", r"\b(crowd|street|market|tavern|inn|square|thron[gs])s?\b",
      "voices at a distance, a door, footsteps passing"),
-    ("court", r"\b(court|castle|throne|hall|palace|banquet)s?\b",
+    # "hall" belongs to the HOUSE below and nowhere else. It was in both, and
+    # because this row sorts first at an equal position, an entrance hall in
+    # a domestic story drew castle audio -- 17 of the 39 corpus works that
+    # fired this row had no castle, throne, palace or banquet in them at all.
+    ("court", r"\b(court|castle|throne|palace|banquet)s?\b",
      "a great room, footfalls carrying, cloth and iron"),
     ("battle", r"\b(sword|battle|army|soldier|drum|trumpet|banner)s?\b",
      "drums, a trumpet, armour and boots on ground"),
     ("wild", r"\b(forest|wood|moor|heath|field|hill|marsh|river|stream)s?\b",
      "open country -- birds, water moving, grass and branch"),
+    # Added 2026-08-04 from a published leg: Twelfth Night 2.5 opens "In the
+    # garden... Malvolio's coming down this walk" and derived NOTHING, so a
+    # comic garden scene fell back to the neutral bed. Drama scenes are short
+    # and stage their location in a line or two -- the vocabulary was
+    # novel-shaped and missed the most common comedy setting there is.
+    ("garden", r"\b(garden|orchard|arbou?r|bower|hedge|lawn|box tree)s?\b",
+     "a garden -- birdsong, leaves, gravel underfoot, a gate"),
     ("night", r"\b(night|midnight|dark|moon|star)s?\b",
      "night quiet, an owl, something small in the dark"),
     ("house", r"\b(parlou?r|drawing[- ]room|study|kitchen|stair|hall(?:way)?|door)s?\b",
@@ -84,26 +99,38 @@ class SourceWorldError(RuntimeError):
     """A sound world could not be derived (loud)."""
 
 
-def _first_index(body_lower: str, pattern: str) -> int | None:
-    match = re.search(pattern, body_lower, re.IGNORECASE)
-    return match.start() if match else None
+def _minimum_hits_for(body: str) -> int:
+    """How many mentions an element needs before it counts as a real setting.
+
+    A single mention is usually figurative in a full-length work -- "a storm
+    of protest", "a train of gloomy spectres", "the tide of opinion" -- and
+    because elements are ordered by FIRST APPEARANCE, one such phrase in an
+    opening paragraph could lead the whole sound world. Requiring a second
+    mention removes that without special-casing individual verbs.
+
+    Short excerpts keep a threshold of one: in a few hundred words a single
+    "he sat by the fire" IS the setting, not a figure of speech.
+    """
+    return 1 if len(body.split()) < 1000 else 2
 
 
 def detect_environment_elements(body: str) -> tuple[str, ...]:
-    """Element keys the SOURCE mentions, ordered by first appearance.
+    """Element keys the SOURCE genuinely establishes, by first appearance.
 
-    Ordering by position rather than by hit count keeps the line loyal to how
+    Ordering by position rather than hit count keeps the line loyal to how
     the work opens: a story that begins at sea and ends in a parlour leads
-    with the sea. Deterministic for a given body.
+    with the sea. Qualifying by hit COUNT first keeps a passing metaphor from
+    taking that lead. Deterministic for a given body.
     """
     if not isinstance(body, str):
         raise SourceWorldError(
             f"source body must be str, got {type(body).__name__}")
+    minimum = _minimum_hits_for(body)
     found: list[tuple[int, str]] = []
     for key, pattern, _phrase in _ENVIRONMENT_VOCABULARY:
-        position = _first_index(body, pattern)
-        if position is not None:
-            found.append((position, key))
+        matches = list(re.finditer(pattern, body, re.IGNORECASE))
+        if len(matches) >= minimum:
+            found.append((matches[0].start(), key))
     found.sort()
     return tuple(key for _position, key in found)
 
@@ -143,4 +170,8 @@ def sound_world_receipt(body: str, *, source_ref: str = "") -> dict:
         "elements_detected": list(detected),
         "elements_used": list(kept),
         "used_neutral_default": not kept,
+        # What it took to qualify, so a reader can tell a short excerpt's
+        # single-mention threshold from a full work's stricter one.
+        "minimum_hits_required": _minimum_hits_for(body),
+        "elements_dropped_by_cap": max(0, len(detected) - len(kept)),
     }

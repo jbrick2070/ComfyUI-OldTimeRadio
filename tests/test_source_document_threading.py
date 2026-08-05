@@ -98,6 +98,54 @@ def test_writer_threading_is_wired_at_the_real_call_site():
     assert 'str(meta.get("style_pool_class") or "") == "adaptation"' in src
 
 
+def test_the_canon_palette_splits_a_derived_world_correctly():
+    # The canon splitter took commas only. A derived world joins per-element
+    # phrases with "; " and each phrase carries internal commas, so a
+    # comma-only split fused one element's tail onto the next element's head
+    # ("a bell over open water; night quiet" as ONE palette entry) on
+    # essentially every adaptation episode.
+    import re
+
+    derived = world.derive_source_sound_world(
+        "The ship stood off the harbour by night, and the tide ran. "
+        "The ship returned at night on the tide.")
+    palette = [p.strip() for p in re.split(r"\s*[;,]\s*", derived) if p.strip()]
+    assert palette
+    assert not any(";" in entry for entry in palette)
+
+
+def test_the_writer_uses_the_two_delimiter_split():
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "nodes" / "OTR_LedgerScriptWriter.py").read_text(encoding="utf-8")
+    assert 're.split(r"\\s*[;,]\\s*", str(contract.sound_world))' in src
+
+
+def test_the_shakespeare_fetcher_carries_a_document_too():
+    # shakespeare is a style_pool_class "adaptation" bank, so it is gated into
+    # source-derived grounding -- but its fetcher passed no document, so it
+    # silently kept the drawn palette while the code claimed to have fixed
+    # "the adaptation lanes".
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "nodes" / "_otr_shakespeare_sources.py").read_text(encoding="utf-8")
+    assert "source_document=source_document_from_text(" in src
+    assert "def normalize_shakespeare_body(" in src
+
+
+def test_shakespeare_normalization_is_uncapped():
+    from nodes import _otr_shakespeare_sources as shk
+
+    body = "SPEAKER  a line of verse here. " * 900
+    full = shk.normalize_shakespeare_body(body)
+    capped = shk.canonicalize_shakespeare_text(body)
+    assert len(full) > shk.INTERPRETER_TEXT_WINDOW
+    assert len(capped) <= shk.INTERPRETER_TEXT_WINDOW
+    assert full.startswith(capped)
+
+
 def test_the_document_is_not_stamped_into_meta_source_meta():
     # meta["source_meta"] is a copy of resolved["source_meta"]; the document
     # rides its own key precisely so that copy cannot pick it up.
