@@ -261,6 +261,13 @@ roundtables/
 # mid-leg is harmless but pointless; it comes straight back.)
 /RUN_STATUS.txt
 /tmp_*
+# The tmp/ DIRECTORY, which /tmp_* never matched -- that pattern needs an
+# underscore, so it caught tmp_audit_results.json at the root and missed the
+# 6,300-file scratch directory beside it. Every git status has been reporting
+# a quarter-gigabyte of run logs, probe scripts and pytest temp trees as
+# untracked ever since. Tracked files are unaffected by an ignore rule, so the
+# harness scripts already committed under tmp/ keep behaving exactly as before.
+/tmp/
 /*_status.txt
 /*_pid.txt
 /30w

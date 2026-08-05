@@ -34,6 +34,53 @@ PACK_ROOT = Path(__file__).resolve().parent.parent
 SWEEP_PATH = PACK_ROOT / "tests" / "_s28_forbidden_sweep.py"
 
 
+def _untracked_python_as_diff() -> str:
+    """New .py files that git diff cannot see yet, rendered as added lines.
+
+    The sweep reads a DIFF, and `git diff` covers TRACKED files only. So a new
+    module or test file was invisible to this gate for exactly as long as it
+    stayed untracked -- it passed green, and then turned HEAD red on its first
+    commit with nothing else changed. That has now cost two red HEADs.
+
+    EVERY unignored untracked `*.py`, matching the tracked half of the sweep,
+    which already covers `*.py` repo-wide. An earlier draft limited this to
+    `nodes/` and `tests/` to avoid "widening the gate to every untouched file";
+    that rationale does not apply -- `git ls-files --others` lists only
+    UNTRACKED files, never the untouched tracked tree, so the narrow scope
+    bought nothing and left runtime Python under `config/`, `scripts/` and the
+    repo root blind. `--exclude-standard` honours .gitignore, so tmp/ scratch
+    stays out.
+
+    FAILS LOUD. A git, read or decode error raises rather than returning an
+    empty string: a gate that silently sweeps nothing is worse than no gate,
+    which is exactly the failure this whole helper exists to close.
+    """
+    listed = subprocess.check_output(
+        ["git", "-C", str(PACK_ROOT), "ls-files", "--others",
+         "--exclude-standard", "--", "*.py"],
+        text=True, encoding="utf-8",
+    )
+    chunks = []
+    for rel in sorted({line.strip() for line in listed.splitlines() if line.strip()}):
+        path = PACK_ROOT / rel
+        body = path.read_text(encoding="utf-8")
+        # Same shape `git diff` emits for a new file, so the sweep's existing
+        # parser needs no change: every line arrives as an addition.
+        #
+        # The @@ header is REQUIRED, not decoration. The sweep tracks the
+        # current line number through `hunk_re`, and a `+` line outside any
+        # hunk is silently dropped -- an earlier draft of this helper omitted
+        # it, produced a diff that looked perfectly correct, and swept exactly
+        # nothing.
+        lines = body.splitlines()
+        chunks.append(
+            "diff --git a/%s b/%s\nnew file mode 100644\n--- /dev/null\n+++ b/%s\n"
+            "@@ -0,0 +1,%d @@\n" % (rel, rel, rel, len(lines))
+            + "".join("+%s\n" % line for line in lines)
+        )
+    return "".join(chunks)
+
+
 def _run_sweep_subprocess() -> tuple[int, str]:
     """Regenerate the diff input + invoke the sweep as a subprocess.
     Returns (return_code, stdout).
@@ -55,6 +102,7 @@ def _run_sweep_subprocess() -> tuple[int, str]:
          "s29-clean-slate-gate", "--", "*.py"],
         text=True, encoding="utf-8",
     )
+    diff += _untracked_python_as_diff()
     diff_path.write_text(diff, encoding="utf-8")
     env = {
         **os.environ,
