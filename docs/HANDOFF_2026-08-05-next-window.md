@@ -81,9 +81,29 @@ Shakespeare has the same shape (`_otr_shakespeare_sources.py:583-629`).
 
 **Trap, driver-verified:** `meta["provenance_coda_line"]` -- the deterministic
 alternative -- is WRITTEN at `OTR_LedgerScriptWriter.py:3595` but has ZERO
-readers, AND is gated behind `defaults.provenance_normalize` which is False for
-every bank. **It has never run.** The fix must WIRE a consumer and ENABLE the
-flag, not merely redirect to it.
+readers. Grep confirms exactly two mentions in the tree: that write, and the
+module docstring at `_otr_provenance.py:19`. Nothing consumes it.
+
+**CORRECTED 2026-08-05 PM (the original text of this paragraph was wrong, and
+building to it would have produced a no-op change).** It claimed the write is
+"gated behind `defaults.provenance_normalize` which is False for every bank"
+and "has never run". Both halves are false:
+
+- `provenance_normalize` is **`true`** for `public_domain` and `shakespeare`
+  (`nodes/story_packs/banks.json`) -- the exact two lanes that leak the
+  citation. They opted in 2026-08-04.
+- It is **pinned by a test**: `tests/test_provenance_v4.py:119`
+  `_PROVENANCE_OPTED_IN = frozenset({"shakespeare", "public_domain"})`, asserted
+  per-bank at `:128-135` so the flag cannot move silently.
+
+So the coda IS composed and stamped on both affected lanes today. **The flag
+does not need enabling -- only a CONSUMER is missing.** The fix is a wire-up,
+not a wire-up plus a switch.
+
+Two comments still assert the old state and should be corrected in the same
+change, since they are what misled this spec: `OTR_LedgerScriptWriter.py:3584-3585`
+("Default False -> key absent -> inert for every current bank") and
+`_otr_ledger_freeze.py:713` ("inert for every current bank").
 
 **Do NOT** bump `NORMALIZATION_VERSION` -- wrong boundary, source bytes are
 unchanged (Codex r4 overruled agy r2 here). Bump the interpreter PROMPT versions

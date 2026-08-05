@@ -84,20 +84,35 @@ def test_formerly_terminal_words_no_longer_stop_the_ship(term):
         "%r still changes the audit -- content enforcement is back" % term)
 
 
-def test_phase_10_raises_nothing_about_content():
-    """A line that used to be a terminal CONTENT failure no longer is one.
+def _freeze_errors_for(text):
+    """Every terminal freeze error for a one-line ledger carrying `text`.
 
-    This fixture ledger is deliberately minimal, so it can still fail the
-    freeze on STRUCTURE -- that is correct and untouched by this change. The
-    claim under test is narrower and exact: whatever the freeze objects to, it
-    is never the words.
+    Returns [] when the freeze passes. The fixture is deliberately minimal and
+    DOES fail on structure -- that is expected, and identical on both sides of
+    the comparison below.
     """
-    ledger = _ledger("Welcome.", "What the hell was that noise?")
     try:
-        freeze.phase_10_gap_audit_post_and_freeze(ledger)
+        freeze.phase_10_gap_audit_post_and_freeze(_ledger("Welcome.", text))
     except freeze.FreezeAssertionError as exc:
-        offending = [e for e in exc.errors if str(e).startswith("G9")]
-        assert not offending, "content is still terminal at freeze: %r" % offending
+        return [str(e) for e in exc.errors]
+    return []
+
+
+def test_phase_10_raises_nothing_about_content():
+    """DIFFERENTIAL at the terminal gate, for the same reason as the audit above.
+
+    The earlier version filtered the freeze errors on a "G9" prefix. G9 is
+    RETIRED and the code number is never reused (_otr_ledger_freeze: "the gate
+    code number is retired rather than reused"), so that comprehension was
+    permanently empty and the assertion could not fail for ANY reason -- it
+    passed whether or not content was terminal. Comparing two ledgers that
+    differ in exactly one word cannot go vacuous: a content policy under any
+    name breaks this the moment it fires.
+    """
+    assert (
+        _freeze_errors_for("What the hell was that noise?")
+        == _freeze_errors_for("What was that noise?")
+    ), "content is still terminal at freeze"
 
 
 def test_macbeth_keeps_its_dagger():

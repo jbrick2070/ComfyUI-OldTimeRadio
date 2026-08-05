@@ -259,10 +259,11 @@ class CastLock:
     def _enforce_freeze_gate(meta) -> None:
         """Enforce the structural/safety freeze and recover writer VRAM.
 
-        Current freeze failures are only genuine ledger corruption or residual
-        narrow spoken-safety violations. Subjective quality block classes and
-        their escape hatch are retired. A missing verdict remains compatible
-        with legacy ledgers.
+        Current freeze failures are only genuine ledger corruption --
+        STRUCTURAL, and nothing else. Spoken-safety block classes went with the
+        content-guardrail rip (2026-08-05); subjective quality block classes and
+        their escape hatch were retired before that. A missing verdict remains
+        compatible with legacy ledgers.
 
         If writer teardown reported an unload failure, attempt one defensive
         unload before the audio chain claims VRAM.
@@ -273,14 +274,14 @@ class CastLock:
             if bypass:
                 log.warning(
                     "[CastLock] FREEZE HALT BYPASSED (OTR_BYPASS_FREEZE_HALT=1); "
-                    "casting a structurally or safety-flagged ledger for "
-                    "operator diagnostics only. See BUG-LOCAL-276."
+                    "casting a structurally flagged ledger for operator "
+                    "diagnostics only. See BUG-LOCAL-276."
                 )
             else:
                 raise ValueError(
                     "OTR_CastLock: freeze cascade stamped "
-                    "freeze_verdict='needs_full_rerun' for structural or "
-                    "residual spoken-safety corruption. Refusing to cast/render. "
+                    "freeze_verdict='needs_full_rerun' for structural ledger "
+                    "corruption. Refusing to cast/render. "
                     "Set OTR_BYPASS_FREEZE_HALT=1 only for operator diagnostics. "
                     "See BUG-LOCAL-276."
                 )

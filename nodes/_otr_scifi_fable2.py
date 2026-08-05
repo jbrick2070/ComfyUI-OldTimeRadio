@@ -2593,34 +2593,22 @@ def _apply_fable_safety_cleanup(
     *,
     technical_fn,
 ) -> "tuple[str, ParsedScript, Treatment, dict[str, Any]]":
-    """Patch only unsafe spoken constituents before proof/authorship seals."""
-    projection: "dict[str, Any]" = {"lines": []}
+    """Return the script unchanged. The content cleanup this ran is retired.
 
-    def add(line_id: str, role: str, text: str) -> None:
-        projection["lines"].append({
-            "line_id": line_id,
-            "speaker_role": role,
-            "skip": False,
-            "text": text,
-        })
+    Same-story SAFETY CLEANUP RETIRED 2026-08-05 (operator directive: no
+    content guardrails on generated episodes). This built a projection of every
+    spoken row -- intro, scene lines, outro, coda, news read -- scanned it,
+    asked the model to rewrite any row matching the profanity / weapon / sexual
+    list, and raised Fable2AuditError when a term survived: two terminal content
+    failures inside the fable2 lane.
 
-    for index, text in enumerate(parsed.announcer_intro):
-        add(f"intro_{index}", "announcer", text)
-    for scene in parsed.scenes:
-        for index, line in enumerate(scene.lines):
-            add(f"scene_{scene.n}_{index}", "character", line.text)
-    for index, text in enumerate(parsed.announcer_outro):
-        add(f"outro_{index}", "announcer", text)
-    add("coda", "announcer", parsed.coda)
-    add("news_read", "announcer", treatment.news_close_read)
-
-    # Same-story SAFETY CLEANUP RETIRED 2026-08-05 (operator directive: no
-    # content guardrails on generated episodes). This scanned the projected
-    # spoken rows, asked the model to rewrite any that matched the profanity /
-    # weapon / sexual list, and raised Fable2AuditError when a term survived --
-    # two terminal content failures inside the fable2 lane. The script is now
-    # returned exactly as written, and the receipt keeps its established shape
-    # so the caller's ledger field never loses a value.
+    The projection fed that scan and nothing else -- no receipt, no treatment
+    mutation, no patched_news propagation read it -- so it is gone with the scan
+    rather than left to walk every line and be discarded. The script is returned
+    exactly as written, and the receipt below keeps its established shape so the
+    caller's ledger field never loses a value.
+    """
+    del technical_fn  # the retired scan was this function's only model call
     return raw_source, parsed, treatment, {
         "status": "retired_no_content_policy",
         "hits": [],
