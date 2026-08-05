@@ -721,7 +721,7 @@ def _seeded_announcer_gender(engine: str, episode_seed) -> str:
 
 def gender_agnostic_fallback_ref(
     bank: Tuple[VoiceBankEntry, ...], *, engine: str, char_id: str,
-    episode_seed=0, role: str = "char_voice",
+    episode_seed=0, role: str = "char_voice", used=None,
 ) -> Optional[VoiceBankEntry]:
     """The reference an UNCASTABLE row actually renders with, or None.
 
@@ -739,6 +739,14 @@ def gender_agnostic_fallback_ref(
 
     Role-matching refs are preferred so an announcer render gets an announcer
     ref, then ANY ref for the engine.
+
+    ``used`` excludes references another character already holds, using the same
+    two-pass shape as ``_ladder_pick``: prefer an unused reference, and fall back
+    to the whole pool only when every candidate is taken (a voice is always
+    better than none). The caster passes it because it tracks the episode's
+    used-set; the render-time resolver has no cross-character state and passes
+    nothing, which is harmless -- once the caster stamps an id, the resolver
+    matches on that id and never reaches this draw at all.
     """
     role_cands = [e for e in bank if e.engine == engine and role in e.roles]
     cands = sorted(
@@ -747,7 +755,12 @@ def gender_agnostic_fallback_ref(
     )
     if not cands:
         return None
-    return random.Random(f"{episode_seed}_{char_id}_anyref").choice(cands)
+    rng = random.Random(f"{episode_seed}_{char_id}_anyref")
+    if used:
+        unused = [e for e in cands if not _entry_is_used(e, set(used))]
+        if unused:
+            return rng.choice(unused)
+    return rng.choice(cands)
 
 
 def _seeded_preferred_announcer_voice_ref(

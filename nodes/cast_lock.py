@@ -542,6 +542,17 @@ class CastLock:
                 continue
             char_id = str(entry.get("char_id") or "")
 
+            # Ledger completeness: every row this caster CONSIDERS carries the
+            # field, so a downstream reader never has to tell "cast normally"
+            # apart from "field never written". Set BEFORE the announcer branch,
+            # which has its own `continue` -- an announcer whose engine cannot
+            # serve it is reported NOT cast and would otherwise be the one row
+            # the caster touched without leaving a verdict. _stamp overwrites it;
+            # rows that fall through keep the empty default. preserve_ledger is
+            # deliberately not touched -- that mode's contract is byte-safety,
+            # and a row the caster never ran on has no cast decision to report.
+            entry.setdefault("voice_cast_fallback", "")
+
             if _is_announcer_entry(entry):
                 try:
                     ref = announcer_ref or announcer_voice_ref(
@@ -561,13 +572,6 @@ class CastLock:
 
             if target_engine is None:
                 continue
-            # Ledger completeness: every row this caster CONSIDERS carries the
-            # field, so a downstream reader never has to tell "cast normally"
-            # apart from "field never written". _stamp overwrites it; the rows
-            # that fall through below keep the empty default. preserve_ledger is
-            # deliberately not touched -- that mode's contract is byte-safety,
-            # and a row the caster never ran on has no cast decision to report.
-            entry.setdefault("voice_cast_fallback", "")
             gender = str(entry.get("gender") or "").strip().lower()
             if not gender:
                 if target_engine == "google_tts":
@@ -634,7 +638,7 @@ class CastLock:
                 # content gate: no refusal, no gender restriction.
                 fallback_ref = gender_agnostic_fallback_ref(
                     bank_entries, engine=target_engine, char_id=char_id,
-                    episode_seed=episode_seed, role="char_voice",
+                    episode_seed=episode_seed, role="char_voice", used=used,
                 )
                 if fallback_ref is None:
                     report.append(f"  {char_id}: NOT cast -- {exc}")

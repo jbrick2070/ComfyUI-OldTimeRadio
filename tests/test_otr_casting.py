@@ -297,12 +297,14 @@ def test_only_binary_genders_can_be_pinned():
     """The roster records male/female/unknown. An 'other' or junk value must
     never reach the slot, so CastingResponse validation cannot be surprised.
     """
-    ens = _pinned_ensemble(
-        ["Malvolio"], {"MALVOLIO": "other"}, 5)
-    assert ens[0].gender in ("male", "female", "other")
-    ens2 = _pinned_ensemble(["Malvolio"], {"MALVOLIO": "banana"}, 5)
     base = _pinned_ensemble(["Malvolio"], None, 5)
-    assert ens2[0].gender == base[0].gender, "a junk pin must be ignored"
+    for junk in ("other", "banana", "", "unknown"):
+        got = _pinned_ensemble(["Malvolio"], {"MALVOLIO": junk}, 5)
+        assert got[0].gender == base[0].gender, (
+            f"pin {junk!r} must be ignored, not applied")
+    # ...but a real gender still pins, whatever case or padding it arrives in.
+    assert _pinned_ensemble(
+        ["Malvolio"], {"MALVOLIO": " Male "}, 5)[0].gender == "male"
 
 
 def test_source_names_skip_blank_announcer_and_dupes():
