@@ -33,6 +33,11 @@ try:
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_content_safety import find_text_hits  # type: ignore
 
+try:
+    from . import _otr_source_document as _osd
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_source_document as _osd  # type: ignore
+
 MANIFEST_SCHEMA_VERSION = "v1"
 PROMPT_VERSION = "public_domain_interpreter_v2"
 SCHEMA_VERSION = "public_domain_briefs_v1"
@@ -330,21 +335,50 @@ def select_public_domain_unit_ref(
         return str(refs[chooser.randrange(len(refs))])
 
 
-# The interpreter reads the whole canonicalized body, not a prefix of it.
+# The LEGACY seven-key payload's body cap. It is a PROJECTION for the payload
+# contract, not the source of truth: the complete body lives in the
+# SourceDocument built by normalize_public_domain_body below.
 INTERPRETER_TEXT_WINDOW: int = 12000
 
 
-def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str:
-    """Strip common public-domain boilerplate and normalize whitespace."""
+def normalize_public_domain_body(text: Any) -> str:
+    """Canonicalize a public-domain body WITHOUT truncating it.
+
+    This is the normalization owner: HTML-unescape, strip Gutenberg header and
+    footer boilerplate, collapse whitespace runs. The result is the coordinate
+    system that every span offset and body hash indexes into, so changing what
+    this function produces invalidates stored offsets -- bump
+    ``_otr_source_document.NORMALIZATION_VERSION`` when it does.
+    """
     raw = html.unescape(str(text or "")).replace("\ufeff", "")
     raw = _PG_HEADER_RE.sub(" ", raw)
     raw = _PG_FOOTER_RE.sub(" ", raw)
     cleaned = _WS_RE.sub(" ", raw).strip()
-    if len(cleaned) > max_chars:
-        cleaned = cleaned[:max_chars].rsplit(" ", 1)[0].rstrip() or cleaned[:max_chars]
     if not cleaned:
         raise PublicDomainSourceRefError("public-domain source text is empty")
     return cleaned
+
+
+def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str:
+    """Legacy payload projection: the canonical body, capped at ``max_chars``.
+
+    Kept for the seven-key ``full_text`` contract, which predates the source
+    document and cannot hold a 25,000-word body. Callers that need the WHOLE
+    work must use ``normalize_public_domain_body`` (or the SourceDocument
+    built from it) -- this one returns a prefix by design.
+    """
+    cleaned = normalize_public_domain_body(text)
+    if len(cleaned) > max_chars:
+        cleaned = cleaned[:max_chars].rsplit(" ", 1)[0].rstrip() or cleaned[:max_chars]
+    return cleaned
+
+
+def source_document_from_text(
+    text: Any, *, source_ref: str = "",
+) -> "_osd.SourceDocument":
+    """Build the transient uncapped document for a public-domain source."""
+    return _osd.build_source_document(
+        normalize_public_domain_body(text), source_ref=source_ref)
 
 
 def payload_from_manifest_unit(
@@ -434,6 +468,11 @@ def fetch_public_domain_source(
         payload=payload_from_manifest_unit(resolved, text=text),
         source_meta=source_meta_from_unit(resolved),
         source_rights=source_rights_from_unit(resolved),
+        # Transient: the COMPLETE body, so the pre-outline authors can be
+        # grounded in the whole work rather than the payload's 12,000-char
+        # prefix. Never serialized -- see SourceFetchResult's contract.
+        source_document=source_document_from_text(
+            text, source_ref=resolved.source_ref),
     )
 
 

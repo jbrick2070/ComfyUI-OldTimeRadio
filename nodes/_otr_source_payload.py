@@ -138,10 +138,20 @@ class SourceFetchResult:
     The payload remains the exact seven-key legacy contract. Rights/provenance
     metadata travels beside it so new banks can stamp source information
     without smuggling unknown keys through ``validate_source_payload``.
+
+    ``source_document`` is TRANSIENT and DIFFERENT in kind from the sidecars:
+    it carries the complete uncapped body for source-owned lanes, and it is
+    deliberately excluded from every serialization path -- ``source_meta`` is
+    copied into durable ledger metadata, and a 25,000-word body must never
+    ride along. Consumers hold it for the duration of a build and persist
+    offsets plus hashes instead. ``normalize_fetch_result`` drops it on
+    purpose; use ``normalize_fetch_result_with_document`` when the caller is
+    equipped to carry it.
     """
     payload: dict
     source_meta: dict | None = None
     source_rights: dict | None = None
+    source_document: object | None = None
 
 
 def validate_source_payload(payload, origin: str) -> dict:
@@ -213,6 +223,21 @@ def normalize_fetch_result(result, origin: str) -> tuple[dict, dict, dict]:
         f"{origin}: fetcher result must be a source payload dict or "
         f"SourceFetchResult, got {type(result).__name__}"
     )
+
+
+def normalize_fetch_result_with_document(result, origin: str):
+    """``normalize_fetch_result`` plus the TRANSIENT source document.
+
+    Returns ``(payload, source_meta, source_rights, source_document)`` where
+    the document is ``None`` for legacy fetchers and for banks that do not
+    build one. Callers that take this tuple accept responsibility for keeping
+    the document out of ``meta``, the ledger and every prompt receipt -- the
+    three-value ``normalize_fetch_result`` stays the default precisely so a
+    caller cannot pick the document up by accident.
+    """
+    payload, source_meta, source_rights = normalize_fetch_result(result, origin)
+    document = getattr(result, "source_document", None)
+    return payload, source_meta, source_rights, document
 
 
 # ---------------------------------------------------------------------------
