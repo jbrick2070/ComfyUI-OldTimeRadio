@@ -14,6 +14,19 @@
   **Still true, and a different thing:** authoring style stays clean -- no curse words in
   CODE, COMMENTS, LOGS or commit messages, and never the name "dummy". That rule is about what
   WE write, not about what the pipeline generates from a source.
+- **STORY QUALITY IS DONE. STOP CHASING IT (operator directive 2026-08-04 -- hard).**
+  Operator: "I am not chasing story quality anymore. It works. It works. I will publish it
+  as open source, and if someone else wants to do it, or in six months I wanna chase it
+  again when I've got better tools, I will." The scripts are ACCEPTED as they are. Do not
+  open writing-quality work, do not propose prompt-craft passes for better prose, do not
+  benchmark writer models for story quality, and do not spend on panels or cloud models to
+  improve scripts. This also settles the cloud-writer question: local stays the default and
+  no paid writer is adopted to raise prose quality.
+  **What this does NOT cover** -- these are CORRECTNESS defects, not quality chasing, and
+  remain open: a character's gender/voice contradicting the source, a character's face
+  changing between beats, voice-pool staleness, and any structural or ledger fault. Fixing
+  "Malvolio speaks with a woman's voice" is a bug fix; rewriting Malvolio's dialogue to be
+  better is not.
 - **NO WORD-COUNT CHASING (operator directive 2026-08-03).** "We never chase word count."
   The target words value is a REQUEST, not a gate: no refusals, no hard caps, no shunts. The
   manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only
