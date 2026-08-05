@@ -2,10 +2,17 @@
 
 interface == "per_line": the announcer node calls generate_voice per announcer
 line; no delegation to a batch node. The announcer voice is ONE per episode,
-chosen by a per-episode seeded pick from the curated British pool -- same pool
-and same seed derivation as the retired legacy node, so a given episode_seed
-yields the same announcer (no change to what listeners hear). The bank can take
-over the assignment at promotion (sprint 4) via cast voice_ref_id.
+chosen by a per-episode seeded pick from the curated British pool.
+
+2026-08-05: that pick now DELEGATES to the voice bank rather than running its
+own formula. This engine derived the seed as
+``Random(f"{episode_seed}_kokoro_announcer")`` while the bank derived it as
+``Random(sha1("kokoro_announcer_pick:<seed>"))`` -- one pool, two draws, so the
+ledger could name one announcer and the render open another. **This DID change
+what listeners hear**: measured over five sampled seeds the two formulas
+disagree on three of them. That re-baseline is the point, not a side effect --
+one episode, one announcer, whichever side is asked. The engine-local formula
+survives only for a bank that cannot be served at all.
 
 C-7: the voice .pt is NEVER fetched during execute. begin_episode picks the
 voice and verifies its file on local disk, raising a NAMED EngineUnusable with
@@ -15,10 +22,13 @@ Library + model imports are lazy (C-5). UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
+import logging
 import os
 import random
 
 from .registry import register
+
+log = logging.getLogger("OTR")
 
 # Curated British announcer pool (2 male + 2 female: BBC authoritative +
 # documentary relaxed) -> natural 50/50 per-episode gender split. Canonical home
@@ -54,12 +64,39 @@ def _kokoro_voice_path(voice_id: str) -> str:
 
 
 def _pick_announcer_voice(episode_seed, voice_override="random") -> str:
-    """One voice per episode. Same pool + seed derivation as the legacy node, so
-    the same episode_seed yields the same announcer (behavior preserved)."""
+    """One voice per episode, drawn the SAME way the voice bank draws it.
+
+    This used to run its own formula -- Random(f"{seed}_kokoro_announcer") --
+    while the bank drew with Random(sha1("kokoro_announcer_pick:<seed>")). Two
+    formulas over one pool means the ledger can name one announcer while the
+    render opens another, which is precisely the defect the shared
+    gender-agnostic selector was extracted to end on the character side.
+
+    Delegates to the bank so there is ONE draw. The local formula survives only
+    as the fallback for a bank that cannot be loaded at all -- an engine must
+    still be able to speak.
+    """
     if voice_override and voice_override != "random":
         return voice_override
-    rng = random.Random(f"{episode_seed}_kokoro_announcer")
-    return rng.choice(ANNOUNCER_VOICE_POOL)
+    from .._otr_voice_bank import (
+        VoiceBankError, VoiceCastingError, announcer_voice_ref,
+    )
+    try:
+        return announcer_voice_ref("kokoro", episode_seed=episode_seed).voice_ref_id
+    except (VoiceBankError, VoiceCastingError):
+        # ONLY the bank's own typed contracts fall back -- a genuinely absent or
+        # unservable bank, where an engine must still be able to speak. A bare
+        # `except Exception` here would recreate the very divergence this
+        # delegation removes: an import error, a schema change or a coding
+        # mistake would silently switch back to the second formula and the
+        # ledger would once again name a different announcer than the render.
+        # Loud, because a seedless-style silent fallback is how the last one hid.
+        log.warning(
+            "[OTR.kokoro] voice bank could not serve an announcer; falling back "
+            "to the engine-local pool. The ledger's announcer and this render "
+            "may now disagree.", exc_info=True)
+        return random.Random(f"{episode_seed}_kokoro_announcer").choice(
+            ANNOUNCER_VOICE_POOL)
 
 
 @register

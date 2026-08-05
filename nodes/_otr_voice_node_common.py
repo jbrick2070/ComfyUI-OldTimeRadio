@@ -173,14 +173,19 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
             except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
                 entry = None
         if entry is None:
-            import random as _random
-            role_cands = [e for e in bank if e.engine == engine and role in e.roles]
-            cands = sorted(
-                role_cands or [e for e in bank if e.engine == engine],
-                key=lambda e: e.voice_ref_id)
-            if cands:
-                _seed = f"{episode_seed}_{cast.get('char_id', '')}_provid"
-                entry = _random.Random(_seed).choice(cands)
+            # THIRD copy of the same gender-agnostic draw, now folded onto the
+            # one selector the caster and the clone-ref path already share.
+            # It differed only in its seed suffix ('_provid' rather than
+            # '_anyref'), which is exactly the shape that lets two code paths
+            # name two different voices for one character -- the defect the
+            # shared selector was extracted to end. Same pool, same ordering,
+            # same char_id keying; the suffix is deliberately dropped so a
+            # cloud row and its local twin resolve to the SAME bank entry.
+            from ._otr_voice_bank import gender_agnostic_fallback_ref
+            entry = gender_agnostic_fallback_ref(
+                bank, engine=engine, char_id=str(cast.get("char_id") or ""),
+                episode_seed=episode_seed, role=role,
+            )
     return getattr(entry, "provider_voice_id", "") or None
 
 

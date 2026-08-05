@@ -149,8 +149,14 @@ def test_kokoro_per_line_returns_audio_contract(monkeypatch):
 
 
 def test_kokoro_announcer_voice_pick_is_episode_seeded():
-    """Deterministic per-episode pick from the curated pool -- preserves what
-    listeners heard from the legacy node (same pool, same seed derivation)."""
+    """Deterministic per-episode pick from the curated pool.
+
+    NOT "preserves what listeners heard from the legacy node" -- that claim was
+    true until 2026-08-05 and is now false. The pick delegates to the voice
+    bank so the ledger and the render agree, and the two formulas disagree on
+    roughly three seeds in five. Determinism per seed is what this pins; parity
+    with the retired formula is deliberately gone.
+    """
     from nodes._otr_audio_engines.eng_kokoro import (
         ANNOUNCER_VOICE_POOL, _pick_announcer_voice,
     )
@@ -268,3 +274,143 @@ def test_source_is_ascii_no_em_dash():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-05: the kokoro announcer pool exists in TWO places and the config
+# copy's own comment has been asking for the sync since it was written:
+# "Keep them in sync; a follow-up is to import the pool from there so there is
+# one canonical list." Nothing enforced it, so the two could drift silently --
+# and a drifted pool means the caster offers a voice the engine cannot open.
+#
+# A test rather than an import: config/cast_pools.py is imported by the script
+# side and pulling an audio-engine module into it to dedupe a four-item list
+# would trade a silent drift for a real import-weight problem.
+# ---------------------------------------------------------------------------
+def test_the_kokoro_announcer_pools_have_not_drifted():
+    """THREE owners, not two. The curated ids live in config/cast_pools.py and
+    eng_kokoro.py, and since 2026-08-05 the voice BANK is the third: the four
+    rows carrying role announcer_voice are what the caster and the engine now
+    actually select through. A drift in any one of them means the caster offers
+    a voice the engine cannot open, or the bank serves one nobody curated.
+    """
+    from config import cast_pools
+    from nodes._otr_audio_engines import eng_kokoro
+    from nodes._otr_voice_bank import load_voice_bank
+
+    presets = [voice_id for voice_id, _label in cast_pools.ANNOUNCER_PRESETS]
+    assert presets == list(eng_kokoro.ANNOUNCER_VOICE_POOL), (
+        "config/cast_pools.ANNOUNCER_PRESETS and "
+        "eng_kokoro.ANNOUNCER_VOICE_POOL have drifted -- the caster and the "
+        "engine no longer agree on which voices exist")
+
+    entries, _ = load_voice_bank()
+    bank_announcers = sorted(
+        e.voice_ref_id for e in entries
+        if e.engine == "kokoro" and "announcer_voice" in tuple(e.roles or ())
+        and e.quality_tier != "reject")
+    assert bank_announcers == sorted(presets), (
+        "the voice bank's kokoro announcer_voice rows %s do not match the "
+        "curated pool %s -- the third owner has drifted"
+        % (bank_announcers, sorted(presets)))
+
+
+def test_the_registry_preset_list_is_the_announcer_pool_not_a_character_catalog():
+    """VOICE_REGISTRY['kokoro']['presets'] IS ANNOUNCER_PRESETS -- the four
+    (id, label) announcer pairs. Pinned because the module calls itself "the
+    single source of truth", which invites a reader to conclude kokoro
+    CHARACTERS have four voices; the real character catalog is the 179-row
+    voice bank. The list is right, the impression it gives is not.
+    """
+    from config import cast_pools
+
+    presets = cast_pools.VOICE_REGISTRY["kokoro"]["presets"]
+    assert presets == list(cast_pools.ANNOUNCER_PRESETS)
+    assert all(isinstance(p, tuple) and len(p) == 2 for p in presets)
+
+
+def test_the_engine_and_the_bank_draw_the_SAME_announcer():
+    """One pool, two draws was the defect. eng_kokoro used
+    Random(f"{seed}_kokoro_announcer") while the bank used
+    Random(sha1("kokoro_announcer_pick:<seed>")), so the ledger could name one
+    announcer and the render open another.
+    """
+    from nodes._otr_audio_engines.eng_kokoro import _pick_announcer_voice
+    from nodes._otr_voice_bank import announcer_voice_ref
+
+    for seed in (0, 7, 42, 284260917, 100003):
+        assert _pick_announcer_voice(seed) == announcer_voice_ref(
+            "kokoro", episode_seed=seed).voice_ref_id, seed
+
+
+def test_an_explicit_voice_override_still_wins():
+    from nodes._otr_audio_engines.eng_kokoro import _pick_announcer_voice
+
+    assert _pick_announcer_voice(42, voice_override="bm_george") == "bm_george"
+    assert _pick_announcer_voice(42, voice_override="random") in \
+        ["bm_george", "bm_fable", "bf_emma", "bf_lily"]
+
+
+def test_the_bank_failure_fallback_actually_runs(monkeypatch):
+    """The branch whose justification is "an engine must still be able to
+    speak" -- which shipped raising NameError on an undefined logger, because
+    nothing walked it. AST-valid, suite-green, broken.
+    """
+    from nodes._otr_audio_engines import eng_kokoro
+    from nodes._otr_voice_bank import VoiceBankError
+
+    def _boom(*_a, **_kw):
+        raise VoiceBankError("bank unreadable")
+
+    monkeypatch.setattr(eng_kokoro, "_pick_announcer_voice",
+                        eng_kokoro._pick_announcer_voice)
+    monkeypatch.setattr(
+        "nodes._otr_voice_bank.announcer_voice_ref", _boom)
+    got = eng_kokoro._pick_announcer_voice(42)
+    assert got in eng_kokoro.ANNOUNCER_VOICE_POOL, (
+        "the fallback must still yield a real pool voice")
+
+
+def test_a_missing_or_corrupt_bank_raises_the_TYPED_error(tmp_path):
+    """load_voice_bank's docstring promised VoiceBankError; raw
+    FileNotFoundError and JSONDecodeError used to escape it, so a caller that
+    correctly caught the documented type still died on the two most likely
+    real failures.
+    """
+    import pytest
+
+    from nodes._otr_voice_bank import VoiceBankError, load_voice_bank
+
+    with pytest.raises(VoiceBankError):
+        load_voice_bank(str(tmp_path / "does_not_exist.json"))
+
+    corrupt = tmp_path / "corrupt.json"
+    corrupt.write_text("{not valid json", encoding="utf-8")
+    with pytest.raises(VoiceBankError):
+        load_voice_bank(str(corrupt))
+
+
+def test_every_curated_announcer_is_actually_DRAW_ELIGIBLE():
+    """Membership is not eligibility. _seeded_preferred_announcer_voice_ref
+    narrows to rows tagged 'preferred_announcer', so untagging one shrinks the
+    audible pool to three while a pool-membership check stays green -- the
+    voice-pool-staleness class again.
+    """
+    from config import cast_pools
+    from nodes._otr_voice_bank import announcer_voice_ref, load_voice_bank
+
+    entries, _ = load_voice_bank()
+    curated = {vid for vid, _label in cast_pools.ANNOUNCER_PRESETS}
+    tagged = {
+        e.voice_ref_id for e in entries
+        if e.engine == "kokoro" and "announcer_voice" in tuple(e.roles or ())
+        and "preferred_announcer" in tuple(e.style_tags or ())}
+    assert tagged == curated, (
+        "curated announcers that are not preferred_announcer-tagged can never "
+        "be drawn: %s" % sorted(curated - tagged))
+
+    drawn = {announcer_voice_ref("kokoro", episode_seed=s).voice_ref_id
+             for s in range(80)}
+    assert drawn == curated, (
+        "the DRAWN pool %s does not match the curated pool %s"
+        % (sorted(drawn), sorted(curated)))

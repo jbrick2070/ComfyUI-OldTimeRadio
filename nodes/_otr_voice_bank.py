@@ -218,17 +218,32 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
     Validates every entry against ``voice_bank_entry_schema.json``, rejects
     duplicate ``voice_ref_id`` values, and caches by content sha. Raises
     :class:`VoiceBankError` on any malformed entry or duplicate id.
+
+    ALSO on an unreadable or unparseable file. That used to leak raw
+    ``FileNotFoundError`` / ``JSONDecodeError`` past this docstring's promise,
+    so a caller that correctly caught the documented ``VoiceBankError`` still
+    died on the two most likely real-world failures -- a missing bank and a
+    corrupt one. Owning the contract here means every consumer gets it, rather
+    than each one widening its own except clause and guessing at the list.
     """
     bank_path = path or _config_path(_BANK_FILENAME)
-    with open(bank_path, "r", encoding="utf-8") as fh:
-        text = fh.read()
+    try:
+        with open(bank_path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        raise VoiceBankError(
+            f"voice_reference_bank unreadable at {bank_path}: {exc}") from exc
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     cached = _BANK_CACHE.get(sha)
     if cached is not None:
         return cached
-    with open(_config_path(_SCHEMA_FILENAME), "r", encoding="utf-8") as fh:
-        schema = json.load(fh)
-    data = json.loads(text)
+    try:
+        with open(_config_path(_SCHEMA_FILENAME), "r", encoding="utf-8") as fh:
+            schema = json.load(fh)
+        data = json.loads(text)
+    except (OSError, ValueError) as exc:   # ValueError covers JSONDecodeError
+        raise VoiceBankError(
+            f"voice_reference_bank or its schema is unparseable: {exc}") from exc
     rows = data.get("voices") if isinstance(data, dict) else data
     if not isinstance(rows, list) or not rows:
         raise VoiceBankError("voice_reference_bank: 'voices' must be a non-empty list")

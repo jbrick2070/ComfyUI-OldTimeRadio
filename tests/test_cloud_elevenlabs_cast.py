@@ -193,3 +193,71 @@ def test_provider_voice_id_none_for_local_engine():
     # and the change is inert for the whole local lane.
     assert _resolve_provider_voice_id(
         "indextts2", {"char_id": "c02", "gender": "female"}, 1) is None
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-05 sprint (F): _resolve_provider_voice_id carried a THIRD private
+# copy of the gender-agnostic draw, keyed '_provid' where the clone-ref path
+# keyed '_anyref' -- same pool, same ordering, different suffix, so one
+# character could get two different voices depending on which lane rendered it.
+# The existing cloud tests all use male/female rows, so normal gender
+# assignment succeeds and this branch was never exercised at all.
+# ---------------------------------------------------------------------------
+def test_an_unservable_gender_resolves_a_provider_voice_through_the_shared_draw():
+    from nodes._otr_voice_bank import gender_agnostic_fallback_ref, load_voice_bank
+    from nodes._otr_voice_node_common import _resolve_provider_voice_id
+
+    entries, _ = load_voice_bank()
+    cloud = next((e.engine for e in entries if e.provider_voice_id), None)
+    if cloud is None:                                    # pragma: no cover
+        import pytest
+        pytest.skip("no provider-id rows in the shipped bank")
+
+    # gender the bank cannot serve -> the fallback branch, not the caster
+    row = {"char_id": "c02", "name": "RIVER", "gender": "other"}
+    got = _resolve_provider_voice_id(cloud, row, 424242)
+
+    expected_entry = gender_agnostic_fallback_ref(
+        tuple(e for e in entries if e.quality_tier != "reject"),
+        engine=cloud, char_id="c02", episode_seed=424242)
+    assert got == (getattr(expected_entry, "provider_voice_id", "") or None), (
+        "the provider path no longer draws through the shared selector")
+
+
+def test_the_provider_path_no_longer_draws_on_its_own_private_seed():
+    """The dropped '_provid' suffix, pinned against the OLD formula rather than
+    against itself.
+
+    The first version of this test called gender_agnostic_fallback_ref twice
+    with identical arguments and asserted the two agreed -- true of any pure
+    function, and green with the whole fix reverted. It tested nothing.
+    """
+    import random
+
+    from nodes._otr_voice_bank import gender_agnostic_fallback_ref, load_voice_bank
+    from nodes._otr_voice_node_common import _resolve_provider_voice_id
+
+    entries, _ = load_voice_bank()
+    bank = tuple(e for e in entries if e.quality_tier != "reject")
+    engine = next((e.engine for e in entries if e.provider_voice_id), None)
+    if engine is None:                                   # pragma: no cover
+        import pytest
+        pytest.skip("no provider-id rows in the shipped bank")
+
+    seed, cid = 424242, "c02"
+    row = {"char_id": cid, "name": "RIVER", "gender": "other"}
+
+    # what the RETIRED private formula would have picked
+    role_cands = [e for e in bank if e.engine == engine and "char_voice" in e.roles]
+    cands = sorted(role_cands or [e for e in bank if e.engine == engine],
+                   key=lambda e: e.voice_ref_id)
+    old = random.Random(f"{seed}_{cid}_provid").choice(cands)
+    new = gender_agnostic_fallback_ref(
+        bank, engine=engine, char_id=cid, episode_seed=seed)
+
+    assert old.voice_ref_id != new.voice_ref_id, (
+        "the two formulas happen to agree on this seed -- pick another, or "
+        "this test cannot detect a revert")
+    assert _resolve_provider_voice_id(engine, row, seed) == (
+        new.provider_voice_id or None), (
+        "the provider path is still drawing on its own private seed")
