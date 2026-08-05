@@ -252,6 +252,28 @@ by the OUTLINE (`OTR_LedgerScriptWriter.py:3948-3963` -> `:4129`), and beats do
 not exist until the outline returns -- so a sound world derived from
 beat-keyed windows is impossible. Build in THIS order, one green pushed chunk
 each:
+**PROGRESS 2026-08-04 evening: chunks 1 and 2 are DONE, QA'd and pushed.**
+Chunk 1 `fde181b3` + `3913bca6` + `0f30dd82`; chunk 2 `3f786344` + `455526ca`
++ `84025367`. Each went through a three-lane QA (codex `gpt-5.6-sol`, agy
+Gemini 3.6 Flash, Sonnet) with every claim driver-verified; the rounds found
+real defects each time -- a body leak through `asdict`, an identity-less
+document, a canon-palette splitter that cut derived worlds in the wrong
+places, and a shakespeare lane that silently got none of the fix.
+**PROVEN ON RENDERS:** three 320-word randomized-style legs published 3/3
+(`wuthering_heights_window`, `stolen_white_elephant`,
+`folger-twelfth-night:act2-scene5`), and they demonstrated the defect in
+production -- two unrelated works drew the SAME sound world, and a comic
+garden scene shipped with thunder over a heath. **CHUNK 3 IS NEXT.**
+
+**Carried into chunk 3 from the chunk-2 QA (do not lose):** snapshot replay
+has no whole-body carrier, so an adaptation lane replaying a frozen source
+falls back to the drawn palette and a live run and its replay produce
+different sound worlds. The tempting fix -- rebuild the document from the
+snapshot's `full_text` -- is WRONG and was rejected: that field is the
+truncated projection, so it would mint a document whose total-coverage
+guarantee describes a prefix. The correct fix is the snapshot-envelope
+extension already specified in 1(a) below.
+
 1. **Uncapped `SourceDocument` + a pre-outline `SourceOverview`** (r4): split
    the normalization owner, then derive deterministic COVERING windows with
    exact-span evidence for cast, setting, principal turns and ending. This is

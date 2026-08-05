@@ -3,6 +3,69 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-04 evening -- HEAD 84025367 (v2.0-alpha) -- WINDOW CODER (chunks 1+2 shipped, QA'd 3 ways, proven on renders)
+
+Did: built and shipped chunks 1 and 2 of the public_domain source grounding,
+  each through a three-lane QA, and proved chunk 1 on three published render
+  legs. SFX untouched and parked per the operator.
+
+- **Chunk 1** (`fde181b3`, QA fixes `3913bca6` + `0f30dd82`): the pipeline was
+  showing its pre-outline authors the first 12,000 CHARACTERS of a work that
+  can run 25,200 words -- roughly the first 8% -- while the pack ordered them
+  to carry the author's own world. `normalize_public_domain_body` is the new
+  uncapped owner; `canonicalize_public_domain_text` stays the legacy payload
+  projection and is documented as returning a prefix by design. `SourceDocument`
+  (complete body + sha256 + normalization version) and `SourceOverview`
+  (ordered gapless windows, total coverage ENFORCED, role-tagged evidence)
+  are transient plain slotted objects -- not dataclasses -- so `asdict`,
+  `astuple`, `vars` and pickle REFUSE rather than leak. That shape was earned:
+  the first fix used `repr=False`, which hides from display only, and because
+  an overview's windows tile the whole work `asdict(overview)` reconstructed
+  the entire body.
+- **Chunk 2** (`3f786344`, `455526ca`, QA fixes `84025367`): the adaptation
+  lanes' sound world was a cast-seed draw that reached the prompt grammar, the
+  meta stamp and the canon palette. `derive_source_sound_world` reads what the
+  work names, ordered by first appearance, model-free. The override lands in
+  `build_story_contract` BEFORE the grammar renders, so one value feeds all
+  three surfaces; the style PICK is untouched and pinned by test.
+- **The QA rounds earned their keep every time.** Codex and Sonnet
+  independently found the same three chunk-1 defects. Sonnet alone found two
+  chunk-2 defects: the canon `sound_palette` splitter takes commas only while
+  derived worlds join with `"; "` and carry internal commas (garbling
+  essentially every adaptation episode), and the SHAKESPEARE lane -- gated as
+  `adaptation` -- never passed a document, so it silently kept the drawn
+  palette while the code claimed to fix "the adaptation lanes". Both fixed.
+  Vocabulary defects found on real corpus text: `hall` was in both `court` and
+  `house` (17 of 39 firing works had no castle at all), and `train`/`whistle`
+  summoned a railway platform in Dumas' 1815 prison and in 18th-century piracy.
+- **Two rejections, with grounds.** Rebuilding the document from the
+  snapshot's `full_text` would mint a document whose coverage guarantee
+  describes a prefix -- the lie chunk 1 exists to kill; carried to chunk 3 as
+  the envelope extension. Synthesizing a grammar block for an unknown slug
+  would change live prompts to fix an edge `select_style` cannot produce.
+- **THE RENDERS ARE THE STORY.** Three 320-word randomized-visual-style legs,
+  box reset per section 4 (two leftover servers were holding port 8000, killed
+  selectively by PID), 3/3 published with `obs_publish OK` and assets on disk.
+  Leg 1 `wuthering_heights_window` (gemma-4, 186 MB, 23:56), leg 2
+  `stolen_white_elephant` (Mistral, 112 MB, 13:48), leg 3
+  `folger-twelfth-night:act2-scene5` (Mistral, 13:08). **Brontë's moors and a
+  Twain comic farce drew the IDENTICAL sound world**, and Malvolio finding a
+  forged letter in a garden shipped with "thunder over a heath, a raven, rain
+  on a castle wall". That is the defect in production, not in argument.
+- **The renders also found what no reviewer could:** for the Malvolio scene the
+  derivation returned NOTHING and fell back to neutral, because the scene opens
+  "In the garden... coming down this walk" and the vocabulary had no garden. It
+  was novel-shaped and missed the most common comedy setting there is.
+- Suite 8498 passed / 131 skipped / 1 xfailed (from 8398 at session start).
+  Bug Bible green throughout. No node, widget, link or schema touched; the
+  canonical workflow is byte-identical.
+
+Current step: **CHUNK 3** -- beat-keyed window selector, `SourceGrounding`
+  threading on every authoring route, typed failure boundaries + the
+  disposition table, and the snapshot-envelope extension carried from the
+  chunk-2 QA. Then ON DECK items 2-5.
+Not now: SFX (parked, operator will be in touch), D2, the verbatim executor.
+
 ## 2026-08-04 night -- HEAD 72bba32e+ (v2.0-alpha) -- WINDOW PLANNER (SFX parked; queue verified; FULL KIBITZ ARC on the plan)
 
 Did: took the operator's SFX doubt, confirmed the real coding queue against the
