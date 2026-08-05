@@ -11,63 +11,86 @@ went was four session batons, thirteen `SUPERSEDED` blocks, the closed
 (struck-through) bug rows, eight superseded validation receipts, and the
 window-letter table for slots that no longer exist.
 
-## ON DECK -- CONTINUITY CORRECTNESS (operator directive 2026-08-04 evening; supersedes the source-grounding sprint below as the active queue)
+## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
-**Story/script QUALITY is CLOSED** (see `CLAUDE.md`). These three tracks are CORRECTNESS
-defects and are the live work. Plans are BUILT and REVIEWED -- do not re-derive them:
-`kibitz-runs/2026-08-04-continuity-ultracode/opus_hardened_plans.json` (3 hardened plans)
-and `opus_critic.md` (cross-track order + cuts). Provenance: 3 Fable designs, 9 Fable
-adversarial lenses (41 fatal-flaw findings), 3 Opus hardens + 1 Opus critic.
+The continuity-correctness queue SHIPPED overnight 2026-08-04/05 (commits `1bdfaaa7`,
+`bd05f696`, `7e4a4c3c`, `89e82181`), full four-round kibitz arc on record at
+`kibitz-runs/2026-08-05-continuity-r3r4/`. Suite 8623 passed, Bug Bible 17 passed, two
+live legs RESULT SUCCESS + obs_publish OK. What follows is only what is NOT done.
 
-**THE MEASURED DEFECT:** across all 94 published adaptation ledgers, **44 of 188 character
-rows carry a gender that CONTRADICTS the shipped provenance sidecar -- 23% of every
-adaptation character ever shipped**, including MALVOLIO, MARIA, ROMEO, JULIET, MIRANDA,
-CELIA, ROSALIND and LEAR.
+### 1. The reference A/B still owes a verdict (the one real open item)
 
-**THE THING EVERY EARLIER ANALYSIS MISSED:** `slot.gender` is NOT a voice field. It feeds
-(a) the description LLM that writes `character_description` (`_otr_casting.py:777-785`),
-(b) the outline prompt (`OTR_LedgerScriptWriter.py:4144`), (c) the dialogue cast block
-(`_otr_line_composer.py:446`), and (d) the image prompt's gender anchor
-(`otr_meta_brief_image_prompt.py:78-90` prepends "adult man, "/"adult woman, "). So the
-gender fix changes the SCRIPT and the PORTRAIT too. Say so in the handoff when it lands --
-a reviewer diffing a script will otherwise think the closed quality directive was violated.
+The reference path is PROVEN WIRED, not proven EFFECTIVE. Live leg
+`signal_lost_lute_strings_fools_tongue_20260805_021040` shows three `scene_character`
+rows stamped `portrait_anchor_mode='reference_latent'`, and the two rows sharing char
+`c03` share one anchor -- so the engine declared the capability, the portrait row
+resolved, the file was on disk, and the anchor entered the cache key.
 
-**HARD ORDERING GATE:** the portrait-seed fix must NOT land on adaptation lanes before the
-gender pin. Today a mis-gendered MIRANDA gets three unrelated faces; after the portrait fix
-alone she gets ONE MALE face, seed-locked for the whole episode -- an intermittent defect
-converted into a confident permanent one.
+**What nobody has answered: does `z_image_turbo_nvfp4` actually ATTEND to the prepended
+reference, or does it accept and ignore it?** The architecture takes it with no missing
+weights (header probe: `cap_pad_token` and `x_pad_token` present, `siglip_embedder`
+absent), but graph shape cannot prove three faces became one. That needs:
+- a control arm with **`OTR_PORTRAIT_REFERENCE=0`**, on its own fresh server boot --
+  env vars cannot reach a resident ComfyUI process, and `OTRImageGenDispatcher` has no
+  `IS_CHANGED` to notice the flag, so the arms MUST NOT share a boot;
+- the control asserts `portrait_anchor_mode == 'seed'`, NOT `''`. The seed pin is still
+  enabled in that arm. Only setting BOTH `OTR_PORTRAIT_REFERENCE=0` and
+  `OTR_PORTRAIT_IDENTITY_SEED=0` yields `''`;
+- an operator eyeball on the two arms, which is the actual verdict.
 
-**SHIP ORDER (from the critic):**
-1. Track 3 Step 1 -- announcer unpin (independent, audible night one, touches no character seed)
-2. Track 1 Steps 1-4 -- roster module -> source_meta plumbing -> curated supplement -> pin
-   WITHOUT touching the allocator + no-rename exemption
-3. Track 1 Step 6 merged with Track 3 Step 7 (the `gender='other'` unservable path)
-4. Track 3 Steps 2 + 4 (speaker_id, tier floor = 2)
-5. Track 2 Steps 1-4 -- capture HEAD baselines AFTER Track 1 lands
-6. Track 2 Steps 5-7 + 9 (capability, cache-safe reference, z_image wiring, live A/B)
-7. Track 2 Step 8 (klein) ONLY if Step 9's A/B fails
+If the reference turns out to be a no-op, **Track 2 Step 8 (flux2_klein)** is the built
+answer -- klein is genuinely reference-trained and its weights are on disk. It is
+deliberately NOT built yet. Switching to it is a Director widget pick, not code.
 
-**HIGHEST VALUE / LOWEST RISK:** Track 2 Step 2+3 -- derive the `scene_character` seed from
-the character's OWN portrait draw. ~6 lines in one pure function, no engine wiring, no VRAM,
-no LLM, no widget, reversible by env var, and it fixes faces on EVERY lane including the
-invention lanes. Gated behind Track 1 on the adaptation lanes only.
+### 2. Operator calls nobody can make for you
 
-**CUT (do not build):** Track 3 Step 5 entirely -- kokoro char_voice is UNREACHABLE in
-production (`config/audio_engine_profiles.yaml:154` allows only `kokoro_builtin` while the
-shipped workflow runs `voice_bank='default'`). Also cut: timbre synonyms, the drift guard,
-and speculative klein wiring. DOWNGRADE Track 1 Step 5 (replay parity) to a `PROD_BUG_LOG`
-entry with its reproducing seed 424242 -- latent while node 80 runs indextts2.
+- **ARIEL and PUCK.** The curated supplement ships 10 entries and deliberately omits
+  these two: Folger's stage directions use "he" for both, but neither has a roster fact
+  and both are editorial. They stay on the roll, so the corpus gate asserts 40 of 42.
+  Say the word and they become 42.
+- **Tier floor 2 or 3.** Shipped at 2: it removes every 100% voice pin while 5 of 24
+  (engine x gender x timbre) combos still honour the requested timbre. Floor 3 also
+  removes them but leaves only 2 of 24 honouring timbre -- it buys spread by deleting the
+  dimension. `OTR_CAST_MIN_TIER_POOL=3` makes it a one-leg A/B, and the floor is folded
+  into the cast seed so the two settings can never both claim policy '3'.
+- **`num_characters` is still 2.** Every published adaptation ran 2, so a 7-speaker scene
+  loses five people. Correct gender for two survivors is still a truncated scene. This
+  collides with the count-match invariant at `OTR_LedgerScriptWriter.py:4119` and is its
+  own piece of work, not a tail of this one.
 
-**KEY CORRECTION to an earlier claim:** ANTIPHOLUS and BOTH DROMIOs are `gender='unknown'`
-in the sidecar. "You don't need to know which Dromio to know he's a man" is FALSE -- they
-need the curated supplement, not the join.
+### 3. Loose ends this build found and did NOT fix (deliberately out of scope)
 
-**MECHANISM WARNING:** do NOT feed pinned genders into `prior_genders`. Probed: that turns a
-coin flip into a GUARANTEED error. Recounting for unpinned slots also changes the writer's
-draw count and re-breaks replay parity. The correct design leaves `_plan_gender_distribution`
-completely untouched -- same count, same priors, same draws -- and OVERRIDES at pinned
-indices. Verified 200-400 seeds: pinned correct 200/200 where today is wrong 106/200,
-unpinned distribution unchanged, rng call count and post-call stream byte-identical.
+- **A third copy of the kokoro announcer pool** at `config/cast_pools.py:304-309`
+  (`ANNOUNCER_PRESETS`), feeding the legacy caster's `pick_announcer()` on a disjoint
+  rng. Its own comment already asks for the sync. The drift guard that would have caught
+  it was in the operator's cut list.
+- **`eng_kokoro`'s own announcer fallback** uses a DIFFERENT seed formula
+  (`Random(f"{episode_seed}_kokoro_announcer")`) than the bank's. Only reachable when
+  CastLock did not stamp, but it means two code paths can name two different announcers.
+- **`_resolve_provider_voice_id`** (`_otr_voice_node_common.py`) has its own
+  gender-agnostic anyref draw (seed suffix `_provid`) for cloud provider engines. It was
+  in nobody's inventory of unowned fallbacks. Left alone because its seed differs, so
+  merging it would re-baseline a live pick.
+- **The deterministic composer's path-guard exposure.** `compose_still_prompt` already
+  leads with the raw appearance, so a cast appearance containing `/` already kills that
+  beat's still today. Tonight's sanitize covers only the new LLM-path exposure. Needs its
+  own change with its own live evidence.
+
+### 4. Standing facts worth not re-deriving
+
+`slot.gender` is NOT a voice field. It feeds the description LLM
+(`_otr_casting.py:777`), the outline prompt (`OTR_LedgerScriptWriter.py:4144`), the
+dialogue cast block (`_otr_line_composer.py:446`) and the image prompt's gender anchor
+(`otr_meta_brief_image_prompt.py:78-90`). **The gender fix therefore changes scripts and
+portraits.** That is a downstream consequence of a correctness fix, not a violation of
+the closed story-quality directive -- exactly as "Malvolio speaks with a woman's voice"
+is a bug while rewriting his dialogue is not.
+
+Do NOT feed pinned genders into `prior_genders`, and do NOT re-call
+`_plan_gender_distribution` with a reduced count. Measured: `(1, ['male'])` returns
+female 400/400, and the shuffle's stream consumption varies with count (getrandbits
+0, 0, 3, 3, 9, 11 for counts 0..5). The shipped design overrides in place and leaves the
+allocator untouched.
 
 ## SUPERSEDED AS THE ACTIVE QUEUE -- the source-grounding sprint (chunks 1-3b shipped)
 
