@@ -58,6 +58,29 @@ def test_empty_body_is_refused_by_name():
         pd.normalize_public_domain_body("   \n\t ")
 
 
+def test_legacy_parity_at_max_chars_zero_still_raises():
+    # The pre-refactor function truncated FIRST and checked empty AFTER, so
+    # max_chars=0 raised. Splitting normalization out moved that check; it is
+    # restored, because a silent empty body is worse than a loud refusal.
+    with pytest.raises(pd.PublicDomainSourceRefError):
+        pd.canonicalize_public_domain_text("hello world", max_chars=0)
+
+
+def test_a_supplied_canonical_body_must_match_the_text():
+    # The normalize-once optimization must not let a caller pair a payload
+    # with a document built from different material.
+    with pytest.raises(pd.PublicDomainSourceRefError):
+        pd.source_document_from_text(
+            "the real source text", canonical_body="something else entirely")
+
+
+def test_a_matching_supplied_canonical_body_is_accepted():
+    text = "  The traveller   returned.  "
+    body = pd.normalize_public_domain_body(text)
+    doc = pd.source_document_from_text(text, canonical_body=body)
+    assert doc.canonical_body == body
+
+
 def test_normalization_is_idempotent():
     raw = "  The   traveller\n\nreturned.  "
     once = pd.normalize_public_domain_body(raw)
@@ -303,6 +326,162 @@ def test_logging_a_document_does_not_dump_the_body():
 def test_exception_formatting_does_not_dump_the_body():
     doc = _sentinel_doc()
     assert _SENTINEL not in str(ValueError(f"bad state: {doc!r}"))
+
+
+# ---------------------------------------------------------------------------
+# ...and structural serializers must REFUSE, not merely hide.
+# repr=False stops display only; asdict/astuple/vars/pickle ignore it, and an
+# overview's windows hold the whole body between them.
+# ---------------------------------------------------------------------------
+
+def test_structural_serializers_refuse_the_document():
+    import dataclasses
+    import pickle
+
+    doc = _sentinel_doc()
+    with pytest.raises(TypeError):
+        dataclasses.asdict(doc)
+    with pytest.raises(TypeError):
+        dataclasses.astuple(doc)
+    with pytest.raises(TypeError):
+        vars(doc)
+    with pytest.raises(osd.SourceDocumentError):
+        pickle.dumps(doc)
+
+
+def test_structural_serializers_refuse_the_overview():
+    import dataclasses
+    import pickle
+
+    overview = osd.build_source_overview(_sentinel_doc())
+    with pytest.raises(TypeError):
+        dataclasses.asdict(overview)
+    with pytest.raises(TypeError):
+        vars(overview)
+    with pytest.raises(osd.SourceDocumentError):
+        pickle.dumps(overview)
+
+
+def test_structural_serializers_refuse_a_span():
+    import dataclasses
+    import pickle
+
+    span = _sentinel_doc().span(0, 120, role="probe")
+    with pytest.raises(TypeError):
+        dataclasses.asdict(span)
+    with pytest.raises(osd.SourceDocumentError):
+        pickle.dumps(span)
+
+
+def test_the_transient_artifacts_are_immutable():
+    doc = _sentinel_doc()
+    with pytest.raises(osd.SourceDocumentError):
+        doc.canonical_body = "replaced"
+    with pytest.raises(osd.SourceDocumentError):
+        del doc.body_sha256
+
+
+# ---------------------------------------------------------------------------
+# identity cannot be skipped, and tiling is checked at the boundaries
+# ---------------------------------------------------------------------------
+
+def test_a_document_cannot_be_built_without_identity():
+    with pytest.raises(osd.SourceDocumentError):
+        osd.SourceDocument(canonical_body="x", body_sha256="",
+                           normalization_version="")
+
+
+def test_a_document_refuses_a_hash_that_is_not_its_own():
+    with pytest.raises(osd.SourceDocumentError):
+        osd.SourceDocument(
+            canonical_body="the traveller returned",
+            body_sha256=osd.canonical_body_sha256("a different body"),
+            normalization_version=osd.NORMALIZATION_VERSION,
+        )
+
+
+def test_coverage_check_catches_a_gap_that_a_length_sum_would_miss():
+    # A gap and an overlap of equal size cancel out in a total; the boundary
+    # check is what actually proves a tiling.
+    doc = _doc()
+    body = doc.canonical_body
+    gapped = (
+        osd.SourceSpan(0, 10, body[0:10]),
+        osd.SourceSpan(20, 20 + (len(body) - 10), body[20:20 + len(body) - 10]),
+    )
+    assert sum(w.char_count for w in gapped) == doc.char_count
+    with pytest.raises(osd.SourceDocumentError):
+        osd._assert_tiles(gapped, doc.char_count)
+
+
+def test_coverage_check_catches_an_overlap():
+    doc = _doc()
+    body = doc.canonical_body
+    overlapping = (
+        osd.SourceSpan(0, 100, body[0:100]),
+        osd.SourceSpan(50, len(body), body[50:]),
+    )
+    with pytest.raises(osd.SourceDocumentError):
+        osd._assert_tiles(overlapping, doc.char_count)
+
+
+def test_the_overview_version_moved_with_its_behaviour():
+    # Dialogue omission, balanced-span counting and the new receipt keys all
+    # changed selection/shape; a v1 receipt is not comparable to a v2 one.
+    assert osd.OVERVIEW_VERSION.endswith("v2")
+    assert osd.build_source_overview(_doc()).receipt()[
+        "overview_version"] == osd.OVERVIEW_VERSION
+
+
+# ---------------------------------------------------------------------------
+# quotation counted as balanced spans, not loose marks
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("prose", [
+    "the boys' club met weekly",
+    "'tis the season for it",
+    "back in the '90s it was so",
+    "he didn't know his father's name",
+    # Dialect g-dropping is ordinary in period prose and must not read as
+    # speech: the mark is word-final, so it can never open a quotation.
+    "he was walkin' and talkin' and thinkin' nothin' of it",
+    "the Joneses' dog and the Davises' cat",
+])
+def test_lone_apostrophes_are_not_quoted_speech(prose):
+    assert osd._count_quoted_spans(prose) == 0
+
+
+def test_apostrophes_do_not_pair_across_a_long_work():
+    # The first narrowing still let an opener in "'90s" pair with a closer in
+    # "boys'" many words later, so a possessive-heavy work scored as dialogue.
+    body = "the boys' club and the girls' team and the '90s besides. " * 60
+    assert osd._count_quoted_spans(body) == 0
+
+
+def test_dialect_narration_does_not_outrank_real_speech():
+    dialect = "he was walkin' and talkin' and thinkin' nothin' of it. " * 60
+    speech = '"Tell me," she said. "I must know." ' * 20
+    doc = osd.build_source_document(dialect + speech)
+    overview = osd.build_source_overview(doc, window_count=2)
+    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
+    assert dialogue is not None
+    assert '"' in dialogue.text
+
+
+@pytest.mark.parametrize("speech", [
+    '"Story!" cried the Editor.',
+    "'Tell me,' she said.",
+    '“Curly quotes count,” he said.',
+])
+def test_balanced_quotations_are_counted(speech):
+    assert osd._count_quoted_spans(speech) >= 1
+
+
+def test_a_possessive_heavy_work_yields_no_dialogue_evidence():
+    doc = osd.build_source_document(
+        "the boys' club and the girls' team and the '90s besides. " * 60)
+    overview = osd.build_source_overview(doc, window_count=4)
+    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
 
 
 # ---------------------------------------------------------------------------

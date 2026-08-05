@@ -360,9 +360,16 @@ def normalize_public_domain_body(text: Any) -> str:
 
 
 def _project_to_payload_window(body: str, *, max_chars: int = 12000) -> str:
-    """Cap an already-normalized body for the legacy seven-key payload."""
+    """Cap an already-normalized body for the legacy seven-key payload.
+
+    The empty check is at the END, matching the pre-refactor function: with
+    ``max_chars=0`` truncation itself produces an empty result, and the
+    legacy behaviour was to raise rather than hand back an empty body.
+    """
     if len(body) > max_chars:
-        return body[:max_chars].rsplit(" ", 1)[0].rstrip() or body[:max_chars]
+        body = body[:max_chars].rsplit(" ", 1)[0].rstrip() or body[:max_chars]
+    if not body:
+        raise PublicDomainSourceRefError("public-domain source text is empty")
     return body
 
 
@@ -378,19 +385,35 @@ def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str
         normalize_public_domain_body(text), max_chars=max_chars)
 
 
+def _canonical_body_for(text: Any, canonical_body: str | None) -> str:
+    """Return the canonical body, PROVING a supplied one derives from ``text``.
+
+    The normalize-once optimization hands the same body to the payload
+    projection and to the document. Accepting it on trust would let a caller
+    pair a payload with a document built from different material -- offsets
+    would index into a body the episode never used. Cheap insurance: verify.
+    """
+    derived = normalize_public_domain_body(text)
+    if canonical_body is None:
+        return derived
+    if canonical_body != derived:
+        raise PublicDomainSourceRefError(
+            "supplied canonical_body does not match the normalization of "
+            "text; the payload and the source document would disagree"
+        )
+    return canonical_body
+
+
 def source_document_from_text(
     text: Any, *, source_ref: str = "", canonical_body: str | None = None,
 ) -> "_osd.SourceDocument":
     """Build the transient uncapped document for a public-domain source.
 
     ``canonical_body`` accepts an already-normalized body so a fetch does not
-    re-run the regexes over a large work.
+    re-run the regexes over a large work; it is verified against ``text``.
     """
-    body = (
-        canonical_body if canonical_body is not None
-        else normalize_public_domain_body(text)
-    )
-    return _osd.build_source_document(body, source_ref=source_ref)
+    return _osd.build_source_document(
+        _canonical_body_for(text, canonical_body), source_ref=source_ref)
 
 
 def payload_from_manifest_unit(
@@ -408,11 +431,8 @@ def payload_from_manifest_unit(
     """
     source = resolved.source
     unit = resolved.unit
-    body = (
-        canonical_body if canonical_body is not None
-        else normalize_public_domain_body(text)
-    )
-    full_text = _project_to_payload_window(body)
+    full_text = _project_to_payload_window(
+        _canonical_body_for(text, canonical_body))
     excerpt = full_text[:excerpt_chars].rsplit(" ", 1)[0].rstrip() or full_text[:excerpt_chars]
     payload = {
         "headline": f"{source['title']} - {unit['label']}",
