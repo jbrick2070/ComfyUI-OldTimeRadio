@@ -32,11 +32,6 @@ try:
     from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
     from ._otr_repair_prompts import make_dispatching_repair_factory
-    from ._otr_content_safety import (
-        apply_safety_cleanup,
-        format_safety_hits,
-        scan_spoken_ledger,
-    )
     from ._otr_script_prep import clean_spoken_text
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import (
@@ -77,11 +72,6 @@ except ImportError:  # pragma: no cover
     from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
-    from _otr_content_safety import (  # type: ignore
-        apply_safety_cleanup,
-        format_safety_hits,
-        scan_spoken_ledger,
-    )
     from _otr_script_prep import clean_spoken_text  # type: ignore
     from _otr_text_metrics import (  # type: ignore
         canonical_word_count,
@@ -2641,19 +2631,11 @@ def _validate_p5_structure(
             )
             if finding is not None:
                 findings.append(finding)
-        safety_hits = scan_spoken_ledger({
-            "lines": [
-                {
-                    "line_id": line.line_id,
-                    "speaker_role": line.speaker_role,
-                    "skip": line.skip,
-                    "text": line.text,
-                }
-                for line in script.lines
-            ]
-        })
-        if safety_hits:
-            findings.append("spoken safety: " + format_safety_hits(safety_hits))
+        # The "spoken safety" finding that used to be appended here was DELETED
+        # 2026-08-05 (operator directive: no content guardrails on generated
+        # episodes). It made a P5 draft fail validation -- and therefore burn a
+        # rung of the retry ladder -- for using a word from the profanity /
+        # weapon / sexual list. Structural findings above are untouched.
         if findings:
             return "; ".join(findings)
     except ScifiCodexError as exc:
@@ -2695,16 +2677,8 @@ def _p5_raw_spoken_findings(
         )
         if finding is not None:
             findings.append(finding)
-        safety_hits = scan_spoken_ledger({
-            "lines": [{
-                "line_id": line_id,
-                "speaker_role": role,
-                "skip": False,
-                "text": str(row.text or ""),
-            }]
-        })
-        if safety_hits:
-            findings.append("spoken safety: " + format_safety_hits(safety_hits))
+        # Per-row "spoken safety" finding DELETED 2026-08-05 (operator
+        # directive). Structural findings above are untouched.
     return findings
 
 
@@ -2712,39 +2686,24 @@ def _apply_script_safety_cleanup(
     script: ScriptArtifactV4,
     technical_fn: GenerateFn,
 ) -> "tuple[ScriptArtifactV4, dict[str, Any]]":
-    projection: "dict[str, Any]" = {
-        "lines": [
-            {
-                "line_id": line.line_id,
-                "speaker_role": line.speaker_role,
-                "skip": line.skip,
-                "text": line.text,
-            }
-            for line in script.lines
-        ]
+    """RETIRED 2026-08-05. Returns the script UNCHANGED with a retired receipt.
+
+    This ran a same-story LLM cleanup over the accepted P5 script and then
+    RAISED ``CodexSpokenTextError`` if any word from the profanity / weapon /
+    sexual list survived -- a terminal content failure inside the codex lane,
+    on top of the four the freeze path used to carry. Removed by operator
+    directive: no content guardrails on generated episodes.
+
+    The receipt is still returned and still stamped to
+    ``lane_meta["safety_cleanup"]`` by the caller, because a ripped pass may
+    not leave an unowned ledger field.
+    """
+    del technical_fn
+    return script, {
+        "status": "retired_no_content_policy",
+        "reason": "content_guardrails_removed_by_operator_directive",
+        "patch_count": 0,
     }
-    receipt = apply_safety_cleanup(projection, technical_fn)
-    residual = scan_spoken_ledger(projection)
-    if residual:
-        raise CodexSpokenTextError(
-            "terminal spoken-safety cleanup failed: "
-            + format_safety_hits(residual)
-        )
-    text_by_id = {
-        str(row["line_id"]): str(row["text"])
-        for row in projection["lines"]
-    }
-    if all(
-        line.skip or text_by_id.get(line.line_id) == line.text
-        for line in script.lines
-    ):
-        return script, receipt
-    return script.model_copy(update={
-        "lines": [
-            line.model_copy(update={"text": text_by_id[line.line_id]})
-            for line in script.lines
-        ]
-    }), receipt
 
 
 def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: ScriptArtifactV4, meta: MutableMapping[str, Any]) -> dict[str, str]:

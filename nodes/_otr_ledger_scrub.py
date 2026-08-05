@@ -1,8 +1,10 @@
 """Final deterministic ledger scrub.
 
-This module owns only JSON/ledger shape, exact transport cleanup, cast binding,
-and the shared narrow spoken-safety scan. It deliberately has no word-count,
-style, craft, visual-vocabulary, name-guessing, or story-quality policy.
+This module owns only JSON/ledger shape, exact transport cleanup and cast
+binding. The spoken-safety scan it used to own was removed 2026-08-05 by
+operator directive (no content guardrails on generated episodes); it has no
+word-count, style, craft, visual-vocabulary, name-guessing, content, or
+story-quality policy.
 """
 from __future__ import annotations
 
@@ -10,7 +12,6 @@ from dataclasses import dataclass, field
 import json
 from typing import Any, Dict, List, Optional
 
-from ._otr_content_safety import scan_spoken_ledger
 from ._otr_text_metrics import set_line_text_metrics
 
 
@@ -189,7 +190,7 @@ def _shape_findings(ledger: Any) -> list[ScrubFinding]:
 
 
 def scrub_ledger(ledger: Dict[str, Any]) -> ScrubResult:
-    """Normalize exact transport wrappers, then validate structure and safety."""
+    """Normalize exact transport wrappers, then validate structure."""
     findings = _shape_findings(ledger)
     if any(f.code in {"json_invalid", "ledger_shape"} for f in findings):
         return ScrubResult("FAIL", ledger, findings=findings)

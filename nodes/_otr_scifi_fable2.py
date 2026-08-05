@@ -45,11 +45,6 @@ try:
         structured_call,
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
-    from ._otr_content_safety import (
-        format_safety_hits,
-        propose_safety_patches,
-        scan_spoken_ledger,
-    )
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import ProviderCapacityMessages
     from ._otr_scifi_p0_contract import (
@@ -72,11 +67,6 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         structured_call,
     )
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
-    from _otr_content_safety import (  # type: ignore
-        format_safety_hits,
-        propose_safety_patches,
-        scan_spoken_ledger,
-    )
     from _otr_text_metrics import (  # type: ignore
         canonical_word_count,
         set_line_text_metrics,
@@ -2624,77 +2614,18 @@ def _apply_fable_safety_cleanup(
     add("coda", "announcer", parsed.coda)
     add("news_read", "announcer", treatment.news_close_read)
 
-    initial_hits = scan_spoken_ledger(projection)
-    if not initial_hits:
-        return raw_source, parsed, treatment, {
-            "status": "clean", "hits": [], "patch_count": 0,
-        }
-    patches, receipt = propose_safety_patches(projection, technical_fn)
-    if not patches:
-        raise Fable2AuditError(
-            "safety_cleanup",
-            "same-story cleanup could not resolve: "
-            + format_safety_hits(initial_hits),
-        )
-    for row in projection["lines"]:
-        if row["line_id"] in patches:
-            set_line_text_metrics(row, patches[row["line_id"]])
-    residual = scan_spoken_ledger(projection)
-    if residual:
-        raise Fable2AuditError(
-            "safety_cleanup",
-            "explicit spoken-safety terms remain: "
-            + format_safety_hits(residual),
-        )
-    text_by_id = {
-        str(row["line_id"]): str(row["text"])
-        for row in projection["lines"]
+    # Same-story SAFETY CLEANUP RETIRED 2026-08-05 (operator directive: no
+    # content guardrails on generated episodes). This scanned the projected
+    # spoken rows, asked the model to rewrite any that matched the profanity /
+    # weapon / sexual list, and raised Fable2AuditError when a term survived --
+    # two terminal content failures inside the fable2 lane. The script is now
+    # returned exactly as written, and the receipt keeps its established shape
+    # so the caller's ledger field never loses a value.
+    return raw_source, parsed, treatment, {
+        "status": "retired_no_content_policy",
+        "hits": [],
+        "patch_count": 0,
     }
-
-    patched_news = text_by_id["news_read"]
-    patched_treatment = treatment
-    if patched_news != treatment.news_close_read:
-        patched_treatment = treatment.model_copy(
-            update={"news_close_read": patched_news}
-        )
-
-    rendered = [f"TITLE: {parsed.title}", f"MUSIC: {parsed.music_open}"]
-    rendered.extend(
-        f"{ANNOUNCER_NAME}: {text_by_id[f'intro_{index}']}"
-        for index, _text in enumerate(parsed.announcer_intro)
-    )
-    inter_by_scene: "dict[int, list[str]]" = {}
-    for scene_after, cue in parsed.music_inter:
-        inter_by_scene.setdefault(scene_after, []).append(cue)
-    for scene in parsed.scenes:
-        rendered.append(f"SCENE {scene.n}: {scene.setting}")
-        rendered.extend(
-            f"{line.speaker}: {text_by_id[f'scene_{scene.n}_{index}']}"
-            for index, line in enumerate(scene.lines)
-        )
-        rendered.extend(
-            f"MUSIC: {cue}" for cue in inter_by_scene.get(scene.n, [])
-        )
-    rendered.extend(
-        f"{ANNOUNCER_NAME}: {text_by_id[f'outro_{index}']}"
-        for index, _text in enumerate(parsed.announcer_outro)
-    )
-    rendered.extend([
-        f"CODA: {text_by_id['coda']}",
-        f"MUSIC: {parsed.music_close}",
-        "END.",
-    ])
-    patched_source = "\n".join(rendered)
-    patched_parsed, defects = parse_fable2_markup(
-        patched_source,
-        [shape.name for shape in patched_treatment.cast_shapes],
-    )
-    if patched_parsed is None:
-        raise Fable2AuditError(
-            "safety_cleanup",
-            "same-story safety patch broke markup: " + render_defects(defects),
-        )
-    return patched_source, patched_parsed, patched_treatment, receipt
 
 
 # ---------------------------------------------------------------------------
@@ -2929,13 +2860,9 @@ def run_scifi_fable2_episode(
     )
     f2 = _fable2_meta(led)
     f2["delivery_telemetry"] = delivery
-    residual = scan_spoken_ledger(led.data)
-    if residual:
-        raise Fable2AuditError(
-            "safety_scan",
-            "explicit spoken-safety terms remain: "
-            + format_safety_hits(residual),
-        )
+    # Terminal "safety_scan" over the assembled ledger DELETED 2026-08-05
+    # (operator directive). It was the last of the fable2 lane's content
+    # refusals -- a fully assembled episode thrown away for a word.
     f2["pass_receipts"] = receipts
     led.save()
     f2 = _fable2_meta(led)

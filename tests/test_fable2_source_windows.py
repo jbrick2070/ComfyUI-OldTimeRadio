@@ -698,7 +698,9 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         "stamp_actual",
         lambda *_args, **_kwargs: {"actual_words": 5},
     )
-    monkeypatch.setattr(F2, "scan_spoken_ledger", lambda _data: [])
+    # (The `scan_spoken_ledger` stub that used to sit here is gone: the fable2
+    # lane's terminal spoken-safety scan was removed 2026-08-05 by operator
+    # directive, so there is no longer a symbol on F2 to neutralize.)
 
     parts = F2.run_scifi_fable2_episode(
         payload=payload,

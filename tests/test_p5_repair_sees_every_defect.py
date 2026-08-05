@@ -210,8 +210,13 @@ def test_validate_p5_structure_reports_every_offending_line(monkeypatch):
     assert "l001: spoken text is production markup" in error
     assert "l003: spoken text starts with a role label" in error
     assert "l004: spoken text is empty" in error
-    assert "l005: weapon='gun'" in error
-    assert "l006: profanity='damn'" in error
+    # Content findings RETIRED 2026-08-05 (operator directive). The structural
+    # defects above still report; the words do not. Inverted rather than
+    # deleted so a re-armed content check fails here.
+    assert "weapon" not in error
+    assert "profanity" not in error
+    assert "l005" not in error
+    assert "l006" not in error
     assert "l002" not in error
 
 
@@ -299,10 +304,11 @@ def test_raw_scan_reports_every_offending_row():
         "l001": "character", "l002": "character", "l003": "announcer",
     })
     findings = lane._p5_raw_spoken_findings(draft, score, _cast_stub())
+    # "spoken safety: l003: weapon='gun'" no longer appears -- content findings
+    # were retired 2026-08-05. l003 is otherwise a clean line, so it drops out.
     assert findings == [
         "l001: spoken text is production markup",
         "l002: spoken text starts with a role label",
-        "spoken safety: l003: weapon='gun'",
     ]
 
 
@@ -367,7 +373,9 @@ def test_compile_refusal_carries_the_markup_findings_with_it(monkeypatch):
     assert error is not None
     assert "do not exactly cover the accepted graph" in error
     assert "l001: spoken text is production markup" in error
-    assert "l001: weapon='gun'" in error
+    # The word inside the markup is no longer a second finding (content
+    # findings retired 2026-08-05); the MARKUP finding is what must ride along.
+    assert "weapon" not in error
 
 
 def test_compile_refusal_alone_stays_bare_when_the_rows_are_clean(monkeypatch):
@@ -431,13 +439,17 @@ def test_cleanup_empty_surface_runs_real_p5_reauthor_rung():
     assert attempts[0]["error_type"] == "PostValidationError"
 
 
-def test_unsafe_p5_candidate_is_abandoned_for_fresh_divergent_fiction(
+def test_defective_p5_candidate_is_abandoned_for_fresh_divergent_fiction(
         monkeypatch):
     monkeypatch.setattr(lane, "_poll_processing_interrupt", lambda: None)
     rejected = lane.ScriptTextDraftV4(
         lines=[{
             "line_id": "l001",
-            "text": "REJECTED_PROSE A gun waits beside the receiver.",
+            # Trigger moved from a content term to production markup
+            # 2026-08-05: content is no longer a defect, but "abandon the
+            # rejected candidate and write fresh divergent fiction" is still
+            # the behavior under test.
+            "text": "(SFX: REJECTED_PROSE static over the receiver)",
         }],
     ).model_dump_json()
     accepted_text = (

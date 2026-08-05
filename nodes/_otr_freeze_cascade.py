@@ -652,38 +652,34 @@ def _build_terminal_skip_disposition(
 
 
 def _run_inline_safety_cleanup(generate_fn, led) -> dict[str, Any]:
-    """Run one atomic safety-only cleanup over the accepted inline story."""
-    ledger_data = led.data
-    started = _isoformat_utc_now()
-    hash_before = _hash_lines_text(ledger_data)
-    try:
-        from ._otr_content_safety import apply_safety_cleanup
-        receipt = apply_safety_cleanup(ledger_data, generate_fn)
-    except Exception as exc:
-        receipt = {
-            "status": "cleanup_failed",
-            "patch_count": 0,
-            "error": f"{type(exc).__name__}: {exc}"[:600],
-        }
+    """RETIRED 2026-08-05. Stamps the phase; edits nothing.
+
+    This used to run one atomic safety-only patch set over the accepted inline
+    story -- rewriting a delivered spoken row whose words matched the
+    profanity / weapon / sexual list. It is gone by operator directive: no
+    content guardrails on generated episodes, and the inline lanes get the same
+    treatment as the adaptation lanes.
+
+    The PHASE is not deleted along with the pass. ``same_story_safety_cleanup``
+    is a declared cascade phase with a registry entry, a telemetry group and a
+    ledger field that two fable2 artifact tests assert on, so it keeps
+    stamping -- with a retired status and zero edits -- exactly the way the
+    producer-owned branch already stamps its not-applicable receipt. A ripped
+    pass may not leave an unowned field.
+    """
+    del generate_fn
     ledger_data = led.data
     meta = ledger_data.setdefault("meta", {})
+    receipt = {
+        "status": "retired_no_content_policy",
+        "reason": "content_guardrails_removed_by_operator_directive",
+        "patch_count": 0,
+    }
     meta["same_story_safety_cleanup"] = dict(receipt)
-    failures = []
-    if receipt.get("status") in {"cleanup_failed", "apply_failed"}:
-        failures.append({
-            "line_id": "__safety_cleanup__",
-            "reason": str(receipt.get("error") or receipt.get("status")),
-        })
-    _stamp_phase_record(
+    _stamp_stub_or_skipped_phase(
         ledger_data,
         phase_name="same_story_safety_cleanup",
-        text_hash_before=hash_before,
-        text_hash_after=_hash_lines_text(ledger_data),
-        started_at=started,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=int(receipt.get("patch_count") or 0),
-        edits_applied=int(receipt.get("patch_count") or 0),
-        failures=failures,
+        reason="retired_no_content_policy",
     )
     return dict(receipt)
 

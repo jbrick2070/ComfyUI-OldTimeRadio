@@ -743,9 +743,20 @@ def test_post_safety_structure_drift_fails_before_assembly(monkeypatch, tmp_path
     assert state["assemble_calls"] == 0
 
 
-def test_post_acceptance_spoken_safety_residual_fails_before_assembly(
+def test_post_acceptance_content_no_longer_fails_before_assembly(
     monkeypatch, tmp_path,
 ):
+    """Inverted 2026-08-05: content drift after acceptance is not terminal.
+
+    This used to assert that a weapon word appearing in the accepted P5 script
+    raised CodexSpokenTextError from the lane's own safety cleanup, BEFORE
+    assembly, with the safety writer unavailable. That cleanup is retired by
+    operator directive, so the same drift now flows through to assembly.
+
+    Kept inverted rather than deleted so a re-armed lane-level content refusal
+    fails here. Note the safety writer is still made unavailable: the point is
+    that its absence can no longer matter.
+    """
     def inject_post_acceptance_drift(
         script: lane.ScriptArtifactV4,
     ) -> lane.ScriptArtifactV4:
@@ -758,17 +769,14 @@ def test_post_acceptance_spoken_safety_residual_fails_before_assembly(
         raise RuntimeError("safety writer unavailable")
 
     state: dict[str, Any] = {}
-    with pytest.raises(
-        lane.CodexSpokenTextError,
-        match="terminal spoken-safety cleanup failed",
-    ):
-        _run_lane(
-            monkeypatch,
-            tmp_path,
-            transform_script=inject_post_acceptance_drift,
-            technical_generator=unavailable,
-            state=state,
-        )
+    _run_lane(
+        monkeypatch,
+        tmp_path,
+        transform_script=inject_post_acceptance_drift,
+        technical_generator=unavailable,
+        state=state,
+    )
 
     assert state["p3_calls"] == state["p5_calls"] == 1
-    assert state["assemble_calls"] == 0
+    assert state["assemble_calls"] == 1, (
+        "the episode must now reach assembly instead of being refused")
