@@ -279,3 +279,58 @@ def test_outline_resolver_call_not_swallowed():
         f"_otr_outline.py are wrapped in try/except -- the swallow is a "
         f"hidden fallback; resolver/pack errors must fail the episode loud"
     )
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-05: the 08-03 guardrail rip deleted the list item "blood, guns,
+# knives, and graphic violence" but left its separating comma standing in front
+# of the full stop, so FOUR live prompt strings ended mid-list --
+# "...unrelated framing story, changed ending,." A model reads these on every
+# fidelity episode, and a sentence that stops at a comma reads as a truncated
+# instruction. Both adaptation packs, both prompt stages each.
+# ---------------------------------------------------------------------------
+def _pack_files():
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent / "nodes" / "story_packs"
+    return sorted(root.glob("*/*.json"))
+
+
+def test_no_prompt_stage_ends_a_sentence_on_a_comma():
+    """Sweeps EVERY stage of EVERY pack, not just the four known sites --
+    otherwise the next clause removal reintroduces exactly this.
+    """
+    import json
+
+    offenders = []
+    for path in _pack_files():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        stages = data.get("prompt_stages")
+        if not isinstance(stages, dict):
+            continue
+        for stage, text in stages.items():
+            if not isinstance(text, str):
+                continue
+            if ",." in text:
+                i = text.index(",.")
+                offenders.append(
+                    "%s::%s ...%s" % (path.name, stage, text[max(0, i - 60):i + 2]))
+    assert not offenders, (
+        "prompt stage ends a sentence on a dangling comma:\n  "
+        + "\n  ".join(offenders))
+
+
+def test_the_packs_are_still_valid_json_with_prompt_stages():
+    """Guards the sweep above: if the packs stopped parsing, or stopped
+    carrying prompt_stages, the sweep would pass by finding nothing.
+    """
+    import json
+
+    files = _pack_files()
+    assert files, "no story packs found -- the sweep would be vacuous"
+    staged = 0
+    for path in files:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data.get("prompt_stages"), dict) and data["prompt_stages"]:
+            staged += 1
+    assert staged >= 2, f"only {staged} pack(s) carry prompt_stages"
