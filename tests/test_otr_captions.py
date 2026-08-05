@@ -147,18 +147,21 @@ def _dialogue_bodies(ass_text):
     return out
 
 
-def test_caption_shows_only_what_the_voice_speaks(tmp_path):
-    """A caption must never show words TTS strips before it speaks.
+def test_caption_keeps_performance_direction_on_purpose(tmp_path):
+    """Captions burn the RAW line, so stage direction is VISIBLE by design.
 
-    The ledger keeps each line as WRITTEN -- parenthetical performance
-    direction included -- because that direction is what a later motion /
-    shot-direction pass reads. TTS has always voiced clean_spoken_text(text);
-    the caption builder used to burn the raw string, so the viewer read stage
-    direction nobody said (measured 2026-08-05 over the shipped .ass files:
-    255 cues across 95 episodes).
+    Operator ruling 2026-08-05: "it's a nice easter egg as long as it's built
+    and we know and it's documented." Caption and audio diverge deliberately --
+    TTS strips the parenthetical via clean_spoken_text, the caption does not.
+    Measured before the ruling: 255 such cues across 95 of 915 shipped episodes.
+
+    This test exists so the divergence cannot be "corrected" by accident by a
+    later reader who assumes a caption must equal the spoken surface. If you
+    are here because you just made captions match TTS, that is a behavior
+    change the operator has to approve, not a bug fix.
     """
     led = {
-        "episode_id": "spoken_surface_ep",
+        "episode_id": "direction_ep",
         "cast": [{"char_id": "c02", "name": "NORA DRAKE"}],
         "lines": [
             {"char_id": "c02", "speaker_role": "character", "start_s": 1.0,
@@ -167,7 +170,7 @@ def test_caption_shows_only_what_the_voice_speaks(tmp_path):
                      "You feel that? The floor is giving."},
         ],
     }
-    p = tmp_path / "spoken_surface_ep_ledger.json"
+    p = tmp_path / "direction_ep_ledger.json"
     p.write_text(json.dumps(led), encoding="utf-8")
 
     out, report = cap.build_ass_from_ledger(p, style="sdh_standard")
@@ -176,50 +179,44 @@ def test_caption_shows_only_what_the_voice_speaks(tmp_path):
 
     assert "You feel that?" in bodies, "the spoken dialogue must survive"
     assert "NORA DRAKE:" in bodies, "the speaker label must survive"
-    assert "slow drag" not in bodies, (
-        "stage direction reached the caption -- TTS strips it, so the viewer "
-        "would read words the voice never speaks")
-    assert "(" not in bodies and ")" not in bodies
+    assert "slow drag" in bodies, (
+        "performance direction must stay VISIBLE -- operator ruling 2026-08-05")
 
 
-def test_caption_drops_a_line_that_is_entirely_direction(tmp_path):
-    """A line with nothing sayable must produce NO cue at all.
+def test_tts_and_caption_surfaces_differ_by_design(tmp_path):
+    """Pin the divergence itself: what is SPOKEN is a strict subset of what is READ.
 
-    Ten shipped cues were entirely stage direction -- a caption on screen with
-    no spoken words under it. One of them put a Project Gutenberg source URL
-    in front of the viewer, which is why this is a publish-facing defect and
-    not a matter of taste.
+    The ledger stores one field, `text`, holding the line as written. TTS voices
+    clean_spoken_text(text); the caption burns text. The same raw string also
+    feeds the still-image prompt (otr_meta_brief_image_prompt.py:1313), which is
+    why the direction stays in the ledger rather than being stripped upstream.
     """
+    from _otr_script_prep import clean_spoken_text
+
+    raw = "(defiant) The train doesn't wait for anyone, Sully."
+    spoken = clean_spoken_text(raw)
+
+    assert spoken == "The train doesn't wait for anyone, Sully."
+    assert "defiant" not in spoken, "TTS must not speak the direction"
+
     led = {
-        "episode_id": "silent_cue_ep",
-        "cast": [
-            {"char_id": "c01", "name": "GULLIVER REEVES"},
-            {"char_id": "c02", "name": "ALICE PALMER"},
-        ],
+        "episode_id": "divergence_ep",
+        "cast": [{"char_id": "c02", "name": "PHYLLIS TERWILLIGER"}],
         "lines": [
-            {"char_id": "c01", "speaker_role": "character", "start_s": 1.0,
-             "dur_s": 4.0,
-             "text": "(pocketing his lighter, then heads for the door)"},
-            {"char_id": "c02", "speaker_role": "character", "start_s": 6.0,
-             "dur_s": 4.0,
-             "text": "(https://www.gutenberg.org/cache/epub/1342/pg1342.txt)"},
-            {"char_id": "c02", "speaker_role": "character", "start_s": 11.0,
-             "dur_s": 4.0, "text": "Rufus, look at the plate."},
+            {"char_id": "c02", "speaker_role": "character", "start_s": 1.0,
+             "dur_s": 6.0, "text": raw},
         ],
     }
-    p = tmp_path / "silent_cue_ep_ledger.json"
+    p = tmp_path / "divergence_ep_ledger.json"
     p.write_text(json.dumps(led), encoding="utf-8")
 
     out, report = cap.build_ass_from_ledger(p, style="sdh_standard")
     assert out is not None, report
-    bodies = _dialogue_bodies(Path(out).read_text(encoding="utf-8"))
+    bodies = " ".join(_dialogue_bodies(Path(out).read_text(encoding="utf-8")))
 
-    assert len(bodies) == 1, (
-        "only the one line with spoken words may become a cue, got %r" % bodies)
-    assert "Rufus, look at the plate." in bodies[0]
-    joined = " ".join(bodies)
-    assert "gutenberg" not in joined.lower(), "a source URL reached the screen"
-    assert "pocketing" not in joined
+    assert "defiant" in bodies, "the caption keeps what TTS drops -- by design"
+    for word in spoken.split():
+        assert word in bodies, "every spoken word must also be readable"
 
 
 if __name__ == "__main__":

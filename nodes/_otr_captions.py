@@ -16,11 +16,28 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
     character. ``_SPEECH_ROLES`` captions the latter two, so the older
     "sparse bracketed ``[STATIC HISS]`` cue" note described a lane that no
     longer exists.
-  * A caption shows the SPOKEN surface -- ``clean_spoken_text(text)``, the same
-    stripper the TTS forward runs. The ledger deliberately keeps each line as
-    written, parenthetical performance direction included, so a later motion /
-    shot-direction pass has that material; but direction is acted, not said, and
-    a viewer must never read words the voice does not speak.
+  * PERFORMANCE DIRECTION IS SHOWN ON PURPOSE (operator ruling 2026-08-05).
+    A caption burns the RAW ledger line, so a parenthetical like
+    ``(forcefully winding the clock)`` appears on screen even though the voice
+    never speaks it -- TTS independently strips it via ``clean_spoken_text``
+    (``_otr_script_prep.py:21``). Caption and audio therefore diverge BY DESIGN;
+    measured at 255 cues across 95 of 915 shipped episodes. The operator's call:
+    "it's a nice easter egg as long as it's built and we know and it's
+    documented." This is that documentation, and
+    ``tests/test_otr_captions.py`` pins it so the divergence cannot be
+    "corrected" by accident later.
+    The same raw text is LOAD-BEARING on the visual side, which is the real
+    reason the ledger keeps the line as written rather than stripping it
+    upstream. It feeds (a) the still-image prompt
+    (``otr_meta_brief_image_prompt.py:1313``), (b) the MOTION CLAUSE that
+    directs i2v video -- ``_otr_motion_clause._line_text_index`` reads raw
+    ``lines[].text`` and hands it to ``build_clause_messages``, under the
+    standing operator directive recorded at ``_otr_motion_clause.py:47``
+    ("the line drives the motion") -- and (c) the HUD / full-script print
+    (``video_engine.py:1311`` and ``:1962``). Stripping direction out of
+    ``lines[].text`` would quietly degrade stills AND motion, so it stays.
+    NOT covered by this ruling: a SOURCE CITATION or URL leaking into line text
+    is a writer defect, not an easter egg, and is tracked separately.
   * SDH line rules: <=2 lines, <=44 chars/line, target <=17 CPS (hard cap 20),
     min 1.0 s on screen, no overlap (later cue start clamps earlier cue end).
 
@@ -243,12 +260,6 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         from . import _otr_ledger_consumers as _OTRLC  # type: ignore
     except ImportError:  # pragma: no cover - direct CLI execution
         import _otr_ledger_consumers as _OTRLC  # type: ignore
-    # The SAME stripper TTS speaks through. A caption must show the words the
-    # voice actually says -- see the spoken-surface note in the module docstring.
-    try:
-        from ._otr_script_prep import clean_spoken_text
-    except ImportError:  # pragma: no cover - direct CLI execution
-        from _otr_script_prep import clean_spoken_text  # type: ignore
     events: list[str] = []
     lint: list[str] = []
     prev_char = None
@@ -270,15 +281,10 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
             nxt = float(dlines[li + 1].get("start_s") or end)
             if nxt < end:
                 end = nxt
-        # Caption the SPOKEN surface, not the raw ledger line. The ledger keeps
-        # the line as written -- parenthetical performance direction and all --
-        # because that direction is the raw material a later motion/shot pass
-        # reads. TTS has always spoken clean_spoken_text(text); the caption used
-        # to burn the raw string, so the viewer READ words nobody SAID (measured
-        # 2026-08-05: 255 cues across 95 episodes, 10 of them entirely direction,
-        # one of which put a Project Gutenberg source URL on screen). One
-        # stripper, one surface: what is heard is what is read.
-        text = _ass_escape(clean_spoken_text(str(ln.get("text") or "")))
+        # RAW line text, deliberately -- see the performance-direction note in
+        # the module docstring. The caption is NOT the spoken surface here, and
+        # that divergence is intended, reviewed and operator-approved.
+        text = _ass_escape(str(ln.get("text") or ""))
         if not text:
             continue
 
