@@ -1416,11 +1416,9 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
             f"char-scene: no appearance text for {cid}; still has NO identity "
             f"anchor (LOUD)")
     else:
-        # Not cosmetic: path_guard_arm rejects os.altsep, which IS '/' on
-        # Windows, and appearance text newly reaching the FINAL prompt would
-        # expose this path to the guard that skips the still entirely. A scarf
-        # described as "black/white" would silently cost the beat its image.
-        _app = _app.replace("\\", " ").replace("/", " or ")
+        # The twin laundering removed 2026-08-05 with its root fix: the guard
+        # now classifies the whole string, so a scarf described as "black/white"
+        # reaches the prompt as written instead of "black or white".
         if _app[:40] not in prompt:
             prompt = f"{_app}, {prompt}"
     if style.image_grade_tail and style.image_grade_tail not in prompt:

@@ -607,21 +607,13 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"
-    # Applied to the COMPOSED string, not just the subject. `setting` is
-    # model-authored and joins the same prompt, so sanitizing only the subject
-    # left an identical trip open one field over -- a setting like "the corner
-    # of 5th/Main" still cost the beat its still. The constant tails are
-    # separator-free (pinned by a test), so this only rescues authored fields.
-    #
-    # STOPGAP, and honest about it: the real defect is that path_guard_arm
-    # treats a bare separator anywhere in prose as a path, which its own
-    # docstring admits refuses "black/white". The root fix is a path-SHAPED
-    # predicate; this and its twin in otr_meta_brief_image_prompt come OUT when
-    # that lands (GO_FORWARD_PLAN, open bugs). The trade is not free: a real
-    # path landing in an appearance field is laundered from a loud guarded skip
-    # into a quiet garbled render. Prose slashes vastly outnumber that, so it
-    # is net-positive today, but it is not strictly dominant.
-    return out.replace("\\", " ").replace("/", " or ")
+    # The slash/backslash laundering that used to sit here was REMOVED
+    # 2026-08-05 with its root fix. It rewrote authored prose -- "the corner of
+    # 5th/Main" became "the corner of 5th or Main" -- to dodge a path guard that
+    # treated a bare separator anywhere as a path. The guard now classifies the
+    # WHOLE STRING, so prose slashes pass and a real path still refuses loudly
+    # rather than being laundered into a quiet garbled render.
+    return out
 
 
 def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,

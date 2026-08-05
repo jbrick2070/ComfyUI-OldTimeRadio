@@ -30,6 +30,7 @@ import hashlib
 import json
 import logging
 import os
+import re as _re
 import time
 
 log = logging.getLogger("OTR")
@@ -270,47 +271,76 @@ _PATH_GUARD_EXCERPT_RADIUS = 90
 _IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 
 
+_DRIVE_ROOT_RE = _re.compile(r"^[A-Za-z]:[\/]")
+_UNC_ROOT_RE = _re.compile(r"^[\/]{2}[^\/]")
+_POSIX_ROOT_RE = _re.compile(r"^/[^/\s]")
+_FILE_URI_RE = _re.compile(r"^file://", _re.IGNORECASE)
+_EXPLICIT_RELATIVE_RE = _re.compile(r"^\.{1,2}[\/]")
+#: A bare filename or a relative path ENDING in an image extension, with no
+#: whitespace anywhere -- "shot.png", "assets/shot.png", "a\b\shot.jpeg".
+_IMAGE_PATH_RE = _re.compile(
+    r"^[^\s]+\.(?:png|jpg|jpeg|webp|bmp|gif|tif|tiff)$", _re.IGNORECASE
+)
+
+
 def path_guard_arm(prompt: str) -> "dict | None":
-    """Which arm of the path guard a prompt trips, or ``None`` if it is clean.
+    r"""Which arm of the path guard a prompt trips, or ``None`` if it is clean.
 
     Returns ``{arm, token, index, excerpt, prompt_len, prompt_hash}``, where
     ``prompt_hash`` is the dispatcher's canonical sha256 (``_prompt_content_hash``)
     so the evidence joins the ledger's field of the same name.
 
-    Split out of ``_assert_not_path`` (2026-08-04) because the guard's own
-    verdict was unrecoverable: it raised one generic sentence and the caller
-    turned that into a wire-only warning, so a silently skipped still could not
-    say WHY. The arms are reported separately because they mean different
-    things -- ``alternate_separator`` is a bare ``/``, which on Windows
-    (``os.altsep == '/'``) refuses ordinary prose like "black/white", while
-    ``extension_suffix`` really does look like a filename.
+    WHOLE-STRING CLASSIFICATION (2026-08-05). The guard exists because a
+    prompt-STRING socket and a path-STRING socket must not be crossed, and a
+    socket carries a WHOLE value: a crossed socket delivers a string that IS a
+    path, never prose that merely contains one. The old predicate was
+    ``os.sep in p or os.altsep in p or endswith(ext)``, and on Windows
+    ``os.altsep`` is ``/`` -- so "a black/white striped scarf" and "the corner
+    of 5th/Main" were refused and their beats rendered NO still. Two producers
+    grew local sanitizers to launder slashes out of prose, and the helper's own
+    comment conceded that laundering a REAL path turns a loud refusal into a
+    quiet garbled render. Both are removed with this change.
 
-    The excerpt is ``repr``-escaped: a prompt is LLM-authored text and may
-    contain newlines, which would otherwise forge extra log records.
+    The arms are ORDERED, most specific first, and every one of them describes
+    the ENTIRE string:
+
+      ``drive_root``        C:\... or C:/...
+      ``unc_root``          \server\share or //server/share
+      ``posix_root``        /var/tmp/x
+      ``file_uri``          file:///...
+      ``explicit_relative`` ./x or ../x
+      ``image_path``        whitespace-free and ending in an image extension,
+                            which covers both "shot.png" and "assets/shot.png"
+
+    Prose containing a separator is CLEAN. Prose ending in ".png" is clean too
+    if it contains whitespace -- "a portrait of the radio host.png" is a
+    sentence, "host.png" is a filename.
     """
     p = str(prompt or "")
     if not p:
         return None
-    # PRECEDENCE IS THE ORIGINAL PREDICATE'S, NOT "earliest match". The guard
-    # evaluated `os.sep or os.altsep or endswith(ext)` as a short-circuit chain;
-    # reporting a different winner would describe a decision the guard did not
-    # make. Likewise NO rstrip() here -- the original tested `endswith` on the
-    # raw lowered string, so adding one would newly reject "foo.png   " and this
-    # change is observability-only.
+    stripped = p.strip()
+    if not stripped:
+        return None
+
     arm = token = None
-    index = -1
-    lowered = p.lower()
-    if os.sep and os.sep in p:
-        arm, token, index = "separator", os.sep, p.index(os.sep)
-    elif os.altsep and os.altsep in p:
-        arm, token, index = "alternate_separator", os.altsep, p.index(os.altsep)
-    else:
-        for ext in _IMAGE_EXTENSIONS:
-            if lowered.endswith(ext):
-                arm, token, index = "extension_suffix", ext, len(p) - len(ext)
-                break
+    for candidate_arm, pattern in (
+        ("drive_root", _DRIVE_ROOT_RE),
+        ("unc_root", _UNC_ROOT_RE),
+        ("posix_root", _POSIX_ROOT_RE),
+        ("file_uri", _FILE_URI_RE),
+        ("explicit_relative", _EXPLICIT_RELATIVE_RE),
+    ):
+        match = pattern.match(stripped)
+        if match:
+            arm, token = candidate_arm, match.group(0)
+            break
+    if arm is None and _IMAGE_PATH_RE.match(stripped):
+        arm, token = "image_path", stripped[stripped.rfind("."):]
     if arm is None:
         return None
+
+    index = p.index(token) if token and token in p else 0
     start = max(0, index - _PATH_GUARD_EXCERPT_RADIUS)
     end = min(len(p), index + _PATH_GUARD_EXCERPT_RADIUS)
     return {

@@ -1165,15 +1165,27 @@ class TestDeterministicComposerPathGuard:
 
         hostile = {"char_id": "c01",
                    "appearance": "a black/white striped scarf, a stern man"}
-        # the raw text really does trip the guard -- that is the premise
-        assert disp.path_guard_arm(hostile["appearance"]) is not None
+        # WHOLE-STRING CLASSIFICATION (2026-08-05): the guard now classifies
+        # the ENTIRE string as a path or not, and this sentence is not one --
+        # so the raw appearance text no longer trips the guard either. The
+        # OLD premise here was "the raw text trips, the composed prompt
+        # doesn't, because a sanitizer launders the slash out of it"; the
+        # sanitizer is GONE too (removed in the same change, since a real
+        # path must now be refused loudly rather than garbled into "or"), so
+        # both halves of that story are replaced by one: prose was never the
+        # guard's business in the first place.
+        assert disp.path_guard_arm(hostile["appearance"]) is None
 
         prompt = compose_still_prompt(
             {"story_brief_terms": {"setting": ["a fogbound pier"]}},
             kind="scene_character", char_entry=hostile)
         assert disp.path_guard_arm(prompt) is None, (
-            "the composed prompt still trips the path guard: %r" % prompt)
-        assert "/" not in prompt.split(",")[0], "the subject still carries a slash"
+            "the composed prompt trips the path guard: %r" % prompt)
+        # No sanitizer runs anymore, so the composed subject legitimately
+        # KEEPS its slash, unlaundered -- the opposite of the pre-2026-08-05
+        # assertion, which expected the slash to have been rewritten away.
+        assert "/" in prompt.split(",")[0], (
+            "the subject should keep its slash unlaundered: %r" % prompt)
 
     def test_a_backslash_is_handled_too(self):
         from nodes import otr_image_gen_dispatcher as disp
