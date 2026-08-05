@@ -4,19 +4,7 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
-Leaned 2026-08-04 from 5,392 lines to this, on the operator's instruction to make
-it "truly stuff that is not done". Nothing open was dropped: every live bug row,
-operator ruling, flagged decision and proof obligation was carried across; what
-went was four session batons, thirteen `SUPERSEDED` blocks, the closed
-(struck-through) bug rows, eight superseded validation receipts, and the
-window-letter table for slots that no longer exist.
-
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
-
-The continuity-correctness queue SHIPPED overnight 2026-08-04/05 (commits `1bdfaaa7`,
-`bd05f696`, `7e4a4c3c`, `89e82181`), full four-round kibitz arc on record at
-`kibitz-runs/2026-08-05-continuity-r3r4/`. Suite 8623 passed, Bug Bible 17 passed, two
-live legs RESULT SUCCESS + obs_publish OK. What follows is only what is NOT done.
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
@@ -58,44 +46,7 @@ deliberately NOT built yet. Switching to it is a Director widget pick, not code.
   collides with the count-match invariant at `OTR_LedgerScriptWriter.py:4119` and is its
   own piece of work, not a tail of this one.
 
-### 3. Loose ends -- CLOSED 2026-08-05 by the bug sprint, except one
-
-The four rows that stood here (third announcer-pool copy, `eng_kokoro`'s divergent
-seed formula, `_resolve_provider_voice_id`'s `_provid` draw, the deterministic
-composer's path-guard exposure) are DONE. The first three are folded onto one
-shared selector with a three-owner drift guard; the fourth has a stopgap and the
-root fix is the row below. Two of those rows said "left alone because merging
-would re-baseline a live pick" and "needs its own change" -- both are now
-contradicted by the shipped diff, which is why they are rewritten rather than
-ticked in place.
-
-**STILL OPEN -- root-fix `path_guard_arm` to recognize path-SHAPED strings**
-(`nodes/otr_image_gen_dispatcher.py:273-326`). The guard flags ANY `os.sep` or
-`os.altsep` anywhere in prose; on Windows `os.altsep` IS `/`, so ordinary
-authored text like "black/white" or "the corner of 5th/Main" is refused and the
-beat loses its still entirely. **The guard's own docstring admits this** (it
-"refuses ordinary prose like 'black/white'"), and the 2026-08-04 refactor that
-split it deliberately preserved the naive predicate as observability-only.
-
-Two producer-local sanitizes now paper over it and BOTH come out when this lands:
-`_otr_story_brief_helpers.compose_still_prompt` (on the composed string) and
-`otr_meta_brief_image_prompt.py` (the LLM path). They are loudly commented so
-they are findable.
-
-Why it was deferred rather than done in the sprint: this is a FAIL-CLOSED guard
-whose reason for existing is that a prompt mistaken for a path cost an episode,
-and "path-shaped" is subtle -- is `5th/Main` prose, is `a/b.png` a path? It needs
-its own kibitz arc plus fixtures covering legitimate slash-bearing prose in EVERY
-composed field alongside genuine absolute and relative image paths.
-
-Known cost of the stopgap, recorded so it is not rediscovered: it masks the
-guard's false-positive rate (subject- and setting-borne trips stop producing D1
-skip evidence), and it launders the rare inverse case -- a real path landing in
-an appearance field becomes a quiet garbled render instead of a loud guarded
-skip. Net-positive today because prose slashes vastly outnumber socket
-crossings, but not strictly dominant.
-
-### 4. Standing facts worth not re-deriving
+### 3. Standing facts worth not re-deriving
 
 `slot.gender` is NOT a voice field. It feeds the description LLM
 (`_otr_casting.py:777`), the outline prompt (`OTR_LedgerScriptWriter.py:4144`), the
@@ -111,26 +62,20 @@ female 400/400, and the shuffle's stream consumption varies with count (getrandb
 0, 0, 3, 3, 9, 11 for counts 0..5). The shipped design overrides in place and leaves the
 allocator untouched.
 
-## SUPERSEDED AS THE ACTIVE QUEUE -- the source-grounding sprint (chunks 1-3b shipped)
-
-Chunks 1, 2, 3a and 3b are SHIPPED and QA'd; chunk 2 is live and working. The remaining
-piece (3b-ii, the supply line that feeds grounding into the writer) is BUILT-BUT-UNWIRED and
-is parked under the story-quality directive -- the delivery mechanism exists and nothing
-calls it. A contributor may pick it up; see the chunk detail below.
+**Source-grounding sprint, the one piece left:** chunk 3b-ii -- the supply line
+that feeds grounding into the writer -- is BUILT-BUT-UNWIRED and PARKED under the
+story-quality directive. The delivery mechanism exists and nothing calls it. A
+contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
-Item 1 is the session's structural work and consumes most of it; items 2-4 are
-small and share one campaign; item 5 (the guardrail-rip completion, found by
-the arc) is its own half-day campaign. The old ~2h40m figure predates the
-panel and is withdrawn -- this queue is one to two coding sessions, panels
-included. THREE campaigns total: item 1; items 2+3+4; item 5.
+Item 1 is the structural work and consumes most of a session; items 2-3 are
+small and share one campaign. TWO campaigns: item 1; items 2+3.
 
-**NO RENDER RUNS THIS SESSION.** The operator wants coding, not GPU time:
-"I don't think we need any runs right now, I want coding sessions." **D2 is
-PARKED** -- it is a render task and it waits. Do not boot the headless server,
-do not reset the box, do not start a leg. The D2 brief is preserved further down
-under "PARKED -- D2" for whenever renders resume.
+**RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
+line is spent -- it governed that session only, and the 08-05 handoff opens on a
+live-proof obligation. Reset per `CLAUDE.md` section 4 before any leg: selective
+CIM kill by CommandLine, never a blanket python kill (it severs the MCP tooling).
 
 Everything below was verified against the real files on 2026-08-04, is
 non-GPU, and is provable by the suite alone. Work them in order; each ends
@@ -163,12 +108,11 @@ a first-try root fix does not need a panel and would otherwise win the conflict.
   MUST-FIX list is answered BEFORE the commit. The panel does not replace the
   suite and the suite does not replace the panel -- both, every item.
 * **Batching (amended by the r1 panel, 2026-08-04):** item 1 gets its OWN
-  campaign covering its 2-3 chunks -- it is the session's structural change and
-  precisely what a panel is for. Items 2 + 3 + 4 SHARE ONE campaign over their
-  combined diff: every item still passes through a full arc (the directive is
-  satisfied), but a 1-character comma fix and a fixture-isolation chunk do not
-  each buy 8 external calls of wall-clock. This batching is the gate-compliant
-  reading, not an exemption.
+  campaign covering its 2-3 chunks -- it is the structural change and precisely
+  what a panel is for. Items 2 + 3 SHARE ONE campaign over their combined diff:
+  every item still passes through a full arc (the directive is satisfied), but a
+  fixture-isolation chunk does not buy 8 external calls of wall-clock on its own.
+  This batching is the gate-compliant reading, not an exemption.
 * **Artifacts:** `kibitz-runs/<date>-<topic>/r<N>/` with the per-round
   `input.md`, `driver_anchor.md`, reviewer files, `judgment.md`, `final.md`.
   UTF-8, no BOM. (r4 fixed a conflict here -- this matches the standing
@@ -359,18 +303,7 @@ by the OUTLINE (`OTR_LedgerScriptWriter.py:3948-3963` -> `:4129`), and beats do
 not exist until the outline returns -- so a sound world derived from
 beat-keyed windows is impossible. Build in THIS order, one green pushed chunk
 each:
-**PROGRESS 2026-08-04 evening: chunks 1 and 2 are DONE, QA'd and pushed.**
-Chunk 1 `fde181b3` + `3913bca6` + `0f30dd82`; chunk 2 `3f786344` + `455526ca`
-+ `84025367`. Each went through a three-lane QA (codex `gpt-5.6-sol`, agy
-Gemini 3.6 Flash, Sonnet) with every claim driver-verified; the rounds found
-real defects each time -- a body leak through `asdict`, an identity-less
-document, a canon-palette splitter that cut derived worlds in the wrong
-places, and a shakespeare lane that silently got none of the fix.
-**PROVEN ON RENDERS:** three 320-word randomized-style legs published 3/3
-(`wuthering_heights_window`, `stolen_white_elephant`,
-`folger-twelfth-night:act2-scene5`), and they demonstrated the defect in
-production -- two unrelated works drew the SAME sound world, and a comic
-garden scene shipped with thunder over a heath. **CHUNK 3 IS NEXT.**
+**CHUNKS 1 AND 2 ARE DONE AND PROVEN ON RENDERS. CHUNK 3 IS NEXT.**
 
 **Carried into chunk 3 from the chunk-2 QA (do not lose):** snapshot replay
 has no whole-body carrier, so an adaptation lane replaying a frozen source
@@ -439,25 +372,7 @@ fixture proves the Folger wording survives flow construction unchanged.
 Legibility on canvas is eyeballed on the next permitted render, not claimed
 from the test.
 
-### 3. THE GUARDRAIL RIP LEFT FOUR DANGLING COMMAS, NOT TWO (~15 min)
-
-Found 2026-08-04 while reading the packs for item 1; the r3 panel doubled the
-count. `,.` residue survives in BOTH prompt stages of BOTH packs:
-
-* `faithful_radio_adaptation.json:9` (`outline_macro_system`) and `:13`
-  (`exchange_system`);
-* `folger_scene_adaptation.json:9` and `:13` -- same pair.
-
-That is residue from the 08-03 removal of the "blood, guns, knives, and graphic
-violence" clause -- the item was deleted, its comma was not. It is not cosmetic:
-these are LIVE prompt strings a model reads on every fidelity episode, and a
-sentence that stops at a dangling comma reads as truncated instruction. Close
-all four sentences AND add a story-pack sweep test asserting no prompt stage
-in any pack contains `,.` -- otherwise half the defect ships again. Do NOT
-restore the removed clause -- the rip was the operator's directive and it
-stands.
-
-### 4. THE TEST-ORDERING POLLUTION (~30 min)
+### 3. THE TEST-ORDERING POLLUTION (~30 min)
 
 `tests/test_public_domain_sources.py` pollutes
 `tests/test_public_domain_interpreter.py::test_empty_cast_is_rejected_and_retried_to_failure`.
@@ -480,32 +395,89 @@ BOTH test-order permutations as regressions. The private-module-name
 alternative is CUT: it risks exercising fallback import paths instead of the
 production `nodes._otr_public_domain_sources` package identity.
 
-### 5. FINISH THE GUARDRAIL RIP -- THE RUNTIME FILTERS THE 08-03 DIRECTIVE KILLED ARE STILL LIVE (~0.5-1 day, own campaign; found by the r4 panel, driver-verified)
+### 4. SOURCE CITATIONS ARE SPOKEN ALOUD, AND REACH TWO LLM PROMPT BUILDERS (recommended next; anchor written)
 
-`CLAUDE.md` (operator, 2026-08-03): generated episode content is NOT filtered
--- "no violence or swearing guardrails" -- and the 08-03 rip removed the
-PROMPT clauses. The RUNTIME gates survived it, and two were verified live this
-session:
+Anchor: `kibitz-runs/2026-08-05-item7-citation/r1/driver_anchor.md` -- fully
+grounded, measured over the corpus, ready for the panel.
 
-* `_otr_public_domain_sources.py:32-34` imports `find_text_hits`
-  (`_otr_content_safety`) and `:616-622` REJECTS a public-domain brief for an
-  "explicit safety term" -- a terminal content gate on the adaptation lane's
-  OWN source-derived brief. Macbeth's daggers can bounce Macbeth.
-* `_otr_ledger_freeze.py:689-710` -- the G9 terminal gate still raises on
-  profanity / explicit weapon / sexual language in delivered rows.
-* Verify-at-build, same class (r4 cites, unread by driver):
-  `_otr_shakespeare_sources.py:32-34,558-560,595-607`,
-  `_otr_ledger_cleanup.py:21-29,306-331`, `_otr_stage3_validators.py:123-139`,
-  the rest of `_otr_ledger_freeze.py:689-728`.
+**Measured 2026-08-05 over 1,587 ledgers: 89 spoken lines carry a URL, a bare
+domain or a licence identifier; 30 distinct episodes leak ON/AFTER 2026-08-04,
+the most recent at 14:22 on 08-05.** The announcer routinely reads "CC BY-NC 3.0"
+on air. Worst case found reads the interpreter's own prompt scaffold aloud --
+"Source: Folger Shakespeare. Date/Rights: c. 1606 | CC BY-NC 3.0. URL:
+https://www.folger.ed..." -- which are verbatim the field labels built at
+`_otr_shakespeare_sources.py:586-589`.
 
-Build: inventory EVERY generation-path profanity/violence filter (prompt
-clause, repair gate, terminal rejection), rip them under the 08-03 directive,
-migrate their tests, and prove source-authored examples pass interpreter,
-composition, cleanup and freeze unchanged. **Keep structural gates** --
-schema/IDs/roster/rights/graph/markup/nonempty stay fail-closed; this rip is
-content-judgment only. Behavior-changing across all banks, so it gets its OWN
-kibitz campaign, and the handoff states the authority chain (07-22 LAW's
-safety authority SUPERSEDED for episode content by the 08-03 directive).
+Because `lines[].text` also feeds the still prompt
+(`otr_meta_brief_image_prompt.py:1313`) and the i2v motion clause
+(`_otr_motion_clause.py:135`), that text reaches two LLM prompt builders as if it
+were stage direction. **The visual path is the wider half of the blast radius.**
+
+Mechanism: the interpreter is handed the URL (`_otr_public_domain_sources.py:443`,
+`_otr_shakespeare_sources.py:589`) and asked for an attribution note in the same
+payload (`:665`, `:624`); the writer appends the model's reply verbatim as spoken
+dialogue (`OTR_LedgerScriptWriter.py:4895-4897` -> `:5489-5497` ->
+`_otr_line_composer.py:1265,1285`), because `compose_news_coda` is contractually
+forbidden to edit it (`:1255` "never score, shorten, or replace it").
+
+**The flag is already ON -- only a CONSUMER is missing.** `provenance_normalize`
+is `true` for `public_domain` and `shakespeare` in `nodes/story_packs/banks.json`,
+pinned at `tests/test_provenance_v4.py:119`. `meta["provenance_coda_line"]` is
+composed and stamped at `OTR_LedgerScriptWriter.py:3595` and has **zero readers**
+(grep: that write plus the docstring at `_otr_provenance.py:19`). The 2026-08-04
+fix that was meant to stop this was applied inside `spoken_coda_line()` -- the
+dead function -- which is exactly why 30 episodes have leaked since.
+
+Settled, do not relitigate: **do NOT bump `NORMALIZATION_VERSION`** (wrong
+boundary, source bytes unchanged -- Codex r4 overruled agy r2); bump the
+interpreter PROMPT versions instead (`_otr_public_domain_sources.py:42`,
+`_otr_shakespeare_sources.py:42`). Printed credits and `noncommercial_notice` do
+NOT change -- this moves what is SPOKEN only. Fix the two stale comments that
+produced the wrong spec (`OTR_LedgerScriptWriter.py:3584-3585`,
+`_otr_ledger_freeze.py:713`, both "inert for every current bank").
+
+Open questions for the panel are in the anchor; the sharp one is WHERE the
+consumer belongs, since `compose_news_coda` is shared with `media_archive` /
+`scifi_news` where the note is a genuine news fact that MUST still be spoken.
+
+### 5. 1,090 CAST ROWS CLAIM A NON-COMMERCIAL MODEL IS COMMERCIALLY CLEAN
+
+`eng_indextts2.py:55` says `commercial_clean = False` (bilibili non-commercial);
+all 40 bank rows say `true`; `cast_lock.py` trusts the bank row. The row flag is
+the CLIP's licence and the engine flag is the MODEL's -- genuinely different
+facts, both already in the right layers. **Stamp the JOIN. Do NOT edit the 40
+bank rows** (`otr_dl_indextts2_refs.py:11-17` documents them as clip provenance;
+the ingest mints three rows across three engines from one PD clip).
+
+**Must heal ATOMICALLY or it creates the defect it fixes:** the stamp
+(`cast_lock.py:742`), the `gated` counter (`:575/:614/:661/:670`) AND the three
+report strings (`:578/:618/:673`) -- otherwise the report prints `clean=True`
+beside a ledger saying `False`. Resolve ONE profile by `(role, engine)` --
+role-scoped, never engine-name-scoped. **Enforcement stays OFF.**
+Prospective-only for the 1,090 frozen ledgers.
+
+### 6. A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD
+
+`find_scene_coherence_issues` reads `lines[].scene_id`; the `scifi_news` lane
+writes `beats[].scene_id`. 55 ledgers assert the check, 0 carry the field, 55
+pass. Nothing in `nodes/` writes `lines[].scene_id` on ANY lane -- the check
+never had a producer.
+
+Join per line: `beat_id` -> beat -> `scene_id` -> declared scene. Add a **VACUITY
+refusal** (an armed gate that examined zero linkages FAILS -- that is how this
+survived 55 episodes). **Split request from verdict:** keep a
+configuration-derived `scene_coherence_required` and write
+`{required, checked, verdict, issues}` into `report.info` -- `run_gap_audit` is
+READ-ONLY (`_otr_ledger_freeze.py:664-698`), so the gate must not mutate the
+ledger; the phase wrappers already persist the report. Measure OFFLINE over the
+published corpus first, then arm in ONE change -- no intermediate flag-off ship.
+Replace the stale hard-coded bank list at `tests/test_scene_guard_v4.py:89-99`
+with registry-derived coverage (it omits `scifi_news`, the one bank that enables
+the flag).
+
+**The vacuity class is now proven twice** -- this gate, and the freeze test at
+`test_g9_sfw_ship_stop.py` that filtered on a retired code prefix (fixed
+`4506b1ed`). Any NEW armed gate ships with a vacuity assertion.
 
 ### Bench leftovers (relocated)
 
@@ -587,14 +559,6 @@ stands.
      `cloud_kling_avatar`).
    * The shared `row_is_active(...)` evaluator over captured state -- confirmed
      absent from the tree -- closing the four env-read sites named in OPEN BUGS.
-
-**Struck as already done (found by this verification):** TTS parenthetical
-stripping. The STILL OPEN line said "never wired", but Step 2 of
-`scene_sequencer.py:520` and `_otr_bark_lib._clean_text_for_bark` both drop ALL
-parenthetical stage directions (BUG-LOCAL-101), kept behaviorally identical by
-`test_scene_sequencer_clean_matches_batcher`. The un-built half of BUG-07.12/13
-is the pre-pad-silence lip-sync onset fix -- the M1-blocked item already in
-KNOWN OPEN.
 
 ## PARKED -- D2 (resume when the operator wants renders again)
 
@@ -1236,14 +1200,6 @@ Path note (verified 2026-08-04): engine adapters live under
   ratio; the reasoning is recorded in `coverage_plan.partition_beat` so the next reader
   does not re-derive the bound and re-ship the regression.
 
-### Lesson kept because the CLASS matters
-
-- **`eng_wan_i2v` threw away a VRAM peak it measured** -- fixed @ `3acc7fed`. Recorded
-  because NEWBUG-1's 2026-07-20 fix landed on `wan_ti2v` and never reached its sibling,
-  and nothing caught it for a week because no test drove `wan_i2v.render_clip`'s
-  RETURN. **When a receipt fix lands on one adapter, grep the siblings in the same
-  change.**
-
 ### PARKED -- unverified at HEAD, re-observe on the next real render legs
 (The 2026-07-24 "after SFX" checkpoint is VOID -- SFX is parked. The re-observe
 now rides whatever real render legs come next, D2 included.)
@@ -1308,18 +1264,6 @@ it, tombstone it.
   the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
   move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
   `OTR_CastLock` freeze cascade (`wan_ti2v`).
-
-## MEASURED -- the 8 GiB-clamped video bench (2026-07-31, `8bd82efb`)
-
-Kept because several rows above cite it. Nine cells ran live under `--reserve-vram 8`
-on the 16 GB card. Arm A: `wan_ti2v` at 832x480, 17 / 49 / 81 frames, all PASS,
-peak_delta 6568.2 / 6563.1 / 6563.1 MiB against a 7168 MiB bar. Arm D: `ltx_8gb`
-`LTX8_RECIPE_V2` at the shipped 512x288 canvas, 17 / 49 / 81 frames, all PASS,
-peak_delta 6691.1 / 6755.3 / 6819.1 MiB. `VramPeakProbe` is machine-wide, which is
-exactly why the bench grades on `peak_delta_mib` against each cell's own baseline
-rather than the absolute. **Read the scope exactly: that is a PREQUALIFICATION on a
-16 GB card told to reserve 8 GiB, not a render on a physical 8 GB card.** Spec and
-gates: `docs/2026-07-31-four-arm-clamped-video-bench-SPEC.md`.
 
 ## MODEL & CREDIT BUDGET (operator, 2026-07-24 -- read this EVERY window)
 
@@ -1530,29 +1474,18 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
   re-survey is mandatory against the then-current writer, and the two campaigns never
   share a window.
 
-## Tombstones (do not re-derive; records in HANDOFF_LOG + PROD_BUG_LOG)
+## Tombstones -- the only three a window might wrongly revive
 
-Keep-6 bank rename (six de-versioned banks; default `scifi_news`, local/offline-first)
--- LLM veto rip + THE LAW -- roster trim + Sonnet-bake-off rip (science_news family,
-`_v2` lanes, scifi_sonnet retired) -- v4 improvement campaign banks #2-#5 PARKED
-(superseded by the rename + THE LAW; revive only by operator decision; plan of record
-`docs/2026-07-17-v4-campaign/final.md`) -- codex56sol attempt telemetry +
-PBUG-20260712-17 root fix -- fresh two-matrix bakeoff -- Qwen-Image still engine
-(removed 2026-07-23) -- word-fit ceilings / candidate campaigns -- style-dropdown
-four-surfaces -- otr-build-tracker artifact -- `tencent/hy3:free` panel seat (expired
-2026-07-21) -- **the 45-word scene matrix, the 54-case visual-style sweep, and the
-entire quick-wins block** (CUT by the operator 2026-07-24: coding over matrices, bugs
-triaged as a batch later; ENGINE_MATRIX survived as a Lean-Mean W6 sub-step; CODER B and
-CODER C dissolved with the block) -- **independent client-authored source banks v1** (all
-seven waves, CODER E, 2026-07-24 @ `30358ad1`; contract `docs/EXTENDING_OTR.md`) -- the
-retired Path-A/B user-source-lanes architecture -- **the 20 fabricated-fixture
-public_domain episodes and the fabricated fixture itself** (operator ruling 2026-08-04:
-dropped and deleted, never raise again) -- **`visual_style_policy`** (ripped 2026-08-04:
-schema-required, read by no code) -- **the credits-roll speed request** (done 2026-08-03:
-`_SCROLL_PPS` 60 -> 120, ~49 s -> ~28 s, operator confirmed on a real episode) --
-**TTS parenthetical stripping** (found already wired 2026-08-04: `scene_sequencer.py`
-Step 2 + `_otr_bark_lib._clean_text_for_bark`, BUG-LOCAL-101, parity-tested; the
-unbuilt half of BUG-07.12/13 is the M1-gated lip-sync pre-pad in KNOWN OPEN).
+Full list in `docs/HANDOFF_LOG.md` + `docs/PROD_BUG_LOG.md`. These three are
+here because each has been re-proposed at least once:
+
+* **The 20 fabricated-fixture `public_domain` episodes and the fixture itself** --
+  operator ruling 2026-08-04: dropped and deleted, **never raise again**.
+* **v4 improvement campaign banks #2-#5** -- PARKED, superseded by the keep-6
+  rename + THE LAW. Revive only by operator decision
+  (`docs/2026-07-17-v4-campaign/final.md`).
+* **LEAN-MEAN** -- lives in `ROADMAP.md`, not this file. A window that wants to
+  rip dead code is on the wrong document.
 
 ## Pointers
 

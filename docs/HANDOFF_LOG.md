@@ -3,6 +3,57 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-05 late afternoon -- HEAD 4506b1ed (v2.0-alpha) -- CODER (live proof PAID; agy QA judged; Item 7 re-grounded)
+
+Did: paid the live receipt the morning session owed, judged an agy QA pass and shipped
+  its three real findings, and corrected an inherited spec that would have shipped a
+  no-op. Suite 8700 passed / 131 skipped / 1 xfailed; Bug Bible 17 passed.
+
+- **PBUG-20260805-03 live receipt PAID.** `scifi_news` was measured 0-for-4 on batch v2
+  and the fix (`016ad146`) had only unit tests behind it -- the batch server booted at
+  08:30, before the 14:30 commit, so it held the old module and could never have proven
+  it. Reset per section 4, booted fresh, ran one leg at the exact failing coordinates
+  (180 words, 2 characters). All three gates: `RESULT SUCCESS`, `obs_publish OK`, and
+  the 16.5 MB asset on disk. `Prompt executed in 00:22:31`.
+- **The log proves the mechanism, not just the outcome.** P3 failed `draft.cast_coverage`
+  ("3/4 covered, missing: announcer"), the typed repair failed identically, the ladder
+  exhausted -- and instead of dying it logged `P3 candidate cycle 1 exhausted; abandoning
+  it and starting cycle 2`, whose first attempt passed. The defect FIRED and was
+  RECOVERED. Pre-fix that same sequence was terminal, four times.
+- **agy QA judged: 4 of 5 claims survived grounding, 1 discarded.** Judgment at
+  `kibitz-runs/2026-08-05-shipped-qa/r4/driver_judgment.md`. Shipped as `4506b1ed`:
+  a vacuous freeze test that filtered on the RETIRED `G9` prefix and therefore could not
+  fail for any reason (proved the rewrite catches a policy reinstated under another name
+  and the old form does not); three CastLock halt messages naming a block class that can
+  no longer occur; and a dead `projection` in the retired fable2 pass that walked every
+  line to build a dict nobody read. Discarded: the "relative paths bypass the path guard"
+  claim -- that is the documented design of `f240e835`, stated three lines above the code
+  agy flagged. Noted, not fixed: the still SEED derives from the prompt hash
+  (`otr_image_gen_dispatcher.py:218`), so dropping the producer sanitizers moves the image
+  for any slash-bearing prompt, and a portrait's hash cascades to its scene stills.
+- **Item 7's inherited spec was wrong in a way that would have shipped a no-op.** It said
+  `defaults.provenance_normalize` is "False for every bank" and "has never run". It is
+  `true` for `public_domain` and `shakespeare` -- the exact two leaking lanes -- enabled
+  2026-08-04 and pinned at `tests/test_provenance_v4.py:119`. The coda is already stamped;
+  only a CONSUMER is missing. Corrected in the handoff doc and the anchor.
+- **Item 7 is ~15x larger than recorded, and LIVE.** Scanned 1,587 ledgers: 89 spoken lines
+  carry a URL, bare domain or licence identifier, across 30 episodes ON/AFTER 2026-08-04 --
+  most recent 14:22 that same day. Worst case reads the interpreter's own prompt scaffold
+  aloud ("Source: ... Date/Rights: ... URL: https://www.folger.ed..."), verbatim the field
+  labels from `_otr_shakespeare_sources.py:586-589`. The 2026-08-04 fix meant to stop this
+  was applied inside `spoken_coda_line()` -- the function with zero readers -- which is
+  precisely why it kept leaking. Anchor: `kibitz-runs/2026-08-05-item7-citation/r1/`.
+- **GO_FORWARD_PLAN leaned on operator instruction** ("only go forward items"): removed the
+  doc's own provenance note, the SHIPPED preamble, the closed loose-ends section, the
+  SUPERSEDED active-queue block, sprint items 3 and 5 (both verified DONE in the tree --
+  no `,.` residue in either pack; `_otr_content_safety` at zero live production refs), the
+  chunk-1/2 progress narrative, the struck-as-done paragraph, the MEASURED bench dump, a
+  closed adapter lesson, and 20 lines of tombstones cut to the three a window might wrongly
+  revive. ADDED the three unbuilt items from the 08-05 arc, which the plan did not carry:
+  the citation leak, the `commercial_clean` join, and the never-populated scene gate.
+- **Gotcha worth keeping:** `FreezeAssertionError.__init__` takes `(errors, report)` --
+  a two-arg constructor. Simulating a freeze failure with one arg fails confusingly.
+
 ## 2026-08-04 night -- HEAD b91a2b4a (v2.0-alpha) -- WINDOW PLANNER (story quality CLOSED; continuity ultracode round)
 
 Did: took two operator directives, ran a full ultracode round on the three continuity

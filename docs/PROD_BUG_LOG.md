@@ -3235,5 +3235,23 @@ symptom.
   consumer stage that cannot create it. Where the plan and the schedule are
   written by different passes, the schedule-time check is the only one that can
   still be repaired.
-- live receipt: OWED. The fix is unproven on a live leg -- the batch v2 server
-  booted before the commit and held the old module in memory.
+- live receipt: **PAID 2026-08-05 16:24.** One `scifi_news` leg at the exact
+  failing coordinates (180 words, 2 characters) through
+  `workflows/otr_canonical.json`, on a server booted FRESH after the fix
+  (the batch v2 server had booted at 08:30, before the 14:30 commit, and held
+  the old module in memory -- which is why the batch could not have proven it).
+  All three gates: `RESULT SUCCESS`, `obs_publish OK`, and the asset on disk --
+  `output/otr/obs/signal_lost_echoes_of_bias_20260805_161414_silent_procgen_blended_captioned_with_credits_final.mp4`,
+  16.5 MB. `Prompt executed in 00:22:31`.
+- what the log proves, and it is the whole point: the defect FIRED and was
+  RECOVERED. P3 attempt 1 failed `draft.cast_coverage` ("3/4 covered, missing:
+  announcer"), attempt 2 (typed repair) failed identically, the retry ladder
+  exhausted -- and instead of killing the episode it logged `P3 candidate cycle
+  1 exhausted (PostValidationError); abandoning it and starting cycle 2`, whose
+  first attempt passed. Two coverage failures, one cycle abandonment, one
+  published episode. Pre-fix that same sequence was terminal, four times.
+- the recovery is bounded in practice: cycle 2 succeeded on attempt 1, so the
+  unbounded fresh-candidate loop did not need a cap on this leg. The open
+  cycle-cap question (agy for, Codex against) stays open on the same reasoning
+  -- the invariant is provably satisfiable at cast <= 7, beats <= 12 -- but
+  there is now one live data point rather than none.
