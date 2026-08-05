@@ -563,6 +563,8 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
         ce = char_entry if isinstance(char_entry, dict) else {}
         subject = str(ce.get("portrait_prompt") or ce.get("appearance")
                       or ce.get("character_description") or "").strip()
+        # (separator sanitize now happens once on the COMPOSED string below,
+        # so `setting` and any other authored field is covered too)
         if not subject:
             subject = "a period-dressed character, face clearly visible"
     else:
@@ -606,7 +608,21 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())
     if not is_portrait:
         out = f"{out}, {NO_TEXT_CLAUSE}"
-    return out
+    # Applied to the COMPOSED string, not just the subject. `setting` is
+    # model-authored and joins the same prompt, so sanitizing only the subject
+    # left an identical trip open one field over -- a setting like "the corner
+    # of 5th/Main" still cost the beat its still. The constant tails are
+    # separator-free (pinned by a test), so this only rescues authored fields.
+    #
+    # STOPGAP, and honest about it: the real defect is that path_guard_arm
+    # treats a bare separator anywhere in prose as a path, which its own
+    # docstring admits refuses "black/white". The root fix is a path-SHAPED
+    # predicate; this and its twin in otr_meta_brief_image_prompt come OUT when
+    # that lands (GO_FORWARD_PLAN, open bugs). The trade is not free: a real
+    # path landing in an appearance field is laundered from a loud guarded skip
+    # into a quiet garbled render. Prose slashes vastly outnumber that, so it
+    # is net-positive today, but it is not strictly dominant.
+    return out.replace("\\", " ").replace("/", " or ")
 
 
 def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,

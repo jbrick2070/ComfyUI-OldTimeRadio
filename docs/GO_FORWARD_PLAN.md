@@ -58,23 +58,42 @@ deliberately NOT built yet. Switching to it is a Director widget pick, not code.
   collides with the count-match invariant at `OTR_LedgerScriptWriter.py:4119` and is its
   own piece of work, not a tail of this one.
 
-### 3. Loose ends this build found and did NOT fix (deliberately out of scope)
+### 3. Loose ends -- CLOSED 2026-08-05 by the bug sprint, except one
 
-- **A third copy of the kokoro announcer pool** at `config/cast_pools.py:304-309`
-  (`ANNOUNCER_PRESETS`), feeding the legacy caster's `pick_announcer()` on a disjoint
-  rng. Its own comment already asks for the sync. The drift guard that would have caught
-  it was in the operator's cut list.
-- **`eng_kokoro`'s own announcer fallback** uses a DIFFERENT seed formula
-  (`Random(f"{episode_seed}_kokoro_announcer")`) than the bank's. Only reachable when
-  CastLock did not stamp, but it means two code paths can name two different announcers.
-- **`_resolve_provider_voice_id`** (`_otr_voice_node_common.py`) has its own
-  gender-agnostic anyref draw (seed suffix `_provid`) for cloud provider engines. It was
-  in nobody's inventory of unowned fallbacks. Left alone because its seed differs, so
-  merging it would re-baseline a live pick.
-- **The deterministic composer's path-guard exposure.** `compose_still_prompt` already
-  leads with the raw appearance, so a cast appearance containing `/` already kills that
-  beat's still today. Tonight's sanitize covers only the new LLM-path exposure. Needs its
-  own change with its own live evidence.
+The four rows that stood here (third announcer-pool copy, `eng_kokoro`'s divergent
+seed formula, `_resolve_provider_voice_id`'s `_provid` draw, the deterministic
+composer's path-guard exposure) are DONE. The first three are folded onto one
+shared selector with a three-owner drift guard; the fourth has a stopgap and the
+root fix is the row below. Two of those rows said "left alone because merging
+would re-baseline a live pick" and "needs its own change" -- both are now
+contradicted by the shipped diff, which is why they are rewritten rather than
+ticked in place.
+
+**STILL OPEN -- root-fix `path_guard_arm` to recognize path-SHAPED strings**
+(`nodes/otr_image_gen_dispatcher.py:273-326`). The guard flags ANY `os.sep` or
+`os.altsep` anywhere in prose; on Windows `os.altsep` IS `/`, so ordinary
+authored text like "black/white" or "the corner of 5th/Main" is refused and the
+beat loses its still entirely. **The guard's own docstring admits this** (it
+"refuses ordinary prose like 'black/white'"), and the 2026-08-04 refactor that
+split it deliberately preserved the naive predicate as observability-only.
+
+Two producer-local sanitizes now paper over it and BOTH come out when this lands:
+`_otr_story_brief_helpers.compose_still_prompt` (on the composed string) and
+`otr_meta_brief_image_prompt.py` (the LLM path). They are loudly commented so
+they are findable.
+
+Why it was deferred rather than done in the sprint: this is a FAIL-CLOSED guard
+whose reason for existing is that a prompt mistaken for a path cost an episode,
+and "path-shaped" is subtle -- is `5th/Main` prose, is `a/b.png` a path? It needs
+its own kibitz arc plus fixtures covering legitimate slash-bearing prose in EVERY
+composed field alongside genuine absolute and relative image paths.
+
+Known cost of the stopgap, recorded so it is not rediscovered: it masks the
+guard's false-positive rate (subject- and setting-borne trips stop producing D1
+skip evidence), and it launders the rare inverse case -- a real path landing in
+an appearance field becomes a quiet garbled render instead of a loud guarded
+skip. Net-positive today because prose slashes vastly outnumber socket
+crossings, but not strictly dominant.
 
 ### 4. Standing facts worth not re-deriving
 

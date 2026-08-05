@@ -1148,3 +1148,78 @@ class TestPortraitIdentitySeed:
             disp.request_cache_key(*args, anchor="def", **kw)
         assert disp.request_cache_key(*args, anchor="abc", **kw) != \
             disp.request_cache_key(*args, **kw)
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-05 sprint: the DETERMINISTIC composer carried the same path-guard
+# exposure the LLM path was hardened against. It leads with the raw appearance,
+# path_guard_arm rejects os.altsep, and os.altsep IS '/' on Windows -- so a
+# character described with "a black/white striped scarf" cost that beat its
+# still entirely, with only skip evidence to show for it.
+# ---------------------------------------------------------------------------
+class TestDeterministicComposerPathGuard:
+
+    def test_a_slash_in_the_appearance_no_longer_trips_the_path_guard(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_story_brief_helpers import compose_still_prompt
+
+        hostile = {"char_id": "c01",
+                   "appearance": "a black/white striped scarf, a stern man"}
+        # the raw text really does trip the guard -- that is the premise
+        assert disp.path_guard_arm(hostile["appearance"]) is not None
+
+        prompt = compose_still_prompt(
+            {"story_brief_terms": {"setting": ["a fogbound pier"]}},
+            kind="scene_character", char_entry=hostile)
+        assert disp.path_guard_arm(prompt) is None, (
+            "the composed prompt still trips the path guard: %r" % prompt)
+        assert "/" not in prompt.split(",")[0], "the subject still carries a slash"
+
+    def test_a_backslash_is_handled_too(self):
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_story_brief_helpers import compose_still_prompt
+
+        prompt = compose_still_prompt(
+            {"story_brief_terms": {"setting": ["a dim study"]}},
+            kind="portrait",
+            char_entry={"char_id": "c01",
+                        "appearance": r"a coat\hat combination"})
+        assert disp.path_guard_arm(prompt) is None
+
+    def test_an_ordinary_appearance_is_untouched(self):
+        from nodes._otr_story_brief_helpers import compose_still_prompt
+
+        prompt = compose_still_prompt(
+            {"story_brief_terms": {"setting": ["a dim study"]}},
+            kind="portrait",
+            char_entry={"char_id": "c01", "appearance": "a stern man in a grey coat"})
+        assert prompt.startswith("a stern man in a grey coat")
+
+
+    def test_a_slash_in_the_SETTING_is_also_rescued(self):
+        """Sanitizing only the subject left an identical trip one field over:
+        `setting` is model-authored and joins the same prompt.
+        """
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_story_brief_helpers import compose_still_prompt
+
+        prompt = compose_still_prompt(
+            {"story_brief_terms": {"setting": ["the corner of 5th/Main"]}},
+            kind="scene_beat")
+        assert disp.path_guard_arm(prompt) is None, (
+            "a setting-borne slash still trips the guard: %r" % prompt)
+
+    def test_the_constant_tails_carry_no_separators(self):
+        """The premise of sanitizing only authored fields: if a pack tail ever
+        gains a separator, this rescue quietly starts rewriting shipped
+        constants instead of just authored text.
+        """
+        from nodes._otr_story_brief_helpers import (
+            NO_TEXT_CLAUSE, STILL_FRAMING_OPEN, STILL_FRAMING_PORTRAIT,
+            STILL_FRAMING_SCENE_BEAT, STILL_FRAMING_SCENE_CHARACTER,
+        )
+
+        for const in (NO_TEXT_CLAUSE, STILL_FRAMING_OPEN,
+                      STILL_FRAMING_PORTRAIT, STILL_FRAMING_SCENE_BEAT,
+                      STILL_FRAMING_SCENE_CHARACTER):
+            assert "/" not in const and "\\" not in const, const
