@@ -139,9 +139,15 @@ def test_caster_gender_floor_holds():
 
 def test_caster_ladder_drops_age_then_role_then_timbre():
     # Drop age: warm+char_voice but wrong age beats a bright adult.
+    #
+    # TWO warm elders, not one. With a single warm entry this tier is size 1 and
+    # the min-tier-pool floor skips it, so the test would fall through to the
+    # gender-only tier and still pass by coincidence -- silently no longer
+    # exercising the age-drop it is named for. Two candidates clear the floor.
     bank_age = (_entry("warm_elder", timbre=["warm"], age="elder"),
+                _entry("warm_elder_2", timbre=["warm"], age="elder"),
                 _entry("bright_adult", timbre=["bright"], age="adult"))
-    assert _cast(bank_age).voice_ref_id == "warm_elder"
+    assert _cast(bank_age).voice_ref_id in {"warm_elder", "warm_elder_2"}
 
     # Drop role: only a gender+timbre match exists, wrong role.
     bank_role = (_entry("ann", timbre=["warm"], roles=["announcer_voice"], age="adult"),)
@@ -464,7 +470,7 @@ def test_casting_policy_version_is_pinned():
     # v2 = the 2026-06-11 whiny-fix weighted-lottery re-baseline (operator-
     # directed): scores WEIGHT the in-tier draw instead of only sorting it.
     # Bumping this constant is a deliberate C7 re-baseline of casting draws.
-    assert CASTING_POLICY_VERSION == "2"
+    assert CASTING_POLICY_VERSION == "3"
 
 
 # ----------------------------------------------------------------------------

@@ -155,7 +155,7 @@ def resolve_roster_gender(slot_name, characters: Iterable) -> RosterGenderVerdic
     winning tier must agree:
 
       exact      slot == name or roster_name
-      alias      slot == the honorific-stripped form
+      short_form slot == the honorific-stripped form (TOBY for SIR TOBY)
       qualified  a roster name starts with 'slot ' -- ANTIPHOLUS matching
                  'ANTIPHOLUS OF EPHESUS' (and both DROMIOs, which is why that
                  case must abstain rather than agree)
@@ -174,15 +174,15 @@ def resolve_roster_gender(slot_name, characters: Iterable) -> RosterGenderVerdic
     if exact:
         return _verdict_from(exact, "exact")
 
-    slot_alias = _strip_honorifics(slot)
-    alias = [
+    slot_short = _strip_honorifics(slot)
+    short_form = [
         r for r in rows
-        if slot_alias and slot_alias in tuple(
+        if slot_short and slot_short in tuple(
             _strip_honorifics(n) for n in _candidate_names(r)
         )
     ]
-    if alias:
-        return _verdict_from(alias, "alias")
+    if short_form:
+        return _verdict_from(short_form, "short_form")
 
     qualified = [
         r for r in rows

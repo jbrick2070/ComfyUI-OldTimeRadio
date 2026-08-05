@@ -74,6 +74,10 @@
     "provider_voice_id": {
       "type": "string",
       "description": "Cloud/direct-provider ADDITIVE: the provider's own voice identifier (e.g. ElevenLabs voice_id or Google prebuilt voice name) for non-local provider engines. Threaded end-to-end so provider casting resolves from adapter metadata, not a disk sentinel. Empty/absent for every local (ref-clip/preset) engine."
+    },
+    "speaker_id": {
+      "type": "string",
+      "description": "ADDITIVE, declarative: the real human behind this reference, when two rows are two different recordings of ONE person (e.g. a narrator's plain and grandfatherly takes, which live in two files and so cannot collide on ref_path). Rows sharing a speaker_id can never both be cast in one episode while reuse is disabled. Empty/absent means the reference is its own speaker."
     }
   }
 }

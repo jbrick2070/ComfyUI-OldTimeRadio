@@ -149,9 +149,13 @@ def _sha256(path: str) -> str:
 def build_entries(spec: dict, ref_rel_path: str, sha: str) -> list:
     """Three bank entries (one per cloner engine) for one PD voice. Pure."""
     base = str(spec["voice_id"])
+    # Carried through so a future ingest of a second take by an ALREADY-INGESTED
+    # narrator collides with the first. Omitted entirely when absent, so every
+    # existing spec produces a byte-identical row.
+    speaker_id = str(spec.get("speaker_id") or "").strip()
     out = []
     for engine, prefix in _CLONER_ENGINES:
-        out.append({
+        row = {
             "voice_ref_id": f"{prefix}_{base}",
             "engine": engine,
             "gender": str(spec["gender"]),
@@ -161,7 +165,10 @@ def build_entries(spec: dict, ref_rel_path: str, sha: str) -> list:
             "ref_path": ref_rel_path,
             "ref_sha256": sha,
             "commercial_clean": True,
-        })
+        }
+        if speaker_id:
+            row["speaker_id"] = speaker_id
+        out.append(row)
     return out
 
 

@@ -250,6 +250,7 @@
     },
     {
       "voice_ref_id": "vz_ljspeech",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "indextts2",
       "gender": "female",
       "timbre": [
@@ -826,6 +827,7 @@
     },
     {
       "voice_ref_id": "cb_ljspeech",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "chatterbox",
       "gender": "female",
       "timbre": [
@@ -1442,6 +1444,7 @@
     },
     {
       "voice_ref_id": "dia_ljspeech",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "dia",
       "gender": "female",
       "timbre": [
@@ -2283,6 +2286,7 @@
     },
     {
       "voice_ref_id": "vz_pd_ljspeech_linda_johnson",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "indextts2",
       "gender": "female",
       "timbre": [
@@ -2298,6 +2302,7 @@
     },
     {
       "voice_ref_id": "cb_pd_ljspeech_linda_johnson",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "chatterbox",
       "gender": "female",
       "timbre": [
@@ -2313,6 +2318,7 @@
     },
     {
       "voice_ref_id": "dia_pd_ljspeech_linda_johnson",
+      "speaker_id": "ljspeech_linda_johnson",
       "engine": "dia",
       "gender": "female",
       "timbre": [
@@ -2328,6 +2334,7 @@
     },
     {
       "voice_ref_id": "vz_pd_librivox_mark_f_smith",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "indextts2",
       "gender": "male",
       "timbre": [
@@ -2343,6 +2350,7 @@
     },
     {
       "voice_ref_id": "cb_pd_librivox_mark_f_smith",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "chatterbox",
       "gender": "male",
       "timbre": [
@@ -2358,6 +2366,7 @@
     },
     {
       "voice_ref_id": "dia_pd_librivox_mark_f_smith",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "dia",
       "gender": "male",
       "timbre": [
@@ -2373,6 +2382,7 @@
     },
     {
       "voice_ref_id": "vz_pd_librivox_mark_f_smith_elder",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "indextts2",
       "gender": "male",
       "timbre": [
@@ -2389,6 +2399,7 @@
     },
     {
       "voice_ref_id": "cb_pd_librivox_mark_f_smith_elder",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "chatterbox",
       "gender": "male",
       "timbre": [
@@ -2405,6 +2416,7 @@
     },
     {
       "voice_ref_id": "dia_pd_librivox_mark_f_smith_elder",
+      "speaker_id": "librivox_mark_f_smith",
       "engine": "dia",
       "gender": "male",
       "timbre": [

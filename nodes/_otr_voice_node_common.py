@@ -109,21 +109,23 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
         if entry is None:
             # Gender-agnostic last resort: an empty or out-of-bank gender (e.g.
             # the writer emitting gender='other'/'unspecified') has no same-gender
-            # reference, but a clone engine must still get a REAL voice rather than
-            # silently dropping to bark (PD1 + the index-only goal). Pick any ref
-            # for this engine, deterministically keyed on char_id so C7 holds.
-            import random as _random
-            # Prefer a ref whose roles include the active role (so an announcer
-            # render gets an announcer ref), then fall back to ANY ref for this
-            # engine so a clone engine still never silently drops to bark (PD1).
-            role_cands = [e for e in bank if e.engine == engine and role in e.roles]
-            cands = sorted(
-                role_cands or [e for e in bank if e.engine == engine],
-                key=lambda e: e.voice_ref_id,
+            # reference, but a clone engine must still get a REAL voice rather
+            # than silently dropping to bark (PD1 + the index-only goal).
+            #
+            # This branch is now the SECOND reader of that draw. CastLock calls
+            # the same helper and stamps its result as voice_ref_id, so a fresh
+            # episode normally takes the vrid lookup above. This stays reachable
+            # for rows CastLock did not stamp -- preserve_ledger, legacy ledgers
+            # frozen before the stamp existed, and any render whose engine
+            # differs from the one CastLock resolved. Do NOT narrow it to a
+            # gender-filtered draw: by definition nothing here matches the
+            # gender, and do not re-implement the choice locally either, or the
+            # ledger will name a voice this path does not open.
+            from ._otr_voice_bank import gender_agnostic_fallback_ref
+            entry = gender_agnostic_fallback_ref(
+                bank, engine=engine, char_id=str(cast.get("char_id") or ""),
+                episode_seed=episode_seed, role=role,
             )
-            if cands:
-                _seed = f"{episode_seed}_{cast.get('char_id', '')}_anyref"
-                entry = _random.Random(_seed).choice(cands)
     path = _resolve_ref_to_disk(getattr(entry, "ref_path", "") or "")
     return path if (path and os.path.exists(path)) else None
 

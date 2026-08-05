@@ -40,7 +40,27 @@ log = logging.getLogger("OTR")
 # tier, so a perfectly-scored ref and a barely-matching one drew equally).
 # Version bump = deliberate C7 re-baseline of all future casting draws.
 # OTR_CAST_WEIGHTED=0 restores the uniform v1 draw for A/B comparison.
-CASTING_POLICY_VERSION = "2"
+# v3 (2026-08-05): _ladder_pick no longer accepts a candidate tier of ONE, which
+# was a 100% pin on three (engine, gender, timbre) combos. Deliberate C7
+# re-baseline of all future casting draws. The effective floor is folded into
+# stable_cast_seed as "+mtp{n}" so two different settings can never both claim
+# to be policy 3. OTR_CAST_MIN_TIER_POOL makes floor=3 a one-run live A/B.
+CASTING_POLICY_VERSION = "3"
+
+# 2 rather than 3: measured against the shipped bank, floor 2 removes every
+# size-1 tier while 5 of 24 combos still honour the requested timbre; floor 3
+# also removes them but leaves only 2 of 24 honouring timbre at all -- it buys
+# spread by deleting the dimension rather than fixing it.
+_MIN_TIER_POOL_DEFAULT = 2
+
+
+def _min_tier_pool() -> int:
+    """Smallest candidate tier the ladder will accept (env-overridable A/B)."""
+    try:
+        return max(1, int(os.getenv("OTR_CAST_MIN_TIER_POOL",
+                                    _MIN_TIER_POOL_DEFAULT)))
+    except (TypeError, ValueError):
+        return _MIN_TIER_POOL_DEFAULT
 VOICE_BANK_SCHEMA_VERSION = "1"
 # VC chunk 4 (2026-06-22): the HYBRID LLM voice-fit. The LLM PROPOSES a
 # voice_ref_id from the engine's gender-slot cards; Python VALIDATES it and
@@ -106,6 +126,11 @@ class VoiceBankEntry:
     # from adapter metadata, NOT a disk sentinel. Empty for every local
     # (ref-clip / preset) engine -- behavior unchanged until a cloud bank ships.
     provider_voice_id: str = ""
+    # The real HUMAN behind this reference, when two rows are two recordings of
+    # one person. ref_path collision cannot catch that case: LibriVox's Mark F.
+    # Smith has a plain and a grandfatherly take in two different files, so
+    # without this one narrator can be cast as two characters in one episode.
+    speaker_id: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -183,6 +208,7 @@ def _entry_from_dict(d: dict) -> VoiceBankEntry:
         quality_tier=str(d.get("quality_tier") or ""),
         style_tags=tuple(str(t) for t in (d.get("style_tags") or [])),
         provider_voice_id=str(d.get("provider_voice_id") or ""),   # C3
+        speaker_id=str(d.get("speaker_id") or ""),
     )
 
 
@@ -351,6 +377,11 @@ def voice_ref_usage_keys(entry: VoiceBankEntry) -> set:
     provider_voice_id = str(getattr(entry, "provider_voice_id", "") or "").strip().lower()
     if provider_voice_id:
         keys.add(f"provider:{entry.engine}:{provider_voice_id}")
+    speaker_id = str(getattr(entry, "speaker_id", "") or "").strip().lower()
+    if speaker_id:
+        # NOT engine-scoped: two takes of one human collide within an engine,
+        # and casting is single-engine anyway, so the bare id is the identity.
+        keys.add(f"speaker:{speaker_id}")
     return {k for k in keys if k}
 
 
@@ -398,9 +429,17 @@ def assign_voice_for_slot(
             f"(role {role!r}, char_id {char_id!r})"
         )
 
+    # Bound HERE, before the seed, not inside _ladder_pick: the floor is folded
+    # into the cast seed below, and a name local to that closure would not exist
+    # yet at this line.
+    floor = _min_tier_pool()
+
     seed = stable_cast_seed(
         episode_seed=episode_seed,
-        casting_policy_version=casting_policy_version,
+        # The floor changes WHICH voice a given (episode_seed, char_id) draws, so
+        # it belongs in the seed's identity. Without it two different byte
+        # outputs would both claim policy '3'.
+        casting_policy_version=f"{casting_policy_version}+mtp{floor}",
         char_id=char_id,
         gender=gender,
         timbre=timbre,
@@ -436,7 +475,17 @@ def assign_voice_for_slot(
                             role=role, age_band=age_band)
                 and (not exclude_used or not _entry_is_used(e, used))
             ]
-            if pool:
+            # A tier of ONE is not a choice, it is a pin: every episode asking
+            # for that (engine, gender, timbre) got the same voice, 100% of the
+            # time. Measured against the shipped bank, three combos did exactly
+            # that -- (indextts2, female, warm), (kokoro, male, warm) and
+            # (kokoro, male, deep). Skip a tier thinner than the floor and let
+            # the ladder drop a dimension instead.
+            #
+            # The gender-only last tier is ALWAYS accepted regardless of size,
+            # so the gender floor and the fail-closed behaviour below are
+            # untouched and no new VoiceCastingError becomes reachable.
+            if pool and (len(pool) >= floor or dims == _LADDER[-1]):
                 return _pick(pool)
         return None
 
@@ -668,6 +717,37 @@ def _seeded_announcer_gender(engine: str, episode_seed) -> str:
         .encode("utf-8")
     ).hexdigest()
     return "male" if int(digest, 16) % 2 == 0 else "female"
+
+
+def gender_agnostic_fallback_ref(
+    bank: Tuple[VoiceBankEntry, ...], *, engine: str, char_id: str,
+    episode_seed=0, role: str = "char_voice",
+) -> Optional[VoiceBankEntry]:
+    """The reference an UNCASTABLE row actually renders with, or None.
+
+    A row whose gender the bank cannot serve -- `other` is 20% of every roll and
+    the bank has zero rows carrying it -- makes `assign_voice_for_slot` raise. The
+    render path must still hand a cloning engine a real voice rather than
+    silently dropping to bark, so it falls back to a uniform draw over the
+    engine's refs, deterministically keyed on char_id so C7 holds.
+
+    This lives here, and is called from BOTH CastLock (to stamp the ledger) and
+    the render-time resolver (to open the file), because those two must agree.
+    A second copy of this draw in the caster would let the ledger name one voice
+    while the render opened another -- which is the exact defect the CastLock
+    stamp exists to close.
+
+    Role-matching refs are preferred so an announcer render gets an announcer
+    ref, then ANY ref for the engine.
+    """
+    role_cands = [e for e in bank if e.engine == engine and role in e.roles]
+    cands = sorted(
+        role_cands or [e for e in bank if e.engine == engine],
+        key=lambda e: e.voice_ref_id,
+    )
+    if not cands:
+        return None
+    return random.Random(f"{episode_seed}_{char_id}_anyref").choice(cands)
 
 
 def _seeded_preferred_announcer_voice_ref(

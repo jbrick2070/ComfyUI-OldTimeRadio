@@ -492,8 +492,8 @@ class CastLock:
                        voice_device="cuda"):
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
-            announcer_voice_ref, assign_voice_for_slot, load_voice_bank,
-            voice_ref_usage_keys,
+            announcer_voice_ref, assign_voice_for_slot,
+            gender_agnostic_fallback_ref, load_voice_bank, voice_ref_usage_keys,
         )
         from ._otr_voice_node_common import coerce_int_seed
 
@@ -561,6 +561,13 @@ class CastLock:
 
             if target_engine is None:
                 continue
+            # Ledger completeness: every row this caster CONSIDERS carries the
+            # field, so a downstream reader never has to tell "cast normally"
+            # apart from "field never written". _stamp overwrites it; the rows
+            # that fall through below keep the empty default. preserve_ledger is
+            # deliberately not touched -- that mode's contract is byte-safety,
+            # and a row the caster never ran on has no cast decision to report.
+            entry.setdefault("voice_cast_fallback", "")
             gender = str(entry.get("gender") or "").strip().lower()
             if not gender:
                 if target_engine == "google_tts":
@@ -617,7 +624,29 @@ class CastLock:
             except VoiceCastingError as exc:
                 if target_engine == "google_tts":
                     raise
-                report.append(f"  {char_id}: NOT cast -- {exc}")
+                # The bank cannot serve this row's gender -- 'other' is 20% of
+                # every roll and the bank carries zero rows for it. Previously
+                # the row was reported "NOT cast" and left with NO voice_ref_id,
+                # and the render path then drew a gender-agnostic reference of
+                # its own. The ledger therefore did not name the voice that
+                # actually spoke. Stamp the SAME draw the render will make, so
+                # the ledger is complete and honest. This is a ledger fix, not a
+                # content gate: no refusal, no gender restriction.
+                fallback_ref = gender_agnostic_fallback_ref(
+                    bank_entries, engine=target_engine, char_id=char_id,
+                    episode_seed=episode_seed, role="char_voice",
+                )
+                if fallback_ref is None:
+                    report.append(f"  {char_id}: NOT cast -- {exc}")
+                    continue
+                self._stamp(entry, fallback_ref, fallback="gender_unservable")
+                _mark_used(fallback_ref)
+                gated += 0 if fallback_ref.commercial_clean else 1
+                report.append(
+                    f"  {char_id}: {fallback_ref.voice_ref_id} "
+                    f"({fallback_ref.engine}, gender {gender!r} unservable -- "
+                    f"gender-agnostic reference)"
+                )
                 continue
             self._stamp(entry, ref)
             _mark_used(ref)
@@ -683,11 +712,18 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _stamp(entry, ref) -> None:
-        """Stamp the chosen reference onto a cast entry (I-4 / I-9)."""
+    def _stamp(entry, ref, *, fallback: str = "") -> None:
+        """Stamp the chosen reference onto a cast entry (I-4 / I-9).
+
+        ``fallback`` records HOW the reference was chosen. It is written on every
+        stamped row, empty string for the ordinary deterministic cast, so a
+        downstream reader never has to distinguish "cast normally" from "field
+        was never written".
+        """
         entry["voice_ref_id"] = ref.voice_ref_id
         entry["voice_engine"] = ref.engine
         entry["commercial_clean"] = bool(ref.commercial_clean)
+        entry["voice_cast_fallback"] = fallback
         # C3 (cloud-audio 2026-07-03): carry the provider voice id for cloud
         # (ElevenLabs) casting -- ONLY when present, so local (ref-clip/preset)
         # cast entries stay byte-identical. The durable cast stamp copies the
