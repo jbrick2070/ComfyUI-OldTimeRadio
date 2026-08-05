@@ -51,7 +51,12 @@ EVIDENCE_OPENING = "opening"
 EVIDENCE_CLOSING = "closing"
 EVIDENCE_DIALOGUE = "dialogue"
 
-_QUOTE_RE = re.compile(r"[\"“”‘’']")
+# Quotation marks that plausibly OPEN or CLOSE quoted speech. Bare apostrophes
+# are deliberately excluded: in "don't", "it's", "father's" the mark is
+# possessive or elided, not a quote, and counting them ranked contraction-heavy
+# NARRATION above real dialogue. Single quotes count only at a word boundary,
+# which is where a quotation actually opens or closes.
+_QUOTE_RE = re.compile(r"[\"“”]|(?<!\w)[‘']|['’](?!\w)")
 
 
 class SourceDocumentError(RuntimeError):
@@ -77,11 +82,16 @@ class SourceSpan:
     document, but it is always verified against the body at construction --
     a span whose text has drifted from its offsets is refused by name rather
     than quietly quoting something the source does not say.
+
+    ``text`` is ``repr=False`` ON PURPOSE: a span can hold thousands of words,
+    and the default dataclass repr would dump them into any log line or
+    traceback that formats a span. Identity (offsets + role) is what a reader
+    of a log actually needs; the text is reachable explicitly when wanted.
     """
 
     start_char: int
     end_char: int
-    text: str
+    text: str = field(repr=False)
     role: str = ""
 
     @property
@@ -110,11 +120,18 @@ class SourceDocument:
     Transient by contract: never stamped into ``meta``, never written to a
     ledger, never persisted in a receipt. Callers that need durability store
     ``body_sha256`` + offsets and re-derive the text from the document.
+
+    ``canonical_body`` is ``repr=False`` ON PURPOSE. "Never serialized" has to
+    survive the paths nobody plans: a debug ``log.info("%s", result)``, an
+    ``f"bad state: {doc!r}"`` in an exception, a traceback frame that formats
+    locals. The default dataclass repr put the entire body -- up to 25,000
+    words -- into every one of those. The repr now carries identity only, and
+    a test pins it.
     """
 
-    canonical_body: str
-    body_sha256: str
-    normalization_version: str
+    canonical_body: str = field(repr=False)
+    body_sha256: str = ""
+    normalization_version: str = ""
     source_ref: str = ""
 
     @property
@@ -182,6 +199,11 @@ class SourceOverview:
     windows: tuple[SourceSpan, ...] = field(default_factory=tuple)
     evidence: tuple[SourceSpan, ...] = field(default_factory=tuple)
     source_ref: str = ""
+    # What the caller ASKED for, kept beside what it got. A body shorter than
+    # 2 chars per window collapses to a single window; that is correct, but a
+    # silent collapse reads downstream as "this work is one undivided block".
+    # No silent caps: the receipt reports both numbers.
+    requested_window_count: int = 0
 
     @property
     def covered_char_count(self) -> int:
@@ -206,7 +228,14 @@ class SourceOverview:
             "overview_version": self.overview_version,
             "source_ref": self.source_ref,
             "window_count": len(self.windows),
+            "requested_window_count": self.requested_window_count,
+            "window_count_collapsed": (
+                self.requested_window_count > len(self.windows)
+            ),
             "covered_char_count": self.covered_char_count,
+            "dialogue_evidence_present": any(
+                s.role == EVIDENCE_DIALOGUE for s in self.evidence
+            ),
             "windows": [
                 {"start_char": w.start_char, "end_char": w.end_char}
                 for w in self.windows
@@ -228,6 +257,11 @@ def _window_bounds(body: str, window_count: int) -> list[tuple[int, int]]:
     Cuts land on whitespace where one is available near the target so a window
     does not open mid-word; coverage is exact regardless -- every character
     belongs to exactly one window.
+
+    FLOOR: a body shorter than two characters per requested window collapses
+    to a SINGLE window. Slicing a 10-character work into 8 pieces produces
+    fragments that ground nothing. The collapse is deliberate and is reported
+    through ``SourceOverview.requested_window_count`` rather than hidden.
     """
     total = len(body)
     if window_count < 1:
@@ -252,18 +286,27 @@ def _window_bounds(body: str, window_count: int) -> list[tuple[int, int]]:
     return bounds
 
 
-def _densest_quote_window(windows: Sequence[SourceSpan]) -> SourceSpan:
+def _densest_quote_window(windows: Sequence[SourceSpan]) -> SourceSpan | None:
     """The window carrying the most quotation marks per character.
+
+    Returns ``None`` when the work contains no quoted speech at all. That
+    matters: tagging a stretch of pure narration as ``dialogue`` would invite
+    a consumer to treat the author's narration as quoted speech -- the exact
+    class of confusion this whole module exists to remove. Absent evidence is
+    reported as absent.
 
     Ties break on the EARLIER window so the pick is stable for a given body.
     """
-    best = windows[0]
-    best_density = -1.0
+    best: SourceSpan | None = None
+    best_density = 0.0
     for window in windows:
         if window.char_count <= 0:
             continue
-        density = len(_QUOTE_RE.findall(window.text)) / window.char_count
-        if density > best_density:
+        hits = len(_QUOTE_RE.findall(window.text))
+        if not hits:
+            continue
+        density = hits / window.char_count
+        if best is None or density > best_density:
             best, best_density = window, density
     return best
 
@@ -298,12 +341,13 @@ def build_source_overview(
         ),
     ]
     dialogue = _densest_quote_window(windows)
-    evidence.append(
-        _make_span(
-            body, dialogue.start_char, dialogue.end_char,
-            role=EVIDENCE_DIALOGUE,
+    if dialogue is not None:
+        evidence.append(
+            _make_span(
+                body, dialogue.start_char, dialogue.end_char,
+                role=EVIDENCE_DIALOGUE,
+            )
         )
-    )
 
     overview = SourceOverview(
         body_sha256=document.body_sha256,
@@ -312,6 +356,7 @@ def build_source_overview(
         windows=windows,
         evidence=tuple(evidence),
         source_ref=document.source_ref,
+        requested_window_count=window_count,
     )
     if overview.covered_char_count != document.char_count:
         raise SourceDocumentError(

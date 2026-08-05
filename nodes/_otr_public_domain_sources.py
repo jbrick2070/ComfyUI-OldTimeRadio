@@ -359,6 +359,13 @@ def normalize_public_domain_body(text: Any) -> str:
     return cleaned
 
 
+def _project_to_payload_window(body: str, *, max_chars: int = 12000) -> str:
+    """Cap an already-normalized body for the legacy seven-key payload."""
+    if len(body) > max_chars:
+        return body[:max_chars].rsplit(" ", 1)[0].rstrip() or body[:max_chars]
+    return body
+
+
 def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str:
     """Legacy payload projection: the canonical body, capped at ``max_chars``.
 
@@ -367,18 +374,23 @@ def canonicalize_public_domain_text(text: Any, *, max_chars: int = 12000) -> str
     work must use ``normalize_public_domain_body`` (or the SourceDocument
     built from it) -- this one returns a prefix by design.
     """
-    cleaned = normalize_public_domain_body(text)
-    if len(cleaned) > max_chars:
-        cleaned = cleaned[:max_chars].rsplit(" ", 1)[0].rstrip() or cleaned[:max_chars]
-    return cleaned
+    return _project_to_payload_window(
+        normalize_public_domain_body(text), max_chars=max_chars)
 
 
 def source_document_from_text(
-    text: Any, *, source_ref: str = "",
+    text: Any, *, source_ref: str = "", canonical_body: str | None = None,
 ) -> "_osd.SourceDocument":
-    """Build the transient uncapped document for a public-domain source."""
-    return _osd.build_source_document(
-        normalize_public_domain_body(text), source_ref=source_ref)
+    """Build the transient uncapped document for a public-domain source.
+
+    ``canonical_body`` accepts an already-normalized body so a fetch does not
+    re-run the regexes over a large work.
+    """
+    body = (
+        canonical_body if canonical_body is not None
+        else normalize_public_domain_body(text)
+    )
+    return _osd.build_source_document(body, source_ref=source_ref)
 
 
 def payload_from_manifest_unit(
@@ -386,11 +398,21 @@ def payload_from_manifest_unit(
     *,
     text: str,
     excerpt_chars: int = 1200,
+    canonical_body: str | None = None,
 ) -> dict[str, str]:
-    """Build the legacy source payload for a resolved manifest fixture unit."""
+    """Build the legacy source payload for a resolved manifest fixture unit.
+
+    ``canonical_body`` lets a caller that has ALREADY normalized the text pass
+    it in, so a fetch does not run the boilerplate/whitespace regexes twice
+    over a 25,000-word body. Omit it and the body is normalized here.
+    """
     source = resolved.source
     unit = resolved.unit
-    full_text = canonicalize_public_domain_text(text)
+    body = (
+        canonical_body if canonical_body is not None
+        else normalize_public_domain_body(text)
+    )
+    full_text = _project_to_payload_window(body)
     excerpt = full_text[:excerpt_chars].rsplit(" ", 1)[0].rstrip() or full_text[:excerpt_chars]
     payload = {
         "headline": f"{source['title']} - {unit['label']}",
@@ -464,15 +486,23 @@ def fetch_public_domain_source(
             f"{text_path}"
         ) from exc
 
+    # Normalize ONCE: both the payload projection and the document index into
+    # the same canonical body, and the regexes are not cheap on a 25,000-word
+    # work. One derivation also means the payload can never disagree with the
+    # document's coordinate system.
+    canonical_body = normalize_public_domain_body(text)
+
     return _osp.SourceFetchResult(
-        payload=payload_from_manifest_unit(resolved, text=text),
+        payload=payload_from_manifest_unit(
+            resolved, text=text, canonical_body=canonical_body),
         source_meta=source_meta_from_unit(resolved),
         source_rights=source_rights_from_unit(resolved),
         # Transient: the COMPLETE body, so the pre-outline authors can be
         # grounded in the whole work rather than the payload's 12,000-char
         # prefix. Never serialized -- see SourceFetchResult's contract.
         source_document=source_document_from_text(
-            text, source_ref=resolved.source_ref),
+            text, source_ref=resolved.source_ref,
+            canonical_body=canonical_body),
     )
 
 

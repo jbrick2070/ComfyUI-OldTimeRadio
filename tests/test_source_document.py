@@ -149,15 +149,13 @@ def test_overview_is_deterministic():
     assert first.receipt() == second.receipt()
 
 
-def test_overview_tags_opening_closing_and_dialogue():
+def test_overview_tags_opening_and_closing():
     doc = _doc()
     overview = osd.build_source_overview(doc)
     opening = overview.evidence_for(osd.EVIDENCE_OPENING)
     closing = overview.evidence_for(osd.EVIDENCE_CLOSING)
-    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
     assert opening is not None and opening.start_char == 0
     assert closing is not None and closing.end_char == doc.char_count
-    assert dialogue is not None
 
 
 def test_dialogue_evidence_prefers_the_quote_dense_window():
@@ -167,6 +165,47 @@ def test_dialogue_evidence_prefers_the_quote_dense_window():
     overview = osd.build_source_overview(doc, window_count=3)
     dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
     assert '"' in dialogue.text
+
+
+def test_no_dialogue_evidence_when_the_work_has_no_quoted_speech():
+    # Tagging pure narration as "dialogue" would invite a consumer to treat
+    # the author's narration as quoted speech -- the confusion this module
+    # exists to remove. Absent evidence is reported absent.
+    doc = osd.build_source_document("narration only, no quotes at all. " * 200)
+    overview = osd.build_source_overview(doc)
+    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
+    assert overview.receipt()["dialogue_evidence_present"] is False
+
+
+def test_contractions_alone_are_not_quoted_speech():
+    # "don't"/"father's" are elision and possession, not quotation. Counting
+    # them ranked contraction-heavy NARRATION above real dialogue. A work of
+    # nothing but contractions has no quoted speech at all.
+    doc = osd.build_source_document(
+        "he didn't know his father's name and wouldn't ask. " * 80)
+    overview = osd.build_source_overview(doc, window_count=4)
+    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
+
+
+def test_real_speech_outranks_a_much_larger_contraction_block():
+    # The speech is a sixth of the body; before the fix the apostrophes in the
+    # other five sixths could outvote it.
+    contractions = "he didn't know his father's name and wouldn't ask. " * 80
+    real_speech = '"Tell me," she said. "I must know." ' * 20
+    doc = osd.build_source_document(contractions + real_speech)
+    overview = osd.build_source_overview(doc, window_count=2)
+    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
+    assert dialogue is not None
+    # The window carrying the actual quotation marks is the one selected.
+    assert '"' in dialogue.text
+    assert dialogue.start_char == overview.windows[-1].start_char
+
+
+def test_single_quoted_speech_still_counts_at_word_boundaries():
+    doc = osd.build_source_document(
+        "plain narration here. " * 40 + "'Tell me,' she said. " * 20)
+    overview = osd.build_source_overview(doc, window_count=2)
+    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is not None
 
 
 def test_overview_receipt_is_body_free_and_json_serializable():
@@ -185,6 +224,85 @@ def test_single_window_and_tiny_body_still_cover_totally():
     doc = osd.build_source_document("tiny body here")
     overview = osd.build_source_overview(doc, window_count=8)
     assert overview.covered_char_count == doc.char_count
+
+
+def test_a_collapsed_window_count_is_reported_not_hidden():
+    # A body too short to split returns one window. That is correct, but a
+    # silent collapse reads downstream as "this work is one undivided block".
+    doc = osd.build_source_document("tiny body here")
+    receipt = osd.build_source_overview(doc, window_count=8).receipt()
+    assert receipt["requested_window_count"] == 8
+    assert receipt["window_count"] == 1
+    assert receipt["window_count_collapsed"] is True
+
+
+def test_an_uncollapsed_window_count_says_so():
+    receipt = osd.build_source_overview(_doc(), window_count=8).receipt()
+    assert receipt["window_count"] == receipt["requested_window_count"] == 8
+    assert receipt["window_count_collapsed"] is False
+
+
+# ---------------------------------------------------------------------------
+# the body must not escape through repr -- logs, tracebacks, f-strings
+# ---------------------------------------------------------------------------
+
+_SENTINEL = "SECRETBODYWORD"
+
+
+def _sentinel_doc() -> osd.SourceDocument:
+    return osd.build_source_document(
+        f"opening {_SENTINEL} middle " * 400, source_ref="u:1")
+
+
+def test_document_repr_carries_identity_not_the_body():
+    doc = _sentinel_doc()
+    text = repr(doc)
+    assert _SENTINEL not in text
+    assert doc.body_sha256[:12] in text
+
+
+def test_span_repr_does_not_carry_its_slice():
+    doc = _sentinel_doc()
+    assert _SENTINEL not in repr(doc.span(0, 200, role="probe"))
+
+
+def test_overview_repr_does_not_carry_the_body():
+    doc = _sentinel_doc()
+    assert _SENTINEL not in repr(osd.build_source_overview(doc))
+
+
+def test_fetch_result_repr_does_not_carry_the_body():
+    doc = _sentinel_doc()
+    result = osp.SourceFetchResult(
+        payload={
+            "headline": "h", "summary": "s", "full_text": "f", "source": "x",
+            "date": "1895", "link": "l", "seed_text": "seed",
+        },
+        source_document=doc,
+    )
+    assert _SENTINEL not in repr(result)
+
+
+def test_logging_a_document_does_not_dump_the_body():
+    import io
+    import logging
+
+    doc = _sentinel_doc()
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    log = logging.getLogger("otr.test.source_document")
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    try:
+        log.info("document: %s", doc)
+    finally:
+        log.removeHandler(handler)
+    assert _SENTINEL not in buf.getvalue()
+
+
+def test_exception_formatting_does_not_dump_the_body():
+    doc = _sentinel_doc()
+    assert _SENTINEL not in str(ValueError(f"bad state: {doc!r}"))
 
 
 # ---------------------------------------------------------------------------
