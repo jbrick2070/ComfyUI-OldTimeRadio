@@ -183,6 +183,45 @@ def test_sidecars_are_separate_and_noncommercial():
     assert "source_meta" not in payload
 
 
+def test_source_meta_carries_the_roster_when_a_text_path_is_supplied():
+    """source_meta is the only channel that reaches the writer, and it is copied
+    wholesale into the durable ledger -- so the sidecar roster travels here and
+    becomes both the gender pin's input and its receipt.
+    """
+    import pathlib
+
+    resolved = shx.resolve_shakespeare_scene(
+        _manifest(), "folger-twelfth-night:act2-scene5-malvolio-letter")
+    bank_dir = pathlib.Path(__file__).resolve().parent.parent / (
+        "config/source_banks/shakespeare")
+    text_path = bank_dir / resolved.scene["text_path"]
+
+    meta = shx.source_meta_from_scene(resolved, text_path=text_path)
+    by_name = {row["name"]: row for row in meta["characters"]}
+    assert by_name["MALVOLIO"]["gender"] == "male"
+    assert by_name["MARIA"]["gender"] == "female"
+
+
+def test_source_meta_omits_the_roster_key_when_there_is_no_sidecar():
+    """Absence must be ABSENCE, not an empty list -- an empty list reads as 'this
+    source has no characters', which is a different and false claim. The
+    fixtures directory genuinely ships no .provenance.json.
+    """
+    import pathlib
+
+    resolved = shx.resolve_shakespeare_scene(
+        _manifest(), "folger-macbeth:act1-scene3-witches")
+    fixture = (pathlib.Path(__file__).resolve().parent.parent
+               / "config/source_banks/shakespeare/fixtures"
+               / "macbeth_act1_scene3_excerpt.txt")
+    assert fixture.exists()
+    meta = shx.source_meta_from_scene(resolved, text_path=fixture)
+    assert "characters" not in meta
+
+    # And the legacy positional call keeps its exact old shape.
+    assert "characters" not in shx.source_meta_from_scene(resolved)
+
+
 def test_fetch_shakespeare_scene_blank_ref_selects_from_manifest_and_sidecars(monkeypatch):
     from nodes import _otr_story_routing as routing
 

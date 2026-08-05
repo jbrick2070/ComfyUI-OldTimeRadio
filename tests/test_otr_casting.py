@@ -180,6 +180,131 @@ def test_source_names_none_is_byte_identical_to_pool():
     assert [s.name for s in a[1]] == [s.name for s in b[1]]
 
 
+# ---------------------------------------------------------------------------
+# Source gender pin (2026-08-05). The row gender was a 40/40/20 roll, so 44 of
+# 176 published adaptation rows contradicted the source: MALVOLIO and LEAR cast
+# female, MIRANDA and CORDELIA cast male. The pin OVERRIDES the drawn value at
+# source-owned indices and never re-runs the allocator.
+# ---------------------------------------------------------------------------
+def _pinned_ensemble(names, pins, seed):
+    """One ensemble the way lock_cast builds it. force_lemmy=False is required:
+    roll_lemmy() uses OS entropy by design, so any A/B without it is ~11% noise.
+    """
+    rng = random.Random(seed)
+    rows, slots, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=len(names), rng=rng, force_lemmy=False,
+        source_character_names=names, source_bank_id="shakespeare")
+    return _OTRC.precompute_ensemble_slots(
+        slots, prior_cast=rows, rng=rng, cast_seed=seed, gender_by_name=pins)
+
+
+def test_pinned_source_genders_are_correct_on_every_seed():
+    """Measured before the pin: wrong on 301 rows across 200 seeds."""
+    pins = {"MALVOLIO": "male", "MARIA": "female"}
+    wrong_unpinned = 0
+    for seed in range(200):
+        for ens in _pinned_ensemble(["Malvolio", "Maria"], pins, seed):
+            assert ens.gender == pins[ens.name.upper()], (seed, ens)
+        for ens in _pinned_ensemble(["Malvolio", "Maria"], None, seed):
+            if ens.gender != pins[ens.name.upper()]:
+                wrong_unpinned += 1
+    assert wrong_unpinned > 0, "the defect must still reproduce without the pin"
+
+
+def test_pinning_one_slot_does_not_make_another_deterministic():
+    """The forced-opposite regression guard.
+
+    Feeding pins into prior_genders would make the allocator push the remaining
+    slot the other way -- measured, _plan_gender_distribution(1, ['male'])
+    returns female on 400/400 seeds. HORATIO is left unpinned and its
+    distribution must be IDENTICAL with and without MARCELLUS pinned.
+    """
+    free, pinned = Counter(), Counter()
+    for seed in range(400):
+        for ens in _pinned_ensemble(["Marcellus", "Horatio"], None, seed):
+            if ens.name.upper() == "HORATIO":
+                free[ens.gender] += 1
+        for ens in _pinned_ensemble(
+                ["Marcellus", "Horatio"], {"MARCELLUS": "male"}, seed):
+            if ens.name.upper() == "HORATIO":
+                pinned[ens.gender] += 1
+    assert free == pinned
+    assert len(pinned) > 1, f"HORATIO collapsed to one gender: {pinned}"
+
+
+def test_unpinned_other_incidence_is_unchanged():
+    """'other' is 20% of the roll and is not servable by the bank. The pin must
+    not change how often it comes up for slots it does not touch.
+    """
+    free, pinned = Counter(), Counter()
+    names = ["Antipholus", "Dromio", "Adriana"]
+    for seed in range(400):
+        for ens in _pinned_ensemble(names, None, seed):
+            if ens.name.upper() == "ADRIANA":
+                free[ens.gender] += 1
+        for ens in _pinned_ensemble(
+                names, {"ANTIPHOLUS": "male", "DROMIO": "male"}, seed):
+            if ens.name.upper() == "ADRIANA":
+                pinned[ens.gender] += 1
+    assert free == pinned
+
+
+def test_source_owned_slots_keep_their_name_through_the_coherence_repair():
+    """SIR TOBY stays TOBY. The repair swaps a first name whose gender tag
+    disagrees with the slot gender; a source character is not a pool name and
+    must never be renamed to ERIN or MARGOT to satisfy it.
+    """
+    slots = [
+        _OTRC.EnsembleSlot("c02", "TOBY", "female", "warm", "lead",
+                           "adult", True),
+        _OTRC.EnsembleSlot("c03", "TOBY", "female", "warm", "lead"),
+    ]
+    repaired = _OTRC._repair_ensemble_names(slots, cast_seed=7)
+    assert repaired[0].name == "TOBY", "source-owned slot was renamed"
+    assert repaired[1].name != "TOBY", (
+        "a pool slot with the same mismatch must still be repaired, or this "
+        "test proves nothing about the exemption"
+    )
+
+
+def test_gender_pin_is_byte_identical_when_no_pins_are_supplied():
+    """C7 for the invention lanes: same ensembles AND same post-call rng state
+    whether gender_by_name is omitted or explicitly None.
+    """
+    for seed in (1, 42, 777, 100003):
+        for count in (1, 3, 6):
+            a = random.Random(seed)
+            rows_a, slots_a, _ = _OTRC.assemble_pre_locked_rows(
+                num_characters=count, rng=a, force_lemmy=False)
+            ens_a = _OTRC.precompute_ensemble_slots(
+                slots_a, prior_cast=rows_a, rng=a, cast_seed=seed)
+            tail_a = [a.random() for _ in range(4)]
+
+            b = random.Random(seed)
+            rows_b, slots_b, _ = _OTRC.assemble_pre_locked_rows(
+                num_characters=count, rng=b, force_lemmy=False)
+            ens_b = _OTRC.precompute_ensemble_slots(
+                slots_b, prior_cast=rows_b, rng=b, cast_seed=seed,
+                gender_by_name=None)
+            tail_b = [b.random() for _ in range(4)]
+
+            assert [(e.char_id, e.name, e.gender) for e in ens_a] == \
+                   [(e.char_id, e.name, e.gender) for e in ens_b], (seed, count)
+            assert tail_a == tail_b, (seed, count)
+
+
+def test_only_binary_genders_can_be_pinned():
+    """The roster records male/female/unknown. An 'other' or junk value must
+    never reach the slot, so CastingResponse validation cannot be surprised.
+    """
+    ens = _pinned_ensemble(
+        ["Malvolio"], {"MALVOLIO": "other"}, 5)
+    assert ens[0].gender in ("male", "female", "other")
+    ens2 = _pinned_ensemble(["Malvolio"], {"MALVOLIO": "banana"}, 5)
+    base = _pinned_ensemble(["Malvolio"], None, 5)
+    assert ens2[0].gender == base[0].gender, "a junk pin must be ignored"
+
+
 def test_source_names_skip_blank_announcer_and_dupes():
     """Blanks, ANNOUNCER, and duplicates never consume a slot."""
     _, open_slots, _ = _OTRC.assemble_pre_locked_rows(

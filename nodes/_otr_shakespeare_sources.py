@@ -29,6 +29,11 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_document as _osd  # type: ignore
 
 try:
+    from . import _otr_roster_gender as _roster_gender
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_roster_gender as _roster_gender  # type: ignore
+
+try:
     from ._otr_structured_call import StructuredCallFailedError, structured_call
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
@@ -425,10 +430,21 @@ def source_rights_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
     }
 
 
-def source_meta_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
-    """Metadata sidecar for the selected scene."""
+def source_meta_from_scene(
+    resolved: ShakespeareScene, *, text_path: "Path | None" = None,
+) -> dict[str, Any]:
+    """Metadata sidecar for the selected scene.
+
+    When ``text_path`` is supplied, the provenance sidecar's ``characters``
+    roster travels with it. source_meta is the only channel that reaches the
+    writer and is copied wholesale into the durable ledger, so the roster becomes
+    both an input to the gender pin and an auditable receipt for it.
+
+    The key is added only when the roster is non-empty -- an absent key is honest
+    absence, where an empty list would read as "the source has no characters".
+    """
     scene = resolved.scene
-    return {
+    meta: dict[str, Any] = {
         "source_ref": resolved.source_ref,
         "play_code": scene["play_code"],
         "play_title": scene["play_title"],
@@ -439,6 +455,11 @@ def source_meta_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
         "recommended_word_budget": scene["recommended_word_budget"],
         "cast_hints": list(scene["cast_hints"]),
     }
+    if text_path is not None:
+        characters = _roster_gender.load_roster_characters(text_path)
+        if characters:
+            meta["characters"] = [dict(row) for row in characters]
+    return meta
 
 
 def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceFetchResult":
@@ -484,7 +505,7 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
         ) from exc
     return _osp.SourceFetchResult(
         payload=payload_from_scene(resolved, text=text),
-        source_meta=source_meta_from_scene(resolved),
+        source_meta=source_meta_from_scene(resolved, text_path=text_path),
         source_rights=source_rights_from_scene(resolved),
         # Transient: the COMPLETE scene. shakespeare is a style_pool_class
         # "adaptation" bank, so it is gated into source-derived grounding

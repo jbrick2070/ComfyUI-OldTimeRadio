@@ -24,6 +24,11 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_payload as _osp  # type: ignore
 
 try:
+    from . import _otr_roster_gender as _roster_gender
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_roster_gender as _roster_gender  # type: ignore
+
+try:
     from ._otr_structured_call import StructuredCallFailedError, structured_call
 except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
@@ -515,7 +520,7 @@ def fetch_public_domain_source(
     return _osp.SourceFetchResult(
         payload=payload_from_manifest_unit(
             resolved, text=text, canonical_body=canonical_body),
-        source_meta=source_meta_from_unit(resolved),
+        source_meta=source_meta_from_unit(resolved, text_path=text_path),
         source_rights=source_rights_from_unit(resolved),
         # Transient: the COMPLETE body, so the pre-outline authors can be
         # grounded in the whole work rather than the payload's 12,000-char
@@ -537,11 +542,20 @@ def source_rights_from_unit(resolved: PublicDomainUnit) -> dict[str, str]:
     }
 
 
-def source_meta_from_unit(resolved: PublicDomainUnit) -> dict[str, Any]:
-    """Small metadata sidecar for future meta stamping."""
+def source_meta_from_unit(
+    resolved: PublicDomainUnit, *, text_path: "Path | None" = None,
+) -> dict[str, Any]:
+    """Small metadata sidecar for future meta stamping.
+
+    Mirrors the shakespeare lane: when ``text_path`` is supplied and a provenance
+    sidecar carries a ``characters`` roster, it travels in source_meta so the
+    gender pin can read a confirmed record. Prose sources have no dramatis
+    personae, so in practice this key is usually absent here -- which is why it
+    is added only when non-empty.
+    """
     source = resolved.source
     unit = resolved.unit
-    return {
+    meta: dict[str, Any] = {
         "source_ref": resolved.source_ref,
         "source_id": source["source_id"],
         "unit_id": unit["unit_id"],
@@ -552,6 +566,11 @@ def source_meta_from_unit(resolved: PublicDomainUnit) -> dict[str, Any]:
         "recommended_word_budget": source["recommended_word_budget"],
         "cast_hints": list(source["cast_hints"]),
     }
+    if text_path is not None:
+        characters = _roster_gender.load_roster_characters(text_path)
+        if characters:
+            meta["characters"] = [dict(row) for row in characters]
+    return meta
 
 
 class PublicDomainBriefs(BaseModel):

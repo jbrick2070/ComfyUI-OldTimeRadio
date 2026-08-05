@@ -1,0 +1,86 @@
+{
+  "schema_version": "1",
+  "_comment": [
+    "Curated gender for the cast_hints no source tier can reach.",
+    "",
+    "Each of the 14 vendored Folger scenes ships a provenance sidecar carrying a",
+    "characters list. Thirty of the 42 shipped cast_hints resolve to male|female",
+    "straight off that roster. The remaining twelve do not, for three different",
+    "reasons: the speech prefix is absent from the printed dramatis personae",
+    "(TOBY, ROBIN), the roster entry exists but the fetched text never gendered it",
+    "(HELENA, HERMIA, LYSANDER, DEMETRIUS carry a populated roster_name and an",
+    "empty description), or the prefix is a shared family name that two source",
+    "people answer to (ANTIPHOLUS and DROMIO are each two brothers, both recorded",
+    "gender='unknown').",
+    "",
+    "The alternative was an address-form heuristic over the whole play text. That",
+    "text is not on disk -- the 14 vendored files are SLICED SCENES, and the",
+    "vendor rebinds body to the slice one line after parsing the roster -- so the",
+    "heuristic would need a network re-vendor to run at all, and it still reaches",
+    "neither ANTIPHOLUS nor DON PEDRO. Ten committed lines are offline,",
+    "deterministic, reviewable as a data diff, and survive a re-vendor, because",
+    "the vendor rewrites sidecars and never this file.",
+    "",
+    "ARIEL and PUCK are deliberately NOT here. Folger's stage directions use 'he'",
+    "for both, but neither has a defensible roster fact and both are genuinely",
+    "editorial calls that belong to the operator. They stay on the existing roll,",
+    "which is why the corpus test asserts 40 of 42 rather than 42 of 42.",
+    "",
+    "MERGE RULE, enforced in _otr_roster_gender.load_gender_supplement and",
+    "resolve_with_supplement: an entry may only fill a slot the roster left",
+    "unknown, every entry must carry a non-empty evidence string, and an entry",
+    "that contradicts a CONFIRMED sidecar gender raises rather than winning."
+  ],
+  "entries": {
+    "Err": {
+      "ANTIPHOLUS": {
+        "gender": "male",
+        "evidence": "Both Antipholus twins are sons of Egeon and Emilia; the sidecar records ANTIPHOLUS OF EPHESUS and ANTIPHOLUS OF SYRACUSE with gender_source=unknown, so the shared speech prefix cannot be joined, but neither brother is a woman."
+      },
+      "DROMIO": {
+        "gender": "male",
+        "evidence": "Both Dromio twins are the bondmen attending the Antipholus twins; the sidecar records DROMIO OF EPHESUS and DROMIO OF SYRACUSE as gender='unknown', so the shared prefix abstains at the join."
+      }
+    },
+    "MND": {
+      "BOTTOM": {
+        "gender": "male",
+        "evidence": "Nick Bottom the weaver, one of the Athenian mechanicals; addressed throughout as a man and cast as Pyramus in their play."
+      },
+      "LYSANDER": {
+        "gender": "male",
+        "evidence": "One of the two Athenian young men in love with Hermia; the sidecar carries roster_name='LYSANDER' with an empty description, so the fetched Folger text simply never gendered the entry."
+      },
+      "DEMETRIUS": {
+        "gender": "male",
+        "evidence": "The other Athenian suitor, whom Egeus prefers for Hermia; sidecar carries roster_name='DEMETRIUS' with an empty description."
+      },
+      "HELENA": {
+        "gender": "female",
+        "evidence": "In love with Demetrius and Hermia's childhood friend; sidecar carries roster_name='HELENA' with an empty description."
+      },
+      "HERMIA": {
+        "gender": "female",
+        "evidence": "Egeus's daughter, in love with Lysander; sidecar carries roster_name='HERMIA' with an empty description."
+      }
+    },
+    "TN": {
+      "TOBY": {
+        "gender": "male",
+        "evidence": "Sir Toby Belch, Olivia's kinsman; the manifest hint drops the honorific so the prefix TOBY is recorded absent_from_roster with an empty roster_name."
+      }
+    },
+    "Ado": {
+      "DON PEDRO": {
+        "gender": "male",
+        "evidence": "Don Pedro, Prince of Aragon; the sidecar's PRINCE entry is gender='unknown', so neither the hint nor a rename reaches a gendered roster fact."
+      }
+    },
+    "Ham": {
+      "HORATIO": {
+        "gender": "male",
+        "evidence": "Hamlet's fellow scholar and confidant at Elsinore; the sidecar entry carries no gendered description."
+      }
+    }
+  }
+}

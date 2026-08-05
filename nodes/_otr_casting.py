@@ -61,7 +61,7 @@ import logging
 import os
 import random
 from dataclasses import dataclass, replace
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Mapping, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -140,6 +140,10 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _VALID_GENDERS = {"male", "female", "other"}
+# What a SOURCE roster may pin. 'other' is deliberately absent: the roster only
+# ever records male/female/unknown, and an unknown is left to the roll rather
+# than pinned, so CastingResponse._gender_in_set is never handed a novel value.
+_PINNABLE_GENDERS = frozenset({"male", "female"})
 
 # Sprint 3D: the "other" share of the ensemble gender split renders
 # through the Bark voice pool (which today is binary male/female), so
@@ -550,6 +554,12 @@ class EnsembleSlot:
     # This does NOT touch python_assign_voice_preset's pool-mode call (that still
     # receives age_band=None), so the bark replay stays byte-identical.
     age_band: str = "adult"   # child / young_adult / adult / elder
+    # True when this slot's NAME came off the source's own cast list rather than
+    # the invented-name pool. Such a slot is a real person in the source, so its
+    # gender is pinned from the roster and its name is exempt from the
+    # coherence rename. APPENDED, never inserted: tests/test_cast_llm_naming.py
+    # builds EnsembleSlot with five positional arguments.
+    source_owned: bool = False
 
 
 def _plan_gender_distribution(
@@ -658,12 +668,20 @@ def _repair_ensemble_names(
     names and 'other'-gender slots are left untouched (coherent with either /
     any gender). OTR_NAME_CROSS_GENDER_RATE > 0 lets a deterministic fraction of
     mismatches stand as deliberate cross-gender names.
+
+    SOURCE-OWNED slots are exempt. TOBY is Sir Toby Belch whatever the pool
+    thinks that first name's gender tag is, and renaming him to ERIN or MARGOT to
+    satisfy a coherence rule loses the character the adaptation exists to perform
+    -- measured, that rename fired on 133 of 400 seeds.
     """
     rate = _otr_cast_env.cross_gender_rate()
     taken_names = {e.name for e in ensemble}
     out: List[EnsembleSlot] = []
     for ens in ensemble:
         repaired = ens
+        if getattr(ens, "source_owned", False):
+            out.append(repaired)
+            continue
         if ens.gender in ("male", "female"):
             tag = _POOLS.gender_of_first_name(ens.name)
             if tag in ("male", "female") and tag != ens.gender:
@@ -687,6 +705,7 @@ def precompute_ensemble_slots(
     rng: Optional[random.Random] = None,
     cast_seed: Optional[int] = None,
     repair_names: bool = True,
+    gender_by_name: Optional[Mapping[str, str]] = None,
 ) -> List[EnsembleSlot]:
     """Stage 1: decide the whole ensemble's gender / timbre / role
     distribution up front. PURE PYTHON -- no LLM.
@@ -707,6 +726,23 @@ def precompute_ensemble_slots(
     The rng makes the gender shuffle deterministic for a fixed seed
     (C7 byte-identity). timbre/role rotation is index-based and needs
     no rng.
+
+    ``gender_by_name`` pins the genders the SOURCE records, for source-owned
+    slots only. The allocation itself is deliberately NOT re-run: the call to
+    ``_plan_gender_distribution`` below takes the same count, the same priors and
+    the same rng it always did, and the pin is applied afterwards by overwriting
+    the drawn value at pinned indices.
+
+    That is the whole design, and the alternatives are both wrong. Feeding the
+    pins in as ``prior_genders`` makes the largest-remainder allocator push the
+    remaining slot the other way -- measured, `_plan_gender_distribution(1,
+    ['male'])` returns female on 400 of 400 seeds -- turning a coin flip into a
+    guaranteed error. Re-calling it with a reduced count changes how far the
+    shuffle advances the stream (measured getrandbits: 0, 0, 3, 3, 9, 11 for
+    counts 0..5), which desynchronizes any replay that reconstructs the ensemble.
+    Overriding in place keeps the rng call count and the post-call stream
+    identical, keeps the unpinned slots' distribution exactly as it is today, and
+    is byte-identical on every lane when ``gender_by_name`` is None.
     """
     prior_cast = list(prior_cast or [])
     rng = rng or random.Random()
@@ -717,14 +753,26 @@ def precompute_ensemble_slots(
         len(open_slots), prior_genders, rng,
     )
 
+    pins = {
+        str(k).strip().upper(): str(v).strip().lower()
+        for k, v in (gender_by_name or {}).items()
+        if str(v).strip().lower() in _PINNABLE_GENDERS
+    }
     ensemble: list[EnsembleSlot] = []
     for i, slot in enumerate(open_slots):
+        source_owned = bool(getattr(slot, "source_owned", False))
+        gender = genders[i]
+        if source_owned and pins:
+            # assemble_pre_locked_rows upper-cases slot names; the writer's
+            # _adapt_names are title-case. Both sides are normalized to UPPER.
+            gender = pins.get(str(slot.name or "").strip().upper(), gender)
         ensemble.append(EnsembleSlot(
             char_id=slot.char_id,
             name=slot.name,
-            gender=genders[i],
+            gender=gender,
             timbre=_TIMBRE_VOCAB[i % len(_TIMBRE_VOCAB)],
             role=_ROLE_VOCAB[i % len(_ROLE_VOCAB)],
+            source_owned=source_owned,
         ))
     # Cast name<->gender coherence repair (isolated rng; byte-identical for an
     # already-coherent seed). See _repair_ensemble_names.
@@ -1178,6 +1226,10 @@ class CastSlot:
 
     char_id: str
     name: str
+    # See EnsembleSlot.source_owned -- set when the name was popped off the
+    # source's cast list instead of rolled from the pool. Trailing default keeps
+    # every existing keyword construction valid.
+    source_owned: bool = False
 
 
 # Source-faithful adaptations must use their own cast, never the recurring
@@ -1309,12 +1361,15 @@ def assemble_pre_locked_rows(
     for _ in range(remaining_open):
         if source_queue:
             name = source_queue.pop(0)   # the source's real character name
+            source_owned = True
         else:
             name = _POOLS.pick_first_last(rng, taken_names)  # pool fallback
+            source_owned = False
         taken_names.add(name)
         open_slots.append(CastSlot(
             char_id=f"c{next_cid_int:02d}",
             name=name,
+            source_owned=source_owned,
         ))
         next_cid_int += 1
 
@@ -1478,6 +1533,7 @@ def lock_cast(
     casting_brief: str = "",
     source_character_names: Optional[List[str]] = None,
     source_bank_id: str | None = None,
+    source_character_genders: Optional[Mapping[str, Mapping[str, str]]] = None,
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -1572,11 +1628,25 @@ def lock_cast(
     # gender/timbre/role distribution ONCE, up front, before any LLM
     # call. Python owns balance here, with a global view of the prior
     # cast (LEMMY's gender feeds the 40/40/20 allocation).
+    # The source contract carries one entry per RESOLVED source character:
+    # {NAME: {gender, evidence, tier, roster_name}}. The pin map is derived from
+    # it here so there is exactly one input and one stamped receipt, and the
+    # evidence that justified each pin travels into the ledger with it.
+    source_contract = {
+        str(name).strip().upper(): dict(spec)
+        for name, spec in (source_character_genders or {}).items()
+        if isinstance(spec, Mapping)
+    }
+    gender_by_name = {
+        name: str(spec.get("gender") or "")
+        for name, spec in source_contract.items()
+    }
     ensemble_slots = precompute_ensemble_slots(
         open_slots,
         prior_cast=prior_cast_for_llm,
         rng=cast_rng,
         cast_seed=cast_seed,
+        gender_by_name=gender_by_name or None,
     )
 
     casting_attempts: list[int] = []
@@ -1779,6 +1849,18 @@ def lock_cast(
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
         "cast_voice_slots":       cast_voice_slots,
         "voice_cast_decision":    voice_cast_decision,
+        # ONE stable shape on EVERY lane -- the invention lanes stamp an empty
+        # contract rather than omitting the key, so a downstream reader never has
+        # to distinguish "no source" from "field never written".
+        "cast_source_contract":   {
+            "source_bank_id":  str(source_bank_id or ""),
+            "character_names": [str(n) for n in (source_character_names or [])],
+            "gender_by_name":  {
+                name: spec["gender"] for name, spec in source_contract.items()
+                if spec.get("gender")
+            },
+            "evidence":        source_contract,
+        },
     })
     return cast, meta
 

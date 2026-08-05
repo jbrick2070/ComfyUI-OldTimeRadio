@@ -3123,3 +3123,74 @@ condition is right and lane-agnostic. What does not survive: "one fault, two
 doors", and the implication that fixing the fable2 parser gap had anything to do
 with the `scifi_news_pro` failure. Two lanes, two mechanisms, one shared
 symptom.
+
+## PBUG-20260805-01 -- every adaptation cast rolled its gender, so 44 published rows contradict the source
+- surfaced: published episodes, measured 2026-08-05 across every adaptation
+  ledger under `output/otr` (88 ledgers, 176 non-announcer rows). Visible in
+  shipped episodes -- e.g. `signal_lost_malvolios_yellow_stockings_20260804_192850`.
+- symptom: MALVOLIO and LEAR cast female; MIRANDA, CORDELIA and ROSALIND cast
+  male. 44 of 176 rows (25%) carry a gender that contradicts the shipped
+  provenance sidecar. Also confirmed on MARIA, ROMEO, JULIET, CELIA, MACBETH,
+  BENEDICK, VIOLA, MARCELLUS, FERDINAND, TITANIA, BANQUO, HERO, PROSPERO.
+- root cause: `precompute_ensemble_slots` assigned every open slot a gender from
+  a 40/40/20 largest-remainder roll (`_plan_gender_distribution`,
+  `nodes/_otr_casting.py`), including slots whose NAME had just been popped off
+  the source's own cast list. The roster truth was already on disk -- 14
+  provenance sidecars carry a `characters` list -- and `source_meta_from_scene`
+  never loaded it, so nothing downstream could know MALVOLIO was a man.
+  The row gender is not only a voice field: it feeds the description LLM
+  (`_otr_casting.py:777`), the outline prompt (`OTR_LedgerScriptWriter.py:4144`),
+  the dialogue cast block (`_otr_line_composer.py:446`) and the image prompt's
+  gender anchor (`otr_meta_brief_image_prompt.py:78-90`), so the defect reached
+  the script and the portrait as well as the voice.
+- fix: new `nodes/_otr_roster_gender.py` joins each source-owned slot name to the
+  sidecar roster through an abstaining tier ladder, backed by a committed
+  10-entry curated supplement for the names no tier reaches; the resolved gender
+  OVERRIDES the drawn value at pinned indices while
+  `_plan_gender_distribution` is left completely untouched -- same count, same
+  priors, same rng, same post-call stream. Source-owned slots are also exempted
+  from the name-coherence rename. Stamped as `meta.cast_source_contract` with
+  per-name evidence.
+- verify idea: for any adaptation ledger, every non-announcer row whose name
+  appears in the source's `characters` roster must carry the roster's gender.
+  Machine-checkable against the shipped sidecars with no render.
+- bible-worthy: yes -- "a generator that rolls a value the source already
+  records" is a reusable defect class, and the fix shape (join, abstain
+  honestly, override in place rather than re-allocating) is portable.
+- confidence: HIGH -- measured across every published adaptation ledger.
+- status: OPEN (fix landed 2026-08-05; live proof leg pending)
+
+## PBUG-20260805-02 -- LATENT: the bark voice replay rebuilds a different ensemble than the writer cast
+- surfaced: NOT a production failure. Reproduced by probe against the shipped
+  modules on 2026-08-05 at cast_seed 424242, and recorded on operator direction
+  rather than promoted to a fix. **This entry does not meet the log's usual
+  live-artifact admission bar and must not be fan-out-promoted to the Bug Bible
+  on its own evidence.**
+- symptom: at cast_seed 424242 with source names
+  `['Antipholus','Dromio','Adriana']` the writer's ensemble is
+  (ANTIPHOLUS male, DROMIO other, ADRIANA female) while `replay_voice_assignment`
+  reconstructs (ERIN MARTIN female, FABER SATO other, KANE SIRIKIT male). The
+  gender SEQUENCE diverges on 149 of 200 seeds (74%).
+- root cause: an asymmetry in what the replay is told. `assemble_pre_locked_rows`
+  accepts `source_character_names`, and on an adaptation lane it POPS those names
+  off a queue for zero rng draws; `replay_voice_assignment(*, cast_seed,
+  num_characters, lemmy_hit)` cannot accept them, so the replay takes the pool
+  path and burns `pick_first_last` draws the writer never spent. Every later draw
+  is then off by that much.
+- why it is latent: `CastLock._assign_bark_voices` writes only
+  `row["voice_preset"]` (`nodes/cast_lock.py:355`) and never a gender, and the
+  shipped workflow runs indextts2 (node 80), which takes its audible reference
+  from the ROW gender at `cast_lock.py:563`. Nothing a listener hears depends on
+  the replay's reconstruction today. It becomes real the day the operator
+  switches character voices back to bark.
+- fix: none. The corrective step was CUT from the 2026-08-05 continuity build as
+  not worth the surface it touches; forwarding `source_character_names` +
+  `source_bank_id` into the replay restores the match exactly (probed), if it is
+  ever wanted.
+- verify idea: `lock_cast` then `_assign_bark_voices` at cast_seed 424242 with
+  those three source names; the reconstructed per-slot gender must equal the row
+  gender.
+- bible-worthy: no -- latent, single-project, and no production artifact behind
+  it. Recorded so the next reader does not re-derive it.
+- confidence: HIGH on the mechanism, N/A on production impact (there is none today).
+- status: OPEN (deliberately unfixed; reproducing seed 424242)

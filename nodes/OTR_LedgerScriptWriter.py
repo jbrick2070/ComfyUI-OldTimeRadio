@@ -150,6 +150,7 @@ from . import _otr_visual_styles as _otr_visual_styles
 # never a silent slide into the science path). Stdlib-only + lazy wrapper
 # imports -- safe at module-import time, same posture as the routing import.
 from . import _otr_source_payload as _otr_source_payload
+from . import _otr_roster_gender as _otr_roster_gender
 from . import _otr_bank_variants as _otr_bank_variants
 
 # The ONE story-lane authority (2026-07-31): pipeline id -> dispatched runner
@@ -3813,6 +3814,32 @@ class OTR_LedgerScriptWriter:
                 )
                 if _adapt_names:
                     meta["_adaptation_character_names"] = _adapt_names
+                    # Join those names to the gender the SOURCE records, so the
+                    # cast row stops being a 40/40/20 roll. This is the same gate
+                    # that already decides an adaptation lane, so invention lanes
+                    # never reach it and stay byte-identical.
+                    _src_meta = meta.get("source_meta") or {}
+                    try:
+                        meta["_adaptation_character_genders"] = (
+                            _otr_roster_gender.gender_map_for_names(
+                                _adapt_names,
+                                _src_meta.get("characters") or (),
+                                play_code=str(_src_meta.get("play_code") or ""),
+                                supplement=_otr_roster_gender
+                                .load_gender_supplement(
+                                    _otr_roster_gender.supplement_dir_for_bank(
+                                        _source_bank_row)),
+                            )
+                        )
+                    except _otr_roster_gender.RosterGenderError:
+                        # A committed supplement contradicting a confirmed
+                        # sidecar is an authoring fault in the data file, not a
+                        # reason to kill an episode. Fall back to the roll and
+                        # let the data test catch it.
+                        log.exception(
+                            "[OTR_LedgerScriptWriter] roster gender supplement "
+                            "rejected; falling back to the gender roll")
+                        meta["_adaptation_character_genders"] = {}
             log.info(
                 "[OTR_LedgerScriptWriter] news_interpreter OK: "
                 "%d key_terms in %d attempt(s)",
@@ -4048,6 +4075,10 @@ class OTR_LedgerScriptWriter:
                 source_bank_id=str(
                     getattr(_source_bank_row, "source_bank_id", "") or ""
                 ),
+                # The source's own gender for each of those names, with the
+                # evidence that justified it. Empty on every invention lane.
+                source_character_genders=meta.get(
+                    "_adaptation_character_genders"),
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
@@ -4076,6 +4107,15 @@ class OTR_LedgerScriptWriter:
         # ledger meta so OTR_CastLock can honour the accepted proposal (and fall
         # closed to the deterministic scorer otherwise). Free-form meta.
         meta["voice_cast_decision"] = cast_meta.get("voice_cast_decision") or {}
+        # The gender pin's receipt: which source names were pinned, to what, and
+        # on what evidence. This copy is REQUIRED -- lock_cast's meta is not
+        # merged wholesale, it is copied key by key right here, so a key stamped
+        # in lock_cast and not named on this line never reaches the ledger.
+        # Always present, empty-shaped on the invention lanes.
+        meta["cast_source_contract"] = cast_meta.get("cast_source_contract") or {
+            "source_bank_id": "", "character_names": [],
+            "gender_by_name": {}, "evidence": {},
+        }
         log.info(
             "[OTR_LedgerScriptWriter] cast locked: %d rows "
             "(announcer + %d characters, lemmy_hit=%s)",
