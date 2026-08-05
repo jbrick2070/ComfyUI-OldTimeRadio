@@ -4,7 +4,7 @@
   "schema_version": "v2.0",
   "notes": [
     "Entropy source for the original_radio concept pass. Atoms are timeless,",
-    "SFW, weapon-free, and modern-tech-free by authoring rule;",
+    "modern-tech-free by authoring rule;",
     "the loader also runs the shared forbidden-term scan at load (fail loud).",
     "Axis count and atom counts are schema-validated (min 6 per axis); the",
     "deck grows freely after first production (kibitz r4 P7)."

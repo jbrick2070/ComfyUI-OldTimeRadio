@@ -443,6 +443,11 @@ _DRAFT_ERROR_CODES = frozenset({
     "shot_index",
     "unused_shot",
     "cast_id",
+    # A planned cast member owning no beat. Recoverable on purpose: the score
+    # is retired and redrafted rather than the episode failing, because P5
+    # cannot give a line to a member this score never scheduled. See the raise
+    # site in compile_radio_score_draft for the measurement behind it.
+    "cast_coverage",
     "fact_id",
     "cue_id",
     "score_schema",
@@ -935,18 +940,37 @@ def compile_radio_score_draft(
             beats=compiled_beats,
         ))
 
-    if used_cast_ids != set(cast_by_id):
-        # Gate 3 (SOURCE_BANK_PREFLIGHT): coverage is a COUNT field and must not
-        # gate production. A short/reconciled draft may not give every planned
-        # cast member a beat; that is ADVISORY (recorded), not fatal -- otherwise
-        # cast_coverage becomes an accidental fatal successor to the removed
-        # beat-count gate (kibitz r3, Codex). The reverse hole -- a beat naming an
-        # unknown cast id -- is still rejected per-beat above, so the executable
-        # graph stays closed (an uncovered cast member simply carries no lines).
-        log.info(
-            "[scifi_codex] cast_coverage advisory: %d/%d planned cast own a beat "
-            "(uncovered: %s)", len(used_cast_ids), len(cast_by_id),
-            sorted(set(cast_by_id) - used_cast_ids),
+    uncovered_cast_ids = sorted(set(cast_by_id) - used_cast_ids)
+    if uncovered_cast_ids:
+        # RECOVERABLE, as of 2026-08-05. This was ADVISORY -- logged and allowed
+        # through -- so a planned cast member could own no beat, and "an
+        # uncovered cast member simply carries no lines" was accepted as normal.
+        # It is not normal. `_otr_cast_voice_coverage` refuses at stamp_receipt
+        # when a cast row owns no sayable line, and P5 cannot repair the hole:
+        # beat/shot/scene ownership is compiled from THIS score, so a member
+        # with no beat here can never be given a line later. Measured over batch
+        # v2: scifi_news went 0-for-4 while every other lane was perfect, one
+        # failure burning 45 minutes before dying, and the live logs show it is
+        # specifically an uncovered ANNOUNCER surviving P3 into P5.
+        #
+        # The prior ruling that made this advisory (kibitz r3, Codex) was
+        # protecting against cast_coverage becoming an accidental FATAL
+        # successor to the removed beat-count gate. That still holds and is why
+        # this is a DRAFT error, not a hard failure: it retires this candidate
+        # and names the missing ids so the fresh-candidate loop can redraft.
+        # `_codex_target_beat_count` returns max(cast_count, 3, ...), so the
+        # topology always reserves a beat per cast member -- undercoverage is a
+        # drafting accident, not an impossibility, and a reroll can fix it.
+        #
+        # The reverse hole -- a beat naming an unknown cast id -- is still
+        # rejected per-beat above, so the executable graph stays closed.
+        raise RadioScoreDraftCompileError(
+            code="cast_coverage", path="scenes[].beats[].char_id",
+            detail=(
+                "every planned cast member must own at least one beat; "
+                f"{len(used_cast_ids)}/{len(cast_by_id)} covered, missing: "
+                + ", ".join(uncovered_cast_ids)
+            ),
         )
 
     compiled_cues: list[MusicCueV4] = []
