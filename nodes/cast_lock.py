@@ -499,6 +499,19 @@ class CastLock:
 
         bank_entries, _bank_sha = load_voice_bank()
         meta = led.get("meta") or {}
+        if meta.get("episode_seed") is None:
+            # SILENCE IS HOW THIS HID. A missing seed folds through
+            # coerce_int_seed(None) to one constant, so every episode drew the
+            # same announcer and the same character voices while every unit test
+            # stayed green -- measured over 14 published episodes before the
+            # writer began stamping it. Never fail on this; a legacy ledger must
+            # still render. Just stop it being invisible.
+            log.warning(
+                "[OTR_CastLock] meta.episode_seed is ABSENT -- voice and "
+                "announcer draws fall back to a CONSTANT seed, so this episode "
+                "will cast identically to every other seedless one. Expected on "
+                "pre-2026-08-05 ledgers; on a fresh render it means the writer "
+                "did not stamp it.")
         episode_seed = coerce_int_seed(meta.get("episode_seed"))
         # VC chunk 3 (2026-06-22): the writer stamps per-character voice-fit
         # facts (timbre/age_band) the frozen cast ROW schema cannot carry. Match

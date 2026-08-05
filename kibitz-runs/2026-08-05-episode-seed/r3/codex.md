@@ -1,0 +1,32 @@
+VERDICT: yes-with-fixes — choose one seed owner, cover the full audio/cache blast radius, and correct the credits/music claims before build.
+
+MUST-FIX BEFORE BUILD:
+1. [Q1] The plan leaves two incompatible sequences open. The custom-runner path returns to `_run_writer_tail` before the inline cast picker (`nodes/OTR_LedgerScriptWriter.py:3669-3716`), while the inline path mints `cast_seed` before `lock_cast` and later stamps `meta.cast_contract` (`nodes/OTR_LedgerScriptWriter.py:3944-4122`). Choose (a): after successful `lock_cast`, stamp `meta.episode_seed = cast_seed` beside `meta.cast_contract`. Do not lift the CONTENT_OWNED gate: its tail deliberately owns lanes that bypass the picker (`nodes/OTR_LedgerScriptWriter.py:6063-6084`), and resolving there for inline lanes would mint a second, unrelated entropy value.
+
+2. [Q2] Define the equality contract explicitly. Copying the number is safe because Bark replay reads only `meta.cast_contract.cast_seed` (`nodes/cast_lock.py:341-352`), whereas bank casting, render requests, and music read `meta.episode_seed` (`nodes/cast_lock.py:502-530`; `nodes/_otr_voice_node_common.py:427-525`; `nodes/stable_audio_theme.py:265-277`). However, “preserve an existing episode_seed” and “the two values never diverge” cannot both hold unless mismatch behavior is specified. The inline writer starts with a fresh ledger and exposes no `episode_seed` input (`nodes/OTR_LedgerScriptWriter.py:3537-3550`; `workflows/otr_canonical.json:1`, node 1), so the smallest contract is an unconditional copy on that path; explicit reproducibility remains `OTR_CAST_SEED`.
+
+3. [Q3] The blast-radius table understates `_otr_voice_node_common`. `episode_seed` is included in `stable_line_seed`, every resolved request identity, and therefore the audio-cache key (`nodes/_otr_resolved_request.py:244-282`; `nodes/_otr_resolved_request.py:68-80`; `nodes/_otr_audio_cache.py:72-82`). This changes stochastic synthesis and invalidates/rekeys cached audio, not merely reference selection. Add behavioral tests proving: same pinned episode seed produces the same resolved request/cache key; different episode seeds produce different keys; and legacy seedless behavior is no longer reachable from a newly produced ledger.
+
+4. [Q3/Q4] Pinning is lane-specific. `OTR_CAST_SEED` controls the inline picker (`nodes/OTR_LedgerScriptWriter.py:1347-1368`), but the fable2/content-owned runner stamps its own seed from `OTR_FABLE2_SEED` (`nodes/_otr_scifi_fable2.py:438-451`; `nodes/_otr_scifi_fable2.py:2768-2774`). The launcher correctly sets both only under `OTR_C7` and clears both for production (`scripts/_otr_soak_server_launch.cmd:26-42`). State this explicitly and test both families; do not claim `OTR_CAST_SEED` alone pins every episode lane.
+
+5. [Q3] Add an integration test through the serialized ledger channel, not source-text inspection. The canonical path is writer node 1 → freeze node 62 → CastLock node 80 → character/announcer/music nodes 81/82/83 via links 230, 234, and 235-237 (`workflows/otr_canonical.json:1`). Assert the same stamped integer survives that path and reaches voice and music seed derivation. Then run the live proof from the real canonical workflow: one `OTR_C7=1` replay and production runs without `OTR_C7`, checking the durable ledger, cue-manifest seeds, published asset, and `obs_publish OK`.
+
+6. [Q2/Q3] Correct the credits rationale. Credits already prefer `meta.cast_contract.cast_seed` over `meta.episode_seed` (`nodes/otr_credits_roll.py:313-318`), so a completed inline ledger already displays the varying cast seed; stamping the top-level key does not change that receipt. Remove the claim that legacy credits carried the frozen value. If seed-source display is touched, read `cast_contract.cast_seed_source`; the current display pairs the cast seed with unrelated `gen_params_initial.seed_source` (`nodes/otr_credits_roll.py:326`; `nodes/OTR_LedgerScriptWriter.py:5778-5794`).
+
+SHOULD-FIX:
+1. [Q5] Narrow the music claim. A missing episode seed freezes the base RNG and therefore repeats the engine seed for the same cue ID (`nodes/stable_audio_theme.py:265-277`, `:329`, `:375`), but prompts can vary from authored music rows or story metadata (`nodes/stable_audio_theme.py:301-375`; `nodes/_otr_music_prompt.py:76-130`). Test seed propagation separately from prompt variation; do not assert that complete music parameters or audio were identical across all episodes.
+
+2. [Q3] State that the committed cast golden does not need re-baselining. Its invariants call `lock_cast` and Bark replay directly with explicit seeds (`tests/test_cast_invariants.py:45-68`, `:104-125`; `tests/test_cast_voice_replay_parity.py:38-55`, `:105-116`). The affected contract is writer-to-media metadata propagation.
+
+3. [Q1] Keep the stamp at the successful cast-producer boundary rather than immediately after entropy minting. The skeleton ledger is saved before the cast operation (`nodes/OTR_LedgerScriptWriter.py:3528-3627`); an early in-memory stamp is not durable if `lock_cast` fails and falsely suggests a completed cast receipt. No downstream media can run until the writer succeeds, so earlier placement buys nothing.
+
+4. [Q1/Q4] Document the distinct, currently unwired FreezeCascade output also named `episode_seed`. It is a hash of the frozen ledger, not `meta.episode_seed` (`nodes/OTR_LedgerFreezeCascade.py:62-70`, `:428`). Keep output 5 unwired as required by `tests/test_freeze_cascade_v2_ports.py:76-84`; otherwise two incompatible clock/seed domains would be conflated.
+
+OPTIONAL / NICE-TO-HAVE:
+Add a durable `episode_seed_source` receipt only if a downstream diagnostic will consume it. The legacy lane already carries `cast_seed_source`; another unused metadata field is unnecessary.
+
+CUT THESE (over-engineering):
+1. [Q1 option (b)] Cut the tail-wide gate lift. It creates a second resolver call for inline lanes and obscures producer ownership.
+2. [Q1] Cut any new node input, widget, output, or workflow link. The seed already travels inside `script_json`/`ledger_json`; changing the ComfyUI interface would add positional-widget and workflow migration risk without solving propagation.
+3. [Q3] Cut golden cast regeneration. The cast algorithm and replay contract are unchanged; only the downstream episode seed receipt changes.
+4. [Q5] Cut audio-content equality assertions across different stories. Assert deterministic seed derivation and manifest receipts instead; prompts are intentionally story-dependent.

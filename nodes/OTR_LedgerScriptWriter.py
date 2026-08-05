@@ -3943,9 +3943,52 @@ class OTR_LedgerScriptWriter:
         # (BUG-LOCAL-260) were each decoupled from it.
         cast_seed, cast_seed_source = _resolve_cast_rng_seed()
         cast_rng = _random.Random(cast_seed)
+        # BUG-LOCAL-269 decoupled the CAST from the fixed seed widget so the
+        # characters stopped being identical every episode. Their VOICES were
+        # left behind: every voice draw, the announcer draw and the music base
+        # RNG are seeded on meta["episode_seed"], and on the inline lanes
+        # (shakespeare / public_domain / original / media_archive) nothing ever
+        # wrote that key. coerce_int_seed(None) folds to a single constant, so
+        # measured across 14 published episodes the announcer was bf_emma 14
+        # times and 18 cast rows used 5 distinct voices. Same bug, one layer
+        # down.
+        #
+        # Stamped HERE, at the mint, rather than 150 lines later beside
+        # meta["cast_contract"]: the consumers read this key, and any path that
+        # does not reach the cast-contract stamp would otherwise leave them on
+        # the frozen constant. The value is deliberately the SAME number as
+        # cast_contract.cast_seed -- credits prefer that key while voices and
+        # music read this one, and equal values are what keeps the displayed
+        # receipt honest about what actually rendered.
+        #
+        # BLAST RADIUS, stated plainly: episode_seed is folded into
+        # stable_line_seed and therefore into the resolved-request identity and
+        # the AUDIO CACHE KEY, so this also varies per-line synthesis and rekeys
+        # cached audio. That is the intent -- a per-episode seed is supposed to
+        # produce a per-episode render -- but it means the first run after this
+        # lands re-synthesizes rather than reusing cached lines.
+        #
+        # Never clobbers a caller-supplied seed, and content-owned lanes (which
+        # never reach this line) keep their own stamp in the writer tail.
+        # OTR_CAST_SEED pins the INLINE lanes for the C7 gate; the content-owned
+        # fable2 runner has its own OTR_FABLE2_SEED.
+        if meta.get("episode_seed") is None:
+            meta["episode_seed"] = int(cast_seed)
+        elif int(meta["episode_seed"]) != int(cast_seed):
+            # Divergence is not fatal, but it must not be silent: credits print
+            # cast_contract.cast_seed while voices and music use this key, so a
+            # mismatch makes the printed receipt describe a render that did not
+            # happen.
+            log.warning(
+                "[OTR_LedgerScriptWriter] meta.episode_seed=%s differs from the "
+                "cast seed %d -- the credits receipt prints the cast seed while "
+                "voices and music use episode_seed, so they now describe "
+                "different draws.",
+                meta.get("episode_seed"), int(cast_seed),
+            )
         log.info(
-            "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast "
-            "randomized per episode (BUG-LOCAL-269)",
+            "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast + voices + "
+            "music randomized per episode (BUG-LOCAL-269)",
             cast_seed, cast_seed_source,
         )
 
