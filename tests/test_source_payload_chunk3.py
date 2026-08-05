@@ -33,6 +33,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from nodes import _otr_public_domain_sources as _pd_sources
 from nodes import _otr_source_payload as osp
 from nodes import _otr_story_routing as routing
 
@@ -193,7 +194,13 @@ def test_public_domain_fetcher_wrapper_returns_source_fetch_result():
     assert payload["headline"] and " - " in payload["headline"]
     assert payload["full_text"].strip()
     assert ":" in meta["source_ref"], meta["source_ref"]
-    assert rights["license_status"] == "public_domain_us"
+    # The library is 64 public_domain_us works and one cc0 (cradle_protocol),
+    # so pinning ONE licence value made this fail 1 run in 65 -- a blank ref
+    # deals at random, which is this test's whole premise. Assert the licence
+    # is a VALID declared status; the sibling test below owns exact values on
+    # a pinned ref, which is where determinism belongs.
+    assert rights["license_status"] in _pd_sources._LICENSE_STATUSES, (
+        rights["license_status"], meta["source_ref"])
 
 
 def test_public_domain_fetcher_wrapper_is_deterministic_for_a_pinned_ref():
