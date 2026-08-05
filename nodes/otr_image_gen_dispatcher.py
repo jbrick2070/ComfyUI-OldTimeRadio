@@ -117,32 +117,72 @@ def _content_hash(obj) -> str:
 
 
 def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_version,
-                      kind="", w=0, h=0) -> str:
+                      kind="", w=0, h=0, *, anchor="") -> str:
     """The dispatch dedup key (PASS-IMG MUST-FIX #5). A change in ANY field ->
     new key -> regen -> new content hash -> B's mesh cache invalidates.
 
     Still-spine ST-3 (pass-02 Gem-1): the key gains ``kind`` + ``w`` + ``h``
     so a landscape scene still and a portrait of the same subject can never
-    collide, and a dim change regenerates."""
-    return _content_hash([
+    collide, and a dim change regenerates.
+
+    ``anchor`` is the portrait hash a reference-conditioned mint was actually
+    given. It is appended ONLY when non-empty, which is load-bearing twice over:
+    an unconditional append would change every existing digest, and a mint that
+    consumed no reference must not be rekeyed by one. Without it in the key, a
+    REGENERATED portrait would keep serving stills conditioned on the old face."""
+    parts = [
         str(role), str(object_id), str(prompt_hash), int(seed),
         str(engine_id), str(engine_version),
         str(kind), int(w or 0), int(h or 0),
-    ])
+    ]
+    if anchor:
+        parts.append(str(anchor))
+    return _content_hash(parts)
 
 
 def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
-    """Per-object seed under the V-7 request-hash scheme: ``mode=request_hash``
-    (the ImageDirector default) derives a deterministic seed from
-    ``request_seed + object_id + prompt_hash`` so every object gets its own
-    seed while the whole episode stays reproducible; ``mode=fixed`` returns
-    ``request_seed`` verbatim. Pure.
+    """The seed alone. See ``resolve_seed_and_mode`` for the full contract.
+
+    Kept as a thin wrapper so every existing call site stays byte-identical --
+    none of them pass a char_id, so none of them can reach the identity branch.
+    """
+    return resolve_seed_and_mode(seed_cfg, object_id, prompt_hash, kind=kind)[0]
+
+
+def resolve_seed_and_mode(
+    seed_cfg, object_id, prompt_hash, *, kind="", char_id="",
+    portrait_prompt_hash="",
+) -> "tuple[int, str]":
+    """Per-object seed AND how it was chosen, as ``(seed, mode)``.
+
+    A character's face changed on every single beat, by construction: each scene
+    still derived its seed from its own ``object_id`` plus its own per-beat
+    ``prompt_hash``, so three beats meant three unrelated draws. A
+    ``scene_character`` still now derives its seed from the CHARACTER'S OWN
+    PORTRAIT draw, which is the one image the whole episode already agrees on
+    (the portrait is also the sole init for the video lane). One face per
+    character, on every lane -- the invention lanes included, where there is no
+    source gender to get wrong in the first place.
+
+    The mode is returned alongside so the ledger can stamp what ACTUALLY
+    happened rather than a literal that lies the moment the kill switch is used.
+
+    jump_segment is deliberately excluded: a jump CUT is supposed to be a cut,
+    and tests/test_multiclip_jump_stills.py pins three DISTINCT seeds across a
+    base plus two segments. Those rows still get the anchor and the reference --
+    just not the shared seed.
+
+    Otherwise unchanged: ``mode=request_hash`` (the ImageDirector default)
+    derives a deterministic seed from ``request_seed + object_id + prompt_hash``
+    so every object gets its own seed while the whole episode stays reproducible;
+    ``mode=fixed`` returns ``request_seed`` verbatim. Pure.
 
     BUG-411 restore: the radio BOOKEND (``kind == "scene_open"``) renders with a
     FIXED deterministic seed (the 6/5 ``radio_bookend_seed=4242`` widget,
     env-overridable via ``OTR_RADIO_BOOKEND_SEED``) so the opening radio still is
     reproducible run-to-run independent of the request hash -- exactly the 6/5
-    behavior the rewrite lost."""
+    behavior the rewrite lost.
+    """
     # The radio BOOKEND still (scene_open) AND the radio-HOST FACE object
     # (2026-07-01 brief-driven radio-host; object_id "radio_host_portrait",
     # matches otr_meta_brief_image_prompt.RADIO_HOST_PORTRAIT_ID) both render
@@ -152,16 +192,30 @@ def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
     if (str(kind or "") == "scene_open" or _oid == "radio_host_portrait"
             or _oid.endswith("_radio_face_169")):   # ltx talking radio-face
         try:
-            return int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242))
+            return (int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242)), "")
         except (TypeError, ValueError):
-            return 4242
+            return (4242, "")
     cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
     base = int(cfg.get("request_seed") or 0)
     if str(cfg.get("mode") or "request_hash") != "request_hash":
-        return base
+        return (base, "")
+    # AFTER the mode gate, never before it. `base` does not exist until the line
+    # above, so a branch placed earlier raises UnboundLocalError inside a call
+    # that dispatch_images makes outside any try/except -- the whole dispatch
+    # dies. Placed between `base` and the gate, it silently breaks the
+    # documented mode='fixed' contract instead, which is worse.
+    if (str(kind or "") == "scene_character" and char_id and portrait_prompt_hash
+            and os.environ.get("OTR_PORTRAIT_IDENTITY_SEED", "1") != "0"):
+        # EXACTLY the portrait object's own draw: the portrait's object_id IS
+        # the char_id (otr_meta_brief_image_prompt.py:1765), so this reproduces
+        # the seed that character's portrait already rendered with, leaving the
+        # portrait itself byte-identical.
+        digest = hashlib.sha256(
+            f"{base}:{char_id}:{portrait_prompt_hash}".encode()).hexdigest()
+        return (int(digest[:8], 16), "seed")
     digest = hashlib.sha256(
         f"{base}:{object_id}:{prompt_hash}".encode()).hexdigest()
-    return int(digest[:8], 16)
+    return (int(digest[:8], 16), "")
 
 
 #: ImageDirector slot per object ROLE (still-spine ST-3: the slots finally
@@ -823,6 +877,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     objects, required_scene_targets, _jump_report = merge_jump_still_requests(
         ledger, objects, required_scene_targets)
     report.extend(_jump_report)
+    # The coverage-plan module was previously bound only inside
+    # merge_jump_still_requests. The object loop below needs JUMP_STILL_KIND to
+    # decide which rows carry a portrait anchor, so bind it here too -- the same
+    # lazy, guarded import, no new dependency.
+    _cp = _coverage_plan_module()
     _required_ids = []
     for _target in required_scene_targets:
         if not isinstance(_target, dict) or not str(
@@ -995,10 +1054,71 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 hit.get("index"), hit.get("prompt_len"),
                 hit.get("prompt_hash"), hit.get("excerpt"))
             continue
-        seed = resolve_object_seed(seed_cfg, oid, prompt_hash, kind=kind)
+        # Resolve the character's PORTRAIT row once, before the seed and the
+        # cache key. Read off the IMAGES list, never the cast row: stamp_portrait
+        # writes portrait_content_hash only on a fresh render, so on a cache HIT
+        # the cast lookup returns None -- exactly where the anchor matters most.
+        # reversed() so a stale row from an earlier image_revision cannot win.
+        portrait_row = None
+        if kind in ("scene_character", _cp.JUMP_STILL_KIND) and char_id:
+            portrait_row = next(
+                (r for r in reversed(images)
+                 if isinstance(r, dict) and r.get("kind") == "portrait"
+                 and str(r.get("object_id") or "") == char_id),
+                None,
+            )
+            if portrait_row is None:
+                report.append(
+                    f"{oid}: no portrait row for char_id {char_id!r} -- still "
+                    f"has NO identity anchor (LOUD)")
+                log.warning(
+                    "[OTR_ImageGenDispatcher] %s: no portrait row for char_id "
+                    "%r; scene still gets no identity anchor", oid, char_id)
+        anchor_hash = str((portrait_row or {}).get("portrait_content_hash") or "")
+
+        # Resolve the reference PNG HERE -- before the cache key, not after it.
+        # The cache-HIT branch below `continue`s, so a reference resolved later
+        # could never enter the key, and a REGENERATED portrait would go on
+        # serving stills conditioned on the old face. Silently.
+        reference_image = ""
+        if (portrait_row is not None and anchor_hash
+                and getattr(_safe_engine(engine_id),
+                            "accepts_reference_image", False)
+                and os.environ.get("OTR_PORTRAIT_REFERENCE", "1") != "0"):
+            _cand = str(portrait_row.get("pool_path")
+                        or portrait_row.get("path") or "")
+            if not _cand or not os.path.isfile(_cand):
+                try:
+                    _cand = str(_pl.portrait_path_for_hash(
+                        anchor_hash, output_dir) or "")
+                except Exception:  # noqa: BLE001 -- resolver is best-effort
+                    _cand = ""
+            if _cand and os.path.isfile(_cand):
+                reference_image = _cand
+            else:
+                # Fail SOFT and LOUD. An unanchored mint is exactly as good as
+                # yesterday's build; refusing the episode over a missing file
+                # would invent a hard stop for a degradation.
+                report.append(
+                    f"{oid}: portrait reference file missing for char_id "
+                    f"{char_id!r}; minting WITHOUT an identity reference (LOUD)")
+                log.warning(
+                    "[OTR_ImageGenDispatcher] %s: portrait reference not on "
+                    "disk for char_id %r; mint proceeds unanchored", oid, char_id)
+
+        seed, anchor_mode = resolve_seed_and_mode(
+            seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
+            portrait_prompt_hash=str((portrait_row or {}).get("prompt_hash") or ""),
+        )
+        if reference_image:
+            # A reference was truly consumed, so the face it carries is part of
+            # this request's identity. Only then -- an unanchored mint keeps its
+            # existing key.
+            anchor_mode = "reference_latent"
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
         key = request_cache_key(role, oid, prompt_hash, seed, engine_id,
-                                eng_version, kind=kind, w=obj_w, h=obj_h)
+                                eng_version, kind=kind, w=obj_w, h=obj_h,
+                                anchor=anchor_hash if reference_image else "")
         if key in cache_index:
             # Cache HIT (pass-02 Gem-2): the hit must STILL materialize into
             # the CURRENT episode's stills/ + append a fresh ledger row --
@@ -1028,6 +1148,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "image_id": hit_id, "object_id": oid, "kind": kind,
                     "role": role, "path": dst, "pool_path": src,
                     "provenance": {"source": "cache_hit"},
+                    # Stamped UNCONDITIONALLY, including the empty case. This
+                    # row starts as a copy of an older one, so a conditional
+                    # stamp would inherit a stale anchor from a previous
+                    # character or a previous revision.
+                    "derived_from_portrait_hash": anchor_hash,
+                    "portrait_anchor_mode": anchor_mode,
                 })
                 if char_id:
                     fresh["char_id"] = char_id
@@ -1107,6 +1233,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
             "negative_prompt": visual_safety_negative(
                 str(obj.get("negative_prompt") or "")),
+            # The character's canonical portrait, when this engine declared it
+            # can condition on one. Empty string on every other path, so an
+            # adapter that never opts in sees exactly the request it always saw.
+            "reference_image": reference_image,
             # w/h end-to-end (pass-02 Gem-1): the engine call reads
             # width/height (flux_gen1._flux_params request precedence), so
             # landscape scene stills are REAL, not env defaults.
@@ -1172,9 +1302,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "kind": kind,
             "path": ep_path, "pool_path": str(path),
             "engine_id": engine_id, "engine_version": eng_version,
+            # portrait_content_hash is THIS row's own decoded-pixel hash on
+            # every kind, portrait or scene -- render_driver and the mesh cache
+            # read it under that name, so it is not renamed.
+            # derived_from_portrait_hash is the different thing: which
+            # character's portrait this scene still was anchored to.
             "request_hash": key, "portrait_content_hash": content_hash,
             "content_hash": content_hash, "w": obj_w, "h": obj_h,
             "prompt_hash": prompt_hash, "provenance": {"source": obj.get("source", "")},
+            "derived_from_portrait_hash": anchor_hash,
+            "portrait_anchor_mode": anchor_mode,
         }
         if char_id:
             row["char_id"] = char_id

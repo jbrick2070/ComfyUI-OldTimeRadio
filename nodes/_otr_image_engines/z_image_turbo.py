@@ -152,6 +152,30 @@ class ZImageTurboEngine:
     requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
     engine_version = "1"
+    #: This adapter can condition a mint on the character's canonical portrait,
+    #: so the dispatcher may hand it a reference_image. Lumina2/Z-Image carries
+    #: the ref_latents path (model_base.Lumina2.extra_conds), and the installed
+    #: checkpoint's header shows cap_pad_token and x_pad_token present with no
+    #: siglip module, so the reference embeds through the shared x_embedder with
+    #: no missing weights. Whether the TURBO checkpoint was trained to attend to
+    #: it is a separate question that only the live A/B answers.
+    accepts_reference_image = True
+
+    #: Resolved SEPARATELY from _node_candidates and merged per call. These must
+    #: never join the main candidate map: render_image caches the resolved map on
+    #: the registry SINGLETON, and the episode's first mint is an unreferenced
+    #: portrait -- so a params-gated map would be cached WITHOUT these keys and
+    #: every later referenced mint would die with 'class unresolved'.
+    #: ImageScale, never FluxKontextImageScale: resolve_graph_classes binds the
+    #: first installed name, and FluxKontextImageScale.execute takes `image`
+    #: ONLY, so it would receive upscale_method/width/height/crop and TypeError.
+    _REF_CANDIDATES = {
+        "load_ref": ("LoadImage",),
+        "scale_ref": ("ImageScale",),
+        "encode_ref": ("VAEEncode",),
+        "ref_pos": ("ReferenceLatent",),
+        "ref_neg": ("ReferenceLatent",),
+    }
 
     #: Terminal graph node (its IMAGE output is the still).
     _TERMINAL = "decode"
@@ -203,6 +227,10 @@ class ZImageTurboEngine:
             # no-request default. Honor dims EXACTLY -- no snapping/upscale here.
             "width": int(get("width") or get("w") or _eint("OTR_ZIMAGE_WIDTH", 1024)),
             "height": int(get("height") or get("h") or _eint("OTR_ZIMAGE_HEIGHT", 1024)),
+            "reference_image": str(get("reference_image") or ""),
+            # Capped well under the portrait's native 1216 so the reference
+            # costs roughly 1.5k latent tokens instead of 4k on an 8-step mint.
+            "reference_height": _eint("OTR_PORTRAIT_REF_HEIGHT", 768),
         }
 
     def _node_candidates(self, params=None):
@@ -233,7 +261,8 @@ class ZImageTurboEngine:
         0=MODEL; CLIPLoader out 0=CLIP; VAELoader out 0=VAE; ModelSamplingAuraFlow
         out 0=MODEL (shifted)."""
         W = wire
-        return {
+        ref = str(params.get("reference_image") or "")
+        graph = {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": params["unet_name"],
                                 "weight_dtype": params["unet_dtype"]}},
@@ -268,6 +297,39 @@ class ZImageTurboEngine:
                        "inputs": {"samples": W("ksampler", 0),
                                   "vae": W("vae", 0)}},
         }
+        if not ref:
+            return graph
+        # ImageScale.upscale takes all FIVE arguments -- image, upscale_method,
+        # width, height, crop -- and run_graph calls fn(**kwargs) straight off
+        # this inputs dict with no fallback, so a short-form node is a dead
+        # episode, not a warning. width=0 lets ImageScale derive the missing
+        # side from the actual image, keeping the 832x1216 portrait's aspect so
+        # no face is cropped into a 16:9 band; VAE.encode crops to a multiple of
+        # 8 internally, so a derived odd width is safe.
+        graph["load_ref"] = {"class": "load_ref", "inputs": {"image": ref}}
+        graph["scale_ref"] = {
+            "class": "scale_ref",
+            "inputs": {"image": W("load_ref", 0), "upscale_method": "lanczos",
+                       "width": 0, "height": int(params["reference_height"]),
+                       "crop": "disabled"}}
+        graph["encode_ref"] = {
+            "class": "encode_ref",
+            "inputs": {"pixels": W("scale_ref", 0), "vae": W("vae", 0)}}
+        # BOTH conditionings. z_image runs cfg=2.0 with a live negative, and the
+        # model doubles its timesteps only on the omni path -- referencing the
+        # positive alone would take the CFG delta between two structurally
+        # different forward passes.
+        graph["ref_pos"] = {
+            "class": "ref_pos",
+            "inputs": {"conditioning": W("pos", 0), "latent": W("encode_ref", 0)}}
+        graph["ref_neg"] = {
+            "class": "ref_neg",
+            "inputs": {"conditioning": W("neg", 0), "latent": W("encode_ref", 0)}}
+        # The rewire is the point. A graph that builds the chain and forgets to
+        # consume it passes a node-count check and renders nothing different.
+        graph["ksampler"]["inputs"]["positive"] = W("ref_pos", 0)
+        graph["ksampler"]["inputs"]["negative"] = W("ref_neg", 0)
+        return graph
 
     # ---- residency (classes resolve lazily; loader nodes own the weights) ----
     def load(self):  # pragma: no cover - resolved lazily in render_image
@@ -318,6 +380,21 @@ class ZImageTurboEngine:
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates(params))
         self._classes = classes
+        if params.get("reference_image"):
+            # Stage the PNG into ComfyUI's input dir OUTSIDE the graph builder,
+            # which stays pure -- LoadImage resolves the returned basename.
+            params = dict(
+                params,
+                reference_image=_wb.stage_into_comfy_input(
+                    params["reference_image"]),
+            )
+            ref_classes = getattr(self, "_ref_classes", None) \
+                or _wb.resolve_graph_classes(self._REF_CANDIDATES)
+            self._ref_classes = ref_classes
+            # Merged into a LOCAL map for this call only, so the cached
+            # self._classes never gains reference keys and an unreferenced mint
+            # keeps resolving exactly what it always did.
+            classes = {**classes, **ref_classes}
         graph = self._build_zimage_graph(params, _wb.Wire)
         try:
             images = _wb.run_graph(graph, classes, terminal=self._TERMINAL)[0]

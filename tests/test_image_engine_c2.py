@@ -165,3 +165,116 @@ def test_z_image_cold_import_clean():
     r = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),
                        capture_output=True, text=True)
     assert r.returncode == 0, f"heavy libs at import:\n{r.stdout}\n{r.stderr}"
+
+
+# ---------------------------------------------------------------------------
+# Portrait reference conditioning (2026-08-05). No engine consumed a reference
+# at all, so a character's face was re-invented from text on every beat.
+# ---------------------------------------------------------------------------
+def _zimage():
+    from nodes._otr_image_engines import registry as ireg
+    return ireg.get_engine("z_image_turbo")
+
+
+def test_only_migrated_engines_declare_the_reference_capability():
+    """An adapter that never opts in must be a hard no-op: the dispatcher reads
+    this through getattr(..., False) before it will resolve a reference at all.
+    """
+    from nodes._otr_image_engines import registry as ireg
+
+    for name in ireg.all_engine_names():
+        eng = ireg.get_engine(name)
+        declared = bool(getattr(eng, "accepts_reference_image", False))
+        assert declared is (name == "z_image_turbo"), name
+
+
+def test_google_image_rejects_the_singular_reference_key():
+    """The guard checked `reference_images` (plural) only, so the singular key
+    the dispatcher actually sends sailed past it into the network call.
+    """
+    import pytest
+
+    from nodes._otr_image_engines import eng_google_image as g
+
+    with pytest.raises(g.GoogleAPIRequestShapeError):
+        g._reject_reference_inputs({"reference_image": "/tmp/portrait.png"})
+    # and the pre-existing shapes still raise
+    with pytest.raises(g.GoogleAPIRequestShapeError):
+        g._reject_reference_inputs({"init_image": "x"})
+    g._reject_reference_inputs({"prompt": "a radio"})  # clean request: no raise
+
+
+def test_unreferenced_zimage_graph_is_byte_identical_to_the_shipped_nine():
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+
+    eng = _zimage()
+    params = eng._zimage_params({"prompt": "a stern man", "seed": 7})
+    assert not params["reference_image"]
+    assert set(eng._build_zimage_graph(params, _wb.Wire)) == {
+        "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
+        "ksampler", "decode",
+    }
+
+
+def test_referenced_zimage_graph_adds_the_chain_AND_rewires_the_sampler():
+    """A graph that builds the chain and forgets to consume it passes a node
+    count check and renders nothing different -- so assert the rewire.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+
+    eng = _zimage()
+    params = eng._zimage_params(
+        {"prompt": "a stern man", "seed": 7, "reference_image": "portrait.png"})
+    graph = eng._build_zimage_graph(params, _wb.Wire)
+    assert set(graph) == {
+        "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
+        "ksampler", "decode",
+        "load_ref", "scale_ref", "encode_ref", "ref_pos", "ref_neg",
+    }
+    assert graph["ksampler"]["inputs"]["positive"] == _wb.Wire("ref_pos", 0)
+    assert graph["ksampler"]["inputs"]["negative"] == _wb.Wire("ref_neg", 0)
+    assert graph["ref_pos"]["inputs"]["conditioning"] == _wb.Wire("pos", 0)
+    assert graph["ref_neg"]["inputs"]["conditioning"] == _wb.Wire("neg", 0)
+
+
+def test_the_scaler_is_spelled_with_every_argument_ImageScale_requires():
+    """ImageScale.upscale is (image, upscale_method, width, height, crop), all
+    required, and run_graph calls fn(**kwargs) with no fallback -- a short-form
+    node is a dead episode, not a warning.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+
+    eng = _zimage()
+    params = eng._zimage_params(
+        {"prompt": "x", "seed": 1, "reference_image": "p.png"})
+    scale = eng._build_zimage_graph(params, _wb.Wire)["scale_ref"]
+    assert set(scale["inputs"]) == {
+        "image", "upscale_method", "width", "height", "crop"}
+    # width=0 lets ImageScale derive the side from the real image, so a
+    # head-and-shoulders portrait is not centre-cropped into a 16:9 band.
+    assert scale["inputs"]["width"] == 0
+    assert scale["inputs"]["crop"] == "disabled"
+
+
+def test_flux_kontext_scaler_must_not_share_the_candidate_tuple():
+    """resolve_graph_classes binds the FIRST installed name, and
+    FluxKontextImageScale.execute takes `image` only -- it would receive four
+    extra kwargs and TypeError inside a GraphExecutionError.
+    """
+    eng = _zimage()
+    assert eng._REF_CANDIDATES["scale_ref"] == ("ImageScale",)
+    assert "FluxKontextImageScale" not in eng._REF_CANDIDATES["scale_ref"]
+
+
+def test_reference_classes_never_pollute_the_cached_singleton_map():
+    """The registry stores ONE instance and render_image caches the resolved
+    class map on it. The episode's first mint is an unreferenced portrait, so a
+    params-gated main map would be cached without the reference keys and every
+    later referenced mint would die with 'class unresolved'.
+    """
+    eng = _zimage()
+    assert "load_ref" not in eng._node_candidates()
+    assert "load_ref" not in eng._node_candidates(
+        {"reference_image": "p.png", "latent_node": "EmptySD3LatentImage"})
+    assert set(eng._REF_CANDIDATES) == {
+        "load_ref", "scale_ref", "encode_ref", "ref_pos", "ref_neg"}

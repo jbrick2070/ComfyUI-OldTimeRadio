@@ -144,7 +144,10 @@ def _prompt(request) -> str:
 def _reject_reference_inputs(request) -> None:
     init_image = _req_get(request, "init_image")
     reference_images = _req_get(request, "reference_images")
-    if init_image or reference_images:
+    # SINGULAR too: the dispatcher passes `reference_image`, and checking only
+    # the plural name let that key sail past this guard into the network call.
+    reference_image = _req_get(request, "reference_image")
+    if init_image or reference_images or reference_image:
         raise GoogleAPIRequestShapeError(
             "google_image.generate: init/reference images are not supported by "
             "this text-to-image adapter yet (no request sent)"

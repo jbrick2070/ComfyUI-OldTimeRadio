@@ -1402,6 +1402,27 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     prompt = finish_visual_prompt(
         meta, prompt, era_profile="portrait", style=style,
     )
+    # A shared seed with a RE-WORDED subject is still a different face. The LLM
+    # receives the appearance only as a hint and may paraphrase it, while the
+    # deterministic composer leads with it verbatim -- so only one of the two
+    # paths anchored identity at all. Lead with the same tokens here.
+    #
+    # Keyed off ce.get('char_id'), mirroring _build_char_scene_request exactly.
+    # The separately-passed `cid` disagrees whenever ce carries no char_id key,
+    # and then the "same token sequence" premise fails silently.
+    _app = _appearance_for_char([ce], str(ce.get("char_id") or ""))
+    if not _app:
+        warnings.append(
+            f"char-scene: no appearance text for {cid}; still has NO identity "
+            f"anchor (LOUD)")
+    else:
+        # Not cosmetic: path_guard_arm rejects os.altsep, which IS '/' on
+        # Windows, and appearance text newly reaching the FINAL prompt would
+        # expose this path to the guard that skips the still entirely. A scarf
+        # described as "black/white" would silently cost the beat its image.
+        _app = _app.replace("\\", " ").replace("/", " or ")
+        if _app[:40] not in prompt:
+            prompt = f"{_app}, {prompt}"
     if style.image_grade_tail and style.image_grade_tail not in prompt:
         prompt = f"{prompt}, {style.image_grade_tail}"
     if not prompt.endswith(NO_TEXT_CLAUSE):

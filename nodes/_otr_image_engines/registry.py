@@ -76,6 +76,16 @@ class ImageEngine(Protocol):
     # --- image-specific identity ---
     required_inputs: tuple
 
+    # OPTIONAL class attribute, read everywhere as
+    # ``getattr(eng, "accepts_reference_image", False)``: True means the adapter
+    # knows how to condition a mint on a reference PNG (the character's canonical
+    # portrait) rather than on text alone. An adapter that never declares it is a
+    # hard no-op -- the dispatcher will not resolve a reference for it, so an
+    # un-migrated engine cannot be handed a request shape it does not understand.
+    # Deliberately NOT in the CAPABILITIES table: that table describes toolchain
+    # and VRAM, not request shape.
+    accepts_reference_image: bool
+
     # --- prompt -> image lifecycle (adapters implement; not called by registry) ---
     def assert_usable(self, host_caps, profile, request_template=None): ...
     def prepare(self, host_caps, profile, session_ctx): ...

@@ -1037,3 +1037,114 @@ class TestDispatcherStillSpine:
         finally:
             ireg._IMAGE_REGISTRY._registry.clear()
             ireg._IMAGE_REGISTRY._registry.update(saved)
+
+
+# ---------------------------------------------------------------------------
+# Portrait / face continuity (2026-08-05).
+#
+# A character's face changed on EVERY beat by construction: each scene still
+# derived its seed from its own object_id plus its own per-beat prompt_hash, so
+# three beats meant three unrelated draws. The scene still now derives its seed
+# from that character's OWN portrait draw.
+# ---------------------------------------------------------------------------
+class TestPortraitIdentitySeed:
+    """HEAD baselines captured BEFORE the change, then the change itself.
+
+    The literals below are the point of the baselines: written after the fact
+    they would be self-fulfilling, and the append-only-when-truthy construction
+    that keeps them stable is exactly what a later step could break.
+    """
+
+    RH = {"request_seed": 0, "mode": "request_hash"}
+
+    def test_head_cache_key_digest_is_unchanged(self):
+        from nodes import otr_image_gen_dispatcher as disp
+
+        assert disp.request_cache_key(
+            "character_video", "still_b002", "phX", 123, "z_image_turbo", "1",
+            kind="scene_character", w=1472, h=832,
+        ) == ("e8e5a5dcacd093e8db11220d218e477a2656763056bb1faca3a61d9f5539"
+              "f17d")
+
+    def test_head_seed_pins_are_unchanged(self):
+        import hashlib
+
+        from nodes import otr_image_gen_dispatcher as disp
+
+        assert disp.resolve_object_seed(self.RH, "c01", "pp_portrait") == 1692108723
+        assert 1692108723 == int(
+            hashlib.sha256(b"0:c01:pp_portrait").hexdigest()[:8], 16)
+        assert disp.resolve_object_seed(
+            {"request_seed": 7, "mode": "fixed"}, "still_b002", "ph") == 7
+        assert disp.resolve_object_seed(
+            self.RH, "x", "ph", kind="scene_open") == 4242
+        assert disp.resolve_object_seed(
+            self.RH, "radio_host_portrait", "ph") == 4242
+
+    def test_every_beat_of_one_character_draws_the_portrait_seed(self):
+        from nodes import otr_image_gen_dispatcher as disp
+
+        portrait = disp.resolve_object_seed(self.RH, "c01", "pp_portrait")
+        for oid in ("still_b002", "still_b004", "still_b006"):
+            assert disp.resolve_seed_and_mode(
+                self.RH, oid, "ph_" + oid, kind="scene_character",
+                char_id="c01", portrait_prompt_hash="pp_portrait",
+            ) == (portrait, "seed")
+
+    def test_placement_after_the_mode_gate_keeps_the_fixed_contract(self):
+        """Placed before the gate this returns a hashed seed instead of 7, and
+        placed before `base` is assigned it raises UnboundLocalError inside a
+        call dispatch_images makes outside any try/except.
+        """
+        from nodes import otr_image_gen_dispatcher as disp
+
+        assert disp.resolve_seed_and_mode(
+            {"request_seed": 7, "mode": "fixed"}, "still_b002", "ph",
+            kind="scene_character", char_id="c01",
+            portrait_prompt_hash="pp") == (7, "")
+
+    def test_a_jump_cut_is_still_a_cut(self):
+        from nodes import otr_image_gen_dispatcher as disp
+
+        seeds = {
+            disp.resolve_seed_and_mode(
+                self.RH, oid, "ph_" + oid, kind="jump_segment",
+                char_id="c01", portrait_prompt_hash="pp_portrait")[0]
+            for oid in ("still_b002", "still_b002_s1", "still_b002_s2")
+        }
+        assert len(seeds) == 3
+
+    def test_incomplete_identity_inputs_fall_back_to_todays_derivation(self):
+        from nodes import otr_image_gen_dispatcher as disp
+
+        today = disp.resolve_object_seed(self.RH, "still_b002", "ph2")
+        assert disp.resolve_seed_and_mode(
+            self.RH, "still_b002", "ph2", kind="scene_character") == (today, "")
+        assert disp.resolve_seed_and_mode(
+            self.RH, "still_b002", "ph2", kind="scene_character",
+            char_id="c01") == (today, "")
+
+    def test_the_kill_switch_reproduces_the_old_behaviour_exactly(self, monkeypatch):
+        from nodes import otr_image_gen_dispatcher as disp
+
+        monkeypatch.setenv("OTR_PORTRAIT_IDENTITY_SEED", "0")
+        today = disp.resolve_object_seed(self.RH, "still_b002", "ph2")
+        seed, mode = disp.resolve_seed_and_mode(
+            self.RH, "still_b002", "ph2", kind="scene_character",
+            char_id="c01", portrait_prompt_hash="pp_portrait")
+        assert (seed, mode) == (today, ""), "the stamped mode must never lie"
+
+    def test_anchor_only_when_truthy_keeps_the_head_digest_stable(self):
+        """An unconditional append changes EVERY digest, including for objects
+        that never resolve a reference.
+        """
+        from nodes import otr_image_gen_dispatcher as disp
+
+        args = ("character_video", "still_b002", "phX", 123, "z_image_turbo", "1")
+        kw = {"kind": "scene_character", "w": 1472, "h": 832}
+        assert disp.request_cache_key(*args, **kw) == disp.request_cache_key(
+            *args, anchor="", **kw)
+        assert disp.request_cache_key(*args, anchor="abc", **kw) != \
+            disp.request_cache_key(*args, anchor="def", **kw)
+        assert disp.request_cache_key(*args, anchor="abc", **kw) != \
+            disp.request_cache_key(*args, **kw)
