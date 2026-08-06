@@ -188,3 +188,65 @@ conformance -- no paid calls, offline-first.
 
 **That single leg also discharges F11** (the mirror deletion has never had a live
 proof) and the multi-clip receipt work's outstanding live proof.
+
+## 7. FINAL-GATE FINDINGS -- open, and the decisions they owe
+
+Found by the Fable co-judge at `65bd6705`, AFTER r4. Neither is fixed; both are
+scheduled here rather than guessed at.
+
+### 7.1 The SFX receipt trio is inherited from the LAST segment (shipped defect)
+
+`beat_clip = dict(clip or {})` (`render_driver.py:3499`) never overwrites
+`sfx_stem_path`, `sfx_duration_s` or `sfx_sha256`. All three are beat-scope
+where they are consumed: `persist_episode_clips` moves the stem as the BEAT's
+(`render_driver.py:4442-4457`), `build_clip_manifest` publishes it on the beat
+row (`:4648-4652`), and `otr_master_audio_mux.py:194-209` lays it into the
+master mix. Producers: `eng_cloud_video.py:916`, `eng_google_vid_sfx.py:439-441`.
+
+**Reachable but dormant:** the `google_vid_sfx` contracts
+(`eng_google_vid_sfx.py:455-460, 498-504`) are soft-continuity discrete ladders,
+so a beat above the top rung takes `JOIN_JUMP` multi-segment and lands in
+`render_beat_coverage` -- where the assembled beat's SFX receipt names only the
+FINAL segment's stem, hash and duration. Cloud lanes cannot run on this box, so
+this is the same dormancy class the `ltx_8gb` receipt had before `e499b7fc`
+fixed it.
+
+**THE DECISION THIS OWES, and why it was not made at the gate:** for a
+multi-segment beat, is the honest value `None` (fail-closed -- the beat has no
+single stem, and a partial one misrepresents it, at the cost of losing that
+beat's SFX) or a MERGED stem (correct, but new work in the assembler)? Publishing
+the last segment's stem is wrong either way. **Do not guess.** Whichever is
+chosen, write it UNCONDITIONALLY like the other beat-scope fields -- that is the
+trap this whole change exists to close, and this is its fifth, sixth and seventh
+instance.
+
+### 7.2 The grader crashes with the WRONG EXIT CODE on malformed rows
+
+Probe-proven: a non-dict inside `manifest["clips"]` (`acceptance.py:361-362`,
+`:429-430`), a non-dict inside `video.shots` (`:76`, `:365`, `:432`), or a
+`coverage_plan` that is a list (`:102`) all raise `AttributeError`. Through
+`scripts/grade_episode.py` these escape as tracebacks with **exit 1 -- the code
+reserved for "graded, findings found"** (`grade_episode.py:112-116`), not exit 2
+("could not grade"). **Automation keying on exit codes reads a crashed grader as
+a graded episode.**
+
+Section 3's `RULE_MANIFEST_SHAPE` closes the MANIFEST half. **The LEDGER half is
+scheduled nowhere** -- and "KEEP `grade_frozen_route`, it is manifest-independent"
+still crashes on a malformed ledger shot row. Both halves, plus a top-level
+`except` in the durable script that exits 2 rather than 1.
+
+### 7.3 One design decision the spec must make before an engineer starts
+
+Step 3's v1 contract says "BOUNDED engines additionally owe native-count
+evidence" -- but the grader may import nothing and query no live state, and
+nothing here says **where boundedness comes from**. The three candidates are not
+equivalent: presence of `coverage_plan` on the shot (under-covers a bounded beat
+that fits one render); a new ShotLock-minted per-shot stamp (probably right,
+currently unspecified); or an engine-name allowlist inside `acceptance.py`
+(violates that module's stated principles). **Make this call before building.**
+
+### 7.4 Line-cite drift
+
+This spec was written at `1759afdd`; `acceptance.py` has grown since. Its cites
+`:353-355`, `:418-420`, `:488-508` are now `:361-362`, `:429-430`, `:515-520`.
+Re-pin before use.
