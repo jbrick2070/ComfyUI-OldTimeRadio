@@ -3,6 +3,69 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD 6a92cbd3 (v2.0-alpha) -- CODER (Item 8: five of six chunks shipped, audit live over the corpus)
+
+Did: built Item 8 chunks 4, 3, 6 and 5 on top of chunk 1. Suite **8798 passed** / 131
+  skipped / 1 xfailed; Bug Bible 17; post-commit B7 re-run also 8798. Four commits,
+  all pushed, HEAD == origin.
+
+- **Chunk 4 -- `presentation_gender` (`d4e51b4d`).** The ledger never recorded which
+  gender the delivered voice actually presents as, so nothing could check it. Stamped in
+  `CastLock._stamp` -- the ONE place every stamped row passes through, so characters,
+  the announcer, the hybrid voice-fit branch and the gender-agnostic fallback are all
+  covered by one line. Value comes from the reference ACTUALLY chosen, not the row's
+  label, which is the only honest source for the two cases the label cannot answer: the
+  announcer (episode-seeded reference that never read its row) and `other` (served by a
+  draw the bank makes without regard to gender).
+  **Carried CONDITIONALLY through `Ledger.set_cast`**, on the existing
+  `provider_voice_id` precedent. The first attempt added it unconditionally and turned
+  `test_fable2_assembly`'s cast-row drift guard red -- correctly, that guard compares
+  WRITER-STAGE keys against a legacy reference. Conditional emission keeps an uncast row
+  byte-identical, so the guard keeps its teeth.
+- **Chunk 3 -- the scifi lane (`6d078f81`).** `_assemble_ledger` hardcoded
+  `{"c01": speaker_6, "c02": speaker_3, "c03": speaker_0}` -- all three MALE, keyed on
+  slot, gender never read -- so every sampled episode shipped the same three male voices
+  whoever was in it. Now allocated from ordered gendered pools read out of
+  `cast_pools.VOICE_PROFILES` with used-exclusion, failing loudly on exhaustion. NOT a
+  gender->preset lookup: two same-gender rows would collide and trip
+  `_assert_unique_bark_voices`. `other` rows get a presentation keyed on `char_id` via
+  **sha1, never `hash()`** -- the builtin is PYTHONHASHSEED-salted and would hand one
+  character different voices across runs.
+  **Correction to an earlier claim in this log's predecessor:** that dict lookup could
+  NOT `KeyError` on a fourth character -- `CastPlanRowV4.char_id` is a
+  `Literal["announcer","c01","c02","c03"]`, so the model constrains it. Gender-blindness
+  was the whole defect; there was no crash risk.
+- **Chunk 6 -- the policy stamp (`6a92cbd3`).**
+  `meta.voice_portrait_consistency_policy_revision = 1`, written by the WRITER before
+  the freeze, deliberately not by CastLock: CastLock can be re-run over an old ledger and
+  would silently promote it to a contract its producer never honoured. Absence means
+  legacy, permanently. `cast_lock_revision` cannot substitute (it counts EXECUTIONS), and
+  neither can "is `presentation_gender` present?" -- that cannot tell POLICY ABSENT from
+  FIELD DROPPED, which is exactly the ambiguity that hid the citation regression.
+- **Chunk 5 -- `scripts/audit_voice_gender_consistency.py` (`6a92cbd3`).** ENGINE-AWARE:
+  it checks the field the row's engine actually SPEAKS (bark -> `voice_preset`,
+  kokoro -> `voice_ref_id`, cloud -> `provider_voice_id`, clone default ->
+  `voice_ref_id`) and reports every other populated identity field as DORMANT rather than
+  as a violation. **Exit 2 means the scan did not finish** -- unreadable ledger, zero
+  ledgers, bad root, unloadable authority, ambiguous workflow nodes. Deliberately unlike
+  `audit_spoken_citations.py`, which reports an operational error only when it has no
+  findings, so a partial scan there can look like a clean report.
+  **First corpus baseline: 1,595 ledgers, 0 unreadable, 0 VIOLATIONS** -- every ledger is
+  pre-policy, which the audit states rather than passing quietly. Underneath: 332 legacy
+  findings (mostly announcer label-vs-seeded-voice, the by-design case), 401 DORMANT
+  mismatches, 3,343 rows with no active identity field at all.
+- **Gotcha banked:** a source-scanning test that greps for a forbidden pattern must strip
+  COMMENTS first. A guard asserting `"hash(" not in src` failed on the code's own comment
+  explaining why `hash()` is forbidden.
+- **Left, and it is the only Item 8 chunk outstanding:** chunk 2-remainder, the portrait
+  contradiction DETECTOR. r4 ruled the render path may only report -- 
+  `otr_meta_brief_image_prompt.py:1587` forbids any Python classifier from rejecting,
+  rewriting or blocking a prompt -- so the detector belongs in the AUDIT, not node 89.
+  It must evaluate SUBJECT assertions so "his mother" does not misclassify the subject.
+- **Item 7 still needs its spec REWRITTEN** (r2 NO/11, r3 NO/7 + agy 9). Not another
+  round. Judgment + the line-shift warning at
+  `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/judgment.md`.
+
 ## 2026-08-06 -- HEAD 041a21d7 (v2.0-alpha) -- CODER (Item 8 chunk 1 shipped; Sonnet QA caught it landing in dead code)
 
 Did: shipped Item 8 chunk 1, then had a Sonnet 5 QA pass find that half of it was
