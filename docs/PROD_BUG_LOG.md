@@ -3325,5 +3325,35 @@ symptom.
   edited symbol is REACHED from that surface before claiming the defect closed --
   grep for callers, not just for the symbol. This is the fourth armed-consumer-
   without-producer defect found on 2026-08-05.
-- live receipt: OWED. Suite-green only; the canonical `public_domain` and
-  `shakespeare` legs and the post-fix audit run to zero are still outstanding.
+- live receipt: **PAID 2026-08-05 evening.** Seven canonical legs on a server
+  booted after `3943dd38`, across every lane the fix touches:
+
+  | leg | bank | `spoken_coda_source` | the announcer's closing line |
+  |---|---|---|---|
+  | 01 | public_domain 320w | `provenance` | "Tonight's tale was adapted from a work in the public domain." |
+  | 02 | shakespeare 320w | `provenance` | "Tonight's tale was adapted from Folger Shakespeare." |
+  | 03 | media_archive 320w | **`news_close_brief`** | its own factual note, verbatim -- the CONTROL held |
+  | 05 | public_domain 520w x3 | `provenance` | deterministic coda |
+  | 06 | shakespeare 520w x3 | `provenance` | deterministic coda |
+  | 07 | original 320w | `none` | fictional close, no attribution -- correct for an unowned lane |
+
+  **Zero leaked lines across all of them.** Leg 02 is the one that matters most:
+  that lane used to read "CC BY-NC 3.0" aloud on essentially every episode, and
+  now says only the edition name -- exactly what `_otr_provenance.py:25-27`
+  specifies ("names the SOURCE, never the licence identifier").
+
+  The control is the other half of the proof: `media_archive` still speaks its
+  news note verbatim, so the fix did not silence the lanes that are supposed to
+  carry one.
+
+- corpus verdict: `scripts/audit_spoken_citations.py --root <output>/otr/episodes`
+  scanned **1,595** ledgers (8 more than the pre-fix baseline) and reports
+  **69 findings -- unchanged**. Every new episode is clean; the number did not
+  move because nothing new leaked. Pre-fix, a shakespeare leg leaked essentially
+  every time.
+- not covered by this receipt, and correctly so: `scifi_news` never traverses this
+  code. It dispatches to `scifi_news_circuit` and returns before the coda block
+  (`OTR_LedgerScriptWriter.py:3663-3717`), so its ledger carries no
+  `spoken_coda_source` key at all -- confirmed live on
+  `shadows_of_phobos_20260805_193430`. That is why the acceptance control is
+  `media_archive` and not `scifi_news`.
