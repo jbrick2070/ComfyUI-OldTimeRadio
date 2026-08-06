@@ -39,7 +39,7 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_document as _osd  # type: ignore
 
 MANIFEST_SCHEMA_VERSION = "v1"
-PROMPT_VERSION = "public_domain_interpreter_v2"
+PROMPT_VERSION = "public_domain_interpreter_v3"
 SCHEMA_VERSION = "public_domain_briefs_v1"
 
 
@@ -624,7 +624,6 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
     headline = str(payload.get("headline", "")).strip()
     source = str(payload.get("source", "")).strip()
     date = str(payload.get("date", "")).strip()
-    link = str(payload.get("link", "")).strip()
     summary = str(payload.get("summary", "")).strip()
     full_text = str(payload.get("full_text", "")).strip()
     source_block = "\n".join(
@@ -632,7 +631,14 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
             f"Title: {headline}",
             f"Source: {source}",
             f"Date: {date}" if date else "",
-            f"URL: {link}" if link else "",
+            # THE URL IS NOT SHOWN TO THE INTERPRETER (2026-08-05, PROMPT_VERSION
+            # v3). It never grounded anything -- grounding is the source text
+            # below, and no instruction in this prompt referenced the link -- but
+            # the model was ALSO asked for a source attribution note in the same
+            # payload, so it dutifully put the URL in the note, and that note was
+            # appended verbatim as the announcer's closing line. `link` still
+            # rides the payload and `source_rights` for the PRINTED credits,
+            # which is where a licence identifier belongs.
             f"Synopsis: {summary}",
             "Source text:",
         # The interpreter is the ONE pass that reads the source, and it is

@@ -39,7 +39,7 @@ except ImportError:  # pragma: no cover -- flat import harnesses
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
 MANIFEST_SCHEMA_VERSION = "v1"
-PROMPT_VERSION = "shakespeare_interpreter_v1"
+PROMPT_VERSION = "shakespeare_interpreter_v2"
 SCHEMA_VERSION = "shakespeare_briefs_v1"
 
 
@@ -585,8 +585,21 @@ def _build_interpreter_prompt(payload: dict[str, str]) -> list[dict[str, str]]:
         part for part in (
             f"Scene: {payload.get('headline', '').strip()}",
             f"Source: {payload.get('source', '').strip()}",
+            # Date/Rights STAYS. The prompt asks this pass for a
+            # "Folger/noncommercial source note", so the licence is INPUT TO A
+            # REQUESTED OUTPUT -- strip it and the model is asked for a note it
+            # has no facts to write. `tests/test_shakespeare_interpreter.py`
+            # pins it deliberately: "RIGHTS terms stay -- they are a licensing
+            # fact about the source."
             f"Date/Rights: {payload.get('date', '').strip()}",
-            f"URL: {payload.get('link', '').strip()}",
+            # THE URL IS NOT SHOWN (2026-08-05, PROMPT_VERSION v2). Unlike the
+            # rights string it is input to NOTHING -- grounding is the scene text
+            # below, and no instruction in this prompt references the link -- yet
+            # the model echoed the whole block back, and shipped episodes read
+            # "Source: Folger Shakespeare. Date/Rights: c. 1606 | CC BY-NC 3.0.
+            # URL: https://www.folger.ed..." ALOUD while the captions burned it
+            # into the video. `link` still rides the payload and `source_rights`
+            # for the PRINTED credits, which is where a URL belongs.
             f"Synopsis: {payload.get('summary', '').strip()}",
             "Scene text:",
         # The interpreter is the ONE pass that reads the source, and it is

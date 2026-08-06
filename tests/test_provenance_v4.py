@@ -119,11 +119,16 @@ _CURRENT_BANKS = [
 _PROVENANCE_OPTED_IN = frozenset({"shakespeare", "public_domain"})
 
 
-class TestCurrentBanksInert:
-    """The normalizer was built opt-in and left switched off everywhere, which
-    is why the announcer read a raw licence string aloud instead of the clean
-    coda this module composes. These tests pin WHICH banks opt in, so turning
-    the flag on (or losing it) is a deliberate, visible act."""
+class TestOnlyTheFidelityBanksOptIn:
+    """These tests pin WHICH banks opt in, so turning the flag on -- or losing
+    it -- is a deliberate, visible act.
+
+    Renamed from TestCurrentBanksInert 2026-08-05: the class asserted two ACTIVE
+    banks while its own name said every bank was inert, and that contradiction
+    was read as fact when specifying the spoken-citation fix. The normalizer was
+    built opt-in and left switched off everywhere, which is why the announcer
+    read a raw licence string aloud instead of the clean coda this module
+    composes; public_domain and shakespeare opted in on 2026-08-04."""
 
     @pytest.mark.parametrize("bank_id", _CURRENT_BANKS)
     def test_only_the_fidelity_banks_opt_in(self, bank_id):

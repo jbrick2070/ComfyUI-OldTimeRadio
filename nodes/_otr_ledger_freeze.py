@@ -710,7 +710,8 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
 # G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Phase 0 collect / Phase 10
 # raise. Operator decision (2026-07-17): a research_only source BLOCKS publish.
 # Opt-in via meta["provenance"] (the writer stamps the normalized record when the
-# bank sets defaults.provenance_normalize); inert for every current bank. Freeze
+# bank sets defaults.provenance_normalize); ACTIVE on public_domain and
+# shakespeare since 2026-08-04, and inert elsewhere. Freeze
 # precedes publish, so raising here prevents the episode from ever publishing --
 # the deterministic realisation of the rule. Only the research_only status blocks;
 # public_domain_us / cc0 / licensed / synthetic all pass.
@@ -727,7 +728,7 @@ def _check_g14_provenance_publish(
         return
     prov = meta.get("provenance")
     if not isinstance(prov, dict):
-        return  # opt-in only; inert for every current bank
+        return  # opt-in; stamped on public_domain and shakespeare, absent elsewhere
     if prov.get("blocks_publish"):
         label = str(prov.get("source_label") or prov.get("license_label") or "")
         errors.append(

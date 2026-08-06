@@ -3255,3 +3255,75 @@ symptom.
   cycle-cap question (agy for, Codex against) stays open on the same reasoning
   -- the invariant is provably satisfiable at cast <= 7, beats <= 12 -- but
   there is now one live data point rather than none.
+
+## PBUG-20260805-04 -- the announcer read the source URL and licence aloud, and the captions burned it into the video
+
+- surfaced: the PUBLISHED corpus, not a review. A scan of all 1,587 ledgers under
+  `output/otr/episodes` finds spoken lines carrying a URL, a bare domain, a
+  licence identifier or our own prompt labels. By `speaker_role` and line
+  position: **84 leaked lines, 100% announcer, 100% at the LAST announcer
+  position (the coda row), 0 non-announcer.** 30 distinct episodes leak on or
+  after 2026-08-04, the most recent at 2026-08-05 14:22. The reusable predicate
+  (`scripts/audit_spoken_citations.py`, which also matches shortened licence
+  forms the sidecar string cannot) reports **69 episodes** with findings.
+- worst shipped example, `2026-08-05 08:42` -- the announcer reads our own
+  interpreter scaffold on air:
+  `From tonight's echoing "Nothing," let us turn our ears to the silent archives:`
+  `Source: Folger Shakespeare. Date/Rights: c. 1606 | CC BY-NC 3.0. URL:`
+  `https://www.folger.ed...` -- `Source:`, `Date/Rights:` and `URL:` are verbatim
+  the field labels built at `_otr_shakespeare_sources.py:586-589`.
+- second surface, and the reason this is not merely an audio defect:
+  `_otr_captions.py:283-286` copies RAW `lines[].text` into the ASS cue
+  ("RAW line text, deliberately") and CaptionBurn is enabled in
+  `workflows/otr_canonical.json`, so the URL is **burned into the delivered
+  video**. NOT the still prompt (announcer rows take `scene_beat` at
+  `otr_meta_brief_image_prompt.py:1117`, whose target carries no line text) and
+  NOT the i2v motion clause (default OFF, `_otr_motion_clause.py:13-14`) -- both
+  were claimed as surfaces in the inherited spec and both were disproved.
+- mechanism: the interpreter is handed the source URL
+  (`_otr_public_domain_sources.py:635`, `_otr_shakespeare_sources.py:589`) and
+  asked for an attribution note in the SAME payload (`:665`, `:624`). The writer
+  hoists that reply (`OTR_LedgerScriptWriter.py:4895-4897`) and
+  `compose_news_coda` appends it VERBATIM (`_otr_line_composer.py:1285`,
+  contract at `:1255` "never score, shorten, or replace it"). The append is
+  deliberate -- it exists so a weak model cannot blend the fact away -- so the
+  one thing engineered to survive unedited is the one carrying the URL.
+- root cause of the RECURRENCE, which is the important part: the deterministic
+  replacement already existed. `meta["provenance_coda_line"]` is composed by
+  `_otr_provenance.spoken_coda_line` and stamped at
+  `OTR_LedgerScriptWriter.py:3595`, and `_otr_provenance.py:112-118` records that
+  the licence was removed from the spoken line on 2026-08-04 for exactly this
+  reason. **That fix was applied inside `spoken_coda_line()`, a function with
+  ZERO readers** -- grep returns the write and one docstring. The live path was
+  never touched, so 30 more episodes leaked after the fix "landed".
+- fix: select the effective spoken fact at the writer call site, keyed on
+  `"provenance" in meta` (stamped unconditionally at `:3592`; the coda key was
+  NOT, so presence of the coda is an invalid ownership test). A provenance-owned
+  lane always takes the deterministic append regardless of `_style_grammar_on`;
+  owned-but-empty goes straight to `fallback_announcer_outro("")` with neither
+  composer entered. `news_close_brief` keeps its value and its owner -- it is
+  also the treatment "Sign-off" line (`video_engine.py:1866`). The URL is also
+  removed from both interpreter prompts (it never grounded anything; grounding is
+  the source text) with `PROMPT_VERSION` bumped to
+  `public_domain_interpreter_v3` / `shakespeare_interpreter_v2`.
+- found in passing, same call, fixed with it: `compose_news_coda` was never
+  passed `source_bank_id` (`OTR_LedgerScriptWriter.py:5491-5497`), so EVERY lane
+  resolved media_archive's `coda_system` prompt -- while the sibling
+  `compose_announcer_outro` call has passed it since Stage 4, and
+  `tests/test_closing_seams_bank_routing.py:123-137` already proved the composer
+  routes correctly when given it.
+- receipt: `meta["spoken_coda_source"]`, closed vocabulary
+  (`provenance` | `news_close_brief` | `none`) validated at write time, so a
+  corpus audit can JOIN on what was spoken instead of inferring it from prose.
+  Inferring it from prose is how this survived.
+- coverage: `tests/test_spoken_citation_audit.py` (22 tests) pins the predicate
+  itself, including that the deterministic coda PASSES its own audit and that the
+  empty `license_label` on the public-domain sidecar is dropped as a needle -- an
+  empty needle is a substring of every string and would report the whole corpus.
+- generalizable rule for the Bible fan-out: **a fix applied to a function with no
+  callers is not a fix.** When correcting a defect on a live surface, prove the
+  edited symbol is REACHED from that surface before claiming the defect closed --
+  grep for callers, not just for the symbol. This is the fourth armed-consumer-
+  without-producer defect found on 2026-08-05.
+- live receipt: OWED. Suite-green only; the canonical `public_domain` and
+  `shakespeare` legs and the post-fix audit run to zero are still outstanding.
