@@ -659,7 +659,11 @@ def _bark_health_check_for_cast(cast_rows):
         vp = row.get("voice_preset") or ""
         if vp not in disabled:
             continue
-        gender = (row.get("gender") or "").lower()
+        # NORMALIZED (item 8, 2026-08-06): lower-casing alone left `woman`/`man`
+        # unmatched against the pool's `male`/`female`, so a disabled preset was
+        # remapped without regard to the row's stated gender.
+        from ._otr_roster_gender import normalize_gender
+        gender = normalize_gender(row.get("gender"))
         # Prefer same-gender survivors not already used by another cast row
         candidates = [pp for pp, gg in _VOICE_PROFILES
                       if pp not in disabled

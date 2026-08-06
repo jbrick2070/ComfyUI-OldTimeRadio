@@ -94,8 +94,15 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
             (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None
         )
     if entry is None:
-        gender = str(cast.get("gender") or "").strip().lower()
-        if gender:
+        # NORMALIZED (item 8, 2026-08-06). This compared the RAW stored value
+        # against the bank's `male`/`female`, so a row recorded as `woman`,
+        # `man`, `m` or `f` matched nothing and fell through to the
+        # gender-agnostic path -- a correctly-gendered character silently
+        # getting a voice of any gender. `other` still falls through, which is
+        # correct: the bank carries no `other` references.
+        from ._otr_roster_gender import normalize_gender
+        gender = normalize_gender(cast.get("gender"))
+        if gender in ("male", "female"):
             try:
                 entry = assign_voice_for_slot(
                     role=role, engine=engine,
@@ -160,8 +167,15 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
         entry = next(
             (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None)
     if entry is None:
-        gender = str(cast.get("gender") or "").strip().lower()
-        if gender:
+        # NORMALIZED (item 8, 2026-08-06). This compared the RAW stored value
+        # against the bank's `male`/`female`, so a row recorded as `woman`,
+        # `man`, `m` or `f` matched nothing and fell through to the
+        # gender-agnostic path -- a correctly-gendered character silently
+        # getting a voice of any gender. `other` still falls through, which is
+        # correct: the bank carries no `other` references.
+        from ._otr_roster_gender import normalize_gender
+        gender = normalize_gender(cast.get("gender"))
+        if gender in ("male", "female"):
             try:
                 entry = assign_voice_for_slot(
                     role=role, engine=engine,

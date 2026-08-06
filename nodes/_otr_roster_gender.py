@@ -32,9 +32,12 @@ dataclass there is a serialization failure waiting for a render.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Optional, Sequence
+
+log = logging.getLogger("OTR")
 
 # Honorifics a speech prefix drops: the sidecar records "SIR TOBY", the manifest
 # hint says "Toby". Mirrors the shape at _otr_character_roster.py:176-192.
@@ -45,6 +48,92 @@ _HONORIFICS = frozenset({
 })
 
 _BINARY = ("male", "female")
+
+# --------------------------------------------------------------------------- #
+# ONE gender normalization boundary (item 8, converged 2026-08-06).
+#
+# The published corpus carries EIGHTEEN distinct gender strings across 5,123 cast
+# rows -- `male`, `female`, `other`, `non-binary`, `unspecified`, `neutral`,
+# `woman`, `man`, `any`, `artificial`, `ai`, `synthetic`, `genderfluid`, `n/a`,
+# `unknown`, `various`, `child-like`, plus absent. `_VALID_GENDERS` in
+# `_otr_casting.py` is enforced only on the CastingResponse path; every other
+# producer route bypasses it, which is how the rest got in.
+#
+# This is the single owner. It lives HERE because this module is a stdlib-only
+# LEAF (json / dataclasses / pathlib / typing) that imports none of its consumers
+# -- `_otr_casting`, `cast_lock`, `_otr_voice_bank`, `otr_meta_brief_image_prompt`,
+# `_otr_voice_node_common`, `story_orchestrator` and the content-owned lane
+# runners can all call it with no import cycle in either direction.
+#
+# READ-THROUGH, never write-back: OTR_CastLock sits AFTER the freeze cascade and
+# its whole contract is byte-safety, so normalization is applied at every READ
+# site and a frozen row's stored value is left exactly as written. Only a
+# producer minting a fresh row stores the normalized form.
+_GENDER_TOKENS: dict = {
+    "male": "male", "m": "male", "man": "male",
+    "female": "female", "f": "female", "woman": "female",
+    # Everything the corpus actually carries that is neither binary. Listed
+    # EXPLICITLY rather than caught by an else-branch, because a closed table is
+    # what makes strict mode able to reject an unlisted value at all -- an
+    # "anything else -> other" rule would make strict mode unreachable.
+    "other": "other",
+    "non-binary": "other", "nonbinary": "other", "non binary": "other",
+    "neutral": "other", "unspecified": "other", "any": "other",
+    "unknown": "other", "n/a": "other", "na": "other", "none": "other",
+    "various": "other", "artificial": "other", "ai": "other",
+    "synthetic": "other", "genderfluid": "other", "gender-fluid": "other",
+    "child-like": "other", "childlike": "other",
+}
+
+#: Bumped when the voice/portrait consistency CONTRACT changes -- never per run.
+#: `cast_lock_revision` cannot serve this: it increments every time the node
+#: executes, so it cannot tell a policy-era ledger from a pre-policy one. Nor can
+#: "is `presentation_gender` present?", which cannot distinguish POLICY ABSENT
+#: from FIELD DROPPED -- exactly the ambiguity that let the spoken-citation
+#: receipt regress unnoticed. Absence of the stamp means legacy, always.
+VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION = 1
+
+#: The durable ledger key carrying the revision above.
+VOICE_PORTRAIT_CONSISTENCY_POLICY_KEY = "voice_portrait_consistency_policy_revision"
+
+
+def normalize_gender(raw, *, strict: bool = False) -> str:
+    """Map any recorded gender string to exactly ``male`` / ``female`` / ``other``.
+
+    ``strict=True`` (policy-revision rows) RAISES ``ValueError`` on a blank or
+    unlisted value -- a new producer writing a gender nobody can resolve is a
+    defect, not a shrug. ``strict=False`` (legacy read-through) warns once per
+    distinct value and maps the unlisted to ``other`` so historical ledgers stay
+    readable.
+
+    Pure; no I/O. The returned value is what every consumer compares against --
+    never the raw string, because `woman` is not `female` to an equality test and
+    that is how a correctly-gendered row reached the gender-agnostic voice path.
+    """
+    token = str(raw or "").strip().lower()
+    mapped = _GENDER_TOKENS.get(token)
+    if mapped is not None:
+        return mapped
+    if strict:
+        raise ValueError(
+            "unmapped gender %r under policy revision %d; add it to "
+            "_GENDER_TOKENS or fix the producer"
+            % (raw, VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION)
+        )
+    if token not in _UNMAPPED_SEEN:
+        _UNMAPPED_SEEN.add(token)
+        log.warning(
+            "[roster_gender] unmapped gender %r -> 'other' (legacy read-through)",
+            raw,
+        )
+    return "other"
+
+
+#: Distinct unmapped values already warned about, so a 1,595-ledger scan does not
+#: emit the same warning thousands of times. Diagnosis lives in the audit, which
+#: reports counted and path-attributed findings; this is only noise control.
+_UNMAPPED_SEEN: set = set()
+
 
 _SUPPLEMENT_FILENAME = "roster_gender_supplement.json"
 

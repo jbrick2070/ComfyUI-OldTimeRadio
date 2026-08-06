@@ -75,20 +75,51 @@ _MALE_PROMPT_TERMS = frozenset({
 })
 
 
+#: Terms that already establish a NON-gendered human subject. Without these the
+#: neutral anchor would stack ("person, a person in a long coat...").
+_NEUTRAL_PROMPT_TERMS = frozenset({
+    "person", "figure", "individual", "adult", "someone", "they",
+})
+
+
 def _ensure_gender_anchor(prompt: str, char: dict) -> str:
-    """Add a known cast-gender anchor when the prompt forgot one."""
+    """Add a cast-gender anchor when the prompt forgot one.
+
+    NORMALIZED (item 8, 2026-08-06). This used to compare the raw stored value
+    against ``("female","male")``. It lower-cased first, so title-case was never
+    the problem -- but `woman`, `man`, `m` and `f` are all live in the published
+    corpus and every one of them fell straight through UNANCHORED. Those rows
+    plainly state a gender; the equality test just could not hear it.
+
+    ``other`` (253 rows) previously got no anchor at all. It now gets a NEUTRAL
+    one, so an `other` row is anchored as a person rather than left to whatever
+    the image model infers from the prose.
+
+    Still deliberately ADDITIVE and non-blocking: this function may not reject,
+    rewrite or block a prompt (the contract at the portrait payload builder
+    below). Contradictions are REPORTED by the consistency audit, not gated here.
+    """
+    from ._otr_roster_gender import normalize_gender
+
     text = str(prompt or "").strip()
-    gender = str((char or {}).get("gender") or "").strip().lower()
-    if gender not in ("female", "male") or not text:
+    if not text:
         return text
+    gender = normalize_gender((char or {}).get("gender"))
     words = set(re.findall(r"[a-z]+", text.lower()))
     if gender == "female":
         if words & _FEMALE_PROMPT_TERMS:
             return text
         return f"adult woman, {text}"
-    if words & _MALE_PROMPT_TERMS:
+    if gender == "male":
+        if words & _MALE_PROMPT_TERMS:
+            return text
+        return f"adult man, {text}"
+    # 'other' -- anchor the subject as a person without asserting a binary the
+    # ledger did not record. The voice side still has to pick a binary because
+    # the bank carries no 'other' references; the PICTURE does not.
+    if words & (_NEUTRAL_PROMPT_TERMS | _FEMALE_PROMPT_TERMS | _MALE_PROMPT_TERMS):
         return text
-    return f"adult man, {text}"
+    return f"person, {text}"
 
 
 #: Shared portrait style anchor. Reworded 2026-06-10 (operator look-QA): the
