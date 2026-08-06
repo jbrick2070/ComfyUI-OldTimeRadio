@@ -134,6 +134,34 @@ def normalize_gender(raw, *, strict: bool = False) -> str:
 #: reports counted and path-attributed findings; this is only noise control.
 _UNMAPPED_SEEN: set = set()
 
+#: Synonyms only -- the half of normalization the VOICE BANK needs.
+_BANK_SYNONYMS: dict = {
+    "m": "male", "man": "male",
+    "f": "female", "woman": "female",
+}
+
+
+def canonical_bank_gender(raw) -> str:
+    """Canonicalize gender SYNONYMS without collapsing the rest.
+
+    This is deliberately NOT :func:`normalize_gender`, and the difference is
+    load-bearing. The tri-state normalizer answers "which of the three buckets
+    is this?" -- right for the portrait anchor, the pronoun map and the policy
+    gate. It is WRONG for voice-bank lookup, because the bank has its own gender
+    vocabulary and carries entries the tri-state would erase: there is exactly
+    one ``neutral`` reference in ``config/voice_reference_bank.json``
+    (``el_river``), and ~27 corpus rows are recorded ``neutral``. Folding those
+    into ``other`` would skip the one voice that actually fits them and send the
+    row to the gender-agnostic uniform draw instead.
+
+    So: fix the synonyms that were provably breaking equality (``woman`` is not
+    ``female`` to ``==``), and pass everything else through lower-cased and
+    unchanged, including the empty string -- callers short-circuit on blank and
+    that behaviour must survive.
+    """
+    token = str(raw or "").strip().lower()
+    return _BANK_SYNONYMS.get(token, token)
+
 
 _SUPPLEMENT_FILENAME = "roster_gender_supplement.json"
 

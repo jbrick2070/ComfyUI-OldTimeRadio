@@ -94,15 +94,19 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
             (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None
         )
     if entry is None:
-        # NORMALIZED (item 8, 2026-08-06). This compared the RAW stored value
-        # against the bank's `male`/`female`, so a row recorded as `woman`,
-        # `man`, `m` or `f` matched nothing and fell through to the
+        # SYNONYM-CANONICALIZED (item 8, 2026-08-06). This compared the RAW
+        # stored value against the bank's vocabulary, so a row recorded as
+        # `woman`, `man`, `m` or `f` matched nothing and fell through to the
         # gender-agnostic path -- a correctly-gendered character silently
-        # getting a voice of any gender. `other` still falls through, which is
-        # correct: the bank carries no `other` references.
-        from ._otr_roster_gender import normalize_gender
-        gender = normalize_gender(cast.get("gender"))
-        if gender in ("male", "female"):
+        # getting a voice of any gender.
+        #
+        # Deliberately NOT the tri-state normalize_gender: the bank has its own
+        # vocabulary and carries a `neutral` reference (el_river). Collapsing
+        # `neutral` into `other` would skip the one voice that fits those rows.
+        # Blank also stays blank so the guard below still short-circuits.
+        from ._otr_roster_gender import canonical_bank_gender
+        gender = canonical_bank_gender(cast.get("gender"))
+        if gender:
             try:
                 entry = assign_voice_for_slot(
                     role=role, engine=engine,
@@ -167,15 +171,19 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
         entry = next(
             (e for e in bank if e.voice_ref_id == vrid and e.engine == engine), None)
     if entry is None:
-        # NORMALIZED (item 8, 2026-08-06). This compared the RAW stored value
-        # against the bank's `male`/`female`, so a row recorded as `woman`,
-        # `man`, `m` or `f` matched nothing and fell through to the
+        # SYNONYM-CANONICALIZED (item 8, 2026-08-06). This compared the RAW
+        # stored value against the bank's vocabulary, so a row recorded as
+        # `woman`, `man`, `m` or `f` matched nothing and fell through to the
         # gender-agnostic path -- a correctly-gendered character silently
-        # getting a voice of any gender. `other` still falls through, which is
-        # correct: the bank carries no `other` references.
-        from ._otr_roster_gender import normalize_gender
-        gender = normalize_gender(cast.get("gender"))
-        if gender in ("male", "female"):
+        # getting a voice of any gender.
+        #
+        # Deliberately NOT the tri-state normalize_gender: the bank has its own
+        # vocabulary and carries a `neutral` reference (el_river). Collapsing
+        # `neutral` into `other` would skip the one voice that fits those rows.
+        # Blank also stays blank so the guard below still short-circuits.
+        from ._otr_roster_gender import canonical_bank_gender
+        gender = canonical_bank_gender(cast.get("gender"))
+        if gender:
             try:
                 entry = assign_voice_for_slot(
                     role=role, engine=engine,

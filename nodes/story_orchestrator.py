@@ -659,11 +659,17 @@ def _bark_health_check_for_cast(cast_rows):
         vp = row.get("voice_preset") or ""
         if vp not in disabled:
             continue
-        # NORMALIZED (item 8, 2026-08-06): lower-casing alone left `woman`/`man`
-        # unmatched against the pool's `male`/`female`, so a disabled preset was
-        # remapped without regard to the row's stated gender.
-        from ._otr_roster_gender import normalize_gender
-        gender = normalize_gender(row.get("gender"))
+        # SYNONYM-CANONICALIZED (item 8, 2026-08-06): lower-casing alone left
+        # `woman`/`man` unmatched against the pool's `male`/`female`, so a
+        # disabled preset was remapped without regard to the row's stated
+        # gender. Blank MUST stay blank -- the tier-1 candidate filter below
+        # short-circuits on a falsy gender to accept any preset while still
+        # preferring one no other character holds. Mapping blank to "other"
+        # would empty tiers 1-2 (no profile is tagged "other") and drop through
+        # to the tier that ignores the not-in-use preference, which can hand two
+        # characters the same voice.
+        from ._otr_roster_gender import canonical_bank_gender
+        gender = canonical_bank_gender(row.get("gender"))
         # Prefer same-gender survivors not already used by another cast row
         candidates = [pp for pp, gg in _VOICE_PROFILES
                       if pp not in disabled

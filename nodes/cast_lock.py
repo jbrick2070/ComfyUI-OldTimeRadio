@@ -586,7 +586,17 @@ class CastLock:
 
             if target_engine is None:
                 continue
-            gender = str(entry.get("gender") or "").strip().lower()
+            # SYNONYM-CANONICALIZED (item 8, 2026-08-06). THIS is the path that
+            # actually runs: CastLock stamps voice_ref_id before any render, so
+            # the render-time resolvers in _otr_voice_node_common find a stamped
+            # id and never reach their own gender fallback. Fixing only those
+            # left the real defect live -- a row recorded `woman` raised
+            # VoiceCastingError here, was caught below, and took the
+            # gender-agnostic draw. The same value also feeds
+            # validate_voice_proposal on the hybrid voice-fit branch, so this
+            # one line closes both.
+            from ._otr_roster_gender import canonical_bank_gender
+            gender = canonical_bank_gender(entry.get("gender"))
             if not gender:
                 if target_engine == "google_tts":
                     raise VoiceCastingError(

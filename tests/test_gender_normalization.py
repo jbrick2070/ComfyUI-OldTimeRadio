@@ -13,6 +13,7 @@ import pytest
 from nodes._otr_roster_gender import (
     VOICE_PORTRAIT_CONSISTENCY_POLICY_KEY,
     VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION,
+    canonical_bank_gender,
     normalize_gender,
 )
 from nodes.otr_meta_brief_image_prompt import _ensure_gender_anchor
@@ -136,3 +137,66 @@ def test_anchor_never_rejects_or_rewrites_a_prompt():
 
 def test_empty_prompt_is_left_alone():
     assert _ensure_gender_anchor("", {"gender": "female"}) == ""
+
+
+# --------------------------------------------------------------------------- #
+# canonical_bank_gender -- the VOICE side, which must not use the tri-state
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("woman", "female"), ("man", "male"), ("f", "female"), ("m", "male"),
+    ("Woman", "female"), (" MAN ", "male"),
+])
+def test_bank_canonicalizer_fixes_the_synonyms(raw, expected):
+    assert canonical_bank_gender(raw) == expected
+
+
+def test_bank_canonicalizer_does_NOT_collapse_neutral():
+    """The bank carries exactly one `neutral` reference (el_river) and ~27
+    corpus rows are recorded `neutral`. The tri-state normalizer folds those
+    into `other`, which would skip the one voice that actually fits them."""
+    assert canonical_bank_gender("neutral") == "neutral"
+    assert normalize_gender("neutral") == "other"
+    assert canonical_bank_gender("neutral") != normalize_gender("neutral")
+
+
+def test_bank_canonicalizer_keeps_blank_blank():
+    """Callers short-circuit on a falsy gender. Mapping blank to `other` emptied
+    the same-gender candidate tiers and dropped the not-already-in-use
+    preference, which can hand two characters the same voice."""
+    assert canonical_bank_gender("") == ""
+    assert canonical_bank_gender(None) == ""
+    assert not canonical_bank_gender(None)
+
+
+def test_bank_canonicalizer_passes_unknown_values_through():
+    """It is a synonym fixer, not a bucketer -- the bank owns its vocabulary."""
+    assert canonical_bank_gender("androgynous") == "androgynous"
+    assert canonical_bank_gender("other") == "other"
+
+
+def test_the_two_helpers_are_not_interchangeable():
+    """Regression guard for the actual mistake: using the tri-state normalizer
+    on the voice path erased a bank-servable gender."""
+    for raw in ("woman", "man", "male", "female"):
+        assert canonical_bank_gender(raw) == normalize_gender(raw)
+    assert canonical_bank_gender("neutral") != normalize_gender("neutral")
+
+
+def test_castlock_char_casting_uses_the_bank_canonicalizer():
+    """THE path that runs. CastLock stamps voice_ref_id before any render, so
+    the render-time resolvers never reach their own gender fallback -- fixing
+    only those left the defect live."""
+    import inspect
+
+    from nodes import cast_lock
+
+    src = inspect.getsource(cast_lock.CastLock._auto_registry)
+    assert "canonical_bank_gender" in src, (
+        "_auto_registry must canonicalize gender before assign_voice_for_slot; "
+        "a row recorded 'woman' otherwise raises and takes the "
+        "gender-agnostic draw"
+    )
+    assert 'str(entry.get("gender") or "").strip().lower()' not in src, (
+        "the raw-gender comparison is the defect; it must not survive"
+    )
