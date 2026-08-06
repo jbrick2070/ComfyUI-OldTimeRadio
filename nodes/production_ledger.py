@@ -1026,7 +1026,7 @@ class Ledger:
             # ledger schema stays clean.
             vparams_in = r.get("voice_params")
             voice_params = vparams_in if isinstance(vparams_in, dict) else None
-            rows.append({
+            row = {
                 "char_id":               _safe_str(r.get("char_id")),
                 "name":                  _safe_str(r.get("name")),
                 "character_description": cdesc,
@@ -1036,7 +1036,24 @@ class Ledger:
                 "voice_params":          voice_params,
                 "line_count":            _safe_int(r.get("line_count")),
                 "word_count":            _safe_int(r.get("word_count")),
-            })
+            }
+            # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
+            # DELIVERED voice presents as, stamped by CastLock from the reference
+            # it actually chose. It has to be carried HERE or it evaporates --
+            # this method rebuilds a FIXED row and silently drops every key it
+            # does not name.
+            #
+            # Carried CONDITIONALLY, on the same reasoning as provider_voice_id
+            # below: a writer-stage row that nobody has cast yet stays
+            # byte-identical to the legacy contract, so the cast-row drift guard
+            # keeps its teeth. Absence is read through by
+            # _otr_roster_gender.get_presentation_gender, which falls back to the
+            # row's normalized label -- which is also what makes the 1,595
+            # pre-field ledgers readable rather than violations.
+            pg = _safe_str(r.get("presentation_gender"))
+            if pg:
+                row["presentation_gender"] = pg
+            rows.append(row)
         self.data["cast"] = rows
         return self
 

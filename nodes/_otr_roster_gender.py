@@ -163,6 +163,26 @@ def canonical_bank_gender(raw) -> str:
     return _BANK_SYNONYMS.get(token, token)
 
 
+def get_presentation_gender(row) -> str:
+    """The gender a cast row's DELIVERED voice presents as.
+
+    Reads the stamped ``presentation_gender`` when CastLock wrote one, and falls
+    back to the row's normalized label otherwise. The fallback is what makes this
+    safe on the 1,595 ledgers frozen before the field existed: a legacy row is
+    read through rather than treated as a violation, and it is never rewritten.
+
+    Consumers must call THIS rather than reading the key directly, so that
+    "field absent" (legacy) and "field empty" (a row the caster never stamped)
+    cannot be confused with "presents as nothing".
+    """
+    if isinstance(row, Mapping):
+        stamped = str(row.get("presentation_gender") or "").strip().lower()
+        if stamped:
+            return stamped
+        return normalize_gender(row.get("gender"))
+    return "other"
+
+
 _SUPPLEMENT_FILENAME = "roster_gender_supplement.json"
 
 # Cache keyed by resolved path + mtime so an edited supplement is picked up

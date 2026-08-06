@@ -752,6 +752,20 @@ class CastLock:
         entry["voice_engine"] = ref.engine
         entry["commercial_clean"] = bool(ref.commercial_clean)
         entry["voice_cast_fallback"] = fallback
+        # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
+        # DELIVERED voice presents as, taken from the reference actually chosen
+        # rather than from the row's label. Stamped HERE because this is the one
+        # place every stamped row passes through -- characters, the announcer,
+        # the hybrid voice-fit branch and the gender-agnostic fallback alike.
+        #
+        # Two rows the label cannot answer for, and this is why the field exists:
+        # the ANNOUNCER's reference is drawn from the episode seed and never read
+        # its row's gender at all, and an `other` row is served by a draw the bank
+        # makes without regard to gender. In both cases the row said one thing and
+        # the audience heard another, with nothing in the ledger recording it.
+        # Whatever the bank's own vocabulary says wins -- including `neutral`,
+        # which is a real reference (el_river), not a bucket to round away.
+        entry["presentation_gender"] = str(getattr(ref, "gender", "") or "").strip().lower()
         # C3 (cloud-audio 2026-07-03): carry the provider voice id for cloud
         # (ElevenLabs) casting -- ONLY when present, so local (ref-clip/preset)
         # cast entries stay byte-identical. The durable cast stamp copies the
