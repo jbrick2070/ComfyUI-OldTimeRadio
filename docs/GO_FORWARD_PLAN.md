@@ -6,6 +6,63 @@ revision of this file is in git. If a thing is DONE, it does not belong here.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
+### 0. VIDEO MATRIX PATTERN -- designed, kibitz-r1 running, NOT built
+
+**Spec: `docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` (commit `11e893f6`).**
+Operator directive 2026-08-06: ONE matrix per plug-and-play module, reader-first so
+video PATHS can be compared, registered in `CLAUDE.md`, built for churn (Flux3 open
+weights + a lowest-lift MiniMax are the near-term adds). Still logic and clip maths are
+the teaching spine.
+
+Owes r2/r3/r4 before code -- r1 is running in
+`kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/` (**LOCAL ONLY; `kibitz-runs/` is
+gitignored**). Build order is section 10 of the spec. Start with the declaration
+surfaces and the two silent defaults, NOT the rename (92 files -- its own commit, if at
+all).
+
+**The actionable defects the spec grounds** -- register a video engine and fill nothing
+in, and today:
+- the frame contract takes **four** silent paths to `SINGLE_ONLY` (missing engine,
+  missing declaration, a RAISING declaration, wrong type);
+- the canvas silently inherits the shared 1472x832 default -- the channel that already
+  cost `wan_8gb` a 268-minute leg;
+- the engine silently vanishes from every per-role listing while staying in the dropdown;
+- a new CLOUD engine gets a **wrong** cell, not a blank one (resolution is a name-prefix
+  if-chain; `side` is detected by name);
+- `QUALIFIED_COST_ROWS` is an **empty frozenset**, so VRAM admission is unenforced for
+  every engine.
+
+MiniMax needs four declaration surfaces built first (`provider_side`,
+`provider_resolution`, `delivered_fps`, `cost_basis`). Flux3 needs only `doc_purpose`
+plus an honest "unqualified" VRAM row.
+
+### 0A. NO-MIRROR ENFORCEMENT -- r1 done, r2/r3/r4 owed
+
+Statement: `docs/2026-08-06-PROBLEM-STATEMENT-no-mirror-enforcement-and-the-matrix.md`.
+r1 judgment artifacts: `kibitz-runs/2026-08-06-2026-08-06-no-mirror-matrix/r1/` (LOCAL).
+
+Operator ruling 2026-08-06: **no mirror or ping-pong anywhere except the closing loop,
+which is CONFIRMED OK.** Enforcement is already in place on every drama path and fails
+loud; the ONE sanctioned reuse is `otr_silent_composite.py:452-455` -- and it is the
+**CLOSING-THEME BACKDROP, not the credits roll** (`OTR_CreditsRoll` freezes a frame and
+never loops). Name it; do not remove it.
+
+Queue, all r1-reviewed:
+1. **A separate single-clip rule** that rejects an explicit non-`none` mode WITHOUT
+   demanding a segment projection. **Do NOT simply delete `len(planned) <= 1`** -- all
+   three reviewers proved that indicts every single-clip beat, because the historical
+   single-render path creates no projection.
+2. Name the closing-theme backdrop + a BEHAVIOURAL test. All three said cut the lexical
+   "only one `loop=True`" test -- it proves spelling, not policy.
+3. Stale prose citing the deleted `wrapper_bridge.extend_frames_to_target`:
+   `frame_contract.py:280-286` (it governs `PLANNING_CAP_ENGINES` membership and argues
+   against a decision the file made 30 lines lower), plus `eng_ltx_8gb.py:32-36,1404-1414`,
+   `beat_session.py:143-154`, `wrapper_bridge.py:525-526`.
+4. The seven generated matrix columns + the "Unfilled cells" gate (~30 lines in
+   `tools/engine_matrix.py`) -- a new engine with a blank cell fails the suite BY NAME.
+5. The six receiptless multi-segment lanes (four `humo`, `ltx_video`, and `eng_ltx_av`
+   bounded at 497) -- its own chunk, they already fail today.
+
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
 The reference path is PROVEN WIRED, not proven EFFECTIVE. Live leg

@@ -3,6 +3,92 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD 11e893f6 (v2.0-alpha) -- CODER (multi-clip grader fixed; the matrix became a source of truth)
+
+Did: shipped the multi-clip honesty repair after a full four-round kibitz arc + Sonnet QA
+  + a Fable arithmetic gate, then rebuilt the video-matrix documentation on operator
+  direction. Suite **8836 passed** / 131 skipped / 1 xfailed (was 8805); Bug Bible 17.
+  Six commits, all pushed, HEAD == origin. `workflows/otr_canonical.json` byte-unchanged.
+
+- **THE MULTI-CLIP HONESTY INVERSION IS FIXED (`e499b7fc`).** It was FOUR defects, not
+  the one the statement described, and two were found by RUNNING the code rather than
+  reading it.
+  **Arm A** -- `acceptance.py` weighed a SEGMENT's `native_frame_count` against the whole
+  BEAT's `frame_count`, because `render_beat_coverage` built the beat clip by copying its
+  LAST segment and overwriting four keys while silently inheriting two. An honest
+  `wan_ti2v` beat of three chained 81-frame renders does 243 frames of work, delivers 241
+  (one duplicated head frame dropped per seam), and was graded "241 delivered, of which
+  only 81 were rendered". **The rule fired on exactly the beats that proved it was
+  satisfied.**
+  **Arm B** -- `ltx_8gb` is in `PLANNING_CAP_ENGINES` so its beats ARE split, but it
+  emitted no receipt at all and owns a `_clip_from_raw` that never inherited the WAN
+  passthrough. It computed the number, logged it, and dropped it.
+  **Arm C, found by execution and the worst of them** -- `scripts/grade_episode.py` was
+  handed the wrapper `OTR_VideoRenderBatch` actually writes, looked for `video.shots` at
+  the ROOT, found none, and printed `ACCEPTED: 0 shot(s)` with exit 0. **The grader was
+  inert on the real artifact; a perfect rule fix would never have fired.** Same files now
+  read 20 shots.
+  **Arm D, also by execution** -- a malformed receipt raised out of the grader, and
+  `True` coerced to 1 and produced "of which only True were rendered".
+- **The fix keeps BOTH counts.** 243 rendered, 241 delivered, distinct fields, plus a
+  per-segment projection the grader RE-DERIVES instead of believing. r1 had killed
+  "sum the segments" -- correctly as the GRADED value, too strongly as a number: 243 is
+  the right answer to what the beat RENDERED. `PRODUCTION_SPRINT_LESSONS` lesson 33
+  already demanded that split and names this bug in advance ("so intentional edits do not
+  masquerade as engine underruns"). Fail-SOFT at mint (a receipt problem must never
+  destroy rendered video), fail-CLOSED at grade.
+- **Fable's arithmetic gate earned its keep:** `frame_count` was the one beat-scope
+  integer nothing re-derived while everything else was weighed against it, so TWO
+  coordinated lies could launder 21 surviving pad frames that either lie alone would
+  catch. Closed -- the frozen plan is now the authority on beat length.
+- **Two of my own rulings were overturned mid-arc and both are recorded.** r3's
+  `episode_id` cross-check would have REJECTED VALID RENAMED EPISODES
+  (`resolve_episode_id_for_clip_persistence` renames `pending_*` after the ledger is
+  captured) -- cut, design preserved as a follow-on. And my r2 evidence sentence about
+  the grader "returning 0 findings, correctly" was true only of a ledger I had unwrapped
+  by hand.
+- **THE MATRIX DOCS WERE LYING ABOUT HUMO (`82dd14db`, `1d0ed295`, `9ebb81d5`).** Operator
+  asked whether the maths docs still matched production. Checked all five against the live
+  registry: four clean, one stale. `2026-08-02-all-local-engines-multiclip-maths.md`
+  claimed `humo_14B_169` was TEN clips of 1.96 s with nine minted stills -- its most
+  alarming finding -- where the live registry says FIVE segments of 97, because
+  `_HUMO_14B_SAFE_RENDER_FRAMES` moved to 97. Retired to `docs/retired/` with `-RETIRED`
+  in the name; its questions kept, its authority over numbers removed.
+  The FINAL doc lost its hand-typed tables and now cites the drift-gated generated
+  matrix, and **every fix item gained a verified STATUS** -- F1 ("every coverage-planned
+  segment renders with NO preflight VRAM check") had been DONE since
+  `assert_frame_affordable` was wired at `render_driver.py:3133`, and still read as
+  blocking. A fixed safety item and an open one were indistinguishable on the page.
+  Both READMEs now link the reference pair and state the rule: **a hand-maintained doc
+  must never re-type a number a generated one already owns.**
+- **THE MATRIX PATTERN SPEC (`11e893f6`) -- designed, NOT built.** Operator wants one
+  matrix per plug-and-play module, reader-first so the video PATHS can be compared,
+  registered in CLAUDE.md, built for churn (Flux3 + a lowest-lift MiniMax are next).
+  Fable's design keeps the doc 100% GENERATED and gives the generator a SECOND INPUT --
+  prose fragments whose every number is a placeholder resolved from the live registry, so
+  judgment stays human and numbers cannot rot. **Still logic and clip maths are the
+  teaching spine**, because they are what a user adding their own visual model gets wrong.
+  **The authoring lane already exists for source banks** (contract + playbook + gated
+  preflight, 1,238 lines) and for nothing else -- video gets built as the SECOND instance
+  of that triad, with a blank matrix cell defined as a failed preflight gate.
+- **Silent defaults found while grounding it, and they are the actionable part:** register
+  an engine and fill nothing in, and the frame contract takes FOUR silent paths to
+  `SINGLE_ONLY` (including a RAISING declaration), the canvas silently inherits the shared
+  landscape default that already cost `wan_8gb` a 268-minute leg, the engine silently
+  vanishes from every role listing, and a new CLOUD engine gets a WRONG cell rather than a
+  blank one. `QUALIFIED_COST_ROWS` is an empty frozenset, so VRAM admission is unenforced
+  for every engine today.
+- **Operator rulings banked this session:** no mirror or ping-pong anywhere except the
+  closing loop, which is CONFIRMED OK -- and it is the CLOSING-THEME BACKDROP, not the
+  credits roll, which freezes a frame and never loops. The single-clip carve-out closure
+  was NOT taken: all three reviewers proved that removing `len(planned) <= 1` as written
+  would subject every single-clip beat to the full projection contract and indict them all.
+- **Left running:** `kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/` (Codex + agy on
+  the pattern spec) and `kibitz-runs/2026-08-06-2026-08-06-no-mirror-matrix/r1/` (done).
+  **`kibitz-runs/` is GITIGNORED -- those artifacts are LOCAL ONLY.**
+- **Gotcha banked:** `git add -A docs/` swept another window's untracked file into a
+  commit. Untracked it the same session. **Pathspec, never `-A`, on a shared tree.**
+
 ## 2026-08-06 -- HEAD e04dcaad (v2.0-alpha) -- CODER (ITEM 8 COMPLETE; a new bug found and r1'd, NOT built)
 
 Did: finished Item 8 (all six chunks), then ran a bug hunt that surfaced one confirmed
