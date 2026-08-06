@@ -95,6 +95,61 @@ def test_presentation_gender_beats_the_label():
 
 
 # --------------------------------------------------------------------------- #
+# Portrait contradiction detection -- reported, never enforced
+
+
+def test_relational_phrase_does_not_misclassify_the_subject():
+    """'his mother' asserts the SUBJECT is male. Counting `mother` there is how
+    a naive detector invents a contradiction on a perfectly good prompt."""
+    female, male = audit.portrait_gender_cues("a stern figure beside his mother")
+    assert "his" in male
+    assert "mother" not in female, "possessive-owned nouns describe someone else"
+
+
+def test_a_possessive_noun_describes_a_feature_not_the_subject():
+    """MEASURED false positive: the first corpus run reported 170 rows, and every
+    sampled one was a male character with a widow's PEAK -- a hairline."""
+    female, _male = audit.portrait_gender_cues(
+        "close-cropped hair with a distinctive widow's peak")
+    assert "widow" not in female
+    female2, _m2 = audit.portrait_gender_cues("a woman's voice on the radio")
+    assert "woman" not in female2
+
+
+def test_a_bare_gendered_noun_does_assert_the_subject():
+    female, _male = audit.portrait_gender_cues("an elderly woman at a desk")
+    assert "woman" in female
+
+
+def test_portrait_contradiction_flags_an_opposing_cue():
+    row = {"character_description": "a stern gentleman adjusting her collar"}
+    hit = audit.portrait_contradiction(row, "female")
+    assert hit and "gentleman" in hit["opposing_cues"]
+
+
+def test_portrait_contradiction_is_silent_when_consistent():
+    row = {"character_description": "an elderly woman, she waits"}
+    assert audit.portrait_contradiction(row, "female") == {}
+
+
+def test_portrait_contradiction_skips_other_rows():
+    """An `other` row is anchored neutrally and has no binary to contradict;
+    scanning it would manufacture findings."""
+    row = {"character_description": "a gentleman with her coat"}
+    assert audit.portrait_contradiction(row, "other") == {}
+
+
+def test_portrait_contradiction_is_never_a_violation():
+    """The prompt path forbids any Python classifier from blocking a prompt, so
+    this reports and never changes the exit code on its own."""
+    import inspect
+    src = inspect.getsource(audit.main)
+    assert "portrait_rows" in src
+    # the only things that can return 1 are active violations / --fail-on-legacy
+    assert "if violations:" in src
+
+
+# --------------------------------------------------------------------------- #
 # Exit codes
 
 

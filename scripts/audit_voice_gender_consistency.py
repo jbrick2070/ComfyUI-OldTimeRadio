@@ -144,6 +144,81 @@ def is_announcer(row: Dict[str, Any]) -> bool:
     return "ANNOUNCER" in str(row.get("name") or "").upper()
 
 
+# --------------------------------------------------------------------------- #
+# Portrait contradiction detection (item 8 chunk 2-remainder)
+#
+# REPORTED, never enforced. `otr_meta_brief_image_prompt` states outright that no
+# Python vocabulary or overlap classifier may reject, rewrite or block a prompt,
+# and that is a deliberate operator-era decision, not an oversight. So the
+# contradiction surfaces HERE, offline, where it informs without gating a render.
+
+_FEMALE_NOUNS = frozenset({
+    "woman", "women", "lady", "girl", "matriarch", "mother", "sister",
+    "daughter", "wife", "widow", "actress", "queen", "princess", "duchess",
+})
+_MALE_NOUNS = frozenset({
+    "man", "men", "gentleman", "boy", "patriarch", "father", "brother",
+    "son", "husband", "widower", "actor", "king", "prince", "duke",
+})
+_FEMALE_PRONOUNS = frozenset({"she", "her", "hers", "herself"})
+_MALE_PRONOUNS = frozenset({"he", "him", "his", "himself"})
+#: A gendered noun right after a possessive describes SOMEONE ELSE. "his mother"
+#: asserts the subject is male, not female -- counting `mother` there is how a
+#: naive detector invents a contradiction on a perfectly good prompt.
+_POSSESSIVES = frozenset({"his", "her", "their", "its", "hers", "theirs"})
+
+
+def portrait_gender_cues(text: str) -> Tuple[set, set]:
+    """(female_cues, male_cues) asserted about the SUBJECT of ``text``."""
+    words = [w for w in "".join(
+        c if c.isalpha() or c.isspace() else " " for c in str(text or "").lower()
+    ).split() if w]
+    female, male = set(), set()
+    for i, word in enumerate(words):
+        prev = words[i - 1] if i else ""
+        nxt = words[i + 1] if i + 1 < len(words) else ""
+        if word in _FEMALE_PRONOUNS:
+            female.add(word)
+            continue
+        if word in _MALE_PRONOUNS:
+            male.add(word)
+            continue
+        if word not in _FEMALE_NOUNS and word not in _MALE_NOUNS:
+            continue
+        # "his mother" -- the noun belongs to someone else.
+        if prev in _POSSESSIVES:
+            continue
+        # "widow's peak", "a woman's voice" -- a POSSESSIVE noun modifies what
+        # follows it; it describes a feature, not the subject. The tokenizer
+        # turns the apostrophe into a break, so a trailing bare "s" is the
+        # possessive's fingerprint. Measured: without this the detector reported
+        # 170 rows, and every sampled one was a male character with a widow's
+        # PEAK -- a hairline.
+        if nxt == "s":
+            continue
+        (female if word in _FEMALE_NOUNS else male).add(word)
+    return female, male
+
+
+def portrait_contradiction(row: Dict[str, Any], expected: str) -> Dict[str, Any]:
+    """A cue asserting the OPPOSITE binary gender, or {} when there is none.
+
+    Only runs for a binary expectation: an `other` row is anchored neutrally and
+    has no binary to contradict, so scanning it would manufacture findings.
+    """
+    if expected not in ("male", "female"):
+        return {}
+    text = " ".join(str(row.get(k) or "") for k in
+                    ("portrait_prompt", "appearance", "character_description"))
+    if not text.strip():
+        return {}
+    female, male = portrait_gender_cues(text)
+    opposing = male if expected == "female" else female
+    if not opposing:
+        return {}
+    return {"expected": expected, "opposing_cues": sorted(opposing)}
+
+
 def field_gender(field: str, row: Dict[str, Any], ref_gender, preset_gender) -> str:
     """The gender a populated identity field implies, or '' when it is absent
     or unresolvable. The two are reported differently and never as agreement."""
@@ -187,6 +262,7 @@ def audit_row(row, engine, ref_gender, preset_gender) -> Dict[str, Any]:
         "active_gender": active_gender,
         "verdict": verdict,
         "dormant": dormant,
+        "portrait": portrait_contradiction(row, expected),
     }
 
 
@@ -247,6 +323,7 @@ def main(argv=None) -> int:
     violations: List[Dict[str, Any]] = []
     legacy_findings = 0
     dormant_rows = 0
+    portrait_rows = 0
     absent_rows = unresolved_rows = 0
 
     for path in iter_ledgers(args.root):
@@ -281,6 +358,12 @@ def main(argv=None) -> int:
                 continue
             engine = ann_engine if is_announcer(row) else char_engine
             res = audit_row(row, engine, ref_gender, preset_gender)
+            if res["portrait"]:
+                portrait_rows += 1
+                if portrait_rows <= 10:
+                    print(f"PORTRAIT {os.path.basename(os.path.dirname(path))} "
+                          f"{res['char']}: expected {res['expected']}, prose "
+                          f"asserts {', '.join(res['portrait']['opposing_cues'])}")
             if res["dormant"]:
                 dormant_rows += 1
             if res["verdict"] == "active_absent":
@@ -309,6 +392,12 @@ def main(argv=None) -> int:
     print(f"active unresolved : {unresolved_rows} row(s)")
     print(f"dormant mismatch  : {dormant_rows} row(s) "
           f"(inaudible today, still a ledger that disagrees with itself)")
+    print(f"portrait conflict : {portrait_rows} row(s) whose prose asserts the "
+          f"opposite gender (REPORTED -- the prompt path may not be gated)")
+    if portrait_rows:
+        print("                    note: a DISGUISE plot is a legitimate hit "
+              "here -- ROSALIND-as-Ganymede and VIOLA-as-Cesario keep female "
+              "voices by operator ruling, so read this list, do not total it")
     print(f"legacy findings   : {legacy_findings} (pre-policy, not failed "
           f"unless --fail-on-legacy)")
     print(f"VIOLATIONS        : {len(violations)}")
