@@ -74,7 +74,9 @@ _COL3_VIEW_H = 908
 
 # scroll / hold (seconds)
 #: Scroll speed, pixels per second. DOUBLED 60 -> 120 on 2026-08-03 (operator:
-#: "we need credits to go faster, twice as fast as now").
+#: "we need credits to go faster, twice as fast as now"), then RAISED 50% again
+#: 120 -> 180 on 2026-08-05 (operator: "another fifty percent is still seem to
+#: take a long time"). Net 3x the original 60.
 #:
 #: The tail duration is `_LEAD_HOLD_S + roll_px / pps + _TAIL_HOLD_S`, and the
 #: scroll dominates it: a measured 49.2 s roll was 42.2 s of travel against 7 s
@@ -85,7 +87,7 @@ _COL3_VIEW_H = 908
 #:
 #: Legibility is the only reason to scroll slowly, so this is a LOOK decision:
 #: every line is on screen half as long as before.
-_SCROLL_PPS = 120.0
+_SCROLL_PPS = 180.0
 _LEAD_HOLD_S = 3.0
 _TAIL_HOLD_S = 4.0
 _MAX_HOLD_S = 120.0             # ceiling -> speed up, never truncate

@@ -1353,7 +1353,15 @@ class _TelemetryHUDRenderer:
     Pre-renders both panels at init time; render() is cheap (crop + paste).
     """
 
-    _SCROLL_PPS = 65  # pixels per second (comfortable reading speed)
+    # Pixels per second. Raised 65 -> 180 on 2026-08-05 to MATCH
+    # otr_credits_roll._SCROLL_PPS. The operator has asked twice for a faster
+    # tail (60 -> 120 on 08-03, 120 -> 180 on 08-05) and both times only the
+    # credits-roll constant moved -- this HUD post-roll kept scrolling at 65 and
+    # runs up to 90 s, so it had become the slower half of the same perceived
+    # surface. Two scrollers on one tail at two speeds is the defect; one rate is
+    # the fix. Raising pps only SHORTENS the post-roll (hud_frames clamps to
+    # 20-90 s), so no duration guard can be violated by this direction.
+    _SCROLL_PPS = 180  # pixels per second -- keep in step with the credits roll
 
     def __init__(self, w, h, fps, data):
         self.w, self.h, self.fps = w, h, fps
