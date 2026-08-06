@@ -3,6 +3,53 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD 041a21d7 (v2.0-alpha) -- CODER (Item 8 chunk 1 shipped; Sonnet QA caught it landing in dead code)
+
+Did: shipped Item 8 chunk 1, then had a Sonnet 5 QA pass find that half of it was
+  landed where nothing reads it. Fixed, re-greened, pushed. Suite 8776 / 131 skipped /
+  1 xfailed; Bug Bible 17. Two commits (`496d9d57`, `041a21d7`), HEAD == origin.
+  Also ran Item 7 r3 -- still NOT buildable.
+
+- **Chunk 1 (`496d9d57`):** `normalize_gender` in `_otr_roster_gender.py` (stdlib leaf,
+  no cycle) + adoption at the portrait anchor, both render-time voice resolvers and the
+  story-orchestrator preset remap. `woman`/`man`/`m`/`f` rows were invisible to every
+  `== "female"` test; `other` rows now get a neutral portrait anchor.
+- **THE QA FINDING THAT MATTERS (`041a21d7`): the voice half was DEAD CODE.** CastLock
+  stamps `voice_ref_id` BEFORE any render, so the render-time resolvers hit `if vrid:`
+  and never reach the fallback I had patched. The path that runs is
+  `cast_lock.py:589`, which I never touched -- so `woman` rows still raised
+  `VoiceCastingError` and took the gender-agnostic draw in production. **This is the
+  exact rule the repo promoted from Item 7 -- "a fix applied to a function with no
+  callers is not a fix" -- and the driver walked into it the same day.** Grep for the
+  path that EXECUTES, not the function that looks right.
+- **Two regressions the driver introduced, both caught by the same QA:** (1) the
+  tri-state normalizer folded `neutral` into `other`, skipping `el_river` -- the bank's
+  ONE neutral reference -- for the ~27 corpus rows recorded `neutral`; (2)
+  `normalize_gender(None)` returns the truthy `"other"`, which broke a blank-gender
+  short-circuit in `story_orchestrator` and could hand two characters the same preset.
+  **Root cause: one normalizer doing two jobs.** Split into `canonical_bank_gender`
+  (synonyms only, passes `neutral` and blank through -- the VOICE BANK owns its own
+  vocabulary) and `normalize_gender` (tri-state -- portrait, pronouns, policy gate). A
+  test now pins that they are NOT interchangeable.
+- **Item 7 r3: still NO.** Codex NO (7 must-fixes), agy yes-with-fixes (9); r2 was NO
+  with 11. Both lanes independently found a manifest sequencing deadlock (the stamper
+  runs per-unit inside the vendor loop, but the manifest is written only after it) and
+  that `RosterGenderVerdict` has no `gender_source`/`gender_confidence` fields to carry
+  the ladder's output. **Per the standing rule this needs a SPEC REWRITE folding r2+r3,
+  not an r4.** Judgment at `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/`.
+  **Trap:** that review read `_otr_roster_gender.py` before `496d9d57` added ~90 lines
+  near its top, so every cite into that file has shifted. Re-pin before acting.
+- **Owed, with the data checked:** three more unnormalized sites in `_otr_casting.py`.
+  `:469` (LLM echo) and `:583-587` (`_plan_gender_distribution` leaves synonym rows
+  UNCOUNTED, skewing the 40/40/20 split) are real but BEHAVIOUR-CHANGING -- they move
+  the roll and break C7/replay parity, so they need a declared re-baseline. `:756-759`
+  (`_PINNABLE_GENDERS` drops `woman`/`man` pins) is **verified INERT**: the shipped
+  roster sidecars emit only `unknown`/`male`/`female` (32/30/23), so no pin is dropped
+  today. Latent hazard, not a live defect.
+- Remaining Item 8 chunks: 4 -> 3 -> 2-remainder -> 6 -> 5, spec at
+  `kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r4/final.md` (LOCAL ONLY --
+  `kibitz-runs/` is gitignored).
+
 ## 2026-08-06 early -- HEAD 189bc78d (v2.0-alpha) -- CODER (credits sped up; Item 8 diagnosed backwards, full arc run, spec converged)
 
 Did: shipped the operator's credits request, then ran a full four-round kibitz arc on
