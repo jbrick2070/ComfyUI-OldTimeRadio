@@ -101,23 +101,30 @@ _CODA_BY_STATUS = {
 
 
 def spoken_coda_line(provenance: Any) -> str:
-    """A short spoken acknowledgement for the announcer coda. Empty for a
-    licensed/unknown status where the pack authors its own line. Never raises."""
+    """A short spoken acknowledgement for the announcer coda.
+
+    EMPTY for a licensed source: the licensor is not the author, and print is
+    where that credit belongs. Never raises.
+    """
     prov = provenance if isinstance(provenance, dict) else {}
     status = str(prov.get("status") or "")
     if status in _CODA_BY_STATUS:
         return _CODA_BY_STATUS[status]
-    if status in ("licensed_commercial", "licensed_noncommercial"):
-        src = str(prov.get("source_label") or "").strip()
-        # THE SPOKEN LINE NAMES THE EDITION, NEVER THE LICENCE (2026-08-04).
-        # It used to append "used under CC BY-NC 3.0 (Folger Shakespeare
-        # Library)", so a listener heard a licence identifier read aloud in the
-        # middle of a drama. Attribution is still satisfied -- CC BY requires
-        # credit "in the manner specified", not credit in the audio -- and the
-        # full licence text rides on printed_credit_line() below, which is what
-        # the credits roll and the episode description carry.
-        if src:
-            return f"Tonight's tale was adapted from {src}."
+    # A LICENSED SOURCE GETS NO SPOKEN LINE (operator ruling 2026-08-05):
+    # "I get it, thanks to Folger, but they didn't write it -- Shakespeare did."
+    #
+    # This used to append "used under CC BY-NC 3.0 (Folger Shakespeare
+    # Library)", so a listener heard a licence identifier mid-drama. On
+    # 2026-08-04 the licence was dropped and the EDITION NAME kept, which left
+    # the announcer thanking the licensor of a public-domain play -- crediting
+    # the wrong party to anyone actually listening. Now neither is spoken.
+    #
+    # Attribution is not lost and was never legally required in the audio: CC BY
+    # asks for credit "in the manner specified", not credit read aloud, and
+    # printed_credit_line() below still emits the full "adapted from <source>,
+    # used under <licence>" for the credits roll, with noncommercial_notice()
+    # warning the operator separately. An empty line here routes the episode to
+    # its ordinary sign-off and stamps spoken_coda_source="none".
     return ""
 
 

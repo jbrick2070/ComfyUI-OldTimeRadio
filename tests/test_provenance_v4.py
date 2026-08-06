@@ -67,10 +67,41 @@ class TestTemplates:
     def test_spoken_coda_per_status(self):
         for st in ("public_domain_us", "cc0", "research_only", "synthetic"):
             assert PROV.spoken_coda_line({"status": st})
-        assert PROV.spoken_coda_line(
-            {"status": "licensed_noncommercial", "source_label": "Hamlet",
-             "license_label": "CC BY-NC"})
         assert PROV.spoken_coda_line({"status": "unknown"}) == ""
+
+    def test_a_licensed_source_is_never_named_aloud(self):
+        """Credit only -- the licensor does not get thanked on air.
+
+        Operator ruling 2026-08-05: "I get it, thanks to Folger, but they didn't
+        write it -- Shakespeare did." Folger publishes the edition; the play is
+        Shakespeare's, so naming the licensor in the audio credits the wrong
+        party to anyone listening.
+
+        This assertion is INVERTED on purpose. It previously required a licensed
+        source to speak "Tonight's tale was adapted from <source_label>". If it
+        fails, someone put the licensor back on the air -- that is an operator
+        decision, not a fix.
+        """
+        for label in ("Hamlet", "Folger Shakespeare", ""):
+            for status in ("licensed_noncommercial", "licensed_commercial"):
+                assert PROV.spoken_coda_line({
+                    "status": status,
+                    "source_label": label,
+                    "license_label": "CC BY-NC 3.0",
+                }) == "", "a licensed source was named aloud: %r" % label
+
+    def test_the_credit_still_carries_what_the_audio_dropped(self):
+        """Dropping it from the audio must not drop it from the record."""
+        prov = {
+            "status": "licensed_noncommercial",
+            "source_label": "Folger Shakespeare",
+            "license_label": "CC BY-NC 3.0",
+            "commercial_use_allowed": False,
+        }
+        printed = PROV.printed_credit_line(prov)
+        assert "Folger Shakespeare" in printed
+        assert "CC BY-NC 3.0" in printed
+        assert "NON-COMMERCIAL SOURCE" in PROV.noncommercial_notice(prov)
 
     def test_printed_credit_per_status(self):
         assert "public domain" in PROV.printed_credit_line(
