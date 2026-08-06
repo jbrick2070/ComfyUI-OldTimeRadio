@@ -3,6 +3,54 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD e04dcaad (v2.0-alpha) -- CODER (ITEM 8 COMPLETE; a new bug found and r1'd, NOT built)
+
+Did: finished Item 8 (all six chunks), then ran a bug hunt that surfaced one confirmed
+  defect and took it through r1. Suite **8805 passed** / 131 skipped / 1 xfailed;
+  Bug Bible 17. HEAD == origin.
+
+- **ITEM 8 IS DONE (`e04dcaad`).** Chunk 2-remainder shipped: portrait contradiction
+  detection lives in the AUDIT, not node 89, because
+  `otr_meta_brief_image_prompt.py:1587` forbids any Python classifier from rejecting,
+  rewriting or blocking a prompt.
+  **The detector caught its own false-positive rate before it shipped findings:** the
+  first corpus run reported 170 conflicts and every sampled one was a male character
+  with a *widow's PEAK* -- a hairline. A gendered noun in POSSESSIVE form modifies what
+  follows it and describes a feature, not the subject. After that rule: **28 findings
+  that read as real** -- `FATHER BROWN` shipped female, `Clara` gendered male with "her"
+  in her prose, `Edgar` gendered female with "his". **`ROSALIND` flags on "boy" and is
+  NOT a defect** -- she disguises as Ganymede and the operator ruling keeps her female
+  voice; the report says so, so the list is read rather than totalled.
+- **Audit baseline over 1,595 ledgers:** 0 unreadable, 0 VIOLATIONS (every ledger is
+  pre-policy, which it states rather than passing quietly), 332 legacy findings, 401
+  dormant mismatches, 28 portrait conflicts.
+- **NEW DEFECT, r1 DONE, NOT BUILT -- the multi-clip honesty rule fails the honest
+  beats.** `acceptance.py:177-178` compares a SEGMENT's `native_frame_count` against the
+  whole BEAT's `frame_count`, because `render_driver.py:3483` builds `beat_clip` from
+  the LAST segment and recomputes only `path` / `frame_count` / `segment_count` /
+  `join_mode`. A `wan_ti2v` beat of 3x81 real renders delivers 241 genuinely rendered
+  frames and is graded "241 delivered, only 81 rendered". **The rule fires on exactly
+  the beats that prove it was satisfied**, and the durable `clip_manifest.json` row is
+  wrong regardless of who runs the grader.
+  **The obvious fix is also wrong, three ways independently agreeing:** summing the
+  segments' native counts gives 243 against 241 delivered, because chaining DROPS
+  duplicated head frames at each seam (`rendered` is `(path, drop_head, keep_frames)`,
+  `render_driver.py:3297`). Corrected shape: accumulate per-segment receipts, mint the
+  beat receipt in the DISTINCT counts Bug Bible **12.69** already mandates
+  (requested/rendered/visible/trimmed), compare DELIVERED-NATIVE frames, and fix the
+  RULE rather than only the receipt.
+  **Also found:** a MISSING `native_frame_count` currently PASSES, because the check is
+  guarded by `native is not None` -- a hole in the same rule.
+  **Two driver overstatements corrected by Codex:** no durable runner invokes
+  `scripts/grade_episode.py` per leg (only temporary `tmp/_w45_campaign.ps1` does), so
+  it is a MANUAL gate and the severity is lower than first written; and REACHABLE is not
+  LIVE, so this may NOT enter `PROD_BUG_LOG.md` without a retained artifact.
+  Statement: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`.
+  Judgment: `kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r1/`.
+  **r2/r3/r4 are OWED before any code** -- r1 changed the fix fundamentally, and the
+  existing grader tests are hand-written rows encoding the very model production
+  contradicts.
+
 ## 2026-08-06 -- HEAD 6a92cbd3 (v2.0-alpha) -- CODER (Item 8: five of six chunks shipped, audit live over the corpus)
 
 Did: built Item 8 chunks 4, 3, 6 and 5 on top of chunk 1. Suite **8798 passed** / 131
