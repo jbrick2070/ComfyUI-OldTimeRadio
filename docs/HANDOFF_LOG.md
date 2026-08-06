@@ -3,6 +3,63 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 early -- HEAD 189bc78d (v2.0-alpha) -- CODER (credits sped up; Item 8 diagnosed backwards, full arc run, spec converged)
+
+Did: shipped the operator's credits request, then ran a full four-round kibitz arc on
+  Item 8 that overturned its shipped diagnosis. Suite 8724 / 131 skipped / 1 xfailed;
+  Bug Bible 17. Two commits, both pushed, HEAD == origin. **No Item 8 code written --
+  deliberately, see below.**
+
+- **Credits (`aca2a04b`).** Operator: 120 pps still reads slow. Raised to 180 -- and
+  found a SECOND tail scroller nobody had moved: the telemetry HUD post-roll
+  (`video_engine.py:1356`) was still at 65 pps and runs up to 90 s, so it had become
+  the slower half of the same perceived surface. Both now 180 and in step. That is why
+  two rounds of "make the credits faster" still felt slow.
+- **ITEM 8'S SHIPPED DIAGNOSIS IS INVERTED, measured over 1,595 ledgers / 5,123 rows.**
+  The plan says `voice_ref_id` ignores gender and is AUDIBLE. Both halves are false:
+  **1,169 rows with both genders resolvable, ZERO cross-gender references** (the only 4
+  exceptions are unservable genders carrying the honest `gender_unservable` receipt).
+  **`voice_preset` is the wrong field** -- 225 of 1,559. And no shipped engine speaks
+  it: engines declare their field (`_otr_voice_node_common.py:454`) and 1,147 of 1,559
+  recent rows rendered indextts2, which reads the REFERENCE. The delivered voice is
+  already gender-correct.
+- **The mechanism was ALREADY LOGGED and I re-derived it.** Codex cited
+  `PROD_BUG_LOG.md:3163-3196` -- `PBUG-20260805-02`, filed the same day, with the exact
+  seed-424242 reproducer, 74% divergence, a probed fix, and status OPEN/deliberately
+  cut. **Driver process failure: `CLAUDE.md` makes the bug log a MANDATORY gate before
+  diagnosis; I read GO_FORWARD + HANDOFF_LOG and skipped it, and burned three
+  hypotheses.** Read the bug log first.
+- **The arc earned its keep every round.** r2 proved the design was UNBUILDABLE: node 89
+  reads node 62, upstream of CastLock (`[255,62,1,89,0,"STRING"]`), so nothing CastLock
+  stamps can reach the portrait; and `Ledger.set_cast` rebuilds a fixed nine-key row
+  (`production_ledger.py:1029-1039`) that silently drops new fields. That combination
+  would have shipped a fix nothing could read -- the same class as the Item 7 defect.
+  r3 inverted the ownership (producers produce the presentation, CastLock persists) and
+  killed the driver's own "regenerate the description" ruling -- node 89 cannot reach
+  that generator. r4 found `otr_meta_brief_image_prompt.py:1585-1588` is a LIVE CONTRACT
+  ("no Python vocabulary or overlap classifier can reject, rewrite, or block the
+  prompt"), which forbids the candidate-rejection both reviewers proposed; chunk 2
+  shrank to normalize-and-report. **Driver overruled both lanes there.**
+- **Driver error, corrected:** the claim that title-cased `Male` gets no portrait anchor
+  is FALSE -- `otr_meta_brief_image_prompt.py:81` already lowercases. agy caught it.
+  The real defect is the non-canonical synonyms (`woman`, `man`, `m`, `f`) plus the
+  whole `other` family.
+- **Found by driver sweep, reviewed by no round:** `story_orchestrator.py:449-453`
+  merges cast rows copying `voice_preset` and `gender` under INDEPENDENT guards, so a
+  row can take its preset from one row and its gender from another -- a plausible third
+  mismatch mechanism. `:662` also remaps presets on raw gender. **Static evidence only,
+  so per the admission rule it may NOT enter PROD_BUG_LOG yet.**
+- **Converged spec: `kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r4/final.md`**
+  (note: `kibitz-runs/` is gitignored, so the artifacts are LOCAL ONLY). Six chunks,
+  landing order 1 -> 4 -> 3 -> 2 -> 6 -> 5, no canonical JSON change, one accepted
+  ShotLock cache re-baseline.
+- **Operator decision owed: item 7 probably outranks item 8.** The panel split --
+  Antigravity says enforcing consistency on an inverted label "guarantees a
+  gender-coherent but ridiculous episode"; Codex says re-ranking is the operator's call.
+  Evidence: ELIZABETH BENNET shipped male and MR. DARCY female within 24 h, MACBETH
+  female at 3.9 d, ANTIPHOLUS male in one leg and female in another -- all coherent, all
+  wrong.
+
 ## 2026-08-05 night -- HEAD 104c3f78 (v2.0-alpha) -- CODER (Item 7 shipped + live-proven; gender ladder specced)
 
 Did: shipped and live-proved the spoken-citation fix, took the licensor off the air,

@@ -533,10 +533,31 @@ The gender value already fans out to three surfaces -- the voice, the portrait
 prose (`otr_meta_brief_image_prompt.py:78-90`, the gender anchor) and the script.
 The defect is that one of them does not follow it.
 
-* **`voice_ref_id` ignores the resolved gender.** Across three episodes the preset
-  follows the roll every time and the reference never does: `bm_george` + `bf_emma`,
-  and in another episode the exact reverse (`bf_emma` + `bm_fable`). A single-source
-  bug, and AUDIBLE in the finished episode. **Fix this first.**
+* ~~**`voice_ref_id` ignores the resolved gender** ... AUDIBLE ... **Fix this
+  first.**~~ **WITHDRAWN 2026-08-06 -- INVERTED, and measured over the whole corpus.**
+  1,595 ledgers / 5,123 rows: **1,169 non-announcer rows with both genders resolvable
+  and ZERO cross-gender references.** The only 4 exceptions are `other`/`non-binary`
+  rows the bank cannot serve, and all 4 carry the honest `gender_unservable` receipt
+  (`cast_lock.py:645-667`). **`voice_ref_id` FOLLOWS the gender; `voice_preset` is the
+  field that does not** (225 of 1,559). And it is not audible: engines declare the field
+  they speak (`_otr_voice_node_common.py:454`) and 1,147 of 1,559 recent rows rendered
+  indextts2, which reads the REFERENCE. The three-episode sample that produced the
+  original claim was read backwards.
+  **The fidelity-lane mechanism is already logged as `PBUG-20260805-02`**
+  (`PROD_BUG_LOG.md:3163-3196`) -- replay desync, seed-424242 reproducer, 74% of seeds,
+  probed fix, deliberately CUT. It stays cut; all four kibitz rounds agree.
+  **Converged build spec (full 4-round arc, 8 external calls):**
+  `kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r4/final.md` -- LOCAL ONLY,
+  `kibitz-runs/` is gitignored. Six chunks, landing order 1 -> 4 -> 3 -> 2 -> 6 -> 5,
+  no canonical JSON change, one accepted ShotLock cache re-baseline. **What is real and
+  worth building:** `woman`/`man`/`m`/`f` rows get no portrait anchor
+  (`otr_meta_brief_image_prompt.py:81` -- note the title-case claim was FALSE, it already
+  lowercases); `_otr_scifi_codex.py:2735` hardcodes an all-male preset triple keyed on
+  `char_id`; `_otr_voice_node_common.py:91-119,158-189` resolve delivered voices off RAW
+  gender so a legacy `woman` takes the gender-agnostic path.
+  **Owed, static evidence only (no PBUG yet):** `story_orchestrator.py:449-453` merges
+  cast rows copying `voice_preset` and `gender` under INDEPENDENT guards -- a row can
+  take its preset from one row and its gender from another.
 * **The portrait must be proven to follow too.** Wheel of Wrath's description says
   "her left cheek" for a character the ledger genders male -- so the portrait prose
   tracks something, and it needs the same consistency assertion as the voice.
