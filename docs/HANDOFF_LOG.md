@@ -3,7 +3,7 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-06 -- HEAD 11e893f6 (v2.0-alpha) -- CODER (multi-clip grader fixed; the matrix became a source of truth)
+## 2026-08-06 -- HEAD 65bd6705 (v2.0-alpha) -- CODER (multi-clip grader fixed; two campaigns arc'd; the review tail found two more code bugs)
 
 Did: shipped the multi-clip honesty repair after a full four-round kibitz arc + Sonnet QA
   + a Fable arithmetic gate, then rebuilt the video-matrix documentation on operator
@@ -88,6 +88,62 @@ Did: shipped the multi-clip honesty repair after a full four-round kibitz arc + 
   **`kibitz-runs/` is GITIGNORED -- those artifacts are LOCAL ONLY.**
 - **Gotcha banked:** `git add -A docs/` swept another window's untracked file into a
   commit. Untracked it the same session. **Pathspec, never `-A`, on a shared tree.**
+
+- **THE REVIEW TAIL AFTER r4 FOUND TWO MORE CODE BUGS, and that is the lesson.**
+  Operator's pipeline, now standing: **Sonnet -> manual agy -> Claude + Fable
+  finalize -> SHA -> handoff.** r4 convergence means the PLAN stopped changing,
+  not that the CODE is clean.
+  * **Sonnet (whole package)** found `grade_delivered` still using a bare
+    `int()` at two sites when the rest of `acceptance.py` moved onto
+    `frame_count()` the same morning -- so an unreadable `target_frame_count`
+    raised past `grade_episode` and past the durable script's 0/1/2 exit
+    contract. The helper existed for exactly that failure; it never reached the
+    one rule nobody re-read. It also caught `GO_FORWARD` item 9 still reading
+    "r1 done, NOT built" AFTER the fix shipped -- the same failure `d548ac54`
+    recorded four commits earlier. Tombstoned.
+  * **Manual agy** found what the four-round arc, the Sonnet pass AND the Fable
+    arithmetic gate all missed in the function all three were reading:
+    `peak_used` has tracked the beat's MAX across segments since 2026-07-26,
+    with a comment saying why -- but the fix reached the RETURN VALUE only.
+    `beat_clip` is `dict(clip or {})`, so `vram_peak_mb` was inherited from the
+    LAST segment and `build_clip_manifest` published it. A beat whose heaviest
+    render was segment 0 reported its lightest. **Same trap as the extension
+    receipts, one field over.**
+- **NO-MIRROR: arc complete, CODE-READY, not built.** Spec
+  `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md` (`dc1794a2`).
+  The rule is ALREADY enforced in production -- the boomerang is DEAD, proven by
+  execution (`_loop_via_reverse()` returns False even with the env hatch set), so
+  its machinery is a DELETION task, not a hole. The retrofit grew **6 -> 10 -> 11
+  surfaces** across three rounds, each correction from someone opening a file.
+  The closing loop is the **CLOSING-THEME BACKDROP**, not the credits roll, and
+  needs a real frame-domain window classifier (`speaker_role == "music_close"`
+  AND `start_s_space == "master_mix"`) because today it authorizes reuse for ANY
+  unexplained tail. The live leg must be an `ltx_video` beat over its 169-frame
+  ceiling WITH the retired env switch set -- a WAN or `ltx_8gb` leg would pass
+  without executing the deleted machinery. That leg also discharges F11.
+- **MATRIX PATTERN: four rounds, four NOs, DID NOT CONVERGE.** Recorded as such
+  in `GO_FORWARD` section 0 rather than counted as a completed arc. The blocker
+  is ABSENT HUMAN-OWNED DATA -- ~32 `doc_purpose` lines and the family taxonomy
+  must be WRITTEN; no review round produces content. What survived all four
+  rounds is sound: templated prose fragments with placeholders resolved from the
+  live registry, extending `AdapterDescriptor` rather than minting a second, a
+  generator-side validator keeping the registry pydantic-free, init order
+  import -> audit -> rows, and the two-unit cost split. **Proven:
+  `str.format_map` CANNOT resolve dotted flat keys** (`KeyError: 'reference'`),
+  so the placeholder grammar must be explicit. **`provider_side` is
+  behaviour-affecting, not STATIC** -- a third name-prefix classifier lives at
+  `scripts/otr_w45_campaign.py:82-108,120-132`, where a provider id without a
+  `cloud_`/`google_` prefix enters the LOCAL campaign.
+- **Four hand-typed numbers rotted THIS SESSION inside documents about hand-typed
+  numbers rotting:** the 08-02 doc's HuMo segments (3 and 10 vs a live 5), my own
+  spec's "eleven of twelve cloud engines" (live: 13), the generated matrix's Veo
+  header (96/144/192 vs its own gated 100/150/200 -- pre-existing and
+  intentional, checked and dismissed), and my own receipts baseline with no
+  commit stamp.
+- **Gotchas banked:** `git add -A` on a shared tree swept another window's
+  untracked file into a commit (untracked same session -- **pathspec, never
+  `-A`**); and Antigravity hit provider quota, so both r4 rounds ran SINGLE-LANE
+  and say so rather than claiming two-reviewer convergence.
 
 ## 2026-08-06 -- HEAD e04dcaad (v2.0-alpha) -- CODER (ITEM 8 COMPLETE; a new bug found and r1'd, NOT built)
 
