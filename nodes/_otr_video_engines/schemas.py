@@ -245,6 +245,22 @@ class CanonicalClip(_Forbid):
     request_hash: str = ""
     asset_hashes: list[str] = Field(default_factory=list)
     qc: dict = Field(default_factory=dict)
+    #: THE HONESTY RECEIPTS (no-mirror enforcement, 2026-08-06). How many of
+    #: this clip's frames the engine actually RENDERED, and how the rest got
+    #: there. ``native_frame_count`` is always the EMITTED count -- what the
+    #: adapter handed back -- never a pre-trim decoded length, so it can never
+    #: exceed ``frame_count``. ``extension_mode`` is drawn from
+    #: ``acceptance.EXTENSION_MODES``; ``"none"`` means every delivered frame was
+    #: rendered, and it is the only mode that may ship.
+    #:
+    #: DECLARED HERE EVEN THOUGH THE RENDER PATH PASSES PLAIN DICTS. This class
+    #: is ``extra="forbid"``, so the day anything validates an adapter's return
+    #: through it, an enriched clip carrying these two keys would be REJECTED as
+    #: unknown fields -- the receipts would be dropped by the schema that exists
+    #: to protect them. Adding them costs nothing today and removes a trap that
+    #: would otherwise fire far from its cause.
+    native_frame_count: Optional[int] = None
+    extension_mode: Optional[str] = None
 
 
 class AdapterDescriptor(_Forbid):

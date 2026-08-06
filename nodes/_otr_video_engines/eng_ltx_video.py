@@ -1494,9 +1494,22 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
+        # THE HONESTY RECEIPT, CAPTURED BEFORE ANY EXTENSION (2026-08-06).
+        # ``n_native`` is what this render actually PRODUCED. The mirror below
+        # can only append to it, so reading the count here is the only place it
+        # is knowable -- afterwards ``len(frames)`` is the extended length and
+        # the real one is unrecoverable.
+        n_native = len(frames)
+        # AND WHETHER THE MIRROR ACTUALLY RAN, not whether it was asked for.
+        # ``loop_via_reverse`` is the INTENT; the branch below declines it on a
+        # sub-2-frame decode. A receipt keyed on the intent would declare a
+        # ping-pong that never happened, and the grader would reject a clip whose
+        # every frame was rendered.
+        mirrored = False
         if loop_via_reverse:
             if len(frames) >= 2:
                 frames = _boomerang_frames(frames)
+                mirrored = True
             else:
                 _LOG.warning("[eng_ltx_video] loop_via_reverse: only %d frame(s) "
                              "decoded -- skipping mirror", len(frames))
@@ -1508,7 +1521,20 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # not, on either recipe path.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n,
-                "ltx_loop_via_reverse": bool(loop_via_reverse)}
+                "ltx_loop_via_reverse": bool(loop_via_reverse),
+                # EMITTED scope, exactly as ``eng_ltx_8gb`` stamps it: the count
+                # is what this clip CARRIES, so ``frame_count -
+                # native_frame_count`` is the number of manufactured frames. On
+                # the mirrored path the real frames are the PREFIX -- the
+                # boomerang is ``[0,1,2,3] -> [0,1,2,3,2,1,0]``, forward run
+                # first -- which is the tail-append contract
+                # ``acceptance.SEGMENT_RECEIPT_KEYS`` documents and depends on.
+                # NOT CLAMPED to ``n``. If the encoder ever emitted fewer frames
+                # than it was handed, a native count above the clip's own length
+                # is an IMPOSSIBLE receipt, and the grader is written to call it
+                # that. A ``min()`` here would launder that into a pass.
+                "native_frame_count": n_native if mirrored else n,
+                "extension_mode": "ping_pong" if mirrored else "none"}
 
     def _render_clip_hq(self, request, prepared, plan):
         """S5: drive ONE silent two-stage HQ clip (hq_two_stage recipe). The
@@ -1560,9 +1586,15 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
+        # The same receipt the single-pass path takes, for the same reason: this
+        # is the SECOND raw return, and a producer seam that stamps one path and
+        # not its sibling is how ``eng_ltx_8gb`` lost its receipt originally.
+        n_native = len(frames)
+        mirrored = False
         if loop_via_reverse:
             if len(frames) >= 2:
                 frames = _boomerang_frames(frames)
+                mirrored = True
             else:
                 _LOG.warning("[eng_ltx_video] HQ loop_via_reverse: only %d "
                              "frame(s) decoded -- skipping mirror", len(frames))
@@ -1573,7 +1605,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n,
                 "ltx_recipe": RECIPE_HQ_TWO_STAGE,
-                "ltx_loop_via_reverse": bool(loop_via_reverse)}
+                "ltx_loop_via_reverse": bool(loop_via_reverse),
+                "native_frame_count": n_native if mirrored else n,
+                "extension_mode": "ping_pong" if mirrored else "none"}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
@@ -1616,6 +1650,15 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "has_audio": False,            # V-1: only OTR_MasterAudioMux emits audio
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # THE SECOND PRODUCER SEAM (2026-08-06). Both raw returns above
+            # stamp the receipts, and WITHOUT this passthrough both die here:
+            # ``canonicalize`` delegates to this method, and a field it does not
+            # copy is a field ``render_beat_coverage`` never sees. That is
+            # exactly how ``eng_ltx_8gb`` lost its receipt -- it has its own
+            # ``_clip_from_raw`` rather than the WAN pair's shared one, and so
+            # does this adapter.
+            "native_frame_count": raw.get("native_frame_count"),
+            "extension_mode": raw.get("extension_mode"),
         }
 
 

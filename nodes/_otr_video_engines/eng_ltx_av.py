@@ -1098,7 +1098,14 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return {"out_path": path, "frame_count": n, "vram_peak_mb": peak,
                 "recipe": recipe, "unet": os.path.basename(str(self._unet_name())),
                 "quant": self._quant_label(), "use_lora": bool(rcfg["use_lora"]),
-                "canvas": "%dx%d" % (width, height), "audio_source": _audio_src}
+                "canvas": "%dx%d" % (width, height), "audio_source": _audio_src,
+                # THE HONESTY RECEIPTS (2026-08-06). Registered as
+                # ``ltx_audio_in``. Nothing stands between the decode above and
+                # this encode -- no trim, no fit, no extension branch -- so the
+                # emitted clip IS the render, frame for frame, and ``"none"`` is
+                # a fact about this path rather than an assumption about it.
+                "native_frame_count": n,
+                "extension_mode": "none"}
 
     def canonicalize(self, raw, request, profile):
         return self._clip_from_raw(raw, request)
@@ -1197,6 +1204,20 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "quant": raw.get("quant"), "use_lora": raw.get("use_lora"),
             "render_canvas": raw.get("canvas"),
             "audio_source": raw.get("audio_source"),
+            # The second producer seam, and this lane genuinely needs it. An
+            # earlier draft of this comment said ``ltx_audio_in`` sits outside
+            # ``PLANNING_CAP_ENGINES`` and is therefore never coverage-split.
+            # That conflates two different gates and is WRONG. Splitting is
+            # decided by ``frame_contract.can_split`` -- ``max_frames or
+            # discrete_frames`` (``frame_contract.py:248-259``) -- and this
+            # adapter declares ``max_frames=497`` at ``:1346``, so a beat past
+            # 497 frames IS partitioned and its segment rows DO reach
+            # ``beat_frame_accounting``. ``PLANNING_CAP_ENGINES`` governs
+            # something else entirely: whether the operator's tier ceiling
+            # narrows the contract BEFORE partitioning
+            # (``effective_frame_contract``, ``:349-376``).
+            "native_frame_count": raw.get("native_frame_count"),
+            "extension_mode": raw.get("extension_mode"),
         }
 
 

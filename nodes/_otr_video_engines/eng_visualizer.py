@@ -163,6 +163,12 @@ class VisualizerEngine:
             "has_audio": False,
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # SURFACE 11 (2026-08-06): a procedural lane paints every frame it
+            # delivers, so nothing here is extended. Declared because the v1
+            # manifest contract asks every delivered video row, not because this
+            # engine could ever pad. UNBOUNDED, so no ``native_frame_count`` --
+            # see the reasoning at ``cheap_families._floor_clip``.
+            "extension_mode": "none",
         }
 
     # ---- render ----

@@ -436,6 +436,41 @@ class _GoogleVidSfxBase:
             "provider_job_id": asset.provider_job_id,
             "content_sha256": asset.sha256,
             "actual_duration_s": asset.duration_s,
+            # The honesty receipts (2026-08-06). Native by construction, like
+            # every provider lane: the asset is downloaded whole and
+            # ``frame_count`` is derived from its own measured duration and fps
+            # directly above, so both counts are one derivation rather than two
+            # that could drift.
+            #
+            # THE VIDEO RECEIPT ONLY. The SFX trio below has its own beat-scope
+            # defect (no-mirror spec 7.1) and it is deliberately NOT touched:
+            # operator ruling 2026-08-06, "we don't have any sfx in prod, it was
+            # ripped out".
+            #
+            # PRECISELY WHY nothing published reaches those three keys today, and
+            # it is NOT that the path was removed: the SFX BED IS STILL WIRED.
+            # ``OTR_MasterAudioMux`` is node 85 in ``workflows/otr_canonical.json``
+            # with ``clip_manifest_json`` on link 278, and it calls
+            # ``compile_sfx_bed_from_manifest`` on every run. That call is a
+            # no-op solely because no manifest row carries ``sfx_stem_path`` --
+            # which is true only because no SFX-producing engine is currently
+            # selected. THIS engine is one of five offered on the ``music_visual``
+            # role, so one dropdown pick arms the bed with no other change.
+            # Searching the canonical JSON for "sfx" finds nothing and is
+            # MISLEADING; the wiring travels as ``clip_manifest_json``.
+            # Full grounding: the 2026-08-06 legacy-SFX problem statement.
+            #
+            # THAT REFERENCE IS DELIBERATELY NOT WRITTEN AS A PATH, and the next
+            # person to tidy this comment should leave it that way.
+            # ``tools/engine_matrix.py`` scrapes every documentation-path token
+            # -- ``docs/`` followed by a filename -- out of an adapter's source
+            # (``_DOC_CITATION``) and publishes it as the
+            # evidence for THAT ENGINE'S VRAM CEILING. Spelling the filename out
+            # here put a problem statement about audio wiring into the generated
+            # matrix as four engines' cap receipt, and the drift gate caught it.
+            # A ``docs/`` path in this file is a claim about the render ceiling.
+            "native_frame_count": frame_count,
+            "extension_mode": "none",
             "sfx_stem_path": str(sfx.path),
             "sfx_duration_s": sfx.duration_s,
             "sfx_sha256": sfx.sha256,

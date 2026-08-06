@@ -629,6 +629,13 @@ class GoogleVeoVideoEngine:
             "provider_job_id": asset.provider_job_id,
             "content_sha256": asset.sha256,
             "actual_duration_s": asset.duration_s,
+            # The honesty receipts (2026-08-06). Native by construction, like
+            # every provider lane: the asset is downloaded whole and
+            # ``frame_count`` is derived from its own measured duration and fps
+            # directly above, so both counts are one derivation rather than two
+            # that could drift.
+            "native_frame_count": frame_count,
+            "extension_mode": "none",
         }
 
     def teardown(self, prepared) -> None:  # noqa: ARG002

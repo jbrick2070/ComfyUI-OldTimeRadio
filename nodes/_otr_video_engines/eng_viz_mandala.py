@@ -179,6 +179,10 @@ class VizMxcMandalaEngine:
             "has_audio": False,
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # SURFACE 11 (2026-08-06): a procedural lane paints every frame it
+            # delivers, so nothing here is extended. UNBOUNDED, so no
+            # ``native_frame_count`` -- see ``cheap_families._floor_clip``.
+            "extension_mode": "none",
             "qc": {"mode": raw.get("mode", "idle"),
                    "audio_used": bool(raw.get("audio_used", False))},
         }

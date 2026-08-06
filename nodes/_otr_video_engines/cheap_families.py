@@ -251,6 +251,25 @@ class _CheapFamilyBase:
             "has_audio": False,            # V-1: only OTR_MasterAudioMux emits audio
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # SURFACE 11 (no-mirror enforcement, 2026-08-06): the v1 manifest
+            # contract asks EVERY delivered video row how its frames got there,
+            # and this one builder answers for the whole cheap-family shelf --
+            # the still-motion pan, the flat static hold, the lavfi radio floor
+            # and ``still_parallax``, which all reach the wire through here.
+            # Without it the v1 contract would indict the honest floor lanes.
+            #
+            # ``"none"`` is exact: each of these clips is synthesized to its
+            # target length in ONE ffmpeg pass (zoompan / loop+frames:v / lavfi),
+            # so there is no shorter render that anything extended afterwards.
+            #
+            # NO ``native_frame_count``, DELIBERATELY. These families are
+            # UNBOUNDED -- ``frame_contract.can_split`` is False for them, so a
+            # beat can never overflow one render -- and under the 7.3 ruling an
+            # unbounded lane owes no native-count evidence. Claiming that a flat
+            # hold's frames were all "natively rendered" would be true of the
+            # ffmpeg pass and misleading about the picture, and an over-claim
+            # here is exactly what a padded clip would want to say.
+            "extension_mode": "none",
         }
 
     def canonicalize(self, raw, request, profile):

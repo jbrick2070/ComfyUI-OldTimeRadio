@@ -500,6 +500,21 @@ class _CloudVideoBase:
             "provider_job_id": asset.provider_job_id,
             "content_sha256": asset.sha256,
             "actual_duration_s": asset.duration_s,
+            # THE HONESTY RECEIPTS (2026-08-06). Every PROVIDER surface carried
+            # ZERO references to these two fields before today, which is the
+            # dormancy the step-3 v1 contract closes: a cloud lane that answers
+            # nothing looks exactly like a local lane that pads without saying
+            # so, and no rule could tell them apart.
+            #
+            # A provider clip is native BY CONSTRUCTION, and the reason is
+            # structural rather than a claim about the vendor: the delivered
+            # asset is downloaded and re-containered whole, and OTR owns no code
+            # on this path that could lengthen it. ``frame_count`` is derived
+            # from the asset's OWN measured duration and fps just above, so the
+            # native count is the same number by the same derivation -- not a
+            # second measurement that could disagree with the first.
+            "native_frame_count": frame_count,
+            "extension_mode": "none",
         }
 
     def teardown(self, prepared) -> None:

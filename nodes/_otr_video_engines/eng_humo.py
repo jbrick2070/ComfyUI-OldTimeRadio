@@ -880,7 +880,26 @@ class HuMoEngine(_MC.MotionEngineBase):
         # because every producer pipes exact bytes -- a property of the current
         # producers, not a contract anything enforced.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
-        return {"out_path": path, "frame_count": n}
+        # THE HONESTY RECEIPTS (2026-08-06). ONE stamp here serves all four
+        # registered subclasses -- ``humo``, ``humo_1.7B``, ``humo_1.7B_169``
+        # and ``humo_14B_169`` -- because every one of them inherits this render
+        # path and this return. Four surfaces, one line, and no way for a tier to
+        # be added later that silently answers neither question.
+        #
+        # ``"none"`` IS PROVEN HERE, not assumed. The only thing between the
+        # decode and this return is ``fit_frames_to_target``, which TRIMS a long
+        # render and RAISES ``MirrorExtensionForbidden`` on a short one (see the
+        # no-mirror note above it). There is no branch on this lane that can add
+        # a frame the model did not draw -- mirroring an audio-driven mouth would
+        # play it backwards, which is why the operator's 2026-07-25 directive
+        # removed it. So every delivered frame is a rendered frame, in order.
+        #
+        # EMITTED scope: ``n`` is what the encoded clip carries, so the gap
+        # ``frame_count - native_frame_count`` is the manufactured count and is
+        # zero here by construction.
+        return {"out_path": path, "frame_count": n,
+                "native_frame_count": n,
+                "extension_mode": "none"}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
@@ -970,6 +989,11 @@ class HuMoEngine(_MC.MotionEngineBase):
             "has_audio": False,            # V-1: only OTR_MasterAudioMux emits audio
             "color_primaries": "bt709", "transfer": "bt709", "matrix": "bt709",
             "engine_id": self.name, "family": self.family,
+            # The second producer seam, shared by all four HuMo tiers. Stamping
+            # the raw return without this line would leave the receipt on the
+            # floor of ``canonicalize``.
+            "native_frame_count": raw.get("native_frame_count"),
+            "extension_mode": raw.get("extension_mode"),
         }
 
 

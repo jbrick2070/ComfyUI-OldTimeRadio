@@ -189,12 +189,28 @@ conformance -- no paid calls, offline-first.
 **That single leg also discharges F11** (the mirror deletion has never had a live
 proof) and the multi-clip receipt work's outstanding live proof.
 
-## 7. FINAL-GATE FINDINGS -- open, and the decisions they owe
+## 7. FINAL-GATE FINDINGS -- RESOLVED 2026-08-06, before any code was typed
 
-Found by the Fable co-judge at `65bd6705`, AFTER r4. Neither is fixed; both are
-scheduled here rather than guessed at.
+Found by the Fable co-judge at `65bd6705`, AFTER r4. All three are now answered:
+**7.1 is CUT by the operator, 7.3 is DECIDED, 7.4 is VERIFIED.** 7.2 stands and
+is built with step 3.
 
-### 7.1 The SFX receipt trio is inherited from the LAST segment (shipped defect)
+### 7.1 CUT (operator ruling 2026-08-06) -- there is no SFX in production
+
+Operator, asked the question below directly: *"we don't have any sfx in prod, it
+was ripped out, I don't want to do sfx now."* **Do not build it, and do not
+"tidy" the SFX path in passing.**
+
+Grounded before the ruling was applied: `workflows/otr_canonical.json` contains
+**zero** matches for `sfx`, so no shipped episode reaches this code. The two
+producers are cloud-only (`eng_cloud_video.py:916`,
+`eng_google_vid_sfx.py:439-441`) and cloud lanes cannot run on this box, so the
+defect is dormant on a lane that is itself switched off.
+
+The finding stays recorded below, unfixed and correctly described, because it is
+real and a future SFX lane will meet it. It is NOT scheduled work.
+
+### 7.1-BIS The finding itself (recorded, NOT scheduled)
 
 `beat_clip = dict(clip or {})` (`render_driver.py:3499`) never overwrites
 `sfx_stem_path`, `sfx_duration_s` or `sfx_sha256`. All three are beat-scope
@@ -211,14 +227,14 @@ FINAL segment's stem, hash and duration. Cloud lanes cannot run on this box, so
 this is the same dormancy class the `ltx_8gb` receipt had before `e499b7fc`
 fixed it.
 
-**THE DECISION THIS OWES, and why it was not made at the gate:** for a
-multi-segment beat, is the honest value `None` (fail-closed -- the beat has no
-single stem, and a partial one misrepresents it, at the cost of losing that
-beat's SFX) or a MERGED stem (correct, but new work in the assembler)? Publishing
-the last segment's stem is wrong either way. **Do not guess.** Whichever is
-chosen, write it UNCONDITIONALLY like the other beat-scope fields -- that is the
-trap this whole change exists to close, and this is its fifth, sixth and seventh
-instance.
+**THE DECISION THIS OWED:** for a multi-segment beat, is the honest value `None`
+(fail-closed -- the beat has no single stem, and a partial one misrepresents it,
+at the cost of losing that beat's SFX) or a MERGED stem (correct, but new work in
+the assembler)? Publishing the last segment's stem is wrong either way.
+**ANSWERED BY 7.1 ABOVE: neither, because the lane is cut.** If SFX is ever
+revived, whichever is chosen must be written UNCONDITIONALLY like the other
+beat-scope fields -- that is the trap this whole change exists to close, and this
+is its fifth, sixth and seventh instance.
 
 ### 7.2 The grader crashes with the WRONG EXIT CODE on malformed rows
 
@@ -235,18 +251,51 @@ scheduled nowhere** -- and "KEEP `grade_frozen_route`, it is manifest-independen
 still crashes on a malformed ledger shot row. Both halves, plus a top-level
 `except` in the durable script that exits 2 rather than 1.
 
-### 7.3 One design decision the spec must make before an engineer starts
+### 7.3 DECIDED -- boundedness is a ShotLock-minted per-shot ledger stamp
 
 Step 3's v1 contract says "BOUNDED engines additionally owe native-count
-evidence" -- but the grader may import nothing and query no live state, and
-nothing here says **where boundedness comes from**. The three candidates are not
-equivalent: presence of `coverage_plan` on the shot (under-covers a bounded beat
-that fits one render); a new ShotLock-minted per-shot stamp (probably right,
-currently unspecified); or an engine-name allowlist inside `acceptance.py`
-(violates that module's stated principles). **Make this call before building.**
+evidence", and the grader may import nothing and query no live state, so the fact
+has to reach it as DATA. **The call, made 2026-08-06 before any code was typed:
+candidate (b) -- ShotLock stamps `shot["frame_bounded"]` at freeze time, derived
+from `frame_contract.can_split()`, and `acceptance.py` reads only that field.**
 
-### 7.4 Line-cite drift
+Why, and why the other two are not merely worse but wrong:
 
-This spec was written at `1759afdd`; `acceptance.py` has grown since. Its cites
-`:353-355`, `:418-420`, `:488-508` are now `:361-362`, `:429-430`, `:515-520`.
-Re-pin before use.
+* **`can_split()` IS the boundedness predicate, already.** It is literally
+  `bool(contract.max_frames or contract.discrete_frames)`
+  (`frame_contract.py:248-259`) -- "does this engine have a ceiling to exceed" --
+  and `tests/test_frame_contract.py:75` already pins it under that name. Minting
+  the stamp from it means the planner and the grader cannot drift about what
+  "bounded" means, because there is one definition.
+* **It is CLOCK-DOMAIN CORRECT, which is this module's first stated refusal.**
+  `acceptance.py`'s own docstring refuses live routing state because "the
+  environment has moved on, so a disagreement would report the grader's clock
+  rather than the episode's". An adapter's `frame_contract` is exactly such state:
+  re-grading a January episode in June must judge it by the contract it was
+  rendered under. A stamp records that; a lookup cannot.
+* **Candidate (a), `coverage_plan` presence, does not discriminate AT ALL** --
+  worse than the "under-covers" this section guessed. `_stamp_coverage_plan`
+  (`otr_shot_lock.py:1319`) stamps a plan for EVERY registered engine with
+  `target >= 1`, and `partition_beat` returns a one-segment `JOIN_SINGLE` plan for
+  an unbounded contract (`coverage_plan.py:313-317`). Every shot carries the key,
+  so the test would call the visualizers bounded.
+* **Candidate (c), an allowlist inside `acceptance.py`, is a STARVED CONSUMER** --
+  register a new bounded engine, forget the list, and the grader silently exempts
+  the one engine it was added to catch. That is the same drift class as the
+  hand-typed numbers retired on 2026-08-06, and it also puts engine names in a
+  module whose whole discipline is that it knows none.
+
+**Producer-first, per section 2:** the ShotLock stamp is itself a producer, so it
+lands in step 2 with the other documents -- BEFORE the step 3 rule that reads it.
+Absence means "not stated", never "unbounded": a legacy ledger with no
+`frame_bounded` key owes no native-count evidence, and only an explicit `true`
+demands it.
+
+### 7.4 VERIFIED -- the re-pinned cites are correct at HEAD
+
+This spec was written at `1759afdd`. Re-checked against `acceptance.py` at
+`90124cb6`: the cites `:353-355`, `:418-420`, `:488-508` are indeed now
+**`:361-362`** (the `grade_delivered` row index), **`:429-430`** (the
+`grade_multiclip_honesty` row index) and **`:515-520`** (the
+`delivered_native != delivered` branch). All three land on the stated code. No
+further drift; use the new numbers.
