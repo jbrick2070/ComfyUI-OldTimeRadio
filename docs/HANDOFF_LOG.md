@@ -3,6 +3,69 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-05 night -- HEAD 104c3f78 (v2.0-alpha) -- CODER (Item 7 shipped + live-proven; gender ladder specced)
+
+Did: shipped and live-proved the spoken-citation fix, took the licensor off the air,
+  ran 8 render legs, and specced the next item. Suite 8724 / 131 skipped / 1 xfailed;
+  Bug Bible 17. Five commits, all pushed, HEAD == origin.
+
+- **Item 7 SHIPPED (`3943dd38`) and LIVE-PROVEN (`0957e169`).** The announcer was
+  speaking source URLs and licence identifiers -- 84 lines across 30 episodes, all of
+  them the coda row -- and because `_otr_captions.py` copies raw `lines[].text` into
+  the ASS cue, it was burned into the video too. Seven legs across six lanes: both
+  fidelity lanes speak the deterministic coda, `media_archive` still speaks its own
+  note verbatim (the control held), `original` speaks none. **Zero leaked lines.**
+  The corpus audit scanned 1,595 ledgers -- eight more than baseline -- and reported
+  the same 69 findings. The number did not move because nothing new leaked.
+- **The root cause of the RECURRENCE, now a Bible-bound rule:** the 2026-08-04 fix
+  for this same defect was applied inside `spoken_coda_line()`, a function with ZERO
+  readers, so 30 more episodes leaked after it landed. **A fix applied to a function
+  with no callers is not a fix.** Grep for callers, not for the symbol.
+- **Credit-only (`104c3f78`), operator ruling:** thanks to Folger, but they did not
+  write it -- Shakespeare did. A licensed source is now never named in the audio;
+  `printed_credit_line` still carries the full "adapted from Folger Shakespeare, used
+  under CC BY-NC 3.0" for the credits roll. Needed no writer change -- an empty coda
+  routes into the owned-but-empty branch built hours earlier, which exists because r3
+  argued a receipt claiming the coda was spoken had to be provably true.
+- **The arc caught what the suite could not, and the suite overruled the arc.** Eight
+  external reviews (`kibitz-runs/2026-08-05-item7-citation/`). Every round changed the
+  build: r1 the blast radius (captions, not prompts), r2 the ownership key, r3 the
+  routing contract plus a `NameError` in my own extraction boundary, r4 a pre-existing
+  wrong-prompt bug (`compose_news_coda` never received `source_bank_id`, so every lane
+  resolved media_archive's prompt). Then the full suite reversed one: Codex said strip
+  `Date/Rights:` from the shakespeare prompt, and a test pinned that it must stay --
+  that prompt asks the model for a noncommercial source note, so the licence is input
+  to a requested output. The panel proposes; the suite still gets a vote.
+- **agy wrote code instead of reviewing.** Its r4 lane edited three production files
+  rather than returning a review. Reverted in full; the tree contains none of it.
+  Recorded in `scope_receipt.md`. Its r2 lane was quota-held and the operator
+  backfilled it through the UI -- and that backfill REVERSED a driver ruling, so the
+  round was worth running rather than waving through.
+- **8 render legs, 6 SUCCESS.** Leg 04 (`scifi_news`) timed out at 45.1m though the
+  server published the episode anyway; leg 08 died in 4.7m -- a real error, undiagnosed.
+- **Next item specced and already reviewed:** character gender is rolled on prose lanes
+  (Scrooge shipped female, Marley "other") while Shakespeare is correct. **The split
+  is the diagnosis: 14 shakespeare sidecars carry rosters, the prose lane's one tracked
+  sidecar has `characters: None`.** The render code is not broken -- it is a vendor-time
+  DATA gap with a working consumer, the exact inverse of Item 7. Spec at
+  `docs/2026-08-05-character-gender-ladder-SPEC.md` (Fable, driver-grounded);
+  **Codex r2 returned NO with 11 must-fixes**, the sharpest being that the proposed web
+  search would silently do nothing (`OpenRouterBackend.generate` swallows unknown kwargs
+  through `**_ignored`) and that extraction over the full unit text cannot run -- 58 of
+  65 files exceed 12,000 bytes against a 32,768 estimated-token cap. Needs r3.
+- **Operator ruling that reorders the queue: CONSISTENCY BEATS ACCURACY.** "The voice
+  and picture must match, that most important." A female Scrooge with a female voice and
+  portrait is coherent; a male Scrooge with a female reference voice is broken. So the
+  voice/portrait consistency defect (new item 8) outranks the gender-accuracy work
+  (item 7). Evidence: across three episodes the voice PRESET follows the gender every
+  time and `voice_ref_id` never does, in both directions.
+- **Found while grounding, and it reopens a ruling:** 32 of 85 shakespeare roster rows
+  are `unknown` today -- 38% of the lane assumed solved; Comedy of Errors ships 7
+  characters, all unknown. Proposed narrowing: Shakespeare's KNOWN rows stay
+  untouchable, tiers 3-4 fill only its unknown rows. Operator decision.
+- Gotcha: `FreezeAssertionError.__init__` takes `(errors, report)` -- a two-arg
+  constructor. Simulating a freeze failure with one argument fails confusingly.
+
 ## 2026-08-05 late afternoon -- HEAD 4506b1ed (v2.0-alpha) -- CODER (live proof PAID; agy QA judged; Item 7 re-grounded)
 
 Did: paid the live receipt the morning session owed, judged an agy QA pass and shipped

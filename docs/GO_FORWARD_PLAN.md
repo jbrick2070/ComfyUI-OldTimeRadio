@@ -395,50 +395,42 @@ BOTH test-order permutations as regressions. The private-module-name
 alternative is CUT: it risks exercising fallback import paths instead of the
 production `nodes._otr_public_domain_sources` package identity.
 
-### 4. SOURCE CITATIONS ARE SPOKEN ALOUD, AND REACH TWO LLM PROMPT BUILDERS (recommended next; anchor written)
+### 4. FINISH ITEM 7 -- the leak is closed and proven; testability is not (~2h)
 
-Anchor: `kibitz-runs/2026-08-05-item7-citation/r1/driver_anchor.md` -- fully
-grounded, measured over the corpus, ready for the panel.
+The spoken-citation defect SHIPPED and is live-proven (`3943dd38`, `0957e169`,
+`104c3f78`; receipt in `PROD_BUG_LOG.md` PBUG-20260805-04). Seven legs, six lanes,
+zero leaked lines, and the corpus audit held at 69 findings across eight new
+episodes. Licensed sources are now credit-only -- the announcer names neither the
+licence nor the licensor, because Folger publishes the edition and Shakespeare
+wrote the play.
 
-**Measured 2026-08-05 over 1,587 ledgers: 89 spoken lines carry a URL, a bare
-domain or a licence identifier; 30 distinct episodes leak ON/AFTER 2026-08-04,
-the most recent at 14:22 on 08-05.** The announcer routinely reads "CC BY-NC 3.0"
-on air. Worst case found reads the interpreter's own prompt scaffold aloud --
-"Source: Folger Shakespeare. Date/Rights: c. 1606 | CC BY-NC 3.0. URL:
-https://www.folger.ed..." -- which are verbatim the field labels built at
-`_otr_shakespeare_sources.py:586-589`.
+What it still owes, all specified in `kibitz-runs/2026-08-05-item7-citation/r4/final.md`:
 
-Because `lines[].text` also feeds the still prompt
-(`otr_meta_brief_image_prompt.py:1313`) and the i2v motion clause
-(`_otr_motion_clause.py:135`), that text reaches two LLM prompt builders as if it
-were stage direction. **The visual path is the wider half of the blast radius.**
+* **B4 -- extract the coda helper** so tests exercise the production reader.
+  **TRAP:** do NOT extract `OTR_LedgerScriptWriter.py:5463-5588` verbatim.
+  `news_meta` is defined inside that range and read by the caller below it --
+  extracting as written is a `NameError` on every episode. Both review lanes
+  caught this independently. Keep `news_meta` in the caller.
+* **B6 -- bump `CURRENT_SCHEMA_VERSION`** (`nodes/_otr_ledger.py:58`). The audit
+  must REQUIRE `spoken_coda_source` on post-fix ledgers while tolerating its
+  absence on the 1,587 legacy ones; without a version boundary a dropped receipt
+  is indistinguishable from history. `LEGACY_SCHEMA_VERSIONS` in
+  `scripts/audit_spoken_citations.py` is already written to expect the bump.
+* **Writer-level routing tests** (depend on B4): both fidelity banks x
+  {non-empty, empty} provenance, plus an owned/non-empty case with
+  `_style_grammar_on == False`. Assert the coda is PRESENT, not merely that the
+  URL is absent. Control is `media_archive`, NEVER `scifi_news` -- that lane
+  dispatches to `scifi_news_circuit` and returns before this block.
+* **Bug Bible coverage** -- mandatory per `CLAUDE.md`, not a judgment call. The
+  rule to promote: **a fix applied to a function with no callers is not a fix.**
+  The 2026-08-04 attempt at this same defect edited `spoken_coda_line()`, which
+  had zero readers, and 30 episodes leaked after it "landed".
 
-Mechanism: the interpreter is handed the URL (`_otr_public_domain_sources.py:443`,
-`_otr_shakespeare_sources.py:589`) and asked for an attribution note in the same
-payload (`:665`, `:624`); the writer appends the model's reply verbatim as spoken
-dialogue (`OTR_LedgerScriptWriter.py:4895-4897` -> `:5489-5497` ->
-`_otr_line_composer.py:1265,1285`), because `compose_news_coda` is contractually
-forbidden to edit it (`:1255` "never score, shorten, or replace it").
-
-**The flag is already ON -- only a CONSUMER is missing.** `provenance_normalize`
-is `true` for `public_domain` and `shakespeare` in `nodes/story_packs/banks.json`,
-pinned at `tests/test_provenance_v4.py:119`. `meta["provenance_coda_line"]` is
-composed and stamped at `OTR_LedgerScriptWriter.py:3595` and has **zero readers**
-(grep: that write plus the docstring at `_otr_provenance.py:19`). The 2026-08-04
-fix that was meant to stop this was applied inside `spoken_coda_line()` -- the
-dead function -- which is exactly why 30 episodes have leaked since.
-
-Settled, do not relitigate: **do NOT bump `NORMALIZATION_VERSION`** (wrong
-boundary, source bytes unchanged -- Codex r4 overruled agy r2); bump the
-interpreter PROMPT versions instead (`_otr_public_domain_sources.py:42`,
-`_otr_shakespeare_sources.py:42`). Printed credits and `noncommercial_notice` do
-NOT change -- this moves what is SPOKEN only. Fix the two stale comments that
-produced the wrong spec (`OTR_LedgerScriptWriter.py:3584-3585`,
-`_otr_ledger_freeze.py:713`, both "inert for every current bank").
-
-Open questions for the panel are in the anchor; the sharp one is WHERE the
-consumer belongs, since `compose_news_coda` is shared with `media_archive` /
-`scifi_news` where the note is a genuine news fact that MUST still be spoken.
+Also parked and owed a merge: another session's worktree
+`.claude/worktrees/awesome-brahmagupta-a509b4` holds the uncommitted deletion of
+the dead `news_coda_spoken_reduction` receipt chain and `finalize_news_coda_surface`
+(no callers tree-wide, no producer for its two trigger flags). It stood down so it
+would not collide with B4. Re-ground it against the new helper boundary, then merge.
 
 ### 5. 1,090 CAST ROWS CLAIM A NON-COMMERCIAL MODEL IS COMMERCIALLY CLEAN
 
@@ -478,6 +470,86 @@ the flag).
 **The vacuity class is now proven twice** -- this gate, and the freeze test at
 `test_g9_sfw_ship_stop.py` that filtered on a retired code prefix (fixed
 `4506b1ed`). Any NEW armed gate ships with a vacuity assertion.
+
+### 7. CHARACTER GENDER IS ROLLED ON PROSE LANES -- Scrooge shipped female (spec written, Codex r2 returned NO)
+
+Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
+`HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
+MIRANDA are all correct.
+
+**The split IS the diagnosis, and it means the render code is not broken.**
+Shakespeare ships 14 provenance sidecars carrying `characters` with genders; the
+prose lane has ONE tracked sidecar and its `characters` key is `None`. The pin
+chain already exists and is lane-neutral (`_otr_roster_gender.py`, 12.6 KB, on
+disk). Shakespeare is right because the DATA is there. Prose is rolled because it
+is not. **This is a vendor-time data gap with a working consumer** -- the exact
+inverse of the Item 7 bug, where the value existed and nothing read it.
+
+Spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` (Fable, driver-grounded).
+A four-tier TOTAL ladder -- roster -> pronouns in the source text ->
+character-in-work web lookup -> name-frequency percentage -- stamping `gender`
+(always populated, never `unknown`, because a voice must still be cast) plus
+`gender_source` and a confidence. Operator rulings baked in: Shakespeare's KNOWN
+rows are untouchable, the announcer stays randomly male/female by design, and the
+invented lanes (`original`, `scifi_news`, `scifi_news_pro`, `media_archive`) keep
+rolling -- their characters do not exist, so a name search there risks matching a
+real person.
+
+**Codex r2 verdict: NO. Eleven must-fixes, at `kibitz-runs/2026-08-05-gender-ladder/r2/codex.md`.**
+The diagnosis survived; the mechanism did not. The three that matter:
+
+1. **The web search would silently do nothing.** The spec passes a tools/plugins
+   argument to `OpenRouterBackend.generate`, which swallows unknown kwargs through
+   `**_ignored` -- no error, no search, a confident answer from a model that never
+   looked. That is the same silent-no-op class as the defect above.
+2. **"LLM extraction over the FULL unit text" cannot run.** `beckoning_fair_one.txt`
+   is 143,176 bytes and 58 of 65 source files exceed 12,000 bytes, against a
+   32,768 estimated-token per-call cap.
+3. **Blanket surname aliases are identity-unsafe.** Two rows sharing a surname
+   with the same gender currently produce a confident pin rather than an
+   abstention.
+
+**Next step is r3 on the spec, not code.**
+
+**Found while grounding, and it reopens an operator ruling:** 32 of 85 Shakespeare
+roster rows are `unknown` TODAY -- 38% of the lane assumed solved. Comedy of Errors
+ships 7 characters, every one unknown. The narrower ruling that fits the evidence:
+Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
+`unknown` rows. That fixes 32 rows without ever second-guessing a parsed
+dramatis personae. **Operator decision, not a driver call.**
+
+### 8. THE VOICE AND THE PORTRAIT MUST MATCH THE GENDER -- outranks item 7 (operator ruling 2026-08-05)
+
+**Operator, and this reorders the board:** "I am fine with LLMs trying to choose
+the best gender as long as they choose one and pick a voice that matches and
+portrait matches." And: "the voice and picture must match, that most important."
+
+**CONSISTENCY BEATS ACCURACY.** A female Scrooge with a female voice and a female
+portrait is a coherent episode that is merely unfaithful to Dickens. A male
+Scrooge with a female reference voice is a BROKEN episode. So item 7 raises
+fidelity; this item protects coherence, and coherence ships first.
+
+The gender value already fans out to three surfaces -- the voice, the portrait
+prose (`otr_meta_brief_image_prompt.py:78-90`, the gender anchor) and the script.
+The defect is that one of them does not follow it.
+
+* **`voice_ref_id` ignores the resolved gender.** Across three episodes the preset
+  follows the roll every time and the reference never does: `bm_george` + `bf_emma`,
+  and in another episode the exact reverse (`bf_emma` + `bm_fable`). A single-source
+  bug, and AUDIBLE in the finished episode. **Fix this first.**
+* **The portrait must be proven to follow too.** Wheel of Wrath's description says
+  "her left cheek" for a character the ledger genders male -- so the portrait prose
+  tracks something, and it needs the same consistency assertion as the voice.
+* **Two gender vocabularies.** `scifi_news` emits `Male` / `Female` / `Non-binary`
+  while every other lane emits `male` / `female` / `other`. Any consumer matching
+  on that string breaks on one of them -- including any consistency check written
+  against the wrong casing.
+
+**The acceptance test this item exists for:** for every cast row in a finished
+episode, `gender`, the voice preset, the voice reference and the portrait's gender
+anchor all agree. That invariant is checkable offline over the published corpus,
+exactly like `scripts/audit_spoken_citations.py`, and it does not care whether the
+gender is the historically correct one.
 
 ### Bench leftovers (relocated)
 
