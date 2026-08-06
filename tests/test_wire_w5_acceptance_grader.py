@@ -34,6 +34,11 @@ if _REPO not in sys.path:
 
 from nodes._otr_video_engines import acceptance as acc
 
+#: Distinguishes "the caller said nothing" from "the caller said None", because
+#: a beat with NO projection and a beat with an explicitly empty one are
+#: different failures and both need testing.
+_MISSING = object()
+
 
 def _ledger(shots, frozen):
     return {"video": {"roles_effective": dict(frozen), "shots": list(shots)}}
@@ -49,11 +54,42 @@ def _shot(shot_id, role, engine_id, *, frames=50, segments=1):
     return shot
 
 
+def _segments(shot_id, *, count=2, render_frames=25, native=None):
+    """The per-segment projection an assembled beat really carries.
+
+    Built to MATCH the plan ``_shot`` freezes, because the grader re-derives the
+    beat totals from these rows and refuses a projection that disagrees with the
+    plan. ``native`` is the beat's total delivered-native count, spread across
+    the segments front-to-back -- so a row asking for fewer native frames than
+    the beat delivers produces a SHORT tail segment, which is exactly the shape
+    a lane that under-rendered leaves behind.
+    """
+    remaining = count * render_frames if native is None else int(native)
+    rows = []
+    for index in range(count):
+        take = max(0, min(render_frames, remaining))
+        remaining -= take
+        rows.append({"segment_id": "%s_seg%02d" % (shot_id, index),
+                     "segment_index": index,
+                     "render_frames": render_frames,
+                     "drop_head": 0, "trim_tail": 0,
+                     "native_frame_count": take,
+                     "extension_mode": "none"})
+    return rows
+
+
 def _row(shot_id, engine_id, *, frames=50, exists=True,
-         extension_mode="none", native=None):
+         extension_mode="none", native=None, segments=2, projection=_MISSING):
     row = {"shot_id": shot_id, "engine_id": engine_id, "exists": exists,
            "frame_count": frames, "extension_mode": extension_mode,
-           "native_frame_count": frames if native is None else native}
+           "native_frame_count": frames if native is None else native,
+           "delivered_native_frame_count": frames if native is None else native}
+    # The receipt the grader re-derives its verdict from. Defaulted to a
+    # projection that AGREES with the row, so a test that means to break one
+    # thing does not accidentally break this too; pass ``projection=None`` to
+    # test a beat that carries no evidence at all.
+    row["segments"] = (_segments(shot_id, count=segments, native=native)
+                       if projection is _MISSING else projection)
     return row
 
 
@@ -220,6 +256,267 @@ def test_a_CLIP_claiming_NO_EXTENSION_must_have_RENDERED_every_frame():
 
 
 # ---------------------------------------------------------------------------
+# The inversion itself: an HONEST chained beat renders MORE than it delivers
+# ---------------------------------------------------------------------------
+
+def _chain_shot(shot_id, *, segment_frames=81, count=3):
+    """A real ``wan_ti2v`` chain: N native renders, one duplicated head frame
+    dropped at every seam after the first."""
+    return {"shot_id": shot_id, "role": "character_video",
+            "engine_id": "wan_ti2v",
+            "target_frame_count": count * segment_frames - (count - 1),
+            "coverage_plan": {"join_mode": "chain", "segments": [
+                {"index": i, "render_frames": segment_frames,
+                 "drop_head": (1 if i else 0), "trim_tail": 0}
+                for i in range(count)]}}
+
+
+def _chain_row(shot_id, *, segment_frames=81, count=3, natives=None):
+    segments = []
+    for index in range(count):
+        native = segment_frames if natives is None else natives[index]
+        segments.append({"segment_id": "%s_seg%02d" % (shot_id, index),
+                         "segment_index": index,
+                         "render_frames": segment_frames,
+                         "drop_head": (1 if index else 0), "trim_tail": 0,
+                         "native_frame_count": native,
+                         "extension_mode": "none"})
+    delivered = sum(
+        max(0, min(s["native_frame_count"],
+                   s["render_frames"] - s["trim_tail"]) - s["drop_head"])
+        for s in segments)
+    return {"shot_id": shot_id, "engine_id": "wan_ti2v", "exists": True,
+            "frame_count": count * segment_frames - (count - 1),
+            "extension_mode": "none",
+            "native_frame_count": sum(s["native_frame_count"] for s in segments),
+            "delivered_native_frame_count": delivered,
+            "segments": segments}
+
+
+def test_an_HONEST_CHAINED_beat_that_renders_MORE_than_it_delivers_is_ACCEPTED():
+    """THE DEFECT, as a test. Three real 81-frame renders do 243 frames of work
+    and deliver 241, because each chained successor opens on a duplicate of its
+    predecessor's last frame and that frame is dropped at the seam.
+
+    Before 2026-08-06 this beat was graded "241 delivered, of which only 81 were
+    rendered" -- the rule fired on exactly the beats that proved it was
+    satisfied, because it weighed ONE SEGMENT's native count against the WHOLE
+    BEAT's length."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1")
+    assert row["native_frame_count"] == 243, "the WORK"
+    assert row["delivered_native_frame_count"] == 241, "the OUTPUT"
+    assert row["frame_count"] == 241
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    assert acc.grade_multiclip_honesty(ledger, _manifest([row])) == []
+
+
+def test_SUMMING_the_segments_would_have_failed_this_same_beat():
+    """The fix r1 killed, pinned so it cannot come back. Summing the raw native
+    counts gives 243 against a 241-frame beat, so an equality test fed the SUM
+    rejects the honest chain for a second, different wrong reason."""
+    row = _chain_row("shot_b1")
+    assert row["native_frame_count"] != row["frame_count"], (
+        "243 != 241 -- summing is the right answer to 'what did this beat "
+        "render' and the wrong answer to 'what did it deliver'")
+
+
+def test_PADDING_that_SURVIVES_the_seam_is_still_REJECTED():
+    """The rule must keep its teeth: a chain whose middle segment rendered 60
+    real frames of its 81 delivers 21 frames that came from nowhere."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1", natives=[81, 60, 81])
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
+    assert "only 220" in findings[0]["detail"], findings[0]["detail"]
+
+
+def test_PADDING_the_TRIM_removes_entirely_does_NOT_condemn_the_beat():
+    """Padding the viewer never sees is not padding. A tail segment that
+    rendered 40 real frames and had its last 41 trimmed away delivers only real
+    frames, whatever happened inside the render."""
+    shot = {"shot_id": "shot_b1", "role": "character_video",
+            "engine_id": "wan_ti2v", "target_frame_count": 121,
+            "coverage_plan": {"join_mode": "chain", "segments": [
+                {"index": 0, "render_frames": 81, "drop_head": 0, "trim_tail": 0},
+                {"index": 1, "render_frames": 81, "drop_head": 1,
+                 "trim_tail": 40}]}}
+    row = {"shot_id": "shot_b1", "engine_id": "wan_ti2v", "exists": True,
+           "frame_count": 121, "extension_mode": "none",
+           "native_frame_count": 122, "delivered_native_frame_count": 121,
+           "segments": [
+               {"segment_id": "b1_seg00", "segment_index": 0,
+                "render_frames": 81, "drop_head": 0, "trim_tail": 0,
+                "native_frame_count": 81, "extension_mode": "none"},
+               {"segment_id": "b1_seg01", "segment_index": 1,
+                "render_frames": 81, "drop_head": 1, "trim_tail": 40,
+                "native_frame_count": 41, "extension_mode": "none"}]}
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    assert acc.grade_multiclip_honesty(ledger, _manifest([row])) == []
+
+
+# ---------------------------------------------------------------------------
+# FAIL CLOSED: an unprovable beat is not an accepted one, and never a crash
+# ---------------------------------------------------------------------------
+
+def test_a_MISSING_native_count_is_a_FINDING_not_a_PASS():
+    """Before 2026-08-06 the check was guarded by ``native is not None``, so a
+    beat declaring "none" while counting nothing sailed through -- a hole in the
+    fail-closed model the receipt exists to serve."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1")
+    row["segments"][1]["native_frame_count"] = None
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
+    assert "missing or impossible" in findings[0]["detail"]
+
+
+def test_a_beat_with_NO_per_segment_receipt_is_a_FINDING():
+    """A beat-level count on its own is one integer -- the easiest thing for a
+    padded beat to carry. It is believed only when the segments behind it
+    exist and re-derive it."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1")
+    row["segments"] = None
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert "carries no per-segment receipt" in findings[0]["detail"]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("delivered_native_frame_count", 246),
+    ("native_frame_count", 999),
+])
+def test_a_beat_whose_OWN_COUNT_disagrees_with_its_SEGMENTS_is_a_FINDING(
+        field, value):
+    """The forgery test. An honest beat's totals are re-derivable from its
+    parts; a fabricated one is not. BOTH counts are checked -- an unchecked
+    beat-scope field is free to say anything."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1")
+    row[field] = value
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert "do not support what it declares" in findings[0]["detail"]
+    assert field in findings[0]["detail"], findings[0]["detail"]
+
+
+def test_TWO_COORDINATED_LIES_cannot_launder_a_padded_beat():
+    """The laundering the Fable arithmetic gate found, closed.
+
+    Every other number here is weighed AGAINST ``frame_count``, so leaving that
+    one unchecked made it the field a dishonest receipt could move: shorten the
+    claimed length to 220 and hand over segment counts that agree with the
+    short version, and a beat carrying 21 real padded frames adds up perfectly.
+    Either lie alone is caught; the pair was not.
+
+    The frozen plan is the authority on how long the beat is -- 81 + 80 + 80 --
+    and the render does not get a vote.
+    """
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1", natives=[81, 60, 81])
+    # The pad is real: 220 native frames survive into a 241-frame beat.
+    assert row["delivered_native_frame_count"] == 220
+    # Now forge the length so the receipt is internally consistent at 220.
+    row["frame_count"] = 220
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
+    assert "the plan it was cut against covers 241" in findings[0]["detail"], \
+        findings[0]["detail"]
+
+
+def test_the_PLAN_is_the_authority_on_the_beats_length():
+    """``plan_visible_frames`` is the re-derivation, and it is lenient toward a
+    corrupt FROZEN document -- a broken plan is a different failure from a
+    dishonest render, and not this rule's to report."""
+    assert acc.plan_visible_frames(
+        [{"render_frames": 81, "drop_head": 0, "trim_tail": 0},
+         {"render_frames": 81, "drop_head": 1, "trim_tail": 0},
+         {"render_frames": 81, "drop_head": 1, "trim_tail": 0}]) == 241
+    assert acc.plan_visible_frames(
+        [{"render_frames": 33, "drop_head": 0, "trim_tail": 8}]) == 25
+    for broken in (None, (), [{"render_frames": "x"}], [{"drop_head": 1}],
+                   [{"render_frames": 10, "drop_head": 8, "trim_tail": 8}],
+                   ["not-a-row"]):
+        assert acc.plan_visible_frames(broken) is None, broken
+
+
+def test_a_projection_that_CONTRADICTS_the_frozen_plan_is_a_FINDING():
+    """The plan is what the ledger FROZE. A receipt describing different
+    segments describes a different beat."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1")
+    row["segments"][2]["render_frames"] = 49
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert "the frozen plan says 81" in findings[0]["detail"], \
+        findings[0]["detail"]
+
+
+def test_a_NATIVE_count_ABOVE_the_segments_own_length_is_IMPOSSIBLE():
+    """Not a large number -- an impossible one. The count is emitted-scope, so
+    it cannot exceed what the segment emitted, and clamping it with min() would
+    launder a broken receipt into a pass."""
+    shot = _chain_shot("shot_b1")
+    row = _chain_row("shot_b1", natives=[81, 999, 81])
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
+    assert "missing or impossible" in findings[0]["detail"]
+
+
+def test_DUPLICATE_segment_ids_and_indices_are_FINDINGS():
+    shot = _chain_shot("shot_b1")
+    dup_id = _chain_row("shot_b1")
+    dup_id["segments"][1]["segment_id"] = dup_id["segments"][0]["segment_id"]
+    dup_index = _chain_row("shot_b1")
+    dup_index["segments"][1]["segment_index"] = 0
+    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    assert "twice" in acc.grade_multiclip_honesty(
+        ledger, _manifest([dup_id]))[0]["detail"]
+    assert "missing or repeated" in acc.grade_multiclip_honesty(
+        ledger, _manifest([dup_index]))[0]["detail"]
+
+
+@pytest.mark.parametrize("bad", ["not-a-number", True, -1, None, 3.5e400])
+def test_an_UNREADABLE_receipt_is_a_FINDING_and_NEVER_a_TRACEBACK(bad):
+    """A grader that dies on a malformed receipt has not graded the episode.
+    Both operands used to be coerced with a bare ``int()``, so a manifest
+    carrying "not-a-number" raised straight out of the grader -- past a durable
+    script that guards only document LOADING.
+
+    ``True`` is in this list on purpose: ``bool`` is an ``int`` subclass, so it
+    coerced to 1 and produced "of which only True were rendered" -- a nonsense
+    number that passed as a real one."""
+    shot = _chain_shot("shot_b1")
+    for field in ("frame_count", "delivered_native_frame_count",
+                  "native_frame_count"):
+        row = _chain_row("shot_b1")
+        row[field] = bad
+        findings = acc.grade_multiclip_honesty(
+            _ledger([shot], {"character_video": "wan_ti2v"}), _manifest([row]))
+        assert findings, "%s=%r must be reported, not ignored" % (field, bad)
+        assert all(f["rule"] == acc.RULE_MULTICLIP_HONESTY for f in findings)
+
+
+def test_the_ACCOUNTING_HELPER_never_raises_on_any_garbage():
+    """The one owner of the arithmetic, hit with the shapes a broken producer
+    or a hand-edited manifest really emits."""
+    for junk in (None, [], [None], ["x"], [{}], 7, "rows",
+                 [{"render_frames": 0}],
+                 [{"render_frames": 81, "drop_head": 0, "trim_tail": 0,
+                   "native_frame_count": 81, "extension_mode": "sideways"}],
+                 [{"render_frames": 81, "drop_head": 90, "trim_tail": 0,
+                   "native_frame_count": 81, "extension_mode": "none"}]):
+        out = acc.beat_frame_accounting(junk)
+        assert out["delivered_native_frame_count"] is None, junk
+        assert out["native_frame_count"] is None, junk
+        assert out["extension_mode"] is None, junk
+
+
+# ---------------------------------------------------------------------------
 # The three refusals
 # ---------------------------------------------------------------------------
 
@@ -249,12 +546,59 @@ def test_the_GRADER_never_reads_the_ENGINE_HISTOGRAM():
 
 def test_the_MANIFEST_carries_the_receipts_the_grader_reads():
     """A grader reading a field nobody stamps is a grader that always passes.
-    ``build_clip_manifest`` must put both receipts on the row."""
-    import inspect
+
+    BY VALUE, not by spelling (2026-08-06). This asserted that two literal
+    source lines appeared in ``build_clip_manifest``, which proves the lines
+    exist and nothing about what an assembled beat actually produces -- and it
+    would have gone green throughout the entire scope inversion it was written
+    to guard against. Build a real result and read the row.
+    """
     from nodes._otr_video_engines import render_driver as rd
-    src = inspect.getsource(rd.build_clip_manifest)
-    assert '"native_frame_count": clip.get("native_frame_count")' in src
-    assert '"extension_mode": clip.get("extension_mode")' in src
+    beat_clip = {
+        "path": "", "type": "video", "frame_count": 241, "engine_id": "wan_ti2v",
+        "native_frame_count": 243, "delivered_native_frame_count": 241,
+        "extension_mode": "none",
+        "segments": [{"segment_id": "b001_seg00", "beat_id": "b001",
+                      "segment_index": 0, "segment_count": 3,
+                      "render_frames": 81, "drop_head": 0, "trim_tail": 0,
+                      "visible_frames": 81, "native_frame_count": 81,
+                      "extension_mode": "none", "init_source": "still",
+                      "fear_cape": False, "path": "otr_seg00.mp4"}],
+    }
+    result = {"ledger": {"video": {"shots": [
+        {"shot_id": "shot_b1", "role": "character_video",
+         "engine_id": "wan_ti2v", "target_frame_count": 241}]}},
+        "clips": {"shot_b1": beat_clip}}
+    row = rd.build_clip_manifest(result)["clips"][0]
+
+    assert row["native_frame_count"] == 243, "the beat's rendered-native work"
+    assert row["delivered_native_frame_count"] == 241, "what survived the seams"
+    assert row["extension_mode"] == "none"
+    assert row["frame_count"] == 241
+    # The projection travels, SANITIZED: accounting keys only.
+    assert [r["segment_id"] for r in row["segments"]] == ["b001_seg00"]
+    assert set(row["segments"][0]) == set(acc.SEGMENT_RECEIPT_KEYS)
+    assert "path" not in row["segments"][0], (
+        "a segment scratch file is never persisted, so naming one in a durable "
+        "manifest points a later reader at a file that was swept")
+    assert "visible_frames" not in row["segments"][0], (
+        "derivable from render_frames/drop_head/trim_tail -- a second number "
+        "that can disagree with the first three")
+
+
+def test_a_SINGLE_RENDER_beat_carries_NO_delivered_native_count():
+    """The absence is INFORMATION: it says the historical single-render path
+    produced this clip rather than the coverage assembler, so a later reader
+    must not "tidy up" the null."""
+    from nodes._otr_video_engines import render_driver as rd
+    result = {"ledger": {"video": {"shots": [
+        {"shot_id": "shot_b1", "role": "character_video", "engine_id": "humo",
+         "target_frame_count": 50}]}},
+        "clips": {"shot_b1": {"path": "", "type": "video", "frame_count": 50,
+                              "engine_id": "humo"}}}
+    row = rd.build_clip_manifest(result)["clips"][0]
+    assert row["delivered_native_frame_count"] is None
+    assert row["segments"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +648,67 @@ def test_the_SCRIPT_exits_TWO_on_an_UNREADABLE_document(tmp_path):
     out = _run_script(str(bad), str(bad))
     assert out.returncode == 2
     assert "cannot read" in out.stderr
+
+
+def test_the_SCRIPT_grades_the_WRAPPER_the_render_batch_actually_writes(tmp_path):
+    """THE VACUOUS PASS (2026-08-06). ``OTR_VideoRenderBatch`` retains its
+    ledger as ``{"ledger": {...}, "master_audio_path": "..."}``, and this script
+    handed that WRAPPER straight to a grader that looks for ``video.shots`` at
+    the ROOT. Pointed at the real retained artifact it printed
+
+        ACCEPTED: 0 shot(s) delivered the route this episode froze.
+
+    and exited 0 -- success reported on an episode it never graded. Even a
+    perfectly repaired honesty rule would never have fired."""
+    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
+                     {"character_video": "humo"})
+    wrapped = {"ledger": ledger, "master_audio_path": "master.wav"}
+    manifest = _manifest([_row("shot_b1", "still_pan")])
+    out = _run_script(_write(tmp_path, "wrapped.json", wrapped),
+                      _write(tmp_path, "m.json", manifest))
+    assert out.returncode == 1, out.stdout + out.stderr
+    assert "shot_b1" in out.stdout and "still_pan" in out.stdout
+
+
+def test_the_SCRIPT_grades_a_WRAPPED_and_a_DIRECT_ledger_IDENTICALLY(tmp_path):
+    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
+                     {"character_video": "humo"})
+    manifest = _write(tmp_path, "m.json", _manifest([_row("shot_b1", "humo")]))
+    direct = _run_script(_write(tmp_path, "d.json", ledger), manifest, "--json")
+    wrapped = _run_script(
+        _write(tmp_path, "w.json", {"ledger": ledger, "master_audio_path": ""}),
+        manifest, "--json")
+    assert direct.returncode == wrapped.returncode == 0
+    assert direct.stdout == wrapped.stdout
+
+
+@pytest.mark.parametrize("root", ["[1, 2, 3]", '"a string"', "7", "null"])
+def test_the_SCRIPT_exits_TWO_on_a_document_of_the_WRONG_SHAPE(tmp_path, root):
+    """PARSEABLE IS NOT READABLE. ``json.load`` happily returns a list, a
+    string or a number for a file whose root is not an object, and every reader
+    downstream assumes a mapping -- so a document of the wrong shape used to
+    crash with an AttributeError instead of exiting 2, which is the exact
+    verdict this script promises for a document it cannot read."""
+    bad = tmp_path / "bad.json"
+    bad.write_text(root, encoding="utf-8")
+    good = _write(tmp_path, "m.json", _manifest([]))
+    for ledger_path, manifest_path in ((str(bad), good), (good, str(bad))):
+        out = _run_script(ledger_path, manifest_path)
+        assert out.returncode == 2, out.stdout + out.stderr
+        assert "not a JSON object" in out.stderr
+        assert "Traceback" not in out.stderr
+
+
+def test_the_SCRIPT_exits_TWO_on_a_ledger_with_NO_SHOTS(tmp_path):
+    """Every rule is per-shot, so an empty shot list makes all of them
+    VACUOUSLY true. "Could not grade" belongs with the other document failures
+    at exit 2 -- this script already knew unreadable is not clean, and empty had
+    to learn the same lesson."""
+    out = _run_script(_write(tmp_path, "l.json", _ledger([], {})),
+                      _write(tmp_path, "m.json", _manifest([])))
+    assert out.returncode == 2
+    assert "nothing to grade" in out.stderr
+    assert "ACCEPTED" not in out.stdout
 
 
 def test_the_SCRIPT_can_emit_JSON_for_a_receipt(tmp_path):

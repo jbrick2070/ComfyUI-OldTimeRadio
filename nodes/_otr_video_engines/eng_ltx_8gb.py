@@ -1448,9 +1448,28 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not os.environ.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] ltx_8gb VRAM render-phase peak %s MB @ %dx%d len=%d",
                       render_peak, width, height, n)
+        # `native_frame_count` / `extension_mode` (2026-08-06). This adapter is
+        # in ``frame_contract.PLANNING_CAP_ENGINES`` -- it is listed there
+        # SPECIFICALLY so its beats are split into real segments -- and it was
+        # the one coverage planner that answered neither question, so every
+        # multi-segment ltx_8gb beat tripped the W5 grader's "declares no
+        # extension_mode" branch. The number was already computed above and
+        # already LOGGED at the tail trim; it was simply never stamped, which is
+        # the PBUG-20260805-04 shape (a consumer armed against a producer that
+        # never fires).
+        #
+        # EMITTED scope, not decoded scope: the count is ``n``, what this clip
+        # actually carries, NOT the pre-trim ``n_native``. The whole point of
+        # the field is that ``frame_count - native_frame_count`` is the number
+        # of MANUFACTURED frames, and a decoded-scope count would make that gap
+        # negative on every off-grid ask. Every frame this adapter delivers is a
+        # rendered frame in order (see the tail-trim note above), so the honest
+        # answer is that all of them are native and nothing was extended.
         return {"out_path": path, "frame_count": n,
                 "vram_peak_mb": render_peak,
                 "recipe": self._recipe_receipt(knobs),
+                "native_frame_count": n,
+                "extension_mode": "none",
                 "render_canvas": "%dx%d" % (int(width), int(height))}
 
     def canonicalize(self, raw, request, profile):
@@ -1479,6 +1498,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "vram_peak_mb": raw.get("vram_peak_mb"),
             # S-B/E5 recipe receipt (None for a raw that did not carry it).
             "recipe": raw.get("recipe"),
+            # The extension receipts (2026-08-06). This is the SECOND producer
+            # seam: a field the engine returns and this method drops is a field
+            # the grader never sees, and this adapter does NOT share the WAN
+            # pair's ``wan_shared._clip_from_raw`` passthrough -- it has its own,
+            # right here, which is exactly why the receipt went missing on this
+            # lane and nowhere else.
+            "native_frame_count": raw.get("native_frame_count"),
+            "extension_mode": raw.get("extension_mode"),
             "render_canvas": raw.get("render_canvas"),
         }
 

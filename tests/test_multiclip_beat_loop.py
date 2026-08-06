@@ -32,12 +32,20 @@ class _BeatStub:
     name = "stub_beat_engine"
     family = "abstract"
 
-    def __init__(self, tmpdir):
+    def __init__(self, tmpdir, *, native=None, extension_mode="none"):
         self.tmpdir = tmpdir
         self.load_calls = 0
         self.teardown_calls = 0
         self.seen_inits = []
         self.seen_frames = []
+        # THE HONESTY RECEIPTS. A stub that emits none lets the beat aggregate
+        # to None and every assertion about frame accounting passes for the
+        # wrong reason -- which is the fixture-shaped false green this whole
+        # change exists to stop. ``native`` maps segment index -> native count
+        # so a test can render a segment that did NOT render everything it
+        # emitted; default is the honest case, every emitted frame rendered.
+        self.native = dict(native or {})
+        self.extension_mode = extension_mode
 
     def session_identity(self):
         return ("stub_beat_engine", "recipe_a", "weights_a")
@@ -68,7 +76,9 @@ class _BeatStub:
         imgs = [np.full((64, 64, 3), level, dtype=np.uint8) for _ in range(frames)]
         out = os.path.join(self.tmpdir, "seg%d.mp4" % index)
         path, n = wb.encode_frames_to_silent_mp4(imgs, out, 25)
-        return {"path": path, "frame_count": n, "fps": 25}
+        return {"path": path, "frame_count": n, "fps": 25,
+                "native_frame_count": self.native.get(index, n),
+                "extension_mode": self.extension_mode}
 
     def canonicalize(self, raw, request, profile):
         return dict(raw, type="video")
@@ -729,3 +739,141 @@ def test_the_FEAR_CAPE_does_not_change_the_beats_FRAME_ARITHMETIC(monkeypatch):
     assert totals["1"] == totals["0"] == target, (
         "the fear cape changed the beat's length: cape-on %d vs cape-off %d "
         "against a target of %d" % (totals["1"], totals["0"], target))
+
+
+# ---------------------------------------------------------------------------
+# THE HONESTY RECEIPT, END TO END
+#
+# render_beat_coverage -> build_clip_manifest -> grade_multiclip_honesty, with
+# a stub that writes real mp4s. The grader's own unit tests hand-author their
+# manifest rows, and the rows they author encode the model production
+# CONTRADICTS -- a clean multi-segment beat with native == frame_count == the
+# whole beat, which no chained render has ever produced. Those tests were green
+# throughout the entire scope inversion. This path is the one that can fail.
+# ---------------------------------------------------------------------------
+
+def _graded(clip, plan, *, shot_id="shot_b001"):
+    """Drive the real manifest builder and the real grader over one beat."""
+    from nodes._otr_video_engines import acceptance as acc
+    shot = dict(_shot(plan), shot_id=shot_id,
+                target_frame_count=plan["target_visible_frames"])
+    ledger = {"video": {"roles_effective": {"character_video":
+                                            "stub_beat_engine"},
+                        "shots": [shot]}}
+    manifest = rd.build_clip_manifest(
+        {"ledger": ledger, "clips": {shot_id: clip}})
+    row = manifest["clips"][0]
+    return row, acc.grade_multiclip_honesty(ledger, manifest)
+
+
+def _chain_plan(count=3, render_frames=81):
+    """The shipped wan_ti2v shape: N native renders, one duplicated head frame
+    dropped at every seam after the first."""
+    segments = [{"index": i, "render_frames": render_frames,
+                 "drop_head": (1 if i else 0), "trim_tail": 0}
+                for i in range(count)]
+    return _plan(cp.JOIN_CHAIN, segments,
+                 count * render_frames - (count - 1))
+
+
+def test_an_HONEST_3x81_CHAIN_is_ACCEPTED_end_to_end(monkeypatch):
+    """243 frames of WORK, 241 DELIVERED, and the grader accepts it.
+
+    This is the defect as a behavioural test. Before 2026-08-06 the assembled
+    beat inherited its LAST segment's native count -- 81 -- and was graded
+    "241 delivered, of which only 81 were rendered". The rule fired on exactly
+    the beats that proved it was satisfied.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _chain_plan()
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        assert ws.ffprobe_counted_frames(clip["path"]) == 241
+        assert clip["frame_count"] == 241
+        assert clip["native_frame_count"] == 243, "the WORK: 3 x 81"
+        assert clip["delivered_native_frame_count"] == 241, "what survived"
+        assert clip["extension_mode"] == "none"
+        # THE ASSERTION THAT WOULD HAVE CAUGHT THE ORIGINAL DEFECT: the beat
+        # must not be wearing its last segment's receipt.
+        assert clip["native_frame_count"] != clip["segments"][-1][
+            "native_frame_count"]
+
+        row, findings = _graded(clip, plan)
+        assert findings == [], findings
+        assert row["delivered_native_frame_count"] == 241
+        assert row["native_frame_count"] == 243
+        assert [r["segment_index"] for r in row["segments"]] == [0, 1, 2]
+        assert "path" not in row["segments"][0], (
+            "segment scratch files are never persisted, so a durable manifest "
+            "must not name one")
+
+
+def test_a_SEGMENT_that_did_NOT_render_everything_is_REJECTED(monkeypatch):
+    """The rule keeps its teeth. Segment 1 emits 81 frames of which only 60 are
+    real, so 21 frames of the delivered beat came from nowhere."""
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp, native={1: 60})
+        _install(monkeypatch, eng)
+        plan = _chain_plan()
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        assert clip["delivered_native_frame_count"] == 220
+        _row, findings = _graded(clip, plan)
+        assert [f["rule"] for f in findings] == ["multiclip_honesty"]
+        assert "only 220" in findings[0]["detail"], findings[0]["detail"]
+
+
+def test_a_SEGMENT_with_NO_receipt_makes_the_BEAT_unknown_and_still_RENDERS(
+        monkeypatch):
+    """Fail-SOFT at mint, fail-CLOSED at grade.
+
+    A receipt problem must never destroy video -- the beat is rendered and
+    assembled and handed back whole. It must also never be quietly accepted:
+    the aggregate is None, and None is a finding. Both halves are asserted here
+    because either one alone is the wrong system.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp, native={1: None})
+        _install(monkeypatch, eng)
+        plan = _chain_plan()
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        # The render SURVIVED, in full.
+        assert ws.ffprobe_counted_frames(clip["path"]) == 241
+        assert clip["frame_count"] == 241
+        # And it makes no claim it cannot support.
+        assert clip["native_frame_count"] is None
+        assert clip["delivered_native_frame_count"] is None
+        assert clip["extension_mode"] is None
+
+        _row, findings = _graded(clip, plan)
+        assert [f["rule"] for f in findings] == ["multiclip_honesty"]
+        assert "declares no extension_mode" in findings[0]["detail"]
+
+
+def test_a_ONE_SEGMENT_TAIL_TRIM_beat_gets_a_TRUTHFUL_receipt_and_no_grade(
+        monkeypatch):
+    """A one-segment plan carrying a tail trim still takes the coverage path
+    (``requires_coverage_execution``), so it earns a truthful receipt -- while
+    the grader deliberately keeps its multi-segment-only scope. The receipt is
+    written and knowingly not read; that is an audit trail, not an oversight.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        plan = _plan(cp.JOIN_SINGLE,
+                     [{"index": 0, "render_frames": 33, "drop_head": 0,
+                       "trim_tail": 8}], 25)
+        clip, _s, _a, _u = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        assert ws.ffprobe_counted_frames(clip["path"]) == 25
+        assert clip["native_frame_count"] == 33, "33 rendered"
+        assert clip["delivered_native_frame_count"] == 25, "25 delivered"
+        _row, findings = _graded(clip, plan)
+        assert findings == [], "single-segment scope is deferred, by ruling"

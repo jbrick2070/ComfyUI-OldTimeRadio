@@ -1086,6 +1086,26 @@ def test_an_OFF_GRID_ask_renders_the_next_rung_up_and_trims_REAL_frames(
         raw = eng.render_clip(_request(staged, frames=100), {"patchers": []})
         path = pathlib.Path(raw["out_path"])
         assert raw["frame_count"] == 100
+        # THE HONESTY RECEIPT (2026-08-06), on the seam that actually trims.
+        # EMITTED scope: 100, what the clip carries -- NOT the 105 the graph
+        # decoded. ``frame_count - native_frame_count`` is the count of
+        # MANUFACTURED frames, so a decoded-scope count would make that gap
+        # negative and mean nothing. Every frame this adapter delivers is a
+        # rendered frame in order, so the honest answer is that all 100 are
+        # native and nothing was extended.
+        assert raw["native_frame_count"] == 100
+        assert raw["extension_mode"] == "none"
+        # AND THROUGH THE SECOND PRODUCER SEAM. ltx_8gb has its OWN
+        # ``_clip_from_raw`` -- it does not share the WAN pair's passthrough --
+        # so a field the render returns and canonicalisation drops is a field
+        # the grader never sees. That is exactly how this receipt went missing
+        # on this lane and nowhere else: the engine is in
+        # ``PLANNING_CAP_ENGINES``, so its beats ARE split into real segments,
+        # and every one of them tripped "declares no extension_mode".
+        clip = eng.canonicalize(raw, _request(staged, frames=100), {})
+        assert clip["native_frame_count"] == 100
+        assert clip["extension_mode"] == "none"
+        assert clip["frame_count"] == 100
     finally:
         if path is not None:
             path.unlink(missing_ok=True)
@@ -1106,6 +1126,14 @@ def test_an_ON_GRID_ask_is_rendered_exactly_and_never_trimmed(staged):
         raw = eng.render_clip(_request(staged, frames=65), {"patchers": []})
         path = pathlib.Path(raw["out_path"])
         assert raw["frame_count"] == 65
+        # The CONTROL for the receipt too: nothing was trimmed, so the emitted
+        # and rendered counts coincide and the field carries the same answer by
+        # a different route.
+        assert raw["native_frame_count"] == 65
+        assert raw["extension_mode"] == "none"
+        clip = eng.canonicalize(raw, _request(staged, frames=65), {})
+        assert clip["native_frame_count"] == 65
+        assert clip["extension_mode"] == "none"
     finally:
         if path is not None:
             path.unlink(missing_ok=True)

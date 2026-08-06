@@ -40,6 +40,25 @@ def _load(path, what):
         raise SystemExit(2)
 
 
+def _unwrap_ledger(doc):
+    """The LEDGER, whether the file holds it directly or wraps it.
+
+    ``OTR_VideoRenderBatch`` writes its retained ledger as
+    ``{"ledger": {...}, "master_audio_path": "..."}``, and this script used to
+    hand that WRAPPER straight to the grader -- which looks for ``video.shots``
+    at the ROOT. The wrapper has no ``video`` key, so every shot vanished and
+    the run printed "ACCEPTED: 0 shot(s)" and exited 0.
+
+    That is the failure this script exists to refuse: it reported success on an
+    episode it never graded. It already knew unreadable is not clean; empty had
+    to learn the same lesson.
+    """
+    if isinstance(doc, dict) and "video" not in doc \
+            and isinstance(doc.get("ledger"), dict):
+        return doc["ledger"]
+    return doc
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Grade a rendered episode against its own frozen route.")
@@ -53,8 +72,34 @@ def main(argv=None):
                         help="emit the findings as JSON instead of lines")
     args = parser.parse_args(argv)
 
-    ledger = _load(args.ledger, "ledger")
+    ledger = _unwrap_ledger(_load(args.ledger, "ledger"))
     manifest = _load(args.manifest, "manifest")
+
+    # PARSEABLE IS NOT THE SAME AS READABLE. ``json.load`` happily returns a
+    # list, a string or a number for a file whose root is not an object, and
+    # every reader below assumes a mapping -- so a document of the wrong SHAPE
+    # crashed with an AttributeError instead of exiting 2, which is the exact
+    # verdict this script promises for a document it cannot read.
+    for doc, what, path in ((ledger, "ledger", args.ledger),
+                            (manifest, "manifest", args.manifest)):
+        if not isinstance(doc, dict):
+            print("the %s at %s is %s, not a JSON object -- there is nothing "
+                  "here to grade" % (what, path, type(doc).__name__),
+                  file=sys.stderr)
+            raise SystemExit(2)
+
+    # A ZERO-SHOT LEDGER IS NOT A CLEAN EPISODE. Every rule below is per-shot,
+    # so an empty shot list makes all of them vacuously true and the script
+    # would exit 0 having judged nothing. "Could not grade" belongs with the
+    # other document failures at exit 2 -- the same distinction
+    # ``audit_voice_gender_consistency.py`` draws when its scan cannot finish.
+    shots = (ledger.get("video") or {}).get("shots") or ()
+    if not shots:
+        print("the ledger at %s carries no video.shots, so there is nothing to "
+              "grade -- this is NOT an accepted episode" % (args.ledger,),
+              file=sys.stderr)
+        raise SystemExit(2)
+
     findings = acceptance.grade_episode(ledger, manifest)
 
     if args.json:
@@ -62,9 +107,8 @@ def main(argv=None):
     elif findings:
         print(acceptance.format_findings(findings))
     else:
-        shots = len(((ledger or {}).get("video") or {}).get("shots") or ())
         print("ACCEPTED: %d shot(s) delivered the route this episode froze."
-              % shots)
+              % len(shots))
     return 1 if findings else 0
 
 

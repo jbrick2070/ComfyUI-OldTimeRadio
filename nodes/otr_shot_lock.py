@@ -1187,7 +1187,11 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     dict the ledger stamp reads, and for the engines in
     ``frame_contract.PLANNING_CAP_ENGINES`` it NARROWS the contract this beat
     is partitioned against -- see :func:`frame_contract.effective_frame_contract`
-    for why that allowlist is one engine long and why WAN must stay out of it.
+    for why membership is a per-engine decision with a live proof attached
+    rather than a rollout. (This read "why that allowlist is one engine long
+    and why WAN must stay out of it"; both halves went stale. It is three
+    engines, and ``wan_ti2v`` joined on 2026-08-02 when the no-mirror ruling
+    removed the adapter-side ping-pong that had made its ceiling harmless.)
     A default of 0 was proposed and rejected: it would let a caller that forgot
     the ceiling plan silently unpinned, which is the exact silent-fallback
     shape this build exists to remove. There is one caller; it passes the

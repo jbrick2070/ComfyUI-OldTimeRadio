@@ -565,7 +565,17 @@ class WanInitImageMixin:
             # acceptance grader above all -- has no way to tell a mirror-filled
             # clip from a real one, and "the count matched" is precisely the
             # evidence a padded clip forges. ``extension_mode`` is "none" or
-            # "ping_pong"; ``native_frame_count`` is what the graph decoded.
+            # "ping_pong"; ``native_frame_count`` is how many of the EMITTED
+            # frames were really rendered.
+            #
+            # EMITTED, not decoded (corrected 2026-08-06). This comment used to
+            # read "what the graph decoded", which disagreed with the adapters'
+            # own wording and never mattered while only WAN stamped the field --
+            # WAN emits exactly what it decodes, so the two readings coincide.
+            # They stop coinciding on a lane that trims internally, and the rule
+            # settles it: ``frame_count - native_frame_count`` is the count of
+            # MANUFACTURED frames, so a decoded-scope count would make that gap
+            # negative and meaningless. The count can never exceed the clip.
             # None on a raw that predates the stamp -- consumers use .get().
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),

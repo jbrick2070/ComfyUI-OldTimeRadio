@@ -3199,12 +3199,20 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     renders it took to make one beat.
     """
     try:
+        # ``acceptance`` owns the beat frame arithmetic, and it lives THERE
+        # rather than here so the grader can reach it: a test pins that module's
+        # import list to exactly ["__future__"], so it can never import this
+        # one. Importing it here instead gives the mint side and the grading
+        # side ONE implementation -- which is the point, because a receipt the
+        # grader cannot re-derive is a number it has to take on faith.
+        from . import acceptance as _acceptance  # type: ignore
         from . import beat_session as _bs  # type: ignore
         from . import coverage_plan as _cp  # type: ignore
         from . import wan_shared as _ws  # type: ignore
         from . import wrapper_bridge as _wb2  # type: ignore
         from ._tmp import otr_engine_tmp_path as _tmp_path  # type: ignore
     except ImportError:  # pragma: no cover -- flat test imports
+        import acceptance as _acceptance  # type: ignore
         import beat_session as _bs  # type: ignore
         import coverage_plan as _cp  # type: ignore
         import wan_shared as _ws  # type: ignore
@@ -3447,6 +3455,14 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                 "drop_head": int(segment.drop_head),
                 "trim_tail": int(segment.trim_tail),
                 "visible_frames": visible,
+                # THE HONESTY RECEIPTS, PER SEGMENT (2026-08-06). Carried
+                # UNCONVERTED -- whatever the adapter said, including nothing --
+                # because this row is EVIDENCE and evidence that repairs itself
+                # on the way past is not evidence. The aggregation below is what
+                # judges them; a segment that cannot answer makes the beat
+                # unknown, which is the honest outcome and not this loop's call.
+                "native_frame_count": (clip or {}).get("native_frame_count"),
+                "extension_mode": (clip or {}).get("extension_mode"),
                 "init_source": init_source,
                 "fear_cape": bool(cape_pending),
                 "path": os.path.basename(path),
@@ -3494,6 +3510,32 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # audio" checkable after the fact instead of merely intended: sum the
     # visible_frames and it must equal the beat's target.
     beat_clip["segments"] = segment_rows
+    # THE BEAT-SCOPE FRAME ACCOUNTING (2026-08-06).
+    #
+    # WRITTEN UNCONDITIONALLY, INCLUDING None. ``beat_clip`` starts life as
+    # ``dict(clip or {})`` -- a copy of the LAST segment -- so any beat-scope
+    # field this block does not assign silently keeps that segment's value.
+    # That is not a hypothetical: it is the defect being repaired here. The
+    # original code overwrote four keys and inherited two, so an assembled beat
+    # of three real 81-frame renders claimed the last segment's 81 native frames
+    # against its own 241, and the grader called every honest multi-segment beat
+    # a pad. A conditional write here would rebuild that trap one field over.
+    #
+    # THE TWO COUNTS ARE DISTINCT ON PURPOSE (Bug Bible 12.69 /
+    # PRODUCTION_SPRINT_LESSONS lesson 33). ``native_frame_count`` is the WORK:
+    # every native frame this beat rendered, 243 for a 3x81 chain.
+    # ``delivered_native_frame_count`` is the OUTPUT: the 241 that survived the
+    # seams. Neither is wrong; they answer different questions, and collapsing
+    # them into one field is what made an intentional seam drop look like an
+    # engine underrun.
+    #
+    # FAIL-SOFT HERE, FAIL-CLOSED AT THE GRADER. The same arithmetic runs on
+    # both sides, but a receipt problem must never destroy video: this path owns
+    # a rendered beat and raising here would throw it away before a manifest
+    # exists. So an unusable receipt becomes None -- and None is a FINDING when
+    # the grader reads it. The render keeps its footage; the episode still
+    # cannot claim coverage it did not prove.
+    beat_clip.update(_acceptance.beat_frame_accounting(segment_rows))
     # Whether this beat's lengths were actually CHECKED against VRAM before any
     # weights loaded, and against a row measured for THIS engine. Stamped even
     # when unenforced, because "the guard did not run here" is the fact a reader
@@ -4409,6 +4451,49 @@ def persist_episode_clips(result, episode_id):
     return result
 
 
+def _segment_receipt_projection(segments):
+    """The DURABLE per-segment receipt for one assembled beat, or ``None``.
+
+    ``render_beat_coverage`` keeps a rich per-segment row for the operator's
+    2026-08-01 traceability ask; this is the narrow slice of it that belongs in
+    a manifest an audit will read months later.
+
+    Why a projection and not the row itself:
+
+    * ``path`` is DELIBERATELY dropped. ``persist_episode_clips`` moves only the
+      ASSEMBLED beat, so every segment file stays in janitor-swept scratch. A
+      segment filename in a durable manifest would name a file that was never
+      persisted there -- a receipt pointing at nothing is worse than no receipt.
+    * ``visible_frames`` is dropped too: it is exactly
+      ``render_frames - drop_head - trim_tail``, already guaranteed by the
+      coverage plan, so persisting it would only add a second number that can
+      disagree with the first three.
+
+    What survives is what makes the beat's frame accounting CHECKABLE rather
+    than merely asserted -- the grader re-derives the beat totals from these
+    rows and names the offending ``segment_id`` when they do not add up.
+    """
+    rows = segments if isinstance(segments, list) else None
+    if not rows:
+        return None
+    return [{key: row.get(key) for key in _acceptance_module().SEGMENT_RECEIPT_KEYS}
+            for row in rows if isinstance(row, dict)]
+
+
+def _acceptance_module():
+    """``acceptance``, imported lazily and locally.
+
+    Same reason as ``render_beat_coverage``'s local import: the grader may
+    import nothing (a test pins its import list to exactly ``["__future__"]``),
+    so the shared receipt vocabulary lives there and is reached from here.
+    """
+    try:
+        from . import acceptance as _mod  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        import acceptance as _mod  # type: ignore
+    return _mod
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -4506,8 +4591,25 @@ def build_clip_manifest(result, *, episode_id=""):
             # acceptance grader has no way to reject a mirror-filled clip on a
             # lane claiming real multi-clip coverage without these. OPTIONAL:
             # None on every engine that emits no receipt.
+            #
+            # SCOPE (2026-08-06): on a single-render clip these are the engine's
+            # own counts. On an ASSEMBLED beat they are beat-scope --
+            # ``native_frame_count`` is every native frame the beat RENDERED
+            # (243 for a 3x81 chain) and ``delivered_native_frame_count`` is the
+            # 241 that survived the seams. The two are deliberately not the same
+            # number, and only the second may be weighed against
+            # ``frame_count``: comparing the work against the output is what
+            # reported every honest multi-segment beat as padded.
             "native_frame_count": clip.get("native_frame_count"),
             "extension_mode": clip.get("extension_mode"),
+            # PRESENT ONLY WHEN THE COVERAGE ASSEMBLER MINTED THIS BEAT, and
+            # that absence is information rather than noise: a beat with no
+            # plan, or a plan owing no head/tail work, takes the historical
+            # single-render path and never acquires one. Do not "tidy up" the
+            # null -- it says which path produced the clip.
+            "delivered_native_frame_count":
+                clip.get("delivered_native_frame_count"),
+            "segments": _segment_receipt_projection(clip.get("segments")),
         }
         # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
         # turntable mesh on a TRANSPARENT background -- it composites over a
