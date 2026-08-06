@@ -63,6 +63,68 @@ def _shots(ledger):
     return list(((ledger or {}).get("video") or {}).get("shots") or ())
 
 
+def manifest_clips(manifest):
+    """The manifest's delivered rows as a LIST. TOTAL -- never raises.
+
+    ``(manifest or {}).get("clips")`` was written out at each call site, and it
+    is wrong in two ways that only a malformed document reveals. A manifest that
+    is not a mapping at all raises ``AttributeError`` out of the grader; and a
+    ``clips`` value that is a STRING satisfies ``or ()`` and then iterates into
+    its CHARACTERS, so every "row" is a one-character string and every rule
+    reports nonsense instead of a shape problem.
+
+    The container rule is deliberately the same one :func:`beat_frame_accounting`
+    applies to its segments: list or tuple, nothing else. Two functions judging
+    what counts as a sequence of rows must not disagree about it.
+    """
+    if not isinstance(manifest, dict):
+        return []
+    clips = manifest.get("clips")
+    if not isinstance(clips, (list, tuple)):
+        return []
+    return list(clips)
+
+
+def clip_rows_by_shot(manifest):
+    """``{shot_id: row}`` over the delivered rows. TOTAL -- never raises.
+
+    THE ONE INDEX. Both per-shot rules built this map with their own dict
+    comprehension, and both inherited the same two faults.
+
+    **It overwrote.** ``{str(r.get("shot_id") or ""): r for r in ...}`` keeps the
+    LAST row for a repeated ``shot_id`` and silently discards the earlier one, so
+    a manifest carrying the same beat twice was graded as though it carried it
+    once -- and which of the two got graded depended on file order. Here the
+    FIRST occurrence wins and the duplicate is left for ``RULE_MANIFEST_SHAPE``
+    (step 3 of the no-mirror build, NOT YET LANDED) to report: a duplicate is a
+    defect to name, never a conflict to resolve quietly. Until that rule exists
+    a duplicate is silently tolerated, exactly as it was before -- the change
+    here is only WHICH of the two rows gets graded, and both regimes are
+    audit-only.
+
+    **It crashed on a non-record.** ``r.get`` on a list, a string or a number
+    inside ``clips`` raised ``AttributeError`` straight out of the grader, past
+    the durable script's exit-code contract -- so automation keying on exit
+    codes read a CRASHED grader as a graded episode. Non-records are skipped
+    here and reported there.
+
+    An EMPTY ``shot_id`` is skipped rather than indexed under ``""``. The old
+    comprehension gave every anonymous row the same key, so a ledger shot that
+    was itself missing a ``shot_id`` would JOIN to an unrelated manifest row
+    purely because both were blank. Two things with no identity are not the same
+    thing.
+    """
+    rows = {}
+    for row in manifest_clips(manifest):
+        if not isinstance(row, dict):
+            continue
+        shot_id = str(row.get("shot_id") or "")
+        if not shot_id or shot_id in rows:
+            continue
+        rows[shot_id] = row
+    return rows
+
+
 def grade_frozen_route(ledger):
     """Every shot renders the engine its ROLE was frozen to.
 
@@ -358,8 +420,7 @@ def grade_delivered(ledger, manifest):
     missing clip and a wrong clip are different failures and an operator fixes
     them differently."""
     frozen = frozen_route(ledger)
-    rows = {str(r.get("shot_id") or ""): r
-            for r in ((manifest or {}).get("clips") or ())}
+    rows = clip_rows_by_shot(manifest)
     findings = []
     for shot in _shots(ledger):
         shot_id = str(shot.get("shot_id") or "")
@@ -426,8 +487,7 @@ def grade_multiclip_honesty(ledger, manifest):
     NOTHING HERE RAISES. Every value arrives from a JSON document written by
     another process; an unreadable one is a FINDING, because a grader that dies
     on a malformed receipt has not graded the episode."""
-    rows = {str(r.get("shot_id") or ""): r
-            for r in ((manifest or {}).get("clips") or ())}
+    rows = clip_rows_by_shot(manifest)
     findings = []
     for shot in _shots(ledger):
         planned = _plan_segments(shot)
@@ -550,6 +610,8 @@ __all__ = [
     "frame_count",
     "beat_frame_accounting",
     "plan_visible_frames",
+    "manifest_clips",
+    "clip_rows_by_shot",
     "frozen_route",
     "grade_frozen_route",
     "grade_delivered",

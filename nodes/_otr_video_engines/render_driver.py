@@ -4510,6 +4510,168 @@ def _acceptance_module():
     return _mod
 
 
+#: The manifest's frame-receipt contract version (no-mirror enforcement, step 2).
+#: Version 1 means: every delivered ``type == "video"`` row DECLARES how its
+#: frames got there. Without a version, "reject an explicit non-none mode" can
+#: never catch an adapter that REGRESSES by dropping its receipt entirely --
+#: absence would stay permanently legal, and silence is exactly what a lane that
+#: pads without saying so looks like.
+FRAME_RECEIPT_VERSION = 1
+
+#: How far two closing-theme chunks may disagree about their shared boundary and
+#: still count as contiguous. The chunks are minted as ``start + i * (dur/count)``
+#: (``scene_sequencer.py``), so consecutive rows meet exactly up to float error;
+#: this absorbs the error and nothing more. A real gap must NOT be bridged --
+#: that would extend the loop authorization over silence.
+_CLOSING_WINDOW_GAP_TOLERANCE_S = 1e-6
+
+
+def _finite_seconds(value):
+    """A finite, non-bool number of seconds, or ``None``. NEVER raises.
+
+    ``bool`` is rejected explicitly for the same reason ``acceptance.frame_count``
+    rejects it: ``True`` is an ``int``, so it would silently become 1.0 second and
+    read as a real measurement.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def closing_theme_frame_window(lines, fps):
+    """The frame span the CLOSING THEME occupies, or ``None``. PURE.
+
+    This is the ONLY thing that may authorize the composite to loop a clip, so
+    it is written to REFUSE rather than to guess. Every failure below returns
+    ``None``, and ``None`` means the tail gets floor/black. Never loop on doubt.
+
+    THIS IS NOT ``video_engine``'S ``music_close_start_f``, AND THE TWO MUST NOT
+    BE UNIFIED. That one places the closing TITLE CARD and, when the real window
+    cannot be resolved, deliberately SYNTHESIZES one over the last few seconds
+    (``video_engine.py:323-334``, stamped ``close_synthesized``) because a card
+    has to be drawn somewhere. Sourcing this from that would authorize a loop
+    over ANY episode's tail, which is precisely the "loops for any unexplained
+    tail" defect this window exists to remove. A placement hint may be guessed;
+    an authorization may not.
+
+    THE EVIDENCE, as ``scene_sequencer`` actually mints it: the closing cue is
+    mirrored into the ledger as one row per chunk, each carrying
+    ``speaker_role == "music_close"``, ``start_s_space == "master_mix"``, a
+    shared ``music_cue_id``, and a 1-based ``music_chunk_index`` out of
+    ``music_chunk_count``. Both role and space are required: ``music_close``
+    alone can also appear in the SCENE-audio space, whose seconds are measured
+    against a different zero, and converting those to master-timeline frames
+    would place the window somewhere the closing theme never was.
+
+    ACCEPTED ONLY IF ALL OF:
+
+    * every row has a finite ``start_s >= 0`` and a finite ``dur_s > 0``;
+    * all rows name ONE ``music_cue_id`` -- two cues is an ambiguity, not a
+      wider window, and merging them would authorize the span between them;
+    * the chunk indices are exactly ``1..music_chunk_count``, each once, with
+      every row agreeing on the count -- a missing chunk means the window has a
+      hole and its true extent is unknown;
+    * consecutive chunks are contiguous or overlapping. A real gap is refused
+      rather than bridged.
+    """
+    # ``OverflowError`` belongs in this guard beside the other two. ``int()`` of
+    # an infinite float raises it rather than ValueError, so an fps of inf would
+    # have escaped a two-exception catch -- the same hole ``acceptance.frame_count``
+    # documents for the bare token ``Infinity`` that ``json.load`` parses.
+    try:
+        rate = int(fps)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if rate <= 0:
+        return None
+    # THE CONTAINER RULE, same as ``acceptance.manifest_clips``. ``lines or ()``
+    # short-circuits on any TRUTHY value, so a scalar ``5`` passed straight
+    # through and ``for ln in 5`` raised TypeError -- out of a function whose
+    # contract is that it never raises, and through ``build_clip_manifest``,
+    # which every render calls unconditionally. A corrupt ledger field must
+    # refuse the window, not destroy the manifest.
+    if not isinstance(lines, (list, tuple)):
+        return None
+    rows = [ln for ln in lines
+            if isinstance(ln, dict)
+            and str(ln.get("speaker_role") or "") == "music_close"
+            and str(ln.get("start_s_space") or "") == "master_mix"]
+    if not rows:
+        return None
+
+    # ``str()`` first, so an unhashable cue id cannot reach the set.
+    cue_ids = {str(r.get("music_cue_id") or "") for r in rows}
+    if len(cue_ids) != 1:
+        return None
+
+    # VALIDATE, THEN HASH -- never the other way round. This was a set
+    # comprehension over the RAW field, so a ``music_chunk_count`` of ``[3]``
+    # raised "unhashable type: 'list'" three lines BEFORE the isinstance check
+    # that exists to reject it. A type guard placed after the operation it is
+    # guarding is not a guard.
+    declared_count = None
+    for row in rows:
+        count = row.get("music_chunk_count")
+        if isinstance(count, bool) or not isinstance(count, int):
+            return None
+        if declared_count is None:
+            declared_count = count
+        elif count != declared_count:
+            return None
+    if declared_count < 1 or declared_count != len(rows):
+        return None
+    indices = set()
+    for row in rows:
+        index = row.get("music_chunk_index")
+        if isinstance(index, bool) or not isinstance(index, int):
+            return None
+        indices.add(index)
+    if indices != set(range(1, declared_count + 1)):
+        return None
+
+    spans = []
+    for row in rows:
+        start = _finite_seconds(row.get("start_s"))
+        duration = _finite_seconds(row.get("dur_s"))
+        if start is None or start < 0 or duration is None or duration <= 0:
+            return None
+        spans.append((start, start + duration))
+    # A RUNNING MAX, not the previous row's end. Chunks are normally equal and
+    # in order, but nothing here may ASSUME that: if one chunk fully contains a
+    # shorter one, comparing the next start against the SHORT chunk's end would
+    # report a gap that the long chunk already covers -- and taking the
+    # last-sorted end as the window's end would stop the authorization short of
+    # the theme it describes. Union the intervals properly and both go away.
+    spans.sort()
+    reach = spans[0][1]
+    for next_start, next_end in spans[1:]:
+        if next_start > reach + _CLOSING_WINDOW_GAP_TOLERANCE_S:
+            return None
+        reach = max(reach, next_end)
+
+    # THE COMPOSITE'S OWN CONVENTION, so the window and the cursor it is compared
+    # against are measured on one ruler. ``plan_timeline_segments`` places a beat
+    # at ``int(round(start_s * fps))`` (``otr_silent_composite.py:385``), and the
+    # manifest quantizes the accepted duration UP to a whole frame for the
+    # terminal boundary (``timeline_total`` below). Deriving either differently
+    # here would put the authorization a frame away from the thing it authorizes.
+    # THE PRODUCT, NOT JUST THE OPERANDS. ``_finite_seconds`` proves each value
+    # is finite on its own; multiplying a finite-but-enormous one by the frame
+    # rate can still overflow to inf, and ``round(inf)`` raises OverflowError.
+    # Checking the inputs and not the arithmetic is how a total function stops
+    # being total.
+    start_scaled = spans[0][0] * rate
+    end_scaled = reach * rate
+    if not (math.isfinite(start_scaled) and math.isfinite(end_scaled)):
+        return None
+    start_frame = max(0, int(round(start_scaled)))
+    end_frame = int(math.ceil(end_scaled))
+    if end_frame <= start_frame:
+        return None
+    return {"start": start_frame, "end": end_frame}
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -4675,6 +4837,7 @@ def build_clip_manifest(result, *, episode_id=""):
     manifest = {
         "episode_id": str(episode_id or ""),
         "video_revision": int(section.get("video_revision") or 1),
+        "frame_receipt_version": FRAME_RECEIPT_VERSION,
         "fps": int(section.get("fps") or 25),
         "canvas": {"w": int(canvas.get("w") or 0), "h": int(canvas.get("h") or 0)},
         "n_beats": len(rows),
@@ -4689,6 +4852,23 @@ def build_clip_manifest(result, *, episode_id=""):
         "engine_histogram": hist,
         "clips": rows,
     }
+    # THE ONE SANCTIONED REUSE, GIVEN A FRAME-DOMAIN WINDOW (no-mirror step 2).
+    # Operator ruling 2026-08-06: no mirror or ping-pong anywhere EXCEPT the
+    # closing loop, which is confirmed OK -- and it is the CLOSING-THEME
+    # BACKDROP, not the credits roll (``OTR_CreditsRoll`` freezes a frame and
+    # never loops). The composite's tail currently loops the last clip for ANY
+    # unexplained shortfall; this is the evidence that lets it tell the
+    # sanctioned case from the rest.
+    #
+    # ONLY ON A POSITIONED MANIFEST, and that condition is not bookkeeping. On a
+    # sequential manifest the rows carry no timeline position, so the composite's
+    # cursor and these frame numbers are measured from different origins and
+    # comparing them would authorize a loop at an arbitrary offset. Absent means
+    # "not established", and the composite must then refuse to loop at all.
+    if positioned:
+        window = closing_theme_frame_window(led.get("lines"), manifest["fps"])
+        if window is not None:
+            manifest["closing_theme_frame_window"] = window
     # BUG-LOCAL-413 guard: LOUD-warn (opt-in strict raises) if a radio-open beat
     # fell to the procgen/still floor instead of an LTX engine -- so the 6/15
     # silent soft-open can never ship unnoticed. Read-only; fallback untouched.

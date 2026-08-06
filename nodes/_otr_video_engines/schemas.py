@@ -330,14 +330,15 @@ class ShotRow(_Forbid):
     one on a shot row -- ``source_line_ids`` carries the beat. It missed
     ``jump_still_requests`` and ``motion_clause``, which are stamped.
 
-    ABSENCE IS LOAD-BEARING for three of these, so they default to ``None``
+    ABSENCE IS LOAD-BEARING for four of these, so they default to ``None``
     rather than to an empty container: an unregistered engine gets NO
     ``coverage_plan`` (and the render path then behaves as it did before chunk
     3b), a ``coverage_contract`` is stamped ONLY when the tier ceiling actually
     narrowed something (``render_driver.assert_coverage_plans`` re-derives it
     and refuses on any difference, so "stamped empty" and "never stamped" must
-    not collapse), and a missing ``motion_clause`` means the pass never ran,
-    which is not the same as a fallback clause.
+    not collapse), a missing ``motion_clause`` means the pass never ran, which
+    is not the same as a fallback clause, and a missing ``frame_bounded`` means
+    nobody ASKED -- see its own note below.
     """
 
     shot_id: str
@@ -374,6 +375,20 @@ class ShotRow(_Forbid):
     jump_still_requests: list[dict] = Field(default_factory=list)
     #: The per-beat motion clause object (text/model/fallback/source_hash).
     motion_clause: Optional[dict] = None
+    #: Whether this shot's engine has a render ceiling a beat can OVERFLOW, as
+    #: ``frame_contract.can_split`` answered it AT FREEZE TIME (no-mirror 7.3).
+    #: The acceptance grader reads this and nothing else to decide whether the
+    #: shot owes native-frame evidence, because that module imports nothing and
+    #: must never consult a live registry whose clock has moved on.
+    #:
+    #: THREE-VALUED ON PURPOSE. ``True`` obliges the shot to prove its frames;
+    #: ``False`` records that we asked and the engine is unbounded; ``None``
+    #: means nobody asked -- an unregistered or unbuildable engine, or any
+    #: ledger frozen before this stamp existed. Collapsing ``None`` into
+    #: ``False`` would turn "unknown" into the claim "we checked", and
+    #: collapsing it into ``True`` would indict every legacy episode for
+    #: missing a receipt that did not exist when it rendered.
+    frame_bounded: Optional[bool] = None
 
 
 class VideoLedgerSection(_Forbid):

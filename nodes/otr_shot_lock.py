@@ -1174,6 +1174,63 @@ def _planning_ceiling(policy):
         (policy or {}).get("max_render_frames"))
 
 
+def _stamp_frame_bounded(shot):
+    """Stamp whether this shot's engine has a ceiling a beat can OVERFLOW.
+
+    THE 7.3 DECISION of the no-mirror build, made 2026-08-06: the acceptance
+    grader must know which engines are BOUNDED, because a bounded engine's beats
+    are split into real segments and therefore owe native-count evidence, while
+    an unbounded one can never be split and owes none. The grader cannot work
+    that out for itself -- ``acceptance.py`` imports nothing (a test pins its
+    import list to exactly ``["__future__"]``) and refuses to query live state on
+    principle. So the fact has to reach it as DATA, stamped here, at the same
+    freeze that stamps the route and the coverage plan.
+
+    DERIVED FROM ``frame_contract.can_split``, never restated. That function IS
+    the boundedness question -- ``bool(max_frames or discrete_frames)``, "does
+    this engine have a ceiling to exceed" -- and it is the same predicate
+    ``partition_beat`` effectively answers when it decides whether a beat needs
+    more than one clip. One definition means the planner and the grader cannot
+    disagree about what "bounded" means.
+
+    AND IT IS CLOCK-DOMAIN CORRECT, which is the reason a stamp beats a lookup.
+    ``acceptance.py``'s first stated refusal is that it never queries live
+    routing state, because "the environment has moved on, so a disagreement
+    would report the grader's clock rather than the episode's". An adapter's
+    ``frame_contract`` is exactly such state: it can be re-declared between the
+    render and the grade. Re-grading a January episode in June must judge it by
+    the contract it was RENDERED under, and only a stamp can say what that was.
+
+    ABSENCE MEANS "NOT STATED", NEVER "UNBOUNDED". An unregistered engine, an
+    unbuildable one, or a legacy ledger written before this stamp existed simply
+    carries no key, and the grader must then demand no native-count evidence.
+    Only an explicit ``True`` obliges a shot to prove its frames. Defaulting a
+    missing key to ``False`` would read "we checked and it is unbounded", which
+    is a claim nobody made; defaulting it to ``True`` would indict every legacy
+    episode for lacking a receipt that did not exist when it rendered.
+    """
+    engine_id = str(shot.get("engine_id") or "")
+    if not engine_id:
+        return
+    try:
+        from ._otr_video_engines import registry as _vreg_local  # type: ignore
+        from ._otr_video_engines import frame_contract as _fc  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import registry as _vreg_local  # type: ignore
+        from _otr_video_engines import frame_contract as _fc  # type: ignore
+    if not _vreg_local.is_registered(engine_id):
+        return
+    try:
+        engine = _vreg_local.get_engine(engine_id)
+    except Exception:  # noqa: BLE001 -- an unbuildable engine states nothing
+        return
+    # ``can_split`` is TOTAL -- ``frame_contract_for`` already answers
+    # SINGLE_ONLY for a missing or raising declaration -- so there is nothing
+    # here to guard against. Wrapping it would only hide a future change that
+    # made it partial.
+    shot["frame_bounded"] = bool(_fc.can_split(engine))
+
+
 def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
 
@@ -1466,6 +1523,13 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # rather than the one the beat asked for. Left in place as a correction
         # rather than deleted: a reader who remembers the old promise should
         # find out here that it expired, not by trusting it.
+        # BOUNDEDNESS FIRST, and separately (no-mirror 7.3). It is stamped by
+        # its own function with its own early returns rather than folded into
+        # the call below, because ``_stamp_coverage_plan`` returns early for a
+        # zero-length beat -- and a beat that renders nothing still has a
+        # perfectly knowable engine. Sharing those early returns would leave the
+        # stamp missing on shots whose engine is not in doubt at all.
+        _stamp_frame_bounded(shots[-1])
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)
 
