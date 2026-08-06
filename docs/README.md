@@ -10,6 +10,22 @@ This folder is intentionally small. Current operator planning lives in
 - `google_tts_ideas.md` - current Google BYO API design notes.
 - `gemma4-gguf-native-setup.md` and `gemma4/` - local Gemma GGUF notes.
 
+## The video model reference (read both before adding or changing an engine)
+
+- `ENGINE_MATRIX.md` - **every per-model number**: clip window, frame ladder,
+  continuity, join mode, segment counts, effective canvas. GENERATED from the
+  live registry and DRIFT-GATED - `python tools/engine_matrix.py --check` is a
+  suite test, so it cannot disagree with the adapters.
+- `2026-08-02-FINAL-all-engine-maths-and-stills.md` - what a generator cannot
+  derive: still logic and the local/cloud re-mint split, the fix list with a
+  verified per-item status, the open decisions, and the padding rule.
+
+**The rule between them: a hand-maintained doc must never re-type a number the
+generated one already owns.** On 2026-08-06 the hand-written tables were found
+claiming 3 and 10 segments for HuMo where the live registry said 5 - a ceiling
+that had moved four days earlier - while the drift-gated matrix had been correct
+throughout. Cite the generated matrix; do not copy it.
+
 ## Current Project Docs
 
 - `GO_FORWARD_PLAN.md` - current sprint and next sprint only.

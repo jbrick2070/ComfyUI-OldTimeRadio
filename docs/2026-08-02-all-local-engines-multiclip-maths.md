@@ -1,5 +1,32 @@
 # The multi-clip maths for EVERY local video model -- verify these numbers
 
+> ## SUPERSEDED FOR NUMBERS -- 2026-08-06
+>
+> **Do not read any figure in this document as current.** It is kept as the
+> dated problem statement it was; its QUESTIONS are still good and several are
+> still open. Its NUMBERS have moved.
+>
+> * **Live per-model numbers:** [`ENGINE_MATRIX.md`](ENGINE_MATRIX.md) --
+>   generated from the live registry and drift-gated
+>   (`python tools/engine_matrix.py --check`, a suite test).
+> * **Live analysis, fix list and status:**
+>   [`2026-08-02-FINAL-all-engine-maths-and-stills.md`](2026-08-02-FINAL-all-engine-maths-and-stills.md).
+>
+> **What is provably wrong here, verified 2026-08-06:**
+>
+> | this doc says | live registry |
+> |---|---|
+> | `humo (portrait)` -- `33-177/4`, **3 segments** | jump, **5**: 97, 97, 97, 97, 57 |
+> | `humo_14B_169` -- `33-49/4`, **10 segments** of 1.96 s, NINE minted stills | jump, **5**: 97, 97, 97, 97, 57 |
+> | the "49-frame ceiling" this doc argues about | `_HUMO_14B_SAFE_RENDER_FRAMES = 97` (`eng_humo.py:106`) |
+> | section 3's canvas table (six engines inherit 1472x832) | superseded by the 2026-08-02 effective-canvas retraction; humo resolves its own `_native_dims`, `ltx_audio_in` takes a driver env branch |
+> | section 2: `humo stills_minted=2` | the generated re-mint column reports **0** for every humo row -- UNRESOLVED, see the FINAL doc section 3 |
+>
+> **The lesson this document became:** it hand-typed numbers the generated
+> matrix already owned, and four days later it was the only one lying. A
+> hand-maintained doc must cite the generated matrix, never copy it.
+
+
 **Operator, 2026-08-02:** "did you check the maths on all local video models
 including humo? if not that's a big miss -- we need to see their maths for
 multi beats, seconds, all that, well thought out."
@@ -11,6 +38,9 @@ of them are wrong. Dropdown names throughout, as the operator asked.
 ## 1. COVERAGE ARITHMETIC -- measured, all ten
 
 A 442-frame beat (17.68 s at 25 fps), partitioned by each engine's own contract:
+
+**STALE TABLE -- superseded 2026-08-06. The `humo` rows below are wrong (see the
+banner at the top). Live numbers: [`ENGINE_MATRIX.md`](ENGINE_MATRIX.md).**
 
 | dropdown name | contract | mode | segments | seconds each | total |
 |---|---|---|---|---|---|
@@ -61,6 +91,11 @@ Questions the panel must answer, grounded:
   ~2 s rather than producing ten cuts?
 
 ## 3. THE CANVAS GAP -- six of ten declare nothing
+
+**STALE TABLE -- superseded 2026-08-06 by the effective-canvas retraction. The
+generated matrix resolves each engine's real canvas (humo uses its own
+`_native_dims`; `ltx_audio_in` takes a driver env branch). Live numbers:
+[`ENGINE_MATRIX.md`](ENGINE_MATRIX.md).**
 
 `declared_render_canvas` returns None for six engines, so they inherit the shared
 1472x832 landscape default:

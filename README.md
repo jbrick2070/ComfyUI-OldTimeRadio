@@ -140,6 +140,29 @@ one at a time with explicit VRAM reclaim between stages, and renders are request
 deterministic. The old VRAM tier system is gone — per-platform workflow variants are the
 sizing mechanism now.
 
+### The video model reference — read these two before adding or changing an engine
+
+| doc | what it holds | kept true by |
+|---|---|---|
+| [`docs/ENGINE_MATRIX.md`](docs/ENGINE_MATRIX.md) | **every per-model number** — clip window, frame ladder, continuity, join mode, segment counts, effective canvas | **generated + drift-gated.** `python tools/engine_matrix.py --check` is a suite test, so it cannot disagree with the adapters |
+| [`docs/2026-08-02-FINAL-all-engine-maths-and-stills.md`](docs/2026-08-02-FINAL-all-engine-maths-and-stills.md) | the things a generator cannot derive — still logic and the local/cloud re-mint split, the fix list with per-item status, the open decisions, the padding rule | by hand, with a dated verification stamp |
+
+**The rule between them: a hand-maintained doc must never re-type a number the
+generated one already owns.** That is not style. On 2026-08-06 the hand-written
+tables were found asserting 3 and 10 segments for HuMo where the live registry
+said 5 — a ceiling that had moved four days earlier — while the drift-gated
+matrix had been right the whole time. Cite the generated matrix; do not copy it.
+
+Multi-clip coverage itself (how a long beat is partitioned into chained or
+jump-cut segments) is settled in `nodes/_otr_video_engines/coverage_plan.py`, and
+the arithmetic totals exactly on every engine, local and cloud.
+
+**Padding rule (operator, 2026-08-06):** no mirror and no ping-pong anywhere —
+every second of audio gets ORIGINAL video, and a short render fails loud rather
+than filling. The single sanctioned exception is the closing-theme backdrop that
+holds the last drama clip under the closing theme; the credits roll itself
+freezes a frame and never loops.
+
 ### Headless canonical path
 
 Agents and API tests use exactly one workflow file: `workflows/otr_canonical.json`.
