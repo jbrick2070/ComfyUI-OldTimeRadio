@@ -6,7 +6,54 @@ revision of this file is in git. If a thing is DONE, it does not belong here.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
-### 0. VIDEO MATRIX PATTERN -- designed, kibitz-r1 running, NOT built
+### 0. VIDEO MATRIX PATTERN -- FOUR ROUNDS, FOUR NOs, DID NOT CONVERGE
+
+**Do not build from the current plan.** Arc r1-r4 complete (r4 single-lane --
+Antigravity out on provider quota). Judgments:
+`kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/` (**LOCAL ONLY, gitignored**).
+Spec: `docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` (`11e893f6`), superseded
+in detail by the r3 `final.md` and the r4 judgment.
+
+**Why it did not converge, and it is not a design problem:** most of what remains
+is ABSENT HUMAN-OWNED DATA. Someone must WRITE a one-line `doc_purpose` for each
+of ~32 registered engines and DECIDE the total `family -> display_group`
+taxonomy. No further review round produces that content. The frozen
+`(engine_id, field)` grandfather set is likewise un-enumerated, so two builders
+could grandfather different holes and both pass.
+
+**What survived all four rounds (this part IS sound):** templated prose fragments
+whose numbers are placeholders resolved from the live registry; extending
+`AdapterDescriptor` rather than minting a second descriptor; a generator-side
+validator that keeps the registry pydantic-free; init order import -> audit ->
+rows; the two-unit cost split (VRAM MB vs provider USD); precedence stated as a
+HUMAN rule; and a mandatory `python tools/engine_matrix.py` regeneration step
+because `--check` never rewrites the doc.
+
+**Corrections banked:** `str.format_map` CANNOT resolve dotted flat keys
+(`KeyError: 'reference'`, proven) so the placeholder grammar must be explicit;
+`provider_side` migration is **behaviour-affecting, not STATIC** -- it changes
+dispatch at `render_driver.py:1653-1668` and there is a THIRD classifier at
+`scripts/otr_w45_campaign.py:82-108,120-132` where a provider id without a
+`cloud_`/`google_` prefix would enter the LOCAL campaign.
+
+**Next step is NOT another round.** Author the content, enumerate the grandfather
+set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
+rule text -- then re-enter at **r3**, per the standing rule that a plan-level
+gap drops back rather than being patched from inside r4.
+
+### 0-BIS. NO-MIRROR ENFORCEMENT -- CODE-READY, arc complete
+
+**Build spec: `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md` (`dc1794a2`).**
+r1-r4 done (r4 single-lane, Antigravity quota). Producer-first build order,
+ELEVEN receipt surfaces, a real closing-window classifier, a manifest
+`frame_receipt_version`, and a live leg that must be an `ltx_video` beat over its
+169-frame ceiling with the retired env switch SET -- a WAN or `ltx_8gb` leg would
+pass without executing the deleted machinery.
+
+Reviews happen BEFORE a chunk is green (Sonnet QA on the diff, then a Fable gate
+where structural), then commit and push immediately per CLAUDE.md section 7.
+
+### 0-TER. SUPERSEDED -- the earlier no-mirror queue
 
 **Spec: `docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` (commit `11e893f6`).**
 Operator directive 2026-08-06: ONE matrix per plug-and-play module, reader-first so
