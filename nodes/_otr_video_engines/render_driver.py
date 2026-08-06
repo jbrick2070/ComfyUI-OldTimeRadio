@@ -3541,6 +3541,22 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # when unenforced, because "the guard did not run here" is the fact a reader
     # needs; a receipt that records only successful checks reads identically
     # whether the guard covered the beat or skipped it.
+    # THE BEAT'S PEAK, ON THE CLIP THE MANIFEST READS (2026-08-06).
+    #
+    # ``peak_used`` has tracked the MAX across segments since the 2026-07-26 QA
+    # panel, for the reason stated where it is initialised: taking whatever the
+    # final segment reported under-reports a beat whose heaviest render was
+    # segment 1. That fix reached the RETURN VALUE and stopped there --
+    # ``beat_clip`` is ``dict(clip or {})``, a copy of the LAST segment, so the
+    # durable receipt kept inheriting the last segment's number while
+    # ``build_clip_manifest`` read it off the clip and published it.
+    #
+    # Same trap as the extension receipts this function was just repaired for,
+    # one field over: a beat-scope value left unassigned silently becomes a
+    # segment-scope one. Written UNCONDITIONALLY for that reason. ``None`` when
+    # nothing was measured, which is the convention every consumer already uses
+    # -- never 0, which would read as "measured, and it was free".
+    beat_clip["vram_peak_mb"] = int(peak_used) if peak_used else None
     beat_clip["vram_admission"] = admission
     _LOG.warning(
         "[OTR video] BEAT %s assembled from %d %s segment(s) -> %d frame(s) "

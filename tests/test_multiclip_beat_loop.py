@@ -877,3 +877,37 @@ def test_a_ONE_SEGMENT_TAIL_TRIM_beat_gets_a_TRUTHFUL_receipt_and_no_grade(
         assert clip["delivered_native_frame_count"] == 25, "25 delivered"
         _row, findings = _graded(clip, plan)
         assert findings == [], "single-segment scope is deferred, by ruling"
+
+
+def test_the_BEAT_reports_its_OWN_vram_peak_not_its_last_segments(monkeypatch):
+    """The beat's PEAK, on the clip the manifest actually publishes.
+
+    ``peak_used`` has tracked the max across segments since the 2026-07-26 QA
+    panel -- but that fix reached only the RETURN VALUE. ``beat_clip`` is a copy
+    of the LAST segment, so the durable receipt kept inheriting that segment's
+    number while ``build_clip_manifest`` read it off the clip and published it.
+
+    Segment 0 is the heavy one here, exactly the case the original comment says
+    the panel was worried about.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        eng = _BeatStub(tmp)
+        _install(monkeypatch, eng)
+        peaks = iter([9000, 1000, 1000])
+        real_render_shot = rd.render_shot
+
+        def _peaked(*args, **kwargs):
+            clip, out_shot, attempts, _used = real_render_shot(*args, **kwargs)
+            return clip, out_shot, attempts, next(peaks)
+
+        monkeypatch.setattr(rd, "render_shot", _peaked)
+        plan = _chain_plan()
+        clip, _s, _a, used = rd.render_beat_coverage(
+            _shot(plan), {}, request_builder=_request_builder)
+
+        assert used == 9000, "the tuple already carried the beat's peak"
+        assert clip["vram_peak_mb"] == 9000, (
+            "the CLIP inherited the last segment's 1000 -- the number the "
+            "manifest publishes must be the beat's peak")
+        row, _findings = _graded(clip, plan)
+        assert row["vram_peak_mb"] == 9000
