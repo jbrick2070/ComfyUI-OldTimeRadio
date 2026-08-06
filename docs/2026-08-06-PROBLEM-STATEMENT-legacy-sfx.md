@@ -151,7 +151,33 @@ travels under the name `clip_manifest_json`. The bed is armed. That comment in
 `eng_google_vid_sfx.py` overstates the case and should be softened when that file
 is next touched.
 
-## 6. THE DECISION THIS OWES -- and I am not making it for you
+## 6-ANSWER. THE OPERATOR RULED: RIP IT, 100% (2026-08-06)
+
+Operator, on reading this document: *"I do really want to rip out SFX 100%,
+that's my aim. How it gets done: you, and ask Fable -- you can
+`/kibitz-plugin:kibitz`, Codex etc. But don't break the system."*
+
+**So option (c) below is the accepted plan, and options (a) and (b) are closed.**
+The rest of section 6 is kept as the reasoning that led here, not as an open
+question.
+
+Two standing rules bind the execution and neither is optional:
+
+* **The ledger rule (operator directive 2026-07-14, hard):** removing a pass is
+  legitimate, but the ledger must still be filled COMPLETELY for downstream
+  consumers, which read FIELDS and not intentions. Before anything is deleted:
+  enumerate EVERY field the path writes, give each one exactly one new owner
+  (deterministic Python, another pass, or an explicit default), delete only
+  then, and prove it on a live leg. A ripped pass with an unowned field is a
+  broken render, not a simplification.
+* **The kibitz gate (operator directive 2026-08-04, hard):** this is a coding
+  item, so it gets the FULL four-round arc before code, plus the Fable gate the
+  operator named explicitly.
+
+The work is tracked in its own build spec; this document remains the statement
+of the problem and the record of how the decision was reached.
+
+## 6-ORIGINAL. THE DECISION THIS OWED -- kept for the record
 
 **Is the SFX bed's live wiring intentional dormancy, or a leftover?**
 
