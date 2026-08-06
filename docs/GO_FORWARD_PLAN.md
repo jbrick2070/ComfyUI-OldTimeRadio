@@ -174,9 +174,10 @@ contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
 Item 1 is the structural work and consumes most of a session; items 2-3 are
-small and share one campaign. Item 8 is DONE (tombstoned below). Item 9 is the
-newest and has r1 behind it. Work them by priority, not by number -- the
-numbering is historical.
+small and share one campaign. **Items 8 AND 9 are DONE (both tombstoned below)
+-- item 9 SHIPPED 2026-08-06 as `e499b7fc`.** The live open work is sections 0
+(video matrix pattern, did NOT converge) and 0-BIS (no-mirror, CODE-READY).
+Work by priority, not by number -- the numbering is historical.
 
 **RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
 line is spent -- it governed that session only, and the 08-05 handoff opens on a
@@ -678,39 +679,26 @@ What now exists and should be USED rather than rebuilt:
    `PROD_BUG_LOG.md` until a live artifact shows it. Needs its own ruling before anyone
    touches the merge.
 
-### 9. THE MULTI-CLIP HONESTY RULE FAILS THE HONEST BEATS (r1 done, NOT built)
+### 9. THE MULTI-CLIP HONESTY RULE -- TOMBSTONE. SHIPPED 2026-08-06 (`e499b7fc`).
 
-`acceptance.py:177-178` compares a SEGMENT's `native_frame_count` against the whole
-BEAT's `frame_count`, because `render_driver.py:3483` builds `beat_clip` from the LAST
-segment and recomputes only `path` / `frame_count` / `segment_count` / `join_mode`. A
-`wan_ti2v` beat of 3x81 real renders delivers 241 genuinely rendered frames and is
-graded "241 delivered, only 81 rendered". **The rule fires on exactly the beats that
-prove it was satisfied**, and the durable `clip_manifest.json` row is wrong regardless
-of who runs the grader.
+**DONE. Do not re-open, do not re-panel, do not re-implement.** This section
+described the bug in full technical detail -- including the "do not just sum the
+segments" trap and the distinct native/delivered-native counts -- and it was
+still headed "r1 done, NOT built" AFTER the fix shipped in the same session.
+A Sonnet whole-package pass caught it; a next engineer would very plausibly have
+rebuilt finished work, which is the exact failure `d548ac54` recorded four
+commits earlier ("The plan was carrying finished work again").
 
-**Do NOT "just sum the segment counts" -- r1 killed that three ways independently.**
-Chaining DROPS duplicated head frames at each seam (`rendered` is
-`(path, drop_head, keep_frames)`, `render_driver.py:3297`), so 3x81 does 243 frames of
-work and delivers 241. Summing fails the same test for a new reason.
+What shipped: it was FOUR defects, not one -- the segment-vs-beat scope
+mismatch; `ltx_8gb` emitting no receipt at all; `scripts/grade_episode.py`
+reporting `ACCEPTED: 0 shot(s)` with exit 0 on the wrapper the render batch
+really writes (the grader was INERT on the real artifact); and a malformed
+receipt raising out of the grader. Suite 8805 -> 8836, Bug Bible 17.
 
-Corrected shape: accumulate per-segment receipts in the render loop, mint the beat
-receipt in the DISTINCT counts **Bug Bible 12.69** and
-`PRODUCTION_SPRINT_LESSONS.md:540-562` already mandate (requested/rendered/visible/
-trimmed), compare DELIVERED-NATIVE frames, and fix the RULE rather than only the
-receipt. **Also in the same rule:** a MISSING `native_frame_count` currently PASSES,
-because the check is guarded by `native is not None`.
-
-Statement: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`.
-r1 judgment: `kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r1/` (LOCAL ONLY --
-`kibitz-runs/` is gitignored). **START AT r2.** The existing grader tests are
-hand-written rows encoding the very model production contradicts, so they will
-rubber-stamp a wrong fix; the new test must run
-`render_beat_coverage -> build_clip_manifest -> grade_multiclip_honesty`.
-
-**Severity, stated honestly:** no durable runner invokes `scripts/grade_episode.py` per
-leg (only the temporary `tmp/_w45_campaign.ps1` does), so this is a MANUAL gate. And
-source inspection proves REACHABLE, not LIVE -- it may not enter `PROD_BUG_LOG.md`
-without a retained ledger, manifest, grader result and asset.
+Receipts: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`
+(the problem statement, now historical) and the commit itself.
+**Still owed:** one live multi-segment leg -- see the no-mirror build spec's
+section 6, whose `ltx_video` leg discharges this and F11 together.
 
 ### Bench leftovers (relocated)
 

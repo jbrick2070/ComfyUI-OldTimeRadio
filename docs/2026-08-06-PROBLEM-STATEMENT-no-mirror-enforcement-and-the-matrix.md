@@ -100,7 +100,7 @@ the pre-no-mirror world sitting on top of post-no-mirror code.
 ## 4. DEFECT B -- the grader's single-clip carve-out is now unfounded
 
 `acceptance.py` skips `len(planned) <= 1`, and
-`tests/test_wire_w5_acceptance_grader.py:198-207` is an explicit CONTROL:
+`tests/test_wire_w5_acceptance_grader.py:234-243` is an explicit CONTROL:
 
 > `test_a_SINGLE_CLIP_beat_may_PAD_all_it_likes` -- *"CONTROL, and it is the
 > shipped 8 GB WAN tier: a single-clip beat renders short on purpose and fills

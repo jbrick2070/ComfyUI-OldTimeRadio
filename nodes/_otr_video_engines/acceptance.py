@@ -363,14 +363,25 @@ def grade_delivered(ledger, manifest):
     findings = []
     for shot in _shots(ledger):
         shot_id = str(shot.get("shot_id") or "")
-        if int(shot.get("target_frame_count") or 0) <= 0:
+        # THROUGH ``frame_count``, like every other count in this module. These
+        # two sites kept a bare ``int()`` when the rest of the file was hardened
+        # on 2026-08-06, so a ledger stamping ``target_frame_count`` as anything
+        # unparseable raised straight out of the grader and past the durable
+        # script's exit-code contract -- the exact failure ``frame_count``
+        # exists to prevent, surviving in the one rule nobody re-read.
+        # A shot that cannot say how many frames it wanted owes nothing that can
+        # be judged, so it is skipped rather than reported: a missing CLIP and
+        # an unreadable PLAN are different failures, and this rule owns the
+        # first one only.
+        target = frame_count(shot.get("target_frame_count"))
+        if not target:
             continue                       # renders nothing; owes nothing
         row = rows.get(shot_id)
         if row is None or not row.get("exists"):
             findings.append(_finding(
                 RULE_MISSING_CLIP, shot_id,
                 "the plan gave this beat %d frame(s) and the manifest carries "
-                "%s" % (int(shot.get("target_frame_count") or 0),
+                "%s" % (target,
                         "no row for it" if row is None
                         else "no clip on disk")))
             continue

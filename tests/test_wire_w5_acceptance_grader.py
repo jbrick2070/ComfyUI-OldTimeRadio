@@ -501,6 +501,27 @@ def test_an_UNREADABLE_receipt_is_a_FINDING_and_NEVER_a_TRACEBACK(bad):
         assert all(f["rule"] == acc.RULE_MULTICLIP_HONESTY for f in findings)
 
 
+@pytest.mark.parametrize("bad", ["not-a-number", True, None, 3.5e400, {}])
+def test_grade_DELIVERED_never_raises_on_an_unreadable_target_count(bad):
+    """The hardening that skipped one rule.
+
+    ``frame_count`` was added so no count coerced from another process's JSON
+    could raise out of the grader -- and every site in this module was moved on
+    to it EXCEPT the two in ``grade_delivered``, which kept a bare ``int()``.
+    A ledger stamping an unreadable ``target_frame_count`` therefore raised
+    straight past ``grade_episode`` and past the durable script's documented
+    0/1/2 exit contract, as an uncaught traceback.
+
+    An unreadable PLAN and a missing CLIP are different failures, and this rule
+    owns only the second -- so a shot that cannot say what it wanted is skipped,
+    not reported here."""
+    ledger = _ledger([{"shot_id": "shot_b1", "role": "character_video",
+                       "engine_id": "humo", "target_frame_count": bad}],
+                     {"character_video": "humo"})
+    assert acc.grade_delivered(ledger, _manifest([])) == []
+    assert acc.grade_episode(ledger, _manifest([])) is not None
+
+
 def test_the_ACCOUNTING_HELPER_never_raises_on_any_garbage():
     """The one owner of the arithmetic, hit with the shapes a broken producer
     or a hand-edited manifest really emits."""

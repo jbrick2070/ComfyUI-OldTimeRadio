@@ -6,11 +6,11 @@
 > dated problem statement it was; its QUESTIONS are still good and several are
 > still open. Its NUMBERS have moved.
 >
-> * **Live per-model numbers:** [`ENGINE_MATRIX.md`](ENGINE_MATRIX.md) --
+> * **Live per-model numbers:** [`ENGINE_MATRIX.md`](../ENGINE_MATRIX.md) --
 >   generated from the live registry and drift-gated
 >   (`python tools/engine_matrix.py --check`, a suite test).
 > * **Live analysis, fix list and status:**
->   [`2026-08-02-FINAL-all-engine-maths-and-stills.md`](2026-08-02-FINAL-all-engine-maths-and-stills.md).
+>   [`2026-08-02-FINAL-all-engine-maths-and-stills.md`](../2026-08-02-FINAL-all-engine-maths-and-stills.md).
 >
 > **What is provably wrong here, verified 2026-08-06:**
 >
@@ -40,7 +40,7 @@ of them are wrong. Dropdown names throughout, as the operator asked.
 A 442-frame beat (17.68 s at 25 fps), partitioned by each engine's own contract:
 
 **STALE TABLE -- superseded 2026-08-06. The `humo` rows below are wrong (see the
-banner at the top). Live numbers: [`ENGINE_MATRIX.md`](ENGINE_MATRIX.md).**
+banner at the top). Live numbers: [`ENGINE_MATRIX.md`](../ENGINE_MATRIX.md).**
 
 | dropdown name | contract | mode | segments | seconds each | total |
 |---|---|---|---|---|---|
@@ -95,7 +95,7 @@ Questions the panel must answer, grounded:
 **STALE TABLE -- superseded 2026-08-06 by the effective-canvas retraction. The
 generated matrix resolves each engine's real canvas (humo uses its own
 `_native_dims`; `ltx_audio_in` takes a driver env branch). Live numbers:
-[`ENGINE_MATRIX.md`](ENGINE_MATRIX.md).**
+[`ENGINE_MATRIX.md`](../ENGINE_MATRIX.md).**
 
 `declared_render_canvas` returns None for six engines, so they inherit the shared
 1472x832 landscape default:
