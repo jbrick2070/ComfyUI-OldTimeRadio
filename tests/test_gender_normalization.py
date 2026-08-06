@@ -185,6 +185,73 @@ def test_the_two_helpers_are_not_interchangeable():
 
 
 # --------------------------------------------------------------------------- #
+# chunk 3 -- the scifi_codex lane allocates bark presets by gender
+
+
+def test_bark_pools_are_gendered_and_non_empty():
+    from nodes._otr_scifi_codex import _bark_preset_pools
+
+    male, female = _bark_preset_pools()
+    assert male and female, "both bark gender columns must be populated"
+    assert not set(male) & set(female), "a preset cannot be in both columns"
+    assert all(p.startswith("v2/") for p in male + female)
+
+
+def test_bark_pools_come_from_cast_pools_not_a_hand_kept_copy():
+    """A second copy of the gender column is how the two drift apart."""
+    from config import cast_pools
+
+    from nodes._otr_scifi_codex import _bark_preset_pools
+
+    male, female = _bark_preset_pools()
+    expected_male = [p for p, g, _l, _t in cast_pools.VOICE_PROFILES
+                     if g.strip().lower() == "male"]
+    expected_female = [p for p, g, _l, _t in cast_pools.VOICE_PROFILES
+                       if g.strip().lower() == "female"]
+    assert male == expected_male
+    assert female == expected_female
+
+
+def test_the_hardcoded_all_male_triple_is_gone():
+    """Every sampled episode on this lane shipped v2/en_speaker_6 / _3 / _0 --
+    all three male -- keyed on char_id with the row's gender never read."""
+    import inspect
+
+    from nodes import _otr_scifi_codex
+
+    src = inspect.getsource(_otr_scifi_codex._assemble_ledger)
+    assert '{"c01": "v2/en_speaker_6"' not in src, (
+        "the hardcoded per-char_id preset map must not survive")
+    assert "canonical_bank_gender" in src, (
+        "preset choice must consult the row's gender")
+
+
+def test_other_gender_presentation_pick_is_seed_stable():
+    """The pick is keyed on char_id via sha1, never hash() -- Python's builtin
+    hash is PYTHONHASHSEED-salted, so it would hand the same character
+    different voices from run to run."""
+    import hashlib
+    import inspect
+
+    from nodes import _otr_scifi_codex
+
+    src = inspect.getsource(_otr_scifi_codex._assemble_ledger)
+    # Strip comments first -- the code's own comment explains why hash() is
+    # forbidden, and a naive substring search matches that explanation.
+    code_only = "\n".join(
+        line.split("#", 1)[0] for line in src.splitlines())
+    assert "sha1" in code_only
+    assert "hash(" not in code_only, "builtin hash() is PYTHONHASHSEED-salted"
+
+    def pick(char_id):
+        d = hashlib.sha1(str(char_id).encode("utf-8")).hexdigest()
+        return "male" if int(d, 16) % 2 == 0 else "female"
+
+    assert pick("c01") == pick("c01")
+    assert pick("c02") == pick("c02")
+
+
+# --------------------------------------------------------------------------- #
 # presentation_gender -- chunk 4
 
 

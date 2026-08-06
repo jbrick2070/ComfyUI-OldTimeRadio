@@ -2732,14 +2732,75 @@ def _apply_script_safety_cleanup(
     }
 
 
+def _bark_preset_pools() -> tuple[list, list]:
+    """Ordered (male, female) bark preset pools, read from the ONE source of
+    truth rather than a hand-kept copy that can drift out of agreement with it.
+    """
+    try:
+        from ..config import cast_pools as _POOLS  # type: ignore
+    except (ImportError, ValueError):  # pragma: no cover - standalone load
+        import os
+        import sys
+        _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from config import cast_pools as _POOLS  # type: ignore
+    male, female = [], []
+    for preset, gender, _lang, _tags in getattr(_POOLS, "VOICE_PROFILES", ()):
+        if str(gender).strip().lower() == "male":
+            male.append(preset)
+        elif str(gender).strip().lower() == "female":
+            female.append(preset)
+    return male, female
+
+
 def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: ScriptArtifactV4, meta: MutableMapping[str, Any]) -> dict[str, str]:
+    # Bark voices used to be a hardcoded per-char_id map --
+    # {"c01": speaker_6, "c02": speaker_3, "c03": speaker_0} -- all three MALE,
+    # keyed on slot and never once reading the row's gender. Measured over the
+    # published corpus, every sampled episode on this lane shipped the same
+    # all-male triple regardless of who was in it, so a female character spoke
+    # with a male voice on a lane that owns its own casting.
+    #
+    # Allocated by gender now, from ordered pools with used-exclusion. NOT a
+    # gender->preset lookup: two same-gender characters would draw the same
+    # preset and trip _assert_unique_bark_voices.
+    from ._otr_roster_gender import canonical_bank_gender
+    male_pool, female_pool = _bark_preset_pools()
+    used: set = set()
+
+    def _pick(char_id: str, raw_gender: str) -> tuple:
+        """(preset, presentation_gender) for one row."""
+        gender = canonical_bank_gender(raw_gender)
+        if gender not in ("male", "female"):
+            # No bark column exists for a non-binary row (the pool is binary by
+            # construction), so a PRESENTATION has to be chosen. Keyed on
+            # char_id via sha1 -- never hash(), which is PYTHONHASHSEED-salted
+            # and would hand the same character different voices across runs.
+            digest = hashlib.sha1(str(char_id).encode("utf-8")).hexdigest()
+            gender = "male" if int(digest, 16) % 2 == 0 else "female"
+        pool = male_pool if gender == "male" else female_pool
+        for preset in pool:
+            if preset not in used:
+                used.add(preset)
+                return preset, gender
+        raise ValueError(
+            "scifi_codex: the %s bark preset pool is exhausted for %s (%d "
+            "already taken). Casting a duplicate voice would break the "
+            "in-episode uniqueness invariant, so this fails rather than "
+            "silently reusing one." % (gender, char_id, len(used))
+        )
+
     cast_rows = []
     for row in cast.cast:
         if row.char_id == "announcer":
-            tts_model, preset = "kokoro", "bm_george"
+            # bm_george is a british MALE kokoro voice; record what it presents
+            # as rather than leaving the row's label to speak for it.
+            tts_model, preset, presentation = "kokoro", "bm_george", "male"
         else:
-            tts_model, preset = "bark", {"c01": "v2/en_speaker_6", "c02": "v2/en_speaker_3", "c03": "v2/en_speaker_0"}[row.char_id]
-        cast_rows.append({"char_id": row.char_id, "name": row.name, "character_description": row.character_description, "gender": row.gender, "tts_model": tts_model, "voice_preset": preset})
+            tts_model = "bark"
+            preset, presentation = _pick(row.char_id, row.gender)
+        cast_rows.append({"char_id": row.char_id, "name": row.name, "character_description": row.character_description, "gender": row.gender, "tts_model": tts_model, "voice_preset": preset, "presentation_gender": presentation})
     scenes = [{"scene_id": s.scene_id, "description": s.description, "env": s.env} for s in score.scenes]
     shots = [{"shot_id": sh.shot_id, "scene_id": sh.scene_id, "description": sh.description, "visual_prompt": sh.visual_prompt} for s in score.scenes for sh in s.shots]
     beats = [{"beat_id": b.beat_id, "shot_id": b.shot_id, "scene_id": b.scene_id, "speaker": b.speaker, "char_id": b.char_id, "line_ids": list(b.line_ids)} for s in score.scenes for b in s.beats]
