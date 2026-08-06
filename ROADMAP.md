@@ -139,7 +139,21 @@ Choose these as separate campaigns after the core surface is stable:
 - direct BYO Google music/image/video paths, followed by other providers only
   when they keep provider identity explicit and fail loud;
 - a new system-agnostic multi-GPU upscale stage built against profile and
-  registry contracts, never resurrection of the retired NVIDIA-only node.
+  registry contracts, never resurrection of the retired NVIDIA-only node;
+- a one-shot continuous multi-speaker segment role (podcast/trailer banter
+  between two announcers, rendered as a single unbroken take). VibeVoice is the
+  candidate model and has maintained ComfyUI nodes, but it is NOT a `char_voice`
+  engine and must never be wired as one: the audio spine is per-line
+  (`interface == "per_line"` -> `pack_audio_batch` -> SceneSequencer unbind), and
+  VibeVoice's whole advantage is cross-turn prosody that only exists because it
+  never cuts at line boundaries. Running it per-line discards the advantage;
+  running it conversation-mode requires forced alignment to recover per-line
+  timings, which is a new drift source in the exact place the ledger rule
+  forbids a hole. Also weigh: a fourth isolated sidecar venv, 4 speakers max per
+  generation, and a `commercial_clean` value that is genuinely unclear because
+  Microsoft withdrew the upstream repo and weights (MIT code, community mirrors).
+  Deferred by the operator 2026-08-06 -- "no for now"; revisit only as this
+  distinct role, never as a voice-engine swap.
 
 Each candidate gets its own scoped design, exact ownership table, tests, and
 qualification ladder before entering GO_FORWARD.
