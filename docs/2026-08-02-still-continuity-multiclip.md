@@ -4,7 +4,7 @@
 clip-to-clip beats."
 
 This document supersedes the still-related claims in
-`docs/2026-08-02-all-local-engines-multiclip-maths.md`. Two of those claims were
+`docs/retired/2026-08-02-all-local-engines-multiclip-maths-RETIRED.md`. Two of those claims were
 WRONG, and the correction is the most useful thing here.
 
 Dropdown names throughout. Do not launch renders or boot a server.
