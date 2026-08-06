@@ -70,7 +70,9 @@ contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
 Item 1 is the structural work and consumes most of a session; items 2-3 are
-small and share one campaign. TWO campaigns: item 1; items 2+3.
+small and share one campaign. Item 8 is DONE (tombstoned below). Item 9 is the
+newest and has r1 behind it. Work them by priority, not by number -- the
+numbering is historical.
 
 **RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
 line is spent -- it governed that session only, and the 08-05 handoff opens on a
@@ -471,7 +473,7 @@ the flag).
 `test_g9_sfw_ship_stop.py` that filtered on a retired code prefix (fixed
 `4506b1ed`). Any NEW armed gate ships with a vacuity assertion.
 
-### 7. CHARACTER GENDER IS ROLLED ON PROSE LANES -- Scrooge shipped female (spec written, Codex r2 returned NO)
+### 7. CHARACTER GENDER IS ROLLED ON PROSE LANES -- Scrooge shipped female (spec REWRITE owed; r2 and r3 both returned NO)
 
 Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
 `HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
@@ -509,7 +511,25 @@ The diagnosis survived; the mechanism did not. The three that matter:
    with the same gender currently produce a confident pin rather than an
    abstention.
 
-**Next step is r3 on the spec, not code.**
+**r3 RAN 2026-08-06 and it is STILL NO** -- Codex NO with 7 must-fixes, agy
+yes-with-fixes with 9. That is three NOs across two rounds, and r3's findings invalidate
+the CODING PLAN rather than its line numbers, so the standing re-ground rule applies:
+**the next step is a SPEC REWRITE folding r2 + r3, then r3 again. Not r4.**
+
+Both lanes independently found (a) a manifest sequencing deadlock -- the stamper is
+specced to run per-unit inside the vendor fetch loop, but the manifest is written only
+AFTER the loop, so it can never see the unit it was called for; and (b)
+`RosterGenderVerdict` has no `gender_source` / `gender_confidence` fields, so the
+ladder's whole output cannot be carried without changing every verdict-construction
+path. Codex also confirmed the r2 finding that the OpenRouter backend still has no
+web/plugin parameter, so the web-search tier would silently do nothing.
+
+Judgment: `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/judgment.md` (LOCAL
+ONLY). **Trap: commit `496d9d57` inserted ~90 lines near the top of
+`nodes/_otr_roster_gender.py`, so every cite into that file in the r3 review has
+SHIFTED. Re-pin before acting.** The rewrite should also CONSUME the
+`normalize_gender` boundary item 8 installed there rather than adding a second
+normalization path.
 
 **Found while grounding, and it reopens an operator ruling:** 32 of 85 Shakespeare
 roster rows are `unknown` TODAY -- 38% of the lane assumed solved. Comedy of Errors
@@ -518,59 +538,75 @@ Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
 `unknown` rows. That fixes 32 rows without ever second-guessing a parsed
 dramatis personae. **Operator decision, not a driver call.**
 
-### 8. THE VOICE AND THE PORTRAIT MUST MATCH THE GENDER -- outranks item 7 (operator ruling 2026-08-05)
+### 8. VOICE/PORTRAIT CONSISTENCY -- DONE 2026-08-06, all six chunks
 
-**Operator, and this reorders the board:** "I am fine with LLMs trying to choose
-the best gender as long as they choose one and pick a voice that matches and
-portrait matches." And: "the voice and picture must match, that most important."
+Tombstone. Shipped `496d9d57` / `041a21d7` / `d4e51b4d` / `6d078f81` / `6a92cbd3` /
+`e04dcaad`; detail in `docs/HANDOFF_LOG.md`. **The shipped premise was INVERTED and is
+withdrawn:** `voice_ref_id` always followed the gender (1,169 rows, zero cross-gender);
+`voice_preset` was the wrong field, and no shipped engine speaks it.
 
-**CONSISTENCY BEATS ACCURACY.** A female Scrooge with a female voice and a female
-portrait is a coherent episode that is merely unfaithful to Dickens. A male
-Scrooge with a female reference voice is a BROKEN episode. So item 7 raises
-fidelity; this item protects coherence, and coherence ships first.
+What now exists and should be USED rather than rebuilt:
+* `normalize_gender` / `canonical_bank_gender` / `get_presentation_gender` in
+  `nodes/_otr_roster_gender.py` -- the single gender boundary. The two normalizers are
+  NOT interchangeable: the tri-state one erases `neutral`, which is a real bank voice.
+* `presentation_gender` on the cast row, stamped in `CastLock._stamp` from the reference
+  actually chosen. Carried CONDITIONALLY through `set_cast` so the writer-stage drift
+  guard keeps its teeth.
+* `meta.voice_portrait_consistency_policy_revision` -- absence means legacy, forever.
+* `scripts/audit_voice_gender_consistency.py` -- the standing receipt. Baseline over
+  1,595 ledgers: 0 unreadable, 0 violations (all pre-policy), 332 legacy findings, 401
+  dormant mismatches, 28 portrait conflicts.
 
-The gender value already fans out to three surfaces -- the voice, the portrait
-prose (`otr_meta_brief_image_prompt.py:78-90`, the gender anchor) and the script.
-The defect is that one of them does not follow it.
+**Left open by it, in priority order:**
+1. **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female, `Clara`
+   gendered male with "her" in her own prose. `ROSALIND` is NOT one of them -- the
+   Ganymede disguise keeps her female voice by operator ruling. Read the list; do not
+   total it.
+2. **Three unnormalized sites in `_otr_casting.py`.** `:469` (the LLM cast echo) and
+   `:583-587` (`_plan_gender_distribution` leaves a synonym row UNCOUNTED, skewing the
+   40/40/20 split) are real but MOVE THE GENDER ROLL -- they break C7 byte-identity and
+   replay parity, so each needs a declared re-baseline. `:756-759` (`_PINNABLE_GENDERS`
+   drops `woman`/`man` pins) is **VERIFIED INERT** -- the shipped roster sidecars emit
+   only `unknown`/`male`/`female` (32/30/23). Latent hazard, not a live defect.
+3. **`story_orchestrator.py:449-453`** merges cast rows copying `voice_preset` and
+   `gender` under INDEPENDENT guards, so a row can take its preset from one row and its
+   gender from another. STATIC evidence only -- per the admission rule it may not enter
+   `PROD_BUG_LOG.md` until a live artifact shows it. Needs its own ruling before anyone
+   touches the merge.
 
-* ~~**`voice_ref_id` ignores the resolved gender** ... AUDIBLE ... **Fix this
-  first.**~~ **WITHDRAWN 2026-08-06 -- INVERTED, and measured over the whole corpus.**
-  1,595 ledgers / 5,123 rows: **1,169 non-announcer rows with both genders resolvable
-  and ZERO cross-gender references.** The only 4 exceptions are `other`/`non-binary`
-  rows the bank cannot serve, and all 4 carry the honest `gender_unservable` receipt
-  (`cast_lock.py:645-667`). **`voice_ref_id` FOLLOWS the gender; `voice_preset` is the
-  field that does not** (225 of 1,559). And it is not audible: engines declare the field
-  they speak (`_otr_voice_node_common.py:454`) and 1,147 of 1,559 recent rows rendered
-  indextts2, which reads the REFERENCE. The three-episode sample that produced the
-  original claim was read backwards.
-  **The fidelity-lane mechanism is already logged as `PBUG-20260805-02`**
-  (`PROD_BUG_LOG.md:3163-3196`) -- replay desync, seed-424242 reproducer, 74% of seeds,
-  probed fix, deliberately CUT. It stays cut; all four kibitz rounds agree.
-  **Converged build spec (full 4-round arc, 8 external calls):**
-  `kibitz-runs/2026-08-05-2026-08-05-item8-voice-portrait/r4/final.md` -- LOCAL ONLY,
-  `kibitz-runs/` is gitignored. Six chunks, landing order 1 -> 4 -> 3 -> 2 -> 6 -> 5,
-  no canonical JSON change, one accepted ShotLock cache re-baseline. **What is real and
-  worth building:** `woman`/`man`/`m`/`f` rows get no portrait anchor
-  (`otr_meta_brief_image_prompt.py:81` -- note the title-case claim was FALSE, it already
-  lowercases); `_otr_scifi_codex.py:2735` hardcodes an all-male preset triple keyed on
-  `char_id`; `_otr_voice_node_common.py:91-119,158-189` resolve delivered voices off RAW
-  gender so a legacy `woman` takes the gender-agnostic path.
-  **Owed, static evidence only (no PBUG yet):** `story_orchestrator.py:449-453` merges
-  cast rows copying `voice_preset` and `gender` under INDEPENDENT guards -- a row can
-  take its preset from one row and its gender from another.
-* **The portrait must be proven to follow too.** Wheel of Wrath's description says
-  "her left cheek" for a character the ledger genders male -- so the portrait prose
-  tracks something, and it needs the same consistency assertion as the voice.
-* **Two gender vocabularies.** `scifi_news` emits `Male` / `Female` / `Non-binary`
-  while every other lane emits `male` / `female` / `other`. Any consumer matching
-  on that string breaks on one of them -- including any consistency check written
-  against the wrong casing.
+### 9. THE MULTI-CLIP HONESTY RULE FAILS THE HONEST BEATS (r1 done, NOT built)
 
-**The acceptance test this item exists for:** for every cast row in a finished
-episode, `gender`, the voice preset, the voice reference and the portrait's gender
-anchor all agree. That invariant is checkable offline over the published corpus,
-exactly like `scripts/audit_spoken_citations.py`, and it does not care whether the
-gender is the historically correct one.
+`acceptance.py:177-178` compares a SEGMENT's `native_frame_count` against the whole
+BEAT's `frame_count`, because `render_driver.py:3483` builds `beat_clip` from the LAST
+segment and recomputes only `path` / `frame_count` / `segment_count` / `join_mode`. A
+`wan_ti2v` beat of 3x81 real renders delivers 241 genuinely rendered frames and is
+graded "241 delivered, only 81 rendered". **The rule fires on exactly the beats that
+prove it was satisfied**, and the durable `clip_manifest.json` row is wrong regardless
+of who runs the grader.
+
+**Do NOT "just sum the segment counts" -- r1 killed that three ways independently.**
+Chaining DROPS duplicated head frames at each seam (`rendered` is
+`(path, drop_head, keep_frames)`, `render_driver.py:3297`), so 3x81 does 243 frames of
+work and delivers 241. Summing fails the same test for a new reason.
+
+Corrected shape: accumulate per-segment receipts in the render loop, mint the beat
+receipt in the DISTINCT counts **Bug Bible 12.69** and
+`PRODUCTION_SPRINT_LESSONS.md:540-562` already mandate (requested/rendered/visible/
+trimmed), compare DELIVERED-NATIVE frames, and fix the RULE rather than only the
+receipt. **Also in the same rule:** a MISSING `native_frame_count` currently PASSES,
+because the check is guarded by `native is not None`.
+
+Statement: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`.
+r1 judgment: `kibitz-runs/2026-08-06-2026-08-06-multiclip-honesty/r1/` (LOCAL ONLY --
+`kibitz-runs/` is gitignored). **START AT r2.** The existing grader tests are
+hand-written rows encoding the very model production contradicts, so they will
+rubber-stamp a wrong fix; the new test must run
+`render_beat_coverage -> build_clip_manifest -> grade_multiclip_honesty`.
+
+**Severity, stated honestly:** no durable runner invokes `scripts/grade_episode.py` per
+leg (only the temporary `tmp/_w45_campaign.ps1` does), so this is a MANUAL gate. And
+source inspection proves REACHABLE, not LIVE -- it may not enter `PROD_BUG_LOG.md`
+without a retained ledger, manifest, grader result and asset.
 
 ### Bench leftovers (relocated)
 
@@ -1492,9 +1528,13 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 
 ## Validation and handoff law
 
-- **Current whole-tree receipt (2026-08-04 @ `dcd5a53b`):** full Windows suite
-  **8398 passed / 131 skipped / 1 xfailed** (4:07); Bug Bible green. Prior receipts live
-  in `docs/HANDOFF_LOG.md` -- this file keeps only the current one.
+- **Current whole-tree receipt (2026-08-06 @ `d3913f7d`):** full Windows suite
+  **8805 passed / 131 skipped / 1 xfailed** (~3:48); Bug Bible **17 passed**. Prior
+  receipts live in `docs/HANDOFF_LOG.md` -- this file keeps only the current one.
+- **Standing acceptance receipt:**
+  `python scripts/audit_voice_gender_consistency.py --root "C:\Users\jeffr\Documents\ComfyUI\output\otr"`
+  -- expect exit 0 over 1,595 ledgers. Exit 2 means the scan did not FINISH and its
+  verdict is not a pass.
 - Every code chunk: focused tests, full Windows suite, Bug Bible, AST/JSON/BOM/zero-byte
   checks, commit, push, verify `HEAD == origin/v2.0-alpha`.
 - Every node/widget/link/schema change edits `workflows/otr_canonical.json` in the same
