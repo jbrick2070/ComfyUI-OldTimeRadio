@@ -4177,6 +4177,26 @@ class OTR_LedgerScriptWriter:
             "source_bank_id": "", "character_names": [],
             "gender_by_name": {}, "evidence": {},
         }
+        # Item 8 chunk 6 (2026-08-06): declare that this episode was produced
+        # under the voice/portrait consistency contract, so the corpus audit can
+        # tell a policy-era ledger from one of the 1,587 frozen before it and
+        # hold each to the right standard.
+        #
+        # Stamped HERE, by the producer, before the freeze -- deliberately NOT by
+        # CastLock. CastLock can be re-run over an old ledger, and if it wrote
+        # this stamp it would silently promote that ledger to a contract its
+        # producer never honoured. Absence means legacy, permanently.
+        #
+        # cast_lock_revision cannot stand in: it counts EXECUTIONS, not contract
+        # versions. Nor can "is presentation_gender present?" -- that cannot tell
+        # POLICY ABSENT from FIELD DROPPED, which is precisely the ambiguity that
+        # let the spoken-citation receipt regress unnoticed for thirty episodes.
+        from ._otr_roster_gender import (
+            VOICE_PORTRAIT_CONSISTENCY_POLICY_KEY,
+            VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION,
+        )
+        meta[VOICE_PORTRAIT_CONSISTENCY_POLICY_KEY] = (
+            VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION)
         log.info(
             "[OTR_LedgerScriptWriter] cast locked: %d rows "
             "(announcer + %d characters, lemmy_hit=%s)",

@@ -111,6 +111,17 @@ def normalize_gender(raw, *, strict: bool = False) -> str:
     that is how a correctly-gendered row reached the gender-agnostic voice path.
     """
     token = str(raw or "").strip().lower()
+    if not token:
+        # Blank is an EXPECTED legacy state, not an anomaly -- 4 corpus rows
+        # carry no gender at all and many more predate the field. Strict still
+        # rejects it, because a policy-era producer writing a blank gender is a
+        # defect; legacy just reads through without crying wolf on every row of
+        # a 1,595-ledger scan.
+        if strict:
+            raise ValueError(
+                "blank gender under policy revision %d"
+                % VOICE_PORTRAIT_CONSISTENCY_POLICY_REVISION)
+        return "other"
     mapped = _GENDER_TOKENS.get(token)
     if mapped is not None:
         return mapped
