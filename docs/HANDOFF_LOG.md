@@ -3,6 +3,49 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-07 -- HEAD bc8a1bde (v2.0-alpha) -- CODER (BANANA ROUTE: full r1-r4 arc, all nine fixes SHIPPED + pushed + two live legs)
+
+Did: executed the operator's ruled order end to end. Fable wrote the r1
+  synthesis under the recorded override, driver-grounded with zero discards;
+  then r2 (coding) -> r3 (wiring) -> r4 (convergence), Codex `gpt-5.6-sol` high
+  + Antigravity every round, `--driver claude`, both ComfyUI profiles and the
+  model verified each round. Then the code, the gates, the commit, and two live
+  renders. **Full-kibitz HARD GATE satisfied.**
+- **Shipped `bc8a1bde`** (9 files, pathspec-only): the six QA defects plus
+  THREE the arc found. Suite **9067/111/1** vs a measured 9033/111/1 baseline,
+  Bug Bible 17, `git diff -- workflows/` empty, lockstep clean against the
+  PUSHED blobs, `HEAD == origin`.
+- **The arc reversed FOUR driver positions, every one by execution, none by
+  assertion.** (1) The phrase-retreat loop was UNSOUND -- Antigravity said so,
+  Codex and the driver both said otherwise, and a positional oracle settled it:
+  68 avoidable splits in 3,641 cases, 0 after the fixed point. (2) Passing the
+  branch clause into the existing `rfind` would have been a SILENT NO-OP
+  (`Static camera.` has a capital S against a lowered haystack) and an empty
+  clause is worse than none (`rfind("")` returns `len`). (3) The blank guard
+  must NOT fall back to the pre-scrub string -- that restores the backslash and
+  reopens the very bug (both lanes, independently). (4) The live proof cannot be
+  read from the node-92 trace, which carries hashes but not `text_prompt`.
+- **A render-killer averted:** 1,294 inputs that compose today would have hit
+  the NO-FALLBACK blank raise under a naive backslash scrub.
+- Sonnet 5 QA: zero blockers, three should-fixes -- two were MY tests unable to
+  catch their own regression, proven by swapping in broken code. Fable gate:
+  SAFE TO COMMIT, preflight safety and ON/OFF seed equality proven by execution.
+- **Two live 120-word legs, both RESULT SUCCESS + obs_publish OK.** Wiring is
+  live-proven (14/14 rows + manifest, six keys, route on, spoken script
+  untouched). The CAP is NOT proven by a GPU render: neither writer produced a
+  weapon noun in a visual prompt, so the transform never fired. Proven instead
+  on leg 1's REAL frozen ledger through the REAL builder -- 4/4 shots keep
+  `Static camera.` at 238 chars inside the published 240; the old rule loses it.
+Current step: banana route CLOSED. Next coder item is the deferred
+  shield-scoping chunk (blanket quote shield lets a quoted weapon survive) --
+  it needs its OWN four-round arc because it changes an operator-ruled contract.
+Next: PLANNER or CODER picks up GO_FORWARD 0-QUATER's deferred item, or ON DECK
+  section 0/0-BIS. A resident server from the live legs may still hold VRAM --
+  selective CIM reset per CLAUDE.md section 4 before any new leg.
+Models: Claude (coder+judge) + Fable (r1 synthesis, final gate) + Sonnet 5 (QA)
+  + kibitz r2-r4 (codex gpt-5.6-sol high + agy Gemini 3.6 Flash High)
+Commits: bc8a1bde
+
 ## 2026-08-06 -- HEAD ec9da848 (v2.0-alpha) -- QA (BANANA ROUTE: read-only review, NOT-READY; kibitz r1 only)
 
 Did: read-only QA of the UNCOMMITTED banana-route build against

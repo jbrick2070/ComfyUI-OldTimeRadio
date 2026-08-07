@@ -151,7 +151,66 @@ semantic consumers once the bed is gone. A third lane agreed independently
 
 </details>
 
-### 0-QUATER. BANANA ROUTE -- BUILT BUT UNCOMMITTED. QA SAYS **NOT-READY**. This is the live coder item.
+### 0-QUATER. BANANA ROUTE -- **SHIPPED `bc8a1bde`, PUSHED, LIVE-RENDERED.** One deferred item below is the only thing left.
+
+**DONE 2026-08-07.** The build and all nine repairs are committed and pushed
+(`HEAD == origin`). Full four-round `kibitz-plugin:kibitz` arc satisfied (r1
+Fable synthesis under operator override -> r2 coding -> r3 wiring -> r4
+convergence; Codex `gpt-5.6-sol` high + Antigravity every round, `--driver
+claude`, both ComfyUI profiles confirmed each round). Sonnet 5 QA: zero
+blockers, three should-fixes, all repaired. Fable gate: SAFE TO COMMIT.
+Receipts: suite **9067 / 111 / 1** (baseline 9033/111/1, zero failures, no new
+skip/xfail classes), Bug Bible 17, `git diff -- workflows/` empty, lockstep
+clean against the pushed blobs. Judgments and build order:
+`kibitz-runs/2026-08-06-banana-route-qa-fixes/` (LOCAL ONLY, gitignored; r3/r4
+raw outputs also under the `2026-08-07-` folder -- the script date-stamps its
+run dir and the arc crossed midnight).
+
+**LIVE ACCEPTANCE, stated honestly.** Two 120-word legs through the canonical
+workflow, `*=ltx_audio_in` forced, all three banana knobs pinned in the fresh
+server: `signal_lost_the_docks_at_midnight_20260807_013045` (38:54) and
+`signal_lost_noon_on_cutbank_street_20260807_021531`. BOTH `RESULT SUCCESS` +
+`obs_publish OK`, assets under `otr/episodes/<ep>/` AND `otr/obs/`.
+* **PROVEN LIVE:** the wiring. 14/14 still rows and 14/14 `stills_manifest.json`
+  entries carry all six receipt keys with `banana_route=on` and the correct
+  variety string, on both legs. The visuals-only rule holds -- zero `banana` in
+  either spoken script.
+* **NOT PROVEN BY A GPU RENDER:** the cap fix. Neither leg's writer produced a
+  weapon noun in a VISUAL prompt (both ignored the premise entirely -- leg 1
+  wrote tailoring, leg 2 a strangulation), so the transform never fired and the
+  cap was never reached. Substitutions were 0 on both. A third leg was not run:
+  two legs at ~40 min each established this is writer behaviour, not luck.
+* **PROVEN ON PRODUCTION DATA INSTEAD:** driving the REAL
+  `build_request_from_shot` with leg 1's REAL frozen ledger (real cast, style
+  pack, engine routing) plus the weapon-bearing identity fragment the writer did
+  not supply: the transform fires on 4/4 shots and all four keep
+  `Static camera.` intact at 238 chars inside the published 240 budget, six
+  receipt keys stamped. The same text under the old `max(188, pre)` rule loses
+  the clause. That reproduces the blocking defect and demonstrates the fix
+  through the production code path.
+
+**THE ONE THING LEFT -- its own chunk, needs its own four-round arc.** The quote
+shield is BLANKET, not scoped to still_word card text: `_clean_llm_prompt`
+(`otr_meta_brief_image_prompt.py:1592-1600`) strips only LEADING/TRAILING
+quotes, so inner quotes reach `obj["prompt"]` on the portrait and
+character-scene paths, `_shielded_spans` protects them, and
+`a man carrying a "revolver"` passes through UNTRANSFORMED. A false negative
+(the route under-fires); no ledger or render fault. Scoping it means an
+`apply(..., shield_quotes=...)` argument, a ruling on which object kinds count
+as card text, and threading through BOTH funnels -- a change to the
+operator-ruled shield contract, which is why it did not ride the repair commit.
+The commonest instance of this class (era-tail quotes reaching the card) IS
+closed by the shipped fix.
+
+**Worth an operator eye, outside this item:** `--premise` reaches the ledger as
+`meta.operator_hint` correctly, but the writer ignored it on BOTH legs and both
+scripts contain the same model meta-response line ("Please provide the SETTING,
+TIME, HOOK, and the cast list..."). Story quality is closed by directive, so
+this was flagged and not chased -- but a premise knob that lands in the ledger
+and never reaches the story reads like wiring rather than quality.
+
+<details><summary>Original NOT-READY briefing, kept for the record</summary>
+
 
 **Contract:** `docs/2026-08-06-BUILD-SPEC-banana-route.md` (committed `ec9da848`).
 **Fix plan:** `docs/2026-08-06-PLAN-banana-route-qa-fixes.md` (this session).
@@ -304,6 +363,8 @@ the effective adapter differs; confirm the asset under `otr/episodes/<ep>/` AND
 `otr/obs/`; eyeball one frame for the banana and its period fit. The default
 procedural graph is INERT for this route (`viz_*` engines ignore `text_prompt`
 and mint no stills) -- seeing no bananas there is correct, not a failure.
+
+</details>
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
