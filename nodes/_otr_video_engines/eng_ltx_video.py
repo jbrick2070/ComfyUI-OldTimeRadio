@@ -1398,8 +1398,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         """S5: drive ONE silent two-stage HQ clip (hq_two_stage recipe). The
         init still is REQUIRED -- a missing/stale still raises LOUD (NO
         FALLBACK to the text path: the HQ ladder anchors BOTH stages on the
-        still). Same length/dims/loop/encode/ceiling mechanics as the
-        single-pass path."""
+        still). Same length/dims/encode/ceiling mechanics as the single-pass
+        path. (It used to read "length/dims/LOOP/encode" -- the loop was the
+        boomerang, deleted 2026-08-06, and both paths now render forward only.)"""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         init_path = self._init_image_path(request)

@@ -1,381 +1,297 @@
-# BUILD SPEC -- rip SFX, 100% (DRAFT, pre-kibitz)
+# BUILD SPEC -- rip SFX, 100%
 
-**Date:** 2026-08-06. **HEAD at draft time:** `ac8a1925` on `v2.0-alpha`.
+**Date:** 2026-08-06. **Arc:** `kibitz-plugin:kibitz`, r1 complete (Codex +
+Antigravity, plus one scoped adjudication lane). **r2-r4 owed before code.**
 **Operator ruling:** *"I do really want to rip out SFX 100%, that's my aim. How
 it gets done: you, and ask Fable -- you can `/kibitz-plugin:kibitz`, Codex etc.
 But don't break the system."*
 
-**Problem statement:** `docs/2026-08-06-PROBLEM-STATEMENT-legacy-sfx.md`.
-**Status: DRAFT. No code ships from this until the full four-round kibitz arc
-and the Fable gate have run** (operator directive 2026-08-04, hard).
+Problem statement: `docs/2026-08-06-PROBLEM-STATEMENT-legacy-sfx.md`.
+r1 judgment: `kibitz-runs/2026-08-06-rip-sfx/r1/judgment.md` (**LOCAL ONLY**).
+
+**This document states the plan as it now stands.** It carries no correction
+diary: r1 found that keeping obsolete claims beside their corrections is what
+made the draft self-contradictory.
 
 ---
 
-## 1. FOUR THINGS ARE CALLED "SFX". THE RIP IS NOT ALL OF THEM
+## 1. FOUR THINGS ARE CALLED SFX. TWO ARE IN THIS RIP
 
-This is the whole reason the word is confusing, and getting the scope wrong is
-how "don't break the system" gets broken. Measured: **395 sfx-matching lines**
-across `nodes/`, `scripts/`, `tools/`.
+Measured: **395 sfx-matching lines** across `nodes/`, `scripts/`, `tools/`.
 
-| # | The thing | State today | In this rip? |
+| # | The thing | State | In this rip? |
 |---|---|---|---|
-| 1 | The sfx/b-roll **ROLE** | RIPPED 2026-07-01 (`rip-sfx-broll`) | **NO -- already gone** |
-| 2 | The **`[SFX: ...]` SCRIPT MARKUP** | LIVE in the writer | **OPEN QUESTION -- see 5.1** |
-| 3 | The **SFX BED** (audio under the master) | LIVE AND WIRED | **YES -- this is the rip** |
-| 4 | The SFX **ENGINE LANE / cue ledger** | PARKED 2026-08-04 (`315e8afd`) | **Docs only -- retire them** |
+| 1 | The sfx/b-roll **ROLE** | ripped 2026-07-01 (`rip-sfx-broll`) | **NO -- already gone, and its guards STAY** |
+| 2 | The **`[SFX:]` SCRIPT MARKUP** | dead by shadowing | **YES -- as dead code (section 5)** |
+| 3 | The **SFX BED** | live and wired | **YES -- the target** |
+| 4 | The **cue-ledger campaign** | parked 2026-08-04 | **Docs only -- retire in place** |
 
 **44 of the 395 lines are ROLE TOMBSTONES and MUST SURVIVE.** They are not dead
 prose: `scene_sequencer.py:905-921` RAISES by name on a ledger carrying
 `speaker_role="sfx"`, and `production_ledger.py:107` fails old sfx ledgers loud.
-Deleting those turns a loud refusal on a stale ledger into a silent
-misinterpretation. A tombstone that still guards something is code.
+Deleting them turns a loud refusal on a stale ledger into a silent
+misinterpretation.
 
-## 2. THE LEDGER RULE -- every field, and who owns it after
+## 2. THE PREMISE, STATED ACCURATELY
 
-Operator directive 2026-07-14, hard: enumerate EVERY field the path writes, give
-each exactly ONE new owner, delete only then, prove it live. Measured: **only
-four files write an SFX field.**
+The SFX-PRODUCING branch is dormant -- no shipped episode has executed it. **The
+runtime checks and the wiring are not.** `OTRMasterAudioMux.mux()` calls
+`compile_sfx_bed_from_manifest` on EVERY run (`otr_master_audio_mux.py:751`); it
+returns `""` only because no manifest row carries `sfx_stem_path`, which is true
+only because no SFX-producing engine is selected. Five engines that would arm it
+sit in the `music_visual` dropdown.
 
-| field | written by | consumed by | owner after the rip |
+## 3. THE LEDGER RULE -- every field, and its owner after
+
+Operator directive 2026-07-14, hard. Verified: only four files write an SFX
+field, and **every production reader is already guarded** -- `.get(...) or ""`,
+an early `continue`, or a `return ""` on an empty list. **Zero shipped episodes
+carry any of the three fields** (grep over 50+ ledgers). **No schema declares
+them** -- neither `CanonicalClip` nor `ShotRow`, both `extra="forbid"`; the
+producers return plain dicts. No manifest hash, golden file, or positional parse.
+
+| field | written by | read by | owner after |
 |---|---|---|---|
-| `sfx_stem_path` | `eng_cloud_video.py:916`, `eng_google_vid_sfx.py:439` | `render_driver.py:4442-4463` (move/clear), `:4650` (manifest row), `otr_master_audio_mux.py:194,209` | **DELETED -- no producer remains** |
-| `sfx_duration_s` | `eng_cloud_video.py:917`, `eng_google_vid_sfx.py:440` | `render_driver.py:4651` | **DELETED** |
-| `sfx_sha256` | `eng_cloud_video.py:918`, `eng_google_vid_sfx.py:441` | `render_driver.py:4652` | **DELETED** |
-| `sfx_bed_path` | `otr_master_audio_mux.py:751` (local) | `mux_master_audio(:294)`, report `:480` | **DELETED** |
-| `sfx_gain` | `_sfx_gain()` `:114-118` | `mux_master_audio(:295)`, report `:481` | **DELETED** |
-| `audio_mode=sfx_mixed` | mux report `:476` | operator-facing log only | **becomes the unconditional non-SFX mode** |
+| `sfx_stem_path` | `eng_cloud_video.py:920`, `eng_google_vid_sfx.py:474` | `otr_master_audio_mux.py:194,209`; `render_driver` persist + manifest | **DELETED -- no producer remains** |
+| `sfx_duration_s` / `sfx_sha256` | same | `render_driver` manifest row | **DELETED** |
+| `sfx_bed_path` / `sfx_gain` | `otr_master_audio_mux.py` | `mux_master_audio`, its report | **DELETED** |
+| `audio_mode=sfx_mixed` | mux report | operator log + 2 test asserts | **`master_copy` becomes unconditional** |
 
-**The critical property, and it is what makes this rip safe:** every one of
-these fields is OPTIONAL at every consumer today -- the manifest row stamps them
-only `if sfx_stem` (`render_driver.py:4648-4652`), and the bed compiles only
-`if sfx_rows` (`otr_master_audio_mux.py:195`). Removing the producers leaves the
-consumers taking the path they ALREADY take on every shipped episode. This is a
-rip of a dormant branch, not of a live one.
+**RE-PIN EVERY LINE CITE IMMEDIATELY BEFORE CODING.** `render_driver.py` grew
+~160 lines during the no-mirror build; the manifest stamp moved from `:4648` to
+`:4810`. `persist_episode_clips:4442-4463` and `render_beat_coverage:3499` are
+current as of this writing. A reviewer or builder working from stale cites
+confidently edits the wrong lines.
 
-**No hole is created, because nothing downstream reads an SFX field it does not
-also guard.** That claim is the panel's first job to break.
+## 4. WHAT GETS DELETED
 
-## 3. WHAT GETS DELETED
+**4a. Five registered engines.** Nothing selects them (zero matches for
+`google_vid_sfx` / `_720p_sfx` / `wants_provider_sfx` across `config/**` and
+`workflows/**`); none is any role's default (`default_roles = ()` on all).
 
-**3a. The five registered engines** (nothing selects them -- verified: zero
-matches for `google_vid_sfx` / `_720p_sfx` / `wants_provider_sfx` across
-`config/**` and `workflows/**`):
+    cloud_vidu_q2_pro_fast_720p_sfx   google_vid_sfx_omni
+    google_vid_sfx_veo_fast           google_vid_sfx_veo_lite
+    google_vid_sfx_veo_pro
 
-    cloud_vidu_q2_pro_fast_720p_sfx      (eng_cloud_video.py)
-    google_vid_sfx_omni                  (eng_google_vid_sfx.py)
-    google_vid_sfx_veo_fast              (eng_google_vid_sfx.py)
-    google_vid_sfx_veo_lite              (eng_google_vid_sfx.py)
-    google_vid_sfx_veo_pro               (eng_google_vid_sfx.py)
+`eng_google_vid_sfx.py` goes entirely. `eng_cloud_video.py` loses
+`CloudViduQ2ProFast720pSfxEngine` and `wants_provider_sfx`. Also: the five
+`CAPABILITIES` rows in `registry.py` (`:515,552,558,564,570`) and the guarded
+import block in `__init__.py:217-222` -- the roster audit reports an orphan row
+as `unexpected` and a missing adapter as `missing`, so both go together.
 
-`eng_google_vid_sfx.py` (119 sfx lines) goes ENTIRELY. `eng_cloud_video.py`
-loses `CloudViduQ2ProFast720pSfxEngine` and `wants_provider_sfx`.
+**4b. The bed.** `compile_sfx_bed_from_manifest`, `_sfx_gain`,
+`DEFAULT_SFX_BED_GAIN`, `_default_sfx_bed_out` (which has never written a file in
+production), and the `sfx_bed_path`/`sfx_gain` parameters and mix branch of
+`mux_master_audio`, including its SFX integrity gate.
 
-**3b. The bed itself:** `compile_sfx_bed_from_manifest`, `_sfx_gain`,
-`DEFAULT_SFX_BED_GAIN`, `_default_sfx_bed_out`, the `sfx_bed_path`/`sfx_gain`
-parameters and mix branch of `mux_master_audio` (`:398-451`), the SFX integrity
-gate (`:472`), and the call at `:751`. **`mux()` then calls `mux_master_audio`
-directly with no bed.**
+**4c. The helpers r1 found missing from the first draft.** Each verified
+unreachable by any surviving engine:
 
-**3c. The extractor:** `extract_sfx_bed_from_provider_video`
-(`_otr_shared/cloud_media_canonical.py`).
+* `cloud_media_canonical.py`: `extract_sfx_bed_from_provider_video`,
+  `_normalize_sfx_stem_audio`, `_sfx_loudnorm_params`,
+  `SFX_LOUDNESS_REFERENCE_SOURCE` (+ its `__all__` entry). A closed chain --
+  each is called only by the next one up.
+* `_otr_story_brief_helpers.py`: `append_sfx_audio_safety_clause` and
+  `SFX_AUDIO_SAFETY_CLAUSE`. **AND ITS THREE CALL SITES ON A SURVIVING CLASS:**
+  `eng_cloud_video.py:46` imports it at MODULE SCOPE, `:886` calls it inside
+  `_conditioned_prompt` on the surviving Vidu base, and `:901` stamps
+  `"sfx_audio_requested"`. Deleting the helper alone is a startup ImportError.
 
-**3d. The manifest row fields** (`render_driver.py:4648-4652`) and the
-persist-time move (`:4442-4463`).
+**4d. The manifest fields and the persist move** (`render_driver`).
 
-**3e. Tests that exist only to prove SFX works** -- `test_google_video_sfx_beds.py`,
-`test_google_video_sfx_render_driver.py`, and the SFX arms of
-`test_cloud_video_adapters.py` / `test_video_render_path_cw4.py` /
-`test_clip_fill.py`. **CONVERT, do not merely delete**: keep one TRIPWIRE
-asserting no registered engine declares `wants_provider_sfx` and no manifest row
-carries `sfx_stem_path`, so the lane cannot be reintroduced by accident. This
-mirrors what step 5 of the no-mirror build does with `test_ltx_boomerang.py`.
+**4e. The dead `[SFX:]` markup.** `_inject_scene_transitions` is defined TWICE in
+`story_orchestrator.py` -- the `[SFX:]`-emitting body at `:143-176` is
+permanently SHADOWED by a same-named function at `:2687`, and both have ZERO
+callers. The `sfx_count` branch at `:2540-2548` belongs to
+`GemmaHeartbeatStreamer`, which is never instantiated. No pack or prompt asks for
+the tag; the token ratios are hardcoded constants; 2 ledgers of several hundred
+contain `[SFX`, both from May, both in critic-guidance text, never in a spoken
+line. Deleting this changes NO generated content, which is what keeps it clear of
+the closed story-quality directive.
 
-**3f. The parked designs** -- `docs/2026-07-31-sfx-engine-lane-SPEC.md`,
+**4f. One dead script check.** `scripts/soak_operator.py:110-112` -- the `NO_SFX`
+quality flag. It is broken today and would FALSE-POSITIVE on every new episode.
+
+**4g. The parked designs** -- `docs/2026-07-31-sfx-engine-lane-SPEC.md`,
 `docs/2026-07-11-timeline-cue-ledger.md`,
-`docs/2026-07-11-cue-ledger-r1-codex-prompt.md` -> `docs/retired/` with
-`-RETIRED` in the name, per the precedent set on 2026-08-06 for the stale HuMo
-maths doc. Their reasoning stays readable; their authority ends.
+`docs/2026-07-11-cue-ledger-r1-codex-prompt.md`. **In-place `RETIRED` headers, no
+file moves** -- moving them breaks historical backlinks for no gain.
+`ROADMAP.md` and `docs/STILL_PLAN_SEED_INVENTORY.md` are updated in the same
+commit, or the code says "removed" while the inventory says "available".
 
-## 4. WHAT MUST NOT BE TOUCHED
+## 5. WHAT MUST NOT BE TOUCHED
 
-* **The 44 role tombstones** (section 1). They still fail loud on stale ledgers.
-* **`nodes/_otr_speaker_role.py`** and the `music_open`/`music_close`/
-  `music_inter` roles. Music is NOT SFX and the closing theme is load-bearing --
-  the no-mirror build's entire step 4 depends on it.
-* **`OTR_MasterAudioMux` itself.** It is the terminal publish node
-  (`obs_publish`). Only its SFX branch dies; the node, its wiring and its
-  fail-closed gates stay exactly as they are.
-* **`clip_manifest_json` link 278 stays wired. No workflow topology change.**
-  **CORRECTED by the fan-out (5b.3): the reason given here was wrong.** This
-  said the mux "still needs the manifest for `fps`/rows". It does not -- the
-  node's own `fps` widget supplies fps, and the SFX bed was the input's only
-  consumer. The link stays because removing it is a topology change to the
-  terminal node for no benefit, and the input becomes VESTIGIAL: still wired,
-  still hashed by `IS_CHANGED`, zero effect on output. Say that plainly rather
-  than inventing a use. Its tooltip must be corrected in the same commit.
+* **The 44 role tombstones.** The predicate, not the tally: anything referencing
+  `rip-sfx-broll`, `speaker_role="sfx"`, or the deleted `sfx[]` array is
+  HISTORY-AND-GUARD and stays. Named instances:
+  `soak_operator.py:146,189,219,268` (parser exclusions),
+  `build_silent_test_episode.py:660`, `audit_otr_full_run.py:169`.
+* **The text sanitizers.** `scene_sequencer.py:517`, `_otr_bark_lib.py:271`,
+  `eng_bark.py:69` strip `[ENV|SFX|MUSIC:...]` before synthesis, and the
+  structural-token sets guard name parsing. These are defence against a model
+  HALLUCINATING a bracket tag -- plausible on old-time-radio training data with
+  no prompt asking for it. Removing them is zero benefit against reintroducing
+  the announcer-reads-a-stage-direction class.
+* **`music_open` / `music_close` / `music_inter`.** Music is not SFX, and the
+  no-mirror build's closing-window classifier depends on `music_close`.
+* **`OTR_MasterAudioMux` itself** -- only its SFX branch dies.
 
-## 5. OPEN QUESTIONS FOR THE PANEL
+## 6. `clip_manifest_json` AND LINK 278 STAY WIRED -- decided, not deferred
 
-**5.1 Does "100%" include the `[SFX: ...]` SCRIPT MARKUP?** This is the one that
-can change output. `story_orchestrator.py:144-169` INJECTS
-`[SFX: Scene transition - low bass sweep or static crossfade]` into the script;
-`scene_sequencer.py:517` STRIPS `[ENV|SFX|MUSIC:...]` before TTS; the tag is
-counted at `:2540-2545` and named in the token budget at `:1933-1988`.
-**ANSWERED BY THE FAN-OUT, and this draft was WRONG.** The sentence that used to
-sit here -- "today the writer writes a tag that the sequencer deletes" -- is
-false. The writer does not write it, by any reachable path.
+r1 split on this. Codex demanded deleting the input, the mux argument, link 278,
+node 85's slot 4 and 278 from node 92's links. **Rejected.**
 
-**`_inject_scene_transitions` is DEAD BY SHADOWING.** It is defined TWICE in the
-same module: the `[SFX:]`-emitting body at `story_orchestrator.py:143-176`, and a
-SECOND, unrelated function of the SAME NAME at `:2687-2712` that injects
-`[TRANSITION: brief pause]`. Python rebinds the name at import, so the first body
-is permanently unreachable. And it does not matter anyway: **both definitions
-have ZERO callers repo-wide** -- the only two hits for `_inject_scene_transitions(`
-are the two `def` lines themselves.
+This is the TERMINAL publish node -- a topology failure yields NO episode, not a
+degraded one. `CLAUDE.md` section 0 requires the canonical JSON edited in the
+same change and re-validated; `widgets_values` is positional with a documented
+drift bug (BUG-LOCAL-097). Against that, the input is optional and has zero
+semantic consumers once the bed is gone. **High-severity publishing risk for zero
+functional benefit.**
 
-Corroborating, all measured rather than argued:
+So it becomes VESTIGIAL: still wired, still hashed by `IS_CHANGED`, no effect on
+output. **Say that plainly -- do not invent a use.** Its tooltip
+(`otr_master_audio_mux.py:579`) currently describes SFX mixing and must be
+corrected to name it a retired connector kept for topology compatibility.
 
-* **No pack or prompt asks for the tag.** `grep -i sfx` over
-  `nodes/story_packs/**` returns nothing. Every other SFX mention in
-  `story_orchestrator.py` is defensive RECOGNITION (structural-token sets,
-  name-parsing false-positive guards) -- it tolerates the tag, never requests it.
-* **The token-budget arithmetic does not move.** `_TOKEN_RATIO_*` are hardcoded
-  constants; the only thing referencing them is a test that reimplements the
-  numbers locally. The live writer has no SFX-named ratio at all.
-* **`GemmaHeartbeatStreamer` -- which owns the `sfx_count` branch at
-  `:2540-2548` -- is never instantiated anywhere.**
-* **Shipped episodes: 2 ledgers out of several hundred contain `[SFX`,** both
-  from May 2026, and in BOTH the hits are inside `script_gates[].issues[]`
-  critic-rule guidance text -- never in a spoken line. **No
-  PBUG-20260805-04-class defect exists here.**
+**NO WORKFLOW TOPOLOGY CHANGE.** Re-verified after the code lands, not assumed --
+`test_google_video_sfx_workflow.py` is the check.
 
-**So the markup IS in scope, as dead-code hygiene rather than as a story
-change.** Deleting the shadowed injector and the never-instantiated `sfx_count`
-branch changes NO generated content, because none of it executes. Two earlier
-reviews already reached this conclusion and neither was executed -- the
-2026-07-02 Fable review ("a dead injector... the last SFX-emitting text in the
-repo") and the 2026-07-10 lean-mean W1 list. Add the guard to
-`tests/test_no_orchestrator_legacy_symbols.py` this time so it cannot creep back.
+## 7. THE MUX COLLAPSE -- the most dangerous line in the rip
 
-**DO NOT TOUCH THE STRIPPERS, and this is the sharpest call in the whole rip.**
-`scene_sequencer.py:517`, `_otr_bark_lib.py:271` and `eng_bark.py:69` strip
-`[ENV|SFX|MUSIC:...]` from text before synthesis, and the structural-token
-recognition sets guard name parsing. These are NOT the SFX feature -- they are
-generic sanitization against a model HALLUCINATING a bracket tag inline, which
-is entirely plausible on old-time-radio training data with no prompt asking for
-it. Removing them is zero benefit against a real risk of reintroducing the
-"announcer reads a stage direction aloud" class. **They stay.**
+`mux_master_audio` is `if not sfx_bed_path: <master_copy> else: <sfx_mix>`.
+**The branch that SURVIVES is the smaller `if` body** -- the one that already
+runs on every episode. The elaborate `else` dies.
 
-**5.2 Does the parked cue-ledger campaign die with this, or stay parked?**
-Retiring the docs (3f) is not the same as abandoning the idea. Recommend
-retiring the docs and saying plainly in `GO_FORWARD` that the lane is CLOSED,
-not parked -- a parked item nobody will revive is a to-do that never clears.
+Keep the wrong one and every episode silently swaps a `-c:a copy` passthrough for
+a re-encode, violating invariant V-1, and **no surviving test distinguishes
+them** -- they assert the audio is valid, not which branch produced it. Add an
+assertion that the surviving command still carries the copy codec.
 
-**5.3 Cloud media: does `cloud_media_canonical` lose anything else?** The
-extractor is SFX-only, but `canonicalize_video` STRIPS provider audio and proves
-the strip. That behaviour must SURVIVE -- it is invariant V-1 (only the mux emits
-audio), not an SFX feature. Panel to confirm the boundary.
+Both gates that protect every real episode are OUTSIDE the SFX branch and
+survive: the duration-drift guard, and the audio-SHA byte-identity check. The
+2026-07-14 fail-closed handler is SFX-agnostic and is untouched.
 
-**5.4 Order.** Proposed: consumers before producers, the exact INVERSE of the
-no-mirror build -- because here we are removing, not adding. Remove the reads
-(mux bed, manifest fields, persist move) FIRST so nothing is left reading a field
-whose writer just vanished; then the producers; then the engines; then the docs.
-Panel to confirm this inversion is right, since the standing habit is
-producer-first and applying it blindly here would leave armed readers.
+## 8. TESTS
 
-## 5-BIS. WHAT THE SONNET FAN-OUT FOUND (2026-08-06, five parallel audits)
+**Order matters: consumers, then producers, then registry, then tests, then
+docs -- as EDITING order, landing as ONE atomic green commit.** Not separately
+shippable commits that temporarily leave a field produced and unread.
 
-Operator asked for a fan-out because the rip "could be a big blast". It was
-worth it -- these are findings this draft did NOT contain, each grounded.
+**Rescue before deleting.** Four pieces of non-SFX coverage live in files that
+look disposable:
 
-### 5b.1 THE SINGLE MOST DANGEROUS LINE IN THE WHOLE RIP
+1. `test_google_video_sfx_workflow.py` -- three `_reresolve_master_audio` tests
+   plus the two topology tests. **All five survive under section 6's decision**,
+   and the topology test IS the section-6 re-verification.
+2. `test_clip_fill.py::test_persist_rekeys_sfx_to_renamed_episode_clips` -- the
+   ONLY coverage of persist's rename/rekey path for `clip["path"]`. Strip its SFX
+   fixture; keep the function.
+3. `test_existing_google_video_engines_stay_silent` (in the beds file) -- proves
+   invariant V-1 for the SURVIVING Veo/Omni engines. Relocate it.
+4. `assert "generateAudio" not in base_payload["parameters"]` -- buried in an
+   SFX-only test and the only assertion pinning that base VEO never requests
+   audio. Preserve it when its host dies.
 
-`mux_master_audio` is `if not sfx_bed_path: <master_copy> else: <sfx_mix>`
-(`:398-482`). **The branch that must SURVIVE is the `if` body (`:399-423`) --
-the smaller one. The elaborate `else` body is the one that dies.** A careless
-collapse that keeps the wrong branch swaps a `-c:a copy` master passthrough for
-a RE-ENCODE on every episode, silently violating invariant V-1, and **no
-surviving test distinguishes the two** -- they assert the audio is valid, not
-which branch produced it. Write the collapse deliberately, and add an assertion
-that the surviving command still carries the copy codec.
+**Then the mechanical fixes** (r1, Antigravity):
+`test_frame_receipt_conformance.py` -- delete the extractor monkeypatch at
+`:94-95` and lower the `>= 30` roster floor; `test_model_slot_audit.py:185-190`;
+`test_multiclip_session_identity_roster.py` `EXPECTED_CLOUD_GAP` (5 entries) and
+the `== 12` length check; `test_engine_contract_roster.py` `WHOLE_SECOND` entry
+and `test_the_sfx_lanes_share_their_base_adapters_ladder_object`;
+`test_video_render_path_cw4.py` -- the two SFX-only tests and the
+`clip_manifest_json="[]"` arguments; the three shared-collection loops in
+`test_cloud_video_adapters.py` (prune the ROW, keep the function).
+**`tests/fixtures/still_plan_head_parity.json` must be REGENERATED** via
+`tests/test_still_plan_parity.py --regenerate` -- removing engines reflows other
+engines' rows, so hand-editing it is wrong.
 
-### 5b.2 BOTH PROTECTIVE GATES ARE OUTSIDE THE SFX BRANCH -- confirmed
+**The tripwire is the only thing that would notice a regression.**
+`EXPECTED_FAILED_NODEIDS` has no presence check, so a vanished nodeid produces
+zero signal. New `tests/test_rip_sfx_bed_guard.py`, sibling to the existing
+`test_rip_sfx_broll_guard.py` (which guards the OLD role rip and is left alone).
+It must reject: any engine declaring `wants_provider_sfx`; any engine id
+containing `sfx` (**both checks are required -- the four `google_vid_sfx_*`
+engines never set the flag**); the bed/compiler symbols; the prompt helper; the
+extractor; any manifest row carrying `sfx_stem_path`. It must carry an EXPLICIT
+ALLOWLIST for the role tombstones and the text sanitizers, so the guard never
+pressures a later reader into deleting protective code.
 
-The duration-drift guard (`:338-395`) sits BEFORE the branch. There are **two**
-audio-SHA checks, not one: the byte-identity check at `:414-422` is inside the
-`if` body (so it survives with it), and the SFX integrity gate at `:467-474` is
-inside the `else` (so it dies with it). The 2026-07-14 fail-closed handler
-(`mux():783-807`) is SFX-agnostic and is untouched. **No gate protecting a real
-episode is removed.**
+## 8-BIS. THE EXACT DELETION CLOSURE (r2 -- every one of these crashes at import)
 
-### 5b.3 THE SPEC'S OWN JUSTIFICATION FOR KEEPING `clip_manifest_json` IS WRONG
+Deleting a symbol without its registration, its global instance and its
+`__all__` entry is a STARTUP failure, and in ComfyUI that means the whole node
+pack vanishes from the menu rather than one engine misbehaving. Both r2 lanes
+found these independently:
 
-Section 4 above says the mux "still needs the manifest for `fps`/rows". It does
-not. `clip_manifest_json` has exactly ONE consumer in `mux()` -- the
-`compile_sfx_bed_from_manifest` call -- plus the `IS_CHANGED` hash. The node's
-own `fps` WIDGET supplies fps. So after the rip the input becomes **vestigial**:
-still wired (link 278 survives, no topology change), still hashed, with zero
-effect on output. That is harmless but must be stated honestly rather than
-justified with a use that does not exist. **Its tooltip (`:579`) describes SFX
-mixing and would become a lie -- update it in the same commit.**
+* `otr_master_audio_mux.py:813-814` -- `"compile_sfx_bed_from_manifest"` in
+  `__all__`. Also `_decoded_pcm_sha` (`:92-103`) has ZERO callers once the SFX
+  mix block goes.
+* `eng_cloud_video.py:1057` (global instance `ViduQ2ProFast720pSfx = ...`),
+  `:1062-1064` (the registration tuple) and `:1068` (`__all__`).
+* `cloud_media_canonical.py:30,35` -- `__all__` entries for the deleted
+  extractor and `SFX_LOUDNESS_REFERENCE_SOURCE`.
+* **`render_driver.py:104-111,1490,2709-2710` -- `_GOOGLE_VIDEO_SFX_ENGINES`
+  and its consumers**, missed entirely by the first inventory. Remove the set,
+  narrow `_GOOGLE_PROVIDER_PROMPT_ENGINES` to the surviving silent Google
+  providers, and drop the now-obsolete `_apply_visual_safety_prompt` SFX
+  exception.
+* `tests/test_model_slot_audit.py:183` -- asserts
+  `vidu.wants_provider_sfx is False` on the SURVIVING base class, so deleting
+  the attribute breaks it. `:185-190` alone is not enough.
 
-### 5b.4 A TEST FILE WHOSE NAME LIES, AND DELETING IT BY NAME WOULD COST REAL COVERAGE
+**AND ONE MORE RESCUE the rewrite dropped:**
+`tests/test_google_video_sfx_render_driver.py:63-76`
+(`test_silent_google_prompt_routing_still_uses_visual_google_branch`) is the ONLY
+test exercising the SURVIVING `google_veo_video` prompt-routing branch. Relocate
+it; do not delete the file wholesale. Suggested homes for the other rescues:
+`generateAudio` and the V-1 silence proof into
+`tests/test_google_veo_video_adapter.py` / `test_google_omni_video_adapter.py`.
 
-`tests/test_google_video_sfx_workflow.py` tests **`_reresolve_master_audio` and
-that canonical link 278 still exists** -- NOT SFX mixing. All five of its tests
-must SURVIVE. Only two mux tests are genuinely SFX-only:
-`test_sfx_bed_compile_rejects_invalid_manifest_rows` and
-`test_sfx_mux_mixes_against_reference_pcm_sha_and_keeps_archival_pcm`.
+## 9. THE PROOF
 
-### 5b.5 THE ROSTER BLOCKERS -- pytest failures, not cleanup
+A green suite after a deletion proves the tests were deleted too. Required:
 
-Dropping 32 engines to 27 breaks these ON THE NEXT RUN:
+1. **The live leg's acceptance criterion is a DECODED-PCM comparison on the
+   ARCHIVAL final -- NOT on the published OBS copy.** An earlier draft of this
+   section demanded the *published* audio be byte-identical to the frozen
+   master. **That is impossible by design and the spec was wrong:**
+   `otr_master_audio_mux.py:675-685` deliberately re-encodes the OBS copy to AAC
+   for viewing, while the byte-identity check runs on the archival final
+   (`:398-423`). So: compare decoded PCM hashes of the frozen master and
+   `otr/episodes/<ep>/*_final.mp4`, and SEPARATELY require the AAC OBS copy to
+   exist and be playable. `RESULT SUCCESS` + `obs_publish OK` are satisfied by
+   BOTH mux branches and prove nothing about section 7 on their own.
+2. `tools/engine_matrix.py` REGENERATED (32 -> 27 engines) and `--check` green.
+3. The full Windows suite, the Bug Bible regression, and the focused
+   mux/registry/tripwire tests.
+4. `OTR_WorkflowValidator` + a JSON round-trip + a link/widget audit, proving the
+   canonical workflow is unchanged and still valid.
+5. AST parse, no BOM, no zero-byte, on every touched file.
+6. Commit by PATHSPEC, push, verify `HEAD == origin/v2.0-alpha`.
 
-* `tests/test_multiclip_session_identity_roster.py` -- **three** hard asserts:
-  `len(names) >= 30` (`:195`), an exact 12-member `EXPECTED_CLOUD_GAP`
-  frozenset containing all five doomed engines (`:106-119`, checked at `:233`
-  and `:389`), and `len(CLOUD_SPLITTERS) == 12` (`:395-397`).
-* `tests/test_engine_contract_roster.py` -- the `WHOLE_SECOND` entry
-  (`:318-324`) and `test_the_sfx_lanes_share_their_base_adapters_ladder_object`
-  (`:395-407`).
-* `tests/test_model_slot_audit.py:177-190` -- asserts `wants_provider_sfx`.
-* **`tests/test_frame_receipt_conformance.py`** -- MY OWN test from no-mirror
-  step 1 asserts `len(names) >= 30`. Same trap, same commit.
-* **`tests/fixtures/still_plan_head_parity.json`** -- a checked-in GOLDEN file
-  naming all five engines with per-engine computed rows. **REGENERATE it via
-  `tests/test_still_plan_parity.py --regenerate`; do NOT hand-edit** -- removing
-  engines reflows other engines' rows.
+## 10. MIGRATION POLICY -- and it needs CODE, not just a rule
 
-Plus the code sites: five `CAPABILITIES` rows in `registry.py`
-(`:515,552,558,564,570`), the guarded import block in `__init__.py:217-222`,
-and `render_driver.py:105-108`.
+A user-saved workflow or an external API client may still name one of the five
+retired engine ids. Repo-owned config proves nothing about those. **A stale
+selection must fail with a NAMED retired-engine error and must never silently
+resolve to another engine.**
 
-**Everything else is dynamic.** `role_slots`, `role_compat`, `slot_matrix`,
-`_workflow_validation`, `otr_image_director`, `otr_shot_lock`,
-`default_engine_for_role` all enumerate off the live registry and shrink by
-themselves. No role DEFAULTS to an SFX engine (every one declares
-`default_roles = ()`), so no role loses its default.
+r2 showed this has no error boundary today: `OTRVideoDirector.VALIDATE_INPUTS`
+accepts everything (`otr_video_director.py:329-332`), `_resolve_and_validate`
+returns an unknown id unchanged (`:543-573`), and the registry classifies it as
+a generic "no video engine named ... is registered"
+(`engine_registry_base.py:142-145`, `registry.py:184-189`).
 
-### 5b.6 THE LEDGER RULE IS SATISFIED -- verdict NO-LEDGER-HOLE, and it is proven
+**BUILD IT:** one explicit `RETIRED_ENGINE_IDS` tombstone set in
+`registry.py` holding exactly the five ids, intercepted in `assert_usable` to
+raise `EngineUnusable` naming the retirement. Reject by name at the director,
+the registry and the force-map boundaries, and test all five. **The tripwire must
+ALLOW that tombstone set while proving none of the five is registered, aliased or
+selectable** -- otherwise the guard's own "no engine id contains sfx" rule would
+force a later reader to delete the tombstone that makes the failure legible.
 
-The audit that mattered most for "don't break the system" came back clean, and
-the evidence is stronger than the argument this draft made:
+## 11. RISK
 
-* **Every production reader of all three fields is already GUARDED.** Four
-  sites, no more: `otr_master_audio_mux.py:194` and `:209` (both
-  `.get(...) or ""`, and the function returns `""` at `:196` before
-  `sfx_duration_s`/`sfx_sha256` are read AT ALL), `render_driver`
-  `persist_episode_clips:4442` (`if not sfx_src: continue`), and
-  `build_clip_manifest` (`if sfx_stem:` gates the other two). `scripts/` and
-  `tools/` have ZERO matches.
-* **ZERO shipped episodes carry the field.** A grep for `sfx_stem_path` across
-  50+ ledgers under `output/otr/episodes` returns nothing. There is no durable
-  reader to break because there is no durable data.
-* **No schema declares them.** Neither `CanonicalClip` nor `ShotRow` -- both
-  `extra="forbid"` -- lists any of the three. The producers return PLAIN DICTS
-  that are never validated through `CanonicalClip`. **No schema edit is owed**,
-  which this draft did not know.
-* **No manifest hash, golden file, or positional parse.** Every consumer does
-  `json.loads` then keyed access, so removing keys changes nothing structurally.
-* **The janitor is generic**, age-based over `episodes/_shared/tmp`, with no
-  knowledge of `.sfx.wav`. A stray file from a past dormant run is still swept.
-
-**And the 7.1 defect simply evaporates:** with the fields gone there is no key
-left for `beat_clip = dict(clip or {})` to inherit wrongly.
-
-### 5b.7 LINE-CITE DRIFT IN THIS VERY DOCUMENT -- and the cause is instructive
-
-Section 2 above cites `build_clip_manifest` at `:4648-4652`. **It is now
-`:4810-4814`.** The file grew by ~160 lines between this draft and now, and it
-grew because of MY OWN no-mirror step-2 commit (`ac8a1925`), which added
-`closing_theme_frame_window` and `FRAME_RECEIPT_VERSION` to the same file.
-
-This is the third time in two days a hand-written document has gone stale
-against a file the same session was editing. **Re-pin every cite in sections 2
-and 3 immediately before the rip is coded, not before it is reviewed** --
-reviewing against stale cites is how a panel confidently blesses the wrong
-lines. `persist_episode_clips:4442-4463` and `render_beat_coverage:3499` are
-still accurate.
-
-### 5b.8 THE SUITE WILL GO GREEN ON A COVERAGE HOLE AND SAY NOTHING -- proven
-
-**`EXPECTED_FAILED_NODEIDS` (`tests/conftest.py:178`) is an empty frozenset, and
-the hook has NO presence or completeness check.** It diffs actual failures
-against expected ones; a nodeid that simply STOPS EXISTING produces no signal
-from either branch. Deleting all 24 SFX-only tests is **0.3% of an 8,951-test
-suite** -- invisible in a "still green" read.
-
-(Also found: `docs/known-failures.md`, which `conftest.py` tells you to update,
-**does not exist anywhere in the repo.** Stale instruction, worth fixing while
-we are here.)
-
-**So the tripwire is not hygiene, it is the only thing that will notice.** Land
-it in the SAME commit as the deletions, as `tests/test_rip_sfx_bed_guard.py`,
-sibling to the existing `test_rip_sfx_broll_guard.py` -- which is the working
-precedent in this repo for exactly this shape and which **guards the OLD role
-rip and must be left completely alone.**
-
-Two checks are BOTH required, and this is a real subtlety: the four
-`google_vid_sfx_*` engines **never set `wants_provider_sfx`** -- only their NAME
-and their module carry the marker. A `wants_provider_sfx` check alone catches
-only the Vidu one. Assert on the flag AND on `"sfx" in engine_id`.
-
-### 5b.9 FOUR PIECES OF NON-SFX COVERAGE WOULD BE DELETED BY NAME
-
-Every one of these lives in a file that LOOKS disposable. This is the list that
-turns a safe rip into an unsafe one if it is skipped:
-
-1. **`tests/test_google_video_sfx_workflow.py` -- ZERO SFX assertions in the
-   whole file.** All five tests survive untouched. One of them,
-   `test_canonical_workflow_wires_clip_manifest_to_master_audio_mux`, pins
-   `last_link_id == 284`, node 85's eight inputs and link 278 itself -- **it IS
-   the section-4 topology re-verification this spec demands. Running this file
-   green after the rip is the proof.**
-2. **`test_clip_fill.py::test_persist_rekeys_sfx_to_renamed_episode_clips`** is
-   the ONLY test covering `persist_episode_clips`' rename/rekey path for
-   `clip["path"]`. Strip its SFX fixture and assertions; **keep the function.**
-3. **`test_existing_google_video_engines_stay_silent`** (in the beds file, which
-   otherwise dies) proves invariant V-1 for the SURVIVING Veo/Omni engines.
-   **Relocate it**, do not delete it.
-4. **`assert "generateAudio" not in base_payload["parameters"]`** -- buried
-   inside an SFX-only test, and the ONLY place in the suite pinning that base
-   VEO payloads never request audio. Preserve the assertion when its host dies.
-
-Plus three shared-collection loops in `test_cloud_video_adapters.py`
-(`_CLOUD_ROWS` and two engine tuples) where the SFX ROW is pruned and the
-FUNCTION survives with a smaller loop.
-
-Exact count: **24 test functions fully deleted, ~4 more shrink.**
-`test_rip_sfx_broll_guard.py` and `test_google_video_sfx_workflow.py` contribute
-ZERO deletions.
-
-### 5b.10 The bed has never written a file in production
-
-`compile_sfx_bed_from_manifest` returns `""` before reaching any `makedirs` or
-ffmpeg write, so `_default_sfx_bed_out`'s `.sfx_mix.wav` has never existed on
-disk. Deleting it orphans nothing. `audio_mode` is consumed by exactly two test
-assertions and no ledger, parser or audit script.
-
-## 6. THE PROOF
-
-Deleting a lane that nothing selects cannot be proven by the suite alone -- a
-green suite proves the tests were also deleted. Required:
-
-1. `tools/engine_matrix.py` REGENERATED (the roster drops from 32 to 27) and
-   `--check` green. The matrix is drift-gated, so this is not optional.
-2. `python scripts/otr_check.py` or equivalent import audit -- five engines
-   leaving `NODE_CLASS_MAPPINGS`/the registry must not dangle a reference.
-3. **One live canonical leg**, `RESULT SUCCESS` + `obs_publish OK` + the asset on
-   disk, proving the mux still publishes with its SFX branch gone. The mux is
-   the TERMINAL node; if this is wrong there is no episode.
-4. The tripwire test from 3e green.
-
-## 7. RISK, STATED PLAINLY
-
-The rip touches the terminal publish node. `OTR_MasterAudioMux` is the last thing
-that runs and the only thing that writes `otr/obs/`. A mistake here does not
-degrade an episode -- it produces none. That is why the live leg in section 6 is
-mandatory rather than nice-to-have, and why section 4 lists what must not move.
-
-Everything else in this rip is dormant code that no shipped episode has ever
-executed.
+The rip touches the terminal publish node. A mistake there does not degrade an
+episode -- it produces none. Everything else is dormant code no shipped episode
+has executed.

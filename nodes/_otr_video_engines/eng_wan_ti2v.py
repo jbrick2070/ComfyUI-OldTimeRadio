@@ -853,15 +853,28 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if env_cap > 0:
             ceiling = env_cap
         if 0 < ceiling < target:
+            # THE MESSAGE USED TO BLAME THE WRONG THING, and an operator reads it
+            # at the moment a leg dies. It said "WAN's ceiling is a RENDER cap,
+            # not a planning cap ... so the planner never saw it" -- true until
+            # 2026-08-02, when ``wan_ti2v`` was ADDED to
+            # ``frame_contract.PLANNING_CAP_ENGINES`` precisely because deleting
+            # its ping-pong left nothing else to absorb an over-ceiling beat.
+            # The planner DOES see the ceiling now, so the only way to reach
+            # here is an ENV override moving the ceiling after the plan was
+            # frozen -- which is what the remedy has to address.
             raise _wb.GraphExecutionError(
-                "%s was handed a coverage-planned segment of %d frame(s) "
-                "but this tier pins its render ceiling at %d. WAN's ceiling is "
-                "a RENDER cap, not a planning cap (frame_contract."
-                "PLANNING_CAP_ENGINES), so the planner never saw it and the "
-                "two now contradict each other. NO FALLBACK -- rendering %d "
-                "and mirroring the rest would put padded frames inside a beat "
-                "claiming real multi-clip coverage. Raise max_render_frames "
-                "for this tier or route the beat to a single-clip engine."
+                "%s was handed a coverage-planned segment of %d frame(s) but "
+                "its render ceiling resolves to %d. The planner partitions this "
+                "engine against its tier ceiling (it IS in frame_contract."
+                "PLANNING_CAP_ENGINES), so a segment above the ceiling means "
+                "the ceiling MOVED after the plan was frozen -- almost always "
+                "OTR_WAN_TI2V_MAX_FRAMES set at boot, or a profile edited "
+                "mid-campaign. NO FALLBACK -- rendering %d and padding the rest "
+                "would put manufactured frames inside a beat claiming real "
+                "multi-clip coverage, and there is no padding left on this lane "
+                "to do it with. Unset the env override so the render agrees "
+                "with the frozen plan, or re-plan the episode against the new "
+                "ceiling."
                 % (self.name, target, ceiling, ceiling))
         # NO AFFORDABILITY ASSERT HERE YET -- deliberately, and this is the
         # second time the ordering has had to be learned.

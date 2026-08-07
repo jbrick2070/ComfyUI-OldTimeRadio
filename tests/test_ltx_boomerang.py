@@ -15,6 +15,17 @@ removed -- the default flipped off on 2026-08-01, the gate made unconditional on
 other way. A rule that survives only while nobody flips a default is not a rule.
 The operator's ruling is flat: no mirror or ping-pong anywhere except the closing
 theme, which is a COMPOSITE decision about a tail and never a clip receipt.
+
+WHAT THIS TRIPWIRE DOES NOT COVER, stated so nobody mistakes it for total
+(QA finding, 2026-08-06). It catches the SYMBOLS and the RECEIPT. It would NOT
+catch someone re-implementing the mirror inline under a different name -- e.g.
+``frames = frames + list(reversed(frames[:-1]))`` written straight into
+``render_clip``. The durable defence against that is not here: it is
+``acceptance.grade_no_mirror``, which asks every delivered clip whether its
+frames were rendered and re-derives the count rather than believing the mode,
+and ``render_driver``'s refusal of any segment whose length differs from its
+plan. A behavioural test would need a GPU to be honest, so it belongs on the
+live leg rather than in this file.
 """
 
 from __future__ import annotations
