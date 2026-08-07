@@ -3,6 +3,67 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-07 -- HEAD 9605dd6d (v2.0-alpha) -- CODER (small-sprint items ALL shipped; a new 23-episode defect found, fixed and LIVE-PROVEN 5/5)
+
+Did: closed queue item 1 entirely, then found and closed a bigger defect next door.
+- **Small sprint items, all five commits:** B4's routing matrix `1f1330d5`; B6
+  `l4-2026-08-07` + the save_ledger_safe PRESERVE policy + the legacy-set repair
+  `39c572ba`. Bug Bible 12.74 landed and survived the survival-guide
+  reconciliation -- now live at `3759ae5`, 261 entries.
+- **Queue item 3 (premise wiring) is DISPROVED, not fixed.** `--premise` reaches
+  the writer and IS consumed (`OTR_LedgerScriptWriter.py:2181` ->
+  `build_original_briefs`; both 08-07 legs show a populated `operator_hint` plus
+  `selected_concept` and 2 pitches). The symptom that prompted it belonged to a
+  different defect standing next to it.
+- **PBUG-20260807-01 -- the announcer asked the OPERATOR to write the opening.**
+  23 shipped ledgers, `b001`, all four inline banks, 07-22..08-07. FOUR faults:
+  the prompt read a `hook` attribute `SafeOpenBrief` never defined; its
+  `filter(None,...)` was dead so empty labels shipped as a form; the derive
+  validator passed a brief with NO CAST while every pack seam promises "the cast
+  list below"; and a failed compose returned canned text that the writer stamped
+  as a successful rewrite, clobbering a real opening. Fixed `a200b6f1`, QA
+  follow-up `615de993`, logged `d771366a`.
+- **The origin was NOT the obvious commit.** 10 of 23 legs PREDATE `314dd481`,
+  proven from the git HEAD each ledger stamps at render time -- so the older
+  cause is the cast-less brief, not the severed wiring.
+- **LIVE-PROVEN 5/5** (`503fcad3`): shakespeare/public_domain/original/
+  media_archive, three model families (Mistral / Gemma / cloud
+  `~anthropic/claude-haiku-latest`, the last quoted from the server's own
+  `[OpenRouter] load slot=A ... (remote, 0 VRAM)`), 30 and 120 words. Every leg
+  `{status: announcer_intro_rewritten, reason: null}`, schema l4,
+  `obs_publish OK`. **No leg asked the operator for input.**
+- Receipts: **suite 9177 passed / 111 skipped / 1 xfailed** (from 9092); **Bug
+  Bible 17** at survival-guide `3759ae5`; `git diff -- workflows/` EMPTY all
+  session. Ten mutations of the shipped code each confirmed to turn the new
+  tests red.
+- Docs: GO_FORWARD + ROADMAP reordered to the operator's 2026-08-07 runway;
+  `visual_storybased` promoted in as the dynamic visual style (a TENTH dropdown
+  entry, peer to `anime`, NOT a new mechanism); model-slug curation added as a
+  queue item after three live catalog errors.
+Current step: queue item 1 is now **model-slug curation** (small, unblocked),
+  then **item 2 `visual_storybased`** which needs a full arc from cold Fable r1.
+  Items 3-7 are all operator-blocked.
+Next: a CODER window takes item 1. **BOX IS CLEAN** -- no resident server, port
+  8000 free, VRAM 1718 MiB (desktop baseline). **Two operator decisions owed:**
+  the 23 already-shipped episodes (rerender vs tombstone) and the Bible fan-out.
+  **FAN-OUT CANDIDATE, verified uncovered:** the dead-receipt class -- a receipt
+  or context field keyed on a producer string/attribute the producer NEVER emits,
+  hidden by a `getattr(x,"name",default)` or an `in flags` test that silently
+  reads False. Four instances now (`hook`, `open_safe_fallback`,
+  `news_coda_fallback`, BUG-LOCAL-255's `_speaker_role`). Checked against
+  `otr_coverage_index.yaml` and the 261-entry Bible: NOT covered. Not promoted
+  here because `PROD_BUG_LOG.md`'s own contract reserves promotion for the
+  operator's fan-out.
+Models: Claude (coder + sole judge) + a FULL four-round kibitz arc on the
+  announcer defect -- cold Fable r1, then Codex + Antigravity r1/r2/r3/r4.
+  **Honest lane count: r1 two-lane, r2 two-lane (agy via the operator's UI after
+  its CLI hit RESOURCE_EXHAUSTED), r3 two-lane (same), r4 SINGLE-LANE (Codex
+  only; agy returned a pure quota note).** Plus an operator-run Antigravity QA on
+  the shipped diff, which caught a render-killer the driver had introduced.
+Commits: 1f1330d5, 39c572ba, a200b6f1, 615de993, d771366a, bb137e9b, 4938d5cd,
+  8c1c0dbe, 074abc5b, ea0308ac, 75e1b8b6, 5f6f7ce8, 98e7fed6, d5f62aab,
+  377124ec, 7798ea21, 3cdda891, 503fcad3, 9605dd6d (+ survival-guide 5b82962).
+
 ## 2026-08-07 -- HEAD 50e65025 (v2.0-alpha) -- CODER (0-BIS no-mirror LIVE LEG ran and PASSED; F11 + the multi-clip proof close with it)
 
 Did: took queue item 1. It owed a render, not a patch, so no production code was

@@ -19,7 +19,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Model-slug curation** -- the pinned OpenRouter catalog carries dead ids (`tencent/hy3:free` expired with its promo; live has `tencent/hy3` at $0.13/$0.53 per M). SMALL chunk, half a day; does NOT displace item 2 as the next real campaign. Policy + verified findings in the section below | `_otr_model_catalog` | coder | nothing |
+| 1 | **Model-slug curation** -- the pinned OpenRouter catalog carries dead ids (`tencent/hy3:free` expired with its promo; live has `tencent/hy3` at $0.13/$0.53 per M). SMALL chunk, half a day; does NOT displace item 2 as the next real campaign. Policy + verified findings in "QUEUE ITEM 1 DETAIL" below | `_otr_model_catalog` | coder | nothing |
 | 2 | **`visual_storybased` -- the dynamic visual style.** Promoted out of ROADMAP row 2 by the operator 2026-08-07. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- the next real campaign |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
@@ -59,7 +59,7 @@ input.
    (`... (12.0 GB)`); the plain id is a hard `ValueError`. The `--dry-run`
    `applied:` line is the only proof an override actually landed.
 
-### QUEUE ITEM 2 DETAIL -- model-slug curation
+### QUEUE ITEM 1 DETAIL -- model-slug curation
 
 **THE PINNED OPENROUTER CATALOG HAS DRIFTED FROM LIVE (found 2026-08-07).**
    `_otr_model_catalog.openrouter_catalog_dropdown_choices("a")` offers
@@ -103,6 +103,27 @@ input.
    Verified live 2026-08-07 and worth adding when the list is curated:
    `qwen/qwen3.7-flash` at `0.00000003`/`0.00000013` -- the cheapest credible
    model found, roughly $0.002 for one episode's script volume.
+
+### PENDING BIBLE FAN-OUT -- one candidate, verified uncovered
+
+`docs/PROD_BUG_LOG.md` PBUG-20260807-01 is logged `promotion: pending fan-out`.
+Checked 2026-08-07 against `otr_coverage_index.yaml` and the 261-entry Bible at
+survival-guide `3759ae5`: **the class below is NOT covered.**
+
+**The class:** a receipt or prompt-context field keyed on a producer string or
+attribute the producer NEVER emits -- hidden by `getattr(x, "name", default)` or
+an `in flags` test that silently reads False. It fails in the SAFE direction, so
+nothing complains and it can survive for weeks. FOUR instances: `hook` (an
+attribute `SafeOpenBrief` never defined), `open_safe_fallback`,
+`news_coda_fallback`, and BUG-LOCAL-255's `_speaker_role`.
+**Verify rule:** assert the label BINDS the value, and assert every stamped flag
+string against its producer.
+
+NOT promoted by a coder window: `PROD_BUG_LOG.md`'s own contract (operator
+2026-07-10) reserves promotion for the operator-triggered fan-out, and the r4
+judgment agreed. Recorded here so the fan-out has it ready.
+
+### STILL OPEN, SMALL, UNSCHEDULED
 
 1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
