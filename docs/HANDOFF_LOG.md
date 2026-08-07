@@ -3,6 +3,46 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-07 -- HEAD 2fc81f72 (v2.0-alpha) -- CODER (SHIELD SCOPING shipped; docs de-staled; queue re-ordered by operator)
+
+Did: closed the banana route's one deferred defect, then cleaned the plan docs
+  and took the operator's new priority order.
+- **Shipped `2fc81f72`** (7 files): the quote shield was BLANKET, so an
+  LLM-styled `a detective carrying a "revolver"` kept its revolver -- the
+  route silently under-firing. `apply()` now takes
+  `shield_quoted_card_text`; the still dispatcher passes
+  `(source == "still_word")`, the video funnel passes False EXPLICITLY (which
+  is what keeps ShotLock cast-time preflight on the same decision).
+  `TABLE_VERSION` "2"->"3", append-only -- historical rows keep "2" -- and the
+  adjacent `otr-banana-v2:` variety namespace deliberately does NOT move.
+  Suite **9081/111/1** (was 9067), Bug Bible 17, `workflows/` diff empty.
+- **Full r1-r4 arc** with cold Fable on r1 (unframed, before the driver
+  anchor). It overturned FOUR driver positions, none by assertion: the
+  TABLE_VERSION objection, the mesh-fodder fold, a universal-preflight-parity
+  claim (the deferred-image-gap fallback builds outside the funnel), and the
+  belief that the stale-doc list was complete. The panel also caught my own r1
+  doc naming the new argument two different ways -- a `TypeError` at both call
+  sites on first run.
+- **Both final gates zero-blocker, and both proved by execution:** Sonnet
+  showed the jump-segment-cover clone can never strip a card's shield
+  (still_word beats never multi-clip, so `jump_still_requests()` is empty);
+  Fable ran the real preflight call shape and showed the new keyword cannot
+  raise, and that music-mode cards keep their shield.
+- **Docs de-staled (`22dd4f57`)**: GO_FORWARD lost 330 lines of done-work to
+  tombstones, five internal contradictions were resolved to the newer fact
+  (renders resumed; SFX retired not parked; the receipt was two ships stale),
+  ROADMAP's dead claims fixed, CLAUDE.md's expired tencent/hy3 seat removed by
+  its own removal clause, and `docs/known-failures.md` created -- the conftest
+  guard had named it in seven places and it never existed.
+Current step: the operator-ordered QUEUE at the top of GO_FORWARD. Next
+  unblocked item is **0-BIS no-mirror: CODE-READY, owes its `ltx_video` live
+  leg** (which also discharges F11).
+Next: a CODER window takes queue item 1 (0-BIS live leg), then item 2 (the
+  three small sprint items). Items 3, 5, 6, 7 are blocked on operator input.
+Models: Claude (coder+judge) + cold Fable (r1) + Fable (final gate) + Sonnet 5
+  (QA) + kibitz r1-r4 (codex gpt-5.6-sol high + agy Gemini 3.6 Flash High)
+Commits: 22dd4f57, b25f69c3, 2fc81f72
+
 ## 2026-08-07 -- HEAD bc8a1bde (v2.0-alpha) -- CODER (BANANA ROUTE: full r1-r4 arc, all nine fixes SHIPPED + pushed + two live legs)
 
 Did: executed the operator's ruled order end to end. Fable wrote the r1

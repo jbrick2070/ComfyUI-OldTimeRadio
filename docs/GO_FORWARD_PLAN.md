@@ -4,6 +4,27 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## THE QUEUE -- OPERATOR-ORDERED 2026-08-07. WORK IT TOP TO BOTTOM.
+
+This order is the operator's, set after the shield-scoping ship. It OVERRIDES
+the section numbering below (which is historical) and the older "work by
+priority, not by number" line. A window takes the topmost item that is not
+blocked on the operator, finishes it green and pushed, then re-reads this list.
+
+| # | Item | Where | Kind | Blocked on |
+|---:|---|---|---|---|
+| 1 | **0-BIS no-mirror -- CODE-READY, owes its `ltx_video` LIVE LEG** (the leg also discharges F11 and the multi-clip receipt's outstanding live proof) | section 0-BIS | coder + ONE render | nothing |
+| 2 | **Small sprint items:** the non-commercial notice reaching no human surface (~30 min); the test-ordering pollution in `test_public_domain_sources.py`; finishing item 7's B4/B6 (`CURRENT_SCHEMA_VERSION`) | THE CODING SPRINT items 2, 3, 4 | coder, mechanical | nothing |
+| 3 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
+| 4 | **Premise wiring** -- `--premise` lands in the ledger as `meta.operator_hint` but never reaches the writer (reproduced on BOTH 2026-08-07 live legs), and both scripts carried the same model meta-response line ("Please provide the SETTING, TIME, HOOK...") | 0-QUATER OPEN 2 | investigate; likely real wiring | nothing |
+| 5 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
+| 6 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
+| 7 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+
+**Items 3, 5, 6 and 7 are blocked on the operator** -- a coder window that
+reaches them without an answer should skip to the next unblocked item rather
+than guess.
+
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
 ### 0. VIDEO MATRIX PATTERN -- FOUR ROUNDS, FOUR NOs, DID NOT CONVERGE
@@ -98,18 +119,17 @@ Full receipts: the 2026-08-07 `docs/HANDOFF_LOG.md` entry +
 raw outputs also sit under the `2026-08-07-` folder -- the script date-stamps
 its run dir and the arc crossed midnight).
 
-**OPEN 1 -- shield scoping: the next banana coder chunk, and it REQUIRES its
-own four-round arc.** The quote shield is BLANKET, not scoped to still_word
-card text: `_clean_llm_prompt` (`otr_meta_brief_image_prompt.py:1592-1600`)
-strips only leading/trailing quotes, so an LLM-authored
-`a man carrying a "revolver"` reaches `obj["prompt"]` with its quote pair and
-`_shielded_spans` protects it -- the route under-fires. A false negative; no
-ledger or render fault. Scoping it means an `apply(..., shield_quotes=...)`
-argument, a ruling on which object kinds count as card text, and threading
-BOTH funnels -- a change to the operator-ruled shield contract, which is why
-it did not ride the repair commit (it surfaced at r4 with zero rounds left to
-review it). The era-tail instance of this class is already closed by the
-shipped fix.
+**OPEN 1 -- shield scoping: CLOSED `2fc81f72` (2026-08-07).** The blanket quote
+shield now scopes to still_word card text: `apply()` takes
+`shield_quoted_card_text`, the still dispatcher passes
+`(source == "still_word")`, the video funnel passes False explicitly, and
+`TABLE_VERSION` moved to `"3"` (append-only -- historical rows keep `"2"`).
+Full r1-r4 arc, Sonnet QA + Fable gate both zero-blocker, suite 9081/111/1.
+Arc: `kibitz-runs/2026-08-07-shield-scoping/`; plan
+`docs/2026-08-07-PLAN-shield-scoping.md`. One cosmetic is recorded there as
+deliberately NOT fixed (the mesh-fodder composer splices the era tail
+unfolded; scoping already ends the under-fire, and folding it would move mesh
+prompt hashes for nothing).
 
 **OPEN 2 -- premise wiring, operator eye when convenient.** `--premise` lands
 in the ledger as `meta.operator_hint`, but the writer ignored it on BOTH live
@@ -1675,8 +1695,8 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 
 ## Validation and handoff law
 
-- **Current whole-tree receipt (2026-08-07 @ `bc8a1bde`):** full Windows suite
-  **9067 passed / 111 skipped / 1 xfailed** (~3:49); Bug Bible **17 passed**. Prior
+- **Current whole-tree receipt (2026-08-07 @ `2fc81f72`):** full Windows suite
+  **9081 passed / 111 skipped / 1 xfailed** (~4:19); Bug Bible **17 passed**. Prior
   receipts live in `docs/HANDOFF_LOG.md` -- this file keeps only the current one.
 - **Standing acceptance receipt:**
   `python scripts/audit_voice_gender_consistency.py --root "C:\Users\jeffr\Documents\ComfyUI\output\otr"`
