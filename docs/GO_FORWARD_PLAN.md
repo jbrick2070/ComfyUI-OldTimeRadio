@@ -182,6 +182,29 @@ consequences, NOT objections to the ask:**
    not. Treat any `:free` or promo-priced slug as time-limited by default:
    prefer a `~...-latest` alias, or if a free tier is genuinely wanted, record
    WHEN it was verified free so the next reader knows how stale the claim is.
+   **THE FIX IS FEWER SLUGS, NOT A REFRESH CHORE (operator 2026-08-07: be sure
+   we have a limited amount of slugs).** The catalog carries 21 slot-a choices
+   and several are already wrong; 21 is more than anyone will keep true, and a
+   periodic-refresh step is a chore that will not get run. Curate for DURABILITY
+   instead, in this order:
+   (a) PREFER `~family-latest` aliases -- they resolve at runtime and track new
+       releases without any edit here. This is the same instinct as wanting a
+       versionless pointer, and it is already the repo's convention.
+   (b) CARRY FEW CONCRETE ids, and only where a specific version genuinely
+       matters (a pinned bake-off arm, a reproducibility anchor).
+   (c) NEVER carry a `:free` or promo-priced slug -- see above.
+   (d) Auto-routers (`openrouter/auto`, `openrouter/auto-beta`) DO exist and are
+       real -- note they are absent from `/api/v1/models`, so a models-endpoint
+       check cannot see them. **Deliberately NOT recommended here:** `auto-beta`
+       picks by what the OpenRouter community spent most on for that task type
+       over a trailing week, so the same episode config can resolve to a
+       different model next week through no change of ours. This pack stamps the
+       resolved model id in the ledger for replay, and a choice that drifts with
+       third-party spending undercuts that. Good for exploration, wrong for a
+       pipeline built on reproducible receipts.
+   Verified live 2026-08-07 and worth adding when the list is curated:
+   `qwen/qwen3.7-flash` at `0.00000003`/`0.00000013` -- the cheapest credible
+   model found, roughly $0.002 for one episode's script volume.
 
 1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
