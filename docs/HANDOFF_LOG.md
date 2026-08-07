@@ -43,10 +43,13 @@ Did: read-only QA of the UNCOMMITTED banana-route build against
   GO_FORWARD 2-PRE line claiming the default/reach was still unruled -- the
   operator ruled it and `ec9da848` records it.
 
-Current step: banana-route QA fixes, corrections folded, next step UNCHOSEN.
-Next: OPERATOR DECISION -- (A) resume kibitz at r2 -> r3 -> r4 then code
-  (satisfies the HARD GATE), or (B) fix-first with r1 as the review of record
-  (does NOT satisfy it). CODER window owns it either way.
+Current step: banana-route QA fixes -- Fable synthesizes r1, then r2 -> r4,
+  then code. RULED by the operator at the end of this session.
+Next: CODER window -- (1) Fable writes `r1/final.md` from the anchor + the
+  grounded panel survivors (an explicit operator OVERRIDE of the skill's
+  never-outsource-synthesis line; Claude still grounds Fable's output before
+  r2 consumes it); (2) r2 -> r3 -> r4, codex + agy, 6 external calls;
+  (3) then code, per GO_FORWARD 0-QUATER's gate order and pathspec.
 Models: Claude (rung 4) + one kibitz r1 (codex gpt-5.6-sol high + agy
   Gemini 3.5 Flash High) + a Claude subagent fan-out for the QA sweep.
 Commits: none on code; this handoff only.

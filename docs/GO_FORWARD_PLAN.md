@@ -251,11 +251,39 @@ them BEFORE writing any code:**
   downgrading the malformed-knob warning to INFO (PBUG-20260723-02 posture and
   BUILD-SPEC line 46 require a warning).
 
-**THE OPERATOR HAS NOT CHOSEN THE NEXT STEP.** Two options, and the window must
-ASK rather than assume: **(A)** resume the kibitz campaign at r2 with the two
-corrections folded, then r3 and r4, then code -- this satisfies the full-kibitz
-HARD GATE; or **(B)** fix-first with the corrections folded and treat r1 as the
-review of record -- this does NOT satisfy the gate and must be recorded as such.
+**THE OPERATOR HAS RULED THE NEXT STEP (2026-08-06) -- do not ask again, do not
+re-derive it:** *"have Fable update the r1 for a synthesis and then r2 - r4."*
+Execute in exactly this order:
+
+1. **FABLE WRITES THE r1 SYNTHESIS.** Fable produces
+   `kibitz-runs/2026-08-06-banana-route-qa-fixes/r1/final.md` -- the hardened
+   plan folding the existing `driver_anchor.md` + the GROUNDED survivors from
+   `codex.md` and `antigravity.md`, including both corrections above and the
+   two explicit rejections. Give Fable the four r1 files, the fix plan, the
+   BUILD-SPEC and the real source files; it is the r1 judge for this campaign.
+   **This is an OPERATOR OVERRIDE of the kibitz skill's "never outsource the
+   synthesis" line, and it is deliberate.** The anti-hallucination property is
+   preserved a different way: Claude still GROUNDS Fable's output against the
+   real Windows files before r2 consumes it, and discards anything that does
+   not survive. Record the override in `r1/judgment.md` so the arc is honest
+   about who judged.
+2. **THEN r2 -> r3 -> r4**, sequentially, Codex + Antigravity each round
+   (6 external calls), each round's `final.md` feeding the next, a fresh
+   code-grounded `driver_anchor.md` written BEFORE each fan-out. Together with
+   the completed r1 this is the FULL four-round arc and satisfies the HARD GATE.
+3. **THEN code**, per the gate order below.
+
+Command shape, from the repo root, one round at a time:
+
+```
+python C:\Users\jeffr\.claude\plugins\cache\kibitz-local\kibitz-plugin\1.2.1\skills\kibitz\scripts\kibitz.py --doc kibitz-runs\2026-08-06-banana-route-qa-fixes\r1\final.md --round r2 --topic banana-route-qa-fixes --repo . --driver claude
+```
+
+(`--driver claude` is explicit: Claude drives from Cowork, so no second
+`claude -p` lane runs against its own family. The ComfyUI profile overlay
+`.kibitz/comfyui.local.md` is auto-appended -- confirm `Profiles:` says so in
+the script's output. Verify `codex_model_selected.txt` reads `gpt-5.6-sol` each
+round; a stale skill cache has silently drifted mid-arc before.)
 
 **Gate order when code is written:** focused
 `tests/test_banana_route.py` + `tests/test_image_platform_c1.py` -> full suite
