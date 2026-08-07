@@ -14,16 +14,17 @@ blocked on the operator, finishes it green and pushed, then re-reads this list.
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
 | 1 | **Announcer-intro qualification -- IN FLIGHT.** The fix shipped; the live ladder is running. See the leg matrix directly below | PBUG-20260807-01 | render + coder | nothing (leg 1 running) |
-| 2 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
-| 3 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
-| 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 5 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
-| 6 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
-| 7 | **Bug Bible fan-out** over `docs/PROD_BUG_LOG.md` -- PBUG-20260807-01 is logged `promotion: pending fan-out` | separate repo | **operator triggers**; the log's own contract forbids a window promoting directly | operator's call |
+| 2 | **`visual_storybased` -- the dynamic visual style.** PROMOTED out of ROADMAP row 2 by the operator 2026-08-07, to start after the qualification ladder. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- starts when item 1 closes |
+| 3 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
+| 4 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
+| 5 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
+| 6 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
+| 7 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+| 8 | **Bug Bible fan-out** over `docs/PROD_BUG_LOG.md` -- PBUG-20260807-01 is logged `promotion: pending fan-out` | separate repo | **operator triggers**; the log's own contract forbids a window promoting directly | operator's call |
 
-**Items 2, 3, 4, 5, 6 and 7 are blocked on the operator** -- a coder window that
+**Items 3, 4, 5, 6, 7 and 8 are blocked on the operator** -- a coder window that
 reaches them without an answer should skip to the next unblocked item rather
-than guess. **Item 1 is the only unblocked work.**
+than guess. **Items 1 and 2 are the unblocked work**, in that order.
 
 ### QUEUE ITEM 1 -- THE QUALIFICATION LADDER (live proof, not tests)
 
@@ -79,6 +80,60 @@ Reset per CLAUDE.md section 4 before every leg. Server boots in ~20s via
 4. Then the queue is operator-blocked end to end, and the next coder window has
    nothing unblocked -- which is the signal to ask for a ruling rather than
    invent work.
+
+### QUEUE ITEM 2 -- `visual_storybased`, THE DYNAMIC VISUAL STYLE
+
+**Promoted out of `ROADMAP.md` row 2 by the operator 2026-08-07.** Starts when
+the qualification ladder closes. **Needs a FULL ARC first -- cold Fable r1 on
+the architecture, then the panel. It is not a coder chunk.**
+
+**THE ASK, verbatim and taken literally:** *"a dynamic visual style that gets
+its parameters decided by the story itself, the LLM making the call. No presets,
+no seeds, pure LLM decision-making."*
+
+**THE SHAPE, operator 2026-08-07: it is a DROPDOWN ENTRY, A PEER TO `anime` AND
+`paper_origami`.** Not a new sentinel, not a new widget, not a new mechanism
+bolted beside the roll. The registry gains a TENTH style whose parameters are
+decided per episode by the model instead of authored ahead of time. Everything
+that consumes a style id keeps working unchanged, because it is a style id.
+
+**Why the driver's three earlier proposals were all wrong, recorded so nobody
+re-proposes them:**
+1. *A selector over the existing nine* -- picking a different fixed pack is
+   still a fixed pack.
+2. *A template with story-owned slots* -- that is a preset with holes in it.
+3. *A third sentinel beside `"roll (any style)"`* -- invents a parallel
+   mechanism when the dropdown already has the right shape.
+The gap is NOT that the wrong pack gets picked. It is that all nine are authored
+ahead of time and none knows anything about the episode it dresses: two
+Shakespeare episodes get identical treatment, and so do a Scottish castle at
+midnight and a Venetian courtroom at noon. A longer list cannot fix that.
+
+**Naming.** Module/feature `visual_storybased`. The dropdown label is
+user-facing and should read like its neighbours -- candidate
+`"story-based (LLM decides)"`; settle it in the arc.
+
+**What the arc must answer -- named now, and these are engineering
+consequences, NOT objections to the ask:**
+* **Reproducibility.** Every other generative surface here replays from a
+  receipt. An LLM-decided look must stamp its COMPLETE decided parameter set on
+  the ledger, or a re-render is a different episode.
+* **Coherence across beats.** The look has to hold for the whole episode and
+  every still/video call in it -- the same continuity problem the cast lock
+  solves for characters.
+* **The rendering contract.** Whatever the model decides must still produce a
+  prompt the image/video engines accept, so SOMETHING owns the vocabulary and
+  the non-negotiable fields even when nothing owns the look.
+* **Fail-closed.** When the decision is unusable, fall back to a registered
+  fixed pack. This is why the existing nine and the seeded roll STAY -- they are
+  the floor, not legacy to be ripped.
+* **The roll now contains it.** If it is a peer in the pool, `"roll (any style)"`
+  can DRAW it, so a rolled episode may get a story-decided look. Decide
+  deliberately whether that is wanted, and whether `eligible_style_ids()`
+  excludes it from the roll -- do not let it happen by accident.
+
+**Not a prose-quality item.** This is the visual surface and does not reopen the
+2026-08-04 "story quality is done" directive.
 
 ### STILL OPEN, SMALL, UNSCHEDULED
 

@@ -25,7 +25,7 @@ operator listening are separate elapsed time.
 | Order | Campaign | Exit condition | Coding estimate |
 |---:|---|---|---:|
 | 1 | ~~Timeline Cue Ledger / generated spotted SFX~~ **RETIRED 2026-08-06** | Operator ruling "rip out SFX 100%" executed by `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`; the five SFX engines, the bed compiler and the mux mix branch are gone, ids barred via `RETIRED_ENGINE_IDS` | - |
-| 2 | Other product expansion | Visual-pack roll, richer cue stills, provider additions, and system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
+| 2 | Other product expansion | Richer cue stills, provider additions, content rating, and system-agnostic upscale as separately gated campaigns. **The visual-style item left this row 2026-08-07** -- promoted to `docs/GO_FORWARD_PLAN.md` queue item 2 as `visual_storybased` | 5-10 days per selected set |
 | 3 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
 | 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
 | 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
@@ -136,81 +136,14 @@ Choose these as separate campaigns after the core surface is stable:
   scale; a future design may combine transcript/audio analysis with video-frame
   moderation, but the rating is advisory display metadata only and must never
   reject, reroll, rewrite, or block publication;
-- **STORY-FITTED VISUAL STYLE -- OPERATOR WANTS THIS (2026-08-07: "customize
-  the visual style based on the actual story, whatever is most appropriate").**
-  This REPLACES the old one-line "Randomizer Design B: visual-pack roll" bullet,
-  which was ambiguous and is why the question came up at all.
-  **What already exists, and is COMPLETE:** the `visual_style` ROLL --
-  `nodes/_otr_rolls.py`, `STYLE_SENTINEL = "roll (any style)"`, a seeded draw
-  replayable via `OTR_VISUAL_STYLE_SEED`. It deliberately reads no premise,
-  outline or brief; its own docstring says it picks "which visual pack dresses
-  it". Nothing is owed on the roll. Do not read it as a half-built version of
-  this item.
-  **What is wanted is the opposite of a roll: the style should be CHOSEN BY THE
-  STORY.**
-  **THE GAP IS NOT "WRONG PACK PICKED". IT IS "EVERY PACK IS PREDEFINED".**
-  (Operator correction 2026-08-07, after the driver mis-framed this as a
-  fidelity defect: *"it's not a problem you have an anime Shakespeare -- the
-  problem is we don't have a visual style that customizes for a Shakespeare
-  story, or any story. The visual packs are all defined."* An anime MACBETH is
-  still faithful to Macbeth's TEXT; the "fidelity lanes invent nothing" rule is
-  about not inventing plot, characters or language, and does NOT extend to the
-  visual treatment. Selecting a different pack from the same fixed nine does not
-  address this at all.)
-  All 9 registered styles -- `anime`, `archival_documentary`, `cartoon`,
-  `paper_origami`, `recur_frac`, `sci_fi_radio`, `shakespeare_stage_realism`,
-  `storybook_engraving`, `video_art` -- are FIXED looks authored ahead of time.
-  None of them knows anything about the episode it is dressing. Two different
-  Shakespeare episodes get the identical `shakespeare_stage_realism` treatment;
-  so do a Scottish castle at midnight and a Venetian courtroom at noon.
-  **What is wanted: the style CUSTOMIZES to the actual story.** "Macbeth Act II"
-  should yield a torchlit Scottish castle at night -- not generic stage realism,
-  and not by adding a `macbeth_act_ii` pack to a list that would then need one
-  per story forever. The LLM authors the story-specific content; a fixed pack
-  list cannot express this no matter how long the list gets.
-  **OPERATOR SPEC, 2026-08-07, stated three times and sharpened each time --
-  take it literally:** *"a dynamic visual style that gets its parameters decided
-  by the story itself, the LLM making the call. No presets, no seeds, pure LLM
-  decision-making."* Working name, operator's: **`visual_appropriate`**.
-  The driver twice proposed something weaker and was corrected both times:
-  first a SELECTOR over the existing nine (rejected -- picking a different fixed
-  pack is still a fixed pack), then a TEMPLATE with a few story-owned slots
-  (still short -- that is a preset with holes in it). **The ask is no preset at
-  all.** The model reads the story and decides the visual parameters, the way
-  the writer decides the script.
-  **This displaces the roll rather than joining it.** `_otr_rolls` seeds and
-  replays a DRAW from a fixed pool; "no seeds, pure LLM" is a different
-  mechanism, not a third sentinel beside the other two. The existing nine packs
-  and the seeded roll stay as they are -- shipped, complete, still selectable --
-  but they are not the thing being extended.
-  **The hard problems this has to answer, named now so the arc starts on them
-  rather than discovering them late.** These are engineering consequences, NOT
-  objections to the ask:
-  (a) REPRODUCIBILITY -- every other generative surface in this repo is
-  replayable from a receipt; an LLM-decided look must stamp its full decided
-  parameter set on the ledger so a re-render is not a different episode.
-  (b) COHERENCE ACROSS BEATS -- the look must hold for the whole episode and
-  across every still/video call in it, which is exactly the continuity problem
-  the cast lock solves for characters.
-  (c) THE RENDERING CONTRACT -- whatever the model decides still has to produce
-  a prompt the image/video engines accept, so SOMETHING must own the vocabulary
-  and the non-negotiable fields even when nothing owns the look.
-  (d) FAIL-CLOSED -- when the decision is unusable, the seeded roll over the
-  existing nine is the obvious floor, which is why those packs stay.
-  This is the largest item in row 2 and needs a full arc: cold Fable r1 on the
-  architecture, then the panel. Not a coder chunk.
-  **Why selection and not generating a bespoke pack per episode:** a generated
-  pack is unbounded, mints a second visual-style authority next to the registry,
-  and cannot be replayed or reviewed; a selector is one constrained call, reuses
-  the whole existing visual layer, needs no new widget position (the sentinel
-  rides an existing dropdown, so `workflows/otr_canonical.json` does not change
-  and no `widgets_values` index shifts), and degrades to today's behaviour.
-  **NOT a prose-quality item** -- this is visual selection and does not reopen
-  the 2026-08-04 "story quality is done" directive.
-  Still needs its own scoped design, ownership table, tests and qualification
-  ladder before entering GO_FORWARD; and the `dynamic_story` prerequisite (ONE
-  visual-style authority) still holds, because a selector fighting a second
-  authority is worse than a dice roll;
+- ~~story-fitted visual style~~ **PROMOTED OUT OF THIS ROW 2026-08-07.** It is
+  now `visual_storybased`, queue item 2 in `docs/GO_FORWARD_PLAN.md`, starting
+  when the announcer-intro qualification ladder closes. The full spec lives
+  there and is NOT duplicated here (same rule as `dynamic_story`). One line so
+  this row is not misread: the ask is a dynamic visual style whose parameters
+  the LLM decides from the story -- no presets, no seeds -- shipped as a TENTH
+  dropdown entry peer to `anime` and `paper_origami`, with the existing nine
+  packs and the seeded roll kept as the fail-closed floor;
 - richer brief-driven music-cue still prompts;
 - direct BYO Google music/image/video paths, followed by other providers only
   when they keep provider identity explicit and fail loud;
