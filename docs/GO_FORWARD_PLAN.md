@@ -76,7 +76,36 @@ SET**. A WAN or `ltx_8gb` leg would pass without ever executing the deleted
 machinery. That one leg also discharges F11 and the multi-clip receipt work's
 outstanding live proof.
 
-### 0-TER. SFX RIP -- 100%. CODE-READY. This is the next coder window's whole job.
+### 0-TER. SFX RIP -- 100%. **DONE, SHIPPED AND LIVE-PROVEN 2026-08-06 (`9eb6ede1`).**
+
+**Shipped in one atomic pathspec commit `9eb6ede1`, pushed, HEAD == origin.**
+Five engines deregistered + deleted; the mux collapsed to the unconditional
+`-c:a copy` master-copy passthrough with an in-source codec assertion; the bed
+compiler and both helper chains deleted; the dead `[SFX:]` machinery deleted;
+`RETIRED_ENGINE_IDS` + `RetiredEngineError` (`reason_code "retired_engine"`)
+wired at all five boundaries in `nodes/_otr_shared/public_engines.py`;
+`tests/test_rip_sfx_bed_guard.py` (closed forbidden set) +
+`tests/test_retired_engine_policy.py` (5 ids x 5 boundaries) added; fixture +
+matrix regenerated 32 -> 27. Suite 8997/111/1; Bug Bible 17. Gates: Sonnet QA
+clean, agy QA SECURE-BUILD-LOCK, Fable gate PASS.
+
+**LIVE-PROVEN:** fresh reset+boot, canonical JSON, 45-word episode
+`signal_lost_the_verdant_debt_20260806_211836` (Prompt executed 01:10:02):
+stamped-ledger receipt present, all three exact ledger paths on disk under
+canonical roots, decoded-PCM of the archival final == frozen master
+(`9a60fe4f4152`), OBS copy playable (video + one AAC stream). All 17
+acceptance checks pass (`tmp/_rip_sfx_leg_verify.py`).
+
+**INCIDENT, resolved:** commit `760a63ae` (banana-route window) accidentally
+swept this rip's three staged file deletions into itself and pushed, leaving
+origin red ~90 minutes until `9eb6ede1` completed the rip. Lesson banked: on a
+multi-window tree, stage nothing until your own commit moment.
+
+`clip_manifest_json` / link 278 remain WIRED as the vestigial terminal-node
+connector (decided; tooltip says so). The canonical JSON is byte-unchanged.
+
+<details><summary>Superseded planning text (pre-ship)</summary>
+
 
 **Operator ruling 2026-08-06: "I do really want to rip out SFX 100%, that's my
 aim... but don't break the system."**
@@ -119,6 +148,8 @@ semantic consumers once the bed is gone. A third lane agreed independently
    `still_plan_head_parity.json` must be REGENERATED against the live registry,
    so the tree necessarily goes RED inside the commit. Spec section 8 has the
    intra-commit order.
+
+</details>
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 

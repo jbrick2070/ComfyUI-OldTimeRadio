@@ -3,6 +3,72 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD 9eb6ede1 (v2.0-alpha) -- CODER (SFX RIP 100%: SHIPPED AND LIVE-PROVEN)
+
+Did: executed `docs/2026-08-06-BUILD-SPEC-rip-sfx.md` end to end -- re-pinned
+  every cite, rescued the four coverage items FIRST, ripped the bed + five
+  engines + both helper chains + the dead `[SFX:]` machinery, built the
+  retired-id policy, regenerated fixture+matrix (32 -> 27), retired three
+  design docs in place, ran the full gate ladder, and proved it on a live
+  episode. Suite **8997 passed** / 111 skipped / 1 xfailed (count moved down
+  from 9018 exactly as five engines left the parameterized rosters + two
+  SFX-only files died). Bug Bible 17. `engine_matrix --check` OK.
+  `workflows/otr_canonical.json` byte-unchanged; its topology test green
+  before and after. ONE atomic pathspec commit `9eb6ede1`, pushed, lockstep
+  verified (HEAD == origin, no BOM, no 0-byte, AST green, remote registry
+  spot-checked).
+- **THE INCIDENT: commit `760a63ae` (banana window, 19:31) swept this rip's
+  three staged `git rm` deletions into its own pushed docs commit**, leaving
+  origin RED ~90 min -- a registry declaring five engines whose adapter module
+  was gone (roster audit missing=4, `>= 30` floors red at 28). Found by the
+  Sonnet QA, verified, repaired by landing `9eb6ede1` promptly (spec section 9's
+  GPU-before-commit order was consciously inverted for the repair; the leg ran
+  right after and passed). **Gotcha banked (memory + here): on a multi-window
+  tree, stage NOTHING until your own commit moment -- the index is shared.**
+- **THE MUX COLLAPSE kept the right branch:** unconditional `-c:a copy`
+  master-copy passthrough + byte-identity gate, plus a NEW in-source assertion
+  that the codec is literally `copy` (no surviving test could tell a re-encode
+  apart -- now the source refuses it). `clip_manifest_json`/link 278 stay wired
+  as the vestigial terminal connector, tooltip corrected.
+- **The retired-id policy is ONE set + ONE helper** in
+  `nodes/_otr_shared/public_engines.py` (`RETIRED_ENGINE_IDS`,
+  `RetiredEngineError` reason_code `"retired_engine"`, pinned message), wired
+  AFTER name resolution at all five boundaries; `resolve_engine_id` runs
+  for-the-guard-only at `_render_one` / multi-clip / `assert_usable` so a
+  future alias cannot slip past (Sonnet QA advisory, applied).
+- **Counts are now DERIVED, not typed:** the spec's own defect class
+  (`>= 30` floors, `== 12`) was also hiding in `test_motion_floor_roster.py`,
+  un-inventoried -- the full suite caught it red at 27 and it now derives from
+  CAPABILITIES + named anchors + retired-ids-absent like the others.
+- **Gates:** Sonnet 5 QA (clean; 1 repo-state finding + 2 advisories, both
+  applied -- the third was a stale sanitizer cite in the spec, corrected);
+  agy QA via the kibitz harness: **SECURE-BUILD-LOCK, zero findings** (raw
+  `agy.EXE -p` denies its command tool headless even with
+  --dangerously-skip-permissions -- twice -- use `kibitz.py --only agy`;
+  banked to memory); Fable gate: **PASS**, all five end-to-end walks clean,
+  including proof the family-input preflight cannot preempt the retired
+  refusal (retired ids resolve to family "abstract", required inputs `()`).
+- **LIVE LEG (45w, fresh reset+boot, canonical JSON):** episode
+  `signal_lost_the_verdant_debt_20260806_211836`, Prompt executed 01:10:02.
+  Boot proved startup safety live: 38 OTR node classes in `/object_info`,
+  director dropdown 28 entries, zero sfx. Mux log: `audio_mode=master_copy`,
+  `audio_byte_identical OK`, `obs_publish OK`, stamped-ledger receipt. All 17
+  acceptance checks pass (`tmp/_rip_sfx_leg_verify.py`): three exact ledger
+  paths on disk under canonical roots, decoded-PCM of the archival final ==
+  frozen master (`9a60fe4f4152`), OBS copy playable (video + one AAC stream).
+  The writer's P3 pass needed all 3 attempts under its 8192-token window
+  (pre-existing budget behavior, not the rip); server left RESIDENT per the
+  no-teardown norm.
+
+Current step: 0-TER CLOSED. Still open: the no-mirror LIVE LEG (0-BIS --
+  canonical `ltx_video` beat over its 169-frame ceiling WITH the retired env
+  switch SET; a WAN/ltx_8gb leg would not execute the deleted machinery).
+Next: operator's call -- the banana route (visuals only) is being coded in its
+  own window on top of `9eb6ede1`.
+Models: Claude (Opus) driver + 1 Sonnet 5 QA + 1 agy QA (kibitz harness) +
+  1 Fable gate. No arc re-run (converged pre-session, per kickoff).
+Commits: 9eb6ede1 (the rip), plus this docs commit.
+
 ## 2026-08-06 -- HEAD 6843d1eb (v2.0-alpha) -- CODER (no-mirror CODE-COMPLETE; SFX rip CODE-READY)
 
 Did: shipped ALL SIX no-mirror steps, then took the SFX rip through a full
