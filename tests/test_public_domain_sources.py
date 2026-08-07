@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import ast
-import importlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -220,17 +221,101 @@ def test_atomic_write_json_replaces_existing_file(tmp_path):
     assert not list(target.parent.glob("*.tmp"))
 
 
-def test_module_import_is_lazy(monkeypatch):
-    def _boom(self, *args, **kwargs):
-        raise AssertionError(f"import-time file read attempted: {self}")
+#: The child program that proves the import is lazy. It runs in a SEPARATE
+#: interpreter, so whatever it does to class objects cannot reach this one.
+#: The repo root arrives as ``argv[1]`` rather than being interpolated into the
+#: source: a Windows path is full of backslashes and every one of them would
+#: need escaping inside a ``-c`` string.
+_LAZY_IMPORT_PROBE = """
+import os
+import sys
 
-    monkeypatch.setattr(Path, "read_text", _boom)
+REPO = os.path.abspath(sys.argv[1])
+sys.path.insert(0, REPO)
+
+from pathlib import Path
+
+_ORIGINAL_READ_TEXT = Path.read_text
+
+
+def _guarded_read_text(self, *args, **kwargs):
+    # SCOPED TO THE REPO, AND THAT SCOPE IS THE POINT. A blanket ban on
+    # Path.read_text fails for a reason that has nothing to do with this
+    # module: importing pydantic runs its plugin loader, which reads
+    # `entry_points.txt` out of site-packages metadata. In the old in-process
+    # test that never showed up, because pydantic was already initialised in
+    # the parent pytest process by the time the reload ran -- a fresh child
+    # initialises it for the first time. Banning third-party metadata reads
+    # would test the interpreter, not us.
+    #
+    # The invariant this test actually owns: the module must not read ITS OWN
+    # DATA FILES at import time.
+    if os.path.abspath(str(self)).startswith(REPO):
+        raise AssertionError("import-time repo file read attempted: %s" % (self,))
+    return _ORIGINAL_READ_TEXT(self, *args, **kwargs)
+
+
+# INSTALLED IN THE CHILD, ON PURPOSE. pytest's monkeypatch fixture is
+# in-process and cannot reach across a process boundary, so the guard has to
+# be armed here, before the import under test.
+Path.read_text = _guarded_read_text
+
+import nodes._otr_public_domain_sources  # noqa: F401,E402
+
+print("LAZY_IMPORT_OK")
+"""
+
+
+def test_module_import_is_lazy():
+    """The module reads no files at IMPORT time -- proven in a CHILD process.
+
+    WHY A SUBPROCESS RATHER THAN ``importlib.reload`` (2026-08-07). This test
+    used to reload the module twice with ``Path.read_text`` patched. Reload
+    REPLACES the module's class objects, and
+    ``tests/test_public_domain_interpreter.py`` imports its exception classes at
+    COLLECTION time -- so once this test had run, that file's ``except`` clauses
+    no longer matched instances raised by the reloaded module and
+    ``test_empty_cast_is_rejected_and_retried_to_failure`` failed whenever the
+    two files ran adjacently. It passed alone, and full-suite ordering hid it,
+    so every targeted run over these two files reported a red line that had to
+    be re-diagnosed as benign.
+
+    Class identity cannot be restored by a fixture -- no teardown can un-rebind
+    a class object -- so the reload leaves this process entirely. The assertion
+    below is the actual invariant: this interpreter's exception class must be
+    the SAME OBJECT afterwards.
+    """
+    before = pd.PublicDomainInterpreterError
+
     try:
-        mod = importlib.reload(pd)
-        assert mod is pd
-    finally:
-        monkeypatch.undo()
-        importlib.reload(pd)
+        proc = subprocess.run(
+            [sys.executable, "-c", _LAZY_IMPORT_PROBE, str(REPO)],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        # A hung import is a real failure mode and `check=True` would say
+        # nothing useful about it, so surface whatever the child managed to emit.
+        raise AssertionError(
+            "lazy-import probe timed out after 120s\n"
+            "stdout: %s\nstderr: %s" % (exc.stdout, exc.stderr)
+        ) from exc
+
+    assert proc.returncode == 0, (
+        "lazy-import probe failed (exit %d) -- the module read a file at import "
+        "time, or would not import at all\nstdout: %s\nstderr: %s"
+        % (proc.returncode, proc.stdout, proc.stderr)
+    )
+    assert "LAZY_IMPORT_OK" in proc.stdout, (
+        "lazy-import probe exited 0 without reaching its marker\n"
+        "stdout: %s\nstderr: %s" % (proc.stdout, proc.stderr)
+    )
+
+    # THE REGRESSION. Nothing this test did may rebind the class objects the
+    # rest of the suite already imported.
+    assert pd.PublicDomainInterpreterError is before
 
 
 def test_module_has_no_network_or_heavy_imports():
