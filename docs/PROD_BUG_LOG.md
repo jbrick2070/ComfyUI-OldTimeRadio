@@ -3357,3 +3357,100 @@ symptom.
   `spoken_coda_source` key at all -- confirmed live on
   `shadows_of_phobos_20260805_193430`. That is why the acceptance control is
   `media_archive` and not `scifi_news`.
+
+## PBUG-20260807-01 -- the announcer asked the operator to write the opening, and 23 episodes shipped with it as their first line
+
+- status: FIXED in code, LIVE PROOF OWED (qualification matrix below not yet run)
+- promotion: pending fan-out
+- found: corpus scan of shipped ledgers under `output/otr/episodes`, 2026-08-07,
+  while investigating a DIFFERENT reported defect (`--premise` allegedly not
+  reaching the writer). The premise wiring turned out to be sound; this was next
+  door and worse.
+- symptom, verbatim from `lines[].text` on shipped episodes:
+
+  > "Please provide the SETTING, TIME, HOOK, and the cast list so that I may
+  > write the opening for you."
+  > "Please provide the cast list and setting details so I may begin the
+  > broadcast."
+
+- blast radius: **23 ledgers**, all `line_id b001`, `speaker_role announcer`,
+  compose_flags `['announcer_intro', 'announcer_intro_rewritten']`. Range
+  2026-07-22 .. 2026-08-07 across `original` (6), `shakespeare` (9),
+  `public_domain` (6), `media_archive` (2). It is the FIRST line the listener
+  hears, it is spoken by TTS, `_otr_captions.py` burns raw `lines[].text` into
+  the ASS cue, and because the rewrite runs BEFORE the outro pass the poisoned
+  text was also fed forward as `intro_text` / `OPENING TONE` into the close.
+  A 24th corpus hit (`the_caretakers_clause`, `shot_001_b2`, scifi lane) is
+  in-story machine dialogue and is NOT this defect.
+- **four independent faults, none of which failed loudly:**
+  1. `_otr_line_composer.compose_announcer_intro` read
+     `getattr(safe_open_brief, 'hook', '')`. `SafeOpenBrief` has never defined
+     `hook` -- its fields are `setting`, `time_of_day`, `opening_status_quo`,
+     `cast`, `era`. The getattr default made it silent, and
+     `opening_status_quo`, `cast` and `era` were constructed at two call sites
+     and read by no prompt builder.
+  2. its `"\n".join(filter(None, (...)))` could never drop anything: every
+     element was an f-string with a literal label prefix, so always truthy. A
+     starved brief therefore shipped as bare labels -- `"SETTING: \nTIME: \n
+     HOOK: \nWrite the opening now."` -- which reads to a model as a form.
+  3. `_otr_story_brief._validate_produced_open` accepted a brief with an EMPTY
+     CAST (it iterated `model.cast` only to reject off-roster names), while all
+     four banks' `announcer_intro_safe_system` seams end "Use ONLY the proper
+     names in the cast list below; invent none". The prompt promised a roster it
+     never sent.
+  4. the rewrite could not have recovered: a failed compose does NOT raise --
+     `_announcer_generate` converts the exception to `None` and the composer
+     returns `fallback_safe_open()`, non-empty canned text -- so the writer
+     stamped `announcer_intro_rewritten` and overwrote a real composed opening.
+     The documented keep-the-in-loop-intro posture only ever fired on a raise.
+- **the origin is NOT the obvious commit.** `314dd481` (2026-07-24) rewrote the
+  safe-open path and severed faults 1 and 2, but **10 of the 23 legs predate
+  it** -- proven from the git HEAD each ledger stamps at render time
+  (`341545ec` x6, `f150213f`, `2129ce84`), not from dates. At `341545ec` the
+  composer already read all five fields, already emitted each only when
+  non-empty, and already sent a cast line -- and `_validate_produced_open` is
+  BYTE-IDENTICAL there to HEAD. So fault 3 is the older cause and the one that
+  explains the pre-314 legs, whose replies lead with the cast list.
+- fix: one shared viability predicate --
+  `(setting OR opening_status_quo) AND at least one CLEANED cast name` --
+  defined once in `_otr_line_composer` and imported by `_otr_story_brief`, so
+  the validator and the composer cannot disagree about what a usable brief is.
+  Direct attribute access replaces every `getattr` default. Labels emit only
+  with a value behind them. A starved brief raises a typed
+  `AnnouncerBriefStarvedError` BEFORE the model call; the rewrite caller
+  declines and keeps the existing line, the in-loop caller ships the
+  deterministic open and records the fallback. A returned structural fallback is
+  no longer stamped as a rewrite. Shipped `a200b6f1` + `615de993`.
+- **two dead receipts found in passing, same defect class, fixed with it:**
+  `meta["open_safe_fallback"]` and `meta["news_coda_fallback"]` each tested for
+  a flag string no producer has ever emitted, so both read False on every
+  episode including the ones that fell back. These are STATIC findings -- no
+  live artifact demonstrates their impact -- and are recorded here only because
+  they rode this fix, NOT as production incidents in their own right.
+- **the class, which is the reusable part:** a receipt or prompt-context field
+  keyed on a producer string or attribute the producer never emits, hidden by
+  `getattr(x, "name", default)` or an `in flags` test that silently reads False.
+  Four instances now: `hook`, `open_safe_fallback`, `news_coda_fallback`, and
+  BUG-LOCAL-255's `_speaker_role`. It fails in the SAFE direction, so nothing
+  ever complains.
+- why no test caught it: `tests/test_closing_seams_bank_routing.py` asserted the
+  SYSTEM message only, `tests/test_announcer_intro_rewrite.py` stubbed the
+  compose entirely, and `test_intro_requires_nonempty_structural_context` had a
+  parametrize list with exactly ONE case -- the sibling `script_brief` path --
+  so the safe-open branch carried the same invariant and none of its cases.
+  Nothing had ever asserted the brief's content REACHES the prompt.
+- receipts: suite 9177 passed / 111 skipped / 1 xfailed; Bug Bible 17 at
+  survival-guide `3759ae5`; `workflows/otr_canonical.json` byte-identical.
+  Ten mutations of the shipped code each confirmed to turn the new tests red.
+- **LIVE PROOF OWED, and one trap to avoid when running it:**
+  `workflows/otr_canonical.json` node 1 has `widgets_values[23] == 'scifi_news'`,
+  a lane that dispatches to `scifi_news_circuit` and RETURNS BEFORE this code.
+  A leg from the unchanged canonical JSON proves nothing here. Every leg must
+  load that exact file with a per-leg RUNTIME bank override and assert the
+  resolved bank is one of `original`/`shakespeare`/`public_domain`/
+  `media_archive`. Per `PRODUCTION_SPRINT_LESSONS.md:106-113` this is
+  model-sensitive work: 30-word smokes on two local model families plus one
+  cloud/frontier lane, the same at 120, only then 720.
+- OPERATOR DECISION OWED: the 23 shipped episodes are in canonical ledgers and
+  delivered audio/captions. Rerender/republish, or tombstone as known-bad and
+  exclude from publication. Not a build gate; recorded here so it is not lost.
