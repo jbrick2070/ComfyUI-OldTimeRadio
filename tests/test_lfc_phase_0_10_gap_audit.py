@@ -597,7 +597,7 @@ class TestGapAuditReport:
         assert not rep.is_clean
 
     def test_constants_exposed(self):
-        assert _LFC.EXPECTED_SCHEMA_VERSION == "l3-2026-05-14"
+        assert _LFC.EXPECTED_SCHEMA_VERSION == "l4-2026-08-07"
         assert "frozen_clean" in _LFC.ALLOWED_FREEZE_VERDICTS
         assert "frozen_with_warns" in _LFC.ALLOWED_FREEZE_VERDICTS
         assert "needs_full_rerun" in _LFC.ALLOWED_FREEZE_VERDICTS

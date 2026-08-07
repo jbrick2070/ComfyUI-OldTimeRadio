@@ -40,8 +40,25 @@ EXIT_OPERATIONAL = 2
 #: Ledgers written before the spoken-coda receipt existed. They cannot carry
 #: ``spoken_coda_source``, so its absence is history rather than a regression.
 #: Anything at a LATER schema is required to carry it on a provenance-owned lane.
+#:
+#: This is the COMPLETE pre-l4 lineage from ``nodes/_otr_ledger.py``. It used to
+#: list three versions, one of which -- "l2-2026-05-02" -- never existed: it is
+#: l2-2026-04-25 and l3-2026-05-02 mashed together. Four real versions were
+#: missing, and ten live ledgers sit at l3-2026-05-08 alone, so the gap was
+#: real rather than cosmetic. It was only ever LATENT because :177 requires a
+#: provenance block before enforcing and the pre-l3 versions predate it.
+#:
+#: "l3-2026-05-14" MUST STAY. It was the current version until the l4 bump, and
+#: it is the string that holds the boundary: replacing it with the new value
+#: would un-legacy 1,587 historical ledgers and legacy every post-bump one --
+#: inverting the audit entirely, while the unit tests below stayed green.
 LEGACY_SCHEMA_VERSIONS = frozenset({
-    "l1-2026-04-24", "l2-2026-05-02", "l3-2026-05-14",
+    "l1-2026-04-24",
+    "l2-2026-04-25",
+    "l3-2026-04-28",
+    "l3-2026-05-02",
+    "l3-2026-05-08",
+    "l3-2026-05-14",
 })
 
 VALID_CODA_SOURCES = frozenset({"provenance", "news_close_brief", "none"})

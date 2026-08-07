@@ -18,6 +18,21 @@ SCRIPT = REPO / "scripts" / "audit_spoken_citations.py"
 sys.path.insert(0, str(REPO / "scripts"))
 import audit_spoken_citations as AUDIT  # noqa: E402
 
+sys.path.insert(0, str(REPO))
+from nodes import _otr_ledger as _OTRL  # noqa: E402
+
+#: The complete pre-l4 lineage, from `_otr_ledger.CURRENT_SCHEMA_VERSION`'s own
+#: docstring. Every one of these must sort as legacy: a ledger written before
+#: the receipt existed cannot be faulted for lacking it.
+HISTORICAL_VERSIONS = (
+    "l1-2026-04-24",
+    "l2-2026-04-25",
+    "l3-2026-04-28",
+    "l3-2026-05-02",
+    "l3-2026-05-08",
+    "l3-2026-05-14",
+)
+
 
 FOLGER_RIGHTS = {
     "source_label": "Folger Shakespeare",
@@ -175,6 +190,65 @@ class TestTheReceiptBoundary:
                          coda_source="provenance")
         violations, receipt_errors = AUDIT.audit_ledger(ledger)
         assert violations == [] and receipt_errors == []
+
+
+class TestTheBoundaryIsWiredToTheREALVersion:
+    """The class above proves the boundary WORKS, using an invented
+    `l4-2999-01-01`. It cannot prove the boundary is drawn in the right PLACE.
+
+    That is the #1 trap of this bump: a completionist find-replace on the
+    l3 literal would put the REAL current version inside
+    `LEGACY_SCHEMA_VERSIONS`, which un-legacies 1,587 historical ledgers and
+    legacies every post-bump one -- inverting the audit completely. Every test
+    above would stay green through it, because they hardcode a version string
+    the production constant never mentions.
+
+    So these assertions read the shipped constant instead.
+    """
+
+    def test_the_current_version_is_not_legacy(self):
+        assert _OTRL.CURRENT_SCHEMA_VERSION not in AUDIT.LEGACY_SCHEMA_VERSIONS, (
+            "the CURRENT version landed in the legacy set -- the boundary is "
+            "inverted and the receipt requirement can never fire again")
+
+    def test_the_current_version_requires_the_receipt(self):
+        ledger = _ledger(GUTENBERG_RIGHTS, "A clean line.",
+                         schema=_OTRL.CURRENT_SCHEMA_VERSION,
+                         provenance={"status": "public_domain_us"})
+        _, receipt_errors = AUDIT.audit_ledger(ledger)
+        assert receipt_errors, (
+            "a provenance-owned ledger at the CURRENT version dropped its "
+            "receipt and the audit said nothing")
+
+    def test_the_current_version_accepts_a_stamped_receipt(self):
+        ledger = _ledger(GUTENBERG_RIGHTS, "A clean line.",
+                         schema=_OTRL.CURRENT_SCHEMA_VERSION,
+                         provenance={"status": "public_domain_us"},
+                         coda_source="provenance")
+        violations, receipt_errors = AUDIT.audit_ledger(ledger)
+        assert violations == [] and receipt_errors == []
+
+    @pytest.mark.parametrize("schema", HISTORICAL_VERSIONS)
+    def test_every_historical_version_is_legacy(self, schema):
+        assert schema in AUDIT.LEGACY_SCHEMA_VERSIONS, (
+            f"{schema} is a real lineage version; ledgers written at it "
+            "predate the receipt and must not be faulted for lacking it")
+        ledger = _ledger(GUTENBERG_RIGHTS, "A clean line.", schema=schema,
+                         provenance={"status": "public_domain_us"})
+        _, receipt_errors = AUDIT.audit_ledger(ledger)
+        assert receipt_errors == [], f"{schema} was audited as current"
+
+    def test_the_legacy_set_carries_no_version_that_never_existed(self):
+        """It listed "l2-2026-05-02" -- l2-2026-04-25 and l3-2026-05-02 mashed
+        together. Harmless in effect, wrong in fact, and the kind of wrong that
+        hides a real gap: four genuine versions were missing beside it."""
+        assert set(AUDIT.LEGACY_SCHEMA_VERSIONS) == set(HISTORICAL_VERSIONS)
+
+    def test_the_previous_current_version_stays_legacy(self):
+        """l3-2026-05-14 is the string that HOLDS the boundary. Replacing it
+        with the new value during a sweep is the inversion this class exists
+        to catch."""
+        assert "l3-2026-05-14" in AUDIT.LEGACY_SCHEMA_VERSIONS
 
 
 class TestTheCommandLineContract:

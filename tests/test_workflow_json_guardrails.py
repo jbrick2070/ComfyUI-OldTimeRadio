@@ -1250,8 +1250,18 @@ class TestVintageLedgerSchemaCompat:
     def test_schema_version_pinned(self):
         # a SILENT schema bump is forbidden -- this fails loud on a rename.
         from nodes._otr_ledger_freeze import EXPECTED_SCHEMA_VERSION
-        assert EXPECTED_SCHEMA_VERSION == "l3-2026-05-14"
-        assert self._vintage_l3_ledger()["schema_version"] == EXPECTED_SCHEMA_VERSION
+        assert EXPECTED_SCHEMA_VERSION == "l4-2026-08-07"
+
+        # The vintage fixture models a LEGACY ledger, so it must now DIFFER
+        # from the current version -- that difference is the entire reason it
+        # exists. Before the l4 bump these two happened to be equal, because
+        # l3-2026-05-14 was simultaneously the vintage value and the current
+        # one; carrying that equality forward by "fixing" the fixture to the
+        # new constant would silently delete the l3 compatibility coverage the
+        # test below depends on.
+        vintage = self._vintage_l3_ledger()["schema_version"]
+        assert vintage == "l3-2026-05-14"
+        assert vintage != EXPECTED_SCHEMA_VERSION
 
     def test_vintage_ledger_no_false_consistency_defect(self):
         # the new consistency guard (chunk 2) must NOT fire on a vintage ledger

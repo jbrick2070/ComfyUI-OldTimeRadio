@@ -700,7 +700,7 @@ class Ledger:
         SCHEMA_VERSION = _OTRL_FOR_SCHEMA.CURRENT_SCHEMA_VERSION
         del _OTRL_FOR_SCHEMA
     except Exception:  # pragma: no cover -- defensive fallback
-        SCHEMA_VERSION = "l3-2026-05-14"
+        SCHEMA_VERSION = "l4-2026-08-07"
 
     def __init__(self, episode_id: str, out_dir: str):
         self.episode_id = episode_id

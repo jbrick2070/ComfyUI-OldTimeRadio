@@ -89,7 +89,7 @@ try:
     EXPECTED_SCHEMA_VERSION: str = _PL_FOR_SCHEMA.Ledger.SCHEMA_VERSION
     del _PL_FOR_SCHEMA
 except Exception:  # pragma: no cover -- defensive fallback
-    EXPECTED_SCHEMA_VERSION = "l3-2026-05-14"
+    EXPECTED_SCHEMA_VERSION = "l4-2026-08-07"
 
 
 # Allowed values for line.speaker_role. Drawn from

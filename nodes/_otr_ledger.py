@@ -55,10 +55,14 @@ log = logging.getLogger("OTR")
 # Constants
 # ---------------------------------------------------------------------------
 
-CURRENT_SCHEMA_VERSION = "l3-2026-05-14"
+CURRENT_SCHEMA_VERSION = "l4-2026-08-07"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
 date suffix so the lineage is greppable.
+
+A ledger already carrying a DIFFERENT version is not promoted on
+write-back -- see ``save_ledger_safe``. Migration is a decision, never
+a side effect of a post-hoc tool touching an old episode.
 
 Lineage:
   l1-2026-04-24 -- baseline (cast, scenes, shots, lines, sfx, music, clips)
@@ -106,6 +110,18 @@ Lineage:
                    shots[].png_path/start_s/dur_s, lines[].bark_wav_path
                    (use lines[].tts_wav_path going forward, both written
                    during the transition).
+
+  l3-2026-05-14 -- ADDITIVE: meta.news, the news_interpreter brief block
+                   wired between style-resolve and cast-lock (f518fb3c).
+  l4-2026-08-07 -- REQUIRED, not additive: a provenance-owned ledger must
+                   carry meta.spoken_coda_source, the receipt naming which
+                   fact the episode actually SPOKE. l4 is what makes that
+                   requirement enforceable: scripts/audit_spoken_citations.py
+                   demands the receipt on any ledger newer than the legacy
+                   set, and until this bump every live ledger sorted as
+                   legacy so the requirement never fired. A dropped receipt
+                   was indistinguishable from history, which is how a coda
+                   with zero readers survived for months.
 
 Reader pattern for all l3-2026-05-08 fields: ALWAYS use
 ``dict.get(field, default)`` with the documented default. Older
@@ -263,9 +279,15 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
     stamped. ATOMIC via tempfile + ``os.replace`` (BUG-LOCAL-127).
 
     Always sets:
-      - ``ledger["schema_version"]``
+      - ``ledger["schema_version"]``       (see the version policy below)
       - ``ledger["meta"]["schema_version"]``
       - ``ledger["meta"]["paths"]``  (BUG-LOCAL-018, Phase E)
+
+    Version policy: a ledger with NO version, or one already at
+    ``CURRENT_SCHEMA_VERSION``, is stamped current. A ledger carrying any
+    OTHER version keeps it, gets it mirrored into ``meta`` so the two
+    surfaces cannot disagree, and logs a WARNING. Both fields are always
+    written -- what changes is whether the value is current or preserved.
 
     The ``meta.paths`` block is resolved fresh on every save from the
     actual on-disk ``path`` argument. This makes it self-correcting --
@@ -286,9 +308,37 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
     Cleanup: any partial temp file is unlinked on failure.
     """
     try:
-        ledger["schema_version"] = CURRENT_SCHEMA_VERSION
+        # STAMP THE CURRENT VERSION, OR PRESERVE A FOREIGN ONE. This used to
+        # restamp unconditionally, which is only safe while nothing older is
+        # ever written back -- and six post-hoc tools do exactly that over
+        # EXISTING episodes (audit_otr_full_run, audio_enhance,
+        # otr_master_audio_mux, scene_sequencer, otr_video_render_batch,
+        # otr_post_upscale_procgen_blend). A read-only corpus measurement found
+        # 43 of 48 provenance-carrying ledgers predating the spoken-coda
+        # receipt: one routine write-back would have promoted each of them past
+        # what it actually contains, after which the citation audit reports a
+        # receipt they never could have carried as a REGRESSION ON HISTORY.
+        # Migration is a decision; it is not a side effect of touching an old
+        # episode. This function is the only guard needed because every one of
+        # those six writers reaches history through here.
+        existing_version = ledger.get("schema_version")
         meta = ledger.setdefault("meta", {})
-        meta["schema_version"] = CURRENT_SCHEMA_VERSION
+        if (
+            isinstance(existing_version, str)
+            and existing_version
+            and existing_version != CURRENT_SCHEMA_VERSION
+        ):
+            # Say so out loud. A ledger that stays behind should be observable
+            # here, not inferred later from a puzzling audit report.
+            log.warning(
+                "[OTR_Ledger] preserving schema_version %r on write-back "
+                "(current is %r) -- this ledger is NOT migrated",
+                existing_version, CURRENT_SCHEMA_VERSION,
+            )
+            meta["schema_version"] = existing_version
+        else:
+            ledger["schema_version"] = CURRENT_SCHEMA_VERSION
+            meta["schema_version"] = CURRENT_SCHEMA_VERSION
         episode_id = ledger.get("episode_id") or ""
         meta["paths"] = _build_meta_paths(
             Path(path),

@@ -15,6 +15,7 @@ REPO = HERE.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from nodes import _otr_ledger as _OTRL  # noqa: E402
 from nodes.production_ledger import (  # noqa: E402
     Ledger,
     get_ledger,
@@ -101,7 +102,11 @@ class TestLedgerBasics:
         # warmup_pad_ms, mp4_dur_s, etc). Live-pulled from
         # _otr_ledger.CURRENT_SCHEMA_VERSION so both write paths stay
         # in lockstep.
-        assert led.data["schema_version"].startswith("l3-")
+        # Compared against the constant, not a prefix. `startswith("l3-")` said
+        # "in lockstep" and meant "still l3", so the l4 bump broke it -- and a
+        # prefix check is invisible to a literal sweep, which is why it was the
+        # last site found.
+        assert led.data["schema_version"] == _OTRL.CURRENT_SCHEMA_VERSION
         # S26-A3: "sfx" key removed from schema scaffold -- sfx are
         # first-class lines[] rows in the v2 ledger; the standalone
         # sfx[] array (and its tolerant consumers) is dead.
