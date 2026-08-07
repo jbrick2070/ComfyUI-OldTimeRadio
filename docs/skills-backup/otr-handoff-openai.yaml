@@ -1,0 +1,7 @@
+interface:
+  display_name: "OTR Handoff"
+  short_description: "Resume or hand off the OTR build baton (GO_FORWARD_PLAN + HANDOFF_LOG)"
+  default_prompt: "Use $otr-handoff to resume the OTR build or wrap up this window."
+
+policy:
+  allow_implicit_invocation: true
