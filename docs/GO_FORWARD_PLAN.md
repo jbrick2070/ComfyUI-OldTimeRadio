@@ -76,295 +76,57 @@ SET**. A WAN or `ltx_8gb` leg would pass without ever executing the deleted
 machinery. That one leg also discharges F11 and the multi-clip receipt work's
 outstanding live proof.
 
-### 0-TER. SFX RIP -- 100%. **DONE, SHIPPED AND LIVE-PROVEN 2026-08-06 (`9eb6ede1`).**
+### 0-TER. SFX RIP -- DONE `9eb6ede1` (2026-08-06), tombstoned.
 
-**Shipped in one atomic pathspec commit `9eb6ede1`, pushed, HEAD == origin.**
-Five engines deregistered + deleted; the mux collapsed to the unconditional
-`-c:a copy` master-copy passthrough with an in-source codec assertion; the bed
-compiler and both helper chains deleted; the dead `[SFX:]` machinery deleted;
-`RETIRED_ENGINE_IDS` + `RetiredEngineError` (`reason_code "retired_engine"`)
-wired at all five boundaries in `nodes/_otr_shared/public_engines.py`;
-`tests/test_rip_sfx_bed_guard.py` (closed forbidden set) +
-`tests/test_retired_engine_policy.py` (5 ids x 5 boundaries) added; fixture +
-matrix regenerated 32 -> 27. Suite 8997/111/1; Bug Bible 17. Gates: Sonnet QA
-clean, agy QA SECURE-BUILD-LOCK, Fable gate PASS.
+Shipped, pushed, live-proven. Five engines barred via `RETIRED_ENGINE_IDS`;
+guard test `tests/test_rip_sfx_bed_guard.py` trips on any surface creeping
+back. Receipts: HANDOFF_LOG + `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`.
+Reviving SFX is a NEW design against the post-rip tree (`ROADMAP.md` keeps the
+historical design record).
 
-**LIVE-PROVEN:** fresh reset+boot, canonical JSON, 45-word episode
-`signal_lost_the_verdant_debt_20260806_211836` (Prompt executed 01:10:02):
-stamped-ledger receipt present, all three exact ledger paths on disk under
-canonical roots, decoded-PCM of the archival final == frozen master
-(`9a60fe4f4152`), OBS copy playable (video + one AAC stream). All 17
-acceptance checks pass (`tmp/_rip_sfx_leg_verify.py`).
+### 0-QUATER. BANANA ROUTE -- CLOSED `bc8a1bde` (2026-08-07). Two open remnants below.
 
-**INCIDENT, resolved:** commit `760a63ae` (banana-route window) accidentally
-swept this rip's three staged file deletions into itself and pushed, leaving
-origin red ~90 minutes until `9eb6ede1` completed the rip. Lesson banked: on a
-multi-window tree, stage nothing until your own commit moment.
-
-`clip_manifest_json` / link 278 remain WIRED as the vestigial terminal-node
-connector (decided; tooltip says so). The canonical JSON is byte-unchanged.
-
-<details><summary>Superseded planning text (pre-ship)</summary>
-
-
-**Operator ruling 2026-08-06: "I do really want to rip out SFX 100%, that's my
-aim... but don't break the system."**
-Problem statement: `docs/2026-08-06-PROBLEM-STATEMENT-legacy-sfx.md`.
-Build spec: `docs/2026-08-06-BUILD-SPEC-rip-sfx.md` (`74a30d23`).
-
-**Why it was confusing, settled:** FOUR things are called SFX. The b-roll ROLE
-was ripped 2026-07-01 (its 44 tombstones still fail loud and MUST survive); the
-engine lane was PARKED 2026-08-04; the `[SFX:]` script markup is dead by
-shadowing; and **the SFX BED was never removed** -- `OTR_MasterAudioMux` node 85
-still calls the bed compiler on every run, and one `music_visual` dropdown pick
-would arm it.
-
-**THE ARC IS COMPLETE AND CONVERGED.** r1 -> r2 -> r3 -> r4, Codex + Antigravity
-every round (8 external calls), plus a scoped adjudication lane in r1 and a
-five-way Sonnet fan-out before it. Codex ran no -> no -> no -> yes-with-fixes and
-each round's findings were strictly narrower than the last. Judgments in
-`kibitz-runs/2026-08-06-rip-sfx/r{1,2,3,4}/` (**LOCAL ONLY, gitignored**).
-
-**STILL OWED BEFORE THE COMMIT LANDS: the Fable gate.** Structural,
-production-touching, and it touches the TERMINAL publish node.
-
-**THE DECISION THAT STUCK, twice contested:** `clip_manifest_json` and link 278
-STAY WIRED as a vestigial input. Codex demanded deletion in r1 and again in r3;
-the answer both times is risk asymmetry -- a topology mistake on the terminal
-node yields NO episode rather than a degraded one, and the input has zero
-semantic consumers once the bed is gone. A third lane agreed independently
-(`docs/2026-08-06-DISPUTE-sfx-test-inventory.md`).
-
-**THE THREE TRAPS THE NEXT WINDOW MUST NOT RE-DERIVE:**
-1. `mux_master_audio` is `if not sfx_bed_path: <master_copy> else: <sfx_mix>`.
-   **KEEP THE SMALLER `if` BODY.** Keeping the wrong one swaps a `-c:a copy`
-   passthrough for a re-encode on every episode, violating V-1, and NO surviving
-   test would notice.
-2. `eng_cloud_video.py:46` imports `append_sfx_audio_safety_clause` at MODULE
-   SCOPE and `:886` calls it on the SURVIVING Vidu base class. Deleting the
-   helper alone is a startup ImportError -- which in ComfyUI means the node pack
-   vanishes from the menu.
-3. "One atomic green commit" describes the COMMIT, not the tree.
-   `still_plan_head_parity.json` must be REGENERATED against the live registry,
-   so the tree necessarily goes RED inside the commit. Spec section 8 has the
-   intra-commit order.
-
-</details>
-
-### 0-QUATER. BANANA ROUTE -- **SHIPPED `bc8a1bde`, PUSHED, LIVE-RENDERED.** One deferred item below is the only thing left.
-
-**DONE 2026-08-07.** The build and all nine repairs are committed and pushed
-(`HEAD == origin`). Full four-round `kibitz-plugin:kibitz` arc satisfied (r1
-Fable synthesis under operator override -> r2 coding -> r3 wiring -> r4
-convergence; Codex `gpt-5.6-sol` high + Antigravity every round, `--driver
-claude`, both ComfyUI profiles confirmed each round). Sonnet 5 QA: zero
-blockers, three should-fixes, all repaired. Fable gate: SAFE TO COMMIT.
-Receipts: suite **9067 / 111 / 1** (baseline 9033/111/1, zero failures, no new
-skip/xfail classes), Bug Bible 17, `git diff -- workflows/` empty, lockstep
-clean against the pushed blobs. Judgments and build order:
+Tombstone: all nine QA fixes shipped and pushed after the full r1-r4
+`kibitz-plugin:kibitz` arc (Fable r1 synthesis under the recorded operator
+override), Sonnet 5 QA + Fable gate green, suite 9067/111/1, and two live
+120-word legs `RESULT SUCCESS` + `obs_publish OK`. Wiring is LIVE-PROVEN (all
+six receipt keys on every still row and manifest entry, spoken script
+untouched); the cap fix is proven on PRODUCTION DATA via ledger replay, NOT by
+a GPU render -- neither leg's writer put a weapon noun in a visual prompt.
+Full receipts: the 2026-08-07 `docs/HANDOFF_LOG.md` entry +
 `kibitz-runs/2026-08-06-banana-route-qa-fixes/` (LOCAL ONLY, gitignored; r3/r4
-raw outputs also under the `2026-08-07-` folder -- the script date-stamps its
-run dir and the arc crossed midnight).
+raw outputs also sit under the `2026-08-07-` folder -- the script date-stamps
+its run dir and the arc crossed midnight).
 
-**LIVE ACCEPTANCE, stated honestly.** Two 120-word legs through the canonical
-workflow, `*=ltx_audio_in` forced, all three banana knobs pinned in the fresh
-server: `signal_lost_the_docks_at_midnight_20260807_013045` (38:54) and
-`signal_lost_noon_on_cutbank_street_20260807_021531`. BOTH `RESULT SUCCESS` +
-`obs_publish OK`, assets under `otr/episodes/<ep>/` AND `otr/obs/`.
-* **PROVEN LIVE:** the wiring. 14/14 still rows and 14/14 `stills_manifest.json`
-  entries carry all six receipt keys with `banana_route=on` and the correct
-  variety string, on both legs. The visuals-only rule holds -- zero `banana` in
-  either spoken script.
-* **NOT PROVEN BY A GPU RENDER:** the cap fix. Neither leg's writer produced a
-  weapon noun in a VISUAL prompt (both ignored the premise entirely -- leg 1
-  wrote tailoring, leg 2 a strangulation), so the transform never fired and the
-  cap was never reached. Substitutions were 0 on both. A third leg was not run:
-  two legs at ~40 min each established this is writer behaviour, not luck.
-* **PROVEN ON PRODUCTION DATA INSTEAD:** driving the REAL
-  `build_request_from_shot` with leg 1's REAL frozen ledger (real cast, style
-  pack, engine routing) plus the weapon-bearing identity fragment the writer did
-  not supply: the transform fires on 4/4 shots and all four keep
-  `Static camera.` intact at 238 chars inside the published 240 budget, six
-  receipt keys stamped. The same text under the old `max(188, pre)` rule loses
-  the clause. That reproduces the blocking defect and demonstrates the fix
-  through the production code path.
+**OPEN 1 -- shield scoping: the next banana coder chunk, and it REQUIRES its
+own four-round arc.** The quote shield is BLANKET, not scoped to still_word
+card text: `_clean_llm_prompt` (`otr_meta_brief_image_prompt.py:1592-1600`)
+strips only leading/trailing quotes, so an LLM-authored
+`a man carrying a "revolver"` reaches `obj["prompt"]` with its quote pair and
+`_shielded_spans` protects it -- the route under-fires. A false negative; no
+ledger or render fault. Scoping it means an `apply(..., shield_quotes=...)`
+argument, a ruling on which object kinds count as card text, and threading
+BOTH funnels -- a change to the operator-ruled shield contract, which is why
+it did not ride the repair commit (it surfaced at r4 with zero rounds left to
+review it). The era-tail instance of this class is already closed by the
+shipped fix.
 
-**THE ONE THING LEFT -- its own chunk, needs its own four-round arc.** The quote
-shield is BLANKET, not scoped to still_word card text: `_clean_llm_prompt`
-(`otr_meta_brief_image_prompt.py:1592-1600`) strips only LEADING/TRAILING
-quotes, so inner quotes reach `obj["prompt"]` on the portrait and
-character-scene paths, `_shielded_spans` protects them, and
-`a man carrying a "revolver"` passes through UNTRANSFORMED. A false negative
-(the route under-fires); no ledger or render fault. Scoping it means an
-`apply(..., shield_quotes=...)` argument, a ruling on which object kinds count
-as card text, and threading through BOTH funnels -- a change to the
-operator-ruled shield contract, which is why it did not ride the repair commit.
-The commonest instance of this class (era-tail quotes reaching the card) IS
-closed by the shipped fix.
+**OPEN 2 -- premise wiring, operator eye when convenient.** `--premise` lands
+in the ledger as `meta.operator_hint`, but the writer ignored it on BOTH live
+legs and both scripts carry the same model meta-response line ("Please provide
+the SETTING, TIME, HOOK, and the cast list..."). Story QUALITY is closed by
+directive; this is flagged as possible WIRING -- a knob that lands in the
+ledger and never reaches the writer -- and was deliberately not chased.
 
-**Worth an operator eye, outside this item:** `--premise` reaches the ledger as
-`meta.operator_hint` correctly, but the writer ignored it on BOTH legs and both
-scripts contain the same model meta-response line ("Please provide the SETTING,
-TIME, HOOK, and the cast list..."). Story quality is closed by directive, so
-this was flagged and not chased -- but a premise knob that lands in the ledger
-and never reaches the story reads like wiring rather than quality.
+### 0-QUINQUE. MINIMAX H3 -- ON DECK (operator, 2026-08-07: "keep minimax on deck")
 
-<details><summary>Original NOT-READY briefing, kept for the record</summary>
-
-
-**Contract:** `docs/2026-08-06-BUILD-SPEC-banana-route.md` (committed `ec9da848`).
-**Fix plan:** `docs/2026-08-06-PLAN-banana-route-qa-fixes.md` (this session).
-**Operator rulings:** section 2-PRE above -- all closed, none reopenable.
-
-**THE CODE IS ON DISK AND UNCOMMITTED. Do not re-derive it, do not rebuild it,
-and do not `git checkout` it away.** Working-tree state at `ec9da848`:
-
-| path | state | owner |
-|---|---|---|
-| `nodes/_otr_banana_route.py` | NEW, untracked | the banana item (this) |
-| `tests/test_banana_route.py` | NEW, untracked, 38 tests green | the banana item |
-| `nodes/otr_image_gen_dispatcher.py` | MODIFIED (+54, -0) | the banana item |
-| `nodes/_otr_video_engines/render_driver.py` | MODIFIED (+66, -12) | the banana item |
-| `docs/2026-08-06-PLAN-banana-route-qa-fixes.md` | committed with this handoff | the banana item |
-| everything else dirty | **ANOTHER WINDOW'S** | see the exclusion list below |
-
-**NOT YOURS -- never stage, never revert, never edit:** `config/profiles/*`,
-`config/source_banks/_corpus/`, `kibitz/`, `uv.lock`, `tmp/*`,
-`docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md`, `scripts/build_variants.py`.
-Stage nothing until your own commit moment -- the index is shared (the `760a63ae`
-incident, section 0-TER).
-
-**A READ-ONLY QA PASS RETURNED NOT-READY.** One blocking defect, two
-runtime-reproduced bugs, two coverage holes, one cosmetic. Under `CLAUDE.md`'s
-admission rule these are **runtime-reproduced pre-production defects, NOT
-PBUGs** -- they were proven by executing the real code in the ComfyUI venv, not
-by a headless run or a published artifact. **Do not open `PROD_BUG_LOG.md`
-entries or Bug Bible rules for them.**
-
-1. **BLOCKING -- `render_driver.py:2909` caps with the wrong number.**
-   `max(188, len(_banana_prompt))` measures the *pre-transform* string
-   (captured `:2885`), so any branch already over 188 chars may not grow and
-   `cap_phrase_safe` trims the growth off the END. Proven: the ia2v
-   compact-talking branch (185 -> 200 -> capped 185) loses `Static camera.`
-   entirely; a brief+beat prompt (204 -> 219 -> capped 196) has
-   `slow cinematic camera drift` mangled to `slow,`. The ia2v branch is
-   explicitly engineered at `:2633-2638` so "the proven IA2V talking clause
-   still stays intact" -- the cap destroys exactly that invariant.
-2. `_otr_banana_route.py:404` -- `""` is in `_TRUE_TOKENS`, so a
-   present-but-empty `OTR_BANANA_INCLUDE_FIDELITY_BANKS` returns True and
-   silently bananafies the fidelity lanes. `raw is None` at `:412` already
-   covers "unset". Contradicts BUILD-SPEC line 45.
-3. `otr_meta_brief_image_prompt.py:958-970` -- a spoken line ending in an ODD
-   backslash run makes the card's closing quote read as escaped,
-   `_shielded_spans` returns `[]`, and the WHOLE card prompt transforms:
-   `HE DREW HIS BANANA` on the one audience-readable surface.
-4. The cap's phrase-retreat branch (`_otr_banana_route.py:388-395`) has ZERO
-   coverage -- `tests/test_banana_route.py:220-225` never enters it.
-5. No test asserts the six receipt keys on any dispatcher row, in
-   `stills_manifest.json`, or in the video trace.
-6. Cosmetic: the dead `.replace("an long","an long")` at
-   `tests/test_banana_route.py:118`.
-
-**A KIBITZ r1 RAN AND COMPLETED** (Codex + Antigravity, driver Claude;
-artifacts `kibitz-runs/2026-08-06-banana-route-qa-fixes/r1/`, LOCAL ONLY,
-gitignored). **r2/r3/r4 did NOT run -- the operator said "stand down".** Under
-the full-kibitz HARD GATE this is a PARTIAL campaign and may never be reported
-as a full arc.
-
-**r1 PRODUCED TWO CORRECTIONS THAT INVALIDATE THE FIX PLAN AS WRITTEN. Fold
-them BEFORE writing any code:**
-* **Fix 3 is placed one level too low (found independently by BOTH lanes).**
-  The music card at `otr_meta_brief_image_prompt.py:1014` calls
-  `_fold_inner_dquotes(title)` directly and never goes through
-  `_still_word_clean_line`. Those two are the only call sites in the tree, so
-  the scrub belongs in `_fold_inner_dquotes` itself (`:919-925`) or the
-  episode-title path keeps the same leak.
-* **Fix 1 does not actually fix the brief+beat branch (Codex).**
-  `finish_visual_prompt` caps at 188 and `_prefix_video_style_cue` then adds
-  the cue, so the pre-transform length ALREADY equals the proposed
-  `188 + cue_delta` budget -- that branch gets no headroom and behaves exactly
-  as today. And `cap_phrase_safe` protects only `no on-screen text`
-  (`_TRAILING_CLAUSE`, `:354`), so `Static camera.` and the motion tail were
-  never protectable by a budget number at all. The real shape is **a declared
-  budget PLUS a branch-owned protected suffix**, trimming only the expendable
-  body. Codex also sharpened the trigger: cap only when the transform CROSSES
-  the boundary (`pre <= budget < post`), never when the prompt was already
-  over budget before the route touched it.
-* Also flagged and worth folding: the `:2831` budget is CONDITIONAL, not a
-  flat 620 -- that assignment is the `_is_open` motion branch with four
-  sub-paths (motion-register base; an atmosphere append guarded at
-  `_LTX_MOTION_PROMPT_MAX` `:2781-2784`; a `_motion_clause_override` that
-  REPLACES the prompt with arbitrary opt-in text `:2789-2791`; and a
-  google-provider-only `finish_visual_prompt(max_chars=620)` `:2816-2820`),
-  with `_prefix_video_style_cue` on all four at `:2826`. The budget must be
-  set INSIDE the google block; the other three declare none.
-* Codex additionally noted BUILD-SPEC section 9's integration list is bigger
-  than fix 5 (multi-segment prebuilt requests, promptless procedural families,
-  a direct caller with no ledger meta, all six keys reaching the trace) and
-  that BUILD-SPEC section 8's LIVE LEG is missing from the plan's gates.
-* **REJECTED, with reason:** Antigravity's "cut the cache-HIT assertion" --
-  the cache-HIT row is the ONE row that starts as a copy of an older row
-  (`fresh = dict(ref_row or {})`, `otr_image_gen_dispatcher.py:1201`), which is
-  the exact stale-inheritance fault the comment at `:1213-1215` exists to
-  prevent; it is the least duplicative assertion in the set. Also rejected:
-  downgrading the malformed-knob warning to INFO (PBUG-20260723-02 posture and
-  BUILD-SPEC line 46 require a warning).
-
-**THE OPERATOR HAS RULED THE NEXT STEP (2026-08-06) -- do not ask again, do not
-re-derive it:** *"have Fable update the r1 for a synthesis and then r2 - r4."*
-Execute in exactly this order:
-
-1. **FABLE WRITES THE r1 SYNTHESIS.** Fable produces
-   `kibitz-runs/2026-08-06-banana-route-qa-fixes/r1/final.md` -- the hardened
-   plan folding the existing `driver_anchor.md` + the GROUNDED survivors from
-   `codex.md` and `antigravity.md`, including both corrections above and the
-   two explicit rejections. Give Fable the four r1 files, the fix plan, the
-   BUILD-SPEC and the real source files; it is the r1 judge for this campaign.
-   **This is an OPERATOR OVERRIDE of the kibitz skill's "never outsource the
-   synthesis" line, and it is deliberate.** The anti-hallucination property is
-   preserved a different way: Claude still GROUNDS Fable's output against the
-   real Windows files before r2 consumes it, and discards anything that does
-   not survive. Record the override in `r1/judgment.md` so the arc is honest
-   about who judged.
-2. **THEN r2 -> r3 -> r4**, sequentially, Codex + Antigravity each round
-   (6 external calls), each round's `final.md` feeding the next, a fresh
-   code-grounded `driver_anchor.md` written BEFORE each fan-out. Together with
-   the completed r1 this is the FULL four-round arc and satisfies the HARD GATE.
-3. **THEN code**, per the gate order below.
-
-Command shape, from the repo root, one round at a time:
-
-```
-python C:\Users\jeffr\.claude\plugins\cache\kibitz-local\kibitz-plugin\1.2.1\skills\kibitz\scripts\kibitz.py --doc kibitz-runs\2026-08-06-banana-route-qa-fixes\r1\final.md --round r2 --topic banana-route-qa-fixes --repo . --driver claude
-```
-
-(`--driver claude` is explicit: Claude drives from Cowork, so no second
-`claude -p` lane runs against its own family. The ComfyUI profile overlay
-`.kibitz/comfyui.local.md` is auto-appended -- confirm `Profiles:` says so in
-the script's output. Verify `codex_model_selected.txt` reads `gpt-5.6-sol` each
-round; a stale skill cache has silently drifted mid-arc before.)
-
-**Gate order when code is written:** focused
-`tests/test_banana_route.py` + `tests/test_image_platform_c1.py` -> full suite
--> Bug Bible 17 -> AST/BOM/zero-byte on every touched file -> Sonnet 5 QA on
-the diff -> Fable gate -> ONE pathspec commit -> push -> `HEAD == origin`.
-**No `workflows/` change** -- if the diff touches it, STOP; a decision was made
-against that. Pathspec:
-`nodes/_otr_banana_route.py`, `nodes/otr_image_gen_dispatcher.py`,
-`nodes/_otr_video_engines/render_driver.py`,
-`nodes/otr_meta_brief_image_prompt.py`, `tests/test_banana_route.py`, plus
-wherever the fix-5 integration test lands, plus the two banana docs' status
-flips. Nothing else.
-
-**Live acceptance (BUILD-SPEC section 8, which the plan omitted):** fresh
-selective reset + UTF-8 boot; load `workflows/otr_canonical.json`; force the
-exercised roles to `ltx_audio_in` via `OTR_FORCE_ENGINE_MAP`; fail preflight if
-the effective adapter differs; confirm the asset under `otr/episodes/<ep>/` AND
-`otr/obs/`; eyeball one frame for the banana and its period fit. The default
-procedural graph is INERT for this route (`viz_*` engines ignore `text_prompt`
-and mint no stills) -- seeing no bananas there is correct, not a failure.
-
-</details>
+The MiniMax H3 dropdown question STAYS QUEUED. Problem statement:
+`docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` -- UNTRACKED and another
+window's working file; never stage, edit or delete it from a different window.
+The matrix-pattern spec already names MiniMax as a churn driver
+(`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5). The next step
+is an operator/planner ruling on the statement's question (does H3 belong in
+the video dropdown given the 4 s floor vs the sub-4 s beats), not coder work.
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
@@ -416,8 +178,8 @@ force-on override. **NO node widget and NO `workflows/otr_canonical.json`
 change.** So `Is this a dagger which I see before me` stays a dagger on the
 fidelity lanes unless the operator flips the override. Two env switches
 (`OTR_BANANA_STILLS`, `OTR_BANANA_VIDEO`), one per funnel. The whole contract is
-`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; its build state is
-section 0-QUATER below.
+`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; SHIPPED -- see
+section 0-QUATER above (`bc8a1bde`).
 
 ### 2. Operator calls nobody can make for you
 
@@ -461,7 +223,9 @@ contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 Item 1 is the structural work and consumes most of a session; items 2-3 are
 small and share one campaign. **Items 8 AND 9 are DONE (both tombstoned below)
 -- item 9 SHIPPED 2026-08-06 as `e499b7fc`.** The live open work is sections 0
-(video matrix pattern, did NOT converge) and 0-BIS (no-mirror, CODE-READY).
+(video matrix pattern, did NOT converge), 0-BIS (no-mirror, CODE-READY),
+0-QUATER's deferred shield-scoping chunk (own kibitz arc), and the 0-QUINQUE
+MiniMax ruling.
 Work by priority, not by number -- the numbering is historical.
 
 **RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
@@ -676,7 +440,7 @@ adaptation styles -- operator-authored 2026-07-14; fix the DRAW and the
 plumbing, not the styles.
 
 **Two receipts, named now so neither is overstated later:**
-* `code-complete + suite-green` -- the most this no-render session can claim.
+* `code-complete + suite-green` -- the most a session without the live leg can claim.
 * `production-qualified` -- only after a canonical `public_domain` leg passes a
   rubric: no unsupported foreign place/character/object; the source's setting
   and principal event retained; provenance receipt complete; `obs_publish OK`;
@@ -695,7 +459,7 @@ by the OUTLINE (`OTR_LedgerScriptWriter.py:3948-3963` -> `:4129`), and beats do
 not exist until the outline returns -- so a sound world derived from
 beat-keyed windows is impossible. Build in THIS order, one green pushed chunk
 each:
-**CHUNKS 1 AND 2 ARE DONE AND PROVEN ON RENDERS. CHUNK 3 IS NEXT.**
+**CHUNKS 1 AND 2 ARE DONE AND PROVEN ON RENDERS. Chunk 3 (the grounding supply line) is PARKED under the story-quality directive -- the Source-grounding note in section 3 above is authoritative; a contributor may pick it up.**
 
 **Carried into chunk 3 from the chunk-2 QA (do not lose):** snapshot replay
 has no whole-body carrier, so an adaptation lane replaying a frozen source
@@ -735,8 +499,9 @@ apply and the plan must say so first. The bench items were conditional filler
 and are now unreachable; that is fine.
 
 **Ceiling to be honest about:** this can be built and unit-tested here, but its
-real proof is a render, and renders are parked. Ship `code-complete +
-suite-green` and say so; `production-qualified` waits for the leg.
+real proof is a render. Renders HAVE RESUMED (2026-08-05), so the
+`production-qualified` leg is runnable whenever a render window is free; until
+it runs, claim only `code-complete + suite-green`.
 
 ### 2. THE NON-COMMERCIAL NOTICE REACHES NO HUMAN SURFACE (~30 min)
 
@@ -1066,7 +831,7 @@ stands.
    * The shared `row_is_active(...)` evaluator over captured state -- confirmed
      absent from the tree -- closing the four env-read sites named in OPEN BUGS.
 
-## PARKED -- D2 (resume when the operator wants renders again)
+## PARKED -- D2 (renders have resumed; run when a render window is free for fail-hunting soak legs)
 
 Reset per AGENTS.md section 4, boot headless, run **320-word `public_domain` or
 `shakespeare` still legs until one fails** (~1 in 6). Three legs on 08-04 all
@@ -1849,7 +1614,7 @@ coder windows never write plans.
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
 | **CODER (open slot)** | The ON DECK queue at the top of this file, in order, one green pushed chunk at a time, each with its full kibitz | Claude codes + judges; kibitz = codex + agy | none -- work it now | ~2h40m + panels |
-| RENDER | PARKED by operator directive 2026-08-04 ("no runs right now"). When it resumes: D2 first, then the WAN/8-GB proof obligations | local production + Codex-app monitor | opens when the operator wants a live leg | GPU days |
+| RENDER | RESUMED 2026-08-05 (the 08-04 "no runs" line was that session only). Queue: D2 first, then the WAN/8-GB proof obligations. Reset per CLAUDE.md section 4 before every leg | local production + Codex-app monitor | operator asks for a live leg | GPU days |
 | PLANNER | Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with any coder window | docs |
 
 **NEVER boot a window by letter.** Boot by the ON DECK section, always:
@@ -1886,10 +1651,13 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 - **Render-window fillers:** cpu-tier smoke (needs the google image lane or stills) +
   nv50 re-soak -- the two open portability remainders; release QA validation time, not
   coding.
-- **SFX: PARKED (operator doubt 2026-08-04)** -- no R4.1 re-ground, no C0
-  promotion, no Timeline Cue Ledger C0/C1 spend until the operator explicitly
-  revives the campaign. The doubt and its reasoning are in HANDOFF_LOG; the
-  designs stay in `ROADMAP.md` as evidence, not as a queue.
+- **SFX: RETIRED and RIPPED (operator ruling 2026-08-06, "rip out SFX 100%";
+  executed `9eb6ede1` per `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`).** The five
+  bed engines are deregistered and barred via `RETIRED_ENGINE_IDS`, the bed
+  compiler and mux mix branch are deleted, and
+  `tests/test_rip_sfx_bed_guard.py` trips on any surface creeping back.
+  Reviving SFX is a NEW design against the post-rip tree; the old design docs
+  in `ROADMAP.md` are the historical record only.
 
 ## Bug Bible promotion field -- pending actions only
 
@@ -1907,8 +1675,8 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 
 ## Validation and handoff law
 
-- **Current whole-tree receipt (2026-08-06 @ `d3913f7d`):** full Windows suite
-  **8805 passed / 131 skipped / 1 xfailed** (~3:48); Bug Bible **17 passed**. Prior
+- **Current whole-tree receipt (2026-08-07 @ `bc8a1bde`):** full Windows suite
+  **9067 passed / 111 skipped / 1 xfailed** (~3:49); Bug Bible **17 passed**. Prior
   receipts live in `docs/HANDOFF_LOG.md` -- this file keeps only the current one.
 - **Standing acceptance receipt:**
   `python scripts/audit_voice_gender_consistency.py --root "C:\Users\jeffr\Documents\ComfyUI\output\otr"`
@@ -1979,9 +1747,9 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 - `dynamic_story` touches the writer, the visual-style authority and the canonical
   workflow; it re-derives the live JSON at build. It is the only claimant on those
   surfaces.
-- Generated-SFX R4 stays local/ignored evidence; the whole SFX campaign is PARKED
-  (operator doubt 2026-08-04) and the R4.1 refit does not run unless the campaign
-  is explicitly revived.
+- Generated-SFX R4 stays local/ignored evidence of a RETIRED campaign (the
+  2026-08-06 rip, `9eb6ede1`); no R4.1 refit exists to run, and reviving SFX
+  is a new design against the post-rip tree.
 - Lean-mean front/tail drift: the constraint holds wherever it runs -- the tail's SW-1
   re-survey is mandatory against the then-current writer, and the two campaigns never
   share a window.
@@ -2002,7 +1770,7 @@ here because each has been re-proposed at least once:
 ## Pointers
 
 - `CLAUDE.md` -- hard operator rules; wins over this file wherever they disagree
-- `ROADMAP.md` (later runway: SFX -> product expansion -> lean-mean -> RunPod -> release)
+- `ROADMAP.md` (later runway: product expansion -> lean-mean -> RunPod -> release; SFX RETIRED + ripped 2026-08-06)
 - `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 11 pointer-not-proof; 24 lost-anchor; 25 bank-teardown)
 - `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate + the Teardown protocol

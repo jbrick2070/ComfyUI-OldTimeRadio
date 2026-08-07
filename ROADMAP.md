@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Updated:** 2026-07-29
+**Updated:** 2026-08-07
 
 **Branch:** `v2.0-alpha`
 
@@ -51,11 +51,12 @@ later block lands on freshly-rewired code. It sits ahead of rows 4 and 5 on
 purpose: validating an install path and tagging a release against a tree still
 full of dead code would have to be redone after the rip.
 
-**Everything in `docs/GO_FORWARD_PLAN.md` precedes row 1 here.** That file
-carries the local-engine OBS wiring block, WAN 8-GB, Randomizer A and
-`dynamic_story`; when its queue is exhausted, a window comes here.
+**Everything in `docs/GO_FORWARD_PLAN.md` precedes row 2 here (row 1 is
+retired).** That file carries the ON DECK continuity-correctness queue, then
+WAN 8-GB, Randomizer A and `dynamic_story`; when its queue is exhausted, a
+window comes here.
 
-**Release-runway planning range after GO_FORWARD:** roughly **28-46 coder-days**
+**Release-runway planning range after GO_FORWARD:** roughly **28-46 coder-days** (figure predates the SFX retirement; the effective range is lower with row 1 gone)
 before optional product-expansion campaigns, or about **6-9 one-coder weeks**
 with normal integration margin. Hardware/provider qualification can extend
 calendar time without consuming equivalent coding time.
@@ -70,11 +71,12 @@ acceptance smokes where matching hardware or credentials are available. That is
 validation time, not planned coding time. A platform smoke creates coding work
 only if it proves a real defect that must be root-fixed. Generated workflows
 remain under `workflows/variants/` and derive from
-`workflows/otr_canonical.json`; the planned `docs/ENGINE_MATRIX.md` makes the
-already-built engine/backend support visible to users.
+`workflows/otr_canonical.json`; the generated `docs/ENGINE_MATRIX.md` (emitted by
+`tools/engine_matrix.py`, drift-gated in the suite) makes the already-built
+engine/backend support visible to users.
 
-`dynamic_story` is owned by the immediate next sprint in
-`docs/GO_FORWARD_PLAN.md`; it is not duplicated in this longer-range queue.
+`dynamic_story` is owned by `docs/GO_FORWARD_PLAN.md`'s standing block
+order; it is not duplicated in this longer-range queue.
 
 ## 1. Timeline Cue Ledger / generated spotted SFX
 
@@ -122,11 +124,8 @@ Planned sequence:
 5. **C4 later:** add VFX rows only after the SFX lane is green; VFX genuinely
    needs a post-video picture-aware pass.
 
-The earlier C0-C3c estimate remains a provisional **8-15 coder-days + 2-4
-elapsed live-evaluation days** until R4.1 re-grounds the generated renderer's
-full ownership and receipt surface. R4.1 must replace this range if the grounded
-scope differs. C0 is technically independently shippable, but remains parked
-with the campaign unless the operator explicitly promotes it earlier.
+Estimates void -- the campaign is RETIRED 2026-08-06; the Status line above
+governs. No C0 promotion path exists on the post-rip tree.
 
 ## 2. Product expansion candidates
 
@@ -246,7 +245,7 @@ full lane retirement including the zero-declarer capability and the
 
 ### ENGINE_MATRIX is a W6 SUB-STEP, not a separate chunk
 
-`docs/ENGINE_MATRIX.md` -- emit from the three live CAPABILITIES registries per
+`docs/ENGINE_MATRIX.md` -- ALREADY GENERATED AND COMMITTED (emitted by `tools/engine_matrix.py`; `--check` drift-gates it in the suite), so W6 only owes the README link. Original design note: emit from the three live CAPABILITIES registries per
 the existing generator pattern (`build_variants.py` ~:276-338): write during
 `--all` / explicit emit; `--check` regenerates in memory and FAILS on drift
 without writing. Columns + stable ordering; link from README. The lean-mean doc

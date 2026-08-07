@@ -230,12 +230,6 @@ Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's 
   aliases, record the resolved model in the manifest). Lean panel of genuinely different
   families beats many near-duplicates -- diversity is the point, correctness comes from the
   grounding step.
-- **UNTIL 2026-07-21 (operator directive 2026-07-09): ALSO seat `tencent/hy3:free` on every
-  panel** -- Tencent Hy3, 295B MoE (21B active), 262K ctx, $0/$0 on OpenRouter, listing expires
-  July 21 2026. Pass it via `--models` (skill panel.config.json is a read-only cache). Free =
-  no budget impact; a 4th genuinely different family, strongest on ideas/R1 rounds. Uses a
-  configurable reasoning effort like the other reasoning panelists. REMOVE this line after
-  2026-07-21 or when the slug 404s.
 - **Cowork (Claude) is ALWAYS a code-aware grounded PANELIST *and* the sole judge.** Write your
   own grounded review FIRST (every claim checked against the real Windows files via Desktop
   Commander, never the lagging Linux mount), THEN ground the panel's reviews, discard the
@@ -250,8 +244,7 @@ Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's 
 - **ARC ROUTING (operator directive 2026-07-09): R1 (ideas/high-level) = cloud `/roundtable`
   on the highest frontier models (that's where paid diversity earns its keep); R2-R4 (coding /
   wiring / convergence) = `/kibitz` (local Codex + Antigravity) ALWAYS PREFERRED -- $0, file-
-  grounded. R1 via kibitz is also fine when economy matters. OpenRouter is paid except
-  `tencent/hy3:free` (until 2026-07-21), so default mechanical review to the local panel.
+  grounded. R1 via kibitz is also fine when economy matters. OpenRouter is paid, so default mechanical review to the local panel.
 - Artifacts under `docs/<YYYY-MM-DD>-<topic>/roundtable/` (pass00..passNN_plan.md +
   passNN_judgment.md), UTF-8 no BOM, ASCII where practical.
 ## 9. MODEL ROUTING -- when to spend Fable (operator directive 2026-07-03)
