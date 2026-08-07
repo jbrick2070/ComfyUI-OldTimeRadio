@@ -13,7 +13,7 @@ blocked on the operator, finishes it green and pushed, then re-reads this list.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Small sprint items:** the non-commercial notice reaching no human surface (~30 min); the test-ordering pollution in `test_public_domain_sources.py`; finishing item 7's B4/B6 (`CURRENT_SCHEMA_VERSION`) | THE CODING SPRINT items 2, 3, 4 | coder, mechanical | nothing |
+| 1 | **Small sprint items -- IN FLIGHT, 2 of 5 commits shipped.** See the checklist directly below; plan is `docs/2026-08-07-PLAN-small-sprint-items.md` | THE CODING SPRINT items 2, 3, 4 | coder | nothing |
 | 2 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 3 | **Premise wiring** -- `--premise` lands in the ledger as `meta.operator_hint` but never reaches the writer (reproduced on BOTH 2026-08-07 live legs), and both scripts carried the same model meta-response line ("Please provide the SETTING, TIME, HOOK...") | 0-QUATER OPEN 2 | investigate; likely real wiring | nothing |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
@@ -27,6 +27,66 @@ than guess.
 The old item 1 (0-BIS no-mirror) is DISCHARGED -- see the tombstone in section
 0-BIS. It took the live leg with it, so F11 and the multi-clip receipt's
 outstanding proof are closed in the same stroke.
+
+### QUEUE ITEM 1 -- COMMIT CHECKLIST (tick these, in this order)
+
+Full plan with every correction and the acceptance gate:
+**`docs/2026-08-07-PLAN-small-sprint-items.md`** (committed `1a746c25`).
+Arc: cold Fable r1 as senior architect -> `kibitz-plugin:kibitz` r2/r3/r4
+(Codex + Antigravity) -> Sonnet 5 QA -> an operator-run independent QA.
+**~28 corrections folded in.** Artifacts: `kibitz-runs/2026-08-07-small-sprint-items/`
+(LOCAL ONLY, gitignored) incl. `scope_receipt.md` and `qa_independent.md`.
+
+| # | Commit | State |
+|---:|---|---|
+| 1 | **Item 3** -- test-ordering pollution; lazy-import probe moved to a subprocess | **SHIPPED `1a746c25`** -- both file orders 28/28 |
+| 2 | **Item 2** -- the non-commercial notice rendered in credits | **SHIPPED `e8e649f2`** -- 5 tests, each proven to catch its own defect |
+| 3 | **B4** -- extract `_compose_and_stamp_announcer_close` | code APPLIED (byte-identical, AST clean); **still owes the routing matrix + the `run()` reachability test** |
+| 4 | **B6** -- `CURRENT_SCHEMA_VERSION` -> `l4-2026-08-07` + the save-version policy + the fixture sweep | NOT STARTED |
+| 5 | **Bug Bible** -- SEPARATE REPO (`comfyui-custom-node-survival-guide`), atomic 3-file landing, after B4 | NOT STARTED |
+
+**Suite baseline moves as this lands:** 9081/111/1 at `76a5208a` -> **9086/111/1
+at `e8e649f2`** (+5 credits tests). Bug Bible **17** and must be re-run after
+commit 5 changes it.
+
+### NEW WORK THE ARC SURFACED -- not previously on this queue
+
+None of these need their own r1: they were found and reviewed inside the item-1
+arc. **Items marked ARC would need a fresh `kibitz-plugin:kibitz` starting at
+Fable r1 if picked up as standalone work.**
+
+1. **The save-version policy** (`save_ledger_safe` must PRESERVE a foreign
+   `schema_version` instead of restamping). **Folded into commit 4** -- do not
+   schedule separately. Measured exposure: **43 of 48 provenance-carrying
+   ledgers** would be falsely flagged without it.
+2. **`LEGACY_SCHEMA_VERSIONS` is wrong today, independently of the bump**
+   (`scripts/audit_spoken_citations.py:43-45`): it omits FOUR real lineage
+   versions and carries one (`l2-2026-05-02`) that never existed. **10 live
+   ledgers** sit at `l3-2026-05-08`, which the set does not recognise. Folded
+   into commit 4.
+3. **Regression owed: nobody may resume a `Ledger()` over a pre-existing on-disk
+   ledger carrying a foreign `schema_version`.** `Ledger.save()` restamps
+   unconditionally at `production_ledger.py:1461-1462` and would promote such a
+   ledger. Dormant today (no caller does it); pin it so it stays dormant.
+   Folded into commit 4.
+4. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
+   is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
+   fixtures match its `l3-` prefix filter. Deliberately OUT of scope for this
+   sprint. Delete-or-revive is a separate small item.
+5. **The parked worktree rip must be RE-GROUNDED after B4.**
+   `.claude/worktrees/awesome-brahmagupta-a509b4` holds the uncommitted removal
+   of `news_coda_spoken_reduction` / `finalize_news_coda_surface`, and its
+   target lines now live INSIDE the new helper. **ARC** if reopened.
+6. **`docs/known-failures.md` + the conftest KNOWN-FAIL-GUARD** exit **2**, not
+   1, on a new failure, and it swallows the traceback in `-q` runs. Not a
+   defect, but it cost two mis-diagnoses this session -- worth knowing before
+   reading a red line.
+
+**Lane note:** Antigravity **quota-failed at r4** (`RESOURCE_EXHAUSTED 429`), so
+that round was Codex-only. Real count for the campaign: **5 successful external
+reviews of 6 attempted**, plus cold Fable r1, four driver anchors and two QA
+passes. It is a scoped tail, NOT a full 8-call panel arc -- see
+`scope_receipt.md`.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
