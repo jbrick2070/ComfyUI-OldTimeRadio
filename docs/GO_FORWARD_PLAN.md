@@ -63,9 +63,9 @@ at 120, plus one cloud/frontier lane.
 |---:|---:|---|---|---|
 | 1 | 30 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | shakespeare | **PASS** `signal_lost_qual_leg_1_shakespeare_nemo_20260807_152012` -- b001 "In the royal court of Britain, King Lear demands an accounting from his daughter, Cordelia."; receipt `{status: announcer_intro_rewritten, reason: None}`; `open_safe_fallback False`; schema l4; 617s |
 | 2 | 30 | `google/gemma-4-12b-it (11.9 GB)` | public_domain | **PASS** `signal_lost_qual_leg_2_publicdomain_gemma_20260807_153216` -- b001 "The sun hangs heavy over the garden as Rikki-tikki-tavi keeps a watchful eye on the grass..."; same clean receipt. **Second model FAMILY -- the fix is not Mistral-shaped** |
-| 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | RUNNING |
-| 4 | 120 | `google/gemma-4-12b-it (11.9 GB)` | media_archive | queued |
-| 5 | 30 | `openrouter:slot-a` -> cheapest resolving (DeepSeek Flash class) | shakespeare | queued |
+| 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | **PASS** `signal_lost_qual_leg_3_original_nemo_120w_20260807_154633` -- b001 names BOTH characters ("Malcolm Sirikit and Clarisse Spender..."), so the cast wire that was severed is demonstrably feeding the prompt. `open_safe_fallback` is `None` not `False` here and that is CORRECT: `original` runs style-grammar OFF, and that receipt is only stamped inside `if _style_grammar_on`. None = never asked; False = asked and did not fall back |
+| 4 | 120 | `google/gemma-4-12b-it (11.9 GB)` | media_archive | RUNNING |
+| 5 | 30 | `openrouter:slot-a` + `openrouter_slot_a_model=tencent/hy3:free` | shakespeare | queued. **DeepSeek is NOT in the pinned catalog** -- checked, do not plan around it without a catalog change. Of the 21 slot-a choices `tencent/hy3:free` is both the cheapest (free) and a genuinely different family from Mistral and Gemma, which is what a diversity arm needs. Fallback `~anthropic/claude-haiku-latest`. Cloud arm cost: $0.00 |
 
 Leg 5 is a **diversity arm only** -- it proves the prompt shape survives a third
 model family. Operator ruling 2026-08-07: use a CHEAP model, spend under a
