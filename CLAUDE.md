@@ -130,6 +130,15 @@ graph since 2026-07-08 and shipped; that unwritten practice is now written down,
   published episode may enter `PROD_BUG_LOG.md` or be promoted to the Bug Bible. A review observation,
   static-audit finding, or invented test fixture may verify a known production bug, but never creates a
   new PBUG or Bible rule on its own.
+- **Bible delta-scrape discipline (2026-08-07):** the Bible repo carries `otr_coverage_index.yaml` --
+  all 369 OTR bug records through 2026-08-07 (BUG_LOG.md, BUG_LOG_2026-06.md, docs/handoffs, kibitz
+  runs, loose logs, git fix history) mapped to Bible ids against the 261-entry Bible (HEAD 3759ae5).
+  NEVER re-scrape indexed history -- the full scrape cost ~4M tokens once and the index exists so it
+  is never paid again. At session wrap-up / handoff, if the session recorded a NEW bug (admission rule
+  above): check it against the index + Bible, promote a genuinely uncovered one with a Bible entry,
+  and append its row to the index in the same change. Any cached Bible copy, entry count, or vendored
+  test snapshot re-syncs to the Bible repo's origin/main -- do not pin a stale local copy of the
+  Bible or its tests.
 - **PowerShell reality (DC runs powershell.exe):** use `;` to chain, NOT `&&`. Do NOT use
   `python -c "..."` with nested quotes -- PowerShell mangles them; instead WRITE A TEMP `.py` file, run
   it, then delete it. `2>&1` makes stderr render as scary red text -- that is NOT a failure; check the
