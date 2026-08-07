@@ -129,6 +129,132 @@ def test_music_mode_blank_title_fails_loud():
         ip.compose_still_word_prompt({"story_brief_terms": {}}, "music_visual", "")
 
 
+# --------------------------------------------------------------------------- #
+# BACKSLASH / QUOTE-SHIELD integrity on the composed card (banana-route QA)
+#
+# The card template wraps its text in the ONLY double-quote pair the prompt is
+# allowed to contain, and the banana route reads that pair as a shielded span so
+# the SPOKEN LINE passes through untransformed. A line ending in an ODD
+# backslash run made the closing quote read as ESCAPED -- no span was found and
+# the WHOLE card prompt transformed, putting a substituted word on the one
+# audience-readable surface.
+# --------------------------------------------------------------------------- #
+
+def _dquote_pairs(prompt):
+    return prompt.count('"')
+
+
+@pytest.mark.parametrize("line", [
+    "He drew his revolver \\",              # odd run -- the leak
+    "He drew his revolver \\\\",            # even run -- was already fine
+    "He drew his revolver \\\\\\",          # odd, longer
+    "He drew his revolver\\ and holstered it \\",   # interior AND trailing
+])
+def test_word_card_backslash_never_breaks_the_quote_shield(line):
+    from nodes import _otr_banana_route as banana
+    out = ip.compose_still_word_prompt(_META, "character_video", line)
+    assert "\\" not in out
+    assert _dquote_pairs(out) == 2          # the template boundary, intact
+    # the spoken words inside the card are SCRIPT and stay byte-identical
+    result = banana.apply(out, variety_key="")
+    assert "revolver" in result.text
+    assert "banana" not in result.text.lower()
+
+
+@pytest.mark.parametrize("line", ["\\", "\\\\", "[static hiss] \\", "\\ \\ \\"])
+def test_backslash_only_line_still_composes_and_never_kills_the_render(line):
+    """These compose fine today. Scrubbing backslashes turns them BLANK, and a
+    blank line is a NO-FALLBACK raise -- so a naive scrub would invent a new way
+    to kill an episode over a stray character. THE LAW: an audit may never fail
+    a story for language or style."""
+    out = ip.compose_still_word_prompt(_META, "character_video", line)
+    assert "title card" in out.lower()
+    assert "\\" not in out
+    assert _dquote_pairs(out) == 2
+
+
+@pytest.mark.parametrize("line", ["", "   ", "[static hiss]"])
+def test_genuinely_blank_lines_still_fail_loud(line):
+    """The blank raise is deliberate and must survive the backslash guard."""
+    with pytest.raises(ValueError, match="NO FALLBACK"):
+        ip.compose_still_word_prompt(_META, "character_video", line)
+
+
+def test_music_title_backslash_is_scrubbed_and_still_shields():
+    """The music card calls the fold DIRECTLY and never passes through the
+    word-card cleaner, so a fix placed one level lower leaves the episode-title
+    path leaking: `The Revolver of Deck Nine \\` renders as `The Banana ...`."""
+    from nodes import _otr_banana_route as banana
+    meta = dict(_META, episode_title="The Revolver of Deck Nine \\")
+    out = ip.compose_still_word_prompt(meta, "music_visual", "")
+    assert "\\" not in out
+    assert banana.apply(out, variety_key="").text.count("Revolver") == 1
+
+
+def test_music_title_that_is_only_a_backslash_does_not_mint_an_empty_card():
+    """A backslash-only title must not mint `evoking ""`.
+
+    Note what actually guarantees this: the fold's degenerate-input rescue, not
+    the fold-then-validate ORDER. Because the rescue makes the folded value
+    truthy for every truthy raw title, validating before or after the fold gives
+    the same answer today -- the reordering is defence in depth for the day
+    someone removes the rescue, and this test cannot isolate it. What the test
+    does pin is that the card is composed FROM THE FOLDED VALUE."""
+    meta = dict(_META, episode_title="\\")
+    out = ip.compose_still_word_prompt(meta, "music_visual", "")
+    assert 'evoking ""' not in out
+    assert _dquote_pairs(out) == 2
+    # composed from the folded value, not the raw title
+    assert 'evoking "%s"' % ip._fold_inner_dquotes("\\") in out
+
+
+def test_era_tail_quotes_cannot_shield_a_weapon_from_the_route():
+    """The era tail splices LLM-authored atmosphere/palette text into the same
+    card. An authored quote PAIR there wrongly shielded whatever it wrapped, so
+    `a "cold revolver" on the desk` kept its revolver -- the route silently not
+    working. Folding era restores this composer's stated invariant: the
+    template's outer pair is the ONLY double-quote pair in the card."""
+    from nodes import _otr_banana_route as banana
+    meta = dict(_META, atmosphere_line='a "cold revolver" on the desk')
+    out = ip.compose_still_word_prompt(meta, "character_video", "We go back.")
+    assert _dquote_pairs(out) == 2          # only the card boundary
+    result = banana.apply(out, variety_key="")
+    # the spoken card text is still shielded byte-identically
+    assert "We go back." in result.text
+
+
+def test_backslash_free_text_keeps_its_whitespace_through_the_fold():
+    """The whitespace collapse is SCOPED to strings that actually carried a
+    backslash, so a card that never had one is not re-seeded.
+
+    This has to be asserted on the MUSIC and ERA paths, which call the fold
+    DIRECTLY. Asserting it on the word card proves nothing: that path runs its
+    own unconditional collapse afterwards, so an unscoped fold would produce
+    byte-identical word cards and the regression would slip through."""
+    for raw in ("The  Signal   From Deck Nine", "  padded title  ",
+                "plain title"):
+        assert ip._fold_inner_dquotes(raw) == raw, raw
+    # ...and through the real music card, whose title is folded directly.
+    meta = dict(_META, episode_title="The  Signal   From Deck Nine")
+    out = ip.compose_still_word_prompt(meta, "music_visual", "")
+    assert 'evoking "The  Signal   From Deck Nine"' in out
+
+
+def test_backslash_bearing_text_IS_collapsed_by_the_fold():
+    """The other half: where a backslash WAS present, the residue it leaves
+    behind is collapsed rather than shipped as stray whitespace."""
+    assert ip._fold_inner_dquotes("Deck Nine \\") == "Deck Nine"
+    assert ip._fold_inner_dquotes("a\\\\b") == "a b"
+
+
+def test_word_cards_are_deterministic():
+    for line in ("We have to go back.", "A quiet, padded  line",
+                 "He said 'run' -- and then... silence"):
+        first = ip.compose_still_word_prompt(_META, "character_video", line)
+        assert first == ip.compose_still_word_prompt(
+            _META, "character_video", line)
+
+
 def test_compose_is_deterministic():
     a = ip.compose_still_word_prompt(_META, "character_video", "Once more.")
     b = ip.compose_still_word_prompt(_META, "character_video", "Once more.")

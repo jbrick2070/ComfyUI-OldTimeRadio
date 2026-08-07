@@ -919,10 +919,35 @@ def _still_word_mood_from_line(line) -> str:
 def _fold_inner_dquotes(s) -> str:
     """Fold every inner double-quote (straight + curly + guillemets) to a single
     quote so the ONLY double-quote pair in a still_word card is the template's
-    outer ``"%s"`` boundary. Closes the nested-quote ambiguity AND the semantic
-    prompt-injection where a stray ``", ...`` closes the span early and injects a
-    sibling clause. Keeps apostrophes / em-dash / ellipsis / unicode. Pure."""
-    return re.sub(r'[\"“”„‟«»]', "'", str(s or ""))
+    outer ``"%s"`` boundary, and SCRUB backslashes for the same reason. Closes
+    the nested-quote ambiguity AND the semantic prompt-injection where a stray
+    ``", ...`` closes the span early and injects a sibling clause. Keeps
+    apostrophes / em-dash / ellipsis / unicode. Pure.
+
+    The backslash scrub is a quote-shield repair, not cosmetics: a card line
+    ending in an ODD backslash run makes the template's CLOSING quote read as
+    escaped, so the banana route's span scan finds no shielded span and the
+    WHOLE card prompt transforms -- putting a substituted word on the one
+    audience-readable surface. A backslash is never legible card lettering.
+
+    Whitespace is re-collapsed only for strings that actually carried a
+    backslash, so every backslash-free title stays byte-identical (the word-card
+    path re-collapses downstream either way; this keeps MUSIC titles from being
+    re-seeded for whitespace they always had).
+
+    A line that is ENTIRELY backslashes would scrub to empty and hit the
+    caller's NO-FALLBACK blank raise -- killing a render that composes fine
+    today. Such input returns a single apostrophe instead: alive, and already
+    this function's own substitution vocabulary. Genuinely empty or
+    whitespace-only input still returns empty, so the blank raise keeps working
+    for the case it was written for."""
+    text = str(s or "")
+    if "\\" in text:
+        scrubbed = re.sub(r"\s+", " ", text.replace("\\", " ")).strip()
+        if not scrubbed and text.strip():
+            return "'"
+        text = scrubbed
+    return re.sub(r'[\"“”„‟«»]', "'", text)
 
 
 def _still_word_fit_card(words: str) -> str:
@@ -1001,17 +1026,30 @@ def compose_still_word_prompt(meta, role, beat_line, style=None):
             get_era_tail, NO_TEXT_CLAUSE, _resolve_style)
     _role = str(role or "")
     _style = _resolve_style(meta, style)
-    era = (get_era_tail(meta, profile="still", style=_style) or "").strip()
+    # The era tail is the one piece here spliced from LLM-authored brief text
+    # (atmosphere_line / visual_palette), so it is the one piece that can carry
+    # its own double quotes. Fold it: this function's contract is that the
+    # template's outer pair is the ONLY double-quote pair in the card, and a
+    # second pair does not merely muddle the prompt -- it SHIELDS whatever it
+    # wraps from the banana route, so a quoted `"revolver"` in an atmosphere
+    # line survives into the picture. (The pack-owned lettering / backdrop /
+    # grade values are authored config and verified quote-free.)
+    era = _fold_inner_dquotes(
+        (get_era_tail(meta, profile="still", style=_style) or "").strip())
     if _role == _STILL_WORD_MUSIC_ROLE:
         # UNTOUCHED music path (operator 2026-07-04: episode titles are proc-gen
         # elsewhere, so the music card stays a WORDLESS abstract mood still).
-        title = _episode_title(meta)
+        # Fold ONCE, then validate the FOLDED value and compose from that same
+        # value -- checking the raw title first would let a backslash-only title
+        # pass the blank gate and mint `evoking ""`, while the word path below
+        # raises for the equivalent input.
+        title = _fold_inner_dquotes(_episode_title(meta))
         if not title:
             raise ValueError(
                 "compose_still_word_prompt: music-role still_word beat has a "
                 "BLANK episode title (meta['episode_title']/['title']) -- cannot "
                 "mint the abstract title still. NO FALLBACK.")
-        pieces = ['an abstract picture evoking "%s"' % _fold_inner_dquotes(title),
+        pieces = ['an abstract picture evoking "%s"' % title,
                   _style.still_word_title_mood_style, era,
                   _style.image_grade_tail]
         out = ", ".join(p.strip().rstrip(",") for p in pieces if p and p.strip())

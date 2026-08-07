@@ -1102,6 +1102,107 @@ def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_
     assert len(hashes) == 2              # B's mesh cache would invalidate
 
 
+def test_banana_receipt_reaches_every_durable_still_row(clean_image_registry,
+                                                        tmp_path, monkeypatch):
+    """The six banana receipt keys on the FRESH row, the CACHE-HIT row and the
+    stills_manifest projection (BUILD-SPEC section 9).
+
+    Nothing asserted these anywhere, so the whole dispatcher hunk could be
+    deleted and the suite would stay green. The cache-hit row is the one that
+    matters most: it starts life as a COPY of an older row
+    (``fresh = dict(ref_row or {})``), so the day the stamp becomes conditional
+    that row inherits the PREVIOUS revision's receipt -- a stale
+    ``banana_route=on`` over a still minted before the route existed. That is a
+    ledger lie, not a missing assertion."""
+    monkeypatch.setenv("OTR_BANANA_STILLS", "1")
+    monkeypatch.delenv("OTR_BANANA_INCLUDE_FIDELITY_BANKS", raising=False)
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_banana",
+              "meta": {"source_bank": "original",
+                       "freeze_timestamp": "2026-08-06T00:00:00Z"},
+              "cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
+              "seed": {"request_seed": 0}, "granularity": {}}
+    prompts = _payload(_pobj("c1", "a detective holding a revolver, station",
+                             "phb1"))
+    lockdir = tmp_path / "lease.lockdir"
+
+    calls = {"n": 0}
+
+    def gen_fn(_req):
+        calls["n"] += 1
+        return _np_pixels(140 + calls["n"])
+
+    keys = ("banana_route", "banana_table_version", "banana_substitutions",
+            "banana_sha256_before", "banana_sha256_after", "banana_varieties")
+
+    led, _done, _report, _w = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=gen_fn, output_dir=str(tmp_path),
+        lockdir=lockdir,
+    )
+    fresh = led["images"]["images"][0]
+    for key in keys:
+        assert key in fresh, key
+    assert fresh["banana_route"] == "on"
+    # the weapon really was transformed on the way to the engine
+    assert fresh["banana_substitutions"] >= 1
+    assert fresh["banana_sha256_before"] != fresh["banana_sha256_after"]
+
+    # second dispatch, same prompt -> genuine CACHE HIT, receipt stamped again
+    led2, _d2, _r2, _w2 = disp.dispatch_images(
+        led, policy, prompts, gen_fn=gen_fn, output_dir=str(tmp_path),
+        lockdir=lockdir,
+    )
+    assert calls["n"] == 1                       # proves the hit branch ran
+    hit = led2["images"]["images"][1]
+    assert hit["provenance"]["source"] == "cache_hit"
+    for key in keys:
+        assert key in hit, key
+    assert hit["banana_route"] == "on"
+    assert hit["banana_sha256_after"] == fresh["banana_sha256_after"]
+
+    # and the manifest projection an operator audits without the ledger
+    manifest = json.loads(
+        (pathlib.Path(fresh["path"]).parent / "stills_manifest.json")
+        .read_text(encoding="utf-8"))
+    for still in manifest["stills"]:
+        for key in keys:
+            assert key in still, key
+        assert still["banana_route"] == "on"
+
+
+def test_banana_receipt_is_stamped_on_the_OFF_path_too(clean_image_registry,
+                                                       tmp_path, monkeypatch):
+    """OFF is a receipt shape, not an absence -- the forensics answer 'which
+    table and which fruits WOULD have applied'. A fidelity lane is OFF by bank
+    policy even with the env switch on."""
+    monkeypatch.setenv("OTR_BANANA_STILLS", "1")
+    monkeypatch.delenv("OTR_BANANA_INCLUDE_FIDELITY_BANKS", raising=False)
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    ledger = {"episode_id": "ep_fidelity",
+              "meta": {"source_bank": "shakespeare",
+                       "freeze_timestamp": "2026-08-06T00:00:00Z"},
+              "cast": [{"char_id": "c1", "name": "BABA"}]}
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
+              "seed": {"request_seed": 0}, "granularity": {}}
+    prompts = _payload(_pobj("c1", "a soldier holding a dagger, castle", "phf1"))
+    led, _d, _r, _w = disp.dispatch_images(
+        ledger, policy, prompts, gen_fn=lambda _r: _np_pixels(7),
+        output_dir=str(tmp_path), lockdir=tmp_path / "l.lockdir",
+    )
+    row = led["images"]["images"][0]
+    assert row["banana_route"] == "off"
+    assert row["banana_substitutions"] == 0
+    assert row["banana_sha256_before"] == row["banana_sha256_after"]
+    assert row["banana_varieties"]          # which fruits WOULD have applied
+
+
 def test_dispatcher_hard_fails_on_unusable_engine(clean_image_registry, tmp_path):
     """NO FALLBACKS (operator 2026-06-18): an unusable/absent REQUESTED engine
     HARD-FAILS the episode (ImageRenderError), never skipped, never a silent

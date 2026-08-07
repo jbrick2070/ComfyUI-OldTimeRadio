@@ -1392,7 +1392,14 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
 
 def _motion_clause_override(shot):
     """Opt-in per-beat motion clause text, or ``None`` (default OFF -> byte-identical).
-    See nodes/_otr_motion_clause + docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md."""
+    See nodes/_otr_motion_clause + docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md.
+
+    BANANA ROUTE NOTE (docs/2026-08-06-BUILD-SPEC-banana-route.md, 7b): this is
+    a SECOND video prompt surface, and when enabled its text lands on
+    ``req["text_prompt"]`` BEFORE the banana funnel -- so it IS filtered like
+    every other composition branch (Sonnet QA traced both call sites). Do not
+    add a second ``_otr_banana_route.apply`` here; the funnel already covers
+    it, and double application is a harmless no-op by closure anyway."""
     try:
         from .._otr_motion_clause import (  # type: ignore
             enabled as _mc_enabled, resolve_motion_clause_text as _mc_text)
@@ -2595,6 +2602,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # fallback prompt + scene-prompt exclusion apply exactly as they do to an
     # audio_driven_face talking head. Announcer/music bookends stay scenes.
     _is_char_face_beat = _is_character_face_beat(shot)
+    # THE PROMPT-BUDGET INVARIANT (banana route, QA r2-r4). Every branch below
+    # that CAPS its own prompt publishes two things: the number it capped to,
+    # and the trailing clause it engineered and expects to survive. The banana
+    # funnel further down re-caps to that published number, preserves that
+    # published clause, and does nothing else. A branch that publishes NOTHING
+    # is never capped -- which is the whole point: the funnel used to cap every
+    # branch at `max(188, pre_transform_length)`, so branches that had promised
+    # nothing (the operator's verbatim OTR_LTX_RADIO_PROMPT override, the M4
+    # wall and its engineered composition tail, the 298-char announcer talking
+    # prompt) were handed zero headroom and lost their tails to any growth.
+    # Publish INSIDE the sub-path that composed the prompt, never at a shared
+    # assignment -- a sibling sub-path must not inherit a budget or a clause it
+    # never authored.
+    _prompt_char_budget = None
+    _prompt_protected_clause = None
     if text_prompt:
         # Authored M4 visual vocabulary is not a publication gate. Preserve it
         # verbatim; framing/style composition below may add context but never
@@ -2642,6 +2664,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _talk = "%s%s %s" % (
                 _cue_prefix, _frag, _IA2V_TALKING_CLAUSE_CHARACTER)
             text_prompt = _talk
+            # This sub-path -- and only this one -- capped to 240 and engineered
+            # the talking clause to survive (_frag shrinks above so it does).
+            _prompt_char_budget = _LTX_MOTION_PROMPT_MAX
+            _prompt_protected_clause = _IA2V_TALKING_CLAUSE_CHARACTER
             _LOG.warning(
                 "[OTR.render_driver] IA2V TALKING register: character beat "
                 "%s M4 wall -> compact talking prompt (%d chars, style_cue=%r)",
@@ -2651,7 +2677,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             text_prompt = (text_prompt.rstrip().rstrip(",")
                            + ", stable centered subject, full face clearly "
                            "visible, generous headroom, comfortably composed")
+        _pre_cue_chars = len(text_prompt)
         text_prompt = _prefix_video_style_cue(_vstyle, text_prompt)
+        # A cue the branch legitimately PREFIXED is not charged against the
+        # body it already capped. On the default sci_fi_radio pack the cue is
+        # "" so this is 0; on the compact-talking path the cue is already
+        # front-loaded inside the 240 budget, so the helper short-circuits and
+        # this is 0 there too. It matters on a NON-DEFAULT pack, which is
+        # exactly where an uncharged prefix would re-cap on arrival.
+        if _prompt_char_budget is not None:
+            _prompt_char_budget += len(text_prompt) - _pre_cue_chars
         req["text_prompt"] = text_prompt
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),
@@ -2724,7 +2759,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if _override:
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "= OTR_LTX_RADIO_PROMPT operator override "
-                         "(verbatim, unfinished)",
+                         "(verbatim except the banana route, unfinished)",
                          _shot_role, shot.get("shot_id"))
             req["text_prompt"] = _override
             _stamp_prompt_meta(req, "env", _override,
@@ -2811,12 +2846,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     f"{_subject}, {_role_hint}, {scene_prompt}",
                     max_chars=620, style_tail=True, era_profile="still",
                     style=_vstyle)
+                # Published INSIDE the google block on purpose: this is the only
+                # one of the four sub-paths reaching the assignment below that
+                # caps at all. (_field_source is REASSIGNED just below, so a
+                # post-block test for "motion_registers:" would be false exactly
+                # when the 620 cap did apply.) No engineered trailing clause.
+                _prompt_char_budget = 620
                 _field_source = (
                     "open_subjects:%s+motion_registers:%s" %
                     (("synthetic" if _is_synthetic_open
                       else ("announcer" if _shot_role == "announcer_visual"
                             else "default")), _motion_key))
+            _pre_cue_chars = len(scene_prompt)
             scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
+            if _prompt_char_budget is not None:
+                _prompt_char_budget += len(scene_prompt) - _pre_cue_chars
             _LOG.warning("[OTR.render_driver] LTX MOTION: %s beat %s motion-"
                          "centric prompt (role=%s, %d chars): %.90s...",
                          _shot_role, shot.get("shot_id"), _motion_key,
@@ -2857,7 +2901,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             scene_prompt = finish_visual_prompt(
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=188, style_tail=False, era_profile="still")
+            _prompt_char_budget = 188
+            # The motion tail is only OURS to protect when we appended it. The
+            # _motion_clause_override sub-path replaced the clause list above,
+            # so it authored no drift clause and publishes none.
+            if not _mc_override:
+                _prompt_protected_clause = "slow cinematic camera drift"
+            _pre_cue_chars = len(scene_prompt)
             scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
+            _prompt_char_budget += len(scene_prompt) - _pre_cue_chars
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "composed from the episode brief (%d chars): "
                          "%.90s...", _shot_role, shot.get("shot_id"),
@@ -2866,6 +2918,64 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _stamp_prompt_meta(req, "brief+beat", scene_prompt,
                                beat=_beat_id_for_shot(shot))
     _apply_visual_safety_prompt(req, shot)
+    # THE BANANA ROUTE (docs/2026-08-06-BUILD-SPEC-banana-route.md) -- the
+    # PINNED ordering (QA ruling 4): safety hook above -> banana transform ->
+    # phrase-safe cap -> assign final text_prompt -> restamp sha8/chars and the
+    # receipt WITHOUT logging -> only then the seed derivation below. The gate
+    # is ambient (env) + ledger (bank idiom), so every prebuilt segment request
+    # through the run_real_episode partial sees the same state -- no flag
+    # threading exists to forget.
+    # UNSTRIPPED: the receipt digests must hash the literal prompt bytes the
+    # request carries (Sonnet QA advisory) -- only the emptiness CHECK strips.
+    _banana_prompt = str(req.get("text_prompt") or "")
+    if _banana_prompt.strip():
+        try:
+            from .._otr_banana_route import (
+                apply as _banana_apply, banana_gate as _banana_gate,
+                cap_phrase_safe as _banana_cap,
+                off_receipt as _banana_off_receipt,
+                receipt_keys as _banana_receipt_keys)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_banana_route import (  # type: ignore
+                apply as _banana_apply, banana_gate as _banana_gate,
+                cap_phrase_safe as _banana_cap,
+                off_receipt as _banana_off_receipt,
+                receipt_keys as _banana_receipt_keys)
+        _bmeta = ((ledger or {}).get("meta") or {})
+        _bkey = str(_bmeta.get("freeze_timestamp") or "")
+        _bobs = req.setdefault("observability", {})
+        if _banana_gate(_bmeta, lane="video"):
+            _bres = _banana_apply(_banana_prompt, variety_key=_bkey)
+            # Re-cap ONLY to the budget the composing branch published, and
+            # ONLY when the transform CROSSED it (pre <= budget < post). An
+            # unpublished budget means the branch promised nothing, so the text
+            # passes through untouched; a prompt already over budget before the
+            # route ran is a composer matter, not ours to repair; and a shrink
+            # (revolver -> banana is -2, the common case) never re-caps.
+            _btext = _bres.text
+            if (_prompt_char_budget is not None
+                    and len(_banana_prompt) <= _prompt_char_budget
+                    < len(_bres.text)):
+                _btext = _banana_cap(_bres.text, _prompt_char_budget,
+                                     _prompt_protected_clause)
+            # banana_substitutions counts what the TRANSFORM did, so a
+            # substitution the cap later trimmed away is still counted -- the
+            # receipt describes the transform step, and sha256_after below
+            # describes the text that shipped.
+            _bkeys = _banana_receipt_keys(_bres)
+            if _btext != _bres.text:
+                # digest recomputed AFTER capping (QA ruling 3)
+                _bkeys["banana_sha256_after"] = hashlib.sha256(
+                    _btext.encode("utf-8")).hexdigest()
+            if _btext != _banana_prompt:
+                req["text_prompt"] = _btext
+                # restamp WITHOUT logging (_stamp_prompt_meta logs every call)
+                _bobs["prompt_sha8"] = hashlib.sha256(
+                    _btext.encode("utf-8")).hexdigest()[:8]
+                _bobs["prompt_chars"] = len(_btext)
+            _bobs.update(_bkeys)
+        else:
+            _bobs.update(_banana_off_receipt(_banana_prompt, variety_key=_bkey))
     req_hash = (shot.get("render_request_hash")
                 or (shot.get("cache_keys") or {}).get("request_hash"))
     # PER SEGMENT, not per shot (2026-08-02). The seed was derived from the
@@ -3729,7 +3839,12 @@ def run_episode(ledger, *, oom_shot_id=None,
         for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
                     "prompt_chars", "init_source", "init_image",
                     "i2v_still_missing", "video_seed",
-                    "visual_style", "prompt_field_source"):
+                    "visual_style", "prompt_field_source",
+                    # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
+                    # -- without these the keys never reach the node-92 report.
+                    "banana_route", "banana_table_version",
+                    "banana_substitutions", "banana_sha256_before",
+                    "banana_sha256_after", "banana_varieties"):
             if key in obs:
                 row[key] = obs[key]
             elif isinstance(request, dict) and ("_" + key) in request:

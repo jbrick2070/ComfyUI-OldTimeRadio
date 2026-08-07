@@ -1,5 +1,32 @@
 # PLAN -- banana-route QA fixes (the six steps)
 
+**Status (2026-08-07): SHIPPED, and SUPERSEDED in part by the r1-r4 arc.** All
+six steps below are implemented, but three of them changed shape under review
+and the arc's `r4/final.md` is the build order of record. The corrections worth
+knowing before reading further:
+* **Fix 1** is not a threaded budget alone. `cap_phrase_safe` also takes a
+  branch-owned PROTECTED CLAUSE, matched case-insensitively (the ia2v clause
+  ends `Static camera.` -- a capital letter, which the old lowered-haystack
+  `rfind` would have missed, making the whole fix a silent no-op), and the
+  funnel re-caps only when the transform CROSSES the published budget.
+* **Fix 1B (new, blocking):** the phrase-retreat loop was unsound. Measured
+  against the real inventory it truncated inside a replacement phrase in 68 of
+  the 3,641 cases the shipped property test builds; the retreat is now a fixed
+  point and that count is 0. (A wider corpus that also sweeps degenerate
+  phrase-only inputs shows 146; 68 is the number a reader can reproduce from
+  `tests/test_banana_route.py` itself, so that is the one quoted.)
+* **Fix 3** belongs in `_fold_inner_dquotes`, not `_still_word_clean_line` --
+  the music card calls the fold directly. It also needs a blank guard: 1,294
+  inputs that compose fine today would otherwise scrub to empty and hit the
+  NO-FALLBACK raise, inventing a new way to kill an episode.
+* **Fix 3B (new):** the era tail is quote-folded, closing a leak where an
+  LLM-authored quoted weapon was SHIELDED from the route.
+
+**OPEN, deferred to its own chunk:** the quote shield is blanket rather than
+scoped to card text, so an ordinary `a man carrying a "revolver"` survives
+untransformed. Grounded in `r4/final.md`; it needs its own four-round arc
+because scoping the shield changes an operator-ruled contract.
+
 **Date:** 2026-08-06. **HEAD:** `ec9da848` on `v2.0-alpha`.
 **Baseline, measured at this HEAD:** suite 9033 passed / 111 skipped / 1 xfailed;
 Bug Bible 17.

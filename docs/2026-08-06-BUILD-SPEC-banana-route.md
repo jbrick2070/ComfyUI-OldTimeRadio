@@ -1,5 +1,17 @@
 # BUILD SPEC -- the banana route (v2 contract)
 
+**Build state (2026-08-07):** BUILT and SHIPPED. The build landed with six
+defects found by a read-only QA pass; all six are repaired, plus three more the
+repair arc surfaced (an unsound phrase-retreat loop in the cap, a
+malformed-knob warning storm, and an era-tail quote leak that shielded weapons
+from the route). Fix plan and arc:
+`docs/2026-08-06-PLAN-banana-route-qa-fixes.md`. **One known defect is
+deliberately OPEN and deferred to its own chunk:** the quote shield is applied
+to EVERY prompt rather than only to still_word card text, so an ordinary
+LLM-authored `a man carrying a "revolver"` is shielded and survives
+untransformed (`_clean_llm_prompt` strips only leading/trailing quotes). That is
+a false negative -- the route under-fires -- with no ledger or render fault.
+
 **Date:** 2026-08-06. **HEAD:** `9c686886` on `v2.0-alpha`.
 **Baseline, measured at this HEAD:** suite 8997 passed / 111 skipped /
 1 xfailed; Bug Bible 17; `engine_matrix --check` OK.
@@ -102,7 +114,7 @@ class BananaResult:
     sha256_after: str
     varieties: str              # canonical compact "SIDEARM=banana,LONG=plantain"
 
-def select_varieties(variety_key: str) -> dict[str, str]   # pure; class -> pick
+def select_varieties(variety_key: str) -> dict[str, int]   # pure; class -> pool INDEX
 def apply(text: str, *, variety_key: str = "") -> BananaResult
 def source_bank_excludes_banana(source_bank_id) -> bool
 def banana_stills_enabled() -> bool          # guarded env reads
@@ -356,6 +368,22 @@ receipt; segment coverage is proven by test, not claimed from the trace.
 * **Original lane, `OTR_BANANA_STILLS=0` + `OTR_BANANA_VIDEO=0`:**
   byte-identical to baseline (the opt-out is the no-op-at-rest proof now that
   the default is ON).
+
+**BYTE-IDENTITY EXCEPTION (QA fix pass, 2026-08-07).** The two byte-identity
+claims above mean **banana-transform-identical**, not composer-identical. The
+QA pass repaired two defects in the CARD COMPOSER itself, which runs before and
+independently of the banana gate, so their inputs cannot be byte-identical even
+with the route OFF:
+1. a card line or episode title carrying a BACKSLASH is now scrubbed (an odd
+   trailing run made the card's closing quote read as escaped, which dropped the
+   quote shield and exposed the whole prompt to substitution); and
+2. the ERA TAIL is now quote-folded (LLM-authored `atmosphere_line` /
+   `visual_palette` could introduce a second double-quote pair, which wrongly
+   SHIELDED whatever it wrapped -- a quoted `"revolver"` survived into the
+   picture).
+Both are deterministic and apply on every lane including OFF and fidelity.
+Prompts with neither a backslash nor an inner era quote remain byte-identical;
+the two defect classes get the repair. OFF and fidelity fixtures cover both.
 * **Original lane, defaults:** mapped terms transform; receipts stamped on
   cache-HIT rows, fresh rows, `stills_manifest.json`, and the video trace;
   VIDEO seed bundles equal across ON/OFF; STILL seeds legitimately move

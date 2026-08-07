@@ -44,6 +44,10 @@ from ._otr_story_brief_helpers import (
     append_visual_safety_clause,
     visual_safety_negative,
 )
+# The banana route (docs/2026-08-06-BUILD-SPEC-banana-route.md): pure,
+# stdlib-only house-style transform applied at THIS funnel before the prompt
+# content hash, gated by env + the fidelity-bank idiom. Cold-import clean.
+from . import _otr_banana_route as _banana
 from ._otr_image_engines import registry as _ireg
 
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
@@ -975,6 +979,20 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # stamp, so stamp_portrait must not fail-closed on them (cast stays
     # CastLock's frozen authority; never added to here).
     cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
+    # THE BANANA ROUTE (docs/2026-08-06-BUILD-SPEC-banana-route.md). Gate and
+    # variety key are per-EPISODE facts, resolved once: env switch + the
+    # fidelity-bank idiom on meta.source_bank; variety keyed on the immutable
+    # freeze_timestamp so re-rendering a frozen ledger reproduces the same
+    # fruits (coherence is structural, never per-re-render).
+    _banana_meta = (ledger.get("meta") or {}) if isinstance(ledger, dict) else {}
+    _banana_on = _banana.banana_gate(_banana_meta, lane="stills")
+    _banana_key = str(_banana_meta.get("freeze_timestamp") or "")
+    #: CANDIDATE substitutions: incremented as each prompt is transformed, which
+    #: happens BEFORE the consumer/engine skip decisions below, so this counts
+    #: transformed candidates that may never mint a row. It is a summary log
+    #: metric only -- the durable per-row receipts are exact -- and the name
+    #: says so rather than the number quietly meaning something else.
+    _banana_candidate_subs = 0
     #: object_id -> why this object was SKIPPED without a ledger row. Keyed, not
     #: substring-matched against free-text warnings: "still_b1" is a prefix of
     #: "still_b12", so matching on text would cross-associate their evidence.
@@ -998,6 +1016,18 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         lettering_style = str(obj.get("lettering_style") or "")
         backdrop_family = str(obj.get("backdrop_family") or "")
         prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
+        # Banana transform BEFORE the content hash, so flipping the switch
+        # re-mints every cached still instead of serving a stale gun. Quoted
+        # spans (the still_word title cards carry the SPOKEN LINE in quotes)
+        # are shielded inside apply() -- text rendered in the picture is
+        # script, not picture.
+        if _banana_on:
+            _bres = _banana.apply(prompt, variety_key=_banana_key)
+            prompt = _bres.text
+            _banana_candidate_subs += _bres.substitutions
+            banana_rcpt = _banana.receipt_keys(_bres)
+        else:
+            banana_rcpt = _banana.off_receipt(prompt, variety_key=_banana_key)
         prompt_hash = _prompt_content_hash(prompt)
         obj_w = int(obj.get("w") or 0)
         obj_h = int(obj.get("h") or 0)
@@ -1185,6 +1215,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "derived_from_portrait_hash": anchor_hash,
                     "portrait_anchor_mode": anchor_mode,
                 })
+                # Banana receipt, UNCONDITIONALLY, for the same reason as the
+                # anchor stamp above: this row is a copy of an older one, and a
+                # conditional stamp would inherit a stale receipt.
+                fresh.update(banana_rcpt)
                 if char_id:
                     fresh["char_id"] = char_id
                 if beat_id:
@@ -1343,6 +1377,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "derived_from_portrait_hash": anchor_hash,
             "portrait_anchor_mode": anchor_mode,
         }
+        # Banana receipt (six keys), on the fresh-generation row exactly as on
+        # the cache-hit row -- both are the durable ledger record.
+        row.update(banana_rcpt)
         if char_id:
             row["char_id"] = char_id
         if beat_id:
@@ -1505,6 +1542,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                                      or r.get("portrait_content_hash")),
                     "prompt_hash": r.get("prompt_hash"),
                     "provenance": r.get("provenance"),
+                    # The banana receipt rides the manifest so an operator can
+                    # audit the route without opening the ledger.
+                    "banana_route": r.get("banana_route"),
+                    "banana_table_version": r.get("banana_table_version"),
+                    "banana_substitutions": r.get("banana_substitutions"),
+                    "banana_sha256_before": r.get("banana_sha256_before"),
+                    "banana_sha256_after": r.get("banana_sha256_after"),
+                    "banana_varieties": r.get("banana_varieties"),
                 } for r in ep_rows],
             }
             with open(os.path.join(ep_dir, "stills_manifest.json"), "w",
@@ -1513,6 +1558,20 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         except OSError as exc:
             warnings.append(f"stills_manifest.json write failed ({exc}); "
                             "episode stills are on disk but unindexed (LOUD)")
+    # ONE aggregate banana line per dispatch, never per object. A split env
+    # state (stills vs video) is valid operator input on t2v lanes and a
+    # footgun on i2v lanes (the anchor still carries the look) -- INFO, never
+    # LOUD, per the build spec's cut list.
+    log.info(
+        "[OTR_ImageGenDispatcher] banana_route=%s candidate_substitutions=%d "
+        "varieties=%s%s",
+        "on" if _banana_on else "off", _banana_candidate_subs,
+        _banana.varieties_receipt(_banana.select_varieties(_banana_key)),
+        ("" if (_banana_on
+                == _banana.banana_gate(_banana_meta, lane="video"))
+         else " (NOTE: stills/video EFFECTIVE gates disagree for this episode "
+              "-- coherent on t2v lanes only; i2v anchors carry the still's "
+              "look)"))
     image_done = f"image:done:rev={rev} made={made} reused={reused}"
     report.insert(0, f"image_dispatch rev={rev}: made={made} reused={reused} total={len(images)}")
     for w in warnings:
