@@ -1162,3 +1162,79 @@ def test_an_all_DIRECTORY_episode_now_publishes(tmp_path, monkeypatch):
     assert rep["ok"] is True and rep["credits_rendered"] is True
     assert rep["backdrop_source"] == "body_final_frame"
     assert tail > 0.0 and os.path.exists(out) and out != str(body)
+
+
+# ---------------------------------------------------------------------------
+# THE NON-COMMERCIAL NOTICE (2026-08-07)
+#
+# meta["noncommercial_notice"] has been stamped by the writer since the
+# provenance work and NOTHING RENDERED IT -- a rights warning with no human
+# surface. These tests pin the two conditions that are easy to get wrong: it
+# must render INDEPENDENTLY of credits_source_line, and it must not invent a
+# second label in front of the notice's own wording.
+#
+# Every assertion reads the ORDERED col3_flow list. Converting it to a dict
+# collapses duplicate "intercept" keys and would silently pass.
+# ---------------------------------------------------------------------------
+
+_NOTICE = (
+    "NON-COMMERCIAL SOURCE: this episode adapts Folger Shakespeare text "
+    "licensed CC BY-NC 3.0, which does NOT permit commercial use. Do not sell "
+    "it, and do not publish it on a monetized channel. Personal and "
+    "non-commercial sharing is fine."
+)
+
+
+def _intercepts(lay):
+    """The intercept texts, IN ORDER. Never dict() -- duplicates collapse."""
+    return [b.get("text", "") for k, b in lay["col3_flow"] if k == "intercept"]
+
+
+def _lay_with_meta(**meta_over):
+    led = _led()
+    led["meta"].update(meta_over)
+    return cr.build_credits_layout(led, w=1920, h=1080, manifest={"clips": []})
+
+
+def test_noncommercial_notice_renders_exactly_once_with_its_own_prefix():
+    lay = _lay_with_meta(noncommercial_notice=_NOTICE)
+    hits = [t for t in _intercepts(lay) if "NON-COMMERCIAL SOURCE:" in t]
+    assert len(hits) == 1, f"expected exactly one notice, got {hits!r}"
+    # ">> " + the notice's own wording. No second label: a
+    # ">> NON-COMMERCIAL NOTICE: %s" wrapper would stutter.
+    assert hits[0] == ">> " + _NOTICE
+    assert "NOTICE: NON-COMMERCIAL" not in hits[0]
+
+
+def test_noncommercial_notice_renders_without_a_source_line():
+    """THE ONE THAT MATTERS. A malformed legacy ledger can carry the notice and
+    no credits_source_line, and the rights warning is exactly the line that must
+    survive the other field's absence -- which is why it is its own `if`."""
+    lay = _lay_with_meta(noncommercial_notice=_NOTICE,
+                         credits_source_line="")
+    texts = _intercepts(lay)
+    assert any(t == ">> " + _NOTICE for t in texts)
+    assert not any(t.startswith(">> SOURCE:") for t in texts)
+
+
+def test_noncommercial_notice_follows_the_source_line_when_both_exist():
+    lay = _lay_with_meta(credits_source_line="adapted from Hamlet (Folger)",
+                         noncommercial_notice=_NOTICE)
+    texts = _intercepts(lay)
+    src = next(i for i, t in enumerate(texts) if t.startswith(">> SOURCE:"))
+    notice = next(i for i, t in enumerate(texts) if "NON-COMMERCIAL SOURCE:" in t)
+    assert notice == src + 1, (
+        f"notice must immediately follow the source line; got {texts!r}")
+
+
+def test_no_notice_intercept_when_the_field_is_absent():
+    lay = _lay_with_meta()
+    assert not any("NON-COMMERCIAL" in t for t in _intercepts(lay))
+
+
+def test_whitespace_only_notice_emits_no_bare_marker():
+    """Without .strip() a whitespace-only field renders a naked '>>'."""
+    lay = _lay_with_meta(noncommercial_notice="   \n\t ")
+    texts = _intercepts(lay)
+    assert not any(t.strip() == ">>" for t in texts), f"bare marker in {texts!r}"
+    assert not any("NON-COMMERCIAL" in t for t in texts)

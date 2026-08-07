@@ -519,6 +519,31 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if _src_line:
         flow.append(("intercept", {"text": ">> SOURCE: %s" % _src_line}))
 
+    # NON-COMMERCIAL NOTICE (2026-08-07). The writer has stamped
+    # meta["noncommercial_notice"] since the provenance work
+    # (OTR_LedgerScriptWriter.py:3632-3634, via _otr_provenance.noncommercial_notice)
+    # and until now NOTHING RENDERED IT -- a rights warning that reached no human
+    # surface at all. It is the one line an operator must see before publishing.
+    #
+    # A SEPARATE `if`, DELIBERATELY -- never an `elif` and never nested under the
+    # SOURCE block above. A malformed legacy ledger can carry the notice with no
+    # credits_source_line, and the rights warning is precisely the one that must
+    # not be lost when the other field is missing. Adjacency (SOURCE immediately
+    # followed by the notice) falls out of appending here, and applies only when
+    # both actually exist.
+    #
+    # NO PREFIX OF OUR OWN. The notice string already begins "NON-COMMERCIAL
+    # SOURCE:", so wrapping it in a second label would stutter
+    # ("NON-COMMERCIAL NOTICE: NON-COMMERCIAL SOURCE: ..."). ">> %s" renders
+    # ">> NON-COMMERCIAL SOURCE: ..." -- consistent with ">> SOURCE:" above and
+    # no new vocabulary.
+    #
+    # .strip() so a whitespace-only field cannot emit a bare ">>" intercept,
+    # matching how credits_source_line is read.
+    _nc_notice = str(meta.get("noncommercial_notice") or "").strip()
+    if _nc_notice:
+        flow.append(("intercept", {"text": ">> %s" % _nc_notice}))
+
     # DIAGNOSTIC (seeded, no fabricated numbers)
     try:
         idx = int(seed) % len(_DIAGNOSTICS)
