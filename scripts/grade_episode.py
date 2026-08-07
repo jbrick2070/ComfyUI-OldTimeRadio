@@ -100,7 +100,26 @@ def main(argv=None):
               file=sys.stderr)
         raise SystemExit(2)
 
-    findings = acceptance.grade_episode(ledger, manifest)
+    # EXIT 2 IS "COULD NOT GRADE", AND A CRASH IS EXACTLY THAT.
+    #
+    # ``grade_episode`` is written to be total, and every known way to break it
+    # has been closed -- but a traceback escaping this call would leave Python
+    # exiting 1, which is the code this script RESERVES for "graded, and there
+    # were findings". Automation keying on exit codes would read a grader that
+    # died as a grader that ran. The distinction between "this episode has
+    # problems" and "I could not examine this episode" is the whole reason
+    # there are three exit codes, and it must not depend on the grader being
+    # bug-free.
+    #
+    # Deliberately BROAD. Narrowing this to the exceptions we happen to know
+    # about would reintroduce the bug for the next unknown one, and there is no
+    # exception whose correct answer here is "pretend the episode graded".
+    try:
+        findings = acceptance.grade_episode(ledger, manifest)
+    except Exception as exc:  # noqa: BLE001 -- see above
+        print("the grader could not examine this episode: %s: %s"
+              % (type(exc).__name__, exc), file=sys.stderr)
+        raise SystemExit(2)
 
     if args.json:
         print(json.dumps(findings, indent=2, sort_keys=True))

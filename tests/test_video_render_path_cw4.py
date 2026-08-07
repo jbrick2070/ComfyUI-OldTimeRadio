@@ -607,7 +607,15 @@ def test_silent_composite_node_assemble_mode_via_manifest(tmp_path):
 def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
     # POSITION mode: beats placed by start_s, floor gap-fills head/gap/tail so the
     # assembled length == the master length (the +intro shift + closing theme).
-    manifest = {"fps": 25, "clips": [
+    # THE CLOSING WINDOW IS PART OF A PRODUCTION-SHAPED MANIFEST (no-mirror
+    # step 4, 2026-08-06). The tail may hold the last drama clip ONLY inside the
+    # closing-theme window, so a fixture that wants the BUG-410 backdrop must
+    # carry the window a real episode carries. Measured on 11 of 12 recent
+    # shipped ledgers: each has exactly one music_close row in master_mix space,
+    # and each mints a window whose end equals the master length.
+    manifest = {"fps": 25,
+                "closing_theme_frame_window": {"start": 340, "end": 1543},
+                "clips": [
         {"shot_id": "s0", "target_frame_count": 50, "path": "/x/a.mp4",
          "exists": True, "start_s": 9.6},      # after a 9.6s floor intro -> frame 240
         {"shot_id": "s1", "target_frame_count": 40, "path": "/x/b.mp4",
@@ -632,7 +640,11 @@ def test_plan_timeline_segments_positions_by_start_s_and_fills_to_master():
 
 def test_positioned_crossfades_partition_visible_timeline_without_duplication():
     """PBUG-20260721-17: render-work frames may overlap; output frames may not."""
-    manifest = {"fps": 25, "total_target_frames": 538, "clips": [
+    # Production-shaped: the closing tail holds the last clip only inside the
+    # closing-theme window (no-mirror step 4). See the sibling test above.
+    manifest = {"fps": 25, "total_target_frames": 538,
+                "closing_theme_frame_window": {"start": 400, "end": 538},
+                "clips": [
         {"shot_id": "open", "target_frame_count": 250,
          "frame_count": 250, "path": "/x/open.mp4", "exists": True,
          "start_s": 0.0, "engine_id": "abstract"},

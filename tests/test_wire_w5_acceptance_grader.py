@@ -205,15 +205,29 @@ def test_a_beat_that_RENDERS_NOTHING_owes_nothing():
 def test_a_PING_PONGED_clip_on_a_MULTI_CLIP_beat_is_REJECTED():
     """The whole reason native_frame_count / extension_mode exist. The clip
     carries the RIGHT frame count -- that is what makes a pad forgeable -- so
-    nothing but the receipt can catch it."""
+    nothing but the receipt can catch it.
+
+    THE VERDICT MOVED, THE REJECTION DID NOT (no-mirror step 3, 2026-08-06).
+    ``grade_multiclip_honesty`` used to own this finding. It now STANDS DOWN on
+    a known non-deliverable mode and leaves the verdict to ``RULE_NO_MIRROR``,
+    which bans the pad on EVERY beat rather than only on multi-clip ones --
+    otherwise one violation produced two differently-worded findings and an
+    operator went looking for two defects.
+
+    So this asserts through ``grade_episode``: the clip is still rejected,
+    exactly once, and the rule that owns it is named."""
     ledger = _ledger([_shot("shot_b1", "character_video", "wan_ti2v",
                             segments=3)],
                      {"character_video": "wan_ti2v"})
     manifest = _manifest([_row("shot_b1", "wan_ti2v",
                                extension_mode="ping_pong", native=17)])
-    findings = acc.grade_multiclip_honesty(ledger, manifest)
-    assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
-    assert "ping_pong" in findings[0]["detail"]
+    findings = acc.grade_episode(ledger, manifest)
+    rules = [f["rule"] for f in findings]
+    assert rules.count(acc.RULE_NO_MIRROR) == 1, rules
+    assert acc.RULE_MULTICLIP_HONESTY not in rules, (
+        "one violation must not be indicted twice")
+    assert "ping_pong" in next(f["detail"] for f in findings
+                               if f["rule"] == acc.RULE_NO_MIRROR)
     assert manifest["clips"][0]["frame_count"] == 50, (
         "the padded clip wears the right count, which is the point")
 
@@ -231,16 +245,33 @@ def test_SILENCE_is_not_a_PASS_on_a_multi_clip_beat():
     assert "declares no extension_mode" in findings[0]["detail"]
 
 
-def test_a_SINGLE_CLIP_beat_may_PAD_all_it_likes():
-    """CONTROL, and it is the shipped 8 GB WAN tier: a single-clip beat renders
-    short on purpose and fills the beat with a mirror (PBUG-20260723-02). If
-    this went red the grader would be failing production's majority path."""
+def test_a_SINGLE_CLIP_beat_is_OUT_OF_SCOPE_for_the_honesty_rule_but_NOT_for_the_ban():
+    """THE OLD CONTROL, AND ITS PREMISE IS NOW HISTORY. It read: "CONTROL, and
+    it is the shipped 8 GB WAN tier: a single-clip beat renders short on purpose
+    and fills the beat with a mirror (PBUG-20260723-02). If this went red the
+    grader would be failing production's majority path."
+
+    That sentence is no longer true in either half. ``eng_wan_ti2v``'s
+    adapter-side ping-pong was DELETED under the operator's no-mirror ruling, so
+    padding is not production's majority path -- it is not any path. And the
+    ruling is flat: *"there is no mirror or ping pong unless for credits."*
+
+    What survives is a SCOPE fact, not a permission: ``grade_multiclip_honesty``
+    still ignores a one-segment plan, because its question is whether a
+    multi-clip beat's arithmetic adds up. That silence was the entire hole --
+    the flat ban was unenforced on exactly the beats a single padded render
+    produces -- and ``RULE_NO_MIRROR`` is what closed it. Both halves are pinned
+    here so the scope fact can never again be mistaken for a licence."""
     ledger = _ledger([_shot("shot_b1", "character_video", "wan_ti2v",
                             segments=1)],
                      {"character_video": "wan_ti2v"})
     manifest = _manifest([_row("shot_b1", "wan_ti2v",
                                extension_mode="ping_pong", native=17)])
+    # The honesty rule does not ask about this beat...
     assert acc.grade_multiclip_honesty(ledger, manifest) == []
+    # ...and the ban most certainly does.
+    rules = [f["rule"] for f in acc.grade_episode(ledger, manifest)]
+    assert rules.count(acc.RULE_NO_MIRROR) == 1, rules
 
 
 def test_a_CLIP_claiming_NO_EXTENSION_must_have_RENDERED_every_frame():

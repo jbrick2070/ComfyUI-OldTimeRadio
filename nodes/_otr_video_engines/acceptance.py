@@ -48,6 +48,26 @@ RULE_MULTICLIP_HONESTY = "multiclip_honesty"
 #: A beat that planned coverage delivered no clip at all.
 RULE_MISSING_CLIP = "missing_clip"
 
+#: A delivered clip declares that some of its frames were MANUFACTURED.
+#: Separate from :data:`RULE_MULTICLIP_HONESTY` on purpose: that rule asks
+#: whether a multi-clip beat's arithmetic adds up, and this one asks the flat
+#: policy question of EVERY beat, single- or multi-clip, with no counts and no
+#: projection involved. A padded single-render clip was invisible to the
+#: honesty rule -- it skips plans of one segment -- so the mirror ban needed a
+#: rule that never skips anything.
+RULE_NO_MIRROR = "no_mirror"
+
+#: The manifest is not shaped like a manifest. Reported instead of crashing, and
+#: reported BEFORE the semantic rules read it, so one malformed row produces one
+#: named finding rather than a cascade of nonsense from every other rule.
+RULE_MANIFEST_SHAPE = "manifest_shape"
+
+#: The ledger's own shot rows are not shaped like shot rows. The manifest half
+#: of this was scheduled; the LEDGER half was scheduled nowhere, and
+#: ``grade_frozen_route`` -- kept precisely because it is manifest-independent --
+#: still crashed on a malformed shot row.
+RULE_LEDGER_SHAPE = "ledger_shape"
+
 
 def frozen_route(ledger):
     """``{role: engine_id}`` as the ledger FROZE it, or ``{}``.
@@ -56,11 +76,39 @@ def frozen_route(ledger):
     ``effective_video_models``. Absent on a legacy ledger, which is reported by
     the caller rather than guessed at here -- an empty map must not read as
     "every shot agrees"."""
-    return dict(((ledger or {}).get("video") or {}).get("roles_effective") or {})
+    if not isinstance(ledger, dict):
+        return {}
+    video = ledger.get("video")
+    if not isinstance(video, dict):
+        return {}
+    frozen = video.get("roles_effective")
+    return dict(frozen) if isinstance(frozen, dict) else {}
 
 
 def _shots(ledger):
-    return list(((ledger or {}).get("video") or {}).get("shots") or ())
+    """The ledger's shot rows, RECORDS ONLY. TOTAL -- never raises.
+
+    Non-record rows are FILTERED rather than tolerated, and that is deliberate:
+    every rule below does ``shot.get(...)``, so one stray string or list in
+    ``video.shots`` raised ``AttributeError`` out of whichever rule reached it
+    first. Through ``scripts/grade_episode.py`` that escaped as a traceback with
+    exit code 1 -- the code reserved for "graded, findings found" -- so
+    automation keying on exit codes read a CRASHED grader as a graded episode.
+
+    The rows that were dropped here are not swallowed: :func:`grade_ledger_shape`
+    reports each one by position. This function makes the rules SAFE; that one
+    makes the defect VISIBLE. Filtering without reporting would be the worse
+    half of the pair.
+    """
+    if not isinstance(ledger, dict):
+        return []
+    video = ledger.get("video")
+    if not isinstance(video, dict):
+        return []
+    shots = video.get("shots")
+    if not isinstance(shots, (list, tuple)):
+        return []
+    return [shot for shot in shots if isinstance(shot, dict)]
 
 
 def manifest_clips(manifest):
@@ -132,6 +180,16 @@ def grade_frozen_route(ledger):
     shot whose ``engine_id`` was rewritten after the freeze. A role absent from
     the frozen map is itself a finding -- an unfrozen role is a role whose
     delivery cannot be judged at all."""
+    # STAND DOWN WHEN THE FROZEN MAP ITSELF IS THE DEFECT. If
+    # ``roles_effective`` is present but not a map, ``grade_ledger_shape``
+    # already says so once -- and every shot would then report its role as
+    # "not in the frozen route", turning one defect into N+1 findings that all
+    # describe the same broken map. One cause, one finding.
+    video = ledger.get("video") if isinstance(ledger, dict) else None
+    if isinstance(video, dict):
+        declared = video.get("roles_effective")
+        if declared is not None and not isinstance(declared, dict):
+            return []
     frozen = frozen_route(ledger)
     findings = []
     for shot in _shots(ledger):
@@ -143,7 +201,10 @@ def grade_frozen_route(ledger):
                 RULE_FROZEN_ROUTE, shot_id,
                 "role %r is not in the ledger's frozen route %s, so what this "
                 "shot was SUPPOSED to render is unknowable"
-                % (role, sorted(frozen))))
+                # ``map(str, ...)`` because a native (non-JSON) ledger can carry
+                # mixed-type keys, and ``sorted`` on those raises TypeError --
+                # out of a function whose contract says it never does.
+                % (role, sorted(map(str, frozen)))))
             continue
         expected = str(frozen.get(role) or "")
         if actual != expected:
@@ -161,7 +222,18 @@ def _plan_segments(shot):
     cross-checks the delivered receipt against them -- so this returns the list
     and lets ``len()`` answer the other question.
     """
-    return list(((shot or {}).get("coverage_plan") or {}).get("segments") or ())
+    if not isinstance(shot, dict):
+        return []
+    plan = shot.get("coverage_plan")
+    # A ``coverage_plan`` that is a LIST reached ``.get`` and raised. The plan is
+    # a record or it is not a plan; anything else is reported by
+    # :func:`grade_ledger_shape` rather than interpreted here.
+    if not isinstance(plan, dict):
+        return []
+    segments = plan.get("segments")
+    if not isinstance(segments, (list, tuple)):
+        return []
+    return list(segments)
 
 
 #: Every ``extension_mode`` an engine is allowed to declare. An unknown string
@@ -169,6 +241,20 @@ def _plan_segments(shot):
 #: a mode nobody can interpret answers the honesty question no better than no
 #: mode at all.
 EXTENSION_MODES = ("none", "ping_pong")
+
+#: What the grader can PARSE. Identical to :data:`EXTENSION_MODES`, and named
+#: separately because the two answer different questions and conflating them is
+#: how a rejected mode becomes an unreadable one. ``"ping_pong"`` remains
+#: parseable forever: legacy receipts on disk carry it, and a receipt the grader
+#: cannot read is reported as malformed accounting rather than as the policy
+#: violation it actually is.
+KNOWN_EXTENSION_MODES = ("none", "ping_pong")
+
+#: What may SHIP. Operator ruling 2026-08-06: "there is no mirror or ping pong
+#: unless for credits" -- and the one sanctioned reuse is the closing-theme
+#: BACKDROP, which is a composite decision about a tail, never a clip receipt.
+#: So no delivered clip may declare anything but ``"none"``.
+DELIVERABLE_EXTENSION_MODES = ("none",)
 
 
 #: The exact keys of the durable per-segment projection. Enumerated here rather
@@ -506,12 +592,28 @@ def grade_multiclip_honesty(ledger, manifest):
                 "rendered or mirrored"
                 % (len(planned), row.get("engine_id"))))
             continue
+        if (isinstance(mode, str) and mode in KNOWN_EXTENSION_MODES
+                and mode not in DELIVERABLE_EXTENSION_MODES):
+            # POLICY IS NOT THIS RULE'S TO GRADE. ``grade_no_mirror`` owns the
+            # flat ban and reports it for every beat; continuing here would emit
+            # a SECOND, differently-worded finding for one violation, and an
+            # operator reading two findings looks for two defects. This rule
+            # keeps only the questions that are its own -- does the arithmetic
+            # add up, does the projection match the frozen plan -- and neither
+            # is answerable once the beat is already condemned.
+            continue
         if str(mode) != "none":
+            # An UNKNOWN mode is still reported HERE, and the distinction
+            # matters: ``grade_no_mirror`` rejects it as policy, and this rule
+            # records that the accounting below cannot be performed at all,
+            # because a mode nobody can interpret makes the native counts
+            # unreadable rather than merely disallowed.
             findings.append(_finding(
                 RULE_MULTICLIP_HONESTY, shot_id,
                 "this beat is planned across %d clips and %r delivered it with "
-                "extension_mode=%r -- a lane claiming real multi-clip coverage "
-                "may not pad" % (len(planned), row.get("engine_id"), mode)))
+                "extension_mode=%r, which is not a mode this grader can "
+                "interpret, so its frame accounting cannot be checked"
+                % (len(planned), row.get("engine_id"), mode)))
             continue
         fault = _projection_fault(row.get("segments"), planned)
         if fault:
@@ -581,15 +683,269 @@ def grade_multiclip_honesty(ledger, manifest):
     return findings
 
 
+def grade_manifest_shape(manifest):
+    """The manifest is shaped like a manifest, or it is a named finding.
+
+    Runs BEFORE every manifest-dependent rule, because a document nobody can
+    read makes all of them report nonsense. Deterministic order: rows are judged
+    by position, so two runs over the same bad file produce the same findings in
+    the same sequence.
+    """
+    findings = []
+    if manifest is not None and not isinstance(manifest, dict):
+        return [_finding(RULE_MANIFEST_SHAPE, "",
+                         "the manifest is %s, not a record"
+                         % (type(manifest).__name__,))]
+    clips = (manifest or {}).get("clips")
+    if clips is None:
+        return []
+    if not isinstance(clips, (list, tuple)):
+        return [_finding(RULE_MANIFEST_SHAPE, "",
+                         "manifest clips is %s, not a list of rows"
+                         % (type(clips).__name__,))]
+    seen = set()
+    for position, row in enumerate(clips):
+        if not isinstance(row, dict):
+            findings.append(_finding(
+                RULE_MANIFEST_SHAPE, "",
+                "manifest clip %d is %s, not a record"
+                % (position, type(row).__name__)))
+            continue
+        raw = row.get("shot_id")
+        shot_id = str(raw or "")
+        if not shot_id:
+            findings.append(_finding(
+                RULE_MANIFEST_SHAPE, "",
+                "manifest clip %d declares shot_id=%r, so nothing can be "
+                "matched to it" % (position, raw)))
+            continue
+        if shot_id in seen:
+            findings.append(_finding(
+                RULE_MANIFEST_SHAPE, shot_id,
+                "manifest clip %d repeats shot_id %r, so which row was graded "
+                "would depend on file order" % (position, shot_id)))
+            continue
+        seen.add(shot_id)
+    return findings
+
+
+def grade_ledger_shape(ledger):
+    """The ledger's video section is shaped like one, or it is a named finding.
+
+    THE HALF THAT WAS SCHEDULED NOWHERE. ``grade_frozen_route`` was kept out of
+    the manifest-shape skip because it is manifest-INDEPENDENT -- and it still
+    crashed on a malformed LEDGER row, which is the same defect through the
+    other door.
+    """
+    findings = []
+    if ledger is not None and not isinstance(ledger, dict):
+        return [_finding(RULE_LEDGER_SHAPE, "",
+                         "the ledger is %s, not a record"
+                         % (type(ledger).__name__,))]
+    video = (ledger or {}).get("video")
+    if video is None:
+        return []
+    if not isinstance(video, dict):
+        return [_finding(RULE_LEDGER_SHAPE, "",
+                         "ledger video is %s, not a record"
+                         % (type(video).__name__,))]
+    frozen = video.get("roles_effective")
+    if frozen is not None and not isinstance(frozen, dict):
+        findings.append(_finding(
+            RULE_LEDGER_SHAPE, "",
+            "ledger video.roles_effective is %s, not a map, so what any shot "
+            "was SUPPOSED to render is unknowable"
+            % (type(frozen).__name__,)))
+    shots = video.get("shots")
+    if shots is None:
+        return findings
+    if not isinstance(shots, (list, tuple)):
+        findings.append(_finding(
+            RULE_LEDGER_SHAPE, "",
+            "ledger video.shots is %s, not a list of rows"
+            % (type(shots).__name__,)))
+        return findings
+    for position, shot in enumerate(shots):
+        if not isinstance(shot, dict):
+            findings.append(_finding(
+                RULE_LEDGER_SHAPE, "",
+                "ledger shot %d is %s, not a record"
+                % (position, type(shot).__name__)))
+            continue
+        plan = shot.get("coverage_plan")
+        if plan is not None and not isinstance(plan, dict):
+            findings.append(_finding(
+                RULE_LEDGER_SHAPE, str(shot.get("shot_id") or ""),
+                "coverage_plan is %s, not a record" % (type(plan).__name__,)))
+    return findings
+
+
+def grade_no_mirror(ledger, manifest):
+    """NO delivered clip may declare that its frames were manufactured.
+
+    Operator ruling 2026-08-06: *"there is no mirror or ping pong unless for
+    credits."* The one sanctioned reuse is the closing-theme BACKDROP, which is
+    a composite decision about a TAIL and never a clip receipt -- so no clip,
+    anywhere, may ship a non-``none`` mode.
+
+    **ALL BEATS.** No counts, no projection, no segment gate, and above all no
+    ``len(planned) <= 1`` skip. ``grade_multiclip_honesty`` answers a different
+    question -- does this multi-clip beat's arithmetic add up -- and it
+    deliberately ignores single-clip beats, which is correct for that question
+    and left the flat policy unenforced on exactly the beats a single padded
+    render produces. A rule that skips the simple case cannot ban anything.
+
+    ABSENCE IS JUDGED BY THE MANIFEST'S OWN VERSION, and that is what makes a
+    REGRESSION detectable. Under ``frame_receipt_version: 1`` every delivered
+    video row must SAY ``"none"``; on an unversioned manifest a missing field is
+    legacy silence and is allowed. Without the version, "reject an explicit
+    non-none" could never catch an adapter that quietly stopped stamping --
+    absence would stay legal forever, and silence is precisely what an
+    unreceipted pad looks like.
+    """
+    # ITERATE THE DELIVERED ROWS, NOT THE LEDGER'S SHOTS. The rule's own
+    # sentence is "any delivered row", and walking shots instead made a manifest
+    # row whose ``shot_id`` is absent from the ledger invisible to EVERY rule --
+    # every other rule walks shots too, so nothing graded it. A row declaring
+    # ``ping_pong`` under a shot id the episode never planned produced
+    # "ACCEPTED: 1 shot(s)" and exit 0. Reproduced end to end before this fix.
+    shots_by_id = {}
+    for shot in _shots(ledger):
+        shot_id = str(shot.get("shot_id") or "")
+        if shot_id and shot_id not in shots_by_id:
+            shots_by_id[shot_id] = shot
+    versioned = frame_count((manifest or {}).get("frame_receipt_version")) == 1 \
+        if isinstance(manifest, dict) else False
+    findings = []
+    for shot_id, row in clip_rows_by_shot(manifest).items():
+        shot = shots_by_id.get(shot_id)
+        if not row.get("exists"):
+            continue                       # grade_delivered owns a missing clip
+        is_video = str(row.get("type") or "video") == "video"
+        mode = row.get("extension_mode")
+        if mode is None or mode == "":
+            # SILENCE is only interrogable on a VIDEO row, only under v1, and
+            # only on a beat ``grade_multiclip_honesty`` is not already asking.
+            # That rule owns silence on a MULTI-segment plan ("declares no
+            # extension_mode"), so reporting it here too produced TWO findings
+            # for ONE missing field -- the boundary this pair exists to keep.
+            # ``""`` is silence in both rules now; it used to be silence here
+            # and "cannot interpret" there, which is one defect wearing two
+            # contradictory classifications.
+            if versioned and is_video and len(_plan_segments(shot)) <= 1:
+                findings.append(_finding(
+                    RULE_NO_MIRROR, shot_id,
+                    "this manifest declares frame_receipt_version=1, in which "
+                    "every delivered video row must state how its frames got "
+                    "there, and %r declares no extension_mode"
+                    % (row.get("engine_id"),)))
+            continue
+        # FROM HERE THE ROW HAS SPOKEN, AND WHAT IT SAID IS JUDGED WHATEVER ITS
+        # TYPE IS. The ``type`` exemption used to sit above this, skipping the
+        # ban entirely for any non-"video" string -- so a row stamped
+        # ``type="still"`` with ``extension_mode="ping_pong"`` passed clean. It
+        # also opened a REGRESSION: ``grade_multiclip_honesty`` now stands down
+        # on a known non-deliverable mode expecting this rule to catch it, and
+        # on a non-video row NEITHER rule fired, where the honesty rule alone
+        # used to. A declaration of padding is a violation on its face; only the
+        # questions about SILENCE need to know what kind of clip this is.
+        if not isinstance(mode, str) or mode not in KNOWN_EXTENSION_MODES:
+            # SAY WHAT IS TRUE. This used to deliver the "no clip may carry
+            # manufactured frames" verdict for an UNINTERPRETABLE mode -- which
+            # asserts a fact the grader has just admitted it cannot establish.
+            # On a single-segment beat that misworded line was the ONLY finding,
+            # so an operator was told the lane padded when what actually
+            # happened is that nobody can tell. Still fail-closed; only honest.
+            findings.append(_finding(
+                RULE_NO_MIRROR, shot_id,
+                "%r declares extension_mode=%r, which is not a mode this "
+                "grader can interpret, so whether this clip carries "
+                "manufactured frames cannot be established"
+                % (row.get("engine_id"), mode)))
+            continue
+        if mode not in DELIVERABLE_EXTENSION_MODES:
+            findings.append(_finding(
+                RULE_NO_MIRROR, shot_id,
+                "%r delivered this beat with extension_mode=%r -- no delivered "
+                "clip may carry manufactured frames (the ONE sanctioned reuse "
+                "is the closing-theme backdrop, which is a composite decision "
+                "about the tail and never a clip receipt)"
+                % (row.get("engine_id"), mode)))
+            continue
+        # THE SECOND HALF OF THE v1 CONTRACT: a BOUNDED engine also owes the
+        # NUMBER. Declaring "none" costs an adapter one string; proving it costs
+        # a count that must survive the arithmetic, and only an engine with a
+        # ceiling a beat can overflow is ever in a position to pad. Boundedness
+        # comes from the shot's own freeze-time stamp and nowhere else (spec
+        # 7.3): this module may not import a registry, and an engine's contract
+        # can change between the render and the grade.
+        #
+        # ONLY an explicit True demands it. Absent means the freeze never said,
+        # which is every ledger written before the stamp existed -- indicting
+        # those would report the grader's calendar, not the episode.
+        if shot is not None and versioned and shot.get("frame_bounded") is True:
+            declared_native = frame_count(row.get("native_frame_count"))
+            if declared_native is None:
+                findings.append(_finding(
+                    RULE_NO_MIRROR, shot_id,
+                    "%r is a BOUNDED engine declaring extension_mode='none' in "
+                    "a frame_receipt_version=1 manifest, but carries no "
+                    "readable native_frame_count (%r) -- the claim that every "
+                    "frame was rendered is exactly the claim that owes evidence"
+                    % (row.get("engine_id"), row.get("native_frame_count"))))
+            elif len(_plan_segments(shot)) <= 1:
+                # AND THEN WEIGH IT. Collecting the number and never comparing
+                # it was the whole rule's blind spot: a single-render clip
+                # stamping frame_count=50 / native_frame_count=17 /
+                # extension_mode="none" CONFESSES 33 manufactured frames in its
+                # own receipt, and graded ACCEPTED at exit 0. The multi-clip
+                # rule skips it (one segment) and this rule believed the mode
+                # STRING while ignoring the COUNT sitting beside it -- which is
+                # exactly the single-render hole RULE_NO_MIRROR was minted to
+                # close, left open for any pad that mislabels its mode.
+                #
+                # SINGLE-SEGMENT ONLY. On a multi-segment beat the same
+                # arithmetic is ``grade_multiclip_honesty``'s, done properly
+                # against the per-segment projection and the frozen plan; doing
+                # it here too would indict one beat twice. The producer
+                # contract (see SEGMENT_RECEIPT_KEYS) puts manufactured frames
+                # at the TAIL, so on an honest single render every delivered
+                # frame is native and ``native < delivered`` is a confession.
+                delivered = frame_count(row.get("frame_count"))
+                if delivered is not None and declared_native < delivered:
+                    findings.append(_finding(
+                        RULE_NO_MIRROR, shot_id,
+                        "%r delivered %d frame(s) declaring extension_mode="
+                        "'none', but its own receipt says only %d were "
+                        "rendered -- %d frame(s) came from somewhere the "
+                        "engine will not name"
+                        % (row.get("engine_id"), delivered, declared_native,
+                           delivered - declared_native)))
+    return findings
+
+
 def grade_episode(ledger, manifest):
     """Every per-shot rule, in one pass. Returns a list of findings; EMPTY
     means the episode delivered the route it froze.
 
     Deliberately returns rather than raises: the caller decides whether a
     finding blocks (the durable script exits non-zero) or is recorded, and a
-    grader that raised on the first problem would hide the rest."""
-    return (grade_frozen_route(ledger)
+    grader that raised on the first problem would hide the rest.
+
+    SHAPE FIRST, AND A SHAPE DEFECT SUPPRESSES THE RULES THAT WOULD CASCADE.
+    One malformed manifest row used to make every semantic rule report its own
+    confused version of the same problem; now it produces one named
+    ``manifest_shape`` finding and the manifest-dependent rules stand down. The
+    LEDGER-only rule keeps running either way, because a broken manifest says
+    nothing about whether the route was frozen correctly -- and it is now safe
+    to run, which it was not before ``_shots`` began filtering non-records."""
+    shape = grade_ledger_shape(ledger) + grade_manifest_shape(manifest)
+    findings = list(shape) + grade_frozen_route(ledger)
+    if shape:
+        return findings
+    return (findings
             + grade_delivered(ledger, manifest)
+            + grade_no_mirror(ledger, manifest)
             + grade_multiclip_honesty(ledger, manifest))
 
 
@@ -605,6 +961,14 @@ __all__ = [
     "RULE_DELIVERED_ENGINE",
     "RULE_MULTICLIP_HONESTY",
     "RULE_MISSING_CLIP",
+    "RULE_NO_MIRROR",
+    "RULE_MANIFEST_SHAPE",
+    "RULE_LEDGER_SHAPE",
+    "grade_no_mirror",
+    "grade_manifest_shape",
+    "grade_ledger_shape",
+    "KNOWN_EXTENSION_MODES",
+    "DELIVERABLE_EXTENSION_MODES",
     "EXTENSION_MODES",
     "SEGMENT_RECEIPT_KEYS",
     "frame_count",

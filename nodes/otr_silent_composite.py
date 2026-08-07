@@ -320,6 +320,59 @@ def _warn_clip_underrun(row, target_n, *, will_loop=False):
         (row or {}).get("engine_id"), real, tgt)
 
 
+def closing_window_authorizes_loop(manifest, cursor, target_total_frames):
+    """Is the tail beginning at ``cursor`` PROVABLY the closing theme? PURE.
+
+    THE ONLY THING IN THIS PIPELINE THAT MAY AUTHORIZE A LOOP. Operator ruling
+    2026-08-06: *"there is no mirror or ping pong unless for credits"* -- and the
+    one sanctioned reuse is the CLOSING-THEME BACKDROP, not the credits roll
+    (``OTR_CreditsRoll`` freezes a frame and never loops).
+
+    Before this, the tail block looped the last drama clip to fill ANY shortfall
+    between the assembled body and the master length, whatever caused it. That
+    is indistinguishable from the sanctioned case by construction: both are "the
+    video ran out before the audio did". A named constant was rejected twice on
+    exactly this point -- vocabulary without a manifest-backed window is not
+    enforcement.
+
+    The window comes from ``render_driver.closing_theme_frame_window``, derived
+    from ledger rows carrying ``speaker_role == "music_close"`` AND
+    ``start_s_space == "master_mix"``, and it is EMITTED ONLY when the manifest
+    is positioned -- so its frames and this cursor are on one ruler.
+
+    ``S <= cursor < target_total_frames <= E``: the tail must BEGIN at or after
+    the theme starts, must have somewhere to go, and must END no later than the
+    theme does. A tail that starts before the theme is drama time and gets
+    floor/black; a tail running past the theme's end would loop over whatever
+    follows it.
+
+    **FALSE ON ANY DOUBT.** A missing window, a malformed one, an unreadable
+    cursor -- every one of them returns False and the caller falls to
+    floor/black. That asymmetry is deliberate: a black tail is a cosmetic
+    disappointment, and an unauthorized loop is the defect this whole build
+    exists to remove.
+    """
+    if not isinstance(manifest, dict):
+        return False
+    window = manifest.get("closing_theme_frame_window")
+    if not isinstance(window, dict):
+        return False
+    start = window.get("start")
+    end = window.get("end")
+    # ``bool`` is an ``int``; a window of ``{"start": True}`` must not read as
+    # frame 1. Same rejection ``acceptance.frame_count`` makes, same reason.
+    if isinstance(start, bool) or isinstance(end, bool):
+        return False
+    if not isinstance(start, int) or not isinstance(end, int):
+        return False
+    try:
+        position = int(cursor)
+        total = int(target_total_frames)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return start <= position < total <= end
+
+
 def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                            target_total_frames=None, fps=None):
     """Pure: the frame-accurate per-beat segment plan from a clip manifest.
@@ -449,11 +502,33 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                           if _clip_rows else None)
         else:
             _last_clip = _clip_rows[-1] if _clip_rows else None
-        if _last_clip is not None:
+        # THE LOOP IS NOW EARNED, NOT ASSUMED (no-mirror step 4, 2026-08-06).
+        #
+        # BLAST RADIUS, stated plainly: any episode whose tail is not PROVABLY
+        # the closing-theme window now gets floor/black where it used to get a
+        # looped last clip. That is a visible change to those episodes and it is
+        # the point -- the old behaviour could not tell the operator's one
+        # sanctioned reuse from a drama beat that simply ran short, because both
+        # look like "the video ended before the audio did".
+        if _last_clip is not None and closing_window_authorizes_loop(
+                manifest, cursor, target_total_frames):
             emit("clip", _last_clip.get("path"), tail_n, 0,
                  _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True,
                  bg_still_path=_last_clip.get("bg_still_path"))
         else:
+            if _last_clip is not None:
+                # LOUD, because this is the case that used to loop and no longer
+                # does. An operator watching a black tail needs to know it was a
+                # refusal rather than a missing clip -- and needs the numbers, so
+                # a genuinely mis-derived window can be diagnosed from the log
+                # instead of by re-running the render.
+                log.warning(
+                    "[OTR.composite] TAIL NOT LOOPED: %d frame(s) from cursor "
+                    "%d to %s are not provably inside the closing-theme window "
+                    "%r -- filling with %s instead. Only the closing theme may "
+                    "reuse a clip (operator ruling 2026-08-06).",
+                    tail_n, cursor, target_total_frames,
+                    (manifest or {}).get("closing_theme_frame_window"), gap_src)
             emit(gap_src, "", tail_n, _floor_aligned(cursor, tail_n))
         cursor = int(target_total_frames)
     return segments, cursor
