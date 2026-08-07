@@ -33,7 +33,10 @@ engine cannot reach -- past its declared 161 or past ``OTR_LTX_8GB_MAX_FRAMES``
 (deleted B4, 2026-07-27): padding a short render back up to the ask let a
 render that did not happen pass the plan-vs-output count gate, and on a
 ``strict_first_frame`` lane the next chained segment would have begun on a
-mirrored frame. WAN keeps its extension -- it renders short on purpose.
+mirrored frame. (The trailing "WAN keeps its extension -- it renders short on
+purpose" is HISTORY: WAN's ping-pong was deleted under the operator's no-mirror
+ruling and it now refuses such a beat rather than padding it. There is no
+extension left on any lane.)
 
 Registered as a NORMAL selectable row: ``requires_flag=None``, empty ``default_roles``
 (selectable, not a default). ORDINARY preflight ONLY -- checkpoint + T5 present +
@@ -1409,9 +1412,15 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # count gate (``render_driver``'s ``got != segment.render_frames``)
         # wearing the right number: part real motion, part mirrored frames, and
         # on this lane -- which declares ``strict_first_frame`` -- the next
-        # chained segment would begin on a MIRRORED tail frame. WAN keeps its
-        # extension: it renders short ON PURPOSE and fills the beat with it,
-        # which is the shipped 8GB tier contract (PBUG-20260723-02).
+        # chained segment would begin on a MIRRORED tail frame.
+        #
+        # The old closing clause -- "WAN keeps its extension: it renders short ON
+        # PURPOSE and fills the beat with it, the shipped 8GB tier contract
+        # (PBUG-20260723-02)" -- EXPIRED on 2026-08-02. WAN's ping-pong was
+        # deleted under the no-mirror ruling and ``wan_ti2v`` was added to
+        # ``PLANNING_CAP_ENGINES`` so the planner splits those beats into
+        # affordable native segments instead. This lane was never the exception;
+        # it was simply first.
         #
         # 1. THE PIPELINE INVARIANT. The graph was asked for exactly ``length``
         #    frames, so anything else is an under-delivery that the pad used to

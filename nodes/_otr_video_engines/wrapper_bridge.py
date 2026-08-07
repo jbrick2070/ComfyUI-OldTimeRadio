@@ -523,7 +523,11 @@ def images_to_uint8(images):
 # quiet mirror nobody sees until the episode plays.
 #
 # The credits lane is untouched and never used this: it renders a black
-# background and calls neither this nor the LTX boomerang.
+# background and called neither this nor the LTX boomerang -- which was itself
+# deleted on 2026-08-06, so there is no longer a second mirror to be untouched
+# by. The ONE sanctioned reuse left in the tree is the closing-theme BACKDROP,
+# and it is a COMPOSITE decision about a tail (gated on a manifest-declared
+# frame window), never anything an adapter does to its own frames.
 
 
 class MirrorExtensionForbidden(ValueError):

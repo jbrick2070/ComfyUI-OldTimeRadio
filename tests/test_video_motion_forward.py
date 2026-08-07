@@ -279,7 +279,12 @@ def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
     prepared = {"patchers": []}
     raw = eng.render_clip(req, prepared)
-    assert raw["ltx_loop_via_reverse"] is False
+    # ``ltx_loop_via_reverse`` was the flag this used to assert. The field went
+    # with the machinery (no-mirror step 5, 2026-08-06) -- a receipt nothing
+    # writes is one a reader eventually believes. What the test proves is
+    # unchanged and stronger: the honesty receipt now says so positively.
+    assert raw["extension_mode"] == "none"
+    assert raw["native_frame_count"] == raw["frame_count"]
     clip = eng.canonicalize(raw, req, {})
     p = pathlib.Path(clip["path"])
     try:
@@ -312,8 +317,14 @@ def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch):
            "canvas": {"w": 768, "h": 512, "fps": 25},
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
     raw = eng.render_clip(req, {"patchers": []})
-    assert raw["ltx_loop_via_reverse"] is False, (
-        "the env hatch must not arm the boomerang")
+    # The flag field is gone with the machinery (step 5). The question this test
+    # exists to ask -- does the env hatch reach the frames? -- is now answered by
+    # the receipt and by the frame count below, which is stronger: the old
+    # assertion could pass while a DIFFERENT code path mirrored.
+    assert raw["extension_mode"] == "none", (
+        "the env hatch must not arm any mirror")
+    assert "ltx_loop_via_reverse" not in raw, (
+        "the retired flag field must not come back")
     clip = eng.canonicalize(raw, req, {})
     p = pathlib.Path(clip["path"])
     try:

@@ -276,15 +276,27 @@ def can_chain(engine) -> bool:
 #: The ONLY engines whose tier-pinned ``max_render_frames`` is a coverage
 #: PLANNING cap. This is a deliberate allowlist of ONE, not a rollout.
 #:
-#: ``max_render_frames`` is NOT a general planning cap, and treating it as one
-#: would break a shipped tier. WAN reads 17 from ``config/profiles/
-#: otr_8gb_wan.json``, renders a short native clip, and PING-PONGS it up to the
-#: beat's full length (``eng_wan_ti2v._floor_length`` -> ``wrapper_bridge.
-#: extend_frames_to_target``); its beat length is unchanged by the ceiling. So
-#: narrowing WAN's contract before ``partition_beat`` would turn every WAN beat
-#: into a pile of 17-frame renders and silently rewrite the low-VRAM tier
-#: ``PBUG-20260723-02`` just fixed. ``ltx_8gb`` is the opposite case: it plans
-#: real coverage, so its ceiling belongs to the PLANNER.
+#: HISTORY, AND THE REASONING EXPIRED -- read this before trusting the paragraph
+#: that follows it. The original argument was: ``max_render_frames`` is not a
+#: general planning cap because WAN reads 17 from ``config/profiles/
+#: otr_8gb_wan.json``, renders a short native clip and PING-PONGS it up to the
+#: beat's full length (``eng_wan_ti2v._floor_length`` ->
+#: ``wrapper_bridge.extend_frames_to_target``), so narrowing WAN's contract
+#: before ``partition_beat`` would turn every WAN beat into a pile of 17-frame
+#: renders.
+#:
+#: **THAT MECHANISM NO LONGER EXISTS.** ``extend_frames_to_target`` was DELETED
+#: under the operator's no-mirror ruling and ``eng_wan_ti2v`` now REFUSES a beat
+#: it cannot render in one affordable pass rather than padding it. Which is
+#: exactly why ``wan_ti2v`` was ADDED to this list on 2026-08-02: with the mirror
+#: gone the ceiling had to become a PLANNING cap, or the engine would simply
+#: refuse the beats the mirror used to absorb. The comment argued against a
+#: decision the file itself made thirty lines below.
+#:
+#: What survives is the SHAPE of the rule, not its example: membership here is a
+#: per-engine decision because a ceiling that plans and a ceiling that merely
+#: caps a render are different things. ``ltx_8gb`` plans real coverage, so its
+#: ceiling belongs to the PLANNER.
 #:
 #: Adding an id here is a per-engine decision with a live proof attached, never
 #: a convenience. ``tests/test_multiclip_effective_contract.py`` pins WAN's

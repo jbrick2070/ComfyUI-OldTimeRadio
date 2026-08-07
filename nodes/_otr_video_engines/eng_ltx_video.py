@@ -146,13 +146,6 @@ def _env_int(name, default, floor):
 #: the one proven length.
 _LTX_DECODE_FLOOR_DEFAULT = 169
 
-#: BOOMERANG (loop_via_reverse, BUG-LOCAL-117d restore 2026-06-15): the proven-safe
-#: SOURCE half-length the loop renders at the native 832x480 canvas before the
-#: in-tensor mirror doubles it back. GPU-proven this session (97f decodes clean at
-#: 832x480 in 12s). This is the LOOP path's OWN floor and deliberately does NOT
-#: touch the 169 landscape floor above (which still guards the 1472x832 tiled band).
-_LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT = 97
-
 
 def assert_env_matches_contract(contract):
     """REFUSE when the environment moves what the declaration froze.
@@ -256,39 +249,26 @@ def _ltx_frame_length(target_frame_count, fallback):
     return ((length - 1) // 8) * 8 + 1
 
 
-def _boomerang_frames(frames):
-    """Forward + reverse-minus-turnaround mirror: ``[0,1,2,3] -> [0,1,2,3,2,1,0]``
-    (length ``2N-1``; the duplicate LAST/turnaround frame is dropped). The
-    in-tensor equivalent of the 6/3 ffmpeg ``[b]reverse,trim=start_frame=1;
-    [a][r]concat`` boomerang (BUG-LOCAL-117d). ``frames`` is the uint8
-    ``[N,H,W,C]`` array from ``images_to_uint8``; returned unchanged when N<2.
-    Pure; CPU-testable (numpy imported lazily so module import stays cold V-12)."""
-    if len(frames) < 2:
-        return frames
-    import numpy as _np
-    return _np.concatenate([frames, frames[-2::-1]], axis=0)
-
-
-def _ltx_loop_source_length(target_frame_count, fallback):
-    """Boomerang SOURCE length: render ~half, the mirror (``2*src-1``) doubles it
-    back. Rounds the half UP and bumps until ``2*src-1 >= target`` so the composite
-    never freeze-fills the loop tail (the 169->161 shortfall the roundtable caught).
-    Floors at the PROVEN-safe native-canvas loop min (env
-    ``OTR_LTX_LOOP_MIN_DECODE_FRAMES`` default 97 -- NOT the global 169 decode
-    floor), snaps to 8n+1, caps at ``OTR_LTX_MAX_FRAMES``. Pure given the env."""
-    target = max(_LTX_MIN_FRAMES, int(target_frame_count or fallback))
-    cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
-    loop_min = _env_int("OTR_LTX_LOOP_MIN_DECODE_FRAMES",
-                        _LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
-    src_ask = (target + 1) // 2                         # round the half UP
-    src = ((max(src_ask, loop_min) - 1) // 8) * 8 + 1   # loop-floor, 8n+1 snap
-    if src > cap:
-        src = ((cap - 1) // 8) * 8 + 1
-    # Guarantee the mirrored clip covers the beat window (no composite freeze).
-    while (2 * src - 1) < target and src < cap:
-        src += 8
-    return src
-
+# THE BOOMERANG IS GONE (no-mirror step 5, 2026-08-06).
+#
+# ``_boomerang_frames`` and ``_ltx_loop_source_length`` lived here. The first
+# mirrored a render forward-then-backward (``[0,1,2,3] -> [0,1,2,3,2,1,0]``); the
+# second rendered HALF a beat on the assumption the mirror would double it back.
+#
+# They were already unreachable -- ``_loop_via_reverse`` had returned False
+# unconditionally since 2026-08-02 -- and unreachable is not the same as gone.
+# The operator's rule is "no mirror or ping pong unless for credits", and a rule
+# that survives only while nobody flips a default is not a rule; this one had
+# already been re-armed once by a default flip going the other way.
+#
+# WHAT OWNS THE PROBLEM NOW: a beat this adapter cannot cover in one native
+# render is SPLIT by coverage planning into chained segments, each rendered
+# forward from its predecessor's real terminal frame. Every frame is original and
+# no second of audio is covered twice.
+#
+# ``tests/test_ltx_boomerang.py`` was CONVERTED rather than deleted: it is now
+# the tripwire proving no environment value and no session state can restore the
+# mirror.
 
 _LTX_DEFAULT_W = 832
 _LTX_DEFAULT_H = 480
@@ -538,108 +518,21 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     engine_version = "1"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
-    #: BUG-LOCAL-117d boomerang: ltx_video used to LOOP by default (half-render
-    #: + forward/reverse, the 5/09-6/05 "more motion" look).
+    #: BUG-LOCAL-117d: this adapter used to LOOP by default -- render half a beat
+    #: and mirror it forward/reverse (the 5/09-6/05 "more motion" look). The
+    #: default was flipped off 2026-08-01, the gate was made unconditional
+    #: 2026-08-02, and the machinery was DELETED 2026-08-06.
     #:
-    #: DEFAULT FLIPPED TO OFF, 2026-08-01 (operator, explicit): "there should be
-    #: no mirror ... no boomerangs, we need to remove all boomerangs in place of
-    #: native clips, except for credits which is a black background."
+    #: It was the SECOND, independent mirror in the tree and the one easy to
+    #: miss: the WAN ping-pong is a VRAM fallback, but this was a deliberate
+    #: STYLE device that fired on every single-clip LTX beat regardless of VRAM.
+    #: A rollout that removed only the VRAM fallback would have left half the
+    #: re-used frames in place and looked like a fix.
     #:
-    #: This was the SECOND, independent mirror in the tree and it is the one that
-    #: is easy to miss: the ping-pong on the WAN path is a VRAM fallback, but this
-    #: one is a deliberate STYLE device that fired on every single-clip LTX beat
-    #: regardless of VRAM. A rollout that only removed the VRAM fallback would
-    #: have left half the re-used frames in place and looked like a fix.
-    #:
-    #: It is already suppressed inside a coverage plan, so this default only ever
-    #: governed the single-clip remainder -- which is exactly the case the
-    #: operator's rule covers: a beat that fits one native render is 1/1, done.
-    #: ``OTR_LTX_LOOP_VIA_REVERSE=on`` still opts back in per-run.
-    #: Credits are untouched -- they render a black background and call neither
-    #: this nor ``extend_frames_to_target``.
-    _LOOP_VIA_REVERSE_DEFAULT = False
-
-    def _loop_via_reverse(self) -> bool:
-        """RETIRED 2026-08-02. Always False. The boomerang cannot be re-armed.
-
-        This is the deferred half the 2026-08-01 change named and left open:
-        "NOTE the scope: this does NOT retire the boomerang. Single-clip renders
-        still overshoot their declared ceiling, which remains the deferred 7c
-        item." The operator's directive closes it -- "kill mirrors and
-        ping-pong, true video for every second of audio" -- and it is
-        unconditional, so the knob goes rather than the default.
-
-        WHY THE ENV HATCH HAD TO GO WITH IT. ``OTR_LTX_LOOP_VIA_REVERSE=on``
-        opted back into rendering half a beat and mirroring it. The back half of
-        that mirror is the render played in REVERSE, under dialogue that keeps
-        running forward. A rule that survives only while nobody sets a variable
-        is not a rule, and this one had already been re-armed once by a default
-        flip going the other way.
-
-        WHAT OWNS THE PROBLEM NOW. A beat ``ltx23_16gb_video`` cannot cover in
-        one native render is SPLIT by coverage planning into chained segments,
-        each rendered forward from its predecessor's real terminal frame. That
-        path is live and is strictly better than a mirror: every frame is
-        original and no second of audio is covered twice.
-
-        The method is kept, rather than deleted with its four call sites, so the
-        retirement is visible at the choke point a future reader will look at --
-        and so ``_loop_fill_allowed``'s coverage-plan suppression keeps its own
-        reasoning intact underneath it.
-        """
-        return False
-
-    def _loop_fill_allowed(self, prepared) -> bool:
-        """Whether the boomerang loop-fill may run for THIS request.
-
-        THE LOOP-FILL IS A SINGLE-CLIP DEVICE AND MUST NOT RUN INSIDE A
-        COVERAGE PLAN. Found live 2026-07-29 (profile otr_w45_ltx_video):
-        ``shot shot_music_opening_001 segment 0 rendered 193 frame(s) but its
-        plan asked for 169``.
-
-        ``_ltx_loop_source_length`` deliberately IGNORES the ask -- it renders
-        a half-source floored at 97 frames and mirrors it to ``2*97-1 = 193``,
-        whatever was requested. That is sound for a SINGLE clip, where the
-        adapter's contract is "cover the beat window" and the composite
-        truncates the surplus (see the module note at the top of this file:
-        "Short asks are RAISED to the floor (safe: the composite TRUNCATES
-        long sources to the beat window)").
-
-        Inside a coverage plan BOTH halves of that reasoning fail. The plan --
-        not the adapter -- is what covers the beat, and it partitions the beat
-        into segments that already respect this engine's declared 169 ceiling,
-        so there is nothing left for a loop-fill to cover. And
-        ``render_beat_coverage`` REFUSES to truncate: it proves every segment
-        against ``segment.render_frames`` precisely so a beat cannot drift
-        against its own audio, which means the surplus the boomerang counts on
-        being absorbed is instead a hard failure.
-
-        ``eng_wan_ti2v`` already reached this conclusion for its own ping-pong
-        and narrows on exactly this discriminator (``eng_wan_ti2v.py:946``);
-        its comment names this gate by name. LTX simply never got the same
-        narrowing. ``BeatSession`` sets ``multi_clip`` from the STAMPED plan's
-        segment count, and it is the only honest signal available here -- a
-        segment's request is shaped exactly like a single-clip beat's, so the
-        request cannot be asked.
-
-        NOTE the scope: this does NOT retire the boomerang. Single-clip
-        renders still overshoot their declared ceiling, which remains the
-        deferred 7c item its tripwire in ``tests/test_ltx_boomerang.py``
-        guards. This closes only the half that a coverage plan can reach --
-        the half that is failing legs today.
-        """
-        if not self._loop_via_reverse():
-            return False
-        session = prepared if isinstance(prepared, dict) else {}
-        if bool((session.get("session_ctx") or {}).get("multi_clip")):
-            _LOG.warning(
-                "[eng_ltx_video] loop_via_reverse SUPPRESSED for this "
-                "request: the beat is a multi-clip coverage plan, which owns "
-                "beat coverage itself and proves each segment against its "
-                "planned frame count -- a mirrored 2N-1 source would fail "
-                "that proof rather than being truncated to fit")
-            return False
-        return True
+    #: ``_LOOP_VIA_REVERSE_DEFAULT``, ``_loop_via_reverse`` and
+    #: ``_loop_fill_allowed`` are gone with it, and so is the
+    #: ``OTR_LTX_LOOP_VIA_REVERSE`` hatch. Credits were never involved -- they
+    #: render a black background and called none of this.
 
     # ---- config resolution (env override -> folder_paths -> join) ----
     # The GGUF mini recipe's weight artifacts (defaults = the frozen mini's
@@ -1452,18 +1345,6 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
-        # BUG-LOCAL-117d boomerang restore: when looping, render the HALF source
-        # length here (after dims, before graph build) -- the in-tensor mirror
-        # below doubles it back to >= the beat window. Leaves the global
-        # _ltx_frame_length / 169 decode floor UNTOUCHED (this path has its own
-        # proven native-canvas floor).
-        loop_via_reverse = self._loop_fill_allowed(prepared)
-        if loop_via_reverse:
-            length = _ltx_loop_source_length(plan["target_frame_count"],
-                                             self.target_fps)
-            _LOG.warning("[eng_ltx_video] loop_via_reverse ON: render src=%d -> "
-                         "mirror %d frames (target %d) @ %dx%d", length,
-                         2 * length - 1, plan["target_frame_count"], width, height)
         if use_i2v:
             init_path = self._init_image_path(request)
             image_name = _wb.stage_into_comfy_input(init_path)
@@ -1494,25 +1375,6 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
-        # THE HONESTY RECEIPT, CAPTURED BEFORE ANY EXTENSION (2026-08-06).
-        # ``n_native`` is what this render actually PRODUCED. The mirror below
-        # can only append to it, so reading the count here is the only place it
-        # is knowable -- afterwards ``len(frames)`` is the extended length and
-        # the real one is unrecoverable.
-        n_native = len(frames)
-        # AND WHETHER THE MIRROR ACTUALLY RAN, not whether it was asked for.
-        # ``loop_via_reverse`` is the INTENT; the branch below declines it on a
-        # sub-2-frame decode. A receipt keyed on the intent would declare a
-        # ping-pong that never happened, and the grader would reject a clip whose
-        # every frame was rendered.
-        mirrored = False
-        if loop_via_reverse:
-            if len(frames) >= 2:
-                frames = _boomerang_frames(frames)
-                mirrored = True
-            else:
-                _LOG.warning("[eng_ltx_video] loop_via_reverse: only %d frame(s) "
-                             "decoded -- skipping mirror", len(frames))
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7 (added 2026-07-27): prove the silent-clip contract on what was
@@ -1521,20 +1383,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # not, on either recipe path.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         return {"out_path": path, "frame_count": n,
-                "ltx_loop_via_reverse": bool(loop_via_reverse),
-                # EMITTED scope, exactly as ``eng_ltx_8gb`` stamps it: the count
-                # is what this clip CARRIES, so ``frame_count -
-                # native_frame_count`` is the number of manufactured frames. On
-                # the mirrored path the real frames are the PREFIX -- the
-                # boomerang is ``[0,1,2,3] -> [0,1,2,3,2,1,0]``, forward run
-                # first -- which is the tail-append contract
-                # ``acceptance.SEGMENT_RECEIPT_KEYS`` documents and depends on.
-                # NOT CLAMPED to ``n``. If the encoder ever emitted fewer frames
-                # than it was handed, a native count above the clip's own length
-                # is an IMPOSSIBLE receipt, and the grader is written to call it
-                # that. A ``min()`` here would launder that into a pass.
-                "native_frame_count": n_native if mirrored else n,
-                "extension_mode": "ping_pong" if mirrored else "none"}
+                # THE CONDITIONAL COLLAPSED WHEN THE MIRROR DIED (step 5). While
+                # the boomerang branch existed this read
+                # ``n_native if mirrored else n`` / ``"ping_pong" if mirrored
+                # else "none"``, keyed on whether the mirror ACTUALLY ran rather
+                # than on the intent flag. With the branch deleted there is
+                # nothing between the decode and this encode that can add a
+                # frame, so every delivered frame is a rendered frame and
+                # ``"none"`` is a fact about this path.
+                "native_frame_count": n,
+                "extension_mode": "none"}
 
     def _render_clip_hq(self, request, prepared, plan):
         """S5: drive ONE silent two-stage HQ clip (hq_two_stage recipe). The
@@ -1561,14 +1419,6 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
-        loop_via_reverse = self._loop_fill_allowed(prepared)
-        if loop_via_reverse:
-            length = _ltx_loop_source_length(plan["target_frame_count"],
-                                             self.target_fps)
-            _LOG.warning("[eng_ltx_video] HQ loop_via_reverse ON: render "
-                         "src=%d -> mirror %d frames (target %d) @ %dx%d",
-                         length, 2 * length - 1, plan["target_frame_count"],
-                         width, height)
         image_name = _wb.stage_into_comfy_input(init_path)
         _LOG.warning(
             "[eng_ltx_video] S5 HQ two-stage: base %dx%d -> upsample x2 -> "
@@ -1586,28 +1436,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 and id(model) not in {id(p) for p in bucket}:
             bucket.append(model)
         frames = _wb.images_to_uint8(images)
-        # The same receipt the single-pass path takes, for the same reason: this
-        # is the SECOND raw return, and a producer seam that stamps one path and
-        # not its sibling is how ``eng_ltx_8gb`` lost its receipt originally.
-        n_native = len(frames)
-        mirrored = False
-        if loop_via_reverse:
-            if len(frames) >= 2:
-                frames = _boomerang_frames(frames)
-                mirrored = True
-            else:
-                _LOG.warning("[eng_ltx_video] HQ loop_via_reverse: only %d "
-                             "frame(s) decoded -- skipping mirror", len(frames))
         out_path = otr_engine_tmp_mp4("otr_ltx_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
                                                   self.target_fps)
         # M7: the hq_two_stage path emits its own mp4 and owes the same proof.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
+        # The same receipt the single-pass path takes, and now unconditional for
+        # the same reason: this is the SECOND raw return, and a seam that stamps
+        # one path and not its sibling is how ``eng_ltx_8gb`` lost its receipt.
         return {"out_path": path, "frame_count": n,
                 "ltx_recipe": RECIPE_HQ_TWO_STAGE,
-                "ltx_loop_via_reverse": bool(loop_via_reverse),
-                "native_frame_count": n_native if mirrored else n,
-                "extension_mode": "ping_pong" if mirrored else "none"}
+                "native_frame_count": n,
+                "extension_mode": "none"}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p

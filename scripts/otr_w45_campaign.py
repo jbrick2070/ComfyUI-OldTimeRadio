@@ -656,9 +656,11 @@ def verify_asset(started_at: float) -> dict:
         # near-static announcer card, but it still reports mirror reflections in
         # clips whose CONSECUTIVE frames already sit inside the mirror tolerance
         # -- on content that still, a reflection is arithmetic rather than
-        # evidence. No boomerang exists in that lane to produce one:
-        # ``eng_ltx_video._loop_via_reverse`` returns False unconditionally and
-        # ``eng_ltx_av`` has no mirror path at all.
+        # evidence. No boomerang exists in that lane to produce one: the
+        # ``eng_ltx_video`` mirror was DELETED on 2026-08-06 (the earlier note
+        # here said ``_loop_via_reverse`` "returns False unconditionally", which
+        # was true while the gate still existed and is now a cite to a symbol
+        # that is gone), and ``eng_ltx_av`` has no mirror path at all.
         #
         # A check that cannot yet separate "quiet shot" from "reused frame" must
         # not discard a completed render. The invariant is ALREADY enforced where

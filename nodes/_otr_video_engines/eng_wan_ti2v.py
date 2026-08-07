@@ -998,23 +998,32 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         contract before the mux trusts it. Fail-closed NAMED on a missing node /
         init image.
 
-        THE PING-PONG IS NARROWED, NOT RIPPED (WIRE-W3b, 2026-07-29). On a
-        SINGLE-CLIP beat this adapter still renders short on purpose and fills
-        the beat with a mirror-extended clip -- that is the shipped 8 GB tier
-        contract (``PBUG-20260723-02``) and it is untouched. On a
-        COVERAGE-PLANNED segment it is forbidden: ``coverage_plan``'s own
-        docstring says a planned segment delivers the frames it was planned
-        for, and a mirrored tail on a lane declaring ``strict_first_frame``
-        would hand the NEXT segment a mirrored frame to chain from. Worse, the
-        pad wears the right frame count, so a render that did not happen passes
-        ``render_driver``'s ``got != segment.render_frames`` gate wearing the
-        number of one that did.
+        THE PING-PONG IS RIPPED, NOT NARROWED (2026-08-02). This docstring said
+        the opposite for four days and the correction matters, because the
+        superseded version described the shipped tier contract: on a SINGLE-CLIP
+        beat the adapter used to render short on purpose and fill the beat with a
+        mirror-extended clip (``PBUG-20260723-02``). The operator's rule is
+        unconditional -- no mirror or ping-pong anywhere except the closing theme
+        -- so the adapter now REFUSES any beat it cannot render in one
+        VRAM-affordable pass, and ``wan_ti2v`` was added to
+        ``frame_contract.PLANNING_CAP_ENGINES`` so the planner splits those beats
+        into affordable NATIVE segments. The mirror was load-bearing; coverage
+        planning is what replaced it.
 
-        ``prepared["session_ctx"]["multi_clip"]`` is the discriminator, and it
-        is the ONLY honest one available here: ``BeatSession`` sets it from the
-        stamped plan's segment count, whereas a segment's REQUEST is shaped
-        exactly like a single-clip beat's. A caller that prepared nothing reads
-        as single-clip, which is the conservative direction."""
+        Why it was forbidden on a COVERAGE-PLANNED segment first, and the
+        reasoning that generalised to every beat: a planned segment delivers the
+        frames it was planned for, a mirrored tail on a lane declaring
+        ``strict_first_frame`` hands the NEXT segment a mirrored frame to chain
+        from, and -- worst -- the pad wears the right frame count, so a render
+        that did not happen passes ``render_driver``'s
+        ``got != segment.render_frames`` gate wearing the number of one that did.
+
+        ``prepared["session_ctx"]["multi_clip"]`` remains the length-authority
+        discriminator (plan vs adapter floor), and it is still the only honest
+        one available here: ``BeatSession`` sets it from the stamped plan's
+        segment count, whereas a segment's REQUEST is shaped exactly like a
+        single-clip beat's. A caller that prepared nothing reads as single-clip,
+        which is the conservative direction."""
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)            # pure, CPU-tested

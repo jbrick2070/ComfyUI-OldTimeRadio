@@ -1832,11 +1832,19 @@ class EpisodeAssembler:
                                 "[EpisodeAssembler] music mirror: "
                                 "appended=%d, chunked_cues=%d, "
                                 "stale_removed=%d, total_lines=%d "
+                                # THE BOOMERANG CLAUSE IS GONE (no-mirror step 6,
+                                # 2026-08-06). This line printed into the
+                                # operator's LIVE RUN that "BUG-LOCAL-117d
+                                # boomerang doubles the rendered half-clip back
+                                # to full audio duration" -- describing machinery
+                                # that was disarmed on 2026-08-02 and deleted on
+                                # 2026-08-06. A stale comment misleads a reader;
+                                # a stale LOG misleads the operator mid-render,
+                                # while they are deciding whether a leg is
+                                # behaving. Music beats past the chunk ceiling
+                                # are covered by chained forward segments now.
                                 "(post-BUG-117e: music chunks <= %.1fs "
-                                "to fit the LTX 22B 25s safe envelope; "
-                                "BUG-LOCAL-117d boomerang doubles the "
-                                "rendered half-clip back to full audio "
-                                "duration)",
+                                "to fit the LTX 22B 25s safe envelope)",
                                 _appended_music, _chunked_cues,
                                 _removed, len(_lines_for_music),
                                 _MUSIC_MAX_CHUNK_DUR_S,
