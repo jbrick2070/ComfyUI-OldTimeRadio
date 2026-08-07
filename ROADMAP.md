@@ -136,8 +136,61 @@ Choose these as separate campaigns after the core surface is stable:
   scale; a future design may combine transcript/audio analysis with video-frame
   moderation, but the rating is advisory display metadata only and must never
   reject, reroll, rewrite, or block publication;
-- Randomizer Design B: visual-pack roll, only after `dynamic_story` establishes
-  one visual-style authority;
+- **STORY-FITTED VISUAL STYLE -- OPERATOR WANTS THIS (2026-08-07: "customize
+  the visual style based on the actual story, whatever is most appropriate").**
+  This REPLACES the old one-line "Randomizer Design B: visual-pack roll" bullet,
+  which was ambiguous and is why the question came up at all.
+  **What already exists, and is COMPLETE:** the `visual_style` ROLL --
+  `nodes/_otr_rolls.py`, `STYLE_SENTINEL = "roll (any style)"`, a seeded draw
+  replayable via `OTR_VISUAL_STYLE_SEED`. It deliberately reads no premise,
+  outline or brief; its own docstring says it picks "which visual pack dresses
+  it". Nothing is owed on the roll. Do not read it as a half-built version of
+  this item.
+  **What is wanted is the opposite of a roll: the style should be CHOSEN BY THE
+  STORY.**
+  **THERE IS A LIVE FIDELITY HOLE UNDERNEATH THIS, and it is not a roadmap
+  item -- it is a defect (found 2026-08-07, NOT yet in PROD_BUG_LOG because no
+  shipped artifact has been checked for it yet).** `resolve_style_selection`
+  (`nodes/_otr_rolls.py:276`) takes NO bank argument and `eligible_style_ids()`
+  (`:264`) takes none either; the docstring says the style roll is "independent
+  of the bank roll in every respect". The registered pool is 9 styles and
+  INCLUDES `anime` and `cartoon` -- alongside a `shakespeare_stage_realism` the
+  roll has no way to prefer. **So a shakespeare or public_domain episode on
+  `"roll (any style)"` can draw anime onto Macbeth today.** That is the same
+  class as a character speaking in the wrong voice: the fidelity lanes must be
+  true to source, and the visual surface is not currently held to it. Operator
+  2026-08-07: "if it's Shakespeare, by god it's not anime". FIRST STEP, cheap
+  and separable: gate the eligible pool by bank so a fidelity lane can never
+  draw a stylized-modern pack. That fix stands on its own even if nothing below
+  is ever built.
+  **Recommended shape (driver's pick, 2026-08-07 -- SELECTION, not generation).**
+  Working name, operator's: **`visual_appropriate`** (a third dropdown sentinel
+  beside `"roll (any style)"`). It replaces the dice at the SAME seam the roll
+  already occupies, so the registry stays the one authority and the pack pool is
+  unchanged -- the only difference is WHO picks. Resolved after the brief
+  exists, handing the model the premise/setting/era/source and the
+  BANK-ELIGIBLE style ids with their one-line descriptions, taking back ONE id,
+  validated against the registry, failing CLOSED to the seeded roll when the
+  reply is not a registered id. Stamp the chosen id, the reason and the fallback
+  flag on the ledger so an audit can tell a fit from a roll.
+  **The open design question, stated honestly:** selection alone gets Macbeth to
+  `shakespeare_stage_realism`, but it does NOT get "Macbeth Act II" -- a
+  torchlit Scottish castle at night rather than generic stage realism. Reaching
+  that means the LLM authoring the story-specific SLOTS inside a chosen style
+  (era, location, light, palette) while the registry keeps owning the vocabulary.
+  That is a bigger change than a selector and is where the arc should start.
+  **Why selection and not generating a bespoke pack per episode:** a generated
+  pack is unbounded, mints a second visual-style authority next to the registry,
+  and cannot be replayed or reviewed; a selector is one constrained call, reuses
+  the whole existing visual layer, needs no new widget position (the sentinel
+  rides an existing dropdown, so `workflows/otr_canonical.json` does not change
+  and no `widgets_values` index shifts), and degrades to today's behaviour.
+  **NOT a prose-quality item** -- this is visual selection and does not reopen
+  the 2026-08-04 "story quality is done" directive.
+  Still needs its own scoped design, ownership table, tests and qualification
+  ladder before entering GO_FORWARD; and the `dynamic_story` prerequisite (ONE
+  visual-style authority) still holds, because a selector fighting a second
+  authority is worse than a dice roll;
 - richer brief-driven music-cue still prompts;
 - direct BYO Google music/image/video paths, followed by other providers only
   when they keep provider identity explicit and fail loud;
