@@ -65,7 +65,7 @@ at 120, plus one cloud/frontier lane.
 | 2 | 30 | `google/gemma-4-12b-it (11.9 GB)` | public_domain | **PASS** `signal_lost_qual_leg_2_publicdomain_gemma_20260807_153216` -- b001 "The sun hangs heavy over the garden as Rikki-tikki-tavi keeps a watchful eye on the grass..."; same clean receipt. **Second model FAMILY -- the fix is not Mistral-shaped** |
 | 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | **PASS** `signal_lost_qual_leg_3_original_nemo_120w_20260807_154633` -- b001 names BOTH characters ("Malcolm Sirikit and Clarisse Spender..."), so the cast wire that was severed is demonstrably feeding the prompt. `open_safe_fallback` is `None` not `False` here and that is CORRECT: `original` runs style-grammar OFF, and that receipt is only stamped inside `if _style_grammar_on`. None = never asked; False = asked and did not fall back |
 | 4 | 120 | `google/gemma-4-12b-it (11.9 GB)` | media_archive | RUNNING |
-| 5 | 30 | `openrouter:slot-a` + `openrouter_slot_a_model=tencent/hy3:free` | shakespeare | queued. **DeepSeek is NOT in the pinned catalog** -- checked, do not plan around it without a catalog change. Of the 21 slot-a choices `tencent/hy3:free` is both the cheapest (free) and a genuinely different family from Mistral and Gemma, which is what a diversity arm needs. Fallback `~anthropic/claude-haiku-latest`. Cloud arm cost: $0.00 |
+| 5 | 30 | `openrouter:slot-a` + `openrouter_slot_a_model=~anthropic/claude-haiku-latest` | shakespeare | queued. Third model family, cheap, alias-resolved. **Two dead ends checked first, both recorded so nobody re-walks them:** DeepSeek is NOT in the pinned catalog at all; and `tencent/hy3:free` -- which the pinned catalog DOES offer -- no longer exists upstream (live OpenRouter has `tencent/hy3` at $0.13/$0.53 per M tokens, no free variant). **Prefer a `~...-latest` alias for any cloud leg: it resolves at runtime and cannot rot like a pinned slug** |
 
 Leg 5 is a **diversity arm only** -- it proves the prompt shape survives a third
 model family. Operator ruling 2026-08-07: use a CHEAP model, spend under a
@@ -149,6 +149,18 @@ consequences, NOT objections to the ask:**
 2026-08-04 "story quality is done" directive.
 
 ### STILL OPEN, SMALL, UNSCHEDULED
+
+0. **THE PINNED OPENROUTER CATALOG HAS DRIFTED FROM LIVE (found 2026-08-07).**
+   `_otr_model_catalog.openrouter_catalog_dropdown_choices("a")` offers
+   `tencent/hy3:free`, and that slug NO LONGER EXISTS upstream -- live OpenRouter
+   has `tencent/hy3` (canonical `tencent/hy3-20260706`) at `0.000000132` prompt /
+   `0.000000528` completion, with no free variant. A cloud leg picking it from
+   the dropdown would fail to resolve. Operator caught this ("I think it stopped
+   being free"); verified against the live `/api/v1/models`. The catalog is
+   PINNED by design (network-free `INPUT_TYPES`), so drift is expected -- what is
+   missing is any refresh discipline or staleness signal. Scope: decide whether
+   the catalog gets a dated refresh step, or whether the `~...-latest` aliases
+   become the recommended default because they resolve at runtime. NOT scheduled.
 
 1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
