@@ -13,87 +13,109 @@ blocked on the operator, finishes it green and pushed, then re-reads this list.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Small sprint items -- IN FLIGHT, 2 of 5 commits shipped.** See the checklist directly below; plan is `docs/2026-08-07-PLAN-small-sprint-items.md` | THE CODING SPRINT items 2, 3, 4 | coder | nothing |
-| 2 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
-| 3 | **Premise wiring** -- `--premise` lands in the ledger as `meta.operator_hint` but never reaches the writer (reproduced on BOTH 2026-08-07 live legs), and both scripts carried the same model meta-response line ("Please provide the SETTING, TIME, HOOK...") | 0-QUATER OPEN 2 | investigate; likely real wiring | nothing |
+| 1 | **Announcer-intro qualification -- IN FLIGHT.** The fix shipped; the live ladder is running. See the leg matrix directly below | PBUG-20260807-01 | render + coder | nothing (leg 1 running) |
+| 2 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
+| 3 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
 | 5 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 6 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+| 7 | **Bug Bible fan-out** over `docs/PROD_BUG_LOG.md` -- PBUG-20260807-01 is logged `promotion: pending fan-out` | separate repo | **operator triggers**; the log's own contract forbids a window promoting directly | operator's call |
 
-**Items 2, 4, 5 and 6 are blocked on the operator** -- a coder window that
+**Items 2, 3, 4, 5, 6 and 7 are blocked on the operator** -- a coder window that
 reaches them without an answer should skip to the next unblocked item rather
-than guess.
+than guess. **Item 1 is the only unblocked work.**
 
-The old item 1 (0-BIS no-mirror) is DISCHARGED -- see the tombstone in section
-0-BIS. It took the live leg with it, so F11 and the multi-clip receipt's
-outstanding proof are closed in the same stroke.
+### QUEUE ITEM 1 -- THE QUALIFICATION LADDER (live proof, not tests)
 
-### QUEUE ITEM 1 -- COMMIT CHECKLIST (tick these, in this order)
+The announcer-intro fix is code-complete and green; what is owed is LIVE proof.
+Full spec: `kibitz-runs/2026-08-07-announcer-intro-starvation/r4/final.md`
+(LOCAL ONLY, gitignored). Incident: `docs/PROD_BUG_LOG.md` PBUG-20260807-01.
 
-Full plan with every correction and the acceptance gate:
-**`docs/2026-08-07-PLAN-small-sprint-items.md`** (committed `1a746c25`).
-Arc: cold Fable r1 as senior architect -> `kibitz-plugin:kibitz` r2/r3/r4
-(Codex + Antigravity) -> Sonnet 5 QA -> an operator-run independent QA.
-**~28 corrections folded in.** Artifacts: `kibitz-runs/2026-08-07-small-sprint-items/`
-(LOCAL ONLY, gitignored) incl. `scope_receipt.md` and `qa_independent.md`.
+**THE TRAP, and the reason a green leg can still prove nothing.**
+`workflows/otr_canonical.json` node 1 has `widgets_values[23] == 'scifi_news'`,
+and that lane dispatches to `scifi_news_circuit` and RETURNS BEFORE this code.
+A leg from the unchanged graph exercises none of the fix. **Every leg loads that
+exact canonical file with a per-leg RUNTIME bank override and asserts the
+resolved bank is one of `original`/`shakespeare`/`public_domain`/`media_archive`
+before the leg counts.** Verify the override landed via the runner's `applied:`
+line -- a wrong `--creative-model` string is a hard `ValueError`, but a missing
+bank override is silent.
 
-| # | Commit | State |
-|---:|---|---|
-| 1 | **Item 3** -- test-ordering pollution; lazy-import probe moved to a subprocess | **SHIPPED `1a746c25`** -- both file orders 28/28 |
-| 2 | **Item 2** -- the non-commercial notice rendered in credits | **SHIPPED `e8e649f2`** -- 5 tests, each proven to catch its own defect |
-| 3 | **B4** -- extract `_compose_and_stamp_announcer_close` | **SHIPPED `5d5f2d0b`** -- byte-identical (suite unchanged at 9086), 6 wiring tests that all go red against the pre-extraction file. **STILL OWES the routing matrix** (see 3a) |
-| 3a | **B4's routing acceptance matrix** -- both fidelity banks x {non-empty, empty} provenance, plus owned/non-empty with `_style_grammar_on == False`. Control is `media_archive`, **NEVER `scifi_news`** (that lane dispatches to `scifi_news_circuit` and returns before this block). Assert the coda is PRESENT, in `lines[].text` AND in a `Dialogue:` cue from `build_ass_from_ledger` | **OWED.** B4 proved the helper is WIRED; it does not yet prove every ROUTE through it |
-| 4 | **B6** -- `CURRENT_SCHEMA_VERSION` -> `l4-2026-08-07` + the save-version policy + the fixture sweep | NOT STARTED |
-| 5 | **Bug Bible** -- SEPARATE REPO (`comfyui-custom-node-survival-guide`), atomic 3-file landing, after B4 | NOT STARTED |
+Ladder per `docs/PRODUCTION_SPRINT_LESSONS.md:106-113` (this is model-sensitive
+work -- it changes prompt SHAPE): two local model families at 30 words, the same
+at 120, plus one cloud/frontier lane.
 
-**Suite baseline as this lands:** 9081/111/1 at `76a5208a` -> 9086 at
-`e8e649f2` (+5 credits) -> **9092/111/1 at `5d5f2d0b`** (+6 wiring). Bug Bible
-**17**, and it must be RE-TAKEN after commit 5 changes it.
+| Leg | Words | Writer (exact catalog string) | Bank | State |
+|---:|---:|---|---|---|
+| 1 | 30 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | shakespeare | RUNNING |
+| 2 | 30 | `google/gemma-4-12b-it (11.9 GB)` | public_domain | queued |
+| 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | queued |
+| 4 | 120 | `google/gemma-4-12b-it (11.9 GB)` | media_archive | queued |
+| 5 | 30 | `openrouter:slot-a` -> cheapest resolving (DeepSeek Flash class) | shakespeare | queued |
 
-**B6 is the one that deserves a fresh window.** It changes `save_ledger_safe` --
-a core write path every node reaches -- and sweeps ~20 test files that must be
-sorted by ROLE (current-modelling fixtures follow the constant; legacy-modelling
-fixtures KEEP their l3 literal, or the compatibility boundary disappears). The
-whole design is settled and written down; what it needs is room, not more review.
+Leg 5 is a **diversity arm only** -- it proves the prompt shape survives a third
+model family. Operator ruling 2026-08-07: use a CHEAP model, spend under a
+dollar, change no production default. **This does NOT reopen the 2026-08-04
+"story quality is done / no paid writer" directive**, which stands.
 
-### NEW WORK THE ARC SURFACED -- not previously on this queue
+**Per-leg acceptance:** `b001` is narrative prose and NOT a request for the
+setting; `meta.announcer_intro_rewrite` = `{"status": "announcer_intro_rewritten",
+"reason": null}`; resolved bank asserted; `RESULT SUCCESS` + `obs_publish OK`;
+asset on disk. Record model IDs, repair counts, ledger path, asset path.
+**No derive-exhaustion rate or safety claim without live receipts.**
 
-None of these need their own r1: they were found and reviewed inside the item-1
-arc. **Items marked ARC would need a fresh `kibitz-plugin:kibitz` starting at
-Fable r1 if picked up as standalone work.**
+Reset per CLAUDE.md section 4 before every leg. Server boots in ~20s via
+`scripts/_otr_soak_server_launch.cmd` as `-FilePath` (never `cmd /c`).
 
-1. **The save-version policy** (`save_ledger_safe` must PRESERVE a foreign
-   `schema_version` instead of restamping). **Folded into commit 4** -- do not
-   schedule separately. Measured exposure: **43 of 48 provenance-carrying
-   ledgers** would be falsely flagged without it.
-2. **`LEGACY_SCHEMA_VERSIONS` is wrong today, independently of the bump**
-   (`scripts/audit_spoken_citations.py:43-45`): it omits FOUR real lineage
-   versions and carries one (`l2-2026-05-02`) that never existed. **10 live
-   ledgers** sit at `l3-2026-05-08`, which the set does not recognise. Folded
-   into commit 4.
-3. **Regression owed: nobody may resume a `Ledger()` over a pre-existing on-disk
-   ledger carrying a foreign `schema_version`.** `Ledger.save()` restamps
-   unconditionally at `production_ledger.py:1461-1462` and would promote such a
-   ledger. Dormant today (no caller does it); pin it so it stays dormant.
-   Folded into commit 4.
-4. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
+### AFTER THE LADDER PASSES -- what closes and what opens
+
+1. Stamp PBUG-20260807-01 `status: FIXED + LIVE PROVEN` with the leg receipts.
+2. Queue item 2 (the 23 episodes) becomes actionable the moment the operator
+   rules rerender-vs-tombstone. The manifest shape is specified in the r4 final:
+   ledger + OBS paths, commit, bank, episode id, ledger SHA-256, affected
+   `line_id`, normalized text hash, disposition -- plus the scan predicate
+   preserved beside it so the baseline is reproducible.
+3. Queue item 7 (Bible fan-out) becomes available to the operator.
+4. Then the queue is operator-blocked end to end, and the next coder window has
+   nothing unblocked -- which is the signal to ask for a ruling rather than
+   invent work.
+
+### STILL OPEN, SMALL, UNSCHEDULED
+
+1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
-   fixtures match its `l3-` prefix filter. Deliberately OUT of scope for this
-   sprint. Delete-or-revive is a separate small item.
-5. **The parked worktree rip must be RE-GROUNDED after B4.**
+   fixtures match its `l3-` prefix filter. Delete-or-revive, separate small item.
+2. **The parked worktree rip must be RE-GROUNDED.**
    `.claude/worktrees/awesome-brahmagupta-a509b4` holds the uncommitted removal
-   of `news_coda_spoken_reduction` / `finalize_news_coda_surface`, and its
-   target lines now live INSIDE the new helper. **ARC** if reopened.
-6. **`docs/known-failures.md` + the conftest KNOWN-FAIL-GUARD** exit **2**, not
-   1, on a new failure, and it swallows the traceback in `-q` runs. Not a
-   defect, but it cost two mis-diagnoses this session -- worth knowing before
-   reading a red line.
+   of `news_coda_spoken_reduction` / `finalize_news_coda_surface`, and its target
+   lines now live INSIDE `_compose_and_stamp_announcer_close`. **ARC** if reopened.
+3. **`BUG_BIBLE.yaml` does not `yaml.safe_load`** -- `ScannerError` at line 834
+   col 217, an unquoted inline JSON fragment whose colon breaks the scan.
+   Pre-existing at survival-guide `3759ae5`; the contract test counts `^- id:`
+   with a regex, so nothing notices. The README calls it machine-readable.
+   Separate repo, separate item.
+4. **`docs/known-failures.md` + the conftest KNOWN-FAIL-GUARD** exit **2**, not
+   1, on a new failure, and swallow the traceback in `-q` runs. Not a defect,
+   but it has cost mis-diagnoses -- know it before reading a red line.
 
-**Lane note:** Antigravity **quota-failed at r4** (`RESOURCE_EXHAUSTED 429`), so
-that round was Codex-only. Real count for the campaign: **5 successful external
-reviews of 6 attempted**, plus cold Fable r1, four driver anchors and two QA
-passes. It is a scoped tail, NOT a full 8-call panel arc -- see
-`scope_receipt.md`.
+### TOMBSTONES -- DONE 2026-08-07, do not reopen
+
+* **Small sprint items (the old queue item 1) -- ALL FIVE COMMITS SHIPPED.**
+  Item 3 test-ordering `1a746c25`; item 2 non-commercial notice `e8e649f2`;
+  B4 extraction `5d5f2d0b`; B4's routing matrix `1f1330d5`; B6
+  `l4-2026-08-07` + save-version preserve policy + legacy-set repair
+  `39c572ba`. Bug Bible 12.74 landed and survived the survival-guide
+  reconciliation -- now live at `3759ae5`, 261 entries.
+* **Premise wiring (the old queue item 3) -- DISPROVED, NOT A BUG.**
+  `--premise` reaches the writer correctly: it lands as
+  `source_meta["operator_hint"]` and IS consumed --
+  `OTR_LedgerScriptWriter.py:2181` passes it to `build_original_briefs`, and
+  both 2026-08-07 legs show `operator_hint` populated with
+  `selected_concept` + 2 pitches. The "Please provide the SETTING, TIME,
+  HOOK..." line that prompted the report came from a DIFFERENT defect next
+  door -- the announcer-intro starvation, now PBUG-20260807-01.
+* **0-BIS no-mirror** -- discharged with its live leg; F11 and the multi-clip
+  receipt closed in the same stroke.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
@@ -199,12 +221,23 @@ deliberately NOT fixed (the mesh-fodder composer splices the era tail
 unfolded; scoping already ends the under-fire, and folding it would move mesh
 prompt hashes for nothing).
 
-**OPEN 2 -- premise wiring, operator eye when convenient.** `--premise` lands
-in the ledger as `meta.operator_hint`, but the writer ignored it on BOTH live
-legs and both scripts carry the same model meta-response line ("Please provide
-the SETTING, TIME, HOOK, and the cast list..."). Story QUALITY is closed by
-directive; this is flagged as possible WIRING -- a knob that lands in the
-ledger and never reaches the writer -- and was deliberately not chased.
+**OPEN 2 -- premise wiring -- CLOSED 2026-08-07. NOT A BUG. Do not re-open.**
+The report was that `--premise` lands as `meta.operator_hint` and the writer
+ignores it. Investigated: **the wiring is sound.** `--premise` -> the
+`custom_premise` widget -> `source_meta["operator_hint"]`
+(`OTR_LedgerScriptWriter.py:1757`) -> read at `:2181` and passed to
+`build_original_briefs`, which folds it into the concept prompt
+(`_otr_original_radio.py:259-261`, `:283`). Both 2026-08-07 legs carry a
+populated `operator_hint` AND a `selected_concept` with 2 pitches, so the hint
+was not merely stored -- it was consumed.
+
+**What the report actually saw was a different defect standing next to it:**
+the "Please provide the SETTING, TIME, HOOK, and the cast list..." line is the
+ANNOUNCER INTRO, starved of its brief and answering the prompt as a form. That
+is PBUG-20260807-01, fixed in `a200b6f1` + `615de993`, and it affected 23
+shipped episodes across four banks -- not only the two legs in this report.
+The lesson worth keeping: a symptom seen on a leg that also used `--premise`
+is not evidence about `--premise`.
 
 ### 0-QUINQUE. MINIMAX H3 -- ON DECK (operator, 2026-08-07: "keep minimax on deck")
 
