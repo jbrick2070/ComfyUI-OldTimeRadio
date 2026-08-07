@@ -20,20 +20,21 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
 | 1 | **Announcer-intro qualification -- IN FLIGHT.** The fix shipped; the live ladder is running. See the leg matrix directly below | PBUG-20260807-01 | render + coder | nothing (legs running) |
-| 2 | **`visual_storybased` -- the dynamic visual style.** Promoted out of ROADMAP row 2 by the operator 2026-08-07. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- starts when item 1 closes |
-| 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
-| 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 5 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
-| 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
-| 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
-| 8 | **System-agnostic multi-GPU upscale stage** -- built against the profile and registry contracts, NEVER a resurrection of the retired NVIDIA-only node. Promoted out of ROADMAP row 2 by the operator 2026-08-07 | ROADMAP section 2 | own design + arc, then coder | nothing once 1-7 clear |
+| 2 | **Model-slug curation** -- the pinned OpenRouter catalog carries dead ids (`tencent/hy3:free` expired with its promo; live has `tencent/hy3` at $0.13/$0.53 per M). SMALL chunk, half a day; does NOT displace item 3 as the next real campaign. Policy + verified findings in the section below | `_otr_model_catalog` | coder | nothing |
+| 3 | **`visual_storybased` -- the dynamic visual style.** Promoted out of ROADMAP row 2 by the operator 2026-08-07. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- starts when item 1 closes |
+| 4 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
+| 5 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
+| 6 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+| 7 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
+| 8 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
+| 9 | **System-agnostic multi-GPU upscale stage** -- built against the profile and registry contracts, NEVER a resurrection of the retired NVIDIA-only node. Promoted out of ROADMAP row 2 by the operator 2026-08-07 | ROADMAP section 2 | own design + arc, then coder | nothing once 1-8 clear |
 
-Then, in `ROADMAP.md`: **9** lean-mean/dead-code -> **10** RunPod + AMD/Mac
-platform tests -> **11** install path -> **12** product docs + v2 release.
+Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
+platform tests -> **12** install path -> **13** product docs + v2 release.
 
-**Items 3, 4, 5, 6 and 7 are blocked on the operator.** A coder window that
+**Items 4, 5, 6, 7 and 8 are blocked on the operator.** A coder window that
 reaches one without an answer skips to the next unblocked item rather than
-guessing. **Items 1, 2 and 8 are the unblocked work**, in that order.
+guessing. **Items 1, 2, 3 and 9 are the unblocked work**, in that order.
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
@@ -163,7 +164,9 @@ consequences, NOT objections to the ask:**
 
 ### STILL OPEN, SMALL, UNSCHEDULED
 
-0. **THE PINNED OPENROUTER CATALOG HAS DRIFTED FROM LIVE (found 2026-08-07).**
+#### QUEUE ITEM 2 DETAIL -- model-slug curation
+
+**THE PINNED OPENROUTER CATALOG HAS DRIFTED FROM LIVE (found 2026-08-07).**
    `_otr_model_catalog.openrouter_catalog_dropdown_choices("a")` offers
    `tencent/hy3:free`, and that slug NO LONGER EXISTS upstream -- live OpenRouter
    has `tencent/hy3` (canonical `tencent/hy3-20260706`) at `0.000000132` prompt /
