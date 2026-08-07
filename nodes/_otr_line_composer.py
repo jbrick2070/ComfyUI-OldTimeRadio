@@ -40,6 +40,12 @@ __all__ = [
     "compose_announcer_intro",
     "compose_announcer_outro",
     "finalize_news_coda_surface",
+    # The safe-open contract. Exported because _otr_story_brief's derive
+    # validator shares this exact predicate -- one definition, two callers, so
+    # a brief that validator accepts is always one this composer can use.
+    "AnnouncerBriefStarvedError",
+    "safe_open_viability",
+    "cleaned_cast_names",
 ]
 
 
@@ -1192,6 +1198,63 @@ def _resolved_closing_prompt(repo_id, *, phase, source_bank_id):
     )
 
 
+class AnnouncerBriefStarvedError(RuntimeError):
+    """The safe-open brief carries nothing the announcer can open on.
+
+    Raised BEFORE the creative call, so a starved brief costs no LLM turn and
+    cannot produce a line. ``reason`` is a bounded value from
+    ``safe_open_viability`` -- the writer reads it directly rather than parsing
+    the message, so a receipt can name the cause without string matching.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"[OTR_AnnouncerPass] safe-open brief: {reason}")
+        self.reason = reason
+
+
+def cleaned_cast_names(cast) -> "list[str]":
+    """The cast names that will actually reach the prompt.
+
+    A bare ``str`` is REJECTED rather than iterated: ``"MARA"`` is a sequence of
+    five characters, and iterating it would put ``M``, ``A``, ``R`` into the
+    cast list as if they were people. ``bytes`` the same. Viability and
+    rendering both read THIS, so a cast that cleans away to nothing can never
+    pass the check and then vanish from the prompt.
+    """
+    if isinstance(cast, (str, bytes, bytearray)):
+        return []
+    try:
+        candidates = list(cast or ())
+    except TypeError:
+        return []
+    return [n for n in (clean_one_line(str(c)) for c in candidates) if n]
+
+
+def safe_open_viability(*, setting, opening_status_quo, cast) -> "str | None":
+    """Return None when the brief can open an episode, else a bounded reason.
+
+    ONE predicate, TWO callers -- the derive validator
+    (``_otr_story_brief._validate_produced_open``) and this module's composer --
+    because a brief the validator accepts and the composer cannot use is exactly
+    the gap that shipped twenty-three episodes opening with the model asking the
+    operator for the setting.
+
+    The cast requirement is not decoration: every bank's
+    ``announcer_intro_safe_system`` seam ends "Use ONLY the proper names in the
+    cast list below; invent none", so a brief with no usable cast promises the
+    model a roster the prompt never delivers, and the model asks for it.
+
+    Precedence is fixed -- scene context before cast -- so an all-empty brief
+    always reports the same reason and a receipt stays comparable across runs.
+    """
+    if not (clean_one_line(str(setting or ""))
+            or clean_one_line(str(opening_status_quo or ""))):
+        return "missing_scene_context"
+    if not cleaned_cast_names(cast):
+        return "missing_cast"
+    return None
+
+
 def compose_announcer_intro(
     *, creative_fn, script_brief: str, safe_open_brief=None,
     creative_repo_id: str | None = None,
@@ -1200,11 +1263,40 @@ def compose_announcer_intro(
     """Author one opening; structural sanitation never re-calls the model."""
     if safe_open_brief is not None:
         phase = "announcer_intro_safe_system"
-        context = "\n".join(filter(None, (
-            f"SETTING: {clean_one_line(getattr(safe_open_brief, 'setting', ''))}",
-            f"TIME: {clean_one_line(getattr(safe_open_brief, 'time_of_day', ''))}",
-            f"HOOK: {clean_one_line(getattr(safe_open_brief, 'hook', ''))}",
-        )))
+        # DIRECT attribute access, never getattr-with-default. The default is
+        # what hid this: the builder read a `hook` attribute SafeOpenBrief has
+        # never defined, so HOOK was silently empty on every episode while
+        # `opening_status_quo`, `cast` and `era` were built and read by nobody.
+        # A field rename now raises AttributeError here instead of quietly
+        # emptying the prompt.
+        _cast = cleaned_cast_names(safe_open_brief.cast)
+        _starved = safe_open_viability(
+            setting=safe_open_brief.setting,
+            opening_status_quo=safe_open_brief.opening_status_quo,
+            cast=safe_open_brief.cast,
+        )
+        if _starved:
+            # Parity with the script_brief branch below, which has raised on a
+            # starved brief since it was written. Raising BEFORE the call means
+            # a starved brief cannot become a line at all.
+            raise AnnouncerBriefStarvedError(_starved)
+        # A label is emitted ONLY with a value behind it. The previous
+        # `filter(None, ...)` could never drop anything -- every element was an
+        # f-string with a literal label prefix, so it was always truthy -- and
+        # a bare "SETTING:" with nothing after it reads to the model as a form
+        # to fill in rather than material to write from.
+        context = "\n".join(
+            f"{label}: {value}"
+            for label, value in (
+                ("SETTING", clean_one_line(safe_open_brief.setting)),
+                ("TIME", clean_one_line(safe_open_brief.time_of_day)),
+                ("OPENING STATUS",
+                 clean_one_line(safe_open_brief.opening_status_quo)),
+                ("CAST", ", ".join(_cast)),
+                ("ERA", clean_one_line(safe_open_brief.era)),
+            )
+            if value
+        )
         fallback = fallback_safe_open(safe_open_brief)
     else:
         phase = "announcer_intro_system"

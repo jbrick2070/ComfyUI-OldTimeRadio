@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from nodes._otr_line_composer import (
+    SafeOpenBrief,
     compose_announcer_intro,
     compose_announcer_outro,
     compose_news_coda,
@@ -133,7 +134,32 @@ def test_news_coda_appends_source_fact_unchanged():
 @pytest.mark.parametrize(
     "kwargs",
     [
+        # The script_brief branch. This was the ONLY case for a long time, and
+        # the single-entry list was the tell: the sibling safe-open branch
+        # carried the same invariant and nobody had written its cases, so it
+        # spent weeks accepting starved briefs and shipping the model's reply
+        # to the operator as the episode's first line.
         {"script_brief": "", "safe_open_brief": None},
+        # The safe-open branch, same invariant. Full coverage of every starved
+        # shape lives in tests/test_announcer_safe_open_contract.py; these two
+        # keep both branches visible together in the file that owns the rule.
+        {
+            "script_brief": "",
+            "story_scaffold": True,
+            "safe_open_brief": SafeOpenBrief(
+                setting="", time_of_day="", opening_status_quo="",
+                cast=(), era="",
+            ),
+        },
+        {
+            "script_brief": "",
+            "story_scaffold": True,
+            "safe_open_brief": SafeOpenBrief(
+                setting="a county records archive", time_of_day="night",
+                opening_status_quo="A mislabeled reel waits.",
+                cast=(), era="1947",
+            ),
+        },
     ],
 )
 def test_intro_requires_nonempty_structural_context(kwargs):

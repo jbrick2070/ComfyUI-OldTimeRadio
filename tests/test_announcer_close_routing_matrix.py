@@ -404,6 +404,12 @@ def test_route_takes_its_branch_and_speaks_a_close(route: Route):
     else:
         assert meta["news_coda_emitted"] is route.expect_emitted, (
             f"{route.label}: wrong news_coda_emitted")
+        # These rows all take a composer SUCCESS path, so no degrade receipt.
+        # This assertion used to pass for the WRONG reason: the writer tested
+        # for a "news_coda_fallback" flag string no composer has ever emitted,
+        # so the value was permanently False and this line proved nothing.
+        # The TRUE cases are pinned in test_the_degraded_coda_routes_are_the_
+        # only_ones_that_raise_the_receipt below.
         assert meta["news_coda_fallback"] is False
 
 
@@ -500,6 +506,43 @@ def test_the_owned_but_silent_lane_defers_to_credits_only_when_they_carry_it():
 
     _led, _meta, empty, _sched, _calls = _run(silent)
     assert "source_note_deferred_to_credits" not in empty.compose_flags
+
+
+def test_the_degraded_coda_routes_are_the_only_ones_that_raise_the_receipt():
+    """`news_coda_fallback` answers ONE question: did the news coda degrade?
+
+    It used to test for a flag string no composer emits, so it was permanently
+    False and reported a clean coda on every episode that fell back. Two routes
+    are a real degrade, and only two:
+
+      news_coda_fact_only      -- the bridge failed validation, fact shipped bare
+      spoken_surface_emergency -- the brief cleaned to empty, deterministic outro
+
+    `news_coda_no_brief` is EXCLUDED because there was no coda to degrade, and
+    `announcer_outro_structural_fallback` because that is the fictional-outro
+    lane -- folding it in would make one boolean mean two different things
+    depending on which route ran.
+    """
+    owned = next(r for r in ROUTES if r.label == "public_domain-owned-fact")
+
+    # A reply the bridge validator REJECTS (brackets are forbidden) -> the fact
+    # ships bare -> news_coda_fact_only -> the coda degraded.
+    degraded = Route(**{**owned.__dict__, "reply": "[not a bridge]"})
+    _led, meta, result, _sched, _calls = _run(degraded)
+    assert "news_coda_fact_only" in result.compose_flags
+    assert meta["news_coda_fallback"] is True, (
+        "a bridge that failed validation is a degraded coda")
+    assert PD_FACT in result.text, "the fact must still ship, unshortened"
+
+    # The success path: a valid bridge is not a degrade.
+    _led, meta, result, _sched, _calls = _run(owned)
+    assert "news_coda_bridge" in result.compose_flags
+    assert meta["news_coda_fallback"] is False
+
+    # The owned-but-silent lane emits no coda at all -- absence is not degrade.
+    silent = next(r for r in ROUTES if r.label == "public_domain-owned-silent")
+    _led, meta, _result, _sched, _calls = _run(silent)
+    assert meta["news_coda_fallback"] is False
 
 
 def test_the_receipt_vocabulary_stays_closed():

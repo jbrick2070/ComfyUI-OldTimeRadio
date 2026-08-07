@@ -184,6 +184,11 @@ from ._otr_story_brief import (
     run_produced_story_summary,
     run_story_brief_reflection,
 )
+# The intro-rewrite block classifies its own failures, and a deliberate derive
+# outcome must never be filed as an unexpected one. Imported by name so the
+# `except` clause cannot silently become a NameError on the failure path --
+# which is the one path nobody exercises by accident.
+from ._otr_structured_call import StructuredCallFailedError
 
 log = logging.getLogger("OTR")
 
@@ -2621,8 +2626,20 @@ def _compose_and_stamp_announcer_close(
     # provenance-owned lane bypasses that gate entirely.
     if provenance_owned or _style_grammar_on:
         meta["news_coda_emitted"] = _spoken_coda_source != "none"
-        meta["news_coda_fallback"] = (
-            "news_coda_fallback" in outro_res.compose_flags
+        # DID THE NEWS CODA DEGRADE? Two routes count, and only two:
+        #   news_coda_fact_only     -- the bridge failed validation, so the
+        #                              fact shipped bare (compose_news_coda).
+        #   spoken_surface_emergency -- the brief cleaned to empty, so the
+        #                              deterministic outro shipped instead.
+        # Deliberately EXCLUDED: news_coda_no_brief (there was no coda to
+        # degrade) and announcer_outro_structural_fallback (the fictional-outro
+        # route -- a different lane, and folding it in here would make one
+        # boolean mean two different things depending on which route ran).
+        # This tested for a "news_coda_fallback" string no composer has ever
+        # emitted, so the receipt was permanently False.
+        meta["news_coda_fallback"] = bool(
+            {"news_coda_fact_only", "spoken_surface_emergency"}
+            .intersection(outro_res.compose_flags)
         )
     # patch_line_text recomputes char_count + word_count in
     # lockstep; patch_line_fields stamps the outro compose_flags
@@ -5564,8 +5581,14 @@ class OTR_LedgerScriptWriter:
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
                     if _style_grammar_on:
+                        # The composer emits announcer_intro_structural_fallback
+                        # on this path; it has never emitted the string this
+                        # once tested for, so the receipt was permanently False
+                        # and reported a clean safe-open on episodes that fell
+                        # back. Same defect class as the `hook` attribute.
                         meta["open_safe_fallback"] = (
-                            "open_safe_fallback" in line_res.compose_flags
+                            "announcer_intro_structural_fallback"
+                            in line_res.compose_flags
                         )
                 elif (
                     last_announcer_id is not None
@@ -5696,6 +5719,7 @@ class OTR_LedgerScriptWriter:
             _rw_text = None
             _rw_flag = "announcer_intro_rewrite_failed"
             _rw_compose_flags = ()
+            _rw_reason = "compose_failed"
             try:
                 # LLM slot: technical -- structured scene-1 derive.
                 with slot_scheduler.helper_context(
@@ -5730,16 +5754,62 @@ class OTR_LedgerScriptWriter:
                         ),
                         source_bank_id=resolved["source_bank"],
                     )
-                _rw_text = _rw_res.text
-                _rw_compose_flags = _rw_res.compose_flags
-                _rw_flag = "announcer_intro_rewritten"
+                if (
+                    "announcer_intro_structural_fallback"
+                    in _rw_res.compose_flags
+                ):
+                    # A STRUCTURAL FALLBACK IS NOT A REWRITE. The composer
+                    # never returns empty text on failure -- it returns
+                    # fallback_safe_open(), a deterministic template -- so
+                    # treating "it returned something" as success replaced a
+                    # real composed opening with a canned line and stamped it
+                    # rewritten. The keep-the-in-loop-intro posture below only
+                    # ever fired on a RAISE, which a model failure is not.
+                    # Drop the flags too: extra_flags are appended even when
+                    # the text is not, so the preserved row would otherwise
+                    # collect the structural flag it did not earn.
+                    _rw_reason = "structural_fallback"
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] announcer intro REWRITE "
+                        "returned a structural fallback -- keeping the "
+                        "in-loop intro (LOUD).",
+                    )
+                else:
+                    _rw_text = _rw_res.text
+                    _rw_compose_flags = _rw_res.compose_flags
+                    _rw_flag = "announcer_intro_rewritten"
+                    _rw_reason = None
+            except _OTRLC.AnnouncerBriefStarvedError as _rw_starved:
+                # The derive produced a brief nothing can open on. Bounded
+                # reason, read off the exception rather than parsed out of it.
+                _rw_reason = _rw_starved.reason
+                log.warning(
+                    "[OTR_LedgerScriptWriter] announcer intro REWRITE "
+                    "skipped (%s) -- keeping the in-loop intro (LOUD).",
+                    _rw_reason,
+                )
+            except (StructuredCallFailedError, ValueError) as _rw_derive_exc:
+                # Both are DELIBERATE derive outcomes: the ladder exhausting,
+                # and _otr_story_brief raising ValueError when scene 1 has no
+                # spoken rows. Classifying them as unexpected would file an
+                # intended failure as a coding defect.
+                _rw_reason = "derive_failed"
+                log.warning(
+                    "[OTR_LedgerScriptWriter] announcer intro REWRITE derive "
+                    "failed (%s: %s) -- keeping the in-loop intro (LOUD).",
+                    type(_rw_derive_exc).__name__, str(_rw_derive_exc)[:200],
+                )
             except Exception as _rw_exc:  # noqa: BLE001 -- a polish pass
                 # must never kill a finished episode; the in-loop intro
                 # stands (it is real composed content, not a template).
-                log.warning(
-                    "[OTR_LedgerScriptWriter] announcer intro REWRITE "
-                    "failed (%s: %s) -- keeping the in-loop intro (LOUD).",
-                    type(_rw_exc).__name__, str(_rw_exc)[:200],
+                # Anything reaching HERE is unexpected -- an AttributeError or
+                # TypeError is a bug in this code, not a starved brief, and it
+                # gets a traceback so it cannot hide as routine starvation.
+                _rw_reason = "uncaught_%s" % type(_rw_exc).__name__
+                log.error(
+                    "[OTR_LedgerScriptWriter] announcer intro REWRITE raised "
+                    "an UNEXPECTED %s -- keeping the in-loop intro (LOUD).",
+                    type(_rw_exc).__name__, exc_info=True,
                 )
             _apply_intro_rewrite_result(
                 led, first_announcer_id, _rw_text, _rw_flag,
@@ -5748,6 +5818,10 @@ class OTR_LedgerScriptWriter:
             meta.setdefault("announcer_intro_rewrite", {})["status"] = (
                 _rw_flag
             )
+            # The reason a later audit reads instead of inferring the cause
+            # from logs that no longer exist. None on success; a closed
+            # vocabulary otherwise.
+            meta["announcer_intro_rewrite"]["reason"] = _rw_reason
             led.save()
             log.info(
                 "[OTR_LedgerScriptWriter] announcer intro rewrite: %s "

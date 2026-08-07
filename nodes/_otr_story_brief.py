@@ -343,6 +343,18 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
 
+# The safe-open viability predicate is defined ONCE, in the composer, and
+# imported here -- not the other way round. _otr_line_composer keeps a
+# stdlib-only module-load import surface by design (see its LineRequest note);
+# this module imports pydantic above, so the dependency has to run heavy ->
+# light. Sharing the predicate is the point: a brief this validator accepts
+# must be one the composer can actually open on, and the gap between those two
+# judgements is what shipped episodes that asked the operator for the setting.
+try:
+    from ._otr_line_composer import safe_open_viability
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_line_composer import safe_open_viability  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Failure sentinel -- refinement section 4.1 + L-6
@@ -859,11 +871,24 @@ def _validate_produced_open(
 ) -> "str | None":
     """Content gate (structured_call post_validator contract).
 
-    Rejects: an all-empty brief (nothing for the composer to starve on),
-    and any cast name not on the roster (case-insensitive) -- the derive
-    pass must never introduce a name the episode does not have."""
-    if not model.setting.strip() and not model.opening_status_quo.strip():
-        return "setting and opening_status_quo both empty"
+    Rejects: a brief the announcer cannot open on, and any cast name not on the
+    roster (case-insensitive) -- the derive pass must never introduce a name the
+    episode does not have.
+
+    Viability is the COMPOSER's predicate, imported rather than restated. This
+    used to check only that setting and opening_status_quo were not both empty,
+    which let a brief through with NO CAST -- and every bank's safe-open seam
+    promises the model "the cast list below", so those briefs produced an
+    announcer asking the operator for the roster. Two definitions of "usable
+    brief" is what the shared predicate exists to end.
+    """
+    starved = safe_open_viability(
+        setting=model.setting,
+        opening_status_quo=model.opening_status_quo,
+        cast=model.cast,
+    )
+    if starved:
+        return starved
     lowered = {n.lower(): n for n in roster}
     for name in model.cast:
         if str(name).strip().lower() not in lowered:

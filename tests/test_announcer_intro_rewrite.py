@@ -194,6 +194,131 @@ class TestApplyIntroRewriteResult:
                 led, "nope", "text", "announcer_intro_rewritten",
             )
 
+    def test_a_rejected_rewrite_leaves_no_trace_of_its_flags(self):
+        """Flags are appended even when the TEXT is not.
+
+        So a rejected rewrite that still handed over its compose_flags would
+        stamp `announcer_intro_structural_fallback` onto a row whose text came
+        from the in-loop pass -- a receipt describing a composition that never
+        reached the ledger. The caller drops the flags; this pins that it must.
+        """
+        led = SimpleNamespace(data=_ledger_dict())
+        before = led.data["lines"][0]["text"]
+
+        W._apply_intro_rewrite_result(
+            led, INTRO_ID, None, "announcer_intro_rewrite_failed", (),
+        )
+
+        row = led.data["lines"][0]
+        assert row["text"] == before
+        assert row["compose_flags"] == [
+            "announcer_intro", "announcer_intro_rewrite_failed",
+        ]
+        assert "announcer_intro_structural_fallback" not in row["compose_flags"]
+        assert "announcer_intro_rewritten" not in row["compose_flags"]
+
+
+# ---------------------------------------------------------------------------
+# The rewrite FAILURE POSTURE, pinned over the shipped source
+# ---------------------------------------------------------------------------
+
+class TestRewriteFailureClassification:
+    """WHY SOURCE-LEVEL. The rewrite decision lives inside ``run()``, which
+    needs an outline, a cast lock, a slot scheduler and a live model lane to
+    reach. A behavioural test would be so heavily mocked it would prove the
+    mocks classify exceptions rather than that the NODE does. Reading the
+    shipped source cannot be satisfied by a stub.
+
+    WHAT IT GUARDS. The composer never returns empty text on failure -- it
+    returns ``fallback_safe_open()``, a deterministic template. So "it returned
+    something" was treated as success, and a provider hiccup silently replaced
+    a real composed opening with a canned line and stamped it rewritten. The
+    documented keep-the-in-loop-intro posture only ever fired on a RAISE.
+    """
+
+    #: Anchors bounding the rewrite decision in the shipped writer source.
+    #: Sliced between two literals that only occur there, so the assertions
+    #: cannot be satisfied by an unrelated part of a 6,000-line module.
+    START = '_rw_reason = "compose_failed"'
+    END = 'meta["announcer_intro_rewrite"]["reason"] = _rw_reason'
+
+    def _run_source(self) -> str:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "nodes" / "OTR_LedgerScriptWriter.py"
+        ).read_text(encoding="utf-8")
+        assert src.count(self.START) == 1, "rewrite-block start anchor moved"
+        assert src.count(self.END) == 1, "rewrite-block end anchor moved"
+        start = src.index(self.START)
+        end = src.index(self.END) + len(self.END)
+        return src[start:end]
+
+    def test_a_structural_fallback_is_not_a_rewrite(self):
+        block = self._run_source()
+        assert "announcer_intro_structural_fallback" in block, (
+            "the rewrite block must inspect the returned flags -- otherwise a "
+            "template return is stamped as a successful rewrite")
+
+    def test_every_failure_class_is_named(self):
+        """A deliberate derive outcome must never be filed as a coding defect,
+        and a coding defect must never hide as routine starvation."""
+        block = self._run_source()
+        for expected in (
+            "AnnouncerBriefStarvedError",   # typed starvation, bounded reason
+            "StructuredCallFailedError",    # ladder exhaustion  -> derive_failed
+            "ValueError",                   # no scene-1 rows    -> derive_failed
+            "uncaught_",                    # genuinely unexpected
+            "exc_info=True",                # ...and it gets a traceback
+        ):
+            assert expected in block, f"the ladder never mentions {expected}"
+
+    def test_the_reason_is_stamped_durably(self):
+        block = self._run_source()
+        assert "_rw_reason" in block
+        assert '"reason"' in block, (
+            "the receipt must be durable -- a log line is gone by the time an "
+            "audit asks why the rewrite did not happen")
+
+
+class TestInLoopSafeOpenTelemetry:
+    """`meta["open_safe_fallback"]` must test the flag the composer EMITS.
+
+    It tested for the literal string "open_safe_fallback", which no composer
+    has ever produced, so the receipt read False on every episode -- including
+    the ones whose safe-open really did fall back to a template. Same defect
+    class as the `hook` attribute and `news_coda_fallback`: a receipt keyed on
+    a producer string the producer never emits, which fails silently in the
+    safe direction and therefore never gets noticed.
+
+    Source-level for the same reason as the class above: the in-loop block sits
+    inside `run()`'s per-beat loop.
+    """
+
+    def test_the_receipt_tests_a_flag_the_composer_actually_emits(self):
+        composer = (
+            Path(__file__).resolve().parents[1]
+            / "nodes" / "_otr_line_composer.py"
+        ).read_text(encoding="utf-8")
+        writer = (
+            Path(__file__).resolve().parents[1]
+            / "nodes" / "OTR_LedgerScriptWriter.py"
+        ).read_text(encoding="utf-8")
+
+        start = writer.index('meta["open_safe_fallback"]')
+        stamp = writer[start:writer.index(")", start) + 1]
+
+        assert '"announcer_intro_structural_fallback"' in stamp, (
+            "open_safe_fallback must key on the composer's real degrade flag")
+        assert '"open_safe_fallback" in' not in stamp, (
+            "the receipt is keyed on its own name -- a string no composer emits")
+
+        # And that flag has to be real on the producer side, or this test just
+        # swaps one phantom string for another.
+        assert (
+            'LineResult(fallback, ("announcer_intro_structural_fallback",))'
+            in composer
+        ), "the composer no longer emits the flag the receipt now tests for"
+
 
 # ---------------------------------------------------------------------------
 # run() ORDER PIN + D4 title-regen root-cause fix (source-level)
