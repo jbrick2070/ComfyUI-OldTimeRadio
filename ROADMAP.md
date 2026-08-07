@@ -148,37 +148,57 @@ Choose these as separate campaigns after the core surface is stable:
   this item.
   **What is wanted is the opposite of a roll: the style should be CHOSEN BY THE
   STORY.**
-  **THERE IS A LIVE FIDELITY HOLE UNDERNEATH THIS, and it is not a roadmap
-  item -- it is a defect (found 2026-08-07, NOT yet in PROD_BUG_LOG because no
-  shipped artifact has been checked for it yet).** `resolve_style_selection`
-  (`nodes/_otr_rolls.py:276`) takes NO bank argument and `eligible_style_ids()`
-  (`:264`) takes none either; the docstring says the style roll is "independent
-  of the bank roll in every respect". The registered pool is 9 styles and
-  INCLUDES `anime` and `cartoon` -- alongside a `shakespeare_stage_realism` the
-  roll has no way to prefer. **So a shakespeare or public_domain episode on
-  `"roll (any style)"` can draw anime onto Macbeth today.** That is the same
-  class as a character speaking in the wrong voice: the fidelity lanes must be
-  true to source, and the visual surface is not currently held to it. Operator
-  2026-08-07: "if it's Shakespeare, by god it's not anime". FIRST STEP, cheap
-  and separable: gate the eligible pool by bank so a fidelity lane can never
-  draw a stylized-modern pack. That fix stands on its own even if nothing below
-  is ever built.
-  **Recommended shape (driver's pick, 2026-08-07 -- SELECTION, not generation).**
-  Working name, operator's: **`visual_appropriate`** (a third dropdown sentinel
-  beside `"roll (any style)"`). It replaces the dice at the SAME seam the roll
-  already occupies, so the registry stays the one authority and the pack pool is
-  unchanged -- the only difference is WHO picks. Resolved after the brief
-  exists, handing the model the premise/setting/era/source and the
-  BANK-ELIGIBLE style ids with their one-line descriptions, taking back ONE id,
-  validated against the registry, failing CLOSED to the seeded roll when the
-  reply is not a registered id. Stamp the chosen id, the reason and the fallback
-  flag on the ledger so an audit can tell a fit from a roll.
-  **The open design question, stated honestly:** selection alone gets Macbeth to
-  `shakespeare_stage_realism`, but it does NOT get "Macbeth Act II" -- a
-  torchlit Scottish castle at night rather than generic stage realism. Reaching
-  that means the LLM authoring the story-specific SLOTS inside a chosen style
-  (era, location, light, palette) while the registry keeps owning the vocabulary.
-  That is a bigger change than a selector and is where the arc should start.
+  **THE GAP IS NOT "WRONG PACK PICKED". IT IS "EVERY PACK IS PREDEFINED".**
+  (Operator correction 2026-08-07, after the driver mis-framed this as a
+  fidelity defect: *"it's not a problem you have an anime Shakespeare -- the
+  problem is we don't have a visual style that customizes for a Shakespeare
+  story, or any story. The visual packs are all defined."* An anime MACBETH is
+  still faithful to Macbeth's TEXT; the "fidelity lanes invent nothing" rule is
+  about not inventing plot, characters or language, and does NOT extend to the
+  visual treatment. Selecting a different pack from the same fixed nine does not
+  address this at all.)
+  All 9 registered styles -- `anime`, `archival_documentary`, `cartoon`,
+  `paper_origami`, `recur_frac`, `sci_fi_radio`, `shakespeare_stage_realism`,
+  `storybook_engraving`, `video_art` -- are FIXED looks authored ahead of time.
+  None of them knows anything about the episode it is dressing. Two different
+  Shakespeare episodes get the identical `shakespeare_stage_realism` treatment;
+  so do a Scottish castle at midnight and a Venetian courtroom at noon.
+  **What is wanted: the style CUSTOMIZES to the actual story.** "Macbeth Act II"
+  should yield a torchlit Scottish castle at night -- not generic stage realism,
+  and not by adding a `macbeth_act_ii` pack to a list that would then need one
+  per story forever. The LLM authors the story-specific content; a fixed pack
+  list cannot express this no matter how long the list gets.
+  **OPERATOR SPEC, 2026-08-07, stated three times and sharpened each time --
+  take it literally:** *"a dynamic visual style that gets its parameters decided
+  by the story itself, the LLM making the call. No presets, no seeds, pure LLM
+  decision-making."* Working name, operator's: **`visual_appropriate`**.
+  The driver twice proposed something weaker and was corrected both times:
+  first a SELECTOR over the existing nine (rejected -- picking a different fixed
+  pack is still a fixed pack), then a TEMPLATE with a few story-owned slots
+  (still short -- that is a preset with holes in it). **The ask is no preset at
+  all.** The model reads the story and decides the visual parameters, the way
+  the writer decides the script.
+  **This displaces the roll rather than joining it.** `_otr_rolls` seeds and
+  replays a DRAW from a fixed pool; "no seeds, pure LLM" is a different
+  mechanism, not a third sentinel beside the other two. The existing nine packs
+  and the seeded roll stay as they are -- shipped, complete, still selectable --
+  but they are not the thing being extended.
+  **The hard problems this has to answer, named now so the arc starts on them
+  rather than discovering them late.** These are engineering consequences, NOT
+  objections to the ask:
+  (a) REPRODUCIBILITY -- every other generative surface in this repo is
+  replayable from a receipt; an LLM-decided look must stamp its full decided
+  parameter set on the ledger so a re-render is not a different episode.
+  (b) COHERENCE ACROSS BEATS -- the look must hold for the whole episode and
+  across every still/video call in it, which is exactly the continuity problem
+  the cast lock solves for characters.
+  (c) THE RENDERING CONTRACT -- whatever the model decides still has to produce
+  a prompt the image/video engines accept, so SOMETHING must own the vocabulary
+  and the non-negotiable fields even when nothing owns the look.
+  (d) FAIL-CLOSED -- when the decision is unusable, the seeded roll over the
+  existing nine is the obvious floor, which is why those packs stay.
+  This is the largest item in row 2 and needs a full arc: cold Fable r1 on the
+  architecture, then the panel. Not a coder chunk.
   **Why selection and not generating a bespoke pack per episode:** a generated
   pack is unbounded, mints a second visual-style authority next to the registry,
   and cannot be replayed or reviewed; a selector is one constrained call, reuses
