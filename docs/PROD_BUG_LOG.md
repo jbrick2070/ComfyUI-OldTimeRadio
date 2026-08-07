@@ -3360,7 +3360,7 @@ symptom.
 
 ## PBUG-20260807-01 -- the announcer asked the operator to write the opening, and 23 episodes shipped with it as their first line
 
-- status: FIXED in code, LIVE PROOF OWED (qualification matrix below not yet run)
+- status: **FIXED AND LIVE-PROVEN 2026-08-07** (5/5 qualification legs; receipts below)
 - promotion: pending fan-out
 - found: corpus scan of shipped ledgers under `output/otr/episodes`, 2026-08-07,
   while investigating a DIFFERENT reported defect (`--premise` allegedly not
@@ -3454,3 +3454,41 @@ symptom.
 - OPERATOR DECISION OWED: the 23 shipped episodes are in canonical ledgers and
   delivered audio/captions. Rerender/republish, or tombstone as known-bad and
   exclude from publication. Not a build gate; recorded here so it is not lost.
+
+### PBUG-20260807-01 -- LIVE QUALIFICATION, 5/5 PASS (2026-08-07)
+
+Ladder per `docs/PRODUCTION_SPRINT_LESSONS.md:106-113`. Every leg loaded the
+UNCHANGED `workflows/otr_canonical.json` with a per-leg RUNTIME bank override,
+and the resolved bank was asserted from `meta.source_bank` before the leg
+counted -- the canonical graph is pinned to `scifi_news`, which returns before
+this code, so an un-overridden leg would have been green and meaningless.
+
+| Leg | Bank | Words | Writer | b001 (opening line, verbatim) |
+|---:|---|---:|---|---|
+| 1 | shakespeare | 30 | `mistralai/Mistral-Nemo-Instruct-2407` | "In the royal court of Britain, King Lear demands an accounting from his daughter, Cordelia." |
+| 2 | public_domain | 30 | `google/gemma-4-12b-it` | "The sun hangs heavy over the garden as Rikki-tikki-tavi keeps a watchful eye on the grass..." |
+| 3 | original | 120 | `mistralai/Mistral-Nemo-Instruct-2407` | "In the hushed confines of Spender Manor, as the grandfather clock strikes midnight, Malcolm Sirikit and Clarisse Spender..." |
+| 4 | media_archive | 120 | `google/gemma-4-12b-it` | "From the dust of a forgotten archive, we find Sailor Burns and Rod Howard standing in a silent hallway..." |
+| 5 | shakespeare | 30 | CLOUD `~anthropic/claude-haiku-latest` | "Good evening, friends, and welcome back to Signal Lost -- tonight we find ourselves on the battlements of Elsinore Castle..." |
+
+**Every leg:** `meta.announcer_intro_rewrite == {"status":
+"announcer_intro_rewritten", "reason": null}`; schema `l4-2026-08-07`;
+`obs_publish OK` with the asset on disk; and **no leg asked the operator for
+input**. Four affected banks, three model families (Mistral / Gemma /
+Anthropic-remote), both 30 and 120 words.
+
+Leg 5's cloud arm is proven from the server log, not inferred:
+`[OpenRouter] load slot=A handle=openrouter:slot-a
+slug=~anthropic/claude-haiku-latest route=default ctx=200000 (remote, 0 VRAM)`
+followed by `[OpenRouter] call accounted ~1239 tokens`.
+
+**Two things this qualification did NOT establish, stated so nobody reads more
+into it than it earned:**
+1. **No exhaustion rate.** Five legs is not a rate. No leg hit
+   `reason: derive_failed`, so the starvation path itself was never exercised
+   live -- the guard is proven present and non-interfering, not proven to fire
+   correctly in production. Its unit coverage is the evidence for that.
+2. **A meta-recording gap found in passing:** `meta.openrouter_slot_a_model` is
+   `null` on leg 5 even though the slot demonstrably resolved and served the
+   run. Routing worked; the RECEIPT is incomplete. Not this defect, not fixed
+   here, and static -- so it does not get its own PBUG.
