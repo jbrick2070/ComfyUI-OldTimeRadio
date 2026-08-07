@@ -41,13 +41,20 @@ Arc: cold Fable r1 as senior architect -> `kibitz-plugin:kibitz` r2/r3/r4
 |---:|---|---|
 | 1 | **Item 3** -- test-ordering pollution; lazy-import probe moved to a subprocess | **SHIPPED `1a746c25`** -- both file orders 28/28 |
 | 2 | **Item 2** -- the non-commercial notice rendered in credits | **SHIPPED `e8e649f2`** -- 5 tests, each proven to catch its own defect |
-| 3 | **B4** -- extract `_compose_and_stamp_announcer_close` | code APPLIED (byte-identical, AST clean); **still owes the routing matrix + the `run()` reachability test** |
+| 3 | **B4** -- extract `_compose_and_stamp_announcer_close` | **SHIPPED `5d5f2d0b`** -- byte-identical (suite unchanged at 9086), 6 wiring tests that all go red against the pre-extraction file. **STILL OWES the routing matrix** (see 3a) |
+| 3a | **B4's routing acceptance matrix** -- both fidelity banks x {non-empty, empty} provenance, plus owned/non-empty with `_style_grammar_on == False`. Control is `media_archive`, **NEVER `scifi_news`** (that lane dispatches to `scifi_news_circuit` and returns before this block). Assert the coda is PRESENT, in `lines[].text` AND in a `Dialogue:` cue from `build_ass_from_ledger` | **OWED.** B4 proved the helper is WIRED; it does not yet prove every ROUTE through it |
 | 4 | **B6** -- `CURRENT_SCHEMA_VERSION` -> `l4-2026-08-07` + the save-version policy + the fixture sweep | NOT STARTED |
 | 5 | **Bug Bible** -- SEPARATE REPO (`comfyui-custom-node-survival-guide`), atomic 3-file landing, after B4 | NOT STARTED |
 
-**Suite baseline moves as this lands:** 9081/111/1 at `76a5208a` -> **9086/111/1
-at `e8e649f2`** (+5 credits tests). Bug Bible **17** and must be re-run after
-commit 5 changes it.
+**Suite baseline as this lands:** 9081/111/1 at `76a5208a` -> 9086 at
+`e8e649f2` (+5 credits) -> **9092/111/1 at `5d5f2d0b`** (+6 wiring). Bug Bible
+**17**, and it must be RE-TAKEN after commit 5 changes it.
+
+**B6 is the one that deserves a fresh window.** It changes `save_ledger_safe` --
+a core write path every node reaches -- and sweeps ~20 test files that must be
+sorted by ROLE (current-modelling fixtures follow the constant; legacy-modelling
+fixtures KEEP their l3 literal, or the compatibility boundary disappears). The
+whole design is settled and written down; what it needs is room, not more review.
 
 ### NEW WORK THE ARC SURFACED -- not previously on this queue
 
