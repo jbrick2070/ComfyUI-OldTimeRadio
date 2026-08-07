@@ -25,10 +25,19 @@ operator listening are separate elapsed time.
 | Order | Campaign | Exit condition | Coding estimate |
 |---:|---|---|---:|
 | 1 | ~~Timeline Cue Ledger / generated spotted SFX~~ **RETIRED 2026-08-06** | Operator ruling "rip out SFX 100%" executed by `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`; the five SFX engines, the bed compiler and the mux mix branch are gone, ids barred via `RETIRED_ENGINE_IDS` | - |
-| 2 | Other product expansion | Richer cue stills, provider additions, content rating, and system-agnostic upscale as separately gated campaigns. **The visual-style item left this row 2026-08-07** -- promoted to `docs/GO_FORWARD_PLAN.md` queue item 2 as `visual_storybased` | 5-10 days per selected set |
+| 2 | ~~Other product expansion~~ **EMPTIED 2026-08-07** | Two items were PROMOTED into `docs/GO_FORWARD_PLAN.md` (`visual_storybased` = its item 2, multi-GPU upscale = its item 8); two were CUT or PARKED (see below). Nothing is left in this row | - |
 | 3 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
-| 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
-| 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
+| 4 | RunPod + AMD/Mac platform tests | Representative-machine acceptance smokes actually run, not just declared available | 3-5 days |
+| 5 | Install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 4-6 days |
+| 6 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
+
+**FULL RUNWAY ORDER, operator 2026-08-07.** GO_FORWARD and this file are ONE
+ordered runway: GO_FORWARD 1-8 (qualification -> `visual_storybased` ->
+reference A/B -> WAN 8-GB -> MiniMax H3 -> video matrix -> the 23 shipped
+episodes -> upscaler), then rows 3-6 here (lean-mean -> RunPod/AMD/Mac ->
+install -> docs and release). Row 4 was split out of the old combined
+"RunPod and install path" because the operator ordered the platform tests as
+their own step.
 
 **SFX (row 1) IS RETIRED, 2026-08-06 (operator: "I do really want to rip out
 SFX 100%").** It was parked by operator doubt on 2026-08-04; two days later the
@@ -144,11 +153,47 @@ Choose these as separate campaigns after the core surface is stable:
   the LLM decides from the story -- no presets, no seeds -- shipped as a TENTH
   dropdown entry peer to `anime` and `paper_origami`, with the existing nine
   packs and the seeded roll kept as the fail-closed floor;
-- richer brief-driven music-cue still prompts;
-- direct BYO Google music/image/video paths, followed by other providers only
-  when they keep provider identity explicit and fail loud;
-- a new system-agnostic multi-GPU upscale stage built against profile and
-  registry contracts, never resurrection of the retired NVIDIA-only node;
+- **richer brief-driven music-cue still prompts -- PARKED 2026-08-07**
+  (operator: "richer cue stills, I dunno, do we need"). Driver's read, recorded
+  so the question is not re-asked cold: it is a polish pass on the same visual
+  surface `visual_storybased` is about to change underneath, so judging it now
+  means judging a gap that may not survive that campaign. Revisit AFTER
+  `visual_storybased` lands and see whether music beats still look generic;
+- **CLOUD MUSIC LANE -- the one real provider gap (operator 2026-08-07).**
+  The driver first CUT this whole bullet as scope creep against `CLAUDE.md`'s
+  "100% local, offline-first, no cloud services" line. **That was wrong and the
+  operator corrected it:** the pack ALREADY ships cloud lanes and treats them as
+  opt-in rather than forbidden -- ElevenLabs TTS for voice, and OpenRouter /
+  Comfy / Google slots for image and text. The local-only rule is about the
+  DEFAULT path staying free and offline, not about refusing to have a cloud arm.
+  **Verified 2026-08-07: music is the one modality with NO cloud option.**
+  `nodes/stable_audio_theme.py` (`StableAudioTheme`) is the only music
+  generator, and a tree-wide search for Lyria / Suno / Udio / any music API
+  returns nothing. So voice has a cloud arm, images have a cloud arm, and music
+  has none -- an asymmetry, not scope creep.
+  Not scheduled and not scoped yet. When it is picked up, the existing provider
+  rules travel with it: provider identity stays EXPLICIT, the lane FAILS LOUD
+  rather than degrading silently, and local stays the default. Adding OTHER
+  provider lanes beyond music is NOT wanted -- the operator's "provider
+  additions, I don't think we need" stands for everything except this gap;
+- **richer brief-driven music-cue still prompts -- PARKED 2026-08-07**
+  (operator: "richer cue stills, I dunno, do we need"). Driver's read, recorded
+  so the question is not re-asked cold: it is a polish pass on the same visual
+  surface `visual_storybased` is about to change underneath, so judging it now
+  means judging a gap that may not survive that campaign. Revisit AFTER
+  `visual_storybased` lands and see whether music beats still look generic;
+- ~~direct BYO Google music/image/video paths, followed by other providers~~
+  **CUT 2026-08-07 (operator: "provider additions I don't think we need").**
+  It also pulls against the pack's own scope rule in `CLAUDE.md` -- "100% local,
+  open source, offline-first. No cloud services, no API keys, no paid services"
+  -- so a campaign to ADD provider lanes works against the thing that makes this
+  shippable to a stranger with no accounts. The cloud slots that already exist
+  stay as opt-in bake-off arms; this was about building MORE of them, and it is
+  not happening;
+- ~~a new system-agnostic multi-GPU upscale stage~~ **PROMOTED 2026-08-07** to
+  `docs/GO_FORWARD_PLAN.md` queue item 8, after the 23-episode disposition. The
+  constraint travels with it: built against the profile and registry contracts,
+  NEVER a resurrection of the retired NVIDIA-only node;
 - a one-shot continuous multi-speaker segment role (podcast/trailer banter
   between two announcers, rendered as a single unbroken take). VibeVoice is the
   candidate model and has maintained ComfyUI nodes, but it is NOT a `char_voice`
