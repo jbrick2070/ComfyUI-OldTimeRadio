@@ -143,9 +143,9 @@ commit, or the code says "removed" while the inventory says "available".
   HISTORY-AND-GUARD and stays. Named instances:
   `soak_operator.py:146,189,219,268` (parser exclusions),
   `build_silent_test_episode.py:660`, `audit_otr_full_run.py:169`.
-* **The text sanitizers.** `scene_sequencer.py:517`, `_otr_bark_lib.py:271`,
-  `eng_bark.py:69` strip `[ENV|SFX|MUSIC:...]` before synthesis, and the
-  structural-token sets guard name parsing. These are defence against a model
+* **The text sanitizers.** `scene_sequencer.py:517` and `_otr_bark_lib.py:318`
+  strip `[ENV|SFX|MUSIC:...]` before synthesis (`eng_bark.py:69` delegates to
+  the latter), and the structural-token sets guard name parsing. These are defence against a model
   HALLUCINATING a bracket tag -- plausible on old-time-radio training data with
   no prompt asking for it. Removing them is zero benefit against reintroducing
   the announcer-reads-a-stage-direction class.

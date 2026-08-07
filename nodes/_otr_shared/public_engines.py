@@ -89,7 +89,51 @@ def resolve_engine_id(value) -> str:
     return _LEGACY_ENGINE_ALIASES.get(resolved, resolved)  # then legacy -> current
 
 
+#: The engine ids RETIRED by the 2026-08-06 SFX-bed rip. A user-saved workflow
+#: or an external API client may still name one; the contract is a NAMED
+#: refusal -- a stale selection must never silently resolve to another engine.
+#: These ids are DATA consulted by :func:`check_retired_engine`: never a row in
+#: the registry's ``CAPABILITIES``, never importable as an adapter. IMMUTABLE:
+#: append here only when another engine is retired, never remove.
+RETIRED_ENGINE_IDS = frozenset({
+    "cloud_vidu_q2_pro_fast_720p_sfx",
+    "google_vid_sfx_omni",
+    "google_vid_sfx_veo_fast",
+    "google_vid_sfx_veo_lite",
+    "google_vid_sfx_veo_pro",
+})
+
+
+class RetiredEngineError(ValueError):
+    """A RETIRED engine id was selected; FAIL CLOSED with a NAMED error.
+
+    ONE policy, one spelling: every selection boundary raises THIS type with
+    THIS ``reason_code`` and THIS message shape, so five boundaries can never
+    drift into five incompatible "named" failures. Boundary wrappers may
+    translate the exception but never restate the policy.
+    """
+
+    reason_code = "retired_engine"      # lower-case; ONE spelling, test-pinned
+
+    def __init__(self, engine_id: str):
+        self.engine_id = str(engine_id)
+        super().__init__(
+            "video engine '%s' is retired and is no longer selectable"
+            % self.engine_id)
+
+
+def check_retired_engine(engine_id) -> None:
+    """Raise :class:`RetiredEngineError` iff ``engine_id`` is retired.
+
+    Call AFTER public/legacy-name resolution (``resolve_engine_id``) at every
+    selection boundary, so an alias cannot slip past. Empty / unknown ids pass
+    through untouched -- this guard owns ONLY the retired set."""
+    if str(engine_id or "") in RETIRED_ENGINE_IDS:
+        raise RetiredEngineError(str(engine_id))
+
+
 __all__ = [
     "_PUBLIC_ENGINES", "_LEGACY_ENGINE_ALIASES", "_INTERNAL_TO_PUBLIC",
     "_PUBLIC_LABEL", "resolve_engine_id",
+    "RETIRED_ENGINE_IDS", "RetiredEngineError", "check_retired_engine",
 ]

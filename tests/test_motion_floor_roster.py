@@ -122,12 +122,27 @@ def test_a_heavy_local_lane_renders_its_own_minimum_rather_than_holding():
 
 def test_the_roster_is_not_empty_and_this_gate_is_not_vacuous():
     """A sweep that finds nothing passes every gate built on it -- this build
-    has paid for that twice. Assert the roster is really being billed."""
+    has paid for that twice. Assert the roster is really being billed --
+    DERIVED from the registry's own CAPABILITIES table, never a hand-typed
+    count that rots when an engine is added or retired (rip-sfx 2026-08-06
+    removed five and the old `>= 30` floor went red at 27)."""
     names = _engines()
-    assert len(names) >= 30, "only %d engines discovered" % len(names)
+    assert names, "registry discovered no engines at all"
+    assert set(names) == set(vreg.CAPABILITIES), (
+        "live roster and CAPABILITIES disagree: only-live=%s only-declared=%s"
+        % (sorted(set(names) - set(vreg.CAPABILITIES)),
+           sorted(set(vreg.CAPABILITIES) - set(names))))
+    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
+    assert not (set(names) & RETIRED_ENGINE_IDS), (
+        "retired engine id(s) re-registered: %s"
+        % sorted(set(names) & RETIRED_ENGINE_IDS))
     with_minimum = [n for n in names
                     if int(_contract(n).min_frames) > 1
                     or _contract(n).discrete_frames]
     assert len(with_minimum) >= 12, (
         "only %d engines have a minimum a short beat could fall under -- the "
         "trim gate above is close to vacuous" % len(with_minimum))
+    # Named anchors the trim gate exists for -- these must always carry a
+    # minimum or a discrete menu:
+    for anchor in ("humo", "ltx_video", "wan_ti2v", "word_razzle"):
+        assert anchor in with_minimum, anchor

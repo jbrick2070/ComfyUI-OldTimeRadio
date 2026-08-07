@@ -91,8 +91,6 @@ def _clip_for(engine, tmp_path, monkeypatch):
         return floor(_REQUEST, "probe.mp4", 25, 50)
     asset = _stub_asset(tmp_path)
     monkeypatch.setattr(_cmc, "canonicalize_video", lambda *a, **k: asset)
-    monkeypatch.setattr(_cmc, "extract_sfx_bed_from_provider_video",
-                        lambda *a, **k: asset)
     return engine.canonicalize(dict(_RAW), _REQUEST, {})
 
 
@@ -148,16 +146,27 @@ def test_the_registry_walk_actually_covered_the_engines_it_claims_to():
     """The parametrization is the test, so an EMPTY one must fail loudly.
 
     A registry that failed to import would collect zero cases and the file
-    above would pass by vacuum -- green because nothing ran. This pins the
-    floor: the shipped roster is 30+ engines, and the four HuMo tiers and both
-    WAN adapters are the ones the multi-clip rules actually interrogate.
+    above would pass by vacuum -- green because nothing ran. DERIVED checks,
+    not a hand-typed floor (a count rots the next time an engine is added or
+    retired -- rip-sfx 2026-08-06 removed five): the live roster must be
+    non-empty, equal the declared CAPABILITIES table, carry the named anchors
+    the multi-clip rules actually interrogate, and carry NONE of the retired
+    ids.
     """
     names = _registered_engines()
-    assert len(names) >= 30, names
+    assert names, "registry discovered no engines at all"
+    assert set(names) == set(reg.CAPABILITIES), (
+        "live roster and CAPABILITIES disagree: only-live=%s only-declared=%s"
+        % (sorted(set(names) - set(reg.CAPABILITIES)),
+           sorted(set(reg.CAPABILITIES) - set(names))))
     for required in ("humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
                      "ltx_video", "ltx_audio_in", "ltx_8gb",
                      "wan_ti2v", "wan_i2v", "fastwan_8gb"):
         assert required in names, required
+    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
+    assert not (set(names) & RETIRED_ENGINE_IDS), (
+        "retired engine id(s) re-registered: %s"
+        % sorted(set(names) & RETIRED_ENGINE_IDS))
 
 
 def test_an_unbounded_lane_does_not_claim_native_frames_it_cannot_evidence():

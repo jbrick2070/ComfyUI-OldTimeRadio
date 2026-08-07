@@ -73,10 +73,11 @@ def test_a_VALID_knob_says_nothing(monkeypatch, caplog):
 
 
 def test_the_mux_has_no_OTHER_unguarded_env_read():
-    """The sibling knob in this file (`_sfx_gain` via `_clamp01`) was already
-    guarded; this one was not. Pin that no third one appears -- a bare numeric
-    cast wrapped straight around an env read, at the terminal node, is the whole
-    bug class.
+    """Pin that no OTHER unguarded env read appears in the terminal mux -- a
+    bare numeric cast wrapped straight around an env read, at the terminal
+    node, is the whole bug class. (The once-guarded sibling knob, the SFX bed
+    gain, died with the bed in the 2026-08-06 rip; the credits-tail ceiling is
+    now the mux's one env read.)
 
     WALKS THE AST, NOT THE TEXT. The first draft grepped the source for
     `float(os.environ.get(` and went red on this module's own DOCSTRING, which

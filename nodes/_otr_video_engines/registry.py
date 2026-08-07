@@ -15,7 +15,8 @@ invariant V-12). One pattern, three parallel namespaces (audio frozen; video
 here; image in C1).
 
 Cold-import-clean: this module imports only ``typing`` + the dep-free shared
-base. No torch / transformers / diffusers at module scope.
+base + the stdlib-only ``role_compat`` / ``public_engines`` helpers. No torch /
+transformers / diffusers at module scope.
 """
 from __future__ import annotations
 
@@ -29,6 +30,10 @@ from .._otr_shared.engine_registry_base import (
     EngineUsabilityReason,
     EngineNotRunnableError,
 )
+# Dep-free like the shared base (public_engines is stdlib-only, V-12 clean):
+# the retired-id policy is consulted at assert_usable so a stale saved name
+# gets the NAMED refusal instead of the generic not-registered error.
+from .._otr_shared.public_engines import check_retired_engine, resolve_engine_id
 
 __all__ = [
     "VideoEngine",
@@ -180,7 +185,12 @@ class VideoEngineRegistry(EngineRegistry):
         ``MALFORMED_CONFIG`` -- not registered. ``INCOMPATIBLE_PROFILE`` -- the role
         cannot supply the engine's ``required_inputs`` (capability), or (fail-soft,
         for an engine with no declared inputs / an unknown role) the legacy ``roles``
-        list does not list ``role``. Never silently resolves to another engine."""
+        list does not list ``role``. Never silently resolves to another engine.
+        A RETIRED id raises :class:`RetiredEngineError` first (rip-sfx
+        2026-08-06) -- the NAMED policy refusal, not the generic message.
+        Resolved for the guard only (idempotent on internal ids); the
+        registration checks below still see the caller's name unchanged."""
+        check_retired_engine(resolve_engine_id(name))
         if not self.is_registered(name):
             raise EngineUnusable(
                 name, role, EngineUsabilityReason.MALFORMED_CONFIG,
@@ -509,15 +519,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # Explicit SFX sibling: same Vidu Q2 pro-fast 720p partner row, but provider
-    # audio is extracted as a separate .sfx.wav stem. If the provider returns no
-    # audio, it fails loud instead of silently degrading to a visual-only clip.
-    "cloud_vidu_q2_pro_fast_720p_sfx": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
     # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
     # (Pixverse row cloud_pixverse_i2v). Provider-side render, cpu_ok. Selectable;
     # NO enable flag (dropdown pick is the enable; missing OTR_COMFY_API_KEY
@@ -546,33 +547,11 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # google_vid_sfx_* (2026-07-08): explicit opt-in Google video engines that
-    # keep provider audio only as separate SFX/foley stems. The canonical video
-    # output remains silent; OTR_MasterAudioMux mixes the SFX bed later.
-    "google_vid_sfx_omni": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
-    "google_vid_sfx_veo_lite": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
-    "google_vid_sfx_veo_fast": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
-    "google_vid_sfx_veo_pro": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
+    # (rip-sfx 2026-08-06: the five SFX-bed rows -- cloud_vidu_q2_pro_fast_720p_sfx
+    # and the four google_vid_sfx_* engines -- are RETIRED. Their ids live in
+    # nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS, consulted by
+    # check_retired_engine at every selection boundary; they must never return
+    # to this table.)
 }
 __all__.append("CAPABILITIES")
 

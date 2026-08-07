@@ -20,7 +20,6 @@ import pytest
 
 from nodes.otr_master_audio_mux import (
     mux_master_audio, audio_pcm_sha, OTRMasterAudioMux,
-    compile_sfx_bed_from_manifest,
 )
 from nodes.otr_silent_composite import (
     normalize_to_silent_canonical, count_audio_streams, probe_video, OTRSilentComposite,
@@ -142,7 +141,6 @@ def test_a_failed_publish_FAILS_THE_RUN_it_never_reports_success(tmp_path, monke
         node.mux(
             silent_video_path=str(tmp_path / "does_not_exist.mp4"),
             master_audio_path=str(tmp_path / "also_missing.wav"),
-            clip_manifest_json="[]",
             declared_credits_tail_s=0.0,
             fps=25,
             ffmpeg="ffmpeg",
@@ -204,79 +202,22 @@ def test_credits_tail_gate_absorbs_concat_frame_quantization(tmp_path):
 
 
 @needs_ffmpeg
-def test_sfx_bed_compile_rejects_invalid_manifest_rows(tmp_path):
-    stem = tmp_path / "stem.wav"
-    _sine(stem, 1.0)
-    base = {"fps": 25, "clips": [
-        {"shot_id": "sfx", "sfx_stem_path": str(stem),
-         "start_s": 0.0, "target_frame_count": 25},
-    ]}
-    for patch, msg in (
-        ({"sfx_stem_path": str(tmp_path / "missing.wav")}, "stem missing"),
-        ({"start_s": "bad"}, "start_s"),
-        ({"target_frame_count": 0}, "target_frame_count"),
-    ):
-        doc = json.loads(json.dumps(base))
-        doc["clips"][0].update(patch)
-        with pytest.raises(ValueError, match=msg):
-            compile_sfx_bed_from_manifest(
-                json.dumps(doc), out_path=tmp_path / "bad.wav")
-    bad_fps = dict(base)
-    bad_fps["fps"] = 0
-    with pytest.raises(ValueError, match="fps must be > 0"):
-        compile_sfx_bed_from_manifest(
-            json.dumps(bad_fps), out_path=tmp_path / "bad_fps.wav")
-
-
-@needs_ffmpeg
-def test_sfx_mux_mixes_against_reference_pcm_sha_and_keeps_archival_pcm(
-    tmp_path, monkeypatch):
+def test_mux_report_declares_unconditional_master_copy(tmp_path):
+    """rip-sfx 2026-08-06: the SFX mix branch is gone, so EVERY mux is the
+    -c:a copy passthrough. The report must say so and must carry none of the
+    retired sfx_mixed fields."""
     master = tmp_path / "master.wav"
     silent = tmp_path / "silent.mp4"
-    sfx = tmp_path / "clip.sfx.wav"
-    bed = tmp_path / "episode.sfx_mix.wav"
     final = tmp_path / "final.mkv"
     _sine(master, 2.0)
     _silent_video(silent, 2.0)
-    _ff("-f", "lavfi", "-i", "sine=frequency=880:duration=2",
-        "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(sfx))
-    manifest = {
-        "fps": 25,
-        "clips": [
-            {"shot_id": "shot_sfx", "sfx_stem_path": str(sfx),
-             "start_s": 0.0, "target_frame_count": 50},
-        ],
-    }
-    compiled = compile_sfx_bed_from_manifest(
-        json.dumps(manifest), out_path=str(bed))
-    info = _audio_stream_info(compiled)
-    assert info["codec_name"] == "pcm_s16le"
-    assert info["sample_rate"] == "48000"
-    assert int(info["channels"]) == 2
-
-    default_final = tmp_path / "final_default.mkv"
-    default_out, default_report = mux_master_audio(
-        str(silent), str(master), str(default_final), fps=25,
-        sfx_bed_path=compiled)
-    assert default_out == str(default_final)
-    assert "sfx_gain=0.720000" in "\n".join(default_report)
-
-    monkeypatch.setenv("OTR_SFX_BED_GAIN", "2.5")
-    out, report = mux_master_audio(
-        str(silent), str(master), str(final), fps=25,
-        sfx_bed_path=compiled, sfx_gain=0.25)
+    out, report = mux_master_audio(str(silent), str(master), str(final), fps=25)
     text = "\n".join(report)
     assert out == str(final)
-    assert "audio_mode=sfx_mixed" in text
-    assert "sfx_gain=1.000000" in text
-    assert _audio_stream_info(out)["codec_name"] == "pcm_s16le"
-    fields = {}
-    for line in report:
-        if "=" in line:
-            k, v = line.split("=", 1)
-            fields[k] = v
-    assert fields["mixed_reference_pcm_sha"] == fields["output_pcm_sha"]
-    assert fields["source_master_pcm_sha"] != fields["output_pcm_sha"]
+    assert "audio_mode=master_copy" in text
+    assert "audio_mode=sfx_mixed" not in text
+    assert "sfx_bed_path" not in text
+    assert "sfx_gain" not in text
 
 
 def test_master_audio_mux_is_output_node():

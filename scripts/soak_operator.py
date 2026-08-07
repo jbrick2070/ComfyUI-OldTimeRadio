@@ -107,9 +107,8 @@ def scan_treatment(path: str) -> list[str]:
     if not script_body:
         flags.append("EMPTY_SCRIPT: Full script section is blank")
 
-    sfx_count = len(re.findall(r"\[SFX\]", script_body))
-    if sfx_count == 0 and script_body:
-        flags.append("NO_SFX: Script has zero [SFX] cues")
+    # (rip-sfx 2026-08-06: the NO_SFX quality flag is gone -- scripts carry no
+    # [SFX] cues by design, so it false-positived on every new episode.)
 
     # 7. Production stats
     m = re.search(r"Duration\s*:\s*([\d.]+)\s*min\s*\(([\d.]+)\s*s\)", text)

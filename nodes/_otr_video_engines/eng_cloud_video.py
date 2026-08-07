@@ -9,7 +9,6 @@ Four rows from the S0 pin table, invoked through the S0 bridge
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
     cloud_wan_i2v_audio  required_audio_ref   (init_image, audio_ref)
     cloud_vidu_q2_pro_fast_720p mute_only     (init_image, text_prompt)
-    cloud_vidu_q2_pro_fast_720p_sfx mute_only (init_image, text_prompt)
 
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
 empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
@@ -43,7 +42,6 @@ from . import frame_contract as _fc
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
-    append_sfx_audio_safety_clause,
     append_visual_safety_clause,
     visual_safety_negative,
 )
@@ -856,8 +854,7 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
 
     name = "cloud_vidu_q2_pro_fast_720p"
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). OTR_CLOUD_VIDU_Q2_DURATION, default 5 s,
-    #: clamped to 1-10 s at the call site. Inherited by the _sfx
-    #: variant, which differs only in keeping the provider audio.
+    #: clamped to 1-10 s at the call site.
     #: 1-10 s at the 25 fps canvas rate = 25-250 frames.
     frame_contract = FrameContract(
         min_frames=25,
@@ -871,7 +868,6 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
     family = "image_to_video"
     required_inputs = ("init_image", "text_prompt")
     reactivity = "mute_only"
-    wants_provider_sfx = False
     #: S1 per-model still plan (Shape A base).
     still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
@@ -880,14 +876,9 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
             "OTR_CLOUD_VIDU_Q2_MOVEMENT", "auto",
             _VIDU_Q2_MOVEMENT_AMPLITUDES, transform=str.lower)
 
-    def _conditioned_prompt(self, request):
-        prompt = self._text_prompt_input(request)
-        if self.wants_provider_sfx:
-            prompt = append_sfx_audio_safety_clause(prompt)
-        return _condition_vidu_q2_prompt(prompt)
-
     def _partner_inputs(self, request):
-        prompt, prompt_meta = self._conditioned_prompt(request)
+        prompt, prompt_meta = _condition_vidu_q2_prompt(
+            self._text_prompt_input(request))
         log_fields = dict(prompt_meta)
         duration = self._duration_seconds(
             request, env="OTR_CLOUD_VIDU_Q2_DURATION",
@@ -898,7 +889,6 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
             "vidu_requested_duration_s": duration,
             "vidu_model": _VIDU_Q2_MODEL,
             "vidu_resolution": _VIDU_Q2_RESOLUTION,
-            "sfx_audio_requested": bool(self.wants_provider_sfx),
         })
         _LOG.info("[OTR.cloud.vidu_q2] prompt_conditioner %s",
                   json.dumps(log_fields, sort_keys=True))
@@ -911,28 +901,6 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
             "resolution": _VIDU_Q2_RESOLUTION,
             "movement_amplitude": self._movement_amplitude(),
         }
-
-
-class CloudViduQ2ProFast720pSfxEngine(CloudViduQ2ProFast720pEngine):
-    """Vidu Q2 pro-fast 720p with provider audio preserved as an SFX stem."""
-
-    name = "cloud_vidu_q2_pro_fast_720p_sfx"
-    wants_provider_sfx = True
-    #: S1 per-model still plan (Shape A base) -- declared explicitly (see the
-    #: CloudWanI2VAudioEngine note above).
-    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
-
-    def canonicalize(self, raw, request, profile):
-        from .._otr_shared.cloud_media_canonical import (
-            extract_sfx_bed_from_provider_video)
-        sfx = extract_sfx_bed_from_provider_video(raw)
-        clip = super().canonicalize(raw, request, profile)
-        clip.update({
-            "sfx_stem_path": str(sfx.path),
-            "sfx_duration_s": sfx.duration_s,
-            "sfx_sha256": sfx.sha256,
-        })
-        return clip
 
 
 # word_razzle Phase 1 (2026-07-03): the ANIMATED word-card cloud i2v engine.
@@ -1054,17 +1022,16 @@ Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WanI2VAudio = CloudWanI2VAudioEngine()
 ViduQ2ProFast720p = CloudViduQ2ProFast720pEngine()
-ViduQ2ProFast720pSfx = CloudViduQ2ProFast720pSfxEngine()
 WordRazzle = CloudWordRazzleEngine()
 
 for _eng in (
         KlingAvatar, Seedance2, WanI2V, WanI2VAudio,
-        ViduQ2ProFast720p, ViduQ2ProFast720pSfx, WordRazzle):
+        ViduQ2ProFast720p, WordRazzle):
     register(_eng)
 
 __all__ = [
     "CloudKlingAvatarEngine", "CloudSeedance2Engine",
     "CloudWanI2VEngine", "CloudWanI2VAudioEngine",
-    "CloudViduQ2ProFast720pEngine", "CloudViduQ2ProFast720pSfxEngine",
+    "CloudViduQ2ProFast720pEngine",
     "CloudWordRazzleEngine",
 ]

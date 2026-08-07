@@ -180,11 +180,6 @@ def test_requested_cloud_smoke_candidate_contracts_are_inspected():
     assert vidu.required_inputs == ("init_image", "text_prompt")
     assert vidu.reactivity == "mute_only"
     assert vidu.must_strip_audio is True
-    assert vidu.wants_provider_sfx is False
-
-    vidu_sfx = video_registry.get_engine("cloud_vidu_q2_pro_fast_720p_sfx")
-    assert vidu_sfx.node_key == "cloud_vidu_q2_i2v"
-    assert vidu_sfx.required_inputs == ("init_image", "text_prompt")
-    assert vidu_sfx.reactivity == "mute_only"
-    assert vidu_sfx.must_strip_audio is True
-    assert vidu_sfx.wants_provider_sfx is True
+    # rip-sfx 2026-08-06: wants_provider_sfx is DELETED, not False -- a dead
+    # attribute kept to appease a stale assert is what the rip removes.
+    assert not hasattr(vidu, "wants_provider_sfx")

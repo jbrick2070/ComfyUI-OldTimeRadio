@@ -140,41 +140,9 @@ def _tail_at_sentence_boundary(text: str, target_chars: int) -> str:
         return tail[first_space+1:]
     return tail
 
-def _inject_scene_transitions(script_text: str) -> tuple:
-    """Detect '=== SCENE ===' boundaries and inject transition SFX where lacking.
-    Returns (modified_text, transition_count).
-    """
-    lines = script_text.split('\n')
-    out_lines = []
-    transition_count = 0
-    idx = 0
-    
-    while idx < len(lines):
-        line = lines[idx]
-        out_lines.append(line)
-        
-        # Check if line is a scene boundary (but don't inject after Scene 1 which has opening music)
-        if re.match(r'^===\s*SCENE\s+(?![1]\b)(.+?)\s*(?:===|\*\*\*)', line.strip(), re.IGNORECASE):
-            # Look ahead at the next non-empty line
-            lookahead = idx + 1
-            while lookahead < len(lines):
-                next_line = lines[lookahead].strip()
-                if not next_line:
-                    lookahead += 1
-                    continue
-                
-                # If the next thing is just dialogue, inject a transition
-                if next_line.startswith('[VOICE:'):
-                    out_lines.append("")
-                    out_lines.append("[SFX: Scene transition - low bass sweep or static crossfade]")
-                    out_lines.append("(beat)")
-                    transition_count += 1
-                break
-                
-        idx += 1
-        
-    return "\n".join(out_lines), transition_count
-
+# (rip-sfx 2026-08-06: the [SFX:]-emitting _inject_scene_transitions body that
+# lived here was dead code -- permanently shadowed by a later same-named
+# function, itself also uncalled -- and both are deleted.)
 
 
 # -----------------------------------------------------------------------------
@@ -2317,7 +2285,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
     """Custom streamer that pulses heartbeats to _runtime_log for Canonical Tokens.
 
     Hooks into model.generate() at the token level. Every time Gemma completes
-    a line that contains a recognizable script tag (=== SCENE, [VOICE:], [SFX:],
+    a line that contains a recognizable script tag (=== SCENE, [VOICE:],
     [ENV:], (beat)), it writes a timestamped entry to otr_runtime.log immediately.
 
     Also tracks:
@@ -2347,7 +2315,6 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         # Counters for the dashboard
         self.scene_count = 0
         self.dialogue_count = 0
-        self.sfx_count = 0
         self.characters_seen = set()
 
         # Token speed tracking
@@ -2537,16 +2504,6 @@ class GemmaHeartbeatStreamer(BaseStreamer):
                 _runtime_log(f"ScriptWriter: Voice line #{self.dialogue_count}")
             return
 
-        # -- SFX tag --------------------------------------------------
-        if "[SFX:" in line:
-            self.sfx_count += 1
-            try:
-                desc = line.split("[SFX:", 1)[1].split("]", 1)[0].strip()
-                _runtime_log(f"ScriptWriter: SFX #{self.sfx_count}: {desc[:50]}")
-            except (IndexError, ValueError):
-                _runtime_log(f"ScriptWriter: SFX #{self.sfx_count}")
-            return
-
         # -- ENV tag --------------------------------------------------
         if "[ENV:" in line:
             try:
@@ -2667,49 +2624,9 @@ def _tail_at_sentence_boundary(text, max_chars):
     return snippet
 
 
-# -----------------------------------------------------------------------------
-# v1.4 Theme B - Automatic scene transitions
-#
-# When Gemma writes back-to-back scenes without any handoff cue, the audio
-# engine has nothing to work with and the result sounds like a hard cut. This
-# helper detects adjacent `=== SCENE N ===` markers with no transition in
-# between and injects a `[TRANSITION: brief pause]` placeholder. Downstream
-# SceneSequencer and BatchBark treat transition cues as audio beats.
-# -----------------------------------------------------------------------------
-
-_SCENE_MARKER_RE = re.compile(r"===\s*SCENE\s+\S+\s*===", re.IGNORECASE)
-_HANDOFF_CUE_RE = re.compile(
-    r"\[TRANSITION:|\[FADE\b|\[SFX:[^\]]*transition",
-    re.IGNORECASE,
-)
-
-
-def _inject_scene_transitions(script_text):
-    """Inject `[TRANSITION: brief pause]` between scenes lacking a handoff cue.
-
-    Walks adjacent scene markers in reverse so each insertion does not disturb
-    the offsets of earlier matches. Returns a tuple of (new_text, injections).
-    """
-    if not script_text:
-        return script_text, 0
-    matches = list(_SCENE_MARKER_RE.finditer(script_text))
-    if len(matches) < 2:
-        return script_text, 0
-
-    injections = 0
-    for idx in range(len(matches) - 1, 0, -1):
-        prev_end = matches[idx - 1].end()
-        curr_start = matches[idx].start()
-        gap = script_text[prev_end:curr_start]
-        if _HANDOFF_CUE_RE.search(gap):
-            continue
-        script_text = (
-            script_text[:curr_start]
-            + "[TRANSITION: brief pause]\n\n"
-            + script_text[curr_start:]
-        )
-        injections += 1
-    return script_text, injections
+# (rip-sfx 2026-08-06: the second, shadowing _inject_scene_transitions body and
+# its _SCENE_MARKER_RE / _HANDOFF_CUE_RE globals were deleted here -- the name
+# won the binding but had zero callers, which is not survival.)
 
 
 # -----------------------------------------------------------------------------

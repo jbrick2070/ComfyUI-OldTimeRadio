@@ -1,6 +1,14 @@
 # Generated SFX Engine Lane -- BUILD SPEC
 
-**Status: CONTRACTS SETTLED, BLOCKED ON A PREREQUISITE. Not yet code-ready.**
+**Status: RETIRED 2026-08-06 (operator ruling: "rip out SFX 100%").** The SFX
+bed, its five provider engines, the bed compiler and the manifest fields this
+spec builds on were removed by `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`; the
+five engine ids are permanently barred via
+`nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS`. Kept in place, unmoved,
+as the historical record of the parked design.
+
+**Status before retirement: CONTRACTS SETTLED, BLOCKED ON A PREREQUISITE. Not
+yet code-ready.**
 
 Product of a local kibitz r1->r4 arc, 2026-07-31 (operator request). Panel =
 Codex `gpt-5.6-sol` @ high + Antigravity `Gemini 3.6 Flash (High)`; Claude as

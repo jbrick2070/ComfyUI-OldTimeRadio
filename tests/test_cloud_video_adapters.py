@@ -30,7 +30,6 @@ _FFMPEG = shutil.which("ffmpeg")
 _CLOUD_ROWS = (
     "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
     "cloud_wan_i2v_audio", "cloud_vidu_q2_pro_fast_720p",
-    "cloud_vidu_q2_pro_fast_720p_sfx",
 )
 _MUSIC_OPEN_RISKY_PROMPT = (
     "Continuous shot, same console throughout. Dial whip-pans across "
@@ -56,7 +55,7 @@ def test_cloud_rows_never_default():
     # default_engine_for_role is the automatic-selection surface).
     for eng in (
             ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
-            ecv.ViduQ2ProFast720p, ecv.ViduQ2ProFast720pSfx):
+            ecv.ViduQ2ProFast720p):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = vreg.default_engine_for_role(role)
@@ -69,10 +68,9 @@ def test_reactivity_descriptors_match_pass04():
     assert ecv.WanI2V.reactivity == "mute_only"
     assert ecv.WanI2VAudio.reactivity == "required_audio_ref"
     assert ecv.ViduQ2ProFast720p.reactivity == "mute_only"
-    assert ecv.ViduQ2ProFast720pSfx.reactivity == "mute_only"
     assert all(e.must_strip_audio for e in
                (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
-                ecv.ViduQ2ProFast720p, ecv.ViduQ2ProFast720pSfx))
+                ecv.ViduQ2ProFast720p))
 
 
 def test_schema_grounded_v3_video_rows_are_partner_invocable():
@@ -83,12 +81,10 @@ def test_schema_grounded_v3_video_rows_are_partner_invocable():
     assert ecv.WanI2V.invocable is True
     assert ecv.WanI2VAudio.invocable is True
     assert ecv.ViduQ2ProFast720p.invocable is True
-    assert ecv.ViduQ2ProFast720pSfx.invocable is True
     assert ecv.Seedance2.invocability_reason == ""
     assert ecv.WanI2V.invocability_reason == ""
     assert ecv.WanI2VAudio.invocability_reason == ""
     assert ecv.ViduQ2ProFast720p.invocability_reason == ""
-    assert ecv.ViduQ2ProFast720pSfx.invocability_reason == ""
 
 
 def test_assert_usable_no_enable_flag(monkeypatch):
@@ -306,18 +302,6 @@ def test_vidu_q2_pro_fast_720p_sends_fixed_cheap_tier_payload(
     _assert_visual_safety(ins["prompt"])
     assert "audio" not in ins and "sound_file" not in ins
     assert hasattr(ins["image"], "ndim") and ins["image"].ndim == 4
-
-
-def test_vidu_q2_sfx_payload_uses_same_fixed_tier_and_sfx_prompt(
-        tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_VIDU_Q2_DURATION", "4")
-    ins = ecv.ViduQ2ProFast720pSfx._partner_inputs(_request(tmp_path))
-    assert ins["model"] == "viduq2-pro-fast"
-    assert ins["resolution"] == "720p"
-    assert ins["duration"] == 4
-    assert "no spoken words" in ins["prompt"].lower()
-    assert "environmental ambience and foley only" in ins["prompt"].lower()
-    assert "audio" not in ins and "sound_file" not in ins
 
 
 def test_vidu_q2_duration_ceil_and_fixed_720p(tmp_path, monkeypatch):
@@ -613,28 +597,3 @@ def test_vidu_q2_normal_canonicalize_strips_provider_audio_without_sfx(tmp_path)
          str(clip["path"])], capture_output=True, text=True, timeout=60)
     streams = json.loads(probe.stdout)["streams"]
     assert all(s["codec_type"] != "audio" for s in streams)
-
-
-@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
-def test_vidu_q2_sfx_canonicalize_preserves_provider_audio_as_stem(tmp_path):
-    src = _make_av_fixture(tmp_path, with_audio=True)
-    raw = {"path": str(src), "content_type": "video/mp4",
-           "duration_s": None, "provider_job_id": "vidu-sfx-job",
-           "raw_meta": {}}
-    clip = ecv.ViduQ2ProFast720pSfx.canonicalize(raw, _request(tmp_path), {})
-    assert clip["engine_id"] == "cloud_vidu_q2_pro_fast_720p_sfx"
-    assert clip["has_audio"] is False
-    assert Path(clip["path"]).is_file()
-    assert Path(clip["sfx_stem_path"]).is_file()
-    assert clip["sfx_duration_s"] > 0
-    assert len(clip["sfx_sha256"]) == 64
-
-
-@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
-def test_vidu_q2_sfx_canonicalize_fails_loud_when_provider_is_silent(tmp_path):
-    src = _make_av_fixture(tmp_path, with_audio=False)
-    raw = {"path": str(src), "content_type": "video/mp4",
-           "duration_s": None, "provider_job_id": "vidu-no-sfx",
-           "raw_meta": {}}
-    with pytest.raises(CloudMediaError, match="SFX unavailable"):
-        ecv.ViduQ2ProFast720pSfx.canonicalize(raw, _request(tmp_path), {})

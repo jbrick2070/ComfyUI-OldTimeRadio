@@ -1,5 +1,10 @@
 # R1 prompt -- Codex (GPT-5.6 sol): broad architecture pass on the Timeline Cue Ledger
 
+**RETIRED 2026-08-06** with its parent design (`2026-07-11-timeline-cue-ledger.md`)
+under the operator's "rip out SFX 100%" ruling -- see
+`docs/2026-08-06-BUILD-SPEC-rip-sfx.md`. Historical record only; the code
+symbols it cites (e.g. `compile_sfx_bed_from_manifest`) no longer exist.
+
 Paste everything below the line into Codex. It is an **R1 pass**: high-level arc, architecture,
 alternatives. Not a coding plan, not wiring -- those are R2/R3.
 

@@ -24,19 +24,21 @@ operator listening are separate elapsed time.
 
 | Order | Campaign | Exit condition | Coding estimate |
 |---:|---|---|---:|
-| 1 | Timeline Cue Ledger / generated spotted SFX | `cue-1` survives its blind noun-detector gate; generated-SFX selector, renderer, timeline mix, canonical wiring, receipts, and byproduct-bed retirement are green | provisionally 8-15 days after the R4.1 refit |
+| 1 | ~~Timeline Cue Ledger / generated spotted SFX~~ **RETIRED 2026-08-06** | Operator ruling "rip out SFX 100%" executed by `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`; the five SFX engines, the bed compiler and the mux mix branch are gone, ids barred via `RETIRED_ENGINE_IDS` | - |
 | 2 | Other product expansion | Visual-pack roll, richer cue stills, provider additions, and system-agnostic upscale as separately gated campaigns | 5-10 days per selected set |
 | 3 | Lean-mean/dead-code campaign | Re-grounded deletion/consolidation waves land green; no dormant interstitial audio or duplicate authorities | 12-16 days |
 | 4 | RunPod and install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 6-10 days |
 | 5 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
-**SFX (row 1) IS PARKED BY OPERATOR DOUBT, 2026-08-04.** The operator doubts it
-will work well with the video model and calls it a much bigger lift than
-imagined -- this table's own estimate (8-15 coder-days + 2-4 elapsed live days)
-is the largest single item on the runway. Parked, not killed: the designs below
-stay as evidence, and NOTHING spends against them -- no R4.1 refit, no C0/C1,
-no SFX coding -- until an explicit operator revival. The effective runway while
-the park holds: product expansion -> lean-mean -> RunPod -> release.
+**SFX (row 1) IS RETIRED, 2026-08-06 (operator: "I do really want to rip out
+SFX 100%").** It was parked by operator doubt on 2026-08-04; two days later the
+rip executed (`docs/2026-08-06-BUILD-SPEC-rip-sfx.md`): the five SFX-bed
+engines are deregistered and permanently barred
+(`nodes/_otr_shared/public_engines.RETIRED_ENGINE_IDS`), the bed compiler and
+the mux mix branch are deleted, and `tests/test_rip_sfx_bed_guard.py` trips on
+any surface creeping back. The design docs below keep in-place RETIRED headers
+as the historical record. The effective runway: product expansion -> lean-mean
+-> RunPod -> release.
 
 **LEAN-MEAN MOVED FROM ORDER 1 TO ORDER 3 ON 2026-07-29 (operator), and moved
 OFF `docs/GO_FORWARD_PLAN.md` entirely at the same time.** Two reasons, and
@@ -81,12 +83,14 @@ Foundation plan: `docs/2026-07-11-timeline-cue-ledger.md`.
 Generated-SFX architecture evidence:
 `docs/2026-07-11-sfx-engine-architecture/roundtable/pass04_final.md`.
 
-**Status: PARKED (operator doubt 2026-08-04; see the note above the lean-mean
-paragraph).** No R4.1 refit, no C0/C1, no SFX coding until explicit revival.
-The paragraphs below are the design record for that future decision, not a
-queue. (Superseded status line: implementation parked until the 720-word runway
-and everything on `docs/GO_FORWARD_PLAN.md` land, with a tracked R4.1 refit as
-the immediate work.)
+**Status: RETIRED 2026-08-06 (operator ruling "rip out SFX 100%"; executed by
+`docs/2026-08-06-BUILD-SPEC-rip-sfx.md`; see the note above the lean-mean
+paragraph).** The paragraphs below are the historical design record only, not
+a queue and not evidence awaiting revival. Reviving SFX would be a NEW design
+against the post-rip tree -- the code these designs cite (the bed compiler,
+the manifest fields, the five provider engines) no longer exists.
+(Superseded status lines: PARKED by operator doubt 2026-08-04; before that,
+implementation parked until the 720-word runway.)
 **This campaign now runs BEFORE lean-mean, not after it** -- the 2026-07-29
 operator direction reversed that dependency, so an older line reading "parked
 until the lean-mean campaign lands" no longer holds anywhere.

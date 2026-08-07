@@ -237,7 +237,10 @@ def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path
     ) == "signal_lost_final"
 
 
-def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
+def test_persist_rekeys_clip_to_renamed_episode_clips(monkeypatch, tmp_path):
+    # Rescued through the rip-sfx bed removal (2026-08-06): this is the ONLY
+    # coverage of persist's rename/rekey path for clip["path"]. The SFX stem
+    # fixture it once carried is gone with the bed producers.
     from nodes._otr_video_engines import render_driver as rd
     import nodes._otr_paths as paths
 
@@ -262,22 +265,19 @@ def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     clip_src = scratch / "shot.mp4"
-    sfx_src = scratch / "shot.sfx.wav"
     clip_src.write_bytes(b"mp4")
-    sfx_src.write_bytes(b"wav")
     result = {
         "clips": {
             "shot_b001": {
                 "type": "video",
                 "path": str(clip_src),
-                "sfx_stem_path": str(sfx_src),
-                "engine_id": "google_vid_sfx_veo_fast",
+                "engine_id": "google_veo_video",
             }
         },
         "ledger": {"video": {"shots": [{
             "shot_id": "shot_b001",
             "role": "character_video",
-            "engine_id": "google_vid_sfx_veo_fast",
+            "engine_id": "google_veo_video",
         }]}},
     }
 
@@ -285,11 +285,9 @@ def test_persist_rekeys_sfx_to_renamed_episode_clips(monkeypatch, tmp_path):
 
     clip = result["clips"]["shot_b001"]
     assert str(final / "clips") in clip["path"]
-    assert str(final / "clips") in clip["sfx_stem_path"]
     assert (final / "clips").is_dir()
     assert not (root / "pending_20260708_010101").exists()
     assert not clip_src.exists()
-    assert not sfx_src.exists()
 
 
 def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path):

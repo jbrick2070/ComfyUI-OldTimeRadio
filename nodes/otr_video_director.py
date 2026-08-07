@@ -52,6 +52,7 @@ def _engine_for_role(resolved_video, effective_by_role, role):
 from ._otr_shared.public_engines import (
     _INTERNAL_TO_PUBLIC,
     _LEGACY_ENGINE_ALIASES,
+    check_retired_engine,
     resolve_engine_id,
 )
 
@@ -543,6 +544,12 @@ class OTRVideoDirector:
                     f"no '{slot}' entry; left unresolved"
                 )
                 return {"engine_id": "", "custom": True, "unresolved": True}
+
+        # A RETIRED id (a stale saved graph / custom_models_json entry) fails
+        # with the NAMED policy error -- never a silent resolve to another
+        # engine. Runs AFTER pick/custom resolution (the pick was already
+        # public/legacy-resolved by _engine_id_from_pick).
+        check_retired_engine(resolve_engine_id(engine_id))
 
         # Validate only against engines the registry actually knows about
         # (CW-1 registry is empty -> nothing to validate; correct once adapters

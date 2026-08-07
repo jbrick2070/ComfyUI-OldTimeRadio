@@ -51,16 +51,11 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | cloud_kling_avatar | provider | audio_driven_face | wide | provider default (none sent) | 50-7500 | 2-300 s | 25 | soft_reference | yes |
 | cloud_seedance_2 | provider | audio_conditioned_video | wide | env OTR_CLOUD_SEEDANCE_RESOLUTION, default 720p | 100-375 step 25 | 4-15 s | 25 | soft_reference | yes |
 | cloud_vidu_q2_pro_fast_720p | provider | image_to_video | wide | 720p (fixed) | 25-250 step 25 | 1-10 s | 25 | soft_reference | yes |
-| cloud_vidu_q2_pro_fast_720p_sfx | provider | image_to_video | wide | 720p (fixed) | 25-250 step 25 | 1-10 s | 25 | soft_reference | yes |
 | cloud_wan_i2v | provider | image_to_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | cloud_wan_i2v_audio | provider | audio_conditioned_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | fastwan_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 17-177 step 4 | 0.68-7.08 s | 25 | strict_first_frame | yes |
 | google_omni_video | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
 | google_veo_video | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
-| google_vid_sfx_omni | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
-| google_vid_sfx_veo_fast | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
-| google_vid_sfx_veo_lite | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
-| google_vid_sfx_veo_pro | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | humo | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | humo_1.7B | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_1.7B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
@@ -88,16 +83,11 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | cloud_kling_avatar | init_image, audio_ref | text_prompt OPTIONAL (sent when present) |
 | cloud_seedance_2 | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
 | cloud_vidu_q2_pro_fast_720p | init_image, text_prompt | text_prompt REQUIRED |
-| cloud_vidu_q2_pro_fast_720p_sfx | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v_audio | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
 | fastwan_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | google_omni_video | text_prompt | text_prompt REQUIRED |
 | google_veo_video | text_prompt | text_prompt REQUIRED |
-| google_vid_sfx_omni | text_prompt | text_prompt REQUIRED |
-| google_vid_sfx_veo_fast | text_prompt | text_prompt REQUIRED |
-| google_vid_sfx_veo_lite | text_prompt | text_prompt REQUIRED |
-| google_vid_sfx_veo_pro | text_prompt | text_prompt REQUIRED |
 | humo | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
@@ -129,16 +119,11 @@ the engine's own `aspect` column above.
 | cloud_kling_avatar | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | cloud_seedance_2 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_vidu_q2_pro_fast_720p | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| cloud_vidu_q2_pro_fast_720p_sfx | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v_audio | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | fastwan_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_omni_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_veo_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| google_vid_sfx_omni | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| google_vid_sfx_veo_fast | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| google_vid_sfx_veo_lite | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| google_vid_sfx_veo_pro | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | humo | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
@@ -172,16 +157,11 @@ means the adapter sizes itself and IGNORES the request canvas.
 | cloud_kling_avatar | n/a -- renders remotely | see `resolution` column |
 | cloud_seedance_2 | n/a -- renders remotely | see `resolution` column |
 | cloud_vidu_q2_pro_fast_720p | n/a -- renders remotely | see `resolution` column |
-| cloud_vidu_q2_pro_fast_720p_sfx | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v_audio | n/a -- renders remotely | see `resolution` column |
 | fastwan_8gb | 832x480 | declared |
 | google_omni_video | n/a -- renders remotely | see `resolution` column |
 | google_veo_video | n/a -- renders remotely | see `resolution` column |
-| google_vid_sfx_omni | n/a -- renders remotely | see `resolution` column |
-| google_vid_sfx_veo_fast | n/a -- renders remotely | see `resolution` column |
-| google_vid_sfx_veo_lite | n/a -- renders remotely | see `resolution` column |
-| google_vid_sfx_veo_pro | n/a -- renders remotely | see `resolution` column |
 | humo | 480x832 | engine _native_dims |
 | humo_1.7B | 480x832 | engine _native_dims |
 | humo_1.7B_169 | 832x480 | engine _native_dims |
@@ -219,16 +199,11 @@ JUMP plan on a still-consuming lane ever re-mints.
 | cloud_kling_avatar | single | 1: 442 | 442 | 442 | 0 |
 | cloud_seedance_2 | jump | 2: 350, 100 | 450 | 442 | 1 |
 | cloud_vidu_q2_pro_fast_720p | jump | 2: 250, 200 | 450 | 442 | 1 |
-| cloud_vidu_q2_pro_fast_720p_sfx | jump | 2: 250, 200 | 450 | 442 | 1 |
 | cloud_wan_i2v | jump | 2: 375, 75 | 450 | 442 | 1 |
 | cloud_wan_i2v_audio | jump | 2: 375, 75 | 450 | 442 | 1 |
 | fastwan_8gb | chain | 3: 177, 177, 93 | 447 | 442 | 0 |
 | google_omni_video | jump | 2: 250, 192 | 442 | 442 | 1 |
 | google_veo_video | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
-| google_vid_sfx_omni | jump | 2: 250, 192 | 442 | 442 | 1 |
-| google_vid_sfx_veo_fast | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
-| google_vid_sfx_veo_lite | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
-| google_vid_sfx_veo_pro | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
 | humo | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | humo_1.7B | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_1.7B_169 | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
@@ -263,16 +238,11 @@ and it read exactly like a measured number until someone looked.
 | cloud_kling_avatar | - | contract max | none cited |
 | cloud_seedance_2 | - | contract max | none cited |
 | cloud_vidu_q2_pro_fast_720p | - | contract max | none cited |
-| cloud_vidu_q2_pro_fast_720p_sfx | - | contract max | none cited |
 | cloud_wan_i2v | - | contract max | none cited |
 | cloud_wan_i2v_audio | - | contract max | none cited |
 | fastwan_8gb | - | contract max | docs/2026-07-31-arm-c-fastwan-BUILD-SPEC.md |
 | google_omni_video | - | contract max | none cited |
 | google_veo_video | - | contract max | none cited |
-| google_vid_sfx_omni | - | contract max | none cited |
-| google_vid_sfx_veo_fast | - | contract max | none cited |
-| google_vid_sfx_veo_lite | - | contract max | none cited |
-| google_vid_sfx_veo_pro | - | contract max | none cited |
 | humo | 97 | safe_render_frames | none cited |
 | humo_1.7B | - | contract max | none cited |
 | humo_1.7B_169 | - | contract max | none cited |
@@ -295,7 +265,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **32**
-* provider-side: **13**
+* registered engine names: **27**
+* provider-side: **8**
 * local: **19**
 * can chain (strict_first_frame): **5**

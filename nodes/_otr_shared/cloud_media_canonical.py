@@ -27,12 +27,10 @@ __all__ = [
     "CanonicalAsset",
     "CANONICALIZER_VERSION",
     "LOUDNESS_REFERENCE_SOURCE",
-    "SFX_LOUDNESS_REFERENCE_SOURCE",
     "validate_partner_result",
     "canonicalize_audio",
     "canonicalize_image",
     "canonicalize_video",
-    "extract_sfx_bed_from_provider_video",
     "cloud_delivery_wh",
 ]
 
@@ -75,90 +73,6 @@ CANONICALIZER_VERSION = 2
 LOUDNESS_REFERENCE_SOURCE = (
     "nodes.scene_sequencer._loudness_normalize_clip / _loudnorm_params "
     "(per-segment RMS leveling, target OTR_SEGMENT_TARGET_RMS_DBFS=-16.0 dBFS)")
-
-#: SFX beds reuse the local RMS leveler but with a deliberately lower target
-#: than dialogue. The final :mod:`OTR_MasterAudioMux` still applies
-#: ``OTR_SFX_BED_GAIN`` (default 0.72), so a normalized stem lands underneath
-#: the frozen master instead of competing with canonical TTS/music.
-SFX_LOUDNESS_REFERENCE_SOURCE = (
-    "nodes.scene_sequencer._loudness_normalize_clip with "
-    "OTR_SFX_STEM_TARGET_RMS_DBFS=-20.0 dBFS, then OTR_SFX_BED_GAIN=0.72")
-
-
-def _env_float(name: str, default: float, lo: float | None = None,
-               hi: float | None = None) -> float:
-    try:
-        v = float(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        v = float(default)
-    if lo is not None:
-        v = max(float(lo), v)
-    if hi is not None:
-        v = min(float(hi), v)
-    return v
-
-
-def _rms_dbfs(samples) -> float | None:
-    import math
-    import numpy as np
-
-    x = np.asarray(samples, dtype=np.float64)
-    if x.size == 0 or not np.all(np.isfinite(x)):
-        return None
-    rms = float(np.sqrt(np.mean(np.square(x))))
-    if rms <= 0.0:
-        return None
-    return 20.0 * math.log10(max(rms, 1e-12))
-
-
-def _sfx_loudnorm_params() -> dict:
-    """SFX-specific RMS target: below dialogue/music, with limited boosting."""
-    return dict(
-        target_rms_dbfs=_env_float(
-            "OTR_SFX_STEM_TARGET_RMS_DBFS", -20.0, -60.0, -6.0),
-        max_boost_db=max(_env_float(
-            "OTR_SFX_STEM_MAX_BOOST_DB", 24.0, 0.0, 24.0), 0.0),
-        max_cut_db=min(_env_float(
-            "OTR_SFX_STEM_MAX_CUT_DB", -12.0, -60.0, 0.0), 0.0),
-        gate_dbfs=_env_float("OTR_SFX_STEM_GATE_DBFS", -55.0, -90.0, -10.0),
-        peak_ceiling=_env_float("OTR_SFX_STEM_PEAK_CEILING", 0.90, 0.05, 1.0),
-    )
-
-
-def _normalize_sfx_stem_audio(audio):
-    """Apply one deterministic SFX-bed gain and return ``(audio, report)``."""
-    import math
-    import numpy as np
-
-    x = np.asarray(audio, dtype=np.float32)
-    if x.size == 0 or not np.all(np.isfinite(x)):
-        return x, "sfx_rms_normalized skipped=empty_or_nonfinite"
-    probe = x.reshape(-1)
-    if float(np.abs(probe).max()) <= 0.0:
-        return x, "sfx_rms_normalized skipped=silence"
-    try:
-        from ..scene_sequencer import _loudness_normalize_clip  # type: ignore
-    except ImportError:  # pragma: no cover -- flat test imports
-        from scene_sequencer import _loudness_normalize_clip  # type: ignore
-
-    params = _sfx_loudnorm_params()
-    before = _rms_dbfs(probe)
-    leveled = _loudness_normalize_clip(probe, **params)
-    j = int(np.argmax(np.abs(probe)))
-    gain = float(leveled[j] / probe[j]) if probe[j] != 0 else 1.0
-    if not math.isfinite(gain) or gain <= 0.0:
-        gain = 1.0
-    out = (x * gain).astype(np.float32)
-    after = _rms_dbfs(out.reshape(-1))
-    return out, (
-        "sfx_rms_normalized target=%.1fdBFS gain=%.2fdB before=%s after=%s"
-        % (
-            params["target_rms_dbfs"],
-            20.0 * math.log10(max(gain, 1e-12)),
-            "n/a" if before is None else "%.2fdBFS" % before,
-            "n/a" if after is None else "%.2fdBFS" % after,
-        )
-    )
 
 
 class PartnerResult(TypedDict):
@@ -511,95 +425,7 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     )
 
 
-def _provider_video_path(raw) -> "tuple[Path, Optional[str]]":
-    if isinstance(raw, (str, os.PathLike)):
-        path = Path(raw)
-        if not path.is_file() or path.stat().st_size == 0:
-            raise CloudMediaError(
-                CloudErrorCode.CORRUPT_OUTPUT,
-                f"SFX unavailable: provider video missing or empty: {path}")
-        return path, None
-    validated = validate_partner_result(dict(raw))
-    return Path(validated["path"]), validated.get("provider_job_id")
-
-
-def extract_sfx_bed_from_provider_video(raw, out_path: str | os.PathLike | None = None) -> CanonicalAsset:
-    """Extract provider video audio as a normalized SFX bed.
-
-    This is intentionally separate from :func:`canonicalize_audio`: SFX stems are
-    foley/ambience material mixed underneath the frozen master later, not
-    dialogue clips that should be matched to local speech. They reuse the local
-    RMS leveler at a lower SFX target, then the final mux applies SFX bed gain.
-    """
-    import hashlib
-    import numpy as np
-    import shutil
-    import subprocess
-
-    src, provider_job_id = _provider_video_path(raw)
-    probe = _ffprobe_streams(str(src))
-    if not probe["audio"]:
-        raise CloudMediaError(
-            CloudErrorCode.CORRUPT_OUTPUT,
-            f"SFX unavailable: provider video {src} has no audio stream")
-    ffmpeg = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
-        or shutil.which("ffmpeg")
-    if not ffmpeg:
-        raise CloudMediaError(
-            CloudErrorCode.CORRUPT_OUTPUT,
-            "ffmpeg not found -- cannot extract provider SFX bed")
-    dst = Path(out_path) if out_path else src.with_suffix(".sfx.wav")
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        dec = subprocess.run(
-            [ffmpeg, "-y", "-v", "error", "-i", str(src), "-map", "0:a:0",
-             "-vn", "-ar", "48000", "-ac", "2", "-f", "f32le", "-"],
-            capture_output=True, timeout=600)
-        if dec.returncode != 0 or not dec.stdout:
-            raise RuntimeError((dec.stderr or b"")[-300:].decode(
-                "utf-8", errors="replace"))
-        flat = np.frombuffer(dec.stdout, dtype=np.float32).copy()
-        if flat.size % 2:
-            raise RuntimeError(
-                "decoded provider SFX sample count is not stereo-aligned")
-        audio = flat.reshape(-1, 2)
-        audio, norm_report = _normalize_sfx_stem_audio(audio)
-        enc = subprocess.run(
-            [ffmpeg, "-y", "-v", "error", "-f", "f32le", "-ar", "48000",
-             "-ac", "2", "-i", "-", "-c:a", "pcm_s16le", str(dst)],
-            input=audio.astype(np.float32).tobytes(),
-            capture_output=True, timeout=600)
-        if enc.returncode != 0:
-            raise RuntimeError((enc.stderr or b"")[-300:].decode(
-                "utf-8", errors="replace"))
-    except CloudMediaError:
-        raise
-    except Exception as exc:
-        raise CloudMediaError(
-            CloudErrorCode.CORRUPT_OUTPUT,
-            f"SFX extraction failed for {src}: {exc}")
-    if not dst.is_file() or dst.stat().st_size == 0:
-        raise CloudMediaError(
-            CloudErrorCode.CORRUPT_OUTPUT,
-            f"SFX extraction wrote no output: {dst}")
-    post = _ffprobe_streams(str(dst))
-    if not post["audio"]:
-        raise CloudMediaError(
-            CloudErrorCode.CORRUPT_OUTPUT,
-            f"SFX extraction output {dst} has no audio stream")
-    sha = hashlib.sha256()
-    with open(dst, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            sha.update(chunk)
-    return CanonicalAsset(
-        path=dst,
-        sha256=sha.hexdigest(),
-        media_type="audio",
-        duration_s=post["duration_s"],
-        width=None,
-        height=None,
-        fps=None,
-        container="wav",
-        provider_job_id=provider_job_id,
-        validation_warnings=(norm_report,),
-    )
+# The SFX-bed extraction chain (extract_sfx_bed_from_provider_video ->
+# _normalize_sfx_stem_audio -> _sfx_loudnorm_params -> _env_float/_rms_dbfs,
+# plus _provider_video_path) was deleted with the SFX bed producers
+# (rip-sfx 2026-08-06). No surviving engine keeps provider audio.

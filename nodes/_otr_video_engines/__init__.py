@@ -214,12 +214,8 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# Explicit opt-in Google video SFX-bed engines. These preserve provider audio
-# only as separate .sfx.wav stems; the canonical video clip remains silent.
-try:  # pragma: no cover - trivial guard
-    from . import eng_google_vid_sfx as _eng_google_vid_sfx  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# (rip-sfx 2026-08-06: the eng_google_vid_sfx import block died with its
+# module -- the SFX-bed lane is retired, ids guarded via RETIRED_ENGINE_IDS.)
 
 
 # ---------------------------------------------------------------------------

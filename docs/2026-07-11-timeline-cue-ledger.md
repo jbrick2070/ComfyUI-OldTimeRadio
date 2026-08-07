@@ -1,6 +1,12 @@
 # Timeline Cue Ledger -- spotted SFX for OTR
 
-Status: **ROADMAP. No code. Not scheduled.** Do not start before runway/720w + lean-mean-rip land.
+Status: **RETIRED 2026-08-06 (operator ruling: "rip out SFX 100%").** The SFX
+bed machinery this design would feed (the bed compiler, the manifest fields,
+the mux mix branch) was removed by `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`.
+Kept in place, unmoved, as the historical record; the link-278 wiring facts
+below describe a connector that is now vestigial by decision.
+
+Status before retirement: **ROADMAP. No code. Not scheduled.** Do not start before runway/720w + lean-mean-rip land.
 Date: 2026-07-11
 
 **OPERATOR DECISION -- RATIFIED 2026-07-11: cue decisions run BEFORE the video chain.**

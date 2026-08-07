@@ -106,15 +106,10 @@ def identity_is_stable(engine):
 EXPECTED_CLOUD_GAP = {
     "cloud_seedance_2",
     "cloud_vidu_q2_pro_fast_720p",
-    "cloud_vidu_q2_pro_fast_720p_sfx",
     "cloud_wan_i2v",
     "cloud_wan_i2v_audio",
     "google_omni_video",
     "google_veo_video",
-    "google_vid_sfx_omni",
-    "google_vid_sfx_veo_fast",
-    "google_vid_sfx_veo_lite",
-    "google_vid_sfx_veo_pro",
     "word_razzle",
 }
 
@@ -190,9 +185,22 @@ def test_this_gate_is_not_vacuous():
     """A sweep that finds nothing passes every gate built on it. This build has
     paid for that before -- the W3b control that watched exactly one engine
     while a second quietly grew an identity. Assert the roster is really being
-    billed."""
+    billed -- DERIVED from the registry's own CAPABILITIES table, never a
+    hand-typed count that rots when an engine is added or retired
+    (PRODUCTION_SPRINT_LESSONS on count assertions; rip-sfx 2026-08-06)."""
     names = _engines()
-    assert len(names) >= 30, "only %d engines discovered" % len(names)
+    assert names, "registry discovered no engines at all"
+    assert set(names) == set(vreg.CAPABILITIES), (
+        "live roster and CAPABILITIES disagree: only-live=%s only-declared=%s"
+        % (sorted(set(names) - set(vreg.CAPABILITIES)),
+           sorted(set(vreg.CAPABILITIES) - set(names))))
+    for anchor in ("humo", "ltx_video", "ltx_8gb", "wan_ti2v", "wan_i2v",
+                   "fastwan_8gb", "viz_green", "still_flat"):
+        assert anchor in names, anchor
+    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
+    assert not (set(names) & RETIRED_ENGINE_IDS), (
+        "retired engine id(s) re-registered: %s"
+        % sorted(set(names) & RETIRED_ENGINE_IDS))
     assert len(IN_SCOPE) >= 7, (
         "only %d local engine(s) split a 30-second beat (%s) -- the identity "
         "gate above is close to vacuous" % (len(IN_SCOPE), ", ".join(IN_SCOPE)))
@@ -392,9 +400,14 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
         "as another arrives, size unchanged -- cannot pass unnoticed if either "
         "assertion is weakened."
         % (sorted(CLOUD_SPLITTERS), sorted(EXPECTED_CLOUD_GAP)))
-    assert len(CLOUD_SPLITTERS) == 12, (
-        "expected exactly 12 splittable engines with no local handles, found "
-        "%d: %s" % (len(CLOUD_SPLITTERS), sorted(CLOUD_SPLITTERS)))
+    # No hand-typed count here: the exact-set equality above already pins
+    # membership, and a count adds nothing but drift the next time an engine
+    # arrives or retires (rip-sfx 2026-08-06 removed five). The retired ids
+    # must never reappear in this set:
+    from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
+    assert not (set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS), (
+        "retired engine id(s) back in the cloud gap: %s"
+        % sorted(set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS))
     assert "word_razzle" in CLOUD_SPLITTERS, (
         "word_razzle is a CLOUD i2v engine that the 45-word campaign wrongly "
         "carried in its local roster; it belongs in this set")

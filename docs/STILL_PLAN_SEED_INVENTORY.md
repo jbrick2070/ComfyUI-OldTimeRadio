@@ -148,13 +148,18 @@ They fire in this order, first match wins:
 
 Families `audio_driven_face` and `character_3d` return False before 3 and 4.
 
-Live result -- the 21 engines that require a scene still, BY MECHANISM:
+Live result -- the 21 engines that required a scene still at capture time, BY
+MECHANISM. **UPDATE 2026-08-06 (rip-sfx):** the five ~~struck~~ SFX-bed
+engines below were RETIRED and deregistered (see
+`docs/2026-08-06-BUILD-SPEC-rip-sfx.md`); they are no longer inventory. The
+historical capture is kept verbatim because the MECHANISM routing it records
+is what the migration needed:
 
 | Mechanism | Engines |
 |---|---|
-| `family` (9) | `wan_ti2v`, `wan_i2v`, `ltx_8gb`, `mesh_stage`, `still_motion`, `word_razzle`, `cloud_wan_i2v`, `cloud_vidu_q2_pro_fast_720p`, `cloud_vidu_q2_pro_fast_720p_sfx` |
+| `family` (9, now 8) | `wan_ti2v`, `wan_i2v`, `ltx_8gb`, `mesh_stage`, `still_motion`, `word_razzle`, `cloud_wan_i2v`, `cloud_vidu_q2_pro_fast_720p`, ~~`cloud_vidu_q2_pro_fast_720p_sfx`~~ |
 | `id_list` (4) | `ltx_audio_in`, `still_flat`, `still_pan`, `still_word` |
-| `provider_side` (6) | `google_veo_video`, `google_omni_video`, `google_vid_sfx_omni`, `google_vid_sfx_veo_lite`, `google_vid_sfx_veo_fast`, `google_vid_sfx_veo_pro` |
+| `provider_side` (6, now 2) | `google_veo_video`, `google_omni_video`, ~~`google_vid_sfx_omni`~~, ~~`google_vid_sfx_veo_lite`~~, ~~`google_vid_sfx_veo_fast`~~, ~~`google_vid_sfx_veo_pro`~~ |
 | `required_inputs` (2) | `cloud_seedance_2`, `cloud_wan_i2v_audio` |
 
 **TRAP 1 -- `still_motion` is NOT in the id list.** The four `still_*`
@@ -222,7 +227,11 @@ mouth-forward radio face rides the hook. Both are "this model asks for a
 face-forward still"; they differ only in aspect and in which mechanism
 currently expresses it.
 
-### Per-engine facts from the live registry (31 engines)
+### Per-engine facts from the live registry (31 engines at capture)
+
+**UPDATE 2026-08-06 (rip-sfx):** the five ~~struck~~ rows were RETIRED and
+deregistered; the live registry is 27 engines (see `docs/ENGINE_MATRIX.md`,
+the generated authority on the current roster).
 
 `still` = declared `accepts_still` (`None` = falls through to the
 `init_image in required_inputs` dual-read in `engine_consumes_still`).
@@ -233,15 +242,15 @@ currently expresses it.
 | `cloud_kling_avatar` | audio_driven_face | wide | None | - | - | no | face |
 | `cloud_seedance_2` | audio_conditioned_video | wide | None | - | - | yes | required_inputs |
 | `cloud_vidu_q2_pro_fast_720p` | image_to_video | wide | None | - | - | yes | family |
-| `cloud_vidu_q2_pro_fast_720p_sfx` | image_to_video | wide | None | - | - | yes | family |
+| ~~`cloud_vidu_q2_pro_fast_720p_sfx`~~ | image_to_video | wide | None | - | - | yes | family |
 | `cloud_wan_i2v` | image_to_video | wide | None | - | - | yes | family |
 | `cloud_wan_i2v_audio` | audio_conditioned_video | wide | None | - | - | yes | required_inputs |
 | `google_omni_video` | text_to_video | wide | True | - | - | yes | provider_side |
 | `google_veo_video` | text_to_video | wide | True | - | - | yes | provider_side |
-| `google_vid_sfx_omni` | text_to_video | wide | True | - | - | yes | provider_side |
-| `google_vid_sfx_veo_fast` | text_to_video | wide | True | - | - | yes | provider_side |
-| `google_vid_sfx_veo_lite` | text_to_video | wide | True | - | - | yes | provider_side |
-| `google_vid_sfx_veo_pro` | text_to_video | wide | True | - | - | yes | provider_side |
+| ~~`google_vid_sfx_omni`~~ | text_to_video | wide | True | - | - | yes | provider_side |
+| ~~`google_vid_sfx_veo_fast`~~ | text_to_video | wide | True | - | - | yes | provider_side |
+| ~~`google_vid_sfx_veo_lite`~~ | text_to_video | wide | True | - | - | yes | provider_side |
+| ~~`google_vid_sfx_veo_pro`~~ | text_to_video | wide | True | - | - | yes | provider_side |
 | `humo` | audio_driven_face | portrait | True | - | - | no | face |
 | `humo_1.7B` | audio_driven_face | portrait | True | - | - | no | face |
 | `humo_1.7B_169` | audio_driven_face | wide | True | - | - | no | face |

@@ -101,14 +101,10 @@ _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
     "google_veo_video",
     "google_omni_video",
 })
-_GOOGLE_VIDEO_SFX_ENGINES = frozenset({
-    "google_vid_sfx_omni",
-    "google_vid_sfx_veo_lite",
-    "google_vid_sfx_veo_fast",
-    "google_vid_sfx_veo_pro",
-})
-_GOOGLE_PROVIDER_PROMPT_ENGINES = (
-    _GOOGLE_SILENT_TEXT_PROVIDERS | _GOOGLE_VIDEO_SFX_ENGINES)
+#: rip-sfx (2026-08-06): the google_vid_sfx_* rows are retired, so every
+#: surviving Google provider is a silent text provider and the prompt-provider
+#: set narrows to the silent set.
+_GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 
 
 class OomSignal(RuntimeError):
@@ -1487,8 +1483,6 @@ def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
 
 def _apply_visual_safety_prompt(req, shot) -> None:
     engine_id = str((shot or {}).get("engine_id") or "").strip()
-    if engine_id in _GOOGLE_VIDEO_SFX_ENGINES:
-        return
     if not _is_cloud_video_engine(engine_id):
         return
     prompt = str(req.get("text_prompt") or "").strip()
@@ -3011,6 +3005,15 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
     if force_oom:
         raise OomSignal("forced soak OOM on %s" % engine_name)
     _assert_family_inputs_satisfiable(engine_name, request)
+    # A RETIRED id must fail with the NAMED policy error BEFORE the generic
+    # not-registered LookupError -- this is the boundary the shipped
+    # /otr/video_render_single HTTP endpoint reaches (rip-sfx 2026-08-06).
+    # Resolved FOR THE GUARD ONLY (idempotent on internal ids), so a future
+    # retired id that also carries a public alias cannot slip past; the
+    # registry checks below still see the caller's own name unchanged.
+    from .._otr_shared.public_engines import (
+        check_retired_engine, resolve_engine_id)
+    check_retired_engine(resolve_engine_id(engine_name))
     if not _vreg.is_registered(engine_name):
         raise LookupError("engine %r is not registered" % engine_name)
     eng = _vreg.get_engine(engine_name)
@@ -3250,6 +3253,13 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             "multi-clip beat. NO FALLBACK."
             % (shot.get("shot_id"), plan.segment_count))
     engine_id = str(shot.get("engine_id") or "")
+    # Multi-clip session creation is its own ingress (a frozen ledger may carry
+    # a stale engine id): a RETIRED id gets the NAMED refusal, never the
+    # generic not-registered error (rip-sfx 2026-08-06). Resolved for the
+    # guard only -- idempotent on the internal ids real ledgers carry.
+    from .._otr_shared.public_engines import (
+        check_retired_engine, resolve_engine_id)
+    check_retired_engine(resolve_engine_id(engine_id))
     if not _vreg.is_registered(engine_id):
         raise RenderError(
             "shot %s carries a %d-segment coverage plan but engine %r is not "
@@ -3841,7 +3851,8 @@ def parse_engine_override(spec: str) -> dict:
     A PUBLIC menu id (``wan_8gb``) or a LEGACY id resolves to its internal engine id
     before the registry check, so the map is stored as internal ids (video-tiers
     2026-07-20, boundary 6). Unknown engines raise at parse time (fail-closed)."""
-    from .._otr_shared.public_engines import resolve_engine_id
+    from .._otr_shared.public_engines import (
+        check_retired_engine, resolve_engine_id)
     out = {}
     for pair in (spec or "").split(","):
         pair = pair.strip()
@@ -3852,6 +3863,7 @@ def parse_engine_override(spec: str) -> dict:
                 "OTR_FORCE_ENGINE_MAP entry %r is not role=engine" % pair)
         role, engine = (s.strip() for s in pair.split("=", 1))
         engine = resolve_engine_id(engine)   # public/legacy -> internal
+        check_retired_engine(engine)         # NAMED refusal, after resolution
         if engine not in ENGINE_FAMILY and not _vreg.is_registered(engine):
             raise ValueError(
                 "OTR_FORCE_ENGINE_MAP names unknown engine %r" % engine)
@@ -4321,13 +4333,13 @@ def _safe_clip_basename(text):
 
 
 def resolve_episode_id_for_clip_persistence(episode_id, freeze_timestamp=""):
-    """Rename-proof the episode id used for durable clip/SFX persistence.
+    """Rename-proof the episode id used for durable clip persistence.
 
     VideoRenderBatch receives the ShotLock ledger while the episode is still
     named ``pending_<ts>``. SignalLostVideo may rename that episode directory to
     the title slug before clips are rendered, so writing to
     ``episodes/pending_<ts>/clips`` can re-create a stale folder and strand the
-    provider clips/SFX away from the real episode. Mirror the stills/master-audio
+    provider clips away from the real episode. Mirror the stills/master-audio
     rename contract: if the pending dir is gone, re-key only to the active
     in-flight ledger and, when supplied, require its immutable freeze receipt
     to match. Never choose a newest-mtime sibling. Test mode leaves the id
@@ -4376,7 +4388,7 @@ def resolve_episode_id_for_clip_persistence(episode_id, freeze_timestamp=""):
         ):
             _LOG.warning(
                 "[OTR video] LOUD re-resolve: episode_id %r is a stale pending "
-                "id (dir renamed before clip persistence); clips/SFX re-keyed "
+                "id (dir renamed before clip persistence); clips re-keyed "
                 "to active ledger episode dir %r.",
                 eid, new_episode_dir.name)
             return new_episode_dir.name
@@ -4418,7 +4430,6 @@ def persist_episode_clips(result, episode_id):
                 str(shot.get("role") or ""), str(shot.get("engine_id") or ""))
     import shutil
     moved = 0
-    moved_sfx = 0
     for sid, clip in clips.items():
         if not isinstance(clip, dict):
             continue
@@ -4439,31 +4450,9 @@ def persist_episode_clips(result, episode_id):
                         _LOG.warning(
                             "[OTR video] persist_episode_clips: move FAILED %s -> "
                             "%s (%s) -- clip stays in tmp", src, dst, exc)
-        sfx_src = str(clip.get("sfx_stem_path") or "")
-        if not sfx_src:
-            continue
-        if not os.path.isfile(sfx_src):
-            _LOG.warning(
-                "[OTR video] persist_episode_clips: SFX stem missing before "
-                "persist %s -- clearing dangling path", sfx_src)
-            clip["sfx_stem_path"] = ""
-            continue
-        sfx_dst = os.path.join(dest_dir, safe_stem + ".sfx.wav")
-        if os.path.dirname(os.path.abspath(sfx_src)) == os.path.abspath(dest_dir):
-            continue
-        try:
-            if os.path.abspath(sfx_src) != os.path.abspath(sfx_dst):
-                shutil.move(sfx_src, sfx_dst)
-            clip["sfx_stem_path"] = sfx_dst
-            moved_sfx += 1
-        except Exception as exc:         # noqa: BLE001 -- clear swept tmp paths
-            _LOG.warning(
-                "[OTR video] persist_episode_clips: SFX move FAILED %s -> "
-                "%s (%s) -- clearing dangling path", sfx_src, sfx_dst, exc)
-            clip["sfx_stem_path"] = ""
-    if moved or moved_sfx:
-        _LOG.info("[OTR video] persisted %d clip(s) and %d SFX stem(s) to "
-                  "episodes/%s/clips/", moved, moved_sfx, episode_id)
+    if moved:
+        _LOG.info("[OTR video] persisted %d clip(s) to episodes/%s/clips/",
+                  moved, episode_id)
     return result
 
 
@@ -4807,11 +4796,6 @@ def build_clip_manifest(result, *, episode_id=""):
                     "(bg_still_path) -- the textured 3D hero composites over the "
                     "floor/black fallback (LOUD; expected a per-beat scene still)",
                     bid)
-        sfx_stem = str(clip.get("sfx_stem_path") or "")
-        if sfx_stem:
-            row["sfx_stem_path"] = sfx_stem
-            row["sfx_duration_s"] = clip.get("sfx_duration_s")
-            row["sfx_sha256"] = clip.get("sfx_sha256")
         rows.append(row)
         if exists:
             hist[eid] = hist.get(eid, 0) + 1

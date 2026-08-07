@@ -383,3 +383,108 @@ def test_google_veo_video_has_no_partner_or_local_engine_call_path():
     names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
     attrs = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
     assert forbidden.isdisjoint(names | attrs)
+
+
+# ---------------------------------------------------------------------------
+# Rescued coverage (rip-sfx bed, 2026-08-06). These four tests lived in the
+# deleted SFX-only files (test_google_video_sfx_beds.py /
+# test_google_video_sfx_render_driver.py) but pin SURVIVING behaviour:
+# the silent Google adapters' V-1 silence proof, the base VEO payload never
+# requesting provider audio, and the visual-Google prompt-routing branch.
+# ---------------------------------------------------------------------------
+
+def _audio_streams(path: pathlib.Path) -> list:
+    import json as _json
+
+    p = subprocess.run(
+        ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams",
+         str(path)],
+        check=True, capture_output=True, text=True, timeout=60)
+    doc = _json.loads(p.stdout or "{}")
+    return [s for s in doc.get("streams") or []
+            if s.get("codec_type") == "audio"]
+
+
+def test_base_veo_payload_never_requests_provider_audio(monkeypatch):
+    """V-1: the base VEO request must not ask the provider to generate audio.
+
+    Rescued from the retired SFX-bed suite -- this is the ONLY assertion
+    pinning that the surviving VEO payload builder omits ``generateAudio``."""
+    _clear_video_env(monkeypatch)
+    base_payload = G._request_payload("veo-3.1-lite-generate-preview", _req())
+    assert "generateAudio" not in base_payload["parameters"]
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_existing_google_video_engines_stay_silent(tmp_path):
+    """V-1 for the surviving Google lanes: canonical clips carry NO audio
+    stream and NO sfx fields (the bed producers are retired)."""
+    from nodes._otr_video_engines import eng_google_omni_video as OMNI  # noqa: F401
+
+    src = _mp4_fixture(tmp_path)
+    raw = {"path": str(src), "content_type": "video/mp4", "duration_s": None,
+           "provider_job_id": "silent-job", "raw_meta": {}}
+    for name in ("google_veo_video", "google_omni_video"):
+        clip = vreg.get_engine(name).canonicalize(dict(raw), _req(), {})
+        assert clip["engine_id"] == name
+        assert clip["has_audio"] is False
+        assert "sfx_stem_path" not in clip
+        assert _audio_streams(pathlib.Path(clip["path"])) == []
+
+
+def _music_open_ledger(engine_id="google_veo_video"):
+    from nodes._otr_video_engines import render_driver as rd
+
+    return {
+        "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
+                  "ledger_frozen": True},
+        "meta": {
+            "visual_style": "video_art",
+            "style": "archive signal mystery",
+            "story_brief_terms": {
+                "setting": ["tape archive"],
+                "atmosphere": ["electrical unease"],
+            },
+        },
+        "lines": [
+            {"line_id": "b000_music_open", "char_id": "",
+             "speaker_role": "music_open", "start_s": 0.0, "dur_s": 4.0},
+        ],
+        "images": {"images": [
+            {"object_id": "still_b000_music_open", "kind": "scene_open",
+             "beat_id": "b000_music_open", "path": "X:/img/open.png"},
+        ]},
+        "video": {"video_revision": 1, "fps": 25, "shots": [
+            {"shot_id": "shot_b000_music_open",
+             "source_line_ids": ["b000_music_open"],
+             "role": "music_visual",
+             "engine_id": engine_id,
+             "family": "text_to_video",
+             "group_id": "grp_music",
+             "target_frame_count": 100,
+             "degradation_trail": [],
+             "render_request_hash": "hash_veo_open",
+             "cache_keys": {"request_hash": "hash_veo_open"},
+             "creative": {}},
+        ]},
+    }
+
+
+def test_silent_google_prompt_routing_still_uses_visual_google_branch():
+    """The ONLY test exercising the surviving google_veo_video prompt-routing
+    branch in the render driver (rescued from the retired SFX driver suite)."""
+    from nodes._otr_video_engines import render_driver as rd
+
+    led = _music_open_ledger(engine_id="google_veo_video")
+    shot = led["video"]["shots"][0]
+    req = rd.build_request_from_shot(shot, led)
+    prompt = req["text_prompt"].lower()
+    assert "single luminous radio receiver" in prompt
+    # Content clause retired 2026-08-05 (operator directive); nothing appends
+    # a speech clause on this branch either.
+    assert "no explicit guns" not in prompt
+    # NOT "applied", and that is correct: `_apply_visual_safety_prompt`
+    # early-returns when the helper changes nothing, and the retired clause
+    # changes nothing -- stamping "applied" would assert an enforcement that
+    # did not happen.
+    assert req["observability"].get("visual_safety_prompt") is None

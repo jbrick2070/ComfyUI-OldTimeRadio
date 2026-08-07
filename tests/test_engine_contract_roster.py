@@ -320,7 +320,6 @@ def test_the_whole_second_cloud_lanes_declare_a_25_frame_quantum():
         "cloud_wan_i2v": (50, 375),
         "cloud_wan_i2v_audio": (50, 375),
         "cloud_vidu_q2_pro_fast_720p": (25, 250),
-        "cloud_vidu_q2_pro_fast_720p_sfx": (25, 250),
     }
     for name, (lo, hi) in WHOLE_SECOND.items():
         c = fc.frame_contract_for(vreg.get_engine(name))
@@ -390,21 +389,6 @@ def _contract_source(filename):
                       text, re.S)
     assert match, "no frame_contract declaration found in %s" % filename
     return match.group(1)
-
-
-def test_the_sfx_lanes_share_their_base_adapters_ladder_object():
-    """The SFX engines call into the Veo/Omni adapters, so restating their
-    numbers would be two declarations over one fact. Read, do not copy."""
-    veo = fc.frame_contract_for(vreg.get_engine("google_veo_video"))
-    for name in ("google_vid_sfx_veo_lite", "google_vid_sfx_veo_fast",
-                 "google_vid_sfx_veo_pro"):
-        c = fc.frame_contract_for(vreg.get_engine(name))
-        assert c.discrete_frames == veo.discrete_frames, name
-        assert c.native_fps == veo.native_fps, name
-
-    omni = fc.frame_contract_for(vreg.get_engine("google_omni_video"))
-    sfx = fc.frame_contract_for(vreg.get_engine("google_vid_sfx_omni"))
-    assert (sfx.min_frames, sfx.max_frames) == (omni.min_frames, omni.max_frames)
 
 
 def test_a_declared_MINIMUM_is_a_length_the_adapter_can_actually_render():

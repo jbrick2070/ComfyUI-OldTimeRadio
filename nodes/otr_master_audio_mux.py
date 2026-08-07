@@ -20,17 +20,14 @@ the audio was copied, not re-encoded or trimmed. Cold-import clean (stdlib only)
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
 import logging
 
 log = logging.getLogger("OTR")
-DEFAULT_SFX_BED_GAIN = 0.72
 
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
@@ -89,35 +86,6 @@ def audio_pcm_sha(path: str) -> str:
     return hashlib.sha256(raw.stdout).hexdigest()
 
 
-def _decoded_pcm_sha(path: str, *, sample_rate: int = 48000, channels: int = 2) -> str:
-    fp = shutil.which("ffmpeg")
-    if not fp:
-        return ""
-    raw = subprocess.run(
-        [fp, "-v", "error", "-i", path, "-map", "0:a", "-f", "s16le",
-         "-acodec", "pcm_s16le", "-ar", str(sample_rate), "-ac", str(channels),
-         "-"],
-        capture_output=True)
-    if raw.returncode != 0 or not raw.stdout:
-        return ""
-    return hashlib.sha256(raw.stdout).hexdigest()
-
-
-def _clamp01(value) -> float:
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        v = DEFAULT_SFX_BED_GAIN
-    return max(0.0, min(1.0, v))
-
-
-def _sfx_gain(value=None) -> float:
-    env = os.environ.get("OTR_SFX_BED_GAIN")
-    if env not in (None, ""):
-        return _clamp01(env)
-    return _clamp01(DEFAULT_SFX_BED_GAIN if value is None else value)
-
-
 #: The legacy credits-tail ceiling when no roll declares its own duration.
 _MAX_CREDITS_TAIL_S_DEFAULT = 45.0
 
@@ -137,10 +105,8 @@ def _credits_tail_ceiling() -> float:
     already-booted server, so a malformed one must be IGNORED, never FATAL. The
     house posture is `otr_silent_composite._unsharp_amount`; this adds the
     WARNING that one omits, because a ceiling silently reverting to the default
-    is a ceiling the operator thinks they moved.
-
-    Its sibling in this same file, ``_sfx_gain``, was already guarded through
-    ``_clamp01``. This was the one env read in the mux that was not."""
+    is a ceiling the operator thinks they moved. This is the one env read in
+    the mux."""
     raw = os.environ.get("OTR_MAX_CREDITS_TAIL_S")
     if raw in (None, ""):
         return _MAX_CREDITS_TAIL_S_DEFAULT
@@ -153,104 +119,6 @@ def _credits_tail_ceiling() -> float:
             "not lose a finished episode at the mux (PBUG-20260723-02).",
             raw, _MAX_CREDITS_TAIL_S_DEFAULT)
         return _MAX_CREDITS_TAIL_S_DEFAULT
-
-
-def _numeric(value, *, field: str, row_id: str) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "OTR_MasterAudioMux: SFX manifest row %s has non-numeric %s=%r"
-            % (row_id, field, value)) from exc
-    return out
-
-
-def compile_sfx_bed_from_manifest(
-    clip_manifest_json,
-    *,
-    out_path,
-    sample_rate=48000,
-    channels=2,
-    gain=DEFAULT_SFX_BED_GAIN,
-) -> str:
-    """Compile clip-side SFX stems into one episode-length bed.
-
-    The bed is unity-gain; ``gain`` is accepted and clamped so callers share the
-    same env/default validation path, but the final master/SFX balance is applied
-    by :func:`mux_master_audio` when the frozen master is mixed with this bed.
-    """
-    text = str(clip_manifest_json or "").strip()
-    if not text:
-        return ""
-    try:
-        manifest = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError(
-            "OTR_MasterAudioMux: clip_manifest_json is not valid JSON for SFX bed"
-        ) from exc
-    rows = (manifest or {}).get("clips") if isinstance(manifest, dict) else None
-    if not isinstance(rows, list):
-        return ""
-    sfx_rows = [r for r in rows if isinstance(r, dict) and str(r.get("sfx_stem_path") or "")]
-    if not sfx_rows:
-        return ""
-    fps = _numeric((manifest or {}).get("fps"), field="fps", row_id="<manifest>")
-    if fps <= 0:
-        raise ValueError("OTR_MasterAudioMux: SFX manifest fps must be > 0")
-    _ = _sfx_gain(gain)
-    fb = _ffmpeg_bin("ffmpeg") or shutil.which("ffmpeg") or ""
-    if not fb:
-        raise ValueError("OTR_MasterAudioMux: ffmpeg not found for SFX bed compile")
-    filters = []
-    labels = []
-    cmd = [fb, "-y", "-loglevel", "error"]
-    for idx, row in enumerate(sfx_rows):
-        row_id = str(row.get("shot_id") or row.get("beat_id") or idx)
-        stem = str(row.get("sfx_stem_path") or "")
-        if not os.path.isfile(stem):
-            raise ValueError(
-                "OTR_MasterAudioMux: SFX manifest row %s stem missing: %r"
-                % (row_id, stem))
-        start_s = _numeric(row.get("start_s"), field="start_s", row_id=row_id)
-        frames = _numeric(
-            row.get("target_frame_count"),
-            field="target_frame_count",
-            row_id=row_id)
-        if frames <= 0:
-            raise ValueError(
-                "OTR_MasterAudioMux: SFX manifest row %s target_frame_count "
-                "must be > 0" % row_id)
-        duration = frames / fps
-        delay_ms = max(0, int(round(start_s * 1000.0)))
-        label = "sfx%d" % idx
-        labels.append("[%s]" % label)
-        cmd.extend(["-i", stem])
-        filters.append(
-            "[%d:a]aformat=sample_rates=%d:channel_layouts=stereo,"
-            "atrim=0:%.6f,asetpts=PTS-STARTPTS,adelay=%d|%d[%s]"
-            % (idx, int(sample_rate), duration, delay_ms, delay_ms, label))
-    mix = "".join(labels) + (
-        "amix=inputs=%d:duration=longest:normalize=0,"
-        "alimiter=limit=0.98,"
-        "aformat=sample_fmts=s16:sample_rates=%d:channel_layouts=stereo[mix]"
-        % (len(labels), int(sample_rate)))
-    filters.append(mix)
-    out = str(out_path)
-    os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
-    cmd.extend([
-        "-filter_complex", ";".join(filters),
-        "-map", "[mix]",
-        "-c:a", "pcm_s16le",
-        "-ar", str(int(sample_rate)),
-        "-ac", str(int(channels)),
-        out,
-    ])
-    p = _run(cmd)
-    if p.returncode != 0 or not os.path.isfile(out) or os.path.getsize(out) == 0:
-        raise ValueError(
-            "OTR_MasterAudioMux: SFX bed compile failed :: %s"
-            % (p.stderr.strip()[:300],))
-    return out
 
 
 class _Interrupted(RuntimeError):
@@ -290,9 +158,7 @@ DEFAULT_DURATION_TOL_FRAMES = 3.0
 def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: str,
                      ffmpeg: str = "ffmpeg", fps: int = 25,
                      duration_tol_frames: float = DEFAULT_DURATION_TOL_FRAMES,
-                     declared_credits_tail_s: float = 0.0,
-                     sfx_bed_path: str = "",
-                     sfx_gain: float = DEFAULT_SFX_BED_GAIN):
+                     declared_credits_tail_s: float = 0.0):
     """Mux the frozen master audio onto the silent video; FAIL CLOSED.
 
     Pure function (used by the node + tests). Steps: validate inputs -> duration
@@ -323,9 +189,6 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         raise ValueError(f"OTR_MasterAudioMux: silent video missing: {silent_video_path!r}")
     if not os.path.isfile(master_audio_path):
         raise ValueError(f"OTR_MasterAudioMux: master audio missing: {master_audio_path!r}")
-    sfx_bed_path = str(sfx_bed_path or "").strip()
-    if sfx_bed_path and not os.path.isfile(sfx_bed_path):
-        raise ValueError(f"OTR_MasterAudioMux: SFX bed missing: {sfx_bed_path!r}")
 
     # Duration gate: the silent composite covers drama beats only; the master
     # audio also includes opening/closing themes (typically 10s + 8s).  It is
@@ -395,91 +258,40 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
             f"tail_budget={max_tail_s:.1f}s ({tail_src}) OK")
 
     _poll_interrupt()
-    if not sfx_bed_path:
-        report.append("audio_mode=master_copy")
-        # mux-LAST: copy both streams, NO -shortest.
-        cmd = [
-            fb, "-y", "-loglevel", "error",
-            "-i", silent_video_path,
-            "-i", master_audio_path,
-            "-map", "0:v", "-map", "1:a",
-            "-c:v", "copy", "-c:a", "copy",
-            out_path,
-        ]
-        assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
-        p = _run(cmd)
-        if p.returncode != 0:
-            raise ValueError(f"OTR_MasterAudioMux: ffmpeg mux failed :: {p.stderr.strip()[:300]}")
+    # UNCONDITIONAL master copy (rip-sfx bed, 2026-08-06): the SFX mix branch
+    # is retired; every episode takes the passthrough that already ran on every
+    # shipped episode.
+    report.append("audio_mode=master_copy")
+    # mux-LAST: copy both streams, NO -shortest.
+    cmd = [
+        fb, "-y", "-loglevel", "error",
+        "-i", silent_video_path,
+        "-i", master_audio_path,
+        "-map", "0:v", "-map", "1:a",
+        "-c:v", "copy", "-c:a", "copy",
+        out_path,
+    ]
+    assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
+    # V-1: the audio stream is COPIED, never re-encoded. The rip kept the
+    # passthrough branch; this assertion is what notices if a later edit swaps
+    # it for a re-encode (no behavioural test can tell the two apart).
+    assert cmd[cmd.index("-c:a") + 1] == "copy", (
+        "V-1: the terminal mux must pass the master audio through with "
+        "-c:a copy, never re-encode")
+    p = _run(cmd)
+    if p.returncode != 0:
+        raise ValueError(f"OTR_MasterAudioMux: ffmpeg mux failed :: {p.stderr.strip()[:300]}")
 
-        # byte-identity: the output audio must decode identically to the master.
-        h_master = audio_pcm_sha(master_audio_path)
-        h_out = audio_pcm_sha(out_path)
-        if not h_out or h_out != h_master:
-            raise ValueError(
-                f"OTR_MasterAudioMux: output audio NOT byte-identical to master "
-                f"(master={h_master[:12]} out={h_out[:12]}); the audio was re-encoded "
-                f"or trimmed -- C7/V-1 violated"
-            )
-        report.append(f"audio_byte_identical OK ({h_out[:12]})")
-    else:
-        gain = _sfx_gain(sfx_gain)
-        mixed_ref = os.path.splitext(out_path)[0] + ".sfx_reference.wav"
-        mix_filter = (
-            "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,"
-            "volume=1.0[master];"
-            "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,"
-            "volume=%.6f[sfx];"
-            "[master][sfx]amix=inputs=2:duration=first:normalize=0,"
-            "alimiter=limit=0.98,"
-            "aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=stereo[mix]"
-            % gain)
-        mix_cmd = [
-            fb, "-y", "-loglevel", "error",
-            "-i", master_audio_path,
-            "-i", sfx_bed_path,
-            "-filter_complex", mix_filter,
-            "-map", "[mix]",
-            "-c:a", "pcm_s16le",
-            "-ar", "48000", "-ac", "2",
-            mixed_ref,
-        ]
-        assert "-shortest" not in mix_cmd, "V-2: -shortest must never appear in the mux"
-        p_mix = _run(mix_cmd)
-        if (p_mix.returncode != 0 or not os.path.isfile(mixed_ref)
-                or os.path.getsize(mixed_ref) == 0):
-            raise ValueError(
-                "OTR_MasterAudioMux: ffmpeg SFX mix failed :: %s"
-                % p_mix.stderr.strip()[:300])
-        cmd = [
-            fb, "-y", "-loglevel", "error",
-            "-i", silent_video_path,
-            "-i", mixed_ref,
-            "-map", "0:v", "-map", "1:a",
-            "-c:v", "copy", "-c:a", "pcm_s16le",
-            "-ar", "48000", "-ac", "2",
-            out_path,
-        ]
-        assert "-shortest" not in cmd, "V-2: -shortest must never appear in the mux"
-        p = _run(cmd)
-        if p.returncode != 0:
-            raise ValueError(
-                f"OTR_MasterAudioMux: ffmpeg SFX mux failed :: {p.stderr.strip()[:300]}")
-        h_master = _decoded_pcm_sha(master_audio_path)
-        h_ref = _decoded_pcm_sha(mixed_ref)
-        h_out = _decoded_pcm_sha(out_path)
-        if not h_ref or not h_out or h_out != h_ref:
-            raise ValueError(
-                "OTR_MasterAudioMux: output audio does not match mixed SFX "
-                "reference PCM (mixed=%s out=%s); SFX integrity gate failed"
-                % (h_ref[:12], h_out[:12]))
-        report.extend([
-            "audio_mode=sfx_mixed",
-            "source_master_pcm_sha=%s" % h_master,
-            "mixed_reference_pcm_sha=%s" % h_ref,
-            "output_pcm_sha=%s" % h_out,
-            "sfx_bed_path=%s" % sfx_bed_path,
-            "sfx_gain=%.6f" % gain,
-        ])
+    # byte-identity: the output audio must decode identically to the master.
+    h_master = audio_pcm_sha(master_audio_path)
+    h_out = audio_pcm_sha(out_path)
+    if not h_out or h_out != h_master:
+        raise ValueError(
+            f"OTR_MasterAudioMux: output audio NOT byte-identical to master "
+            f"(master={h_master[:12]} out={h_out[:12]}); the audio was re-encoded "
+            f"or trimmed -- C7/V-1 violated"
+        )
+    report.append(f"audio_byte_identical OK ({h_out[:12]})")
     return out_path, report
 
 
@@ -576,7 +388,7 @@ class OTRMasterAudioMux:
                 }),
                 "clip_manifest_json": ("STRING", {
                     "default": "", "forceInput": True,
-                    "tooltip": "Optional clip manifest from OTR_VideoRenderBatch. SFX stems listed here are mixed beneath the frozen master.",
+                    "tooltip": "Retired connector kept for topology compatibility (rip-sfx 2026-08-06). The manifest is hashed by IS_CHANGED but has no effect on the output.",
                 }),
                 "fps": ("INT", {"default": 25, "min": 1, "max": 120}),
                 "ffmpeg": ("STRING", {"default": "ffmpeg"}),
@@ -642,11 +454,6 @@ class OTRMasterAudioMux:
             out_dir = episodes_root / ep
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(str(out_dir), f"{stem}_final.mp4")
-
-    def _default_sfx_bed_out(self, silent_video_path: str) -> str:
-        final_out = self._default_out(silent_video_path)
-        stem = os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
-        return os.path.join(os.path.dirname(final_out), f"{stem}.sfx_mix.wav")
 
     def _publish_to_obs(self, final: str) -> str:
         """OUTPUT HYGIENE (operator directive 2026-06-09): the FINAL playable
@@ -744,19 +551,15 @@ class OTRMasterAudioMux:
     def mux(self, silent_video_path, master_audio_path, audio_done="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
             ffmpeg="ffmpeg", output_path=""):
+        # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
+        # still wired on the canonical graph and hashed by IS_CHANGED, but it
+        # feeds nothing -- the SFX bed compiler it once armed is deleted.
         master_audio_path = _reresolve_master_audio(master_audio_path)
         out = output_path.strip() or self._default_out(silent_video_path)
-        sfx_bed = ""
         try:
-            sfx_bed = compile_sfx_bed_from_manifest(
-                clip_manifest_json,
-                out_path=self._default_sfx_bed_out(silent_video_path),
-                gain=_sfx_gain())
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
                 declared_credits_tail_s=float(declared_credits_tail_s or 0.0),
-                sfx_bed_path=sfx_bed,
-                sfx_gain=_sfx_gain(),
             )
             obs_copy = self._publish_to_obs(final)
             report.append("obs_publish OK -> " + obs_copy)
@@ -811,4 +614,4 @@ class OTRMasterAudioMux:
 
 
 __all__ = ["OTRMasterAudioMux", "mux_master_audio", "audio_pcm_sha",
-           "compile_sfx_bed_from_manifest", "_reresolve_master_audio"]
+           "_reresolve_master_audio"]

@@ -28,16 +28,10 @@ from typing import Any
 # request -- so an episode faithful enough to say "dagger" was still asking the
 # image model not to draw one. Emptied rather than deleted: they are imported
 # by name across the render path, and an empty clause appends nothing.
+# (The SFX audio clause + its appender died with the SFX bed producers,
+# rip-sfx 2026-08-06 -- no surviving engine requests provider audio.)
 VISUAL_SAFETY_POSITIVE_CLAUSE = ""
 VISUAL_SAFETY_NEGATIVE_PROMPT = ""
-# The SFX clause is NOT purely content policy -- "no spoken words / no singing /
-# no narration / no readable text" is a FUNCTIONAL requirement of an ambience
-# bed, and it stays. Only the trailing weapon/nudity content policy is removed.
-SFX_AUDIO_SAFETY_CLAUSE = (
-    "environmental ambience and foley only, no spoken words, no singing, "
-    "no lyrics, no narration, no voiceover, no intelligible speech, "
-    "no subtitles, no captions, no readable text"
-)
 
 
 def append_visual_safety_clause(prompt: str) -> str:
@@ -50,22 +44,6 @@ def append_visual_safety_clause(prompt: str) -> str:
     is being reordered around it), not because it still does anything.
     """
     return str(prompt or "").strip()
-
-
-def append_sfx_audio_safety_clause(prompt: str) -> str:
-    """Append the opt-in Google video SFX prompt contract.
-
-    The SFX video lane may keep provider audio only as a separate ambience/foley
-    stem. This helper keeps the normal visual safety ask and adds the audio
-    boundary in one pure, idempotent step.
-    """
-    text = append_visual_safety_clause(prompt)
-    if not text:
-        return ""
-    folded = text.lower()
-    if "no spoken words" in folded:
-        return text
-    return f"{text}, {SFX_AUDIO_SAFETY_CLAUSE}"
 
 
 def visual_safety_negative(extra: str = "") -> str:
