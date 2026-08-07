@@ -144,6 +144,30 @@ If the reference turns out to be a no-op, **Track 2 Step 8 (flux2_klein)** is th
 answer -- klein is genuinely reference-trained and its weights are on disk. It is
 deliberately NOT built yet. Switching to it is a Director widget pick, not code.
 
+### 2-PRE. OPERATOR CALLS ALREADY MADE -- do not re-open, do not re-panel
+
+**BANANA ROUTE: VISUALS ONLY. The spoken script is NOT touched
+(operator ruling 2026-08-06).** Operator, asked whether the filter should reach
+spoken lines as well as image prompts: *"No. Just visuals. I do not want people
+discussing the Cavendish versus the other variety."*
+
+So the substitution happens on the STILL/VIDEO PROMPT and nowhere else. The
+announcer still says "he drew his revolver" over a shot of a man holding a
+banana -- which the problem statement flagged as either the joke or the thing
+that breaks it. It is the joke. **The dialogue ledger, the writer, and the
+adaptation lanes are all out of scope**, which also keeps this clear of the
+closed story-quality directive and of the fidelity lanes' invents-nothing rule
+at the TEXT level.
+
+This closes the second half of section 7 of
+`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (**ANOTHER WINDOW's
+untracked file at time of writing -- do not edit it from a different window**).
+**Still OPEN in that same section:** the DEFAULT and the REACH -- one global
+switch on, versus on with the `shakespeare`/`public_domain` fidelity banks
+defaulting it off, versus a per-episode widget. Nobody has ruled on that, and it
+is a taste call: `Is this a dagger which I see before me` becomes `Is this a
+banana which I see before me` on those lanes.
+
 ### 2. Operator calls nobody can make for you
 
 - **ARIEL and PUCK.** The curated supplement ships 10 entries and deliberately omits
