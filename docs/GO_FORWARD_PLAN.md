@@ -13,17 +13,20 @@ blocked on the operator, finishes it green and pushed, then re-reads this list.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **0-BIS no-mirror -- CODE-READY, owes its `ltx_video` LIVE LEG** (the leg also discharges F11 and the multi-clip receipt's outstanding live proof) | section 0-BIS | coder + ONE render | nothing |
-| 2 | **Small sprint items:** the non-commercial notice reaching no human surface (~30 min); the test-ordering pollution in `test_public_domain_sources.py`; finishing item 7's B4/B6 (`CURRENT_SCHEMA_VERSION`) | THE CODING SPRINT items 2, 3, 4 | coder, mechanical | nothing |
-| 3 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
-| 4 | **Premise wiring** -- `--premise` lands in the ledger as `meta.operator_hint` but never reaches the writer (reproduced on BOTH 2026-08-07 live legs), and both scripts carried the same model meta-response line ("Please provide the SETTING, TIME, HOOK...") | 0-QUATER OPEN 2 | investigate; likely real wiring | nothing |
-| 5 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 6 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
-| 7 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+| 1 | **Small sprint items:** the non-commercial notice reaching no human surface (~30 min); the test-ordering pollution in `test_public_domain_sources.py`; finishing item 7's B4/B6 (`CURRENT_SCHEMA_VERSION`) | THE CODING SPRINT items 2, 3, 4 | coder, mechanical | nothing |
+| 2 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
+| 3 | **Premise wiring** -- `--premise` lands in the ledger as `meta.operator_hint` but never reaches the writer (reproduced on BOTH 2026-08-07 live legs), and both scripts carried the same model meta-response line ("Please provide the SETTING, TIME, HOOK...") | 0-QUATER OPEN 2 | investigate; likely real wiring | nothing |
+| 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
+| 5 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
+| 6 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
 
-**Items 3, 5, 6 and 7 are blocked on the operator** -- a coder window that
+**Items 2, 4, 5 and 6 are blocked on the operator** -- a coder window that
 reaches them without an answer should skip to the next unblocked item rather
 than guess.
+
+The old item 1 (0-BIS no-mirror) is DISCHARGED -- see the tombstone in section
+0-BIS. It took the live leg with it, so F11 and the multi-clip receipt's
+outstanding proof are closed in the same stroke.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
@@ -62,40 +65,38 @@ set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
 rule text -- then re-enter at **r3**, per the standing rule that a plan-level
 gap drops back rather than being patched from inside r4.
 
-### 0-BIS. NO-MIRROR ENFORCEMENT -- CODE-COMPLETE. Only the LIVE LEG is owed.
+### 0-BIS. NO-MIRROR ENFORCEMENT -- TOMBSTONE. DISCHARGED 2026-08-07.
 
-**Build spec: `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md`.**
-Section 7 is fully resolved (7.1 CUT by the operator -- no SFX; 7.3 DECIDED --
-boundedness is a ShotLock stamp from `frame_contract.can_split`; 7.4 verified).
+**DONE. Do not re-open, do not re-panel, do not re-run the leg.** The code
+shipped 2026-08-06 across `27d48b35`, `ac8a1925`, `f9a7f9df`, `57f92f74` and
+`d8187fcd`; the LIVE LEG that was the last outstanding obligation ran
+2026-08-07 and passed. Build spec:
+`docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md` (section 6 is the leg's
+acceptance and is now stamped DISCHARGED).
 
-**Shipped 2026-08-06,** each green, reviewed and pushed:
-- `27d48b35` step 1 -- the eleven producer surfaces + `CanonicalClip` fields.
-- `ac8a1925` step 2 -- `frame_receipt_version`, `closing_theme_frame_window`,
-  `shot["frame_bounded"]`, and the centralized manifest index.
-- `f9a7f9df` steps 3+4 -- `RULE_NO_MIRROR` / shape rules / the v1 contract, the
-  exit-2 fix for a crashed grader, and the composite's closing-window classifier.
+The leg: `signal_lost_midnights_toll_20260807_085918`, profile
+`otr_w45_ltx_video`, 120 words, `Prompt executed in 00:47:43`, `RESULT SUCCESS`
++ `obs_publish OK`. All seven beats rendered on `ltx_video`; **two beats
+exceeded the 169-frame ceiling and CHAINED into two segments each**
+(`music_opening` 250, `music_closing` 200), which is the condition that makes
+the deleted machinery reachable at all. Every beat receipt and all nine segment
+receipts read `extension_mode="none"`; `scripts/grade_episode.py` returned
+`ACCEPTED: 7 shot(s)` at exit 0. **The retired switches were PROVEN live in the
+server's own environment block** (`OTR_LTX_LOOP_VIA_REVERSE='on'`,
+`OTR_LTX_LOOP_MIN_DECODE_FRAMES='97'`) while the live contract vars stayed
+unset -- without that check the leg would only have shown the mirror absent,
+not that the old switch can no longer summon it. Full receipts: the 2026-08-07
+`docs/HANDOFF_LOG.md` entry.
 
-Steps 5 and 6 shipped in `57f92f74` (boomerang deleted atomically,
-`test_ltx_boomerang.py` CONVERTED into a tripwire rather than deleted, fossils
-swept including the INFO log that was describing the boomerang to the operator
-mid-render). QA fixes in `d8187fcd` after an Antigravity pass returned
-BUILD-READY: two stale texts an operator reads AT FAILURE TIME -- the
-`eng_wan_ti2v` raise still blaming "WAN's ceiling is a RENDER cap, not a planning
-cap" after `wan_ti2v` joined `PLANNING_CAP_ENGINES`, and an HQ docstring still
-advertising "loop" mechanics.
+**This closes F11 and section 9's outstanding multi-segment proof too** -- it is
+the first retained multi-segment artifact on this box.
 
-**KNOWN GAP, recorded not hidden:** the AST tripwire catches the SYMBOLS and the
-RECEIPT; it would NOT catch a mirror re-implemented inline under another name.
-The durable defence is `acceptance.grade_no_mirror` (re-derives the count instead
-of believing the mode) plus `render_driver`'s refusal of any segment whose length
-differs from its plan. An honest behavioural test needs a GPU, so it rides the
-live leg.
-
-**THE LIVE LEG IS STILL OWED** and its shape is not negotiable: a canonical
-`ltx_video` beat EXCEEDING its 169-frame ceiling **with the retired env switch
-SET**. A WAN or `ltx_8gb` leg would pass without ever executing the deleted
-machinery. That one leg also discharges F11 and the multi-clip receipt work's
-outstanding live proof.
+**KNOWN GAP, still true and still recorded:** the AST tripwire catches the
+SYMBOLS and the RECEIPT; it would NOT catch a mirror re-implemented inline under
+another name. The durable defence remains `acceptance.grade_no_mirror` (it
+re-derives the count instead of believing the mode) plus `render_driver`'s
+refusal of any segment whose length differs from its plan -- both of which this
+leg exercised on live multi-segment beats.
 
 ### 0-TER. SFX RIP -- DONE `9eb6ede1` (2026-08-06), tombstoned.
 
@@ -767,8 +768,11 @@ receipt raising out of the grader. Suite 8805 -> 8836, Bug Bible 17.
 
 Receipts: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`
 (the problem statement, now historical) and the commit itself.
-**Still owed:** one live multi-segment leg -- see the no-mirror build spec's
-section 6, whose `ltx_video` leg discharges this and F11 together.
+**The owed live proof is DISCHARGED (2026-08-07)** by the 0-BIS leg
+`signal_lost_midnights_toll_20260807_085918`: two `ltx_video` beats chained into
+two segments each, nine segment receipts all `"none"`, and the grader returned
+`ACCEPTED: 7 shot(s)` at exit 0 on the real artifact rather than the
+`ACCEPTED: 0 shot(s)` inert reading this work fixed. See section 0-BIS.
 
 ### Bench leftovers (relocated)
 

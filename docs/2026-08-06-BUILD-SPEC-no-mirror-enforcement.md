@@ -174,7 +174,24 @@ structural -> full Windows suite (baseline **8836 passed / 131 skipped /
 1 xfailed at `e499b7fc`**) -> Bug Bible 17 -> commit -> **push** -> verify
 `HEAD == origin/v2.0-alpha`, AST-parse touched Python, no BOM, no zero-byte.
 
-## 6. THE LIVE LEG -- and why the obvious one would not count
+## 6. THE LIVE LEG -- DISCHARGED 2026-08-07 (and why the obvious one would not count)
+
+**RAN AND PASSED.** `signal_lost_midnights_toll_20260807_085918`, profile
+`otr_w45_ltx_video`, 120 words, `Prompt executed in 00:47:43`, `RESULT SUCCESS`
++ `obs_publish OK`. Seven `ltx_video` beats; `music_opening` (250 visible
+frames) and `music_closing` (200) each exceeded the 169 ceiling and chained into
+TWO segments, with the server log showing the real per-segment audio slices
+(`segment 0/2` at +6.760s, `segment 1/2` at +1.280s with a trimmed tail). All
+beat receipts and all nine segment receipts `extension_mode="none"`;
+`scripts/grade_episode.py` `ACCEPTED: 7 shot(s)` exit 0. The retired switches
+were verified PRESENT in the render server's environment block
+(`OTR_LTX_LOOP_VIA_REVERSE='on'`, `OTR_LTX_LOOP_MIN_DECODE_FRAMES='97'`) with
+`OTR_LTX_MAX_FRAMES` / `OTR_LTX_MIN_DECODE_FRAMES` unset -- otherwise the leg
+would only have shown the mirror absent, not that the switch is inert.
+
+The requirement below is kept as the spec of record.
+
+
 
 A WAN or `ltx_8gb` leg would PASS while never executing the deleted
 `eng_ltx_video` machinery or its newly-fixed passthrough.

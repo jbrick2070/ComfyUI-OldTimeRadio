@@ -3,6 +3,58 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-07 -- HEAD 50e65025 (v2.0-alpha) -- CODER (0-BIS no-mirror LIVE LEG ran and PASSED; F11 + the multi-clip proof close with it)
+
+Did: took queue item 1. It owed a render, not a patch, so no production code was
+  touched and no kibitz arc was owed -- the deliverable was the live leg and its
+  receipts.
+- **The leg: `signal_lost_midnights_toll_20260807_085918`** -- profile
+  `otr_w45_ltx_video`, 120 words, canonical workflow, `Prompt executed in
+  00:47:43`, `RESULT SUCCESS` + `obs_publish OK`, asset in `otr/obs`, 6 mp4 +
+  7 clips on disk. Suite **9081/111/1** (exactly the `50e65025` receipt, NOT
+  inflated by the six untracked `otr_sbcov_*` profiles another window has on
+  disk), Bug Bible **17**, `git diff -- workflows/` empty.
+- **Why 120 words was the right leg, and it was measured rather than guessed.**
+  Beat length comes from the AUDIO, not the engine, so the word count decides
+  whether anything can exceed `ltx_video`'s `min=max=169` contract. ffprobing the
+  two 2026-08-07 banana legs showed a 120-word episode yields beats of
+  170/174/200/236/250 frames at 25 fps. This leg then split **two** beats into
+  two segments each (`music_opening` 250, `music_closing` 200) -- and the server
+  log carries the real per-segment audio slices (`segment 0/2` at +6.760s,
+  `segment 1/2` at +1.280s with a trimmed tail), so the multi-segment path
+  genuinely executed rather than being inferred from a receipt.
+- **All receipts `"none"`:** every delivered beat row and all NINE segment rows.
+  `scripts/grade_episode.py` returned **`ACCEPTED: 7 shot(s)` at exit 0** on the
+  real artifact -- the number matters, because `ACCEPTED: 0 shot(s)` at exit 0 is
+  the inert-grader reading `e499b7fc` fixed, and a checker that treats it as a
+  pass proves nothing. Both state singletons were copied aside before the next
+  episode overwrites them.
+- **The switch was PROVEN live, not assumed.** The leg's whole claim is that an
+  env which used to re-arm the mirror is now inert, which is worth nothing if the
+  env never reached the server. Read out of the resident server's own environment
+  block: `OTR_LTX_LOOP_VIA_REVERSE='on'`, `OTR_LTX_LOOP_MIN_DECODE_FRAMES='97'`,
+  with `OTR_LTX_MAX_FRAMES` / `OTR_LTX_MIN_DECODE_FRAMES` UNSET so 169 was the
+  engine's own literal and not an override.
+- **One correction, recorded because it looked like a product failure and was
+  not.** The first grader run exited 2 ("carries no video.shots") -- the per-
+  episode `audio/<ep>_ledger.json` has no `video` section at all. The document
+  that carries `video.shots` is the render batch's `_shared/state/
+  node_episode_input.json` wrapper, which is exactly the shape
+  `grade_episode._unwrap_ledger` exists to peel. Harness bug, fixed, re-run clean.
+- Docs: 0-BIS tombstoned, section 9's owed proof discharged, F11 closed in
+  `docs/2026-08-02-FINAL-all-engine-maths-and-stills.md`, and the build spec's
+  section 6 stamped DISCHARGED. Queue re-numbered; old item 1 is gone.
+Current step: the operator-ordered QUEUE at the top of GO_FORWARD. Item 1 is now
+  the three small sprint items (non-commercial notice, test-ordering pollution,
+  item 7's B4/B6) -- mechanical, suite-provable, nothing blocked.
+Next: a CODER window takes the new queue item 1. Items 2, 4, 5 and 6 are blocked
+  on operator input. **This box has no resident server** -- the leg's two server
+  processes were selectively killed by CommandLine and VRAM is back to 1131 MiB.
+Models: Claude only (coder + judge). No panel: the item shipped no code, so the
+  full-kibitz gate did not apply. No GPU model beyond the production lane.
+Commits: docs-only (this entry + the four tombstone/de-stale edits); no code
+  shipped this session -- the deliverable was the live leg.
+
 ## 2026-08-07 -- HEAD 2fc81f72 (v2.0-alpha) -- CODER (SHIELD SCOPING shipped; docs de-staled; queue re-ordered by operator)
 
 Did: closed the banana route's one deferred defect, then cleaned the plan docs

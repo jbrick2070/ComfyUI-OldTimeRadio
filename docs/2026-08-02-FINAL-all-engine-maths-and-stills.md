@@ -186,12 +186,21 @@ mirror-extend to the audio target". Verified 2026-08-06.
 Share one portrait across a character beat's segments as the local face lane
 does, or accept per-cut re-minting on cloud. See section 3's contradiction.
 
-**F11 -- THE MIRROR DELETION HAS NO LIVE PROOF. STATUS: OPEN.**
-No canonical leg has proven capped single- AND multi-segment beats cover their
+**F11 -- THE MIRROR DELETION HAS NO LIVE PROOF. STATUS: CLOSED 2026-08-07.**
+No canonical leg had proven capped single- AND multi-segment beats cover their
 audio. **Reinforced 2026-08-06:** the acceptance-grader repair (`e499b7fc`)
 shipped on code-complete + suite-green for the same reason -- a scan of 4,371
 JSON files under `output/otr` found no retained multi-segment artifact anywhere
-on this box. **One live multi-segment leg would discharge both.**
+on this box.
+
+**DISCHARGED** by the 0-BIS live leg `signal_lost_midnights_toll_20260807_085918`
+(`otr_w45_ltx_video`, 120 words, `RESULT SUCCESS` + `obs_publish OK`), which is
+that missing artifact: seven `ltx_video` beats, two of them past the 169-frame
+ceiling and chained into two segments each, every beat and all nine segment
+receipts `extension_mode="none"`, `scripts/grade_episode.py` `ACCEPTED: 7
+shot(s)` at exit 0 -- with the retired `OTR_LTX_LOOP_VIA_REVERSE=on` switch
+proven present in the render server's own environment block. See GO_FORWARD
+section 0-BIS and the 2026-08-07 `docs/HANDOFF_LOG.md` entry.
 
 **F12 -- `google_veo_video` contract vs behaviour. STATUS: UNVERIFIED.**
 Recorded as `max_frames=0` (the unbounded sentinel) while something caps its
