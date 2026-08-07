@@ -243,6 +243,15 @@ class TestRewriteFailureClassification:
     END = 'meta["announcer_intro_rewrite"]["reason"] = _rw_reason'
 
     def _run_source(self) -> str:
+        """The rewrite block's EXECUTABLE lines -- comments stripped.
+
+        Stripping matters. These are string-presence assertions over source, and
+        this block is heavily commented with the very names being asserted, so
+        matching raw text would let a deleted `except` clause keep passing on
+        the strength of the comment that describes it. `ValueError` was
+        demonstrably satisfied by a comment alone before this stripping was
+        added (independent QA caught it).
+        """
         src = (
             Path(__file__).resolve().parents[1]
             / "nodes" / "OTR_LedgerScriptWriter.py"
@@ -251,7 +260,32 @@ class TestRewriteFailureClassification:
         assert src.count(self.END) == 1, "rewrite-block end anchor moved"
         start = src.index(self.START)
         end = src.index(self.END) + len(self.END)
-        return src[start:end]
+        block = src[start:end]
+        return "\n".join(
+            line for line in block.splitlines()
+            if not line.strip().startswith("#")
+        )
+
+    def test_the_assertions_cannot_be_satisfied_by_comments_alone(self):
+        """Guards the guard. If a future edit moves these names into prose,
+        every assertion below silently stops testing anything."""
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "nodes" / "OTR_LedgerScriptWriter.py"
+        ).read_text(encoding="utf-8")
+        start = src.index(self.START)
+        end = src.index(self.END) + len(self.END)
+        comments = "\n".join(
+            line for line in src[start:end].splitlines()
+            if line.strip().startswith("#")
+        )
+        code = self._run_source()
+        for name in (
+            "AnnouncerBriefStarvedError", "StructuredCallFailedError",
+            "ValueError", "uncaught_", "exc_info=True",
+            "announcer_intro_structural_fallback",
+        ):
+            assert name in code, f"{name} is not in executable code"
 
     def test_a_structural_fallback_is_not_a_rewrite(self):
         block = self._run_source()

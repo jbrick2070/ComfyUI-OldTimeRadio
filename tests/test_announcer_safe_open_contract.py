@@ -269,6 +269,42 @@ def test_a_viable_brief_passes_the_derive_validator():
     assert SB._validate_produced_open(model, ["MARA"]) is None
 
 
+def test_the_in_loop_caller_survives_a_starved_brief():
+    """A STARVED BRIEF MUST NOT KILL A RENDER.
+
+    The rewrite caller can decline and keep the line the in-loop pass already
+    wrote. The in-loop caller IS that pass -- declining there means the episode
+    has no opening at all, so a raise reaching the node boundary would trade a
+    weak first line for a dead episode, which is a worse defect than the one
+    this fix closes.
+
+    Reachable, not theoretical: the outline schema pins `setting` at
+    ``min_length=1`` (`_otr_outline.py:202`), which admits a single space that
+    ``clean_one_line`` strips to nothing. Pair that with an empty
+    first-character-beat intent and the brief carries no scene context.
+
+    Source-level because the call sits inside ``run()``'s per-beat loop.
+    """
+    writer = (
+        Path(__file__).resolve().parents[1]
+        / "nodes" / "OTR_LedgerScriptWriter.py"
+    ).read_text(encoding="utf-8")
+
+    start = writer.index('"compose_announcer_intro"')
+    block = writer[start:writer.index('meta["open_safe_fallback"]', start)]
+    code = "\n".join(
+        ln for ln in block.splitlines() if not ln.strip().startswith("#")
+    )
+
+    assert "except _OTRLC.AnnouncerBriefStarvedError" in code, (
+        "the in-loop caller must catch a starved brief -- an uncaught raise "
+        "here reaches the node boundary and kills the render")
+    assert "fallback_safe_open" in code, (
+        "it must still SHIP an opening, deterministically")
+    assert "announcer_intro_structural_fallback" in code, (
+        "and record that it fell back, so open_safe_fallback stays truthful")
+
+
 def test_both_consumers_reach_the_shared_predicate(monkeypatch):
     """A shared predicate only one caller reaches is the same zero-reader
     defect in new clothes.

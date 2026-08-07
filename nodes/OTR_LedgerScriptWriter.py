@@ -5565,19 +5565,49 @@ class OTR_LedgerScriptWriter:
                     with slot_scheduler.helper_context(
                         "compose_announcer_intro"
                     ):
-                        line_res = _OTRLC.compose_announcer_intro(
-                            creative_fn=creative_generate_fn,
-                            script_brief=(
-                                "" if _style_grammar_on else script_brief
-                            ),
-                            creative_repo_id=resolved[
-                                "creative_writing_model"
-                            ],
-                            story_scaffold=_style_grammar_on,
-                            safe_open_brief=safe_open_brief,
-                            # QA F1 (2026-07-09): pack-routed intro seam.
-                            source_bank_id=resolved["source_bank"],
-                        )
+                        try:
+                            line_res = _OTRLC.compose_announcer_intro(
+                                creative_fn=creative_generate_fn,
+                                script_brief=(
+                                    "" if _style_grammar_on else script_brief
+                                ),
+                                creative_repo_id=resolved[
+                                    "creative_writing_model"
+                                ],
+                                story_scaffold=_style_grammar_on,
+                                safe_open_brief=safe_open_brief,
+                                # QA F1 (2026-07-09): pack-routed intro seam.
+                                source_bank_id=resolved["source_bank"],
+                            )
+                        except _OTRLC.AnnouncerBriefStarvedError as _open_exc:
+                            # A STARVED BRIEF MUST NOT KILL A RENDER HERE. The
+                            # rewrite caller can decline and keep an existing
+                            # line; this one is composing that line for the
+                            # first time, so declining means the episode has no
+                            # opening at all. The guard's job is to stop a bare
+                            # form reaching the model -- it has already done
+                            # that by raising -- so take the deterministic open
+                            # and record it, rather than trading a weak line
+                            # for a dead episode.
+                            #
+                            # Reachable because the outline schema pins
+                            # `setting` at min_length=1, which admits a single
+                            # space that cleans away to nothing; pair that with
+                            # an empty first-character-beat intent and the brief
+                            # carries no scene context.
+                            log.warning(
+                                "[OTR_LedgerScriptWriter] safe-open brief was "
+                                "starved (%s) -- deterministic open, and the "
+                                "episode continues (LOUD).",
+                                _open_exc.reason,
+                            )
+                            line_res = _OTRLC.LineResult(
+                                text=_OTRLC.fallback_safe_open(safe_open_brief),
+                                compose_flags=(
+                                    "announcer_intro",
+                                    "announcer_intro_structural_fallback",
+                                ),
+                            )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
                     if _style_grammar_on:
