@@ -41,74 +41,74 @@ set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
 rule text -- then re-enter at **r3**, per the standing rule that a plan-level
 gap drops back rather than being patched from inside r4.
 
-### 0-BIS. NO-MIRROR ENFORCEMENT -- CODE-READY, arc complete
+### 0-BIS. NO-MIRROR ENFORCEMENT -- STEPS 1-4 SHIPPED, 5-6 OPEN
 
-**Build spec: `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md` (`dc1794a2`).**
-r1-r4 done (r4 single-lane, Antigravity quota). Producer-first build order,
-ELEVEN receipt surfaces, a real closing-window classifier, a manifest
-`frame_receipt_version`, and a live leg that must be an `ltx_video` beat over its
-169-frame ceiling with the retired env switch SET -- a WAN or `ltx_8gb` leg would
-pass without executing the deleted machinery.
+**Build spec: `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md`.**
+Section 7 is fully resolved (7.1 CUT by the operator -- no SFX; 7.3 DECIDED --
+boundedness is a ShotLock stamp from `frame_contract.can_split`; 7.4 verified).
 
-Reviews happen BEFORE a chunk is green (Sonnet QA on the diff, then a Fable gate
-where structural), then commit and push immediately per CLAUDE.md section 7.
+**Shipped 2026-08-06,** each green, reviewed and pushed:
+- `27d48b35` step 1 -- the eleven producer surfaces + `CanonicalClip` fields.
+- `ac8a1925` step 2 -- `frame_receipt_version`, `closing_theme_frame_window`,
+  `shot["frame_bounded"]`, and the centralized manifest index.
+- `f9a7f9df` steps 3+4 -- `RULE_NO_MIRROR` / shape rules / the v1 contract, the
+  exit-2 fix for a crashed grader, and the composite's closing-window classifier.
 
-### 0-TER. SUPERSEDED -- the earlier no-mirror queue
+**STILL OPEN -- steps 5 and 6:**
+5. **Delete the dead boomerang atomically** -- `_boomerang_frames`,
+   `_ltx_loop_source_length`, `_LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT`,
+   `_LOOP_VIA_REVERSE_DEFAULT`, `_loop_via_reverse`, `_loop_fill_allowed`, both
+   render/HQ branches, both `ltx_loop_via_reverse` raw fields, and the matching
+   assertions in `test_ltx_boomerang.py`, `test_video_motion_forward.py`,
+   `test_session_ctx_ownership.py`. **CONVERT `test_ltx_boomerang.py`, do not
+   delete it** -- keep a tripwire proving no env value or session state can
+   restore the mirror. Note: step 1 left the receipt stamp CONDITIONAL on
+   `mirrored` in `eng_ltx_video`; when the branch dies the conditional collapses
+   to an unconditional `"none"`.
+6. **The fossil sweep** -- `boomerang`, `ping_pong`, `mirror`,
+   `loop_via_reverse`, `stream_loop`. Known: `frame_contract.py:280-286` (cites
+   the DELETED `extend_frames_to_target` and governs `PLANNING_CAP_ENGINES`),
+   `eng_ltx_8gb.py:32-36,1404-1414`, `beat_session.py:143-154`,
+   `wrapper_bridge.py:525-526`, `eng_wan_ti2v.py:1001-1017`, and above all
+   **`scene_sequencer.py:1831-1842`, an INFO log printed into the operator's LIVE
+   RUN** asserting the boomerang "doubles the rendered half-clip back to full
+   audio duration". A stale comment misleads a reader; a stale log misleads the
+   operator mid-render.
 
-**Spec: `docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` (commit `11e893f6`).**
-Operator directive 2026-08-06: ONE matrix per plug-and-play module, reader-first so
-video PATHS can be compared, registered in `CLAUDE.md`, built for churn (Flux3 open
-weights + a lowest-lift MiniMax are the near-term adds). Still logic and clip maths are
-the teaching spine.
+**THE LIVE LEG IS STILL OWED** and its shape is not negotiable: a canonical
+`ltx_video` beat EXCEEDING its 169-frame ceiling **with the retired env switch
+SET**. A WAN or `ltx_8gb` leg would pass without ever executing the deleted
+machinery. That one leg also discharges F11 and the multi-clip receipt work's
+outstanding live proof.
 
-Owes r2/r3/r4 before code -- r1 is running in
-`kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/r1/` (**LOCAL ONLY; `kibitz-runs/` is
-gitignored**). Build order is section 10 of the spec. Start with the declaration
-surfaces and the two silent defaults, NOT the rename (92 files -- its own commit, if at
-all).
+### 0-TER. SFX RIP -- 100%, kibitz arc IN PROGRESS, no code yet
 
-**The actionable defects the spec grounds** -- register a video engine and fill nothing
-in, and today:
-- the frame contract takes **four** silent paths to `SINGLE_ONLY` (missing engine,
-  missing declaration, a RAISING declaration, wrong type);
-- the canvas silently inherits the shared 1472x832 default -- the channel that already
-  cost `wan_8gb` a 268-minute leg;
-- the engine silently vanishes from every per-role listing while staying in the dropdown;
-- a new CLOUD engine gets a **wrong** cell, not a blank one (resolution is a name-prefix
-  if-chain; `side` is detected by name);
-- `QUALIFIED_COST_ROWS` is an **empty frozenset**, so VRAM admission is unenforced for
-  every engine.
+**Operator ruling 2026-08-06: "I do really want to rip out SFX 100%, that's my
+aim... but don't break the system."**
+Problem statement: `docs/2026-08-06-PROBLEM-STATEMENT-legacy-sfx.md`.
+Build spec: `docs/2026-08-06-BUILD-SPEC-rip-sfx.md` (`74a30d23`).
 
-MiniMax needs four declaration surfaces built first (`provider_side`,
-`provider_resolution`, `delivered_fps`, `cost_basis`). Flux3 needs only `doc_purpose`
-plus an honest "unqualified" VRAM row.
+**Why it was confusing, settled:** FOUR things are called SFX. The b-roll ROLE
+was ripped 2026-07-01 (its 44 tombstones still fail loud and MUST survive); the
+engine lane was PARKED 2026-08-04; the `[SFX:]` script markup is dead by
+shadowing; and **the SFX BED was never removed** -- `OTR_MasterAudioMux` node 85
+still calls the bed compiler on every run, and one `music_visual` dropdown pick
+would arm it.
 
-### 0A. NO-MIRROR ENFORCEMENT -- r1 done, r2/r3/r4 owed
+**Gate: the full four-round arc, then the Fable gate, before any code.** r1 is
+done (Codex NO, Antigravity yes-with-fixes) and its claims are being grounded.
+A five-way Sonnet fan-out ran first and is folded into spec section 5-BIS.
 
-Statement: `docs/2026-08-06-PROBLEM-STATEMENT-no-mirror-enforcement-and-the-matrix.md`.
-r1 judgment artifacts: `kibitz-runs/2026-08-06-2026-08-06-no-mirror-matrix/r1/` (LOCAL).
+**The open decision r1 surfaced:** Codex demands deleting the vestigial
+`clip_manifest_json` input and link 278 outright; the spec plans to keep them
+wired. That is a TERMINAL-node topology change either way, so it is being
+adjudicated (`docs/2026-08-06-DISPUTE-sfx-test-inventory.md`) rather than guessed.
 
-Operator ruling 2026-08-06: **no mirror or ping-pong anywhere except the closing loop,
-which is CONFIRMED OK.** Enforcement is already in place on every drama path and fails
-loud; the ONE sanctioned reuse is `otr_silent_composite.py:452-455` -- and it is the
-**CLOSING-THEME BACKDROP, not the credits roll** (`OTR_CreditsRoll` freezes a frame and
-never loops). Name it; do not remove it.
-
-Queue, all r1-reviewed:
-1. **A separate single-clip rule** that rejects an explicit non-`none` mode WITHOUT
-   demanding a segment projection. **Do NOT simply delete `len(planned) <= 1`** -- all
-   three reviewers proved that indicts every single-clip beat, because the historical
-   single-render path creates no projection.
-2. Name the closing-theme backdrop + a BEHAVIOURAL test. All three said cut the lexical
-   "only one `loop=True`" test -- it proves spelling, not policy.
-3. Stale prose citing the deleted `wrapper_bridge.extend_frames_to_target`:
-   `frame_contract.py:280-286` (it governs `PLANNING_CAP_ENGINES` membership and argues
-   against a decision the file made 30 lines lower), plus `eng_ltx_8gb.py:32-36,1404-1414`,
-   `beat_session.py:143-154`, `wrapper_bridge.py:525-526`.
-4. The seven generated matrix columns + the "Unfilled cells" gate (~30 lines in
-   `tools/engine_matrix.py`) -- a new engine with a blank cell fails the suite BY NAME.
-5. The six receiptless multi-segment lanes (four `humo`, `ltx_video`, and `eng_ltx_av`
-   bounded at 497) -- its own chunk, they already fail today.
+**Already grounded and NOT optional whichever way that goes:**
+`eng_cloud_video.py:46` imports `append_sfx_audio_safety_clause` at module scope
+and `:886` calls it on the SURVIVING Vidu base class -- deleting the helper
+breaks a surviving engine at import. And `tests/test_frame_receipt_conformance.py:94`
+monkeypatches the extractor, so it breaks the day that symbol dies.
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
@@ -844,15 +844,17 @@ document.
    r3 asks whether that design still wires to the code that exists today, and the
    roster, the routing authority and the writer tail have all moved since rev-5.
    5-9 coder-days + 2-4 GPU days.
-3. **SFX campaign -- PARKED (operator doubt, 2026-08-04).** The operator doubts
-   it will work well with the video model and calls it a much bigger lift than
-   imagined -- and ROADMAP's own estimate agrees on the lift: 8-15 coder-days +
-   2-4 elapsed live days, the largest single item on the runway. Parked, not
-   killed: the Timeline Cue Ledger and generated-SFX designs stay in
-   `ROADMAP.md` as evidence, and NOTHING spends against them -- no R4.1 refit,
-   no C0/C1, no SFX coding -- until an explicit operator revival. If revived,
-   the R4.1 refit is still the re-ground; no second SFX queue, no library
-   fallback.
+3. **SFX campaign -- SUPERSEDED 2026-08-06. It is not parked any more; it is
+   being RIPPED.** The 2026-08-04 park (operator doubt + an 8-15 coder-day lift)
+   became a deletion when the operator ruled *"I do really want to rip out SFX
+   100%, that's my aim."* **The live work is section 0-TER of this document**;
+   this entry survives only so a reader who remembers "parked" finds out here
+   that it expired.
+   Nothing spends against a REVIVAL, and now nothing preserves one either: the
+   Timeline Cue Ledger and generated-SFX designs are slated for retirement with
+   the code. What the rip does NOT touch is the b-roll role tombstones (they
+   still fail loud on stale ledgers) or the `[ENV|SFX|MUSIC:]` text sanitizers
+   (defence against a model hallucinating a tag, not an SFX feature).
 
 Open judgment question (render-window, not a coder slot): the LOCAL mistral/gemma
 writer matrix. The Sonnet arm of the creative-writer question is answered
