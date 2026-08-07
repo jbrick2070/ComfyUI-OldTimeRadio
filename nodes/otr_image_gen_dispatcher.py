@@ -1007,6 +1007,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         role = str(obj.get("role") or "character_video")
         char_id = str(obj.get("char_id") or "")
         beat_id = str(obj.get("beat_id") or "")
+        # Composition provenance -- the banana quote-shield discriminator below.
+        source = str(obj.get("source") or "")
         # RADIO FACE LOGIC (2026-07-04): the announcer portrait's chosen radio-host
         # style rides onto the dispatched ledger row so the render-side guard can
         # fail CLOSED on a faceless still about to feed a HuMo announcer init.
@@ -1017,12 +1019,22 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         backdrop_family = str(obj.get("backdrop_family") or "")
         prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
         # Banana transform BEFORE the content hash, so flipping the switch
-        # re-mints every cached still instead of serving a stale gun. Quoted
-        # spans (the still_word title cards carry the SPOKEN LINE in quotes)
-        # are shielded inside apply() -- text rendered in the picture is
-        # script, not picture.
+        # re-mints every cached still instead of serving a stale gun.
+        #
+        # Quote shielding is SCOPED to card prompts, and this row is the only
+        # place that knows which is which. `source` is stamped at COMPOSITION
+        # (derive_image_prompts writes "still_word" on the card objects), which
+        # is why it -- and not `kind` or `role` -- is the discriminator: a
+        # card's `kind` is inherited from the scene target it replaced, and its
+        # `role` can drift under OTR_FORCE_ENGINE_MAP between derive and
+        # dispatch. On a card the quoted span is script (rendered as picture
+        # text in word mode; spoken and shown in the credits in music mode);
+        # everywhere else a quote is decoration, and shielding it let a
+        # writer-styled `a man carrying a "revolver"` survive untransformed.
         if _banana_on:
-            _bres = _banana.apply(prompt, variety_key=_banana_key)
+            _bres = _banana.apply(
+                prompt, variety_key=_banana_key,
+                shield_quoted_card_text=(source == "still_word"))
             prompt = _bres.text
             _banana_candidate_subs += _bres.substitutions
             banana_rcpt = _banana.receipt_keys(_bres)

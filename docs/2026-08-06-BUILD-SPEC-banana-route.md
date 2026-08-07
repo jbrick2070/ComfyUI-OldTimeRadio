@@ -1,16 +1,16 @@
-# BUILD SPEC -- the banana route (v2 contract)
+# BUILD SPEC -- the banana route (v3 contract)
 
 **Build state (2026-08-07):** BUILT and SHIPPED. The build landed with six
 defects found by a read-only QA pass; all six are repaired, plus three more the
 repair arc surfaced (an unsound phrase-retreat loop in the cap, a
 malformed-knob warning storm, and an era-tail quote leak that shielded weapons
 from the route). Fix plan and arc:
-`docs/2026-08-06-PLAN-banana-route-qa-fixes.md`. **One known defect is
-deliberately OPEN and deferred to its own chunk:** the quote shield is applied
-to EVERY prompt rather than only to still_word card text, so an ordinary
-LLM-authored `a man carrying a "revolver"` is shielded and survives
-untransformed (`_clean_llm_prompt` strips only leading/trailing quotes). That is
-a false negative -- the route under-fires -- with no ledger or render fault.
+`docs/2026-08-06-PLAN-banana-route-qa-fixes.md`. **That deferred defect is now CLOSED (2026-08-07, shield scoping,
+`TABLE_VERSION = "3"`):** the quote shield used to apply to EVERY prompt, so an
+ordinary LLM-authored `a man carrying a "revolver"` was shielded and survived
+untransformed. Shielding is now SCOPED to still_word card prompts -- the still
+dispatcher passes `shield_quoted_card_text=(source == "still_word")` and the
+video funnel passes False. Arc: `kibitz-runs/2026-08-07-shield-scoping/`.
 
 **Date:** 2026-08-06. **HEAD:** `9c686886` on `v2.0-alpha`.
 **Baseline, measured at this HEAD:** suite 8997 passed / 111 skipped /
@@ -102,20 +102,21 @@ not import-clean -- verify at build). No import-time side effects, no
 `NODE_CLASS_MAPPINGS` entry.
 
 ```
-TABLE_VERSION = "2"
+TABLE_VERSION = "3"   # versions the WHOLE algorithm: table AND shield scope
 BANANA_TABLE: tuple[tuple[str, str], ...]   # every source form an explicit pair
 
 @dataclasses.dataclass(frozen=True)
 class BananaResult:
     text: str
-    substitutions: int          # unquoted regex matches replaced
+    substitutions: int          # regex matches replaced (outside any shielded
+                                # span, when card shielding is on)
     table_version: str
     sha256_before: str          # raw-UTF-8 hex of the prompt string
     sha256_after: str
     varieties: str              # canonical compact "SIDEARM=banana,LONG=plantain"
 
 def select_varieties(variety_key: str) -> dict[str, int]   # pure; class -> pool INDEX
-def apply(text: str, *, variety_key: str = "") -> BananaResult
+def apply(text, *, variety_key="", shield_quoted_card_text=True) -> BananaResult
 def source_bank_excludes_banana(source_bank_id) -> bool
 def banana_stills_enabled() -> bool          # guarded env reads
 def banana_video_enabled() -> bool
@@ -138,7 +139,15 @@ def include_fidelity_banks() -> bool
   preceding backslash run has ODD length; unmatched openers and closers are
   LITERAL text -- the transform resumes, never silently disabling the rest of
   the prompt.
-  **WHY the shield exists, so nobody weakens it (Fable cold-r1 catch):** the
+  **SCOPE (2026-08-07): the shield applies to still_word CARD prompts ONLY.**
+`apply()` takes `shield_quoted_card_text`; the still dispatcher passes True
+only for objects stamped `source == "still_word"` (composition provenance --
+`kind` is inherited from the scene target a card replaced and `role` drifts
+under `OTR_FORCE_ENGINE_MAP`, so neither can discriminate), and the video
+funnel passes False because no card composes on that lane. Elsewhere a quote
+is decoration and its contents transform.
+
+**WHY the shield exists, so nobody weakens it (Fable cold-r1 catch):** the
   `still_word` title cards quote the SPOKEN LINE verbatim inside the visual
   prompt (`otr_meta_brief_image_prompt.py` composes
   `a title card displaying the words "<spoken line>"`; the music card quotes
@@ -155,7 +164,8 @@ def include_fidelity_banks() -> bool
   int(sha256(f"otr-banana-v2:{variety_key}:{cls}".encode()).hexdigest()[:8], 16) % len(pool)`.
   Index 0 of every pool is the exact v1 replacement, so an empty key is
   byte-identical to the base table.
-* `apply()` is unconditional and pure; the gate lives at the call sites. The
+* `apply()` is unconditional and pure; the ENABLE gate and the SHIELD
+  decision both live at the call sites. The
   module is imported on OFF runs too: the OFF receipt records `TABLE_VERSION`
   and `select_varieties(freeze_timestamp)` (which table and which fruits WOULD
   have applied -- the QA's fix for OFF-run forensics).
@@ -272,7 +282,9 @@ At `otr_image_gen_dispatcher.py:1000-1001` (transform BEFORE
 ```python
 prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
 if _banana_gate(ledger_meta):            # env + bank idiom, section 1
-    _b = _otr_banana_route.apply(prompt, variety_key=freeze_ts)
+    _b = _otr_banana_route.apply(
+        prompt, variety_key=freeze_ts,
+        shield_quoted_card_text=(source == "still_word"))
     prompt = _b.text
 prompt_hash = _prompt_content_hash(prompt)
 ```

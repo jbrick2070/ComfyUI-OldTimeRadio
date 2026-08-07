@@ -2945,7 +2945,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _bkey = str(_bmeta.get("freeze_timestamp") or "")
         _bobs = req.setdefault("observability", {})
         if _banana_gate(_bmeta, lane="video"):
-            _bres = _banana_apply(_banana_prompt, variety_key=_bkey)
+            # shield_quoted_card_text=False, and EXPLICITLY rather than by
+            # default: no still_word card composes on the video lane (a card's
+            # words travel in the minted still, never in a video text_prompt),
+            # so a quoted span here is always decoration. Passing it explicitly
+            # also keeps ShotLock's cast-time preflight -- which calls this
+            # same builder per beat -- on the identical decision, so a future
+            # change to the default cannot silently desynchronize the two.
+            _bres = _banana_apply(_banana_prompt, variety_key=_bkey,
+                                  shield_quoted_card_text=False)
             # Re-cap ONLY to the budget the composing branch published, and
             # ONLY when the transform CROSSED it (pre <= budget < post). An
             # unpublished budget means the branch promised nothing, so the text

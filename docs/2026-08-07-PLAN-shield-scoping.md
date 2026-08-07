@@ -1,7 +1,31 @@
 # PLAN -- shield scoping (the banana route's quote shield, narrowed to card text)
 
 **Date:** 2026-08-07. **HEAD:** `22dd4f57` on `v2.0-alpha`.
-**Status: r1 COMPLETE (2026-08-07).** This document was the r1 input; the
+**Status: SHIPPED 2026-08-07.** Full r1-r4 `kibitz-plugin:kibitz` arc
+complete (cold Fable on r1 + Codex `gpt-5.6-sol` high + Antigravity every
+round, `--driver claude`); build order
+`kibitz-runs/2026-08-07-shield-scoping/r4/final.md`, judgments per round
+(LOCAL ONLY, gitignored).
+
+**What shipped.** `apply()` takes `shield_quoted_card_text` (keyword-only,
+default True); the still dispatcher passes
+`(source == "still_word")`, the video funnel passes False explicitly.
+`TABLE_VERSION` "2" -> "3", which versions the WHOLE transform algorithm
+(table AND shield scope) -- append-only: historical rows keep "2" and are
+never rewritten, and the version is not a cache input, so the bump alone
+re-mints nothing.
+
+**KNOWN AND DELIBERATELY NOT FIXED:** `_compose_mesh_fodder_prompt` splices
+`get_era_tail` unfolded (`otr_meta_brief_image_prompt.py:1595-1597`) where the
+card composer folds. Scoping already ends the under-fire there (mesh rows are
+not `still_word`, so nothing shields their quote pair); folding it would move
+mesh prompt hashes for zero functional gain, and `_fold_inner_dquotes` is
+documented as a still_word-CARD invariant. Cosmetic only: a doubled quote may
+appear in a mesh prompt.
+
+---
+
+**Historical -- r1 completion note.** This document was the r1 input; the
 CONVERGED shape lives in `kibitz-runs/2026-08-07-shield-scoping/r1/final.md`
 (LOCAL ONLY, gitignored) and supersedes the FIX DIRECTION sketch below where
 they differ. Headline rulings: per-call-site switch keyed on the object's

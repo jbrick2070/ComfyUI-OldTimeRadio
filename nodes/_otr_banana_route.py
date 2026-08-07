@@ -8,7 +8,7 @@ the visual-safety clauses stands, and this module must never grow stakes
 rewrites (murder/blood/kill stay untouched: bananas replace the INSTRUMENTS,
 never the stakes).
 
-Contract: docs/2026-08-06-BUILD-SPEC-banana-route.md (the v2 contract).
+Contract: docs/2026-08-06-BUILD-SPEC-banana-route.md (the v3 contract -- scoped card shielding).
 Applied at exactly two funnels -- the still dispatcher
 (otr_image_gen_dispatcher, before the prompt content hash) and the video
 render driver (after _apply_visual_safety_prompt) -- gated by:
@@ -44,11 +44,25 @@ branch made. No still composer publishes such a number, so a still cap would
 invent a truncation contract nobody owns and would move every still prompt
 hash for nothing.
 
-Quote shielding exists for a script-integrity reason, not politeness: the
-still_word title cards quote the SPOKEN LINE verbatim inside the visual prompt
-(``a title card displaying the words "<spoken line>"``). Text rendered inside
-the picture is script, not picture -- so quoted spans pass through
-byte-identical.
+Quote shielding exists for a script-integrity reason, not politeness, and it
+is SCOPED TO CARD TEXT -- it is not a general "quotes are sacred" rule. Two
+card shapes are shielded, both composed by ``compose_still_word_prompt``:
+
+* WORD mode -- ``a title card displaying the words "<spoken line>"``. The
+  quoted span is script RENDERED as picture text, so transforming it would put
+  a substituted word on the one audience-readable surface.
+* MUSIC mode -- ``an abstract picture evoking "<episode title>"``. The card is
+  wordless, but the title is still script: the credits roll DISPLAYS it and
+  the announcer SPEAKS it, so a bananafied evocation would contradict the
+  episode.
+
+Everywhere else quotes are decorative and are NOT shielded. A writer LLM
+styling an ordinary prompt as ``a man carrying a "revolver"`` used to have
+that revolver survive untransformed -- the route silently under-firing. So
+``apply()`` takes ``shield_quoted_card_text``: the still dispatcher passes
+True only for objects stamped ``source == "still_word"``, and the video funnel
+passes False (no card composes on that lane -- a card's words travel in the
+minted still, never in a video text prompt).
 
 Hash contract: ``sha256_before``/``sha256_after`` are raw-UTF-8 hex digests of
 the prompt string. They are deliberately NOT the dispatcher's
@@ -71,7 +85,14 @@ try:  # package import (production)
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_bank_variants import base_source_bank_id  # type: ignore
 
-TABLE_VERSION = "2"
+#: Versions the COMPLETE transform algorithm -- the substitution table AND the
+#: quote-shield SCOPE. "3" is the scoped-shield revision: quoted spans are
+#: protected only on still_word card prompts, where "2" protected them
+#: everywhere. Bumped so a v2 and a v3 receipt can never claim the same
+#: contract. NOTE: this is NOT the ``otr-banana-v2:`` variety hash namespace
+#: below -- that string is a hash domain separator and moving it would
+#: reshuffle every episode's fruit picks.
+TABLE_VERSION = "3"
 
 #: COPIED from nodes/_otr_casting.py:1238 per the operator's ruling ("copy the
 #: existing idiom -- three lines, not new machinery"). Drift is closed by a
@@ -287,19 +308,35 @@ class BananaResult:
     varieties: str
 
 
-def apply(text: str, *, variety_key: str = "") -> BananaResult:
-    """Transform every UNQUOTED weapon noun; pure, idempotent, unconditional.
+def apply(text: str, *, variety_key: str = "",
+          shield_quoted_card_text: bool = True) -> BananaResult:
+    """Transform every weapon noun; pure, idempotent, unconditional.
 
     The enable gate lives at the call sites (env + bank idiom); apply() itself
     always transforms. Idempotence is by CONSTRUCTION -- no replacement
     contains any source term (the closure test enumerates every episode
     table) -- so historical adapter re-calls of the visual-safety seam and any
     accidental double application are harmless no-ops.
+
+    ``shield_quoted_card_text`` selects whether QUOTED SPANS are protected, and
+    it is a policy the CALLER owns because only the caller knows what it is
+    composing (see the module docstring for the two shielded card shapes):
+
+    * True -- quoted spans pass through byte-identical. Correct ONLY for
+      still_word card prompts, where the quoted text is script.
+    * False -- quotes are treated as decoration and their contents transform.
+      Correct for portraits, scene stills and every video prompt.
+
+    The default is True so that a caller who forgets fails toward UNDER-firing
+    (the route does less, harmlessly) rather than toward transforming card
+    script, which is the one outcome the visuals-only ruling forbids. Both
+    production funnels pass it EXPLICITLY regardless; a new caller transforming
+    ordinary visual prompts must pass ``shield_quoted_card_text=False``.
     """
     original = str(text or "")
     picks = select_varieties(variety_key)
     table = _table_for(picks)
-    spans = _shielded_spans(original)
+    spans = _shielded_spans(original) if shield_quoted_card_text else []
 
     # Split into (segment, shielded) pieces preserving order.
     pieces = []

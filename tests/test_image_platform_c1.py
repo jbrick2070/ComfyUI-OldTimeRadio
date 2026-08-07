@@ -1174,6 +1174,125 @@ def test_banana_receipt_reaches_every_durable_still_row(clean_image_registry,
         assert still["banana_route"] == "on"
 
 
+def _banana_dispatch(disp_mod, tmp_path, objects, monkeypatch, ledger=None):
+    """Run dispatch_images over hand-built objects with the route ON."""
+    monkeypatch.setenv("OTR_BANANA_STILLS", "1")
+    monkeypatch.delenv("OTR_BANANA_INCLUDE_FIDELITY_BANKS", raising=False)
+    led = ledger or {
+        "episode_id": "ep_shield",
+        "meta": {"source_bank": "original",
+                 "freeze_timestamp": "2026-08-07T00:00:00Z"},
+        "cast": [{"char_id": "c1", "name": "BABA"}],
+    }
+    policy = {"policy_version": 2,
+              "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
+              "video_models": _complete_video_models(),
+              "seed": {"request_seed": 0}, "granularity": {}}
+    out, _d, _r, _w = disp_mod.dispatch_images(
+        led, policy, {"version": 1, "objects": objects},
+        gen_fn=lambda _req: _np_pixels(11), output_dir=str(tmp_path),
+        lockdir=tmp_path / "l.lockdir")
+    return out
+
+
+def _shield_obj(oid, prompt, source, role="character_video"):
+    return {"object_id": oid, "kind": "scene_character", "role": role,
+            "w": 64, "h": 64, "prompt": prompt,
+            "prompt_hash": "ph-" + oid, "source": source}
+
+
+def test_card_prompts_keep_their_quoted_script_but_visuals_transform(
+        clean_image_registry, tmp_path, monkeypatch):
+    """The whole point of scoping: a still_word CARD's quoted span is script
+    and survives; the same quoted shape on an ordinary visual prompt is
+    decoration and must transform."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    word_card = 'a title card displaying the words "He drew his revolver"'
+    music_card = 'an abstract picture evoking "The Revolver Of Deck Nine"'
+    ordinary = 'a weathered detective carrying a "revolver" in a dim hall'
+    # Both card SHAPES ride `source="still_word"` with the dispatchable still
+    # role; `music_visual` is a VIDEO role and carries no still object of its
+    # own, so the music card's prompt shape is what is exercised here (its
+    # shielding is also pinned at unit level in tests/test_banana_route.py).
+    led = _banana_dispatch(disp, tmp_path, [
+        _shield_obj("still_w", word_card, "still_word"),
+        _shield_obj("still_m", music_card, "still_word"),
+        _shield_obj("scene_1", ordinary, "llm"),
+    ], monkeypatch)
+    rows = {r["object_id"]: r for r in led["images"]["images"]}
+    # cards: shielded, byte-identical, zero substitutions
+    assert rows["still_w"]["banana_substitutions"] == 0
+    assert rows["still_m"]["banana_substitutions"] == 0
+    assert (rows["still_w"]["banana_sha256_before"]
+            == rows["still_w"]["banana_sha256_after"])
+    # ordinary visual prompt: the quoted revolver TRANSFORMS (the defect)
+    assert rows["scene_1"]["banana_substitutions"] >= 1
+    assert (rows["scene_1"]["banana_sha256_before"]
+            != rows["scene_1"]["banana_sha256_after"])
+
+
+@pytest.mark.parametrize("source", ["", "portrait_llm", "mesh_fodder"])
+def test_non_card_sources_all_transform(clean_image_registry, tmp_path,
+                                        monkeypatch, source):
+    """Missing and unknown sources are NOT cards -- they transform. Only the
+    exact `still_word` stamp shields."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    led = _banana_dispatch(disp, tmp_path, [
+        _shield_obj("o1", 'a hall with a "revolver" on the desk', source),
+    ], monkeypatch)
+    assert led["images"]["images"][0]["banana_substitutions"] >= 1
+
+
+def test_card_backdrop_outside_the_quotes_still_transforms(
+        clean_image_registry, tmp_path, monkeypatch):
+    """Shielding protects the QUOTED SPAN, not the whole card. The backdrop
+    describes PICTURE and must still banana."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    card = ('a title card displaying the words "He waited", '
+            'a smoky saloon with a rifle rack behind the bar')
+    led = _banana_dispatch(disp, tmp_path, [
+        _shield_obj("still_b", card, "still_word"),
+    ], monkeypatch)
+    row = led["images"]["images"][0]
+    assert row["banana_substitutions"] >= 1          # the backdrop rifle went
+    assert row["banana_table_version"] == "3"
+
+
+def test_version_is_append_only_history_is_never_rewritten(
+        clean_image_registry, tmp_path, monkeypatch):
+    """A ledger carrying a historical v2 row keeps it: a receipt records the
+    transform that produced ITS row. Only newly dispatched rows and the CURRENT
+    manifest carry v3."""
+    clean_image_registry._registry.clear()
+    ireg.register(_img_stub(name="flux_gen1"))
+    historical = {"object_id": "old_still", "kind": "scene_character",
+                  "role": "character_video", "path": "x.png",
+                  "banana_route": "on", "banana_table_version": "2",
+                  "banana_substitutions": 1,
+                  "banana_sha256_before": "aa", "banana_sha256_after": "bb",
+                  "banana_varieties": "SIDEARM=banana,LONG=long banana"}
+    led = {"episode_id": "ep_hist",
+           "meta": {"source_bank": "original",
+                    "freeze_timestamp": "2026-08-07T00:00:00Z"},
+           "cast": [{"char_id": "c1", "name": "BABA"}],
+           "images": {"images": [historical]}}
+    out = _banana_dispatch(disp, tmp_path, [
+        _shield_obj("new_still", "a hall with a rifle", "llm"),
+    ], monkeypatch, ledger=led)
+    rows = {r["object_id"]: r for r in out["images"]["images"]}
+    assert rows["old_still"]["banana_table_version"] == "2"   # untouched
+    assert rows["new_still"]["banana_table_version"] == "3"   # newly stamped
+    manifest = json.loads(
+        (pathlib.Path(rows["new_still"]["path"]).parent
+         / "stills_manifest.json").read_text(encoding="utf-8"))
+    assert all(s["banana_table_version"] == "3"
+               for s in manifest["stills"]
+               if s["object_id"] == "new_still")
+
+
 def test_banana_receipt_is_stamped_on_the_OFF_path_too(clean_image_registry,
                                                        tmp_path, monkeypatch):
     """OFF is a receipt shape, not an absence -- the forensics answer 'which

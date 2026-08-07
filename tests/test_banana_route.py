@@ -236,6 +236,133 @@ def test_cap_empty_text_returns_empty():
 
 
 # --------------------------------------------------------------------------- #
+# SHIELD SCOPING (2026-08-07) -- quoted spans are protected only on CARD
+# prompts. Everywhere else a quote is decoration, and shielding it let a
+# writer-styled `a man carrying a "revolver"` survive untransformed.
+# --------------------------------------------------------------------------- #
+
+_QUOTED_WEAPON = 'a weathered detective carrying a "revolver" in a dim hall'
+
+
+def test_shield_on_protects_the_quoted_span():
+    r = b.apply(_QUOTED_WEAPON, shield_quoted_card_text=True)
+    assert '"revolver"' in r.text
+    assert r.substitutions == 0
+
+
+def test_shield_off_transforms_inside_the_quotes():
+    r = b.apply(_QUOTED_WEAPON, shield_quoted_card_text=False)
+    assert '"revolver"' not in r.text
+    assert "banana" in r.text.lower()
+    assert r.substitutions >= 1
+
+
+def test_shield_defaults_to_ON_so_a_forgetful_caller_under_fires():
+    """The default must fail toward doing LESS. A caller who forgets the
+    keyword leaves a weapon unbananafied (harmless); the opposite default would
+    transform card script, which the visuals-only ruling forbids."""
+    assert b.apply(_QUOTED_WEAPON).text == b.apply(
+        _QUOTED_WEAPON, shield_quoted_card_text=True).text
+
+
+def test_shield_off_leaves_unquoted_behaviour_identical():
+    plain = "the gunman raised his revolver"
+    assert (b.apply(plain, shield_quoted_card_text=False).text
+            == b.apply(plain, shield_quoted_card_text=True).text)
+
+
+def test_shield_scope_does_not_touch_the_parity_mechanism():
+    """QA ruling 9 stands: with shielding ON, odd/even backslash parity still
+    decides which spans exist. Only the DECISION TO SCAN is scoped."""
+    even = 'he said "revolver\\\\" loudly'      # even run -> closer is real
+    odd = 'he said "revolver\\" loudly'         # odd run -> closer is escaped
+    assert b.apply(even, shield_quoted_card_text=True).substitutions == 0
+    assert b.apply(odd, shield_quoted_card_text=True).substitutions >= 1
+    # ...and with shielding OFF the parity machine is simply never consulted.
+    assert b.apply(even, shield_quoted_card_text=False).substitutions >= 1
+
+
+def test_table_version_is_the_scoped_shield_revision():
+    """The receipt version covers the whole transform algorithm -- table AND
+    shield scope -- so a v2 (blanket) and a v3 (scoped) receipt can never claim
+    the same contract."""
+    assert b.TABLE_VERSION == "3"
+    assert b.receipt_keys(b.apply("a knife"))["banana_table_version"] == "3"
+    assert b.off_receipt("a knife")["banana_table_version"] == "3"
+
+
+def test_variety_hash_namespace_is_NOT_the_table_version():
+    """`otr-banana-v2:` is a hash domain separator, not a contract version.
+    Moving it in sympathy with TABLE_VERSION would reshuffle every episode's
+    fruit picks and move unrelated prompts."""
+    import inspect
+    assert "otr-banana-v2:" in inspect.getsource(b.select_varieties)
+
+
+# --------------------------------------------------------------------------- #
+# The call-site guard: every PRODUCTION apply() must state its shield policy.
+# --------------------------------------------------------------------------- #
+
+def test_every_production_apply_call_states_its_shield_policy():
+    """Resolve imports semantically rather than matching alias strings, so a
+    third call site under a new name cannot slip through.
+
+    Known limits, stated rather than pretended away: a call built via getattr
+    or routed through a wrapper function is out of scope for a static guard.
+    """
+    import ast
+    import pathlib
+
+    nodes_dir = pathlib.Path(__file__).resolve().parent.parent / "nodes"
+    found = []
+    for path in nodes_dir.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        module_aliases, func_aliases = set(), set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name.endswith("_otr_banana_route"):
+                        module_aliases.add(a.asname or a.name.split(".")[-1])
+            elif isinstance(node, ast.ImportFrom):
+                if (node.module or "").endswith("_otr_banana_route"):
+                    # from ..._otr_banana_route import apply [as X]
+                    for a in node.names:
+                        if a.name == "apply":
+                            func_aliases.add(a.asname or a.name)
+                else:
+                    # from . import _otr_banana_route as X -- the MODULE is the
+                    # alias name, not node.module (which is None for a bare
+                    # relative package import). Missing this branch made the
+                    # guard blind to the still dispatcher.
+                    for a in node.names:
+                        if a.name.endswith("_otr_banana_route"):
+                            module_aliases.add(a.asname or a.name)
+        if not module_aliases and not func_aliases:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            hit = (
+                (isinstance(fn, ast.Attribute) and fn.attr == "apply"
+                 and isinstance(fn.value, ast.Name)
+                 and fn.value.id in module_aliases)
+                or (isinstance(fn, ast.Name) and fn.id in func_aliases))
+            if hit:
+                found.append((path.name, node.lineno,
+                              {k.arg for k in node.keywords}))
+
+    assert found, "no production apply() call sites found -- guard is blind"
+    for name, lineno, kwargs in found:
+        assert "shield_quoted_card_text" in kwargs, (
+            "%s:%d calls apply() without stating its shield policy" %
+            (name, lineno))
+    assert len(found) == 2, (
+        "expected exactly two production apply() call sites (the still "
+        "dispatcher and the video funnel); found %r" % (found,))
+
+
+# --------------------------------------------------------------------------- #
 # the cap's PHRASE-INTEGRITY property (QA r2/r4)
 #
 # The old single-retreat loop truncated INSIDE a replacement phrase in 68 of the
