@@ -2409,6 +2409,258 @@ class TailFinalizer(Protocol):
     ) -> None: ...
 
 
+
+
+def _compose_and_stamp_announcer_close(
+    led,
+    meta,
+    *,
+    first_announcer_id,
+    last_announcer_id,
+    provenance_owned,
+    style_grammar_on,
+    effective_spoken_fact,
+    nc_brief,
+    script_brief,
+    premise,
+    resolved,
+    slot_scheduler,
+    creative_generate_fn,
+):
+    """Compose the announcer close, stamp its receipts, and hand back the result.
+
+    EXTRACTED VERBATIM (B4, 2026-08-07) so tests can exercise the PRODUCTION
+    reader. The 2026-08-04 attempt at the citation defect edited
+    ``spoken_coda_line()``, which had zero callers, and thirty episodes leaked
+    after it "landed" -- a fix applied to a function nobody calls is not a fix.
+
+    WHAT STAYS IN THE CALLER, and why:
+
+    * ``news_meta`` -- defined ABOVE this block and read BELOW it by the
+      key-term audit. Moving it here is a ``NameError`` on every episode.
+    * ``led.save()`` and the flag log -- the caller persists, so this helper
+      stays in-memory and therefore testable without touching disk. The caller
+      needs the composed result for its log line, which is why this RETURNS
+      rather than mutating and going quiet.
+    * the ``last_announcer_id``/``first_announcer_id`` guard itself.
+
+    ``script_brief`` is a parameter for the same reason: the fictional-outro
+    branch passes it to ``compose_announcer_outro`` and it is bound far outside
+    this range.
+
+    Returns the ``_OTRLC.LineResult`` that was written. Every path through this
+    body binds it -- there is a ``raise`` in the closed-vocabulary check, but no
+    path REACHES the end without ``outro_res`` set.
+    """
+    # LATE IMPORTS, mirroring ``run()``'s own "no GPU / no model loads at module
+    # import" contract at :3458. Hoisting these to module scope would break that
+    # deliberately -- and would be the same defect the lazy-import test guards.
+    from . import _otr_line_composer as _OTRLC
+    from . import _otr_ledger as _OTRL
+
+    # Named locals the extracted body already used, rebound here so the block
+    # below stays byte-identical to what ran inline.
+    _style_grammar_on = style_grammar_on
+    _premise = str(premise or "")
+
+    intro_text = ""
+    for _ln in led.data.get("lines") or []:
+        if _ln.get("line_id") == first_announcer_id:
+            intro_text = str(_ln.get("text") or "")
+            break
+    # LLM slot: creative -- dedicated announcer outro, a
+    # narrative framing pass. Routed through the writer's
+    # creative_writing_model slot; no widget.
+    # F3 (story-engine v1): thread the resolved ending + the final
+    # character line so the close STATES the outcome instead of
+    # hedging. Both null-guarded ("" when unavailable) -> the
+    # composer's post-check skips cleanly on an unresolved/missing
+    # ending.
+    # KILL 2 / NEWS CODA (2026-06-24): a dynamic premise->news segue. The
+    # LLM writes ONLY a short bridge clause (from the premise + the safe
+    # intro tone, never the outcome); the real news_close_brief is appended
+    # deterministically so the weak model can't blend the fact away.
+    # compose_announcer_outro is UNTOUCHED -- the off / no-brief path runs
+    # it verbatim, so the fictional close stays byte-identical.
+    # WHICH FACT IS SPOKEN, AND BY WHICH ROUTE (2026-08-05).
+    # A provenance-owned lane ALWAYS takes the deterministic append,
+    # independent of _style_grammar_on. It cannot use the fictional-outro
+    # route below: that one passes the note as LLM *context* and returns
+    # whatever the model authors, so a receipt claiming the deterministic
+    # coda was spoken would simply be untrue.
+    if provenance_owned:
+        _spoken_fact_for_coda = effective_spoken_fact
+    elif _style_grammar_on:
+        _spoken_fact_for_coda = nc_brief.strip()
+    else:
+        _spoken_fact_for_coda = ""
+
+    if _spoken_fact_for_coda:
+        _spoken_coda_source = (
+            "provenance" if provenance_owned else "news_close_brief"
+        )
+        with slot_scheduler.helper_context("compose_news_coda"):
+            outro_res = _OTRLC.compose_news_coda(
+                creative_fn=creative_generate_fn,
+                news_close_brief=_spoken_fact_for_coda,
+                premise=_premise,
+                intro_text=intro_text,
+                creative_repo_id=resolved["creative_writing_model"],
+                # The bank was never passed here, so every lane resolved
+                # media_archive's coda_system prompt -- while the
+                # fictional-outro call below has passed it since Stage 4.
+                source_bank_id=resolved["source_bank"],
+            )
+        if not outro_res.text:
+            # Pathological (brief cleaned to empty) -- never ship an empty
+            # close. Deterministic news outro, LOUD.
+            log.warning(
+                "[OTR_LedgerScriptWriter] news coda produced no text "
+                "(fact=%r); using the deterministic outro fallback",
+                _spoken_fact_for_coda,
+            )
+            # The factual note remains in meta. Never route it through
+            # the older character-truncating outro template, and do not
+            # mark this generic close as a protected coda that later
+            # repair could mistake for a fact-bearing row.
+            #
+            # This said "remains in meta/credits" unconditionally, and
+            # stamped the deferred-to-credits flag to match -- but the
+            # printed credit line can itself be empty, in which case both
+            # asserted an attribution surface that does not exist. The
+            # flag is now only raised when the credits really carry it.
+            _deferred_to_credits = bool(
+                str(meta.get("credits_source_line") or "").strip()
+            )
+            outro_res = _OTRLC.LineResult(
+                text=_OTRLC.fallback_announcer_outro(""),
+                compose_flags=(
+                    ("announcer_outro_fallback",)
+                    + (("source_note_deferred_to_credits",)
+                       if _deferred_to_credits else ())
+                    + ("spoken_surface_emergency",)
+                ),
+            )
+            _spoken_coda_source = "none"
+    elif provenance_owned:
+        # Owned, but the normalizer produced no spoken line (unknown
+        # status, or a licensed source with no label). The episode speaks
+        # NO attribution and print carries it -- credits_source_line and
+        # noncommercial_notice are untouched. Never fall back to the raw
+        # interpreter note here: that is the leak, on the path most likely
+        # to reach it. Neither composer is entered, which also avoids
+        # compose_announcer_outro's empty-briefs RuntimeError.
+        _spoken_coda_source = "none"
+        # The "deferred to credits" flag is only TRUE when the credits
+        # actually carry the line. Stamping it unconditionally would
+        # assert an attribution surface that may not exist -- the flag
+        # would say print has it while nothing does, which is the same
+        # class of false receipt this whole item is correcting.
+        _deferred_to_credits = bool(
+            str(meta.get("credits_source_line") or "").strip()
+        )
+        log.warning(
+            "[OTR_LedgerScriptWriter] provenance-owned lane has no spoken "
+            "coda (status=%r); generic sign-off, printed credit %s",
+            str((meta.get("provenance") or {}).get("status") or ""),
+            "carries the attribution" if _deferred_to_credits
+            else "is ALSO empty -- this episode attributes nowhere",
+        )
+        outro_res = _OTRLC.LineResult(
+            text=_OTRLC.fallback_announcer_outro(""),
+            compose_flags=(
+                ("announcer_outro_fallback",)
+                + (("source_note_deferred_to_credits",)
+                   if _deferred_to_credits else ())
+            ),
+        )
+    else:
+        _spoken_coda_source = "none"
+        # The fictional-outro path (flag off, OR on but no news brief).
+        # Build its inputs INSIDE the else -- only this path needs them.
+        _outro_ending_change = str(
+            (meta.get("dramatic_state") or {}).get("ending_change") or ""
+        )
+        _outro_final_char_line = ""
+        for _ln in reversed(led.data.get("lines") or []):
+            if str(_ln.get("speaker_role") or "").strip() == "character":
+                _t = str(_ln.get("text") or "").strip()
+                if _t:
+                    _outro_final_char_line = _t
+                    break
+        with slot_scheduler.helper_context("compose_announcer_outro"):
+            outro_res = _OTRLC.compose_announcer_outro(
+                creative_fn=creative_generate_fn,
+                script_brief=script_brief,
+                news_close_brief=nc_brief,
+                intro_text=intro_text,
+                creative_repo_id=resolved["creative_writing_model"],
+                ending_change=_outro_ending_change,
+                final_character_line=_outro_final_char_line,
+                source_bank_id=resolved["source_bank"],  # Stage 4
+            )
+        if _style_grammar_on:
+            # On-flag but no news brief -> mark it (text unchanged; frozen).
+            import dataclasses as _dc
+            outro_res = _dc.replace(
+                outro_res,
+                compose_flags=outro_res.compose_flags + ("news_coda_no_brief",),
+            )
+    # WHICH FACT WAS SPOKEN -- the receipt a corpus audit can join on.
+    # Closed vocabulary, validated at write time so a typo cannot drift
+    # into the ledger and quietly widen what the audit accepts.
+    if _spoken_coda_source not in _SPOKEN_CODA_SOURCES:
+        raise ValueError(
+            "OTR_LedgerScriptWriter: spoken_coda_source %r is not one of "
+            "%s -- the receipt vocabulary is closed on purpose"
+            % (_spoken_coda_source, sorted(_SPOKEN_CODA_SOURCES))
+        )
+    meta["spoken_coda_source"] = _spoken_coda_source
+    # news_coda_emitted describes what was SPOKEN, not what the
+    # interpreter wrote, and is stamped outside the style gate because a
+    # provenance-owned lane bypasses that gate entirely.
+    if provenance_owned or _style_grammar_on:
+        meta["news_coda_emitted"] = _spoken_coda_source != "none"
+        meta["news_coda_fallback"] = (
+            "news_coda_fallback" in outro_res.compose_flags
+        )
+    # patch_line_text recomputes char_count + word_count in
+    # lockstep; patch_line_fields stamps the outro compose_flags
+    # so aggregate_compose_flags + soak see the pass result.
+    _OTRL.patch_line_text(
+        led.data, last_announcer_id, outro_res.text,
+    )
+    _OTRL.patch_line_fields(
+        led.data, last_announcer_id,
+        {"compose_flags": list(outro_res.compose_flags)},
+    )
+    _coda_action = (
+        "fact_reduced"
+        if "news_coda_fact_reduced" in outro_res.compose_flags
+        else "fact_deferred_to_credits"
+        if "news_coda_fact_deferred_to_credits"
+        in outro_res.compose_flags
+        else ""
+    )
+    if _coda_action:
+        import hashlib as _hashlib_coda
+        meta["news_coda_spoken_reduction"] = {
+            "schema_version": 1,
+            "line_id": last_announcer_id,
+            "action": _coda_action,
+            "source_fact_sha256": _hashlib_coda.sha256(
+                nc_brief.encode("utf-8")
+            ).hexdigest(),
+            "spoken_line_sha256": _hashlib_coda.sha256(
+                outro_res.text.encode("utf-8")
+            ).hexdigest(),
+            "source_fact_retained_in_meta_news": True,
+        }
+    else:
+        meta.pop("news_coda_spoken_reduction", None)
+
+    return outro_res
+
 class OTR_LedgerScriptWriter:
     """v2.0 LPL script writer with legacy-style widget surface.
 
@@ -5530,201 +5782,21 @@ class OTR_LedgerScriptWriter:
         ):
             # Read the composed intro line back from the ledger so the
             # outro prompt can lightly echo its tone.
-            intro_text = ""
-            for _ln in led.data.get("lines") or []:
-                if _ln.get("line_id") == first_announcer_id:
-                    intro_text = str(_ln.get("text") or "")
-                    break
-            # LLM slot: creative -- dedicated announcer outro, a
-            # narrative framing pass. Routed through the writer's
-            # creative_writing_model slot; no widget.
-            # F3 (story-engine v1): thread the resolved ending + the final
-            # character line so the close STATES the outcome instead of
-            # hedging. Both null-guarded ("" when unavailable) -> the
-            # composer's post-check skips cleanly on an unresolved/missing
-            # ending.
-            # KILL 2 / NEWS CODA (2026-06-24): a dynamic premise->news segue. The
-            # LLM writes ONLY a short bridge clause (from the premise + the safe
-            # intro tone, never the outcome); the real news_close_brief is appended
-            # deterministically so the weak model can't blend the fact away.
-            # compose_announcer_outro is UNTOUCHED -- the off / no-brief path runs
-            # it verbatim, so the fictional close stays byte-identical.
-            # WHICH FACT IS SPOKEN, AND BY WHICH ROUTE (2026-08-05).
-            # A provenance-owned lane ALWAYS takes the deterministic append,
-            # independent of _style_grammar_on. It cannot use the fictional-outro
-            # route below: that one passes the note as LLM *context* and returns
-            # whatever the model authors, so a receipt claiming the deterministic
-            # coda was spoken would simply be untrue.
-            if provenance_owned:
-                _spoken_fact_for_coda = effective_spoken_fact
-            elif _style_grammar_on:
-                _spoken_fact_for_coda = nc_brief.strip()
-            else:
-                _spoken_fact_for_coda = ""
-
-            if _spoken_fact_for_coda:
-                _spoken_coda_source = (
-                    "provenance" if provenance_owned else "news_close_brief"
-                )
-                with slot_scheduler.helper_context("compose_news_coda"):
-                    outro_res = _OTRLC.compose_news_coda(
-                        creative_fn=creative_generate_fn,
-                        news_close_brief=_spoken_fact_for_coda,
-                        premise=str(getattr(outline, "premise", "") or ""),
-                        intro_text=intro_text,
-                        creative_repo_id=resolved["creative_writing_model"],
-                        # The bank was never passed here, so every lane resolved
-                        # media_archive's coda_system prompt -- while the
-                        # fictional-outro call below has passed it since Stage 4.
-                        source_bank_id=resolved["source_bank"],
-                    )
-                if not outro_res.text:
-                    # Pathological (brief cleaned to empty) -- never ship an empty
-                    # close. Deterministic news outro, LOUD.
-                    log.warning(
-                        "[OTR_LedgerScriptWriter] news coda produced no text "
-                        "(fact=%r); using the deterministic outro fallback",
-                        _spoken_fact_for_coda,
-                    )
-                    # The factual note remains in meta. Never route it through
-                    # the older character-truncating outro template, and do not
-                    # mark this generic close as a protected coda that later
-                    # repair could mistake for a fact-bearing row.
-                    #
-                    # This said "remains in meta/credits" unconditionally, and
-                    # stamped the deferred-to-credits flag to match -- but the
-                    # printed credit line can itself be empty, in which case both
-                    # asserted an attribution surface that does not exist. The
-                    # flag is now only raised when the credits really carry it.
-                    _deferred_to_credits = bool(
-                        str(meta.get("credits_source_line") or "").strip()
-                    )
-                    outro_res = _OTRLC.LineResult(
-                        text=_OTRLC.fallback_announcer_outro(""),
-                        compose_flags=(
-                            ("announcer_outro_fallback",)
-                            + (("source_note_deferred_to_credits",)
-                               if _deferred_to_credits else ())
-                            + ("spoken_surface_emergency",)
-                        ),
-                    )
-                    _spoken_coda_source = "none"
-            elif provenance_owned:
-                # Owned, but the normalizer produced no spoken line (unknown
-                # status, or a licensed source with no label). The episode speaks
-                # NO attribution and print carries it -- credits_source_line and
-                # noncommercial_notice are untouched. Never fall back to the raw
-                # interpreter note here: that is the leak, on the path most likely
-                # to reach it. Neither composer is entered, which also avoids
-                # compose_announcer_outro's empty-briefs RuntimeError.
-                _spoken_coda_source = "none"
-                # The "deferred to credits" flag is only TRUE when the credits
-                # actually carry the line. Stamping it unconditionally would
-                # assert an attribution surface that may not exist -- the flag
-                # would say print has it while nothing does, which is the same
-                # class of false receipt this whole item is correcting.
-                _deferred_to_credits = bool(
-                    str(meta.get("credits_source_line") or "").strip()
-                )
-                log.warning(
-                    "[OTR_LedgerScriptWriter] provenance-owned lane has no spoken "
-                    "coda (status=%r); generic sign-off, printed credit %s",
-                    str((meta.get("provenance") or {}).get("status") or ""),
-                    "carries the attribution" if _deferred_to_credits
-                    else "is ALSO empty -- this episode attributes nowhere",
-                )
-                outro_res = _OTRLC.LineResult(
-                    text=_OTRLC.fallback_announcer_outro(""),
-                    compose_flags=(
-                        ("announcer_outro_fallback",)
-                        + (("source_note_deferred_to_credits",)
-                           if _deferred_to_credits else ())
-                    ),
-                )
-            else:
-                _spoken_coda_source = "none"
-                # The fictional-outro path (flag off, OR on but no news brief).
-                # Build its inputs INSIDE the else -- only this path needs them.
-                _outro_ending_change = str(
-                    (meta.get("dramatic_state") or {}).get("ending_change") or ""
-                )
-                _outro_final_char_line = ""
-                for _ln in reversed(led.data.get("lines") or []):
-                    if str(_ln.get("speaker_role") or "").strip() == "character":
-                        _t = str(_ln.get("text") or "").strip()
-                        if _t:
-                            _outro_final_char_line = _t
-                            break
-                with slot_scheduler.helper_context("compose_announcer_outro"):
-                    outro_res = _OTRLC.compose_announcer_outro(
-                        creative_fn=creative_generate_fn,
-                        script_brief=script_brief,
-                        news_close_brief=nc_brief,
-                        intro_text=intro_text,
-                        creative_repo_id=resolved["creative_writing_model"],
-                        ending_change=_outro_ending_change,
-                        final_character_line=_outro_final_char_line,
-                        source_bank_id=resolved["source_bank"],  # Stage 4
-                    )
-                if _style_grammar_on:
-                    # On-flag but no news brief -> mark it (text unchanged; frozen).
-                    import dataclasses as _dc
-                    outro_res = _dc.replace(
-                        outro_res,
-                        compose_flags=outro_res.compose_flags + ("news_coda_no_brief",),
-                    )
-            # WHICH FACT WAS SPOKEN -- the receipt a corpus audit can join on.
-            # Closed vocabulary, validated at write time so a typo cannot drift
-            # into the ledger and quietly widen what the audit accepts.
-            if _spoken_coda_source not in _SPOKEN_CODA_SOURCES:
-                raise ValueError(
-                    "OTR_LedgerScriptWriter: spoken_coda_source %r is not one of "
-                    "%s -- the receipt vocabulary is closed on purpose"
-                    % (_spoken_coda_source, sorted(_SPOKEN_CODA_SOURCES))
-                )
-            meta["spoken_coda_source"] = _spoken_coda_source
-            # news_coda_emitted describes what was SPOKEN, not what the
-            # interpreter wrote, and is stamped outside the style gate because a
-            # provenance-owned lane bypasses that gate entirely.
-            if provenance_owned or _style_grammar_on:
-                meta["news_coda_emitted"] = _spoken_coda_source != "none"
-                meta["news_coda_fallback"] = (
-                    "news_coda_fallback" in outro_res.compose_flags
-                )
-            # patch_line_text recomputes char_count + word_count in
-            # lockstep; patch_line_fields stamps the outro compose_flags
-            # so aggregate_compose_flags + soak see the pass result.
-            _OTRL.patch_line_text(
-                led.data, last_announcer_id, outro_res.text,
+            outro_res = _compose_and_stamp_announcer_close(
+                led,
+                meta,
+                first_announcer_id=first_announcer_id,
+                last_announcer_id=last_announcer_id,
+                provenance_owned=provenance_owned,
+                style_grammar_on=_style_grammar_on,
+                effective_spoken_fact=effective_spoken_fact,
+                nc_brief=nc_brief,
+                script_brief=script_brief,
+                premise=str(getattr(outline, "premise", "") or ""),
+                resolved=resolved,
+                slot_scheduler=slot_scheduler,
+                creative_generate_fn=creative_generate_fn,
             )
-            _OTRL.patch_line_fields(
-                led.data, last_announcer_id,
-                {"compose_flags": list(outro_res.compose_flags)},
-            )
-            _coda_action = (
-                "fact_reduced"
-                if "news_coda_fact_reduced" in outro_res.compose_flags
-                else "fact_deferred_to_credits"
-                if "news_coda_fact_deferred_to_credits"
-                in outro_res.compose_flags
-                else ""
-            )
-            if _coda_action:
-                import hashlib as _hashlib_coda
-                meta["news_coda_spoken_reduction"] = {
-                    "schema_version": 1,
-                    "line_id": last_announcer_id,
-                    "action": _coda_action,
-                    "source_fact_sha256": _hashlib_coda.sha256(
-                        nc_brief.encode("utf-8")
-                    ).hexdigest(),
-                    "spoken_line_sha256": _hashlib_coda.sha256(
-                        outro_res.text.encode("utf-8")
-                    ).hexdigest(),
-                    "source_fact_retained_in_meta_news": True,
-                }
-            else:
-                meta.pop("news_coda_spoken_reduction", None)
             led.save()
             log.info(
                 "[OTR_LedgerScriptWriter] announcer outro pass wrote "
