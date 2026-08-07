@@ -61,9 +61,9 @@ at 120, plus one cloud/frontier lane.
 
 | Leg | Words | Writer (exact catalog string) | Bank | State |
 |---:|---:|---|---|---|
-| 1 | 30 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | shakespeare | RUNNING |
-| 2 | 30 | `google/gemma-4-12b-it (11.9 GB)` | public_domain | queued |
-| 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | queued |
+| 1 | 30 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | shakespeare | **PASS** `signal_lost_qual_leg_1_shakespeare_nemo_20260807_152012` -- b001 "In the royal court of Britain, King Lear demands an accounting from his daughter, Cordelia."; receipt `{status: announcer_intro_rewritten, reason: None}`; `open_safe_fallback False`; schema l4; 617s |
+| 2 | 30 | `google/gemma-4-12b-it (11.9 GB)` | public_domain | **PASS** `signal_lost_qual_leg_2_publicdomain_gemma_20260807_153216` -- b001 "The sun hangs heavy over the garden as Rikki-tikki-tavi keeps a watchful eye on the grass..."; same clean receipt. **Second model FAMILY -- the fix is not Mistral-shaped** |
+| 3 | 120 | `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)` | original | RUNNING |
 | 4 | 120 | `google/gemma-4-12b-it (11.9 GB)` | media_archive | queued |
 | 5 | 30 | `openrouter:slot-a` -> cheapest resolving (DeepSeek Flash class) | shakespeare | queued |
 
