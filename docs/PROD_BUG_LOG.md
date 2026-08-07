@@ -1,14 +1,43 @@
 # Production Bug Log (staging pre-Bible)
 
-**Contract (operator, 2026-07-10):** Claude appends entries here AUTONOMOUSLY, but
-ONLY for bugs that actually failed in a live/prod run (live render, headless lane,
-soak, published episode). Dev/audit/review catches get fixed, never logged. NO entry
-here touches the Bug Bible directly -- at ship time the operator triggers a BUG
-FAN-OUT over this log, which promotes approved entries into the survival-guide
-Bible in bulk under the Three-File Contract (YAML + README count + regression
-test, one commit). Promoted entries get a `- promotion: BUG-...` mapping;
+**Contract (operator, 2026-07-10; AMENDED 2026-08-07):** Claude appends entries
+here AUTONOMOUSLY, but ONLY for bugs that actually failed in a live/prod run
+(live render, headless lane, soak, published episode). Dev/audit/review catches
+get fixed, never logged. Promoted entries get a `- promotion: BUG-...` mapping;
 rejected ones get marked `REJECTED` and stay for the record. Append-only,
 newest last.
+
+**AMENDMENT 2026-08-07 -- a window MAY now promote a single genuinely-uncovered
+entry directly.** The original rule said "NO entry here touches the Bug Bible
+directly -- at ship time the operator triggers a BUG FAN-OUT". That was written
+when checking coverage meant re-scraping the whole bug history, which was far
+too expensive to do per session. **That constraint is gone:**
+`otr_coverage_index.yaml` in the survival-guide repo now maps all 369 OTR bug
+records through 2026-08-07 to Bible ids, so a window can check ONE new bug
+against the index in seconds instead of paying for a full scrape.
+
+So the rule now splits by SIZE, not by authority:
+
+* **A single new entry -- the window promotes it**, at wrap-up, if and only if:
+  it clears the admission rule above (verified by a live artifact, not a review
+  finding); it is checked against `otr_coverage_index.yaml` AND `BUG_BIBLE.yaml`
+  and found genuinely uncovered; and it lands under the **Three-File Contract**
+  in ONE commit in the survival-guide repo -- YAML entry + README count +
+  executable coverage -- with its `otr_coverage_index.yaml` row appended in the
+  same change. Then stamp `- promotion: BUG-...` here.
+* **The BULK FAN-OUT over the backlog stays the OPERATOR'S**, unchanged. Batch
+  promotion, re-litigating older entries, and any judgment call about whether a
+  historical incident deserves a rule are not a window's to make.
+* **When in doubt, record the candidate and leave it.** A window that cannot
+  cleanly establish "genuinely uncovered" writes the candidate into
+  `docs/GO_FORWARD_PLAN.md` for the fan-out rather than guessing. Never
+  re-scrape indexed history; only the delta past the index date is ever scraped.
+
+This amendment resolves a real contradiction, not a hypothetical one: the
+`otr-handoff` v2 skill instructs a wrapping session to promote a genuinely
+uncovered bug, and the pre-amendment contract forbade it, so the 2026-08-07
+session recorded its candidate instead of promoting. Under this rule that
+session would have promoted.
 
 `promotion` and `status` are deliberately separate axes. `promotion` means a
 real production incident has supplied a reusable Bible rule; `status` continues
@@ -3361,7 +3390,7 @@ symptom.
 ## PBUG-20260807-01 -- the announcer asked the operator to write the opening, and 23 episodes shipped with it as their first line
 
 - status: **FIXED AND LIVE-PROVEN 2026-08-07** (5/5 qualification legs; receipts below)
-- promotion: pending fan-out
+- promotion: BUG-12.86 (survival-guide `7a5fb88`, entry count 261 -> 262, `otr_coverage_index.yaml` row appended in the same commit). Promoted by the window under the 2026-08-07 amendment above, after checking the class against the index and the 261-entry Bible and finding it uncovered.
 - found: corpus scan of shipped ledgers under `output/otr/episodes`, 2026-08-07,
   while investigating a DIFFERENT reported defect (`--premise` allegedly not
   reaching the writer). The premise wiring turned out to be sound; this was next

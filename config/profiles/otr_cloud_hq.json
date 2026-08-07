@@ -1,0 +1,87 @@
+{
+  "id": "otr_cloud_hq",
+  "display_name": "Cloud HQ -- quality all-cloud episode (OpenRouter script + Gemini TTS + Lyria + Gemini image + Veo 3.1 video)",
+  "status": "draft",
+  "ratify_before_emit": [
+    "openrouter_model_pins: operator ratifies concrete OpenRouter slugs for slot-a/slot-b before emission",
+    "audio_cache: content-addressed audio cache keyed by (voice, model, text, config) hash must exist before production use -- Gemini TTS has documented voice drift and no version pinning",
+    "macbeth_probe: one deliberately violent adaptation beat sent through Gemini TTS + Veo to verify no safety refusal before committing an episode -- Veo filters cannot be loosened below block_only_high without a Google account team"
+  ],
+  "platform": "any",
+  "device_backend": "cpu",
+  "gpu_vendor": "none",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "google_veo_video",
+    "music_visual": "google_veo_video",
+    "character_visual": "google_veo_video",
+    "announcer_image": "google_image",
+    "music_image": "google_image",
+    "character_image": "google_image"
+  },
+  "slot_overrides": {
+    "voice_bank": "google_tts",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "google_tts",
+    "announcer_voice_engine": "google_tts",
+    "music_engine": "google_lyria",
+    "video_render_engine": "google_veo_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cpu",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 0,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "openrouter:slot-a",
+    "technical_model": "openrouter:slot-b",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "cpu",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "cpu"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": ["OPENROUTER_API_KEY", "OTR_GOOGLE_API_KEY"]
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": ["--cpu"],
+    "env": {}
+  }
+}

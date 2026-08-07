@@ -14,7 +14,7 @@ blocked on the operator, finishes it green and pushed, then re-reads this list.
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
 **ORDER SET BY THE OPERATOR 2026-08-07** and it now runs straight through
-`ROADMAP.md` as ONE runway -- rows 1-8 live here, rows 9-12 are the roadmap's
+`ROADMAP.md` as ONE runway -- rows 1-9 live here, rows 10-13 are the roadmap's
 later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
@@ -27,13 +27,14 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
 | 8 | **System-agnostic multi-GPU upscale stage** -- built against the profile and registry contracts, NEVER a resurrection of the retired NVIDIA-only node. Promoted out of ROADMAP row 2 by the operator 2026-08-07 | ROADMAP section 2 | own design + arc, then coder | nothing once 1-7 clear |
+| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (BLOCKS production voice; Gemini TTS drifts and cannot be pinned) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | nothing (cache chunk first) |
 
-Then, in `ROADMAP.md`: **9** lean-mean/dead-code -> **10** RunPod + AMD/Mac
-platform tests -> **11** install path -> **12** product docs + v2 release.
+Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
+platform tests -> **12** install path -> **13** product docs + v2 release.
 
 **Items 3, 4, 5, 6 and 7 are blocked on the operator.** A coder window that
 reaches one without an answer skips to the next unblocked item rather than
-guessing. **Items 1, 2 and 8 are the unblocked work**, in that order.
+guessing. **Items 1, 2, 8 and 9 are the unblocked work**, in that order.
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
@@ -104,24 +105,20 @@ input.
    `qwen/qwen3.7-flash` at `0.00000003`/`0.00000013` -- the cheapest credible
    model found, roughly $0.002 for one episode's script volume.
 
-### PENDING BIBLE FAN-OUT -- one candidate, verified uncovered
+### BIBLE PROMOTION -- DONE 2026-08-07, no candidate pending
 
-`docs/PROD_BUG_LOG.md` PBUG-20260807-01 is logged `promotion: pending fan-out`.
-Checked 2026-08-07 against `otr_coverage_index.yaml` and the 261-entry Bible at
-survival-guide `3759ae5`: **the class below is NOT covered.**
+PBUG-20260807-01's class promoted as **BUG-12.86** (survival-guide `7a5fb88`,
+261 -> 262 entries, index row in the same commit): *a receipt or prompt-context
+field keyed on a producer string the producer never emits, so it reads
+empty/False forever.* Four instances found in one afternoon.
 
-**The class:** a receipt or prompt-context field keyed on a producer string or
-attribute the producer NEVER emits -- hidden by `getattr(x, "name", default)` or
-an `in flags` test that silently reads False. It fails in the SAFE direction, so
-nothing complains and it can survive for weeks. FOUR instances: `hook` (an
-attribute `SafeOpenBrief` never defined), `open_safe_fallback`,
-`news_coda_fallback`, and BUG-LOCAL-255's `_speaker_role`.
-**Verify rule:** assert the label BINDS the value, and assert every stamped flag
-string against its producer.
-
-NOT promoted by a coder window: `PROD_BUG_LOG.md`'s own contract (operator
-2026-07-10) reserves promotion for the operator-triggered fan-out, and the r4
-judgment agreed. Recorded here so the fan-out has it ready.
+**The contract changed to allow this.** `docs/PROD_BUG_LOG.md` was amended
+2026-08-07: a window MAY now promote a SINGLE genuinely-uncovered entry directly
+under the Three-File Contract, because `otr_coverage_index.yaml` makes checking
+coverage cheap -- the old fan-out-only rule existed when checking meant
+re-scraping the whole history. **The BULK fan-out over the backlog is still the
+operator's.** Operator's reason for the change, 2026-08-07: *"we keep hitting
+the same bugs so we need to update the bible and test regularly."*
 
 ### STILL OPEN, SMALL, UNSCHEDULED
 
