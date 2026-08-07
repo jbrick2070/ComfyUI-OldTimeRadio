@@ -161,6 +161,14 @@ consequences, NOT objections to the ask:**
    missing is any refresh discipline or staleness signal. Scope: decide whether
    the catalog gets a dated refresh step, or whether the `~...-latest` aliases
    become the recommended default because they resolve at runtime. NOT scheduled.
+   **The real lesson is narrower and sharper than "the catalog drifted"
+   (operator: "it was a promo deal").** `hy3:free` was free PROMOTIONALLY, so it
+   was never going to stay free -- pinning a `:free` slug bakes in an expiry
+   date that nothing in the repo records. A `:free` id is a PRICE PROMISE
+   embedded in an identifier, and price promises expire while identifiers do
+   not. Treat any `:free` or promo-priced slug as time-limited by default:
+   prefer a `~...-latest` alias, or if a free tier is genuinely wanted, record
+   WHEN it was verified free so the next reader knows how stale the claim is.
 
 1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
