@@ -151,6 +151,132 @@ semantic consumers once the bed is gone. A third lane agreed independently
 
 </details>
 
+### 0-QUATER. BANANA ROUTE -- BUILT BUT UNCOMMITTED. QA SAYS **NOT-READY**. This is the live coder item.
+
+**Contract:** `docs/2026-08-06-BUILD-SPEC-banana-route.md` (committed `ec9da848`).
+**Fix plan:** `docs/2026-08-06-PLAN-banana-route-qa-fixes.md` (this session).
+**Operator rulings:** section 2-PRE above -- all closed, none reopenable.
+
+**THE CODE IS ON DISK AND UNCOMMITTED. Do not re-derive it, do not rebuild it,
+and do not `git checkout` it away.** Working-tree state at `ec9da848`:
+
+| path | state | owner |
+|---|---|---|
+| `nodes/_otr_banana_route.py` | NEW, untracked | the banana item (this) |
+| `tests/test_banana_route.py` | NEW, untracked, 38 tests green | the banana item |
+| `nodes/otr_image_gen_dispatcher.py` | MODIFIED (+54, -0) | the banana item |
+| `nodes/_otr_video_engines/render_driver.py` | MODIFIED (+66, -12) | the banana item |
+| `docs/2026-08-06-PLAN-banana-route-qa-fixes.md` | committed with this handoff | the banana item |
+| everything else dirty | **ANOTHER WINDOW'S** | see the exclusion list below |
+
+**NOT YOURS -- never stage, never revert, never edit:** `config/profiles/*`,
+`config/source_banks/_corpus/`, `kibitz/`, `uv.lock`, `tmp/*`,
+`docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md`, `scripts/build_variants.py`.
+Stage nothing until your own commit moment -- the index is shared (the `760a63ae`
+incident, section 0-TER).
+
+**A READ-ONLY QA PASS RETURNED NOT-READY.** One blocking defect, two
+runtime-reproduced bugs, two coverage holes, one cosmetic. Under `CLAUDE.md`'s
+admission rule these are **runtime-reproduced pre-production defects, NOT
+PBUGs** -- they were proven by executing the real code in the ComfyUI venv, not
+by a headless run or a published artifact. **Do not open `PROD_BUG_LOG.md`
+entries or Bug Bible rules for them.**
+
+1. **BLOCKING -- `render_driver.py:2909` caps with the wrong number.**
+   `max(188, len(_banana_prompt))` measures the *pre-transform* string
+   (captured `:2885`), so any branch already over 188 chars may not grow and
+   `cap_phrase_safe` trims the growth off the END. Proven: the ia2v
+   compact-talking branch (185 -> 200 -> capped 185) loses `Static camera.`
+   entirely; a brief+beat prompt (204 -> 219 -> capped 196) has
+   `slow cinematic camera drift` mangled to `slow,`. The ia2v branch is
+   explicitly engineered at `:2633-2638` so "the proven IA2V talking clause
+   still stays intact" -- the cap destroys exactly that invariant.
+2. `_otr_banana_route.py:404` -- `""` is in `_TRUE_TOKENS`, so a
+   present-but-empty `OTR_BANANA_INCLUDE_FIDELITY_BANKS` returns True and
+   silently bananafies the fidelity lanes. `raw is None` at `:412` already
+   covers "unset". Contradicts BUILD-SPEC line 45.
+3. `otr_meta_brief_image_prompt.py:958-970` -- a spoken line ending in an ODD
+   backslash run makes the card's closing quote read as escaped,
+   `_shielded_spans` returns `[]`, and the WHOLE card prompt transforms:
+   `HE DREW HIS BANANA` on the one audience-readable surface.
+4. The cap's phrase-retreat branch (`_otr_banana_route.py:388-395`) has ZERO
+   coverage -- `tests/test_banana_route.py:220-225` never enters it.
+5. No test asserts the six receipt keys on any dispatcher row, in
+   `stills_manifest.json`, or in the video trace.
+6. Cosmetic: the dead `.replace("an long","an long")` at
+   `tests/test_banana_route.py:118`.
+
+**A KIBITZ r1 RAN AND COMPLETED** (Codex + Antigravity, driver Claude;
+artifacts `kibitz-runs/2026-08-06-banana-route-qa-fixes/r1/`, LOCAL ONLY,
+gitignored). **r2/r3/r4 did NOT run -- the operator said "stand down".** Under
+the full-kibitz HARD GATE this is a PARTIAL campaign and may never be reported
+as a full arc.
+
+**r1 PRODUCED TWO CORRECTIONS THAT INVALIDATE THE FIX PLAN AS WRITTEN. Fold
+them BEFORE writing any code:**
+* **Fix 3 is placed one level too low (found independently by BOTH lanes).**
+  The music card at `otr_meta_brief_image_prompt.py:1014` calls
+  `_fold_inner_dquotes(title)` directly and never goes through
+  `_still_word_clean_line`. Those two are the only call sites in the tree, so
+  the scrub belongs in `_fold_inner_dquotes` itself (`:919-925`) or the
+  episode-title path keeps the same leak.
+* **Fix 1 does not actually fix the brief+beat branch (Codex).**
+  `finish_visual_prompt` caps at 188 and `_prefix_video_style_cue` then adds
+  the cue, so the pre-transform length ALREADY equals the proposed
+  `188 + cue_delta` budget -- that branch gets no headroom and behaves exactly
+  as today. And `cap_phrase_safe` protects only `no on-screen text`
+  (`_TRAILING_CLAUSE`, `:354`), so `Static camera.` and the motion tail were
+  never protectable by a budget number at all. The real shape is **a declared
+  budget PLUS a branch-owned protected suffix**, trimming only the expendable
+  body. Codex also sharpened the trigger: cap only when the transform CROSSES
+  the boundary (`pre <= budget < post`), never when the prompt was already
+  over budget before the route touched it.
+* Also flagged and worth folding: the `:2831` budget is CONDITIONAL, not a
+  flat 620 -- that assignment is the `_is_open` motion branch with four
+  sub-paths (motion-register base; an atmosphere append guarded at
+  `_LTX_MOTION_PROMPT_MAX` `:2781-2784`; a `_motion_clause_override` that
+  REPLACES the prompt with arbitrary opt-in text `:2789-2791`; and a
+  google-provider-only `finish_visual_prompt(max_chars=620)` `:2816-2820`),
+  with `_prefix_video_style_cue` on all four at `:2826`. The budget must be
+  set INSIDE the google block; the other three declare none.
+* Codex additionally noted BUILD-SPEC section 9's integration list is bigger
+  than fix 5 (multi-segment prebuilt requests, promptless procedural families,
+  a direct caller with no ledger meta, all six keys reaching the trace) and
+  that BUILD-SPEC section 8's LIVE LEG is missing from the plan's gates.
+* **REJECTED, with reason:** Antigravity's "cut the cache-HIT assertion" --
+  the cache-HIT row is the ONE row that starts as a copy of an older row
+  (`fresh = dict(ref_row or {})`, `otr_image_gen_dispatcher.py:1201`), which is
+  the exact stale-inheritance fault the comment at `:1213-1215` exists to
+  prevent; it is the least duplicative assertion in the set. Also rejected:
+  downgrading the malformed-knob warning to INFO (PBUG-20260723-02 posture and
+  BUILD-SPEC line 46 require a warning).
+
+**THE OPERATOR HAS NOT CHOSEN THE NEXT STEP.** Two options, and the window must
+ASK rather than assume: **(A)** resume the kibitz campaign at r2 with the two
+corrections folded, then r3 and r4, then code -- this satisfies the full-kibitz
+HARD GATE; or **(B)** fix-first with the corrections folded and treat r1 as the
+review of record -- this does NOT satisfy the gate and must be recorded as such.
+
+**Gate order when code is written:** focused
+`tests/test_banana_route.py` + `tests/test_image_platform_c1.py` -> full suite
+-> Bug Bible 17 -> AST/BOM/zero-byte on every touched file -> Sonnet 5 QA on
+the diff -> Fable gate -> ONE pathspec commit -> push -> `HEAD == origin`.
+**No `workflows/` change** -- if the diff touches it, STOP; a decision was made
+against that. Pathspec:
+`nodes/_otr_banana_route.py`, `nodes/otr_image_gen_dispatcher.py`,
+`nodes/_otr_video_engines/render_driver.py`,
+`nodes/otr_meta_brief_image_prompt.py`, `tests/test_banana_route.py`, plus
+wherever the fix-5 integration test lands, plus the two banana docs' status
+flips. Nothing else.
+
+**Live acceptance (BUILD-SPEC section 8, which the plan omitted):** fresh
+selective reset + UTF-8 boot; load `workflows/otr_canonical.json`; force the
+exercised roles to `ltx_audio_in` via `OTR_FORCE_ENGINE_MAP`; fail preflight if
+the effective adapter differs; confirm the asset under `otr/episodes/<ep>/` AND
+`otr/obs/`; eyeball one frame for the banana and its period fit. The default
+procedural graph is INERT for this route (`viz_*` engines ignore `text_prompt`
+and mint no stills) -- seeing no bananas there is correct, not a failure.
+
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
 The reference path is PROVEN WIRED, not proven EFFECTIVE. Live leg
@@ -191,13 +317,18 @@ closed story-quality directive and of the fidelity lanes' invents-nothing rule
 at the TEXT level.
 
 This closes the second half of section 7 of
-`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (**ANOTHER WINDOW's
-untracked file at time of writing -- do not edit it from a different window**).
-**Still OPEN in that same section:** the DEFAULT and the REACH -- one global
-switch on, versus on with the `shakespeare`/`public_domain` fidelity banks
-defaulting it off, versus a per-episode widget. Nobody has ruled on that, and it
-is a taste call: `Is this a dagger which I see before me` becomes `Is this a
-banana which I see before me` on those lanes.
+`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (committed `9c686886`).
+
+**THE DEFAULT AND THE REACH ARE ALSO RULED NOW (2026-08-06, `ec9da848`) --
+that question is CLOSED, do not reopen it.** Global default **ON**, with
+`shakespeare` + `public_domain` defaulting **OFF** via the copied `_LEMMY`
+exclusion idiom, plus `OTR_BANANA_INCLUDE_FIDELITY_BANKS` as the operator's
+force-on override. **NO node widget and NO `workflows/otr_canonical.json`
+change.** So `Is this a dagger which I see before me` stays a dagger on the
+fidelity lanes unless the operator flips the override. Two env switches
+(`OTR_BANANA_STILLS`, `OTR_BANANA_VIDEO`), one per funnel. The whole contract is
+`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; its build state is
+section 0-QUATER below.
 
 ### 2. Operator calls nobody can make for you
 

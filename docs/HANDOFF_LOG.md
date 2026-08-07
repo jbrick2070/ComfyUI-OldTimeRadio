@@ -3,6 +3,54 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD ec9da848 (v2.0-alpha) -- QA (BANANA ROUTE: read-only review, NOT-READY; kibitz r1 only)
+
+Did: read-only QA of the UNCOMMITTED banana-route build against
+  `docs/2026-08-06-BUILD-SPEC-banana-route.md`. **No source file was modified
+  and nothing was committed except these docs.** Verdict **NOT-READY**: one
+  blocking defect, two runtime-reproduced bugs, two coverage holes, one
+  cosmetic -- all enumerated in GO_FORWARD section 0-QUATER with file:line.
+- **The blocker:** `render_driver.py:2909` caps against the PRE-transform
+  length, so any branch already over 188 chars may not grow and the growth is
+  trimmed off the END. The ia2v compact-talking branch loses `Static camera.`
+  outright (185 -> 200 -> capped 185); brief+beat mangles
+  `slow cinematic camera drift` into `slow,`. The ia2v branch is explicitly
+  engineered at `:2633-2638` to keep that clause intact.
+- Also found: `""` in `_TRUE_TOKENS` (`_otr_banana_route.py:404`) makes a
+  present-but-empty `OTR_BANANA_INCLUDE_FIDELITY_BANKS` read as TRUE and
+  silently bananafies Shakespeare / public_domain; and an odd trailing
+  backslash in a spoken line drops the card quote shield entirely
+  (`otr_meta_brief_image_prompt.py:958-970`), putting transformed script on the
+  one audience-readable surface.
+- **Clean and worth not re-deriving:** cold-import safety (stdlib +
+  `_otr_bank_variants` only, proven by a live import with zero heavy modules);
+  the quote shield on the REAL composed card shapes; ON/OFF video seed equality
+  (seed reads only the shot's stamped request hash); OFF-path byte-identity;
+  table closure re-derived over all four variety combos; an AST scan of every
+  string literal in the image/video engines, meta-brief, style helpers and all
+  nine packs against all 83 sources found ZERO camera-vocabulary collisions;
+  no closed key set anywhere breaks on the six new receipt keys.
+- **Kibitz: r1 ONLY** (Codex + Antigravity, driver Claude) --
+  `kibitz-runs/2026-08-06-banana-route-qa-fixes/r1/` (LOCAL ONLY, gitignored).
+  r2/r3/r4 NOT run; operator said "stand down". **This is a PARTIAL campaign
+  and does not satisfy the full-kibitz HARD GATE.** r1 earned its keep twice:
+  both lanes independently caught that the backslash fix was placed one level
+  too low (the music card at `:1014` bypasses `_still_word_clean_line`), and
+  Codex proved the proposed cap fix would not have changed the brief+beat
+  branch at all, because `cap_phrase_safe` protects only `no on-screen text`.
+- Wrote `docs/2026-08-06-PLAN-banana-route-qa-fixes.md`; the two r1 corrections
+  SUPERSEDE parts of it and are recorded in 0-QUATER. Corrected the stale
+  GO_FORWARD 2-PRE line claiming the default/reach was still unruled -- the
+  operator ruled it and `ec9da848` records it.
+
+Current step: banana-route QA fixes, corrections folded, next step UNCHOSEN.
+Next: OPERATOR DECISION -- (A) resume kibitz at r2 -> r3 -> r4 then code
+  (satisfies the HARD GATE), or (B) fix-first with r1 as the review of record
+  (does NOT satisfy it). CODER window owns it either way.
+Models: Claude (rung 4) + one kibitz r1 (codex gpt-5.6-sol high + agy
+  Gemini 3.5 Flash High) + a Claude subagent fan-out for the QA sweep.
+Commits: none on code; this handoff only.
+
 ## 2026-08-06 -- HEAD 9eb6ede1 (v2.0-alpha) -- CODER (SFX RIP 100%: SHIPPED AND LIVE-PROVEN)
 
 Did: executed `docs/2026-08-06-BUILD-SPEC-rip-sfx.md` end to end -- re-pinned
