@@ -3,6 +3,73 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-06 -- HEAD 6843d1eb (v2.0-alpha) -- CODER (no-mirror CODE-COMPLETE; SFX rip CODE-READY)
+
+Did: shipped ALL SIX no-mirror steps, then took the SFX rip through a full
+  four-round kibitz arc. Suite **9018 passed** / 131 skipped / 1 xfailed
+  (8842 -> 9033 -> 9018; the dip is 15 boomerang tests replaced by a 13-test
+  tripwire). Bug Bible 17. `engine_matrix --check` OK.
+  `workflows/otr_canonical.json` byte-unchanged all session. 8 commits, all
+  pushed, HEAD == origin each time.
+- **NO-MIRROR IS CODE-COMPLETE.** `27d48b35` eleven producer surfaces +
+  `CanonicalClip` fields; `ac8a1925` `frame_receipt_version`,
+  `closing_theme_frame_window`, `shot["frame_bounded"]`, centralized manifest
+  index; `f9a7f9df` `RULE_NO_MIRROR` + shape rules + the v1 contract + the
+  exit-2 fix + the composite classifier; `57f92f74` boomerang deleted, fossils
+  swept; `d8187fcd` QA fixes. **Only the LIVE LEG remains.**
+- **THE REVIEW GATE FOUND FIVE WAYS TO PAD AND PASS, each reproduced end to end
+  through `scripts/grade_episode.py` before it was fixed.** The worst: the
+  bounded branch COLLECTED `native_frame_count` and never weighed it, so a clip
+  stamping `frame_count=50 / native=17 / mode="none"` -- confessing 33
+  manufactured frames in its own receipt -- printed ACCEPTED and exited 0. Also:
+  an orphan manifest row was invisible to EVERY rule (they all walked ledger
+  shots, while the rule's own sentence says "any delivered row"); and the `type`
+  exemption sat above the mode check, which combined with a stand-down I had
+  added meant a non-video padded row was caught by NEITHER rule.
+- **Section 7 resolved before any code.** 7.1 CUT by the operator (no SFX in
+  prod -- grounded: zero `sfx` in the canonical JSON); 7.3 DECIDED (boundedness
+  is a ShotLock stamp from `frame_contract.can_split` -- an `acceptance.py`
+  allowlist would be a STARVED CONSUMER, and `coverage_plan` presence does not
+  discriminate at all since `partition_beat` returns a one-segment plan for
+  unbounded contracts); 7.4 verified.
+- **The closing loop had NO test.** Nothing asserted the tail loops -- so the one
+  reuse the operator sanctioned could have been deleted outright and the suite
+  stayed green. Both directions pinned now, plus an end-to-end test that the
+  window the render driver MINTS and the classifier that READS it agree on frame
+  conventions. Measured before touching it: **11 of 12 shipped ledgers** carry a
+  `music_close`/`master_mix` row and all 11 mint a valid window ending exactly at
+  the master length -- so real episodes keep the credits-over-the-scene backdrop.
+- **SFX: FOUR THINGS wear that name and only TWO are in the rip.** The b-roll
+  ROLE was ripped 2026-07-01 (44 tombstones still fail loud, they STAY); the
+  engine lane was PARKED 2026-08-04; the `[SFX:]` markup is dead by SHADOWING;
+  and **the BED was never removed** -- node 85 still calls the bed compiler every
+  run, and one `music_visual` dropdown pick would arm it.
+- **The arc bought things a green suite cannot see:** a SURVIVING engine imports
+  `append_sfx_audio_safety_clause` at module scope (startup ImportError = the
+  node pack vanishes from the menu); `/otr/video_render_single` raises a generic
+  `LookupError` BEFORE any registry check, so the retirement error would never
+  fire on the one path reachable from outside; `_GOOGLE_VIDEO_SFX_ENGINES`,
+  missed by every earlier sweep; and a GUARANTEED failing `>= 30` roster floor
+  against a post-rip 27.
+- **Two corrections to my own work, recorded not patched:** I demanded the
+  PUBLISHED audio be byte-identical to the master -- impossible, the OBS copy is
+  deliberately re-encoded to AAC; the check belongs on the archival final, via
+  the three EXACT ledger-stamped paths rather than a `*_final.mp4` glob that
+  could match a stale artifact. And I propagated a FALSE rationale that
+  `registry.py` imports torch; its own docstring says the opposite. Conclusion
+  survived, reason did not.
+- **Gotcha banked:** `Out-File -Encoding utf8` injects a BOM -- it reached a
+  commit SUBJECT (`e75cc321`). Write commit messages with the file tools.
+
+Current step: no-mirror LIVE LEG (canonical `ltx_video` beat over its 169-frame
+  ceiling WITH the retired env switch SET), and the SFX rip build.
+Next: a CODER window owns the SFX rip end to end --
+  `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`, Fable gate before the commit lands.
+Models: Claude + 4 kibitz rounds (codex gpt-5.6-sol + agy) + 1 scoped agy
+  adjudication + 1 agy QA + a 5-way Sonnet fan-out + 2 Sonnet QA + 2 Fable gates.
+Commits: 27d48b35, 66c177e3, ac8a1925, 74a30d23, f9a7f9df, e75cc321, 57f92f74,
+  d8187fcd, 6843d1eb
+
 ## 2026-08-06 -- HEAD 65bd6705 (v2.0-alpha) -- CODER (multi-clip grader fixed; two campaigns arc'd; the review tail found two more code bugs)
 
 Did: shipped the multi-clip honesty repair after a full four-round kibitz arc + Sonnet QA

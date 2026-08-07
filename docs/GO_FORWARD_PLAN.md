@@ -41,7 +41,7 @@ set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
 rule text -- then re-enter at **r3**, per the standing rule that a plan-level
 gap drops back rather than being patched from inside r4.
 
-### 0-BIS. NO-MIRROR ENFORCEMENT -- STEPS 1-4 SHIPPED, 5-6 OPEN
+### 0-BIS. NO-MIRROR ENFORCEMENT -- CODE-COMPLETE. Only the LIVE LEG is owed.
 
 **Build spec: `docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md`.**
 Section 7 is fully resolved (7.1 CUT by the operator -- no SFX; 7.3 DECIDED --
@@ -54,26 +54,21 @@ boundedness is a ShotLock stamp from `frame_contract.can_split`; 7.4 verified).
 - `f9a7f9df` steps 3+4 -- `RULE_NO_MIRROR` / shape rules / the v1 contract, the
   exit-2 fix for a crashed grader, and the composite's closing-window classifier.
 
-**STILL OPEN -- steps 5 and 6:**
-5. **Delete the dead boomerang atomically** -- `_boomerang_frames`,
-   `_ltx_loop_source_length`, `_LTX_LOOP_MIN_DECODE_FRAMES_DEFAULT`,
-   `_LOOP_VIA_REVERSE_DEFAULT`, `_loop_via_reverse`, `_loop_fill_allowed`, both
-   render/HQ branches, both `ltx_loop_via_reverse` raw fields, and the matching
-   assertions in `test_ltx_boomerang.py`, `test_video_motion_forward.py`,
-   `test_session_ctx_ownership.py`. **CONVERT `test_ltx_boomerang.py`, do not
-   delete it** -- keep a tripwire proving no env value or session state can
-   restore the mirror. Note: step 1 left the receipt stamp CONDITIONAL on
-   `mirrored` in `eng_ltx_video`; when the branch dies the conditional collapses
-   to an unconditional `"none"`.
-6. **The fossil sweep** -- `boomerang`, `ping_pong`, `mirror`,
-   `loop_via_reverse`, `stream_loop`. Known: `frame_contract.py:280-286` (cites
-   the DELETED `extend_frames_to_target` and governs `PLANNING_CAP_ENGINES`),
-   `eng_ltx_8gb.py:32-36,1404-1414`, `beat_session.py:143-154`,
-   `wrapper_bridge.py:525-526`, `eng_wan_ti2v.py:1001-1017`, and above all
-   **`scene_sequencer.py:1831-1842`, an INFO log printed into the operator's LIVE
-   RUN** asserting the boomerang "doubles the rendered half-clip back to full
-   audio duration". A stale comment misleads a reader; a stale log misleads the
-   operator mid-render.
+Steps 5 and 6 shipped in `57f92f74` (boomerang deleted atomically,
+`test_ltx_boomerang.py` CONVERTED into a tripwire rather than deleted, fossils
+swept including the INFO log that was describing the boomerang to the operator
+mid-render). QA fixes in `d8187fcd` after an Antigravity pass returned
+BUILD-READY: two stale texts an operator reads AT FAILURE TIME -- the
+`eng_wan_ti2v` raise still blaming "WAN's ceiling is a RENDER cap, not a planning
+cap" after `wan_ti2v` joined `PLANNING_CAP_ENGINES`, and an HQ docstring still
+advertising "loop" mechanics.
+
+**KNOWN GAP, recorded not hidden:** the AST tripwire catches the SYMBOLS and the
+RECEIPT; it would NOT catch a mirror re-implemented inline under another name.
+The durable defence is `acceptance.grade_no_mirror` (re-derives the count instead
+of believing the mode) plus `render_driver`'s refusal of any segment whose length
+differs from its plan. An honest behavioural test needs a GPU, so it rides the
+live leg.
 
 **THE LIVE LEG IS STILL OWED** and its shape is not negotiable: a canonical
 `ltx_video` beat EXCEEDING its 169-frame ceiling **with the retired env switch
@@ -81,7 +76,7 @@ SET**. A WAN or `ltx_8gb` leg would pass without ever executing the deleted
 machinery. That one leg also discharges F11 and the multi-clip receipt work's
 outstanding live proof.
 
-### 0-TER. SFX RIP -- 100%, kibitz arc IN PROGRESS, no code yet
+### 0-TER. SFX RIP -- 100%. CODE-READY. This is the next coder window's whole job.
 
 **Operator ruling 2026-08-06: "I do really want to rip out SFX 100%, that's my
 aim... but don't break the system."**
@@ -95,20 +90,35 @@ shadowing; and **the SFX BED was never removed** -- `OTR_MasterAudioMux` node 85
 still calls the bed compiler on every run, and one `music_visual` dropdown pick
 would arm it.
 
-**Gate: the full four-round arc, then the Fable gate, before any code.** r1 is
-done (Codex NO, Antigravity yes-with-fixes) and its claims are being grounded.
-A five-way Sonnet fan-out ran first and is folded into spec section 5-BIS.
+**THE ARC IS COMPLETE AND CONVERGED.** r1 -> r2 -> r3 -> r4, Codex + Antigravity
+every round (8 external calls), plus a scoped adjudication lane in r1 and a
+five-way Sonnet fan-out before it. Codex ran no -> no -> no -> yes-with-fixes and
+each round's findings were strictly narrower than the last. Judgments in
+`kibitz-runs/2026-08-06-rip-sfx/r{1,2,3,4}/` (**LOCAL ONLY, gitignored**).
 
-**The open decision r1 surfaced:** Codex demands deleting the vestigial
-`clip_manifest_json` input and link 278 outright; the spec plans to keep them
-wired. That is a TERMINAL-node topology change either way, so it is being
-adjudicated (`docs/2026-08-06-DISPUTE-sfx-test-inventory.md`) rather than guessed.
+**STILL OWED BEFORE THE COMMIT LANDS: the Fable gate.** Structural,
+production-touching, and it touches the TERMINAL publish node.
 
-**Already grounded and NOT optional whichever way that goes:**
-`eng_cloud_video.py:46` imports `append_sfx_audio_safety_clause` at module scope
-and `:886` calls it on the SURVIVING Vidu base class -- deleting the helper
-breaks a surviving engine at import. And `tests/test_frame_receipt_conformance.py:94`
-monkeypatches the extractor, so it breaks the day that symbol dies.
+**THE DECISION THAT STUCK, twice contested:** `clip_manifest_json` and link 278
+STAY WIRED as a vestigial input. Codex demanded deletion in r1 and again in r3;
+the answer both times is risk asymmetry -- a topology mistake on the terminal
+node yields NO episode rather than a degraded one, and the input has zero
+semantic consumers once the bed is gone. A third lane agreed independently
+(`docs/2026-08-06-DISPUTE-sfx-test-inventory.md`).
+
+**THE THREE TRAPS THE NEXT WINDOW MUST NOT RE-DERIVE:**
+1. `mux_master_audio` is `if not sfx_bed_path: <master_copy> else: <sfx_mix>`.
+   **KEEP THE SMALLER `if` BODY.** Keeping the wrong one swaps a `-c:a copy`
+   passthrough for a re-encode on every episode, violating V-1, and NO surviving
+   test would notice.
+2. `eng_cloud_video.py:46` imports `append_sfx_audio_safety_clause` at MODULE
+   SCOPE and `:886` calls it on the SURVIVING Vidu base class. Deleting the
+   helper alone is a startup ImportError -- which in ComfyUI means the node pack
+   vanishes from the menu.
+3. "One atomic green commit" describes the COMMIT, not the tree.
+   `still_plan_head_parity.json` must be REGENERATED against the live registry,
+   so the tree necessarily goes RED inside the commit. Spec section 8 has the
+   intra-commit order.
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
