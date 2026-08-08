@@ -4,8 +4,7 @@
   "status": "draft",
   "ratify_before_emit": [
     "openrouter_model_pins: operator ratifies concrete OpenRouter slugs for slot-a/slot-b before emission",
-    "audio_cache: content-addressed audio cache keyed by (voice, model, text, config) hash must exist before production use -- Gemini TTS has documented voice drift and no version pinning",
-    "macbeth_probe: one deliberately violent adaptation beat sent through Gemini TTS + cloud Wan to verify no safety refusal before committing an episode"
+    "audio_cache: content-addressed audio cache keyed by (voice, model, text, config) hash must exist before production use -- Gemini TTS has documented voice drift and no version pinning"
   ],
   "platform": "any",
   "device_backend": "cpu",
