@@ -78,6 +78,76 @@ def _safe_json(data: bytes) -> Any:
         ) from exc
 
 
+def _best_effort_json(data: bytes) -> tuple[Any, str | None]:
+    """Parse an ERROR body without ever throwing.
+
+    An error body is evidence, not a contract. Letting a non-JSON body (an
+    HTML 502 page, a truncated proxy response) raise out of the parser
+    destroyed the HTTP status before it could be classified -- the caller
+    then saw a shape error and could not tell auth from quota from refusal.
+    Returns ``(parsed_or_None, raw_text_or_None)``.
+    """
+    if not data:
+        return None, None
+    try:
+        return json.loads(data.decode("utf-8")), None
+    except Exception:  # noqa: BLE001
+        try:
+            return None, data.decode("utf-8", errors="replace")[:2000]
+        except Exception:  # noqa: BLE001 -- pragma: no cover
+            return None, repr(data[:200])
+
+
+def _retry_after_seconds(headers: Any) -> float | None:
+    """Bounded ``Retry-After``. Absent/garbage/negative -> None; capped so a
+    hostile or mistaken header cannot park a probe past its deadline."""
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("Retry-After")
+    except Exception:  # noqa: BLE001
+        return None
+    if raw is None:
+        return None
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    return min(value, 300.0)
+
+
+def _attach_evidence(exc: GoogleAPIError, *, status: int | None,
+                     response_json: Any = None, raw_body: str | None = None,
+                     headers: Any = None) -> GoogleAPIError:
+    """Attach structured, non-secret evidence to a classified exception.
+
+    Consumers classify on FIELDS -- never by matching exception text, which
+    is how an infrastructure error gets misreported as a safety refusal.
+    Preserved through every wrapper so the outermost caller still sees it.
+    """
+    exc.http_status = status
+    exc.response_json = response_json
+    exc.raw_body = raw_body
+    exc.retry_after_s = _retry_after_seconds(headers)
+    if status in (401, 403):
+        kind, retryable = "auth", False
+    elif status == 429:
+        kind, retryable = "quota", True
+    elif status in (400, 404, 422):
+        kind, retryable = "request_shape", False
+    elif isinstance(status, int) and status >= 500:
+        kind, retryable = "server", True
+    elif status is None:
+        kind, retryable = "transport", True
+    else:
+        kind, retryable = "http", False
+    exc.failure_kind = kind
+    exc.retryable = retryable
+    return exc
+
+
 def _classify_http_error(status: int, body: Any) -> GoogleAPIError:
     msg = _error_message(body, fallback=f"HTTP {status}")
     if status in (400, 404, 422):
@@ -117,12 +187,21 @@ def _post_json(
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
             return _safe_json(resp.read())
     except urllib.error.HTTPError as exc:
-        body = _safe_json(exc.read())
-        raise _classify_http_error(int(exc.code), body) from exc
+        # Read the body ONCE and parse best-effort. The previous _safe_json
+        # call raised on a non-JSON error body BEFORE the status could be
+        # classified, losing the one field that distinguishes auth from
+        # quota from a content refusal.
+        parsed, raw_text = _best_effort_json(exc.read())
+        classified = _classify_http_error(int(exc.code),
+                                          parsed if parsed is not None else raw_text)
+        raise _attach_evidence(classified, status=int(exc.code),
+                               response_json=parsed, raw_body=raw_text,
+                               headers=getattr(exc, "headers", None)) from exc
     except urllib.error.URLError as exc:
-        raise GoogleAPIError(
-            f"Google API transport failure: {exc}. No fallback was attempted."
-        ) from exc
+        raise _attach_evidence(
+            GoogleAPIError(
+                f"Google API transport failure: {exc}. No fallback was attempted."
+            ), status=None) from exc
 
 
 def _absolute_url(path_or_url: str) -> str:
@@ -156,16 +235,17 @@ def _get_bytes(
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
             return resp.read()
     except urllib.error.HTTPError as exc:
-        body_bytes = exc.read()
-        try:
-            body = _safe_json(body_bytes)
-        except GoogleAPIRequestShapeError:
-            body = body_bytes.decode("utf-8", errors="replace")[:500]
-        raise _classify_http_error(int(exc.code), body) from exc
+        parsed, raw_text = _best_effort_json(exc.read())
+        classified = _classify_http_error(int(exc.code),
+                                          parsed if parsed is not None else raw_text)
+        raise _attach_evidence(classified, status=int(exc.code),
+                               response_json=parsed, raw_body=raw_text,
+                               headers=getattr(exc, "headers", None)) from exc
     except urllib.error.URLError as exc:
-        raise GoogleAPIError(
-            f"Google API transport failure: {exc}. No fallback was attempted."
-        ) from exc
+        raise _attach_evidence(
+            GoogleAPIError(
+                f"Google API transport failure: {exc}. No fallback was attempted."
+            ), status=None) from exc
 
 
 def get_json(

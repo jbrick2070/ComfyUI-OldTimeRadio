@@ -16,15 +16,17 @@ import logging
 import os
 import re
 import urllib.error
-import urllib.request
 from typing import Optional
 
+from .._otr_google_api.client import GoogleAPIError
 from .base import AudioEngineAdapter
 from .registry import register
 
 log = logging.getLogger("OTR")
 
-_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+#: Path on the shared Google client; the full URL (and its base-URL override)
+#: is owned by ``_otr_google_api.client`` now that transport lives there.
+_INTERACTIONS_PATH = "/v1beta/interactions"
 _DEFAULT_MODEL = "gemini-2.5-flash-preview-tts"
 _LOW_COST_RETRY_MODEL = "gemini-3.1-flash-tts-preview"
 _TTS_TIMEOUT_S = 180.0
@@ -175,20 +177,48 @@ def _interaction_payload(model: str, text: str, voice: str) -> dict:
     }
 
 
+#: Structured evidence fields the shared Google client attaches to a
+#: classified exception. Carried across this adapter's own error wrapper so
+#: the outermost caller can still classify on FIELDS rather than on text.
+_EVIDENCE_FIELDS = (
+    "http_status", "response_json", "raw_body", "retry_after_s",
+    "failure_kind", "retryable",
+)
+
+
+def _carry_evidence(target: BaseException, source: BaseException) -> BaseException:
+    """Copy structured evidence from ``source`` onto ``target``.
+
+    Wrapping an exception in a redacted adapter error is correct -- losing the
+    HTTP status while doing it is not. A caller that cannot tell a 403 from a
+    content refusal will report an infrastructure failure as a safety refusal.
+    """
+    for field in _EVIDENCE_FIELDS:
+        if hasattr(source, field):
+            setattr(target, field, getattr(source, field))
+    return target
+
+
 def _post_interaction(api_key: str, payload: dict) -> dict:
-    data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    req = urllib.request.Request(
-        _INTERACTIONS_URL,
-        data=data,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-        },
+    """POST one Interactions request through the SHARED Google client.
+
+    This adapter used to hand-roll the transport, so a refusal or a quota
+    failure arrived as a bare urllib error carrying no status, no parsed body,
+    and nothing a caller could classify on. The shared client owns transport,
+    best-effort error-body parsing, and structured evidence.
+
+    Retries stay with the caller: the model ladder in ``generate_voice`` is
+    this adapter's retry policy, and a second one inside the client would
+    double-POST a paid call.
+    """
+    from .._otr_google_api.client import post_json
+
+    return post_json(
+        _INTERACTIONS_PATH,
+        payload,
+        timeout_s=int(_TTS_TIMEOUT_S),
+        _api_key=api_key,
     )
-    with urllib.request.urlopen(req, timeout=_TTS_TIMEOUT_S) as resp:
-        raw = resp.read()
-    return json.loads(raw.decode("utf-8"))
 
 
 def _sample_rate_from(block: dict) -> int:
@@ -252,10 +282,21 @@ def _extract_audio_data(response: dict) -> dict:
                 ):
                     return _audio_block(data, block)
 
-    raise GoogleTTSError(
+    # A 200 OK carrying no audio is how Gemini surfaces a CONTENT BLOCK on
+    # this endpoint shape (`promptFeedback.blockReason`). Raising bare here
+    # threw that away, so a genuine safety refusal reached callers as an
+    # evidence-free error indistinguishable from an infrastructure hiccup.
+    # http_status stays None on purpose: absent a structured refusal code, a
+    # completed-but-empty response is UNKNOWN, never an inferred refusal.
+    error = GoogleTTSError(
         "Google TTS response did not include audio data in output_audio, "
         "outputAudio, or steps[].content[]"
     )
+    error.response_json = response
+    error.http_status = None
+    error.failure_kind = "empty_response"
+    error.retryable = False
+    raise error
 
 
 def _pcm16le_to_audio(pcm: bytes, sample_rate: int = _SAMPLE_RATE) -> dict:
@@ -401,13 +442,18 @@ class GoogleTTSVoice(AudioEngineAdapter):
             try:
                 response = _post_interaction(api_key, payload)
                 return _audio_from_response(response)
-            except (urllib.error.HTTPError, urllib.error.URLError,
-                    json.JSONDecodeError, UnicodeDecodeError, GoogleTTSError,
-                    ValueError) as exc:
-                last_error = GoogleTTSError(
-                    "Google TTS request failed for model %s: %s"
-                    % (model_id, _redact(exc, extra=(api_key,)))
-                )
+            # GoogleAPIError is what the shared client raises now; the raw
+            # urllib errors stay in the tuple because this seam's contract is
+            # "ANY failure of this POST comes back redacted", and that
+            # guarantee must not depend on which layer raised.
+            except (GoogleAPIError, urllib.error.HTTPError,
+                    urllib.error.URLError, json.JSONDecodeError,
+                    UnicodeDecodeError, GoogleTTSError, ValueError) as exc:
+                last_error = _carry_evidence(
+                    GoogleTTSError(
+                        "Google TTS request failed for model %s: %s"
+                        % (model_id, _redact(exc, extra=(api_key,)))
+                    ), exc)
                 remaining = models[attempt:]  # local tuple; not a re-computed default
                 if remaining:
                     next_model = remaining[0]

@@ -3,6 +3,185 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 (evening) -- v2.0-alpha -- CODER (Macbeth safety probe: harness BUILT, Commit 1)
+
+Did: implemented `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md`
+  end-to-end. The r1-r4 arc had CLOSED pre-code; this window opened directly
+  against the locked spec and worked its VERIFY-AT-BUILD checklist against the
+  real tree BEFORE writing anything.
+- **THE HEADLINE: the conditional discharge predicate resolves PERMISSIVE.**
+  All four frozen provider-bound inputs RETAIN explicit II.ii violence, so a
+  full four-cell PASS *is* eligible to discharge the gate:
+  - A1/A2/A3 (one shared visual prompt): `bloody`, `crimson`, `daggers`,
+    `murdering` -- *"Macbeth stands with bloody daggers and crimson hands
+    after murdering Duncan in the dark, gathering tension, the story's peak
+    intensity, slow cinematic camera drift, low torchlight, dread"*
+  - A4 (TTS): `blood`, and `[Stabbing him]` + the `MACBETH:` speaker label are
+    both correctly STRIPPED by `_otr_script_prep`, exactly as r4 predicted.
+  **Honest caveat recorded in the harness:** the episode brief is authored to
+  be representative of a Macbeth II.ii adaptation brief. What the probe proves
+  is that PRODUCTION'S COMPOSITION PATH PRESERVES violent brief language end to
+  end -- which is precisely the r4 claim under test.
+- **Why violence survives at all.** `_INTENT_CLAUSES` (7 distinct strings) and
+  `_ARC_CLAUSES` (5) are closed and carry NO violence -- the strongest are
+  "voices in conflict" and "the story's peak intensity". Violence reaches a
+  video engine ONLY through `get_story_brief_ltx`'s <=90-char brief core.
+  Also confirmed: `append_visual_safety_clause` was RETIRED 2026-08-05 under
+  the no-content-guardrails directive (both clauses are now `""`), so OTR does
+  not scrub the visual prompt.
+- **VERIFY-AT-BUILD grounding (every r4 claim checked at the line).** All three
+  ledger-field defect instances CONFIRMED: `banana_gate` (`:609-629` -- the
+  docstring itself documents absent-`source_bank` as permissive; both lanes
+  default ON `:586,590`), the style pool (`:844-846`, keyed on the DIFFERENT
+  field `style_pool_class`, stamped from `banks.json:149` `"adaptation"` via
+  writer `:3863-3864`), and `_LEMMY` (`:1241-1249`, same idiom, takes an
+  explicit arg so likely inert -- asserted anyway). Veo money bug (`:573-580`)
+  and full-timeout-per-GET (`:390-403`) confirmed. `_probe_macbeth` really
+  would have raised `OtrPathContractError`. Comfy retry defaults confirmed
+  exactly 3/16/10 and `raise Exception(msg)` at `client.py:823` is a bare
+  builtin, so `CloudMediaError.raw_response` stays CUT.
+- **Two findings the arc did not have:**
+  1. **Only ONE ComfyUI core actually exists on disk.** `Documents/ComfyUI` has
+     no `comfy_api_nodes`; only `ComfyUI-Installs/ComfyUI/ComfyUI` does. r4
+     MF-7's "two roots" is really repo-root vs core-root, and
+     `otr_cloud_s0_smoke.py`'s default is correct. The pin stays as a loud
+     assertion, but the ambiguity is resolved.
+  2. **The Google evidence defect is ASYMMETRIC.** `_get_bytes` (`:158-164`)
+     already did the best-effort error-body parse; `_post_json` (`:119-121`)
+     did NOT. Only the POST path lost the HTTP status.
+- **`validate_canonical_workflow`'s fail-open reproduced LIVE:** it printed
+  `SKIPPED ... could not resolve NODE_CLASS_MAPPINGS` and then `OK`, exit 0.
+  Cause: the package dir is `ComfyUI-OldTimeRadio` (hyphen), so
+  `import ComfyUI_OldTimeRadio` can never resolve -- ComfyUI loads it BY PATH.
+  The probe's pre-flight loads it by path and runs the REAL
+  `validate_workflow_contract` (34 node classes), so a SKIP is genuinely fatal
+  here rather than aspirationally fatal.
+- **Shipped:** `scripts/otr_macbeth_probe.py` (fail-closed pre-flight,
+  `SUBMITTING->ACCEPTED->POLLING->TERMINAL` attempt machine that never
+  auto-resubmits, bounded poller capping every GET at
+  `min(60s, deadline-now)`, 7-state taxonomy, Windows-safe atomic report,
+  pinned validation constants, CLI) + `tests/test_otr_macbeth_probe.py`
+  (88 hermetic tests, no `live` marker, zero spend) + the Google evidence
+  plumbing (`_best_effort_json`, `_attach_evidence`, bounded `Retry-After`) +
+  TTS routed through the shared client with `disable_retry=True` (the model
+  ladder is a paid re-POST per rung).
+- **Suite 9440 passed / 111 skipped / 1 xfailed, ZERO failures** (baseline
+  9356/111/1; +84 is this sprint's new tests). Bible 17/24/3 at survival-guide
+  `7a5fb88` -- note the Bible moved past the handoff's `3759ae5` pin (261->262
+  entries) and CLAUDE.md says re-sync rather than pin the stale copy.
+- **THREE REQUEST-SHAPE BUGS caught by grounding my own call sites against the
+  engines (each would have wrecked the first live run):**
+  1. **A2 would have CRASHED.** I hand-built partner inputs
+     (`image`/`prompt`/`duration`); the `cloud_wan_i2v` row REQUIRES
+     `first_frame`/`model`/`prompt_extend`/`seed`/`watermark` with the prompt
+     NESTED inside `model` (`partner_nodes.yaml:440-471`,
+     `eng_cloud_video.py:796-823`), so `_validate_declared_inputs` rejects it.
+     Fixed by driving the SHIPPED `CloudWanI2VEngine` with a full request dict
+     -- which is what the spec said, and which also makes A2 measure
+     production rather than the harness. (`seed_bundle.request_seed`, not
+     `.seed`.)
+  2. **A MONEY BUG on A3.** Veo derives its billed duration from
+     `timing.target_frame_count / canvas.fps` -- NOT from any `duration_s` key
+     -- and falls back to **8 seconds** when it cannot
+     (`eng_google_veo_video.py:244-273`). My request carried `duration_s`, so
+     without `OTR_GOOGLE_VEO_DURATION_S` exported it would have billed ~$0.40
+     against a $0.20 reservation. Asserting an env var equals its pin proves
+     nothing when the var is UNSET, so pre-flight now asks the ENGINE what it
+     would bill (`assert_resolved_video_duration`) and fails closed.
+  3. **A1 would have gone out PORTRAIT.** `_canvas_wh` reads TOP-LEVEL
+     `width`/`height` and never looks inside `canvas`
+     (`eng_google_image.py:101-110`), so a canvas-only request silently yields
+     the 832x1216 default at 2:3 -- a portrait still handed to a 16:9 video
+     arm. Both idioms are now supplied.
+- **THREE OF MY OWN BUGS, caught and root-fixed before commit:**
+  1. **sys.path ordering.** `bootstrap_sys_path`'s `if p not in sys.path`
+     guard preserved a path's EXISTING position, so a repo root already at a
+     late index ended up BEHIND a freshly inserted core -- and the core ships
+     `nodes.py` while OTR ships `nodes/`, so `import nodes` resolved to the
+     core and every `from nodes.X import Y` broke process-wide. Ordering is
+     now forced, not appended.
+  2. **Test-isolation leak (same class as `867f16c3`).** Those tests injected
+     the comfy core into the shared pytest interpreter and it outlived them,
+     breaking 4 import-behaviour tests that run after this file
+     alphabetically. Root fix: split `ensure_repo_on_path()` (OTR-only, no
+     core) from `bootstrap_sys_path()` (live paths only); plus an autouse
+     `sys.path` restore fixture and a test that pins the property.
+  3. **Tautological audio assertion.** `validate_audio(dest, expect_rate=rate)`
+     compared the provider's reported rate against ITSELF -- an assertion that
+     could never fail. Now pinned to 24 kHz mono PCM16LE independently.
+  Also: evidence is now an explicit field ALLOWLIST (a raw provider body can
+  echo the request, and the request carries the key), and
+  `inputs_retained_violence` reads the frozen inputs rather than the
+  eligibility verdict, which `--only-cell` overwrites.
+- **Sonnet 5 QA-on-diff (08-05 rule) found ONE genuine MUST-FIX I missed, and
+  it is the mirror image of the failure mode this gate exists to prevent --
+  not a false PASS but a LOST SAFETY_REFUSAL.** Gemini surfaces a content
+  block on this endpoint shape as a **200 OK with no media** and a
+  `promptFeedback.blockReason`. Both `_extract_audio_data`
+  (`eng_google_tts.py:283`) and `_extract_image_data`
+  (`eng_google_image.py:206`) raised BARE on that path, so the body never
+  reached `classify_refusal` -- which is written specifically to read that
+  field -- and a real refusal on **A1 or A4, the two arms most likely to be
+  refused this way**, would have been reported as UNKNOWN, indistinguishable
+  from an infra hiccup. Both now attach `response_json` before raising, with
+  `http_status` left None ON PURPOSE so that a completed-but-empty response
+  WITHOUT a structured code still classifies UNKNOWN rather than an inferred
+  refusal. Two tests pin both directions. Sonnet reproduced the defect
+  empirically against a mocked 200 body.
+- **Three SHOULD-FIXes folded:** A2's env knobs were entirely unpinned
+  (`OTR_CLOUD_WAN_RESOLUTION|DURATION|PROMPT_EXTEND`, `OTR_CLOUD_VIDEO_EST_USD|
+  TIMEOUT_S`) on a box with plenty of stale OTR vars exported -- now in
+  `ENV_PINS`; A2's request dict was hand-duplicated in the test rather than
+  shared, so a key rename would stay green until the paid run -- now one
+  `a2_request()` builder used by both; and a transient 429/503 during the
+  up-to-900s Veo poll aborted the whole $0.20 attempt as ORPHANED -- the poll
+  now continues on a `retryable` error (safe: retrying a GET against a STORED
+  `operation_name` cannot double-charge, the submit is never replayed).
+  Both NITs addressed too: the side-effect-free test now OBSERVES
+  `sys.path`/`sys.modules` across the import instead of asserting constants,
+  and the audio-pin test asserts the signature default + real 48k rejection
+  instead of a source substring.
+- **One more money-safety hole found on a final read of A3:** the paid POST
+  returns, then `_extract_operation_name` parses the envelope -- and it RAISES
+  on a malformed one. A raise there would have stranded an already-CHARGED
+  job with nothing on disk to poll or reconcile it by. The receipt (raw name +
+  the envelope's KEY NAMES only, never the body) is now persisted BEFORE the
+  name is parsed, and a test pins the ordering.
+- **Fable final gate (08-06 rule): PASS, no MUST-FIX** -- the one it found was
+  the A3 receipt-ordering hole above, already fixed on disk mid-review. It
+  independently re-grounded the five ledger assertions, confirmed
+  `append_visual_safety_clause` + `VISUAL_SAFETY_NEGATIVE_PROMPT` are retired
+  so nothing scrubs the prompt between the frozen string and the provider,
+  confirmed no fallback-asset fabrication exists on any PASS path, and ran a
+  zero-spend freeze live. Four SHOULD-FIXes folded: a failure BEFORE any
+  network I/O was labelled ORPHANED with "after the request was transmitted"
+  (untrue -- a new **PREPARING** state, excluded from `AMBIGUOUS_STATES`, now
+  covers imports/payload-build/tensor-check so the operator is never sent
+  hunting a charge that never happened); A2's `CloudMediaError.code`
+  (AUTH/TIMEOUT/PROVIDER_REJECTED -- the only structure an A2 failure has) is
+  now kept in evidence; and three dead names cleaned up.
+- **TWO ACCEPTED RESIDUALS, stated not hidden** (both recorded in the
+  pre-flight receipt): A2's installed Comfy client retries INTERNALLY
+  (3/16/10), so its submit POST can be re-issued inside the partner node --
+  patching that would make A2 measure a non-production configuration, so it is
+  documented rather than defeated. And a refusal surfaced ONLY in
+  non-allowlisted fields lands UNKNOWN/PROVIDER_ERROR -- conservative by
+  design: it can never discharge the gate, only cost an escalation.
+- **Both profile JSONs are byte-identical** -- `git diff` on them is EMPTY.
+  Commit 2 (the actual discharge) is a SEPARATE, CONDITIONAL commit that only
+  fires if all four cells PASS live.
+Current step: Commit 1 pushed; the live 4-cell run is next.
+Next: run the live probe (~$0.72, backgrounded + polled), then the conditional
+  Commit 2, then the Bug Bible promotion for the ledger-field defect class
+  (the admission rule needs the live artifact first).
+Follow-up chips owed: (1) Antigravity r4 retry if a second opinion is wanted;
+  (2) Bug Bible promotion for the ledger-field defect class AFTER the live run;
+  (3) `_otr_casting.py:1241-1248` `_LEMMY` deeper look; (4) `_prefix_video_style_cue`
+  runs AFTER the 188-char cap and re-budgets rather than re-truncating --
+  CONFIRMED at `render_driver.py:2911-2912`, so the final prompt CAN exceed 188;
+  file or accept; (5) item 8 SHA pin; (6) SF#1 stale-metadata clearing;
+  (7) SF#1 caplog degraded-write test.
+
 ## 2026-08-08 (afternoon) -- v2.0-alpha -- CODER (SF#1 SHIPPED + live-proven; Macbeth-probe r1-r4 arc CLOSED pre-code)
 
 Did: three commits shipped and pushed, SF#1 live-proven against real Google

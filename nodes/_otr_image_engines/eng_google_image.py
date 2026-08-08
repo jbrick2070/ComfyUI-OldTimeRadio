@@ -203,10 +203,21 @@ def _extract_image_data(response: dict) -> dict:
                 and (kind == "image" or mime.startswith("image/"))
             ):
                 return _image_block(data, block)
-    raise GoogleAPIRequestShapeError(
+    # A 200 OK carrying no image is how Gemini surfaces a CONTENT BLOCK on
+    # this endpoint shape (`promptFeedback.blockReason`). Raising bare here
+    # threw that away, so a genuine safety refusal reached callers as an
+    # evidence-free error indistinguishable from an infrastructure hiccup.
+    # http_status stays None on purpose: absent a structured refusal code, a
+    # completed-but-empty response is UNKNOWN, never an inferred refusal.
+    error = GoogleAPIRequestShapeError(
         "Google image response did not include image data in output_image, "
         "outputImage, or steps[].content[]"
     )
+    error.response_json = response
+    error.http_status = None
+    error.failure_kind = "empty_response"
+    error.retryable = False
+    raise error
 
 
 def _write_provider_image(response: dict) -> dict:
