@@ -5,7 +5,9 @@
 **Status:** Unblocked, not started. Licensing cleared 2026-08-07 — see `docs/licensing/MINIMAX_H3_AUTHORIZATION.md`.
 **Verdict up front:** H3 is worth testing, but two things are already known before a byte is downloaded. It is a **15-second shot generator**, not an episode renderer. And **no published variant fits 14.5 GB resident** — the smallest diffusion model on the Hub is 15.6 GB and the smallest text encoder is 14.6 GB, so running H3 here requires the weight-streaming mechanism this project has already discarded. See §2 Q1. That decision is the gate.
 
-This document is the testing protocol. It follows the same discipline as the HyWorld Gate 0 in `ROADMAP.md`: **no integration code until the gate produces measured numbers.** Every figure below marked *(reported)* comes from secondary sources and is a hypothesis to falsify on our own hardware, not a fact to build on.
+This document is the testing protocol. It follows the same discipline as the HyWorld Gate 0 in `ROADMAP.md`: **no integration code until the gate produces measured numbers.**
+
+Two kinds of number appear below, and they carry different weight. **Artifact sizes in §2 Q1 are facts** — the Hub's own byte counts, not secondary reporting. **Every runtime figure — peak VRAM, wall time, whether a clip completes — is unmeasured** and is a hypothesis to falsify on our own hardware. Do not build on the second kind.
 
 ---
 
@@ -180,7 +182,7 @@ Write results to `docs/superpowers/specs/h3_gate0_results.md`. No integration co
 
 - **All pass** → H3 becomes a candidate for the v2 visual sidecar. Write the recipe, then re-open the H3-vs-HyWorld decision with real numbers on both sides.
 - **Fits VRAM but too slow** → park it. Record the wall-clock number; revisit when quantization improves. A visual pass that triples episode render time fails the "queue it and walk away" promise in the README.
-- **Q1 or Q2 fails** → stop. Record the measurement, add H3 to the discarded-ideas list with the reason, and let HyWorld Gate 0 proceed unblocked. This is the most likely outcome given 26.9 GB peak on a larger card.
+- **Q1 or Q2 fails** → stop. Record the measurement, add H3 to the discarded-ideas list with the reason, and let HyWorld Gate 0 proceed unblocked. This is the most likely outcome: the smallest published diffusion model is 15.6 GB against a 14.5 GB ceiling, so a pass requires the RAM-streaming mechanism already on the discarded list.
 - **Q3 fails** → escalate to explicit security review. Do not flip `trust_remote_code`.
 
 ---

@@ -110,7 +110,9 @@ Source: review triage K4.
 ### 14. MiniMax H3 recipe gate *(licensing cleared 2026-08-07)*
 Open-weight omni-modal video model: 15-second 2K clips with native stereo audio. Commercial-use authorization from MiniMax is on file for Blueberrky Kale Yoga Books, which is what makes local weights legal here at all — the H3 Community License puts the US in its Excluded Territories. Testing is unblocked.
 
-Two numbers govern viability: 26.9 GB peak VRAM reported at NVFP4 on a *desktop* 5090, against our 14.5 GB ceiling; and a 15-second clip ceiling against a 30+ minute episode. Only a 4-bit path is plausible, and only as a v2 visual sidecar feeding the existing audio master — never replacing it. Run the gate before writing a line of integration code.
+Two numbers govern viability. The smallest diffusion model published anywhere is 15.6 GB and the smallest text encoder is 14.6 GB — both over our 14.5 GB ceiling, so **nothing fits resident** and H3 needs the RAM-streaming mechanism already on the discarded list below. And a 15-second clip ceiling against a 30+ minute episode confines H3 to a v2 visual sidecar feeding the existing audio master — never replacing it. Settle the streaming question before downloading anything; run the gate before writing a line of integration code.
+
+`scripts/fetch_minimax_h3.py` handles acquisition when that decision goes the right way.
 
 Overlaps HyWorld (items 3, 4, 6, 8). Do not run both visual bets in parallel on one 16 GB GPU — pick a lead once H3 Gate 0 has numbers.
 
