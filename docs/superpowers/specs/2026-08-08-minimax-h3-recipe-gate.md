@@ -3,7 +3,7 @@
 **Date:** 2026-08-08
 **Author:** Claude (Cowork mode)
 **Status:** Unblocked, not started. Licensing cleared 2026-08-07 — see `docs/licensing/MINIMAX_H3_AUTHORIZATION.md`.
-**Verdict up front:** H3 is worth testing, but it is a **15-second shot generator**, not an episode renderer, and the only VRAM path that plausibly fits our 14.5 GB ceiling is 4-bit. Measure before designing anything.
+**Verdict up front:** H3 is worth testing, but two things are already known before a byte is downloaded. It is a **15-second shot generator**, not an episode renderer. And **no published variant fits 14.5 GB resident** — the smallest diffusion model on the Hub is 15.6 GB and the smallest text encoder is 14.6 GB, so running H3 here requires the weight-streaming mechanism this project has already discarded. See §2 Q1. That decision is the gate.
 
 This document is the testing protocol. It follows the same discipline as the HyWorld Gate 0 in `ROADMAP.md`: **no integration code until the gate produces measured numbers.** Every figure below marked *(reported)* comes from secondary sources and is a hypothesis to falsify on our own hardware, not a fact to build on.
 
@@ -42,19 +42,55 @@ These decide whether H3 is viable here. Answer them in order; a failure at #1 or
 
 ### Q1 — Does any variant fit 14.5 GB?
 
-Reported footprints, worst to best:
+**On current evidence, no — not fully resident.** These are actual file sizes from the Hub, not reported figures.
 
-| Variant | Disk | Peak VRAM | Source |
-|---|---|---|---|
-| BF16 base | ~123.6 GB | far over | *(reported)* |
-| NVFP4 pruned+quantized | 31.7 GB | **26.9 GB** on RTX 5090 | *(reported)* |
-| Smallest official variants | 42.5 GB min download | — | *(reported)* |
-| 4-bit NF4 + DiffSynth-Studio | — | **~8 GB claimed** | *(reported)* |
-| Community quant/prune collections | — | targeted at 16–24 GB cards | *(reported)* |
+H3 is a four-part stack: a diffusion model (pick **one** of FL2VA or Ref2VA), the Qwen3-VL-32B text encoder, a video VAE, and an audio VAE.
 
-The NVFP4 number is the alarming one: **26.9 GB peak is 12+ GB over our ceiling**, on a desktop 5090 with more headroom than our laptop 5080. Only the 4-bit NF4 path is in the running, and an "8 GB minimum" claim almost certainly means 480p/short-frame-count, not 2K/15s. Treat the 8 GB figure as marketing until measured.
+**`Comfy-Org/MiniMax-H3`** — the ComfyUI repackage, 3.1M downloads, the obvious starting point for a ComfyUI node pack:
 
-Budget note: 42.5 GB of weights is a real disk cost. `models/` is gitignored, so this never touches the repo — but confirm free space before downloading.
+| Component | Variant | Size |
+|---|---|---|
+| Diffusion (FL2VA *or* Ref2VA) | bf16 | 66.3 GB |
+| | int8_convrot | 34.0 GB |
+| | pruned_bf16 | 40.2 GB |
+| | **pruned_fp8_scaled** | **21.0 GB** |
+| | **pruned_int8_convrot** | **21.0 GB** |
+| Text encoder (Qwen3-VL-32B) | bf16 | 51.5 GB |
+| | int8_convrot | 27.1 GB |
+| | **nvfp4_awq** | **15.7 GB** |
+| Video VAE | fp16 | 5.2 GB |
+| Audio VAE | fp32 | 0.6 GB |
+
+Smallest viable Comfy-Org stack: 21.0 + 15.7 + 5.2 + 0.6 = **42.5 GB**. That exactly reproduces the widely-quoted "42.5 GB minimum download," which confirms the reading.
+
+**`Abiray/MiniMax-H3-GGUF`** — goes lower, and ships two ComfyUI workflow JSONs plus a NOTICE file:
+
+| Component | Quant | Size |
+|---|---|---|
+| FL2VA / Ref2VA unet | **Q3_K_M / Q3_K_S** | **15.6 GB** |
+| | Q4_0 | 18.6 GB |
+| | Q4_K_M | 19.9 GB |
+| | Q8_0 | 36.0 GB |
+| Text encoder | **Q4_K_M** | **14.6 GB** |
+| | int4_convrot | 15.0 GB |
+
+Smallest GGUF stack: 15.6 + 14.6 + 5.2 + 0.6 = **36.0 GB** on disk.
+
+**The verdict.** The smallest diffusion model in existence today is **15.6 GB (Q3_K_M)** — already above our 14.5 GB ceiling and above the card's 16 GB before a single activation, VAE tensor, or context frame. The smallest text encoder is **14.6 GB**, which by itself consumes the entire budget. Nothing here fits.
+
+That does not make H3 impossible, but it forces a specific architecture:
+
+1. **Sequential residency** — load encoder, encode the prompt, fully evict, then load the diffusion model. The two can never coexist.
+2. **Block-swap / layer streaming from system RAM** for the diffusion model, since even Q3_K_M overflows.
+
+Point 2 is the problem. `ROADMAP.md` lists **"Weight streaming from system RAM via ComfyUI-Manager"** and **"Asynchronous weight streamer as a fallback for 16 GB OOM"** under *discarded ideas — do not revisit*. H3 on this card requires exactly the class of mechanism we already rejected. Either that decision gets revisited deliberately, with the wall-clock cost measured, or H3 doesn't run here. **Do not let this get re-litigated silently inside an integration PR.**
+
+The "~8 GB minimum via 4-bit DiffSynth-Studio" figure circulating in coverage is layer-by-layer streaming — the same discarded mechanism, described optimistically. It is not a resident-weights number.
+
+**Download traps:**
+- `Abiray/MiniMax-H3-GGUF` lists `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` at **27.1 GB**, which is byte-for-byte the size of Comfy-Org's *int8_convrot*, not its 15.7 GB nvfp4_awq. The file looks mislabeled. **Pull the nvfp4 encoder from `Comfy-Org`,** not from there.
+- FL2VA and Ref2VA are the same size. Download **one**. Picking both doubles a 21 GB line item for nothing.
+- Confirm ≥ 60 GB free first. `models/` is gitignored, so none of this touches the repo.
 
 ### Q2 — Do the quantized kernels exist for sm_120 + torch 2.10 + CUDA 13 on Windows?
 
@@ -79,9 +115,10 @@ Two consequences follow immediately:
 
 Run in order. Record peak VRAM and wall time for every step. Stop at the first hard failure and record why.
 
-1. **Kernel/wheel survey.** Confirm quantized-inference support for sm_120 + torch 2.10 + CUDA 13 + Windows. Pass/fail. *(Do this before any download.)*
+0. **Settle the weight-streaming question first.** Q1 shows nothing fits resident. Decide, explicitly and on the record, whether the discarded "streaming from system RAM" mechanism is back on the table for H3 only. If the answer is no, the gate ends here and costs nothing. *(Do this before any download.)*
+1. **Kernel/wheel survey.** Confirm quantized-inference support for sm_120 + torch 2.10 + CUDA 13 + Windows. Pass/fail. *(Also before any download.)*
 2. **Disk check.** Confirm ≥ 60 GB free before pulling weights.
-3. **Acquire the smallest viable quantized variant.** Pin the exact revision hash — §VII.1 of the license disclaims any support or update obligation, so upstream can move without notice.
+3. **Acquire the smallest viable stack.** GGUF Q3_K_M unet + Q4_K_M encoder (36.0 GB) is the floor; Comfy-Org pruned_fp8_scaled + nvfp4_awq (42.5 GB) is the ComfyUI-native option. Pick one path, one of FL2VA/Ref2VA, and pin the exact revision hash — §VII.1 of the license disclaims any support or update obligation, so upstream can move without notice.
 4. **Loader smoke test.** Load under `trust_remote_code=False`. Record peak VRAM at load, before any generation.
 5. **Minimum-viable generation.** One short clip at the lowest supported resolution and frame count. Record peak VRAM, wall time, and whether the OTR pipeline's own weights can coexist or must be fully evicted first.
 6. **Target-shape generation.** One clip at the resolution and duration a real scene sidecar would need. Record the same three numbers.
@@ -117,3 +154,5 @@ Write results to `docs/superpowers/specs/h3_gate0_results.md`. No integration co
 - `ROADMAP.md` — platform pins, HyWorld Gate 0 protocol this gate mirrors
 - MiniMax H3 Community License — `https://huggingface.co/MiniMaxAI/MiniMax-H3/LICENSE`
 - ComfyUI day-0 H3 support — `https://blog.comfy.org/p/minimax-h3-day-0-support-in-comfyui`
+- `Comfy-Org/MiniMax-H3` — ComfyUI repackage, safetensors, source of the §2 Q1 sizes
+- `Abiray/MiniMax-H3-GGUF` — GGUF quants down to Q3_K_M, plus two ComfyUI workflow JSONs worth reading as recipe starting points
