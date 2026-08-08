@@ -97,11 +97,36 @@ def test_load_calls_model_loader_with_resolved_device(tmp_path):
     assert engine.device == torch.device("cpu")
 
 
-def test_load_raises_missing_model_when_file_absent(tmp_path):
-    """No RealESRGAN file anywhere -> classified EngineUnusable(MISSING_MODEL)."""
+def test_load_raises_missing_model_when_file_absent(tmp_path, monkeypatch):
+    """No RealESRGAN file anywhere -> classified EngineUnusable(MISSING_MODEL).
+
+    Isolates BOTH candidate lookups from the real filesystem:
+      * folder_paths.get_folder_paths() returns an empty tmp dir; AND
+      * the module's __file__ is monkeypatched so the parents[4] fallback
+        resolves to a tmp-only root whose models/upscale_models/ is empty.
+
+    Without the second isolation this test silently passed under "no model
+    installed" and false-passed once the operator downloaded the weights
+    into <comfy_root>/models/upscale_models/ (item 8 tombstone follow-up
+    chip #4). The assertion is about the ABSENCE OF WEIGHTS anywhere the
+    adapter looks, not about folder_paths alone.
+    """
+    from nodes._otr_upscale_engines import eng_spandrel_esrgan
     from nodes._otr_upscale_engines.eng_spandrel_esrgan import SpandrelEsrgan
     empty_dir = tmp_path / "upscale_models"
     empty_dir.mkdir()
+    # Build a 5-deep fake ComfyUI tree so parents[4] lands in fake_root.
+    # The .py file itself does not need to exist -- resolve(strict=False)
+    # accepts nonexistent paths and returns them absolute unchanged.
+    fake_root = tmp_path / "fake_comfy_root"
+    (fake_root / "models" / "upscale_models").mkdir(parents=True)
+    fake_file = (
+        fake_root
+        / "custom_nodes" / "ComfyUI-OldTimeRadio" / "nodes"
+        / "_otr_upscale_engines" / "eng_spandrel_esrgan.py"
+    )
+    monkeypatch.setattr(eng_spandrel_esrgan, "__file__", str(fake_file))
+
     mock_spandrel = mock.MagicMock()
     mock_spandrel.ModelLoader = mock.MagicMock()
     mock_folder_paths = mock.MagicMock()
