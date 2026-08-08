@@ -3044,14 +3044,17 @@ class OTR_LedgerScriptWriter:
                     ),
                 }),
                 # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
-                # APPENDED at the END of optional (indices [19]/[20]) so the
-                # existing [0..18] widget order is untouched. PASSIVE: a pick
-                # here binds a real slug to openrouter:slot-a/b but does NOT
-                # activate remote -- it is used only when creative_writing_model
-                # / technical_model selects that handle. Choices come from the
-                # S0 disk cache (network-free); remote-disabled shows the
-                # "(enable OpenRouter)" sentinel. Resolution + preservation
-                # land in S3.
+                # APPENDED at the END of optional so the existing widget order
+                # is untouched. They land at widgets_values[17]/[18] -- verified
+                # against workflows/otr_canonical.json on 2026-08-07. (This
+                # comment said [19]/[20] until then; a wrong positional claim in
+                # a POSITIONAL widgets_values system is a trap, so it is stated
+                # here only because it was re-verified.) PASSIVE: a pick here
+                # binds a real slug to openrouter:slot-a/b but does NOT activate
+                # remote -- it is used only when creative_writing_model /
+                # technical_model selects that handle. Choices come from the S0
+                # disk cache plus the curated aliases (network-free);
+                # remote-disabled shows the "(enable OpenRouter)" sentinel.
                 "openrouter_slot_a_model": (
                     _slot_a_choices,
                     {
@@ -3061,9 +3064,12 @@ class OTR_LedgerScriptWriter:
                             "'openrouter:slot-a' handle (the creative slot). "
                             "Passive: only used when creative_writing_model "
                             "is set to 'openrouter:slot-a'. Choices are the "
-                            "cached OpenRouter catalog (run the refresh "
-                            "script); shows '(enable OpenRouter)' until "
-                            "OPENROUTER_API_KEY is "
+                            "curated '~family-latest' aliases (which resolve "
+                            "upstream, so they never go stale) plus your "
+                            "favourites from the cached catalog; run the "
+                            "refresh script or set OTR_OPENROUTER_FULL_CATALOG=1 "
+                            "to browse every cached slug. Shows "
+                            "'(enable OpenRouter)' until OPENROUTER_API_KEY is "
                             "set. A saved slug is preserved even if absent "
                             "from a stale cache. See docs/openrouter-setup.md."
                         ),
@@ -3077,18 +3083,25 @@ class OTR_LedgerScriptWriter:
                             "OpenRouter model slug bound to the "
                             "'openrouter:slot-b' handle (the technical slot). "
                             "Passive: only used when technical_model is set "
-                            "to 'openrouter:slot-b'. Choices are the cached "
-                            "OpenRouter catalog; shows '(enable OpenRouter)' "
-                            "until remote is enabled. Set "
-                            "OTR_OPENROUTER_SLOT_B_REQUIRE_JSON=1 to limit "
-                            "this slot to structured-output models. See "
+                            "to 'openrouter:slot-b'. Choices are the curated "
+                            "'~family-latest' aliases plus your favourites "
+                            "from the cached catalog; shows "
+                            "'(enable OpenRouter)' until remote is enabled. "
+                            "OTR_OPENROUTER_SLOT_B_REQUIRE_JSON=1 limits the "
+                            "CACHED CATALOG rows to structured-output models; "
+                            "the curated aliases are policy, not catalog "
+                            "discovery, so they are still offered -- check the "
+                            "family before binding one here. See "
                             "docs/openrouter-setup.md."
                         ),
                     },
                 ),
                 # Comfy Credits slot-slug pickers (2026-06-01), APPENDED at the
-                # END of optional (indices [21]/[22]) so the existing [0..20]
-                # widget order is untouched. PASSIVE: a pick binds a real slug
+                # END of optional so the existing widget order is untouched.
+                # They land at widgets_values[19]/[20] -- re-verified against
+                # workflows/otr_canonical.json on 2026-08-07. (This said
+                # [21]/[22] until then: the SAME stale-positional trap the
+                # OpenRouter comment above carried, caught in the same QA pass.) PASSIVE: a pick binds a real slug
                 # to comfy:slot-a/b but does NOT activate the lane -- it is used
                 # only when creative_writing_model / technical_model selects
                 # that handle. Choices come from the pinned partner-node catalog

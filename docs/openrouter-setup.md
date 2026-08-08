@@ -120,6 +120,8 @@ setx OTR_OPENROUTER_SLOT_B_REQUIRE_JSON 1                :: slot B: only structu
 
 `REQUIRE_JSON` is **per slot** (default off). It's meant for slot B when you route the technical slot remote — it never narrows slot A, so a creative-only model is never hidden from A because B needs JSON. You can also pin each slot's default with `OTR_OPENROUTER_SLOT_A_DEFAULT` / `OTR_OPENROUTER_SLOT_B_DEFAULT`.
 
+**What these filters do and do not reach (2026-08-07).** They narrow the rows that come from the **cached catalog**. They do *not* narrow the curated `~family-latest` aliases or the slot's recommended default, which are offered as policy rather than discovered from the cache — so `REQUIRE_JSON` and `MODEL_DENYLIST` will not remove an alias from the list. Setting `OTR_OPENROUTER_MODEL_ALLOWLIST` or `OTR_OPENROUTER_PROVIDER_FILTER` is the exception: an explicit narrowing means you asked for an exact set, so the curated aliases are skipped entirely and you get only what you named.
+
 ## Your saved model is never silently swapped
 
 A workflow saved with a specific slug keeps it. If you reload that workflow and your local cache is stale or cold (so the slug isn't in the current dropdown list), OTR **preserves your saved slug, logs a warning, and still uses it** — a stale cache is not a missing model, and OTR never quietly substitutes a different one. If a remote call genuinely fails, the run aborts with a clear error (fail-loud) rather than swapping to another model mid-episode. Re-run the refresh script to bring the slug back into the visible list.

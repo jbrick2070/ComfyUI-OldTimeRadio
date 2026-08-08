@@ -19,7 +19,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Model-slug curation** -- the pinned OpenRouter catalog carries dead ids (`tencent/hy3:free` expired with its promo; live has `tencent/hy3` at $0.13/$0.53 per M). SMALL chunk, half a day; does NOT displace item 2 as the next real campaign. Policy + verified findings in "QUEUE ITEM 1 DETAIL" below | `_otr_model_catalog` | coder | nothing |
+| 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | an `OPENROUTER_API_KEY` reaching the run |
 | 2 | **`visual_storybased` -- the dynamic visual style.** Promoted out of ROADMAP row 2 by the operator 2026-08-07. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- the next real campaign |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
@@ -32,9 +32,11 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
 
-**Items 3, 4, 5, 6 and 7 are blocked on the operator.** A coder window that
-reaches one without an answer skips to the next unblocked item rather than
-guessing. **Items 1, 2, 8 and 9 are the unblocked work**, in that order.
+**Items 1, 3, 4, 5, 6 and 7 are blocked on the operator** (item 1 needs only an
+API key reaching the run). A coder window that reaches one without an answer
+skips to the next unblocked item rather than guessing. **Items 2, 8 and 9 are
+the unblocked work**, in that order -- item 2 (`visual_storybased`) is the next
+real campaign and needs a FULL arc from a cold Fable r1.
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
@@ -60,50 +62,81 @@ input.
    (`... (12.0 GB)`); the plain id is a hard `ValueError`. The `--dry-run`
    `applied:` line is the only proof an override actually landed.
 
-### QUEUE ITEM 1 DETAIL -- model-slug curation
+### TOMBSTONE -- MODEL-SLUG CURATION CHUNK A, SHIPPED 2026-08-07
 
-**THE PINNED OPENROUTER CATALOG HAS DRIFTED FROM LIVE (found 2026-08-07).**
-   `_otr_model_catalog.openrouter_catalog_dropdown_choices("a")` offers
-   `tencent/hy3:free`, and that slug NO LONGER EXISTS upstream -- live OpenRouter
-   has `tencent/hy3` (canonical `tencent/hy3-20260706`) at `0.000000132` prompt /
-   `0.000000528` completion, with no free variant. A cloud leg picking it from
-   the dropdown would fail to resolve. Operator caught this ("I think it stopped
-   being free"); verified against the live `/api/v1/models`. The catalog is
-   PINNED by design (network-free `INPUT_TYPES`), so drift is expected -- what is
-   missing is any refresh discipline or staleness signal. Scope: decide whether
-   the catalog gets a dated refresh step, or whether the `~...-latest` aliases
-   become the recommended default because they resolve at runtime. NOT scheduled.
-   **The real lesson is narrower and sharper than "the catalog drifted"
-   (operator: "it was a promo deal").** `hy3:free` was free PROMOTIONALLY, so it
-   was never going to stay free -- pinning a `:free` slug bakes in an expiry
-   date that nothing in the repo records. A `:free` id is a PRICE PROMISE
-   embedded in an identifier, and price promises expire while identifiers do
-   not. Treat any `:free` or promo-priced slug as time-limited by default:
-   prefer a `~...-latest` alias, or if a free tier is genuinely wanted, record
-   WHEN it was verified free so the next reader knows how stale the claim is.
-   **THE FIX IS FEWER SLUGS, NOT A REFRESH CHORE (operator 2026-08-07: be sure
-   we have a limited amount of slugs).** The catalog carries 21 slot-a choices
-   and several are already wrong; 21 is more than anyone will keep true, and a
-   periodic-refresh step is a chore that will not get run. Curate for DURABILITY
-   instead, in this order:
-   (a) PREFER `~family-latest` aliases -- they resolve at runtime and track new
-       releases without any edit here. This is the same instinct as wanting a
-       versionless pointer, and it is already the repo's convention.
-   (b) CARRY FEW CONCRETE ids, and only where a specific version genuinely
-       matters (a pinned bake-off arm, a reproducibility anchor).
-   (c) NEVER carry a `:free` or promo-priced slug -- see above.
-   (d) Auto-routers (`openrouter/auto`, `openrouter/auto-beta`) DO exist and are
-       real -- note they are absent from `/api/v1/models`, so a models-endpoint
-       check cannot see them. **Deliberately NOT recommended here:** `auto-beta`
-       picks by what the OpenRouter community spent most on for that task type
-       over a trailing week, so the same episode config can resolve to a
-       different model next week through no change of ours. This pack stamps the
-       resolved model id in the ledger for replay, and a choice that drifts with
-       third-party spending undercuts that. Good for exploration, wrong for a
-       pipeline built on reproducible receipts.
-   Verified live 2026-08-07 and worth adding when the list is curated:
-   `qwen/qwen3.7-flash` at `0.00000003`/`0.00000013` -- the cheapest credible
-   model found, roughly $0.002 for one episode's script volume.
+**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc; build spec
+`kibitz-runs/2026-08-07-model-slug-curation/r3/final.md` (LOCAL ONLY,
+gitignored). What landed:
+
+* `tencent/hy3:free` DELETED -- and with it the whole pinned-contender
+  mechanism, because the operator also ruled out `aion-labs/aion-3.0-mini`
+  ("if it never won, dump it" -- it never did: both bake-offs were BANK
+  contests that held the writer constant, so no model-vs-model contest was ever
+  run, and Aion's live record is PBUG-20260713-20 plus an episode-aborting
+  `finish_reason=length`). `CURATED_CREATIVE_ROWS` therefore does not exist.
+* `OPENROUTER_FRONTIER_LATEST` -> `OPENROUTER_CURATED_ALIASES`, **10 aliases**,
+  gaining `~x-ai/grok-latest` -- which RETIRED `OPENROUTER_NO_LATEST_AUTHORS`,
+  `_newest_concrete_for_author` and `_NON_FRONTIER_MARKERS` (~30 lines that
+  synthesised what OpenRouter now publishes itself).
+* The uncurated **recent-8 tier is GONE** (`_OPENROUTER_RECENT_COUNT`, the
+  `_created` helper, the loop). That is the change that actually delivered
+  "fewer slugs": **22 -> 12 entries on slot A, 21 -> 12 on slot B**, verified by
+  reading the node's own live `INPUT_TYPES`.
+* `OPENROUTER_VERIFIED_ON_BY_ID` + `tests/test_openrouter_slug_curation.py`:
+  every CONCRETE id must carry a real ISO date, no shipped id may contain
+  `:free`/`-free`, and the retired symbols must stay retired. Proven
+  non-vacuous by mutation (4 injections -> RED, GREEN after revert).
+
+**The honest limit, do not report it as a failure later:** the curation removes
+our OFFER. It cannot remove a dead slug from a STALE PER-MACHINE cache under
+`OTR_OPENROUTER_FULL_CATALOG=1` -- `models/openrouter_models.json` is
+**untracked and git-ignored** (`.gitignore:15`), refresh-script-owned, and this
+box's copy is from 13 July. Running the refresh clears it.
+
+**Standing policy this established:** prefer `~family-latest` aliases; carry a
+concrete id only where a version genuinely matters, and date it; NEVER carry a
+`:free`/promo slug -- a `:free` id is a price promise baked into an identifier,
+and promises expire while identifiers do not.
+
+### CHUNK B DETAIL -- what queue item 1 now means
+
+Chunk A shipped the curation. Chunk B is the part that CANNOT be proven without
+a live remote call, and it is one coder chunk plus one leg.
+
+**Why it is blocked:** `openrouter_enabled()` is
+`bool(_env("OPENROUTER_API_KEY"))` (`_otr_openrouter_backend.py:345-351`) and
+`_env` reads `os.environ` ONLY (`:261-263`). The key is set inside the launcher
+scripts, not in a coder window's environment, so the whole remote lane is
+disabled during ordinary coding. Chunk B needs the key to reach the run.
+
+**(a) Promote the CREATIVE default to `~anthropic/claude-opus-latest`.**
+Verified live 2026-08-07: identical price to the pinned `anthropic/claude-opus-4.8`
+(`0.000005`/`0.000025`), `structured_outputs=True`, 1M context -- and
+`anthropic/claude-opus-5` is already live at that same price, so the pin is
+ALREADY a version behind. Replay is safe: the ledger stamps the RESOLVED
+concrete model, proven by `tests/test_openrouter_resolved.py:19-30`. The panel
+still requires a live leg because catalog flags cannot qualify a behavioural
+default change.
+
+**(b) Decide `qwen/qwen3.7-flash`.** Cheapest credible model found
+(`0.00000003`/`0.00000013`, ~$0.002 of script volume per episode). Caveats that
+must be settled by the leg, not by the catalog: it is a VISION-language model
+and reports `structured_outputs=False` (only `response_format`), so under the
+repo's OR-derivation it passes a REQUIRE_JSON filter on the weaker signal --
+creative slot only, never technical. It is NOT in this box's cached catalog.
+
+**Do NOT add an auto-router.** `openrouter/auto` and `openrouter/auto-beta` are
+real and ARE listed by `/api/v1/models` (an earlier note here claimed they were
+absent -- corrected 2026-08-07). They stay out because `auto-beta` routes by
+what the OpenRouter community spent most on over a trailing week, so one config
+could resolve to a different model week to week. This pack stamps the resolved
+model for replay, and a choice that drifts with third-party spending undercuts
+that. Good for exploration, wrong for reproducible receipts.
+
+**Technical default stays `deepseek/deepseek-v4-pro` and is NOT part of chunk
+B.** The only DeepSeek alias is `~deepseek/deepseek-v4-flash-latest` -- the
+FLASH tier, so switching is a capability drop, not a like-for-like swap. Both
+review lanes independently said keep the pin.
 
 ### BIBLE PROMOTION -- DONE 2026-08-07, no candidate pending
 
@@ -137,6 +170,52 @@ the same bugs so we need to update the bible and test regularly."*
 4. **`docs/known-failures.md` + the conftest KNOWN-FAIL-GUARD** exit **2**, not
    1, on a new failure, and swallow the traceback in `-q` runs. Not a defect,
    but it has cost mis-diagnoses -- know it before reading a red line.
+5. **`reasoning.default_enabled` is captured and never read.**
+   `_otr_openrouter_backend.py:918` slims it into every cached catalog row, but
+   only `mandatory` and `supported_efforts` are ever consulted (`:324`, `:330`).
+   Found 2026-08-07 while grounding the slug curation; PRE-EXISTING, not caused
+   there. Sibling to the freshly promoted BUG-12.86 class (a field that reads
+   as though it informs a decision and informs nothing). Per the admission rule
+   a static observation does NOT create a PBUG -- delete-or-consume, small item.
+6. **THE OTHER PINNED SLUG LISTS -- same defect class, NOT yet curated
+   (operator asked 2026-08-07: "do we need to review the comfy llm engine slugs
+   too?"). Answer: yes, and it is wider than that one list.** Chunk A dated and
+   guarded the OpenRouter ids only. The same "concrete version pin, no date,
+   nothing able to notice it went stale" pattern is live in at least:
+   `_otr_comfy_backend.COMFY_LLM_MODELS` (6 slugs, curated 2026-07-04, **no disk
+   cache and no refresh script -- the catalog IS a constant**);
+   `_otr_google_api/models.py` (`GOOGLE_API_LEGACY_/STABLE_/STATIC_TEXT_MODELS`);
+   and the audio/image engine lists (`eng_cloud_elevenlabs._SUPPORTED_MODELS`,
+   `eng_google_tts`, `eng_google_lyria`, `eng_cloud_image._NANO_MODELS` /
+   `_SEEDREAM_MODELS` / `_KREA_MODELS` / `_LUMA_PHOTON_MODELS`,
+   `eng_google_image.SUPPORTED_MODELS`).
+   **Already-visible staleness in COMFY_LLM_MODELS:** `anthropic/claude-opus-4.7`
+   is two versions behind (live has 4.8 and 5), and the block's stated curation
+   premise -- "Reasoning models ... are DELIBERATELY EXCLUDED"
+   (`_otr_comfy_backend.py:84-91`) -- is aging badly: verified live 2026-08-07,
+   essentially every frontier candidate now advertises reasoning, so that filter
+   no longer discriminates.
+   **Why it is NOT a copy of chunk A:** each lane has a DIFFERENT source of
+   truth. Comfy Credits slugs are Comfy Cloud's partner catalog, Google's are
+   Google's, ElevenLabs' are theirs -- none is verifiable against OpenRouter's
+   `/api/v1/models`, so each needs its own verification path. The reusable part
+   is the POLICY and the guard shape (`OPENROUTER_VERIFIED_ON_BY_ID` +
+   `tests/test_openrouter_slug_curation.py`): every concrete id carries a
+   verified-on date, and a test fails when one is added undated.
+7. **v2.1 CANDIDATE (operator, 2026-08-07): a low-footprint LOCAL model added
+   to the mix.** Operator: *"if there's a cool local model we can add to the mix
+   without much footprint change ... but that's later, maybe 2.1."* The two
+   ideas raised were a model steeped in public-domain OTR diction, and one
+   tuned for Early Modern English on the Shakespeare lane. **Grounding worth
+   keeping so it is not re-derived:** the Shakespeare lane would benefit LEAST
+   -- THE ADAPTATION DESIGN makes it a VERBATIM compiler and the ownership table
+   rules `exchange_compose` NOT RUN there ("there is no dialogue to author"), so
+   a period-tuned model would only touch announcer/bridge/stage-setting prose,
+   never a line Shakespeare wrote. The `original` and `media_archive` lanes DO
+   generate their text and are where such a model would actually land. Note the
+   collision to settle first: this is adjacent to the 2026-08-04 "story quality
+   is done, stop chasing it" directive, so reopening it is a conscious operator
+   call, not a drift. Offline-first also means a FINE-TUNE, not a download.
 
 ### TOMBSTONES -- DONE 2026-08-07, do not reopen
 

@@ -778,8 +778,11 @@ OPENROUTER_EMPTY_CACHE_SENTINEL = "(no OpenRouter models cached -- run refresh_c
 """Shown when remote is enabled but the catalog cache is missing/empty. The
 recommended default is offered alongside so the slot still has a valid pick."""
 
-# Top-N newest-by-`created` models that lead the "recent" tier.
-_OPENROUTER_RECENT_COUNT = 8
+# 2026-08-07: the "recent" tier is GONE. It contributed 8 of the 21 slot-a
+# choices from whatever the disk cache happened to hold, which is the opposite
+# of curation -- an uncurated, silently-changing block. Discovery now lives in
+# OTR_OPENROUTER_FAVORITES, the allowlist/provider filters, and the explicit
+# OTR_OPENROUTER_FULL_CATALOG=1 opt-in, all of which already existed.
 
 
 def _lead_with_sentinel(sentinel: str, choices: list[str]) -> list[str]:
@@ -868,16 +871,31 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     return out
 
 
-# 2026-06-20: pruned + future-proof OpenRouter dropdown. The full catalog is
-# 300+ concrete slugs (a huge scroll that also dates fast). The dropdown now
-# leads with the `~author/family-latest` ROUTING ALIASES (dynamic newest per
-# family -- they never need updating when a new model ships) so the common
-# frontier picks need no scrolling. These are routing features and may not all
-# appear in /api/v1/models, so they are offered UNCONDITIONALLY (valid slugs
-# regardless of the cache). The full alphabetical catalog is opt-in via
-# OTR_OPENROUTER_FULL_CATALOG=1 for power users who need a specific concrete
-# slug. See reference_openrouter_latest_slugs (operator-supplied, doc-confirmed).
-OPENROUTER_FRONTIER_LATEST = (
+# The CURATED alias set (2026-08-07 curation; supersedes the 2026-06-20 block).
+#
+# POLICY, in priority order:
+#   (a) PREFER `~author/family-latest` routing aliases. They resolve upstream at
+#       request time, so a new model in that family is picked up with no edit
+#       here and an operator never sees a slug that has gone stale.
+#   (b) Carry a CONCRETE id only where a specific version genuinely matters, and
+#       give it a date in OPENROUTER_VERIFIED_ON_BY_ID below.
+#   (c) NEVER carry a `:free` or promo-priced slug. A `:free` id is a PRICE
+#       PROMISE baked into an IDENTIFIER, and price promises expire while
+#       identifiers do not -- `tencent/hy3:free` was carried here until its promo
+#       ended and the slug stopped resolving. test_openrouter_slug_curation.py
+#       enforces this; a comment cannot.
+#   (d) Auto-routers (`openrouter/auto`, `openrouter/auto-beta`) are real and ARE
+#       listed by /api/v1/models, but are deliberately NOT offered: auto-beta
+#       routes by trailing-week community spend, so one config could resolve to a
+#       different model week to week. This pack stamps the resolved model in the
+#       ledger for replay; a choice that drifts with third-party spending
+#       undercuts that.
+#
+# Verified against live /api/v1/models on 2026-08-07: all ten are listed. They
+# are offered even when the disk cache is cold, because a cold cache must not
+# hide the curated set -- see openrouter_catalog_dropdown_choices for the two
+# states where the block is skipped.
+OPENROUTER_CURATED_ALIASES = (
     "~anthropic/claude-opus-latest",
     "~openai/gpt-latest",
     "~google/gemini-pro-latest",
@@ -887,58 +905,20 @@ OPENROUTER_FRONTIER_LATEST = (
     "~openai/gpt-mini-latest",
     "~google/gemini-flash-latest",
     "~moonshotai/kimi-latest",
+    # 2026-08-07: x-ai now publishes a `~latest` resolver, which retired ~30
+    # lines of bespoke "pick the author's newest concrete slug" synthesis.
+    "~x-ai/grok-latest",
 )
 
-# Providers that have NO `~latest` resolver today (so the dropdown adds their
-# single NEWEST concrete slug from the live catalog -- auto-updates as new
-# versions land, no hardcoded version to maintain).
-OPENROUTER_NO_LATEST_AUTHORS = ("x-ai",)
-
-
-# Pinned creative contenders that must remain selectable while an on-disk
-# catalog predates their listing.  These deliberately omit ``supports_json``:
-# a slot that explicitly requires structured output must fail closed until a
-# refreshed catalog supplies that capability evidence.
-_PINNED_CREATIVE_CONTENDER_ROWS = (
-    {"id": "tencent/hy3:free", "provider": "tencent"},
-    {"id": "aion-labs/aion-3.0-mini", "provider": "aion-labs"},
-)
-
-
-# Suffixes that mark a NON-frontier variant (dev builds, small/fast tiers, free
-# previews). Excluded when auto-picking an author's frontier model so the
-# dropdown keeps e.g. x-ai/grok-4.3, not x-ai/grok-build-0.1 / grok-mini.
-_NON_FRONTIER_MARKERS = (
-    "build", "mini", "nano", "lite", "fast", "code", "preview", "beta",
-    "draft", ":free", "-free", "instant",
-)
-
-
-def _newest_concrete_for_author(models: list[dict], author: str) -> str | None:
-    """The newest FRONTIER concrete slug for an author lacking a `~latest` alias
-    (e.g. x-ai/Grok). Skips dev-build / mini / preview variants, then takes the
-    highest `created` (then highest id as a tiebreak). Falls back to the newest
-    of all rows if every row looks non-frontier. None if no rows. Pure; never
-    raises."""
-    try:
-        prefix = author.lower() + "/"
-        rows = [m for m in models if str(m.get("id", "")).lower().startswith(prefix)]
-        if not rows:
-            return None
-        frontier = [
-            m for m in rows
-            if not any(mark in str(m.get("id", "")).lower()
-                       for mark in _NON_FRONTIER_MARKERS)
-        ]
-        pool = frontier or rows
-
-        def _key(m: dict):
-            c = m.get("created")
-            return (float(c) if isinstance(c, (int, float)) else 0.0, str(m.get("id", "")))
-
-        return sorted(pool, key=_key, reverse=True)[0]["id"]
-    except Exception:  # noqa: BLE001
-        return None
+#: Every CONCRETE (non-alias) OpenRouter id this pack ships, mapped to the date
+#: it was last verified against live /api/v1/models. An alias needs no date --
+#: it resolves upstream -- but a concrete id is a claim about a specific version
+#: that can quietly stop being true. The guard test asserts these keys are
+#: EXACTLY the concrete ids shipped, so a new pin cannot be added undated.
+OPENROUTER_VERIFIED_ON_BY_ID: dict[str, str] = {
+    "anthropic/claude-opus-4.8": "2026-08-07",   # recommended creative default
+    "deepseek/deepseek-v4-pro": "2026-08-07",    # recommended technical default
+}
 
 
 def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
@@ -948,18 +928,30 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     always choices[0] -- the 'off / use-local' default -- so a saved workflow
     that stores it validates whether or not the lane is enabled.
     Remote disabled -> [OPENROUTER_ENABLE_SENTINEL].
-    Remote enabled  -> the sentinel, then an ordered, de-duplicated slug list
-    drawn from the S0 disk cache, filtered by _filter_catalog_models:
+    Remote enabled  -> the sentinel, then an ordered, de-duplicated list:
         1. recommended default for the slot -- the per-slot
            OTR_OPENROUTER_SLOT_x_DEFAULT override when set AND present in the
            filtered cache, else the OPENROUTER_RECOMMENDED_*_DEFAULT constant.
            Always offered first so the slot's default value is selectable even
            if a cold cache or a filter would otherwise hide it.
-        2. favorites -- OTR_OPENROUTER_FAVORITES, in operator order
-        3. recent    -- top-N newest by `created`
-        4. the rest  -- alphabetical by id
+        2. favorites -- OTR_OPENROUTER_FAVORITES, in operator order, cache-gated
+        3. OPENROUTER_CURATED_ALIASES -- the `~family-latest` routing aliases
+        4. the full filtered catalog, alphabetically, ONLY under explicit
+           narrowing or OTR_OPENROUTER_FULL_CATALOG=1
     Enabled but empty/cold cache ->
     [OPENROUTER_ENABLE_SENTINEL, recommended_default, EMPTY_CACHE_SENTINEL].
+
+    WHERE THE ALIASES ARE *NOT* OFFERED -- two states, both deliberate, and both
+    easy to misdescribe (the pre-2026-08-07 comment here claimed they were
+    offered "UNCONDITIONALLY", which the code has never done):
+        * explicit narrowing (allowlist / provider filter) -- the operator asked
+          for an exact set, so it is honoured verbatim;
+        * the cold-cache branch -- it returns lead + empty-cache sentinel so the
+          operator is pointed at a refresh rather than handed a long list.
+    Consequence worth knowing: in the default warm view the aliases BYPASS
+    _filter_catalog_models, so REQUIRE_JSON and the denylist do not narrow them.
+    They are curated policy, not catalog discovery.
+
     INPUT_TYPES-safe: reads the disk cache only, never the network.
     """
     s = slot.strip().lower()
@@ -974,17 +966,6 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     models = _filter_catalog_models(_orb.cached_models(), slot=s)
     by_id = {m["id"]: m for m in models}
-    # Apply the same operator filters to cache-independent contenders.  A
-    # stale cache must not hide an explicitly requested creative comparison,
-    # but a denylist, provider/allowlist restriction, or REQUIRE_JSON contract
-    # must still win.
-    supplemental_creative_by_id = {
-        m["id"]: m
-        for m in (
-            _filter_catalog_models(list(_PINNED_CREATIVE_CONTENDER_ROWS), slot=s)
-            if s == "a" else []
-        )
-    }
 
     # Tier 1 lead: the per-slot env override iff present in the filtered cache,
     # else the recommended constant ("if set + present, else recommended").
@@ -1009,37 +990,17 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
         if fav in by_id:
             _add(fav)
 
-    # PRUNED + FUTURE-PROOF block (default view only): the `~latest` resolver
-    # aliases (dynamic newest, no scrolling, never need version bumps) + the
-    # newest concrete slug for providers lacking a `~latest` (e.g. x-ai/Grok).
-    # SKIPPED when the operator set an EXPLICIT allowlist / provider-filter --
-    # there they asked for an exact narrowed set, so we honour it verbatim.
+    # The CURATED alias block (default view only). SKIPPED when the operator set
+    # an EXPLICIT allowlist / provider-filter -- there they asked for an exact
+    # narrowed set, so we honour it verbatim.
     allowlist = (os.environ.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
     provider_filter = (os.environ.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
     explicit_narrowing = bool(allowlist or provider_filter)
 
-    # Operator-requested creative contenders.  HY3 is temporary through
-    # 2026-07-21.  Keep both selectable when a cache predates their listing,
-    # without bypassing the filters above; these are options, never defaults.
-    if s == "a" and not explicit_narrowing:
-        for row in _PINNED_CREATIVE_CONTENDER_ROWS:
-            mid = row["id"]
-            if mid in by_id or mid in supplemental_creative_by_id:
-                _add(mid)
     if not explicit_narrowing:
-        for mid in OPENROUTER_FRONTIER_LATEST:
+        for mid in OPENROUTER_CURATED_ALIASES:
             _add(mid)
-        for author in OPENROUTER_NO_LATEST_AUTHORS:
-            newest = _newest_concrete_for_author(models, author)
-            if newest:
-                _add(newest)
 
-    def _created(m: dict) -> float:
-        c = m.get("created")
-        return float(c) if isinstance(c, (int, float)) else 0.0
-
-    for m in sorted(models, key=_created, reverse=True)[:_OPENROUTER_RECENT_COUNT]:
-        _add(m["id"])
     # The FULL alphabetical catalog (300+ slugs) is a long scroll that dates
     # fast; in the default view it is OPT-IN (OTR_OPENROUTER_FULL_CATALOG=1) so
     # the dropdown stays short. When the operator is explicitly narrowing
@@ -1051,18 +1012,10 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     if not models:
         # Cold / fully-filtered cache: keep the recommended default selectable
-        # and flag that discovery is empty so the operator runs a refresh.  An
-        # eligible pinned contender remains visible so a stale cache cannot
-        # erase an operator-requested comparison lane.
-        cold_choices = [lead]
-        if s == "a" and not explicit_narrowing:
-            for row in _PINNED_CREATIVE_CONTENDER_ROWS:
-                mid = row["id"]
-                if mid in supplemental_creative_by_id and mid not in cold_choices:
-                    cold_choices.append(mid)
-        cold_choices.append(OPENROUTER_EMPTY_CACHE_SENTINEL)
+        # and flag that discovery is empty so the operator runs a refresh.
         return _lead_with_sentinel(
-            OPENROUTER_ENABLE_SENTINEL, cold_choices
+            OPENROUTER_ENABLE_SENTINEL,
+            [lead, OPENROUTER_EMPTY_CACHE_SENTINEL],
         )
     return _lead_with_sentinel(OPENROUTER_ENABLE_SENTINEL, ordered)
 
