@@ -92,6 +92,44 @@ The "~8 GB minimum via 4-bit DiffSynth-Studio" figure circulating in coverage is
 - FL2VA and Ref2VA are the same size. Download **one**. Picking both doubles a 21 GB line item for nothing.
 - Confirm ≥ 60 GB free first. `models/` is gitignored, so none of this touches the repo.
 
+### Where the files go
+
+The models root is derived, not hardcoded. `prestartup_script.py:42-45` walks three directories up from this custom-node folder and sets `HF_HOME` beneath it:
+
+```
+C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\prestartup_script.py
+                ↑ three up
+HF_HOME = C:\Users\jeffr\Documents\ComfyUI\models\huggingface
+```
+
+So the root is `C:\Users\jeffr\Documents\ComfyUI\models\`. The `Comfy-Org/MiniMax-H3` repo layout deliberately mirrors ComfyUI's own subfolder names — each file drops into the same-named directory:
+
+| File | Destination |
+|---|---|
+| `minimax_h3_fl2va_pruned_fp8_scaled.safetensors` | `models\diffusion_models\` |
+| `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` | `models\text_encoders\` |
+| `minimax_h3_video_vae_fp16.safetensors` | `models\vae\` |
+| `minimax_h3_audio_vae_fp32.safetensors` | `models\vae\` |
+
+GGUF path (`Abiray`): the unet goes in `models\unet\` per the ComfyUI-GGUF convention; encoder still `models\text_encoders\`; VAEs unchanged.
+
+**The trap.** `HF_HOME` is set, so a bare `hf download Comfy-Org/MiniMax-H3` dumps ~42 GB into `models\huggingface\hub\` in blob-plus-symlink layout — which ComfyUI's `diffusion_models` / `text_encoders` / `vae` loaders do not scan. The weights would be on disk, invisible, and Windows symlink handling makes it worse. Download **individual files to explicit destinations** instead:
+
+```powershell
+hf download Comfy-Org/MiniMax-H3 diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors `
+  --local-dir "C:\Users\jeffr\Documents\ComfyUI\models"
+```
+
+That preserves the repo's `diffusion_models/…` prefix under the models root, landing the file exactly where the loader looks. Repeat per file; skip whichever of FL2VA/Ref2VA you are not using.
+
+**Verify the root before downloading 42 GB.** The ComfyUI desktop app splits its install directory (`C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI`) from the user directory (`C:\Users\jeffr\Documents\ComfyUI`, passed as `--user-directory` in `scripts/soak_operator.py:259`). `folder_paths.models_dir` follows the *install* path unless an `extra_model_paths.yaml` redirects it, while `HF_HOME` above follows the *user* path. Those can differ. Confirm which root is live before committing the download:
+
+```powershell
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -c "import folder_paths; print(folder_paths.models_dir)"
+```
+
+If C: is tight, `extra_model_paths.yaml` can point these four entries at the E: drive already in use for archives (`soak_operator.py:31`). 42 GB is a lot to put on a user-profile volume.
+
 ### Q2 — Do the quantized kernels exist for sm_120 + torch 2.10 + CUDA 13 on Windows?
 
 H3's memory reductions lean on int8 convrot quantization and custom kernels. **This is the exact trap Flash Attention 2 set on this platform**: the technique exists, the wheel does not. Verify wheel availability for Blackwell laptop + Windows *before* downloading 42.5 GB. Cheapest possible check, highest possible cost if skipped.
@@ -118,7 +156,7 @@ Run in order. Record peak VRAM and wall time for every step. Stop at the first h
 0. **Settle the weight-streaming question first.** Q1 shows nothing fits resident. Decide, explicitly and on the record, whether the discarded "streaming from system RAM" mechanism is back on the table for H3 only. If the answer is no, the gate ends here and costs nothing. *(Do this before any download.)*
 1. **Kernel/wheel survey.** Confirm quantized-inference support for sm_120 + torch 2.10 + CUDA 13 + Windows. Pass/fail. *(Also before any download.)*
 2. **Disk check.** Confirm ≥ 60 GB free before pulling weights.
-3. **Acquire the smallest viable stack.** GGUF Q3_K_M unet + Q4_K_M encoder (36.0 GB) is the floor; Comfy-Org pruned_fp8_scaled + nvfp4_awq (42.5 GB) is the ComfyUI-native option. Pick one path, one of FL2VA/Ref2VA, and pin the exact revision hash — §VII.1 of the license disclaims any support or update obligation, so upstream can move without notice.
+3. **Acquire the smallest viable stack.** GGUF Q3_K_M unet + Q4_K_M encoder (36.0 GB) is the floor; Comfy-Org pruned_fp8_scaled + nvfp4_awq (42.5 GB) is the ComfyUI-native option. Pick one path, one of FL2VA/Ref2VA, and pin the exact revision hash — §VII.1 of the license disclaims any support or update obligation, so upstream can move without notice. Destinations and the `HF_HOME` download trap: §2 Q1, "Where the files go". Verify the live models root *first*.
 4. **Loader smoke test.** Load under `trust_remote_code=False`. Record peak VRAM at load, before any generation.
 5. **Minimum-viable generation.** One short clip at the lowest supported resolution and frame count. Record peak VRAM, wall time, and whether the OTR pipeline's own weights can coexist or must be fully evicted first.
 6. **Target-shape generation.** One clip at the resolution and duration a real scene sidecar would need. Record the same three numbers.
