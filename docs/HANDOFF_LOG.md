@@ -3,6 +3,61 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 -- HEAD f25d7b14 (v2.0-alpha) -- CODER REVIEW-AND-FINISH (visual_storybased ships, queue item 2 retired)
+
+Did: finished the uncommitted `visual_storybased` implementation that
+Antigravity/Flash had written from the r3/final.md build spec, and shipped it.
+Not a rewrite -- a QA-and-ship pass with four root-cause fixes.
+- **Ship.** `nodes/_otr_visual_styles.py` (composer + card model +
+  path-independent validator + `get_visual_style` embedded-pack arm),
+  `nodes/_otr_rolls.py` (dynamic in `eligible_style_ids`, out of
+  `floor_style_ids`), `nodes/_otr_story_brief.py` (extended dynamic reflection
+  schema + `_DYNAMIC_REFLECTION_MAX_NEW_TOKENS=1024`),
+  `nodes/OTR_LedgerScriptWriter.py` (widget slot 24 sentinel, skeleton stamps
+  pending receipt, K.5.5 composes/validates/hashes/embeds the pack, floor
+  branch loads the frozen pack from disk and embeds it, transaction save).
+  Plus the four modified tests and a new `tests/test_visual_storybased.py`
+  (10 tests).
+- **Four bugs the acceptance matrix didn't catch, all fixed at root:**
+  (1) `env` undefined in `_run_writer_tail`; `resolve_seed` now defaults to
+  `os.environ`. (2) `_otr_story_brief.REJECT_JSON_PARSE` used a module name
+  never bound in the writer; imported by-name as `_STORY_BRIEF_REJECT_*`.
+  (3) `"model_id"` inside `visual_style_receipt` violated the post-B2b
+  guardrail (`test_no_legacy_model_id_meta_key_in_writer`); renamed to
+  `"technical_model_id"`. (4) `_is_dynamic_style` read
+  `resolved["visual_style"]` and KeyError'd on the fable2 tail-context tests;
+  switched to `meta.get("visual_style")`. Plus terminal `led.save()` made
+  unconditionally truthy-required per spec section 6.
+- **Two bytecode regression pins** inspect `_run_writer_tail.__code__.co_names`
+  so a future edit cannot silently reintroduce the two NameErrors. Sonnet 5
+  QA caught that my first draft pinned the wrong function (`run.__code__`
+  instead of `_run_writer_tail.__code__`) -- fix landed in the same commit.
+- **QA gates.** Sonnet 5 QA pass on the final diff: **clean** after fixes.
+  Antigravity QA pass on the final diff (via operator's UI): **no MUST-FIX,
+  no SHOULD-FIX**, all 9 verification points cleared. Two-lane independent
+  confirmation on a diff Claude also wrote.
+- **Suite.** 9191 passed / 111 skipped / 1 xfailed (from 9177 pre-ship, exactly
+  matches the added coverage). Bug Bible 17 green (survival-guide `3759ae5`).
+  `git diff -- workflows/` EMPTY.
+- **Kibitz honesty.** The r1-r4 arc had already been run BEFORE this session
+  by the operator -- r1 was cold Fable + Codex + Antigravity, r2/r3 were
+  Codex + Antigravity, r4 was Antigravity-only (`codex.md` is a stale JSONL
+  from a quota-failed run and kibitz flagged OK on it because the file was
+  non-empty -- the false positive its own docs warn about). Do NOT report
+  r4 as two-lane in future writeups.
+Current step: queue item 2 tombstoned in GO_FORWARD. The **unblocked** work is
+  now item 8 (system-agnostic multi-GPU upscale, needs own design + arc) and
+  item 9 (cloud stack test-and-build). Item 1 chunk B still gated on an
+  `OPENROUTER_API_KEY` reaching the run.
+Next: a CODER window takes item 8 or 9 (operator's call on the order). **BOX
+  IS CLEAN** -- no test runs left resident, port 8000 free at session close.
+  **Follow-up chip filed** for the phantom `visual_style_receipt["attempts"]`
+  count on the dynamic success path (SHOULD-FIX per Sonnet 5, not a
+  build-breaker; instructions include the on_attempt_complete wiring sketch).
+Models: Claude Opus 4.7 (coder + judge), Sonnet 5 (QA subagent), Antigravity
+  (independent QA lane via operator's UI). Kibitz arc predated this session,
+  not re-run per operator instruction.
+
 ## 2026-08-07 -- HEAD 9605dd6d (v2.0-alpha) -- CODER (small-sprint items ALL shipped; a new 23-episode defect found, fixed and LIVE-PROVEN 5/5)
 
 Did: closed queue item 1 entirely, then found and closed a bigger defect next door.

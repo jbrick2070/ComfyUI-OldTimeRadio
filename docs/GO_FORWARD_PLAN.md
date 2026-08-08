@@ -20,7 +20,6 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
 | 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | an `OPENROUTER_API_KEY` reaching the run |
-| 2 | **`visual_storybased` -- the dynamic visual style.** Promoted out of ROADMAP row 2 by the operator 2026-08-07. Spec below | new campaign | **full arc first** (cold Fable r1 -> panel), then coder | nothing -- the next real campaign |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
 | 5 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
@@ -34,9 +33,8 @@ platform tests -> **12** install path -> **13** product docs + v2 release.
 
 **Items 1, 3, 4, 5, 6 and 7 are blocked on the operator** (item 1 needs only an
 API key reaching the run). A coder window that reaches one without an answer
-skips to the next unblocked item rather than guessing. **Items 2, 8 and 9 are
-the unblocked work**, in that order -- item 2 (`visual_storybased`) is the next
-real campaign and needs a FULL arc from a cold Fable r1.
+skips to the next unblocked item rather than guessing. **Items 8 and 9 are the
+unblocked work** (item 2 shipped 2026-08-08 -- tombstone below).
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
@@ -61,6 +59,62 @@ input.
 3. **Dry-run first.** The catalog's model ids carry size suffixes
    (`... (12.0 GB)`); the plain id is a hard `ValueError`. The `--dry-run`
    `applied:` line is the only proof an override actually landed.
+
+### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
+
+**DONE. Do not re-open.** Kibitz `kibitz-plugin:kibitz` r1-r4 arc completed
+2026-08-07 (r1 cold Fable + Codex + Antigravity; r2/r3 Codex + Antigravity;
+r4 Antigravity-only -- codex.md is a stale JSONL from a quota-failed run and
+must not be reported as a two-lane round). Build spec
+`kibitz-runs/2026-08-07-visual-storybased/r3/final.md`; campaign brief
+`docs/2026-08-07-BRIEF-visual-storybased.md`. What shipped
+(HEAD `f25d7b14`, v2.0-alpha):
+
+* **Tenth visual style in the roll, equal odds.** `eligible_style_ids()`
+  now returns the 9 disk packs plus `visual_storybased`; `floor_style_ids()`
+  STRICTLY excludes the dynamic lane so a floor draw cannot re-pick dynamic.
+* **Card-to-pack composition.** LLM emits a 9-field `VisualStyleCard` on the
+  extended K.5.5 reflection (`_DYNAMIC_REFLECTION_PROMPT`, token budget
+  1024). A deterministic Python composer expands it into a 23-field v2 pack
+  with the exact placeholders, mouth vocabulary, and dict keys the loaders
+  require. `medium_short` is bounded (max_length=40) and drives the
+  compact-template gradient interpolation.
+* **Fail-loud provenance.** MODEL failures (JSON parse / schema rejection)
+  and TRANSPORT failures floor exactly once from the 9-pack registry; the
+  floor pack is EMBEDDED in the ledger (`meta["embedded_visual_style_pack"]`)
+  so re-render is byte-reproducible. Composer defects and code errors are
+  LOUD by construction -- no try/except wraps `compose_pack_from_card` or
+  `validate_pack`.
+* **Consume-time guard.** `get_visual_style` raises on pending /
+  missing embedded pack / sha256 mismatch when the id is `visual_storybased`
+  -- it never silently defaults to `sci_fi_radio`.
+* **Ledger transaction.** Skeleton save (`3944`), reflection-pack save
+  (`6390`), and terminal save (`6610`) are all unconditionally
+  truthy-required per r3/final.md section 6.
+
+**Four bugs the acceptance matrix didn't catch, all fixed at root:**
+1. `env` was undefined in `_run_writer_tail`; `resolve_seed` now defaults
+   to `os.environ`. The receipt-classifier imports `REJECT_JSON_PARSE` /
+   `REJECT_SCHEMA` by name (the module identifier was never bound).
+2. `"model_id"` inside `visual_style_receipt` violated the post-B2b
+   guardrail -- renamed to `"technical_model_id"`.
+3. `_is_dynamic_style` read `resolved["visual_style"]` and KeyError'd on
+   the fable2 tail-context tests; switched to `meta.get("visual_style")`.
+4. Terminal `led.save()` was only truthy-required with a `tail_finalizer`;
+   now unconditional.
+
+Two bytecode regression pins (`test_writer_floor_branch_has_no_undefined_globals`,
+`test_writer_floor_branch_reject_constants_bound`) inspect
+`_run_writer_tail.__code__.co_names` so a future edit cannot silently
+reintroduce either NameError. Sonnet 5 QA + Antigravity QA both cleared the
+diff after the fixes. Suite **9191 passed / 111 skipped / 1 xfailed** (from
+9177 pre-visual_storybased). Bug Bible 17 green at survival-guide `3759ae5`.
+`git diff -- workflows/` EMPTY all session.
+
+**Follow-up chip (SHOULD-FIX, not a build-breaker):** on the dynamic success
+path `visual_style_receipt["attempts"]` always reports 1 even after the
+`structured_call` ladder retries. Fix is to thread `on_attempt_complete`
+through `run_story_brief_reflection`. Not gated by the acceptance matrix.
 
 ### TOMBSTONE -- MODEL-SLUG CURATION CHUNK A, SHIPPED 2026-08-07
 
@@ -189,12 +243,24 @@ the same bugs so we need to update the bible and test regularly."*
    `eng_google_tts`, `eng_google_lyria`, `eng_cloud_image._NANO_MODELS` /
    `_SEEDREAM_MODELS` / `_KREA_MODELS` / `_LUMA_PHOTON_MODELS`,
    `eng_google_image.SUPPORTED_MODELS`).
-   **Already-visible staleness in COMFY_LLM_MODELS:** `anthropic/claude-opus-4.7`
-   is two versions behind (live has 4.8 and 5), and the block's stated curation
-   premise -- "Reasoning models ... are DELIBERATELY EXCLUDED"
-   (`_otr_comfy_backend.py:84-91`) -- is aging badly: verified live 2026-08-07,
-   essentially every frontier candidate now advertises reasoning, so that filter
-   no longer discriminates.
+   **SIGNAL-CHECKED 2026-08-07 -- and the news is better than first stated:
+   ALL SIX `COMFY_LLM_MODELS` slugs are LIVE.** Checked against the live
+   OpenRouter catalog: `google/gemini-3.5-flash`, `deepseek/deepseek-v3.2`,
+   `mistralai/mistral-large-2512`, `x-ai/grok-4.20`, `openai/gpt-5.5`,
+   `anthropic/claude-opus-4.7` all present. **No dead ids** -- unlike the
+   OpenRouter dropdown, which carried a genuinely dead one. This list is
+   VERSION-BEHIND, not broken, and that distinction should not be lost again.
+   *Authority caveat:* Comfy Cloud's partner catalog is what decides whether
+   Comfy SERVES a slug; OpenRouter presence is a signal, not proof. An
+   authoritative pass still owes a check against Comfy's own catalog.
+   **The stale PREMISE is the real defect, not the version lag.** The block says
+   "Reasoning models ... are DELIBERATELY EXCLUDED"
+   (`_otr_comfy_backend.py:84-91`), a rule written 2026-07-04. Verified live
+   2026-08-07: essentially every frontier candidate now advertises reasoning --
+   including `deepseek-v3.2` and `x-ai/grok-4.20` sitting inside that very list.
+   So the comment claims an exclusion the list no longer performs. Fixing the
+   COMMENT is the cheap, high-value half of this item; re-dating the slugs is
+   the mechanical half.
    **Why it is NOT a copy of chunk A:** each lane has a DIFFERENT source of
    truth. Comfy Credits slugs are Comfy Cloud's partner catalog, Google's are
    Google's, ElevenLabs' are theirs -- none is verifiable against OpenRouter's
