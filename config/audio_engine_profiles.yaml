@@ -342,6 +342,7 @@ profiles:
     billing_category: tts
     canonicalizer: audio
     error_policy: fail_loud
+    use_cache: true
 
   - profile_id: announcer_google_tts_v1
     role: announcer_voice
@@ -367,6 +368,7 @@ profiles:
     billing_category: tts
     canonicalizer: audio
     error_policy: fail_loud
+    use_cache: true
 
   # --- cloud Sonilo MUSIC (cloud-audio S5, 2026-07-03; dropdown-opt-in, Comfy
   # Cloud via invoke_partner_node). NEVER a default (is_default false, high rank);

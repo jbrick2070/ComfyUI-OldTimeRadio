@@ -25,7 +25,7 @@ from typing import Optional, Tuple
 
 import torch
 
-REQUEST_SCHEMA_VERSION = "1"
+REQUEST_SCHEMA_VERSION = "2"
 _DEFAULT_SR = 24000
 _SEP = b"\x1f"  # ASCII unit separator -> unambiguous part join
 
@@ -74,7 +74,8 @@ def _seed_to_int64(*parts) -> int:
 # Fields that ARE identity (feed cache_key).
 IN_KEY_FIELDS: Tuple[str, ...] = (
     "request_schema_version", "role", "engine_profile_id", "engine_name",
-    "engine_impl_version", "char_id", "line_id", "occurrence",
+    "engine_impl_version", "provider_model_id", "provider_voice_id",
+    "char_id", "line_id", "occurrence",
     "prepared_text_sha256", "voice_ref_id", "voice_preset",
     "delivery_profile_id", "delivery_profile_version", "episode_seed",
     "cast_lock_revision", "stable_line_seed", "sample_rate", "channels",
@@ -100,6 +101,8 @@ class ResolvedVoiceRequest:
     engine_profile_id: str = ""
     engine_name: str = ""
     engine_impl_version: str = ""
+    provider_model_id: str = ""
+    provider_voice_id: str = ""
     char_id: str = ""
     line_id: str = ""
     occurrence: int = 0
@@ -249,6 +252,8 @@ def build_resolved_request(
     quantum: int = DEFAULT_PARAM_QUANTUM,
     source_ref_sha256: str = "",
     commercial_clean: Optional[bool] = None,
+    provider_model_id: str = "",
+    provider_voice_id: str = "",
 ) -> ResolvedVoiceRequest:
     """Pack already-resolved pieces into the frozen ``ResolvedVoiceRequest``.
 
@@ -271,6 +276,8 @@ def build_resolved_request(
         engine_name=engine_name,
         engine_profile_id=engine_profile_id,
         engine_impl_version=engine_impl_version,
+        provider_model_id=str(provider_model_id or ""),
+        provider_voice_id=str(provider_voice_id or ""),
         char_id=char_id,
         line_id=line_id,
         occurrence=int(occurrence),

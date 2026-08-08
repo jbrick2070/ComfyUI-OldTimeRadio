@@ -71,6 +71,16 @@ class AudioEngineAdapter:
     def unload(self) -> None:  # pragma: no cover - trivial no-op default
         """Release residency. Cheap when already unloaded."""
 
+    def identity_params(self, *, resolved_voice_ref=None, resolved_model=None, **_kw) -> dict:
+        """Call-time identity fields that must live in the cache key (I-6).
+
+        Default is empty; adapters whose forward has externally-resolved
+        identity (e.g. env-selected model) override to return keys folded
+        into ResolvedVoiceRequest's provider_model_id / provider_voice_id
+        by the per-line wiring in _otr_voice_node_common._render_per_line.
+        """
+        return {}
+
 
 def engine_supports_external_generator(engine) -> bool:
     """True iff ``engine`` binds an external ``torch.Generator`` per forward.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "otr:audio_cache_sidecar/v1",
+  "$id": "otr:audio_cache_sidecar/v2",
   "title": "OTR audio cache sidecar",
-  "description": "Metadata sidecar persisted beside each cached audio buffer (plan G0). Mirrors nodes/_otr_audio_cache.AudioCacheRecord field-for-field; the cache key is cache_key == ResolvedVoiceRequest.cache_key (I-6). Only cache_key is required so a partially-populated record still round-trips; the release gate enforces allowed_for_release + a present commercial_clean boolean (I-8).",
+  "description": "Metadata sidecar persisted beside each cached audio buffer (plan G0). Mirrors nodes/_otr_audio_cache.AudioCacheRecord field-for-field; the cache key is cache_key == ResolvedVoiceRequest.cache_key (I-6). Only cache_key is required so a partially-populated record still round-trips; the release gate enforces allowed_for_release + a present commercial_clean boolean (I-8). v2 (cloud-audio-cache chunk 2, 2026-08-08) adds actual_sample_rate and provider_model_id for drift forensics against Gemini TTS.",
   "type": "object",
   "additionalProperties": true,
   "required": ["cache_key"],
@@ -23,6 +23,15 @@
     "voice_ref_id": { "type": ["string", "null"] },
     "sample_rate": { "type": "integer", "minimum": 0 },
     "channels": { "type": "integer", "minimum": 1 },
+    "actual_sample_rate": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "The sample rate of the STORED audio bytes; may differ from the request's sample_rate (identity) when the provider returned a different rate. Null when unknown."
+    },
+    "provider_model_id": {
+      "type": "string",
+      "description": "Readable id of the actual model that produced the bytes (e.g. Gemini variant). For drift forensics; the OPAQUE identity is provider_model_id in ResolvedVoiceRequest IN_KEY."
+    },
     "commercial_clean": {
       "type": ["boolean", "null"],
       "description": "I-8; a null here is fail-closed at the release gate."

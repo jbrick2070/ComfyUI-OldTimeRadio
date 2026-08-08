@@ -210,6 +210,8 @@ def voice_assignments_from_cast(led: dict) -> dict:
 _OPTIONAL_STRING_FIELDS = (
     "audio_wav_path",
     "audio_cache_key",
+    "audio_sha256",
+    "provider_model_id",
     "music_wav_path",
     "music_cache_key",
     "video_clip_path",

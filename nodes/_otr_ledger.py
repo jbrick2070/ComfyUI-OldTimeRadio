@@ -655,15 +655,26 @@ def stamp_per_line_audio_meta(
     *,
     tts_engine: str,
     voice_preset: str = "",
-    render_ms: int = 0,
+    render_ms: Optional[int] = None,
     generated_dur_s: float = 0.0,
     audio_sample_hash: str = "",
+    audio_cache_key: str = "",
+    audio_sha256: str = "",
+    provider_model_id: str = "",
 ) -> bool:
     """Stamp per-line audio render metadata. Wraps ``patch_line_fields``.
 
-    Skips empty/zero values so callers can pass a partial bundle without
-    overwriting fields they didn't compute (e.g. MusicGen has no
-    voice_preset; just leave it ``""`` and that field stays unset).
+    Skips empty values so callers can pass a partial bundle without
+    overwriting fields they didn't compute. ``render_ms`` uses ``None``
+    (default) to mean "skip"; an explicit ``0`` is a valid persisted value
+    -- the cache-hit path stamps ``render_ms=0`` to mean "no generation
+    time consumed" and MUST land on disk.
+
+    New optional kwargs (cloud-audio-cache chunk 2, 2026-08-08):
+    ``audio_cache_key`` / ``audio_sha256`` / ``provider_model_id`` are the
+    per-line provenance for the FileAudioCache hit/miss on this line.
+    ``_OPTIONAL_STRING_FIELDS`` in _otr_ledger_consumers recognizes them
+    for the post-freeze null-shape audit.
 
     Returns True if a row was updated, False if no matching line_id.
     Never raises.
@@ -671,12 +682,18 @@ def stamp_per_line_audio_meta(
     fields: dict = {"tts_engine": str(tts_engine)}
     if voice_preset:
         fields["voice_preset"] = str(voice_preset)
-    if int(render_ms) > 0:
+    if render_ms is not None:
         fields["render_ms"] = int(render_ms)
     if float(generated_dur_s) > 0:
         fields["generated_dur_s"] = float(generated_dur_s)
     if audio_sample_hash:
         fields["audio_sample_hash"] = str(audio_sample_hash)
+    if audio_cache_key:
+        fields["audio_cache_key"] = str(audio_cache_key)
+    if audio_sha256:
+        fields["audio_sha256"] = str(audio_sha256)
+    if provider_model_id:
+        fields["provider_model_id"] = str(provider_model_id)
     try:
         return patch_line_fields(ledger, line_id, fields)
     except Exception:  # noqa: BLE001

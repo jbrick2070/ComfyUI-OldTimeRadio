@@ -22,11 +22,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import tempfile
 from dataclasses import asdict, dataclass, fields as _dc_fields
-from typing import Iterable, List, Optional, Protocol, runtime_checkable
+from typing import Iterable, List, Optional, Protocol, Tuple, runtime_checkable
 
-CACHE_SCHEMA_VERSION = "1"
+import numpy as np
+
+log = logging.getLogger("OTR")
+
+CACHE_SCHEMA_VERSION = "2"
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +61,8 @@ class AudioCacheRecord:
     voice_ref_id: Optional[str] = None
     sample_rate: int = 0
     channels: int = 1
+    actual_sample_rate: Optional[int] = None
+    provider_model_id: str = ""
     commercial_clean: Optional[bool] = None
     allowed_for_release: bool = False
     audio_path: str = ""
@@ -98,6 +106,8 @@ def record_from_request(
     prepare_text_version: str = "",
     delivery_projection_version: str = "",
     engine_prompt_template_version: str = "",
+    actual_sample_rate: Optional[int] = None,
+    provider_model_id: str = "",
 ) -> AudioCacheRecord:
     """Build the sidecar record for a resolved request + its rendered audio.
 
@@ -113,6 +123,8 @@ def record_from_request(
         voice_ref_id=getattr(request, "voice_ref_id", None),
         sample_rate=int(getattr(request, "sample_rate", 0) or 0),
         channels=int(getattr(request, "channels", 1) or 1),
+        actual_sample_rate=(int(actual_sample_rate) if actual_sample_rate is not None else None),
+        provider_model_id=str(provider_model_id or ""),
         commercial_clean=getattr(request, "commercial_clean", None),
         allowed_for_release=bool(allowed_for_release),
         audio_path=audio_path,
@@ -148,8 +160,19 @@ class AudioCache(Protocol):
         """Return the cached record for ``request`` or ``None`` on a miss."""
         ...
 
-    def put(self, request, audio, *, allowed_for_release: bool = False) -> AudioCacheRecord:
+    def put(
+        self, request, audio, *,
+        allowed_for_release: bool = False,
+        actual_sample_rate: Optional[int] = None,
+        provider_model_id: str = "",
+    ) -> AudioCacheRecord:
         """Persist ``audio`` for ``request`` and return its sidecar record."""
+        ...
+
+    def load(self, request) -> "Optional[Tuple[dict, AudioCacheRecord]]":
+        """Return (audio_dict, record) on a verified hit; None on any failure
+        (missing/corrupt payload, hash mismatch, rate/channel drift, etc.).
+        Corruption is a silent miss with ONE bounded warning log line."""
         ...
 
     def iter_records(self) -> Iterable[AudioCacheRecord]:
@@ -257,11 +280,15 @@ class FileAudioCache:
         return record
 
     # -- write --
-    def put(self, request, audio, *, allowed_for_release: bool = False) -> AudioCacheRecord:
+    def put(
+        self, request, audio, *,
+        allowed_for_release: bool = False,
+        actual_sample_rate: Optional[int] = None,
+        provider_model_id: str = "",
+    ) -> AudioCacheRecord:
         key = self.key_for(request)
         os.makedirs(self.cache_dir, exist_ok=True)
-        audio_path = self._audio_path(key)
-        audio_sha = self._write_audio(audio, audio_path)
+        audio_path, audio_sha = self._write_audio_atomic(audio, self.cache_dir, key)
         record = record_from_request(
             request,
             audio_path=audio_path,
@@ -270,10 +297,93 @@ class FileAudioCache:
             prepare_text_version=_prepare_text_version(),
             delivery_projection_version=_delivery_projection_version(),
             engine_prompt_template_version="1",
+            actual_sample_rate=actual_sample_rate,
+            provider_model_id=provider_model_id,
         )
-        with open(self._sidecar_path(key), "w", encoding="utf-8") as fh:
-            json.dump(record.to_dict(), fh, sort_keys=True, separators=(",", ":"))
+        # Sidecar published LAST via tmp + os.replace so sidecar presence is
+        # the "committed" signal. A crash between .npy replace and sidecar
+        # replace leaves an orphan .npy that the next put overwrites.
+        sidecar_final = self._sidecar_path(key)
+        fd, tmp_side = tempfile.mkstemp(
+            prefix=f"{key}.", suffix=".json.tmp", dir=self.cache_dir,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(record.to_dict(), fh, sort_keys=True, separators=(",", ":"))
+            os.replace(tmp_side, sidecar_final)
+        except Exception:
+            try:
+                os.unlink(tmp_side)
+            except OSError:
+                pass
+            raise
         return record
+
+    # -- load (verified reconstruction; corruption / drift is silent miss) --
+    def load(self, request) -> "Optional[Tuple[dict, AudioCacheRecord]]":
+        """Return (audio_dict, record) on a verified hit, else None. Emits ONE
+        bounded log.warning per miss-due-to-corruption naming the cache key
+        and failure class."""
+        try:
+            rec = self.get(request)
+            if rec is None:
+                return None
+            key = self.key_for(request)
+            if rec.cache_key != key:
+                log.warning("[OTR audio cache] cache_key mismatch on load key=%s", key)
+                return None
+            # r4 Fable gate SF#3: derive the payload path from cache_dir + key
+            # rather than trusting the sidecar's absolute audio_path. When an
+            # episode dir is renamed / moved (pipeline's rename_episode step),
+            # the absolute path stored at put-time is stale but the payload
+            # traveled WITH the sidecar; derivation lets the hit survive the
+            # rename and keeps rec.audio_path as forensics only.
+            audio_path = os.path.join(self.cache_dir, f"{key}.npy")
+            if not os.path.isfile(audio_path):
+                log.warning("[OTR audio cache] audio file missing on load key=%s", key)
+                return None
+            req_sr = int(getattr(request, "sample_rate", 0) or 0)
+            req_ch = int(getattr(request, "channels", 0) or 0)
+            if int(rec.sample_rate or 0) != req_sr:
+                log.warning("[OTR audio cache] sample_rate mismatch on load key=%s", key)
+                return None
+            if int(rec.channels or 0) != req_ch:
+                log.warning("[OTR audio cache] channels mismatch on load key=%s", key)
+                return None
+            arr = np.load(audio_path, allow_pickle=False)
+            if not hasattr(arr, "dtype"):
+                log.warning("[OTR audio cache] npy load produced non-array key=%s", key)
+                return None
+            digest = hashlib.sha256(
+                f"{arr.dtype}|{arr.shape}|".encode("utf-8") + arr.tobytes()
+            ).hexdigest()
+            if rec.audio_sha256 and digest != rec.audio_sha256:
+                log.warning("[OTR audio cache] sha256 mismatch on load key=%s", key)
+                return None
+            if arr.ndim != 3 or int(arr.shape[1]) != (req_ch or 1):
+                log.warning(
+                    "[OTR audio cache] shape mismatch on load key=%s shape=%s",
+                    key, tuple(arr.shape),
+                )
+                return None
+            arr = np.ascontiguousarray(arr).astype(np.float32, copy=False)
+            sr = rec.actual_sample_rate or rec.sample_rate
+            if not isinstance(sr, int) or sr <= 0:
+                log.warning("[OTR audio cache] invalid sample_rate on load key=%s", key)
+                return None
+            import torch  # lazy: keep import-time light (C-5)
+
+            audio = {"waveform": torch.from_numpy(arr), "sample_rate": int(sr)}
+            from ._otr_resolved_request import assert_audio_batch_contract
+
+            assert_audio_batch_contract(audio, where="FileAudioCache.load")
+            return audio, rec
+        except Exception as exc:  # noqa: BLE001 -- whole-body miss boundary
+            log.warning(
+                "[OTR audio cache] load failed key=%s cls=%s: %s",
+                getattr(request, "cache_key", "?"), type(exc).__name__, exc,
+            )
+            return None
 
     # -- scan --
     def iter_records(self) -> Iterable[AudioCacheRecord]:
@@ -293,17 +403,37 @@ class FileAudioCache:
         return [r for r in self.iter_records() if r.allowed_for_release]
 
     @staticmethod
-    def _write_audio(audio, path: str) -> str:
-        """Persist an AUDIO buffer to ``path`` (npy) and return its sha256."""
-        import numpy as np
+    def _write_audio_atomic(audio, cache_dir: str, key: str) -> Tuple[str, str]:
+        """Persist AUDIO to <cache_dir>/<key>.npy atomically via tempfile +
+        os.replace. Returns (final_path, sha256 over dtype|shape|bytes).
 
+        Hashing includes dtype and shape so header corruption cannot
+        reinterpret identical payload bytes and still pass a hash check.
+        """
         wf = audio["waveform"] if isinstance(audio, dict) else audio
         if hasattr(wf, "detach"):
             arr = wf.detach().to("cpu").contiguous().numpy()
         else:
             arr = np.asarray(wf)
-        np.save(path, arr)
-        return hashlib.sha256(np.ascontiguousarray(arr).tobytes()).hexdigest()
+        arr = np.ascontiguousarray(arr)
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f"{key}.", suffix=".npy.tmp", dir=cache_dir,
+        )
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                np.save(fh, arr)
+            final = os.path.join(cache_dir, f"{key}.npy")
+            os.replace(tmp_path, final)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+        digest = hashlib.sha256(
+            f"{arr.dtype}|{arr.shape}|".encode("utf-8") + arr.tobytes()
+        ).hexdigest()
+        return final, digest
 
 
 def _prepare_text_version() -> str:

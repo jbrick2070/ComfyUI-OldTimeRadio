@@ -17,6 +17,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from typing import Optional
 
 from .base import AudioEngineAdapter
 from .registry import register
@@ -123,7 +124,12 @@ def _selected_model() -> str:
     return model
 
 
-def _models_to_try(model: str) -> tuple[str, ...]:
+def _models_to_try(model: str, *, allow_retry: bool = True) -> tuple[str, ...]:
+    # Cache-active callers pass allow_retry=False to force single-model runs so
+    # a fallback model cannot silently produce audio cached under the requested
+    # model's key. Matches the profile error_policy: fail_loud.
+    if not allow_retry:
+        return (model,)
     configured = str(os.environ.get("OTR_GOOGLE_TTS_RETRY_MODELS") or "").strip()
     if configured:
         raw = [m.strip() for m in configured.split(",") if m.strip()]
@@ -365,16 +371,32 @@ class GoogleTTSVoice(AudioEngineAdapter):
         cleaned = _restore_stage_tags(_neutral_prepare_text(protected), saved)
         return _apply_delivery_prompt(cleaned, delivery_vector)
 
-    def generate_voice(self, text, provider_voice_id, delivery_vector, seed):
+    def identity_params(self, *, resolved_voice_ref=None, resolved_model=None, **_kw) -> dict:
+        """Call-time identity: the env-selected Gemini model + resolved voice.
+        The wiring folds these into ResolvedVoiceRequest.provider_model_id and
+        provider_voice_id so a Flash/Pro flip changes the cache key."""
+        model = str(resolved_model) if resolved_model else _selected_model()
+        return {
+            "model": model,
+            "provider_voice": str(resolved_voice_ref or ""),
+        }
+
+    def generate_voice(
+        self, text, provider_voice_id, delivery_vector, seed,
+        *, disable_retry: bool = False, resolved_model: Optional[str] = None,
+    ):
         if not text or not str(text).strip():
             raise ValueError("google_tts.generate_voice: blank line")
         voice = _validate_voice(provider_voice_id)
-        model = _selected_model()
+        model = str(resolved_model) if resolved_model else _selected_model()
         api_key = _resolve_api_key()
         spoken = _apply_voice_prompt(str(text).strip(), voice)
 
+        # Resolve the model ladder ONCE so the retry-log message and the
+        # loop iteration are guaranteed to reference the same tuple.
+        models = _models_to_try(model, allow_retry=not disable_retry)
         last_error = None
-        for attempt, model_id in enumerate(_models_to_try(model), start=1):
+        for attempt, model_id in enumerate(models, start=1):
             payload = _interaction_payload(model_id, spoken, voice)
             try:
                 response = _post_interaction(api_key, payload)
@@ -386,7 +408,7 @@ class GoogleTTSVoice(AudioEngineAdapter):
                     "Google TTS request failed for model %s: %s"
                     % (model_id, _redact(exc, extra=(api_key,)))
                 )
-                remaining = _models_to_try(model)[attempt:]
+                remaining = models[attempt:]  # local tuple; not a re-computed default
                 if remaining:
                     next_model = remaining[0]
                     log.warning(

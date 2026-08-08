@@ -122,6 +122,14 @@ class EngineProfile(BaseModel):
     canonicalizer: str = ""          # canonicalize_audio variant to run on the result
     error_policy: str = ""           # "" | fail_loud (cloud = fail_loud, no local fallback)
 
+    # --- Cloud-audio-cache chunk 2 (2026-08-08): content-addressed replay
+    # activation. When True, the per-line voice dispatcher runs FileAudioCache
+    # get/put around the adapter call so drift-prone providers (Gemini TTS) pin
+    # to identical bytes on re-render. Default False keeps every LOCAL profile
+    # byte-identical to today's shipped path; the two Google TTS profiles opt
+    # in. Read at nodes/_otr_voice_node_common._render_per_line. ---
+    use_cache: bool = False
+
     @model_validator(mode="after")
     def _validate_metadata(self):
         if self.runtime not in _VALID_RUNTIMES:

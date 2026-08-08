@@ -3,6 +3,165 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 -- HEAD 1619b0ce (v2.0-alpha) -- CODER (cloud-audio-cache chunk 2 SHIPS, queue item 9 chunk 2 retired)
+
+Did: took queue item 9 chunk 2 (content-addressed audio cache for the two
+  all-cloud profiles). The `_otr_audio_cache.py` module was already shipped as
+  Wave 1f (commits `1d45e783` + `a5349ccb`), tested, and reachable from the
+  release gate -- but NEVER wired to the per-line voice render loop. This
+  chunk wired it into `_render_per_line`, closed a handful of correctness
+  gaps the panels caught, and stamped per-line cache provenance in the ledger.
+- **Ship.** Ten code/config files + five test files.
+  - `nodes/_otr_resolved_request.py` -- `REQUEST_SCHEMA_VERSION` "1"->"2";
+    added `provider_model_id` + `provider_voice_id` as first-class IN_KEY
+    fields (r2 Codex MF#2: `quantize_params` reduces strings to a 31-bit
+    tick, unsuitable for identity strings).
+  - `nodes/_otr_audio_cache.py` -- `CACHE_SCHEMA_VERSION` "1"->"2"; new
+    `AudioCacheRecord.actual_sample_rate` + `provider_model_id` optional
+    fields; `_write_audio` becomes `_write_audio_atomic` (tempfile.mkstemp +
+    os.replace, sidecar published LAST as the commit signal); new
+    `FileAudioCache.load(request) -> Optional[(dict, AudioCacheRecord)]`
+    method that verifies cache_key match, path presence, cache_dir
+    containment, sample_rate/channels match, dtype|shape|bytes sha256, 3-D
+    shape, and the AUDIO batch contract before returning. Bounded log.warning
+    per miss-due-to-corruption.
+  - `nodes/_otr_audio_engines/base.py` -- optional `identity_params()` hook
+    on `AudioEngineAdapter`; default returns `{}` (byte-identical for every
+    adapter that doesn't override).
+  - `nodes/_otr_audio_engines/eng_google_tts.py` -- `identity_params()`
+    returns `{"model": _selected_model(), "provider_voice": ...}`; new
+    `generate_voice` kwargs `disable_retry: bool = False` and
+    `resolved_model: Optional[str] = None` so the wiring resolves the model
+    ONCE and passes it through to keep identity and actual match;
+    `_models_to_try(model, *, allow_retry=True)` gains cache-scoped
+    single-model mode (r3 Codex MF#1 + MF#2: the retry-log message now
+    references the LOCAL `models` tuple, not a re-computed default).
+  - `nodes/_otr_engine_profiles.py` -- `EngineProfile.use_cache: bool =
+    False` (Pydantic frozen strict; the two Google TTS profiles set True,
+    every other profile keeps the default; cache activation is entirely
+    profile-owned).
+  - `nodes/_otr_ledger.py` -- `stamp_per_line_audio_meta` gains
+    `audio_cache_key`, `audio_sha256`, `provider_model_id` optional kwargs
+    and changes `render_ms` semantics: `None` = skip, `0` = valid persisted
+    value (r4 Codex MF#4 -- the cache-hit path stamps `render_ms=0` to mean
+    "no generation time consumed"; skipping it would leave the hit stamp
+    silently incomplete).
+  - `nodes/_otr_ledger_consumers.py` -- `_OPTIONAL_STRING_FIELDS` gains
+    `audio_sha256` and `provider_model_id` so the post-freeze null-shape
+    audit tolerates them.
+  - `nodes/_otr_voice_node_common.py` -- the wiring. New `IS_CHANGED`
+    classmethod on `OTRVoiceNodeBase` returns `float("nan")` when the
+    resolved profile has `use_cache=True` OR resolution fails (fail-open per
+    Bug Bible unavailable-input rule); returns `"static"` for local engines
+    so ComfyUI doesn't force reruns on today's byte-identical paths. Three
+    new module-scope helpers: `_audio_cache_dir_for` (env override ->
+    meta.paths.audio_dir/audio_cache -> ""),
+    `_resolve_voice_ref_early` (consolidates the three post-request
+    resolution branches for the cache path so RESOLVED identity enters the
+    key), and `_persist_ledger_stamps` (reload-then-stamp-then-save via
+    `save_ledger_safe`, so a character role's stamps survive an announcer
+    role's follow-up write -- r2 Codex MF#4). The `_render_per_line` loop
+    branches on `cache_enabled`: cache-off path is byte-identical to today's
+    code; cache-on path hoists ref resolution, keys the request with the
+    provider identity, checks the cache, and either serves a hit (ledger
+    stamp with `render_ms=0`) or generates and puts (ledger stamp with the
+    real elapsed time + `audio_cache_key` + `audio_sha256`). Old P-OBS emit
+    at `:793` is gated `if not cache_enabled` (Sonnet 5 QA MF#1 -- otherwise
+    every cache-enabled line double-logs). Old voice-ref block at `:735` is
+    gated `if not cache_enabled` (Fable gate SF#1 -- the early-resolver
+    covers this path). Per-line try/finally around load/generate/put
+    guarantees ONE P-OBS emit per line even on a mid-line raise (Fable gate
+    SF#2). `FileAudioCache.load()` now derives the payload path from
+    `<cache_dir>/<key>.npy` instead of trusting the sidecar's absolute
+    `audio_path`, so a `rename_episode` step does not silently invalidate
+    the whole cache (Fable gate SF#3).
+  - `config/audio_engine_profiles.yaml` -- `use_cache: true` on
+    `char_google_tts_v1` (line 344) and `announcer_google_tts_v1` (line 369).
+    No other profile touched.
+  - `config/audio_cache_sidecar_schema.json` -- `$id` bumped
+    `otr:audio_cache_sidecar/v2`; two new properties.
+- **Tests.** New file `tests/test_audio_cache_wiring.py` = 29 tests covering
+  IN_KEY exposure, schema versions, model/voice flip changes cache_key,
+  put+load roundtrip, every corruption class (missing sidecar / missing npy
+  / sha mismatch / rate mismatch / channels mismatch / cache_key mismatch),
+  atomic write survives partial crash, identity_params model+voice threading,
+  models_to_try allow_retry=False, generate_voice new kwargs, IS_CHANGED
+  behavior (three cases), `_audio_cache_dir_for` three cases,
+  `_persist_ledger_stamps` reload-before-save preserves prior role stamps,
+  ASCII-source guard, and TWO end-to-end tests through the real
+  `AnnouncerVoice().generate(engine="google_tts")` proving miss-then-hit +
+  cache-off byte-identity (the coverage Sonnet 5 QA MF#2 named as the reason
+  the double-log ever shipped). Two SF#3-specific tests prove load derives
+  from cache_dir + survives dir rename. `tests/test_audio_cache_protocol.py`,
+  `tests/test_per_line_audio_meta.py`, `tests/test_audio_config_schemas.py`,
+  `tests/test_audio_cache_impl.py` extended for the new signatures and the
+  schema version bump.
+- **Full-kibitz HARD GATE satisfied.** Four-round arc completed
+  2026-08-08: r1 cold Fable + Codex + Antigravity (three-lane); r2 Codex +
+  Antigravity (two-lane); r3 Codex only (agy timed out at 5m
+  `--print-timeout` -- documented single-lane, not fabricated); r4 Codex +
+  Antigravity (two-lane, agy re-attempted after r3 timeout).
+  Judgments: `kibitz-runs/2026-08-08-cloud-audio-cache/r{1,2,3,4}/`.
+  **Honest lane count: 8 completed external panel calls + 1
+  attempted-failed** (r3 agy). Every prior-round anchor was reversed on at
+  least one axis by the panel: r1 flipped G1 mechanism, G3 cross-episode
+  reuse rationale, and G5 already-reserved field; r2 caught FIVE invented
+  identifiers (`.id_for_key`, `last_model_used`, `force_single_model_for_google_tts`,
+  `audio_matches_rate`, `meta.paths.audio_dir` dot-notation) + the sidecar
+  schema JSON test enforcement + IS_CHANGED gap; r3 (single-lane) caught
+  the model-resolved-twice defect + retry-log-message inconsistency + hit
+  vs miss hash contract mismatch + `render_ms=0` skipped + no ledger
+  persistence route without `save_ledger_safe`; r4 caught the missing
+  P-OBS setup lines + `np` not module-scope + two test contradictions.
+- **Post-r4 QA gates:**
+  - Sonnet 5 QA (2026-08-05 standing rule) on the diff via subagent -- found
+    TWO must-fixes both applied: the double P-OBS log emission on every
+    cache-enabled line, and zero test coverage of the actual
+    `_render_per_line` cache-on path. Both empirically reproduced by Sonnet
+    against the real venv. Fixes in the diff: bare P-OBS emit gated
+    `if not cache_enabled`, two real end-to-end tests added
+    (`test_end_to_end_google_tts_cache_miss_then_hit` +
+    `test_end_to_end_google_tts_cache_off_byte_identity`) that would have
+    caught the double-log via a P-OBS line-count assertion.
+  - Fable final gate (2026-08-06 standing rule) via subagent -- VERDICT
+    SAFE TO COMMIT with three SHOULD-FIXes named. SF#3 (load derives
+    audio_path from cache_dir + key -- rename_episode invalidation) applied
+    in this commit with two new tests. SF#2 (P-OBS on mid-line crash)
+    already covered by the per-line try/finally added in this diff -- Fable
+    grounded it live. SF#1 (outer try around loop for stamp persistence on
+    mid-loop raise -- adopted r4 ruling was pack-only; the loop-wrapping
+    version is the r4 Fable gate's improvement) DEFERRED as a follow-up:
+    Fable rated it NON-blocker because a crashed leg fails loud, never
+    ships, and the operator's retry self-heals (the previously-completed
+    line replays as a HIT and its stamps persist then, proven live by
+    Fable's own probe). See `kibitz-runs/2026-08-08-cloud-audio-cache/r4/fable_gate.md`.
+- **Suite.** 9222 passed / 111 skipped / 1 xfailed (baseline 9191, so +31
+  tests: 29 new in `tests/test_audio_cache_wiring.py` plus 2 extended
+  assertions each in `test_per_line_audio_meta.py` +
+  `test_audio_cache_protocol.py`). Bug Bible 17 green at survival-guide
+  `3759ae5`. `git diff -- workflows/` EMPTY all session.
+- **Non-goals held.** No `workflows/otr_canonical.json` change. No content
+  guardrails on generated episodes (operator 08-03). No word-count check
+  (operator 08-03). No local-engine output byte change on the miss path
+  (use_cache defaults False on all local profiles; cache-off byte-identity
+  verified by the e2e test). Release-gate PRODUCTION integration remains a
+  future chunk (this ships release-compatible metadata only). Bounded
+  same-model 429 retry deferred to a distinct chunk.
+Current step: queue item 9 chunk 2 SHIPPED and tombstoned. The **unblocked**
+  work is now item 8 (system-agnostic multi-GPU upscale) and item 9's next
+  chunk (Macbeth safety probe per arm, then 20-clip accept-rate
+  measurement, then the first full LOW episode).
+Next: a CODER window takes item 8 or item 9 chunk 3 (Macbeth probe --
+  requires a live cloud leg). **BOX IS CLEAN** -- no resident server, port
+  8000 free. **Follow-up chip owed:** SF#1 above (wrap the whole per-line
+  loop plus pack in one try/finally so completed lines' stamps survive a
+  mid-loop raise; add `test_cache_on_multi_line_partial_crash_stamps_completed_lines_via_finally`
+  per the r4 spec). Non-blocker; ship in its own tiny arc.
+Models: Claude Opus 4.7 (coder + sole judge), Fable (r1 cold + final gate),
+  Codex `gpt-5.6-sol` high (r1-r4 panels), Antigravity `Gemini 3.6 Flash
+  (High)` (r1/r2/r4 panels; r3 timed out at 5m), Sonnet 5 (post-coding QA).
+Commits: <one atomic commit forthcoming>.
+
 ## 2026-08-08 -- HEAD f25d7b14 (v2.0-alpha) -- CODER REVIEW-AND-FINISH (visual_storybased ships, queue item 2 retired)
 
 Did: finished the uncommitted `visual_storybased` implementation that

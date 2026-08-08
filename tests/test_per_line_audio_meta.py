@@ -87,11 +87,13 @@ class TestStampPerLineAudioMeta:
         assert row["bark_render_ms"] == 1234
 
     def test_skips_empty_values(self, ledger):
+        # render_ms defaults to None (skip); passing 0 explicitly PERSISTS 0
+        # under the cloud-audio-cache chunk 2 signature (2026-08-08). See
+        # test_render_ms_zero_persists_when_explicit below.
         ok = OTRL.stamp_per_line_audio_meta(
             ledger, "l002",
             tts_engine="kokoro",
             voice_preset="",
-            render_ms=0,
             generated_dur_s=0.0,
             audio_sample_hash="",
         )
@@ -103,6 +105,34 @@ class TestStampPerLineAudioMeta:
         assert "render_ms" not in row
         assert "generated_dur_s" not in row
         assert "audio_sample_hash" not in row
+
+    def test_render_ms_zero_persists_when_explicit(self, ledger):
+        # r4 MF#4: cache-hit path stamps render_ms=0 to mean "no generation
+        # time consumed". None still means "skip"; an explicit 0 must land.
+        ok = OTRL.stamp_per_line_audio_meta(
+            ledger, "l001",
+            tts_engine="google_tts",
+            render_ms=0,
+        )
+        assert ok is True
+        row = ledger["lines"][0]
+        assert row["render_ms"] == 0
+        assert row["tts_engine"] == "google_tts"
+
+    def test_stamps_cache_provenance_fields(self, ledger):
+        # cloud-audio-cache chunk 2 (2026-08-08): new optional string kwargs.
+        ok = OTRL.stamp_per_line_audio_meta(
+            ledger, "l001",
+            tts_engine="google_tts",
+            audio_cache_key="cachekey123",
+            audio_sha256="sha256abc",
+            provider_model_id="gemini-2.5-flash-preview-tts",
+        )
+        assert ok is True
+        row = ledger["lines"][0]
+        assert row["audio_cache_key"] == "cachekey123"
+        assert row["audio_sha256"] == "sha256abc"
+        assert row["provider_model_id"] == "gemini-2.5-flash-preview-tts"
 
     def test_returns_false_for_unknown_line(self, ledger):
         ok = OTRL.stamp_per_line_audio_meta(

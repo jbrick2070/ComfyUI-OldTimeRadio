@@ -29,7 +29,9 @@ def _req(**over):
 
 
 def test_schema_version_present():
-    assert CACHE_SCHEMA_VERSION == "1"
+    # Bumped to "2" in the cloud-audio-cache chunk (2026-08-08) when
+    # AudioCacheRecord gained actual_sample_rate + provider_model_id.
+    assert CACHE_SCHEMA_VERSION == "2"
 
 
 def test_record_is_frozen():
@@ -92,8 +94,16 @@ def test_complete_stub_satisfies_protocol():
         def get(self, request):
             return None
 
-        def put(self, request, audio, *, allowed_for_release=False):
-            return record_from_request(request, allowed_for_release=allowed_for_release)
+        def put(self, request, audio, *, allowed_for_release=False,
+                actual_sample_rate=None, provider_model_id=""):
+            return record_from_request(
+                request, allowed_for_release=allowed_for_release,
+                actual_sample_rate=actual_sample_rate,
+                provider_model_id=provider_model_id,
+            )
+
+        def load(self, request):
+            return None
 
         def iter_records(self):
             return []

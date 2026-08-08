@@ -26,7 +26,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
 | 8 | **System-agnostic multi-GPU upscale stage** -- built against the profile and registry contracts, NEVER a resurrection of the retired NVIDIA-only node. Promoted out of ROADMAP row 2 by the operator 2026-08-07 | ROADMAP section 2 | own design + arc, then coder | nothing once 1-7 clear |
-| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (BLOCKS production voice; Gemini TTS drifts and cannot be pinned) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | nothing (cache chunk first) |
+| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08, tombstone below) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
 
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
@@ -34,7 +34,9 @@ platform tests -> **12** install path -> **13** product docs + v2 release.
 **Items 1, 3, 4, 5, 6 and 7 are blocked on the operator** (item 1 needs only an
 API key reaching the run). A coder window that reaches one without an answer
 skips to the next unblocked item rather than guessing. **Items 8 and 9 are the
-unblocked work** (item 2 shipped 2026-08-08 -- tombstone below).
+unblocked work** (item 2 shipped 2026-08-08 -- tombstone below; item 9 chunk 2
+also shipped 2026-08-08 -- tombstone below; item 9's next chunk is the Macbeth
+safety probe which needs a live cloud leg).
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
@@ -59,6 +61,74 @@ input.
 3. **Dry-run first.** The catalog's model ids carry size suffixes
    (`... (12.0 GB)`); the plain id is a hard `ValueError`. The `--dry-run`
    `applied:` line is the only proof an override actually landed.
+
+### TOMBSTONE -- CLOUD-AUDIO-CACHE (queue item 9 chunk 2), SHIPPED 2026-08-08
+
+**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc completed
+2026-08-08 (r1 cold Fable + Codex + Antigravity; r2 Codex + Antigravity;
+r3 Codex only -- agy timed out at 5m, documented single-lane; r4 Codex +
+Antigravity). Sonnet 5 QA on the diff caught two must-fixes (both applied
+in the same commit); Fable final gate cleared SAFE TO COMMIT with three
+SHOULD-FIXes (two applied, one deferred as a follow-up chip).
+
+The shipped Wave-1f `FileAudioCache` module has been WIRED into
+`_render_per_line`: cloud legs (`char_google_tts_v1` + `announcer_google_tts_v1`,
+the two profiles with `use_cache: true`) now content-address their audio
+via `<meta.paths.audio_dir>/audio_cache/` (overridable with
+`OTR_AUDIO_CACHE_DIR`). Same input yields same audio bytes; drift-prone
+Gemini TTS replay is pinned to disk.
+
+* **`REQUEST_SCHEMA_VERSION` 1->2** with `provider_model_id` and
+  `provider_voice_id` as first-class IN_KEY fields (r2 Codex MF#2 --
+  `quantize_params` reduces strings to 31-bit ticks, unsuitable for
+  identity strings).
+* **`CACHE_SCHEMA_VERSION` 1->2** with `actual_sample_rate` and
+  `provider_model_id` optional record fields. Atomic writes via
+  `tempfile.mkstemp` + `os.replace`; sidecar published LAST as the commit
+  signal. `FileAudioCache.load()` verifies cache_key, path presence,
+  cache_dir containment (via derivation, not sidecar-trust), sample_rate
+  and channels match, dtype|shape|bytes sha256, and the AUDIO batch
+  contract. Whole-body `except Exception` boundary with per-class
+  `log.warning`.
+* **Adapter identity hook** on `AudioEngineAdapter.identity_params()`
+  (default `{}`); Google TTS returns `{"model": _selected_model(),
+  "provider_voice": ...}`. Wiring folds this into
+  `ResolvedVoiceRequest.provider_model_id` / `provider_voice_id`.
+* **Retry ladder cache-safe.** `_models_to_try(model, *, allow_retry=True)`;
+  `generate_voice(disable_retry=True, resolved_model=<pinned>)` on cache
+  paths pins the ladder to one entry so a fallback model cannot silently
+  produce audio cached under the requested model's key.
+* **Per-line ledger stamp.** `stamp_per_line_audio_meta` grows three
+  optional kwargs (`audio_cache_key`, `audio_sha256`, `provider_model_id`);
+  `render_ms` becomes `Optional[int] = None` (None skips; 0 persists so
+  cache-hit rows still stamp `render_ms=0`). `_persist_ledger_stamps`
+  reload-before-save preserves prior roles' stamps (r2 Codex MF#4).
+* **`IS_CHANGED`** on both voice nodes returns `float("nan")` when
+  `use_cache=True` OR the profile fails to resolve (fail-open per Bug
+  Bible unavailable-input rule); `"static"` for local engines so today's
+  paths stay byte-identical.
+* **`_audio_cache_dir_for(meta)`** helper: env override
+  (`OTR_AUDIO_CACHE_DIR`, expanduser + abspath, logged) ->
+  `<meta.paths.audio_dir>/audio_cache/` -> `""` (which is a fail-loud
+  `MALFORMED_CONFIG` when a profile has `use_cache=True` and no dir
+  resolves).
+
+**Follow-up chip owed (SHOULD-FIX from r4 Fable gate, non-blocker):** wrap
+the whole per-line loop plus `pack_audio_batch` in one `try/finally` so a
+mid-loop `generate_voice` raise still persists the completed lines'
+ledger stamps. Currently the persistence finally covers only pack; a
+mid-loop cloud leg failure loses completed-line stamps until the retry
+replays them. Non-blocker today because a crashed leg fails loud, never
+publishes, and the operator's retry self-heals (previously-completed line
+replays as a HIT and its stamps persist then, proven live). Add the r4
+spec's `test_cache_on_multi_line_partial_crash_stamps_completed_lines_via_finally`
+in the same fix.
+
+Suite **9222 passed / 111 skipped / 1 xfailed** (was 9191 pre-chunk, +31
+tests: 29 new in `tests/test_audio_cache_wiring.py` + 2 extended in
+`test_per_line_audio_meta.py` and `test_audio_cache_protocol.py`). Bug
+Bible 17 green at survival-guide `3759ae5`. `git diff -- workflows/`
+EMPTY. Full arc receipts: `kibitz-runs/2026-08-08-cloud-audio-cache/r{1,2,3,4}/`.
 
 ### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
 
