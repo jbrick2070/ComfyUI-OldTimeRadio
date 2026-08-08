@@ -612,315 +612,282 @@ class OTRVoiceNodeBase:
             log_lines.append(f"{self.ROLE}: cache enabled dir={cache_dir}")
         cache_stats = {"hit": 0, "miss": 0, "degraded_write": 0, "degraded_ledger": 0}
         ledger_stamps: list = []
-        for occ, ln in enumerate(lines):
-            # C2 (S2 P1.3): resolve canonical vs delivery through the ONE
-            # resolver. `text` is the DELIVERY string every downstream
-            # surface (delivery vector, adapter/neutral prep, request
-            # hashing) consumes. LEGACY -> delivery == canonical (byte-
-            # identical); content-owned -> the verified text_for_tts stamp
-            # (this raises TextDeliveryError BEFORE generation on an
-            # absent/stale stamp).
-            canonical_text, _delivery_text = resolve_line_delivery(ln, _delivery_mode)
-            text = _delivery_text.strip()
-            char_id = str(ln.get("char_id") or "")
-            line_id = str(ln.get("line_id") or "")
-            cast = _OTRLC.cast_lookup(led, char_id)
-            voice_ref_id = cast.get("voice_ref_id")
-            voice_preset = cast.get("voice_preset")
-            if ref_field == "voice_ref_path":
-                voice_ref = cast.get("voice_ref_path") or cast.get("ref_path")
-            else:
-                voice_ref = cast.get(ref_field)
-            delivery_vector = None
-            _dv_source = "off"
-            if _delivery_on:
-                _tension = ln.get("scene_tension", ln.get("tension", 0.0)) or 0.0
-                try:
-                    # Whiny-fix P1.1: ONE chooser -- stamped vector with the
-                    # version guard (stale v1 stamps re-derive LOUDLY), else
-                    # derived from PREPARED text (G13: never raw text).
-                    from ._otr_delivery_vector import select_delivery_vector
-                    delivery_vector, _dv_source = select_delivery_vector(
-                        ln, _neutral_prepare_text(text), float(_tension))
-                except Exception as _e:  # noqa: BLE001 -- best-effort, never fatal
-                    log.debug("[OTR] delivery derive failed: %s", _e)
-                    delivery_vector, _dv_source = None, "error"
-            prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
-            # NO-FALLBACK (operator 2026-07-03): a beat that cleans to EMPTY text
-            # (a stage-direction-only line like "(flips the switch)") must NEVER be
-            # silently rendered as silence -- that hid a writer/ledger defect. The
-            # writer must not emit voiced lines with no spoken content (a pre-freeze
-            # assert guards this), and the ledger carries no stage-direction voice
-            # role today. If one still reaches the voice gate, FAIL LOUD naming the
-            # line so it is fixed, never papered over with a silent clip. (Routing a
-            # stage-direction beat to a dedicated non-voice media engine is parked in
-            # docs/ROADMAP_IDEAS.md -- re-add the role to the ledger then.)
-            if not str(prepared or "").strip():
-                raise ValueError(
-                    f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} "
-                    f"cleans to EMPTY spoken text (stage-direction-only?). No "
-                    f"silent-clip fallback (no-fallback rip) -- the writer must not "
-                    f"emit voiced lines with no dialogue. Canonical text: "
-                    f"{canonical_text!r}"
-                )
-            # Cloud-audio-cache (2026-08-08): resolve voice_ref BEFORE the
-            # request build so the RESOLVED identity enters the cache key
-            # (elevenlabs/kokoro/etc. draw from the current bank -- keying the
-            # unresolved cast row would let a bank change replay a hit with a
-            # different voice). Non-cache path keeps today's inline order below,
-            # byte-identical. r2 MF#3 grounding: this does NOT perturb
-            # stable_line_seed because params are not in the seed.
-            provider_model_id_stamp = ""
-            provider_voice_stamp = ""
-            if cache_enabled:
-                voice_ref, id_for_key = _resolve_voice_ref_early(
-                    adapter, engine, cast, episode_seed, self.ROLE, voice_ref,
-                )
-                adapter_identity = adapter.identity_params(resolved_voice_ref=id_for_key)
-                provider_model_id_stamp = str(adapter_identity.get("model", ""))
-                provider_voice_stamp = str(adapter_identity.get("provider_voice", id_for_key))
-                request = build_resolved_request(
-                    role=self.ROLE,
-                    engine_name=engine,
-                    engine_profile_id=profile.profile_id,
-                    engine_impl_version=profile.engine_impl_version,
-                    char_id=char_id,
-                    line_id=line_id,
-                    occurrence=occ,
-                    prepared_text=prepared,
-                    voice_ref_id=id_for_key,
-                    voice_preset=voice_preset,
-                    episode_seed=episode_seed,
-                    cast_lock_revision=cast_lock_revision,
-                    sample_rate=sr,
-                    channels=1,
-                    params=dict(profile.default_params or {}),
-                    commercial_clean=profile.commercial_clean,
-                    provider_model_id=provider_model_id_stamp,
-                    provider_voice_id=provider_voice_stamp,
-                )
-            else:
-                request = build_resolved_request(
-                    role=self.ROLE,
-                    engine_name=engine,
-                    engine_profile_id=profile.profile_id,
-                    engine_impl_version=profile.engine_impl_version,
-                    char_id=char_id,
-                    line_id=line_id,
-                    occurrence=occ,
-                    prepared_text=prepared,
-                    voice_ref_id=voice_ref_id,
-                    voice_preset=voice_preset,
-                    episode_seed=episode_seed,
-                    cast_lock_revision=cast_lock_revision,
-                    sample_rate=sr,
-                    channels=1,
-                    params=dict(profile.default_params or {}),
-                    commercial_clean=profile.commercial_clean,
-                )
-            # G1: per-engine external seed reduced from the stable line seed.
-            engine_seed = _seed_to_int64(engine, request.stable_line_seed)
-            # Ref-clip resolution (no-fallback rip 2026-07-03): a voice-CLONING char
-            # engine (voice_ref_field == "voice_ref_path", e.g. indextts2 /
-            # chatterbox) cannot synthesize without a per-character reference WAV.
-            # We resolve the cast row's OWN ref below; if none resolves, the line
-            # FAILS LOUD (no bark fallback). A valid ref is left byte-identical.
-            #
-            # Cloud-audio-cache chunk 2 (2026-08-08): gated behind
-            # `not cache_enabled` because _resolve_voice_ref_early above already
-            # ran these three branches when the cache is active (r4 Sonnet 5 QA
-            # SF#1). Removes wasted resolver work per line and closes the latent
-            # trap where a future non-idempotent clone-engine resolver would
-            # double-mutate state.
-            if not cache_enabled:
-                if _engine_requires_voice_ref(adapter) and voice_ref:
-                    # A non-empty but STALE ref (the file is gone) must fall through to
-                    # resolution, not be shipped to the worker (which would hard-fail
-                    # "ref_clip missing"). A valid ref is left untouched (the adapter
-                    # resolves it) so shipped paths are byte-identical; only a
-                    # missing-on-disk ref is nulled -> re-resolved or fails loud below.
-                    _disk = _resolve_ref_to_disk(voice_ref)
-                    if not (_disk and os.path.exists(_disk)):
-                        voice_ref = None
-                if _engine_requires_voice_ref(adapter) and not voice_ref:
-                    # preserve_ledger / CastLock-stamps-only-the-id: resolve an
-                    # on-disk reference WAV from voice_ref_id or by gender so the
-                    # clone engine clones a REAL voice for THIS character. If none
-                    # resolves, we FAIL LOUD below (no-fallback rip 2026-07-03) -- a
-                    # cloning engine NEVER silently renders on bark.
-                    voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
-                # ONE-KNOB (2026-07-04): a cloud PROVIDER-voice engine (voice_ref_field
-                # == "provider_voice_id", e.g. elevenlabs) whose cast row has NO provider
-                # id -- the operator changed only the VOICE ENGINE and left CastLock's
-                # voice_bank on a LOCAL bank. Resolve a gender-matched voice_id from the
-                # ENGINE's own pool here (deterministic per-character casting, parity with
-                # the clone-ref path above), so the voice engine is the SINGLE knob and
-                # CastLock never has to be touched. A missing pool -> None -> the adapter
-                # still fails loud (no silent inherit of another voice).
-                if getattr(adapter, "voice_ref_field", "") == "provider_voice_id" and not voice_ref:
-                    voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=self.ROLE)
-            # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
-            # char -> voice_ref_id -> ref basename -> engine -> alpha ->
-            # delivery version/state/source -> seed. Render_log line + runtime
-            # log mirror; this is the observability floor every later step
-            # (P0-zero, the audit, P3a durable stamping) builds on.
-            _alpha_fn = getattr(adapter, "current_emo_alpha", None)
-            _alpha = _alpha_fn() if callable(_alpha_fn) else None
-            if delivery_vector is None:
-                _vec_state = "omitted"
-            elif not any(float(v or 0.0) > 0.0 for v in delivery_vector.values()):
-                _vec_state = "zero"
-            else:
-                _vec_state = "nonzero"
-            try:
-                from ._otr_delivery_vector import DELIVERY_TABLE_VERSION as _DTV
-            except Exception:  # noqa: BLE001
-                _DTV = "?"
-            _pobs = (
-                f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} -> "
-                f"voice_ref_id={voice_ref_id or '-'} "
-                f"ref={os.path.basename(voice_ref) if voice_ref else '-'} "
-                f"engine={engine} "
-                f"alpha={'n/a' if _alpha is None else _alpha} "
-                f"delivery={_DTV}:{_vec_state}({_dv_source}) seed={engine_seed}"
-            )
-            # Cloud-audio-cache chunk 2 (2026-08-08): when cache is enabled,
-            # a SECOND P-OBS emit happens further down with the terminal
-            # cache=<status> token. Skip the bare emit here to avoid the
-            # double-log per r4 Sonnet 5 QA MF#1. When cache is off, the
-            # bare emit here IS the one and only P-OBS line (byte-identical
-            # to pre-chunk behavior).
-            if not cache_enabled:
-                log_lines.append(_pobs)
-                log.info("[OTR voice P-OBS] %s", _pobs)
-            # NO-FALLBACK (operator 2026-07-03): a cloning engine that reached this
-            # line with no usable voice reference FAILS LOUD -- it never silently
-            # renders on bark. The old bark missing-ref net is retired; a missing
-            # reference is a casting/install defect the operator must fix, surfaced
-            # here as a NAMED EngineUnusable (MISSING_MODEL) naming the char/line.
-            if _engine_requires_voice_ref(adapter) and not voice_ref:
-                raise EngineUnusable(
-                    engine, self.ROLE, EngineUsabilityReason.MISSING_MODEL,
-                    f"no usable voice reference for cloning engine '{engine}' on "
-                    f"line={line_id or occ} char={char_id or '-'} "
-                    f"(voice_ref_id={voice_ref_id or '-'}). Install the engine's "
-                    f"reference WAVs or cast a voice with a resolvable ref -- there "
-                    f"is NO bark fallback (no-fallback rip).",
-                )
-            # G1: scope strict-determinism + seed/restore every RNG around the
-            # single forward (I-2/C-2). warn_only=True keeps the process default
-            # non-strict so a nondeterministic CUDA op cannot crash the opt-in
-            # render on sm_120; bit_exact (warn_only=False) is gated on the F
-            # pilot verifying each engine binds an external torch.Generator.
-            #
-            # Cloud-audio-cache chunk 2 (2026-08-08): when profile.use_cache is
-            # True, look up FileAudioCache first; on a hit skip the API call
-            # entirely. On a miss run the forward, cache the bytes, stamp the
-            # ledger. Both branches inline "adapter.generate_voice(" under the
-            # deterministic_inference CM to keep the source-grep guard at
-            # tests/test_audio_determinism_wrap.py:158-163 green.
-            #
-            # Per-line try/finally (r4 Fable gate SF#2): ensures P-OBS emits
-            # per line even when generate_voice raises, so a dying render
-            # always logs which line it died on -- preserves the pre-chunk
-            # observability contract ("per-line attribution, ALWAYS").
-            _render_start = time.monotonic()
-            cache_status = "off"
-            audio = None
-            try:
-                if cache_enabled and cache is not None:
-                    loaded = cache.load(request)
-                    if loaded is not None:
-                        audio, cached_record = loaded
-                        cache_status = "hit"
-                        cache_stats["hit"] += 1
-                if audio is None:
-                    if cache_enabled and engine == "google_tts":
-                        with deterministic_inference(engine_seed, warn_only=True):
-                            audio = adapter.generate_voice(
-                                prepared, voice_ref, delivery_vector, engine_seed,
-                                disable_retry=True,
-                                resolved_model=provider_model_id_stamp,
-                            )
-                    else:
-                        with deterministic_inference(engine_seed, warn_only=True):
-                            audio = adapter.generate_voice(
-                                prepared, voice_ref, delivery_vector, engine_seed,
-                            )
-                # P-OBS sample-rate assert: a primary-engine clip whose rate does
-                # not match the pack rate is a real defect (the pack would crash
-                # or silently resample later) -- LOUD, never silent.
-                _got_sr = int(audio.get("sample_rate", sr) or sr)
-                if _got_sr != sr:
-                    _sr_msg = (
-                        f"{self.ROLE}: WARNING line={line_id or occ} clip sample "
-                        f"rate {_got_sr} != pack rate {sr} (engine {engine}) -- "
-                        f"investigate before trusting this episode's voice lane"
+        try:
+            for occ, ln in enumerate(lines):
+                # C2 (S2 P1.3): resolve canonical vs delivery through the ONE
+                # resolver. `text` is the DELIVERY string every downstream
+                # surface (delivery vector, adapter/neutral prep, request
+                # hashing) consumes. LEGACY -> delivery == canonical (byte-
+                # identical); content-owned -> the verified text_for_tts stamp
+                # (this raises TextDeliveryError BEFORE generation on an
+                # absent/stale stamp).
+                canonical_text, _delivery_text = resolve_line_delivery(ln, _delivery_mode)
+                text = _delivery_text.strip()
+                char_id = str(ln.get("char_id") or "")
+                line_id = str(ln.get("line_id") or "")
+                cast = _OTRLC.cast_lookup(led, char_id)
+                voice_ref_id = cast.get("voice_ref_id")
+                voice_preset = cast.get("voice_preset")
+                if ref_field == "voice_ref_path":
+                    voice_ref = cast.get("voice_ref_path") or cast.get("ref_path")
+                else:
+                    voice_ref = cast.get(ref_field)
+                delivery_vector = None
+                _dv_source = "off"
+                if _delivery_on:
+                    _tension = ln.get("scene_tension", ln.get("tension", 0.0)) or 0.0
+                    try:
+                        # Whiny-fix P1.1: ONE chooser -- stamped vector with the
+                        # version guard (stale v1 stamps re-derive LOUDLY), else
+                        # derived from PREPARED text (G13: never raw text).
+                        from ._otr_delivery_vector import select_delivery_vector
+                        delivery_vector, _dv_source = select_delivery_vector(
+                            ln, _neutral_prepare_text(text), float(_tension))
+                    except Exception as _e:  # noqa: BLE001 -- best-effort, never fatal
+                        log.debug("[OTR] delivery derive failed: %s", _e)
+                        delivery_vector, _dv_source = None, "error"
+                prepared = prep(text, delivery_vector) if callable(prep) else _neutral_prepare_text(text)
+                # NO-FALLBACK (operator 2026-07-03): a beat that cleans to EMPTY text
+                # (a stage-direction-only line like "(flips the switch)") must NEVER be
+                # silently rendered as silence -- that hid a writer/ledger defect. The
+                # writer must not emit voiced lines with no spoken content (a pre-freeze
+                # assert guards this), and the ledger carries no stage-direction voice
+                # role today. If one still reaches the voice gate, FAIL LOUD naming the
+                # line so it is fixed, never papered over with a silent clip. (Routing a
+                # stage-direction beat to a dedicated non-voice media engine is parked in
+                # docs/ROADMAP_IDEAS.md -- re-add the role to the ledger then.)
+                if not str(prepared or "").strip():
+                    raise ValueError(
+                        f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} "
+                        f"cleans to EMPTY spoken text (stage-direction-only?). No "
+                        f"silent-clip fallback (no-fallback rip) -- the writer must not "
+                        f"emit voiced lines with no dialogue. Canonical text: "
+                        f"{canonical_text!r}"
                     )
-                    log_lines.append(_sr_msg)
-                    log.warning("[OTR voice P-OBS] %s", _sr_msg)
-                # Cloud-audio-cache: on the miss path, cache the bytes (unless
-                # rate mismatched, in which case skip the put -- a mismatched
-                # clip cached would silently mispitch on the next hit). On any
-                # path collect the ledger stamp bundle. r4 MF#4: hit stamps
-                # render_ms=0 (valid persisted value under the new
-                # render_ms=None-is-skip signature); miss stamps the elapsed time.
+                # Cloud-audio-cache (2026-08-08): resolve voice_ref BEFORE the
+                # request build so the RESOLVED identity enters the cache key
+                # (elevenlabs/kokoro/etc. draw from the current bank -- keying the
+                # unresolved cast row would let a bank change replay a hit with a
+                # different voice). Non-cache path keeps today's inline order below,
+                # byte-identical. r2 MF#3 grounding: this does NOT perturb
+                # stable_line_seed because params are not in the seed.
+                provider_model_id_stamp = ""
+                provider_voice_stamp = ""
                 if cache_enabled:
-                    _asample_hash = compute_audio_sample_hash(
-                        audio["waveform"] if isinstance(audio, dict) else audio
+                    voice_ref, id_for_key = _resolve_voice_ref_early(
+                        adapter, engine, cast, episode_seed, self.ROLE, voice_ref,
                     )
-                    _dur_s = (
-                        float(audio["waveform"].shape[-1]) / float(_got_sr)
-                        if _got_sr else 0.0
+                    adapter_identity = adapter.identity_params(resolved_voice_ref=id_for_key)
+                    provider_model_id_stamp = str(adapter_identity.get("model", ""))
+                    provider_voice_stamp = str(adapter_identity.get("provider_voice", id_for_key))
+                    request = build_resolved_request(
+                        role=self.ROLE,
+                        engine_name=engine,
+                        engine_profile_id=profile.profile_id,
+                        engine_impl_version=profile.engine_impl_version,
+                        char_id=char_id,
+                        line_id=line_id,
+                        occurrence=occ,
+                        prepared_text=prepared,
+                        voice_ref_id=id_for_key,
+                        voice_preset=voice_preset,
+                        episode_seed=episode_seed,
+                        cast_lock_revision=cast_lock_revision,
+                        sample_rate=sr,
+                        channels=1,
+                        params=dict(profile.default_params or {}),
+                        commercial_clean=profile.commercial_clean,
+                        provider_model_id=provider_model_id_stamp,
+                        provider_voice_id=provider_voice_stamp,
                     )
-                    if cache_status == "hit":
-                        ledger_stamps.append((line_id, {
-                            "tts_engine": engine,
-                            "voice_preset": voice_preset or "",
-                            "render_ms": 0,
-                            "generated_dur_s": _dur_s,
-                            "audio_sample_hash": _asample_hash,
-                            "audio_cache_key": cached_record.cache_key,
-                            "audio_sha256": cached_record.audio_sha256,
-                            "provider_model_id": cached_record.provider_model_id or "",
-                        }))
-                    else:
-                        _elapsed_ms = int((time.monotonic() - _render_start) * 1000)
-                        if _got_sr != sr:
-                            cache_status = "degraded_write"
-                            cache_stats["degraded_write"] += 1
+                else:
+                    request = build_resolved_request(
+                        role=self.ROLE,
+                        engine_name=engine,
+                        engine_profile_id=profile.profile_id,
+                        engine_impl_version=profile.engine_impl_version,
+                        char_id=char_id,
+                        line_id=line_id,
+                        occurrence=occ,
+                        prepared_text=prepared,
+                        voice_ref_id=voice_ref_id,
+                        voice_preset=voice_preset,
+                        episode_seed=episode_seed,
+                        cast_lock_revision=cast_lock_revision,
+                        sample_rate=sr,
+                        channels=1,
+                        params=dict(profile.default_params or {}),
+                        commercial_clean=profile.commercial_clean,
+                    )
+                # G1: per-engine external seed reduced from the stable line seed.
+                engine_seed = _seed_to_int64(engine, request.stable_line_seed)
+                # Ref-clip resolution (no-fallback rip 2026-07-03): a voice-CLONING char
+                # engine (voice_ref_field == "voice_ref_path", e.g. indextts2 /
+                # chatterbox) cannot synthesize without a per-character reference WAV.
+                # We resolve the cast row's OWN ref below; if none resolves, the line
+                # FAILS LOUD (no bark fallback). A valid ref is left byte-identical.
+                #
+                # Cloud-audio-cache chunk 2 (2026-08-08): gated behind
+                # `not cache_enabled` because _resolve_voice_ref_early above already
+                # ran these three branches when the cache is active (r4 Sonnet 5 QA
+                # SF#1). Removes wasted resolver work per line and closes the latent
+                # trap where a future non-idempotent clone-engine resolver would
+                # double-mutate state.
+                if not cache_enabled:
+                    if _engine_requires_voice_ref(adapter) and voice_ref:
+                        # A non-empty but STALE ref (the file is gone) must fall through to
+                        # resolution, not be shipped to the worker (which would hard-fail
+                        # "ref_clip missing"). A valid ref is left untouched (the adapter
+                        # resolves it) so shipped paths are byte-identical; only a
+                        # missing-on-disk ref is nulled -> re-resolved or fails loud below.
+                        _disk = _resolve_ref_to_disk(voice_ref)
+                        if not (_disk and os.path.exists(_disk)):
+                            voice_ref = None
+                    if _engine_requires_voice_ref(adapter) and not voice_ref:
+                        # preserve_ledger / CastLock-stamps-only-the-id: resolve an
+                        # on-disk reference WAV from voice_ref_id or by gender so the
+                        # clone engine clones a REAL voice for THIS character. If none
+                        # resolves, we FAIL LOUD below (no-fallback rip 2026-07-03) -- a
+                        # cloning engine NEVER silently renders on bark.
+                        voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
+                    # ONE-KNOB (2026-07-04): a cloud PROVIDER-voice engine (voice_ref_field
+                    # == "provider_voice_id", e.g. elevenlabs) whose cast row has NO provider
+                    # id -- the operator changed only the VOICE ENGINE and left CastLock's
+                    # voice_bank on a LOCAL bank. Resolve a gender-matched voice_id from the
+                    # ENGINE's own pool here (deterministic per-character casting, parity with
+                    # the clone-ref path above), so the voice engine is the SINGLE knob and
+                    # CastLock never has to be touched. A missing pool -> None -> the adapter
+                    # still fails loud (no silent inherit of another voice).
+                    if getattr(adapter, "voice_ref_field", "") == "provider_voice_id" and not voice_ref:
+                        voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=self.ROLE)
+                # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
+                # char -> voice_ref_id -> ref basename -> engine -> alpha ->
+                # delivery version/state/source -> seed. Render_log line + runtime
+                # log mirror; this is the observability floor every later step
+                # (P0-zero, the audit, P3a durable stamping) builds on.
+                _alpha_fn = getattr(adapter, "current_emo_alpha", None)
+                _alpha = _alpha_fn() if callable(_alpha_fn) else None
+                if delivery_vector is None:
+                    _vec_state = "omitted"
+                elif not any(float(v or 0.0) > 0.0 for v in delivery_vector.values()):
+                    _vec_state = "zero"
+                else:
+                    _vec_state = "nonzero"
+                try:
+                    from ._otr_delivery_vector import DELIVERY_TABLE_VERSION as _DTV
+                except Exception:  # noqa: BLE001
+                    _DTV = "?"
+                _pobs = (
+                    f"{self.ROLE}: line={line_id or occ} char={char_id or '-'} -> "
+                    f"voice_ref_id={voice_ref_id or '-'} "
+                    f"ref={os.path.basename(voice_ref) if voice_ref else '-'} "
+                    f"engine={engine} "
+                    f"alpha={'n/a' if _alpha is None else _alpha} "
+                    f"delivery={_DTV}:{_vec_state}({_dv_source}) seed={engine_seed}"
+                )
+                # Cloud-audio-cache chunk 2 (2026-08-08): when cache is enabled,
+                # a SECOND P-OBS emit happens further down with the terminal
+                # cache=<status> token. Skip the bare emit here to avoid the
+                # double-log per r4 Sonnet 5 QA MF#1. When cache is off, the
+                # bare emit here IS the one and only P-OBS line (byte-identical
+                # to pre-chunk behavior).
+                if not cache_enabled:
+                    log_lines.append(_pobs)
+                    log.info("[OTR voice P-OBS] %s", _pobs)
+                # NO-FALLBACK (operator 2026-07-03): a cloning engine that reached this
+                # line with no usable voice reference FAILS LOUD -- it never silently
+                # renders on bark. The old bark missing-ref net is retired; a missing
+                # reference is a casting/install defect the operator must fix, surfaced
+                # here as a NAMED EngineUnusable (MISSING_MODEL) naming the char/line.
+                if _engine_requires_voice_ref(adapter) and not voice_ref:
+                    raise EngineUnusable(
+                        engine, self.ROLE, EngineUsabilityReason.MISSING_MODEL,
+                        f"no usable voice reference for cloning engine '{engine}' on "
+                        f"line={line_id or occ} char={char_id or '-'} "
+                        f"(voice_ref_id={voice_ref_id or '-'}). Install the engine's "
+                        f"reference WAVs or cast a voice with a resolvable ref -- there "
+                        f"is NO bark fallback (no-fallback rip).",
+                    )
+                # G1: scope strict-determinism + seed/restore every RNG around the
+                # single forward (I-2/C-2). warn_only=True keeps the process default
+                # non-strict so a nondeterministic CUDA op cannot crash the opt-in
+                # render on sm_120; bit_exact (warn_only=False) is gated on the F
+                # pilot verifying each engine binds an external torch.Generator.
+                #
+                # Cloud-audio-cache chunk 2 (2026-08-08): when profile.use_cache is
+                # True, look up FileAudioCache first; on a hit skip the API call
+                # entirely. On a miss run the forward, cache the bytes, stamp the
+                # ledger. Both branches inline "adapter.generate_voice(" under the
+                # deterministic_inference CM to keep the source-grep guard at
+                # tests/test_audio_determinism_wrap.py:158-163 green.
+                #
+                # Per-line try/finally (r4 Fable gate SF#2): ensures P-OBS emits
+                # per line even when generate_voice raises, so a dying render
+                # always logs which line it died on -- preserves the pre-chunk
+                # observability contract ("per-line attribution, ALWAYS").
+                _render_start = time.monotonic()
+                cache_status = "off"
+                audio = None
+                try:
+                    if cache_enabled and cache is not None:
+                        loaded = cache.load(request)
+                        if loaded is not None:
+                            audio, cached_record = loaded
+                            cache_status = "hit"
+                            cache_stats["hit"] += 1
+                    if audio is None:
+                        if cache_enabled and engine == "google_tts":
+                            with deterministic_inference(engine_seed, warn_only=True):
+                                audio = adapter.generate_voice(
+                                    prepared, voice_ref, delivery_vector, engine_seed,
+                                    disable_retry=True,
+                                    resolved_model=provider_model_id_stamp,
+                                )
+                        else:
+                            with deterministic_inference(engine_seed, warn_only=True):
+                                audio = adapter.generate_voice(
+                                    prepared, voice_ref, delivery_vector, engine_seed,
+                                )
+                    # P-OBS sample-rate assert: a primary-engine clip whose rate does
+                    # not match the pack rate is a real defect (the pack would crash
+                    # or silently resample later) -- LOUD, never silent.
+                    _got_sr = int(audio.get("sample_rate", sr) or sr)
+                    if _got_sr != sr:
+                        _sr_msg = (
+                            f"{self.ROLE}: WARNING line={line_id or occ} clip sample "
+                            f"rate {_got_sr} != pack rate {sr} (engine {engine}) -- "
+                            f"investigate before trusting this episode's voice lane"
+                        )
+                        log_lines.append(_sr_msg)
+                        log.warning("[OTR voice P-OBS] %s", _sr_msg)
+                    # Cloud-audio-cache: on the miss path, cache the bytes (unless
+                    # rate mismatched, in which case skip the put -- a mismatched
+                    # clip cached would silently mispitch on the next hit). On any
+                    # path collect the ledger stamp bundle. r4 MF#4: hit stamps
+                    # render_ms=0 (valid persisted value under the new
+                    # render_ms=None-is-skip signature); miss stamps the elapsed time.
+                    if cache_enabled:
+                        _asample_hash = compute_audio_sample_hash(
+                            audio["waveform"] if isinstance(audio, dict) else audio
+                        )
+                        _dur_s = (
+                            float(audio["waveform"].shape[-1]) / float(_got_sr)
+                            if _got_sr else 0.0
+                        )
+                        if cache_status == "hit":
                             ledger_stamps.append((line_id, {
                                 "tts_engine": engine,
                                 "voice_preset": voice_preset or "",
-                                "render_ms": _elapsed_ms,
+                                "render_ms": 0,
                                 "generated_dur_s": _dur_s,
                                 "audio_sample_hash": _asample_hash,
-                                "provider_model_id": provider_model_id_stamp,
+                                "audio_cache_key": cached_record.cache_key,
+                                "audio_sha256": cached_record.audio_sha256,
+                                "provider_model_id": cached_record.provider_model_id or "",
                             }))
-                        elif cache is not None:
-                            try:
-                                fresh_record = cache.put(
-                                    request, audio,
-                                    allowed_for_release=(
-                                        effective_license_state(profile) == "clean"
-                                    ),
-                                    actual_sample_rate=_got_sr,
-                                    provider_model_id=provider_model_id_stamp,
-                                )
-                                cache_status = "miss"
-                                cache_stats["miss"] += 1
-                                ledger_stamps.append((line_id, {
-                                    "tts_engine": engine,
-                                    "voice_preset": voice_preset or "",
-                                    "render_ms": _elapsed_ms,
-                                    "generated_dur_s": _dur_s,
-                                    "audio_sample_hash": _asample_hash,
-                                    "audio_cache_key": request.cache_key,
-                                    "audio_sha256": fresh_record.audio_sha256,
-                                    "provider_model_id": provider_model_id_stamp,
-                                }))
-                            except Exception as _put_err:  # noqa: BLE001
-                                log.warning("[OTR voice cache] put failed: %s", _put_err)
+                        else:
+                            _elapsed_ms = int((time.monotonic() - _render_start) * 1000)
+                            if _got_sr != sr:
                                 cache_status = "degraded_write"
                                 cache_stats["degraded_write"] += 1
                                 ledger_stamps.append((line_id, {
@@ -931,15 +898,66 @@ class OTRVoiceNodeBase:
                                     "audio_sample_hash": _asample_hash,
                                     "provider_model_id": provider_model_id_stamp,
                                 }))
-            finally:
-                if cache_enabled:
-                    _pobs_tail = f" cache={cache_status}"
-                    log_lines.append(_pobs + _pobs_tail)
-                    log.info("[OTR voice P-OBS] %s%s", _pobs, _pobs_tail)
-            clips.append(audio)
-        packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
-        n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
-        log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")
+                            elif cache is not None:
+                                try:
+                                    fresh_record = cache.put(
+                                        request, audio,
+                                        allowed_for_release=(
+                                            effective_license_state(profile) == "clean"
+                                        ),
+                                        actual_sample_rate=_got_sr,
+                                        provider_model_id=provider_model_id_stamp,
+                                    )
+                                    cache_status = "miss"
+                                    cache_stats["miss"] += 1
+                                    ledger_stamps.append((line_id, {
+                                        "tts_engine": engine,
+                                        "voice_preset": voice_preset or "",
+                                        "render_ms": _elapsed_ms,
+                                        "generated_dur_s": _dur_s,
+                                        "audio_sample_hash": _asample_hash,
+                                        "audio_cache_key": request.cache_key,
+                                        "audio_sha256": fresh_record.audio_sha256,
+                                        "provider_model_id": provider_model_id_stamp,
+                                    }))
+                                except Exception as _put_err:  # noqa: BLE001
+                                    log.warning("[OTR voice cache] put failed: %s", _put_err)
+                                    cache_status = "degraded_write"
+                                    cache_stats["degraded_write"] += 1
+                                    ledger_stamps.append((line_id, {
+                                        "tts_engine": engine,
+                                        "voice_preset": voice_preset or "",
+                                        "render_ms": _elapsed_ms,
+                                        "generated_dur_s": _dur_s,
+                                        "audio_sample_hash": _asample_hash,
+                                        "provider_model_id": provider_model_id_stamp,
+                                    }))
+                finally:
+                    if cache_enabled:
+                        _pobs_tail = f" cache={cache_status}"
+                        log_lines.append(_pobs + _pobs_tail)
+                        log.info("[OTR voice P-OBS] %s%s", _pobs, _pobs_tail)
+                clips.append(audio)
+            packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
+            n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
+            log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")
+        finally:
+            # Flush the collected per-line ledger stamps whether the loop
+            # completed cleanly or a mid-loop exception is propagating out.
+            # Any raise from _persist_ledger_stamps' pre-try setup is credited
+            # as fully degraded so telemetry never lies (r4 SF#1 defensive wrap).
+            if cache_enabled and ledger_stamps:
+                try:
+                    cache_stats["degraded_ledger"] += _persist_ledger_stamps(
+                        meta, ledger_stamps, log)
+                except Exception as _pe:  # noqa: BLE001
+                    cache_stats["degraded_ledger"] += len(ledger_stamps)
+                    log.warning(
+                        "[OTR voice cache] ledger stamp flush failed in finally "
+                        "(reporting %d stamps as degraded): %s",
+                        len(ledger_stamps), _pe)
+        # Cache summary emitted only on successful completion; a mid-loop
+        # exception propagates past this block, correctly skipping the summary.
         if cache_enabled:
             _total = cache_stats["hit"] + cache_stats["miss"] + cache_stats["degraded_write"]
             log_lines.append(

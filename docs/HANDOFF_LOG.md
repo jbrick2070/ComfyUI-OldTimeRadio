@@ -3,6 +3,101 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 -- v2.0-alpha -- CODER (SF#1 ledger-flush + partial-exception finally SHIPPED against locked r4 spec)
+
+Did: implemented `kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md`
+  end-to-end. The r1-r4 kibitz arc had CLOSED yesterday with the spec
+  locked pre-code; this window opened directly against `Files touched`
+  and executed the r4 §2/§3/§4/§7 plan verbatim.
+- **Root cause the arc landed on.** `_persist_ledger_stamps` shipped
+  2026-08-08 in `ebe24bd4` DEFINED and isolated-tested but NEVER CALLED
+  in production. `_render_per_line` built up `ledger_stamps` for every
+  cache-enabled line then dropped the list at return. Four ledger fields
+  (`audio_cache_key`, `audio_sha256`, `render_ms`, `provider_model_id`)
+  landed on ZERO lines on every leg since yesterday. Downstream renders
+  survived because no active render node reads those fields today
+  (`_OPTIONAL_STRING_FIELDS` schema null-checks + post-run audit scripts
+  only). DATA LOSS on metadata, not a render-blocker -- but the ledger
+  silently lied.
+- **The fix (r4 §2).** `nodes/_otr_voice_node_common.py:_render_per_line`
+  wrapped in a try/finally that opens immediately after `ledger_stamps`
+  init, encloses the per-line for-loop AND the `pack_audio_batch` call,
+  and calls `_persist_ledger_stamps(meta, ledger_stamps, log)` guarded
+  by `(cache_enabled and ledger_stamps)`. A defensive inner
+  `try/except Exception` at the finally call site catches any raise from
+  the helper's setup (its own try starts after the `meta.paths` read) and
+  credits `len(ledger_stamps)` as degraded so telemetry never lies. The
+  cache-summary log line moved to AFTER the try/finally so it sees the
+  updated `degraded_ledger` counter and is naturally skipped when a
+  mid-loop exception propagates past.
+- **Tests (r4 §3, +5 items).** Added `import ast` + `import re` + `import
+  logging` + `_bootstrap_ledger_on_disk` helper that runs the target
+  ledger through `save_ledger_safe` so `meta.paths.ledger_path` lands on
+  the wire copy the voice node receives. Extended
+  `test_end_to_end_google_tts_cache_miss_then_hit` to read the on-disk
+  ledger after each call and pin the four provenance fields
+  (`audio_cache_key`/`audio_sha256` match `^[0-9a-f]{64}$`, `render_ms`
+  is a non-negative int on miss and exactly `0` on hit, `provider_model_id`
+  non-empty, `degraded_ledger=0` in the returned log). Added
+  `test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finally`
+  parameterized over BOTH `AnnouncerVoice` and `BatchCharacterVoices`
+  (Codex r4 MF-3 route coverage: the two voice nodes reach
+  `_render_per_line` through different `generate()` branches, so the
+  finally must fire on both) -- 5-line fixture, sentinel `RuntimeError`
+  on the 3rd call, `pytest.raises(...)` + `excinfo.value is sentinel`,
+  then assert `a1`/`a2` have full stamps by `line_id` while `a3`/`a4`/`a5`
+  have empty strings for the four fields and `render_ms is None`. Added
+  `test_cache_persist_failure_does_not_mask_render_exception` (Codex r4
+  SF-2: no return-value channel when a sentinel escapes, so caplog is
+  the only surface for the flush warning). Added
+  `test_cache_persist_failure_reports_full_degraded_count_on_success`
+  (Codex r4 SF-1: the defensive except must credit
+  `len(ledger_stamps)` so `degraded_ledger={N}` in the summary reads
+  accurately). Added `test_persist_ledger_stamps_wired_into_render_per_line_finally`
+  BUG-12.74 static AST reachability guard (Codex r4 MF-2 strict shape):
+  exactly ONE call in `_render_per_line`, positional args
+  `(meta, ledger_stamps, log)`, inside an `ast.Try.finalbody` whose body
+  contains BOTH the for-loop AND the `pack_audio_batch` call, and the
+  return value used in `AugAssign(op=Add,
+  target=cache_stats["degraded_ledger"])`. Strengthened
+  `test_end_to_end_google_tts_cache_off_byte_identity` with a monkeypatch
+  recorder assertion that `_persist_ledger_stamps` is NEVER invoked on
+  the cache-off path (Codex r4 MF-3 control -- without this a future
+  edit could wire the flush unconditionally and silently rewrite disk
+  ledgers on every leg).
+- **Correction to yesterday's log.** The 2026-08-08 chunk-2 entry
+  reported the code as shipped and live-proven. It was shipped as
+  defined-and-tested but the wiring had ZERO production call sites -- 
+  a defect not caught until the SF#1 arc opened the follow-up chip. This
+  entry ships the wiring. Prior-entry text about the wired stamps landing
+  on legs should be read as "was expected to; actually did not until
+  this commit."
+- **Suite.** 9351 -> +5 tests (partial-exception counts as 2 params).
+  Focused `tests/test_audio_cache_wiring.py` 34 passed / 0 failed. Full
+  suite gate per r4 §7 items 1-6 in the atomic commit below.
+- **Non-goals held (r4 §9).** No `workflows/otr_canonical.json` change
+  (`git diff -- workflows/` empty). No `build_variants.py --all`. No
+  cloud provider live regression. No two-phase pending/committed. No
+  per-line flush. No new PBUG. No touching operator-dirty paths. No
+  stale-metadata-clearing (deferred chip). No MPS advertising.
+Current step: implementation landed against the locked r4/final.md;
+  Sonnet 5 QA-on-diff + Fable final gate + atomic commit + push +
+  post-push lockstep verify remaining on the runway per standing
+  08-05/08-06 rules.
+Next: three follow-up chips owed (do NOT do inline): (1) run
+  `python scripts/ensure_upscale_models.py` + pin the printed SHA into
+  `SpandrelEsrgan._model_sha256` (item 8 tombstone chip). (2) SF#1
+  stale metadata retention across legs (Codex r4 MF-1) -- different
+  defect class from "helper unwired"; a downstream reader consuming an
+  obsolete field needs its own arc. (3) SF#1 caplog-based degraded-write
+  test (Codex r2 OPT-2).
+Models used this session: Claude Opus 4.7 (coder + sole judge), Sonnet
+  5 (post-coding QA-on-diff, standing 08-05), Fable (final gate,
+  standing 08-06). The r1-r4 kibitz arc CLOSED yesterday against the
+  locked spec; this window did not re-run it.
+Box state: baseline entering this window CLEAN per CLAUDE.md section 4.
+Commits: <one atomic commit forthcoming this session>.
+
 ## 2026-08-08 -- HEAD 3ebadbf1 (v2.0-alpha) -- CODER (item 8 SHIPPED + SF#1 r1-r4 arc CLOSED, spec locked pre-code)
 
 Did: two campaigns in one session, both fully-arced.

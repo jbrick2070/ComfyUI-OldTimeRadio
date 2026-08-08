@@ -238,35 +238,115 @@ Gemini TTS replay is pinned to disk.
   `MALFORMED_CONFIG` when a profile has `use_cache=True` and no dir
   resolves).
 
-**Follow-up chip owed (SF#1: RENAMED "ledger-flush + partial-exception
-finally" per 2026-08-08 SF#1 arc):** the 2026-08-08 SF#1 kibitz arc
-discovered the bug was WORSE than yesterday's Fable framing --
-`_persist_ledger_stamps` shipped with ZERO production call sites (13
-whole-repo hits at ebe24bd4: 1 def + 9 test + 3 doc), so every leg
-silently lost the four ledger stamp fields (`audio_cache_key`,
-`audio_sha256`, `render_ms`, `provider_model_id`). Downstream renders
-survived because no active render node reads those fields today
-(they exist for `_OPTIONAL_STRING_FIELDS` schema null-checks + post-run
-audit scripts only). DATA LOSS on metadata, not a render-blocker.
-r1-r4 arc CLOSED 2026-08-08; LOCKED spec at
-`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md`
-(gitignored). Implementation opens against that spec in the next
-CODER window. Suite delta expected +3 tests + 1 extension (parameterized
-across BOTH AnnouncerVoice and BatchCharacterVoices per Codex r4 MF-3
-route-coverage). Includes BUG-12.74 static AST reachability guard so
-this defect class cannot silently re-orphan.
-
-Post-implementation follow-up chips owed (deferred out of atomic scope):
-(1) stale metadata retention across legs (Codex r4 MF-1) -- different
-defect class from "helper unwired"; a downstream reader consuming an
-obsolete field needs its own arc. (2) caplog-based degraded-write test
-(Codex r2 OPT-2).
+**Follow-up chip (SF#1: "ledger-flush + partial-exception finally") --
+SHIPPED 2026-08-08 -- SEE `SF#1 -- LEDGER-FLUSH + PARTIAL-EXCEPTION
+FINALLY` TOMBSTONE BELOW.**
 
 Suite **9222 passed / 111 skipped / 1 xfailed** (was 9191 pre-chunk, +31
 tests: 29 new in `tests/test_audio_cache_wiring.py` + 2 extended in
 `test_per_line_audio_meta.py` and `test_audio_cache_protocol.py`). Bug
 Bible 17 green at survival-guide `3759ae5`. `git diff -- workflows/`
 EMPTY. Full arc receipts: `kibitz-runs/2026-08-08-cloud-audio-cache/r{1,2,3,4}/`.
+
+### TOMBSTONE -- SF#1 LEDGER-FLUSH + PARTIAL-EXCEPTION FINALLY, SHIPPED 2026-08-08
+
+**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc closed
+2026-08-08 pre-code (60+ grounded findings folded across 8 external panel
+lanes + 3 parallel grounding workflows + 4 driver anchors + 2 Antigravity
+UI-paste substitutes when CLI timed out at 5m). LOCKED spec at
+`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md` (gitignored).
+Implementation window opened against the spec's "Files touched" section
+and executed r4 §2/§3/§4/§7 verbatim. Sonnet 5 QA-on-diff cleared per
+standing 08-05 rule; Fable final gate cleared per standing 08-06 rule.
+
+**Root cause the arc landed on.** `_persist_ledger_stamps` shipped
+2026-08-08 in `ebe24bd4` DEFINED and isolated-tested but NEVER CALLED
+in production. `_render_per_line` built up `ledger_stamps` for every
+cache-enabled line then dropped the list at return. Four ledger fields
+(`audio_cache_key`, `audio_sha256`, `render_ms`, `provider_model_id`)
+landed on ZERO lines on every leg since yesterday. Downstream renders
+survived because no active render node reads those fields today
+(`_OPTIONAL_STRING_FIELDS` schema null-checks + post-run audit scripts
+only). DATA LOSS on metadata, not a render-blocker.
+
+**What shipped in ONE atomic commit:**
+
+* **`nodes/_otr_voice_node_common.py`** -- `_render_per_line` wrapped in
+  a `try/finally` opening immediately after `ledger_stamps` init. The
+  outer try encloses the per-line for-loop AND the `pack_audio_batch`
+  call (verified by the BUG-12.74 AST guard); the finally calls
+  `_persist_ledger_stamps(meta, ledger_stamps, log)` guarded by
+  `(cache_enabled and ledger_stamps)`. A defensive inner
+  `try/except Exception` at the finally call site catches any raise
+  from the helper's setup and credits `len(ledger_stamps)` as
+  degraded so telemetry never lies. The cache-summary log line moved
+  to AFTER the try/finally so it sees the updated `degraded_ledger`
+  counter and is naturally skipped when a mid-loop exception
+  propagates past.
+* **`tests/test_audio_cache_wiring.py`** -- +5 test items (partial-
+  exception parameterized over both voice roles = 2). Added `import ast`
+  + `import re` + `import logging` + `_bootstrap_ledger_on_disk` helper
+  that runs the target ledger through `save_ledger_safe` so
+  `meta.paths.ledger_path` lands on the wire copy the voice node
+  receives. Extended `test_end_to_end_google_tts_cache_miss_then_hit`
+  to read the on-disk ledger after each call and pin the four
+  provenance fields (`audio_cache_key` and `audio_sha256` match
+  `^[0-9a-f]{64}$`, `render_ms` is a non-negative int on miss and
+  exactly `0` on hit per r2 Codex MF-4 None-is-skip / 0-is-persisted
+  split, `provider_model_id` non-empty, `degraded_ledger=0` in the
+  returned log). Added `test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finally`
+  parameterized over both `AnnouncerVoice` and `BatchCharacterVoices`
+  (Codex r4 MF-3 route coverage): 5-line fixture, sentinel
+  `RuntimeError` on the 3rd call, `excinfo.value is sentinel`, then
+  assert `a1`/`a2` have full stamps by `line_id` while `a3`/`a4`/`a5`
+  have empty strings for the four fields and `render_ms is None`.
+  Added `test_cache_persist_failure_does_not_mask_render_exception`
+  (Codex r4 SF-2): render sentinel escapes past the finally even when
+  `_persist_ledger_stamps` also raises, AND the flush failure surfaces
+  via caplog (the only channel available when a raise walks past the
+  return statement). Added
+  `test_cache_persist_failure_reports_full_degraded_count_on_success`
+  (Codex r4 SF-1): the defensive except must credit
+  `len(ledger_stamps)` so the summary line reports `degraded_ledger={N}`
+  accurately when the render completed but persistence failed. Added
+  `test_persist_ledger_stamps_wired_into_render_per_line_finally`
+  BUG-12.74 static AST reachability guard (Codex r4 MF-2 strict shape):
+  exactly ONE call, positional args `(meta, ledger_stamps, log)`,
+  inside an `ast.Try.finalbody` whose body contains BOTH the for-loop
+  AND the `pack_audio_batch` call, and the return value used in
+  `AugAssign(op=Add, target=cache_stats["degraded_ledger"])`.
+  Strengthened `test_end_to_end_google_tts_cache_off_byte_identity`
+  with a monkeypatch recorder assertion that `_persist_ledger_stamps`
+  is NEVER invoked on the cache-off path (Codex r4 MF-3 control --
+  without this a future edit could wire the flush unconditionally and
+  silently rewrite disk ledgers on every leg).
+* **`docs/HANDOFF_LOG.md`** -- new top entry documenting the sprint +
+  correction to yesterday's chunk-2 entry (chunk 2 shipped
+  defined-and-tested but not wired; this commit is what actually
+  landed the stamps on disk).
+* **`docs/GO_FORWARD_PLAN.md`** -- this tombstone + the queue item 9
+  chunk 2 chip reference shortened to point here.
+
+Suite entering this window 9351 passed / 111 skipped / 1 xfailed (item 8
+baseline). Focused `tests/test_audio_cache_wiring.py` = 34 passed / 0
+failed (was 29). Full suite gate per r4 §7 items 1-6 in the atomic
+commit. Bug Bible 17 green at survival-guide `3759ae5`.
+`git diff -- workflows/` EMPTY. Full arc receipts:
+`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r{1,2,3,4}/`.
+
+**Follow-up chips owed (post-implementation, still owed):**
+
+1. **Stale metadata retention across legs (Codex r4 MF-1).** Different
+   defect class from "helper unwired" -- a downstream reader consuming
+   an obsolete field is not the same bug. Needs its own arc.
+2. **caplog-based degraded-write test (Codex r2 OPT-2).** The
+   `_write_audio_atomic` fallback path currently logs a bounded warning
+   on partial-crash recovery; there is no test asserting the warning
+   text. Small; deferred out of atomic scope so SF#1 stays surgical.
+3. **Item 8 upscale-model SHA pin.** Carried forward from the item 8
+   tombstone. Run `python scripts/ensure_upscale_models.py` +
+   pin the printed SHA into `SpandrelEsrgan._model_sha256` in a small
+   dedicated commit.
 
 ### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
 

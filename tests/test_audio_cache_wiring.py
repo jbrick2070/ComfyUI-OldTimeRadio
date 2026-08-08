@@ -13,10 +13,13 @@ Non-goals covered:
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import logging
 import os
 import pathlib
+import re
 
 import numpy as np
 import pytest
@@ -447,6 +450,38 @@ def _one_line_google_ledger():
     })
 
 
+def _bootstrap_ledger_on_disk(tmp_path, lines_data):
+    """Write a minimal ledger through save_ledger_safe so meta.paths.ledger_path
+    lands on the wire copy the voice node receives. Returns (ledger_path_str,
+    ledger_dict) where ledger_dict has been re-hydrated from disk so meta.paths
+    reflects the derived-from-path canonical block that _persist_ledger_stamps
+    reads back in the finally.
+    """
+    from nodes._otr_ledger import save_ledger_safe
+
+    ledger_path = tmp_path / "ep_ledger.json"
+    ledger = {
+        "episode_id": "test_ep",
+        "cast": [{
+            "char_id": "ann",
+            "name": "ANNOUNCER",
+            "voice_ref_id": "Zephyr",
+            "provider_voice_id": "Zephyr",
+        }],
+        "lines": lines_data,
+        "meta": {
+            "episode_seed": 42,
+            "cast_lock_revision": "1",
+            "paths": {
+                "ledger_path": str(ledger_path),
+                "audio_dir": str(tmp_path / "audio_out"),
+            },
+        },
+    }
+    assert save_ledger_safe(pathlib.Path(ledger_path), ledger) is True
+    return str(ledger_path), ledger
+
+
 def _stub_google_generate_voice(monkeypatch, recorder):
     """Point the singleton google_tts adapter at a stub that records calls."""
     from nodes._otr_audio_engines import get_engine
@@ -471,20 +506,36 @@ def _stub_google_generate_voice(monkeypatch, recorder):
 
 
 def test_end_to_end_google_tts_cache_miss_then_hit(tmp_path, monkeypatch):
-    """MUST-FIX #2 from Sonnet 5 QA: exercise _render_per_line with
-    use_cache=True. First call misses (stub called once); second call hits
-    (stub NOT called). P-OBS line count matches line count (would have
-    caught the pre-fix double-emit)."""
+    """MUST-FIX #2 from Sonnet 5 QA + SF#1 ledger-flush wire-up: exercise
+    _render_per_line with use_cache=True. First call misses (stub called
+    once); second call hits (stub NOT called). P-OBS line count matches line
+    count (would have caught the pre-fix double-emit). After each call, read
+    the on-disk ledger and assert the per-line provenance fields landed via
+    the finally-flushed _persist_ledger_stamps (would have caught the
+    zero-callers SF#1 bug: hit-stamp render_ms==0, miss-stamp render_ms>=0,
+    both carry cache_key + sha256 hex digests + non-empty provider_model_id).
+    """
     from nodes.announcer_voice import AnnouncerVoice
 
     recorder = []
     _stub_google_generate_voice(monkeypatch, recorder)
-    monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(tmp_path))
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
+    ledger_path, ledger_dict = _bootstrap_ledger_on_disk(
+        tmp_path,
+        [{
+            "line_id": "a1",
+            "char_id": "ann",
+            "speaker_role": "announcer",
+            "text": "Hello there.",
+        }],
+    )
     node = AnnouncerVoice()
 
     # First call: MISS.
     audio_a, log_a, done_a = node.generate(
-        script_json=_one_line_google_ledger(), engine="google_tts",
+        script_json=json.dumps(ledger_dict), engine="google_tts",
     )
     assert len(recorder) == 1
     assert recorder[0]["disable_retry"] is True
@@ -496,11 +547,36 @@ def test_end_to_end_google_tts_cache_miss_then_hit(tmp_path, monkeypatch):
         "gemini-2.5-pro-preview-tts",
     )
 
+    # SF#1 finally-flush: miss stamp lands on disk with the full provenance.
+    with open(ledger_path, "r", encoding="utf-8") as fh:
+        miss_ledger = json.load(fh)
+    miss_line = next(ln for ln in miss_ledger["lines"] if ln["line_id"] == "a1")
+    _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+    assert _HEX64.match(miss_line.get("audio_cache_key", "") or ""), miss_line
+    assert _HEX64.match(miss_line.get("audio_sha256", "") or ""), miss_line
+    _miss_render_ms = miss_line.get("render_ms")
+    assert isinstance(_miss_render_ms, int) and _miss_render_ms >= 0, miss_line
+    assert miss_line.get("provider_model_id", ""), miss_line
+
     # Second call, identical input: HIT (no new adapter call).
     audio_b, log_b, done_b = node.generate(
-        script_json=_one_line_google_ledger(), engine="google_tts",
+        script_json=json.dumps(ledger_dict), engine="google_tts",
     )
     assert len(recorder) == 1, "cache hit should not have called generate_voice again"
+
+    with open(ledger_path, "r", encoding="utf-8") as fh:
+        hit_ledger = json.load(fh)
+    hit_line = next(ln for ln in hit_ledger["lines"] if ln["line_id"] == "a1")
+    assert _HEX64.match(hit_line.get("audio_cache_key", "") or ""), hit_line
+    assert _HEX64.match(hit_line.get("audio_sha256", "") or ""), hit_line
+    # Hit path stamps render_ms == 0 (no generation time consumed) -- the
+    # None-is-skip / 0-is-persisted split (r2 Codex MF-4) MUST NOT lose this.
+    assert hit_line.get("render_ms") == 0, hit_line
+    assert hit_line.get("provider_model_id", ""), hit_line
+
+    # Neither leg reported any degraded stamps.
+    assert "degraded_ledger=0" in log_a, log_a
+    assert "degraded_ledger=0" in log_b, log_b
 
     # P-OBS line count == line count (not double). One-line episode has 1 P-OBS.
     def _pobs_lines(log_str):
@@ -513,13 +589,17 @@ def test_end_to_end_google_tts_cache_miss_then_hit(tmp_path, monkeypatch):
     assert " cache=hit" in log_b
 
 
-def test_end_to_end_google_tts_cache_off_byte_identity(tmp_path, monkeypatch):
+def test_end_to_end_google_tts_cache_off_byte_identity(tmp_path, monkeypatch, caplog):
     """When the profile's use_cache is False the wiring is byte-identical to
     the pre-chunk behavior: generate_voice is called EVERY time, no cache dir
-    is opened, P-OBS emits its bare form (no `cache=` token)."""
+    is opened, P-OBS emits its bare form (no `cache=` token), and
+    _persist_ledger_stamps is NEVER invoked (SF#1 Codex r4 MF-3 control:
+    without this, a future edit could wire the flush unconditionally and
+    silently rewrite disk ledgers on every leg)."""
     from nodes._otr_audio_engines import get_engine
     from nodes.announcer_voice import AnnouncerVoice
     from nodes import _otr_engine_profiles as ep
+    from nodes import _otr_voice_node_common as vnc
 
     # Force the resolver to return a profile with use_cache=False even though
     # the YAML has True -- this simulates "the operator did not opt in".
@@ -533,21 +613,435 @@ def test_end_to_end_google_tts_cache_off_byte_identity(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ep.EngineProfileResolver, "resolve_casting_plan", _mock_resolve,
     )
+    persist_calls = []
+    real_persist = vnc._persist_ledger_stamps
+
+    def _persist_spy(meta, stamps, log_):
+        persist_calls.append(len(stamps))
+        return real_persist(meta, stamps, log_)
+
+    monkeypatch.setattr(vnc, "_persist_ledger_stamps", _persist_spy)
+
     recorder = []
     _stub_google_generate_voice(monkeypatch, recorder)
     monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(tmp_path))
     node = AnnouncerVoice()
 
-    node.generate(
-        script_json=_one_line_google_ledger(), engine="google_tts",
-    )
-    node.generate(
-        script_json=_one_line_google_ledger(), engine="google_tts",
-    )
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        node.generate(
+            script_json=_one_line_google_ledger(), engine="google_tts",
+        )
+        node.generate(
+            script_json=_one_line_google_ledger(), engine="google_tts",
+        )
     assert len(recorder) == 2, "cache off: adapter must be called both times"
     # No cache dir should have been populated.
     npy_files = [f for f in tmp_path.iterdir() if f.name.endswith(".npy")]
     assert not npy_files, f"cache off should not write to disk, found: {npy_files}"
+    # SF#1 Codex r4 MF-3: no persistence call on the cache-off path.
+    assert persist_calls == [], (
+        f"cache-off path must NOT invoke _persist_ledger_stamps; called "
+        f"with stamp counts {persist_calls}"
+    )
+    # And no ledger-flush warnings surfaced.
+    for record in caplog.records:
+        assert "ledger stamp flush failed" not in record.getMessage()
+
+
+# ============================================================================
+# SF#1: cloud-audio-cache ledger-flush + partial-exception finally wire-up
+# ============================================================================
+def _multi_line_ledger_for_role(tmp_path, role):
+    """Bootstrap a five-line ledger on disk for the given voice ROLE.
+
+    `role` is one of "announcer" (AnnouncerVoice.LINE_ROLES) or "character"
+    (BatchCharacterVoices.LINE_ROLES). All five lines share the same char_id
+    so a single cast row suffices; each line gets a distinct line_id.
+    """
+    lines = [
+        {
+            "line_id": f"a{idx}",
+            "char_id": "ann",
+            "speaker_role": role,
+            "text": f"Line number {idx}.",
+        }
+        for idx in range(1, 6)
+    ]
+    return _bootstrap_ledger_on_disk(tmp_path, lines)
+
+
+def _stamp_from_ledger(ledger_dict, line_id):
+    """Return the on-disk line row for `line_id`, or None if absent."""
+    for row in ledger_dict.get("lines", []):
+        if row.get("line_id") == line_id:
+            return row
+    return None
+
+
+@pytest.mark.parametrize(
+    "node_cls_path,role,engine",
+    [
+        ("nodes.announcer_voice.AnnouncerVoice", "announcer", "google_tts"),
+        (
+            "nodes.batch_character_voices.BatchCharacterVoices",
+            "character",
+            "google_tts",
+        ),
+    ],
+    ids=["announcer_voice", "batch_character_voices"],
+)
+def test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finally(
+    tmp_path, monkeypatch, node_cls_path, role, engine,
+):
+    """SF#1 root fix: five-line episode where the 3rd generate_voice call
+    raises. Expectations:
+
+    * The sentinel escapes _render_per_line -- the caller sees the raise.
+    * Lines a1 + a2 completed before the raise, so their per-line ledger
+      stamps land on disk via the finally-flushed _persist_ledger_stamps.
+    * Lines a3-a5 never completed, so their stamp fields stay empty (no
+      audio_cache_key / audio_sha256 / provider_model_id) and render_ms is
+      the None-is-skip default (absent from the row).
+    * Parameterized over BOTH voice nodes (Codex r4 MF-3 route coverage):
+      AnnouncerVoice and BatchCharacterVoices reach _render_per_line via
+      different generate() branches, so the finally must fire on both.
+    """
+    import importlib
+    from nodes._otr_audio_engines import get_engine
+    from nodes import _otr_engine_profiles as ep
+
+    module_path, cls_name = node_cls_path.rsplit(".", 1)
+    node_cls = getattr(importlib.import_module(module_path), cls_name)
+
+    ledger_path, ledger_dict = _multi_line_ledger_for_role(tmp_path, role)
+
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
+
+    sentinel = RuntimeError("mid-loop generate_voice sentinel")
+    call_count = {"n": 0}
+
+    def _gen(text, voice_ref, delivery_vector, seed,
+             *, disable_retry=False, resolved_model=None):
+        call_count["n"] += 1
+        if call_count["n"] == 3:
+            raise sentinel
+        return {
+            "waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+            "sample_rate": 24000,
+        }
+
+    monkeypatch.setattr(get_engine(engine), "generate_voice", _gen)
+    # Neuter the preflights so a live API key/model file are not needed.
+    monkeypatch.setattr(ep, "assert_token_for_profile", lambda p: None)
+    monkeypatch.setattr(ep, "assert_model_available", lambda p: None)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "test-key")
+
+    node = node_cls()
+    with pytest.raises(RuntimeError) as excinfo:
+        node.generate(script_json=json.dumps(ledger_dict), engine=engine)
+    assert excinfo.value is sentinel, (
+        f"expected the loop's sentinel to escape unchanged; got {excinfo.value!r}"
+    )
+    # We got as far as the 3rd generate_voice call (which raised).
+    assert call_count["n"] == 3, call_count
+
+    with open(ledger_path, "r", encoding="utf-8") as fh:
+        after_ledger = json.load(fh)
+
+    # a1 + a2 completed and were stamped via the finally.
+    _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+    for done_id in ("a1", "a2"):
+        line = _stamp_from_ledger(after_ledger, done_id)
+        assert line is not None, done_id
+        assert _HEX64.match(line.get("audio_cache_key", "") or ""), (done_id, line)
+        assert _HEX64.match(line.get("audio_sha256", "") or ""), (done_id, line)
+        assert line.get("provider_model_id", ""), (done_id, line)
+        _rm = line.get("render_ms")
+        assert isinstance(_rm, int) and _rm >= 0, (done_id, line)
+
+    # a3 raised, a4 + a5 never started -- no stamps land on any of them.
+    for skipped_id in ("a3", "a4", "a5"):
+        line = _stamp_from_ledger(after_ledger, skipped_id)
+        assert line is not None, skipped_id
+        assert (line.get("audio_cache_key", "") or "") == "", (skipped_id, line)
+        assert (line.get("audio_sha256", "") or "") == "", (skipped_id, line)
+        assert (line.get("provider_model_id", "") or "") == "", (skipped_id, line)
+        # render_ms uses None-is-skip semantics -- an unstamped row must not
+        # carry the field at all (stamp helper skips it, not writes 0).
+        assert line.get("render_ms") is None, (skipped_id, line)
+
+
+def test_cache_persist_failure_does_not_mask_render_exception(
+    tmp_path, monkeypatch, caplog,
+):
+    """If both the render AND the finally-triggered _persist_ledger_stamps
+    raise, the ORIGINAL render exception must escape (defensive wrap in the
+    finally must not swallow the primary raise) AND the flush failure must
+    be logged as a warning (Codex r4 SF-2: no return-value channel is
+    available when the sentinel escapes, so caplog is the only surface).
+
+    Uses three lines with a raise on the third call so ledger_stamps has
+    entries when the finally runs -- otherwise the guarded inner block
+    ``if cache_enabled and ledger_stamps:`` short-circuits and the
+    persistence stub never fires, defeating the assertion.
+    """
+    from nodes._otr_audio_engines import get_engine
+    from nodes.announcer_voice import AnnouncerVoice
+    from nodes import _otr_engine_profiles as ep
+    from nodes import _otr_voice_node_common as vnc
+
+    ledger_path, ledger_dict = _bootstrap_ledger_on_disk(
+        tmp_path,
+        [
+            {
+                "line_id": f"a{idx}",
+                "char_id": "ann",
+                "speaker_role": "announcer",
+                "text": f"Line {idx}.",
+            }
+            for idx in range(1, 4)
+        ],
+    )
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
+
+    sentinel = RuntimeError("render sentinel escapes past finally")
+    calls = {"n": 0}
+
+    def _gen(text, voice_ref, delivery_vector, seed,
+             *, disable_retry=False, resolved_model=None):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise sentinel
+        return {
+            "waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+            "sample_rate": 24000,
+        }
+
+    monkeypatch.setattr(get_engine("google_tts"), "generate_voice", _gen)
+    monkeypatch.setattr(ep, "assert_token_for_profile", lambda p: None)
+    monkeypatch.setattr(ep, "assert_model_available", lambda p: None)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "test-key")
+
+    def _persist_explodes(meta, stamps, log_):
+        raise RuntimeError("persistence exploded")
+
+    monkeypatch.setattr(vnc, "_persist_ledger_stamps", _persist_explodes)
+
+    node = AnnouncerVoice()
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        with pytest.raises(RuntimeError) as excinfo:
+            node.generate(script_json=json.dumps(ledger_dict), engine="google_tts")
+
+    # The ORIGINAL render sentinel escapes (defensive wrap must not shadow).
+    assert excinfo.value is sentinel, (
+        f"the render sentinel must escape unchanged even when the finally-"
+        f"flushed _persist_ledger_stamps raises; got {excinfo.value!r}"
+    )
+    # AND the flush failure surfaced via caplog (the only channel available
+    # when a raise walks past the return statement).
+    messages = [rec.getMessage() for rec in caplog.records]
+    assert any("ledger stamp flush failed in finally" in m for m in messages), (
+        f"expected the defensive-wrap warning; got {messages}"
+    )
+
+
+def test_cache_persist_failure_reports_full_degraded_count_on_success(
+    tmp_path, monkeypatch, caplog,
+):
+    """Successful three-line render + _persist_ledger_stamps raises in the
+    finally. Audio still returns; the finally's defensive except credits
+    len(ledger_stamps) as degraded so the cache summary line (emitted AFTER
+    try/finally on the success path) reports the accurate count. Codex r4
+    SF-1: absent this credit, a persistence failure quietly reported
+    degraded_ledger=0 while the ledger silently missed every stamp.
+    """
+    from nodes._otr_audio_engines import get_engine
+    from nodes.announcer_voice import AnnouncerVoice
+    from nodes import _otr_engine_profiles as ep
+    from nodes import _otr_voice_node_common as vnc
+
+    ledger_path, ledger_dict = _bootstrap_ledger_on_disk(
+        tmp_path,
+        [
+            {
+                "line_id": f"a{idx}",
+                "char_id": "ann",
+                "speaker_role": "announcer",
+                "text": f"Line {idx}.",
+            }
+            for idx in range(1, 4)
+        ],
+    )
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
+
+    recorder = []
+
+    def _gen(text, voice_ref, delivery_vector, seed,
+             *, disable_retry=False, resolved_model=None):
+        recorder.append(text)
+        return {
+            "waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
+            "sample_rate": 24000,
+        }
+
+    monkeypatch.setattr(get_engine("google_tts"), "generate_voice", _gen)
+    monkeypatch.setattr(ep, "assert_token_for_profile", lambda p: None)
+    monkeypatch.setattr(ep, "assert_model_available", lambda p: None)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "test-key")
+
+    def _persist_explodes(meta, stamps, log_):
+        raise RuntimeError("persistence exploded")
+
+    monkeypatch.setattr(vnc, "_persist_ledger_stamps", _persist_explodes)
+
+    node = AnnouncerVoice()
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        audio, log_str, done = node.generate(
+            script_json=json.dumps(ledger_dict), engine="google_tts",
+        )
+    # Render completed for all three lines.
+    assert len(recorder) == 3, recorder
+    assert audio is not None
+    # And the summary line reports the full degraded count (3 stamps
+    # attempted, all credited as degraded by the defensive wrap).
+    assert "degraded_ledger=3" in log_str, log_str
+    # Flush failure was logged.
+    assert any(
+        "ledger stamp flush failed in finally" in rec.getMessage()
+        for rec in caplog.records
+    ), [rec.getMessage() for rec in caplog.records]
+
+
+# ----------------------------------------------------------------------------
+# BUG-12.74 static-reachability guard for SF#1 -- the last defect class we
+# want to catch by AST, not by hoping a suite happens to exercise it.
+# ----------------------------------------------------------------------------
+_VOICE_COMMON = (
+    pathlib.Path(__file__).resolve().parents[1] / "nodes" / "_otr_voice_node_common.py"
+)
+
+
+def _voice_common_tree():
+    return ast.parse(_VOICE_COMMON.read_text(encoding="utf-8"))
+
+
+def _class_method(tree, cls_name, method_name):
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == cls_name:
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name == method_name:
+                    return item
+    raise AssertionError(f"{cls_name}.{method_name} not found")
+
+
+def test_persist_ledger_stamps_wired_into_render_per_line_finally():
+    """BUG-12.74 static-reachability guard for the SF#1 fix.
+
+    Assert:
+      (1) EXACTLY ONE call to _persist_ledger_stamps in _render_per_line;
+      (2) called with args named meta, ledger_stamps, log (or matching
+          positional);
+      (3) call sits inside an ast.Try.finalbody AND that try's body contains
+          both the per-line for-loop AND the pack_audio_batch call;
+      (4) call return is used in AugAssign(op=Add,
+          target=Subscript(cache_stats, "degraded_ledger")).
+    """
+    tree = _voice_common_tree()
+    fn = _class_method(tree, "OTRVoiceNodeBase", "_render_per_line")
+
+    calls = [
+        n
+        for n in ast.walk(fn)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "_persist_ledger_stamps"
+    ]
+    assert len(calls) == 1, (
+        f"BUG-12.74: expected exactly one _persist_ledger_stamps call in "
+        f"_render_per_line; got {len(calls)}"
+    )
+    call = calls[0]
+
+    # (2) arg names OR ordered positional (meta, ledger_stamps, log).
+    if call.args:
+        positional_names = [
+            a.id if isinstance(a, ast.Name) else None for a in call.args
+        ]
+        assert positional_names == ["meta", "ledger_stamps", "log"], (
+            f"expected positional args (meta, ledger_stamps, log); "
+            f"got {positional_names}"
+        )
+    else:
+        keyword_names = sorted(k.arg for k in call.keywords)
+        assert keyword_names == sorted(["meta", "ledger_stamps", "log"])
+
+    # (3) enclosing Try.finalbody + try body contains for + pack call.
+    enclosing_try = None
+    for try_node in ast.walk(fn):
+        if not isinstance(try_node, ast.Try):
+            continue
+        for stmt in try_node.finalbody:
+            for inner in ast.walk(stmt):
+                if inner is call:
+                    enclosing_try = try_node
+                    break
+            if enclosing_try:
+                break
+        if enclosing_try:
+            break
+    assert enclosing_try is not None, (
+        "the _persist_ledger_stamps call must sit inside a try.finalbody"
+    )
+
+    body_stmts = list(
+        ast.walk(ast.Module(body=enclosing_try.body, type_ignores=[]))
+    )
+    has_for = any(isinstance(n, ast.For) for n in body_stmts)
+    has_pack_call = any(
+        isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "pack_audio_batch"
+        for n in body_stmts
+    )
+    assert has_for, "enclosing try must contain the per-line for loop"
+    assert has_pack_call, "enclosing try must contain the pack_audio_batch call"
+
+    # (4) call is inside AugAssign(target=cache_stats["degraded_ledger"], op=Add).
+    aug_hit = None
+    for aug in ast.walk(fn):
+        if not isinstance(aug, ast.AugAssign):
+            continue
+        if not isinstance(aug.op, ast.Add):
+            continue
+        if not isinstance(aug.target, ast.Subscript):
+            continue
+        if not (
+            isinstance(aug.target.value, ast.Name)
+            and aug.target.value.id == "cache_stats"
+        ):
+            continue
+        slice_val = aug.target.slice
+        slice_str = (
+            slice_val.value if isinstance(slice_val, ast.Constant) else None
+        )
+        if slice_str != "degraded_ledger":
+            continue
+        for inner in ast.walk(aug):
+            if inner is call:
+                aug_hit = aug
+                break
+        if aug_hit:
+            break
+    assert aug_hit is not None, (
+        "call return must be used to augment cache_stats['degraded_ledger'] "
+        "(Codex r4 MF-2 strict shape; not just any call anywhere)"
+    )
 
 
 if __name__ == "__main__":
