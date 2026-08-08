@@ -166,6 +166,16 @@ returned zero drift. `scripts/validate_canonical_workflow.py` clean
    downloads the ~64 MB weights and prints the SHA (deliberately empty
    in the ship for first-run bootstrap; pin it into
    `SpandrelEsrgan._model_sha256` in a follow-up commit).
+5. **DISCHARGED `867f16c3` (2026-08-08).** Test
+   `test_load_raises_missing_model_when_file_absent` silently passed
+   under "no model installed" and false-passed the moment the operator
+   ran `ensure_upscale_models.py` and populated
+   `<comfy_root>/models/upscale_models/RealESRGAN_x2plus.pth` -- the
+   test mocked `folder_paths.get_folder_paths()` but had no isolation
+   on the `parents[4]` fallback the adapter also consults. Surfaced
+   by SF#1's suite gate. Fixed at root by monkeypatching the module's
+   `__file__` to a 5-deep path in `tmp_path` so `parents[4]` resolves
+   to an empty fake root. Test-only change; nodes/ untouched.
 
 ### TOMBSTONE -- ANNOUNCER-INTRO QUALIFICATION, CLOSED 2026-08-07
 
@@ -347,6 +357,16 @@ commit. Bug Bible 17 green at survival-guide `3759ae5`.
    tombstone. Run `python scripts/ensure_upscale_models.py` +
    pin the printed SHA into `SpandrelEsrgan._model_sha256` in a small
    dedicated commit.
+4. **`cache=off` token on a mid-`generate_voice` raise (Fable
+   final-gate pass-through observation, pre-existing from
+   `ebe24bd4`).** `cache_status` initializes `"off"` at
+   `nodes/_otr_voice_node_common.py:829` and stays that way if the
+   `generate_voice` call raises before any status assignment -- so a
+   cache-enabled line that dies mid-generation emits its P-OBS with
+   a misleading `cache=off` token on the exact dying-line log this
+   SF#1 fix's scenario produces. Not in this diff's scope (the
+   defect ships from the day chunk 2 shipped); tiny code fix +
+   caplog test.
 
 ### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
 
