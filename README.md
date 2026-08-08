@@ -509,3 +509,9 @@ MIT License
 - **MusicGen** by [Meta AI](https://huggingface.co/facebook/musicgen-medium)
 - Built with patterns from the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide)
 - Created by [Jeffrey Brick](https://github.com/jbrick2070)
+
+### Third-party model licensing
+
+**MiniMax H3** — not shipped, not integrated, and not enabled by anything in this repository. A commercial-use authorization for **MiniMax H3** is on file for Blueberrky Kale Yoga Books (granted 2026-08-07), which clears our own evaluation work only. It is recorded in [`docs/licensing/MINIMAX_H3_AUTHORIZATION.md`](docs/licensing/MINIMAX_H3_AUTHORIZATION.md).
+
+That authorization does **not** transfer to you. The [MiniMax H3 Community License](https://huggingface.co/MiniMaxAI/MiniMax-H3/LICENSE) excludes the United States, the European Union, the United Kingdom and the Republic of Korea from its Applicable Territory, so users in those regions need their own written authorization from MiniMax (`api@minimax.io`, subject line "MiniMax H3 licensing - authorization request") before running H3 weights locally. This repo ships no H3 weights and will not redistribute them.

@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-15
+**Last updated:** 2026-08-08
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -107,6 +107,18 @@ Replace implicit `script_json` title-token read with explicit socket input wired
 
 Source: review triage K4.
 
+### 14. MiniMax H3 recipe gate *(licensing cleared 2026-08-07)*
+Open-weight omni-modal video model: 15-second 2K clips with native stereo audio. Commercial-use authorization from MiniMax is on file for Blueberrky Kale Yoga Books, which is what makes local weights legal here at all — the H3 Community License puts the US in its Excluded Territories. Testing is unblocked.
+
+Two numbers govern viability. The smallest diffusion model published anywhere is 15.6 GB and the smallest text encoder is 14.6 GB — both over our 14.5 GB ceiling, so **nothing fits resident** and H3 needs the RAM-streaming mechanism already on the discarded list below. And a 15-second clip ceiling against a 30+ minute episode confines H3 to a v2 visual sidecar feeding the existing audio master — never replacing it. Settle the streaming question before downloading anything; run the gate before writing a line of integration code.
+
+`scripts/fetch_minimax_h3.py` handles acquisition when that decision goes the right way.
+
+Overlaps HyWorld (items 3, 4, 6, 8). Do not run both visual bets in parallel on one 16 GB GPU — pick a lead once H3 Gate 0 has numbers.
+
+Protocol: `docs/superpowers/specs/2026-08-08-minimax-h3-recipe-gate.md`
+Clearance and its limits: `docs/licensing/MINIMAX_H3_AUTHORIZATION.md`
+
 ---
 
 ## HyWorld Gate 0 — The gating empirical step
@@ -159,6 +171,8 @@ Full discard reasoning in `2026-04-15-hyworld-integration-plan-review.md`.
 ## References
 
 - BUG_LOG.md — live bug tracking
+- `docs/licensing/MINIMAX_H3_AUTHORIZATION.md` — MiniMax H3 commercial-use clearance of record, and what it does not cover
+- `docs/superpowers/specs/2026-08-08-minimax-h3-recipe-gate.md` — H3 Gate 0 testing protocol
 - `docs/superpowers/specs/2026-04-15-hyworld-integration-plan-review.md` — full external review triage
 - `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md` — HyWorld integration master plan
 - `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
