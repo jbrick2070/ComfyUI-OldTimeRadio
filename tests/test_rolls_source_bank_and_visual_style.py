@@ -75,7 +75,7 @@ def test_rolling_the_style_does_not_roll_the_bank():
     style, style_receipt = ROLLS.resolve_style_selection(
         ROLLS.STYLE_SENTINEL, env={})
     assert bank == "scifi_news" and bank_receipt is None
-    assert style_receipt is not None and style in STYLES.list_style_ids()
+    assert style_receipt is not None and style in ROLLS.eligible_style_ids()
 
 
 def test_both_surfaces_can_roll_in_the_same_run_with_separate_seeds():
@@ -154,11 +154,12 @@ def test_bank_pool_is_derived_from_the_live_registry_not_a_literal():
     }
 
 
-def test_style_pool_is_every_registered_style_sorted():
-    """No filter, by design: every registered style is fully live."""
+def test_style_pool_is_registry_plus_dynamic_sorted():
+    """Pool contains registered disk packs plus dynamic visual_storybased at equal odds."""
     order = ROLLS.eligible_style_ids()
-    assert list(order) == sorted(STYLES.list_style_ids())
-    assert len(order) == len(STYLES.list_style_ids())
+    expected = tuple(sorted((*STYLES.list_style_ids(), "visual_storybased")))
+    assert order == expected
+    assert len(order) == len(STYLES.list_style_ids()) + 1 == 10
 
 
 def test_an_empty_bank_pool_fails_loud_and_names_both_filters(monkeypatch):
@@ -302,7 +303,7 @@ def test_both_dropdowns_carry_their_sentinel_as_choice_zero():
     assert bank_choices[0] == ROLLS.BANK_SENTINEL
     assert bank_choices[1:] == list(ROUTING.list_bank_ids())
     assert style_choices[0] == ROLLS.STYLE_SENTINEL
-    assert style_choices[1:] == list(STYLES.list_style_ids())
+    assert style_choices[1:] == list(ROLLS.eligible_style_ids())
 
 
 def test_the_shipped_defaults_are_still_concrete_ids_not_the_roll():

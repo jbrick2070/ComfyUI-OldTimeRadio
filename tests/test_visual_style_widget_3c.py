@@ -70,8 +70,8 @@ class TestWidgetSurface:
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         choices, meta = spec["optional"]["visual_style"]
         assert choices[0] == rolls.STYLE_SENTINEL
-        assert choices[1:] == list(vs.list_style_ids())
-        assert rolls.STYLE_SENTINEL not in vs.list_style_ids()
+        assert choices[1:] == list(rolls.eligible_style_ids())
+        assert rolls.STYLE_SENTINEL not in rolls.eligible_style_ids()
         # The saved graph still stores a concrete id, so no canonical diff.
         assert meta["default"] == "sci_fi_radio"
         # ALL styles are live (no execution lane); known non-defaults listed.

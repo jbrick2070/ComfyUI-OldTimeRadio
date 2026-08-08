@@ -721,10 +721,10 @@ class TestWriterB2aSurface:
             f"visual_style (slot 24) must ship 'sci_fi_radio' (the "
             f"production look); got {wv[24]!r}"
         )
-        from nodes import _otr_visual_styles as _vstyles
-        assert wv[24] in _vstyles.list_style_ids(), (
-            f"visual_style (slot 24) value {wv[24]!r} is not a registered "
-            f"style id: {_vstyles.list_style_ids()!r}"
+        from nodes import _otr_rolls as _rolls
+        assert wv[24] in _rolls.eligible_style_ids(), (
+            f"visual_style (slot 24) value {wv[24]!r} is not an eligible "
+            f"style id: {_rolls.eligible_style_ids()!r}"
         )
         assert wv[25] == "(select Google API model)", (
             f"google_api_slot_a_model (slot 25) must ship the unselected "

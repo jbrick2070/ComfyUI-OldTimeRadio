@@ -63,6 +63,10 @@ _REFLECTION_TEMPERATURE: float = 0.3
 # headroom; the schema's hard caps still bound the actual prose.
 _REFLECTION_MAX_NEW_TOKENS: int = 512
 
+# Must-Fix 2 (r4 AG M2): Token budget override for visual_storybased reflection
+# pass when generating both story brief reflection fields and visual_card object.
+_DYNAMIC_REFLECTION_MAX_NEW_TOKENS: int = 1024
+
 # Sprint 2A/2B: Attempt 2 structural-retry temperature for the shared
 # structured_call retry ladder. STRICTLY BELOW _REFLECTION_TEMPERATURE
 # -- a JSON-schema re-roll LOWERS entropy, it never raises it.
@@ -155,8 +159,20 @@ class StoryBriefModel(BaseModel):
         return value
 
 
+try:
+    from ._otr_visual_styles import VisualStyleCardModel
+except ImportError:
+    from _otr_visual_styles import VisualStyleCardModel
+
+
+class StoryBriefVisualStorybasedModel(StoryBriefModel):
+    """Extended schema for the dynamic visual_storybased reflection pass."""
+
+    visual_card: VisualStyleCardModel
+
+
 # ---------------------------------------------------------------------------
-# Prompt body
+# Prompt bodies
 # ---------------------------------------------------------------------------
 
 # Per refinement section 3 + 3.3 + 3.4. Hard-capped at <250 tokens of
@@ -194,6 +210,45 @@ RULES:
 - music_mood_terms are for instrumental scoring (tense, sombre,
   hopeful). visual_palette is colors / textures. key_objects are
   concrete nouns the scene contains.
+
+Script context:
+"""
+
+_DYNAMIC_REFLECTION_PROMPT: str = """\
+Write a visual + audio brief and a visual style card for this audio drama.
+Return ONE JSON object, no Markdown:
+
+{
+  "story_brief":      "a useful visual and audio clause",
+  "setting_terms":    ["setting terms"],
+  "lighting_terms":   ["lighting terms"],
+  "atmosphere_terms": ["atmosphere terms"],
+  "music_mood_terms": ["music mood terms"],
+  "visual_palette":   ["color or texture terms"],
+  "key_objects":      ["objects present in the episode"],
+  "tempo_hint":       "a tempo description",
+  "atmosphere_line":  "an atmosphere sentence",
+  "visual_card": {
+    "medium_short":        "1-3 word art medium (e.g. oil painting, stained glass diorama)",
+    "medium":              "descriptive art medium phrase",
+    "radio_material":      "material and craftsmanship of radio console",
+    "character_art_style": "color-neutral portrait rendering style",
+    "texture":             "surface texture and weathering",
+    "linework":            "line quality and edge definition",
+    "lighting_character":  "atmospheric lighting quality",
+    "typography_voice":    "letterform character for title cards",
+    "motion_temperament":  "surface motion descriptor (max 60 chars)"
+  }
+}
+
+RULES:
+- ONE sentence per string field. No quotes, no Markdown.
+- Preserve exact context names and world terms when they help describe the
+  places, light, sound, and mood.
+- No dialogue verbs or plot verbs.
+- No invented dates, decades, centuries, cities, countries, or eras.
+- music_mood_terms are for scoring. visual_palette is colors / textures. key_objects are concrete nouns.
+- visual_card fields must be concise, expressive aesthetic descriptions. medium_short must be 1-3 words (max 40 chars).
 
 Script context:
 """
@@ -461,8 +516,9 @@ def run_story_brief_reflection(
     *,
     technical_model_id: str = "",
     prompt_version: str = _PROMPT_VERSION,
+    is_visual_storybased: bool = False,
 ) -> dict:
-    """Run the reflection pass and return the 8-key meta delta.
+    """Run the reflection pass and return the 8-key meta delta (plus visual_card if dynamic).
 
     LLM slot: technical -- structured JSON output, NOT narrative
     composition. Per L-2 the writer's technical slot is the right
@@ -483,7 +539,16 @@ def run_story_brief_reflection(
     slot fn both map to `_failure_sentinel`. On every path the
     function returns a dict; it never raises.
     """
-    user_message = _REFLECTION_PROMPT + _build_reflection_input(led)
+    if is_visual_storybased:
+        prompt_body = _DYNAMIC_REFLECTION_PROMPT
+        target_schema = StoryBriefVisualStorybasedModel
+        max_tokens = _DYNAMIC_REFLECTION_MAX_NEW_TOKENS
+    else:
+        prompt_body = _REFLECTION_PROMPT
+        target_schema = StoryBriefModel
+        max_tokens = _REFLECTION_MAX_NEW_TOKENS
+
+    user_message = prompt_body + _build_reflection_input(led)
     messages = [{"role": "user", "content": user_message}]
 
     # LLM slot: technical -- structured JSON validation pass, not
@@ -491,12 +556,12 @@ def run_story_brief_reflection(
     try:
         brief_model = structured_call(
             prompt=messages,
-            schema=StoryBriefModel,
+            schema=target_schema,
             slot_fn=technical_fn,
             base_temperature=_REFLECTION_TEMPERATURE,
             structural_retry_temperature=_REFLECTION_STRUCTURAL_RETRY_TEMPERATURE,
             repair_prompt_factory=make_dispatching_repair_factory(),
-            max_new_tokens=_REFLECTION_MAX_NEW_TOKENS,
+            max_new_tokens=max_tokens,
             max_attempts=3,
             helper_name="run_story_brief_reflection",
         )
@@ -516,11 +581,13 @@ def run_story_brief_reflection(
             "after %d attempt(s) (last error: %s); returning failed-status "
             "sentinel (reason=%s)", exc.attempts, exc.last_error, reason,
         )
-        return _failure_sentinel(
+        delta = _failure_sentinel(
             reason=reason,
             technical_model_id=technical_model_id,
             prompt_version=prompt_version,
         )
+        delta["story_brief_attempts"] = exc.attempts
+        return delta
     except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
         # structured_call does not catch slot-fn exceptions: a network /
         # VRAM / framework failure inside the technical_fn closure lands
@@ -536,11 +603,14 @@ def run_story_brief_reflection(
             prompt_version=prompt_version,
         )
 
-    return _success_delta(
+    delta = _success_delta(
         brief_model=brief_model,
         technical_model_id=technical_model_id,
         prompt_version=prompt_version,
     )
+    if is_visual_storybased and hasattr(brief_model, "visual_card"):
+        delta["visual_card"] = brief_model.visual_card
+    return delta
 
 
 # ---------------------------------------------------------------------------

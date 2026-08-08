@@ -17,9 +17,11 @@ existing dropdown's choices, so no new widget appears, no positional
 canonical workflow JSON does not change: choices are not persisted, only the
 selected value is.
 
-ZERO LLM CALLS. A roll reads a registry, filters, and draws. Selection under
-a declared uniform policy over an enumerated pool is mechanical -- if a
-later draft introduces a model call here, that draft is wrong.
+ZERO LLM CALLS IN THE ROLL ITSELF. A roll reads a pool of eligible ids,
+filters, and draws deterministically from a seed. Selection under a declared
+uniform policy over an enumerated pool is mechanical. Selecting a style lane
+(such as `visual_storybased`) may later trigger an LLM authoring pass during
+script reflection, but the roll mechanism itself never calls a model.
 
 SEEDS. Each surface owns its own env override so either roll can be replayed
 ALONE: `OTR_BANK_SEED` and `OTR_VISUAL_STYLE_SEED`. (`OTR_STYLE_SEED` is the
@@ -261,14 +263,23 @@ def resolve_bank_selection(
 # visual_style
 # ---------------------------------------------------------------------------
 
+DYNAMIC_STYLE_ID: str = "visual_storybased"
+
+
 def eligible_style_ids() -> "tuple[str, ...]":
     """Style ids the roll may select, sorted.
 
-    NO filter, by design and not by omission: unlike a story bank, every
-    registered style is fully live -- a style rewrites prompt tails and has
-    no execution lane to be missing. There is no `runnable` concept in the
-    visual-style registry to consult (see `_otr_visual_styles`), so adding a
-    predicate here would be inventing a gate the data cannot answer.
+    Includes all registered disk packs plus the dynamic `visual_storybased`
+    lane at equal odds (10 total, 10% each per Operator Ruling R1).
+    """
+    return tuple(sorted((*_STYLES.list_style_ids(), DYNAMIC_STYLE_ID)))
+
+
+def floor_style_ids() -> "tuple[str, ...]":
+    """Style ids eligible for floor fallback when dynamic visual_storybased fails.
+
+    STRICTLY excludes `visual_storybased` (9 total) -- drawing from the floor pool
+    prevents re-selecting dynamic on fallback.
     """
     return tuple(sorted(_STYLES.list_style_ids()))
 
@@ -308,6 +319,7 @@ def resolve_style_selection(
 __all__ = [
     "BANK_SEED_ENV",
     "BANK_SENTINEL",
+    "DYNAMIC_STYLE_ID",
     "RECEIPT_VERSION",
     "RollError",
     "RollReceipt",
@@ -316,6 +328,7 @@ __all__ = [
     "draw",
     "eligible_bank_ids",
     "eligible_style_ids",
+    "floor_style_ids",
     "is_bank_sentinel",
     "is_style_sentinel",
     "resolve_bank_selection",

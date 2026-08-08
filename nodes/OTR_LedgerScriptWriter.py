@@ -180,6 +180,8 @@ from . import _otr_word_delivery as _OTRWD
 # import (not hot-path) so a typo / refactor surfaces at module load
 # time rather than during the first script generation.
 from ._otr_story_brief import (
+    REJECT_JSON_PARSE as _STORY_BRIEF_REJECT_JSON_PARSE,
+    REJECT_SCHEMA as _STORY_BRIEF_REJECT_SCHEMA,
     derive_produced_open_brief,
     run_produced_story_summary,
     run_story_brief_reflection,
@@ -3248,7 +3250,7 @@ class OTR_LedgerScriptWriter:
                 # posture: no new widget, no slot shift, no canonical diff.
                 "visual_style": (
                     [_ROLLS.STYLE_SENTINEL]
-                    + list(_otr_visual_styles.list_style_ids()),
+                    + list(_ROLLS.eligible_style_ids()),
                     {
                         "default": "sci_fi_radio",
                         "tooltip": (
@@ -3554,9 +3556,9 @@ class OTR_LedgerScriptWriter:
         # Stage 3C visual-style gate -- beside the bank gate, same zero-side-
         # effect contract: an unknown visual_style id raises
         # UnknownVisualStyleError here, before ANY story work (no fallback).
-        # Every REGISTERED style is valid to run (styles are prompt-tail
-        # deltas; no execution lane to gate).
-        _otr_visual_styles.resolve_visual_style(visual_style)
+        # Every REGISTERED style (and the dynamic visual_storybased style) is valid.
+        if visual_style != _ROLLS.DYNAMIC_STYLE_ID:
+            _otr_visual_styles.resolve_visual_style(visual_style)
         # Lane request gate (2026-07-31) -- beside the other two, same
         # zero-side-effect contract. A dispatched lane that STRUCTURALLY
         # cannot build the requested shape (today: scifi_news_circuit's
@@ -3921,6 +3923,8 @@ class OTR_LedgerScriptWriter:
         # get_visual_style(meta) off the serialized ledger (stamp precedes
         # all of them by construction -- verified 2026-07-05).
         meta["visual_style"] = resolved["visual_style"]
+        if resolved["visual_style"] == _ROLLS.DYNAMIC_STYLE_ID:
+            meta["visual_style_receipt"] = {"status": "pending"}
         # Randomizer receipt for the OTHER surface -- separate key, separate
         # seed, separate presence. A run may carry one, both, or neither.
         if _style_roll is not None:
@@ -3936,6 +3940,8 @@ class OTR_LedgerScriptWriter:
         # it with real progress. Goal: a ledger on disk for every run,
         # regardless of how far it gets.
         _skeleton_path = led.save()
+        if not _skeleton_path:
+            raise RuntimeError("failed to save skeleton ledger to disk")
         log.info(
             "[OTR_LedgerScriptWriter] skeleton ledger saved up front: %s",
             _skeleton_path,
@@ -6278,13 +6284,110 @@ class OTR_LedgerScriptWriter:
         # pre-spine/pre-fit draft. They mutate meta only and use the technical
         # slot; failures retain the established non-raising sentinel contract.
         # LLM slot: technical
+        # Read the durable meta stamp rather than `resolved`: run() writes
+        # `meta["visual_style"]` at :3925 before dispatch, and other lanes
+        # (fable2, tests) build their own `resolved` dicts that need not
+        # carry a `visual_style` key. Meta is the tail's declared field on
+        # WriterTailContext; the resolver dict is not.
+        _is_dynamic_style = (
+            meta.get("visual_style") == _ROLLS.DYNAMIC_STYLE_ID
+        )
         with slot_scheduler.helper_context("story_brief_reflection"):
             _brief_delta = run_story_brief_reflection(
                 led,
                 technical_generate_fn,
                 technical_model_id=resolved["technical_model"],
+                is_visual_storybased=_is_dynamic_style,
             )
         meta.update(_brief_delta)
+
+        if _is_dynamic_style:
+            _card = _brief_delta.get("visual_card")
+            if _card is not None:
+                # Dynamic reflection succeeded -> compose pack from card.
+                # Code/composer defects raise LOUD per Section 5 (never floored).
+                _composed_pack = _otr_visual_styles.compose_pack_from_card(_card)
+                _otr_visual_styles.validate_pack(_composed_pack, _ROLLS.DYNAMIC_STYLE_ID)
+
+                _canonical_bytes = json.dumps(
+                    _composed_pack, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode("utf-8")
+                _sha256 = hashlib.sha256(_canonical_bytes).hexdigest()
+                _attempts = _brief_delta.get("story_brief_attempts", 1)
+
+                meta["embedded_visual_style_pack"] = _composed_pack
+                meta["visual_style_card"] = _card.model_dump() if hasattr(_card, "model_dump") else dict(_card)
+                meta["visual_style_receipt"] = {
+                    "status": "dynamic",
+                    "floor_style_id": None,
+                    "failure_class": None,
+                    "sha256": _sha256,
+                    "schema_version": "v2",
+                    "composer_version": 1,
+                    "technical_model_id": resolved["technical_model"],
+                    "attempts": _attempts,
+                    "floor_roll": None,
+                }
+                meta["visual_style"] = _ROLLS.DYNAMIC_STYLE_ID
+            else:
+                # Dynamic reflection failed (MODEL or TRANSPORT) -> floor fallback
+                _err = _brief_delta.get("story_brief_error") or ""
+                if _err in (_STORY_BRIEF_REJECT_JSON_PARSE, _STORY_BRIEF_REJECT_SCHEMA):
+                    _fail_class = "model"
+                else:
+                    _fail_class = "transport"
+
+                if _style_roll is not None:
+                    _f_seed = _style_roll.seed
+                    _f_source = _style_roll.seed_source
+                else:
+                    # Direct pick has no roll receipt: resolve a floor seed at
+                    # failure time from process env (OTR_VISUAL_STYLE_SEED
+                    # override or OS entropy), matching the rolled path.
+                    _f_seed, _f_source = _ROLLS.resolve_seed(_ROLLS.STYLE_SEED_ENV)
+
+                _f_order = _ROLLS.floor_style_ids()
+                _f_selected = _ROLLS.draw(_f_order, _f_seed, random.Random)
+                _f_roll_dict = {
+                    "surface": "visual_style_floor",
+                    "requested": _ROLLS.DYNAMIC_STYLE_ID,
+                    "eligible_order": list(_f_order),
+                    "selected": _f_selected,
+                    "seed": _f_seed,
+                    "seed_source": _f_source,
+                }
+
+                _raw_floor = json.loads(
+                    (_otr_visual_styles._VISUAL_STYLES_ROOT / f"{_f_selected}.json").read_text(encoding="utf-8")
+                )
+                _floor_pack = dict(_raw_floor)
+                _floor_pack["style_id"] = _ROLLS.DYNAMIC_STYLE_ID
+                _floor_pack["label"] = f"Visual Story-Based (Floor: {_f_selected})"
+
+                _canonical_bytes = json.dumps(
+                    _floor_pack, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode("utf-8")
+                _sha256 = hashlib.sha256(_canonical_bytes).hexdigest()
+                _attempts = _brief_delta.get("story_brief_attempts", 1)
+
+                meta["embedded_visual_style_pack"] = _floor_pack
+                meta["visual_style_receipt"] = {
+                    "status": "floor",
+                    "floor_style_id": _f_selected,
+                    "failure_class": _fail_class,
+                    "sha256": _sha256,
+                    "schema_version": "v2",
+                    "composer_version": 1,
+                    "technical_model_id": resolved["technical_model"],
+                    "attempts": _attempts,
+                    "floor_roll": _f_roll_dict,
+                }
+                meta["visual_style"] = _ROLLS.DYNAMIC_STYLE_ID
+
+            # Transaction: Require truthy led.save() BEFORE run_produced_story_summary
+            _reflection_save = led.save()
+            if not _reflection_save:
+                raise RuntimeError("failed to save ledger after visual_style pack embedding")
 
         # LLM slot: technical
         with slot_scheduler.helper_context("produced_story_summary"):
@@ -6497,12 +6600,17 @@ class OTR_LedgerScriptWriter:
         )
 
         # --- M. Save ledger -------------------------------------------
+        # Spec r3/final.md section 6: terminal saves MUST be truthy-required.
+        # `Ledger.save()` returns None rather than raising on failure
+        # (production_ledger.py:1423-1492); accepting None silently would
+        # leave downstream consumers reading a stale ledger from disk while
+        # the writer logs "DONE".
         saved_path = led.save()
+        if not saved_path:
+            raise RuntimeError(
+                "terminal ledger save returned no path -- ledger not persisted"
+            )
         if tail_finalizer is not None:
-            if not saved_path:
-                raise RuntimeError(
-                    "lane TailFinalizer cannot verify a missing ledger save"
-                )
             tail_finalizer.after_save(
                 saved_path=str(saved_path), ledger_data=led.data,
             )
