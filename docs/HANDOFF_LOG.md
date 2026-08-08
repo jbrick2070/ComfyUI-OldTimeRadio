@@ -3,6 +3,88 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 (afternoon) -- v2.0-alpha -- CODER (SF#1 SHIPPED + live-proven; Macbeth-probe r1-r4 arc CLOSED pre-code)
+
+Did: three commits shipped and pushed, SF#1 live-proven against real Google
+  TTS, all cloud credentials brought up, and a full r1-r4 kibitz arc closed on
+  the next sprint.
+- **Commits (all lockstep-verified HEAD == origin):** `867f16c3` item 8 test
+  isolation fix (the spandrel MISSING_MODEL test false-passed once the operator
+  downloaded the real weights -- it mocked `folder_paths` but not the
+  `parents[4]` fallback); `b7cb2e10` SF#1 ledger-flush + partial-exception
+  finally per the locked r4 spec; `52775c16` follow-up chips.
+- **SF#1 LIVE-PROVEN (Phase A).** Two in-process `AnnouncerVoice.generate()`
+  calls against the real Gemini TTS endpoint: call 1 MISS (real API, 1.1s of
+  audio, `render_ms=3218`), call 2 HIT (no API call, `render_ms=0` persisted).
+  All 12 assertions green; cache sidecar + .npy on disk. This is the runtime
+  signal the mocked suite could not produce. Cost ~$0.005.
+- **Cloud credentials.** Google was `429 prepayment credits depleted` ->
+  operator added ~$25 to the ArchivalFlow project; working key is the AI-Studio
+  one ending `...5D8g`. **Comfy Cloud was never actually broken** -- the probe
+  used `Authorization: Bearer`; the correct header is **`X-API-Key`** (verified
+  200, 6823 credits). Lesson: an auth failure that is really a wrong-header bug
+  cost about an hour.
+- **Macbeth safety probe (queue item 9 chunk 3): FULL r1-r4 arc CLOSED, no
+  code written.** LOCKED spec `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md`
+  (gitignored); framing doc committed here. **Scope ruled down 12 cells -> 4**
+  (B1 x A1-A4, ~$0.72): both profile gates say "ONE deliberately violent
+  adaptation beat", so the 3-beat ladder was over-scoped, and r3 proved B2/B3's
+  TTS cells are controls anyway.
+  **Four findings that would each have invalidated the probe:**
+  1. **Ledger-field defect class (OPERATOR FIND, generalized).** A synthetic
+     ledger silently inverts any gate that reads a `meta.` field and treats
+     absent-as-permissive. Confirmed 3x: banana route
+     (`_otr_banana_route.py:609-629` -- missing `source_bank` turns weapons into
+     bananas, defaults ON), style pool (`_otr_style_catalog.py:844-846` --
+     keyed on a DIFFERENT field, `style_pool_class`, so fixing bananas does not
+     fix it), and a lower-confidence `_LEMMY` sibling in `_otr_casting.py`.
+     Bug Bible candidate after the live run.
+  2. **Money bug.** `eng_google_veo_video.py:573-580` submits a paid
+     long-running job BEFORE polling; a whole-call retry double-submits.
+     Generalized at r4: any paid POST whose receipt is lost can double-submit.
+     Now a `SUBMITTING->ACCEPTED->POLLING->TERMINAL` state machine that never
+     auto-resubmits.
+  3. **Invalid output path.** `otr/episodes/_probe_macbeth/` collides with
+     `_otr_paths.py:191-216`, which reserves underscore-prefixed episode
+     entries. Now `otr_episodes_root() / ("macbeth_probe_" + run_id)`.
+  4. **Prompt-shape reality.** Production video prompts are ~188-char
+     logline+beat-intent abstractions (`render_driver.py:2872-2919`), and
+     `prepare_text` strips `[Stabbing him]` (`_otr_script_prep.py:17,28,51`).
+     So discharge is CONDITIONAL: freeze the provider-bound prompts, inspect
+     them, and if they do not retain explicit violence the harness REFUSES to
+     discharge and escalates rather than deciding.
+  **Driver correction recorded:** my r3 claim "no gore ever reaches a video
+  engine" was an overstatement -- `get_story_brief_ltx` preserves
+  `meta.story_brief` content when it fits 90 chars. Retracted in r4/final.md.
+- **Arc lane honesty.** 6 completed external panel calls + Fable cold-r1 +
+  Sonnet 5 grounding sweep across 4 rounds. **Antigravity failed 3 times, in
+  two different ways:** r2 timeout at 5m (wrote a complete review first, which
+  was used), r3 timeout at 5m (wrote nothing -- **r3 was single-lane Codex**),
+  r4 genuine quota (`RESOURCE_EXHAUSTED (code 429)`, retry after
+  2026-08-08T16:12-07:00). A full four-round arc, but NOT 8 clean lanes.
+Current step: Macbeth-probe spec LOCKED; implementation is the next CODER
+  window's first job. Suite 9356/111/1 at `b7cb2e10`. Bible 17 green at
+  survival-guide `3759ae5`. `git diff -- workflows/` EMPTY all session.
+Next: implement `scripts/otr_macbeth_probe.py` per r4/final.md, then Sonnet 5
+  QA-on-diff + Fable final gate, Commit 1, the live 4-cell run, then the
+  conditional Commit 2.
+Follow-up chips owed: (1) retry the Antigravity r4 lane after the quota window
+  if a second opinion is wanted; (2) Bug Bible promotion for the ledger-field
+  defect class after the live run (admission rule needs a live artifact);
+  (3) investigate `_otr_casting.py:1241-1248` `_LEMMY` for the same class;
+  (4) `_prefix_video_style_cue` runs AFTER the 188-char cap and re-budgets
+  rather than re-truncating -- confirm intended or file it; (5) item 8 SHA pin
+  for `SpandrelEsrgan._model_sha256`; (6) SF#1 stale-metadata clearing;
+  (7) SF#1 caplog degraded-write test.
+Models: Claude Opus 4.7 then Opus 5 (coder + sole judge), Codex `gpt-5.6-sol`
+  high (r1-r4, the strongest lane), Antigravity `Gemini 3.6 Flash (High)`
+  (r1/r2 partial, r3/r4 failed), Fable (r1 cold), Sonnet 5 (SF#1 QA-on-diff,
+  r4 grounding sweep).
+Box state: CLEAN. No resident server; operator ran video-model testing on the
+  GPU throughout -- every task this session was cloud/CPU only and never
+  touched it.
+Commits: `867f16c3`, `b7cb2e10`, `52775c16`, + this docs commit.
+
 ## 2026-08-08 -- v2.0-alpha -- CODER (SF#1 ledger-flush + partial-exception finally SHIPPED against locked r4 spec)
 
 Did: implemented `kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md`
