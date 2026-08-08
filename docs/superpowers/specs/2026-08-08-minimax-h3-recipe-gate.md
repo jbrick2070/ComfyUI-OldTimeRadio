@@ -122,6 +122,15 @@ hf download Comfy-Org/MiniMax-H3 diffusion_models/minimax_h3_fl2va_pruned_fp8_sc
 
 That preserves the repo's `diffusion_models/…` prefix under the models root, landing the file exactly where the loader looks. Repeat per file; skip whichever of FL2VA/Ref2VA you are not using.
 
+`scripts/fetch_minimax_h3.py` does all of the above — root resolution, disk guard, one variant only, skip-if-present:
+
+```powershell
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\fetch_minimax_h3.py --dry-run
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\fetch_minimax_h3.py
+```
+
+Run it with ComfyUI's interpreter, not a bare `python` — that way `folder_paths` is importable and the script resolves the *live* models root instead of the derived fallback. Add `--profile gguf` for the 36.0 GB path.
+
 **Verify the root before downloading 42 GB.** The ComfyUI desktop app splits its install directory (`C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI`) from the user directory (`C:\Users\jeffr\Documents\ComfyUI`, passed as `--user-directory` in `scripts/soak_operator.py:259`). `folder_paths.models_dir` follows the *install* path unless an `extra_model_paths.yaml` redirects it, while `HF_HOME` above follows the *user* path. Those can differ. Confirm which root is live before committing the download:
 
 ```powershell
