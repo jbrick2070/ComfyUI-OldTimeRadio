@@ -238,16 +238,29 @@ Gemini TTS replay is pinned to disk.
   `MALFORMED_CONFIG` when a profile has `use_cache=True` and no dir
   resolves).
 
-**Follow-up chip owed (SHOULD-FIX from r4 Fable gate, non-blocker):** wrap
-the whole per-line loop plus `pack_audio_batch` in one `try/finally` so a
-mid-loop `generate_voice` raise still persists the completed lines'
-ledger stamps. Currently the persistence finally covers only pack; a
-mid-loop cloud leg failure loses completed-line stamps until the retry
-replays them. Non-blocker today because a crashed leg fails loud, never
-publishes, and the operator's retry self-heals (previously-completed line
-replays as a HIT and its stamps persist then, proven live). Add the r4
-spec's `test_cache_on_multi_line_partial_crash_stamps_completed_lines_via_finally`
-in the same fix.
+**Follow-up chip owed (SF#1: RENAMED "ledger-flush + partial-exception
+finally" per 2026-08-08 SF#1 arc):** the 2026-08-08 SF#1 kibitz arc
+discovered the bug was WORSE than yesterday's Fable framing --
+`_persist_ledger_stamps` shipped with ZERO production call sites (13
+whole-repo hits at ebe24bd4: 1 def + 9 test + 3 doc), so every leg
+silently lost the four ledger stamp fields (`audio_cache_key`,
+`audio_sha256`, `render_ms`, `provider_model_id`). Downstream renders
+survived because no active render node reads those fields today
+(they exist for `_OPTIONAL_STRING_FIELDS` schema null-checks + post-run
+audit scripts only). DATA LOSS on metadata, not a render-blocker.
+r1-r4 arc CLOSED 2026-08-08; LOCKED spec at
+`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md`
+(gitignored). Implementation opens against that spec in the next
+CODER window. Suite delta expected +3 tests + 1 extension (parameterized
+across BOTH AnnouncerVoice and BatchCharacterVoices per Codex r4 MF-3
+route-coverage). Includes BUG-12.74 static AST reachability guard so
+this defect class cannot silently re-orphan.
+
+Post-implementation follow-up chips owed (deferred out of atomic scope):
+(1) stale metadata retention across legs (Codex r4 MF-1) -- different
+defect class from "helper unwired"; a downstream reader consuming an
+obsolete field needs its own arc. (2) caplog-based degraded-write test
+(Codex r2 OPT-2).
 
 Suite **9222 passed / 111 skipped / 1 xfailed** (was 9191 pre-chunk, +31
 tests: 29 new in `tests/test_audio_cache_wiring.py` + 2 extended in

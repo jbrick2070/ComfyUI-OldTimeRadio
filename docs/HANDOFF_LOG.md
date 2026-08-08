@@ -3,6 +3,84 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 -- HEAD 3ebadbf1 (v2.0-alpha) -- CODER (item 8 SHIPPED + SF#1 r1-r4 arc CLOSED, spec locked pre-code)
+
+Did: two campaigns in one session, both fully-arced.
+- **First half:** took queue item 8 (system-agnostic multi-GPU / device-
+  selectable upscale stage) end-to-end. New `nodes/_otr_upscale_engines/`
+  namespace (`off` + `spandrel_esrgan` Real-ESRGAN x2plus BSD-3-Clause);
+  per-segment model hook inside `OTR_SilentComposite._encode_segment`'s
+  sharpen=True branch (Fable r3 fork ruling A over Codex CUT-2
+  post-composite alternative); FFMPEG-owns-TIME + MODEL-owns-SPACE split;
+  bt709 color-matrix symmetry on both ffmpeg sides (Fable final-gate MF-1);
+  device-selectable across cpu / cuda / cuda:N (MPS deferred). Rip:
+  `nodes/rtx_upscale.py` deleted, `OTR_RTXUpscale` added to
+  `DELETED_NODE_TYPES`. `perfect_run_spacesaver` widget kept as no-op
+  sentinel (Antigravity r2 MF-6 prevents widget-index shift breaking saved
+  workflows). Full `kibitz-plugin:kibitz` r1-r4 arc (Codex + Antigravity +
+  Fable cold r1) + Sonnet 5 pre-implementation review + Sonnet 5 QA-on-
+  diff + Fable final gate. ~35 grounded fixes folded. Suite grew from
+  9222 -> 9351 (+129 tests across 11 new test files). SHIPPED as
+  `3ebadbf1` and pushed to `origin/v2.0-alpha`; lockstep verified HEAD ==
+  origin, AST parse + no BOM + no zero-byte on every touched .py.
+- **Second half:** opened the cloud-audio-cache SF#1 follow-up chip.
+  Immediately discovered the bug was WORSE than yesterday's Fable framed:
+  `_persist_ledger_stamps` shipped 2026-08-08 in `ebe24bd4` with ZERO
+  production call sites (13 whole-repo hits: 1 def + 9 test + 3 doc).
+  Every leg since yesterday silently lost the four ledger stamp fields
+  (`audio_cache_key` / `audio_sha256` / `render_ms` / `provider_model_id`).
+  Downstream renders survived because no active render node reads those
+  fields today (Antigravity r1 UI Q2 grounded: `_OPTIONAL_STRING_FIELDS`
+  schema null-checks + post-run audit scripts only). DATA LOSS on
+  metadata, not a render-blocker. Ran the FULL r1-r4 arc on the enlarged
+  bug (renamed sprint "cloud-audio-cache ledger-flush + partial-exception
+  finally"): Fable-cold r1 + Codex CLI r1-r4 + Antigravity CLI r1/r3/r4 +
+  Antigravity UI r1-grounding/r2-paste-fallback + 3 parallel Workflow
+  grounding sweeps + driver anchors. ~60+ grounded findings folded across
+  the 4 rounds. LOCKED spec at
+  `kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md` (gitignored).
+  NO code committed yet -- implementation opens against r4/final.md in
+  the next CODER window.
+- **Documentation.** Updated `docs/HANDOFF_LOG.md` (this entry),
+  `docs/GO_FORWARD_PLAN.md` (item 8 tombstone shipped in first half; SF#1
+  chip renamed + rewritten with the arc-discovered scope), added
+  `docs/2026-08-08-PROBLEM-STATEMENT-multi-gpu-upscale.md` (item 8 r1
+  framing), added `docs/2026-08-08-NEXT-SPRINT-CANDIDATES.md` (mid-session
+  next-sprint decision doc referenced by the SF#1 pivot).
+Current step: SF#1 spec LOCKED; implementation is the NEXT CODER window's
+  first job. Suite baseline entering that window: 9351/111/1. Bible
+  17/24/3 at survival-guide `3759ae5`. Item 8 fully live at `3ebadbf1`.
+  Follow-up chip owed from item 8: run `python scripts/ensure_upscale_models.py`
+  to download Real-ESRGAN x2plus (~64 MB) + pin the printed SHA into
+  `SpandrelEsrgan._model_sha256` in a small commit (the operator started
+  the download this session; SHA pin still pending).
+Next: a CODER window takes `kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md`
+  and implements per its "Files touched" + suite gate. Order: focused
+  test file first, full suite second, variant `--check` (NEVER `--all`),
+  canonical validation, Bug Bible, owned-diff, atomic commit + push,
+  executable post-push lockstep verify (all per Codex r4 MF-4/5). Then
+  Sonnet 5 QA-on-diff + Fable final gate per standing 08-05/08-06 rules,
+  then a follow-up chip: (1) stale metadata clearing (Codex r4 MF-1,
+  different defect class), (2) SHA pin for the item 8 upscale model,
+  (3) caplog degraded-write test.
+Models used this session: Claude Opus 4.7 (coder + sole judge), Codex
+  `gpt-5.6-sol` high (r1-r4 both campaigns, plus parallel Workflow
+  subagents), Antigravity `Gemini 3.6 Flash (High)` (r1/r2/r4 item-8;
+  r1/r3/r4 SF#1 CLI + r1/r2 UI-paste when CLI timed out at 5m per SKILL.md
+  agy-timeout rule -- NOT a quota event), Fable (r1-cold on both campaigns,
+  r3 fork-ruling on item 8, final gate on item 8), Sonnet 5 (pre-
+  implementation review + QA-on-diff on item 8). Kibitz-arc lane count:
+  item-8 8 external lanes over 4 rounds; SF#1 8 external lanes over 4
+  rounds (some via UI-paste fallback when CLI timed out). Both campaigns
+  used the operator-required FULL kibitz-plugin:kibitz r1-r4 arc, not a
+  scoped tail.
+Box state: CLEAN. No resident ComfyUI server. VRAM 2.7 GB (desktop
+  baseline). Port 8000 free. Ready for a fresh CODER boot per CLAUDE.md
+  section 4 reset ceremony.
+Commits: `3ebadbf1` (item 8 SHIPPED, pushed to origin/v2.0-alpha);
+  docs-only handoff commit follows (this entry + GO_FORWARD SF#1 chip
+  rewrite + new problem-statement/candidates docs).
+
 ## 2026-08-08 -- HEAD a6c19bdc (v2.0-alpha) -- CODER (device-selectable upscale stage SHIPS, queue item 8 retired)
 
 Did: took queue item 8 (system-agnostic multi-GPU upscale stage) end-to-end.
