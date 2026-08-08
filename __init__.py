@@ -245,13 +245,17 @@ _NODE_MODULES = {
     # -shortest, byte-identical master). The type is tombstoned in the
     # workflow validator's DELETED_NODE_TYPES so any stale workflow JSON
     # naming it fails loudly at validation; such graphs must be re-saved.
-    # v2.0 final-stage RTX VSR upscaler. Path-in / path-out wrapper around
-    # NVIDIA's RTXVideoSuperResolution that preserves C7 audio identity:
-    # decodes video frames in chunks via ffmpeg pipe, runs nvvfx HW-accel
-    # upscale, encodes silent libx264 yuv420p, then muxes the original mp4
-    # audio with -c:a copy (zero audio re-encode). Bypassable via the
-    # `bypass` widget for raw 832x480 deliverables.
-    "OTR_RTXUpscale":              (".nodes.rtx_upscale", "RTXUpscale", " RTX VSR Upscale (1080p)"),
+    # Queue item 8 (2026-08-08): the NVIDIA-only RTX VSR upscaler
+    # (nodes/rtx_upscale.py) was RIPPED and REPLACED by the device-
+    # selectable upscale namespace at nodes/_otr_upscale_engines/. The new
+    # stage runs INSIDE OTR_SilentComposite (per-clip model dispatch in
+    # _encode_segment's sharpen=True branch), so it does NOT ship as a
+    # separate ComfyUI node -- the SilentComposite widget dropdown selects
+    # the engine, and cross-vendor support (CUDA + CPU today; MPS deferred
+    # pending a Mac receipt) comes from the shipped device_backends
+    # declaration on each engine row. OTR_RTXUpscale is in
+    # nodes/_workflow_validation.py DELETED_NODE_TYPES so any stale saved
+    # workflow fails loudly at validation.
     # BUG-LOCAL-028 fix (2026-05-03): per-episode-aware image save sink.
     # Replaces stock SaveImage nodes whose hardcoded filename_prefix
     # couldn't track the in-flight episode_id. Reads the Ledger singleton

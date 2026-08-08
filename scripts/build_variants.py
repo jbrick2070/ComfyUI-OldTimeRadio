@@ -126,6 +126,20 @@ def build_variant(profile_id: str, *, schemas=None, mapping=None,
             + "\nThe operator ratifies each decision and clears "
             "ratify_before_emit; emission stays refused until then.")
 
+    # Queue item 8 (2026-08-08): cross-validate the profile's capability
+    # overrides against every registry's enable-set BEFORE applying it. Catches
+    # a bad upscale_stage.engine, a stale role/slot override, etc., before any
+    # canonical mutation. Codex r4 MF-3.
+    from nodes._otr_shared.capability_profiles import cross_validate_profile
+    from nodes._otr_audio_engines.registry import CAPABILITIES as _AUDIO_CAPS
+    from nodes._otr_video_engines.registry import CAPABILITIES as _VIDEO_CAPS
+    from nodes._otr_image_engines.registry import CAPABILITIES as _IMAGE_CAPS
+    from nodes._otr_upscale_engines.registry import CAPABILITIES as _UPSCALE_CAPS
+    cross_validate_profile(profile, mapping, {
+        "audio": _AUDIO_CAPS, "video": _VIDEO_CAPS,
+        "image": _IMAGE_CAPS, "upscale": _UPSCALE_CAPS,
+    })
+
     applied = apply_profile(canonical, profile, mapping=mapping,
                             schemas=schemas)
     master_hash = semantic_master_hash(applied, mapping=mapping,

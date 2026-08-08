@@ -81,8 +81,12 @@ Widget surface (current as of 2026-05-23):
         act_count         combo   ('auto' derives the act count from
                                    target_words; '1'-'7' set it explicitly)
         creativity        combo   (maps to temperature + top_p preset)
-        perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for
-                                        RTXUpscale spacesaver)
+        perfect_run_spacesaver BOOLEAN (DEPRECATED 2026-08-08 -- no-op
+                                        sentinel; kept to preserve widget
+                                        positional layout per BUG-LOCAL-097.
+                                        Formerly triggered RTXUpscale's
+                                        per-episode cleanup, which was
+                                        retired with the RTX-VSR node.)
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
         repetition_penalty FLOAT  (anti-loop penalty; 1.0 disables)
         max_new_tokens_cap INT    (per-line composer token ceiling)
@@ -2882,13 +2886,13 @@ class OTR_LedgerScriptWriter:
                 "perfect_run_spacesaver": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "Stamps ledger.meta.perfect_run_spacesaver = "
-                        "true so OTR_RTXUpscale's spacesaver cleanup "
-                        "fires after PostUpscaleProcgenBlend produces "
-                        "the final 1080p mp4. Wipes intermediates to "
-                        "free disk space. Leave OFF for any run you "
-                        "want to keep the per-stage mp4 set around for "
-                        "debugging."
+                        "DEPRECATED 2026-08-08 -- NO-OP sentinel. "
+                        "Widget preserved to keep positional layout "
+                        "stable (BUG-LOCAL-097). Formerly triggered "
+                        "OTR_RTXUpscale's per-episode intermediate "
+                        "cleanup, which was retired with the RTX-VSR "
+                        "node (queue item 8; nodes/rtx_upscale.py "
+                        "removed). Setting this True has no effect."
                     ),
                 }),
                 # Phase 4 v4 (2026-05-11): sampling knobs appended at

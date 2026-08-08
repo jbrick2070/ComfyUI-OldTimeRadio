@@ -25,7 +25,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | 5 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
-| 8 | **System-agnostic multi-GPU upscale stage** -- built against the profile and registry contracts, NEVER a resurrection of the retired NVIDIA-only node. Promoted out of ROADMAP row 2 by the operator 2026-08-07 | ROADMAP section 2 | own design + arc, then coder | nothing once 1-7 clear |
+| ~~8~~ | ~~**System-agnostic multi-GPU upscale stage**~~ **SHIPPED 2026-08-08 (queue item 8 retired -- see tombstone below)** | -- | -- | -- |
 | 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08, tombstone below) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
 
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
@@ -41,6 +41,131 @@ safety probe which needs a live cloud leg).
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
 log's own contract forbids a window promoting directly.
+
+### TOMBSTONE -- SYSTEM-AGNOSTIC UPSCALE STAGE (queue item 8), SHIPPED 2026-08-08
+
+**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc completed
+2026-08-08: r1 cold Fable + Codex + Antigravity (three-lane); r2 Codex +
+Antigravity; r3 Codex + Antigravity CLI (timed out at 5m, operator pasted
+UI review back) + Fable-fork ruling subagent; r4 Codex + Antigravity CLI
+(landed clean) + parallel Workflow verify-at-build sweep (8 items). Sonnet
+5 PRE-implementation review caught 4 must-fixes before code was written
+(spandrel API contract collision, `source` NameError in cross_validate,
+schema self-contradiction on `_UPSCALE_STAGE_KEYS` device requiredness,
+`assemble_silent_timeline` engine-threading pseudocode mismatch); Sonnet 5
+QA-on-diff caught 2 more (parents[3]->parents[4] fallback path off-by-one
++ mirrored test error; `engine.load()` firing on the single-base composite
+path where the model is never consumed). Fable final gate caught the LAST
+fresh bug the entire six-review chain missed: color-matrix asymmetry on
+the model round-trip (`in_color_matrix=bt709` on decode, `out_color_matrix=bt709:out_range=tv`
+on encode) -- ffmpeg's auto rgb->yuv conversion falls to swscale default
+(bt601 historically), color-shifting exactly the model-enhanced segments.
+
+**What shipped in ONE atomic commit** (queue item 8 D-2 codicil satisfied
+in full):
+
+* **New adapter namespace `nodes/_otr_upscale_engines/`** (6 files):
+  `__init__.py` (guarded imports + roster audit), `registry.py`
+  (UpscaleEngine Protocol, EngineRegistry subclass, CAPABILITIES table,
+  `RETIRED_UPSCALE_ENGINE_IDS = frozenset()`), `_resolve.py` (device
+  resolver: `cpu | cuda | cuda:N` -- MPS deferred until Mac receipt),
+  `_pipeline.py` (frame-exact pipe reads, tempfile-based stderr capture,
+  kill-and-wait, `_fit_and_pad_bhwc` decrease-fit + pad, engine output
+  validator, `_probe_video_dims` with N/D fraction split), `eng_off.py`
+  (mandatory pass-through sentinel), `eng_spandrel_esrgan.py` (Real-ESRGAN
+  x2plus via spandrel's ModelLoader, per-frame descriptor calls per
+  spandrel's `(1,C,H,W)` contract, SHA verification, `folder_paths`
+  fallback via `parents[4]`).
+* **Registry cross-validation** (`nodes/_otr_shared/capability_profiles.py`):
+  `upscale_stage` added to `_TOP_LEVEL_KEYS` (OPTIONAL); `_UPSCALE_STAGE_KEYS`
+  and `_UPSCALE_STAGE_OPTIONAL_KEYS` split so partial specs like
+  `{engine: "spandrel_esrgan"}` are legal (Sonnet 5 pre-implementation
+  MF-3); `_REGISTRY_NAMES` gains `"upscale"`; `cross_validate_profile`
+  extended with a upscale stanza that accumulates violations (not
+  inline-raise). Wired at BOTH boundaries: `scripts/build_variants.py:build_variant`
+  and `scripts/otr_api.py:apply_profile_to_workflow`. Codex r4 MF-3.
+* **`_flatten_profile_values`** (`nodes/_otr_workflow_apply.py`): only-if-
+  present flattening of `upscale_stage.engine` / `.device`, so profiles
+  that omit the section keep the canonical's `"off"/"cpu"` defaults
+  byte-identically.
+* **Widget mapping** (`config/profiles/widget_mapping.json`): 2 new
+  managed entries (`upscale_stage.engine` with `registry: "upscale"`,
+  `upscale_stage.device` with `registry: null`).
+* **`OTR_SilentComposite`** (`nodes/otr_silent_composite.py`): 2 optional
+  widgets APPENDED (BUG-LOCAL-097); `composite()` threads engine into
+  `assemble_silent_timeline` only (single-base normalize path unchanged);
+  engine.load gated on `assemble AND non-off` (Sonnet 5 QA-on-diff MF-2);
+  `_encode_segment` fast-path branch unchanged for off/floor/dir/black
+  (byte-identity preserved); new `_run_model_pipeline` with
+  FFMPEG-owns-TIME + MODEL-owns-SPACE split, per-frame model calls,
+  bt709 color-matrix declarations on both ffmpeg sides (Fable MF-1),
+  no-enlargement skip when source >= canvas at 1x (Codex r4 SF-3),
+  path-based stderr capture so `_tail` reads after Popen writes
+  (Antigravity r3 MF-2), guarded lifecycle with kill-and-wait on error
+  and count_video_frames assert; new `IS_CHANGED` fingerprints base
+  video + manifest clip paths (with sorted dir-frame tuples) + sibling
+  master WAV + `OTR_COMPOSITE_UNSHARP_AMOUNT` + engine identity + model
+  file mtime.
+* **Canonical workflow**: node 84 grows 2 `inputs[]` objects and 2
+  `widgets_values` entries (5 -> 7). All 45 shipping variants
+  regenerated via `build_variants.py --all`; 4 `.env.json` master_hash
+  fields refreshed to match.
+* **Ship profile** (`config/profiles/otr_upscale_ship.json`): clone of
+  `otr_w45_wan_ti2v.json` with `upscale_stage: {engine: "spandrel_esrgan",
+  device: "cuda:0"}` and `real-esrgan-x2plus` in `preflight.required_models`.
+* **Rip** (D-2 codicil, deferred since 2026-07-10): `nodes/rtx_upscale.py`
+  DELETED; `__init__.py` mapping removed; `OTR_RTXUpscale` added to
+  `DELETED_NODE_TYPES`; 4 test files updated to drop stale references;
+  `OTR_LedgerScriptWriter.py` widget tooltip re-labeled DEPRECATED
+  (widget preserved as no-op sentinel per BUG-LOCAL-097 -- Antigravity
+  r2 MF-6); `otr_post_upscale_procgen_blend.py` docstring rewritten.
+* **Provisioners**: `scripts/ensure_upscale_models.py` (bounded-retry
+  download of Real-ESRGAN x2plus + SHA verify + atomic rename; empty
+  SHA at ship for the first-run bootstrap that prints the actual hash);
+  `scripts/validate_canonical_workflow.py` (structural audit script --
+  no inline `python -c`, per Codex r4 MF-10 + CLAUDE.md).
+* **Documentation**: `docs/EXTENDING_OTR.md` cross-referenced with a
+  "how to add your own audio/video/image/upscale engine" pointer at
+  the top; each namespace's `__init__.py` carries the shipped-pattern
+  guide. `docs/2026-08-08-PROBLEM-STATEMENT-multi-gpu-upscale.md`
+  captured the r1 framing.
+* **Dependency**: `spandrel~=0.4.1` added to `requirements.txt` (pinned
+  minor version; 0.5 major bumps blocked pending a fresh API-contract
+  test pass).
+* **Tests added**: 11 new files covering registry protocol/roster/CAPABILITIES,
+  widget positional guard, workflow-JSON structural pin, retired-node
+  guard, deprecated-sentinel scope, profile schema (partial spec + unknown
+  engine + retired engine), both-boundary cross_validate hookup,
+  `_fit_and_pad_bhwc` decrease-fit + contiguity, spandrel API contract,
+  mocked spandrel adapter (7 tests including per-frame loop + fail-closed
+  matrix + bare-venv fallback), single-base composite no-engine-load
+  gating (3 tests including engine-load-error-tolerance path), and
+  color-matrix bt709 symmetry pin.
+
+Suite **9351 passed / 111 skipped / 1 xfailed** (baseline 9222,
++129 tests). Bug Bible 17 green at survival-guide `3759ae5`.
+`build_variants.py --all` regenerated 45 variants cleanly, `--check`
+returned zero drift. `scripts/validate_canonical_workflow.py` clean
+(23 nodes, 56 links).
+
+**Follow-up chips owed (Fable SHOULD-FIXes, non-blockers):**
+1. IS_CHANGED hardcodes the spandrel engine + filename in its model-file
+   fingerprint block; engine #2 will get no model fingerprint. Route
+   through registry/engine metadata in a small dedicated commit.
+2. Stale RTXUpscale prose in `nodes/video_engine.py:2086` tooltip and a
+   handful of docstrings (`_otr_paths.py`, `_otr_memory.py`,
+   `otr_post_upscale_procgen_blend.py` body comments). Comments-only
+   sweep commit.
+3. `meta.perfect_run_spacesaver` is now written by
+   `OTR_LedgerScriptWriter.py:6196-6197` with zero remaining readers.
+   The deprecated-noop guard test pins this disposition deliberately, so
+   keep-or-drop is an operator call; recording the ledger-audit-trail
+   honestly.
+4. Live 5080 leg for `otr_upscale_ship` -- ONE 30-sec synthetic + one
+   120-word real leg. Pre-leg: `python scripts/ensure_upscale_models.py`
+   downloads the ~64 MB weights and prints the SHA (deliberately empty
+   in the ship for first-run bootstrap; pin it into
+   `SpandrelEsrgan._model_sha256` in a follow-up commit).
 
 ### TOMBSTONE -- ANNOUNCER-INTRO QUALIFICATION, CLOSED 2026-08-07
 

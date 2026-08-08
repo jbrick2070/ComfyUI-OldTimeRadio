@@ -558,6 +558,15 @@ def _flatten_profile_values(profile: dict) -> dict:
     aud = profile.get("audio", {})
     if "voice_device" in aud:
         flat["audio.voice_device"] = aud["voice_device"]
+    # Queue item 8 (2026-08-08): upscale_stage section, only-if-present.
+    # If absent, nothing flattens -> applier never patches the widgets ->
+    # canonical's "off"/"cpu" defaults survive (registry-supplied default).
+    us = profile.get("upscale_stage")
+    if us is not None:
+        if "engine" in us:
+            flat["upscale_stage.engine"] = us["engine"]
+        if "device" in us:
+            flat["upscale_stage.device"] = us["device"]
     return flat
 
 

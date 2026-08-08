@@ -107,6 +107,12 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     # scripts/build_variants.py REFUSES to emit this profile's variant;
     # the operator ratifies each named decision and clears the list.
     "ratify_before_emit": (False, _is_str_list, "list[str] (optional)"),
+    # Queue item 8 (2026-08-08): OPTIONAL post-render upscale/enhance stage.
+    # Absent = registry default {engine: "off", device: "cpu"} applied by the
+    # applier; a byte-identical no-op for every profile that omits it. Present
+    # requires at minimum {engine: <name>}; device is optional per
+    # _SECTION_OPTIONAL_KEYS.
+    "upscale_stage": (False, lambda v: isinstance(v, dict), "dict (optional)"),
 }
 
 _SEED_POLICY_KEYS = {
@@ -145,9 +151,21 @@ _VIDEO_OPTIONAL_KEYS = {
     "max_render_frames": lambda v: (
         isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 240),
 }
+# Queue item 8 (2026-08-08): required-if-section-present keys for upscale_stage.
+# `engine` is required (must name a real engine); `device` is optional (see
+# _UPSCALE_STAGE_OPTIONAL_KEYS below) so a profile writing just
+# ``upscale_stage: {"engine": "spandrel_esrgan"}`` is legal and inherits the
+# registry-supplied device default. Sonnet 5 MF-3.
+_UPSCALE_STAGE_KEYS = {
+    "engine": lambda v: isinstance(v, str) and bool(v),
+}
+_UPSCALE_STAGE_OPTIONAL_KEYS = {
+    "device": lambda v: isinstance(v, str) and bool(v),
+}
 #: section name -> its optional-key spec (missing = no optional keys).
 _SECTION_OPTIONAL_KEYS = {
     "video": _VIDEO_OPTIONAL_KEYS,
+    "upscale_stage": _UPSCALE_STAGE_OPTIONAL_KEYS,
 }
 _IMAGE_KEYS = {
     "dtype_policy": lambda v: v in _DTYPE_POLICIES,
@@ -245,7 +263,15 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         ("audio", _AUDIO_KEYS),
         ("render", _RENDER_KEYS),
         ("preflight", _PREFLIGHT_KEYS),
+        ("upscale_stage", _UPSCALE_STAGE_KEYS),
     ):
+        # Optional sections: absent + not-required is legal (queue item 8's
+        # upscale_stage relies on this; the applier injects the registry
+        # default when absent). Sonnet 5 MF-3.
+        if sub_name not in profile:
+            required = _TOP_LEVEL_KEYS[sub_name][0]
+            if not required:
+                continue
         sub = profile[sub_name]
         optional_spec = _SECTION_OPTIONAL_KEYS.get(sub_name, {})
         unknown = set(sub) - set(sub_spec) - set(optional_spec)
@@ -311,7 +337,7 @@ _MAPPING_SECTIONS = ("managed", "emit_only")
 _MAPPING_KEYS = ("version", "_comment", "managed", "emit_only",
                  "exempt_node_types", "exempt_widget_names",
                  "never_patch_widget_names")
-_REGISTRY_NAMES = ("video", "audio", "image")
+_REGISTRY_NAMES = ("video", "audio", "image", "upscale")
 
 
 def validate_widget_mapping_shape(mapping: Any, source: str = "<dict>") -> dict:
@@ -524,6 +550,37 @@ def cross_validate_profile(profile: dict, mapping: dict,
                 f"{dotted}={value!r}: engine excluded from profile "
                 f"{profile['id']!r} enable-set ({reason})"
             )
+    # Queue item 8 (2026-08-08): upscale_stage cross-validation. Deliberate
+    # simplification vs the role/slot registry loop above: `upscale_stage.device`
+    # is a free-form string (validated at runtime by resolve_device), not a
+    # top-level device_backend enum, so we don't route it through
+    # `availability()` / `_fit_reason()` -- we only check the engine name is
+    # registered (and not retired). r4 judgment C5 + Sonnet SF-2 document this
+    # as intentional; a future round wanting parity with the other 3
+    # namespaces' availability strength must first add a proper backend field.
+    upscale = profile.get("upscale_stage") or {}
+    engine_name = upscale.get("engine", "")
+    if engine_name:
+        try:
+            from .._otr_upscale_engines.registry import (
+                all_engine_names as _upscale_engine_names,
+                RETIRED_UPSCALE_ENGINE_IDS as _upscale_retired_ids,
+            )
+        except ImportError as e:
+            problems.append(
+                f"upscale_stage.engine={engine_name!r}: upscale registry not "
+                f"importable ({e}); cannot cross-validate"
+            )
+        else:
+            if engine_name in _upscale_retired_ids:
+                problems.append(
+                    f"upscale_stage.engine={engine_name!r}: engine is retired"
+                )
+            elif engine_name not in _upscale_engine_names():
+                problems.append(
+                    f"upscale_stage.engine={engine_name!r}: engine not registered "
+                    f"in the upscale namespace"
+                )
     if problems:
         raise ProfileError(
             f"profile {profile.get('id')!r} failed capability cross-validation:\n  "

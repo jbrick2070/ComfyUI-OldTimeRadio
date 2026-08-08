@@ -308,11 +308,16 @@ _RAWVIDEO_STDIN_ENCODERS = {
     ("video_engine.py", "_encode_mp4"):
         "the whole-episode procedural FLOOR, which hard-requires audio and "
         "stamps no frame_count -- a different contract, not a clip",
-    ("rtx_upscale.py", "_chunked_upscale"):
-        "the upscaler's chunk pipe -- transforms an existing clip rather than "
-        "authoring one",
     ("encode_sink.py", "__enter__"):
         "imported only by scripts/profile_scope_render.py; not a live writer",
+    ("otr_silent_composite.py", "_run_model_pipeline"):
+        "queue item 8 (2026-08-08): the FFMPEG-owns-time / MODEL-owns-space "
+        "streaming pipeline. Decoder ffmpeg emits rawvideo rgb24 on stdout, "
+        "Python passes single frames through spandrel, encoder ffmpeg takes "
+        "rawvideo rgb24 on stdin -- the ONE per-segment model dispatch inside "
+        "OTR_SilentComposite. Deliberately its own copy because it carries a "
+        "stderr-to-tempfile pattern the batch encoder does not, and it must "
+        "not accidentally take a shared code path that changes byte output.",
 }
 
 

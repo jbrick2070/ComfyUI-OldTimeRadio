@@ -428,6 +428,24 @@
           "voice_device"
         ]
       ]
+    },
+    "upscale_stage.engine": {
+      "registry": "upscale",
+      "targets": [
+        [
+          "OTR_SilentComposite",
+          "upscale_engine"
+        ]
+      ]
+    },
+    "upscale_stage.device": {
+      "registry": null,
+      "targets": [
+        [
+          "OTR_SilentComposite",
+          "upscale_device"
+        ]
+      ]
     }
   },
   "emit_only": {

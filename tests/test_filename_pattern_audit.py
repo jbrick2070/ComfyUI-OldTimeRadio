@@ -73,13 +73,13 @@ BANNED_PATTERNS = [
 # convention. Format: (file relative to repo root, line snippet substring).
 # When extending this allowlist, add a comment explaining the contract.
 ALLOWLIST = [
-    # OBS final mp4 -- post BUG-LOCAL-108 (2026-05-05) the writer is
-    # OTR_PostUpscaleProcgenBlend (writes ``<ep>_procgen_blended.mp4``
-    # via otr_obs_dir() / f"{src.stem}{out_suffix}{src.suffix}", no slug
-    # reconstruction). RTXUpscale only retains an EXISTENCE GUARD against
-    # the same canonical path -- predictor, not writer. Single-source
-    # contract still holds; allowlist entry covers the guard string.
-    ("nodes/rtx_upscale.py", 'obs" / f"{ep_id}_procgen_blended.mp4"'),
+    # Queue item 8 (2026-08-08): the rtx_upscale entry was pruned when
+    # nodes/rtx_upscale.py was ripped alongside the device-selectable
+    # upscale rebuild. OBS-final writer is still OTR_PostUpscaleProcgenBlend
+    # (writes ``<ep>_procgen_blended.mp4`` via otr_obs_dir() /
+    # f"{src.stem}{out_suffix}{src.suffix}"), and the existence guard on
+    # <ep>_procgen_blended.mp4 lived inside rtx_upscale's spacesaver
+    # cleanup -- that whole path was retired with the node.
     # CW-4 legacy teardown (2026-06-07): the nodes/video_composite.py allowlist
     # entry was PRUNED -- VideoComposite was deleted in the render-chain teardown.
     # The canonical composited mp4 is now produced by OTR_SilentComposite +
@@ -181,20 +181,16 @@ def test_allowlist_entries_still_present():
 
 
 def test_destructive_paths_use_glob_not_reconstruction():
-    """The two destructive code paths (rtx_upscale spacesaver, ledger
-    rename sidecar loop) must use glob discovery, not slug reconstruction.
-    This is a positive assertion: the substring patterns we expect
-    must be present.
+    """The remaining destructive code path (ledger rename sidecar loop)
+    must use glob discovery, not slug reconstruction. This is a positive
+    assertion: the substring pattern we expect must be present.
+
+    Queue item 8 (2026-08-08): the rtx_upscale spacesaver was retired
+    with the node; that half of this test is gone with it. If a future
+    destructive path lands, add an assertion here for its glob shape.
     """
-    rtx = (NODES_DIR / "rtx_upscale.py").read_text(encoding="utf-8")
     ledger = (NODES_DIR / "production_ledger.py").read_text(encoding="utf-8")
 
-    assert 'audio_dir.glob("*_treatment.txt")' in rtx, (
-        "rtx_upscale spacesaver lost its glob-based treatment discovery"
-    )
-    assert 'audio_dir.glob("*_ledger.json")' in rtx, (
-        "rtx_upscale spacesaver lost its glob-based ledger discovery"
-    )
     assert 'sidecar_dir.glob(f"{old_prefix}*.txt")' in ledger, (
         "production_ledger sidecar rename lost its old-prefix glob"
     )

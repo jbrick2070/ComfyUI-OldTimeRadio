@@ -71,6 +71,7 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_VoiceRender",            # legacy aggregator
     "OTR_BatchKokoroGenerator",   # replaced by OTR_KokoroAnnouncer
     "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + the (now also removed) legacy compositor
+    "OTR_RTXUpscale",             # queue item 8 (2026-08-08): NVIDIA-only RTX-VSR upscale ripped in the same commit as the device-selectable upscale rebuild (nodes/_otr_upscale_engines/); D-2 codicil.
     # CW-4 legacy render-path teardown (2026-06-07): the legacy in-graph
     # compositor mixed audio with ffmpeg -shortest (forbidden by the
     # frozen-audio spine). Replaced by SignalLostVideo -> OTR_SilentComposite

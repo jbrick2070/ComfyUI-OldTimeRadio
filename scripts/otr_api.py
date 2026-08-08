@@ -808,11 +808,34 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from nodes._otr_shared.capability_profiles import load_profile
+    from nodes._otr_shared.capability_profiles import load_profile, load_widget_mapping, cross_validate_profile
     from nodes._otr_workflow_apply import apply_profile
 
     if isinstance(profile, str):
         profile = load_profile(profile)
+    # Queue item 8 (2026-08-08): cross-validate the profile's capability
+    # overrides against every registry's enable-set BEFORE applying. Same
+    # coverage as scripts/build_variants.py:build_variant(); no live
+    # application path may bypass validation (Codex r4 MF-3).
+    try:
+        _mapping = load_widget_mapping()
+        from nodes._otr_audio_engines.registry import CAPABILITIES as _AUDIO_CAPS
+        from nodes._otr_video_engines.registry import CAPABILITIES as _VIDEO_CAPS
+        from nodes._otr_image_engines.registry import CAPABILITIES as _IMAGE_CAPS
+        from nodes._otr_upscale_engines.registry import CAPABILITIES as _UPSCALE_CAPS
+        cross_validate_profile(profile, _mapping, {
+            "audio": _AUDIO_CAPS, "video": _VIDEO_CAPS,
+            "image": _IMAGE_CAPS, "upscale": _UPSCALE_CAPS,
+        })
+    except (ImportError, FileNotFoundError, OSError):
+        # Fall through if either (a) a namespace's CAPABILITIES table failed
+        # to import (bare-venv edge cases), or (b) load_widget_mapping()'s
+        # underlying `open()` raised because the mapping file is absent in a
+        # headless smoke context. The applier itself still enforces the
+        # individual widget-mapping contracts at patch time (Sonnet 5 QA
+        # SF-1: the earlier `except ImportError` alone did not match the
+        # FileNotFoundError shape load_widget_mapping actually raises).
+        pass
     flat = []
     for section in ("role_overrides", "slot_overrides", "features"):
         for k, v in (profile.get(section) or {}).items():

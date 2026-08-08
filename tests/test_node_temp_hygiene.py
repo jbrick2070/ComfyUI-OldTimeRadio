@@ -26,8 +26,9 @@ _NODES = _REPO / "nodes"
 # straight into the ambient system temp dir, which (unlike a self-cleaning
 # mkdtemp that rmtree's in a finally) persists and trips the soak hygiene gate.
 # (mkdtemp(prefix="otr_...") callers that clean up in a finally never persist ->
-# deliberately NOT flagged here; that would false-fail otr_silent_composite /
-# rtx_upscale which Codex confirmed self-delete.)
+# deliberately NOT flagged here; that would false-fail otr_silent_composite,
+# which self-deletes its assemble workdir. rtx_upscale was retired in queue
+# item 8 -- 2026-08-08.)
 _JOIN_GETTEMP_OTR = re.compile(
     r"join\(\s*(?:_?tempfile\.)?gettempdir\(\)\s*,\s*[frbu]*['\"]otr")
 

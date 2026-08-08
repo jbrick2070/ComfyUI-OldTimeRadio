@@ -1,42 +1,41 @@
-"""OTR_PostUpscaleProcgenBlend -- post-RTXUpscale procgen visual blend.
+"""OTR_PostUpscaleProcgenBlend -- procgen visual blend over the composite.
 
-BUG-LOCAL-030 Phase B (2026-05-03 EVENING, Jeffrey final spec):
+Takes the OTR_SilentComposite's 1920x1080 silent output and blends the
+1920x1080 procgen render (OTR_SignalLostVideo -- CRT scanlines + audio-
+reactive flicker + waveform visualizer) on top via ffmpeg
+-filter_complex blend. Audio passes through with ``-c:a copy`` (zero
+audio re-encodes; C7 byte identity preserved end-to-end).
 
-The per-clip-mux composite path (master_mix_per_clip_mux mode) renders
-HuMo + LTX clips into a 1472x832 canvas with black pillarbox bars on
-each side of HuMo character clips. RTXUpscale takes that 1472x832 to
-1920x1080 for delivery.
+Inputs:
+  - source_mp4_path:  1920x1080 composite output
+  - procgen_mp4_path: 1920x1080 procgen render
 
-Procgen (OTR_SignalLostVideo) renders SEPARATELY at native 1920x1080
-(NOT at the prior 832x480 that got upscaled with everything else). This
-node takes:
-
-  - source_mp4_path:  1920x1080 RTXUpscale output (HuMo + LTX content)
-  - procgen_mp4_path: 1920x1080 procgen render (CRT scanlines + audio-
-                      reactive flicker + waveform visualizer)
-
-and produces a final 1920x1080 mp4 with procgen blended on top via
-ffmpeg -filter_complex blend, audio passing through with ``-c:a copy``
-(zero audio re-encodes).
-
-Why post-upscale instead of pre-composite:
+Why the procgen blend runs POST-composite rather than pre-composite:
   1. Procgen is SYNTHETIC (CRT scanlines, geometric patterns). Running
-     it through RTX VSR (designed for natural / AI-rendered content)
-     produces ringing artifacts and softens the sharp digital character.
+     it through a model-based super-resolution pass alongside natural /
+     AI-rendered clip content would introduce ringing artifacts.
      Native-rendering procgen at 1920x1080 keeps it crisp.
-  2. The per-clip-mux composite is the C7 byte-identity-protected audio
-     path. Adding a procgen blend INTO that composite means re-encoding
-     the audio mux, which makes byte-identity harder to guarantee.
-     Post-upscale blend is purely visual (-c:a copy) so audio stays
-     untouched between SignalLostVideo and final delivery.
-  3. Procgen visually FILLS the HuMo character pillarbox bars from
-     BUG-030 Phase A simple-pillarbox composite, turning the visible
-     black surround into the SIGNAL LOST CRT signature (audio-reactive
-     scanlines + flicker over the otherwise-static black bars).
+  2. The composite is the C7 byte-identity-protected audio path. Adding
+     a procgen blend INTO that composite means re-encoding the audio mux,
+     which makes byte-identity harder to guarantee. This node's blend
+     stays purely visual (-c:a copy) so audio is untouched.
+  3. Procgen visually FILLS pillarbox surround from the composite's
+     mixed 4:3 / 16:9 sources, turning the visible black surround into
+     the SIGNAL LOST CRT signature (audio-reactive scanlines + flicker
+     over the otherwise-static black bars).
 
-Bypass mode (``bypass=True`` widget): copies source -> output
-verbatim with no procgen overlay. Useful for A/B comparison or when
-the procgen visual is unwanted (e.g. clean uplift for an external editor).
+Bypass mode (``bypass=True`` widget): copies source -> output verbatim
+with no procgen overlay. Useful for A/B comparison or when the procgen
+visual is unwanted (e.g. clean uplift for an external editor).
+
+**History note (2026-08-08):** the retired ``OTR_RTXUpscale`` node used
+to sit between OTR_SilentComposite and this node, taking a smaller
+composite canvas up to 1080p via an NVIDIA-only RTX VSR pass. That
+stage was ripped as part of queue item 8; the composite chain now
+delivers 1080p directly (via ``render.composite_w/h`` per profile), and
+per-clip model enhancement lives inside SilentComposite itself
+(``nodes/_otr_upscale_engines/`` -- device-selectable across vendors).
+This node's inputs are unchanged.
 """
 from __future__ import annotations
 

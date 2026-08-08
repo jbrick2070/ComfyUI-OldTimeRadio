@@ -6,6 +6,16 @@
 Every field name below is grounded against the live code; re-verify pins at
 build time.
 
+**Extending OTR in other ways.** This doc covers source banks (the heavy
+bundle+activation pattern). For adapter-style extensions -- adding your own
+AUDIO / VIDEO / IMAGE / UPSCALE engine -- the pattern is a lighter code drop:
+create `nodes/_otr_<kind>_engines/eng_<yourname>.py`, decorate the class with
+`@register` from the namespace's `registry.py`, add a `CAPABILITIES` row, and
+the dropdown auto-populates on next boot. The per-namespace `__init__.py` files
+carry a short "HOW TO ADD YOUR OWN ..." docstring for each; the upscale
+namespace's guide is at `nodes/_otr_upscale_engines/__init__.py` and mirrors
+the shipped audio/video/image conventions.
+
 OTR ships six source banks. Every bank is INDEPENDENT and EQUAL -- its own
 definition, its own fetch/interpret strategy, its own story pack. Adding your
 own bank means adding a seventh peer, not plugging into a special "user" tier.

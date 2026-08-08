@@ -26,6 +26,46 @@ import logging
 
 log = logging.getLogger("OTR")
 
+# Queue item 8 (2026-08-08): upscale-engine namespace for per-clip model
+# enhancement. Imported at MODULE TOP so the roster is populated by the time
+# INPUT_TYPES first runs. Python's package-loading rule means
+# `_otr_upscale_engines/__init__.py` runs first, registering every adapter,
+# so the dropdown built from `_upscale_engine_names()` is complete on first
+# call. Import guarded so a namespace-import failure never breaks
+# SilentComposite (roster audit logs the details).
+try:
+    from ._otr_upscale_engines.registry import (
+        all_engine_names as _upscale_engine_names,
+        get_engine as _get_upscale_engine,
+        assert_usable as _assert_upscale_usable,
+    )
+    from ._otr_upscale_engines._resolve import (
+        resolve_device as _resolve_upscale_device,
+    )
+except Exception as _upscale_import_err:  # noqa: BLE001
+    # Fail-open: if the package fails to import, fall back to a hardcoded
+    # ["off"] roster so the composite still runs today's byte-identical path.
+    log.warning(
+        "[OTR_SilentComposite] _otr_upscale_engines import failed (%s); "
+        "upscale_engine dropdown falls back to ['off']",
+        _upscale_import_err)
+    _upscale_engine_names = lambda: ["off"]  # noqa: E731
+
+    def _assert_upscale_usable(name, role):
+        if name != "off":
+            raise RuntimeError(
+                f"upscale engine {name!r} unavailable: namespace import failed")
+        return name
+
+    def _get_upscale_engine(name):
+        class _NullOff:
+            name = "off"
+        return _NullOff()
+
+    def _resolve_upscale_device(v):
+        import torch
+        return torch.device("cpu")
+
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
     return ffmpeg if (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)) else ""
@@ -652,7 +692,7 @@ def _color_args(out_path):
 
 
 def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
-                    loop=False, sharpen=True):
+                    loop=False, sharpen=True, engine=None):
     """One canonical silent segment of EXACTLY ``n_frames`` from ``src`` (a clip,
     or the floor sliced at ``start_frame``): truncates a long source, holds the
     last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error.
@@ -663,15 +703,200 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     in _seg_vf stays as a safety but never triggers under an infinite loop.
 
     ``sharpen`` is True for a real engine clip (lanczos+unsharp soft-native fix)
-    and False for the procgen-floor slice (NOT sharpened -- byte-identical)."""
-    loop_args = ["-stream_loop", "-1"] if loop else []
-    cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
-           "-vf", _seg_vf(w, h, fps, start_frame, sharpen=sharpen),
-           "-frames:v", str(int(n_frames))] + _color_args(seg_path)
-    p = _run(cmd)
-    if p.returncode != 0:
-        raise ValueError("OTR_SilentComposite: segment encode failed (%s) :: %s"
-                         % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+    and False for the procgen-floor slice (NOT sharpened -- byte-identical).
+
+    Queue item 8 (2026-08-08): ``engine`` is an UpscaleEngine instance loaded on
+    a device (or None). When non-None AND ``engine.name != "off"`` AND
+    ``sharpen=True``, dispatch to ``_run_model_pipeline`` (real-clip model path).
+    Every other combination takes the byte-identical ffmpeg fast path -- ``off``
+    is a sentinel that flows through the SAME lines as today, so directory/floor/
+    black paths remain byte-identical whether a profile picks ``off`` or a real
+    engine."""
+    if engine is None or engine.name == "off" or not sharpen:
+        loop_args = ["-stream_loop", "-1"] if loop else []
+        cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
+               "-vf", _seg_vf(w, h, fps, start_frame, sharpen=sharpen),
+               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+        p = _run(cmd)
+        if p.returncode != 0:
+            raise ValueError(
+                "OTR_SilentComposite: segment encode failed (%s) :: %s"
+                % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+        return
+
+    # Model path: probe source dims first; if source already >= canvas at 1x,
+    # the model would upsample to 2x then downsample back, which changes
+    # pixels without advancing the goal (Codex r4 SF-3). Skip to the fast path.
+    from ._otr_upscale_engines._pipeline import _probe_video_dims
+    try:
+        _src_w, _src_h, _ = _probe_video_dims(fb, src)
+    except Exception as e:  # noqa: BLE001
+        raise ValueError(
+            "OTR_SilentComposite: probe failed for %r: %s" % (src, e))
+    if _src_w >= int(w) and _src_h >= int(h):
+        log.info(
+            "[OTR_SilentComposite] model skip (source %dx%d >= canvas %dx%d "
+            "at 1x); fast path", _src_w, _src_h, int(w), int(h))
+        loop_args = ["-stream_loop", "-1"] if loop else []
+        cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
+               "-vf", _seg_vf(w, h, fps, start_frame, sharpen=True),
+               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+        p = _run(cmd)
+        if p.returncode != 0:
+            raise ValueError(
+                "OTR_SilentComposite: segment encode failed (%s) :: %s"
+                % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+        return
+    _run_model_pipeline(fb=fb, src=src, seg_path=seg_path,
+                        n_frames=n_frames, w=w, h=h, fps=fps,
+                        start_frame=start_frame, loop=loop, engine=engine,
+                        src_w=_src_w, src_h=_src_h)
+
+
+def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
+                        start_frame, loop, engine, src_w, src_h):
+    """FFMPEG OWNS TIME, MODEL OWNS SPACE (Fable r3 amendment).
+
+    Decoder runs the full _seg_vf chain MINUS scale/pad/sharpen:
+      trim=start_frame, setpts=PTS-STARTPTS, fps=<target>,
+      tpad=stop_mode=clone:stop_duration=3600
+    with -frames:v n_frames on decode so the Python loop receives EXACTLY
+    n_frames of conformed CFR source-resolution frames. Python loop is a dumb
+    spatial map: read 1 frame -> model 2x (BHWC->BCHW inside the adapter) ->
+    _fit_and_pad_bhwc decrease-fit + pad -> write to encoder stdin. Encoder
+    has its own -frames:v n_frames. count_video_frames(seg_path) == n_frames
+    is asserted BEFORE returning (Codex r3 MF-1 non-negotiable guard)."""
+    import numpy as np
+    import torch
+
+    from ._otr_upscale_engines._pipeline import (
+        _read_frames_exact, _tempfile_stderr, _close_stderr, _tail_path,
+        _kill_and_wait_all, _unlink_if_exists,
+        _validate_engine_output, _fit_and_pad_bhwc,
+    )
+
+    dec_vf_parts = []
+    if int(start_frame) > 0:
+        dec_vf_parts.append("trim=start_frame=%d" % int(start_frame))
+        dec_vf_parts.append("setpts=PTS-STARTPTS")
+    dec_vf_parts.append("fps=%d" % int(fps))
+    dec_vf_parts.append("tpad=stop_mode=clone:stop_duration=3600")
+    # Fable final gate MF-1: force EXPLICIT bt709 on the yuv->rgb24 decode.
+    # Every clip source is bt709-tagged by the V-1 contract (matrix stamps in
+    # eng_wan_ti2v / eng_ltx_av / eng_visualizer). Without this, ffmpeg 8's
+    # negotiation still honors the tag correctly here -- but the encoder side
+    # (below) is what needed the fix; adding this belt keeps the pair
+    # symmetric and removes the version dependency for future ffmpeg builds.
+    dec_vf_parts.append("scale=in_color_matrix=bt709")
+    dec_vf_parts.append("format=rgb24")
+    dec_vf = ",".join(dec_vf_parts)
+    dec_args = [fb, "-y", "-loglevel", "error"]
+    if loop:
+        dec_args += ["-stream_loop", "-1"]
+    dec_args += ["-i", src, "-vf", dec_vf,
+                 "-frames:v", str(int(n_frames)),
+                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-an", "-"]
+
+    # Fable final gate MF-1: force EXPLICIT bt709 tv on the rgb->yuv encode.
+    # The encoder's rawvideo rgb24 stdin carries NO color tag, so ffmpeg's
+    # auto-inserted rgb->yuv420p conversion falls to swscale's default matrix
+    # (bt601 historically; version-dependent at best) while `_color_args`
+    # TAGS the output bt709. Asymmetric round-trip = real color shift on
+    # exactly the model-enhanced segments. This -vf forces bt709+tv range
+    # BEFORE libx264, matching the tagging.
+    enc_args = [fb, "-y", "-loglevel", "error",
+                "-f", "rawvideo", "-pix_fmt", "rgb24",
+                "-s", "%dx%d" % (int(w), int(h)),
+                "-r", "%d" % int(fps),
+                "-i", "-", "-an",
+                "-frames:v", str(int(n_frames)),
+                "-vf", "scale=out_color_matrix=bt709:out_range=tv"
+                ] + _color_args(seg_path)
+
+    dec_stderr_fobj, dec_stderr_path = _tempfile_stderr("dec")
+    enc_stderr_fobj, enc_stderr_path = _tempfile_stderr("enc")
+    dec = subprocess.Popen(dec_args, stdout=subprocess.PIPE,
+                           stderr=dec_stderr_fobj, bufsize=0)
+    try:
+        enc = subprocess.Popen(enc_args, stdin=subprocess.PIPE,
+                               stderr=enc_stderr_fobj, bufsize=0)
+    except Exception:  # noqa: BLE001
+        _kill_and_wait_all([dec], timeout=30)
+        _close_stderr(dec_stderr_fobj, enc_stderr_fobj)
+        _unlink_if_exists(dec_stderr_path)
+        _unlink_if_exists(enc_stderr_path)
+        raise
+
+    # BATCH = 1: spandrel's ImageModelDescriptor.__call__ enforces (1,C,H,W).
+    # Having a per-pipe BATCH > 1 just adds partial-batch-on-EOF complexity
+    # for zero throughput gain (Antigravity r4 MF-1, Codex r4 MF-1).
+    BATCH = 1
+    src_frame_bytes = int(src_w) * int(src_h) * 3
+    frames_written = 0
+    error_raised = False
+    try:
+        while frames_written < int(n_frames):
+            want = min(BATCH, int(n_frames) - frames_written)
+            buf = _read_frames_exact(dec.stdout, src_frame_bytes, want)
+            if not buf:
+                raise RuntimeError(
+                    "decoder EOF before n_frames satisfied "
+                    "(%d/%d) src=%r" % (frames_written, int(n_frames), src))
+            got = len(buf) // src_frame_bytes
+            arr = np.frombuffer(buf, dtype=np.uint8).copy()
+            arr = arr.reshape((got, int(src_h), int(src_w), 3))
+            # engine.device (Antigravity r3 MF-3) -- public property, never
+            # reach into engine._descriptor.
+            bhwc = torch.from_numpy(arr).to(engine.device).float() / 255.0
+            out_bhwc = engine.upscale_frames(bhwc)
+            _validate_engine_output(
+                out_bhwc, expected_scale=int(engine.intrinsic_scale),
+                in_shape=bhwc.shape)
+            out_bhwc = _fit_and_pad_bhwc(out_bhwc, int(w), int(h))
+            # .contiguous() before .numpy() -- non-contiguous tensors after a
+            # permute would raise or corrupt strides (Antigravity r4 MF-2).
+            out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
+            enc.stdin.write(out_u8.tobytes())
+            frames_written += got
+        enc.stdin.close()
+        # Check return codes and read stderr WHILE handles are open (path-based
+        # so the offset issue can't bite -- Antigravity r3 MF-2 + r4 MF-1).
+        try:
+            dec.wait(timeout=30)
+            enc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            error_raised = True
+            _kill_and_wait_all([dec, enc], timeout=30)
+            raise RuntimeError(
+                "ffmpeg wait timeout; dec_tail=%r enc_tail=%r"
+                % (_tail_path(dec_stderr_path, 400),
+                   _tail_path(enc_stderr_path, 400)))
+        if dec.returncode not in (0, None):
+            error_raised = True
+            raise RuntimeError(
+                "ffmpeg decode rc=%s :: %s"
+                % (dec.returncode, _tail_path(dec_stderr_path, 400)))
+        if enc.returncode not in (0, None):
+            error_raised = True
+            raise RuntimeError(
+                "ffmpeg encode rc=%s :: %s"
+                % (enc.returncode, _tail_path(enc_stderr_path, 400)))
+        got_frames = count_video_frames(seg_path)
+        if got_frames != int(n_frames):
+            error_raised = True
+            raise RuntimeError(
+                "segment frame count mismatch: %d != %d (src=%r seg=%r)"
+                % (got_frames, int(n_frames), src, seg_path))
+    except Exception:
+        error_raised = True
+        _kill_and_wait_all([dec, enc], timeout=30)
+        _unlink_if_exists(seg_path)
+        raise
+    finally:
+        _close_stderr(dec_stderr_fobj, enc_stderr_fobj)
+        if not error_raised:
+            _unlink_if_exists(dec_stderr_path)
+            _unlink_if_exists(enc_stderr_path)
 
 
 def _encode_black(fb, n_frames, seg_path, *, w, h, fps):
@@ -792,7 +1017,7 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
 
 
 def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
-                             h=832, fps=25, ffmpeg="ffmpeg"):
+                             h=832, fps=25, ffmpeg="ffmpeg", engine=None):
     """Assemble a beat-ordered clip manifest into ONE always-silent canonical
     CFR video; FAIL CLOSED. Sequential beats retain their full requested spans;
     positioned beats are conformed to their non-overlapping visible slots. A
@@ -919,14 +1144,20 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                     bg_is_still=use_still)
             elif kind == "clip":
                 # A REAL engine clip -> sharpen (lanczos+unsharp soft-native fix).
+                # Queue item 8 (2026-08-08): engine THREADS here (Antigravity r4
+                # MF-3 explicit-forward). This is the ONE branch that consumes
+                # the upscale model; dir_clip / floor / black paths NEVER get
+                # engine=engine, so their output stays byte-identical for every
+                # profile whether upscale_stage.engine is "off" or non-off.
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=0,
-                                loop=bool(seg.get("loop")), sharpen=True)
+                                loop=bool(seg.get("loop")), sharpen=True,
+                                engine=engine)
             elif kind == "floor":
                 # The procgen floor slice -> NOT sharpened (byte-identical chain).
                 _encode_segment(fb, base_video_path, seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=seg["src_start_frame"],
-                                sharpen=False)
+                                sharpen=False, engine=None)
             else:
                 _encode_black(fb, seg["n_frames"], seg_path, w=w, h=h, fps=fps)
             seg_paths.append(seg_path)
@@ -1010,12 +1241,122 @@ class OTRSilentComposite:
                         "base_video_path). Empty -> the single-base floor path."
                     ),
                 }),
+                # Queue item 8 (2026-08-08): post-render upscale/enhance stage.
+                # APPEND at end of widgets_values per BUG-LOCAL-097.
+                # The dropdown auto-populates from the upscale registry's live
+                # roster; "off" is the byte-identical default.
+                "upscale_engine": (list(_upscale_engine_names()) or ["off"], {
+                    "default": "off",
+                    "tooltip": (
+                        "Post-render upscale/enhance stage. Runs INSIDE the "
+                        "composite per-clip (sharpen=True branch only); floor / "
+                        "directory / black paths are unchanged. off = today's "
+                        "lanczos+unsharp, byte-identical."
+                    ),
+                }),
+                "upscale_device": ("STRING", {
+                    "default": "cpu", "multiline": False,
+                    "tooltip": (
+                        "cpu | cuda | cuda:N. Composite itself runs on CPU "
+                        "(ffmpeg); this widget selects the device the model "
+                        "loads on. Rejected invalid tokens fail loud."
+                    ),
+                }),
             },
         }
 
     @classmethod
     def VALIDATE_INPUTS(cls, **kwargs):
         return True
+
+    @classmethod
+    def IS_CHANGED(cls, base_video_path="", canvas_w=1472, canvas_h=832, fps=25,
+                    ffmpeg="ffmpeg", output_path="", gate_in="",
+                    clip_manifest_json="{}",
+                    upscale_engine="off", upscale_device="cpu", **kw):
+        """Fingerprint ALL external inputs regardless of engine. ComfyUI relies
+        on ``nan != nan`` to force re-execution, so returning ``float("nan")``
+        when a stat fails is the correct fail-open per Bug Bible 06.02/06.07.
+        Codex r4 MF-6: fingerprint includes clip manifest paths, background
+        stills, sibling master WAV, OTR_COMPOSITE_UNSHARP_AMOUNT env var, and
+        the engine identity."""
+        try:
+            parts: list = []
+            # 1. Base video (source of the assemble/normalize path).
+            if base_video_path and os.path.isfile(base_video_path):
+                st = os.stat(base_video_path)
+                parts.append(("base", base_video_path, st.st_mtime_ns, st.st_size))
+            # 2. Clips from manifest.
+            try:
+                manifest = json.loads(clip_manifest_json or "{}")
+            except Exception:  # noqa: BLE001
+                return float("nan")
+            for row in ((manifest or {}).get("clips") or []):
+                for k in ("path", "bg_still_path"):
+                    p = row.get(k)
+                    if not p:
+                        continue
+                    if os.path.isfile(p):
+                        st = os.stat(p)
+                        parts.append((k, p, st.st_mtime_ns, st.st_size))
+                    elif os.path.isdir(p):
+                        # Directory-clip: sorted (name, mtime, size) tuples
+                        # (in-place frame replacement invisible to dir stat --
+                        # Codex r4 MF-6).
+                        try:
+                            frames = sorted(os.listdir(p))
+                        except OSError:
+                            return float("nan")
+                        dir_parts: list = []
+                        for fname in frames:
+                            fp = os.path.join(p, fname)
+                            try:
+                                fst = os.stat(fp)
+                                dir_parts.append((fname, fst.st_mtime_ns, fst.st_size))
+                            except OSError:
+                                return float("nan")
+                        parts.append(("dir", p, tuple(dir_parts)))
+            # 3. Sibling master WAV (composite reads it for timeline length).
+            if base_video_path:
+                base_dir = os.path.dirname(base_video_path)
+                if os.path.isdir(base_dir):
+                    try:
+                        for candidate in sorted(os.listdir(base_dir)):
+                            if candidate.endswith("_master.wav"):
+                                fp = os.path.join(base_dir, candidate)
+                                try:
+                                    st = os.stat(fp)
+                                    parts.append(("master_wav", fp,
+                                                  st.st_mtime_ns, st.st_size))
+                                except OSError:
+                                    pass
+                    except OSError:
+                        pass
+            # 4. Environment values that affect output pixels (Codex r4 MF-6).
+            parts.append(("env",
+                          os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT", ""),
+                          os.environ.get("OTR_MESH_COMPOSITE_STYLE", "")))
+            # 5. Engine identity + resolved model path (guarded folder_paths
+            # per Antigravity r4 MF-4).
+            parts.append(("engine", str(upscale_engine), str(upscale_device)))
+            if upscale_engine == "spandrel_esrgan":
+                model_path = None
+                try:
+                    import folder_paths  # type: ignore
+                    try:
+                        model_path = folder_paths.get_full_path(
+                            "upscale_models", "RealESRGAN_x2plus.pth")
+                    except Exception:  # noqa: BLE001
+                        model_path = None
+                except (ImportError, ModuleNotFoundError):
+                    model_path = None
+                if model_path and os.path.isfile(model_path):
+                    st = os.stat(model_path)
+                    parts.append(("model", model_path,
+                                  st.st_mtime_ns, st.st_size))
+            return repr(parts)
+        except Exception:  # noqa: BLE001
+            return float("nan")
 
     def _default_out(self, base_video_path: str) -> str:
         try:
@@ -1033,7 +1374,9 @@ class OTRSilentComposite:
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
     def composite(self, base_video_path, canvas_w=1472, canvas_h=832, fps=25,
-                  ffmpeg="ffmpeg", output_path="", gate_in="", clip_manifest_json="{}"):
+                  ffmpeg="ffmpeg", output_path="", gate_in="",
+                  clip_manifest_json="{}",
+                  upscale_engine="off", upscale_device="cpu"):
         out = output_path.strip() or self._default_out(base_video_path)
         manifest = {}
         try:
@@ -1045,25 +1388,53 @@ class OTRSilentComposite:
         assemble = bool(manifest.get("clips"))
         # the assemble timeline follows the audio-derived budget fps when present
         eff_fps = int(manifest.get("fps") or fps) if assemble else int(fps)
+
+        # Queue item 8 (2026-08-08): resolve the upscale engine + load it once
+        # BEFORE the segment loop, unload it in an outer finally. Load is
+        # GATED on BOTH (engine.name != "off") AND (assemble is True):
+        # * Off engine: HONEST-SWITCH LAW default -- never touch the model
+        #   pipeline; a stale device value must NOT break the byte-identical
+        #   path (Sonnet 5 pre-implementation MF-2).
+        # * Single-base normalize path (assemble=False): normalize_to_silent_
+        #   canonical never consumes the engine, so loading it there is pure
+        #   waste AND -- worse -- a load-time failure (missing model file, no
+        #   spandrel, CUDA OOM) would break a render that never needed the
+        #   model at all (Sonnet 5 QA-on-diff MF-2).
+        _assert_upscale_usable(upscale_engine, "upscale_stage")
+        engine = _get_upscale_engine(upscale_engine)
+        _engine_active = (engine.name != "off") and assemble
+        if _engine_active:
+            device = _resolve_upscale_device(upscale_device)
+            engine.load(device)
         try:
-            if assemble:
-                silent, report = assemble_silent_timeline(
-                    manifest, base_video_path, out, w=int(canvas_w),
-                    h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
-                )
-            else:
-                silent, report = normalize_to_silent_canonical(
-                    base_video_path, out, w=int(canvas_w), h=int(canvas_h),
-                    fps=int(fps), ffmpeg=ffmpeg,
-                )
-        except ValueError as exc:
-            log.error("[OTR_SilentComposite] %s", exc)
-            return ("", f"error: {exc}")
+            try:
+                if assemble:
+                    silent, report = assemble_silent_timeline(
+                        manifest, base_video_path, out, w=int(canvas_w),
+                        h=int(canvas_h), fps=eff_fps, ffmpeg=ffmpeg,
+                        engine=engine,
+                    )
+                else:
+                    # normalize_to_silent_canonical is the single-base path;
+                    # it does NOT consume the engine (Codex r4 MF-7). The
+                    # load was gated above so no unload is needed here.
+                    silent, report = normalize_to_silent_canonical(
+                        base_video_path, out, w=int(canvas_w), h=int(canvas_h),
+                        fps=int(fps), ffmpeg=ffmpeg,
+                    )
+            except ValueError as exc:
+                log.error("[OTR_SilentComposite] %s", exc)
+                return ("", f"error: {exc}")
+        finally:
+            if _engine_active:
+                engine.unload()
         for line in report:
             log.info("[OTR_SilentComposite] %s", line)
         mode = "assemble" if assemble else "single-base"
-        return (silent, "OTR_SilentComposite OK (%s) -> %s\n%s"
-                % (mode, silent, "\n".join(report)))
+        engine_tag = ("" if engine.name == "off"
+                      else " upscale=%s@%s" % (engine.name, upscale_device))
+        return (silent, "OTR_SilentComposite OK (%s%s) -> %s\n%s"
+                % (mode, engine_tag, silent, "\n".join(report)))
 
 
 __all__ = ["OTRSilentComposite", "normalize_to_silent_canonical",

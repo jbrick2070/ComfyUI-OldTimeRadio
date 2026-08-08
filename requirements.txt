@@ -37,3 +37,11 @@ bitsandbytes>=0.42.0
 # compat is provided by nodes/_otr_lmfe_compat.py (the third-party
 # integration hard-imports PreTrainedTokenizerBase from the v4 path).
 lm-format-enforcer>=0.11.3,<1.0
+
+# Queue item 8 (2026-08-08): spandrel for the shipped `spandrel_esrgan`
+# upscale engine. Pinned to 0.4.x — the API this pack calls (ModelLoader
+# device kwarg, load_from_file returning ImageModelDescriptor with a
+# batch=1 __call__, descriptor.scale/.device/.to) was verified on 0.4.1.
+# A 0.5 major bump may reshape those; a follow-up chip re-verifies then.
+spandrel~=0.4.1
+

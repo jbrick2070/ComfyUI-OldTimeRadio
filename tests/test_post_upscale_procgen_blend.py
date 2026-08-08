@@ -199,7 +199,7 @@ def test_default_blend_mode_is_screen_with_green_only(node):
 
 
 def test_blend_cmd_uses_audio_passthrough(node, tmp_path):
-    src = tmp_path / "rtx_upscale.mp4"
+    src = tmp_path / "silent_composite.mp4"
     src.write_bytes(b"src")
     pgn = tmp_path / "procgen_1080p.mp4"
     pgn.write_bytes(b"pgn")
