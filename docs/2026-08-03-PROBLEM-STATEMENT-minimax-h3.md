@@ -158,7 +158,12 @@ An in-process CUDA OOM corrupts the allocator.
 
 - Smallest usable set = **42.5 GB**: DiT `fl2va_pruned_int8_convrot` 19.53 GiB +
   `qwen3vl_32b_nvfp4_awq` 14.61 GiB + video VAE 4.85 GiB + audio VAE 0.56 GiB.
-  Read from the HF API file listing. **No GGUF, no distill exists.**
+  Read from the HF API file listing. ~~No GGUF, no distill exists.~~
+  **FALSE, corrected 2026-08-07:** `vram-recipe-lab` documents a GGUF stack --
+  `MiniMax-H3-FL2VA-Q3_K_M.gguf` (15.58 GB) + `qwen3vl-32B-MiniMax-H3-Q2_K.gguf`
+  (8.49 GB), 29.89 GiB total, needing `ComfyUI-GGUF` + `ComfyUI-Spectrum-MiniMax-H3`.
+  Note also that 42.5 GB is a DISK figure and this document used it as a VRAM
+  argument; see the 08-07 update in section 6.
 - 33.1B params. Local envelope: short edge 768, cap 768x1344 / 32; 24 fps;
   4-15 s on a 17k+5 grid. **2K is not available locally** (needs
   `H3-Regenerate-2K`, not repacked).
@@ -207,18 +212,51 @@ lanes'.
 
 The provisional answer is **no -- not now, and not for this role.**
 
-**2026-08-07 update -- the license cleared, the decision did not move.** The
-licensing question in section 5 is now answered in writing (authorization from
-MiniMax, same date). That removes a real blocker, and it was the only one an
-email could remove. Every load-bearing objection above is a measurement or an
-architecture fact, and none of them heard the news: `ltx_audio_in` still
-strictly contains H3's duration window, 42.5 GB still does not fit 14.5 GiB,
-the 4 s floor is still above the 3.75 s default beat, `humo`'s entire window is
-still illegal for H3, the Sage int8 QK path still yields silent noise, and F1
-still leaves three shipping engines rendering with no preflight VRAM check. The
-answer stays **no**, on unchanged grounds. What would actually move it is M3
-(question 2) -- if 449 frames does not fit under 14.5 GiB, the local
-single-segment capability evaporates and this reopens on the merits.
+**2026-08-07 update -- the license cleared, and a VRAM RECIPE EXISTS that this
+document never consulted.** Two things landed on 08-07, and the second is the
+larger one.
+
+**1. Licensing: answered.** Written authorization from MiniMax, same date, per
+section 5.
+
+**2. `vram-recipe-lab` -- and the withdrawal of the 42.5 GB objection.**
+`C:\Users\jeffr\Documents\ComfyUI\vram-recipe-lab\` holds six authored H3
+recipes (`h3_{t2v,i2v,r2v}_{low,best}.json`) plus `docs/H3_VRAM_BUDGET.md`,
+`docs/H3_DOWNLOAD_DECISION.md` and `research/H3_COMMUNITY_INTEL.md`. **This
+document's 42.5 GB argument is a CATEGORY ERROR and is withdrawn**: 42.5 GB is
+the DISK footprint, never a residency claim. The recipe pairs layerwise DiT
+offload (32 blocks swapped to host RAM) with encode-then-unload on the text
+encoder, so the stack lives in the 63.4 GB of system RAM and only the working
+set is resident. `h3_i2v_low` -- 864x480, 124 frames, 24 fps, 20 steps,
+`vram_ceiling_gb: 14.5` -- carries an EXTERNAL-REPORTED peak of **7.4-7.6 GB**
+(Tomiigo, Linux, GPU capped to 8,188 MiB). Section 5's "no GGUF" is also false.
+
+**What the recipe does NOT touch:**
+- **Duration.** The `17k+5` @ 24 fps grid is unchanged, so section 2B stands
+  exactly as written: `ltx_audio_in` (0.36-19.88 s) still strictly contains
+  H3's 4-15 s, `humo`'s whole window is still illegal for H3, and the recipe's
+  own 5.16 s is still above the 3.75 s default beat.
+- **Resolution.** The lane that fits is **864x480**, below the production
+  canvas. Native 1344x768 measures **14.6-15.3 GB on an actual RTX 5080**
+  (tnsor_works) -- over the 14.5 GiB gate before Windows WDDM adds its
+  0.5-1.2 GB, and HF discussion #6 puts text encoding ALONE at 15,219 MiB.
+- **Proof.** **Zero H3 weights exist on disk** (verified 2026-08-07: both
+  `C:\ComfyUI-Models` and `ComfyUI\models` return nothing), every recipe is
+  `blocked: true`, and the lab states it has never executed H3. Every number
+  here is EXTERNAL-REPORTED, none of it measured on this box.
+
+**And the cost the recipe pays for that VRAM, which this document never
+costed:** layerwise swapping streams **~268 GB of NVMe reads per 5-second
+generation**. At eight clips to an episode that is **~2.1 TB of read traffic
+per episode**, on a laptop SSD.
+
+**So the ruling is no longer "no, on VRAM grounds."** It is: the VRAM
+objection is **answered on paper and unproven here**, and the duration
+dominance is **untouched**. M3 (question 2) remains the hinge -- if 449 frames
+does not fit under 14.5 GiB, `ltx_audio_in`'s single-segment advantage
+evaporates and this reopens on the merits. The next step is an operator call on
+`H3_DOWNLOAD_DECISION.md` (Path A 42.48 GiB vs Path B 29.89 GiB), which the
+licensing clearance has now unblocked.
 
 ---
 
