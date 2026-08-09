@@ -269,7 +269,16 @@ def get_all_registered_voices(bank: Optional[Tuple[VoiceBankEntry, ...]] = None)
 
 # Bank-backed voice engines (bark uses v2/en_speaker_* presets, not bank refs);
 # the library-coverage gate over config/voice_reference_bank.json applies to these.
-APPROVED_VOICE_ENGINES: Tuple[str, ...] = ("indextts2", "chatterbox", "dia", "kokoro")
+#
+# ``google_tts`` appended 2026-08-08. It was ABSENT, so the coverage floor --
+# the gate whose entire job is to stop an engine going thin -- never looked at
+# the cloud lane, and google_tts sat at FOUR castable char voices until a
+# nine-speaker roster failed casting outright (CastLock re-raises for
+# google_tts, no fallback). Order matters and this must stay LAST:
+# ``default_char_engine`` returns the first approved engine that has char_voice
+# refs, so appending leaves that resolution byte-identical.
+APPROVED_VOICE_ENGINES: Tuple[str, ...] = (
+    "indextts2", "chatterbox", "dia", "kokoro", "google_tts")
 
 
 def compute_bank_coverage(

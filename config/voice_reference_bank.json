@@ -1,7 +1,7 @@
 {
   "voice_bank_id": "otr_voice_reference_bank_v1",
   "schema_version": "1",
-  "notes": "Starter v2 voice reference bank (plan E.1). Each entry codes to config/voice_bank_entry_schema.json. ref_sha256 is 'pending' until the F GPU pilot pins the real clip hashes; ref_path is the intended on-disk location (VALIDATE_INPUTS checks local-disk presence at queue time). Bark uses presets (bark_legacy bank), not reference clips, so it is not represented here. The whole-file sha is the voice_bank_id+sha re-baseline trigger.",
+  "notes": "Starter v2 voice reference bank (plan E.1). Each entry codes to config/voice_bank_entry_schema.json. ref_sha256 is 'pending' until the F GPU pilot pins the real clip hashes; ref_path is the intended on-disk location (VALIDATE_INPUTS checks local-disk presence at queue time). Bark uses presets (bark_legacy bank), not reference clips, so it is not represented here. The whole-file sha is the voice_bank_id+sha re-baseline trigger. google_tts EXPANDED 2026-08-08: the engine accepts 30 prebuilt Gemini voices but only 6 were castable (and only 4 for char_voice), so any cast over four speakers repeated. All 30 are now mapped. gender is MEASURED (median F0, split 134.2 Hz derived from the six pre-existing rows; all six reproduce) and each row carries its own measured_median_f0_hz -- it is auditable, not asserted. Three voices near the split carry style_tag confirm_gender_by_ear. OPEN GAPS: every row is age_band=adult (Google publishes no age, and inferring one from 'Youthful'/'Mature' would be a guess), and ACCENT is untagged beyond the two pre-existing british_leaning announcers -- pitch cannot detect accent.",
   "voices": [
     {
       "voice_ref_id": "vz_bill_boerst",
@@ -2838,7 +2838,9 @@
       "style_tags": [
         "character_capable"
       ],
-      "provider_voice_id": "Algenib"
+      "provider_voice_id": "Algenib",
+      "measured_median_f0_hz": 97.2,
+      "gender_source": "measured_median_f0_2026-08-08"
     },
     {
       "voice_ref_id": "gt_puck",
@@ -2859,7 +2861,9 @@
       "style_tags": [
         "character_capable"
       ],
-      "provider_voice_id": "Puck"
+      "provider_voice_id": "Puck",
+      "measured_median_f0_hz": 105.7,
+      "gender_source": "measured_median_f0_2026-08-08"
     },
     {
       "voice_ref_id": "gt_kore",
@@ -2880,7 +2884,9 @@
       "style_tags": [
         "character_capable"
       ],
-      "provider_voice_id": "Kore"
+      "provider_voice_id": "Kore",
+      "measured_median_f0_hz": 152.9,
+      "gender_source": "measured_median_f0_2026-08-08"
     },
     {
       "voice_ref_id": "gt_aoede",
@@ -2901,7 +2907,9 @@
       "style_tags": [
         "character_capable"
       ],
-      "provider_voice_id": "Aoede"
+      "provider_voice_id": "Aoede",
+      "measured_median_f0_hz": 159.5,
+      "gender_source": "measured_median_f0_2026-08-08"
     },
     {
       "voice_ref_id": "gt_charon_announcer",
@@ -2923,7 +2931,9 @@
         "preferred_announcer",
         "british_leaning"
       ],
-      "provider_voice_id": "Charon"
+      "provider_voice_id": "Charon",
+      "measured_median_f0_hz": 115.4,
+      "gender_source": "measured_median_f0_2026-08-08"
     },
     {
       "voice_ref_id": "gt_sulafat_announcer",
@@ -2945,7 +2955,549 @@
         "preferred_announcer",
         "british_leaning"
       ],
-      "provider_voice_id": "Sulafat"
+      "provider_voice_id": "Sulafat",
+      "measured_median_f0_hz": 228.6,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_achernar",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "soft",
+        "high"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Achernar",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Achernar",
+      "measured_median_f0_hz": 190.5,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_achird",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "friendly"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Achird",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Achird",
+      "measured_median_f0_hz": 118.2,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_algieba",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "smooth",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Algieba",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Algieba",
+      "measured_median_f0_hz": 78.4,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_alnilam",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "firm",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Alnilam",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Alnilam",
+      "measured_median_f0_hz": 96.0,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_autonoe",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Autonoe",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Autonoe",
+      "measured_median_f0_hz": 156.4,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_callirrhoe",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "easy_going"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Callirrhoe",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Callirrhoe",
+      "measured_median_f0_hz": 179.8,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_despina",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "smooth",
+        "high"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Despina",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Despina",
+      "measured_median_f0_hz": 203.4,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_enceladus",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "breathy",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Enceladus",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Enceladus",
+      "measured_median_f0_hz": 99.6,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_erinome",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Erinome",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Erinome",
+      "measured_median_f0_hz": 181.8,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_fenrir",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "excitable"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Fenrir",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Fenrir",
+      "measured_median_f0_hz": 101.3,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_gacrux",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "mature"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Gacrux",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable",
+        "confirm_gender_by_ear"
+      ],
+      "provider_voice_id": "Gacrux",
+      "measured_median_f0_hz": 142.9,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_iapetus",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Iapetus",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Iapetus",
+      "measured_median_f0_hz": 102.1,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_laomedeia",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "upbeat"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Laomedeia",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Laomedeia",
+      "measured_median_f0_hz": 178.4,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_leda",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "youthful",
+        "high"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Leda",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Leda",
+      "measured_median_f0_hz": 199.2,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_orus",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "firm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Orus",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable",
+        "confirm_gender_by_ear"
+      ],
+      "provider_voice_id": "Orus",
+      "measured_median_f0_hz": 130.4,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_pulcherrima",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "forward"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Pulcherrima",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable",
+        "confirm_gender_by_ear"
+      ],
+      "provider_voice_id": "Pulcherrima",
+      "measured_median_f0_hz": 128.7,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_rasalgethi",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "informative"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Rasalgethi",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Rasalgethi",
+      "measured_median_f0_hz": 107.1,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_sadachbia",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "lively",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Sadachbia",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Sadachbia",
+      "measured_median_f0_hz": 86.0,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_sadaltager",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "knowledgeable",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Sadaltager",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Sadaltager",
+      "measured_median_f0_hz": 95.0,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_schedar",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "even"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Schedar",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Schedar",
+      "measured_median_f0_hz": 105.5,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_umbriel",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "easy_going",
+        "deep"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Umbriel",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Umbriel",
+      "measured_median_f0_hz": 93.2,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_vindemiatrix",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "gentle"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Vindemiatrix",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Vindemiatrix",
+      "measured_median_f0_hz": 152.9,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_zephyr",
+      "engine": "google_tts",
+      "gender": "female",
+      "timbre": [
+        "bright"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Zephyr",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Zephyr",
+      "measured_median_f0_hz": 177.8,
+      "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "gt_zubenelgenubi",
+      "engine": "google_tts",
+      "gender": "male",
+      "timbre": [
+        "casual"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "cloud:google_tts:Zubenelgenubi",
+      "ref_sha256": "cloud",
+      "commercial_clean": true,
+      "quality_tier": "a",
+      "style_tags": [
+        "character_capable"
+      ],
+      "provider_voice_id": "Zubenelgenubi",
+      "measured_median_f0_hz": 115.9,
+      "gender_source": "measured_median_f0_2026-08-08"
     }
   ]
 }
