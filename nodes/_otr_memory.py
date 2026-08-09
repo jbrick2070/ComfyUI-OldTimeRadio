@@ -7,10 +7,9 @@ risk-#10 review). Two helpers used at phase boundaries inside the
 composite pipeline:
 
   * ``phase_gc(label)`` -- gc.collect() + torch.cuda.empty_cache() +
-    torch.cuda.ipc_collect(). Idempotent, never raises. Run between
-    the BatchHumo -> VideoComposite handoff and between RTXUpscale ->
-    PostUpscaleProcgenBlend handoff so PyTorch returns RAM/VRAM to
-    the OS instead of holding it across phases.
+    torch.cuda.ipc_collect(). Idempotent, never raises. Run at a phase
+    boundary so PyTorch returns RAM/VRAM to the OS instead of holding
+    it across phases.
 
   * ``dram_canary(min_free_gb=6.0, label="")`` -- best-effort psutil
     check. Returns (ok: bool, reason: str). ``ok=True`` on any error
@@ -18,11 +17,20 @@ composite pipeline:
     never blocks a render that would otherwise complete. Caller decides
     whether to log + abort or just log + continue when ``ok=False``.
 
-Why a shared module: the composite chain has 3 phase barriers
-(BatchHumo -> Composite, Composite -> RTXUpscale, RTXUpscale ->
-PostUpscaleProcgenBlend). Putting the logic in one place keeps the
-invariants identical and makes it cheap to add a 4th call site if
-later phases get added.
+Why a shared module: it was written for three phase barriers, so
+putting the logic in one place kept the invariants identical and made
+adding a call site cheap.
+
+CURRENT REALITY (grep before trusting this paragraph): there is
+exactly ONE live ``phase_gc`` call site in production --
+``otr_post_upscale_procgen_blend.py`` at its entry. The other two
+barriers are gone, not merely quiet: ``OTR_BatchHumoRender`` was
+removed (it is in ``DELETED_NODE_TYPES``; HuMo is an in-process
+adapter now), and queue item 8 (2026-08-08) ripped the standalone
+RTXUpscale stage, folding per-clip model enhancement INSIDE
+SilentComposite (``nodes/_otr_upscale_engines/``) where it needs no
+handoff of its own. The helpers stay because the remaining barrier is
+real and a future phase may want one.
 
 Both helpers are best-effort: any internal exception is caught and
 logged at WARNING. Callers should NEVER let memory hygiene abort

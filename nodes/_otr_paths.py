@@ -364,13 +364,17 @@ def otr_composited_dir(episode_id: str) -> Path:
     """Per-episode VideoComposite intermediate dir:
     ``<output>/otr/episodes/<episode_id>/composited/``.
 
-    Holds the 832x480 composited mp4 written by VideoComposite as
-    ``<episode_id>.mp4``. Downstream OTR_RTXUpscale reads from here
-    and writes its 1080p output to ``otr_upscaled_dir(episode_id)``
-    (a sibling per-episode dir; pre-2026-05-05 the upscale lived in
-    ``otr/obs/`` directly but that broke the "one mp4 per episode"
-    contract once OTR_PostUpscaleProcgenBlend started writing the
-    real final there too).
+    Holds the composited mp4 written by VideoComposite as
+    ``<episode_id>.mp4``. Downstream OTR_PostUpscaleProcgenBlend reads
+    from here and writes the final blended deliverable to
+    ``otr_obs_dir()``.
+
+    HISTORY (queue item 8, 2026-08-08): a standalone OTR_RTXUpscale
+    stage used to sit in between, reading this dir and writing 1080p
+    into ``otr_upscaled_dir(episode_id)``. That node was ripped; the
+    composite now delivers 1080p directly via ``render.composite_w/h``
+    per profile, and per-clip model enhancement happens inside
+    SilentComposite (``nodes/_otr_upscale_engines/``).
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "composited")
@@ -380,17 +384,24 @@ def otr_upscaled_dir(episode_id: str) -> Path:
     """Per-episode 1080p upscaled-but-pre-blend dir:
     ``<output>/otr/episodes/<episode_id>/upscaled/``.
 
-    Holds the 1920x1080 mp4 written by OTR_RTXUpscale as
-    ``<episode_id>.mp4``. Downstream OTR_PostUpscaleProcgenBlend reads
-    from here and writes the final blended deliverable to
-    ``otr_obs_dir()/<episode_id>_procgen_blended.mp4``.
+    ORPHANED by queue item 8 (2026-08-08) and kept only so an existing
+    on-disk tree stays addressable: OTR_RTXUpscale wrote
+    ``<episode_id>.mp4`` here, and that node was ripped. Nothing in the
+    live render chain reads or writes this dir today -- the composite
+    delivers 1080p directly and OTR_PostUpscaleProcgenBlend consumes
+    ``otr_composited_dir``. The only remaining references are this
+    definition, the ``__all__`` entry, and the output-tree contract test
+    that iterates every helper. Delete-or-keep is an operator call, so
+    it was left in place rather than removed inside a comments-only
+    sweep.
 
-    Added 2026-05-05 (Jeffrey directive): obs/ is the broadcast folder
-    and must hold exactly ONE mp4 per episode -- the post-blend
-    deliverable. Pre-blend intermediates (832x480 native composite,
-    1080p upscale) live under per-episode subdirs so the broadcast
-    library stays clean. Mirror of ``otr_composited_dir`` but for the
-    upscale stage of the chain.
+    Why the dir exists at all (2026-05-05, Jeffrey directive): obs/ is
+    the broadcast folder and must hold exactly ONE mp4 per episode --
+    the post-blend deliverable. Pre-blend intermediates were therefore
+    moved under per-episode subdirs so the broadcast library stayed
+    clean, and this was the upscale stage's subdir, mirroring
+    ``otr_composited_dir``. That rule still governs obs/; this
+    particular subdir simply no longer has a producer.
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "upscaled")
@@ -425,19 +436,21 @@ def otr_obs_dir() -> Path:
     Render chain (one final mp4 per episode lands here):
 
       1. VideoComposite -> otr/episodes/<ep>/composited/<ep>.mp4
-         (832x480 native composite intermediate)
-      2. OTR_RTXUpscale -> otr/episodes/<ep>/upscaled/<ep>.mp4
-         (1920x1080 upscale intermediate -- see otr_upscaled_dir)
-      3. OTR_PostUpscaleProcgenBlend -> otr/obs/<ep>_procgen_blended.mp4
+         (composite intermediate, already at delivery resolution;
+         per-clip model enhancement happens inside SilentComposite via
+         nodes/_otr_upscale_engines/)
+      2. OTR_PostUpscaleProcgenBlend -> otr/obs/<ep>_procgen_blended.mp4
          (final broadcast cut with green-CRT overlay -- this dir)
 
-    Pre-2026-05-05, OTR_RTXUpscale wrote step 2's output directly
-    into otr/obs/ which was correct when that node was the final
-    stage. After OTR_PostUpscaleProcgenBlend joined the chain (BUG-099
-    onward) two mp4s ended up in obs/ per episode, breaking the
-    "broadcast folder" contract. Step 2's output now lands in
-    ``otr_upscaled_dir(episode_id)`` instead -- intermediates live
-    under their episode, only the broadcast cut lives here.
+    HISTORY, because the "one mp4 per episode" rule was won the hard
+    way: a standalone OTR_RTXUpscale stage used to sit between those
+    two steps, and before 2026-05-05 it wrote straight into otr/obs/ --
+    correct while it was the final stage, but once
+    OTR_PostUpscaleProcgenBlend joined the chain (BUG-099 onward) two
+    mp4s landed in obs/ per episode and broke the broadcast-folder
+    contract. Its output was moved under the episode dir, and queue
+    item 8 (2026-08-08) then ripped the node entirely. Intermediates
+    live under their episode; only the broadcast cut lives here.
     """
     return _validate_contract(comfy_output_dir() / "otr" / "obs")
 
@@ -450,11 +463,12 @@ def episodes_for_obs_dir(episode_id: str = "") -> Path:
     parent of all per-episode subdirs) when called without an
     episode_id, for legacy callers that scan the tree.
 
-    Holds the 832x480 native composite mp4 written by VideoComposite
-    as ``<episode_id>.mp4`` (one per episode). This is the
-    INTERMEDIATE -- the downstream OTR_RTXUpscale stage reads from
-    here and writes the final mp4 to the OBS-watched dir at
-    ``<output>/otr/obs/<episode_id>.mp4`` (see ``otr_obs_dir``).
+    Holds the native composite mp4 written by VideoComposite as
+    ``<episode_id>.mp4`` (one per episode). This is the INTERMEDIATE --
+    the downstream OTR_PostUpscaleProcgenBlend stage reads from here
+    and writes the final mp4 to the OBS-watched dir (see
+    ``otr_obs_dir``). It read through a standalone OTR_RTXUpscale stage
+    until queue item 8 (2026-08-08) ripped that node.
 
     Despite the historical name ``episodes_for_obs_dir``, this dir
     is NOT what OBS watches anymore -- that role moved to ``otr/obs/``

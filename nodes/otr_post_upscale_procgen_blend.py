@@ -48,9 +48,10 @@ from pathlib import Path
 from typing import Optional
 
 # Ensure sibling node modules (e.g. _otr_paths) resolve when this file is
-# loaded by ComfyUI's custom-node loader. Mirrors the pattern used in
-# rtx_upscale.py so otr_obs_dir() is reachable as the canonical write
-# target for the broadcast-ready blended mp4.
+# loaded by ComfyUI's custom-node loader, so otr_obs_dir() is reachable as
+# the canonical write target for the broadcast-ready blended mp4. (The
+# pattern was originally copied from rtx_upscale.py, which queue item 8
+# deleted; it is standard across the pack.)
 _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
@@ -162,8 +163,8 @@ def _stamp_ledger_final_video_path(
     """Stamp the in-flight ledger with the post-blend final deliverable path.
 
     BUG-LOCAL-030 audit gap fix (2026-05-03 EVENING): without this stamp,
-    ``ledger.final_video_path`` still pointed at the pre-blend ``_1080p.mp4``
-    that RTXUpscale wrote, even though the actual final deliverable is
+    ``ledger.final_video_path`` still pointed at the pre-blend mp4 the
+    upstream stage wrote, even though the actual final deliverable is
     the procgen-blended ``_1080p_procgen_blended.mp4``. Anyone reading
     the ledger to find "the final mp4" picked the wrong file.
 
@@ -269,7 +270,7 @@ def _build_blend_cmd(
     """Build the ffmpeg command for procgen-over-source blend.
 
     Filter chain:
-      [0:v]                                       # source (RTXUpscale output)
+      [0:v]                                       # source (composite output)
       [1:v] scale + fps conform                   # procgen scaled if needed
       [src][pgn] blend=all_mode={mode}:all_opacity={opacity}[v]
 
@@ -286,8 +287,8 @@ def _build_blend_cmd(
     # procgen at 1920x1080 native).
     # BUG-LOCAL-031 FIX (2026-05-03 EVENING): add filter-level
     # ``shortest=1`` to the blend filter. This clamps the VIDEO output
-    # to the shorter of the two video inputs (the source mp4 from
-    # RTXUpscale, ~50s) instead of running to the longer procgen
+    # to the shorter of the two video inputs (the composited source
+    # mp4, ~50s) instead of running to the longer procgen
     # input (~94-114s). Audio is mapped separately via ``-map 0:a?
     # -c:a copy`` so the audio stream is untouched -- C7 byte-identity
     # holds.
@@ -423,7 +424,7 @@ def _build_blend_cmd(
 
     # 2026-06-09 dim-conform fix (capstone soak catch): the legacy
     # ``scale=-2:ih`` referenced the PROCGEN'S OWN height -- a no-op that only
-    # worked when the source was already 1080p (post-RTXUpscale). The blend
+    # worked when the source arrived already at 1080p. The blend
     # filter hard-fails on a size mismatch (1472x832 source vs 1920x1080
     # procgen). Scale the procgen EXPLICITLY to the probed source dims (the
     # ~0.4% aspect difference is imperceptible for a full-frame CRT overlay).
@@ -657,13 +658,17 @@ def _build_bars_caption_cmd(composite_mp4: Path, bars_mp4: Path, out_mp4: Path,
 
 
 class PostUpscaleProcgenBlend:
-    """BUG-LOCAL-030 Phase B: post-RTXUpscale procgen visual blend.
+    """BUG-LOCAL-030 Phase B: final procgen visual blend.
 
-    Takes the RTXUpscale output (1920x1080 HuMo + LTX content with
+    Takes the composite output (1920x1080 HuMo + LTX content with
     black HuMo pillarbox bars from Phase A simple-pillarbox composite)
     and overlays the 1920x1080 native procgen render on top via
     ffmpeg -filter_complex blend. Audio passes through with ``-c:a copy``
     so the C7 byte-identity guarantee from per-clip-mux holds end-to-end.
+
+    The class name is historical: it read a standalone RTXUpscale stage
+    until queue item 8 (2026-08-08) ripped that node. Its input is now
+    SilentComposite's output directly. See the module docstring.
     """
 
     @classmethod
@@ -673,7 +678,7 @@ class PostUpscaleProcgenBlend:
                 "source_mp4_path": ("STRING", {
                     "multiline": False, "default": "",
                     "tooltip": (
-                        "Path to RTXUpscale output mp4 "
+                        "Path to the SilentComposite output mp4 "
                         "(1920x1080 HuMo + LTX composite)."
                     ),
                 }),
@@ -896,9 +901,9 @@ class PostUpscaleProcgenBlend:
                 return ("", msg)
 
         # BUG-LOCAL-030 long-form hardening (2026-05-03 EVENING, post
-        # round-robin risk-#10 review): phase barrier handoff from
-        # RTXUpscale. Reclaim DRAM/VRAM that PyTorch may still be
-        # holding from upscaling, then check the canary before kicking
+        # round-robin risk-#10 review): phase barrier handoff from the
+        # composite. Reclaim DRAM/VRAM that PyTorch may still be
+        # holding from rendering, then check the canary before kicking
         # off filter_complex blend (which buffers frames from BOTH
         # input mp4s). DRAM canary degrades open -- if we can't verify
         # we still attempt the blend; only an actively low reading
@@ -1032,7 +1037,7 @@ class PostUpscaleProcgenBlend:
         # BUG-LOCAL-030 audit gap fix: stamp ledger.final_video_path with
         # the post-blend deliverable path so downstream tooling reading
         # the ledger picks the right "final mp4" -- not the pre-blend
-        # _1080p.mp4 RTXUpscale wrote earlier. Best-effort; never raises.
+        # composite written earlier. Best-effort; never raises.
         # Only invoked on successful real blend (NOT bypass / missing
         # procgen / ffmpeg failure paths -- those leave the previous
         # ledger.final_video_path intact, which is correct for those

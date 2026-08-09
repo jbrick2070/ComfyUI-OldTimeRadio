@@ -3,8 +3,9 @@ tests/test_otr_memory.py -- BUG-LOCAL-030 long-form hardening regression
 ============================================================================
 
 Covers ``nodes/_otr_memory.py`` -- the shared DRAM/VRAM hygiene
-helpers used at composite phase boundaries (BatchHumo -> Composite,
-Composite -> RTXUpscale -> PostUpscaleProcgenBlend).
+helpers used at composite phase boundaries. There is one live
+``phase_gc`` call site today (Composite -> PostUpscaleProcgenBlend);
+the BatchHumo and RTXUpscale barriers went away with their nodes.
 
 Acceptance gates:
   * ``phase_gc`` never raises (best-effort even when torch is missing

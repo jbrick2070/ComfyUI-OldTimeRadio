@@ -2069,21 +2069,22 @@ class SignalLostVideoRenderer:
                 # so procgen renders directly at delivery resolution.
                 # Per Jeffrey: "proc gen 1920x1080 ... then a final
                 # ffmpeg w/ the proc gen mix for final 1080p". Procgen
-                # is now SEPARATE from the per-clip-mux composite path
-                # (which stays at 1472x832 native + RTXUpscaled to
-                # 1920x1080). The OTR_PostUpscaleProcgenBlend node
-                # overlays this 1920x1080 procgen on the upscaled mp4
-                # at delivery res. Result: procgen's CRT scanline /
-                # audio-reactive flicker stays CRISP at 1080p (would
-                # have been smeared if upscaled by RTX VSR -- synthetic
-                # patterns + AI upscaler = ringing / softening), and
+                # is now SEPARATE from the per-clip-mux composite path,
+                # which reaches 1920x1080 itself via render.composite_w/h.
+                # The OTR_PostUpscaleProcgenBlend node overlays this
+                # 1920x1080 procgen on the composited mp4 at delivery
+                # res. Result: procgen's CRT scanline / audio-reactive
+                # flicker stays CRISP at 1080p (it would be smeared if
+                # run through a super-resolution model -- synthetic
+                # patterns + AI upscaler = ringing / softening, which is
+                # why procgen renders at delivery res instead), and
                 # fills the visible HuMo black pillarbox bars from
                 # BUG-030 Phase A as the SIGNAL LOST visual signature.
                 # 832x480 retained as legacy mode for the prior path
-                # (composite-then-RTXUpscale-everything-together).
+                # (composite everything small, then upscale it together).
                 "resolution": (["1920x1080", "1280x720", "832x480", "854x480", "3840x2160"], {
                     "default": "1920x1080",
-                    "tooltip": "Procgen output resolution. 1920x1080 = delivery res for post-RTXUpscale blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
+                    "tooltip": "Procgen output resolution. 1920x1080 = delivery res for the final procgen blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
                 }),
                 "episode_title": ("STRING", {
                     "default": "",

@@ -1,4 +1,4 @@
-"""BUG-LOCAL-030 Phase B regression: post-RTXUpscale procgen blend node."""
+"""BUG-LOCAL-030 Phase B regression: the final procgen blend node."""
 from __future__ import annotations
 
 import os
@@ -445,7 +445,7 @@ def test_ledger_stamped_after_successful_blend(node, tmp_path):
 
 def test_ledger_NOT_stamped_on_bypass_mode(node, tmp_path):
     """bypass=True: do NOT touch the ledger (output is a verbatim copy of
-    source; final_video_path should remain whatever RTXUpscale set)."""
+    source; final_video_path should remain whatever the upstream stage set)."""
     import json
     src = tmp_path / "src.mp4"; src.write_bytes(b"src")
     pgn = tmp_path / "pgn.mp4"; pgn.write_bytes(b"pgn")
