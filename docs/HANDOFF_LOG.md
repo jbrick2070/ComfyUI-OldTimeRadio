@@ -170,12 +170,55 @@ Did: implemented `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md`
 - **Both profile JSONs are byte-identical** -- `git diff` on them is EMPTY.
   Commit 2 (the actual discharge) is a SEPARATE, CONDITIONAL commit that only
   fires if all four cells PASS live.
-Current step: Commit 1 pushed; the live 4-cell run is next.
-Next: run the live probe (~$0.72, backgrounded + polled), then the conditional
-  Commit 2, then the Bug Bible promotion for the ledger-field defect class
-  (the admission rule needs the live artifact first).
+- **LIVE RUN DONE -- ALL FOUR CELLS PASS; GATE DISCHARGED (Commit 2 `63ee4fe3`).**
+  Run `macbeth_probe_20260808T234517Z` at harness commit `e11f2015`, exit 0,
+  status COMPLETE, `may_discharge=true`. Artifacts under
+  `output/otr/episodes/macbeth_probe_20260808T234517Z/`:
+  - **A1 google_image PASS** -- 1280x720, luma spread 1.0
+  - **A4 google_tts PASS** -- 24 kHz mono pcm_s16le, 20.25 s
+  - **A3 google_veo_video PASS** -- 1280x720 h264, **96 decoded frames /
+    4.000 s exactly** (independently ffprobed; this is the proof the duration
+    fix landed -- an 8s fallback would read 192 frames and bill double)
+  - **A2 cloud_wan_i2v PASS** -- 1280x720 h264, 150 decoded frames / 5.04 s
+  **NO SAFETY REFUSAL ON ANY ARM.** Google and Comfy both rendered bloody-
+  daggers Macbeth without complaint. Spend = the reserved **$0.725**.
+  Frame counts are real `ffprobe -count_frames`, not `duration*fps`.
+  **What makes this evidence rather than four green lights:** the providers
+  actually received the violence (visual prompt kept bloody/crimson/daggers/
+  murdering, spoken line kept blood), and the **banana route was OFF with 0
+  substitutions**, so no weapon was rewritten to fruit. All five ledger-field
+  assertions held before any spend and are recorded in the report.
+  Commit 2 removed the `macbeth_probe` entry from BOTH profiles and touched
+  NOTHING else. `openrouter_model_pins` + `audio_cache` remain, so profile
+  ACTIVATION is still a separate operator decision.
+- **BUG BIBLE PROMOTION: DECLINED, on the admission rule.** The ledger-field
+  defect class ("a gate that reads a ledger field and treats ABSENT AS
+  PERMISSIVE silently inverts for a hand-built ledger") is genuinely
+  UNCOVERED -- Bible `12.45` is a missing-field HEURISTIC causing timing
+  clumps and `11.51` is a banana under-fire from a quoted-span shield;
+  neither is this. **But the live run did not EXHIBIT the failure, it
+  exhibited the GUARD HOLDING** (banana off, 0 substitutions). The admission
+  rule requires a bug verified by a live artifact and says a static-audit
+  finding "never creates a new PBUG or Bible rule on its own" -- so the chip's
+  premise ("promote after the live run, the admission rule needs a live
+  artifact") did not come true: this run produced evidence the FIX works, not
+  evidence the BUG fires. Promotion stays owed until something reproduces it
+  live (e.g. a deliberate harness leg with `source_bank` dropped, which would
+  be cheap on the stills lane alone).
+Current step: BOTH commits shipped and lockstep-verified; queue item 9-C3 done.
+Next: queue item 9's next chunk (20-clip accept-rate measurement, then the
+  first full LOW episode) -- or any operator-unblocked item.
 Follow-up chips owed: (1) Antigravity r4 retry if a second opinion is wanted;
-  (2) Bug Bible promotion for the ledger-field defect class AFTER the live run;
+  (2) Bug Bible promotion for the ledger-field defect class -- STILL OWED but
+  its premise changed, see the DECLINED note above: it needs a leg that
+  REPRODUCES the failure, not the passing run we got;
+  (2b) **NEW -- google_tts castable voice pool is 6 of 30** (engine accepts 30
+  voices at `eng_google_tts.py:41-48`; `config/voice_reference_bank.json` maps
+  only Algenib/Puck/Kore/Aoede/Charon/Sulafat, 3M/3F, ALL `adult`). Any cast
+  over six speakers repeats a voice and there is no age differentiation -- a
+  Macbeth cast exhausts it immediately. In scope: voice-pool staleness is
+  explicitly NOT covered by the story-quality freeze. Do not guess gender tags;
+  a wrong one IS the "Malvolio speaks with a woman's voice" defect;
   (3) `_otr_casting.py:1241-1248` `_LEMMY` deeper look; (4) `_prefix_video_style_cue`
   runs AFTER the 188-char cap and re-budgets rather than re-truncating --
   CONFIRMED at `render_driver.py:2911-2912`, so the final prompt CAN exceed 188;
