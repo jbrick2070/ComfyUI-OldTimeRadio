@@ -884,17 +884,20 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 #       identifiers do not -- `tencent/hy3:free` was carried here until its promo
 #       ended and the slug stopped resolving. test_openrouter_slug_curation.py
 #       enforces this; a comment cannot.
-#   (d) Auto-routers (`openrouter/auto`, `openrouter/auto-beta`) are real and ARE
-#       listed by /api/v1/models, but are deliberately NOT offered: auto-beta
-#       routes by trailing-week community spend, so one config could resolve to a
-#       different model week to week. This pack stamps the resolved model in the
-#       ledger for replay; a choice that drifts with third-party spending
-#       undercuts that.
+#   (d) Auto-routers are deliberately NOT offered. There are FIVE of them live,
+#       not the two this comment used to name -- `openrouter/auto`,
+#       `openrouter/auto-beta`, `openrouter/bodybuilder`, `openrouter/fusion`
+#       and `openrouter/pareto-code` (all priced `-1`, i.e. whatever they route
+#       to). The exclusion is not about which router: any of them picks a model
+#       by criteria we do not control, so one config resolves differently week
+#       to week. This pack stamps the resolved model for replay, so a router run
+#       is auditable AFTER the fact but not predictable before it -- and a
+#       default nobody can predict is the wrong default.
 #
-# Verified against live /api/v1/models on 2026-08-07: all ten are listed. They
-# are offered even when the disk cache is cold, because a cold cache must not
-# hide the curated set -- see openrouter_catalog_dropdown_choices for the two
-# states where the block is skipped.
+# Verified against live /api/v1/models on 2026-08-09: all eleven are listed.
+# They are offered even when the disk cache is cold, because a cold cache must
+# not hide the curated set -- see openrouter_catalog_dropdown_choices for the
+# two states where the block is skipped.
 OPENROUTER_CURATED_ALIASES = (
     "~anthropic/claude-opus-latest",
     "~openai/gpt-latest",
@@ -908,6 +911,16 @@ OPENROUTER_CURATED_ALIASES = (
     # 2026-08-07: x-ai now publishes a `~latest` resolver, which retired ~30
     # lines of bespoke "pick the author's newest concrete slug" synthesis.
     "~x-ai/grok-latest",
+    # 2026-08-09 (chunk B): THE CHEAP SLOT, and it is an alias on purpose.
+    # ~$0.08/$0.25 per M -- the cheapest option that is a POINTER rather than a
+    # pin. The two cheaper candidates were rejected for the same reason:
+    # `qwen/qwen3.7-flash` ($0.03/$0.13) and `inclusionai/ling-2.6-flash`
+    # ($0.01/$0.03) are both CONCRETE ids with no `~latest` resolver published
+    # by their authors, so shipping either re-creates the hy3 defect at a
+    # rounding-error saving. `inclusionai` is additionally a five-model author
+    # in the whole catalog -- its cheapest SKU is the likeliest on the board to
+    # be retired. Paying 2.6x of almost nothing buys out an entire failure class.
+    "~deepseek/deepseek-v4-flash-latest",
 )
 
 #: Every CONCRETE (non-alias) OpenRouter id this pack ships, mapped to the date
@@ -915,9 +928,14 @@ OPENROUTER_CURATED_ALIASES = (
 #: it resolves upstream -- but a concrete id is a claim about a specific version
 #: that can quietly stop being true. The guard test asserts these keys are
 #: EXACTLY the concrete ids shipped, so a new pin cannot be added undated.
+#:
+#: Down to ONE entry as of chunk B (2026-08-09): the creative default became
+#: `~anthropic/claude-opus-latest`, and an alias needs no date because there is
+#: no version claim left to go stale. The guard test computes this set from the
+#: '~' prefix, so the removal below is not optional bookkeeping -- leaving the
+#: old dated pin here would fail `test_every_concrete_id_is_dated`.
 OPENROUTER_VERIFIED_ON_BY_ID: dict[str, str] = {
-    "anthropic/claude-opus-4.8": "2026-08-07",   # recommended creative default
-    "deepseek/deepseek-v4-pro": "2026-08-07",    # recommended technical default
+    "deepseek/deepseek-v4-pro": "2026-08-09",    # recommended technical default
 }
 
 

@@ -365,7 +365,13 @@ def test_allowlist_narrows(enabled_cached, monkeypatch):
                        "anthropic/claude-opus-4.8,openai/gpt-4o")
     a = cat.openrouter_catalog_dropdown_choices("a")
     # BUG-LOCAL-400: the enable-sentinel is always present alongside the filtered set.
+    # The recommended default is ALSO always present -- the tier-1 lead is added
+    # before any narrowing precisely so the slot's own default value stays
+    # selectable (see the docstring). That used to be invisible here because the
+    # default was `anthropic/claude-opus-4.8`, which the allowlist already
+    # contained; chunk B made the default an alias, so it now shows up plainly.
     assert set(a) == {cat.OPENROUTER_ENABLE_SENTINEL,
+                      orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
                       "anthropic/claude-opus-4.8", "openai/gpt-4o"}
 
 
@@ -383,8 +389,12 @@ def test_denylist_removes(enabled_cached, monkeypatch):
 def test_provider_filter_narrows(enabled_cached, monkeypatch):
     monkeypatch.setenv("OTR_OPENROUTER_PROVIDER_FILTER", "anthropic")
     a = cat.openrouter_catalog_dropdown_choices("a")
-    # BUG-LOCAL-400: sentinel leads even a single-provider filtered list.
-    assert a == [cat.OPENROUTER_ENABLE_SENTINEL, "anthropic/claude-opus-4.8"]
+    # BUG-LOCAL-400: sentinel leads even a single-provider filtered list, and the
+    # tier-1 lead follows it -- always offered so the slot default stays
+    # selectable through a filter. Then the filtered catalog itself.
+    assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
+                 orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+                 "anthropic/claude-opus-4.8"]
 
 
 def test_favorites_float_after_lead(enabled_cached, monkeypatch):
@@ -398,15 +408,23 @@ def test_favorites_float_after_lead(enabled_cached, monkeypatch):
 
 def test_default_view_is_exactly_sentinel_lead_and_curated_aliases(enabled_cached):
     """THE contract this curation exists to create, asserted as an EXACT
-    ORDERED list rather than a count: 12 entries, none of them from the cache.
-    Before 2026-08-07 this was 22, of which 8 were whatever the disk cache
-    happened to hold."""
+    ORDERED list rather than a count: none of it from the cache. Before
+    2026-08-07 this was 22 entries, of which 8 were whatever the disk cache
+    happened to hold.
+
+    The expectation must DE-DUPLICATE, because since chunk B (2026-08-09) slot
+    A's lead is itself a curated pointer (`~anthropic/claude-opus-latest`) and
+    the builder adds each id once. Slot B's lead is still a concrete pin, so it
+    is a genuinely extra entry there. That asymmetry is the point of building
+    `expected` this way rather than hardcoding two lengths.
+    """
     for slot, lead in (
         ("a", orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT),
         ("b", orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT),
     ):
-        expected = ([cat.OPENROUTER_ENABLE_SENTINEL, lead]
-                    + list(cat.OPENROUTER_CURATED_ALIASES))
+        expected = [cat.OPENROUTER_ENABLE_SENTINEL, lead]
+        expected += [mid for mid in cat.OPENROUTER_CURATED_ALIASES
+                     if mid not in expected]
         assert cat.openrouter_catalog_dropdown_choices(slot) == expected
 
 
@@ -451,9 +469,15 @@ def test_slot_picker_is_network_free(enabled_cached, monkeypatch):
     def _boom(**kw):
         raise AssertionError("network fetch fired from a dropdown build")
     monkeypatch.setattr(orb, "_fetch_models_json", _boom)
-    # Must build purely from the disk cache -- no fetch, no raise.
+    # Must build purely from the disk cache -- no fetch, no raise. The real
+    # assertion is the _boom monkeypatch not firing; the membership check just
+    # proves a REAL list came back rather than an empty/sentinel-only degrade.
+    # It deliberately checks the recommended default rather than a specific
+    # cached id: in the default warm view cache rows are pruned, so naming one
+    # would couple this test to the curation instead of to the network.
     out = cat.openrouter_catalog_dropdown_choices("a")
-    assert "anthropic/claude-opus-4.8" in out
+    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT in out
+    assert len(out) > 2
 
 
 # --- BUG-LOCAL-400: enable-sentinel stays a valid choice when ENABLED -------

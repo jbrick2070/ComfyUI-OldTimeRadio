@@ -150,7 +150,16 @@ DEFAULT_CONTEXT_WINDOW = 8192
 # OTR_OPENROUTER_SLOT_x_DEFAULT override. They are recommended STARTING points,
 # never a cage -- any cached slug can be chosen. Creative favours a strong
 # narrative model; technical favours a reliably structured-output model.
-OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "anthropic/claude-opus-4.8"
+# CREATIVE is an ALIAS (chunk B, 2026-08-09). It was pinned to
+# `anthropic/claude-opus-4.8`, which was ALREADY a version behind -- opus-5 was
+# live at the identical price ($5/$25 per M) while the pin still said 4.8. That
+# is the whole failure mode the curation policy exists to stop, and a pin cannot
+# notice it has gone stale. Replay is unaffected: the ledger stamps the RESOLVED
+# concrete model, proven by tests/test_openrouter_resolved.py.
+OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "~anthropic/claude-opus-latest"
+# TECHNICAL stays CONCRETE and stays pinned. The only DeepSeek pointer is the
+# FLASH tier, so aliasing this would be a capability DROP on the slot that most
+# needs reliable structured output -- not a like-for-like swap.
 OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "deepseek/deepseek-v4-pro"
 
 # Conservative cost ceilings. Deliberately low so an unconfigured

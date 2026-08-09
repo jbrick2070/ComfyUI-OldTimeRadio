@@ -113,7 +113,8 @@ def test_curated_pointer_spellings_are_pinned_literally():
     without something like this, `~x-ai/grok-latest` could be silently
     misspelled and the whole suite would stay green.
 
-    Each spelling below was verified against live /api/v1/models on 2026-08-07.
+    Each spelling below was verified against live /api/v1/models -- the first
+    ten on 2026-08-07, the deepseek flash pointer on 2026-08-09.
     """
     pinned = {
         "~anthropic/claude-opus-latest",
@@ -126,6 +127,7 @@ def test_curated_pointer_spellings_are_pinned_literally():
         "~google/gemini-flash-latest",
         "~moonshotai/kimi-latest",
         "~x-ai/grok-latest",
+        "~deepseek/deepseek-v4-flash-latest",
     }
     assert set(cat.OPENROUTER_CURATED_ALIASES) == pinned, (
         "The curated pointer set changed. That is allowed -- but update these "
@@ -133,6 +135,51 @@ def test_curated_pointer_spellings_are_pinned_literally():
         "live /api/v1/models, because nothing else in this suite can catch a "
         "misspelt pointer."
     )
+
+
+def test_creative_default_is_a_routing_pointer_not_a_pin():
+    """Chunk B (2026-08-09). The creative default must stay an alias.
+
+    It was `anthropic/claude-opus-4.8` and was ALREADY a version behind when
+    that was noticed -- opus-5 was live at the identical price while the pin
+    still said 4.8. Nothing could see it: a pin has no way to report that it has
+    gone stale, and the dated-pin guard above only proves someone WROTE a date,
+    not that the date is still true. Making the default a pointer removes the
+    version claim entirely, and this test stops it being quietly re-pinned.
+
+    The TECHNICAL default is deliberately NOT covered: the only DeepSeek pointer
+    is the flash tier, so aliasing it would be a capability drop on the slot
+    that most needs reliable structured output.
+    """
+    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT.startswith("~"), (
+        f"creative default {orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT!r} is a "
+        f"concrete pin. Use a '~family-latest' pointer: a pin cannot notice it "
+        f"has gone stale, and replay is unaffected because the ledger stamps "
+        f"the RESOLVED model (tests/test_openrouter_resolved.py)."
+    )
+    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT in cat.OPENROUTER_CURATED_ALIASES, (
+        "the creative default must also be OFFERED in the curated set, or the "
+        "dropdown's leading pick is a slug the dropdown does not list"
+    )
+
+
+def test_a_cheap_pointer_is_offered_so_the_cheap_slot_needs_no_pin():
+    """Chunk B: the cheap option is an ALIAS, which is the whole point.
+
+    The two cheaper candidates -- qwen/qwen3.7-flash and
+    inclusionai/ling-2.6-flash -- are concrete ids whose authors publish no
+    `~latest` resolver, so shipping either would re-create the hy3 defect to
+    save a rounding error. This asserts the curated set keeps at least one
+    pointer meaningfully cheaper than the frontier creative default, so nobody
+    has to reach for a pin to get a cheap slot.
+    """
+    assert "~deepseek/deepseek-v4-flash-latest" in cat.OPENROUTER_CURATED_ALIASES
+    for banned in ("qwen/qwen3.7-flash", "inclusionai/ling-2.6-flash"):
+        assert banned not in _all_shipped_ids(), (
+            f"{banned!r} is a CONCRETE id with no '~latest' resolver published "
+            f"by its author. Cheap is not worth a slug that can vanish -- use "
+            f"~deepseek/deepseek-v4-flash-latest."
+        )
 
 
 def test_retired_synthesis_machinery_stays_retired():
