@@ -19,7 +19,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | an `OPENROUTER_API_KEY` reaching the run |
+| 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | **NOTHING -- UNBLOCKED 2026-08-08** |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
 | 5 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
@@ -32,9 +32,20 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
 
-**Items 1, 3, 4, 5, 6 and 7 are blocked on the operator** (item 1 needs only an
-API key reaching the run). A coder window that reaches one without an answer
-skips to the next unblocked item rather than guessing. **Item 8 SHIPPED
+**Items 3, 4, 5, 6 and 7 are blocked on the operator.** A coder window that
+reaches one without an answer skips to the next unblocked item rather than
+guessing.
+
+**ITEM 1 IS NOT BLOCKED -- corrected 2026-08-08 by MEASUREMENT, after this file
+had asserted the opposite for a day and a coder window repeated it to the
+operator as fact.** The `OPENROUTER_API_KEY` is present in the **User**
+environment scope on this box (73 chars, `sk-or-` prefix), so every process a
+coder window spawns inherits it. Proven, not assumed: a plain venv run of
+`nodes._otr_openrouter_backend.openrouter_enabled()` returns **True** with no
+launcher involved. The old note below claiming the key "is set inside the
+launcher scripts, not in a coder window's environment" is FALSE and has been
+corrected in place. **Grep or measure before repeating a blocker out of this
+file** -- that is the lesson, not just the fact. **Item 8 SHIPPED
 2026-08-08 and item 9-C3 (Macbeth safety probe) SHIPPED + DISCHARGED
 2026-08-08 evening** -- both tombstoned below. Item 9's remaining chunks (the
 20-clip accept-rate measurement, then the first full LOW episode) are the
@@ -529,11 +540,13 @@ and promises expire while identifiers do not.
 Chunk A shipped the curation. Chunk B is the part that CANNOT be proven without
 a live remote call, and it is one coder chunk plus one leg.
 
-**Why it is blocked:** `openrouter_enabled()` is
+**IT IS NOT BLOCKED (corrected 2026-08-08).** `openrouter_enabled()` is
 `bool(_env("OPENROUTER_API_KEY"))` (`_otr_openrouter_backend.py:345-351`) and
-`_env` reads `os.environ` ONLY (`:261-263`). The key is set inside the launcher
-scripts, not in a coder window's environment, so the whole remote lane is
-disabled during ordinary coding. Chunk B needs the key to reach the run.
+`_env` reads `os.environ` ONLY (`:261-263`) -- all still true. What was WRONG
+was the conclusion drawn from it: the key is not launcher-only, it lives in the
+**User** environment scope, so `os.environ` carries it into any coder-window
+process. Measured on this box: `openrouter_enabled()` -> `True` from a plain
+venv run. Chunk B is one coder chunk plus one live leg, available now.
 
 **(a) Promote the CREATIVE default to `~anthropic/claude-opus-latest`.**
 Verified live 2026-08-07: identical price to the pinned `anthropic/claude-opus-4.8`
