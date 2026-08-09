@@ -43,12 +43,13 @@ dialogue, so they should not run mid-Lemmy.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-08 evening |
+| Thing | Value as of 2026-08-08 late |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `bec0ca79`, == `origin/v2.0-alpha` |
-| Suite | **9465 passed / 111 skipped / 1 xfailed, ZERO failures** |
+| Branch / HEAD | `v2.0-alpha` @ `7c26ec86`, == `origin/v2.0-alpha` |
+| Suite | **9486 passed / 111 skipped / 1 xfailed, ZERO failures** (was 9465; +21 from `tests/test_upscale_cache_fingerprint.py`) |
 | Bug Bible | **17 passed / 24 skipped / 3 xfailed** at survival-guide `7a5fb88` (262 entries, index 370 rows) |
-| Canonical workflow | untouched all session; `git diff -- workflows/` EMPTY |
+| Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
+| Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
 
 A window that reads a different suite number has inherited drift -- find out
@@ -197,13 +198,28 @@ returned zero drift. `scripts/validate_canonical_workflow.py` clean
 (23 nodes, 56 links).
 
 **Follow-up chips owed (Fable SHOULD-FIXes, non-blockers):**
-1. IS_CHANGED hardcodes the spandrel engine + filename in its model-file
-   fingerprint block; engine #2 will get no model fingerprint. Route
-   through registry/engine metadata in a small dedicated commit.
-2. Stale RTXUpscale prose in `nodes/video_engine.py:2086` tooltip and a
-   handful of docstrings (`_otr_paths.py`, `_otr_memory.py`,
-   `otr_post_upscale_procgen_blend.py` body comments). Comments-only
-   sweep commit.
+1. ~~IS_CHANGED hardcodes the spandrel engine + filename~~ **SHIPPED
+   `088dabc8` (2026-08-08).** Full `kibitz-plugin:kibitz` r1-r4 arc (8
+   external calls: Codex `gpt-5.6-sol` high x4 + Antigravity x4, plus a
+   cold Fable r1 and four driver anchors), Sonnet 5 QA and the Fable
+   final gate both SAFE-TO-COMMIT with no must-fix. Required
+   `model_fingerprint_parts()` on `UpscaleEngine`, `_resolve_model()`
+   single-sourced between loader and cache key, 21 new tests.
+   **The headline the arc surfaced: this was NOT a latent engine-#2
+   defect, it was LIVE on the render server.** `_otr_soak_server_launch.cmd`
+   boots the ComfyUI-Installs tree with `scripts/_otr_headless_model_paths.yaml`,
+   whose only `upscale_models` mapping is `C:/ComfyUI-Models/upscale_models/`
+   -- which holds no checkpoint. The one `RealESRGAN_x2plus.pth` lives
+   under `Documents/ComfyUI/models/upscale_models` and is reachable ONLY
+   through the `parents[4]` fallback, so the old `get_full_path`-only
+   fingerprint contributed zero model bytes on the box that publishes
+   episodes. `otr_upscale_ship` is the one variant of 45 that walks it.
+2. ~~Stale RTXUpscale prose~~ **SHIPPED `7c26ec86` (2026-08-08).**
+   Wider than the chip said: **two USER-VISIBLE TOOLTIPS** were stale
+   (`video_engine.py:2086` and `otr_post_upscale_procgen_blend.py:676`),
+   the second unlisted. Split KEEP vs FIX -- the rip's own receipts
+   (`test_rip_rtx_upscale_guard.py`, `DELETED_NODE_TYPES`, the
+   `__init__.py` tombstone) were preserved deliberately.
 3. `meta.perfect_run_spacesaver` is now written by
    `OTR_LedgerScriptWriter.py:6196-6197` with zero remaining readers.
    The deprecated-noop guard test pins this disposition deliberately, so
@@ -564,6 +580,36 @@ operator's.** Operator's reason for the change, 2026-08-07: *"we keep hitting
 the same bugs so we need to update the bible and test regularly."*
 
 ### STILL OPEN, SMALL, UNSCHEDULED
+
+0. **THREE FINDINGS FROM THE UPSCALE-FINGERPRINT CHUNK (2026-08-08), all
+   deliberately NOT swept into `088dabc8` / `7c26ec86`:**
+   * **`scripts/validate_canonical_workflow.py` CAN EXIT 0 WITHOUT
+     VALIDATING.** At `:105-114` a failure to resolve `NODE_CLASS_MAPPINGS`
+     prints `SKIPPED validate_workflow_contract` to stderr and then
+     `return []` -- i.e. "no problems" -- so the exit code reports a pass.
+     This script is named as an acceptance gate in the item-8 tombstone
+     above, so anyone trusting its exit code is trusting a skip. Make the
+     skip fail, or add a `--strict` used wherever it gates.
+   * **`otr_upscaled_dir()` (`nodes/_otr_paths.py:383`) is DEAD.** Its only
+     producer was `OTR_RTXUpscale`; references now are the definition, the
+     `__all__` entry, and the output-tree contract test that iterates every
+     helper. Documented in place in `7c26ec86`. Removing a public path
+     helper is an operator call, not a comments-only change -- item 10
+     (lean-mean/dead-code) material.
+   * **`SpandrelEsrgan._resolve_model` robustness pair** (Sonnet QA on
+     `088dabc8`, deferred on purpose): an unreadable NON-WINNING candidate
+     aborts the whole search instead of skipping to the next, and the
+     winning file is stat'ed twice with a TOCTOU window that can turn
+     ordinary absence into a bare NaN. **This is the same absence-vs-fault
+     logic already reworked twice, so per the two-strikes rule the third
+     attempt MUST get a full kibitz panel BEFORE any code.**
+   **Banked so it is never re-derived:** `Path.is_file()` on Python 3.12.11
+   does NOT swallow every `OSError` -- pathlib filters through
+   `_ignore_error()`, which whitelists only ENOENT/ENOTDIR/EBADF/ELOOP and
+   RE-RAISES `PermissionError` and `OSError(EIO)`. Measured on the venv
+   interpreter and independently confirmed against its `pathlib.py` source.
+   Both r4 review lanes asserted the opposite and a compensating
+   classification pass was written, proven unreachable, and deleted.
 
 1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
    is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
