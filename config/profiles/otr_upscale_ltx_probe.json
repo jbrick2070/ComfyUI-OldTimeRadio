@@ -1,0 +1,94 @@
+{
+  "id": "otr_upscale_ltx_probe",
+  "display_name": "PROBE: 45-word ltx_video + upscale_stage=spandrel_esrgan (reach node 84)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": true,
+  "role_overrides": {
+    "announcer_visual": "ltx_video",
+    "music_visual": "ltx_video",
+    "character_visual": "ltx_video",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "indextts2",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "ltx_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "bnb_nf4",
+    "vram_ceiling_gb": 14.5,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q8_0",
+    "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "fp8_ok"
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "real-esrgan-x2plus"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": true,
+    "extra_args": [],
+    "env": {}
+  },
+  "upscale_stage": {
+    "engine": "spandrel_esrgan",
+    "device": "cuda:0"
+  }
+}

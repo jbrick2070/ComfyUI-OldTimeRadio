@@ -98,14 +98,39 @@ mirror-image defect** -- it took a canvas declaration on 2026-08-02, so its
 canvas is probably fine, which would mean the retention is about model/VAE
 residency between chained segments rather than about pixel count.
 
-## 6. WHAT IS NOT YET KNOWN -- do not assume any of this
+## 6. THE CONTROL ARM -- `ltx_video` COMPLETES THE SAME TOPOLOGY (2026-08-09)
+
+**This is the most useful fact in the document and it was measured, not
+reasoned.** A matched leg was run immediately after the failure, same session,
+same box, same boot generation:
+
+| | wan_ti2v leg | ltx_video control |
+|---|---|---|
+| profile | `otr_upscale_ship` | `otr_upscale_ltx_probe` (draft, added for this) |
+| words / bank | 45 / original | 45 / original |
+| composite | 1920x1080 | 1920x1080 |
+| video canvas | (wan_ti2v declared) | 832x480 |
+| result | **FAIL** at node 92, shot 3 | **`RESULT SUCCESS`**, `Prompt executed in 00:34:44` |
+| beats | died after shot_b001 (200 frames, 2 chained segments) | **`assembled 8 beats -> 1072 frames`** |
+| deliverable | none | `signal_lost_nightshift_erasure_20260809_115705_..._final.mp4`, 30,757,126 bytes, `obs_publish OK` |
+
+The control rendered the SAME structural feature that killed wan_ti2v -- a
+multi-beat timeline with chained segments -- and finished with headroom to
+spare. **So the retention is `wan_ti2v`-SPECIFIC, not a property of the video
+path, the cost model, the 1920x1080 composite, or this box's VRAM.**
+
+That kills the "maybe the box is just too small" reading and points the
+investigation at wan_ti2v's own residency. The strongest lead in the log is its
+VAE staging, which appears twice:
+`Model WanVAE prepared for dynamic VRAM loading. 1344MB Staged.`
+
+## 7. WHAT IS STILL NOT KNOWN -- do not assume any of this
 
 * Whether `post 8190 MB` is the model deliberately kept warm for the next shot
   (an intentional optimisation that simply does not account for a later larger
   beat) or a genuine leak. **Find the intent before changing anything.**
-* Whether the same retention occurs on `ltx_video`, `fastwan_8gb` or `humo`, or
-  is specific to wan_ti2v's VAE staging (`Model WanVAE prepared for dynamic
-  VRAM loading. 1344MB Staged.` appears twice in the log).
+* Whether `fastwan_8gb` / `humo` retain the same way. `ltx_video` does NOT
+  (section 6); the other two are untested.
 * Whether shot ORDER matters -- the 200-frame chained beat ran FIRST here. A
   topology that renders small beats first might complete and hide this.
 * Whether this is a regression or has always been true. The item-8 tombstone
