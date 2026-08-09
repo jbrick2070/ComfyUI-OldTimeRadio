@@ -314,10 +314,32 @@ LEMMY_PROFILE = {
     "gender": "male",
     "age": "50s",
     "demeanor": "gravelly",
-    "accent": "neutral",
+    "accent": "cockney",
+    "dialogue_orthography": "standard_english",
+    "speech_signature": "Warm, quick-witted Cockney phrasing and rhythm using standard English spelling",
     "voice_preset": "v2/en_speaker_8",  # English native - gravelly, confident, 40s-50s. Avoids Bark hallucination from de_speaker
     "character_description": "Genial communications officer, 50s, broad friendly Cockney accent, quick-witted and humorous with a warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
     "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
+}
+
+LEMMY_VOICE_POLICY = {
+    "policy_version": "lemmy-cockney-v1",
+    "required_accent": "cockney",
+    "dialogue_orthography": "standard_english",
+    "canonical_route": {
+        "engine": "bark",
+        "identity_kind": "preset",
+        "identity_id": "v2/en_speaker_8",
+        "qualification_receipt": "canonical_bark_preset_v1",
+    },
+    "approved_native_routes": {
+        "bark": {
+            "engine": "bark",
+            "identity_kind": "preset",
+            "identity_id": "v2/en_speaker_8",
+            "qualification_receipt": "canonical_bark_preset_v1",
+        },
+    },
 }
 
 # -----------------------------------------------------------------------------
@@ -454,6 +476,9 @@ def lemmy_row() -> dict:
     return {
         "name":                  LEMMY_PROFILE["name"],
         "gender":                LEMMY_PROFILE["gender"],
+        "accent":                LEMMY_PROFILE["accent"],
+        "dialogue_orthography":  LEMMY_PROFILE["dialogue_orthography"],
+        "speech_signature":      LEMMY_PROFILE["speech_signature"],
         "tts_model":             "bark",
         "voice_preset":          LEMMY_PROFILE["voice_preset"],
         # voice_params: None today; Phase 2 populates when LLM picks

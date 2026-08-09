@@ -1053,6 +1053,15 @@ class Ledger:
             pg = _safe_str(r.get("presentation_gender"))
             if pg:
                 row["presentation_gender"] = pg
+            acc = _safe_str(r.get("accent"))
+            if acc:
+                row["accent"] = acc
+            dorth = _safe_str(r.get("dialogue_orthography"))
+            if dorth:
+                row["dialogue_orthography"] = dorth
+            ssig = _safe_str(r.get("speech_signature"))
+            if ssig:
+                row["speech_signature"] = ssig
             rows.append(row)
         self.data["cast"] = rows
         return self

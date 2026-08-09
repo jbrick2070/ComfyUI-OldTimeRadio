@@ -388,6 +388,9 @@ def build_exchange_prompt(
     # when the injected value equals the constant (science lane, test-pinned).
     base = EXCHANGE_SYSTEM_PROMPT if system_prompt is None else system_prompt
     system = base + f"  - {grounding_clause}\n"
+    from ._otr_dialogue_policy import append_dialogue_policy
+    roster_items = list(cast or []) + [slot.speaker for slot in beat_group]
+    system = append_dialogue_policy(system, roster_items)
 
     fmt = (
         "Output EXACTLY one line per slot id, in this order, nothing else:\n"

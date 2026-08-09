@@ -1005,6 +1005,9 @@ def compose_line_draft(
             phase="line_composer_system",
             source_bank_id=source_bank_id,
         )
+    from ._otr_dialogue_policy import append_dialogue_policy
+    roster = list(req.allowed_people or ()) + [req.speaker]
+    system = append_dialogue_policy(system, roster)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": _build_user_prompt(req)},
