@@ -22,7 +22,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 | 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | **NOTHING -- UNBLOCKED 2026-08-08** |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 5 | **MiniMax H3 dropdown ruling** -- does H3 belong, given its 4 s floor vs sub-4 s beats? | section 0-QUINQUE | **operator ruling**, then maybe a coder chunk | operator's call |
+| 5 | **MiniMax H3 -- VIDEO-PATH SPRINT SERIES** (reframed by the operator 2026-08-09; the old "does H3 belong in the dropdown" ruling is RETIRED, not pending). H3 becomes a run of sprints refining the video paths, each its own gated chunk. **Scope TBA -- do not invent the sprint list**; when the operator names sprint 1, add it here as its own row | section 0-QUINQUE | coder, several chunks | operator naming sprint 1 |
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
 | ~~8~~ | ~~**System-agnostic multi-GPU upscale stage**~~ **SHIPPED 2026-08-08 (queue item 8 retired -- see tombstone below)** | -- | -- | -- |
@@ -32,7 +32,9 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
 
-**Items 3, 4, 5, 6 and 7 are blocked on the operator.** A coder window that
+**Items 3, 4, 6 and 7 are blocked on the operator.** (Item 5 left this list on
+2026-08-09: H3 is no longer a pending ruling, it is a sprint series whose first
+sprint the operator will name -- see 0-QUINQUE.) A coder window that
 reaches one without an answer skips to the next unblocked item rather than
 guessing.
 
@@ -839,15 +841,39 @@ shipped episodes across four banks -- not only the two legs in this report.
 The lesson worth keeping: a symptom seen on a leg that also used `--premise`
 is not evidence about `--premise`.
 
-### 0-QUINQUE. MINIMAX H3 -- ON DECK (operator, 2026-08-07: "keep minimax on deck")
+### 0-QUINQUE. MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
 
-The MiniMax H3 dropdown question STAYS QUEUED. Problem statement:
-`docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` -- UNTRACKED and another
-window's working file; never stage, edit or delete it from a different window.
-The matrix-pattern spec already names MiniMax as a churn driver
-(`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5). The next step
-is an operator/planner ruling on the statement's question (does H3 belong in
-the video dropdown given the 4 s floor vs the sub-4 s beats), not coder work.
+**THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
+say the next step was an operator ruling on "does H3 belong in the video
+dropdown given the 4 s floor vs the sub-4 s beats". That framing is RETIRED.
+The operator's 2026-08-09 direction: H3 is **"a series of sprints all to refine
+the video paths"** -- scope TBA.
+
+**What that changes for a window picking this up:**
+* It is NOT a yes/no dropdown admission any more, so do not go looking for a
+  verdict to record. There is nothing blocked on the operator here.
+* The unit of work is a SPRINT against the video paths, not a one-shot chunk.
+  Expect several, each with its own kibitz gate, each landing green and pushed
+  on its own.
+* The 4 s floor is now an INPUT to that refinement -- a constraint the video
+  paths have to accommodate or explicitly route around -- rather than a
+  disqualifier that settles admission.
+
+**Scope is TBA and that is deliberate.** Do NOT invent the sprint list. When the
+operator names the first sprint, write it into THE QUEUE at the top of this file
+as its own row, and leave this section as the standing context.
+
+**Grounding that survives the reframing:**
+* Problem statement `docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` is
+  UNTRACKED and another window's working file -- never stage, edit or delete it
+  from a different window. Read it; do not touch it.
+* The matrix-pattern spec already names MiniMax as a churn driver
+  (`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5), so a video-path
+  sprint will likely collide with the un-converged matrix work (section 0). Read
+  that section's "what survived all four rounds" before designing anything.
+* The recipes are NOT on the table (standing directive). A video-path sprint
+  refines PATHS -- routing, canvas negotiation, admission, extension -- never
+  the shipped render recipe.
 
 ### 1. The reference A/B still owes a verdict (the one real open item)
 
