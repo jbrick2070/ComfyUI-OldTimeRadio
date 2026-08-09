@@ -51,7 +51,11 @@ ASSETS: "list[dict]" = [
         "filename": "RealESRGAN_x2plus.pth",
         "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/"
                "v0.2.1/RealESRGAN_x2plus.pth",
-        "sha256": "",   # first-run: downloader computes + prints; operator pins later.
+        # PINNED 2026-08-08 from the local copy of the v0.2.1 release asset,
+        # after loading it through spandrel and confirming ESRGAN / scale=2 /
+        # 3->3 ch / tags ['64nf','23nb','unshuffle'] at 67,061,725 bytes.
+        # Must match eng_spandrel_esrgan.SpandrelEsrgan._model_sha256.
+        "sha256": "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb",
         "license": "BSD-3-Clause",
         "notes": "Real-ESRGAN x2plus super-resolution weights; used by the "
                  "shipped `spandrel_esrgan` upscale engine.",

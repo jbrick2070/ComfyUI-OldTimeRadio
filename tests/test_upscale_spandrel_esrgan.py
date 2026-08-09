@@ -64,13 +64,50 @@ def _make_mock_loader(descriptor):
     return mock_loader_cls, mock_loader_instance
 
 
+_FAKE_WEIGHTS = b"fake_weights_content"
+#: The real digest of the fake file. Since the checkpoint SHA was pinned
+#: (2026-08-08), a mocked-loader test that leaves the class pin in place gets
+#: correctly REJECTED before spandrel is ever called. These tests are about
+#: device pinning / scale / frame invocation, so they pin the fake file's own
+#: digest rather than blanking the check -- that way verification actually
+#: RUNS and passes, which is coverage the suite did not have before.
+_FAKE_WEIGHTS_SHA = hashlib.sha256(_FAKE_WEIGHTS).hexdigest()
+
+
 def _prepare_model_dir(tmp_path):
     """Create a fake model file. Real bytes so hash-check tests work."""
     d = tmp_path / "upscale_models"
     d.mkdir()
     p = d / "RealESRGAN_x2plus.pth"
-    p.write_bytes(b"fake_weights_content")
+    p.write_bytes(_FAKE_WEIGHTS)
     return d, p
+
+
+def test_checkpoint_sha_is_pinned_and_agrees_with_the_provisioner():
+    """The pin must exist and must match `scripts/ensure_upscale_models.py`.
+
+    An empty `_model_sha256` SKIPS verification entirely, so a truncated or
+    substituted checkpoint would load silently -- that was the state until
+    2026-08-08. Two independent copies of a digest is exactly the pair that
+    drifts, so they are checked against each other here rather than trusted
+    to stay in step.
+    """
+    import re
+
+    from nodes._otr_upscale_engines.eng_spandrel_esrgan import SpandrelEsrgan
+
+    pinned = SpandrelEsrgan._model_sha256
+    assert re.fullmatch(r"[0-9a-f]{64}", pinned), (
+        "checkpoint SHA is unpinned or malformed -- verification is skipped "
+        "whenever this is empty")
+
+    script = (Path(__file__).resolve().parents[1]
+              / "scripts" / "ensure_upscale_models.py").read_text(encoding="utf-8")
+    digests = re.findall(r'"sha256":\s*"([0-9a-f]{64})"', script)
+    assert pinned in digests, (
+        "engine pin %s is not present in ensure_upscale_models.py ASSETS; the "
+        "provisioner and the engine disagree about which checkpoint is valid"
+        % pinned)
 
 
 def test_load_calls_model_loader_with_resolved_device(tmp_path):
@@ -86,6 +123,7 @@ def test_load_calls_model_loader_with_resolved_device(tmp_path):
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(model_dir)])
 
     engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
@@ -132,6 +170,7 @@ def test_load_raises_missing_model_when_file_absent(tmp_path, monkeypatch):
     mock_folder_paths = mock.MagicMock()
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(empty_dir)])
     engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
@@ -174,6 +213,7 @@ def test_load_raises_incompatible_profile_on_scale_mismatch(tmp_path):
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(model_dir)])
 
     engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
@@ -194,6 +234,7 @@ def test_upscale_frames_calls_descriptor_per_frame(tmp_path):
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(model_dir)])
 
     engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
@@ -220,6 +261,7 @@ def test_unload_clears_device_and_descriptor(tmp_path):
     mock_folder_paths.get_folder_paths = mock.MagicMock(return_value=[str(model_dir)])
 
     engine = SpandrelEsrgan()
+    engine._model_sha256 = _FAKE_WEIGHTS_SHA
     with mock.patch.dict("sys.modules",
                           {"spandrel": mock_spandrel,
                            "folder_paths": mock_folder_paths}):
@@ -270,6 +312,15 @@ def test_load_falls_back_when_folder_paths_missing(tmp_path):
             try:
                 # Insert an ImportError-raising stub? No -- just leave it absent.
                 engine = SpandrelEsrgan()
+                # This test uniquely runs against the REAL checkpoint when the
+                # operator has one installed, and against a fake one otherwise.
+                # Pin whichever is actually on disk: forcing the fake digest
+                # would fail against real weights, and forcing the class pin
+                # would fail against the fake ones. The point here is the
+                # parents[4] fallback, not SHA verification.
+                if not _existed_before:
+                    engine._model_sha256 = hashlib.sha256(
+                        b"fake_fallback_content").hexdigest()
                 engine.load(torch.device("cpu"))
                 assert engine._descriptor is not None
             finally:

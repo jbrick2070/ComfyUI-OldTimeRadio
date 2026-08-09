@@ -54,12 +54,20 @@ class SpandrelEsrgan:
     # `scripts/ensure_upscale_models.py` handles URL + SHA-256 provisioning.
     _model_filename = "RealESRGAN_x2plus.pth"
 
-    # SHA-256 pinned by scripts/ensure_upscale_models.py after the first
-    # successful download on this box. Empty string = SHA check skipped
-    # (this is the CURRENT state on a fresh install; the operator populates
-    # this once ensure_upscale_models.py has computed + printed the digest).
+    # SHA-256 PINNED 2026-08-08. An empty string SKIPS verification entirely,
+    # so a truncated or substituted checkpoint would have loaded silently.
+    #
+    # The digest was not taken on trust: before pinning, the file was loaded
+    # through spandrel on CPU and confirmed to be a genuine ESRGAN at
+    # scale=2, 3->3 channels, tags ['64nf', '23nb', 'unshuffle'] -- the
+    # RealESRGAN_x2plus signature -- at 67,061,725 bytes, matching the
+    # upstream v0.2.1 release. Pinning the hash of a corrupt file would have
+    # cemented the corruption, which is worse than no pin at all.
+    #
+    # Must stay in lockstep with ASSETS[...]["sha256"] in
+    # scripts/ensure_upscale_models.py; a test pins that they agree.
     # Tests monkeypatch this to force verify-fail scenarios.
-    _model_sha256 = ""
+    _model_sha256 = "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb"
 
     def __init__(self) -> None:
         self._descriptor = None
