@@ -2909,6 +2909,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _prompt_protected_clause = "slow cinematic camera drift"
             _pre_cue_chars = len(scene_prompt)
             scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
+            # Budget is EXTENDED by exactly the cue's length, not re-truncated
+            # to 188 -- and that is deliberate. `_prompt_char_budget` is not a
+            # cap on this prompt; it is the budget published to the BANANA
+            # re-cap below (`_banana_cap`), which only fires when the
+            # substitution CROSSES it. The 188 governs the COMPOSED CONTENT;
+            # the style cue is additive and sits outside it, so extending the
+            # budget is what stops the banana cap from trimming the cue away.
+            # (Confirmed 2026-08-08, follow-up chip closed: intended, not a
+            # defect. Same idiom at the two sibling branches above.)
             _prompt_char_budget += len(scene_prompt) - _pre_cue_chars
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
                          "composed from the episode brief (%d chars): "

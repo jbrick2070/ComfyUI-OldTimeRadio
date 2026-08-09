@@ -208,6 +208,33 @@ Did: implemented `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md`
 Current step: BOTH commits shipped and lockstep-verified; queue item 9-C3 done.
 Next: queue item 9's next chunk (20-clip accept-rate measurement, then the
   first full LOW episode) -- or any operator-unblocked item.
+### Later the same evening -- owed chips worked while Codex ran an
+### independent architectural take on the Lemmy question
+
+- **Chip 5 CLOSED -- upscale checkpoint SHA pinned (`8250e01c`).**
+  `SpandrelEsrgan._model_sha256` was `""`, and an empty pin SKIPS verification
+  entirely, so a truncated or substituted checkpoint would have loaded
+  silently on every render. Pinned `49fafd45...` in BOTH the engine and
+  `ensure_upscale_models.py`, with a test that the two agree (two copies of a
+  digest is exactly the pair that drifts). **The digest was not taken on
+  trust:** the file was first loaded through spandrel on CPU and confirmed to
+  be a genuine ESRGAN, scale=2, 3->3 ch, tags `['64nf','23nb','unshuffle']`,
+  67,061,725 bytes -- the RealESRGAN_x2plus signature matching the upstream
+  v0.2.1 release. Pinning a corrupt file's hash cements the corruption and is
+  worse than no pin. The pin proved itself instantly: four existing tests
+  broke on contact because they write fake bytes and expect a successful load.
+  They now pin each fake file's OWN digest instead of blanking the check, so
+  verification RUNS and passes -- happy-path coverage the suite lacked.
+- **Chip 4 CLOSED -- `_prefix_video_style_cue` is INTENDED, not a defect.**
+  It runs after the 188-char cap and EXTENDS `_prompt_char_budget` rather than
+  re-truncating. Grounded: `_prompt_char_budget` is not a cap on the prompt at
+  all -- it is the budget published to the BANANA re-cap
+  (`render_driver.py:2964-2968` `_banana_cap`), which only fires when the
+  substitution CROSSES it. The 188 governs composed CONTENT; the style cue is
+  additive and outside it, and extending the budget is precisely what stops
+  the banana cap trimming the cue away. Same idiom at all three composing
+  branches (`:2689`, `:2863`, `:2912`) -- consistent design. A comment now
+  records this at the line so it is not re-opened. **No code change needed.**
 Follow-up chips owed: (1) Antigravity r4 retry if a second opinion is wanted;
   (2) Bug Bible promotion for the ledger-field defect class -- STILL OWED but
   its premise changed, see the DECLINED note above: it needs a leg that
