@@ -3,6 +3,103 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-08 -- HEAD bec0ca79 (v2.0-alpha) -- CODER (Macbeth gate DISCHARGED live; voice pool 4->28; two chips closed; Lemmy Phase 1 landed from a 2nd window)
+
+Did: five commits from this window, all pushed and lockstep-verified, plus one
+  from a concurrent Codex window.
+- **`e11f2015` + `63ee4fe3` -- MACBETH SAFETY PROBE SHIPPED AND THE GATE
+  DISCHARGED ON LIVE EVIDENCE.** Run `macbeth_probe_20260808T234517Z`, exit 0,
+  `may_discharge=true`, spend $0.725. **All four cells PASS, no safety refusal
+  on any arm** -- A1 google_image 1280x720; A4 google_tts 24 kHz mono
+  pcm_s16le 20.25 s; A3 google_veo_video 1280x720 h264 **96 decoded frames /
+  4.000 s exactly** (real `ffprobe -count_frames`); A2 cloud_wan_i2v 150
+  frames / 5.04 s. The providers genuinely received the violence (visual
+  prompt kept bloody/crimson/daggers/murdering, spoken line kept blood) and
+  the **banana route was OFF with 0 substitutions**, so no weapon was
+  rewritten to fruit. Commit 2 removed `macbeth_probe` from BOTH profiles and
+  touched nothing else.
+- **`874b3a18` -- google_tts castable voice pool 4 -> 28.** Not a variety
+  nicety: at four char voices a nine-speaker Shakespeare roster cast 6/9 and
+  CastLock RE-RAISES for google_tts with no fallback, so a Macbeth episode on
+  either cloud profile would have DIED AT CASTING. Root cause was not the
+  bank -- `google_tts` was missing from `APPROVED_VOICE_ENGINES`, so the
+  coverage floor never inspected the cloud lane. Appended LAST so
+  `default_char_engine` stays `indextts2`. Gender is MEASURED (median F0,
+  split 134.2 Hz DERIVED from the six pre-existing rows; all six reproduce);
+  each row carries its `measured_median_f0_hz`. A first attempt with
+  hand-picked thresholds FAILED its own control check and was discarded
+  rather than retuned until it agreed.
+- **`8250e01c` -- upscale checkpoint SHA pinned.** `_model_sha256` was `""`,
+  which SKIPS verification entirely. Validated the file through spandrel
+  first (ESRGAN, scale=2, tags `['64nf','23nb','unshuffle']`, 67,061,725 B)
+  because pinning a corrupt file's hash cements the corruption. Pinned in
+  engine AND provisioner with a test they agree.
+- **`aae732f7` -- chip 4 closed as INTENDED, not a defect.** My earlier
+  suspicion about `_prefix_video_style_cue` was wrong: `_prompt_char_budget`
+  is the budget published to the BANANA re-cap, not a cap on the prompt.
+- **`bec0ca79` -- LEMMY Cockney Phase 1, shipped by a CONCURRENT CODEX
+  WINDOW** (not this one). Independently verified by me: push real and on
+  origin, suite genuinely 9465 (its report said 9461, which was MY
+  pre-change number), and `pack_audio_batch` is in
+  `_otr_audio_engines/base.py:114`, not `_otr_voice_node_common.py` as its
+  report stated. Both corrections passed back.
+- **Reviews that earned their keep.** Sonnet QA found the one MUST-FIX I
+  missed on the probe: Gemini surfaces a content block as a **200 OK with no
+  media**, and both extractors raised BARE, so a real refusal on A1/A4 would
+  have been reported UNKNOWN -- a LOST SAFETY_REFUSAL, the mirror of a false
+  green. Fable's cold r1 on Lemmy overturned two of my own claims. The Codex
+  r1 lane demolished three of my factual premises (see below).
+- **THREE OF MY OWN FACTUAL ERRORS, corrected by the panel and recorded so
+  they are not re-inherited:** (1) I quoted a DOCSTRING EXAMPLE
+  (`_otr_casting.py:333`) as Lemmy's character sheet -- the real profile
+  already said "broad friendly Cockney accent"; (2) I claimed indextts2 /
+  chatterbox / dia all clone one WAV and called it "bigger than Lemmy" -- a
+  sampling error, they each have ~40 distinct refs; (3) I listed six voice
+  engines and omitted **bark**, the one Lemmy actually uses. Also retracted:
+  "the accent silently drops on emotional lines" was a string-level
+  observation asserted as an audible one, and the operator's own listening
+  contradicted it.
+- **BUG BIBLE DELTA-SCRAPE CHECK: RUN, NO PROMOTION.** Index 370 rows / Bible
+  262 entries at survival-guide `7a5fb88`; no existing coverage for
+  voice-pool exhaustion or a coverage gate omitting an engine, so the
+  candidates ARE uncovered. But none clears the ADMISSION RULE: the
+  ledger-field class was proven by the live run only in the sense that the
+  GUARD HELD (not that the bug fired); the pool-exhaustion defect was proven
+  by running the real caster against the real bank, which is stronger than a
+  static audit but still not a live production artifact; and the empty-200
+  lost-refusal was reproduced against a MOCKED body, i.e. an invented
+  fixture. Promoting any of them would have been inventing a Bible rule from
+  a code reading. **What would qualify the strongest candidate:** one live
+  episode leg on google_tts with a 5+ speaker cast, which would exhibit the
+  casting death directly.
+Current step: Macbeth gate DISCHARGED and item 9-C3 retired. Lemmy Phase 1 in;
+  Phases 2-4 planned but NOT built, owned by the Codex window.
+Next: hold the 20-clip accept-rate measurement and the first full LOW episode
+  until Lemmy lands -- both exercise casting and dialogue and would measure a
+  half-finished state. Unblocked meanwhile: the ledger-field REPRO leg (drop
+  `source_bank`, show daggers become bananas) which would finally qualify the
+  Bible promotion; and the two SF#1 chips once `_otr_voice_node_common.py`
+  stops moving.
+Models: Opus 5 (coder + sole judge). Sonnet 5 QA-on-diff x2 (probe diff, voice
+  bank). Fable final gate on the probe (PASS, no must-fix) + Fable cold r1 on
+  Lemmy. Kibitz on Lemmy was an **explicitly scoped r1-ONLY campaign, NOT a
+  four-round arc** -- `scope_receipt.md` written before fan-out; 2 external
+  calls attempted, **1 delivered** (Codex `gpt-5.6-sol`); Antigravity FAILED
+  on a print-mode timeout, NOT quota (`agy models` returned rc=0, no
+  RESOURCE_EXHAUSTED markers) and was re-issued to the operator as
+  `AGY_PASTE_ME.md`. r2/r3/r4 were NOT run.
+Box state: NOT clean, and none of it is this window's. The operator's own work
+  is resident: `run_h3_suite.py` + a ComfyUI server on **port 8199**
+  (`--cuda-malloc`) since 17:50, and `vram-recipe-lab/run_recipe.py` since
+  19:03. This window was cloud/CPU only and never touched the GPU or port
+  8000. One orphaned background waiter of mine was found and killed -- its
+  filter matched only the happy path ("passed"), the run it watched tripped
+  the KNOWN-FAIL-GUARD which suppressed that line, and its `SUITE EXIT`
+  sentinel was echoed outside the file redirect, so it had no reachable exit
+  condition.
+Commits: `e11f2015`, `63ee4fe3`, `1223be64`, `874b3a18`, `8250e01c`,
+  `aae732f7` (+ `bec0ca79` from the concurrent Codex window).
+
 ## 2026-08-08 (evening) -- v2.0-alpha -- CODER (Macbeth safety probe: harness BUILT, Commit 1)
 
 Did: implemented `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md`

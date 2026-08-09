@@ -34,10 +34,57 @@ platform tests -> **12** install path -> **13** product docs + v2 release.
 
 **Items 1, 3, 4, 5, 6 and 7 are blocked on the operator** (item 1 needs only an
 API key reaching the run). A coder window that reaches one without an answer
-skips to the next unblocked item rather than guessing. **Items 8 and 9 are the
-unblocked work** (item 2 shipped 2026-08-08 -- tombstone below; item 9 chunk 2
-also shipped 2026-08-08 -- tombstone below; item 9's next chunk is the Macbeth
-safety probe which needs a live cloud leg).
+skips to the next unblocked item rather than guessing. **Item 8 SHIPPED
+2026-08-08 and item 9-C3 (Macbeth safety probe) SHIPPED + DISCHARGED
+2026-08-08 evening** -- both tombstoned below. Item 9's remaining chunks (the
+20-clip accept-rate measurement, then the first full LOW episode) are the
+unblocked queue work, but see the LEMMY row: they exercise casting and
+dialogue, so they should not run mid-Lemmy.
+
+### CURRENT BASELINE -- carry forward, detect drift
+
+| Thing | Value as of 2026-08-08 evening |
+|---|---|
+| Branch / HEAD | `v2.0-alpha` @ `bec0ca79`, == `origin/v2.0-alpha` |
+| Suite | **9465 passed / 111 skipped / 1 xfailed, ZERO failures** |
+| Bug Bible | **17 passed / 24 skipped / 3 xfailed** at survival-guide `7a5fb88` (262 entries, index 370 rows) |
+| Canonical workflow | untouched all session; `git diff -- workflows/` EMPTY |
+| Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
+
+A window that reads a different suite number has inherited drift -- find out
+why before building on it.
+
+### LEMMY COCKNEY -- ACTIVE, SECOND WINDOW (do not collide)
+
+**Phase 1 SHIPPED `bec0ca79`** by a Codex window: `accent="cockney"`,
+`dialogue_orthography="standard_english"` and `speech_signature` on
+`LEMMY_PROFILE` (`config/cast_pools.py`), preserved through
+`Ledger.set_cast()` (`nodes/production_ledger.py:1053-1058`), plus a new
+`nodes/_otr_dialogue_policy.py` anti-eye-dialect guardrail wired into
+`_otr_line_composer.py` and `_otr_compose_exchange.py`, with
+`tests/test_otr_dialogue_policy.py` (4 tests).
+
+**Phases 2-4 are PLANNED, NOT BUILT** (CastLock route policy -> mixed-engine
+renderer + sample-rate normalization -> workflow/handoff integrity). r1 ideas
+round artifacts: `kibitz-runs/2026-08-08-lemmy-cockney/r1/` (scoped r1 ONLY --
+`scope_receipt.md`; r2/r3/r4 NOT run).
+
+**Grounded facts the next window must not re-derive or get wrong:**
+- LEMMY was ALREADY described as Cockney before Phase 1 -- the "gruff
+  mechanic, one-line sheet" often quoted is a DOCSTRING EXAMPLE at
+  `_otr_casting.py:333`, not the profile.
+- SEVEN char-voice engines, not six (`cast_lock.py:44-46` includes **bark**).
+- indextts2 / chatterbox / dia each have ~40 DISTINCT reference paths; only 3
+  rows share `vz_bill_boerst.wav`. There is no shared-clip crisis.
+- The per-character voice pin does NOT reach pre-locked LEMMY:
+  `voice_cast_decision` covers `ensemble_slots` only
+  (`_otr_casting.py:1750-1806`), so he falls through to ordinary casting.
+- Verified for Phase 3: `pack_audio_batch` (`_otr_audio_engines/base.py:114`,
+  NOT `_otr_voice_node_common.py`) RAISES on mixed sample rates. Native rates:
+  bark 24000, kokoro 24000, indextts2 22050, dia 44100.
+- Both r1 lanes independently agreed the biggest risk is the WRITER, not the
+  TTS (eye-dialect reaching captions/credits), and that a PARTIAL rollout --
+  Cockney on some engines, American on others -- is worse than doing nothing.
 
 **Bug Bible fan-out** is not a numbered row: it is an operator action available
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
