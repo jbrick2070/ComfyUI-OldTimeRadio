@@ -551,6 +551,23 @@ def run_story_brief_reflection(
     user_message = prompt_body + _build_reflection_input(led)
     messages = [{"role": "user", "content": user_message}]
 
+    # Attempt counter for the SUCCESS path. The failure path already reported
+    # honestly via `exc.attempts` below, but a success reported nothing -- so
+    # the writer's `_brief_delta.get("story_brief_attempts", 1)` fell through
+    # to its default and `visual_style_receipt["attempts"]` read 1 forever,
+    # even when the ladder had retried twice before succeeding. A receipt that
+    # can only ever print one value is not a measurement.
+    # `on_attempt_complete` fires once per ladder attempt (structured_call
+    # :1010-1013); the same hook the scifi_codex passes already use.
+    _attempts_seen = 0
+
+    def _mark_attempt(attempts_run, _last_raw, _error):
+        nonlocal _attempts_seen
+        try:
+            _attempts_seen = int(attempts_run)
+        except (TypeError, ValueError):  # never let telemetry break the pass
+            pass
+
     # LLM slot: technical -- structured JSON validation pass, not
     # narrative composition; routed through the shared ladder.
     try:
@@ -564,6 +581,7 @@ def run_story_brief_reflection(
             max_new_tokens=max_tokens,
             max_attempts=3,
             helper_name="run_story_brief_reflection",
+            on_attempt_complete=_mark_attempt,
         )
     except StructuredCallFailedError as exc:
         # Ladder exhausted. Attribute the failure to its class via the
@@ -597,17 +615,30 @@ def run_story_brief_reflection(
             "[OTR_StoryBrief] technical_fn raised %s: %s; returning "
             "failed-status sentinel", type(exc).__name__, exc,
         )
-        return _failure_sentinel(
+        _slot_delta = _failure_sentinel(
             reason="technical_fn_exception",
             technical_model_id=technical_model_id,
             prompt_version=prompt_version,
         )
+        # Report the count here too. structured_call fires the hook before
+        # re-raising on every rung, so by the time a slot-fn exception reaches
+        # this branch `_attempts_seen` already holds the true number. Dropping
+        # it would leave the consumer's `.get("story_brief_attempts", 1)`
+        # defaulting to 1 on exactly the sibling branch this change exists to
+        # fix -- the same "receipt that can only print one value" defect, moved
+        # one except-clause over.
+        _slot_delta["story_brief_attempts"] = _attempts_seen or 1
+        return _slot_delta
 
     delta = _success_delta(
         brief_model=brief_model,
         technical_model_id=technical_model_id,
         prompt_version=prompt_version,
     )
+    # Report what the ladder ACTUALLY cost. Falls back to 1 only if the hook
+    # never fired, which would mean a single clean attempt anyway -- so the
+    # value is honest in every branch rather than merely plausible.
+    delta["story_brief_attempts"] = _attempts_seen or 1
     if is_visual_storybased and hasattr(brief_model, "visual_card"):
         delta["visual_card"] = brief_model.visual_card
     return delta

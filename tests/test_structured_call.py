@@ -929,3 +929,97 @@ def test_alternate_repair_context_hard_limit_never_silently_clips():
             helper_name="alternate_context_limit",
         )
     assert len(alternate.calls) == 0
+
+
+# ---------------------------------------------------------------------------
+# on_attempt_complete -- the SHARED contract every caller re-trusts by hand
+# ---------------------------------------------------------------------------
+# Callers use this hook to report how many attempts a pass really cost
+# (nodes/_otr_story_brief.py's story_brief_attempts, nodes/_otr_scifi_codex.py's
+# mark_attempt). Each of them encodes the same three beliefs -- the parameter is
+# named on_attempt_complete, the first argument is a CUMULATIVE 1-based count,
+# and the hook fires on the SUCCESSFUL attempt too -- and until now nothing
+# pinned any of them: `grep on_attempt_complete tests/` matched only callers.
+#
+# A caller-side test that monkeypatches structured_call cannot cover this; it
+# only re-asserts the caller's own belief. If a future edit renamed the
+# parameter, made the count 0-based, or stopped firing on success, those tests
+# would stay green while every attempts receipt in the pack silently went wrong.
+# Pin it once, here, against the real ladder.
+
+
+def _hook_recorder():
+    seen = []
+
+    def hook(attempts_run, last_raw, error):
+        seen.append((attempts_run, error))
+
+    hook.seen = seen
+    return hook
+
+
+def test_on_attempt_complete_fires_once_on_a_first_attempt_success():
+    hook = _hook_recorder()
+    sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=_make_counting_slot_fn(responses=[_valid_json()]),
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        helper_name="sample_pass",
+        on_attempt_complete=hook,
+    )
+    assert [a for a, _ in hook.seen] == [1], (
+        f"expected the hook to fire once with a cumulative count of 1, got "
+        f"{hook.seen!r} -- a caller reporting 'attempts' now reports the wrong "
+        f"number"
+    )
+    assert hook.seen[0][1] is None, "a successful attempt reported an error"
+
+
+def test_on_attempt_complete_counts_cumulatively_and_fires_on_the_success():
+    """The assertion the caller-side tests cannot make.
+
+    Two recoverable failures then a success must report 1, 2, 3 -- cumulative
+    and 1-based -- with the error present on the failures and None on the win.
+    """
+    hook = _hook_recorder()
+    slot = _make_counting_slot_fn(
+        responses=[_bad_json(), _bad_json(), _valid_json()])
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.45,
+        structural_retry_temperature=0.15,
+        helper_name="sample_pass",
+        on_attempt_complete=hook,
+    )
+    assert isinstance(result, SampleSchema)
+    counts = [a for a, _ in hook.seen]
+    assert counts == [1, 2, 3], (
+        f"attempt counts were {counts!r}; callers take the LAST value as the "
+        f"total cost, so anything other than a cumulative 1-based sequence "
+        f"makes every attempts receipt wrong"
+    )
+    assert hook.seen[-1][1] is None, (
+        "the final (successful) attempt reported an error, so a caller cannot "
+        "tell success from failure by this hook"
+    )
+    assert all(err is not None for _, err in hook.seen[:-1]), (
+        "the failing attempts reported no error"
+    )
+
+
+def test_the_hook_is_optional():
+    """Omitting it must not change behaviour -- every existing caller relies on
+    that (structured_call short-circuits when it is None)."""
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=_make_counting_slot_fn(responses=[_valid_json()]),
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        helper_name="sample_pass",
+    )
+    assert isinstance(result, SampleSchema)
