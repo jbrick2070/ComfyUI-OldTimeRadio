@@ -83,35 +83,75 @@ def _audit_deleted_types(wf: dict, source: str) -> "list[str]":
     return problems
 
 
+def _load_otr_package():
+    """Import the OTR package the way ComfyUI does -- BY PATH, not by name.
+
+    THIS IS THE WHOLE BUG. The package directory is ``ComfyUI-OldTimeRadio``
+    with a HYPHEN, so ``importlib.import_module("ComfyUI_OldTimeRadio")`` --
+    which is what this script used to do, after a dash->underscore rename --
+    can never resolve. ComfyUI itself loads the pack by path. The lookup was
+    therefore not merely fragile on a "bare venv sys.path issue" as the old
+    docstring claimed: it was PERMANENTLY UNSATISFIABLE, so the contract check
+    never ran ONCE, on any box, while the script still printed OK and exited 0.
+
+    Loading from ``__init__.py`` via spec_from_file_location is the technique
+    ``scripts/otr_macbeth_probe.py:load_otr_package`` already uses for exactly
+    this reason -- that probe had to route around this script's fail-open to
+    get a real contract check.
+    """
+    import importlib.util
+
+    pkg_name = REPO_ROOT.name.replace("-", "_")
+    existing = sys.modules.get(pkg_name)
+    if existing is not None and getattr(existing, "NODE_CLASS_MAPPINGS", None):
+        return existing
+
+    init_py = REPO_ROOT / "__init__.py"
+    if not init_py.is_file():
+        raise RuntimeError(f"OTR package __init__.py missing: {init_py}")
+    custom_nodes_parent = str(REPO_ROOT.parent)
+    if custom_nodes_parent not in sys.path:
+        sys.path.insert(0, custom_nodes_parent)
+    spec = importlib.util.spec_from_file_location(
+        pkg_name, init_py, submodule_search_locations=[str(REPO_ROOT)])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[pkg_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(pkg_name, None)
+        raise
+    return module
+
+
 def _run_validator_contract(wf: dict, source: str) -> "list[str]":
     """Call the shipped structural contract validator (validate_workflow_contract).
     Signature is `(workflow, node_class_mappings, ...)` -- feed the live
     NODE_CLASS_MAPPINGS from the OTR package.
 
-    If the OTR package fails to import (bare-venv sys.path issue), skip this
-    check with a warning line rather than fail -- the link/widget/deleted-type
-    audits below cover the structural invariants this script guarantees."""
+    FAILS CLOSED. If the contract cannot be run, that is a PROBLEM and the
+    script exits non-zero. It used to print a SKIPPED line to stderr and
+    ``return []`` -- an empty problem list means "nothing wrong", so ``main()``
+    reported OK and exited 0 having validated nothing. This script's own
+    docstring advertises the contract check and calls itself callable from the
+    suite gate and CI, so a green that skipped the headline check is a lie to
+    every caller. Reproduced live and recorded in docs/HANDOFF_LOG.md."""
     try:
         from nodes._workflow_validation import validate_workflow_contract
     except Exception as e:  # noqa: BLE001
         return [f"{source}: could not import validate_workflow_contract: {e}"]
-    import importlib
-    # ComfyUI conversion: dash -> underscore for the package name.
-    pkg_name = REPO_ROOT.name.replace("-", "_")
-    # The custom_nodes/ parent must be on sys.path for this import to work.
-    custom_nodes_parent = str(REPO_ROOT.parent)
-    if custom_nodes_parent not in sys.path:
-        sys.path.insert(0, custom_nodes_parent)
     try:
-        pkg = importlib.import_module(pkg_name)
+        pkg = _load_otr_package()
         ncm = getattr(pkg, "NODE_CLASS_MAPPINGS", None)
         if not ncm:
-            raise RuntimeError("NODE_CLASS_MAPPINGS empty on the imported package")
+            raise RuntimeError("NODE_CLASS_MAPPINGS empty on the loaded package")
     except Exception as e:  # noqa: BLE001
-        print(f"[validate_canonical_workflow] SKIPPED validate_workflow_contract "
-              f"(could not resolve NODE_CLASS_MAPPINGS: {type(e).__name__}: {e})",
-              file=sys.stderr)
-        return []
+        return [
+            f"{source}: CONTRACT NOT RUN -- could not resolve "
+            f"NODE_CLASS_MAPPINGS ({type(e).__name__}: {e}). This is a "
+            f"failure, not a skip: the contract check is this script's "
+            f"headline guarantee."
+        ]
     problems: "list[str]" = []
     try:
         validate_workflow_contract(wf, ncm)

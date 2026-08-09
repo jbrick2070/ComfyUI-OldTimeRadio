@@ -917,6 +917,26 @@ def _slim_model(raw: dict) -> dict | None:
         if isinstance(supported_efforts, list)
         else []
     )
+    # DISPOSITION OF THE UNREAD KEYS (settled 2026-08-09 -- KEEP, do not prune).
+    # Only `supported_efforts` and `mandatory` are consulted today (see :324 and
+    # :330). `default_effort`, `default_enabled` and `supports_max_tokens` are
+    # captured and never read -- GO_FORWARD flagged one of the three as a
+    # possible BUG-12.86 sibling (a field that reads as though it informs a
+    # decision and informs nothing) and asked delete-or-consume.
+    # The ruling is KEEP, for a reason that stopped being hypothetical on
+    # 2026-08-09: an OpenRouter roundtable run had `deepseek/deepseek-v4-pro`
+    # return EMPTY CONTENT with finish_reason=length, having spent its whole
+    # budget on hidden reasoning. That is precisely the condition this sub-dict
+    # describes, and it is the same failure class that got reasoning-branded
+    # SKUs excluded from the Comfy lane (see _otr_comfy_backend.py). So these
+    # keys are not decoration -- they are the data a future guard needs to
+    # refuse a reasoning-heavy model in a structured-JSON slot.
+    # They also differ from BUG-12.86 in the way that matters: that class is
+    # about a field keyed on a producer string the producer NEVER EMITS, so it
+    # reads empty forever. These are faithfully populated from the upstream row;
+    # they are simply not consulted yet. Pruning them would also change the
+    # on-disk shape of every cached row in models/openrouter_models.json for no
+    # gain.
     reasoning = {
         "supported_efforts": supported_efforts,
         "default_effort": (

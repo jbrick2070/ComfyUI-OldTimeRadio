@@ -89,6 +89,23 @@ COMFY_RECOMMENDED_TECHNICAL_DEFAULT = "google/gemini-3.5-flash"
 # reasoning-pro upstream-502'd the news_interpreter; the technical DEFAULT was
 # also on a reasoning deepseek-v4-pro). Keep the writer's JSON path on
 # text-completion models. gemini-3.5-flash is LIVE-PROVEN (Desktop, 2026-07-04).
+#
+# RE-CONFIRMED LIVE 2026-08-09, and read this before "modernising" the rule.
+# GO_FORWARD had recorded this block as STALE -- the reasoning being that
+# essentially every frontier SKU now advertises reasoning, so an exclusion of
+# "reasoning models" supposedly no longer describes what the list does. That
+# reading conflates two different things. The rule excludes reasoning-BRANDED
+# SKUs (the -pro / -thinking / sonar-reasoning tiers) because they EMPIRICALLY
+# BREAK STRUCTURED JSON; it never claimed the survivors cannot reason. The list
+# still performs exactly that, which is why deepseek-v3.2 sits here labelled
+# NON-reasoning while deepseek-*-pro does not.
+# The re-confirmation was accidental and therefore worth trusting: an
+# unrelated OpenRouter roundtable run on 2026-08-09 put `deepseek/deepseek-v4-pro`
+# on a 3-model panel and it returned EMPTY CONTENT with finish_reason=length,
+# having spent its entire token budget on hidden reasoning -- the exact failure
+# this block was written about, on the exact SKU pattern it names, thirteen
+# months of model churn later. The rule is load-bearing. Do not delete it; if
+# the slugs need re-dating, that is a separate mechanical pass.
 COMFY_LLM_MODELS: tuple[str, ...] = (
     "google/gemini-3.5-flash",        # Gemini   -- LOW/cheap, fast, PROVEN 2026-07-04
     "deepseek/deepseek-v3.2",         # DeepSeek -- cheap general chat (NON-reasoning)
