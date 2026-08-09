@@ -238,8 +238,33 @@ returned zero drift. `scripts/validate_canonical_workflow.py` clean
    The deprecated-noop guard test pins this disposition deliberately, so
    keep-or-drop is an operator call; recording the ledger-audit-trail
    honestly.
-4. **Live 5080 leg for `otr_upscale_ship` -- ATTEMPTED 2026-08-09, STILL
-   OWED, and the attempt produced two findings worth more than the leg.**
+4. ~~**Live 5080 leg for `otr_upscale_ship`**~~ **DISCHARGED 2026-08-09.**
+   `spandrel_esrgan` is LIVE-PROVEN on `cuda:0`. Leg
+   `signal_lost_the_midnight_chime_20260809_142258`, prompt
+   `3bad85f1-7ad1-4a7b-a2f7-41f2033a1bc5`, `RESULT SUCCESS`,
+   `Prompt executed in 00:41:04`, `obs_publish OK`, 36,960,014 B deliverable.
+   Receipts: `upscale engine LOADED: spandrel_esrgan on cuda:0`, **7 x
+   `upscale MODEL PATH ... src=832x448 -> canvas=1920x1080`**, and **ZERO**
+   `FAST PATH` lines -- so the model ran on every segment of a 7-beat,
+   1262-frame assembled timeline. Run on `otr_upscale_ltx_probe` rather than
+   `otr_upscale_ship` because wan_ti2v cannot complete a leg on this box
+   (see STILL OPEN item 0); the upscale stage is downstream of the video
+   engine and identical on both profiles.
+   **THE CHECKPOINT PATH IS THE FINDING.** It resolved to
+   `Documents\ComfyUI\models\upscale_models\RealESRGAN_x2plus.pth` -- NOT the
+   `C:/ComfyUI-Models/upscale_models/` that `_otr_headless_model_paths.yaml`
+   maps. The model is reachable ONLY through the repo-relative fallback on the
+   headless topology, which is exactly the lookup the pre-`088dabc8`
+   `get_full_path`-only fingerprint never consulted. That commit fixed a
+   defect that was LIVE on the publishing box, now measured rather than
+   inferred.
+   *A prediction that was wrong, recorded so it is not re-derived:* the driver
+   expected `sharpen=False` to force FAST PATH on every beat and the model path
+   to be unreachable on an assembled timeline. It is reachable, and it runs.
+
+   Historical detail of the failed first attempt:
+   ~~**ATTEMPTED 2026-08-09, STILL OWED, and the attempt produced two findings
+   worth more than the leg.**~~
    The SHA is already pinned (`8250e01c`) and `ensure_upscale_models.py`
    verifies clean, so no download is needed.
    * **The leg FAILED before reaching the upscale stage.** `wan_ti2v` refused
