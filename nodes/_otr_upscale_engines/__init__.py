@@ -19,7 +19,7 @@ HOW TO ADD YOUR OWN UPSCALE ENGINE (same shape as the other three namespaces):
    :mod:`registry` -- inheritance is never required; the shipped ``Protocol``
    ducks-types on the required members.
 
-2. Implement three lifecycle methods:
+2. Implement four methods -- three lifecycle, one cache contract:
 
      def load(self, device: torch.device) -> None:
          # MUST set self.device. Import torch / your model framework LAZILY
@@ -34,6 +34,32 @@ HOW TO ADD YOUR OWN UPSCALE ENGINE (same shape as the other three namespaces):
          # frames: BHWC float32 in [0, 1] on self.device.
          # returns: BHWC float32 in [0, 1] on self.device, upscaled by
          # self.intrinsic_scale in each spatial dim (2x, 3x, 4x, ...).
+
+     def model_fingerprint_parts(self) -> tuple:
+         # Your engine's contribution to OTR_SilentComposite's ComfyUI cache
+         # key. Return a TUPLE OF TAG-TUPLES of plain primitives -- the
+         # caller does parts.extend(...), so a FLAT tuple would splice
+         # scalars into its top level. No model files? Return () (see
+         # eng_off.py). Otherwise return os.stat metadata for each file you
+         # consume plus any DECLARED digest (see eng_spandrel_esrgan.py).
+         #
+         # DO NOT SKIP THIS. Omitting it means an operator can swap your
+         # checkpoint on disk and ComfyUI will happily reuse the previous
+         # composite: the render silently ignores the new weights. It is a
+         # required member for exactly that reason, and
+         # tests/test_upscale_cache_fingerprint.py fails the build if any
+         # registered engine lacks it.
+         #
+         # Three rules: PURE with respect to load state (class declarations
+         # + disk stat only -- never self.device or your model handle, so
+         # the value is identical before load(), after load() and after
+         # unload()); NO live hashing (this runs on every prompt
+         # evaluation -- stat metadata and a declared constant, never a
+         # multi-MB read); and a MISSING file is a stable marker, NEVER NaN
+         # (two calls with identical inputs must compare equal or the cache
+         # is defeated forever -- Bug Bible 06.07). Raise only for
+         # UNEXPECTED failures; the caller turns those into a bare
+         # top-level NaN, which is the only place NaN reads as fail-open.
 
 3. Add your engine's CAPABILITIES row in :mod:`registry` -- ``device_backends``
    subset of ``("cuda", "cpu", "mps")``, ``requires_vendor`` None or one of

@@ -60,11 +60,52 @@ except Exception as _upscale_import_err:  # noqa: BLE001
     def _get_upscale_engine(name):
         class _NullOff:
             name = "off"
+
+            def model_fingerprint_parts(self):
+                # The real engines declare this; the stub must too, or
+                # IS_CHANGED would raise on the exact degraded path this
+                # fallback exists to survive and return nan on every
+                # evaluation -- breaking caching for plain `off` renders.
+                return ()
         return _NullOff()
 
     def _resolve_upscale_device(v):
         import torch
         return torch.device("cpu")
+
+
+#: Failure identities already reported by IS_CHANGED's fingerprint step.
+#: IS_CHANGED runs on EVERY prompt evaluation, so an unguarded log line would
+#: flood; but staying silent is worse -- a mis-typed engine id in a profile
+#: would become a permanent invisible cache miss on a node that takes minutes.
+#: Keyed on (engine_id, exception class name): small, stable, and free of the
+#: formatted message, so it cannot grow with varying paths. Bounded per Bug
+#: Bible 06.04 (an unbounded module-level cache is itself a named defect).
+#: No lock: two threads may both emit the line, and a duplicate log entry is a
+#: far cheaper outcome than a lock on a per-prompt code path.
+_FINGERPRINT_LOG_ONCE_CACHE: set = set()
+_FINGERPRINT_LOG_ONCE_MAX = 64
+
+
+def _log_fingerprint_failure_once(engine_id, exc) -> None:
+    """Emit one warning per distinct (engine, error type); never raise."""
+    key = (str(engine_id), type(exc).__name__)
+    if key in _FINGERPRINT_LOG_ONCE_CACHE:
+        return
+    if len(_FINGERPRINT_LOG_ONCE_CACHE) >= _FINGERPRINT_LOG_ONCE_MAX:
+        _FINGERPRINT_LOG_ONCE_CACHE.clear()
+    _FINGERPRINT_LOG_ONCE_CACHE.add(key)
+    # %r on the free-form values: an exception string can carry newlines, and
+    # a raw one would forge log records (Bug Bible 12.83).
+    # Wording is deliberately "while it persists", not "until it is fixed":
+    # a checkpoint deleted between the resolver's is_file() and the
+    # fingerprint's os.stat raises once and then settles into the stable
+    # absent marker on the next evaluation, with nothing to fix.
+    log.warning(
+        "[OTR_SilentComposite] upscale model fingerprint unavailable for "
+        "engine %r (%s: %r); IS_CHANGED falls open to nan, so this node "
+        "re-executes every run while that persists.",
+        str(engine_id), type(exc).__name__, str(exc))
 
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
@@ -1336,24 +1377,25 @@ class OTRSilentComposite:
             parts.append(("env",
                           os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT", ""),
                           os.environ.get("OTR_MESH_COMPOSITE_STYLE", "")))
-            # 5. Engine identity + resolved model path (guarded folder_paths
-            # per Antigravity r4 MF-4).
+            # 5. Engine identity + whatever model state that engine declares.
+            #
+            # The engine is ASKED rather than special-cased. This block used to
+            # test `upscale_engine == "spandrel_esrgan"` and stat a hardcoded
+            # "RealESRGAN_x2plus.pth", which meant engine #2 would register,
+            # appear in the dropdown, run, and contribute NO model bytes to the
+            # cache key -- and it resolved the file differently from the loader
+            # besides. Both go away by asking the owner of the fact.
             parts.append(("engine", str(upscale_engine), str(upscale_device)))
-            if upscale_engine == "spandrel_esrgan":
-                model_path = None
-                try:
-                    import folder_paths  # type: ignore
-                    try:
-                        model_path = folder_paths.get_full_path(
-                            "upscale_models", "RealESRGAN_x2plus.pth")
-                    except Exception:  # noqa: BLE001
-                        model_path = None
-                except (ImportError, ModuleNotFoundError):
-                    model_path = None
-                if model_path and os.path.isfile(model_path):
-                    st = os.stat(model_path)
-                    parts.append(("model", model_path,
-                                  st.st_mtime_ns, st.st_size))
+            try:
+                engine = _get_upscale_engine(upscale_engine)
+                parts.extend(engine.model_fingerprint_parts())
+            except Exception as exc:  # noqa: BLE001
+                # An unknown engine id (KeyError from the registry) or a real
+                # stat failure lands here. nan is the correct fail-open, but a
+                # SILENT nan on a minutes-long node is how a typo hides for
+                # weeks -- so say it once, naming the engine.
+                _log_fingerprint_failure_once(upscale_engine, exc)
+                return float("nan")
             return repr(parts)
         except Exception:  # noqa: BLE001
             return float("nan")

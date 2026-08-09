@@ -46,3 +46,13 @@ class OffUpscale:
         """Pass-through. Never invoked in production -- the composite's fast
         path bypasses the model pipeline entirely when engine.name == "off"."""
         return frames
+
+    def model_fingerprint_parts(self) -> tuple:
+        """No model, no bytes, nothing to fingerprint.
+
+        Empty is the honest answer, not a placeholder: `off` consumes no
+        checkpoint, so there is no external state whose change should
+        invalidate the composite's cache. Returning `()` keeps today's key
+        byte-identical for every `off` render.
+        """
+        return ()

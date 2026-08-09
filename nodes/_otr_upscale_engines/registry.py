@@ -84,6 +84,40 @@ class UpscaleEngine(Protocol):
 
     def upscale_frames(self, frames: "torch.Tensor") -> "torch.Tensor": ...
 
+    def model_fingerprint_parts(self) -> tuple:
+        """The engine's contribution to OTR_SilentComposite's cache key.
+
+        Returns a TUPLE OF TAG-TUPLES of plain primitives -- never a flat
+        tuple, because the caller does ``parts.extend(...)`` and a flat tuple
+        would splice scalars into the top level. An engine with no model
+        files returns ``()``.
+
+        Three hard rules, each of them load-bearing:
+
+        * **PURE with respect to load state.** Derive only from class
+          declarations plus disk stat -- never ``self.device``, never
+          ``self._descriptor``. Calling it before ``load()``, after
+          ``load()`` and after ``unload()`` MUST return identical values, or
+          the cache key changes mid-session for no real reason.
+        * **NO live hashing.** ``os.stat`` metadata plus a statically
+          DECLARED digest string. This runs on every prompt evaluation;
+          reading a 67 MB checkpoint here is prohibited.
+        * **Ordinary absence is a deterministic marker, never NaN.** A
+          missing checkpoint must still produce a STABLE value (Bug Bible
+          06.07: two calls with identical inputs must compare EQUAL, or the
+          cache is defeated forever). Reserve raising for UNEXPECTED
+          failures -- the caller turns those into a bare top-level NaN,
+          which is the only place NaN behaves as fail-open.
+
+        ENFORCEMENT IS A TEST, NOT THE REGISTRY. ``EngineRegistry.register``
+        records any object carrying a ``name`` and validates nothing, and
+        that base class is shared with the audio / video / image namespaces
+        whose adapters have no such method -- so validating here would break
+        them. ``tests/test_upscale_cache_fingerprint.py`` asserts every
+        registered upscale engine exposes this.
+        """
+        ...
+
 
 # One registry instance for the upscale namespace (its own dict; no cross-pollution).
 _UPSCALE_REGISTRY = EngineRegistry("upscale")

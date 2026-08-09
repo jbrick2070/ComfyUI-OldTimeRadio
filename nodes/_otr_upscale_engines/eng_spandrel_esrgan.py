@@ -34,6 +34,15 @@ from .registry import register
 
 _LOG = logging.getLogger("OTR.upscale.spandrel_esrgan")
 
+#: Exception types already reported by _resolve_model's folder_paths guard.
+#: That warning used to sit only on load() -- an occasional, explicit call.
+#: model_fingerprint_parts() now calls the same resolver from IS_CHANGED, which
+#: ComfyUI runs on EVERY prompt evaluation, so a persistently broken
+#: folder_paths would emit one warning per evaluation forever. Keyed on the
+#: exception class name: tiny, stable, and bounded (Bug Bible 06.04).
+_RESOLVE_WARNED: set = set()
+_RESOLVE_WARNED_MAX = 32
+
 
 @register
 class SpandrelEsrgan:
@@ -74,6 +83,142 @@ class SpandrelEsrgan:
         self.device = None
 
     # -----------------------------------------------------------------
+    # Model resolution -- ONE source of truth for two callers
+    # -----------------------------------------------------------------
+    def _resolve_model(self):
+        """Locate the checkpoint. Returns ``(candidates, path_or_None)``.
+
+        SINGLE-SOURCED DELIBERATELY. ``load()`` and
+        ``model_fingerprint_parts()`` both need the answer, and before this
+        existed they asked DIFFERENT questions: the loader walked this
+        candidate list while the composite's cache key called
+        ``folder_paths.get_full_path`` alone. On a box where the checkpoint is
+        reachable only through the repo-relative fallback, the loader found it
+        and the cache key did not -- so swapping those weights never
+        invalidated the composite.
+
+        Returns a plain tuple rather than a dataclass/NamedTuple on purpose:
+        this module imports only stdlib + the registry base, and staying
+        cold-import clean is the whole design claim of the namespace.
+
+        Candidate paths are absolutised and normalised, then deduplicated on
+        ``normcase`` with FIRST occurrence winning. The dedupe is not cosmetic:
+        ``folder_paths`` normally returns the very directory the repo-relative
+        fallback appends, and the absence marker EMBEDS this list in the cache
+        key, so a duplicate would be baked into it.
+
+        Never raises for ordinary absence -- that is ``None``, and the caller
+        decides what it means. An UNREADABLE candidate is a different matter
+        and does raise: ``Path.is_file()`` filters through pathlib's
+        ``_ignore_error()``, which returns False only for the not-found family
+        and re-raises everything else, so a ``PermissionError`` escapes here
+        rather than masquerading as absence. That is the behaviour we want and
+        it costs no code -- see ``model_fingerprint_parts`` for why an explicit
+        classification pass was written and then deleted as unreachable.
+        """
+        raw: list = []
+        try:
+            import folder_paths  # noqa: WPS433 - deliberate lazy import
+            fp_candidates = folder_paths.get_folder_paths("upscale_models")
+            if fp_candidates:
+                raw.extend(fp_candidates)
+        except (ImportError, ModuleNotFoundError):
+            pass
+        except Exception as e:  # noqa: BLE001
+            key = type(e).__name__
+            if key not in _RESOLVE_WARNED:
+                if len(_RESOLVE_WARNED) >= _RESOLVE_WARNED_MAX:
+                    _RESOLVE_WARNED.clear()
+                _RESOLVE_WARNED.add(key)
+                _LOG.warning(
+                    "[OTR.upscale] folder_paths.get_folder_paths raised (%s: "
+                    "%r); falling back to repo-relative models dir. Logged "
+                    "once per error type -- this path runs on every prompt "
+                    "evaluation.", key, str(e))
+        # Repo-relative fallback: the ComfyUI install has
+        # models/upscale_models/ at its root; our path is
+        # <comfy_root>/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_upscale_engines/eng_spandrel_esrgan.py
+        # so parents[0]=_otr_upscale_engines, parents[1]=nodes,
+        # parents[2]=ComfyUI-OldTimeRadio, parents[3]=custom_nodes,
+        # parents[4]=<comfy_root>. Sonnet 5 QA MF-1: r4 wrote parents[3],
+        # which landed under custom_nodes/ (nothing there) and silently
+        # missed the shipped models dir on a bare-venv path resolution.
+        # The length guard covers a checkout shallower than five levels
+        # (pip-install / symlink / tmp_path test tree), where indexing
+        # parents[4] would raise IndexError instead of resolving.
+        here = Path(__file__).resolve()
+        if len(here.parents) > 4:
+            raw.append(here.parents[4] / "models" / "upscale_models")
+
+        candidates: list = []
+        seen: set = set()
+        for entry in raw:
+            norm = os.path.abspath(os.path.normpath(os.fspath(entry)))
+            key = os.path.normcase(norm)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(norm)
+
+        model_path = None
+        for base in candidates:
+            path = Path(base) / self._model_filename
+            # NOT wrapped in try/except OSError on purpose: is_file() already
+            # returns False for the not-found family and re-raises anything
+            # else, which is exactly the absence-vs-fault line we want. A
+            # broad catch here would launder an unreadable checkpoint into
+            # "absent" and cache a stale composite against it.
+            if path.is_file():
+                model_path = str(path)
+                break
+        return tuple(candidates), model_path
+
+    # -----------------------------------------------------------------
+    # Cache fingerprint (see UpscaleEngine.model_fingerprint_parts)
+    # -----------------------------------------------------------------
+    def model_fingerprint_parts(self) -> tuple:
+        """Filesystem metadata for the pinned checkpoint + the declared digest.
+
+        Pure with respect to load state: nothing here reads ``self.device`` or
+        ``self._descriptor``, so the value is identical before ``load()``,
+        after ``load()`` and after ``unload()``.
+
+        THE ABSENCE / FAILURE SPLIT, which is where the care goes. A missing
+        checkpoint is a NORMAL, stable state and must keep producing an EQUAL
+        key (Bug Bible 06.07 -- an unstable key defeats the cache forever),
+        whereas an UNREADABLE one is a real fault the caller should turn into a
+        bare NaN. Nothing here has to draw that line by hand, because
+        ``pathlib`` already draws it: ``Path.is_file()`` filters through
+        ``_ignore_error()``, which whitelists only the not-found family
+        (ENOENT / ENOTDIR / EBADF / ELOOP) and RE-RAISES everything else.
+        Verified on this platform, Python 3.12.11: ``PermissionError`` and
+        ``OSError(EIO)`` propagate out of ``is_file()``; ``FileNotFoundError``
+        and ``NotADirectoryError`` return False. So ``_resolve_model`` returns
+        ``None`` for genuine absence ONLY, and a permission fault has already
+        escaped before we get here. An earlier draft of this method re-stat'ed
+        every candidate to classify the failure itself; that pass was
+        unreachable and was removed rather than kept as reassuring dead code.
+
+        No live hashing -- ``_model_sha256`` is the DECLARED constant, folded
+        in so that re-pinning it changes the key. What this key can prove is
+        bounded and worth stating plainly: it is filesystem metadata plus a
+        version salt, and it does not guarantee detection when the resulting
+        path, size and mtime are all unchanged.
+        """
+        candidates, model_path = self._resolve_model()
+        if model_path is not None:
+            st = os.stat(model_path)          # unexpected OSError propagates
+            return (
+                ("model", self._model_filename, model_path,
+                 st.st_mtime_ns, st.st_size),
+                ("declared_sha256", self._model_sha256),
+            )
+        return (
+            ("model_absent", self._model_filename, candidates),
+            ("declared_sha256", self._model_sha256),
+        )
+
+    # -----------------------------------------------------------------
     # Lifecycle: load + unload
     # -----------------------------------------------------------------
     def load(self, device) -> None:
@@ -94,43 +239,13 @@ class SpandrelEsrgan:
                 f"({e})",
                 kind="upscale")
 
-        # Model path resolution. Prefer folder_paths (ComfyUI-aware); fall back
-        # to a repo-relative path when folder_paths is not importable (bare
-        # venv / unit tests -- Antigravity r4 MF-4 / Sonnet 5 MF-5 guard).
-        candidates: list[str] = []
-        try:
-            import folder_paths  # noqa: WPS433 - deliberate lazy import
-            fp_candidates = folder_paths.get_folder_paths("upscale_models")
-            if fp_candidates:
-                candidates.extend(str(p) for p in fp_candidates)
-        except (ImportError, ModuleNotFoundError):
-            pass
-        except Exception as e:  # noqa: BLE001
-            _LOG.warning(
-                "[OTR.upscale] folder_paths.get_folder_paths raised (%s); "
-                "falling back to repo-relative models dir", e)
-        # Repo-relative fallback: the ComfyUI install has
-        # models/upscale_models/ at its root; our path is
-        # <comfy_root>/custom_nodes/ComfyUI-OldTimeRadio/nodes/_otr_upscale_engines/eng_spandrel_esrgan.py
-        # so parents[0]=_otr_upscale_engines, parents[1]=nodes,
-        # parents[2]=ComfyUI-OldTimeRadio, parents[3]=custom_nodes,
-        # parents[4]=<comfy_root>. Sonnet 5 QA MF-1: r4 wrote parents[3],
-        # which landed under custom_nodes/ (nothing there) and silently
-        # missed the shipped models dir on a bare-venv path resolution.
-        fallback = Path(__file__).resolve().parents[4] / "models" / "upscale_models"
-        candidates.append(str(fallback))
-
-        model_path = None
-        for base in candidates:
-            path = Path(base) / self._model_filename
-            if path.is_file():
-                model_path = str(path)
-                break
+        candidates, model_path = self._resolve_model()
         if model_path is None:
             raise EngineUnusable(
                 self.name, "upscale_stage",
                 EngineUsabilityReason.MISSING_MODEL,
-                f"{self._model_filename} not found under any of {candidates}. "
+                f"{self._model_filename} not found under any of "
+                f"{list(candidates)}. "
                 f"Run `python scripts/ensure_upscale_models.py` to download it.",
                 kind="upscale")
 
