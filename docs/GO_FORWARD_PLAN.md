@@ -238,11 +238,29 @@ returned zero drift. `scripts/validate_canonical_workflow.py` clean
    The deprecated-noop guard test pins this disposition deliberately, so
    keep-or-drop is an operator call; recording the ledger-audit-trail
    honestly.
-4. Live 5080 leg for `otr_upscale_ship` -- ONE 30-sec synthetic + one
-   120-word real leg. Pre-leg: `python scripts/ensure_upscale_models.py`
-   downloads the ~64 MB weights and prints the SHA (deliberately empty
-   in the ship for first-run bootstrap; pin it into
-   `SpandrelEsrgan._model_sha256` in a follow-up commit).
+4. **Live 5080 leg for `otr_upscale_ship` -- ATTEMPTED 2026-08-09, STILL
+   OWED, and the attempt produced two findings worth more than the leg.**
+   The SHA is already pinned (`8250e01c`) and `ensure_upscale_models.py`
+   verifies clean, so no download is needed.
+   * **The leg FAILED before reaching the upscale stage.** `wan_ti2v` refused
+     shot 3 on VRAM: `static frame budget 65 ... affordable 19 frames`. Node
+     92 dies before node 84, so the stage was never exercised. Full writeup:
+     `docs/2026-08-09-PROBLEM-STATEMENT-wan-ti2v-inter-shot-vram-retention.md`.
+     **DO NOT chase the wan side -- a concurrent window owns it.**
+   * **A matched `ltx_video` control (`otr_upscale_ltx_probe`, draft profile)
+     COMPLETED the same topology** -- 8 assembled beats, 1072 frames,
+     `Prompt executed in 00:34:44`, `obs_publish OK`, 30.7 MB deliverable. So
+     the retention is wan_ti2v-specific, not a video-path property.
+   * **But that green leg STILL could not prove the upscale stage**, because
+     nothing logged. That silence is now FIXED (`tests/test_upscale_stage_observability.py`):
+     the composite emits an engine-LOADED receipt with the resolved checkpoint
+     path, a MODEL PATH receipt, and a FAST PATH receipt when an engine is
+     selected but a segment skips the model. The `off` default stays silent so
+     byte-identity holds.
+   **What remains is now cheap:** re-run `otr_upscale_ltx_probe` and read the
+   receipts. If FAST PATH fires on every segment, the real question is why
+   `sharpen` is False for all of them -- i.e. whether the model path is
+   reachable at all on an assembled timeline.
 5. **DISCHARGED `867f16c3` (2026-08-08).** Test
    `test_load_raises_missing_model_when_file_absent` silently passed
    under "no model installed" and false-passed the moment the operator
@@ -598,13 +616,20 @@ the same bugs so we need to update the bible and test regularly."*
 
 0. **THREE FINDINGS FROM THE UPSCALE-FINGERPRINT CHUNK (2026-08-08), all
    deliberately NOT swept into `088dabc8` / `7c26ec86`:**
-   * **`scripts/validate_canonical_workflow.py` CAN EXIT 0 WITHOUT
-     VALIDATING.** At `:105-114` a failure to resolve `NODE_CLASS_MAPPINGS`
-     prints `SKIPPED validate_workflow_contract` to stderr and then
-     `return []` -- i.e. "no problems" -- so the exit code reports a pass.
-     This script is named as an acceptance gate in the item-8 tombstone
-     above, so anyone trusting its exit code is trusting a skip. Make the
-     skip fail, or add a `--strict` used wherever it gates.
+   * ~~**`scripts/validate_canonical_workflow.py` CAN EXIT 0 WITHOUT
+     VALIDATING.**~~ **FIXED `5fdf93f1` (2026-08-09), and it was WORSE than
+     recorded here.** The contract had never run ON ANY BOX: the package dir
+     is `ComfyUI-OldTimeRadio` (HYPHEN) and ComfyUI loads it BY PATH, so the
+     old `importlib.import_module(name.replace("-","_"))` was PERMANENTLY
+     unsatisfiable -- it always took the skip, always returned `[]`, always
+     printed OK. The item-8 receipt "clean (23 nodes, 56 links)" was the skip
+     path. Fixed at root with `spec_from_file_location` on `__init__.py` (the
+     technique `otr_macbeth_probe.py` already used to route AROUND this
+     script), and an unrunnable contract is now a PROBLEM. 5 tests in
+     `tests/test_validate_canonical_workflow_fails_closed.py`, including a
+     control that fail-closed has not become fail-always.
+     **Carry-forward lesson:** the workaround shipped and the shared gate
+     stayed broken for weeks. When you route around a gate, fix the gate.
    * **`otr_upscaled_dir()` (`nodes/_otr_paths.py:383`) is DEAD.** Its only
      producer was `OTR_RTXUpscale`; references now are the definition, the
      `__all__` entry, and the output-tree contract test that iterates every

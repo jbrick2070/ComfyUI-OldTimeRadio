@@ -754,6 +754,19 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     black paths remain byte-identical whether a profile picks ``off`` or a real
     engine."""
     if engine is None or engine.name == "off" or not sharpen:
+        # OBSERVABILITY (2026-08-09). A completed render used to say NOTHING
+        # about whether the upscale stage engaged: neither this branch nor the
+        # model branch logged, and the node's status string -- the only carrier
+        # of "upscale=<engine>@<device>" -- never reaches /history. A live
+        # 8-beat leg with upscale_engine='spandrel_esrgan' therefore finished
+        # green while leaving zero evidence either way, which is not a proof.
+        # Logged ONLY when an engine is actually selected, so the `off` default
+        # emits nothing and its byte-identical path stays byte-identical.
+        if engine is not None and engine.name != "off":
+            log.info(
+                "[OTR_SilentComposite] upscale FAST PATH for %s: engine=%s "
+                "sharpen=%s (model runs only on sharpened real-clip segments)",
+                os.path.basename(seg_path), engine.name, sharpen)
         loop_args = ["-stream_loop", "-1"] if loop else []
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
                "-vf", _seg_vf(w, h, fps, start_frame, sharpen=sharpen),
@@ -788,6 +801,14 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
                 "OTR_SilentComposite: segment encode failed (%s) :: %s"
                 % (os.path.basename(seg_path), p.stderr.strip()[:200]))
         return
+    # The positive receipt. Names the engine, the device it was loaded on, and
+    # the geometry it is actually changing -- so a finished render proves the
+    # model ran rather than leaving it to be inferred from silence.
+    log.info(
+        "[OTR_SilentComposite] upscale MODEL PATH for %s: engine=%s device=%s "
+        "src=%dx%d -> canvas=%dx%d (%d frames)",
+        os.path.basename(seg_path), engine.name, getattr(engine, "device", None),
+        _src_w, _src_h, int(w), int(h), int(n_frames))
     _run_model_pipeline(fb=fb, src=src, seg_path=seg_path,
                         n_frames=n_frames, w=w, h=h, fps=fps,
                         start_frame=start_frame, loop=loop, engine=engine,
@@ -1448,6 +1469,22 @@ class OTRSilentComposite:
         if _engine_active:
             device = _resolve_upscale_device(upscale_device)
             engine.load(device)
+            # Load succeeds silently in the adapter, so without this a reader
+            # cannot tell "loaded fine" from "never engaged". Report the
+            # RESOLVED checkpoint too: on the headless topology folder_paths
+            # maps upscale_models at a dir that holds no .pth, so the file is
+            # reached only via the repo-relative fallback -- exactly the
+            # divergence 088dabc8 fixed, and worth seeing per run.
+            _resolved = None
+            try:
+                _resolver = getattr(engine, "_resolve_model", None)
+                if callable(_resolver):
+                    _resolved = _resolver()[1]
+            except Exception:  # noqa: BLE001 -- diagnostics must never fail a render
+                _resolved = None
+            log.info(
+                "[OTR_SilentComposite] upscale engine LOADED: %s on %s "
+                "(checkpoint=%s)", engine.name, device, _resolved or "n/a")
         try:
             try:
                 if assemble:
