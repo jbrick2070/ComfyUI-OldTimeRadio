@@ -322,24 +322,76 @@ LEMMY_PROFILE = {
     "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
 }
 
+# What a REAL qualification receipt has to contain before a route may be called
+# approved. Every field answers "could someone else reproduce this judgement?" --
+# which is the whole difference between evidence and a label.
+#
+# WHY THIS EXISTS. `approved_native_routes` used to list bark as approved with
+# `qualification_receipt: "canonical_bark_preset_v1"` -- a BARE STRING. No
+# artifact, no hash, no test lines, no seed, no operator verdict. Nothing had
+# been auditioned; the string simply asserted that something had. That is a field
+# which reads as evidence and is not (BUG-12.86), and it is the exact defect this
+# pack keeps finding, sitting inside the policy meant to prevent it.
+QUALIFICATION_RECEIPT_REQUIRED_FIELDS = frozenset({
+    "artifact_path",      # the rendered audition clip on disk
+    "artifact_sha256",    # so the clip cannot be swapped under the verdict
+    "neutral_line",       # the exact two lines auditioned, verbatim
+    "emotional_line",
+    "seed",
+    "engine",
+    "engine_impl_version",
+    "identity_kind",
+    "identity_id",
+    "settings",           # whatever the engine needs to reproduce the render
+    "operator_verdict",   # a human said yes; nothing else can supply this
+    "audited_on",         # ISO date
+})
+
+
+def is_qualified_route(route) -> bool:
+    """True only when ``route`` carries a COMPLETE qualification receipt.
+
+    Fail-closed by construction: a missing receipt, a bare string, a non-dict, or
+    a dict missing any required field is UNQUALIFIED. A route that cannot prove
+    it was auditioned has not been auditioned.
+    """
+    if not isinstance(route, dict):
+        return False
+    receipt = route.get("qualification_receipt")
+    if not isinstance(receipt, dict):
+        return False                      # None, or the old bare-string shape
+    missing = QUALIFICATION_RECEIPT_REQUIRED_FIELDS - set(receipt)
+    if missing:
+        return False
+    # Present-but-empty is the same lie in a longer form.
+    return all(str(receipt.get(f, "")).strip() != "" for f in
+               QUALIFICATION_RECEIPT_REQUIRED_FIELDS)
+
+
 LEMMY_VOICE_POLICY = {
     "policy_version": "lemmy-cockney-v1",
     "required_accent": "cockney",
     "dialogue_orthography": "standard_english",
+    # The DEFAULT route. This is a ROUTING fact -- where Lemmy goes when nothing
+    # else decides -- and it is deliberately NOT a claim that the route was
+    # auditioned. `lemmy_row()` pins this same engine/preset today.
     "canonical_route": {
         "engine": "bark",
         "identity_kind": "preset",
         "identity_id": "v2/en_speaker_8",
-        "qualification_receipt": "canonical_bark_preset_v1",
+        # UNQUALIFIED: no audition has ever been run against the Cockney claim,
+        # on bark or on any other engine. When one is, put a receipt matching
+        # QUALIFICATION_RECEIPT_REQUIRED_FIELDS here and add the route below.
+        "qualification_receipt": None,
     },
-    "approved_native_routes": {
-        "bark": {
-            "engine": "bark",
-            "identity_kind": "preset",
-            "identity_id": "v2/en_speaker_8",
-            "qualification_receipt": "canonical_bark_preset_v1",
-        },
-    },
+    # DELIBERATELY EMPTY (2026-08-10). Nothing is audition-proven Cockney -- not
+    # bark, not the six other char-voice engines. British != Cockney, and the one
+    # entry that used to sit here was the bare string described above.
+    #
+    # This is the honest state, and it is also the useful one: the audition step
+    # now has a defined target to fill in rather than an approval to explain
+    # away. Populate it ONLY from a real operator audition.
+    "approved_native_routes": {},
 }
 
 # -----------------------------------------------------------------------------

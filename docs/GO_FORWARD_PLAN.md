@@ -123,6 +123,26 @@ from `kibitz-runs/2026-08-08-lemmy-cockney/r1/final.md` must skip its step 1.
 D-4 (governing the writer) is also partly addressed by Phase 1's
 `dialogue_orthography`, `speech_signature` and `nodes/_otr_dialogue_policy.py`.
 
+**LEMMY r2 RAN 2026-08-10 (both lanes) -- see `kibitz-runs/2026-08-10-lemmy-cockney/r2/`.
+r3 NOT run, deliberately: r2 hit a PLAN-LEVEL blocker that is now operator row 14.**
+
+**SHIPPED from r2's cleanest finding:** the qualification receipt is honest now.
+`approved_native_routes` had listed bark as APPROVED via the bare string
+`canonical_bark_preset_v1` -- no artifact, no hash, no test lines, no operator
+verdict -- while r1 states plainly that no voice on any engine is audition-proven.
+A field that reads as evidence and is not, sitting inside the policy meant to
+prevent exactly that. `approved_native_routes` is now EMPTY, `canonical_route`
+keeps bark as a ROUTING fact with `qualification_receipt: None`, and
+`QUALIFICATION_RECEIPT_REQUIRED_FIELDS` + `is_qualified_route()` define what a
+real receipt must contain (artifact + sha256, both audition lines verbatim, seed,
+engine/impl version, identity, settings, **operator_verdict**, date). Fail-closed:
+a bare string, a missing field, or a present-but-empty field is UNQUALIFIED.
+34 new tests, mutation-checked -- restoring the bare string turns the guard red.
+**Zero behaviour risk: `LEMMY_VOICE_POLICY` has no production consumer** (Phase 1
+shipped it defined-but-unwired), so this could land without a re-baseline.
+**This gives the audition (D-3) a target to fill in rather than an approval to
+explain away.**
+
 **WHAT IS ACTUALLY LEFT, verified at the line 2026-08-10 -- D-2, the
 partial-rollout state both r1 lanes called the worst possible one.** The
 per-character voice pin still does NOT reach pre-locked LEMMY:
