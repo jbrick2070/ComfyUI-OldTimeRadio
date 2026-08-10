@@ -70,9 +70,9 @@ dialogue, so they should not run mid-Lemmy.
 
 | Thing | Value as of 2026-08-09 |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `e791344b`, == `origin/v2.0-alpha` (measured 2026-08-10 after the plan-5.2 push) |
+| Branch / HEAD | `v2.0-alpha` @ `fdc016ef`, == `origin/v2.0-alpha` (measured 2026-08-10 after the plan-5.3 push) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9672 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-10 at `e791344b`; was 9516 as of 08-09, and that row had gone stale across the two Lemmy pushes before this one). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
+| Suite | **9708 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-10 at `fdc016ef`; was 9516 as of 08-09, and that row had gone stale across the two Lemmy pushes before this one). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
 | Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
@@ -214,7 +214,7 @@ waiting on me?" without reading the whole file.
 | 10 | **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female; `Clara` gendered male with "her" in her own prose | READ THE LIST, rule case by case. Do not total it. `ROSALIND` is NOT one -- Ganymede keeps her female voice by your earlier ruling | sprint item 8 |
 | ~~11~~ | ~~**`story_orchestrator.py` cast-merge ruling**~~ **ANSWERED 2026-08-10: operator wants AN LLM PASS to clean this up**, not a test pinning today's behaviour and not a mechanical re-baseline. Scoped as a coder item below | -- | -- |
 | 12 | **v2.1 candidate:** a low-footprint LOCAL model steeped in OTR diction | A CONSCIOUS RE-OPEN. It collides with your 2026-08-04 "story quality is done" directive, so only you can reopen it | STILL OPEN item 7 |
-| 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` §0A |
+| 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` Â§0A |
 
 | 14 | **LEMMY PHASE 2 CANNOT BE BUILT AS SPECIFIED -- a scope call, surfaced by the r2 panel 2026-08-10 and confirmed at the line.** The plan's central behaviour is *"if an engine cannot meet the Cockney floor, suppress the cameo on that engine rather than silently substitute"*. **That is not expressible in the current graph.** Lemmy is selected UPSTREAM in the writer (`OTR_LedgerScriptWriter.py:4412-4426`); the voice engine is chosen LATER by nodes 80/81, and `BatchCharacterVoices` exposes ONE engine for the entire character bus. So by the time anything knows the engine, the cameo is already written into the script | **PICK ONE:** (a) downgrade the requirement to a FAIL-CLOSED CastLock error (no new surface, but a bad combination stops the render instead of degrading); (b) add ONE upstream engine-policy authority feeding writer + CastLock + renderer so the writer can decline the cameo before authoring -- this needs a NEW NODE/WIDGET SURFACE and `otr_canonical.json` wiring, which r1 explicitly ruled out of scope, so it is a deliberate scope change only you can authorise; or (c) accept the cameo on any engine and drop the floor | `kibitz-runs/2026-08-10-lemmy-cockney/r2/` |
 
@@ -290,9 +290,39 @@ supported by the bank metadata and that overreach was correctly rejected.
   contract items; its one finding (the claim resolver not being handed the bank
   `lock()` had already loaded) is fixed in the same commit.
 
-**STILL TO BUILD:** 5.3's second half (receipt / `IS_CHANGED` fingerprint /
-`tts_engine` on per-line receipts). Then Branch A (section 7). **Branch B stays
-unbuilt unless G1 fails and a separate decision approves it.**
+* **Plan 5.3 second half -- reference resolution, receipts, fingerprint.
+  SHIPPED 2026-08-10 (`fdc016ef`).** `resolve_and_verify_reference` (the 5.1 seam
+  that had never actually been built) now runs right after `cast_lookup`, and a
+  proved local route RENDERS ITS OWN BYTES -- without that override the route
+  proved one file while the generic resolver handed the adapter another.
+  `build_resolved_request` carries the four route fields into the cache key.
+  `IS_CHANGED` stopped returning the constant `"static"` for local legs, which
+  had asserted that a local voice render can never change: swap the reference WAV
+  under a pin and ComfyUI would serve the previous render while the ledger
+  claimed the new route. It is now a fingerprint over route identity, runtime and
+  the actual reference bytes -- with a ledger carrying NO routes still returning
+  the literal string `"static"`, never a network call, and NaN (fail-open) on an
+  unreadable expected local file. Per-line receipts now also land on the LOCAL
+  path for policy-route lines (`voice_route_id` + `sample_rate`), scoped to those
+  lines because stamping every local line would reload-and-resave the whole
+  ledger on every ordinary leg -- which `test_end_to_end_google_tts_cache_off_
+  byte_identity` forbids, correctly. 36 tests.
+  **Sonnet QA caught a real defect and it is fixed in the same commit:** the
+  "receipt must persist" rule first fired on a bare degraded COUNT plus "was any
+  route in this render a policy route", so an unrelated line's failed stamp would
+  have thrown away good, fully evidenced route audio. `_persist_ledger_stamps`
+  now reports WHICH line_ids failed and the raise compares that set against the
+  route's own lines.
+
+**BRANCH A IS BLOCKED ON G1, NOT ON CODE (measured 2026-08-10).** Plan section 7
+opens *"Branch A starts only after G1 pass"*, and its first step is to commit the
+bank entry, the reference and the POLICY RECORD -- a qualification receipt whose
+`operator_verdict` only a human listening session can supply. Every seam Branch A
+needs is now built and inert; what is missing is the evidence, and a coder window
+must not invent it. **The unblocking act is G1 Test A** (~20 min GPU + ~10 min
+operator ears; the audition lines are frozen in `LEMMY_AUDITION_LINES` and the
+candidate WAV's SHA-256 is verified). **Branch B stays unbuilt unless G1 fails and
+a separate decision approves it.**
 
 **STILL TO RUN:** G1 Test A -- blinded A/B/C on IndexTTS2 (candidate = Algenib
 Cockney clip as clone reference; incumbent = `vz_donor_marshal_indian`; control
@@ -2473,3 +2503,5 @@ here because each has been re-proposed at least once:
 - `docs/2026-07-11-announcer-framing-defect.md` (PARKED) / `docs/2026-07-11-timeline-cue-ledger.md`
 - `docs/2026-07-17-model-bakeoff-scoreboard.md` (writer-model verdict)
 - `workflows/otr_canonical.json` (the workflow source of truth)
+
+
