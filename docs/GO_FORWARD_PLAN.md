@@ -346,6 +346,20 @@ zero quota markers, a timeout not credits). The spec is TRACKED deliberately: th
 arc's raw artifacts are in `kibitz-runs/2026-08-09-slug-provenance-nonvideo/`,
 which is gitignored, and this file's own GROUNDING RULE says why that matters.
 
+**ITS STEP 4 IS NOW DONE (2026-08-10) -- the live catalog run happened and is
+written down:** `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
+A COMPLETE terminal-page listing, 52 unique ids, and **all seven shipped Google
+ids are present**, so the preview rule is satisfiable for the four
+preview-labelled ones (three TTS + Lyria) and the verifier's exit-2 "missing"
+condition does not fire. **The escalated `gemini-3.1-flash-image-preview` is
+present too and that changes NOTHING** -- runtime sends it to a Vertex proxy, not
+the catalog endpoint that was measured, so it still ships `unverified` as the
+sole named exception. It does undercut one disputed claim: the id is still listed
+46 days after the 2026-06-25 shutdown Codex reported, which argues against a
+completed catalog removal while saying nothing about the proxy route.
+**A window picking this up no longer has to pause mid-atomic-commit to go fetch
+dates.** Steps 1-5 remain to build, as ONE commit.
+
 **Why it was not built in that window:** the r4 panel raised a serialization
 prerequisite and it was confirmed live -- a concurrent window still held
 uncommitted `eng_wan_i2v.py` + `otr_g4_wan_ti2v.json`, and r4 also ruled that
