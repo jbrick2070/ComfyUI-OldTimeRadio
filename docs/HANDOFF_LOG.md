@@ -3,6 +3,103 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-09 -- HEAD a36483b3 (v2.0-alpha) -- CODER (chip 4 discharged live; four "reports success while doing nothing" defects fixed; first Bible promotion in 3 sessions)
+
+Did: 15 commits here + 2 in the survival-guide repo, all pushed and lockstep
+  verified. `workflows/otr_canonical.json` byte-identical across the whole
+  session (`git diff 36d695f6..HEAD -- workflows/otr_canonical.json` EMPTY).
+- **THE SESSION'S PATTERN, worth carrying:** every defect found was something
+  REPORTING SUCCESS WHILE DOING NOTHING. None was visible from reading code;
+  each needed something actually run, and two were caught only because a test
+  refused to go red when the thing it guarded was deleted.
+- **`088dabc8` -- upscale cache fingerprint, and it was LIVE not latent.**
+  `IS_CHANGED` hardcoded one engine id + one filename and resolved the model
+  differently from the loader. Fable's grounding proved the consequence on THIS
+  box: `_otr_headless_model_paths.yaml` maps `upscale_models` at
+  `C:/ComfyUI-Models/upscale_models/`, which holds no `.pth`; the only
+  checkpoint is under `Documents/ComfyUI/` and reachable ONLY via the
+  `parents[4]` fallback. So a weight swap never invalidated the composite on
+  the publishing box. Later PROVEN by the chip-4 leg's own receipt.
+- **`5fdf93f1` -- the workflow validator could NEVER run its contract.** Package
+  dir is `ComfyUI-OldTimeRadio` (hyphen), ComfyUI loads by path, so
+  `import ComfyUI_OldTimeRadio` was permanently unsatisfiable; the error path
+  returned `[]` = "no problems" and exited 0. The item-8 receipt "clean (23
+  nodes, 56 links)" WAS the skip path. Fixed by path-loading `__init__.py`, the
+  technique `otr_macbeth_probe.py` already used to route AROUND this gate --
+  the workaround had shipped while the shared gate stayed broken.
+- **`69f2384a` -- upscale stage made observable.** Neither branch of
+  `_encode_segment` logged and node 84 emits no `/history` entry, so a green
+  render could not distinguish "ran" from "never engaged". This is what made
+  chip 4 unclosable by ANY leg. Three receipts added; `off` stays silent.
+- **CHIP 4 DISCHARGED (`c327d0f8`).** Leg
+  `signal_lost_the_midnight_chime_20260809_142258`, prompt
+  `3bad85f1-7ad1-4a7b-a2f7-41f2033a1bc5`, `Prompt executed in 00:41:04`,
+  `obs_publish OK`, 36,960,014 B. `upscale engine LOADED: spandrel_esrgan on
+  cuda:0 (checkpoint=...Documents\ComfyUI\models\upscale_models\RealESRGAN_x2plus.pth)`
+  + **7 x MODEL PATH, 0 x FAST PATH**. Run on `otr_upscale_ltx_probe` because
+  wan_ti2v cannot finish a leg on this box.
+- **`262dfa8f` + `22012263` -- OpenRouter durability (queue item 1 chunk B).**
+  Creative default is now `~anthropic/claude-opus-latest`; new cheap pointer
+  `~deepseek/deepseek-v4-flash-latest`. Rejected `qwen3.7-flash` and
+  `ling-2.6-flash` BY NAME in the guard: cheaper, but concrete ids whose authors
+  publish no `~latest`, and `inclusionai` has 5 models in the whole catalog.
+  Proven live -- the alias resolved to `anthropic/claude-opus-5` while the pin
+  it replaced said `4.8`. Also stamped `meta["resolved_models"]` in the WRITER
+  (provenance previously existed only on the video path, so writer-only runs
+  lost it) and unbroke `workflows/otr_story_only.json`, which could not be
+  submitted at all due to a stale non-suffixed widget value.
+- **`e16e9a63` + `a36483b3` -- attempts receipt + the shared ladder contract.**
+  `visual_style_receipt["attempts"]` always read 1. Fixed, and then the
+  `on_attempt_complete` contract that THREE callers silently depend on was
+  pinned against the real ladder for the first time; `grep on_attempt_complete
+  tests/` had matched only callers. Then closed the one exit of six that
+  skipped `notify_attempt`. Mutation-checked.
+- **BIBLE: BUG-12.87 promoted** (survival-guide `905e85c`) -- "a gate reports
+  success from its own error path". First promotion in 3 sessions; the previous
+  window declined all 3 candidates for want of a live artifact. **And the bible
+  had an instance of its own new rule** (`656c36e`): `BUG_BIBLE.yaml` had never
+  `yaml.safe_load`ed while the README called it machine-readable, because every
+  structural check counts by regex. 263 entries / 371 index rows / 20-24-3.
+- **MY OWN ERRORS, recorded so they are not re-inherited:** (1) I repeated
+  GO_FORWARD's "item 1 is blocked on an API key" as fact -- the key was in the
+  User env all along (`15f23044`). (2) The r4 kibitz panel and I unanimously
+  believed `Path.is_file()` swallows `PermissionError`; measuring showed pathlib
+  re-raises, and my compensating code was dead -- deleted. (3) I predicted the
+  upscale model path was unreachable on an assembled timeline; it ran 7/7.
+  (4) I swept 8 pre-existing uncommitted `test_otr_*` guards into survival-guide
+  `656c36e` by staging a whole file without checking `git status` in that repo.
+Current step: queue item 1 effectively closed (chunk B coded + live-proven);
+  item 8 chips 1/2/4 all discharged. Item 5 (H3) reframed by the operator as a
+  video-path SPRINT SERIES, scope TBA, no longer operator-blocked.
+Next: the WAN VRAM problem statement is written and controlled
+  (`docs/2026-08-09-PROBLEM-STATEMENT-wan-ti2v-inter-shot-vram-retention.md`)
+  but is NOT this window's to fix -- a concurrent window owns that engine and
+  its uncommitted `render_canvas` edit still reddens 3 tests. Unblocked
+  non-video work: the `SpandrelEsrgan._resolve_model` robustness pair (MUST
+  get a kibitz panel first -- third touch of that logic), `otr_upscaled_dir()`
+  dead-code removal (operator call), and the mechanical half of slug re-dating.
+  SF#1 chips and the 20-clip measurement remain held: Lemmy Phases 2-4 never
+  shipped (`bec0ca79` was Phase 1).
+Models: Opus 5 (coder + sole judge). FULL `kibitz-plugin:kibitz` r1-r4 arc on
+  the upscale-fingerprint chunk -- 8 external calls (Codex `gpt-5.6-sol` high
+  x4 verified per round + Antigravity `Gemini 3.6 Flash (High)` x4), plus a cold
+  Fable r1 and 4 driver anchors; agy timed out on r1 and delivered on one
+  `--only agy` retry (TIMEOUT, not quota -- `agy models` rc=0, no
+  RESOURCE_EXHAUSTED, no quota_hold written). Sonnet 5 QA on four separate
+  diffs; Fable final gate on the behavioural upscale commit. LATER CHUNKS WERE
+  NOT PANELLED: the operator instructed "ask me first before paneling"
+  (2026-08-09) and did not ask for one; they carry Sonnet QA only, and that is
+  a scoped receipt, NOT a four-round arc. One live `anthropic-skills:roundtable`
+  R1 test pass, ~$0.1267 -- truncated at max_tokens=2000 and DeepSeek returned
+  empty (reasoning burn), so the shipped panel config is under-provisioned.
+Box state: CLEAN and free. Port 8000 free, zero servers, GPU 1173 MiB / 5%,
+  nothing of mine running. GPU was returned to the operator twice on request
+  mid-session; all later work was CPU-only.
+Commits: `088dabc8`, `7c26ec86`, `bf9f7fb1`, `15f23044`, `262dfa8f`,
+  `abaafd16`, `0ad04742`, `6530ed84`, `5fdf93f1`, `69f2384a`, `c327d0f8`,
+  `22012263`, `e16e9a63`, `76d26c6d`, `a36483b3` (+ survival-guide `905e85c`,
+  `656c36e`).
+
 ## 2026-08-08 -- HEAD bec0ca79 (v2.0-alpha) -- CODER (Macbeth gate DISCHARGED live; voice pool 4->28; two chips closed; Lemmy Phase 1 landed from a 2nd window)
 
 Did: five commits from this window, all pushed and lockstep-verified, plus one

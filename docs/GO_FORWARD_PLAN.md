@@ -56,17 +56,41 @@ dialogue, so they should not run mid-Lemmy.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-08 late |
+| Thing | Value as of 2026-08-09 |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `7c26ec86`, == `origin/v2.0-alpha` |
-| Suite | **9486 passed / 111 skipped / 1 xfailed, ZERO failures** (was 9465; +21 from `tests/test_upscale_cache_fingerprint.py`) |
-| Bug Bible | **17 passed / 24 skipped / 3 xfailed** at survival-guide `7a5fb88` (262 entries, index 370 rows) |
+| Branch / HEAD | `v2.0-alpha` @ `a36483b3`, == `origin/v2.0-alpha` |
+| Suite | **9509 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (was 9465/111/1 at `36d695f6`; +44 tests this session). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
+| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
 | Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
 
 A window that reads a different suite number has inherited drift -- find out
 why before building on it.
+
+### THE SUITE IS RED AND IT IS NOT YOURS -- read this before diagnosing
+
+Three tests fail in the WORKING TREE and none of them come from a commit:
+
+    tests/test_engine_matrix_doc.py::test_the_doc_matches_the_live_registry
+    tests/test_ltx_8gb_canonical_canvas.py::test_a_SIBLING_lane_still_takes_the_landscape_default
+    tests/test_ltx_8gb_canonical_canvas.py::test_engines_that_declare_NOTHING_are_left_alone
+
+Cause: a CONCURRENT window has an **uncommitted** `render_canvas = (832, 480)`
+on `nodes/_otr_video_engines/eng_wan_i2v.py`. It is a correct VRAM fix from the
+recipe-lab findings -- the engine had been falling through to the 1472x832
+landscape default, 3.07x its tier's pixels. It invalidates those two canvas
+tests and `docs/ENGINE_MATRIX.md`, all of which belong in ITS commit.
+
+**Consequences for you:**
+* `origin/v2.0-alpha` is GREEN. The edit never reached origin, so a fresh clone
+  and CI both pass. Only this working tree is red.
+* Do NOT "fix" those tests or regenerate ENGINE_MATRIX.md -- that would sweep
+  another window's in-flight work into your commit.
+* Do NOT touch wan (operator instruction 2026-08-09, still standing).
+* The exact pass count is not quotable while the guard trips: the
+  KNOWN-FAIL-GUARD replaces pytest's summary line. To get a real number, run
+  the suite with those three `--deselect`ed.
 
 ### LEMMY COCKNEY -- ACTIVE, SECOND WINDOW (do not collide)
 
@@ -622,7 +646,39 @@ B.** The only DeepSeek alias is `~deepseek/deepseek-v4-flash-latest` -- the
 FLASH tier, so switching is a capability drop, not a like-for-like swap. Both
 review lanes independently said keep the pin.
 
-### BIBLE PROMOTION -- DONE 2026-08-07, no candidate pending
+### BIBLE PROMOTION -- BUG-12.87 LANDED 2026-08-09
+
+**First promotion in three sessions.** The 2026-08-08 window checked three
+candidates and had to decline all of them for want of a live artifact. This one
+cleared the admission rule outright: reproduced live, recorded in
+`docs/HANDOFF_LOG.md`, fixed, and verified.
+
+**BUG-12.87 -- "a gate reports success from its own error path"**
+(survival-guide `905e85c`; index row + README count moved in the same commit,
+Three-File Contract intact at 263 entries / 371 rows). The rule: an error path
+that returns the SAME sentinel as success turns "I could not check" into "I
+checked and it was fine". Two things make it durable -- the skip is usually
+DELIBERATE and documented as a convenience, and its trigger may be PERMANENT,
+so the check runs zero times while its output is cited as evidence. The
+diagnostic tell recorded with it: **another component has quietly
+reimplemented the same check with a comment saying the shared one cannot be
+trusted.**
+
+**And the bible had an instance of its own new rule** (survival-guide
+`656c36e`): `BUG_BIBLE.yaml` had never `yaml.safe_load`ed -- six entry fields
+were plain scalars containing `': '` -- while the README called it
+machine-readable, because every structural check counts entries by REGEX and a
+text scan cannot tell a parseable file from a broken one. Fixed, with three
+`TestBibleIsActuallyParseable` guards.
+
+**Carry-forward warning for the next window:** that second commit ALSO swept in
+8 pre-existing uncommitted `test_otr_*` guards that were sitting dirty in the
+survival-guide repo -- staged by a whole-file `git add` without checking
+`git status` there first. Nothing is broken and the suite is green, but the
+commit message does not describe them. **Operator decision pending:** leave it
+with a documenting follow-up, or split them into their own commit.
+
+### BIBLE PROMOTION -- historical, 2026-08-07
 
 PBUG-20260807-01's class promoted as **BUG-12.86** (survival-guide `7a5fb88`,
 261 -> 262 entries, index row in the same commit): *a receipt or prompt-context
