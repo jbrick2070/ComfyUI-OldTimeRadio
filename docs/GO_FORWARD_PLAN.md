@@ -19,7 +19,7 @@ later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 1 | **Model-slug curation CHUNK B** -- the two pieces chunk A could not prove without an `OPENROUTER_API_KEY`: (a) promote the CREATIVE default from `anthropic/claude-opus-4.8` to `~anthropic/claude-opus-latest` (identical price, `structured_outputs=True`, and the ledger already stamps the resolved concrete model -- `tests/test_openrouter_resolved.py:19-30`); (b) decide `qwen/qwen3.7-flash` (cheapest credible at $0.03/$0.13 per M, but a VISION-language model reporting `structured_outputs=False`, so slot-a only). **BOTH are gated on one live canonical OpenRouter leg** -- catalog presence proves discovery, not generation. Chunk A is DONE (tombstone below) | `_otr_model_catalog`, `_otr_openrouter_backend` | coder + ONE live leg | **NOTHING -- UNBLOCKED 2026-08-08** |
+| ~~1~~ | ~~**Model-slug curation CHUNK B**~~ **SHIPPED + LIVE-PROVEN 2026-08-09 (`262dfa8f` + `22012263`). Queue item 1 is CLOSED -- do not re-open.** (a) landed: the creative default is `~anthropic/claude-opus-latest`, and the live leg resolved it to `anthropic/claude-opus-5` while the pin it replaced still said `4.8` -- the staleness the alias exists to prevent, caught on its first run. (b) was DECIDED AGAINST: `qwen/qwen3.7-flash` and `inclusionai/ling-2.6-flash` are REJECTED BY NAME in the curation guard -- cheap, but concrete ids whose authors publish no `~latest`, and `inclusionai` ships 5 models total. Also added the `~deepseek/deepseek-v4-flash-latest` pointer, stamped `meta["resolved_models"]` in the WRITER (provenance had existed only on the video path, so writer-only runs lost it), and unbroke `workflows/otr_story_only.json`, which could not be submitted at all | -- | -- | -- |
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
 | 5 | **MiniMax H3 -- VIDEO-PATH SPRINT SERIES** (reframed by the operator 2026-08-09; the old "does H3 belong in the dropdown" ruling is RETIRED, not pending). H3 becomes a run of sprints refining the video paths, each its own gated chunk. **Scope TBA -- do not invent the sprint list**; when the operator names sprint 1, add it here as its own row | section 0-QUINQUE | coder, several chunks | operator naming sprint 1 |
@@ -38,16 +38,28 @@ sprint the operator will name -- see 0-QUINQUE.) A coder window that
 reaches one without an answer skips to the next unblocked item rather than
 guessing.
 
-**ITEM 1 IS NOT BLOCKED -- corrected 2026-08-08 by MEASUREMENT, after this file
-had asserted the opposite for a day and a coder window repeated it to the
-operator as fact.** The `OPENROUTER_API_KEY` is present in the **User**
-environment scope on this box (73 chars, `sk-or-` prefix), so every process a
-coder window spawns inherits it. Proven, not assumed: a plain venv run of
-`nodes._otr_openrouter_backend.openrouter_enabled()` returns **True** with no
-launcher involved. The old note below claiming the key "is set inside the
-launcher scripts, not in a coder window's environment" is FALSE and has been
-corrected in place. **Grep or measure before repeating a blocker out of this
-file** -- that is the lesson, not just the fact. **Item 8 SHIPPED
+**READ THIS BEFORE HUNTING FOR WORK (state as of 2026-08-09 late).** With item 1
+closed, **THE QUEUE HAS NO UNBLOCKED CODING ROW LEFT** -- every remaining row is
+waiting on the operator, and item 9's remainder is held behind Lemmy besides. A
+coder window that reaches this line has not run out of work; it has run out of
+QUEUE. The unblocked work lives in **STILL OPEN, SMALL, UNSCHEDULED** below and
+in the 6-STATUS follow-ups. Take the topmost item there instead of forcing a
+blocked row, and do not read the queue's silence as "nothing to do".
+
+**ITEM 1 SHIPPED 2026-08-09 -- the row above is a tombstone, not work.** It is
+recorded here because the ROUTE to it is the lesson. This file asserted for a
+day that item 1 was blocked on a missing `OPENROUTER_API_KEY`, and a coder
+window repeated that to the operator as fact. It was false: the key sits in the
+**User** environment scope on this box (73 chars, `sk-or-` prefix), so every
+process a coder window spawns inherits it, proven by a plain venv run of
+`nodes._otr_openrouter_backend.openrouter_enabled()` returning **True** with no
+launcher involved. **Grep or measure before repeating a blocker out of this
+file** -- that is the lesson, and it has now cost two windows.
+**A SECOND INSTANCE, 2026-08-09 (late):** this queue row itself stayed at
+"UNBLOCKED, needs a live leg" for most of a day AFTER `262dfa8f` shipped it and
+the leg ran. A row that describes finished work as pending is the same defect
+pointing the other way, and it costs the next window a re-grounding pass.
+**When you close an item, close its ROW in the same push.** **Item 8 SHIPPED
 2026-08-08 and item 9-C3 (Macbeth safety probe) SHIPPED + DISCHARGED
 2026-08-08 evening** -- both tombstoned below. Item 9's remaining chunks (the
 20-clip accept-rate measurement, then the first full LOW episode) are the
@@ -804,14 +816,28 @@ the same bugs so we need to update the bible and test regularly."*
    *Authority caveat:* Comfy Cloud's partner catalog is what decides whether
    Comfy SERVES a slug; OpenRouter presence is a signal, not proof. An
    authoritative pass still owes a check against Comfy's own catalog.
-   **The stale PREMISE is the real defect, not the version lag.** The block says
-   "Reasoning models ... are DELIBERATELY EXCLUDED"
-   (`_otr_comfy_backend.py:84-91`), a rule written 2026-07-04. Verified live
-   2026-08-07: essentially every frontier candidate now advertises reasoning --
-   including `deepseek-v3.2` and `x-ai/grok-4.20` sitting inside that very list.
-   So the comment claims an exclusion the list no longer performs. Fixing the
-   COMMENT is the cheap, high-value half of this item; re-dating the slugs is
-   the mechanical half.
+   ~~**The stale PREMISE is the real defect, not the version lag.**~~
+   **RESOLVED 2026-08-09 (`5fdf93f1`) -- AND THIS PLAN'S READING WAS THE WRONG
+   ONE. Do not re-open it; the comment is now load-bearing documentation.**
+   This file had recorded the `_otr_comfy_backend.py:84-91` block ("Reasoning
+   models ... are DELIBERATELY EXCLUDED") as STALE, reasoning that essentially
+   every frontier SKU now advertises reasoning -- including `deepseek-v3.2` and
+   `x-ai/grok-4.20` sitting inside that very list -- so the comment described an
+   exclusion the list no longer performed. **That conflates two different
+   things.** The rule excludes reasoning-BRANDED SKUs (the `-pro` / `-thinking` /
+   `sonar-reasoning` tiers) because they EMPIRICALLY BREAK STRUCTURED JSON; it
+   never claimed the survivors cannot reason. The list still performs exactly
+   that, which is why `deepseek-v3.2` sits there labelled NON-reasoning while
+   `deepseek-*-pro` does not.
+   **The re-confirmation was accidental, and therefore worth trusting:** an
+   unrelated OpenRouter roundtable run on 2026-08-09 put `deepseek/deepseek-v4-pro`
+   on a 3-model panel and it returned EMPTY CONTENT with `finish_reason=length`,
+   having spent its whole token budget on hidden reasoning -- the exact failure
+   the block was written about, on the exact SKU pattern it names, thirteen
+   months of model churn later.
+   **Carry-forward lesson:** "this comment sounds dated" is not evidence. The
+   cheap half of this item was never the comment; re-dating the slugs is the
+   whole remaining mechanical half.
    **Why it is NOT a copy of chunk A:** each lane has a DIFFERENT source of
    truth. Comfy Credits slugs are Comfy Cloud's partner catalog, Google's are
    Google's, ElevenLabs' are theirs -- none is verifiable against OpenRouter's
