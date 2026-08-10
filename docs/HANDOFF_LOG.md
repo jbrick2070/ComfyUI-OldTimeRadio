@@ -3,6 +3,67 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-10 (overnight, operator asleep) -- CODER (decision round executed; Lemmy r2 hit a plan-level blocker; Sonnet caught my own overclaim)
+
+Did: the operator answered a 4-question decision round, then went to bed with
+  *"see what you can code ... if you can do another r4 on lemmy and code it's a
+  great time while our GPU is busy"*.
+- **DELETED `otr_upscaled_dir()`** (their call). Helper, `__all__` entry,
+  contract-test reference, and a dangling history mention in a NEIGHBOURING
+  docstring. Suite 9541 (-2 = exactly the parameterized cases that walked it).
+- **THE OTHER THREE ANSWERS WERE NOT SIMPLE YES/NOS, and two reopened as
+  features.** (1) `perfect_run_spacesaver`: operator wants it to WORK, not be
+  dropped -- *"wouldn't it be nice not to store all the little files ... just
+  save the last otr/obs episode"*, later narrowed to **"it deletes images and
+  video clips, not the ledger."** Scoped with the hard constraints (never delete
+  before `obs_publish OK`; never touch another episode; the audio cache is a
+  SEPARATE store, do not sweep it by accident). (2) Cast-merge: operator wants
+  **an LLM pass**, not a pinning test -- scoped with the ledger-completeness
+  rule and the warning that it MOVES the casting roll and needs a declared
+  re-baseline.
+- **I DECLINED TO DELETE THE 8 BIBLE GUARDS, then the operator delegated the
+  call and I kept them.** The question carried a false premise -- and MY OWN
+  NOTE WAS THE SOURCE. `656c36e` touched TWO files, not eight; the 8
+  `test_otr_*` items are FUNCTIONS inside `tests/bug_bible_regression.py`. And
+  **none is video-related** (timeline ownership, word delivery, outer-word-fit,
+  protected suffix, cast-role identity, rename transactions, ledger text
+  metrics, P5 transport), so the "new video tests will replace them" premise
+  was wrong. Deleting would have cost coverage and bought nothing.
+- **LEMMY IS NOT BLOCKED -- the GO_FORWARD header was stale.** No Lemmy file is
+  dirty; that window shipped Phase 1 and left. **And r1's own `final.md` is
+  stale on its step 1** (D-1 `accent: "neutral"` is FIXED, `cast_pools.py:317`
+  reads `"cockney"`). Both corrected in the plan.
+- **LEMMY r2 RAN (both lanes) AND HIT A PLAN-LEVEL BLOCKER.** The central
+  behaviour -- suppress the cameo on an engine that cannot meet the floor -- is
+  **not expressible in the current graph**: Lemmy is chosen UPSTREAM by the
+  writer while the engine is chosen LATER by nodes 80/81, and
+  `BatchCharacterVoices` exposes ONE engine for the whole character bus. Per
+  the standing rule a plan-level gap drops back rather than being patched from
+  inside a later round, so **r3 was NOT run** and this is now operator row 14
+  (fail-closed error / new upstream authority / drop the floor).
+- **Best actionable Lemmy find, NOT built:** `approved_native_routes` marks bark
+  APPROVED with a bare string `canonical_bark_preset_v1` -- no artifact, no SHA,
+  no operator verdict -- while r1 says nothing is audition-proven. BUG-12.86,
+  live in config. Safe to fix (zero production consumers of
+  `LEMMY_VOICE_POLICY`), so it is the next window's first Lemmy move.
+- **SONNET QA CAUGHT A REAL DEFECT IN MY OWN WORK, TWICE.** (1) My line-range
+  deletion left FOUR blank lines where the file's convention is two -- exactly
+  the artifact I had asked it to look for. Fixed. (2) **My commit message for
+  `672899fd` OVERCLAIMS**: "the guard can see what we actually send" is true
+  only of the new self-referential test; the PRE-EXISTING provenance guard
+  never imports the resolver and still cannot see
+  `gemini-3.1-flash-image-preview`. Recorded as a standing correction in
+  GO_FORWARD so the commit message does not mislead a future reader.
+Current step: decision round executed; Lemmy blocked at r2 pending operator
+  row 14. Nothing is half-applied.
+Next: answer row 14, then Lemmy's honest-receipt fix; and the slug spec's
+  steps 3+5 (verifier + schema migration) remain the biggest ready chunk.
+Models: Opus 5 (coder + judge), Codex `gpt-5.6-sol` high + Antigravity
+  `Gemini 3.6 Flash (High)` on Lemmy r2, **Fable** for the audio-cache taxonomy
+  ruling (operator asked), **Sonnet 5** QA on the diff (operator asked).
+Box state: GPU busy with the operator's own work all session -- everything here
+  was CPU-only. No servers of mine.
+
 ## 2026-08-09 (night) -- HEAD 2c2df490+ (v2.0-alpha) -- CODER (queue found empty of unblocked rows; GO_FORWARD cleaned; full r1-r4 arc closed with a TRACKED spec, deliberately NOT built)
 
 Did: 3 commits, all pushed, HEAD == origin at each. **No production code

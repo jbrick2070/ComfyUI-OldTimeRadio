@@ -371,40 +371,14 @@ def otr_composited_dir(episode_id: str) -> Path:
 
     HISTORY (queue item 8, 2026-08-08): a standalone OTR_RTXUpscale
     stage used to sit in between, reading this dir and writing 1080p
-    into ``otr_upscaled_dir(episode_id)``. That node was ripped; the
+    into a per-episode ``upscaled/`` subdir. That node was ripped and
+    its path helper deleted 2026-08-10 (operator call); the
     composite now delivers 1080p directly via ``render.composite_w/h``
     per profile, and per-clip model enhancement happens inside
     SilentComposite (``nodes/_otr_upscale_engines/``).
     """
     eid = _validate_episode_id(episode_id)
     return _validate_contract(otr_episodes_root() / eid / "composited")
-
-
-def otr_upscaled_dir(episode_id: str) -> Path:
-    """Per-episode 1080p upscaled-but-pre-blend dir:
-    ``<output>/otr/episodes/<episode_id>/upscaled/``.
-
-    ORPHANED by queue item 8 (2026-08-08) and kept only so an existing
-    on-disk tree stays addressable: OTR_RTXUpscale wrote
-    ``<episode_id>.mp4`` here, and that node was ripped. Nothing in the
-    live render chain reads or writes this dir today -- the composite
-    delivers 1080p directly and OTR_PostUpscaleProcgenBlend consumes
-    ``otr_composited_dir``. The only remaining references are this
-    definition, the ``__all__`` entry, and the output-tree contract test
-    that iterates every helper. Delete-or-keep is an operator call, so
-    it was left in place rather than removed inside a comments-only
-    sweep.
-
-    Why the dir exists at all (2026-05-05, Jeffrey directive): obs/ is
-    the broadcast folder and must hold exactly ONE mp4 per episode --
-    the post-blend deliverable. Pre-blend intermediates were therefore
-    moved under per-episode subdirs so the broadcast library stayed
-    clean, and this was the upscale stage's subdir, mirroring
-    ``otr_composited_dir``. That rule still governs obs/; this
-    particular subdir simply no longer has a producer.
-    """
-    eid = _validate_episode_id(episode_id)
-    return _validate_contract(otr_episodes_root() / eid / "upscaled")
 
 
 def otr_state_dir() -> Path:
@@ -669,7 +643,6 @@ __all__ = [
     "otr_videos_dir",
     "otr_clips_dir",
     "otr_composited_dir",
-    "otr_upscaled_dir",
     "otr_obs_dir",
     "otr_state_dir",
     "episodes_for_obs_dir",

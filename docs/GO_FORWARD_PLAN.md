@@ -105,7 +105,40 @@ tests and `docs/ENGINE_MATRIX.md`, all of which belong in ITS commit.
   KNOWN-FAIL-GUARD replaces pytest's summary line. To get a real number, run
   the suite with those three `--deselect`ed.
 
-### LEMMY COCKNEY -- ACTIVE, SECOND WINDOW (do not collide)
+### LEMMY COCKNEY -- NOT BLOCKED (corrected 2026-08-10), Phase 1 shipped, 2-4 open
+
+**THE "ACTIVE, SECOND WINDOW -- do not collide" HEADER WAS STALE and is
+withdrawn.** Measured 2026-08-10: **no window is holding any Lemmy file** --
+`git status` shows nothing dirty under `cast_pools.py`, `cast_lock.py`,
+`_otr_dialogue_policy.py`, `_otr_line_composer.py` or `_otr_compose_exchange.py`.
+That window shipped Phase 1 in `bec0ca79` and left. The only window still
+holding anything is the VIDEO one (`eng_wan_i2v.py`), which touches nothing here.
+Lemmy is CPU-only work and available.
+
+**AND r1's OWN `final.md` IS NOW STALE ON ITS STEP 1.** It opens the order of
+work with *"Reconcile D-1: `accent: 'neutral'` contradicts a description saying
+broad friendly Cockney"*. **That is FIXED** -- `config/cast_pools.py:317` reads
+`"accent": "cockney"`, landed by Phase 1 AFTER r1 was written. Anyone resuming
+from `kibitz-runs/2026-08-08-lemmy-cockney/r1/final.md` must skip its step 1.
+D-4 (governing the writer) is also partly addressed by Phase 1's
+`dialogue_orthography`, `speech_signature` and `nodes/_otr_dialogue_policy.py`.
+
+**WHAT IS ACTUALLY LEFT, verified at the line 2026-08-10 -- D-2, the
+partial-rollout state both r1 lanes called the worst possible one.** The
+per-character voice pin still does NOT reach pre-locked LEMMY:
+`_otr_casting.py:1815-1837` builds `cast_voice_slots` for every row, but
+`timbre`, `role` and `age_band` all come from the ensemble slot, and a pre-locked
+row has none -- the code comment says so outright ("empty for the pre-locked
+announcer / LEMMY rows which have no ensemble slot"). `voice_cast_decision` is
+likewise built only for open characters and only under `hybrid_voice_fit_enabled()`.
+So he is hard-pinned to bark via `lemmy_row()` and cast on **gender alone** on the
+other six char-voice engines.
+**Mind the cost before coding it:** changing how he is cast MOVES the casting
+roll, which breaks replay parity and needs a DECLARED re-baseline. Consider
+making it OBSERVABLE first -- the pattern that made the upscale stage provable
+this week -- since the audition step (D-3) needs the operator's ears anyway.
+
+### LEMMY -- historical r1 context (kept, but read the correction above first)
 
 **Phase 1 SHIPPED `bec0ca79`** by a Codex window: `accent="cockney"`,
 `dialogue_orthography="standard_english"` and `speech_signature` on
@@ -155,13 +188,15 @@ waiting on me?" without reading the whole file.
 | 4 | **MiniMax H3 sprint series** -- name SPRINT 1 | NAME THE SCOPE. Do not let a window invent the sprint list | 0-QUINQUE |
 | 5 | **Video matrix pattern** -- ~32 engines each need a one-line `doc_purpose`, and the `family -> display_group` taxonomy must be decided | WRITE CONTENT. No review round can produce it; this is absent human-owned data | section 0 |
 | 6 | **Bug Bible bulk fan-out** -- 9+ closed candidates + the duplicate-`legacy_id` cleanup | ONE FAN-OUT SESSION. A window may promote a SINGLE uncovered entry, but the log's contract reserves the bulk pass for you | Bug Bible promotion field |
-| 7 | **The 8 swept survival-guide guards.** `656c36e` staged 8 pre-existing uncommitted `test_otr_*` files whose commit message does not describe them | LEAVE IT (with a documenting follow-up) or SPLIT them into their own commit. Nothing is broken; the suite is green | Bible promotion note |
-| 8 | **`otr_upscaled_dir()` is DEAD** (`nodes/_otr_paths.py:383`) -- its only producer was the ripped `OTR_RTXUpscale` | DELETE OR KEEP. Removing a public path helper is your call, not a comments-only change | STILL OPEN item 0 |
-| 9 | **`meta.perfect_run_spacesaver`** is written by `OTR_LedgerScriptWriter.py:6196-6197` with zero remaining readers | KEEP OR DROP | upscale chips |
+| ~~7~~ | ~~**The 8 swept survival-guide guards**~~ **DECIDED 2026-08-10: KEEP THEM.** The operator delegated the call (*"between you and Sonnet you can ensure we keep or remove those tests"*) after the original question was found to carry a false premise. Two corrections of record: `656c36e` touched TWO files, not eight (`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`), so the 8 `test_otr_*` items are FUNCTIONS in one file; and **none of them is video-related** -- they guard positioned-media timeline ownership, explicit word delivery, outer-word-fit fail-closed, protected-suffix surface, cast-role identity, rename transactions, canonical ledger text metrics, and P5 text transport. New video-lane tests would replace NONE of them, so deleting cost coverage and bought nothing. A follow-up commit in that repo should document what rode along in `656c36e` | -- | -- |
+| ~~8~~ | ~~**`otr_upscaled_dir()` is DEAD**~~ **ANSWERED 2026-08-10: DELETE. Executed -- helper, `__all__` entry, contract-test reference and a dangling history mention all removed.** | -- | -- |
+| ~~9~~ | ~~**`meta.perfect_run_spacesaver`**~~ **ANSWERED 2026-08-10, and the answer REOPENED IT AS A FEATURE, not a cleanup.** Operator: *"once people get the workflow going wouldn't it be nice not to store all the little files on their drive and just save the last otr/obs episode ... if it doesn't work let's rip it out and design a new one, or keep it actually and make it work as intended"*. So: the flag is NOT to be quietly dropped -- it either becomes real or is replaced by a designed successor. Scoped as a coder item below | -- | -- |
 | 10 | **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female; `Clara` gendered male with "her" in her own prose | READ THE LIST, rule case by case. Do not total it. `ROSALIND` is NOT one -- Ganymede keeps her female voice by your earlier ruling | sprint item 8 |
-| 11 | **`story_orchestrator.py:449-453`** copies `voice_preset` and `gender` under INDEPENDENT guards, so a row can take its preset from one row and its gender from another | A RULING before anyone touches the merge. STATIC evidence only -- it may not enter the bug log until a live artifact shows it | sprint item 8 |
+| ~~11~~ | ~~**`story_orchestrator.py` cast-merge ruling**~~ **ANSWERED 2026-08-10: operator wants AN LLM PASS to clean this up**, not a test pinning today's behaviour and not a mechanical re-baseline. Scoped as a coder item below | -- | -- |
 | 12 | **v2.1 candidate:** a low-footprint LOCAL model steeped in OTR diction | A CONSCIOUS RE-OPEN. It collides with your 2026-08-04 "story quality is done" directive, so only you can reopen it | STILL OPEN item 7 |
 | 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` §0A |
+
+| 14 | **LEMMY PHASE 2 CANNOT BE BUILT AS SPECIFIED -- a scope call, surfaced by the r2 panel 2026-08-10 and confirmed at the line.** The plan's central behaviour is *"if an engine cannot meet the Cockney floor, suppress the cameo on that engine rather than silently substitute"*. **That is not expressible in the current graph.** Lemmy is selected UPSTREAM in the writer (`OTR_LedgerScriptWriter.py:4412-4426`); the voice engine is chosen LATER by nodes 80/81, and `BatchCharacterVoices` exposes ONE engine for the entire character bus. So by the time anything knows the engine, the cameo is already written into the script | **PICK ONE:** (a) downgrade the requirement to a FAIL-CLOSED CastLock error (no new surface, but a bad combination stops the render instead of degrading); (b) add ONE upstream engine-policy authority feeding writer + CastLock + renderer so the writer can decline the cameo before authoring -- this needs a NEW NODE/WIDGET SURFACE and `otr_canonical.json` wiring, which r1 explicitly ruled out of scope, so it is a deliberate scope change only you can authorise; or (c) accept the cameo on any engine and drop the floor | `kibitz-runs/2026-08-10-lemmy-cockney/r2/` |
 
 **Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
 a dropdown ruling (it became a sprint series), and queue item 1 is closed.
@@ -188,6 +223,29 @@ into real Google ids at invoke time, so the pack ships
 `gemini-3.1-flash-image-preview` with no provenance entry at all -- while its
 stable twin ships in parallel through another lane. Four more defects in the
 driver's own plan were caught and are recorded in the spec.
+
+### CORRECTION -- `672899fd`'s COMMIT MESSAGE OVERCLAIMS (Sonnet QA, 2026-08-10)
+
+**Recorded because a commit message travels further than a handoff entry.** That
+commit is titled *"so the guard can see what we actually send"* and its body says
+*"THE KEY GUARD IS PROVEN NON-VACUOUS"*. Both are true **only of the new
+`tests/test_slug_inventory.py`**, which is self-referential.
+
+**The PRE-EXISTING provenance guard is untouched by it and still cannot see the
+preview id.** `tests/test_slug_provenance.py:36-71` never imports
+`slug_inventory`, `collect_inventory` or `resolve_selector_to_model_id` (grep:
+zero hits), so `gemini-3.1-flash-image-preview` is still never produced as a
+candidate and is still not a key in `SLUG_PROVENANCE`.
+`test_every_shipped_concrete_slug_has_provenance` is green today **only because
+it is still checking the DISPLAY NAME** -- precisely the defect
+`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` section 1 describes as
+unfixed.
+
+Nothing to revert; the code is sound and `HANDOFF_LOG.md` already says "first
+half built". But **do not read that commit as closing the provenance gap**, and
+do not let it make operator row 13 look settled by an automated guard. Steps 3
+(verifier) and 5 (schema migration) of the spec's five-step order are still
+unbuilt.
 
 ### FOLLOW-UP CHIPS OWED -- coder work, no operator input needed
 
@@ -258,6 +316,54 @@ bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
 6. ~~`visual_style_receipt["attempts"]` always reports 1~~ **DONE** (`e16e9a63`),
    and the shared `on_attempt_complete` contract three callers depend on is now
    pinned against the real ladder.
+
+### OPERATOR-DIRECTED WORK, SCOPED 2026-08-10 (answers to the decision round)
+
+**A. THE SPACE-SAVER BECOMES REAL (or gets a designed successor).**
+Operator's words: *"wouldn't it be nice not to store all the little files on
+their drive and just save the last otr/obs episode ... if it doesn't work let's
+rip it out and design a new one, or keep it actually and make it work as
+intended."*
+
+`perfect_run_spacesaver` is currently a DEPRECATED no-op checkbox that still
+stamps `ledger.meta`. It is NOT to be silently dropped.
+
+* **The checkbox itself must survive regardless of the design.** `widgets_values`
+  is POSITIONAL (BUG-LOCAL-097) -- removing a widget shifts every saved value in
+  every saved graph. Any successor either reuses this slot or appends a new one.
+* **THIS FEATURE DELETES USER FILES, so it needs a real spec before code.** The
+  output-tree contract exists because obs/ must hold exactly ONE mp4 per episode
+  and intermediates were deliberately moved under per-episode subdirs. A
+  space-saver interacts with that contract directly.
+* **WHAT IT SWEEPS -- operator, 2026-08-10: "it deletes images and video clips,
+  not the ledger."** So the target set is the per-episode visual intermediates
+  (stills/frames and the per-beat/segment clips), and the LEDGER IS EXPLICITLY
+  PRESERVED. That is the safe shape: the ledger is the replay and audit record,
+  so an episode stays reproducible and inspectable after the sweep even though
+  its intermediate media are gone. Keep the published `otr/obs/` deliverable.
+* Open design questions that remain: is AUDIO in or out (the operator named
+  images and clips, not audio -- and the content-addressed audio cache is a
+  separate store with its own lifetime, so do not sweep it by accident); does it
+  run only on a SUCCESSFUL publish; opt-in per render or a global setting; and
+  what a re-render does when it needs a swept clip.
+* **Hard constraint:** it may never delete anything before `obs_publish OK`, and
+  it must never touch another episode's tree.
+
+**B. AN LLM PASS TO RECONCILE MERGED CAST ROWS.**
+Operator, on the merge that can take a character's VOICE from one row and its
+GENDER from another (`story_orchestrator.py:416-421`, each field folded under its
+own independent guard): *"there should be an LLM pass to clean this stuff up."*
+
+* This is CORRECTNESS work, not story-quality chasing -- a character's
+  gender/voice contradicting itself is explicitly carved out of the 2026-08-04
+  "story quality is done" directive.
+* **The ledger-completeness rule governs any new pass:** enumerate every field it
+  writes, give each exactly one owner, and prove it on a LIVE leg. A pass that
+  reconciles cast rows touches casting, which is downstream of everything.
+* Note the collision: changing merged output MOVES the gender roll, which breaks
+  replay parity and needs a declared re-baseline. The LLM pass must be designed
+  with that in mind rather than discovering it late.
+* Held while LEMMY is active -- it exercises casting.
 
 ### TOMBSTONE -- SYSTEM-AGNOSTIC UPSCALE STAGE (queue item 8), SHIPPED 2026-08-08
 

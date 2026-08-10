@@ -43,7 +43,7 @@ def out_root(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 _EPISODE_HELPERS = [
     P.otr_audio_dir, P.otr_stills_dir, P.otr_portraits_dir,
-    P.otr_videos_dir, P.otr_composited_dir, P.otr_upscaled_dir,
+    P.otr_videos_dir, P.otr_composited_dir,
 ]
 _NOARG_HELPERS = [
     P.otr_episodes_root, P.otr_obs_dir, P.otr_state_dir,

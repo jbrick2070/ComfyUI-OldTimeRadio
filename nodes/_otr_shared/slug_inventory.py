@@ -15,8 +15,8 @@ reason about either.
 
 SCOPE. Audio, image and the static LLM lanes. **No video** -- the video lanes are
 out of scope by operator ruling (2026-08-09) and nothing here may import them.
-``tests/test_slug_inventory_scope.py`` proves that mechanically in a fresh
-process rather than trusting this comment.
+``tests/test_slug_inventory.py::test_collecting_the_inventory_imports_no_video_module``
+proves that mechanically in a fresh process rather than trusting this comment.
 
 WHAT IT COLLECTS, AND WHAT IT DELIBERATELY DOES NOT. Checked-in constants and
 declared defaults ONLY. It never calls a runtime selector: ``resolve_model_id()``

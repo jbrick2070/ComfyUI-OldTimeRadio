@@ -284,8 +284,8 @@ class FileAudioCache:
             # PowerShell cmdlet, which this project has met before.
             # It is also a CLOUD cache: swallowing this silently re-bills the
             # provider and leaves no trace of why.
-            log.warning("[OTR audio cache] unreadable sidecar key=%s (%s)",
-                        key, type(exc).__name__)
+            log.warning("[OTR audio cache] unreadable sidecar key=%s cls=%s: %s",
+                        key, type(exc).__name__, exc)
             return None
         if needs_rerender(record, target_request_schema_version=self.request_schema_version):
             return None  # slim migration: schema drift -> re-render
