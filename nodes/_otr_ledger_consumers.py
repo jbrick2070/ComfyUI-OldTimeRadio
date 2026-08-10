@@ -212,6 +212,9 @@ _OPTIONAL_STRING_FIELDS = (
     "audio_cache_key",
     "audio_sha256",
     "provider_model_id",
+    # Plan 5.3: the qualified voice route this line actually rendered on.
+    # Empty string on every non-policy line, which is all of them today.
+    "voice_route_id",
     "music_wav_path",
     "music_cache_key",
     "video_clip_path",

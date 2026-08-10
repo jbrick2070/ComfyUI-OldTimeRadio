@@ -276,6 +276,10 @@ def build_resolved_request(
     commercial_clean: Optional[bool] = None,
     provider_model_id: str = "",
     provider_voice_id: str = "",
+    route_id: str = "",
+    route_contract_version: int = 0,
+    qualification_record_id: str = "",
+    weight_revision: str = "",
 ) -> ResolvedVoiceRequest:
     """Pack already-resolved pieces into the frozen ``ResolvedVoiceRequest``.
 
@@ -316,5 +320,13 @@ def build_resolved_request(
         quantized_params=quantized,
         source_ref_sha256=source_ref_sha256,
         commercial_clean=commercial_clean,
+        # Route identity (plan 5.3). A NON-policy line passes nothing and gets
+        # the deterministic empty/zero defaults, which is what keeps every legacy
+        # row's cache_key byte-identical -- the schema grew, the key did not move
+        # for anybody who is not on a qualified route.
+        route_id=str(route_id or ""),
+        route_contract_version=int(route_contract_version or 0),
+        qualification_record_id=str(qualification_record_id or ""),
+        weight_revision=str(weight_revision or ""),
         prepared_text=prepared_text,
     )

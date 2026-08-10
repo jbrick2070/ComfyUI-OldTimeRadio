@@ -661,6 +661,8 @@ def stamp_per_line_audio_meta(
     audio_cache_key: str = "",
     audio_sha256: str = "",
     provider_model_id: str = "",
+    voice_route_id: str = "",
+    sample_rate: int = 0,
 ) -> bool:
     """Stamp per-line audio render metadata. Wraps ``patch_line_fields``.
 
@@ -675,6 +677,12 @@ def stamp_per_line_audio_meta(
     per-line provenance for the FileAudioCache hit/miss on this line.
     ``_OPTIONAL_STRING_FIELDS`` in _otr_ledger_consumers recognizes them
     for the post-freeze null-shape audit.
+
+    New optional kwargs (plan 5.3, 2026-08-10): ``voice_route_id`` names the
+    qualified voice route this line actually rendered on -- empty on every
+    non-policy line -- and ``sample_rate`` records the rate the clip came back
+    at. Both are per-line RENDER EVIDENCE: current, bounded, overwritten by a
+    re-render. Static route identity lives once on the cast row, not here.
 
     Returns True if a row was updated, False if no matching line_id.
     Never raises.
@@ -694,6 +702,13 @@ def stamp_per_line_audio_meta(
         fields["audio_sha256"] = str(audio_sha256)
     if provider_model_id:
         fields["provider_model_id"] = str(provider_model_id)
+    # Plan 5.3 per-line render evidence. Both skip-when-empty, like every field
+    # above, so a caller that computed neither cannot blank one that was already
+    # stamped by an earlier role.
+    if voice_route_id:
+        fields["voice_route_id"] = str(voice_route_id)
+    if int(sample_rate or 0) > 0:
+        fields["sample_rate"] = int(sample_rate)
     try:
         return patch_line_fields(ledger, line_id, fields)
     except Exception:  # noqa: BLE001

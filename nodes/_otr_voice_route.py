@@ -491,6 +491,195 @@ def resolve_policy_route_claim(
     )
 
 
+# --------------------------------------------------------------------------- #
+# Plan 5.1/5.3 -- what the VOICE NODE resolves, per cast row, before it builds
+# either request.
+# --------------------------------------------------------------------------- #
+
+#: A row with no ``voice_route``. Every field empty/zero, which is exactly what
+#: keeps a legacy line's cache_key byte-identical after the schema grew.
+LEGACY_REFERENCE_IDENTITY = {
+    "route_id": "",
+    "route_contract_version": 0,
+    "qualification_record_id": "",
+    "weight_revision": "",
+    "source_ref_sha256": "",
+}
+
+
+@dataclass(frozen=True)
+class ResolvedReference:
+    """What the request builders need from a cast row's route, if it has one."""
+
+    is_policy_route: bool
+    route_id: str = ""
+    route_contract_version: int = 0
+    qualification_record_id: str = ""
+    weight_revision: str = ""
+    source_ref_sha256: str = ""
+    ref_path: str = ""
+    reference_kind: str = ""
+
+    def request_fields(self) -> dict:
+        return {
+            "route_id": self.route_id,
+            "route_contract_version": self.route_contract_version,
+            "qualification_record_id": self.qualification_record_id,
+            "weight_revision": self.weight_revision,
+            "source_ref_sha256": self.source_ref_sha256,
+        }
+
+
+LEGACY_REFERENCE = ResolvedReference(is_policy_route=False)
+
+
+def resolve_and_verify_reference(
+    cast_row: Any,
+    active_engine: Optional[str],
+    *,
+    bank_lookup: Optional[Callable[[str], Optional[dict]]] = None,
+    repo_root: Optional[str] = None,
+    verify_bytes: bool = True,
+) -> ResolvedReference:
+    """Resolve a cast row's reference identity, proving a route if it has one.
+
+    THREE ROW SHAPES, and the plan is emphatic that they stay distinguishable:
+
+    * **legacy, no route** -> ``LEGACY_REFERENCE``. Existing resolver behaviour
+      is preserved and can never be confused with a newly qualified route. The
+      pair ``(voice_engine, voice_ref_id)`` on such a row is a declared BANK
+      REFERENCE, not a claim that a renderer ever ran.
+    * **local_wav route** -> the selected route is re-proved here, at the point
+      of use, and its ``source_ref_sha256`` is supplied to the request. The
+      bytes are re-hashed because a receipt proved at cast time says nothing
+      about the file five minutes later.
+    * **provider_voice route** -> validated on route/provider/model/voice fields
+      WITHOUT pretending a cloud URI is a local file. This is the confusion that
+      made ``gt_algenib`` look usable as a local IndexTTS2 reference when its
+      ``ref_sha256`` is the literal string ``cloud``.
+
+    ``verify_bytes`` is only ever relaxed by a caller that already hashed the
+    same file for the same route in this render -- never to skip the check.
+    """
+    if not isinstance(cast_row, dict):
+        return LEGACY_REFERENCE
+    route = cast_row.get("voice_route")
+    if not isinstance(route, dict) or not route:
+        return LEGACY_REFERENCE
+
+    route_id = str(route.get("route_id") or "<unnamed route>")
+    engine = str(route.get("engine") or "").strip()
+    active = str(active_engine or "").strip()
+
+    # THE TRIPLE, first: route == active scalar == bank entry. A row carrying a
+    # route for an engine that is not the one about to render is not a reason to
+    # quietly render anyway -- it means the ledger and the graph disagree about
+    # who is speaking.
+    if not active:
+        raise VoiceRouteError(
+            "cast row %r carries voice_route %r but the active voice engine is "
+            "unknown -- a route cannot be proved against nothing"
+            % (cast_row.get("char_id") or cast_row.get("name"), route_id))
+    if engine != active:
+        raise VoiceRouteError(
+            "ENGINE DISAGREEMENT on cast row %r: voice_route %r is for engine "
+            "%r but %r is rendering"
+            % (cast_row.get("char_id") or cast_row.get("name"), route_id,
+               engine, active))
+
+    version = route.get("route_contract_version")
+    if version not in SUPPORTED_ROUTE_CONTRACT_VERSIONS:
+        raise VoiceRouteError(
+            "voice_route %r declares route_contract_version %r, which this "
+            "build does not understand (known: %r)"
+            % (route_id, version, list(SUPPORTED_ROUTE_CONTRACT_VERSIONS)))
+
+    if route.get("status") != SELECTABLE_ROUTE_STATUS:
+        raise VoiceRouteError(
+            "voice_route %r has status %r, not %r -- it may not render"
+            % (route_id, route.get("status"), SELECTABLE_ROUTE_STATUS))
+
+    voice_ref_id = str(route.get("voice_ref_id") or "").strip()
+    if not voice_ref_id:
+        raise VoiceRouteError("voice_route %r names no voice_ref_id" % (route_id,))
+
+    if bank_lookup is not None:
+        try:
+            bank_row = bank_lookup(voice_ref_id)
+        except VoiceRouteError:
+            raise
+        except Exception as exc:              # noqa: BLE001
+            raise VoiceRouteError(
+                "voice_route %r: bank lookup for %r raised %s"
+                % (route_id, voice_ref_id, type(exc).__name__))
+        if bank_row is None:
+            raise VoiceRouteError(
+                "voice_route %r names voice_ref_id %r, which is not in the "
+                "active voice bank" % (route_id, voice_ref_id))
+        bank_engine = str(
+            (bank_row.get("engine") if isinstance(bank_row, dict)
+             else getattr(bank_row, "engine", "")) or "").strip()
+        if bank_engine and bank_engine != engine:
+            raise VoiceRouteError(
+                "ENGINE DISAGREEMENT: bank entry %r is engine %r but "
+                "voice_route %r claims %r"
+                % (voice_ref_id, bank_engine, route_id, engine))
+
+    kind = route.get("reference_kind")
+    if kind not in REFERENCE_KINDS:
+        raise VoiceRouteError(
+            "voice_route %r has reference_kind %r, which is not a defined kind"
+            % (route_id, kind))
+
+    source_sha = str(route.get("source_ref_sha256") or "")
+    ref_path = str(route.get("ref_path") or "")
+
+    if kind == "local_wav":
+        if not _is_sha256(source_sha):
+            raise VoiceRouteError(
+                "voice_route %r: source_ref_sha256 is not 64 hex characters"
+                % (route_id,))
+        if not ref_path:
+            raise VoiceRouteError(
+                "voice_route %r: ref_path is missing for a local_wav route"
+                % (route_id,))
+        if verify_bytes:
+            full = ref_path
+            if not os.path.isabs(full) and repo_root:
+                full = os.path.join(repo_root, ref_path)
+            if not os.path.isfile(full):
+                raise VoiceRouteError(
+                    "voice_route %r: reference file does not exist: %s"
+                    % (route_id, full))
+            actual = sha256_of_file(full)
+            if actual is None:
+                raise VoiceRouteError(
+                    "voice_route %r: reference file could not be read: %s"
+                    % (route_id, full))
+            if actual.lower() != source_sha.lower():
+                raise VoiceRouteError(
+                    "voice_route %r: REFERENCE BYTES DO NOT MATCH the receipt "
+                    "-- %s hashes to %s but the route claims %s"
+                    % (route_id, full, actual, source_sha.lower()))
+    else:
+        # provider_voice: there are no local bytes, and demanding some is the
+        # exact category error this branch exists to refuse.
+        source_sha = ""
+        ref_path = ""
+
+    runtime = route.get("runtime") or {}
+    return ResolvedReference(
+        is_policy_route=True,
+        route_id=str(route.get("route_id") or ""),
+        route_contract_version=int(version),
+        qualification_record_id=str(route.get("qualification_record_id") or ""),
+        weight_revision=str(runtime.get("weight_revision") or ""),
+        source_ref_sha256=source_sha,
+        ref_path=ref_path,
+        reference_kind=str(kind),
+    )
+
+
 __all__ = [
     "ROUTE_STATUSES", "TECHNICAL_VERDICTS", "RIGHTS_STATUSES",
     "SELECTABLE_ROUTE_STATUS", "SELECTABLE_TECHNICAL_VERDICT",
@@ -499,4 +688,6 @@ __all__ = [
     "validate_qualified_voice_route",
     "VoiceRouteError", "PolicyRouteClaim", "policy_character_key",
     "cast_row_matches_policy", "select_policy_route", "resolve_policy_route_claim",
+    "ResolvedReference", "LEGACY_REFERENCE", "LEGACY_REFERENCE_IDENTITY",
+    "resolve_and_verify_reference",
 ]
