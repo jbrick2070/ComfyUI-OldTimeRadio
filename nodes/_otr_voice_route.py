@@ -288,10 +288,215 @@ def validate_qualified_voice_route(
     return RouteValidation(not bad, tuple(bad))
 
 
+# --------------------------------------------------------------------------- #
+# Plan 5.2 -- the EXPLICIT RE-PIN.
+#
+# WHAT THIS IS NOT. It is not a change to the generic seeded selector, and it
+# must never become one. Lemmy was never redrawn per episode: 33 of the 35
+# reference-carrying LEMMY ledger rows name the SAME reference, because every one of
+# them had `meta.episode_seed=None` and the selector therefore derived an
+# identical seed. He was ACCIDENTALLY PINNED. The defect is that the incumbent
+# cannot PROVE the configured floor -- not that the selector misbehaves. So the
+# repair is a narrow, qualified, provable claim on ONE named row, and every
+# unclaimed row keeps drawing exactly as it does today.
+# --------------------------------------------------------------------------- #
+
+
+class VoiceRouteError(RuntimeError):
+    """A SELECTED policy route could not be honoured.
+
+    Deliberately its own type so no caller can fold it into a generic
+    ``VoiceCastingError`` rescue and quietly cast someone else. A route that was
+    selected and then failed is a STOP, never a fallback -- the whole point of
+    qualifying a voice is that an unqualified one does not silently take its
+    place.
+    """
+
+
+def policy_character_key(policy: Any) -> str:
+    """The normalized cast key this policy claims, or ``""`` if it claims none."""
+    if not isinstance(policy, dict):
+        return ""
+    return str(policy.get("character_key") or "").strip().lower()
+
+
+def cast_row_matches_policy(entry: Any, character_key: str) -> bool:
+    """True when this cast row is the one the policy claims.
+
+    Matches the row NAME or its char_id, both normalized. char_id is positional
+    (`c02` today), so name is usually what actually hits -- but a ledger that
+    does spell the char_id `lemmy` must not slip through either.
+    """
+    if not character_key or not isinstance(entry, dict):
+        return False
+    key = character_key.strip().lower()
+    for field in ("name", "char_id"):
+        if str(entry.get(field) or "").strip().lower() == key:
+            return True
+    return False
+
+
+def select_policy_route(policy: Any, active_engine: Optional[str]) -> Optional[dict]:
+    """The approved route this policy selects for ``active_engine``, or None.
+
+    Three outcomes, and the difference between them is the whole contract:
+
+    * **No approved routes at all** -> ``None``. The policy is dormant. This is
+      the state shipping today (``approved_native_routes`` is ``{}``), so the
+      re-pin is inert until an operator audition fills it in.
+    * **Routes exist, but none for the engine actually rendering** -> ``None``.
+      Nothing was selected, so nothing failed. Qualifying Lemmy on IndexTTS2 must
+      not break every bark render.
+    * **Routes exist and the active engine is unknown** -> ``VoiceRouteError``.
+      This is the case worth being loud about: we cannot prove agreement, and
+      silently skipping a qualified route is the very floor-evidence failure this
+      module exists to end.
+    """
+    if not isinstance(policy, dict):
+        return None
+    routes = policy.get("approved_native_routes")
+    if not isinstance(routes, dict) or not routes:
+        return None
+
+    engine = str(active_engine or "").strip()
+    if not engine:
+        raise VoiceRouteError(
+            "voice policy %r approves %d native route(s) but the active "
+            "character voice engine could not be resolved -- refusing to skip a "
+            "qualified route without proving it does not apply"
+            % (policy.get("policy_version"), len(routes)))
+
+    record = routes.get(engine)
+    return record if isinstance(record, dict) else None
+
+
+@dataclass(frozen=True)
+class PolicyRouteClaim:
+    """A proven claim on one cast row: which row, which reference, what receipt."""
+
+    character_key: str
+    engine: str
+    voice_ref_id: str
+    bank_entry: Any                       # VoiceBankEntry -- injected, not imported
+    voice_route: dict                     # the immutable identity stamped on the row
+
+
+def _route_payload(record: dict, engine: str, voice_ref_id: str) -> dict:
+    """The immutable route identity stored on the cast row (plan 5.2)."""
+    qual = record.get("qualification_record") or {}
+    ref = qual.get("reference") or {}
+    runtime = qual.get("runtime") or {}
+    return {
+        "route_id": str(record.get("route_id") or ""),
+        "route_contract_version": record.get("route_contract_version"),
+        "status": qual.get("status"),
+        "engine": engine,
+        "voice_ref_id": voice_ref_id,
+        "reference_kind": ref.get("kind"),
+        "ref_path": str(ref.get("absolute_path") or ""),
+        "source_ref_sha256": str(ref.get("source_ref_sha256") or ""),
+        "qualification_record_id": str(qual.get("record_id") or ""),
+        "runtime": {
+            "model_id": str(runtime.get("model_id") or ""),
+            "engine_impl_version": str(runtime.get("engine_impl_version") or ""),
+            "weight_revision": str(runtime.get("weight_revision") or ""),
+        },
+    }
+
+
+def resolve_policy_route_claim(
+    policy: Any,
+    active_engine: Optional[str],
+    now_utc: datetime,
+    *,
+    bank_entries: Sequence,
+    repo_root: Optional[str] = None,
+) -> Optional[PolicyRouteClaim]:
+    """Prove the selected route, or raise. ``None`` means nothing was selected.
+
+    ``bank_entries`` is the loaded voice bank, injected so this module stays
+    stdlib-only and CastLock's cold path never drags a model in.
+    """
+    record = select_policy_route(policy, active_engine)
+    if record is None:
+        return None
+
+    engine = str(active_engine or "").strip()
+    character_key = policy_character_key(policy)
+    if not character_key:
+        raise VoiceRouteError(
+            "voice policy %r selected an approved route on engine %r but names "
+            "no character_key -- a route that claims nobody cannot be applied"
+            % (policy.get("policy_version"), engine))
+
+    rows = [e for e in (bank_entries or [])
+            if str(getattr(e, "engine", "")) == engine]
+
+    def _hits(voice_ref_id: str) -> list:
+        return [e for e in rows
+                if str(getattr(e, "voice_ref_id", "")) == voice_ref_id]
+
+    route_id = str(record.get("route_id") or "<unnamed route>")
+    qual = record.get("qualification_record")
+    claimed_ref_id = str((qual or {}).get("voice_ref_id") or "").strip() \
+        if isinstance(qual, dict) else ""
+
+    # UNIQUENESS IS CHECKED FIRST, and separately, on purpose. The validator
+    # wraps bank_lookup in a broad except and would fold this into a generic
+    # "bank lookup raised" reason -- but ambiguity is a REJECT with a specific
+    # cause, not a coin flip: two rows sharing one id on one engine means the
+    # bank cannot say which bytes were auditioned.
+    if claimed_ref_id:
+        found = _hits(claimed_ref_id)
+        if len(found) > 1:
+            raise VoiceRouteError(
+                "SELECTED voice route %r: the voice bank has %d entries for "
+                "voice_ref_id %r on engine %r -- a qualified route needs "
+                "exactly one, and there is no fallback"
+                % (route_id, len(found), claimed_ref_id, engine))
+
+    def _lookup(voice_ref_id: str):
+        found = _hits(voice_ref_id)
+        return found[0] if found else None
+
+    validation = validate_qualified_voice_route(
+        record, now_utc,
+        active_engine=engine,
+        bank_lookup=_lookup,
+        repo_root=repo_root,
+        require_local_bytes=True,
+    )
+    if not validation.ok:
+        raise VoiceRouteError(
+            "SELECTED voice route %r for %r on engine %r FAILED qualification "
+            "and there is no fallback: %s"
+            % (route_id, character_key, engine, validation.summary))
+
+    voice_ref_id = claimed_ref_id
+    bank_entry = _lookup(voice_ref_id)
+    if bank_entry is None:
+        # validate_qualified_voice_route already checks this; belt and braces,
+        # because the next line dereferences it.
+        raise VoiceRouteError(
+            "SELECTED voice route %r names voice_ref_id %r, which has no entry "
+            "on engine %r in the active voice bank"
+            % (route_id, voice_ref_id, engine))
+
+    return PolicyRouteClaim(
+        character_key=character_key,
+        engine=engine,
+        voice_ref_id=voice_ref_id,
+        bank_entry=bank_entry,
+        voice_route=_route_payload(record, engine, voice_ref_id),
+    )
+
+
 __all__ = [
     "ROUTE_STATUSES", "TECHNICAL_VERDICTS", "RIGHTS_STATUSES",
     "SELECTABLE_ROUTE_STATUS", "SELECTABLE_TECHNICAL_VERDICT",
     "SELECTABLE_RIGHTS_STATUS", "SUPPORTED_ROUTE_CONTRACT_VERSIONS",
     "REFERENCE_KINDS", "RouteValidation", "parse_utc", "sha256_of_file",
     "validate_qualified_voice_route",
+    "VoiceRouteError", "PolicyRouteClaim", "policy_character_key",
+    "cast_row_matches_policy", "select_policy_route", "resolve_policy_route_claim",
 ]

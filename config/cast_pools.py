@@ -405,6 +405,13 @@ LEMMY_AUDITION_LINES = {
 
 LEMMY_VOICE_POLICY = {
     "policy_version": "lemmy-cockney-v1",
+    # WHICH CAST ROW THIS POLICY CLAIMS, and why it is a field rather than a
+    # hard-coded "lemmy". char_id is POSITIONAL -- Lemmy currently lands on
+    # `c02` and would move the moment the roster ahead of him changes -- so a
+    # matcher that assumed `char_id == "lemmy"` would claim nobody on a real
+    # ledger and silently do nothing. Matching is against the NAME or the
+    # char_id, normalized, so both spellings of the same character are caught.
+    "character_key": "lemmy",
     "required_accent": "cockney",
     "dialogue_orthography": "standard_english",
     # The DEFAULT route. This is a ROUTING fact -- where Lemmy goes when nothing

@@ -28,8 +28,31 @@ import hashlib
 import json
 import logging
 import os
+from datetime import datetime, timezone
+
+from . import _otr_voice_route as _ROUTE
 
 log = logging.getLogger("OTR")
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _lemmy_voice_policy():
+    """The character voice policy, or ``{}`` if the pack cannot be imported.
+
+    Fail-SOFT here and fail-CLOSED downstream: an unreadable policy yields no
+    approved routes, so nothing is selected and casting proceeds exactly as it
+    did before this path existed. The strictness lives where a route is actually
+    claimed -- refusing to import is not the place to break a render.
+    """
+    try:
+        from ..config import cast_pools as _POOLS  # type: ignore
+    except ImportError:
+        try:
+            from config import cast_pools as _POOLS  # type: ignore
+        except ImportError:
+            return {}
+    return getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
 
 # Voice-bank ids the operator picks from the OTR_CastLock dropdown. The bank id
 # does NOT filter the per-ref bank (assign_voice_for_slot scores by gender/timbre/
@@ -180,6 +203,12 @@ class CastLock:
             meta = {}
             led["meta"] = meta
         revision = int(meta.get("cast_lock_revision") or 0) + 1
+        # STEP 1 (plan 5.2): the revision is stamped BEFORE any route is
+        # resolved. A qualified re-pin can raise, and when it does the ledger
+        # must already carry the revision that attempted it -- a failure with no
+        # revision on it is a failure nobody can locate afterwards. The rest of
+        # the CastLock-owned meta is stamped after casting, as before.
+        meta["cast_lock_revision"] = revision
 
         # Sprint 2 (a): CastLock OWNS bark voice casting. The writer no longer
         # stamps voice_preset -- it persists cast_seed in meta.cast_contract and
@@ -189,23 +218,58 @@ class CastLock:
         # governs the clip-engine voice bank, not bark casting).
         self._assign_bark_voices(cast, meta, report)
 
+        # STEP 2 (plan 5.2): resolve the bank and stamp the engine metadata ONCE,
+        # for BOTH modes, before any route is looked at. It used to happen inside
+        # each branch, which meant a route could not be proved against the engine
+        # that was going to render it -- the agreement check needs the engine in
+        # hand first.
+        #
+        # preserve_ledger deliberately passes bank_entries=None: with an `auto`
+        # request that mode records `char_voice_engine="auto"` rather than
+        # pinning a concrete engine into a ledger it promised not to re-cast.
+        # Loading the bank here would silently change that stamp.
+        bank_entries = None
+        if cast_voice_policy == "auto_registry":
+            from ._otr_voice_bank import load_voice_bank
+            bank_entries, _bank_sha = load_voice_bank()
+        target_engine, announcer_engine = self._stamp_voice_engine_selection(
+            led, voice_bank, char_voice_engine, announcer_voice_engine,
+            bank_entries=bank_entries, voice_device=voice_device)
+
+        # STEP 4 (plan 5.2): prove the policy route BEFORE either caster runs, so
+        # a route that cannot prove itself stops the lock instead of losing a
+        # race with the generic selector. Returns None when no policy claims a
+        # row -- which is every render shipping today.
+        # Hand over the bank auto_registry already loaded. preserve_ledger passes
+        # None here by design and the claim path loads its own only if a route is
+        # actually selected -- which keeps the dormant case free of bank I/O.
+        policy_claim = self._resolve_policy_claim(
+            voice_bank, target_engine, bank_entries=bank_entries)
+
         if cast_voice_policy == "auto_registry":
             self._auto_registry(
                 led, cast, voice_bank, allow_voice_reuse, report,
                 char_voice_engine=char_voice_engine,
                 announcer_voice_engine=announcer_voice_engine,
-                voice_device=voice_device)
+                voice_device=voice_device,
+                bank_entries=bank_entries,
+                target_engine=target_engine,
+                announcer_engine=announcer_engine,
+                policy_claim=policy_claim)
         else:
-            self._stamp_voice_engine_selection(
-                led, voice_bank, char_voice_engine, announcer_voice_engine,
-                voice_device=voice_device)
+            # STEP 5 (plan 5.2): in preserve_ledger ONLY the claimed row changes.
+            # Every other row keeps the bytes it arrived with -- that is the
+            # mode's whole contract, and an explicit re-pin is not a licence to
+            # re-cast the cast.
+            claimed = self._apply_policy_claim(cast, policy_claim, report)
             report.append(
-                f"preserve_ledger: {len(cast)} cast entries preserved "
+                f"preserve_ledger: {len(cast) - claimed} cast entries preserved "
                 f"(no re-cast)"
             )
 
-        # Stamp the lock identity onto meta (I-4: stamp once at cast lock).
-        meta["cast_lock_revision"] = revision
+        # STEP 6 (plan 5.2): the ordinary meta stamp and durable save happen ONCE,
+        # here, after casting -- unchanged. cast_lock_revision was stamped up top
+        # (step 1) and is not re-written.
         meta["cast_voice_policy"] = cast_voice_policy
         meta["delivery_profile_id"] = delivery_profile
         meta["delivery_profile_version"] = DELIVERY_PROFILE_VERSION
@@ -490,7 +554,19 @@ class CastLock:
     def _auto_registry(self, led, cast, voice_bank, allow_voice_reuse, report,
                        char_voice_engine="auto",
                        announcer_voice_engine="auto",
-                       voice_device="cuda"):
+                       voice_device="cuda",
+                       bank_entries=None,
+                       target_engine=None,
+                       announcer_engine=None,
+                       policy_claim=None):
+        """Re-cast the registry rows.
+
+        ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
+        ``policy_claim`` are OPTIONAL pre-resolved values from ``lock``, which
+        now does that work once for both modes (plan 5.2 step 2). They stay
+        optional because this method is also called directly, with five
+        positional arguments, and must keep resolving its own inputs when it is.
+        """
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
             announcer_voice_ref, assign_voice_for_slot,
@@ -498,7 +574,8 @@ class CastLock:
         )
         from ._otr_voice_node_common import coerce_int_seed
 
-        bank_entries, _bank_sha = load_voice_bank()
+        if bank_entries is None:
+            bank_entries, _bank_sha = load_voice_bank()
         meta = led.get("meta") or {}
         if meta.get("episode_seed") is None:
             # SILENCE IS HOW THIS HID. A missing seed folds through
@@ -524,9 +601,15 @@ class CastLock:
         # when this CastLock resolved the SAME engine and it still validates +
         # does not collide; otherwise fall closed to the deterministic scorer.
         voice_decisions = meta.get("voice_cast_decision") or {}
-        target_engine, announcer_engine = self._stamp_voice_engine_selection(
-            led, voice_bank, char_voice_engine, announcer_voice_engine,
-            bank_entries=bank_entries, voice_device=voice_device)
+        # announcer_engine is the sentinel: the resolver never returns None for
+        # it, while target_engine legitimately can be None (a preset-only bank).
+        if announcer_engine is None:
+            target_engine, announcer_engine = self._stamp_voice_engine_selection(
+                led, voice_bank, char_voice_engine, announcer_voice_engine,
+                bank_entries=bank_entries, voice_device=voice_device)
+            if policy_claim is None:
+                policy_claim = self._resolve_policy_claim(
+                    voice_bank, target_engine, bank_entries=bank_entries)
 
         if target_engine is None:
             report.append(
@@ -582,6 +665,29 @@ class CastLock:
                     if announcer_engine == "google_tts":
                         raise
                     report.append(f"  {char_id or 'ANNOUNCER'}: announcer NOT cast -- {exc}")
+                continue
+
+            # STEP 4/5 (plan 5.2): the EXPLICIT RE-PIN, ahead of both the hybrid
+            # LLM voice-fit and the generic seeded selection. The claim was
+            # already proved in `lock` -- bytes hashed, engine triple agreed,
+            # rights checked -- so all that happens here is the stamp.
+            #
+            # `_mark_used` runs regardless of allow_voice_reuse. The `used` set
+            # only changes other rows' draws when reuse is off, so marking
+            # unconditionally is free there and correct here: a pinned reference
+            # is spoken for either way.
+            if policy_claim is not None and _ROUTE.cast_row_matches_policy(
+                    entry, policy_claim.character_key):
+                self._stamp(entry, policy_claim.bank_entry,
+                            fallback="policy_route")
+                entry["voice_route"] = dict(policy_claim.voice_route)
+                _mark_used(policy_claim.bank_entry)
+                gated += 0 if policy_claim.bank_entry.commercial_clean else 1
+                report.append(
+                    f"  {char_id}: {policy_claim.voice_ref_id} "
+                    f"({policy_claim.engine}, QUALIFIED policy route "
+                    f"{policy_claim.voice_route.get('route_id')})"
+                )
                 continue
 
             if target_engine is None:
@@ -689,6 +795,77 @@ class CastLock:
                 f"auto_registry: {gated} assigned voice(s) are known-gated "
                 f"(commercial_clean=false) -- non-blocking warning (I-8)"
             )
+
+    # ------------------------------------------------------------------ #
+    def _resolve_policy_claim(self, voice_bank, target_engine,
+                              bank_entries=None):
+        """Prove the character voice policy's selected route, or return None.
+
+        None means NOTHING WAS SELECTED, which is every render shipping today:
+        ``LEMMY_VOICE_POLICY["approved_native_routes"]`` is empty, because no
+        audition has yet proved a Cockney route on any engine. The mechanism is
+        built and inert, and it activates the day an operator receipt fills that
+        dict -- not before.
+
+        A route that IS selected and cannot prove itself raises
+        ``VoiceRouteError``. It never falls back: casting somebody else's voice
+        because the qualified one failed its own check is precisely the silent
+        substitution this path exists to prevent.
+        """
+        policy = _lemmy_voice_policy()
+        if not (policy or {}).get("approved_native_routes"):
+            return None                      # dormant -- do not touch the bank
+
+        # A policy with real routes needs a concrete engine to prove agreement
+        # against, even in preserve_ledger, where `lock` deliberately leaves the
+        # engine stamp as "auto". Resolve one HERE, for the proof only -- this
+        # must not write meta["char_voice_engine"].
+        if bank_entries is None:
+            from ._otr_voice_bank import load_voice_bank
+            bank_entries, _bank_sha = load_voice_bank()
+        engine = target_engine
+        if engine is None:
+            engine = self._resolve_char_engine(voice_bank, bank_entries, "auto")
+
+        return _ROUTE.resolve_policy_route_claim(
+            policy, engine, datetime.now(timezone.utc),
+            bank_entries=bank_entries, repo_root=_REPO_ROOT,
+        )
+
+    # ------------------------------------------------------------------ #
+    def _apply_policy_claim(self, cast, policy_claim, report) -> int:
+        """Stamp a proved claim onto its row in preserve_ledger. Returns rows changed.
+
+        Deliberately narrow: announcer rows are never claimed, and a policy that
+        matches no row at all is REPORTED rather than raised. The route proved
+        itself; that the episode did not cast that character is an ordinary fact
+        about the episode, not a qualification failure.
+        """
+        if policy_claim is None:
+            return 0
+        changed = 0
+        for entry in cast:
+            if not isinstance(entry, dict) or _is_announcer_entry(entry):
+                continue
+            if not _ROUTE.cast_row_matches_policy(
+                    entry, policy_claim.character_key):
+                continue
+            self._stamp(entry, policy_claim.bank_entry, fallback="policy_route")
+            entry["voice_route"] = dict(policy_claim.voice_route)
+            changed += 1
+            report.append(
+                f"  {entry.get('char_id') or entry.get('name')}: "
+                f"{policy_claim.voice_ref_id} ({policy_claim.engine}, "
+                f"QUALIFIED policy route "
+                f"{policy_claim.voice_route.get('route_id')})"
+            )
+        if not changed:
+            report.append(
+                f"policy route {policy_claim.voice_route.get('route_id')!r} "
+                f"proved, but no cast row matches "
+                f"{policy_claim.character_key!r} -- nothing re-pinned"
+            )
+        return changed
 
     # ------------------------------------------------------------------ #
     def _stamp_voice_engine_selection(self, led, voice_bank,
