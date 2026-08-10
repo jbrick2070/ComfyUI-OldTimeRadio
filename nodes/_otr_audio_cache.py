@@ -267,13 +267,25 @@ class FileAudioCache:
         return os.path.exists(self._sidecar_path(self.key_for(request)))
 
     def get(self, request) -> Optional[AudioCacheRecord]:
-        path = self._sidecar_path(self.key_for(request))
+        key = self.key_for(request)
+        path = self._sidecar_path(key)
         if not os.path.exists(path):
-            return None
+            return None                    # never cached -- the definitional miss
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 record = AudioCacheRecord.from_dict(json.load(fh))
-        except Exception:  # noqa: BLE001 -- an unreadable sidecar is a miss
+        except Exception as exc:  # noqa: BLE001 -- still a miss, but NOT a silent one
+            # A PRESENT-but-unparseable sidecar is the worst corruption this
+            # cache can show, and it used to be the only one that said nothing
+            # while nine lesser ones warned. `put()` publishes the sidecar LAST
+            # via os.replace precisely so its presence IS the commit signal, so
+            # a garbled one means the commit marker itself is damaged -- torn
+            # write, external tool, or BOM contamination from a stray
+            # PowerShell cmdlet, which this project has met before.
+            # It is also a CLOUD cache: swallowing this silently re-bills the
+            # provider and leaves no trace of why.
+            log.warning("[OTR audio cache] unreadable sidecar key=%s (%s)",
+                        key, type(exc).__name__)
             return None
         if needs_rerender(record, target_request_schema_version=self.request_schema_version):
             return None  # slim migration: schema drift -> re-render

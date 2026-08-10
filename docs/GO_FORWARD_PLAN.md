@@ -212,12 +212,22 @@ bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
    **Real deliverable: warning/COUNT coverage layered on existing behavioural
    coverage.** "ONE bounded warning" (`:172-175`) is the load-bearing half of the
    promise, and a test asserting mere presence would pass if the code logged six.
-   **A DESIGN STEP COMES FIRST:** the corruption taxonomy is undecided --
-   unreadable sidecars are swallowed by `get()` (`:273-277`) and returned
-   indistinguishably by `load()` (`:328-330`), contradicting that promise. Decide
-   which states are silent misses (absent entry, schema drift) and which are
-   corruption owing exactly one warning. If unreadable sidecars are corruption,
-   `_otr_audio_cache.py` cannot stay read-only.
+   **THE TAXONOMY IS NOW DECIDED (Fable design ruling 2026-08-09) AND THE
+   SIDECAR HALF IS SHIPPED.** Absent -> silent (the definitional miss every cold
+   cache hits). Schema drift -> silent (a DESIGNED invalidation; the record is
+   intact, the reader's target moved). **Present-but-unparseable -> ONE bounded
+   warning**, added in `get()`'s `except`, which is where it is FORCED to live:
+   `load()` reaches the sidecar only through `get()`, and by then the failure
+   class has already collapsed into `None`.
+   **Why it is corruption and not an ordinary miss:** `put()` publishes the
+   sidecar LAST via `os.replace` precisely so its presence IS the commit signal,
+   so a garbled one means the commit marker itself is damaged -- the strictest
+   corruption this cache can exhibit, and the only one that was silent while
+   nine lesser ones warned. It is also a CLOUD cache, so each silent instance
+   re-bills the provider with no trace. BOM contamination from a stray
+   PowerShell write lands in exactly this branch, which this project has met
+   before. The docstring was RIGHT; the code was wrong.
+   **Remaining here:** the payload-level warning/COUNT coverage described above.
    **Two existing tests cannot reach the branch they are named for:**
    `sample_rate`/`channels` at `:137-150` are IDENTITY fields
    (`_otr_resolved_request.py:75-84`), so changing one changes the cache KEY and

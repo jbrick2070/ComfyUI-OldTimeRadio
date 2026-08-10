@@ -182,3 +182,84 @@ def test_source_is_ascii_no_em_dash():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ----------------------------------------------------------------------------
+# Corruption taxonomy -- which states owe a warning, and which stay silent.
+#
+# `load()` promises "Corruption is a silent miss with ONE bounded warning log
+# line", and nine payload-level failures in `load()` keep that promise. The
+# sidecar READ path did not: a present-but-unparseable sidecar returned None
+# without a word, which is the WORST corruption this cache can show. `put()`
+# publishes the sidecar LAST via os.replace so its presence is the commit
+# signal -- a garbled one means the commit marker itself is damaged. It is also
+# a CLOUD cache, so swallowing it silently re-bills the provider with no trace.
+#
+# Absent and schema-drifted stay SILENT deliberately: absent is the definitional
+# miss every cold cache hits, and drift is a designed invalidation.
+# ----------------------------------------------------------------------------
+def _put_sidecar_bytes(cache, request, raw: bytes) -> str:
+    """Write raw bytes where the sidecar for `request` belongs."""
+    path = cache._sidecar_path(cache.key_for(request))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(raw)
+    return path
+
+
+def _sidecar_warnings(caplog):
+    return [r for r in caplog.records if "unreadable sidecar" in r.getMessage()]
+
+
+@pytest.mark.parametrize("raw,label", [
+    (b"{ this is not json", "truncated json"),
+    (b"", "empty file"),
+    (b"\xef\xbb\xbf{}", "UTF-8 BOM -- what a stray PowerShell write produces"),
+    (b'{"no_cache_key": true}', "readable json, wrong shape"),
+])
+def test_unparseable_sidecar_warns_exactly_once_and_still_misses(
+        tmp_path, caplog, raw, label):
+    """ONE bounded line, and still a miss -- the episode never fails for this."""
+    import logging
+    cache = FileAudioCache(str(tmp_path))
+    req = _req()
+    _put_sidecar_bytes(cache, req, raw)
+
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        got = cache.get(req)
+
+    assert got is None, f"{label}: a corrupt sidecar must still be a miss"
+    warnings = _sidecar_warnings(caplog)
+    assert len(warnings) == 1, (
+        f"{label}: expected exactly ONE bounded warning, got {len(warnings)}: "
+        f"{[w.getMessage() for w in warnings]}")
+    assert cache.key_for(req) in warnings[0].getMessage(), (
+        "the warning must name the key, or it cannot be acted on")
+
+
+def test_absent_sidecar_is_a_SILENT_miss(tmp_path, caplog):
+    """The control. Every cold cache hits this on every line -- warning here
+    would be spam by construction, and nothing was ever committed."""
+    import logging
+    cache = FileAudioCache(str(tmp_path))
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        assert cache.get(_req()) is None
+    assert _sidecar_warnings(caplog) == [], "absent must stay silent"
+
+
+def test_schema_drift_is_a_SILENT_miss(tmp_path, caplog):
+    """Drift is a DESIGNED invalidation: the record is intact and readable, the
+    reader's target moved. Warning on intended behaviour is noise."""
+    import logging
+    writer = FileAudioCache(str(tmp_path))
+    req = _req()
+    writer.put(req, _audio(), provider_model_id="m", actual_sample_rate=24000)
+    assert writer.get(req) is not None, "fixture must start as a real hit"
+
+    drifted = FileAudioCache(str(tmp_path))
+    # request_schema_version is a STRING (see AudioCacheRecord), so drift is a
+    # different string, not an increment.
+    drifted.request_schema_version = str(writer.request_schema_version) + "-next"
+    with caplog.at_level(logging.WARNING, logger="OTR"):
+        assert drifted.get(req) is None, "a drifted entry must miss"
+    assert _sidecar_warnings(caplog) == [], "schema drift must stay silent"
