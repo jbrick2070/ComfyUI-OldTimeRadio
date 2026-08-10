@@ -25,7 +25,14 @@ from typing import Optional, Tuple
 
 import torch
 
-REQUEST_SCHEMA_VERSION = "2"
+# BUMPED 2 -> 3 (2026-08-10) because four ROUTE-IDENTITY fields joined
+# IN_KEY_FIELDS. Adding a key field changes every request's cache_key, so
+# the bump routes that invalidation through the DESIGNED slim-migration
+# path (`needs_rerender`) instead of letting keys drift silently -- a
+# cache that quietly stops matching is indistinguishable from a cache
+# that is broken. Measured at bump time: ZERO cached entries on this box,
+# so the practical cost was nil; the declaration is for the next box.
+REQUEST_SCHEMA_VERSION = "3"
 _DEFAULT_SR = 24000
 _SEP = b"\x1f"  # ASCII unit separator -> unambiguous part join
 
@@ -80,6 +87,14 @@ IN_KEY_FIELDS: Tuple[str, ...] = (
     "delivery_profile_id", "delivery_profile_version", "episode_seed",
     "cast_lock_revision", "stable_line_seed", "sample_rate", "channels",
     "quantized_params", "source_ref_sha256", "commercial_clean",
+    # Route identity (plan 5.3). A line rendered through a QUALIFIED
+    # policy route is not the same render as the same line drawn by the
+    # generic selector, even when every other field matches -- so the
+    # route must key, or a re-pin would silently serve the old audio
+    # from cache. weight_revision keys for the same reason a model
+    # version does: new weights, new sound.
+    "route_id", "route_contract_version", "qualification_record_id",
+    "weight_revision",
 )
 # Fields that are NOT identity: debug text, the derived engine seed, and the
 # release gate (a gate is not identity -- I-8).
@@ -120,6 +135,13 @@ class ResolvedVoiceRequest:
     source_ref_sha256: str = ""
     commercial_clean: Optional[bool] = None
     request_schema_version: str = REQUEST_SCHEMA_VERSION
+    # Route identity. Deterministic empty/zero defaults so every
+    # legacy non-policy row keys EXACTLY as it does today -- the
+    # re-pin must not re-baseline lines it never touched.
+    route_id: str = ""
+    route_contract_version: int = 0
+    qualification_record_id: str = ""
+    weight_revision: str = ""
     # --- IGNORED (debug / derived / gate -- never identity) ---
     prepared_text: str = ""
     engine_seed: int = 0

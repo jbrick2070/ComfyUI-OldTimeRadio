@@ -221,6 +221,73 @@ waiting on me?" without reading the whole file.
 **Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
 a dropdown ruling (it became a sprint series), and queue item 1 is closed.
 
+### LEMMY BRANCH A -- IN PROGRESS 2026-08-10, foundation landed
+
+**Authoritative plan:** `docs/2026-08-10-OPEN-PLAN-lemmy-cross-engine.md`
+(rewritten by a second window from my open plan; my rebuttal at
+`docs/2026-08-10-REBUTTAL-lemmy-identity-premise.md` was accepted and folded in).
+
+**G0 IS CLOSED -- the operator APPROVED on the record**
+(`docs/2026-08-10-G0-RIGHTS-DECISION-CARD-lemmy.md`, decided
+2026-08-10T20:37:17Z, against a same-day snapshot of the Gemini API Additional
+Terms and the Prohibited Use Policy, both quoted in the card). Scope: use of
+self-generated Google TTS output (voice Algenib) as a clone reference for LOCAL
+engines. Tier left UNDETERMINED and marked for the evidence packet -- it governs
+what Google may do with our data, not our rights to the output.
+
+**THE PREMISE CORRECTION THAT SURVIVED REVIEW, and must not be re-inherited:**
+Lemmy was never redrawn per episode. 1,633 ledgers, 186 LEMMY rows: 151 carry
+`voice_ref_id=None` (the bark-preset path, expected) and **33 of the remaining 35
+are the SAME reference**, `vz_donor_marshal_indian`. The second window explained
+the mechanism -- all 33 had `meta.episode_seed=None`, so CastLock derived an
+identical selector seed every time. **He was ACCIDENTALLY PINNED.** The fix is an
+explicit qualified re-pin, NOT a rewrite of the generic selector. A current
+40-seed sweep selects 14 refs, so an unpinned future route WOULD vary.
+The defect is a **floor-EVIDENCE failure** (the incumbent cannot prove the
+configured floor) -- NOT, as I originally wrote, proof from the `_indian` name
+or the `warm` timbre tag that it violates accent/vocal weight. Neither is
+supported by the bank metadata and that overreach was correctly rejected.
+
+**SHIPPED so far (both independent of which voice wins the audition):**
+* **Plan 5.1 -- `nodes/_otr_voice_route.py`.** `validate_qualified_voice_route`
+  makes a route PROVE itself: file exists, bytes hash to the receipt, the
+  ENGINE TRIPLE agrees (route == active scalar == bank entry), rights not
+  expired/revoked, closed status vocabularies, contract version supported.
+  Fail-closed on every unknown. Returns reasons, not a bare bool. The legacy
+  `is_qualified_route` REMAINS as a compatibility helper and may never authorize
+  a selected route -- a test pins that it says yes where the new one says no.
+  65 tests.
+* **Plan 5.3 (first half) -- route identity in the cache key.** `route_id`,
+  `route_contract_version`, `qualification_record_id`, `weight_revision` added to
+  `ResolvedVoiceRequest` AND to `IN_KEY_FIELDS`; partition invariant verified
+  intact. Legacy rows keep byte-identical keys via empty/zero defaults, so
+  nothing untouched gets re-baselined.
+  **`REQUEST_SCHEMA_VERSION` 2 -> 3**, deliberately: adding a key field changes
+  every request's cache_key, and the bump routes that invalidation through the
+  designed `needs_rerender` slim-migration path instead of silent key drift.
+  Measured at bump time: **ZERO cached entries on this box**, so the practical
+  cost was nil. `CACHE_SCHEMA_VERSION` unchanged -- the sidecar shape did not
+  change, only what the key is computed over.
+
+**STILL TO BUILD:** plan 5.2 (CastLock ordering -- the explicit re-pin, six
+ordered steps, touches production casting), and 5.3's second half (receipt /
+`IS_CHANGED` fingerprint / `tts_engine` on per-line receipts). Then Branch A
+(section 7). **Branch B stays unbuilt unless G1 fails and a separate decision
+approves it.**
+
+**STILL TO RUN:** G1 Test A -- blinded A/B/C on IndexTTS2 (candidate = Algenib
+Cockney clip as clone reference; incumbent = `vz_donor_marshal_indian`; control
+= fixed plain Algenib). ~20 min GPU + ~10 min operator ears. **The audition LINES
+were never recorded** and the original ones are unrecoverable from the repo --
+but they are NOT a blocker: all three arms must speak identical text anyway, so
+one line pair gets chosen and frozen. Proposed and awaiting operator OK:
+neutral *"Signal's clean this side, Captain. I've got the relay warmed up and
+waiting on your word."* / stressed *"Don't you touch that dial! I've been
+chasing this frequency for six hours and I'll not lose it now!"*
+
+**The candidate's SHA-256 was verified against the real file** -- the plan's
+stated `47E733D5...A60DB2` matches `2_algenib_cockney.wav` byte for byte.
+
 ### NEXT CODER CHUNK -- SPEC COMPLETE, NOT BUILT (2026-08-09)
 
 **`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` is ready to

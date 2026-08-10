@@ -75,7 +75,16 @@ def test_provider_fields_in_key():
 
 
 def test_schema_versions_bumped():
-    assert REQUEST_SCHEMA_VERSION == "2"
+    """Pinned so a schema change is DELIBERATE, never incidental.
+
+    REQUEST 2 -> 3 on 2026-08-10: four route-identity fields (route_id,
+    route_contract_version, qualification_record_id, weight_revision) joined
+    IN_KEY_FIELDS, which changes every request's cache_key. The bump routes that
+    invalidation through the designed slim-migration path rather than letting
+    keys drift silently. CACHE_SCHEMA_VERSION is unchanged: the SIDECAR record
+    shape did not change, only what the key is computed over.
+    """
+    assert REQUEST_SCHEMA_VERSION == "3"
     assert CACHE_SCHEMA_VERSION == "2"
 
 

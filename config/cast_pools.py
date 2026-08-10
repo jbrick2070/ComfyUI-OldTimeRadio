@@ -368,6 +368,41 @@ def is_qualified_route(route) -> bool:
                QUALIFICATION_RECEIPT_REQUIRED_FIELDS)
 
 
+# The two lines every LEMMY audition speaks, on every engine, forever.
+#
+# WHY THEY ARE FROZEN HERE. An audition is only evidence if the arms are
+# comparable, and they are comparable only when they say the same words. The
+# 2026-08-08 Algenib audition used a neutral line and an emotional line -- the
+# right shape -- but the TEXT was never written down and is not recoverable from
+# the repo, so its receipt can never be completed. That is the mistake this
+# constant exists to not repeat.
+#
+# The original lines are NOT a blocker for the pending IndexTTS2 test: all three
+# arms (candidate, incumbent, control) must speak identical text regardless, so
+# the pair below is what the comparison uses. The 08-08 clips remain valid as the
+# clone REFERENCE -- what a mold says matters far less than how it sounds.
+#
+# Chosen for the job, and approved by the operator 2026-08-10:
+#   * both are in Lemmy's voice -- a genial 50s communications officer;
+#   * dialect lives in WORD CHOICE, never phonetic respelling, per the shipped
+#     dialogue policy ("I'll not lose it", "this side", "your word");
+#   * the second is the real test. The operator's 08-08 finding was that the
+#     accent held under emotion, and an audition that only ever renders calm
+#     speech cannot check the thing most likely to break.
+LEMMY_AUDITION_LINES = {
+    "lines_version": "lemmy-audition-v1",
+    "neutral_line": (
+        "Signal's clean this side, Captain. I've got the relay warmed up "
+        "and waiting on your word."
+    ),
+    "emotional_line": (
+        "Don't you touch that dial! I've been chasing this frequency for "
+        "six hours and I'll not lose it now!"
+    ),
+    "approved_by": "operator",
+    "approved_on": "2026-08-10",
+}
+
 LEMMY_VOICE_POLICY = {
     "policy_version": "lemmy-cockney-v1",
     "required_accent": "cockney",
