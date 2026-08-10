@@ -200,13 +200,46 @@ bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
 1. **Stale metadata retention across legs** (SF#1, Codex r4 MF-1). A downstream
    reader consuming an obsolete field is a different defect class from "helper
    unwired". Needs its own arc.
-2. **caplog-based degraded-write test** (SF#1, Codex r2 OPT-2). `_write_audio_atomic`
-   logs a bounded warning on partial-crash recovery; no test asserts the text.
-3. **`cache=off` token on a mid-`generate_voice` raise** (SF#1, Fable gate).
-   `cache_status` initialises `"off"` at `_otr_voice_node_common.py:829` and stays
-   there if `generate_voice` raises before any status assignment -- so a
-   cache-enabled line that dies mid-generation emits a misleading `cache=off`
-   token on the exact dying-line log. Tiny fix + caplog test.
+2. **Audio-cache corruption-warning coverage. REWRITTEN 2026-08-09 from the
+   kibitz r1 judgment -- THE ORIGINAL CHIP TEXT WAS WRONG TWICE and is not a safe
+   basis to build from.** It claimed `_write_audio_atomic` had no coverage; in
+   fact missing payload, hash mismatch, cache-key mismatch and partial
+   atomic-write failure are ALREADY covered at
+   `tests/test_audio_cache_wiring.py:117-163,205-219` -- a grep for
+   `degraded_write|_write_audio_atomic` misses them because they use other names.
+   And there are **nine** warning exits, not "a warning":
+   `_otr_audio_cache.py:333,343,348,351,355,361,364,372,382`.
+   **Real deliverable: warning/COUNT coverage layered on existing behavioural
+   coverage.** "ONE bounded warning" (`:172-175`) is the load-bearing half of the
+   promise, and a test asserting mere presence would pass if the code logged six.
+   **A DESIGN STEP COMES FIRST:** the corruption taxonomy is undecided --
+   unreadable sidecars are swallowed by `get()` (`:273-277`) and returned
+   indistinguishably by `load()` (`:328-330`), contradicting that promise. Decide
+   which states are silent misses (absent entry, schema drift) and which are
+   corruption owing exactly one warning. If unreadable sidecars are corruption,
+   `_otr_audio_cache.py` cannot stay read-only.
+   **Two existing tests cannot reach the branch they are named for:**
+   `sample_rate`/`channels` at `:137-150` are IDENTITY fields
+   (`_otr_resolved_request.py:75-84`), so changing one changes the cache KEY and
+   `get()` returns an ordinary miss before reaching `:348/351`. **BUG-12.87
+   again** -- the second live instance found on 2026-08-09. Correct technique:
+   mutate the persisted SIDECAR with the request/key held fixed.
+3. **A dying cache-enabled line reports `cache=off`** (SF#1, Fable gate).
+   `cache_status` initialises `"off"` at `_otr_voice_node_common.py:829`;
+   `generate_voice` sits inside the try at `:831-850` and the enabled-path P-OBS
+   tail is emitted from its `finally` at `:935-939`, so a raise mid-generation
+   reaches the tail with the initial value intact.
+   **Correction (kibitz r1):** the earlier text here implied the cache-OFF path
+   also emits `cache=off`. It does NOT -- cache-off emits the original BARE line
+   with **no `cache=` token at all** (`:790-796`), pinned by the byte-identity
+   test at `tests/test_audio_cache_wiring.py:592-598`.
+   **Fix, panel-preferred over inventing a token:** set `cache_status = "miss"`
+   immediately after an enabled lookup returns `None`, BEFORE generation -- true
+   at that moment, existing vocabulary, and it cannot touch cache-off bytes.
+   Then extend the two-node partial-exception test (`:681-748`) to require
+   exactly one dying-line P-OBS carrying `cache=miss`.
+   Receipts: `kibitz-runs/2026-08-09-audio-cache-chips/r1/judgment.md`
+   (GITIGNORED; **r1 ONLY -- a scoped receipt, never to be called an arc**).
 4. **`SpandrelEsrgan._resolve_model` robustness pair.** An unreadable NON-winning
    candidate aborts the whole search instead of skipping; the winning file is
    stat'ed twice with a TOCTOU window. **THIRD touch of this logic, so the

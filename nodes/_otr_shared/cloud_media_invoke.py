@@ -44,6 +44,7 @@ from .cloud_media_backend import (
     get_or_create_session,
 )
 from .cloud_media_canonical import PartnerResult, validate_partner_result
+from .google_image_model_ids import resolve_selector_to_model_id
 
 __all__ = [
     "invoke_partner_node",
@@ -476,12 +477,11 @@ async def _call_gemini_nano_banana2_v2(cls, inputs: dict) -> Any:
 
     validate_string(prompt, strip_whitespace=True, min_length=1)
     model_choice = model["model"]
-    if model_choice == "Nano Banana 2 (Gemini 3.1 Flash Image)":
-        model_id = "gemini-3.1-flash-image-preview"
-    elif model_choice == "Nano Banana 2 Lite":
-        model_id = "gemini-3.1-flash-lite-image"
-    else:
-        model_id = model_choice
+    # Resolution moved to _otr_shared/google_image_model_ids.py so the provenance
+    # collector reads the SAME table this call does. Behaviour is unchanged,
+    # identity fallthrough included; a second copy of the mapping is exactly the
+    # drift that hid two shipped model ids from the guard.
+    model_id = resolve_selector_to_model_id(model_choice)
 
     images = model.get("images") or {}
     parts = [GeminiPart(text=prompt)]

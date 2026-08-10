@@ -57,13 +57,60 @@ Did: 3 commits, all pushed, HEAD == origin at each. **No production code
   + `otr_g4_wan_ti2v.json`, and r4 also ruled schema + tests + verifier + dates
   must be ONE atomic green commit. Starting a five-file atomic change against a
   tree another window is holding is how work gets swept.
-Current step: spec complete and tracked; implementation is the next window's
-  first act, once the concurrent window has yielded the coder slot.
-Next: build the spec in order (mapping leaf -> inventory leaf -> verifier core
-  -> live run -> schema+tests), ONE commit, then suite AND Bug Bible, then push.
-  **Operator row 13 is new and may affect already-shipped stills** -- the Nano
-  Banana selector may point at a model retired upstream 2026-06-25; one render
-  settles it.
+- **THEN THE OPERATOR PICKED ITEMS 1, 3, 4 (GPU was busy, so the render legs
+  were parked) AND ASKED FOR A PANEL.** All three moved:
+- **ITEM 1 -- ROW 13 IS A FALSE ALARM, and this is the correction that matters
+  most.** `gemini-3.1-flash-image-preview` is **NOT retired.** Probed Google
+  `models.get` directly: it returns full metadata and **ZERO** deprecation /
+  shutdown / sunset / retire fields. Codex's "public shutdown 2026-06-25" was
+  marked [ASSUMPTION] and does not survive contact with Google's own record.
+  **Nothing already shipped is broken.** What IS true and worth keeping: the
+  preview id and the stable `gemini-3.1-flash-image` are capability-IDENTICAL
+  (65536 in/out, same methods, version 3.0) and Google gives BOTH the same
+  `displayName: "Nano Banana 2"`. So the pack uses a preview id where an
+  equivalent stable one exists -- housekeeping, not an incident. Recorded in the
+  mapping table, NOT changed: a model swap on the stills path is recipe-adjacent
+  and the operator's call.
+- **ITEM 3 -- FIRST HALF BUILT, GREEN, PUSHED.** Two shared leaves plus the
+  invoke rewiring. `nodes/_otr_shared/google_image_model_ids.py` is now the ONE
+  selector->id table, with the identity fallthrough preserved as CONTRACT (most
+  offered values are already concrete ids; a resolver that raised on "unknown"
+  would break every seedream/krea/photon row).
+  `nodes/_otr_shared/slug_inventory.py` replaces the flat `{slug: where}` dict
+  with records: **39 records, 32 unique provider ids** -- the old dict was
+  collapsing real distinctions, including `gemini-3.1-flash-lite-image`, which is
+  genuinely offered through TWO billing surfaces. 17 new tests.
+  **The key guard is PROVEN NON-VACUOUS:** the "no second copy of the mapping"
+  test greps the invoke file for the wire ids -- 2 present at HEAD, 0 after the
+  fix, so it would have been RED before. Also a FRESH-PROCESS test asserting the
+  collector imports no video module, which enforces the operator's scope ruling
+  mechanically instead of by naming discipline.
+  **Deliberately committed as a green increment rather than the full five-file
+  atomic change** -- the schema migration + verifier are the remaining half, and
+  starting an atomic change that cannot be finished is the worse outcome.
+- **ITEM 4 -- PANELLED (r1 ONLY, a scoped receipt, NOT an arc), and BOTH LANES
+  SAID MY PROBLEM STATEMENT WAS WRONG.** Three corrections, all confirmed:
+  (1) the cache-OFF path emits NO `cache=` token at all (`:790-796`, pinned by
+  the byte-identity test at `test_audio_cache_wiring.py:592-598`) -- my premise
+  that it emits `off` was false, though the underlying defect is real: the
+  enabled-path tail fires from a `finally` at `:935-939` with the initial value
+  intact. Panel's fix beats mine -- set `cache_status="miss"` right after an
+  enabled lookup returns `None`, no new token. (2) "zero tests" was FALSE -- four
+  behaviours are already covered at `test_audio_cache_wiring.py:117-163,205-219`;
+  my grep used identifiers those tests do not mention. (3) nine warning exits,
+  not seven. **Best catch: two existing tests cannot reach the branch they are
+  named for** -- `sample_rate`/`channels` are IDENTITY fields, so changing one
+  changes the cache key and `get()` misses before reaching `:348/351`. That is
+  **BUG-12.87 again, the second live instance today.** Chip text in GO_FORWARD
+  rewritten from the judgment, since the original was not a safe basis to build
+  from. NOT built -- a corruption-taxonomy decision comes first.
+Current step: item 1 CLOSED (false alarm, recorded). Item 3 first half green and
+  pushed; schema migration + verifier remain. Item 4 panelled at r1, needs a
+  taxonomy decision before code.
+Next: finish item 3 (verifier pure core -> live run -> `ProvenanceRecord`
+  migration + tests, ONE commit per `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md`),
+  then item 4 from its r1 judgment. **Operator row 13 downgraded to housekeeping
+  -- do NOT re-escalate it as a live breakage.**
 Models: Opus 5 (coder + sole judge). Panel = Codex `gpt-5.6-sol` high +
   Antigravity `Gemini 3.6 Flash (High)`. **No Fable lane and no Sonnet QA this
   window** -- there is no diff to review, and the session instruction barred the
