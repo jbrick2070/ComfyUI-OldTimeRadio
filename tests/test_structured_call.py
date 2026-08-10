@@ -1023,3 +1023,42 @@ def test_the_hook_is_optional():
         helper_name="sample_pass",
     )
     assert isinstance(result, SampleSchema)
+
+
+def test_deterministic_repair_return_still_reports_its_attempt():
+    """The sixth exit. A typed repair factory MAY resolve the failure itself
+    and hand back a finished schema instance instead of a repair prompt; that
+    return skipped notify_attempt while every other successful return called
+    it, so a caller counting attempts under-reported by one on this path.
+
+    Reachable in production from _otr_scifi_codex.py, which passes
+    `deterministic_repair`. Pinned here rather than there because the defect
+    is in the shared ladder, not in any one caller.
+    """
+    hook = _hook_recorder()
+
+    def deterministic_factory(original_prompt, failed_output, error):
+        # Resolve it ourselves: hand back a finished instance, no LLM call.
+        return SampleSchema(title="The Bulkhead Closes", score=42)
+
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=_make_counting_slot_fn(responses=[_bad_json()]),
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=deterministic_factory,
+        helper_name="sample_pass",
+        on_attempt_complete=hook,
+    )
+    assert isinstance(result, SampleSchema)
+    counts = [a for a, _ in hook.seen]
+    assert counts, (
+        "the deterministic-repair return reported NO attempt at all -- a "
+        "caller counting attempts silently under-reports on this path"
+    )
+    assert counts == sorted(counts), f"counts not monotonic: {counts!r}"
+    assert hook.seen[-1][1] is None, (
+        "the resolving attempt reported an error, so a caller cannot tell it "
+        "succeeded"
+    )

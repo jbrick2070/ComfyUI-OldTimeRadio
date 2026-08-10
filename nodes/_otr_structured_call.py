@@ -1150,6 +1150,18 @@ def structured_call(
                     "repair call made",
                     helper_name, attempts_run,
                 )
+                # The attempt COMPLETED here, so report it like every other
+                # successful return does. This was the one exit of six that
+                # skipped the hook: `attempts_run` had already been
+                # incremented for this rung, so a caller counting attempts
+                # under-reported by one whenever a typed repair factory
+                # resolved the failure itself. Unreachable from callers that
+                # pass no `deterministic_repair` (the story-brief reflection),
+                # but `_otr_scifi_codex.py` does pass one.
+                # Mutation-checked 2026-08-09: deleting this call turns
+                # test_deterministic_repair_return_still_reports_its_attempt
+                # red, so the guard is real rather than decorative.
+                notify_attempt(None)
                 return repair_prompt
             repair_prompt = _inherit_generation_contract(
                 contract_prompt, repair_prompt,
