@@ -3,6 +3,79 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-09 (night) -- HEAD 2c2df490+ (v2.0-alpha) -- CODER (queue found empty of unblocked rows; GO_FORWARD cleaned; full r1-r4 arc closed with a TRACKED spec, deliberately NOT built)
+
+Did: 3 commits, all pushed, HEAD == origin at each. **No production code
+  changed this window** -- two docs commits and a spec. That is the honest
+  headline.
+- **THE QUEUE HAD NO UNBLOCKED CODING ROW LEFT, and its top row was lying.**
+  Row 1 (model-slug chunk B) still read "UNBLOCKED, needs one live leg" most of
+  a day after `262dfa8f` + `22012263` shipped it and the leg ran. Tombstoned in
+  `a4cd217b`. **Two more stale entries in the same file:** STILL-OPEN item 6's
+  "the comment is stale, fixing it is the cheap half" had been resolved the
+  OTHER way in `5fdf93f1` (the `_otr_comfy_backend` reasoning-exclusion rule is
+  load-bearing -- it excludes reasoning-BRANDED SKUs because they empirically
+  break structured JSON, re-proved 2026-08-09 when `deepseek-v4-pro` returned
+  empty content with `finish_reason=length`); and 6-STATUS claimed the video
+  lanes were blocked by a concurrent window, when that window owns
+  `eng_wan_i2v.py`, a local engine, and all three cloud video files are clean.
+- **`2c2df490` -- GO_FORWARD cleanup (operator asked).** 2697 -> 2196 lines.
+  Collapsed ten tombstone blocks to one-paragraph pointers; preserved every
+  RULE they carried (slug policy, bank-qualification method, bible promotion
+  contract, the no-mirror KNOWN GAP). **New WAITING ON THE OPERATOR section --
+  13 rows, collected from nine sections**, each saying what KIND of answer it
+  needs, because "blocked on the operator" alone does not tell them what to do.
+  **New FOLLOW-UP CHIPS OWED, and two chips listed as owed were already DONE**
+  (the upscale SHA is pinned at `eng_spandrel_esrgan.py:79`, a real 64-hex
+  digest; the attempts thread landed in `e16e9a63`) -- struck, not deleted.
+- **FULL `kibitz-plugin:kibitz` r1-r4 ARC on the non-video slug-provenance
+  chunk. 7 DELIVERED EXTERNAL REVIEWS, NOT 8** -- r3 is a documented
+  SINGLE-LANE round (agy timed out twice; **zero** quota markers, no
+  `quota_hold`, `agy models` rc=0 -- a timeout, not credits). **Model drift
+  caught at r2:** lanes were running `Gemini 3.5 Flash (High)` where CLAUDE.md
+  specifies **3.6**; pinned correctly for r3/r4. Codex verified `gpt-5.6-sol`
+  high every round.
+- **THE ARC EARNED ITS KEEP -- it found FIVE things the driver had wrong, three
+  in the driver's own anchors.** (1) The pack ships a `preview` id today with no
+  provenance entry: `cloud_media_invoke.py:479-484` resolves display names to
+  real Google ids at invoke time, so `gemini-3.1-flash-image-preview` is
+  invisible to the guard while its stable twin ships through another lane.
+  (2) "19/19 LIVE" overstated -- production calls `/v1beta/interactions` and a
+  Vertex proxy, not the catalog endpoint measured, so catalog listing is not
+  callability. (3) The driver's staleness mitigation was invisible: it prints
+  under pytest capture and the baseline is captured `pytest -q`. (4) A global
+  preview-twin ban would have DELETED a working billing path -- `eng_cloud_image`
+  bills via the Comfy partner path, `eng_google_image` via a BYO key. (5) The
+  driver's "no remote/local classifier exists" blocker was a bad grep: it is
+  `native`, and `eng_cloud_image.py` declares it **zero times**, so a fail-open
+  design would have let the whole cloud image lane escape.
+- **`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` -- TRACKED ON
+  PURPOSE.** The arc's artifacts live in `kibitz-runs/`, which is gitignored;
+  leaving the spec only there is the exact failure the GROUNDING RULE records.
+- **NOT BUILT, deliberately.** r4 raised a serialization prerequisite and it
+  confirmed live: a concurrent window still holds uncommitted `eng_wan_i2v.py`
+  + `otr_g4_wan_ti2v.json`, and r4 also ruled schema + tests + verifier + dates
+  must be ONE atomic green commit. Starting a five-file atomic change against a
+  tree another window is holding is how work gets swept.
+Current step: spec complete and tracked; implementation is the next window's
+  first act, once the concurrent window has yielded the coder slot.
+Next: build the spec in order (mapping leaf -> inventory leaf -> verifier core
+  -> live run -> schema+tests), ONE commit, then suite AND Bug Bible, then push.
+  **Operator row 13 is new and may affect already-shipped stills** -- the Nano
+  Banana selector may point at a model retired upstream 2026-06-25; one render
+  settles it.
+Models: Opus 5 (coder + sole judge). Panel = Codex `gpt-5.6-sol` high +
+  Antigravity `Gemini 3.6 Flash (High)`. **No Fable lane and no Sonnet QA this
+  window** -- there is no diff to review, and the session instruction barred the
+  Agent tool. Operator was asked before paneling, per the 2026-08-09 standing
+  instruction, and approved a full four-round arc with video excluded.
+Box state: clean and free -- no servers, no GPU work, CPU-only all window. The
+  suite was run once for a real baseline: **9520 passed / 111 skipped / 3
+  deselected / 1 xfailed, exit 0**. The +4 over the recorded 9516 is the
+  operator's untracked `otr_sbcov_*.json` profiles (12 collected `sbcov` ids, 2
+  per profile), NOT code drift -- measured, not assumed.
+Commits: `a4cd217b`, `2c2df490`, + this handoff.
+
 ## 2026-08-09 (late) -- HEAD ab76f6bc (v2.0-alpha) -- CODER (slug provenance + saved-workflow guard; the operator's gitignored audit changed the design)
 
 Did: 2 commits after the handoff below (`735cc8b1` handoff itself, then

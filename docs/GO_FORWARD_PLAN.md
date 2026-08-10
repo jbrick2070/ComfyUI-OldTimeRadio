@@ -161,9 +161,33 @@ waiting on me?" without reading the whole file.
 | 10 | **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female; `Clara` gendered male with "her" in her own prose | READ THE LIST, rule case by case. Do not total it. `ROSALIND` is NOT one -- Ganymede keeps her female voice by your earlier ruling | sprint item 8 |
 | 11 | **`story_orchestrator.py:449-453`** copies `voice_preset` and `gender` under INDEPENDENT guards, so a row can take its preset from one row and its gender from another | A RULING before anyone touches the merge. STATIC evidence only -- it may not enter the bug log until a live artifact shows it | sprint item 8 |
 | 12 | **v2.1 candidate:** a low-footprint LOCAL model steeped in OTR diction | A CONSCIOUS RE-OPEN. It collides with your 2026-08-04 "story quality is done" directive, so only you can reopen it | STILL OPEN item 7 |
+| 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` §0A |
 
 **Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
 a dropdown ruling (it became a sprint series), and queue item 1 is closed.
+
+### NEXT CODER CHUNK -- SPEC COMPLETE, NOT BUILT (2026-08-09)
+
+**`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` is ready to
+implement.** Full `kibitz-plugin:kibitz` r1-r4 arc closed; **7 delivered external
+reviews, not 8** -- r3 is a documented SINGLE-LANE round (agy timed out twice,
+zero quota markers, a timeout not credits). The spec is TRACKED deliberately: the
+arc's raw artifacts are in `kibitz-runs/2026-08-09-slug-provenance-nonvideo/`,
+which is gitignored, and this file's own GROUNDING RULE says why that matters.
+
+**Why it was not built in that window:** the r4 panel raised a serialization
+prerequisite and it was confirmed live -- a concurrent window still held
+uncommitted `eng_wan_i2v.py` + `otr_g4_wan_ti2v.json`, and r4 also ruled that
+schema + tests + verifier + dates must land as ONE atomic green commit. Starting
+a five-file atomic change against a tree another window is holding is how work
+gets swept. **Implementation is the next window's first act.**
+
+**The headline the arc found:** the provenance guard reads as a totality claim
+and is not one. `cloud_media_invoke.py:479-484` resolves shipped DISPLAY NAMES
+into real Google ids at invoke time, so the pack ships
+`gemini-3.1-flash-image-preview` with no provenance entry at all -- while its
+stable twin ships in parallel through another lane. Four more defects in the
+driver's own plan were caught and are recorded in the spec.
 
 ### FOLLOW-UP CHIPS OWED -- coder work, no operator input needed
 
