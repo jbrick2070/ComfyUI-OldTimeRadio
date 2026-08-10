@@ -11,23 +11,24 @@ the section numbering below (which is historical) and the older "work by
 priority, not by number" line. A window takes the topmost item that is not
 blocked on the operator, finishes it green and pushed, then re-reads this list.
 
-| # | Item | Where | Kind | Blocked on |
-|---:|---|---|---|---|
 **ORDER SET BY THE OPERATOR 2026-08-07** and it now runs straight through
 `ROADMAP.md` as ONE runway -- rows 1-9 live here, rows 10-13 are the roadmap's
 later runway, reordered to match. A window works the topmost UNBLOCKED item.
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| ~~1~~ | ~~**Model-slug curation CHUNK B**~~ **SHIPPED + LIVE-PROVEN 2026-08-09 (`262dfa8f` + `22012263`). Queue item 1 is CLOSED -- do not re-open.** (a) landed: the creative default is `~anthropic/claude-opus-latest`, and the live leg resolved it to `anthropic/claude-opus-5` while the pin it replaced still said `4.8` -- the staleness the alias exists to prevent, caught on its first run. (b) was DECIDED AGAINST: `qwen/qwen3.7-flash` and `inclusionai/ling-2.6-flash` are REJECTED BY NAME in the curation guard -- cheap, but concrete ids whose authors publish no `~latest`, and `inclusionai` ships 5 models total. Also added the `~deepseek/deepseek-v4-flash-latest` pointer, stamped `meta["resolved_models"]` in the WRITER (provenance had existed only on the video path, so writer-only runs lost it), and unbroke `workflows/otr_story_only.json`, which could not be submitted at all | -- | -- | -- |
+**CLOSED, do not re-open:** row 1 (model-slug curation chunk B, `262dfa8f` + `22012263`),
+row 8 (multi-GPU upscale stage), row 9-C3 (Macbeth safety probe -- all four live cells
+passed, `macbeth_probe` removed from both profiles). Detail lives in `docs/HANDOFF_LOG.md`.
+
+| # | Item | Where | Kind | Blocked on |
+|---:|---|---|---|---|
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
 | 5 | **MiniMax H3 -- VIDEO-PATH SPRINT SERIES** (reframed by the operator 2026-08-09; the old "does H3 belong in the dropdown" ruling is RETIRED, not pending). H3 becomes a run of sprints refining the video paths, each its own gated chunk. **Scope TBA -- do not invent the sprint list**; when the operator names sprint 1, add it here as its own row | section 0-QUINQUE | coder, several chunks | operator naming sprint 1 |
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
-| ~~8~~ | ~~**System-agnostic multi-GPU upscale stage**~~ **SHIPPED 2026-08-08 (queue item 8 retired -- see tombstone below)** | -- | -- | -- |
-| ~~9-C3~~ | ~~**Macbeth safety probe (item 9 chunk 3)**~~ **SHIPPED + DISCHARGED 2026-08-08 evening. All four live cells PASSED, no safety refusal on any arm, `macbeth_probe` removed from BOTH profiles (`e11f2015` harness, `63ee4fe3` discharge). See the HANDOFF_LOG entry. Retired -- do not re-open.** Historical detail below: ~~**HARNESS SHIPPED 2026-08-08 evening (Commit 1); the LIVE 4-CELL RUN IS WHAT REMAINS.** r1-r4 arc CLOSED pre-code; LOCKED spec `kibitz-runs/2026-08-08-macbeth-safety-probe/r4/final.md` (gitignored; framing doc `docs/2026-08-08-PROBLEM-STATEMENT-macbeth-safety-probe.md` tracked). Scope LOCKED to **B1 x A1-A4 = 4 cells** (~$0.72). **The conditional discharge predicate has RESOLVED PERMISSIVE:** all four frozen provider-bound inputs retain explicit II.ii violence (`bloody`/`crimson`/`daggers`/`murdering` on the visual arms, `blood` on TTS), so a full four-cell PASS *is* eligible. Pre-flight holds green (workflow contract genuinely validated, five ledger-field assertions, provenance, env pins, creds). **Both profile JSONs remain byte-identical -- the discharge is a SEPARATE conditional Commit 2 that only fires if all four cells PASS live.** Run: `python scripts/otr_macbeth_probe.py --live` (background it; ~60s MCP ceiling) | `scripts/otr_macbeth_probe.py` | 1 live run, then conditional Commit 2 | nothing -- unblocked |
-| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08, tombstone below) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
+| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
 
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
@@ -61,7 +62,7 @@ the leg ran. A row that describes finished work as pending is the same defect
 pointing the other way, and it costs the next window a re-grounding pass.
 **When you close an item, close its ROW in the same push.** **Item 8 SHIPPED
 2026-08-08 and item 9-C3 (Macbeth safety probe) SHIPPED + DISCHARGED
-2026-08-08 evening** -- both tombstoned below. Item 9's remaining chunks (the
+2026-08-08 evening** -- both closed, detail in `docs/HANDOFF_LOG.md`. Item 9's remaining chunks (the
 20-clip accept-rate measurement, then the first full LOW episode) are the
 unblocked queue work, but see the LEMMY row: they exercise casting and
 dialogue, so they should not run mid-Lemmy.
@@ -157,42 +158,6 @@ other six char-voice engines.
 roll, which breaks replay parity and needs a DECLARED re-baseline. Consider
 making it OBSERVABLE first -- the pattern that made the upscale stage provable
 this week -- since the audition step (D-3) needs the operator's ears anyway.
-
-### LEMMY -- historical r1 context (kept, but read the correction above first)
-
-**Phase 1 SHIPPED `bec0ca79`** by a Codex window: `accent="cockney"`,
-`dialogue_orthography="standard_english"` and `speech_signature` on
-`LEMMY_PROFILE` (`config/cast_pools.py`), preserved through
-`Ledger.set_cast()` (`nodes/production_ledger.py:1053-1058`), plus a new
-`nodes/_otr_dialogue_policy.py` anti-eye-dialect guardrail wired into
-`_otr_line_composer.py` and `_otr_compose_exchange.py`, with
-`tests/test_otr_dialogue_policy.py` (4 tests).
-
-**Phases 2-4 are PLANNED, NOT BUILT** (CastLock route policy -> mixed-engine
-renderer + sample-rate normalization -> workflow/handoff integrity). r1 ideas
-round artifacts: `kibitz-runs/2026-08-08-lemmy-cockney/r1/` (scoped r1 ONLY --
-`scope_receipt.md`; r2/r3/r4 NOT run).
-
-**Grounded facts the next window must not re-derive or get wrong:**
-- LEMMY was ALREADY described as Cockney before Phase 1 -- the "gruff
-  mechanic, one-line sheet" often quoted is a DOCSTRING EXAMPLE at
-  `_otr_casting.py:333`, not the profile.
-- SEVEN char-voice engines, not six (`cast_lock.py:44-46` includes **bark**).
-- indextts2 / chatterbox / dia each have ~40 DISTINCT reference paths; only 3
-  rows share `vz_bill_boerst.wav`. There is no shared-clip crisis.
-- The per-character voice pin does NOT reach pre-locked LEMMY:
-  `voice_cast_decision` covers `ensemble_slots` only
-  (`_otr_casting.py:1750-1806`), so he falls through to ordinary casting.
-- Verified for Phase 3: `pack_audio_batch` (`_otr_audio_engines/base.py:114`,
-  NOT `_otr_voice_node_common.py`) RAISES on mixed sample rates. Native rates:
-  bark 24000, kokoro 24000, indextts2 22050, dia 44100.
-- Both r1 lanes independently agreed the biggest risk is the WRITER, not the
-  TTS (eye-dialect reaching captions/credits), and that a PARTIAL rollout --
-  Cockney on some engines, American on others -- is worse than doing nothing.
-
-**Bug Bible fan-out** is not a numbered row: it is an operator action available
-any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
-log's own contract forbids a window promoting directly.
 
 ### WAITING ON THE OPERATOR -- the whole list, in one place (2026-08-09)
 
@@ -337,65 +302,32 @@ chasing this frequency for six hours and I'll not lose it now!"*
 **The candidate's SHA-256 was verified against the real file** -- the plan's
 stated `47E733D5...A60DB2` matches `2_algenib_cockney.wav` byte for byte.
 
-### NEXT CODER CHUNK -- SPEC COMPLETE, NOT BUILT (2026-08-09)
+### SLUG PROVENANCE -- SHIPPED 2026-08-10 (`4bc760c8`). Two live findings owed to the operator.
 
-**`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` is ready to
-implement.** Full `kibitz-plugin:kibitz` r1-r4 arc closed; **7 delivered external
-reviews, not 8** -- r3 is a documented SINGLE-LANE round (agy timed out twice,
-zero quota markers, a timeout not credits). The spec is TRACKED deliberately: the
-arc's raw artifacts are in `kibitz-runs/2026-08-09-slug-provenance-nonvideo/`,
-which is gitignored, and this file's own GROUNDING RULE says why that matters.
+Built to `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` (r1-r4 arc
+closed; 7 delivered external reviews, not 8 -- r3 was a documented single-lane
+round, agy timed out). Provenance is now keyed on `(provider_id,
+authority_lane)` off the shared inventory, so the guard finally sees the id
+`cloud_media_invoke` actually sends rather than the display name it used to date.
+Dates come from a real catalog run: `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
 
-**ITS STEP 4 IS NOW DONE (2026-08-10) -- the live catalog run happened and is
-written down:** `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
-A COMPLETE terminal-page listing, 52 unique ids, and **all seven shipped Google
-ids are present**, so the preview rule is satisfiable for the four
-preview-labelled ones (three TTS + Lyria) and the verifier's exit-2 "missing"
-condition does not fire. **The escalated `gemini-3.1-flash-image-preview` is
-present too and that changes NOTHING** -- runtime sends it to a Vertex proxy, not
-the catalog endpoint that was measured, so it still ships `unverified` as the
-sole named exception. It does undercut one disputed claim: the id is still listed
-46 days after the 2026-06-25 shutdown Codex reported, which argues against a
-completed catalog removal while saying nothing about the proxy route.
-**A window picking this up no longer has to pause mid-atomic-commit to go fetch
-dates.** Steps 1-5 remain to build, as ONE commit.
+**TWO THINGS NEED THE OPERATOR, and neither is a code defect:**
 
-**Why it was not built in that window:** the r4 panel raised a serialization
-prerequisite and it was confirmed live -- a concurrent window still held
-uncommitted `eng_wan_i2v.py` + `otr_g4_wan_ti2v.json`, and r4 also ruled that
-schema + tests + verifier + dates must land as ONE atomic green commit. Starting
-a five-file atomic change against a tree another window is holding is how work
-gets swept. **Implementation is the next window's first act.**
+1. **`gemini-2.0-flash` and `gemini-2.0-flash-lite` are GONE from Google's
+   catalog.** Found by the new verifier on its first live run (exit 2, a complete
+   52-id listing). They are still shipped in `GOOGLE_API_LEGACY_TEXT_MODELS`, so
+   selecting either would hit a model Google no longer lists. **Left in place and
+   left loud** -- removing a model from the operator's choices is his call, and
+   making the gap impossible to hide is what the tooling is for.
+2. **`gemini-3.1-flash-image-preview` is still the one named preview exception.**
+   It IS in the catalog, and that settles nothing: runtime sends it to a Vertex
+   proxy, not the endpoint fetched, so presence proves the id is listed, never
+   that the route works. It also undercuts the reported 2026-06-25 shutdown --
+   the id is listed 46 days later. Cheapest settlement is unchanged: one still
+   through the Nano Banana lane. It either renders or the proxy rejects it.
 
-**The headline the arc found:** the provenance guard reads as a totality claim
-and is not one. `cloud_media_invoke.py:479-484` resolves shipped DISPLAY NAMES
-into real Google ids at invoke time, so the pack ships
-`gemini-3.1-flash-image-preview` with no provenance entry at all -- while its
-stable twin ships in parallel through another lane. Four more defects in the
-driver's own plan were caught and are recorded in the spec.
-
-### CORRECTION -- `672899fd`'s COMMIT MESSAGE OVERCLAIMS (Sonnet QA, 2026-08-10)
-
-**Recorded because a commit message travels further than a handoff entry.** That
-commit is titled *"so the guard can see what we actually send"* and its body says
-*"THE KEY GUARD IS PROVEN NON-VACUOUS"*. Both are true **only of the new
-`tests/test_slug_inventory.py`**, which is self-referential.
-
-**The PRE-EXISTING provenance guard is untouched by it and still cannot see the
-preview id.** `tests/test_slug_provenance.py:36-71` never imports
-`slug_inventory`, `collect_inventory` or `resolve_selector_to_model_id` (grep:
-zero hits), so `gemini-3.1-flash-image-preview` is still never produced as a
-candidate and is still not a key in `SLUG_PROVENANCE`.
-`test_every_shipped_concrete_slug_has_provenance` is green today **only because
-it is still checking the DISPLAY NAME** -- precisely the defect
-`docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` section 1 describes as
-unfixed.
-
-Nothing to revert; the code is sound and `HANDOFF_LOG.md` already says "first
-half built". But **do not read that commit as closing the provenance gap**, and
-do not let it make operator row 13 look settled by an automated guard. Steps 3
-(verifier) and 5 (schema migration) of the spec's five-step order are still
-unbuilt.
+Run it any time: `python scripts/verify_google_slugs.py` (exit 0/2/3/4/5; it
+never writes a date back).
 
 ### FOLLOW-UP CHIPS OWED -- coder work, no operator input needed
 
@@ -515,26 +447,6 @@ own independent guard): *"there should be an LLM pass to clean this stuff up."*
   with that in mind rather than discovering it late.
 * Held while LEMMY is active -- it exercises casting.
 
-### TOMBSTONE -- SYSTEM-AGNOSTIC UPSCALE STAGE (queue item 8), SHIPPED 2026-08-08
-
-**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc; new
-`nodes/_otr_upscale_engines/` namespace (registry + device resolver + pipeline +
-`eng_off` + `eng_spandrel_esrgan`), registry cross-validation at both boundaries,
-2 appended widgets on `OTR_SilentComposite` (BUG-LOCAL-097), all 45 variants
-regenerated, `nodes/rtx_upscale.py` ripped, `spandrel~=0.4.1` pinned, 11 new test
-files. **Live-proven 2026-08-09** on `otr_upscale_ltx_probe`: leg
-`signal_lost_the_midnight_chime_20260809_142258`, `RESULT SUCCESS`, `obs_publish
-OK`, 7 x `MODEL PATH` and ZERO `FAST PATH`.
-
-**The finding worth keeping:** the checkpoint resolves to
-`Documents\ComfyUI\models\upscale_models\RealESRGAN_x2plus.pth`, NOT the
-`C:/ComfyUI-Models/upscale_models/` that `_otr_headless_model_paths.yaml` maps.
-On the headless topology the model is reachable ONLY through the repo-relative
-`parents[4]` fallback -- exactly the lookup the old `get_full_path`-only
-fingerprint never consulted, so a weight swap never invalidated the composite on
-the box that publishes episodes. Full receipts: `docs/HANDOFF_LOG.md` 2026-08-08
-and 2026-08-09 entries.
-
 ### CARRY-FORWARD -- how to run a bank-specific qualification (from the closed announcer-intro work)
 
 PBUG-20260807-01 is FIXED and LIVE-PROVEN (5/5 legs, four banks, three model
@@ -550,33 +462,6 @@ re-learning:
 3. **Dry-run first.** Catalog model ids carry size suffixes (`... (12.0 GB)`);
    the plain id is a hard `ValueError`. The `--dry-run` `applied:` line is the
    only proof an override actually landed.
-
-### TOMBSTONE -- CLOUD AUDIO CACHE + SF#1 LEDGER FLUSH, SHIPPED 2026-08-08
-
-**DONE. Do not re-open.** Both had full `kibitz-plugin:kibitz` r1-r4 arcs.
-Cloud legs content-address their audio via `<meta.paths.audio_dir>/audio_cache/`
-(`OTR_AUDIO_CACHE_DIR` overrides); request schema v2 carries
-`provider_model_id` / `provider_voice_id` as first-class IN_KEY fields; the
-retry ladder is pinned on cache paths so a fallback model cannot produce audio
-cached under the requested model's key.
-
-**The root cause SF#1 landed on, worth carrying:** `_persist_ledger_stamps`
-shipped DEFINED, isolated-tested, and NEVER CALLED. Four ledger fields landed on
-ZERO lines for a day. Downstream renders survived only because no active render
-node reads those fields yet -- data loss on metadata, not a render-blocker. Fixed
-with a `try/finally` around the per-line loop plus a BUG-12.74 static AST
-reachability guard that pins the call's exact shape. Receipts:
-`docs/HANDOFF_LOG.md`. Chips it left are in FOLLOW-UP CHIPS OWED above.
-
-### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
-
-**DONE. Do not re-open.** Tenth visual style, equal odds in the roll; an LLM
-emits a 9-field `VisualStyleCard` and a deterministic Python composer expands it
-into a 23-field v2 pack. MODEL and TRANSPORT failures floor once from the 9-pack
-registry and EMBED the floor pack in the ledger so re-render is byte-reproducible;
-`get_visual_style` raises rather than silently defaulting to `sci_fi_radio`.
-Two bytecode regression pins inspect `_run_writer_tail.__code__.co_names` so a
-future edit cannot reintroduce either NameError. Receipts: `docs/HANDOFF_LOG.md`.
 
 ### STANDING POLICY -- provider model slugs (from the closed curation chunks)
 
@@ -812,29 +697,6 @@ set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
 rule text -- then re-enter at **r3**, per the standing rule that a plan-level
 gap drops back rather than being patched from inside r4.
 
-### TOMBSTONES -- no-mirror (0-BIS), SFX rip (0-TER), banana route (0-QUATER)
-
-**All three DONE and live-proven. Do not re-open, do not re-panel, do not
-re-run the legs.** No-mirror discharged 2026-08-07 by leg
-`signal_lost_midnights_toll_20260807_085918` (two beats chained into two segments
-each -- the condition that makes the deleted machinery reachable at all -- nine
-segment receipts all `extension_mode="none"`, grader `ACCEPTED: 7 shot(s)`); it
-closed F11 and the multi-segment proof in the same stroke. SFX ripped `9eb6ede1`
-(five engines barred via `RETIRED_ENGINE_IDS`; reviving SFX is a NEW design
-against the post-rip tree). Banana route closed `bc8a1bde`, and both its remnants
-closed too -- shield scoping `2fc81f72`, premise wiring DISPROVED (not a bug).
-
-**KNOWN GAP worth keeping:** the no-mirror AST tripwire catches the SYMBOLS and
-the RECEIPT; it would NOT catch a mirror re-implemented inline under another
-name. The durable defence is `acceptance.grade_no_mirror` (it re-derives the
-count instead of believing the mode) plus `render_driver`'s refusal of any
-segment whose length differs from its plan.
-
-**The lesson from the premise-wiring false alarm:** a symptom seen on a leg that
-also used `--premise` is not evidence about `--premise`. What that report
-actually saw was the announcer intro starved of its brief and answering the
-prompt as a form -- a different defect standing next door.
-
 ### 0-QUINQUE. MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
 
 **THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
@@ -962,8 +824,8 @@ contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
 Item 1 is the structural work and consumes most of a session; items 2-3 are
-small and share one campaign. **Items 8 AND 9 are DONE (both tombstoned below)
--- item 9 SHIPPED 2026-08-06 as `e499b7fc`.** The live open work is sections 0
+small and share one campaign. **Items 8 AND 9 are DONE**
+-- item 9 SHIPPED 2026-08-06 as `e499b7fc`; detail in `docs/HANDOFF_LOG.md`.** The live open work is sections 0
 (video matrix pattern, did NOT converge), 0-BIS (no-mirror, CODE-READY),
 0-QUATER's deferred shield-scoping chunk (own kibitz arc), and the 0-QUINQUE
 MiniMax ruling.
@@ -1433,54 +1295,6 @@ ships 7 characters, every one unknown. The narrower ruling that fits the evidenc
 Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
 `unknown` rows. That fixes 32 rows without ever second-guessing a parsed
 dramatis personae. **Operator decision, not a driver call.**
-
-### 8. VOICE/PORTRAIT CONSISTENCY -- DONE 2026-08-06, all six chunks
-
-Tombstone. Shipped `496d9d57` / `041a21d7` / `d4e51b4d` / `6d078f81` / `6a92cbd3` /
-`e04dcaad`; detail in `docs/HANDOFF_LOG.md`. **The shipped premise was INVERTED and is
-withdrawn:** `voice_ref_id` always followed the gender (1,169 rows, zero cross-gender);
-`voice_preset` was the wrong field, and no shipped engine speaks it.
-
-What now exists and should be USED rather than rebuilt:
-* `normalize_gender` / `canonical_bank_gender` / `get_presentation_gender` in
-  `nodes/_otr_roster_gender.py` -- the single gender boundary. The two normalizers are
-  NOT interchangeable: the tri-state one erases `neutral`, which is a real bank voice.
-* `presentation_gender` on the cast row, stamped in `CastLock._stamp` from the reference
-  actually chosen. Carried CONDITIONALLY through `set_cast` so the writer-stage drift
-  guard keeps its teeth.
-* `meta.voice_portrait_consistency_policy_revision` -- absence means legacy, forever.
-* `scripts/audit_voice_gender_consistency.py` -- the standing receipt. Baseline over
-  1,595 ledgers: 0 unreadable, 0 violations (all pre-policy), 332 legacy findings, 401
-  dormant mismatches, 28 portrait conflicts.
-
-**Left open by it, in priority order:**
-1. **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female, `Clara`
-   gendered male with "her" in her own prose. `ROSALIND` is NOT one of them -- the
-   Ganymede disguise keeps her female voice by operator ruling. Read the list; do not
-   total it.
-2. **Three unnormalized sites in `_otr_casting.py`.** `:469` (the LLM cast echo) and
-   `:583-587` (`_plan_gender_distribution` leaves a synonym row UNCOUNTED, skewing the
-   40/40/20 split) are real but MOVE THE GENDER ROLL -- they break C7 byte-identity and
-   replay parity, so each needs a declared re-baseline. `:756-759` (`_PINNABLE_GENDERS`
-   drops `woman`/`man` pins) is **VERIFIED INERT** -- the shipped roster sidecars emit
-   only `unknown`/`male`/`female` (32/30/23). Latent hazard, not a live defect.
-3. **`story_orchestrator.py:449-453`** merges cast rows copying `voice_preset` and
-   `gender` under INDEPENDENT guards, so a row can take its preset from one row and its
-   gender from another. STATIC evidence only -- per the admission rule it may not enter
-   `PROD_BUG_LOG.md` until a live artifact shows it. Needs its own ruling before anyone
-   touches the merge.
-
-### 9. THE MULTI-CLIP HONESTY RULE -- TOMBSTONE. SHIPPED 2026-08-06 (`e499b7fc`), proof DISCHARGED 2026-08-07.
-
-**DONE. Do not re-open, do not re-panel, do not re-implement.** It was FOUR
-defects, not one: the segment-vs-beat scope mismatch; `ltx_8gb` emitting no
-receipt at all; `scripts/grade_episode.py` reporting `ACCEPTED: 0 shot(s)` with
-exit 0 on the wrapper the render batch really writes (the grader was INERT on the
-real artifact); and a malformed receipt raising out of the grader.
-
-**This section stayed headed "r1 done, NOT built" AFTER the fix shipped in the
-same session** -- a next engineer would very plausibly have rebuilt finished
-work. That is why tombstones are one paragraph and DONE work leaves this file.
 
 ### Bench leftovers (relocated)
 
