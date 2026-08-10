@@ -3,6 +3,56 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-09 (late) -- HEAD ab76f6bc (v2.0-alpha) -- CODER (slug provenance + saved-workflow guard; the operator's gitignored audit changed the design)
+
+Did: 2 commits after the handoff below (`735cc8b1` handoff itself, then
+  `ab76f6bc`). Read that entry first -- this one only covers what came after.
+- **`ab76f6bc` -- GO_FORWARD item 6, partly closed, and NOT the way it was
+  written.** The item called for the "mechanical half": re-date the concrete
+  provider slugs. I did not, because none of the 35 has been verified against
+  its authority and each lane has a DIFFERENT one (Comfy Cloud's partner
+  catalog, Google's model list, ElevenLabs' endpoint). Stamping today's date on
+  all of them would have manufactured BUG-12.86 at scale -- fields that read as
+  evidence and are not, and worse than no date because they look settled.
+  So `nodes/_otr_slug_provenance.py` requires an ENTRY, not a date: a real ISO
+  date OR an explicit `UNVERIFIED` marker whose lane names who could settle it.
+  21 of 35 are honestly UNVERIFIED and the suite PRINTS that backlog rather
+  than letting it decay in a dict. Mutation-checked (an undated slug fails
+  exactly one test). The 6 comfy dates are carried forward from the 2026-08-07
+  OpenRouter check, recorded as a SIGNAL, not proof Comfy serves them.
+- **THE OPERATOR REMEMBERED AN AUDIT I COULD NOT FIND, and it was better than
+  mine.** `kibitz-runs/2026-08-07-slugfest/antigravity_slug_audit.md` -- 71
+  slugs across 11 lists. **`kibitz-runs/` is GITIGNORED (`.gitignore:251`)**, so
+  two days of work was invisible to every doc search and every `git log --all`.
+  That grounding rule is now in GO_FORWARD's baseline table.
+  It caught three things my pass missed: local checkpoint filenames, four
+  `preview`-marked slugs (a lifecycle promise baked into an id -- the `:free`
+  class that killed `tencent/hy3:free`), and the one that mattered most:
+- **THE AUDIT PREDICTED TODAY'S BUG TWO DAYS EARLY.** It flagged that
+  `otr_canonical.json` hardcodes the SIZE-SUFFIXED label
+  `"google/gemma-4-12b-it (11.9 GB)"` and warned saved graphs would stop
+  matching if the suffix moved. On 2026-08-09 exactly that hit
+  `otr_story_only.json` (bare id vs `(12.0 GB)`), `value_not_in_list`, graph
+  unrunnable, and **`--dry-run` PASSED**. Fixed the instance in `22012263`;
+  `ab76f6bc` adds the CLASS guard
+  (`tests/test_saved_workflow_model_values_resolve.py`).
+  Worse than the audit assumed: the badge is not a literal, it is
+  `_estimate_resident_gb(repo_id)` rendered at runtime
+  (`_otr_model_catalog.py:1189-1195`), so a quantisation-policy change rewrites
+  every label with nobody editing anything. Mutation-checked against the REAL
+  bug; the workflow was restored byte-identical to HEAD afterwards.
+Current step: item 6 partly closed (see 6-STATUS in GO_FORWARD). Video lanes
+  deliberately excluded from the guard while the concurrent window owns them.
+Next: three named follow-ups in 6-STATUS -- video lanes once that window lands,
+  local checkpoint filenames, and a ruling on the four `preview` slugs.
+Models: Opus 5 only. NO kibitz panel on this chunk -- the operator instructed
+  "ask me first before paneling" (2026-08-09) and did not ask. Sonnet 5 QA ran
+  on the preceding attempts-receipt diff, not on this one. This is a SCOPED
+  receipt, NOT an arc.
+Box state: clean and free -- port 8000 free, zero servers, GPU ~1.1 GB idle,
+  nothing of mine running. All work in this stretch was CPU-only.
+Commits: `735cc8b1`, `ab76f6bc`.
+
 ## 2026-08-09 -- HEAD a36483b3 (v2.0-alpha) -- CODER (chip 4 discharged live; four "reports success while doing nothing" defects fixed; first Bible promotion in 3 sessions)
 
 Did: 15 commits here + 2 in the survival-guide repo, all pushed and lockstep

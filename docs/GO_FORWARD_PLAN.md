@@ -58,8 +58,9 @@ dialogue, so they should not run mid-Lemmy.
 
 | Thing | Value as of 2026-08-09 |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `a36483b3`, == `origin/v2.0-alpha` |
-| Suite | **9509 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (was 9465/111/1 at `36d695f6`; +44 tests this session). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
+| Branch / HEAD | `v2.0-alpha` @ `ab76f6bc`, == `origin/v2.0-alpha` |
+| **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
+| Suite | **9516 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (was 9465/111/1 at `36d695f6`; +51 tests this session). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
 | Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
@@ -754,6 +755,33 @@ the same bugs so we need to update the bible and test regularly."*
    there. Sibling to the freshly promoted BUG-12.86 class (a field that reads
    as though it informs a decision and informs nothing). Per the admission rule
    a static observation does NOT create a PBUG -- delete-or-consume, small item.
+6-STATUS. **PARTLY CLOSED 2026-08-09 (`ab76f6bc`).** `nodes/_otr_slug_provenance.py`
+   + `tests/test_slug_provenance.py` now require an ENTRY for every shipped
+   concrete slug in the comfy / google_api / elevenlabs / comfy_image /
+   google_image lanes -- either a verified date or an explicit `UNVERIFIED`
+   marker naming the authority that could settle it. **Dates were NOT invented:**
+   21 of 35 are honestly UNVERIFIED and the suite prints that backlog out loud.
+   The 6 comfy dates are carried forward from the 2026-08-07 OpenRouter check,
+   recorded as a SIGNAL (OpenRouter presence is not proof Comfy serves a slug).
+   Also `tests/test_saved_workflow_model_values_resolve.py`: a saved graph's
+   model widgets must exist in the LIVE dropdown -- the class-level fix for the
+   `value_not_in_list` that made `otr_story_only.json` unrunnable, which the
+   slugfest audit had PREDICTED two days earlier.
+   **STILL OPEN from the audit, deliberately not in that commit:**
+   * **VIDEO lanes** (`eng_cloud_video`, `eng_google_omni_video`,
+     `eng_google_veo_video`) -- excluded because a concurrent window owns those
+     files and a guard would red-flag its in-flight edits. Add them once it lands.
+   * **LOCAL checkpoint filenames** (`z_image_turbo_bf16.safetensors`,
+     `flux-2-klein-4b-Q4_K_M.gguf`, `stable_audio_3_small_music.safetensors`,
+     ...) -- same staleness class, authority is local disk.
+   * **FOUR `preview`-marked slugs** (`gemini-3.1-flash-tts-preview`,
+     `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`,
+     `lyria-3-clip-preview`). "preview" in an identifier is a LIFECYCLE PROMISE
+     baked into an id -- the same class as `:free`, which is what killed
+     `tencent/hy3:free`. Decide whether to ban, warn, or date them.
+   Full inventory: `kibitz-runs/2026-08-07-slugfest/antigravity_slug_audit.md`
+   (GITIGNORED -- read it there, it is not in git).
+
 6. **THE OTHER PINNED SLUG LISTS -- same defect class, NOT yet curated
    (operator asked 2026-08-07: "do we need to review the comfy llm engine slugs
    too?"). Answer: yes, and it is wider than that one list.** Chunk A dated and
