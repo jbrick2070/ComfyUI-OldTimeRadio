@@ -88,11 +88,19 @@ Algenib's accent.
 ## Decision
 
 ```
-DECISION:    APPROVED / DENIED          (operator writes one)
-DECIDED BY:  Jeffrey Brick
-DECIDED AT:  ____-__-__T__:__Z
+DECISION:    APPROVED
+DECIDED BY:  Jeffrey Brick (operator)
+DECIDED AT:  2026-08-10T20:37:17Z
 SCOPE:       use of self-generated Google TTS output (voice Algenib) as a
              clone reference for LOCAL engines, for OTR character voicing
-TIER:        paid / unpaid              (fill from the account at packet time)
-EXPIRES:     none set / date
+TIER:        UNDETERMINED at decision time -- record from the account when the
+             evidence packet is assembled. Does NOT affect this decision: the
+             tier governs what GOOGLE may do with OUR data, not our rights to
+             the output, which are identical on both.
+EXPIRES:     none set
+REVOKED:     none
 ```
+
+**G0 IS CLOSED. Test A is unblocked.** The operator approved on the record
+above, against the 2026-08-10 snapshot of both documents quoted in this card --
+not against an assumption, which is what the gate existed to prevent.
