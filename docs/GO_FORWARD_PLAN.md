@@ -70,9 +70,9 @@ dialogue, so they should not run mid-Lemmy.
 
 | Thing | Value as of 2026-08-09 |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `ab76f6bc`, == `origin/v2.0-alpha` |
+| Branch / HEAD | `v2.0-alpha` @ `e791344b`, == `origin/v2.0-alpha` (measured 2026-08-10 after the plan-5.2 push) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9516 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (was 9465/111/1 at `36d695f6`; +51 tests this session). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
+| Suite | **9672 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-10 at `e791344b`; was 9516 as of 08-09, and that row had gone stale across the two Lemmy pushes before this one). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
 | Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
@@ -269,11 +269,30 @@ supported by the bank metadata and that overreach was correctly rejected.
   cost was nil. `CACHE_SCHEMA_VERSION` unchanged -- the sidecar shape did not
   change, only what the key is computed over.
 
-**STILL TO BUILD:** plan 5.2 (CastLock ordering -- the explicit re-pin, six
-ordered steps, touches production casting), and 5.3's second half (receipt /
-`IS_CHANGED` fingerprint / `tts_engine` on per-line receipts). Then Branch A
-(section 7). **Branch B stays unbuilt unless G1 fails and a separate decision
-approves it.**
+* **Plan 5.2 -- CastLock re-pin ordering. SHIPPED 2026-08-10 (`e791344b`).**
+  `lock()` now runs the plan's six ordered steps: the revision is stamped before
+  any route resolution; bank + engine metadata resolve ONCE for both cast
+  policies (preserve_ledger still passes `bank_entries=None`, so its
+  `char_voice_engine` stamp stays `auto` and does not start pinning a concrete
+  engine); rows match on normalized name OR char_id against a new
+  `LEMMY_VOICE_POLICY["character_key"]`, because Lemmy is positional `c02` and a
+  matcher keyed to a literal `lemmy` char_id would claim nobody; the route is
+  proved ahead of both the hybrid voice-fit and the generic selector; only the
+  claimed row changes; and a selected route that fails qualification raises
+  `VoiceRouteError` with NO fallback. New `_resolve_policy_claim` /
+  `_apply_policy_claim` on CastLock, and `select_policy_route` /
+  `resolve_policy_route_claim` / `cast_row_matches_policy` in
+  `nodes/_otr_voice_route.py`. 32 tests.
+  **IT SHIPPED INERT and that is the point:** `approved_native_routes` is still
+  `{}`, so nothing is selected, the voice bank is not even consulted on the
+  dormant path, and no current render changes. It activates the day G1 Test A
+  puts an operator receipt in that dict. Sonnet QA pass was clean on all nine
+  contract items; its one finding (the claim resolver not being handed the bank
+  `lock()` had already loaded) is fixed in the same commit.
+
+**STILL TO BUILD:** 5.3's second half (receipt / `IS_CHANGED` fingerprint /
+`tts_engine` on per-line receipts). Then Branch A (section 7). **Branch B stays
+unbuilt unless G1 fails and a separate decision approves it.**
 
 **STILL TO RUN:** G1 Test A -- blinded A/B/C on IndexTTS2 (candidate = Algenib
 Cockney clip as clone reference; incumbent = `vz_donor_marshal_indian`; control
