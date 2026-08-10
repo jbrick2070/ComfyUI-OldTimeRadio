@@ -3,6 +3,108 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-10 -- HEAD ae06b00e (v2.0-alpha) -- CODER (G0 closed; Lemmy Branch A foundation shipped; the audition that "never happened" was on disk all along)
+
+Did: 6 commits this stretch (13 across the whole session). Everything CPU-only
+  -- the operator's own 11-leg render campaign held the GPU throughout and was
+  never touched.
+- **THE FINDING OF THE SESSION: the Lemmy audition EXISTS and was never
+  recorded.** `output/otr/episodes/voice_audition_cockney/` holds four takes
+  dated 2026-08-08: `1_algenib_plain.wav`, `2_algenib_cockney.wav`,
+  `3_algenib_cockney_angry.wav`, `4_charon_plain_control.wav` -- baseline,
+  target, stress case, control. The operator remembered doing it; every plan
+  document, including one I wrote the day before, asserted "no voice on any
+  engine is audition-proven Cockney." **That claim was FALSE.** Found by
+  grepping the whole tree for the character rather than trusting the docs. Voice
+  is `gt_algenib` (`config/voice_reference_bank.json:2823`): google_tts, provider
+  voice Algenib, timbre already `['gravelly','authority']`, gender MEASURED at
+  97.2 Hz median f0 on the audition date. Candidate SHA verified byte-for-byte
+  against the plan's stated `47E733D5...A60DB2`.
+- **G0 IS CLOSED -- operator APPROVED**
+  (`docs/2026-08-10-G0-RIGHTS-DECISION-CARD-lemmy.md`, `38d7ddca`, decided
+  2026-08-10T20:37:17Z). I fetched and quoted both governing documents rather
+  than inferring: we own the output, voice/audio/cloning are never mentioned in
+  EITHER, the only model restriction is against COMPETING models, and
+  impersonation requires a real person plus intent to deceive. The one
+  stretchable clause ("replicate any component") targets model internals by its
+  own example -- recorded as the residual risk, not hidden. Tier left
+  UNDETERMINED for the evidence packet; it governs what Google may do with our
+  data, not our rights to the output.
+- **`ae06b00e` -- plan 5.1 + first half of 5.3, both independent of which voice
+  wins.** `nodes/_otr_voice_route.py`: `validate_qualified_voice_route` makes a
+  route PROVE itself -- bytes hashed against the receipt, the ENGINE TRIPLE
+  (route == active scalar == bank entry), rights expiry/revocation, closed
+  status vocabularies, unsupported contract version refused. It rejects
+  `ref_sha256="cloud"`, a real value live in the bank and exactly what made
+  `gt_algenib` look usable as a local reference. 65 tests; the legacy
+  `is_qualified_route` stays a compatibility helper and a test pins that it says
+  yes where the new one says no. Route identity (`route_id`,
+  `route_contract_version`, `qualification_record_id`, `weight_revision`) joined
+  `ResolvedVoiceRequest` AND `IN_KEY_FIELDS`, partition invariant verified.
+  **`REQUEST_SCHEMA_VERSION` 2 -> 3** so the resulting cache-key change runs
+  through the designed `needs_rerender` migration instead of silent drift;
+  measured ZERO cached entries first, so the cost was nil.
+- **PREMISE CORRECTION, accepted by the plan's author -- do not re-inherit the
+  old story.** Fable ruled Lemmy was "a different man at every appearance". The
+  ledgers say otherwise: 1,633 files, 186 LEMMY rows, 151 `None` (bark presets,
+  expected) and **33 of the remaining 35 on ONE reference**,
+  `vz_donor_marshal_indian`. The second window then explained the mechanism --
+  all 33 had `meta.episode_seed=None`, so CastLock derived an identical selector
+  seed every time. **He was ACCIDENTALLY PINNED.** Fix = explicit qualified
+  re-pin, NOT a rewrite of the generic selector. A 40-seed sweep selects 14 refs,
+  so an unpinned future route WOULD vary.
+- **AND MY OWN OVERREACH WAS CORRECTLY REJECTED:** I argued `_indian` in an
+  identifier proved nationality and `warm` proved the opposite of gravelly.
+  Neither is supported by the bank metadata -- that is inferring evidence from a
+  NAME, the same defect class I had been citing at others all session. The
+  agreed framing is a **floor-EVIDENCE failure**: the incumbent cannot prove the
+  configured floor. I also claimed "33 shipped episodes" of listener exposure;
+  a ledger row is not a publication, and that needs a separate release/OBS audit.
+- **`0e19129e`** research plan: the seven char-voice engines are TWO problems --
+  prompted/catalogue vs reference-clone -- and on the clone trio the accent comes
+  from the reference WAV, so one proven clip may solve four engines. Gated on G0,
+  now approved.
+- Earlier in the session: GO_FORWARD cleaned 2697 -> 2196 lines with a
+  WAITING-ON-THE-OPERATOR table; the slug-provenance shared inventory
+  (`672899fd`); the garbled-sidecar warning from a Fable ruling (`81a7e47f`);
+  `otr_upscaled_dir()` deleted (`50b6d983`); the bark "approval" that was a bare
+  string replaced with a real receipt contract (`3864f517`).
+Current step: Lemmy Branch A foundation in; G0 closed; Test A not yet run.
+Next: plan section **5.2 (CastLock ordering -- the explicit re-pin, six ordered
+  steps, touches production casting)** then **5.3's second half** (receipt /
+  `IS_CHANGED` fingerprint / `tts_engine` on per-line receipts), then Branch A
+  section 7. **Branch B stays unbuilt unless G1 fails AND a separate decision
+  approves it.** Then G1 Test A: blinded A/B/C on IndexTTS2 (~20 min GPU + ~10
+  min operator ears) once the operator's render campaign finishes.
+  `LEMMY_AUDITION_LINES` are frozen and operator-approved, so the arms are
+  comparable.
+**BIBLE CANDIDATE, NOT PROMOTED -- next window should finish this.** The
+  accidental pin qualifies under the admission rule (verified by 1,633 live
+  production ledgers, not by review). Class: *a seed-derived random selection
+  silently collapses to a constant when its seed input is None -- it looks
+  random, audits as random, and has been pinned all along.* Checked
+  `BUG_BIBLE.yaml` at survival-guide `656c36e` (263 entries): **no covering
+  entry found.** Not promoted here only because the Three-File Contract deserves
+  a window with context left, not a rushed edit at the end of a long session.
+Models: Opus 5 (coder + sole judge). **Fable** twice at the operator's request --
+  the audio-cache corruption taxonomy (ruled C, shipped) and the Lemmy design
+  ruling (ruled pin-don't-suppress; its identity premise was later corrected by
+  ledger evidence). **Sonnet 5** QA on the diff -- caught a four-blank-line
+  artifact from my line-range deletion AND that my `672899fd` commit message
+  overclaimed. Codex + Antigravity on the slug arc (r1-r4, **7 delivered reviews
+  not 8** -- r3 single-lane, agy timed out twice) and on Lemmy r2. **No kibitz
+  arc on this stretch's code**: the Lemmy plan had already been through
+  Fable -> me -> Antigravity -> my rebuttal -> the author's ruling, which is more
+  review than an arc, and the operator said to build.
+Box state: clean on my side -- zero servers, zero background tasks, nothing of
+  mine on the GPU. The **operator's own 11-leg campaign holds ~8.1 GB** and had
+  ~3h remaining at handoff; port 8000 free. Suite **9640 passed / 111 skipped /
+  3 deselected / 1 xfailed, exit 0**. Bug Bible **20 passed / 24 skipped /
+  3 xfailed** at survival-guide `656c36e`. The 3 deselected are still the
+  concurrent window's uncommitted `eng_wan_i2v.py` -- not ours, untouched all
+  session (verified: 0 of their files in any commit I made).
+Commits: `465736ee`, `0e19129e`, `692ac6d1`, `ff83634c`, `38d7ddca`, `ae06b00e`.
+
 ## 2026-08-10 (overnight, operator asleep) -- CODER (decision round executed; Lemmy r2 hit a plan-level blocker; Sonnet caught my own overclaim)
 
 Did: the operator answered a 4-question decision round, then went to bed with
