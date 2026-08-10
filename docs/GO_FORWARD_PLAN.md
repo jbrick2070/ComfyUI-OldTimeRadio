@@ -141,570 +141,162 @@ round artifacts: `kibitz-runs/2026-08-08-lemmy-cockney/r1/` (scoped r1 ONLY --
 any time (PBUG-20260807-01 is logged `promotion: pending fan-out`), and the
 log's own contract forbids a window promoting directly.
 
+### WAITING ON THE OPERATOR -- the whole list, in one place (2026-08-09)
+
+Nothing below is blocked on a coder. Each row needs YOU. Collected here because
+they were scattered across nine sections and no window could answer "what is
+waiting on me?" without reading the whole file.
+
+| # | What | What kind of answer | Where the detail is |
+|---:|---|---|---|
+| 1 | **The 23 shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | A DECISION. Then a coder/render window executes it | PBUG-20260807-01, `docs/PROD_BUG_LOG.md` |
+| 2 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` ATTEND to the prepended reference, or accept and ignore it? | YOUR EYES on two arms. Two renders on SEPARATE fresh boots; the code side is ready | section 1 |
+| 3 | **WAN 8-GB launch contract** -- after profile retirement, who owns a tier's native render ceiling? | RATIFY A SHAPE. Proposed: the adapter DECLARES its own tier ceiling, the widget becomes an override, `0` means "use the adapter's contract" | 8 GB / profile cluster |
+| 4 | **MiniMax H3 sprint series** -- name SPRINT 1 | NAME THE SCOPE. Do not let a window invent the sprint list | 0-QUINQUE |
+| 5 | **Video matrix pattern** -- ~32 engines each need a one-line `doc_purpose`, and the `family -> display_group` taxonomy must be decided | WRITE CONTENT. No review round can produce it; this is absent human-owned data | section 0 |
+| 6 | **Bug Bible bulk fan-out** -- 9+ closed candidates + the duplicate-`legacy_id` cleanup | ONE FAN-OUT SESSION. A window may promote a SINGLE uncovered entry, but the log's contract reserves the bulk pass for you | Bug Bible promotion field |
+| 7 | **The 8 swept survival-guide guards.** `656c36e` staged 8 pre-existing uncommitted `test_otr_*` files whose commit message does not describe them | LEAVE IT (with a documenting follow-up) or SPLIT them into their own commit. Nothing is broken; the suite is green | Bible promotion note |
+| 8 | **`otr_upscaled_dir()` is DEAD** (`nodes/_otr_paths.py:383`) -- its only producer was the ripped `OTR_RTXUpscale` | DELETE OR KEEP. Removing a public path helper is your call, not a comments-only change | STILL OPEN item 0 |
+| 9 | **`meta.perfect_run_spacesaver`** is written by `OTR_LedgerScriptWriter.py:6196-6197` with zero remaining readers | KEEP OR DROP | upscale chips |
+| 10 | **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female; `Clara` gendered male with "her" in her own prose | READ THE LIST, rule case by case. Do not total it. `ROSALIND` is NOT one -- Ganymede keeps her female voice by your earlier ruling | sprint item 8 |
+| 11 | **`story_orchestrator.py:449-453`** copies `voice_preset` and `gender` under INDEPENDENT guards, so a row can take its preset from one row and its gender from another | A RULING before anyone touches the merge. STATIC evidence only -- it may not enter the bug log until a live artifact shows it | sprint item 8 |
+| 12 | **v2.1 candidate:** a low-footprint LOCAL model steeped in OTR diction | A CONSCIOUS RE-OPEN. It collides with your 2026-08-04 "story quality is done" directive, so only you can reopen it | STILL OPEN item 7 |
+
+**Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
+a dropdown ruling (it became a sprint series), and queue item 1 is closed.
+
+### FOLLOW-UP CHIPS OWED -- coder work, no operator input needed
+
+Consolidated 2026-08-09 from four tombstones. **Verified against the tree, and
+two chips that were listed as owed are already DONE** -- the upscale-model SHA
+is pinned (`eng_spandrel_esrgan.py:79`, a real 64-hex digest, not the empty
+bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
+`e16e9a63`. Both are struck below rather than deleted, so nobody re-derives them.
+
+1. **Stale metadata retention across legs** (SF#1, Codex r4 MF-1). A downstream
+   reader consuming an obsolete field is a different defect class from "helper
+   unwired". Needs its own arc.
+2. **caplog-based degraded-write test** (SF#1, Codex r2 OPT-2). `_write_audio_atomic`
+   logs a bounded warning on partial-crash recovery; no test asserts the text.
+3. **`cache=off` token on a mid-`generate_voice` raise** (SF#1, Fable gate).
+   `cache_status` initialises `"off"` at `_otr_voice_node_common.py:829` and stays
+   there if `generate_voice` raises before any status assignment -- so a
+   cache-enabled line that dies mid-generation emits a misleading `cache=off`
+   token on the exact dying-line log. Tiny fix + caplog test.
+4. **`SpandrelEsrgan._resolve_model` robustness pair.** An unreadable NON-winning
+   candidate aborts the whole search instead of skipping; the winning file is
+   stat'ed twice with a TOCTOU window. **THIRD touch of this logic, so the
+   two-strikes rule makes a full kibitz panel MANDATORY before any code.**
+5. ~~Upscale-model SHA pin~~ **DONE** -- `_model_sha256` is pinned.
+6. ~~`visual_style_receipt["attempts"]` always reports 1~~ **DONE** (`e16e9a63`),
+   and the shared `on_attempt_complete` contract three callers depend on is now
+   pinned against the real ladder.
+
 ### TOMBSTONE -- SYSTEM-AGNOSTIC UPSCALE STAGE (queue item 8), SHIPPED 2026-08-08
 
-**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc completed
-2026-08-08: r1 cold Fable + Codex + Antigravity (three-lane); r2 Codex +
-Antigravity; r3 Codex + Antigravity CLI (timed out at 5m, operator pasted
-UI review back) + Fable-fork ruling subagent; r4 Codex + Antigravity CLI
-(landed clean) + parallel Workflow verify-at-build sweep (8 items). Sonnet
-5 PRE-implementation review caught 4 must-fixes before code was written
-(spandrel API contract collision, `source` NameError in cross_validate,
-schema self-contradiction on `_UPSCALE_STAGE_KEYS` device requiredness,
-`assemble_silent_timeline` engine-threading pseudocode mismatch); Sonnet 5
-QA-on-diff caught 2 more (parents[3]->parents[4] fallback path off-by-one
-+ mirrored test error; `engine.load()` firing on the single-base composite
-path where the model is never consumed). Fable final gate caught the LAST
-fresh bug the entire six-review chain missed: color-matrix asymmetry on
-the model round-trip (`in_color_matrix=bt709` on decode, `out_color_matrix=bt709:out_range=tv`
-on encode) -- ffmpeg's auto rgb->yuv conversion falls to swscale default
-(bt601 historically), color-shifting exactly the model-enhanced segments.
+**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc; new
+`nodes/_otr_upscale_engines/` namespace (registry + device resolver + pipeline +
+`eng_off` + `eng_spandrel_esrgan`), registry cross-validation at both boundaries,
+2 appended widgets on `OTR_SilentComposite` (BUG-LOCAL-097), all 45 variants
+regenerated, `nodes/rtx_upscale.py` ripped, `spandrel~=0.4.1` pinned, 11 new test
+files. **Live-proven 2026-08-09** on `otr_upscale_ltx_probe`: leg
+`signal_lost_the_midnight_chime_20260809_142258`, `RESULT SUCCESS`, `obs_publish
+OK`, 7 x `MODEL PATH` and ZERO `FAST PATH`.
 
-**What shipped in ONE atomic commit** (queue item 8 D-2 codicil satisfied
-in full):
+**The finding worth keeping:** the checkpoint resolves to
+`Documents\ComfyUI\models\upscale_models\RealESRGAN_x2plus.pth`, NOT the
+`C:/ComfyUI-Models/upscale_models/` that `_otr_headless_model_paths.yaml` maps.
+On the headless topology the model is reachable ONLY through the repo-relative
+`parents[4]` fallback -- exactly the lookup the old `get_full_path`-only
+fingerprint never consulted, so a weight swap never invalidated the composite on
+the box that publishes episodes. Full receipts: `docs/HANDOFF_LOG.md` 2026-08-08
+and 2026-08-09 entries.
 
-* **New adapter namespace `nodes/_otr_upscale_engines/`** (6 files):
-  `__init__.py` (guarded imports + roster audit), `registry.py`
-  (UpscaleEngine Protocol, EngineRegistry subclass, CAPABILITIES table,
-  `RETIRED_UPSCALE_ENGINE_IDS = frozenset()`), `_resolve.py` (device
-  resolver: `cpu | cuda | cuda:N` -- MPS deferred until Mac receipt),
-  `_pipeline.py` (frame-exact pipe reads, tempfile-based stderr capture,
-  kill-and-wait, `_fit_and_pad_bhwc` decrease-fit + pad, engine output
-  validator, `_probe_video_dims` with N/D fraction split), `eng_off.py`
-  (mandatory pass-through sentinel), `eng_spandrel_esrgan.py` (Real-ESRGAN
-  x2plus via spandrel's ModelLoader, per-frame descriptor calls per
-  spandrel's `(1,C,H,W)` contract, SHA verification, `folder_paths`
-  fallback via `parents[4]`).
-* **Registry cross-validation** (`nodes/_otr_shared/capability_profiles.py`):
-  `upscale_stage` added to `_TOP_LEVEL_KEYS` (OPTIONAL); `_UPSCALE_STAGE_KEYS`
-  and `_UPSCALE_STAGE_OPTIONAL_KEYS` split so partial specs like
-  `{engine: "spandrel_esrgan"}` are legal (Sonnet 5 pre-implementation
-  MF-3); `_REGISTRY_NAMES` gains `"upscale"`; `cross_validate_profile`
-  extended with a upscale stanza that accumulates violations (not
-  inline-raise). Wired at BOTH boundaries: `scripts/build_variants.py:build_variant`
-  and `scripts/otr_api.py:apply_profile_to_workflow`. Codex r4 MF-3.
-* **`_flatten_profile_values`** (`nodes/_otr_workflow_apply.py`): only-if-
-  present flattening of `upscale_stage.engine` / `.device`, so profiles
-  that omit the section keep the canonical's `"off"/"cpu"` defaults
-  byte-identically.
-* **Widget mapping** (`config/profiles/widget_mapping.json`): 2 new
-  managed entries (`upscale_stage.engine` with `registry: "upscale"`,
-  `upscale_stage.device` with `registry: null`).
-* **`OTR_SilentComposite`** (`nodes/otr_silent_composite.py`): 2 optional
-  widgets APPENDED (BUG-LOCAL-097); `composite()` threads engine into
-  `assemble_silent_timeline` only (single-base normalize path unchanged);
-  engine.load gated on `assemble AND non-off` (Sonnet 5 QA-on-diff MF-2);
-  `_encode_segment` fast-path branch unchanged for off/floor/dir/black
-  (byte-identity preserved); new `_run_model_pipeline` with
-  FFMPEG-owns-TIME + MODEL-owns-SPACE split, per-frame model calls,
-  bt709 color-matrix declarations on both ffmpeg sides (Fable MF-1),
-  no-enlargement skip when source >= canvas at 1x (Codex r4 SF-3),
-  path-based stderr capture so `_tail` reads after Popen writes
-  (Antigravity r3 MF-2), guarded lifecycle with kill-and-wait on error
-  and count_video_frames assert; new `IS_CHANGED` fingerprints base
-  video + manifest clip paths (with sorted dir-frame tuples) + sibling
-  master WAV + `OTR_COMPOSITE_UNSHARP_AMOUNT` + engine identity + model
-  file mtime.
-* **Canonical workflow**: node 84 grows 2 `inputs[]` objects and 2
-  `widgets_values` entries (5 -> 7). All 45 shipping variants
-  regenerated via `build_variants.py --all`; 4 `.env.json` master_hash
-  fields refreshed to match.
-* **Ship profile** (`config/profiles/otr_upscale_ship.json`): clone of
-  `otr_w45_wan_ti2v.json` with `upscale_stage: {engine: "spandrel_esrgan",
-  device: "cuda:0"}` and `real-esrgan-x2plus` in `preflight.required_models`.
-* **Rip** (D-2 codicil, deferred since 2026-07-10): `nodes/rtx_upscale.py`
-  DELETED; `__init__.py` mapping removed; `OTR_RTXUpscale` added to
-  `DELETED_NODE_TYPES`; 4 test files updated to drop stale references;
-  `OTR_LedgerScriptWriter.py` widget tooltip re-labeled DEPRECATED
-  (widget preserved as no-op sentinel per BUG-LOCAL-097 -- Antigravity
-  r2 MF-6); `otr_post_upscale_procgen_blend.py` docstring rewritten.
-* **Provisioners**: `scripts/ensure_upscale_models.py` (bounded-retry
-  download of Real-ESRGAN x2plus + SHA verify + atomic rename; empty
-  SHA at ship for the first-run bootstrap that prints the actual hash);
-  `scripts/validate_canonical_workflow.py` (structural audit script --
-  no inline `python -c`, per Codex r4 MF-10 + CLAUDE.md).
-* **Documentation**: `docs/EXTENDING_OTR.md` cross-referenced with a
-  "how to add your own audio/video/image/upscale engine" pointer at
-  the top; each namespace's `__init__.py` carries the shipped-pattern
-  guide. `docs/2026-08-08-PROBLEM-STATEMENT-multi-gpu-upscale.md`
-  captured the r1 framing.
-* **Dependency**: `spandrel~=0.4.1` added to `requirements.txt` (pinned
-  minor version; 0.5 major bumps blocked pending a fresh API-contract
-  test pass).
-* **Tests added**: 11 new files covering registry protocol/roster/CAPABILITIES,
-  widget positional guard, workflow-JSON structural pin, retired-node
-  guard, deprecated-sentinel scope, profile schema (partial spec + unknown
-  engine + retired engine), both-boundary cross_validate hookup,
-  `_fit_and_pad_bhwc` decrease-fit + contiguity, spandrel API contract,
-  mocked spandrel adapter (7 tests including per-frame loop + fail-closed
-  matrix + bare-venv fallback), single-base composite no-engine-load
-  gating (3 tests including engine-load-error-tolerance path), and
-  color-matrix bt709 symmetry pin.
+### CARRY-FORWARD -- how to run a bank-specific qualification (from the closed announcer-intro work)
 
-Suite **9351 passed / 111 skipped / 1 xfailed** (baseline 9222,
-+129 tests). Bug Bible 17 green at survival-guide `3759ae5`.
-`build_variants.py --all` regenerated 45 variants cleanly, `--check`
-returned zero drift. `scripts/validate_canonical_workflow.py` clean
-(23 nodes, 56 links).
+PBUG-20260807-01 is FIXED and LIVE-PROVEN (5/5 legs, four banks, three model
+families). Receipts in `docs/PROD_BUG_LOG.md`. Three things worth not
+re-learning:
 
-**Follow-up chips owed (Fable SHOULD-FIXes, non-blockers):**
-1. ~~IS_CHANGED hardcodes the spandrel engine + filename~~ **SHIPPED
-   `088dabc8` (2026-08-08).** Full `kibitz-plugin:kibitz` r1-r4 arc (8
-   external calls: Codex `gpt-5.6-sol` high x4 + Antigravity x4, plus a
-   cold Fable r1 and four driver anchors), Sonnet 5 QA and the Fable
-   final gate both SAFE-TO-COMMIT with no must-fix. Required
-   `model_fingerprint_parts()` on `UpscaleEngine`, `_resolve_model()`
-   single-sourced between loader and cache key, 21 new tests.
-   **The headline the arc surfaced: this was NOT a latent engine-#2
-   defect, it was LIVE on the render server.** `_otr_soak_server_launch.cmd`
-   boots the ComfyUI-Installs tree with `scripts/_otr_headless_model_paths.yaml`,
-   whose only `upscale_models` mapping is `C:/ComfyUI-Models/upscale_models/`
-   -- which holds no checkpoint. The one `RealESRGAN_x2plus.pth` lives
-   under `Documents/ComfyUI/models/upscale_models` and is reachable ONLY
-   through the `parents[4]` fallback, so the old `get_full_path`-only
-   fingerprint contributed zero model bytes on the box that publishes
-   episodes. `otr_upscale_ship` is the one variant of 45 that walks it.
-2. ~~Stale RTXUpscale prose~~ **SHIPPED `7c26ec86` (2026-08-08).**
-   Wider than the chip said: **two USER-VISIBLE TOOLTIPS** were stale
-   (`video_engine.py:2086` and `otr_post_upscale_procgen_blend.py:676`),
-   the second unlisted. Split KEEP vs FIX -- the rip's own receipts
-   (`test_rip_rtx_upscale_guard.py`, `DELETED_NODE_TYPES`, the
-   `__init__.py` tombstone) were preserved deliberately.
-3. `meta.perfect_run_spacesaver` is now written by
-   `OTR_LedgerScriptWriter.py:6196-6197` with zero remaining readers.
-   The deprecated-noop guard test pins this disposition deliberately, so
-   keep-or-drop is an operator call; recording the ledger-audit-trail
-   honestly.
-4. ~~**Live 5080 leg for `otr_upscale_ship`**~~ **DISCHARGED 2026-08-09.**
-   `spandrel_esrgan` is LIVE-PROVEN on `cuda:0`. Leg
-   `signal_lost_the_midnight_chime_20260809_142258`, prompt
-   `3bad85f1-7ad1-4a7b-a2f7-41f2033a1bc5`, `RESULT SUCCESS`,
-   `Prompt executed in 00:41:04`, `obs_publish OK`, 36,960,014 B deliverable.
-   Receipts: `upscale engine LOADED: spandrel_esrgan on cuda:0`, **7 x
-   `upscale MODEL PATH ... src=832x448 -> canvas=1920x1080`**, and **ZERO**
-   `FAST PATH` lines -- so the model ran on every segment of a 7-beat,
-   1262-frame assembled timeline. Run on `otr_upscale_ltx_probe` rather than
-   `otr_upscale_ship` because wan_ti2v cannot complete a leg on this box
-   (see STILL OPEN item 0); the upscale stage is downstream of the video
-   engine and identical on both profiles.
-   **THE CHECKPOINT PATH IS THE FINDING.** It resolved to
-   `Documents\ComfyUI\models\upscale_models\RealESRGAN_x2plus.pth` -- NOT the
-   `C:/ComfyUI-Models/upscale_models/` that `_otr_headless_model_paths.yaml`
-   maps. The model is reachable ONLY through the repo-relative fallback on the
-   headless topology, which is exactly the lookup the pre-`088dabc8`
-   `get_full_path`-only fingerprint never consulted. That commit fixed a
-   defect that was LIVE on the publishing box, now measured rather than
-   inferred.
-   *A prediction that was wrong, recorded so it is not re-derived:* the driver
-   expected `sharpen=False` to force FAST PATH on every beat and the model path
-   to be unreachable on an assembled timeline. It is reachable, and it runs.
-
-   Historical detail of the failed first attempt:
-   ~~**ATTEMPTED 2026-08-09, STILL OWED, and the attempt produced two findings
-   worth more than the leg.**~~
-   The SHA is already pinned (`8250e01c`) and `ensure_upscale_models.py`
-   verifies clean, so no download is needed.
-   * **The leg FAILED before reaching the upscale stage.** `wan_ti2v` refused
-     shot 3 on VRAM: `static frame budget 65 ... affordable 19 frames`. Node
-     92 dies before node 84, so the stage was never exercised. Full writeup:
-     `docs/2026-08-09-PROBLEM-STATEMENT-wan-ti2v-inter-shot-vram-retention.md`.
-     **DO NOT chase the wan side -- a concurrent window owns it.**
-   * **A matched `ltx_video` control (`otr_upscale_ltx_probe`, draft profile)
-     COMPLETED the same topology** -- 8 assembled beats, 1072 frames,
-     `Prompt executed in 00:34:44`, `obs_publish OK`, 30.7 MB deliverable. So
-     the retention is wan_ti2v-specific, not a video-path property.
-   * **But that green leg STILL could not prove the upscale stage**, because
-     nothing logged. That silence is now FIXED (`tests/test_upscale_stage_observability.py`):
-     the composite emits an engine-LOADED receipt with the resolved checkpoint
-     path, a MODEL PATH receipt, and a FAST PATH receipt when an engine is
-     selected but a segment skips the model. The `off` default stays silent so
-     byte-identity holds.
-   **What remains is now cheap:** re-run `otr_upscale_ltx_probe` and read the
-   receipts. If FAST PATH fires on every segment, the real question is why
-   `sharpen` is False for all of them -- i.e. whether the model path is
-   reachable at all on an assembled timeline.
-5. **DISCHARGED `867f16c3` (2026-08-08).** Test
-   `test_load_raises_missing_model_when_file_absent` silently passed
-   under "no model installed" and false-passed the moment the operator
-   ran `ensure_upscale_models.py` and populated
-   `<comfy_root>/models/upscale_models/RealESRGAN_x2plus.pth` -- the
-   test mocked `folder_paths.get_folder_paths()` but had no isolation
-   on the `parents[4]` fallback the adapter also consults. Surfaced
-   by SF#1's suite gate. Fixed at root by monkeypatching the module's
-   `__file__` to a 5-deep path in `tmp_path` so `parents[4]` resolves
-   to an empty fake root. Test-only change; nodes/ untouched.
-
-### TOMBSTONE -- ANNOUNCER-INTRO QUALIFICATION, CLOSED 2026-08-07
-
-**5/5 legs passed. PBUG-20260807-01 is FIXED AND LIVE-PROVEN.** Full receipt
-table with every verbatim opening line is in `docs/PROD_BUG_LOG.md`. Four
-affected banks, three model families (Mistral / Gemma / Anthropic-remote), 30
-and 120 words, `reason: null` on every leg, and no leg asked the operator for
-input.
-
-**Three things worth carrying forward from how it was run:**
 1. **Always override the bank per leg and ASSERT `meta.source_bank`.** The
-   canonical graph is pinned to `scifi_news`, which returns before the writer's
-   close/intro block. An un-overridden leg is green and proves nothing.
-2. **Assert on `meta.source_bank`, never `meta.source_meta.kind`** -- `kind` is
-   the FETCH MECHANISM (`media_archive_rss`, `original_llm`), a different
-   vocabulary. The driver's first verifier read `kind` and false-flagged a
-   passing leg.
-3. **Dry-run first.** The catalog's model ids carry size suffixes
-   (`... (12.0 GB)`); the plain id is a hard `ValueError`. The `--dry-run`
-   `applied:` line is the only proof an override actually landed.
+   canonical graph is pinned to `scifi_news`, which returns BEFORE the writer's
+   close/intro block -- so an un-overridden leg is green and proves nothing.
+2. **Assert on `meta.source_bank`, never `meta.source_meta.kind`.** `kind` is the
+   FETCH MECHANISM (`media_archive_rss`, `original_llm`), a different vocabulary.
+   A verifier that read `kind` false-flagged a passing leg.
+3. **Dry-run first.** Catalog model ids carry size suffixes (`... (12.0 GB)`);
+   the plain id is a hard `ValueError`. The `--dry-run` `applied:` line is the
+   only proof an override actually landed.
 
-### TOMBSTONE -- CLOUD-AUDIO-CACHE (queue item 9 chunk 2), SHIPPED 2026-08-08
+### TOMBSTONE -- CLOUD AUDIO CACHE + SF#1 LEDGER FLUSH, SHIPPED 2026-08-08
 
-**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc completed
-2026-08-08 (r1 cold Fable + Codex + Antigravity; r2 Codex + Antigravity;
-r3 Codex only -- agy timed out at 5m, documented single-lane; r4 Codex +
-Antigravity). Sonnet 5 QA on the diff caught two must-fixes (both applied
-in the same commit); Fable final gate cleared SAFE TO COMMIT with three
-SHOULD-FIXes (two applied, one deferred as a follow-up chip).
+**DONE. Do not re-open.** Both had full `kibitz-plugin:kibitz` r1-r4 arcs.
+Cloud legs content-address their audio via `<meta.paths.audio_dir>/audio_cache/`
+(`OTR_AUDIO_CACHE_DIR` overrides); request schema v2 carries
+`provider_model_id` / `provider_voice_id` as first-class IN_KEY fields; the
+retry ladder is pinned on cache paths so a fallback model cannot produce audio
+cached under the requested model's key.
 
-The shipped Wave-1f `FileAudioCache` module has been WIRED into
-`_render_per_line`: cloud legs (`char_google_tts_v1` + `announcer_google_tts_v1`,
-the two profiles with `use_cache: true`) now content-address their audio
-via `<meta.paths.audio_dir>/audio_cache/` (overridable with
-`OTR_AUDIO_CACHE_DIR`). Same input yields same audio bytes; drift-prone
-Gemini TTS replay is pinned to disk.
-
-* **`REQUEST_SCHEMA_VERSION` 1->2** with `provider_model_id` and
-  `provider_voice_id` as first-class IN_KEY fields (r2 Codex MF#2 --
-  `quantize_params` reduces strings to 31-bit ticks, unsuitable for
-  identity strings).
-* **`CACHE_SCHEMA_VERSION` 1->2** with `actual_sample_rate` and
-  `provider_model_id` optional record fields. Atomic writes via
-  `tempfile.mkstemp` + `os.replace`; sidecar published LAST as the commit
-  signal. `FileAudioCache.load()` verifies cache_key, path presence,
-  cache_dir containment (via derivation, not sidecar-trust), sample_rate
-  and channels match, dtype|shape|bytes sha256, and the AUDIO batch
-  contract. Whole-body `except Exception` boundary with per-class
-  `log.warning`.
-* **Adapter identity hook** on `AudioEngineAdapter.identity_params()`
-  (default `{}`); Google TTS returns `{"model": _selected_model(),
-  "provider_voice": ...}`. Wiring folds this into
-  `ResolvedVoiceRequest.provider_model_id` / `provider_voice_id`.
-* **Retry ladder cache-safe.** `_models_to_try(model, *, allow_retry=True)`;
-  `generate_voice(disable_retry=True, resolved_model=<pinned>)` on cache
-  paths pins the ladder to one entry so a fallback model cannot silently
-  produce audio cached under the requested model's key.
-* **Per-line ledger stamp.** `stamp_per_line_audio_meta` grows three
-  optional kwargs (`audio_cache_key`, `audio_sha256`, `provider_model_id`);
-  `render_ms` becomes `Optional[int] = None` (None skips; 0 persists so
-  cache-hit rows still stamp `render_ms=0`). `_persist_ledger_stamps`
-  reload-before-save preserves prior roles' stamps (r2 Codex MF#4).
-* **`IS_CHANGED`** on both voice nodes returns `float("nan")` when
-  `use_cache=True` OR the profile fails to resolve (fail-open per Bug
-  Bible unavailable-input rule); `"static"` for local engines so today's
-  paths stay byte-identical.
-* **`_audio_cache_dir_for(meta)`** helper: env override
-  (`OTR_AUDIO_CACHE_DIR`, expanduser + abspath, logged) ->
-  `<meta.paths.audio_dir>/audio_cache/` -> `""` (which is a fail-loud
-  `MALFORMED_CONFIG` when a profile has `use_cache=True` and no dir
-  resolves).
-
-**Follow-up chip (SF#1: "ledger-flush + partial-exception finally") --
-SHIPPED 2026-08-08 -- SEE `SF#1 -- LEDGER-FLUSH + PARTIAL-EXCEPTION
-FINALLY` TOMBSTONE BELOW.**
-
-Suite **9222 passed / 111 skipped / 1 xfailed** (was 9191 pre-chunk, +31
-tests: 29 new in `tests/test_audio_cache_wiring.py` + 2 extended in
-`test_per_line_audio_meta.py` and `test_audio_cache_protocol.py`). Bug
-Bible 17 green at survival-guide `3759ae5`. `git diff -- workflows/`
-EMPTY. Full arc receipts: `kibitz-runs/2026-08-08-cloud-audio-cache/r{1,2,3,4}/`.
-
-### TOMBSTONE -- SF#1 LEDGER-FLUSH + PARTIAL-EXCEPTION FINALLY, SHIPPED 2026-08-08
-
-**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc closed
-2026-08-08 pre-code (60+ grounded findings folded across 8 external panel
-lanes + 3 parallel grounding workflows + 4 driver anchors + 2 Antigravity
-UI-paste substitutes when CLI timed out at 5m). LOCKED spec at
-`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r4/final.md` (gitignored).
-Implementation window opened against the spec's "Files touched" section
-and executed r4 §2/§3/§4/§7 verbatim. Sonnet 5 QA-on-diff cleared per
-standing 08-05 rule; Fable final gate cleared per standing 08-06 rule.
-
-**Root cause the arc landed on.** `_persist_ledger_stamps` shipped
-2026-08-08 in `ebe24bd4` DEFINED and isolated-tested but NEVER CALLED
-in production. `_render_per_line` built up `ledger_stamps` for every
-cache-enabled line then dropped the list at return. Four ledger fields
-(`audio_cache_key`, `audio_sha256`, `render_ms`, `provider_model_id`)
-landed on ZERO lines on every leg since yesterday. Downstream renders
-survived because no active render node reads those fields today
-(`_OPTIONAL_STRING_FIELDS` schema null-checks + post-run audit scripts
-only). DATA LOSS on metadata, not a render-blocker.
-
-**What shipped in ONE atomic commit:**
-
-* **`nodes/_otr_voice_node_common.py`** -- `_render_per_line` wrapped in
-  a `try/finally` opening immediately after `ledger_stamps` init. The
-  outer try encloses the per-line for-loop AND the `pack_audio_batch`
-  call (verified by the BUG-12.74 AST guard); the finally calls
-  `_persist_ledger_stamps(meta, ledger_stamps, log)` guarded by
-  `(cache_enabled and ledger_stamps)`. A defensive inner
-  `try/except Exception` at the finally call site catches any raise
-  from the helper's setup and credits `len(ledger_stamps)` as
-  degraded so telemetry never lies. The cache-summary log line moved
-  to AFTER the try/finally so it sees the updated `degraded_ledger`
-  counter and is naturally skipped when a mid-loop exception
-  propagates past.
-* **`tests/test_audio_cache_wiring.py`** -- +5 test items (partial-
-  exception parameterized over both voice roles = 2). Added `import ast`
-  + `import re` + `import logging` + `_bootstrap_ledger_on_disk` helper
-  that runs the target ledger through `save_ledger_safe` so
-  `meta.paths.ledger_path` lands on the wire copy the voice node
-  receives. Extended `test_end_to_end_google_tts_cache_miss_then_hit`
-  to read the on-disk ledger after each call and pin the four
-  provenance fields (`audio_cache_key` and `audio_sha256` match
-  `^[0-9a-f]{64}$`, `render_ms` is a non-negative int on miss and
-  exactly `0` on hit per r2 Codex MF-4 None-is-skip / 0-is-persisted
-  split, `provider_model_id` non-empty, `degraded_ledger=0` in the
-  returned log). Added `test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finally`
-  parameterized over both `AnnouncerVoice` and `BatchCharacterVoices`
-  (Codex r4 MF-3 route coverage): 5-line fixture, sentinel
-  `RuntimeError` on the 3rd call, `excinfo.value is sentinel`, then
-  assert `a1`/`a2` have full stamps by `line_id` while `a3`/`a4`/`a5`
-  have empty strings for the four fields and `render_ms is None`.
-  Added `test_cache_persist_failure_does_not_mask_render_exception`
-  (Codex r4 SF-2): render sentinel escapes past the finally even when
-  `_persist_ledger_stamps` also raises, AND the flush failure surfaces
-  via caplog (the only channel available when a raise walks past the
-  return statement). Added
-  `test_cache_persist_failure_reports_full_degraded_count_on_success`
-  (Codex r4 SF-1): the defensive except must credit
-  `len(ledger_stamps)` so the summary line reports `degraded_ledger={N}`
-  accurately when the render completed but persistence failed. Added
-  `test_persist_ledger_stamps_wired_into_render_per_line_finally`
-  BUG-12.74 static AST reachability guard (Codex r4 MF-2 strict shape):
-  exactly ONE call, positional args `(meta, ledger_stamps, log)`,
-  inside an `ast.Try.finalbody` whose body contains BOTH the for-loop
-  AND the `pack_audio_batch` call, and the return value used in
-  `AugAssign(op=Add, target=cache_stats["degraded_ledger"])`.
-  Strengthened `test_end_to_end_google_tts_cache_off_byte_identity`
-  with a monkeypatch recorder assertion that `_persist_ledger_stamps`
-  is NEVER invoked on the cache-off path (Codex r4 MF-3 control --
-  without this a future edit could wire the flush unconditionally and
-  silently rewrite disk ledgers on every leg).
-* **`docs/HANDOFF_LOG.md`** -- new top entry documenting the sprint +
-  correction to yesterday's chunk-2 entry (chunk 2 shipped
-  defined-and-tested but not wired; this commit is what actually
-  landed the stamps on disk).
-* **`docs/GO_FORWARD_PLAN.md`** -- this tombstone + the queue item 9
-  chunk 2 chip reference shortened to point here.
-
-Suite entering this window 9351 passed / 111 skipped / 1 xfailed (item 8
-baseline). Focused `tests/test_audio_cache_wiring.py` = 34 passed / 0
-failed (was 29). Full suite gate per r4 §7 items 1-6 in the atomic
-commit. Bug Bible 17 green at survival-guide `3759ae5`.
-`git diff -- workflows/` EMPTY. Full arc receipts:
-`kibitz-runs/2026-08-08-cloud-audio-cache-sf1/r{1,2,3,4}/`.
-
-**Follow-up chips owed (post-implementation, still owed):**
-
-1. **Stale metadata retention across legs (Codex r4 MF-1).** Different
-   defect class from "helper unwired" -- a downstream reader consuming
-   an obsolete field is not the same bug. Needs its own arc.
-2. **caplog-based degraded-write test (Codex r2 OPT-2).** The
-   `_write_audio_atomic` fallback path currently logs a bounded warning
-   on partial-crash recovery; there is no test asserting the warning
-   text. Small; deferred out of atomic scope so SF#1 stays surgical.
-3. **Item 8 upscale-model SHA pin.** Carried forward from the item 8
-   tombstone. Run `python scripts/ensure_upscale_models.py` +
-   pin the printed SHA into `SpandrelEsrgan._model_sha256` in a small
-   dedicated commit.
-4. **`cache=off` token on a mid-`generate_voice` raise (Fable
-   final-gate pass-through observation, pre-existing from
-   `ebe24bd4`).** `cache_status` initializes `"off"` at
-   `nodes/_otr_voice_node_common.py:829` and stays that way if the
-   `generate_voice` call raises before any status assignment -- so a
-   cache-enabled line that dies mid-generation emits its P-OBS with
-   a misleading `cache=off` token on the exact dying-line log this
-   SF#1 fix's scenario produces. Not in this diff's scope (the
-   defect ships from the day chunk 2 shipped); tiny code fix +
-   caplog test.
+**The root cause SF#1 landed on, worth carrying:** `_persist_ledger_stamps`
+shipped DEFINED, isolated-tested, and NEVER CALLED. Four ledger fields landed on
+ZERO lines for a day. Downstream renders survived only because no active render
+node reads those fields yet -- data loss on metadata, not a render-blocker. Fixed
+with a `try/finally` around the per-line loop plus a BUG-12.74 static AST
+reachability guard that pins the call's exact shape. Receipts:
+`docs/HANDOFF_LOG.md`. Chips it left are in FOLLOW-UP CHIPS OWED above.
 
 ### TOMBSTONE -- `visual_storybased`, SHIPPED 2026-08-08
 
-**DONE. Do not re-open.** Kibitz `kibitz-plugin:kibitz` r1-r4 arc completed
-2026-08-07 (r1 cold Fable + Codex + Antigravity; r2/r3 Codex + Antigravity;
-r4 Antigravity-only -- codex.md is a stale JSONL from a quota-failed run and
-must not be reported as a two-lane round). Build spec
-`kibitz-runs/2026-08-07-visual-storybased/r3/final.md`; campaign brief
-`docs/2026-08-07-BRIEF-visual-storybased.md`. What shipped
-(HEAD `f25d7b14`, v2.0-alpha):
+**DONE. Do not re-open.** Tenth visual style, equal odds in the roll; an LLM
+emits a 9-field `VisualStyleCard` and a deterministic Python composer expands it
+into a 23-field v2 pack. MODEL and TRANSPORT failures floor once from the 9-pack
+registry and EMBED the floor pack in the ledger so re-render is byte-reproducible;
+`get_visual_style` raises rather than silently defaulting to `sci_fi_radio`.
+Two bytecode regression pins inspect `_run_writer_tail.__code__.co_names` so a
+future edit cannot reintroduce either NameError. Receipts: `docs/HANDOFF_LOG.md`.
 
-* **Tenth visual style in the roll, equal odds.** `eligible_style_ids()`
-  now returns the 9 disk packs plus `visual_storybased`; `floor_style_ids()`
-  STRICTLY excludes the dynamic lane so a floor draw cannot re-pick dynamic.
-* **Card-to-pack composition.** LLM emits a 9-field `VisualStyleCard` on the
-  extended K.5.5 reflection (`_DYNAMIC_REFLECTION_PROMPT`, token budget
-  1024). A deterministic Python composer expands it into a 23-field v2 pack
-  with the exact placeholders, mouth vocabulary, and dict keys the loaders
-  require. `medium_short` is bounded (max_length=40) and drives the
-  compact-template gradient interpolation.
-* **Fail-loud provenance.** MODEL failures (JSON parse / schema rejection)
-  and TRANSPORT failures floor exactly once from the 9-pack registry; the
-  floor pack is EMBEDDED in the ledger (`meta["embedded_visual_style_pack"]`)
-  so re-render is byte-reproducible. Composer defects and code errors are
-  LOUD by construction -- no try/except wraps `compose_pack_from_card` or
-  `validate_pack`.
-* **Consume-time guard.** `get_visual_style` raises on pending /
-  missing embedded pack / sha256 mismatch when the id is `visual_storybased`
-  -- it never silently defaults to `sci_fi_radio`.
-* **Ledger transaction.** Skeleton save (`3944`), reflection-pack save
-  (`6390`), and terminal save (`6610`) are all unconditionally
-  truthy-required per r3/final.md section 6.
+### STANDING POLICY -- provider model slugs (from the closed curation chunks)
 
-**Four bugs the acceptance matrix didn't catch, all fixed at root:**
-1. `env` was undefined in `_run_writer_tail`; `resolve_seed` now defaults
-   to `os.environ`. The receipt-classifier imports `REJECT_JSON_PARSE` /
-   `REJECT_SCHEMA` by name (the module identifier was never bound).
-2. `"model_id"` inside `visual_style_receipt` violated the post-B2b
-   guardrail -- renamed to `"technical_model_id"`.
-3. `_is_dynamic_style` read `resolved["visual_style"]` and KeyError'd on
-   the fable2 tail-context tests; switched to `meta.get("visual_style")`.
-4. Terminal `led.save()` was only truthy-required with a `tail_finalizer`;
-   now unconditional.
+Queue item 1 is CLOSED (chunks A and B both shipped; see the tombstone in THE
+QUEUE). What survives as a RULE:
 
-Two bytecode regression pins (`test_writer_floor_branch_has_no_undefined_globals`,
-`test_writer_floor_branch_reject_constants_bound`) inspect
-`_run_writer_tail.__code__.co_names` so a future edit cannot silently
-reintroduce either NameError. Sonnet 5 QA + Antigravity QA both cleared the
-diff after the fixes. Suite **9191 passed / 111 skipped / 1 xfailed** (from
-9177 pre-visual_storybased). Bug Bible 17 green at survival-guide `3759ae5`.
-`git diff -- workflows/` EMPTY all session.
+* **Prefer `~family-latest` pointers.** Carry a concrete id only where a version
+  genuinely matters, and DATE it.
+* **NEVER carry a `:free` / promo slug.** A `:free` id is a price promise baked
+  into an identifier, and promises expire while identifiers do not. That is what
+  killed `tencent/hy3:free`.
+* **Do NOT add an auto-router.** `openrouter/auto` and `auto-beta` are real and
+  listed, but `auto-beta` routes by what the community spent most on over a
+  trailing week -- a config that resolves differently week to week undercuts the
+  resolved-model replay stamp. Good for exploration, wrong for reproducible
+  receipts.
+* **The technical default stays `deepseek/deepseek-v4-pro`.** The only DeepSeek
+  pointer is the FLASH tier, so aliasing it is a capability DROP, not a swap.
 
-**Follow-up chip (SHOULD-FIX, not a build-breaker):** on the dynamic success
-path `visual_style_receipt["attempts"]` always reports 1 even after the
-`structured_call` ladder retries. Fix is to thread `on_attempt_complete`
-through `run_story_brief_reflection`. Not gated by the acceptance matrix.
+**The honest limit, do not report it later as a failure:** curation removes our
+OFFER. It cannot remove a dead slug from a STALE PER-MACHINE cache under
+`OTR_OPENROUTER_FULL_CATALOG=1` -- `models/openrouter_models.json` is untracked
+and gitignored. Running the refresh script clears it.
 
-### TOMBSTONE -- MODEL-SLUG CURATION CHUNK A, SHIPPED 2026-08-07
+### BIBLE PROMOTION -- standing contract + what is pending
 
-**DONE. Do not re-open.** Full `kibitz-plugin:kibitz` r1-r4 arc; build spec
-`kibitz-runs/2026-08-07-model-slug-curation/r3/final.md` (LOCAL ONLY,
-gitignored). What landed:
-
-* `tencent/hy3:free` DELETED -- and with it the whole pinned-contender
-  mechanism, because the operator also ruled out `aion-labs/aion-3.0-mini`
-  ("if it never won, dump it" -- it never did: both bake-offs were BANK
-  contests that held the writer constant, so no model-vs-model contest was ever
-  run, and Aion's live record is PBUG-20260713-20 plus an episode-aborting
-  `finish_reason=length`). `CURATED_CREATIVE_ROWS` therefore does not exist.
-* `OPENROUTER_FRONTIER_LATEST` -> `OPENROUTER_CURATED_ALIASES`, **10 aliases**,
-  gaining `~x-ai/grok-latest` -- which RETIRED `OPENROUTER_NO_LATEST_AUTHORS`,
-  `_newest_concrete_for_author` and `_NON_FRONTIER_MARKERS` (~30 lines that
-  synthesised what OpenRouter now publishes itself).
-* The uncurated **recent-8 tier is GONE** (`_OPENROUTER_RECENT_COUNT`, the
-  `_created` helper, the loop). That is the change that actually delivered
-  "fewer slugs": **22 -> 12 entries on slot A, 21 -> 12 on slot B**, verified by
-  reading the node's own live `INPUT_TYPES`.
-* `OPENROUTER_VERIFIED_ON_BY_ID` + `tests/test_openrouter_slug_curation.py`:
-  every CONCRETE id must carry a real ISO date, no shipped id may contain
-  `:free`/`-free`, and the retired symbols must stay retired. Proven
-  non-vacuous by mutation (4 injections -> RED, GREEN after revert).
-
-**The honest limit, do not report it as a failure later:** the curation removes
-our OFFER. It cannot remove a dead slug from a STALE PER-MACHINE cache under
-`OTR_OPENROUTER_FULL_CATALOG=1` -- `models/openrouter_models.json` is
-**untracked and git-ignored** (`.gitignore:15`), refresh-script-owned, and this
-box's copy is from 13 July. Running the refresh clears it.
-
-**Standing policy this established:** prefer `~family-latest` aliases; carry a
-concrete id only where a version genuinely matters, and date it; NEVER carry a
-`:free`/promo slug -- a `:free` id is a price promise baked into an identifier,
-and promises expire while identifiers do not.
-
-### CHUNK B DETAIL -- what queue item 1 now means
-
-Chunk A shipped the curation. Chunk B is the part that CANNOT be proven without
-a live remote call, and it is one coder chunk plus one leg.
-
-**IT IS NOT BLOCKED (corrected 2026-08-08).** `openrouter_enabled()` is
-`bool(_env("OPENROUTER_API_KEY"))` (`_otr_openrouter_backend.py:345-351`) and
-`_env` reads `os.environ` ONLY (`:261-263`) -- all still true. What was WRONG
-was the conclusion drawn from it: the key is not launcher-only, it lives in the
-**User** environment scope, so `os.environ` carries it into any coder-window
-process. Measured on this box: `openrouter_enabled()` -> `True` from a plain
-venv run. Chunk B is one coder chunk plus one live leg, available now.
-
-**(a) Promote the CREATIVE default to `~anthropic/claude-opus-latest`.**
-Verified live 2026-08-07: identical price to the pinned `anthropic/claude-opus-4.8`
-(`0.000005`/`0.000025`), `structured_outputs=True`, 1M context -- and
-`anthropic/claude-opus-5` is already live at that same price, so the pin is
-ALREADY a version behind. Replay is safe: the ledger stamps the RESOLVED
-concrete model, proven by `tests/test_openrouter_resolved.py:19-30`. The panel
-still requires a live leg because catalog flags cannot qualify a behavioural
-default change.
-
-**(b) Decide `qwen/qwen3.7-flash`.** Cheapest credible model found
-(`0.00000003`/`0.00000013`, ~$0.002 of script volume per episode). Caveats that
-must be settled by the leg, not by the catalog: it is a VISION-language model
-and reports `structured_outputs=False` (only `response_format`), so under the
-repo's OR-derivation it passes a REQUIRE_JSON filter on the weaker signal --
-creative slot only, never technical. It is NOT in this box's cached catalog.
-
-**Do NOT add an auto-router.** `openrouter/auto` and `openrouter/auto-beta` are
-real and ARE listed by `/api/v1/models` (an earlier note here claimed they were
-absent -- corrected 2026-08-07). They stay out because `auto-beta` routes by
-what the OpenRouter community spent most on over a trailing week, so one config
-could resolve to a different model week to week. This pack stamps the resolved
-model for replay, and a choice that drifts with third-party spending undercuts
-that. Good for exploration, wrong for reproducible receipts.
-
-**Technical default stays `deepseek/deepseek-v4-pro` and is NOT part of chunk
-B.** The only DeepSeek alias is `~deepseek/deepseek-v4-flash-latest` -- the
-FLASH tier, so switching is a capability drop, not a like-for-like swap. Both
-review lanes independently said keep the pin.
-
-### BIBLE PROMOTION -- BUG-12.87 LANDED 2026-08-09
-
-**First promotion in three sessions.** The 2026-08-08 window checked three
-candidates and had to decline all of them for want of a live artifact. This one
-cleared the admission rule outright: reproduced live, recorded in
-`docs/HANDOFF_LOG.md`, fixed, and verified.
-
-**BUG-12.87 -- "a gate reports success from its own error path"**
-(survival-guide `905e85c`; index row + README count moved in the same commit,
-Three-File Contract intact at 263 entries / 371 rows). The rule: an error path
-that returns the SAME sentinel as success turns "I could not check" into "I
-checked and it was fine". Two things make it durable -- the skip is usually
-DELIBERATE and documented as a convenience, and its trigger may be PERMANENT,
-so the check runs zero times while its output is cited as evidence. The
-diagnostic tell recorded with it: **another component has quietly
-reimplemented the same check with a comment saying the shared one cannot be
-trusted.**
-
-**And the bible had an instance of its own new rule** (survival-guide
-`656c36e`): `BUG_BIBLE.yaml` had never `yaml.safe_load`ed -- six entry fields
-were plain scalars containing `': '` -- while the README called it
-machine-readable, because every structural check counts entries by REGEX and a
-text scan cannot tell a parseable file from a broken one. Fixed, with three
-`TestBibleIsActuallyParseable` guards.
-
-**Carry-forward warning for the next window:** that second commit ALSO swept in
-8 pre-existing uncommitted `test_otr_*` guards that were sitting dirty in the
-survival-guide repo -- staged by a whole-file `git add` without checking
-`git status` there first. Nothing is broken and the suite is green, but the
-commit message does not describe them. **Operator decision pending:** leave it
-with a documenting follow-up, or split them into their own commit.
-
-### BIBLE PROMOTION -- historical, 2026-08-07
-
-PBUG-20260807-01's class promoted as **BUG-12.86** (survival-guide `7a5fb88`,
-261 -> 262 entries, index row in the same commit): *a receipt or prompt-context
-field keyed on a producer string the producer never emits, so it reads
-empty/False forever.* Four instances found in one afternoon.
-
-**The contract changed to allow this.** `docs/PROD_BUG_LOG.md` was amended
-2026-08-07: a window MAY now promote a SINGLE genuinely-uncovered entry directly
-under the Three-File Contract, because `otr_coverage_index.yaml` makes checking
-coverage cheap -- the old fan-out-only rule existed when checking meant
-re-scraping the whole history. **The BULK fan-out over the backlog is still the
-operator's.** Operator's reason for the change, 2026-08-07: *"we keep hitting
+**A window MAY promote a SINGLE genuinely-uncovered entry** directly under the
+Three-File Contract, because `otr_coverage_index.yaml` makes checking coverage
+cheap. **The BULK fan-out over the backlog is still the operator's** (waiting-on-
+operator row 6). Operator's reason for the change, 2026-08-07: *"we keep hitting
 the same bugs so we need to update the bible and test regularly."*
+
+Live at survival-guide `656c36e`: **263 entries, index 371 rows**, 20 passed /
+24 skipped / 3 xfailed. Recent promotions: **BUG-12.87** ("a gate reports success
+from its own error path" -- the tell being that another component has quietly
+reimplemented the same check with a comment saying the shared one cannot be
+trusted) and **BUG-12.86** (a receipt keyed on a producer string the producer
+never emits, so it reads empty forever).
+
+**Pending operator decision (waiting-on-operator row 7):** `656c36e` also swept
+in 8 pre-existing uncommitted `test_otr_*` guards, staged by a whole-file
+`git add` without checking `git status` in that repo first. Nothing is broken and
+the suite is green, but the commit message does not describe them.
 
 ### STILL OPEN, SMALL, UNSCHEDULED
 
@@ -860,25 +452,6 @@ the same bugs so we need to update the bible and test regularly."*
    is done, stop chasing it" directive, so reopening it is a conscious operator
    call, not a drift. Offline-first also means a FINE-TUNE, not a download.
 
-### TOMBSTONES -- DONE 2026-08-07, do not reopen
-
-* **Small sprint items (the old queue item 1) -- ALL FIVE COMMITS SHIPPED.**
-  Item 3 test-ordering `1a746c25`; item 2 non-commercial notice `e8e649f2`;
-  B4 extraction `5d5f2d0b`; B4's routing matrix `1f1330d5`; B6
-  `l4-2026-08-07` + save-version preserve policy + legacy-set repair
-  `39c572ba`. Bug Bible 12.74 landed and survived the survival-guide
-  reconciliation -- now live at `3759ae5`, 261 entries.
-* **Premise wiring (the old queue item 3) -- DISPROVED, NOT A BUG.**
-  `--premise` reaches the writer correctly: it lands as
-  `source_meta["operator_hint"]` and IS consumed --
-  `OTR_LedgerScriptWriter.py:2181` passes it to `build_original_briefs`, and
-  both 2026-08-07 legs show `operator_hint` populated with
-  `selected_concept` + 2 pitches. The "Please provide the SETTING, TIME,
-  HOOK..." line that prompted the report came from a DIFFERENT defect next
-  door -- the announcer-intro starvation, now PBUG-20260807-01.
-* **0-BIS no-mirror** -- discharged with its live leg; F11 and the multi-clip
-  receipt closed in the same stroke.
-
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
 ### 0. VIDEO MATRIX PATTERN -- FOUR ROUNDS, FOUR NOs, DID NOT CONVERGE
@@ -916,90 +489,28 @@ set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
 rule text -- then re-enter at **r3**, per the standing rule that a plan-level
 gap drops back rather than being patched from inside r4.
 
-### 0-BIS. NO-MIRROR ENFORCEMENT -- TOMBSTONE. DISCHARGED 2026-08-07.
+### TOMBSTONES -- no-mirror (0-BIS), SFX rip (0-TER), banana route (0-QUATER)
 
-**DONE. Do not re-open, do not re-panel, do not re-run the leg.** The code
-shipped 2026-08-06 across `27d48b35`, `ac8a1925`, `f9a7f9df`, `57f92f74` and
-`d8187fcd`; the LIVE LEG that was the last outstanding obligation ran
-2026-08-07 and passed. Build spec:
-`docs/2026-08-06-BUILD-SPEC-no-mirror-enforcement.md` (section 6 is the leg's
-acceptance and is now stamped DISCHARGED).
+**All three DONE and live-proven. Do not re-open, do not re-panel, do not
+re-run the legs.** No-mirror discharged 2026-08-07 by leg
+`signal_lost_midnights_toll_20260807_085918` (two beats chained into two segments
+each -- the condition that makes the deleted machinery reachable at all -- nine
+segment receipts all `extension_mode="none"`, grader `ACCEPTED: 7 shot(s)`); it
+closed F11 and the multi-segment proof in the same stroke. SFX ripped `9eb6ede1`
+(five engines barred via `RETIRED_ENGINE_IDS`; reviving SFX is a NEW design
+against the post-rip tree). Banana route closed `bc8a1bde`, and both its remnants
+closed too -- shield scoping `2fc81f72`, premise wiring DISPROVED (not a bug).
 
-The leg: `signal_lost_midnights_toll_20260807_085918`, profile
-`otr_w45_ltx_video`, 120 words, `Prompt executed in 00:47:43`, `RESULT SUCCESS`
-+ `obs_publish OK`. All seven beats rendered on `ltx_video`; **two beats
-exceeded the 169-frame ceiling and CHAINED into two segments each**
-(`music_opening` 250, `music_closing` 200), which is the condition that makes
-the deleted machinery reachable at all. Every beat receipt and all nine segment
-receipts read `extension_mode="none"`; `scripts/grade_episode.py` returned
-`ACCEPTED: 7 shot(s)` at exit 0. **The retired switches were PROVEN live in the
-server's own environment block** (`OTR_LTX_LOOP_VIA_REVERSE='on'`,
-`OTR_LTX_LOOP_MIN_DECODE_FRAMES='97'`) while the live contract vars stayed
-unset -- without that check the leg would only have shown the mirror absent,
-not that the old switch can no longer summon it. Full receipts: the 2026-08-07
-`docs/HANDOFF_LOG.md` entry.
+**KNOWN GAP worth keeping:** the no-mirror AST tripwire catches the SYMBOLS and
+the RECEIPT; it would NOT catch a mirror re-implemented inline under another
+name. The durable defence is `acceptance.grade_no_mirror` (it re-derives the
+count instead of believing the mode) plus `render_driver`'s refusal of any
+segment whose length differs from its plan.
 
-**This closes F11 and section 9's outstanding multi-segment proof too** -- it is
-the first retained multi-segment artifact on this box.
-
-**KNOWN GAP, still true and still recorded:** the AST tripwire catches the
-SYMBOLS and the RECEIPT; it would NOT catch a mirror re-implemented inline under
-another name. The durable defence remains `acceptance.grade_no_mirror` (it
-re-derives the count instead of believing the mode) plus `render_driver`'s
-refusal of any segment whose length differs from its plan -- both of which this
-leg exercised on live multi-segment beats.
-
-### 0-TER. SFX RIP -- DONE `9eb6ede1` (2026-08-06), tombstoned.
-
-Shipped, pushed, live-proven. Five engines barred via `RETIRED_ENGINE_IDS`;
-guard test `tests/test_rip_sfx_bed_guard.py` trips on any surface creeping
-back. Receipts: HANDOFF_LOG + `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`.
-Reviving SFX is a NEW design against the post-rip tree (`ROADMAP.md` keeps the
-historical design record).
-
-### 0-QUATER. BANANA ROUTE -- CLOSED `bc8a1bde` (2026-08-07). Two open remnants below.
-
-Tombstone: all nine QA fixes shipped and pushed after the full r1-r4
-`kibitz-plugin:kibitz` arc (Fable r1 synthesis under the recorded operator
-override), Sonnet 5 QA + Fable gate green, suite 9067/111/1, and two live
-120-word legs `RESULT SUCCESS` + `obs_publish OK`. Wiring is LIVE-PROVEN (all
-six receipt keys on every still row and manifest entry, spoken script
-untouched); the cap fix is proven on PRODUCTION DATA via ledger replay, NOT by
-a GPU render -- neither leg's writer put a weapon noun in a visual prompt.
-Full receipts: the 2026-08-07 `docs/HANDOFF_LOG.md` entry +
-`kibitz-runs/2026-08-06-banana-route-qa-fixes/` (LOCAL ONLY, gitignored; r3/r4
-raw outputs also sit under the `2026-08-07-` folder -- the script date-stamps
-its run dir and the arc crossed midnight).
-
-**OPEN 1 -- shield scoping: CLOSED `2fc81f72` (2026-08-07).** The blanket quote
-shield now scopes to still_word card text: `apply()` takes
-`shield_quoted_card_text`, the still dispatcher passes
-`(source == "still_word")`, the video funnel passes False explicitly, and
-`TABLE_VERSION` moved to `"3"` (append-only -- historical rows keep `"2"`).
-Full r1-r4 arc, Sonnet QA + Fable gate both zero-blocker, suite 9081/111/1.
-Arc: `kibitz-runs/2026-08-07-shield-scoping/`; plan
-`docs/2026-08-07-PLAN-shield-scoping.md`. One cosmetic is recorded there as
-deliberately NOT fixed (the mesh-fodder composer splices the era tail
-unfolded; scoping already ends the under-fire, and folding it would move mesh
-prompt hashes for nothing).
-
-**OPEN 2 -- premise wiring -- CLOSED 2026-08-07. NOT A BUG. Do not re-open.**
-The report was that `--premise` lands as `meta.operator_hint` and the writer
-ignores it. Investigated: **the wiring is sound.** `--premise` -> the
-`custom_premise` widget -> `source_meta["operator_hint"]`
-(`OTR_LedgerScriptWriter.py:1757`) -> read at `:2181` and passed to
-`build_original_briefs`, which folds it into the concept prompt
-(`_otr_original_radio.py:259-261`, `:283`). Both 2026-08-07 legs carry a
-populated `operator_hint` AND a `selected_concept` with 2 pitches, so the hint
-was not merely stored -- it was consumed.
-
-**What the report actually saw was a different defect standing next to it:**
-the "Please provide the SETTING, TIME, HOOK, and the cast list..." line is the
-ANNOUNCER INTRO, starved of its brief and answering the prompt as a form. That
-is PBUG-20260807-01, fixed in `a200b6f1` + `615de993`, and it affected 23
-shipped episodes across four banks -- not only the two legs in this report.
-The lesson worth keeping: a symptom seen on a leg that also used `--premise`
-is not evidence about `--premise`.
+**The lesson from the premise-wiring false alarm:** a symptom seen on a leg that
+also used `--premise` is not evidence about `--premise`. What that report
+actually saw was the announcer intro starved of its brief and answering the
+prompt as a form -- a different defect standing next door.
 
 ### 0-QUINQUE. MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
 
@@ -1636,29 +1147,17 @@ What now exists and should be USED rather than rebuilt:
    `PROD_BUG_LOG.md` until a live artifact shows it. Needs its own ruling before anyone
    touches the merge.
 
-### 9. THE MULTI-CLIP HONESTY RULE -- TOMBSTONE. SHIPPED 2026-08-06 (`e499b7fc`).
+### 9. THE MULTI-CLIP HONESTY RULE -- TOMBSTONE. SHIPPED 2026-08-06 (`e499b7fc`), proof DISCHARGED 2026-08-07.
 
-**DONE. Do not re-open, do not re-panel, do not re-implement.** This section
-described the bug in full technical detail -- including the "do not just sum the
-segments" trap and the distinct native/delivered-native counts -- and it was
-still headed "r1 done, NOT built" AFTER the fix shipped in the same session.
-A Sonnet whole-package pass caught it; a next engineer would very plausibly have
-rebuilt finished work, which is the exact failure `d548ac54` recorded four
-commits earlier ("The plan was carrying finished work again").
+**DONE. Do not re-open, do not re-panel, do not re-implement.** It was FOUR
+defects, not one: the segment-vs-beat scope mismatch; `ltx_8gb` emitting no
+receipt at all; `scripts/grade_episode.py` reporting `ACCEPTED: 0 shot(s)` with
+exit 0 on the wrapper the render batch really writes (the grader was INERT on the
+real artifact); and a malformed receipt raising out of the grader.
 
-What shipped: it was FOUR defects, not one -- the segment-vs-beat scope
-mismatch; `ltx_8gb` emitting no receipt at all; `scripts/grade_episode.py`
-reporting `ACCEPTED: 0 shot(s)` with exit 0 on the wrapper the render batch
-really writes (the grader was INERT on the real artifact); and a malformed
-receipt raising out of the grader. Suite 8805 -> 8836, Bug Bible 17.
-
-Receipts: `docs/2026-08-06-PROBLEM-STATEMENT-multiclip-honesty-inversion.md`
-(the problem statement, now historical) and the commit itself.
-**The owed live proof is DISCHARGED (2026-08-07)** by the 0-BIS leg
-`signal_lost_midnights_toll_20260807_085918`: two `ltx_video` beats chained into
-two segments each, nine segment receipts all `"none"`, and the grader returned
-`ACCEPTED: 7 shot(s)` at exit 0 on the real artifact rather than the
-`ACCEPTED: 0 shot(s)` inert reading this work fixed. See section 0-BIS.
+**This section stayed headed "r1 done, NOT built" AFTER the fix shipped in the
+same session** -- a next engineer would very plausibly have rebuilt finished
+work. That is why tombstones are one paragraph and DONE work leaves this file.
 
 ### Bench leftovers (relocated)
 
