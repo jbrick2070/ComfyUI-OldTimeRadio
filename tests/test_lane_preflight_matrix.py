@@ -183,9 +183,8 @@ EXPECTED_RED: dict = {
     # LANE 3 CLOSED 2026-08-11 -- humo_1.7B and humo_1.7B_169 left this table.
     # Both now declare their canvas, and the portrait tier's profile stopped
     # claiming 832x480 on a lane whose whole identity is the pillarbox.
-    ("humo", "G2"): (
-        "S8b-4 sibling -- no HuMo lane declares a render_canvas today. "
-        "OWNER: lane 4 (humo14_high_audio_in_portrait)."),
+    # LANE 4 CLOSED 2026-08-11 -- the last HuMo tier declares its canvas,
+    # and BOTH its profiles stopped claiming landscape on the pillarbox.
     ("ltx_audio_in", "G2"): (
         "S3 -- the HQ lane must declare render_canvas = (1024, 576) at the "
         "measured envelope; and S8b-10, the ia2v stage-A base latent 416x240 "

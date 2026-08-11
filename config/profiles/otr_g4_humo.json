@@ -68,8 +68,8 @@
   },
   "render": {
     "fps": 25,
-    "canvas_w": 832,
-    "canvas_h": 480,
+    "canvas_w": 480,
+    "canvas_h": 832,
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,
@@ -84,7 +84,9 @@
     "sage_attention": true,
     "extra_args": [],
     "env": {
-      "GEMMA4_12B_MAX_NEW_TOKENS": "3072"
-    }
+      "OTR_HEADLESS_RESERVE_VRAM_GB": "2.921",
+      "OTR_HEADLESS_DISABLE_PINNED": "1"
+    },
+    "boot_contract": "humo_diet"
   }
 }

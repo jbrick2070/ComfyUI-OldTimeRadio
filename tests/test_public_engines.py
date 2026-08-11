@@ -43,6 +43,8 @@ _TIER = {
     # the id.
     "humo17_high_audio_in_portrait": "humo_1.7B",
     "humo17_high_audio_in_wide": "humo_1.7B_169",
+    # Lane 4, 2026-08-11: the last HuMo tier.
+    "humo14_high_audio_in_portrait": "humo",
 }
 
 

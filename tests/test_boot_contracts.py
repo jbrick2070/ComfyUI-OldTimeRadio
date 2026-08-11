@@ -265,19 +265,23 @@ def test_the_env_overrides_can_no_longer_contradict_the_declaration(
     assert engine._native_dims() == DECLARED_CANVAS
 
 
-def test_an_undeclared_sibling_tier_still_honours_its_overrides(monkeypatch):
-    """The refusal is scoped to tiers that DECLARE a canvas.
+def test_the_override_refusal_is_SCOPED_to_tiers_that_declare(monkeypatch):
+    """The refusal applies to a tier that DECLARES a canvas, and to no other.
 
-    The control has moved once already: `humo_1.7B` held it until lane 3 gave
-    it a declaration of its own, and `humo` (the portrait 14B) holds it now.
-    When lane 4 declares that one, this control moves again rather than the
-    test being deleted -- the invariant outlives every occupant, which is the
-    same shape as the ltx_8gb landscape-default control.
+    This started life as "an undeclared SIBLING still honours its overrides"
+    and moved twice -- humo_1.7B held it until lane 3, `humo` until lane 4 --
+    and then the HuMo family ran out of undeclared tiers, because closing the
+    family was the point. So the invariant is asserted directly rather than
+    parked on whichever tier has not been done yet: strip the declaration and
+    the overrides go back to winning, exactly as they did for every tier before
+    this build. A control with no occupant left is a control that has to be
+    rewritten, not deleted.
     """
     monkeypatch.setenv("OTR_HUMO_WIDTH", "640")
     monkeypatch.setenv("OTR_HUMO_HEIGHT", "384")
-    assert rd.declared_render_canvas("humo") is None
-    assert vreg.get_engine("humo")._native_dims() == (640, 384)
+    engine = vreg.get_engine("humo")
+    monkeypatch.setattr(type(engine), "render_canvas", None, raising=False)
+    assert engine._native_dims() == (640, 384)
 
 
 def test_the_profile_canvas_agrees_with_the_declaration(profile):
@@ -414,3 +418,38 @@ def test_the_1p7b_public_ids_state_the_aspect(tier, public):
     label suffix."""
     assert vd.exact_menu_option_for(tier).startswith(public)
     assert "audio_in" in public
+
+
+# ---------------------------------------------------------------------------
+# LANE 4 -- the last HuMo tier. It held the "declares NOTHING" control until
+# now, so closing it moves that control off the family entirely.
+# ---------------------------------------------------------------------------
+
+def test_the_last_humo_tier_declares_its_canvas():
+    engine = vreg.get_engine("humo")
+    assert tuple(engine.render_canvas) == (480, 832)
+    assert rd.declared_render_canvas("humo") == (480, 832)
+
+
+@pytest.mark.parametrize("pid", ["otr_w45_humo", "otr_g4_humo"])
+def test_both_humo_profiles_stopped_claiming_landscape(pid):
+    """BOTH of this tier's profiles said 832x480 on the pillarbox lane. The
+    w45 one was found by G2.3; the g4 one only surfaced because the gate reads
+    EVERY profile that selects the engine, not just the one being edited."""
+    prof = load_profile(pid)
+    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (480, 832)
+
+
+def test_every_humo_tier_now_declares_a_canvas_and_a_contract():
+    """The family is closed. Four tiers, four declarations, four contract
+    lists -- and the aspect each one renders is now readable without loading
+    anything."""
+    expected = {
+        "humo": (480, 832), "humo_1.7B": (480, 832),
+        "humo_1.7B_169": (832, 480), "humo_14B_169": (832, 480),
+    }
+    for tier, canvas in expected.items():
+        engine = vreg.get_engine(tier)
+        assert tuple(engine.render_canvas) == canvas, tier
+        assert bc.compatible_contracts_for_engine(engine) == (
+            "default", "humo_diet"), tier

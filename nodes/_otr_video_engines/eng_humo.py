@@ -230,6 +230,21 @@ class HuMoEngine(_MC.MotionEngineBase):
 
     name = "humo"
     family = "audio_driven_face"
+    #: THE CANVAS, DECLARED (lane 4, 2026-08-11) -- the LAST HuMo tier to get
+    #: one, which is why it held the "declares NOTHING" differential control
+    #: until now. Portrait 480x832 is where the 14B was measured on both boot
+    #: lanes (14.98 GiB default / 13.22 GiB diet warm, HUMO_BAKEOFF +
+    #: ENVELOPE_LADDERS, indexed in docs/evidence/video_evidence_manifest.json).
+    #: Without it the request fell through to the 1472x832 landscape default on
+    #: the tier whose whole job is the pillarbox talking head. Both axes
+    #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is a named
+    #: refusal; see :meth:`HuMoEngine._native_dims`.
+    render_canvas = (480, 832)
+    #: BOOT CONTRACTS. Both, for the same reason as every other HuMo tier: it
+    #: has shipped under `default`, so requiring the diet would retire a
+    #: shipping lane. What `default` COSTS is stated rather than hidden --
+    #: 14.98 GiB, over the 14.5 GiB gate.
+    compatible_boot_contracts = ("default", "humo_diet")
     #: S1 per-model still plan (see ``_HUMO_STILL_PLAN`` above -- audio-
     #: driven-face with portrait REQUIRED).
     still_plan = _HUMO_STILL_PLAN

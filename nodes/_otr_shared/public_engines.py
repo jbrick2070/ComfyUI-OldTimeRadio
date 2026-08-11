@@ -64,6 +64,9 @@ _PUBLIC_ENGINES = {
     # aspect is the whole difference, so the aspect is in the id.
     "humo17_high_audio_in_portrait": "humo_1.7B",
     "humo17_high_audio_in_wide": "humo_1.7B_169",
+    # Lane 4, 2026-08-11: the last HuMo tier. The 2026-06-09 keystone, and
+    # the only one of the four whose id was previously just "humo".
+    "humo14_high_audio_in_portrait": "humo",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -116,6 +119,9 @@ _PUBLIC_LABEL = {
     "humo17_high_audio_in_wide": (
         "HuMo 1.7B 16:9 - audio-driven face, high VRAM, LONG beats "
         "(same checkpoint as the portrait tier; UNMEASURED at this aspect)"),
+    "humo14_high_audio_in_portrait": (
+        "HuMo 14B fp8 portrait - audio-driven face, high VRAM "
+        "(13.22 GiB warm at 480x832x97 on the humo_diet boot)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

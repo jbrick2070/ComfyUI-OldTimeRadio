@@ -113,7 +113,10 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     # configured for, on a 14B fp8 lane at a 14.5 GiB gate. The invariant this
     # test guards is unchanged -- an engine that declares NOTHING is still
     # untouched -- and mesh_stage now carries the control.
-    for other in ("ltx_audio_in", "mesh_stage", "humo",
+    # `humo` left this list in lane 4 (2026-08-11) when the HuMo family
+    # closed -- the third occupant to leave. What remains are lanes whose
+    # own packets have not run yet.
+    for other in ("ltx_audio_in", "mesh_stage",
                   "still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None

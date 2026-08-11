@@ -86,10 +86,20 @@ def test_humo_loader_names_and_dims_env(monkeypatch):
     assert names["clip"].startswith("umt5") and names["vae"] == "wan_2.1_vae.safetensors"
     assert names["unet"].endswith(".safetensors")
     monkeypatch.setenv("OTR_HUMO_UNET_NAME", "custom_humo.safetensors")
+    assert eng._loader_names()["unet"] == "custom_humo.safetensors"
+    # DIMS ARE NO LONGER AN OPEN OVERRIDE ON A DECLARING TIER (lane 4,
+    # 2026-08-11). This tier now declares render_canvas = (480, 832), and the
+    # declaration is applied LAST in the request chain -- so an override that
+    # DISAGREES would render one size while every receipt reported the other.
+    # It is a named refusal; an override that AGREES still passes through.
     monkeypatch.setenv("OTR_HUMO_WIDTH", "512")
     monkeypatch.setenv("OTR_HUMO_HEIGHT", "768")
-    assert eng._loader_names()["unet"] == "custom_humo.safetensors"
-    assert eng._native_dims() == (512, 768)
+    from nodes._otr_video_engines.registry import EngineUnusable
+    with pytest.raises(EngineUnusable):
+        eng._native_dims()
+    monkeypatch.setenv("OTR_HUMO_WIDTH", "480")
+    monkeypatch.setenv("OTR_HUMO_HEIGHT", "832")
+    assert eng._native_dims() == (480, 832)
 
 
 # --- fail-closed (NAMED) without the wrapper / without inputs --------------- #
