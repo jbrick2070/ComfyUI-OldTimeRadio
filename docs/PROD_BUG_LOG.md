@@ -3597,19 +3597,39 @@ normal render. Re-run before treating the cause as understood.
   no `num_characters_locked`. `num_characters` was also ignored (asked 2, got 3:
   Ada, Kai, Dr. Elara). Compare `original` on the same sweep, which stamped all
   seven keys.
-- root cause: NOT ESTABLISHED. The `scifi_news_circuit` pipeline does not reach
-  `_otr_casting.lock_cast()`, which is the function that stamps the cast contract
-  and applies the cameo. WHY it stopped reaching it is unknown.
+- root cause: **ESTABLISHED 2026-08-11.** `scifi_news` is a CONTENT-OWNED lane
+  (`delivery_mode_for_meta(meta) == CONTENT_OWNED`, verified against the sweep's
+  own ledger; `original` on the same sweep is `legacy`). Content-owned lane
+  runners build their own cast rows and stamp their own voice presets, so they
+  never run the writer's seeded cast picker -- `OTR_LedgerScriptWriter` says so
+  in as many words at the content-owned tail. `lock_cast()` is what applies the
+  cameo, so the cameo cannot happen there. The empty `cast_contract` is the same
+  decision: that block deliberately stamps `meta.episode_seed` and NOT
+  `cast_contract.cast_seed`, because cast_seed is a claim the writer's picker
+  produced this cast and can replay it -- and a lane-owned cast has no
+  `num_characters_request` to replay with. Claiming it detonated CastLock's
+  replay in a prior bug (`num_characters must be 1-6, got 0`).
+- **so this is a capability lost to an ARCHITECTURAL change, not a careless
+  break.** scifi_news predates the content-owned redesign, worked under the
+  legacy picker (which is why the operator remembers it working), and lost the
+  cameo when it became content-owned. Nobody removed Lemmy from it.
+- **THE OBVIOUS FIX IS THE WRONG ONE.** Routing content-owned lanes back through
+  `lock_cast()` is exactly what the writer's comment warns detonates the replay.
+  The repair belongs in the LANE RUNNER: either it offers the cameo itself when
+  building its cast, or it stamps an explicit declined-policy so the ledger
+  records a decision instead of a silence. Which of those is an operator call --
+  it decides whether Lemmy can appear in scifi_news again at all.
 - **why this is a REGRESSION and not a design choice:** the operator confirmed
   2026-08-11 that scifi_news "was built with Lemmy in mind and always used to
   work -- it was the first Lemmy plan". This lane is the cameo's ORIGINAL home.
   An earlier draft of the finding doc recorded it as a possible
   "lane owns its cast" design decision; that reading is WITHDRAWN.
 - fix: NONE YET.
-- verify idea: assert every runnable bank's episode stamps a non-empty
-  `cast_contract` with `lemmy_hit` + `lemmy_policy` present -- absence of the
-  keys, not just absence of Lemmy, is the detectable defect. A lane that
-  deliberately declines the cameo must still say so.
+- verify idea: assert every runnable bank's episode records a cameo DECISION --
+  `lemmy_policy` present with some value -- even on content-owned lanes. Absence
+  of the key, not absence of Lemmy, is the detectable defect. Do NOT assert a
+  non-empty `cast_contract.cast_seed` on content-owned lanes; that is the field
+  whose false claim caused the earlier replay detonation.
 - bible-worthy: likely yes as a class -- "a pipeline silently bypassed the one
   function that records a decision, so the ledger cannot distinguish 'declined'
   from 'never asked'". That shape is portable well beyond this cameo.
