@@ -777,6 +777,52 @@ before the packet started (G1, G3, G4, G5, G7 never went red).
 
 ---
 
+## Lane 8 -- `ltx098_low_video` (`ltx_8gb`), closed 2026-08-11
+
+**What bit (1): adding a gate makes every test that used the gated function as
+a PROXY go red.** `assert_usable` gained a node-class gate, and six "CONTROL
+... still passes" checks in two files went red at once. They were not testing
+node classes -- their subjects are loader tokens, DIR overrides and the
+integrity floor -- but they call the real `assert_usable` on a CPU box with an
+empty ComfyUI registry, so the new gate refused before their subject was ever
+reached.
+
+**Runnable check:** before adding a gate to a widely-called preflight function,
+grep for tests that assert that function SUCCEEDS. Each one is now also
+asserting your new precondition, whether it means to or not. Fix them at the
+fixture -- give them what the new gate wants -- never by weakening the gate.
+
+**Twin assertion:** an autouse `_node_classes_present` fixture in both files,
+with the reason in its docstring, plus three tests that exercise the gates
+directly (`..._refused_BEFORE_any_weight_is_resolved`,
+`..._refused_at_PREFLIGHT_not_at_load`, `..._reads_the_ACTIVE_candidate_set`).
+A gate with no coverage is the hole one level up from the one you just closed.
+
+**What bit (2): a hole is invisible next door for a reason worth knowing.**
+`eng_ltx_video` has had the identical node gate for a while, and the CPU suite
+never calls its `assert_usable` at all -- so the gate is never exercised there
+and nobody learned what it does off the runtime. `ltx_8gb` has a dedicated
+`assert_usable` suite, which is the only reason this surfaced.
+
+**Runnable check:** "the sibling does it this way and its tests are green" is
+not evidence the pattern is CPU-safe. Check whether the sibling's tests
+actually call the function.
+
+**What bit (3): an ORDERING claim needs a test that can fail.** The Sage gate is
+first "so a refusal costs nothing rather than a checkpoint load" -- a claim that
+passes trivially if the gate is anywhere in the function. The test makes weight
+resolution raise `RuntimeError`, so a mis-ordered gate fails with the wrong
+exception type instead of quietly passing.
+
+**What did NOT bite: the measurement-before-naming order paid.** The corpus told
+this lane to measure before final naming and the manifest said the marker was
+provisional because nothing had ever measured the lane on this box. Smoking
+first turned `low` from an inherited guess into 6,835 MB net -- and the label
+states the measured COST rather than "runs on an 8 GB card", which is the claim
+the retired `8gb` token made without evidence.
+
+---
+
 ## A process defect this ledger caught about ITSELF (2026-08-11, lane 7)
 
 Lanes 4, 5 and 6 closed green and pushed **without appending to this file**.

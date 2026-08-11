@@ -68,8 +68,8 @@
   },
   "render": {
     "fps": 25,
-    "canvas_w": 832,
-    "canvas_h": 480,
+    "canvas_w": 512,
+    "canvas_h": 288,
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,

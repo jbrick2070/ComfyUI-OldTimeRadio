@@ -57,6 +57,31 @@ def _clean_env(monkeypatch):
 _TEST_FLOOR = 1024
 
 
+@pytest.fixture(autouse=True)
+def _node_classes_present(monkeypatch):
+    """Satisfy assert_usable's NODE GATE so these tests stay about their own
+    subject (S8b-13, lane 8, 2026-08-11).
+
+    `assert_usable` gained a node-class gate: every class in
+    `_node_candidates()` must resolve at preflight instead of surfacing at
+    `load()` mid-render. Correct, and it made six tests in this file go red --
+    they call the real `assert_usable` on a CPU box where ComfyUI's registry is
+    empty, so the gate refused before their actual subject (loader tokens, DIR
+    overrides, the integrity floor) was ever reached.
+
+    Fixed at the fixture, never by weakening the gate: hand it a mapping in
+    which every candidate exists. Tests that mean to exercise the gate itself
+    override this. Lesson L9 -- when a lane's gate gets stricter, the checks
+    that used it as a proxy for something else have to say so out loud.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    names = set()
+    for candidates in m.Ltx8gbEngine()._node_candidates().values():
+        names.update(candidates)
+    monkeypatch.setattr(_wb, "node_class_mappings",
+                        lambda mapping=None: {n: object for n in names})
+
+
 @pytest.fixture
 def eng(tmp_path, monkeypatch):
     """A big-enough checkpoint and a T5, resolved by TOKEN."""
@@ -219,3 +244,72 @@ def test_CONTROL_a_missing_t5_still_says_offline(eng):
         eng.assert_usable(host_caps={}, profile={})
     assert e.value.reason == EngineUsabilityReason.MISSING_MODEL
     assert "offline" in str(e.value)
+
+
+# --------------------------------------------------------------------------- #
+# S8b-13 (lane 8, 2026-08-11) -- the two gates this adapter did not have
+# --------------------------------------------------------------------------- #
+def test_SageAttention_is_refused_BEFORE_any_weight_is_resolved(eng, monkeypatch):
+    """BUG-070, on the exact family it was written for.
+
+    int8-PV SageAttention process-ABORTS LTX-Video with no traceback, so an
+    engine that cannot tolerate it must refuse before the first forward. Both
+    siblings (`eng_ltx_video`, `eng_ltx_av`) called `assert_sage_not_patched`;
+    this 0.9.8 lane had no Sage gate of any kind, so the failure mode here was a
+    dead process rather than a named refusal.
+
+    Ordered FIRST on purpose: a refusal that costs nothing beats one that costs
+    a checkpoint load. Proved by making weight resolution explode -- if the Sage
+    gate did not run first, this raises RuntimeError instead of EngineUnusable.
+    """
+    from nodes._otr_video_engines import motion_common as _MC
+    monkeypatch.setattr(_MC, "sageattention_patched",
+                        lambda modules=None, env=None: True)
+    monkeypatch.setattr(eng, "_resolve_model_file", _explode)
+    with pytest.raises(EngineUnusable) as excinfo:
+        eng.assert_usable(host_caps={}, profile={})
+    assert excinfo.value.reason == EngineUsabilityReason.INCOMPATIBLE_PROFILE
+    assert "SageAttention" in str(excinfo.value)
+
+
+def _explode(*_a, **_k):
+    raise RuntimeError("weight resolution must not be reached")
+
+
+def test_a_missing_node_class_is_refused_at_PREFLIGHT_not_at_load(eng, monkeypatch):
+    """The node gate. Without it a missing LTXV class surfaced inside `load()`
+    -- mid-render, after the checkpoint had already been paid for.
+
+    Asserts the message NAMES what is missing, and names EVERY missing class
+    rather than the first: on a fresh install, one-at-a-time turns a single
+    diagnosis into a sequence of failed renders.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda mapping=None: {})
+    with pytest.raises(EngineUnusable) as excinfo:
+        eng.assert_usable(host_caps={}, profile={})
+    msg = str(excinfo.value)
+    assert excinfo.value.reason == EngineUsabilityReason.MISSING_MODEL
+    assert "node class" in msg
+    for logical in ("LTXVImgToVideo", "LTXVScheduler", "ModelSamplingLTXV"):
+        assert logical in msg, "the gate must name %s, not just the first miss" % logical
+
+
+def test_the_node_gate_reads_the_ACTIVE_candidate_set(eng, monkeypatch):
+    """The tiled-VAE knob swaps VAEDecode for VAEDecodeTiled, so a fixed list
+    would gate the wrong class in one of the two configurations. Reading
+    `_node_candidates()` is what keeps the gate honest; this pins that it does.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    monkeypatch.setenv("OTR_LTX_8GB_TILED_VAE", "1")
+    tiled = set()
+    for cands in eng._node_candidates().values():
+        tiled.update(cands)
+    assert "VAEDecodeTiled" in tiled and "VAEDecode" not in tiled
+    # everything present EXCEPT the tiled decoder -> refused, and named
+    monkeypatch.setattr(
+        _wb, "node_class_mappings",
+        lambda mapping=None: {n: object for n in tiled if n != "VAEDecodeTiled"})
+    with pytest.raises(EngineUnusable) as excinfo:
+        eng.assert_usable(host_caps={}, profile={})
+    assert "VAEDecodeTiled" in str(excinfo.value)

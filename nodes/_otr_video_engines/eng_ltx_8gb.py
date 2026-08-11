@@ -1060,8 +1060,22 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     def assert_usable(self, host_caps, profile, request_template=None):
         """Ordinary asset preflight -- NO VRAM/NVML/vendor gate, NO fallback
-        (operator directive 2026-07-20). Fail CLOSED on a bad render knob, then a
-        missing checkpoint, a wrong-size checkpoint, or a missing T5."""
+        (operator directive 2026-07-20). Fail CLOSED on SageAttention, then a bad
+        render knob, then a missing checkpoint, a wrong-size checkpoint, a
+        missing T5, and finally any missing ComfyUI node class.
+
+        S8b-13 (lane 8, 2026-08-11) ADDED THE FIRST AND LAST OF THOSE. This is an
+        LTX-Video 0.9.8 engine -- the exact family BUG-070 was written for -- and
+        it was the only one of the three LTX lanes with NO Sage gate at all,
+        while both siblings call ``assert_sage_not_patched`` (``eng_ltx_video``,
+        ``eng_ltx_av``). int8-PV SageAttention process-aborts LTX with no
+        traceback, so "no gate" means the failure mode is a dead process rather
+        than a named refusal. The node gate was the same shape of hole one level
+        down: a missing LTXV class surfaced at ``load()`` -- mid-render, after
+        the checkpoint had been paid for -- instead of at preflight."""
+        # BUG-070 SageAttention contamination -- FIRST, before any weight is
+        # resolved: a refusal that costs nothing beats one that costs a load.
+        _MC.assert_sage_not_patched(self.name, self.family)
         self._resolve_render_config()                 # range-checked, fail-closed
         ckpt = self._ckpt_path()
         if ckpt is None:
@@ -1083,6 +1097,26 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "OTR_LTX_8GB_T5_NAME if the basename differs. Do not reach for "
                 "OTR_LTX_8GB_T5_DIR -- it never reached the loader and is now "
                 "refused" % self._t5_name(), kind="video")
+        # NODE GATE (S8b-13, lane 8): every required ComfyUI class must resolve
+        # HERE, at preflight, on the ACTIVE candidate set -- the tiled-VAE knob
+        # swaps VAEDecode for VAEDecodeTiled, so reading `_node_candidates()`
+        # rather than a fixed list is what keeps this honest. Collect every
+        # missing class before raising: naming one at a time turns a fresh
+        # install into a sequence of failed renders.
+        from . import wrapper_bridge as _wb
+        mapping = _wb.node_class_mappings()
+        missing = []
+        for _logical, candidates in self._node_candidates().items():
+            try:
+                _wb.resolve_node_class(candidates, mapping)
+            except Exception:  # noqa: BLE001 -- collect every missing class
+                missing.append("/".join(candidates))
+        if missing:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "%s missing required ComfyUI node class(es): %s (install/update "
+                "ComfyUI-LTXVideo)" % (self.name, ", ".join(missing)),
+                kind="video")
         return self.name
 
     # ---- in-process graph spec (0.9.8 distilled; discovery + smoke verified) ----

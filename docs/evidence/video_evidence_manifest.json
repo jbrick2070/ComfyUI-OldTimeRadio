@@ -1,6 +1,6 @@
 {
   "schema": "otr.video_evidence_manifest/1",
-  "manifest_version": 2,
+  "manifest_version": 3,
   "built": "2026-08-11",
   "lab_repo": "vram-recipe-lab",
   "lab_evidence_commit": "4d87cfa3278c39cbdde6f3cb8b16f241aeb58c02",
@@ -20,7 +20,7 @@
     "humo_14B_169": "admission NOT enforced: the ruled hero cast has a measured 13.06 GiB warm landscape f97 receipt under the diet boot, but a receipt is not a qualified cost row and nothing refuses an over-budget plan on this lane today.",
     "ltx_audio_in": "admission NOT enforced: no cost row. The affine FIT is CUT for LTX because the HQ ladder is non-monotonic against the model's pixel scaling, so this lane needs conservative ABSOLUTE envelopes rather than a smoothed line. Lane 7 (2026-08-11) DECLARED render_canvas = 1024x576, the canvas the ltx_av_hq_1024x576_f193 row measures, but that row is LAB WARM and this lane carries a live counter-receipt that in-pipeline peaks read higher than isolation probes (1280x704 breached at 14,716 MB in the full pipeline). The declaration is qualified by the lane's own solo smoke on this box, not by the lab row; until a cost row exists, admission stays unenforced here in words.",
     "ltx_video": "admission NOT enforced: no cost row, and its only datapoint is a FAILED chained diagnostic at 832x448 -- not the 832x480 it declares, and not a single-render number at all.",
-    "ltx_8gb": "admission NOT enforced: no cost row and NO measurement of any kind on this box, which is also why its low/high public marker is still provisional.",
+    "ltx_8gb": "admission NOT enforced: no cost row. The 'NO measurement of any kind on this box' that made its low/high marker provisional is CLOSED by lane 8 (2026-08-11): 9,106 MB absolute / 6,835 MB net, cold, at 512x288x161 in 22.1 s, a VramPeakProbe maximum. That qualifies the `low` MARKER; it is still not a cost row, and nothing refuses an over-budget plan on this lane today. Note what the number does NOT say: 6.8 GiB net is not a promise that the lane fits an 8 GB card, which is the exact claim the retired `8gb` token made without evidence.",
     "mesh_stage": "admission NOT enforced: no cost row; the lane's real preflight gap is the ungated hy3d graph, not a VRAM envelope."
   },
   "narratives": [
@@ -525,6 +525,23 @@
       "seeds_cost_row": true,
       "receipt": "docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md",
       "note": "Lane 7's declaration leg: the canvas moved 832x480 -> 1024x576 and this is the first measurement AT the declared canvas. ABSOLUTE clears the 14500 MB ceiling by only 35 MB (0.24%) and that is queue row 7b, an operator decision; NET is unremarkable and sits with the HuMo figures. The live absolute is 1.92x the lab warm number (7536 MB) for the identical config -- state the surface before comparing them. Recipe ia2v_canonical, Q3_K_M, LoRA on; no diet boot contract on this lane."
+    },
+    {
+      "lane": "ltx_8gb",
+      "public_id": "ltx098_low_video",
+      "canvas": "512x288",
+      "model_frames": 161,
+      "delivered_frames": 161,
+      "boot_lane": "default (LTX token, Sage-free)",
+      "cache_state": "cold",
+      "surface": "absolute device total (VramPeakProbe max)",
+      "absolute_peak_mb": 9106,
+      "baseline_mb": 2271,
+      "net_mb": 6835,
+      "wall_time_s": 22.1,
+      "seeds_cost_row": true,
+      "receipt": "docs/evidence/lane_receipts/lane08-ltx098_low_video.md",
+      "note": "The FIRST measurement of any kind for this lane on this box, and the one the low/high marker was waiting on. Cheapest lane in the roster: 1.75x cheaper than ltx23_low_audio_in by NET and 13.8x faster per beat. Recipe ltx098_distilled_2b_i2v_single_pass_v2, no quant. 5,394 MB of absolute headroom under the ceiling."
     }
   ]
 }

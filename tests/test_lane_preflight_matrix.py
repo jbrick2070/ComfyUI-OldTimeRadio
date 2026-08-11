@@ -200,14 +200,18 @@ EXPECTED_RED: dict = {
     # The lane declares (1024, 576), the halving is validated at its root, and
     # an env canvas that disagrees is a named refusal. Pinned by
     # tests/test_ltx_av_ia2v_canonical.py and tests/test_ltx_av_driver_wiring.py.
-    ("ltx_8gb", "G6"): (
-        "S8b-13 -- an LTX-Video 0.9.8 engine with NO assert_sage_not_patched "
-        "gate at all, on the exact family BUG-070 was written for, and no "
-        "node-class gate in assert_usable. OWNER: lane 8 (ltx098_low_video)."),
-    ("ltx_8gb", "G2"): (
-        "S8b-11 -- otr_w45_ltx_8gb.json / otr_g4_ltx_8gb.json declare 832x480 "
-        "against the LIVE 512x288 declaration and sit outside the one-profile "
-        "drift guard. OWNER: lane 8 (ltx098_low_video)."),
+    # LANE 8 CLOSED 2026-08-11 -- ltx_8gb's G2 and G6 rows left this table. G6
+    # was S8b-13: the only one of the three LTX lanes with NO
+    # assert_sage_not_patched gate, on the exact family BUG-070 was written for
+    # (int8-PV Sage process-aborts LTX with no traceback, so "no gate" means a
+    # dead process instead of a named refusal), plus no node-class gate, so a
+    # missing LTXV class surfaced at load() after the checkpoint was paid for.
+    # Both now fire in assert_usable, Sage first. G2 was S8b-11: two profiles
+    # claimed 832x480 on a lane that DECLARES 512x288 -- the declaration
+    # overruled them, so the config an operator reads disagreed with the render
+    # by 2.7x the pixels on the tier that exists because it cannot afford them.
+    # 512x288 stands: it is the 2026-07-26 arc judgment's ruled canvas (exact
+    # 16:9, /32-clean, zero pad area) and the profiles moved to it.
     ("mesh_stage", "G1"): (
         "S8b-16 -- the hy3d CHECKPOINT is gated but the hy3d GRAPH is not: "
         "the ten node classes resolve only inside load(), so preflight passes "

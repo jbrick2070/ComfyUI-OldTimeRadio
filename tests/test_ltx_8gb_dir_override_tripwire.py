@@ -57,6 +57,31 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _node_classes_present(monkeypatch):
+    """Satisfy assert_usable's NODE GATE so these tests stay about their own
+    subject (S8b-13, lane 8, 2026-08-11).
+
+    `assert_usable` gained a node-class gate: every class in
+    `_node_candidates()` must resolve at preflight instead of surfacing at
+    `load()` mid-render. Correct, and it made six tests in this file go red --
+    they call the real `assert_usable` on a CPU box where ComfyUI's registry is
+    empty, so the gate refused before their actual subject (loader tokens, DIR
+    overrides, the integrity floor) was ever reached.
+
+    Fixed at the fixture, never by weakening the gate: hand it a mapping in
+    which every candidate exists. Tests that mean to exercise the gate itself
+    override this. Lesson L9 -- when a lane's gate gets stricter, the checks
+    that used it as a proxy for something else have to say so out loud.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    names = set()
+    for candidates in m.Ltx8gbEngine()._node_candidates().values():
+        names.update(candidates)
+    monkeypatch.setattr(_wb, "node_class_mappings",
+                        lambda mapping=None: {n: object for n in names})
+
+
 @pytest.fixture
 def eng(tmp_path, monkeypatch):
     """A REAL resolution path -- the resolver IS the subject here.

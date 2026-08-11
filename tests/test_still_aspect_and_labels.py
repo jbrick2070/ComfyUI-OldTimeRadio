@@ -135,7 +135,11 @@ def test_label_suffix_is_aspect_derived():
     # rollout being visible, not a drift.
     assert vd._label_for("ltx_audio_in") == "ltx23_low_audio_in (16:9)"
     assert vd._label_for("wan_ti2v") == "wan22_high_video (16:9)"
-    assert vd._label_for("ltx_8gb") == "ltx_8gb (16:9)"
+    # ltx_8gb took its low/high name in lane 8 (2026-08-11). It was the last
+    # IDENTITY row in the public table -- public id == internal id -- so this
+    # line used to read the same string twice and looked like it was asserting
+    # nothing. It is now a real rename, and the internal id keeps `8gb`.
+    assert vd._label_for("ltx_8gb") == "ltx098_low_video (16:9)"
 
 
 def test_label_descriptor_suffix_is_family_derived():

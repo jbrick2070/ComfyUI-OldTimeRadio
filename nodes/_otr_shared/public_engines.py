@@ -28,7 +28,6 @@ from __future__ import annotations
 #: Public menu id -> internal engine id (the four video-tier rows). ltx_8gb maps to
 #: itself (its internal id IS its public id).
 _PUBLIC_ENGINES = {
-    "ltx_8gb": "ltx_8gb",
     "ltx23_16gb_video": "ltx_video",
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
     # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
@@ -81,6 +80,18 @@ _PUBLIC_ENGINES = {
     # warm, against a 14.5 GiB gate -- comfortably the cheapest local video lane
     # in the roster, which is exactly what the token is for.
     "ltx23_low_audio_in": "ltx_audio_in",
+    # Lane 8, 2026-08-11. `ltx_8gb` was an IDENTITY row like lane 6's
+    # `fastwan_8gb`, so it needs NO alias on the way out -- a bare internal id
+    # already passes through resolve_engine_id step 3, and adding one would
+    # imply an internal rename that never happened. The internal id KEEPS the
+    # `8gb` token; only the public surface loses it.
+    #
+    # `low` is MEASURED here, not inherited from the retired token: 9,106 MB
+    # absolute / 6,835 MB net, cold, at 512x288x161 -- the cheapest lane in the
+    # roster and 1.75x cheaper than ltx23_low_audio_in. Until this lane's own
+    # smoke ran, the marker was provisional in the evidence manifest's own
+    # words ("NO measurement of any kind on this box").
+    "ltx098_low_video": "ltx_8gb",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -128,7 +139,15 @@ _INTERNAL_TO_PUBLIC = {v: k for k, v in _PUBLIC_ENGINES.items()}
 
 #: Friendly prose labels -- TOOLTIP / DOCS ONLY, never the combo/saved value.
 _PUBLIC_LABEL = {
-    "ltx_8gb": "LTX 0.9.8 2B - 8GB",
+    # MEASURED, and deliberately NOT an 8 GB claim. The retired `8gb` token
+    # encoded the card the lane was built for; this label states what the lane
+    # was measured to COST (6.8 GiB net at 512x288x161, cold) and lets the user
+    # decide what that fits on. Saying "runs on an 8 GB card" would repeat the
+    # exact mistake lane 5 retired the token for -- net cost is not the whole
+    # story on a card whose desktop already eats some of it.
+    "ltx098_low_video": (
+        "LTX 0.9.8 2B - low VRAM (6.8 GiB net at 512x288x161; "
+        "the cheapest local video lane, ~22 s a beat)"),
     # "3-step" rather than "fast" or "better": this tier renders the SAME motion at
     # the SAME canvas for the SAME VRAM as wan_8gb, about 2.7x sooner. Naming it a
     # quality or longer-clip upgrade would mis-sell it.
