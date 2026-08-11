@@ -304,18 +304,18 @@ def test_google_api_llm_slots_are_headless_bindable(tmp_path, monkeypatch):
         "--dry-run",
         "--creative-model", "google_api:slot-a",
         "--technical-model", "google_api:slot-b",
-        "--google-slot-a-model", "gemini-3.5-flash",
-        "--google-slot-b-model", "gemini-3.1-flash-lite",
+        "--google-slot-a-model", "gemini-flash-latest",
+        "--google-slot-b-model", "gemini-flash-lite-latest",
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
-    assert "google_api_slot_a_model='gemini-3.5-flash'" in out
+    assert "google_api_slot_a_model='gemini-flash-latest'" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     assert writer["inputs"]["creative_writing_model"] == "google_api:slot-a"
     assert writer["inputs"]["technical_model"] == "google_api:slot-b"
-    assert writer["inputs"]["google_api_slot_a_model"] == "gemini-3.5-flash"
-    assert writer["inputs"]["google_api_slot_b_model"] == "gemini-3.1-flash-lite"
+    assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
+    assert writer["inputs"]["google_api_slot_b_model"] == "gemini-flash-lite-latest"
 
 
 def test_set_refuses_direct_engine_widget_patch(tmp_path):

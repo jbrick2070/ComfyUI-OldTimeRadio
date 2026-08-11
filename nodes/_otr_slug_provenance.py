@@ -126,10 +126,11 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     # --- google_api text -----------------------------------------------------
     # Pointers (`*-latest`) carry no version claim and are excluded from this
     # table entirely, by `is_pointer`.
-    ("gemini-3.5-flash", "google_api"):      _catalog(_GOOGLE_RUN),
-    ("gemini-3.1-flash-lite", "google_api"): _catalog(_GOOGLE_RUN),
-    ("gemini-2.5-flash", "google_api"):      _catalog(_GOOGLE_RUN),
-    ("gemini-2.5-pro", "google_api"):        _catalog(_GOOGLE_RUN),
+    # EMPTIED BY THE EVERGREEN SWEEP (2026-08-10). This lane offers only
+    # `*-latest` pointers now, and a pointer is never dated -- it has no version
+    # claim to go stale. gemini-3.5-flash, gemini-3.1-flash-lite,
+    # gemini-2.5-flash and gemini-2.5-pro were all LIVE in the same catalog run
+    # and were dropped for being pins, not for being dead.
     # `gemini-2.0-flash` and `gemini-2.0-flash-lite` USED TO SIT HERE. The
     # 2026-08-10 verifier run found both absent from a completed catalog, so they
     # were retired from `GOOGLE_API_STABLE_TEXT_MODELS` rather than left in a
@@ -229,6 +230,113 @@ def has_preview_token(provider_id: str) -> bool:
     return _PREVIEW_TOKEN in provider_id.split("-")
 
 
+# --------------------------------------------------------------------------- #
+# EVERGREEN POLICY (operator directive 2026-08-10)
+#
+# "Remove all dead slugs and only keep dynamic ones -- latest -- that won't die."
+# The operator's word for a pointer is EVERGREEN, and it is the better word: the
+# point is not that the slug indirects, it is that it does not die.
+#
+# A concrete version pin is a slug with an expiry date nobody wrote down.
+# `tencent/hy3:free` sat in a dropdown until its promo ended. `gemini-2.0-flash`
+# and `gemini-2.0-flash-lite` sat in the Google slot dropdowns until a catalog
+# fetch on 2026-08-10 showed they were simply gone. Every one of those was found
+# LATE, by a person, after it had already shipped.
+#
+# WHERE IT COULD BE APPLIED, IT WAS. The Google text lane is now three pointers
+# and nothing else, and the OpenRouter lane was already eleven aliases plus one
+# pin.
+#
+# WHERE IT CANNOT BE, THE REASON IS MEASURED AND WRITTEN DOWN. A policy that
+# empties a working dropdown is not a policy, it is an outage: Google publishes
+# NO `-latest` id for image, TTS or music -- checked against the same complete
+# 52-id listing -- so demanding one there would leave the operator no model to
+# pick. Those are exemptions with stated reasons, not silent skips, and the test
+# below fails on any concrete id that has neither a pointer nor an entry here.
+# --------------------------------------------------------------------------- #
+
+#: `(provider_id, authority_lane) -> why no evergreen pointer exists`.
+EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
+    # --- Google publishes no `-latest` for these modalities ------------------
+    # Verified against the complete 2026-08-10 catalog: the only `-latest` ids
+    # Google ships are gemini-flash-latest, gemini-flash-lite-latest,
+    # gemini-pro-latest and gemini-2.5-flash-native-audio-latest. None is an
+    # image, speech or music model.
+    ("gemini-3.1-flash-image", "google_image"):
+        "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
+    ("gemini-3.1-flash-lite-image", "google_image"):
+        "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
+    ("gemini-3-pro-image", "google_image"):
+        "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
+    ("gemini-2.5-flash-preview-tts", "google_tts"):
+        "Google publishes no -latest pointer for speech models (2026-08-10 catalog)",
+    ("gemini-2.5-pro-preview-tts", "google_tts"):
+        "Google publishes no -latest pointer for speech models (2026-08-10 catalog)",
+    ("gemini-3.1-flash-tts-preview", "google_tts"):
+        "Google publishes no -latest pointer for speech models (2026-08-10 catalog)",
+    ("lyria-3-clip-preview", "google_lyria"):
+        "Google publishes no -latest pointer for music models (2026-08-10 catalog)",
+
+    # --- ElevenLabs has no pointer convention at all -------------------------
+    ("eleven_multilingual_v2", "elevenlabs"):
+        "ElevenLabs model ids are versioned families with no -latest alias",
+    ("eleven_v3", "elevenlabs"):
+        "ElevenLabs model ids are versioned families with no -latest alias",
+
+    # --- Comfy partner catalog: authority is Comfy, and it is unverifiable
+    # from this box. The `~author/model-latest` spelling is OPENROUTER's
+    # variant-routing syntax; whether Comfy's partner node accepts it has never
+    # been tested, and swapping a working pinned id for an unverified pointer
+    # would trade a slug that goes stale slowly for one that may not resolve at
+    # all. Settle it with one live partner-node call, then revisit.
+    ("google/gemini-3.5-flash", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("deepseek/deepseek-v3.2", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("mistralai/mistral-large-2512", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("x-ai/grok-4.20", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.5", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("anthropic/claude-opus-4.7", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+
+    # --- Comfy image selectors are DISPLAY NAMES, not versioned slugs --------
+    ("seedream 5.0 lite", "comfy_image"):
+        "Comfy display selector, not a provider version pin",
+    ("Krea 2 Medium Turbo", "comfy_image"):
+        "Comfy display selector, not a provider version pin",
+    ("Krea 2 Medium", "comfy_image"):
+        "Comfy display selector, not a provider version pin",
+    ("Krea 2 Large", "comfy_image"):
+        "Comfy display selector, not a provider version pin",
+    # These four ARE date/version pinned, and ByteDance / Luma publish no
+    # pointer. They are the lane most likely to rot next.
+    ("seedream-4-5-251128", "comfy_image"):
+        "ByteDance publishes no -latest alias; date-pinned by the vendor",
+    ("seedream-4-0-250828", "comfy_image"):
+        "ByteDance publishes no -latest alias; date-pinned by the vendor",
+    ("photon-flash-1", "comfy_image"):
+        "Luma publishes no -latest alias",
+    ("photon-1", "comfy_image"):
+        "Luma publishes no -latest alias",
+    ("gemini-3.1-flash-lite-image", "comfy_image"):
+        "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
+    ("gemini-3.1-flash-image-preview", "comfy_image"):
+        "Google publishes no -latest pointer for image models (2026-08-10 catalog)",
+}
+
+
+def is_evergreen(slug: str) -> bool:
+    """True when a slug resolves upstream and therefore cannot go stale here.
+
+    The operator's term, and the preferred one. Two spellings live in the tree:
+    OpenRouter's ``~author/family-latest`` and Google's bare ``...-latest``.
+    """
+    return is_pointer(slug)
+
+
 def is_pointer(slug: str) -> bool:
     """True for a routing pointer that resolves upstream at request time.
 
@@ -255,5 +363,6 @@ __all__ = [
     "CATALOG_LISTED", "SIGNAL_LISTED", "UNVERIFIED", "VERIFICATION_KINDS",
     "DATED_KINDS", "ProvenanceRecord", "LANE_AUTHORITY", "SLUG_PROVENANCE",
     "FREE_MARKERS", "PREVIEW_DATE_EXCEPTIONS", "PREVIEW_TO_STABLE",
+    "EVERGREEN_EXEMPTIONS", "is_evergreen",
     "has_preview_token", "is_pointer", "unverified_identities",
 ]

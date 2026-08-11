@@ -47,9 +47,17 @@ def test_key_slot_choices_include_static_text_models(monkeypatch):
     assert choices[0] == gmodels.GOOGLE_API_MODEL_UNSELECTED
     assert gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT in choices
     assert gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT in choices
-    assert "gemini-2.5-flash" in choices
-    assert "gemini-3.5-flash" in choices
-    assert "gemini-3.1-flash-lite" in choices
+    # EVERGREEN ONLY (operator directive 2026-08-10). This lane used to offer
+    # gemini-2.5-flash / gemini-3.5-flash / gemini-3.1-flash-lite alongside the
+    # pointers. Every one was a version PIN -- a slug with an expiry date nobody
+    # wrote down -- and two of this lane's pins (gemini-2.0-flash and
+    # -flash-lite) had already gone dead in the catalog. The lane is now the
+    # three pointers Google actually publishes, and nothing else.
+    assert "gemini-pro-latest" in choices
+    for pin in ("gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.5-flash",
+                "gemini-3.1-flash-lite", "gemini-2.0-flash"):
+        assert pin not in choices, (
+            "%r is a version pin and this lane is evergreen-only" % pin)
 
 
 def test_virtual_rows_present_only_with_key(monkeypatch):

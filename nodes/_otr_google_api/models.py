@@ -18,28 +18,68 @@ GOOGLE_API_ROW_IDS = frozenset({GOOGLE_API_SLOT_A_ID, GOOGLE_API_SLOT_B_ID})
 GOOGLE_API_MODEL_UNSELECTED = "(select Google API model)"
 GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT = "gemini-flash-latest"
 GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT = "gemini-flash-lite-latest"
-GOOGLE_API_LEGACY_TEXT_MODELS = (
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
+#: EVERGREEN ONLY (operator directive 2026-08-10). "Remove all dead slugs and
+#: only keep dynamic ones -- latest -- that won't die." A concrete version pin is
+#: a slug with an expiry date nobody wrote down: `gemini-2.0-flash` and
+#: `gemini-2.0-flash-lite` were both retired hours earlier for exactly that, and
+#: `tencent/hy3:free` before them. A `*-latest` pointer resolves upstream, so it
+#: cannot go stale in this file.
+#:
+#: MEASURED, NOT ASSUMED. Google publishes exactly FOUR `-latest` ids in the
+#: 2026-08-10 catalog: `gemini-flash-latest`, `gemini-flash-lite-latest`,
+#: `gemini-pro-latest`, and `gemini-2.5-flash-native-audio-latest` (audio, not
+#: text). The three text pointers are what this lane offers, and nothing else.
+#:
+#: `gemini-pro-latest` is NEW here -- it was published and this pack simply was
+#: not offering it, so the evergreen sweep added a capability rather than only
+#: removing pins.
+#:
+#: The four concrete ids that used to live here -- gemini-3.5-flash,
+#: gemini-3.1-flash-lite, gemini-2.5-flash, gemini-2.5-pro -- were all LIVE in
+#: the same catalog run. They were dropped for being pins, not for being dead.
+GOOGLE_API_EVERGREEN_TEXT_MODELS = (
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-pro-latest",
 )
-#: RETIRED 2026-08-10: `gemini-2.0-flash` and `gemini-2.0-flash-lite` were
-#: removed from this tuple because they are GONE from Google's own catalog.
-#: Measured, not assumed -- `scripts/verify_google_slugs.py` fetched a COMPLETE
-#: terminal-page listing of 52 ids and neither was in it
-#: (`docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`). Offering a
-#: model the provider no longer lists is a dropdown entry that can only fail at
-#: request time, which is the exact `tencent/hy3:free` shape this pack's slug
-#: guards exist to prevent. The lane's DEFAULTS were never affected: both are
-#: `*-latest` pointers and both are still listed.
-GOOGLE_API_STABLE_TEXT_MODELS = (
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-)
-GOOGLE_API_STATIC_TEXT_MODELS = (
-    GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,
-    GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT,
-    *GOOGLE_API_STABLE_TEXT_MODELS,
-    *GOOGLE_API_LEGACY_TEXT_MODELS,
+
+#: Retained name for the two tuples this lane used to expose. Both are now empty:
+#: every text model on this lane is evergreen. Kept rather than deleted so an
+#: importer gets an empty tuple instead of an ImportError, and so the reason is
+#: readable at the point someone goes looking for the pins.
+GOOGLE_API_LEGACY_TEXT_MODELS: tuple[str, ...] = ()
+#: Also emptied by the evergreen sweep. `gemini-2.0-flash` and
+#: `gemini-2.0-flash-lite` had already been retired hours earlier for being GONE
+#: from Google's catalog; `gemini-2.5-flash` and `gemini-2.5-pro` were alive and
+#: were dropped for being PINS. Both retirements have the same root cause -- a
+#: concrete id is a promise about someone else's service that this file cannot
+#: keep.
+GOOGLE_API_STABLE_TEXT_MODELS: tuple[str, ...] = ()
+
+def _dedupe(*groups: "tuple[str, ...]") -> "tuple[str, ...]":
+    """Concatenate, first occurrence wins, order preserved.
+
+    Needed since the evergreen sweep: both recommended defaults are THEMSELVES
+    evergreen pointers and so appear in `GOOGLE_API_EVERGREEN_TEXT_MODELS` too. A
+    plain splat listed each twice, which the inventory's uniqueness rule catches
+    -- correctly, because a duplicated offer is a dropdown with a repeated row.
+    """
+    seen: set = set()
+    out: list = []
+    for group in groups:
+        for slug in group:
+            if slug and slug not in seen:
+                seen.add(slug)
+                out.append(slug)
+    return tuple(out)
+
+
+GOOGLE_API_STATIC_TEXT_MODELS = _dedupe(
+    (GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,
+     GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT),
+    GOOGLE_API_EVERGREEN_TEXT_MODELS,
+    GOOGLE_API_STABLE_TEXT_MODELS,
+    GOOGLE_API_LEGACY_TEXT_MODELS,
 )
 GOOGLE_API_STRUCTURED_OUTPUT_MODELS = frozenset(GOOGLE_API_STATIC_TEXT_MODELS)
 DEFAULT_CONTEXT_WINDOW = 8192

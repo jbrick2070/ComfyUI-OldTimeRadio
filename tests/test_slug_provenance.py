@@ -192,6 +192,79 @@ def test_lane_authority_lists_nothing_unused(records):
 
 
 # ===========================================================================
+# EVERGREEN POLICY (operator directive 2026-08-10).
+# "Remove all dead slugs and only keep dynamic ones -- latest -- that won't die."
+# ===========================================================================
+def test_every_concrete_id_is_evergreen_or_has_a_measured_exemption(records):
+    """THE POLICY. A concrete version pin is a slug with an expiry date nobody
+    wrote down -- that is how hy3 and both gemini-2.0 ids shipped and rotted.
+    Adding a new pin now requires saying, in writing, why no pointer exists."""
+    offenders = []
+    for rec in records:
+        if prov.is_evergreen(rec.provider_id):
+            continue
+        key = (rec.provider_id, rec.authority_lane)
+        if key in prov.EVERGREEN_EXEMPTIONS:
+            continue
+        offenders.append(key)
+    assert not offenders, (
+        "%d concrete slug(s) with neither a -latest pointer nor a stated reason "
+        "one is unavailable:\n" % len(offenders)
+        + "\n".join("  %s  (lane %s)" % k for k in sorted(offenders))
+        + "\nUse the provider's pointer if it publishes one. If it does not, add "
+          "an EVERGREEN_EXEMPTIONS entry saying so -- measured, not assumed.")
+
+
+def test_the_google_text_lane_is_pure_evergreen():
+    """The lane the sweep could fully clean. Three pointers, no pins."""
+    from nodes._otr_google_api import models as gmodels
+
+    assert gmodels.GOOGLE_API_EVERGREEN_TEXT_MODELS == (
+        "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest")
+    assert gmodels.GOOGLE_API_STABLE_TEXT_MODELS == ()
+    assert gmodels.GOOGLE_API_LEGACY_TEXT_MODELS == ()
+    for slug in gmodels.GOOGLE_API_STATIC_TEXT_MODELS:
+        assert prov.is_evergreen(slug), (
+            "%r is a PIN on the google_api text lane, which is evergreen-only" % slug)
+
+
+def test_gemini_pro_latest_was_added_not_just_pins_removed():
+    """The sweep found a pointer Google publishes that this pack was not
+    offering. Removing dead entries and gaining nothing would have been a
+    smaller result than the directive deserved."""
+    from nodes._otr_google_api import models as gmodels
+
+    assert "gemini-pro-latest" in gmodels.GOOGLE_API_STATIC_TEXT_MODELS
+
+
+def test_no_exemption_is_claimed_for_a_slug_that_could_be_evergreen():
+    """An exemption on a pointer would be nonsense, and an exemption for
+    something no longer shipped is a stale excuse."""
+    for key in prov.EVERGREEN_EXEMPTIONS:
+        assert not prov.is_evergreen(key[0]), key
+
+
+def test_every_exemption_is_still_shipped(records):
+    live = {(r.provider_id, r.authority_lane) for r in records}
+    stale = sorted(set(prov.EVERGREEN_EXEMPTIONS) - live)
+    assert not stale, "exemption(s) for slugs no longer shipped: %s" % stale
+
+
+def test_every_exemption_states_a_reason():
+    """A reason, not a shrug. The bar is that a reader can tell whether the
+    exemption is still true without re-deriving it."""
+    for key, reason in prov.EVERGREEN_EXEMPTIONS.items():
+        assert len(reason) > 30, ("an exemption must explain itself", key)
+
+
+def test_is_evergreen_recognises_both_spellings():
+    assert prov.is_evergreen("gemini-flash-latest")
+    assert prov.is_evergreen("~anthropic/claude-opus-latest")
+    assert not prov.is_evergreen("gemini-2.5-pro")
+    assert not prov.is_evergreen("seedream-4-0-250828")
+
+
+# ===========================================================================
 # Preview rules.
 # ===========================================================================
 @pytest.mark.parametrize("pid,expected", [
