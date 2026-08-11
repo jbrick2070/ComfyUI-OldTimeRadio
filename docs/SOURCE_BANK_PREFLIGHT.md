@@ -272,6 +272,36 @@ Creative quality remains a taste decision, not a runtime validator.
   widgets were appended, not inserted.
 - [ ] **Hard:** Importing routing, pack, source, and runner modules performs no
   network request, model load, GPU allocation, or unrelated file mutation.
+- [ ] **Hard: the bank DECLARES whether the LEMMY recurring cameo may appear in
+  it.** Lemmy is the gravelly comms engineer who joins a cast on a ~11% roll, and
+  a source-faithful adaptation must use the SOURCE's cast, never a house cameo.
+  This is not optional or implicit -- pick one and act on it:
+  - **Faithful adaptation** (the bank retells someone else's work: Shakespeare,
+    public-domain fiction, any lane whose contract is fidelity to a source):
+    add the `source_bank_id` to `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` in
+    `nodes/_otr_casting.py` in the SAME change. The exclusion overrides BOTH the
+    entropy roll AND the operator's `always include` setting, and it stamps
+    `lemmy_policy = "source_fidelity_exclusion"` so the ledger says WHY he is
+    absent rather than leaving it to look like a lost roll.
+  - **Invention or archive lane** (the bank writes its own story): no exclusion
+    entry. The cameo behaves normally.
+
+  Either way, add the id to `BANK_CAMEO_POLICY` in
+  `tests/test_cast_lock_policy_repin.py`. That map is asserted **EQUAL** to the
+  shipped bank registry, so a new bank FAILS THE SUITE until someone records the
+  decision -- which is the point. A hardcoded exclusion set that a new bank can
+  quietly slip past is how a house character ends up in someone else's play.
+
+  **Name variants so they inherit.** `base_source_bank_id` strips a trailing
+  `_v2` / `_v3`, so `shakespeare_v2` inherits `shakespeare`'s exclusion for free.
+  A bake-off variant named on a different pattern does NOT inherit and needs its
+  own entry.
+
+  **If you are shipping your OWN bank under `user_packs/source_banks/<id>/`,
+  this one is on you.** The shipped map cannot see a bank this repo has never
+  heard of, and no static rule can tell whether your bank is a faithful
+  adaptation. If it is, add its id to the exclusion set yourself -- otherwise
+  Lemmy will roll into your adaptation and nothing will warn you.
 
 ## Gate 6 -- Gates, tests, and live proof
 
@@ -390,6 +420,13 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 - [ ] **Hard:** Registry consistency -- no retired `story_pipeline_id` remains in
   `_otr_story_routing._ensure_loaded().pipelines`; `runnable`(bank) and `executable`(pipeline) stay in
   sync or `_otr_story_routing` raises `RegistryValidationError`.
+- [ ] **Hard:** LEMMY cameo policy removed with the bank. Delete the id from
+  `BANK_CAMEO_POLICY` in `tests/test_cast_lock_policy_repin.py`, and from
+  `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` in `nodes/_otr_casting.py` if it was a
+  faithful adaptation. That map is asserted EQUAL to the shipped registry in
+  BOTH directions, so a leftover entry fails the suite as loudly as a missing one
+  -- which is the CLEAN RIP law above applied to the cameo surface: a ripped bank
+  leaves no entry claiming a rule about a bank nobody ships.
 - [ ] **Hard:** Tests UPDATED, not just deleted -- the roster/bijection test (`tests/test_bank_variants.py`
   counts + id lists) reflects the new runnable roster; guard tests that enumerate banks via `_CURRENT_BANKS`/
   inline lists (`test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`,
