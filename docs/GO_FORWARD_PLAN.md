@@ -279,31 +279,35 @@ supported by the bank metadata and that overreach was correctly rejected.
   now reports WHICH line_ids failed and the raise compares that set against the
   route's own lines.
 
-**BRANCH A IS WAITING ON YOUR EARS -- the GPU half is DONE (2026-08-10).**
-Plan section 7 opens *"Branch A starts only after G1 pass"*, and its first step
-commits a POLICY RECORD whose `operator_verdict` only a listening session can
-supply. Every seam Branch A needs is built and inert; what is missing is the
-evidence, and a coder window must not invent it.
+**BRANCH A IS SHIPPED (`46608b93`, 2026-08-10). G1 PASSED.**
 
-**G1 Test A HAS BEEN RENDERED.** `scripts/otr_g1_lemmy_audition.py` (`7aca595e`)
-produced six clips -- three arms x two frozen lines -- at
-`otr/episodes/g1_lemmy_test_a/`, with the arm mapping sealed in the sibling
-`g1_lemmy_test_a_KEY/`. Start at `LISTEN-ME-FIRST.md` in the clips folder: it
-carries the acceptance bar verbatim from plan section 6, which was written before
-anything was rendered.
+The operator ran the blinded audition and returned a PASS: `arm1` "best cockney
+... preferred" was the candidate; `arm3` "not really cockney but an interesting
+indian" was the incumbent `vz_donor_marshal_indian`. **He identified the
+incumbent as Indian without seeing its label** -- which is the floor-evidence
+failure evidenced properly, after an earlier draft's attempt to infer it from the
+`_indian` in the filename was correctly rejected. The candidate also beat the
+same-speaker control, so IndexTTS2 carried the ACCENT through the clone and not
+merely the timbre.
 
-The preflight proved all three frozen references BEFORE the model loaded, which
-is what makes it an audition rather than six wav files:
-`2_algenib_cockney.wav` = `47E733D5...A60DB2` and `1_algenib_plain.wav` =
-`D48AAD5E...283CFB` both match the plan, and the incumbent
-`vz_donor_marshal_indian` byte-matches its BANK hash `8F573D3A...AF4AA3F` after
-resolving through its bank-relative path.
+Shipped: the reference at `models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav`
+(byte-identical to the audited arm-A input), bank row
+`idx_lemmy_algenib_cockney_v1`, and the policy record with the verdict quoted in
+it. Runtime identity is DERIVED, never invented -- `engine_impl_version` is the
+sha256 of the adapter plus its worker, `weight_revision` the sha256 of a
+name+size manifest over the 65 checkpoint files.
 
-**Blinding caveat, stated rather than hidden:** `tmp/_g1_audition.log` names each
-arm as it writes it, so reading it unblinds you exactly as much as the key does.
+**THE LIVE ROUTE EXPOSED TWO REAL DEFECTS that no test could have caught while
+`approved_native_routes` was empty**, which is the whole argument for proving a
+thing live: (1) the validator joined bank-relative ref paths onto the REPO root
+when they are relative to ComfyUI's MODELS root, so the first real route failed
+against a path that never existed -- fixed with an injected `path_resolver` now
+shared by CastLock, the voice node and `IS_CHANGED`; (2) a qualified indextts2
+route made the unrelated `bark_legacy` preset bank RAISE, because no character
+engine resolves there -- it now logs and declines instead.
 
-**~10 minutes of listening is now the only thing between here and Branch A.**
-**Branch B stays unbuilt unless G1 fails and a separate decision approves it.**
+**Branch B stays unbuilt.** It was only ever for a G1 failure, and G1 passed.
+
 
 ### SLUG PROVENANCE -- SHIPPED 2026-08-10 (`4bc760c8`). Two live findings owed to the operator.
 
