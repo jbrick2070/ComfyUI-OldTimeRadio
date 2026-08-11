@@ -70,7 +70,17 @@ dialogue, so they should not run mid-Lemmy.
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
 **WINDOW HANDOFF 2026-08-11: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
-first.** 6 of 21 packets confirmed working and pushed; lane 7 is next.
+first.** 6 of 21 packets confirmed working and pushed; **lane 7
+(`ltx23_low_audio_in`) is next.** Baselines to detect drift against: suite
+**9920 passed / 109 skipped / 1 xfailed**, Bug Bible **20 passed / 24
+skipped / 3 xfailed** at 264 entries. Box was left CLEAN (no resident
+server, VRAM at the ~1.9 GB desktop baseline).
+
+**The kibitz gate has NOT run on this build's CODE.** The corpus carries a
+full four-round arc plus two QA passes, and lanes 0-6 were built to that
+reviewed plan -- but no panel has seen the diffs. That is a real gap under
+the 2026-08-04 directive, not a scoped tail, and it is the operator's call
+whether the next window pays it before lane 7 or after the roster closes.
 
 Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
 its QA before touching the next.** A lane may take several commits when
