@@ -279,28 +279,31 @@ supported by the bank metadata and that overreach was correctly rejected.
   now reports WHICH line_ids failed and the raise compares that set against the
   route's own lines.
 
-**BRANCH A IS BLOCKED ON G1, NOT ON CODE (measured 2026-08-10).** Plan section 7
-opens *"Branch A starts only after G1 pass"*, and its first step is to commit the
-bank entry, the reference and the POLICY RECORD -- a qualification receipt whose
-`operator_verdict` only a human listening session can supply. Every seam Branch A
-needs is now built and inert; what is missing is the evidence, and a coder window
-must not invent it. **The unblocking act is G1 Test A** (~20 min GPU + ~10 min
-operator ears; the audition lines are frozen in `LEMMY_AUDITION_LINES` and the
-candidate WAV's SHA-256 is verified). **Branch B stays unbuilt unless G1 fails and
-a separate decision approves it.**
+**BRANCH A IS WAITING ON YOUR EARS -- the GPU half is DONE (2026-08-10).**
+Plan section 7 opens *"Branch A starts only after G1 pass"*, and its first step
+commits a POLICY RECORD whose `operator_verdict` only a listening session can
+supply. Every seam Branch A needs is built and inert; what is missing is the
+evidence, and a coder window must not invent it.
 
-**STILL TO RUN:** G1 Test A -- blinded A/B/C on IndexTTS2 (candidate = Algenib
-Cockney clip as clone reference; incumbent = `vz_donor_marshal_indian`; control
-= fixed plain Algenib). ~20 min GPU + ~10 min operator ears. **The audition LINES
-were never recorded** and the original ones are unrecoverable from the repo --
-but they are NOT a blocker: all three arms must speak identical text anyway, so
-one line pair gets chosen and frozen. Proposed and awaiting operator OK:
-neutral *"Signal's clean this side, Captain. I've got the relay warmed up and
-waiting on your word."* / stressed *"Don't you touch that dial! I've been
-chasing this frequency for six hours and I'll not lose it now!"*
+**G1 Test A HAS BEEN RENDERED.** `scripts/otr_g1_lemmy_audition.py` (`7aca595e`)
+produced six clips -- three arms x two frozen lines -- at
+`otr/episodes/g1_lemmy_test_a/`, with the arm mapping sealed in the sibling
+`g1_lemmy_test_a_KEY/`. Start at `LISTEN-ME-FIRST.md` in the clips folder: it
+carries the acceptance bar verbatim from plan section 6, which was written before
+anything was rendered.
 
-**The candidate's SHA-256 was verified against the real file** -- the plan's
-stated `47E733D5...A60DB2` matches `2_algenib_cockney.wav` byte for byte.
+The preflight proved all three frozen references BEFORE the model loaded, which
+is what makes it an audition rather than six wav files:
+`2_algenib_cockney.wav` = `47E733D5...A60DB2` and `1_algenib_plain.wav` =
+`D48AAD5E...283CFB` both match the plan, and the incumbent
+`vz_donor_marshal_indian` byte-matches its BANK hash `8F573D3A...AF4AA3F` after
+resolving through its bank-relative path.
+
+**Blinding caveat, stated rather than hidden:** `tmp/_g1_audition.log` names each
+arm as it writes it, so reading it unblinds you exactly as much as the key does.
+
+**~10 minutes of listening is now the only thing between here and Branch A.**
+**Branch B stays unbuilt unless G1 fails and a separate decision approves it.**
 
 ### SLUG PROVENANCE -- SHIPPED 2026-08-10 (`4bc760c8`). Two live findings owed to the operator.
 
@@ -467,6 +470,30 @@ re-learning:
 
 Queue item 1 is CLOSED (chunks A and B both shipped; see the tombstone in THE
 QUEUE). What survives as a RULE:
+
+**SUPERSEDED AND HARDENED 2026-08-10 -- the operator calls them EVERGREEN
+slugs.** "Remove all dead slugs and only keep dynamic ones -- latest -- that
+won't die." It is now an ENFORCED policy, not a preference:
+`EVERGREEN_EXEMPTIONS` in `nodes/_otr_slug_provenance.py` fails the build on any
+concrete slug that has neither a pointer nor a written, measured reason none
+exists. Applied fully where possible (the Google text lane is three pointers and
+nothing else, and gained `gemini-pro-latest`, which Google publishes and this
+pack simply was not offering). Exempt where measured impossible: Google ships NO
+`-latest` for image, speech or music, ElevenLabs has no pointer convention, and
+Comfy's partner catalog is a pinned list whose pointer support is unverified.
+
+**AND BOTH OPENROUTER SLOTS NOW DEFAULT TO `openrouter/auto`** (operator, same
+day). The argument that carried it is his and it is a good one: a
+`~vendor/model-latest` pointer dies with its vendor, a router does not --
+`~latest` is evergreen at the VERSION level, a router is evergreen at the VENDOR
+level. Two routers are offered (`openrouter/auto`, `openrouter/auto-beta`) and
+exactly two are eligible: `bodybuilder`, `fusion` and `pareto-code` declare no
+`supported_parameters` at all, so they cannot serve a schema-constrained writer
+pass. **The standing objection is recorded in the code and was overruled, not
+forgotten:** a router picks by criteria this pack does not control, so the writer
+model can differ between episodes -- which the 2026-08-04 "story quality is DONE"
+directive had settled. `meta["resolved_models"]` makes every run auditable after
+the fact, which is what makes it survivable.
 
 * **Prefer `~family-latest` pointers.** Carry a concrete id only where a version
   genuinely matters, and DATE it.
