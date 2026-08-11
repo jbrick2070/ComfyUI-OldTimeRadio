@@ -822,15 +822,22 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         1. The length is not on this adapter's ladder. That means the stamped
            plan and the declared contract disagree, which is a build error, not
            a render-time condition.
-        2. The tier pinned a render ceiling BELOW the planned length. WAN is
-           deliberately excluded from ``frame_contract.PLANNING_CAP_ENGINES``
-           -- its ceiling is a RENDER cap that the single-clip path fills
-           around with the ping-pong, and narrowing the planner by it would
-           turn every WAN beat into a pile of 17-frame renders and rewrite the
-           low-VRAM tier ``PBUG-20260723-02`` fixed. The consequence is that a
-           tier ceiling and a multi-clip plan CAN contradict each other, and
-           when they do the honest answer is to say so by name rather than
-           render short and mirror the difference.
+        2. The tier pinned a render ceiling BELOW the planned length.
+
+           CORRECTED 2026-08-11 (lane 5). This paragraph used to say WAN was
+           "deliberately excluded from ``frame_contract.PLANNING_CAP_ENGINES``".
+           That stopped being true on 2026-08-02, when ``wan_ti2v`` was ADDED to
+           that tuple and the adapter-side ping-pong the exclusion depended on
+           was ripped the same day. So the ceiling now narrows the PLANNER, and
+           the comment was describing protection that no longer existed --
+           while ``config/profiles/otr_8gb_wan.json`` still pinned 17, which is
+           exactly the "pile of 17-frame renders" this paragraph warned about,
+           shipping live at 0.68 s per segment. The pin is 81 now, on the 4n+1
+           ladder and matching its sibling profiles.
+
+           A tier ceiling and a multi-clip plan can still contradict each
+           other, and when they do the honest answer is to say so by name
+           rather than render short and mirror the difference.
         """
         from . import wrapper_bridge as _wb
         target = int(target_frame_count or 0)

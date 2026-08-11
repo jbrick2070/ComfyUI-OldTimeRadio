@@ -23,7 +23,6 @@ from nodes._otr_workflow_apply import (
 
 _TIER = {
     "ltx_8gb": "ltx_8gb",
-    "wan_8gb": "wan_ti2v",
     # fastwan_8gb, 2026-08-01 -- ADDITIVE. Maps to itself like ltx_8gb. wan_8gb
     # still points at wan_ti2v, so every saved dropdown value keeps resolving.
     "fastwan_8gb": "fastwan_8gb",
@@ -45,6 +44,10 @@ _TIER = {
     "humo17_high_audio_in_wide": "humo_1.7B_169",
     # Lane 4, 2026-08-11: the last HuMo tier.
     "humo14_high_audio_in_portrait": "humo",
+    # Lane 5, 2026-08-11: the first MOVE. `wan_8gb` left this table
+    # for _LEGACY_ENGINE_ALIASES in the same edit -- never two public
+    # ids on one internal id.
+    "wan22_high_video": "wan_ti2v",
 }
 
 
@@ -173,8 +176,13 @@ def test_profile_apply_writes_public_menu_option():
     director = [n for n in applied["nodes"]
                 if n.get("type") == "OTR_VideoDirector"][0]
     wv = director.get("widgets_values") or []
-    assert "wan_8gb (16:9)" in wv          # the public menu option, not the internal
+    # The LIVE public option, not the internal id -- and not the RETIRED
+    # public id either. `wan_8gb` moved to the alias table in lane 5
+    # (2026-08-11), so an applier still writing it would be writing a
+    # string that resolves but is no longer in the menu the UI offers.
+    assert "wan22_high_video (16:9)" in wv
     assert "wan_ti2v" not in wv
+    assert not any(str(v).startswith("wan_8gb") for v in wv)
 
 
 def test_director_direct_resolves_public_pick_to_internal_engine_id():
@@ -277,3 +285,29 @@ def test_public_engines_is_cold_import_clean():
     for heavy in ("import torch", "import numpy", "import transformers",
                   "from torch", "from numpy"):
         assert heavy not in src
+
+
+def test_a_renamed_lane_MOVES_its_old_public_id_and_never_keeps_two():
+    """The rename rule that protects the whole node menu (lane 5, 2026-08-11).
+
+    Two public ids on one internal id collapses `_INTERNAL_TO_PUBLIC`, which
+    trips the MODULE-SCOPE bijection assert at IMPORT time. Because the
+    director and the shared profile/driver modules import this module
+    unguarded, and the pack wraps each node import in its own try/except, the
+    blast radius is most of OTR silently vanishing from the ComfyUI menu with
+    scattered logged exceptions -- not one clean lane failure.
+
+    So a rename MOVES: the old id lands in `_LEGACY_ENGINE_ALIASES`, where it
+    still resolves every saved graph, profile and variant that names it, and
+    never renders as a second menu option.
+    """
+    combo = vd._video_model_combo()
+    for old, internal in (("wan_8gb", "wan_ti2v"),):
+        assert old not in pub._PUBLIC_ENGINES, (
+            "%s must MOVE to the alias table, not stay a second public row"
+            % old)
+        assert pub._LEGACY_ENGINE_ALIASES[old] == internal
+        assert resolve_engine_id(old) == internal
+        assert resolve_engine_id(old + " (16:9)") == internal
+        assert not any(o.startswith(old) for o in combo), (
+            "%s still renders as a live menu option" % old)

@@ -215,14 +215,20 @@ def test_every_variant_director_carries_max_render_frames(wf_path):
             % (wf_path.name, names))
 
 
-def test_the_wan_8gb_variant_still_carries_its_real_17_frame_ceiling():
+def test_the_wan_8gb_variant_still_carries_a_REAL_frame_ceiling():
     """The value, not just the descriptor.
 
-    ``config/profiles/otr_8gb_wan.json`` is the ONLY shipped profile pinning
-    ``max_render_frames``, and it pins 17. If this ever reads 0 again, someone
-    'fixed' a parity failure by deleting the value instead of wiring it, and
-    the 8GB WAN tier has silently lost its cap for the second time.
+    If this ever reads 0, someone "fixed" a parity failure by deleting the
+    value instead of wiring it, and the 8GB WAN tier has silently lost its
+    cap. The NUMBER moved 17 -> 81 in lane 5 (2026-08-11) because the 17
+    had become a planner-narrowing live bug; what this test guards is that
+    a ceiling REACHES the variant at all, so it asserts against the profile
+    rather than against a literal that will move again.
     """
+    from nodes._otr_shared import capability_profiles as _cp
+    expected = _cp.load_profile("otr_8gb_wan")["video"]["max_render_frames"]
+    assert expected and expected > 17, (
+        "the 8GB WAN ceiling must be a real, planner-legal value")
     wf = VARIANTS_DIR / "otr_8gb_wan.json"
     with open(wf, "r", encoding="utf-8") as fh:
         data = json.load(fh)
@@ -230,7 +236,7 @@ def test_the_wan_8gb_variant_still_carries_its_real_17_frame_ceiling():
                 if str(n.get("type") or "") == "OTR_VideoDirector")
     names = [i.get("name") for i in _widget_inputs(node)]
     idx = names.index("max_render_frames")
-    assert node["widgets_values"][idx] == 17, (
-        "otr_8gb_wan.json should pin max_render_frames=17 to match "
+    assert node["widgets_values"][idx] == expected, (
+        "otr_8gb_wan.json should pin max_render_frames=%r to match "
         "config/profiles/otr_8gb_wan.json; got %r"
-        % (node["widgets_values"][idx],))
+        % (expected, node["widgets_values"][idx]))

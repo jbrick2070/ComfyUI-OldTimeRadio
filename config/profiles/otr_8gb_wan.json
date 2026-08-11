@@ -48,12 +48,18 @@
     "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
-    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
   },
   "video": {
     "device_policy": "cuda",
     "dtype_policy": "fp8_ok",
-    "max_render_frames": 17
+    "max_render_frames": 81
   },
   "image": {
     "dtype_policy": "fp8_ok"
@@ -72,7 +78,11 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": ["wan2.2-ti2v-5b", "umt5-xxl-encoder", "wan2.2_vae"],
+    "required_models": [
+      "wan2.2-ti2v-5b",
+      "umt5-xxl-encoder",
+      "wan2.2_vae"
+    ],
     "required_keys": []
   },
   "launch": {
@@ -80,7 +90,7 @@
     "extra_args": [],
     "env": {
       "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
-      "OTR_WAN_TI2V_MAX_FRAMES": "17"
+      "OTR_WAN_TI2V_MAX_FRAMES": "81"
     }
   }
 }

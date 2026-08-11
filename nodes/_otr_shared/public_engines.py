@@ -29,7 +29,6 @@ from __future__ import annotations
 #: itself (its internal id IS its public id).
 _PUBLIC_ENGINES = {
     "ltx_8gb": "ltx_8gb",
-    "wan_8gb": "wan_ti2v",
     # fastwan_8gb maps to ITSELF, like ltx_8gb: its internal id IS its public id.
     # ADDITIVE -- wan_8gb keeps pointing at wan_ti2v, so the incumbent's saved
     # dropdown value is unchanged and every existing graph still resolves.
@@ -67,6 +66,13 @@ _PUBLIC_ENGINES = {
     # Lane 4, 2026-08-11: the last HuMo tier. The 2026-06-09 keystone, and
     # the only one of the four whose id was previously just "humo".
     "humo14_high_audio_in_portrait": "humo",
+    # Lane 5, 2026-08-11 -- the first MOVE rather than an add.
+    # `wan_8gb` left this table for _LEGACY_ENGINE_ALIASES in the
+    # same edit: two public ids on one internal id collapses
+    # _INTERNAL_TO_PUBLIC and trips the bijection assert at IMPORT
+    # time, which empties the ComfyUI menu rather than failing one
+    # lane. MOVE, never ADD.
+    "wan22_high_video": "wan_ti2v",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -89,6 +95,14 @@ _LEGACY_ENGINE_ALIASES = {
     # if the ruling really is `wan21`, swapping the two is one line each way and
     # neither string ever stops resolving.
     "wan21_high_i2v": "wan_i2v",
+    # MOVED out of _PUBLIC_ENGINES in lane 5 (2026-08-11). Every
+    # saved graph, profile and variant carrying `wan_8gb` still
+    # resolves through here; it just no longer renders as a menu
+    # option. The token was retired because it encoded the card
+    # the lane was built for, and this lane really consumes
+    # 12.5-13.2 GiB -- it cannot run on an 8 GB card at
+    # production canvas.
+    "wan_8gb": "wan_ti2v",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -98,7 +112,6 @@ _INTERNAL_TO_PUBLIC = {v: k for k, v in _PUBLIC_ENGINES.items()}
 #: Friendly prose labels -- TOOLTIP / DOCS ONLY, never the combo/saved value.
 _PUBLIC_LABEL = {
     "ltx_8gb": "LTX 0.9.8 2B - 8GB",
-    "wan_8gb": "Wan 2.2 TI2V 5B - 8GB",
     # "3-step" rather than "fast" or "better": this tier renders the SAME motion at
     # the SAME canvas for the SAME VRAM as wan_8gb, about 2.7x sooner. Naming it a
     # quality or longer-clip upgrade would mis-sell it.
@@ -110,6 +123,9 @@ _PUBLIC_LABEL = {
     # has warm evidence -- the f177 the contract allows is model-legal and not
     # machine-qualified.
     "wan22_high_i2v": "Wan 2.2 I2V 14B fp8 - high VRAM (13.9 GiB warm at f33)",
+    "wan22_high_video": (
+        "Wan 2.2 TI2V 5B Q5 - high VRAM (12.1 GiB warm at 832x480x193; "
+        "the default WAN lane)"),
     "humo14_high_audio_in_wide": (
         "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
         "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),

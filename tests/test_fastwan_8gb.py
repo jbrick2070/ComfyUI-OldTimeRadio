@@ -52,8 +52,13 @@ def test_capability_row_declares_the_lora_separately():
 
 def test_public_menu_is_additive_and_still_a_bijection():
     assert _PE._PUBLIC_ENGINES["fastwan_8gb"] == "fastwan_8gb"
-    # The incumbent's row is untouched -- saved graphs still resolve.
-    assert _PE._PUBLIC_ENGINES["wan_8gb"] == "wan_ti2v"
+    # The incumbent MOVED to the alias table in lane 5 (2026-08-11): saved
+    # graphs still resolve, but `wan_8gb` is no longer a live menu row --
+    # two public ids on one internal id would collapse the bijection this
+    # very test checks, at IMPORT time.
+    assert "wan_8gb" not in _PE._PUBLIC_ENGINES
+    assert _PE._LEGACY_ENGINE_ALIASES["wan_8gb"] == "wan_ti2v"
+    assert _PE.resolve_engine_id("wan_8gb") == "wan_ti2v"
     assert len(_PE._PUBLIC_ENGINES) == len(_PE._INTERNAL_TO_PUBLIC)
     assert _PE._INTERNAL_TO_PUBLIC["fastwan_8gb"] == "fastwan_8gb"
 
