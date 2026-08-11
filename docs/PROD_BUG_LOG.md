@@ -3584,3 +3584,38 @@ to revert.
 node and a named beat, which the admission rule admits; but it has not been
 reproduced, and the ONE observation came from a diagnostic leg rather than a
 normal render. Re-run before treating the cause as understood.
+
+---
+
+## PBUG-20260811-03 -- scifi_news LOST the Lemmy cameo it was built for
+
+- surfaced: live canonical headless leg, 2026-08-11 (`BANKSWEEP scifi_news`,
+  profile `otr_w45_still_flat`, 30 words, `lemmy_cameo="always include"`)
+- symptom: the forced cameo produced NO Lemmy row and recorded NO reason. The
+  episode's `cast_contract` is **empty** -- no `cast_seed`, no `cast_seed_source`,
+  no `casting_attempts`, no `lemmy_hit`, no `lemmy_policy`,
+  no `num_characters_locked`. `num_characters` was also ignored (asked 2, got 3:
+  Ada, Kai, Dr. Elara). Compare `original` on the same sweep, which stamped all
+  seven keys.
+- root cause: NOT ESTABLISHED. The `scifi_news_circuit` pipeline does not reach
+  `_otr_casting.lock_cast()`, which is the function that stamps the cast contract
+  and applies the cameo. WHY it stopped reaching it is unknown.
+- **why this is a REGRESSION and not a design choice:** the operator confirmed
+  2026-08-11 that scifi_news "was built with Lemmy in mind and always used to
+  work -- it was the first Lemmy plan". This lane is the cameo's ORIGINAL home.
+  An earlier draft of the finding doc recorded it as a possible
+  "lane owns its cast" design decision; that reading is WITHDRAWN.
+- fix: NONE YET.
+- verify idea: assert every runnable bank's episode stamps a non-empty
+  `cast_contract` with `lemmy_hit` + `lemmy_policy` present -- absence of the
+  keys, not just absence of Lemmy, is the detectable defect. A lane that
+  deliberately declines the cameo must still say so.
+- bible-worthy: likely yes as a class -- "a pipeline silently bypassed the one
+  function that records a decision, so the ledger cannot distinguish 'declined'
+  from 'never asked'". That shape is portable well beyond this cameo.
+- status: OPEN
+
+**Ranking note.** Of the three defects the sweep found this is the one that has
+been shipping longest and most invisibly: nothing failed, nothing logged, and
+every scifi_news episode since the regression simply has no cast contract. It was
+only visible because the cameo was FORCED and then did not appear.

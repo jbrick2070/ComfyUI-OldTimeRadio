@@ -287,11 +287,14 @@ BANK_CAMEO_POLICY = {
     # lemmy_policy="source_fidelity_exclusion" recorded on the ledger.
     "public_domain": "source_fidelity_excluded",
     "shakespeare": "source_fidelity_excluded",
-    # MEASURED, NOT INTENDED-BY-ANYONE-I-CAN-CITE. The circuit lane owns its own
-    # cast and never consults the cameo. Whether that is by design or an
-    # oversight is an OPERATOR question, recorded rather than guessed at --
-    # see docs/2026-08-11-FINDING-lane-cast-contract-divergence.md.
-    "scifi_news": "lane_owns_its_cast",
+    # REGRESSION, not a design choice. The operator confirmed 2026-08-11 that
+    # scifi_news "was built with Lemmy in mind and always used to work -- it was
+    # the first Lemmy plan". So the empty cast contract is a lane that LOST a
+    # capability, not one that never had it. PBUG-20260811-03.
+    #
+    # The value stays "cameo_allowed" because that is the INTENT and the target
+    # state; the guard below is what fails while reality disagrees.
+    "scifi_news": "cameo_allowed",
     # NOT MEASURED. Its leg failed in the WRITER before casting ran
     # ("[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
     # exhausted"), so nothing about its cameo behaviour was observed. Marked
@@ -305,7 +308,7 @@ BANK_CAMEO_POLICY = {
 
 #: The policies whose claim is "Lemmy may appear here" -- the only ones the
 #: `_source_bank_excludes_lemmy` cross-check can speak about.
-_CAMEO_ALLOWED_POLICIES = ("cameo_allowed", "lane_owns_its_cast", "unmeasured")
+_CAMEO_ALLOWED_POLICIES = ("cameo_allowed", "unmeasured")
 
 
 def _shipped_bank_ids():
