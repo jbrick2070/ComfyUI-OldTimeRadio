@@ -174,6 +174,25 @@ def test_a_bank_with_no_character_engine_is_reported_not_raised():
         assert "voice_route" not in entry
 
 
+def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
+        monkeypatch, pin):
+    """The other half of the bark_legacy carve-out, and the reason it is not a
+    hole. `bark_legacy` is fine because it carries no indextts2 entries at all.
+    A bank that DOES carry them, yet resolves no engine, is the resolver
+    declining for some other reason -- and a qualified route silently not
+    applying is the exact failure this path exists to end.
+
+    Two independent reviews flagged that the first cut could not tell these
+    apart. Neither could construct a live trigger, so this pins the distinction
+    rather than fixing a reachable bug."""
+    pin()
+    monkeypatch.setattr(CastLock, "_resolve_char_engine",
+                        staticmethod(lambda *a, **k: None))
+    with pytest.raises(ROUTE.VoiceRouteError, match="no character voice engine"):
+        CastLock().lock(script_json=_ledger(), voice_bank="default",
+                        cast_voice_policy="auto_registry")
+
+
 def test_a_dormant_policy_still_costs_nothing(monkeypatch):
     """The empty-routes path must not pay for a bank load, and must not raise
     when the active engine is unresolved. Still reachable: any policy whose

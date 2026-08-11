@@ -827,20 +827,70 @@ class CastLock:
         if engine is None:
             engine = self._resolve_char_engine(voice_bank, bank_entries, "auto")
         if engine is None:
-            # NO CHARACTER ENGINE AT ALL for this bank -- `bark_legacy` and
-            # `kokoro_builtin` are preset banks with no reference entries. A
-            # route for some other engine was never SELECTED here, so there is
-            # nothing to fail; raising would break a legitimate bank choice
-            # because an unrelated engine happens to be qualified.
+            # NO CHARACTER ENGINE RESOLVED. Two very different situations reach
+            # here and they must not be treated alike -- both a Sonnet 5 review
+            # and an agy sweep independently flagged that the first cut could
+            # not tell them apart:
             #
-            # It is still said out loud, because "a qualified route quietly did
-            # not apply" is the failure this whole path exists to prevent -- the
-            # difference is that this one is the operator's own explicit choice
-            # of bank, not something happening behind their back.
+            #  (a) LEGITIMATE. The chosen bank has no reference entries for the
+            #      route's engine at all -- `bark_legacy` and `kokoro_builtin`
+            #      are preset banks. The route was never SELECTED here, so there
+            #      is nothing to fail, and raising would break a valid bank
+            #      choice merely because an unrelated engine is qualified.
+            #
+            #  (b) SUSPICIOUS. The bank DOES carry entries for the route's
+            #      engine, yet no engine resolved. That is not a bank choice, it
+            #      is the resolver declining for some other reason -- a
+            #      malformed profile, a bank the engine's profile does not
+            #      allow, or an exception swallowed by `_resolve_char_engine`'s
+            #      broad `except`. A qualified route silently not applying is
+            #      exactly the floor-evidence failure this path exists to end,
+            #      so this one is FAIL-CLOSED.
+            #
+            # Neither reviewer could construct a reachable trigger for (b) --
+            # `load_resolver` is fail-soft and `legacy_first_engines` is pure --
+            # so this is closing an ambiguity rather than patching a live bug.
+            # It costs one set comprehension and removes the need for the next
+            # reader to re-derive the same question.
+            # THE DISCRIMINATOR IS THE PROFILE, NOT THE BANK CONTENTS. A first
+            # cut asked "does bank_entries contain the route's engine", which is
+            # always true: `bank_entries` is the WHOLE reference bank, and the
+            # `voice_bank` id does not filter it -- it gates which engine is
+            # eligible, through each profile's `allowed_voice_banks`. So the
+            # right question is the one `_resolve_char_engine` itself asks: is
+            # the route's engine ALLOWED on this bank, and does it have refs?
+            route_engines = {
+                str(name) for name in (policy or {}).get(
+                    "approved_native_routes", {})
+            }
+            banked = {str(getattr(e, "engine", "")) for e in (bank_entries or ())}
+            servable = set()
+            try:
+                from ._otr_engine_profiles import load_resolver
+
+                resolver = load_resolver()
+                for candidate in route_engines & banked:
+                    profile = (resolver.profile_for("char_voice", candidate)
+                               if resolver is not None else None)
+                    if profile and voice_bank in profile.allowed_voice_banks:
+                        servable.add(candidate)
+            except Exception:                 # noqa: BLE001
+                # Cannot tell -- say nothing rather than raise on a guess. The
+                # dispatch path calls require_resolver() and fails loudly there.
+                servable = set()
+            if servable:
+                raise _ROUTE.VoiceRouteError(
+                    "voice policy %r approves route(s) on %s, and voice bank %r "
+                    "DOES carry entries for %s, but no character voice engine "
+                    "resolved. A qualified route must not silently fail to "
+                    "apply -- fix the engine profile or the bank selection."
+                    % ((policy or {}).get("policy_version"),
+                       sorted(route_engines), voice_bank, sorted(servable)))
             log.warning(
-                "[OTR_CastLock] voice policy %r has approved route(s) but bank "
-                "%r resolves NO character voice engine -- no route applies to "
-                "this cast", (policy or {}).get("policy_version"), voice_bank)
+                "[OTR_CastLock] voice policy %r has approved route(s) on %s but "
+                "bank %r carries no entries for %s -- no route applies to this "
+                "cast", (policy or {}).get("policy_version"),
+                sorted(route_engines), voice_bank, sorted(route_engines))
             return None
 
         # Resolve reference paths the SAME way the render path does. A bank
