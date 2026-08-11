@@ -71,9 +71,9 @@ dialogue, so they should not run mid-Lemmy.
 
 | Thing | Value as of 2026-08-09 |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `fdc016ef`, == `origin/v2.0-alpha` (measured 2026-08-10 after the plan-5.3 push) |
+| Branch / HEAD | `v2.0-alpha` @ `9663961b`, == `origin/v2.0-alpha` (measured 2026-08-11 after the bank sweep) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9708 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-10 at `fdc016ef`; was 9516 as of 08-09, and that row had gone stale across the two Lemmy pushes before this one). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
+| Suite | **9821 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-11 at `9663961b`). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
 | Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
@@ -280,6 +280,49 @@ supported by the bank metadata and that overreach was correctly rejected.
   route's own lines.
 
 **BRANCH A IS SHIPPED (`46608b93`, 2026-08-10). G1 PASSED.**
+
+**AND PROVEN IN PRODUCTION 2026-08-11 by a six-bank render sweep** (one 30-word
+`otr_w45_still_flat` episode per runnable bank, cameo FORCED on every leg).
+Full write-up: `docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`.
+
+| bank | Lemmy | `lemmy_policy` | |
+|---|---|---|---|
+| `original` | cast, qualified route | `operator_cameo` | PASS |
+| `media_archive` | cast, qualified route | `operator_cameo` | PASS |
+| `public_domain` | refused | `source_fidelity_exclusion` | PASS |
+| `shakespeare` | refused | `source_fidelity_exclusion` | PASS |
+| `scifi_news` | absent | **none recorded** | FINDING |
+| `scifi_news_pro` | -- | writer crashed | PBUG-20260811-01/02 |
+
+Both cameo lanes cast Lemmy on `idx_lemmy_algenib_cockney_v1` via route
+`lemmy-indextts2-algenib-cockney-v1` and PUBLISHED to `otr/obs/`. **The last
+unticked Branch A acceptance row is ticked.** Both fidelity lanes refused the
+same forced `always include` and recorded WHY -- which is the half that needed
+proving, because the cameo is an ~11% roll and a broken exclusion looks exactly
+like a working one unless the ledger states a decision.
+
+**THREE THINGS THE SWEEP FOUND, none of them in the voice route:**
+1. **`scifi_news` writes an EMPTY cast contract** -- the `scifi_news_circuit`
+   pipeline never calls `lock_cast()`, so it silently ignores `lemmy_cameo` AND
+   `num_characters` (asked 2, got 3) and records no `cast_seed`. May be correct
+   (a news lane may own its cast) but it is UNRECORDED, which is the defect.
+   **OPERATOR DECISION OWED.**
+2. **PBUG-20260811-01** -- forcing the cameo kills the `scifi_fable2` writer on
+   `scifi_news_pro`. Reproduced at 30 AND 90 words, so it is not a word squeeze;
+   with the cameo on its natural roll the writer passes cleanly.
+3. **PBUG-20260811-02** -- `scifi_news_pro` dies at node 92 with no materialized
+   still for beat `music_closing_001`, on the same profile where five other banks
+   produced one. Seen once.
+
+**A claim of mine was disproved and corrected in the same push:**
+`BANK_CAMEO_POLICY` had asserted `scifi_news: cameo_allowed`, written from the
+bank list without measuring. It now records observations, and marks
+`scifi_news_pro` `unmeasured` rather than inheriting from its sibling.
+
+**Chunk D shipped (`baf338ee`):** `lemmy_cameo` is a legal creative dial for
+headless drivers, so a qualification run forces the cameo deterministically
+instead of waiting on an 11% roll. It did not create PBUG-01, but it made it
+reachable from the sanctioned runner.
 
 The operator ran the blinded audition and returned a PASS: `arm1` "best cockney
 ... preferred" was the candidate; `arm3` "not really cockney but an interesting
