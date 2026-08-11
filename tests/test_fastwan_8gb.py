@@ -51,7 +51,12 @@ def test_capability_row_declares_the_lora_separately():
 
 
 def test_public_menu_is_additive_and_still_a_bijection():
-    assert _PE._PUBLIC_ENGINES["fastwan_8gb"] == "fastwan_8gb"
+    # Lane 6, 2026-08-11: the IDENTITY row became a named public id. It
+    # needed no alias on the way out -- a bare internal id already passes
+    # through resolve_engine_id step 3, which this asserts.
+    assert "fastwan_8gb" not in _PE._PUBLIC_ENGINES
+    assert _PE._PUBLIC_ENGINES["wan22_high_fast"] == "fastwan_8gb"
+    assert _PE.resolve_engine_id("fastwan_8gb") == "fastwan_8gb"
     # The incumbent MOVED to the alias table in lane 5 (2026-08-11): saved
     # graphs still resolve, but `wan_8gb` is no longer a live menu row --
     # two public ids on one internal id would collapse the bijection this
@@ -60,12 +65,12 @@ def test_public_menu_is_additive_and_still_a_bijection():
     assert _PE._LEGACY_ENGINE_ALIASES["wan_8gb"] == "wan_ti2v"
     assert _PE.resolve_engine_id("wan_8gb") == "wan_ti2v"
     assert len(_PE._PUBLIC_ENGINES) == len(_PE._INTERNAL_TO_PUBLIC)
-    assert _PE._INTERNAL_TO_PUBLIC["fastwan_8gb"] == "fastwan_8gb"
+    assert _PE._INTERNAL_TO_PUBLIC["fastwan_8gb"] == "wan22_high_fast"
 
 
 def test_label_sells_throughput_not_quality():
     """It is the SAME motion at the SAME canvas for the SAME VRAM, ~2.7x sooner."""
-    label = _PE._PUBLIC_LABEL["fastwan_8gb"]
+    label = _PE._PUBLIC_LABEL["wan22_high_fast"]
     assert "3-step" in label
     assert not any(w in label.lower() for w in ("better", "hq", "high quality"))
 

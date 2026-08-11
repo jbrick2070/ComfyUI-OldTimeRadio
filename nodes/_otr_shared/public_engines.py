@@ -29,10 +29,6 @@ from __future__ import annotations
 #: itself (its internal id IS its public id).
 _PUBLIC_ENGINES = {
     "ltx_8gb": "ltx_8gb",
-    # fastwan_8gb maps to ITSELF, like ltx_8gb: its internal id IS its public id.
-    # ADDITIVE -- wan_8gb keeps pointing at wan_ti2v, so the incumbent's saved
-    # dropdown value is unchanged and every existing graph still resolves.
-    "fastwan_8gb": "fastwan_8gb",
     "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
@@ -73,6 +69,12 @@ _PUBLIC_ENGINES = {
     # time, which empties the ComfyUI menu rather than failing one
     # lane. MOVE, never ADD.
     "wan22_high_video": "wan_ti2v",
+    # Lane 6, 2026-08-11. `fastwan_8gb` was an IDENTITY row (its public id
+    # WAS its internal id), so it needs no alias row on the way out --
+    # a bare internal id already passes through resolve_engine_id step 3.
+    # The label sells THROUGHPUT, never quality: same motion, same canvas,
+    # same VRAM as wan22_high_video, about 2.7x sooner.
+    "wan22_high_fast": "fastwan_8gb",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -115,7 +117,9 @@ _PUBLIC_LABEL = {
     # "3-step" rather than "fast" or "better": this tier renders the SAME motion at
     # the SAME canvas for the SAME VRAM as wan_8gb, about 2.7x sooner. Naming it a
     # quality or longer-clip upgrade would mis-sell it.
-    "fastwan_8gb": "FastWan 2.2 TI2V 5B - 8GB (3-step)",
+    "wan22_high_fast": (
+        "FastWan 2.2 TI2V 5B 3-step - high VRAM (the SAME motion at the "
+        "SAME canvas for the SAME VRAM as wan22_high_video, ~2.7x sooner)"),
     "ltx23_16gb_audio_in": "LTX 2.3 - 16GB Audio In",
     "ltx23_16gb_video": "LTX 2.3 - 16GB Video",
     # "high" is the measured bucket, not a quality claim: 13.93 GiB warm at

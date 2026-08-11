@@ -69,6 +69,9 @@ dialogue, so they should not run mid-Lemmy.
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
+**WINDOW HANDOFF 2026-08-11: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
+first.** 6 of 21 packets confirmed working and pushed; lane 7 is next.
+
 Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
 its QA before touching the next.** A lane may take several commits when
 measurement must be separated from a root fix, but no other lane starts between
@@ -96,7 +99,7 @@ written), `TODO`.
 | 4 | `humo14_high_audio_in_portrait` / `humo` | the remaining HuMo lane, portrait f97 smoke | **DONE** -- 7/7 green, live 480x832 f97 smoke, peak 13,800 MB. **The HuMo family is CLOSED: 4 tiers, 4 declarations.** BOTH its profiles were claiming landscape; G2.3 caught the second one. Receipt `docs/evidence/lane_receipts/lane04-humo14_high_audio_in_portrait.md` |
 | 5 | `wan22_high_video` / `wan_ti2v` | S8b-2 LIVE profile pin bug, S8b-7 stale comment, the first naming MOVE | **DONE** -- 7/7 green, live 832x480 f81 smoke on the `default` boot. The 17-frame pin was chopping every beat into 0.68 s segments AND three tests were asserting 17 as correct. Receipt `docs/evidence/lane_receipts/lane05-wan22_high_video.md`. **Open: 81 is NOT re-measured on real 8 GB hardware.** |
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids | TODO |
-| 6 | `wan22_high_fast` / `fastwan_8gb` | its own injected cost row + pin, inherited retention behaviour | TODO |
+| 6 | `wan22_high_fast` / `fastwan_8gb` | public surface + live proof; the cost row stays put with wan_ti2v's per Q3 | **DONE** -- 7/7 green before and after, live 832x480 f81 smoke in **70.5 s vs wan_ti2v's 171.2 s** on the same boot/still/rung (2.43x). Receipt `docs/evidence/lane_receipts/lane06-wan22_high_fast.md` |
 | 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | TODO |
 | 8 | `ltx098_low_video` / `ltx_8gb` | lab-first measurement before naming, S8b-11, S8b-13 Sage + node gates, profile-canvas reconciliation | TODO |
 | 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | TODO |
