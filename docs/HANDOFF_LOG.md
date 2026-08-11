@@ -3,6 +3,76 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-11 -- HEAD 7afe40e5 (v2.0-alpha) -- CODER (lanes 7 + 8 closed, row 7b proved, retro bug hunt on lanes 0-6, Bible 264 -> 268)
+
+Did: closed lane 7 `ltx23_low_audio_in` (`57665ee8`) and lane 8
+  `ltx098_low_video` (`c6a99764`), both 7/7 preflight gates green with a live
+  probed smoke -- 1024x576 f193 in 303.8 s, and 512x288 f161 in 22.1 s. **8 of
+  21 packets now closed and render-proved, covering 8 distinct engines across 9
+  live legs** (`humo_1.7B_169` is gates-green riding its sibling's smoke, and
+  `ltx_video` is 7/7 green with NO render behind it -- which is exactly why lane
+  9 is open). Lane 7's S3 and S8b-10 turned out to be ONE defect: the canvas was
+  an inline recipe-dependent driver branch that `declared_render_canvas`
+  overruled anyway, and its value halved to a stage-A latent LTX rejects --
+  `LTXVLatentUpsampler` doubles with no target size, so only a /64 canvas has a
+  legal stage A. Lane 8 added the `assert_sage_not_patched` gate this LTX 0.9.8
+  lane never had (int8-PV Sage process-ABORTS LTX with no traceback, so "no
+  gate" meant a dead process, not degraded output) plus the missing node gate.
+  Row 7b (`310437ae`, operator-ordered): diet boot PROVED rather than assumed --
+  default 14,465 MB vs `ltx_av_diet` 14,385 MB absolute, margin 115 MB, UNDER
+  the 0.3 GiB rule, so shipped flagged **MARGINAL** with both numbers. Output
+  byte-identical between boots (same sha256), so the diet is free. It bought
+  only 80 MB because `reserve_vram_gb` is INERT here -- the adapter's own
+  in-process 4.0 GB `EXTRA_RESERVED_VRAM` dominates any boot value -- so HuMo's
+  ~1.9 GiB does not transfer and the lever is nearly exhausted.
+  Retro bug hunt r1 on the pushed lanes 0-6 diff (`38b77ecc`, operator-ordered):
+  NOT clean. Both reviewers independently found that `check_running_server`
+  returned an empty problem list when the server state was unreadable -- "I
+  could not check" reading as "it passed" for every contract constraining a real
+  clamp, and live in the `ltx_av_diet` contract shipped 20 minutes earlier. Plus
+  `sage_probe_error` recorded and never read, and a LoRA receipt that reached
+  PUBLISHED CREDITS (`bool("none")` is truthy, so LoRA-free tiers stamped
+  `use_lora=True` and credits printed "lora"). Both were GATE holes, so the twin
+  assertions went into `tests/test_lane_preflight_matrix.py` (new G4.2) where
+  lanes 9+ inherit them. Discarded 2 findings as out-of-scope per the ruling
+  (build order, naming). Also found and fixed three faults belonging to earlier
+  lanes: `render_single` never consulted `declared_render_canvas` (so lanes 1-6
+  all smoked the ASPECT DEFAULT, invisible only because all six declared what
+  that path already produced); lane 5's rename left five variants stale so
+  `build_variants --check` had been RED for two lanes; and the `LTX` boot token
+  enabled only one of the two LTX engines. Lessons L10-L14 added with twin
+  assertions, and the lanes 4-6 ledger sections backfilled (their own commits
+  skipped step 9). Bible delta (survival-guide `12005e3`): 4 promoted as
+  12.89-12.92, 4 indexed as already covered by 12.86/12.87/12.88; index audited
+  through 2026-08-11, 380 records, README moved 264 -> 268 at all three sites.
+Current step: **lane 9 `ltx23_high_video` is OPEN with its blocker cleared.**
+  Its gates were already green, so its work is MEASUREMENT: the consent act and
+  L4 receipt fields it needed are pushed, and two legs are due -- the decode band
+  at 1024x576 (to answer S8b-14 at its root; the 169 floor was measured at
+  1472x832 and is canvas-dependent) and a single-render VRAM leg for the low/high
+  marker. Lane 10 `mesh_stage` is next and is the most defective lane left at 4
+  red gates. Still open and not lanes: rows 2b, 5b, the 8 GB re-measure, and one
+  re-smoke each for `wan_ti2v` and `fastwan` to recover the peaks `_clip_summary`
+  used to drop.
+Next: run lane 9's two measurement legs, then close its naming and receipt. Not
+  blocked on the operator. Run `scripts/build_variants.py --check` BEFORE
+  starting -- a red at the start of a lane belongs to whoever caused it.
+Models: rung 4 (Claude, Cowork) for all coding and judging; rungs 2+3 (agy
+  "Gemini 3.6 Flash (High)" + codex `gpt-5.6-sol` high, $0) for two r1 panels.
+  **NEITHER was a full four-round arc and neither is reported as one.** Lane 7's
+  r1 ran and then the operator withdrew the gate mid-lane ("skip the kibitz and
+  code") -- it still earned its keep, catching a real hole in the shipped fix
+  (a contract-bearing env var compared AFTER its own crash-guard fallback, now
+  L12). The retro hunt was r1-only BY RULING, scoped to the pushed lanes 0-6
+  diff. Artifacts: `kibitz-runs/2026-08-11-lane07-ltx-audio-in/r1/` and
+  `kibitz-runs/2026-08-11-retro-lanes-0-6/r1/` (gitignored -- list by hand).
+Commits: OTR `57665ee8` (lane 7), `c6a99764` (lane 8), `38b77ecc` (retro fixes),
+  `310437ae` (row 7b), `7afe40e5` (canvas ruling + lane 9 measurement path);
+  survival-guide `12005e3` (Bible 12.89-12.92 + index). Suite 9937 passed / 109
+  skipped / 1 xfailed with NOTHING deselected; Bug Bible 20/24/3 at 268 entries;
+  variants 46/0; preflight 15/15. Canonical workflow UNTOUCHED. Box left CLEAN --
+  no resident server, port 8000 free, VRAM ~2.0 GiB idle.
+
 ## 2026-08-11 -- HEAD 930e3bda (v2.0-alpha) -- CODER (video lane build: scaffolding + 6 of 21 lane packets, all smoked live and pushed)
 
 Did: 7 commits. Queue item 5 (the video lane build) opened and worked one lane

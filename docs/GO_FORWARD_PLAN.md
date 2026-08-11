@@ -69,9 +69,10 @@ dialogue, so they should not run mid-Lemmy.
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
-first.** 7 of 21 packets confirmed working and pushed; **lane 8
-(`ltx098_low_video` / `ltx_8gb`) is next.** Baselines to detect drift
+**WINDOW HANDOFF 2026-08-11 (lane-8 wrap): read
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** 8 of 21 packets
+confirmed working and pushed; **lane 9 (`ltx23_high_video` / `ltx_video`) is
+OPEN and lane 10 (`mesh_stage`) is next after it.** Baselines to detect drift
 against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at 264 entries;
 `scripts/build_variants.py --check` **0 failures** (it had been RED since
 lane 5 -- see the lane 7 row). Box was left CLEAN (no resident server, VRAM
@@ -123,7 +124,7 @@ written), `TODO`.
 | 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | **DONE** -- 7/7 green. S3 and S8b-10 turned out to be ONE defect: the canvas was an inline recipe-dependent driver branch (832x480 ia2v / 512x288 single-pass) that `declared_render_canvas` overruled anyway, and 832x480 halves to the ia2v stage-A latent 416x240 with `240 % 32 == 16`. `LTXVLatentUpsampler` doubles with NO target size, so the delivered canvas IS 2x the stage-A base and only a /64 canvas has a legal stage A -- 1024x576 is the only rung that is /64 AND exact 16:9. Declared, branch deleted, halving validated at its root, env disagreement now a named refusal. Receipt `docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md`. **Three things this lane found that are NOT its own:** lane 5's rename never regenerated five other variants still carrying `wan_8gb (16:9)` (so `build_variants --check` had been RED since lane 5); the `LTX` boot token enabled only one of the two LTX engines; and `render_single` -- the path EVERY solo lane smoke uses -- never consulted `declared_render_canvas`, so lanes 1-6 all validated the aspect default and only coincidence made that invisible. All three fixed here. |
 | 7b | `ltx_audio_in` HEADROOM | **DONE 2026-08-11 -- MARGINAL.** Operator ordered the lever proved rather than waving the 0.24% through. Diet leg run: `default` 14,465 MB vs `ltx_av_diet` **14,385 MB** absolute (11,872 net), margin **115 MB / 0.11 GiB** -- clears, but UNDER the 0.3 GiB threshold, so decision rule 2 applied: ship the diet contract, flag the lane MARGINAL in the manifest with both numbers, do not call it a pass. The diet bought only 80 MB because `reserve_vram_gb` is inert on this lane (the adapter's own in-process 4.0 GB `EXTRA_RESERVED_VRAM` dominates any boot value), so only `--disable-pinned-memory` was available -- **HuMo's ~1.9 GiB does not transfer.** Flag PROVEN in live argv, not just in the profile. Output is **BYTE-IDENTICAL** between boots (same sha256), so the diet is free and needs no quality hold. Lever now nearly exhausted here | DONE |
 | 8 | `ltx098_low_video` / `ltx_8gb` | lab-first measurement before naming, S8b-11, S8b-13 Sage + node gates, profile-canvas reconciliation | **DONE** -- 7/7 green, live 512x288 f161 smoke in **22.1 s**. S8b-13: this was the only one of the three LTX lanes with NO `assert_sage_not_patched`, on the exact family BUG-070 was written for (int8-PV Sage process-ABORTS LTX with no traceback, so "no gate" meant a dead process, not degraded output); added FIRST, before any weight resolves, with a test that proves the ordering. Node gate added too -- a missing LTXV class used to surface at `load()` after the checkpoint was paid for. S8b-11: two profiles claimed 832x480 on a lane declaring 512x288, 2.7x the pixels on the tier that exists because it cannot afford them; profiles moved, 512x288 stands as the 07-26 judgment's ruled canvas. **The `low` marker is no longer provisional**: 9,106 MB absolute / **6,835 MB net**, cold -- the cheapest lane in the roster, 1.75x cheaper than lane 7 by NET and 13.8x faster per beat. `ltx_8gb` was an IDENTITY row so it needed no alias, and the label states the measured COST, never "runs on an 8 GB card". Receipt `docs/evidence/lane_receipts/lane08-ltx098_low_video.md` |
-| 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | TODO |
+| 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | **OPEN -- its blocker is cleared, two legs due.** Its preflight rows were ALREADY green, so the work is measurement, not gate-flipping. What landed 2026-08-11 (`7afe40e5`): the canvas moved to 1024x576 by operator ruling (its HQ two-stage path had the same fixed-x2 illegal-stage-A defect as lane 7, unflagged by the corpus); a PREQUALIFICATION consent act (`OTR_LTX_VIDEO_PREQUALIFICATION`) because this was the last frozen LTX adapter with no sanctioned way to measure and its own env refusal correctly blocks moving the decode floor; and the L4 receipt fields it never produced, without which a measurement has nowhere to stamp departures and no peak to report. **STILL DUE: (1) the decode-band leg at 1024x576 under the consent act, to answer S8b-14 at its root -- the 169 floor was measured at 1472x832 and is canvas-dependent; (2) a single-render VRAM leg for the low/high marker, which the corpus forbids shipping as a guess.** The decode floor is deliberately UNMOVED and the trim ratio is logged loud until leg 1 answers it. NOTE: the operator's ruling cited a lab 1024x576x193 warm row that is recorded under `ltx_audio_in`, not this lane -- the geometry argument stands alone, but this lane still has NO measurement at its new canvas |
 | 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | TODO |
 | 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | TODO |
 | 12 | `viz_camera` | same visualizer checks, this lane only | TODO |
@@ -154,42 +155,29 @@ one-token fix on a cloud lane outside the 21-lane order, tracked by an
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-09 |
+| Thing | Value as of 2026-08-11 (lane-8 wrap) |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `9663961b`, == `origin/v2.0-alpha` (measured 2026-08-11 after the bank sweep) |
+| Branch / HEAD | `v2.0-alpha` @ `7afe40e5`, == `origin/v2.0-alpha` (measured 2026-08-11 at the lane-8 wrap) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9821 passed / 111 skipped / 1 xfailed / 3 DESELECTED, exit 0** (measured 2026-08-11 at `9663961b`). The 3 deselected are the foreign failures in the box below -- deselecting them is the ONLY way to read a real number while that edit is uncommitted |
-| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `656c36e` (**263** entries, index **371** rows). Was 17/24/3 at `7a5fb88`; +3 are the new `TestBibleIsActuallyParseable` guards |
-| Variants | `build_variants.py --check` **45 variants / 0 failures** (baselined BEFORE and after; the operator's untracked `otr_sbcov_*.json` do NOT register as drift) |
+| Suite | **9937 passed / 109 skipped / 1 xfailed, exit 0** (measured 2026-08-11 at `7afe40e5`, NOTHING deselected -- the three foreign failures in the box below are GONE, the concurrent window committed its wan_i2v canvas edit). Was 9920 before this window; +17 are new coverage from lanes 7-8 and the retro bug hunt |
+| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `12005e3` (**268** entries, index **380** rows, audited through **2026-08-11**). +4 entries this window (12.89-12.92) from the lane 0-8 delta; 4 more records indexed as already-covered. NEVER re-scrape indexed history |
+| Variants | `build_variants.py --check` **46 variants / 0 failures**. **RUN THIS BEFORE STARTING A LANE** -- it had been RED since lane 5 (five variants still carried `wan_8gb (16:9)`) and lane 7 had to separate inherited drift from its own. A red at the start of a lane belongs to whoever caused it |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
 
 A window that reads a different suite number has inherited drift -- find out
 why before building on it.
 
-### THE SUITE IS RED AND IT IS NOT YOURS -- read this before diagnosing
+### ~~THE SUITE IS RED AND IT IS NOT YOURS~~ -- RESOLVED 2026-08-11
 
-Three tests fail in the WORKING TREE and none of them come from a commit:
-
-    tests/test_engine_matrix_doc.py::test_the_doc_matches_the_live_registry
-    tests/test_ltx_8gb_canonical_canvas.py::test_a_SIBLING_lane_still_takes_the_landscape_default
-    tests/test_ltx_8gb_canonical_canvas.py::test_engines_that_declare_NOTHING_are_left_alone
-
-Cause: a CONCURRENT window has an **uncommitted** `render_canvas = (832, 480)`
-on `nodes/_otr_video_engines/eng_wan_i2v.py`. It is a correct VRAM fix from the
-recipe-lab findings -- the engine had been falling through to the 1472x832
-landscape default, 3.07x its tier's pixels. It invalidates those two canvas
-tests and `docs/ENGINE_MATRIX.md`, all of which belong in ITS commit.
-
-**Consequences for you:**
-* `origin/v2.0-alpha` is GREEN. The edit never reached origin, so a fresh clone
-  and CI both pass. Only this working tree is red.
-* Do NOT "fix" those tests or regenerate ENGINE_MATRIX.md -- that would sweep
-  another window's in-flight work into your commit.
-* Do NOT touch wan (operator instruction 2026-08-09, still standing).
-* The exact pass count is not quotable while the guard trips: the
-  KNOWN-FAIL-GUARD replaces pytest's summary line. To get a real number, run
-  the suite with those three `--deselect`ed.
+That box named three failures caused by a concurrent window's uncommitted
+`render_canvas = (832, 480)` on `eng_wan_i2v.py`. **They are gone.** That
+window committed its edit, and the suite now reads **9937 / 109 / 1 with
+NOTHING deselected**. The workaround it described -- deselecting three tests
+to read a real number -- is retired; a window that still deselects them is
+hiding real failures. Kept as a tombstone because the SHAPE recurs: when the
+suite is red, check `git status` for another window's in-flight work before
+diagnosing, and never sweep their files into your commit.
 
 ### LEMMY COCKNEY -- NOT BLOCKED (corrected 2026-08-10), Phase 1 shipped, 2-4 open
 

@@ -5,8 +5,10 @@ Everything else you need is linked from those two.
 
 ## Where it stands
 
-**6 of 21 lane packets confirmed working and pushed. Nothing is in flight; the
-working tree carries only other windows' files.**
+**8 of 21 lane packets confirmed working and pushed, covering 8 distinct
+engines across 9 live legs. Lane 9 is OPEN with two measurement legs due.
+Nothing else is in flight; the working tree carries only other windows'
+files.**
 
 | # | Lane | State |
 |---|---|---|
@@ -17,9 +19,11 @@ working tree carries only other windows' files.**
 | 4 | `humo14_high_audio_in_portrait` (`humo`) | DONE `b53ca2f1` |
 | 5 | `wan22_high_video` (`wan_ti2v`) | DONE `d0536e72` |
 | 6 | `wan22_high_fast` (`fastwan_8gb`) | DONE `930e3bda` |
-| 7 | `ltx23_low_audio_in` (`ltx_audio_in`) | DONE -- 7/7 green, live 1024x576 f193 smoke |
-| 7b | `ltx_audio_in` headroom | **OPERATOR DECISION -- read below** |
-| 8-21 | LTX pair, mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
+| 7 | `ltx23_low_audio_in` (`ltx_audio_in`) | DONE `57665ee8` -- live 1024x576 f193 |
+| 7b | `ltx_audio_in` headroom | DONE `310437ae` -- MARGINAL, 115 MB, diet boot shipped |
+| 8 | `ltx098_low_video` (`ltx_8gb`) | DONE `c6a99764` -- live 512x288 f161 |
+| 9 | `ltx23_high_video` (`ltx_video`) | **OPEN -- two measurement legs due** |
+| 10-21 | mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
 
 ## THREE THINGS LANE 7 CHANGED FOR EVERY LANE AFTER IT
@@ -45,46 +49,57 @@ report carries `vram_peak_mb` / `recipe` / `quant` / `render_canvas` /
 `wan_ti2v` and `fastwan` peaks** that were measured and dropped -- no
 measurement campaign, and it unblocks queue row 5a.
 
-## QUEUE ROW 7b -- the one thing only the operator can settle
+## QUEUE ROW 7b -- RESOLVED 2026-08-11 (`310437ae`)
 
-Lane 7's live COLD peak, stating both surfaces per the `f2470e31` ruling:
+Operator ruled: prove the lever, do not wave through 0.24%. Done. Both legs
+cold, same recipe/canvas/frames/still, only the boot differing:
 
-* **ABSOLUTE 14,465 MB** against a 14,500 MB ceiling -- **35 MB, 0.24%**.
-* **NET 11,952 MB** (minus its own 2,513 MB pre-queue baseline) -- unremarkable,
-  sits with the HuMo figures (11,911 / 12,664 / 13,321), seed-eligible.
+* `default` -- 14,465 MB absolute / 11,952 MB net -- margin 35 MB
+* `ltx_av_diet` -- **14,385 MB** absolute / 11,872 MB net -- margin **115 MB**
 
-It passes. On the will-it-fit question 0.24% is not headroom. A smaller canvas
-is NOT available: the ia2v two-stage recipe needs /64 on both axes and 1024x576
-is the smallest exact-16:9 rung that qualifies. The lever that IS available
-without touching a recipe is a diet-style boot contract -- the mechanism lane 2
-built and proved for HuMo. This lane declares none and smoked on stock
-`default`. Decide: ship as-is, or spend one leg proving a diet contract.
-
-Detail: `docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md`.
+Clears, but UNDER the 0.3 GiB threshold, so decision rule 2 applied: the diet
+contract ships and the lane is flagged **MARGINAL** in the manifest with both
+numbers. Output is BYTE-IDENTICAL between boots, so the diet is free. It bought
+only 80 MB because `reserve_vram_gb` is INERT on this lane -- the adapter's own
+in-process 4.0 GB reserve dominates any boot value -- so HuMo's ~1.9 GiB does
+NOT transfer and the lever is nearly exhausted here.
 
 "Confirmed working" = built, 7/7 preflight gates green, a live render smoked and
 PROBED (canvas, exact frame count, silence, no trim), full suite green, pushed.
 
-## Lane 7 is next: `ltx23_low_audio_in` (`ltx_audio_in`)
+## Lane 9 is OPEN: `ltx23_high_video` (`ltx_video`) -- MEASUREMENT, not gates
 
-Its work list, from the corpus and its RED preflight rows:
+Its preflight rows were already green before the lane started, so there is no
+gate to flip. What landed in `7afe40e5`, all of it prerequisite:
 
-- **S8b-9, the one that can DELETE the lane from the dropdown.**
-  `eng_ltx_av.py:177` is a bare module-scope `float()` on
-  `OTR_LTX_AV_RESERVE_VRAM_GB` -- the one env read the guarded `_env_num` was
-  never applied to. A malformed value raises at import, the guarded import in
-  `_otr_video_engines/__init__.py` swallows it, and the lane vanishes with
-  nothing in the log (reproduced once: registry 27 -> 26).
-  `tests/test_ltx_av_env_import_safety.py` claims to cover every module-scope
-  env read and omits exactly this one.
-- **S8b-10**, the ia2v stage-A base latent: `:819` halves the canvas to
-  416x240 and `240 % 32 == 16`. `assert_ltx_dims` only checks the full canvas,
-  and `tests/test_ltx_av_ia2v_canonical.py:62-63` PINS the illegal value.
-- **S3**, the HQ lane: declare `render_canvas = (1024, 576)` plus a named
-  profile supplying 1024x576 and 193 frames (measured 7.36 GiB warm / 585.3 s).
-  Do NOT touch the graph -- OTR's LTX graph is ahead of the lab's.
-- The missing `ContractEnvConflict` refusal that `eng_ltx_video.py` already has.
-- Public id + alias MOVE, profile/variant, matrix row, solo smoke.
+- the canvas moved to **1024x576** by operator ruling. Its HQ two-stage path
+  had the SAME fixed-x2 illegal-stage-A defect as lane 7 and the corpus never
+  flagged it -- 832x480 halves to 416x240 and `240 % 32 == 16`. It hid because
+  the OLD landscape default (1472x832) is also /64, so the path was legal until
+  the lane was reconfigured. Lesson L13.
+- a PREQUALIFICATION consent act (`OTR_LTX_VIDEO_PREQUALIFICATION`): this was
+  the last frozen LTX adapter with no sanctioned way to measure, and its own
+  env refusal correctly blocks moving the decode floor. Default off, LOUD, and
+  its clips stamp `+prequalification[...]`.
+- the L4 receipt fields it never produced. Without them a measurement has
+  nowhere to stamp departures and no peak to report.
+
+**STILL DUE -- two live legs:**
+
+1. the **decode band at 1024x576** under the consent act, to answer S8b-14 at
+   its ROOT. The 169 floor is canvas-dependent and was measured at 1472x832, so
+   a 50-frame beat renders 169 and discards 119 -- ~3.4x the GPU work. The
+   floor is deliberately UNMOVED and the trim ratio is logged loud until this
+   leg answers it. Do NOT bundle a guess into the canvas fix.
+2. a **single-render VRAM leg** for the low/high marker, which the corpus
+   forbids shipping as a guess -- its only datapoint is a chained diagnostic
+   that cannot decide it.
+
+NOTE: the operator's ruling cited a lab 1024x576x193 warm row (7.36 GiB). That
+row is recorded under `ltx_audio_in`, NOT this lane. The geometry argument
+stands on its own, but this lane still has NO measurement at its new canvas.
+
+Then lane 10 `mesh_stage` -- the most defective lane left, 4 red gates.
 
 ## The per-lane loop (do not skip step 1)
 
@@ -133,17 +148,19 @@ because the build had used the right name from the start. The retired spelling
 keeps a legacy-alias row so a paste from a stale copy of any reviewed doc still
 resolves instead of erroring.
 
-## One thing the operator still owes a decision on
+## ~~One thing the operator still owes a decision on~~ -- SETTLED (`f2470e31`)
 
-1. **The cold peaks run higher than the corpus headline** -- 14,604 MB (14B
-   wide f97), 15,261 MB (1.7B portrait f129), 13,800 MB (14B portrait f97), all
-   absolute and COLD against a 13.06 GiB warm figure. Not a contradiction:
-   different cache state, and these are device totals including the ~1.9 GB idle
-   baseline. Lane 5's admission work should use THIS surface, not the lab's.
+The cold-peaks-vs-corpus-headline question is answered by the NET ruling:
+derive cost rows from **NET** peaks (each leg's absolute minus its OWN pre-queue
+baseline), never from absolute device totals, and seed a row ONLY from a true
+`VramPeakProbe` maximum -- an `nvidia-smi` sample is a LOWER BOUND and would
+make the row under-predict, admitting renders that then OOM. Every leg in
+`docs/evidence/video_evidence_manifest.json` now records both surfaces.
 
-Nothing is machine-qualified yet. `QUALIFIED_COST_ROWS` is still empty and
-`docs/evidence/video_evidence_manifest.json` says "admission NOT enforced" per
-lane, in words. That is deliberate (standing default Q3), not an omission.
+Nothing is machine-qualified yet. `QUALIFIED_COST_ROWS` is still empty and the
+manifest says "admission NOT enforced" per lane, in words. Deliberate
+(standing default Q3), not an omission -- and `ltx_audio_in` additionally reads
+**MARGINAL** there, with both boot numbers.
 
 ## Open rows that are NOT lanes
 
@@ -152,6 +169,10 @@ lane, in words. That is deliberate (standing default Q3), not an omission.
 - **5b** -- S7 WAN retention. Instrument the post-close boundary, collect
   telemetry on a live chained leg, THEN pick a release branch from what it
   names. A measurement campaign, not a code change.
+- **5a re-smoke (cheap, unblocks a queue row)** -- `_clip_summary` used to drop
+  the telemetry, so `wan_ti2v` and `fastwan` smoked with no peak on disk. The
+  passthrough landed in lane 7, so ONE re-smoke each recovers both. No
+  measurement campaign.
 - **8 GB re-measure** -- `otr_8gb_wan` went 17 -> 81 frames because 17 was
   narrowing the planner into 0.68 s segments. 81 has NOT been proved to fit on
   real 8 GB hardware. If it does not, the answer is a measured ceiling, not a
