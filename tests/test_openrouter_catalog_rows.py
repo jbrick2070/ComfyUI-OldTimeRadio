@@ -425,6 +425,12 @@ def test_default_view_is_exactly_sentinel_lead_and_curated_aliases(enabled_cache
         expected = [cat.OPENROUTER_ENABLE_SENTINEL, lead]
         expected += [mid for mid in cat.OPENROUTER_CURATED_ALIASES
                      if mid not in expected]
+        # The auto-routers close the curated block (2026-08-10). Since BOTH
+        # leads are now `openrouter/auto`, the de-duplication above is doing
+        # real work in both slots rather than only slot A -- the lead and the
+        # router entry are the same id.
+        expected += [mid for mid in cat.OPENROUTER_CURATED_ROUTERS
+                     if mid not in expected]
         assert cat.openrouter_catalog_dropdown_choices(slot) == expected
 
 

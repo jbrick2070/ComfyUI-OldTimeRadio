@@ -156,11 +156,39 @@ DEFAULT_CONTEXT_WINDOW = 8192
 # is the whole failure mode the curation policy exists to stop, and a pin cannot
 # notice it has gone stale. Replay is unaffected: the ledger stamps the RESOLVED
 # concrete model, proven by tests/test_openrouter_resolved.py.
-OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "~anthropic/claude-opus-latest"
-# TECHNICAL stays CONCRETE and stays pinned. The only DeepSeek pointer is the
-# FLASH tier, so aliasing this would be a capability DROP on the slot that most
-# needs reliable structured output -- not a like-for-like swap.
-OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "deepseek/deepseek-v4-pro"
+# BOTH SLOTS DEFAULT TO THE AUTO-ROUTER (operator, 2026-08-10: "lets make auto
+# default -- for both openrouter A/B").
+#
+# THIS OVERRIDES THE RULE DIRECTLY ABOVE IT, and the rule was not wrong. A router
+# picks by criteria this pack does not control, so a router default is a config
+# that resolves differently week to week -- which is exactly what the previous
+# defaults were chosen to avoid. The operator was told that, twice, and decided
+# for it anyway. It is his call and it is recorded here rather than argued with.
+#
+# WHAT IT COSTS, so nobody rediscovers it as a bug:
+#   * The writer model can differ between episodes, and between two passes of one
+#     episode. The 2026-08-04 "story quality is DONE, stop chasing it" directive
+#     settled prose variance; a router default reopens that door by design.
+#   * Price is `-1` -- not published, not discoverable in advance. Unlike a
+#     `~latest` alias, whose real price IS in the catalog and merely moves when
+#     the vendor ships, there is nothing to look up.
+#   * `response_format` on the router row says the ROUTER accepts the parameter,
+#     not that today's route honours it. An unparseable structured pass on a
+#     router run is expected variance, not a new defect.
+#
+# WHAT MAKES IT SURVIVABLE: this pack stamps the RESOLVED model. A router run is
+# fully auditable after the fact (`meta["resolved_models"]`,
+# tests/test_openrouter_resolved.py), so "which model wrote this episode, and
+# what did it cost" always has an answer -- just not before the run.
+#
+# The previous defaults, kept here because reverting should be a one-line edit
+# rather than an archaeology exercise:
+#   creative  ~anthropic/claude-opus-latest
+#   technical deepseek/deepseek-v4-pro   (concrete on purpose -- the only
+#             DeepSeek pointer is the FLASH tier, so aliasing it would be a
+#             capability DROP on the slot that most needs structured output)
+OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT = "openrouter/auto"
+OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT = "openrouter/auto"
 
 # Conservative cost ceilings. Deliberately low so an unconfigured
 # operator cannot accidentally spend a fortune; raise via env when ready.

@@ -26,6 +26,8 @@ from __future__ import annotations
 import datetime
 import re
 
+import pytest
+
 from nodes import _otr_model_catalog as cat
 from nodes import _otr_openrouter_backend as orb
 
@@ -48,6 +50,12 @@ def _shipped_concrete_ids() -> set[str]:
     concrete.update(
         row["id"] for row in getattr(cat, "CURATED_CREATIVE_ROWS", ())
     )
+    # The auto-routers (2026-08-10). They carry no '~', so they are concrete by
+    # this rule and must be dated like any other pin. Included HERE rather than
+    # left to a test of their own, because a curated list the dating guard
+    # cannot see is precisely the second-list-that-must-agree defect the rest of
+    # this suite exists to prevent.
+    concrete.update(getattr(cat, "OPENROUTER_CURATED_ROUTERS", ()))
     # Computed from the '~' prefix rather than a hand-kept list, so a future
     # alias-valued default (chunk B) does not demand a nonsensical date entry.
     return {mid for mid in concrete if not mid.startswith("~")}
@@ -56,7 +64,92 @@ def _shipped_concrete_ids() -> set[str]:
 def _all_shipped_ids() -> set[str]:
     ids = set(cat.OPENROUTER_CURATED_ALIASES) | _shipped_concrete_ids()
     ids.update(row["id"] for row in getattr(cat, "CURATED_CREATIVE_ROWS", ()))
+    ids.update(getattr(cat, "OPENROUTER_CURATED_ROUTERS", ()))
     return ids
+
+
+# ---------------------------------------------------------------------------
+# Auto-routers (operator, 2026-08-10). Offered, AND now the default for both
+# slots -- see test_both_slots_default_to_the_auto_router for the decision.
+# ---------------------------------------------------------------------------
+def test_exactly_the_two_json_capable_routers_are_offered():
+    """MEASURED against live /api/v1/models on 2026-08-10, not chosen by taste.
+    bodybuilder / fusion / pareto-code declare NO supported_parameters at all,
+    so they cannot be told to return JSON and cannot serve a schema-constrained
+    writer pass. Listing them would put three dead entries in a dropdown."""
+    assert cat.OPENROUTER_CURATED_ROUTERS == (
+        "openrouter/auto", "openrouter/auto-beta")
+
+
+@pytest.mark.parametrize("dead", ["openrouter/bodybuilder", "openrouter/fusion",
+                                  "openrouter/pareto-code"])
+def test_the_json_incapable_routers_are_never_shipped(dead):
+    assert dead not in _all_shipped_ids()
+
+
+def test_both_slots_default_to_the_auto_router():
+    """OPERATOR DECISION 2026-08-10, recorded rather than argued with.
+
+    This test REPLACED one asserting the exact opposite ("no router is a
+    recommended default"), written hours earlier under the previous rule. The
+    reasoning behind that rule was not wrong and is preserved in
+    `_otr_openrouter_backend`: a router resolves differently week to week, and
+    the 2026-08-04 directive had settled prose variance. The operator was told
+    that twice and chose the router anyway.
+
+    The test is kept -- pointing the other way -- because a DEFAULT that changes
+    which model writes the show is exactly the kind of thing that should never
+    move silently. If someone reverts it, they do so deliberately.
+    """
+    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT == "openrouter/auto"
+    assert orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT == "openrouter/auto"
+    for default in (orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+                    orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT):
+        assert default in cat.OPENROUTER_CURATED_ROUTERS, default
+
+
+def test_a_default_router_is_still_dated_and_still_json_capable():
+    """The default is now a concrete id, so the dating rule must still cover it
+    -- and it must be one of the two routers measured able to return JSON, not
+    one of the three that declare no parameters at all."""
+    for default in (orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
+                    orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT):
+        assert default in cat.OPENROUTER_VERIFIED_ON_BY_ID, default
+        assert default in ("openrouter/auto", "openrouter/auto-beta"), default
+
+
+def test_routers_are_dated_like_any_other_concrete_pin():
+    for router in cat.OPENROUTER_CURATED_ROUTERS:
+        assert not router.startswith("~"), router
+        assert router in cat.OPENROUTER_VERIFIED_ON_BY_ID, router
+
+
+def test_routers_are_not_smuggled_into_the_pointer_set():
+    """The curated ALIAS tuple is `~...` pointers only; a router in there would
+    fail test_curated_aliases_are_all_routing_pointers_and_unique, and putting
+    it there would also hide it from the dating guard."""
+    for router in cat.OPENROUTER_CURATED_ROUTERS:
+        assert router not in cat.OPENROUTER_CURATED_ALIASES, router
+
+
+def test_routers_appear_in_both_slot_dropdowns_and_auto_leads(monkeypatch):
+    """Both routers reachable in A and B, with `openrouter/auto` LEADING each --
+    it is the recommended default for both slots now."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.delenv("OTR_OPENROUTER_MODEL_ALLOWLIST", raising=False)
+    monkeypatch.delenv("OTR_OPENROUTER_PROVIDER_FILTER", raising=False)
+    for slot in ("a", "b"):
+        choices = cat.openrouter_catalog_dropdown_choices(slot)
+        if len(choices) <= 2:
+            pytest.skip("cold catalog cache on this box; dropdown is sentinel-led")
+        for router in cat.OPENROUTER_CURATED_ROUTERS:
+            assert router in choices, (slot, router)
+        # `openrouter/auto` now LEADS both slots -- it is the recommended
+        # default. It must still appear exactly once despite being both the lead
+        # and a curated-router entry; `_add` de-duplicates, and this is what
+        # proves it does.
+        assert choices[1] == "openrouter/auto", (slot, choices[:3])
+        assert choices.count("openrouter/auto") == 1, (slot, choices)
 
 
 def test_no_shipped_slug_carries_a_free_marker():
@@ -137,30 +230,42 @@ def test_curated_pointer_spellings_are_pinned_literally():
     )
 
 
-def test_creative_default_is_a_routing_pointer_not_a_pin():
-    """Chunk B (2026-08-09). The creative default must stay an alias.
+def test_neither_default_is_a_stale_able_version_pin():
+    """SUPERSEDES `test_creative_default_is_a_routing_pointer_not_a_pin`.
 
-    It was `anthropic/claude-opus-4.8` and was ALREADY a version behind when
-    that was noticed -- opus-5 was live at the identical price while the pin
-    still said 4.8. Nothing could see it: a pin has no way to report that it has
-    gone stale, and the dated-pin guard above only proves someone WROTE a date,
-    not that the date is still true. Making the default a pointer removes the
-    version claim entirely, and this test stops it being quietly re-pinned.
+    The original rule: the creative default must be a `~family-latest` pointer.
+    It existed because the default had been `anthropic/claude-opus-4.8` and was
+    ALREADY a version behind when someone noticed -- opus-5 was live at the
+    identical price while the pin still said 4.8, and nothing could see it. A
+    pin has no way to report that it has gone stale.
 
-    The TECHNICAL default is deliberately NOT covered: the only DeepSeek pointer
-    is the flash tier, so aliasing it would be a capability drop on the slot
-    that most needs reliable structured output.
+    THE UNDERLYING REQUIREMENT WAS NEVER "starts with ~". It was "the default
+    must not be a frozen version claim". A `~latest` pointer satisfies that by
+    resolving upstream. An AUTO-ROUTER satisfies it more completely: it has no
+    version in it at all, so there is nothing to go stale -- it is the most
+    evergreen id on the board, in the operator's sense of the word.
+
+    So the test now asserts the requirement rather than the old spelling: a
+    default may be a pointer OR a router, and may never be a bare concrete pin.
     """
-    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT.startswith("~"), (
-        f"creative default {orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT!r} is a "
-        f"concrete pin. Use a '~family-latest' pointer: a pin cannot notice it "
-        f"has gone stale, and replay is unaffected because the ledger stamps "
-        f"the RESOLVED model (tests/test_openrouter_resolved.py)."
-    )
-    assert orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT in cat.OPENROUTER_CURATED_ALIASES, (
-        "the creative default must also be OFFERED in the curated set, or the "
-        "dropdown's leading pick is a slug the dropdown does not list"
-    )
+    for label, default in (
+        ("creative", orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT),
+        ("technical", orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT),
+    ):
+        evergreen = (default.startswith("~")
+                     or default in cat.OPENROUTER_CURATED_ROUTERS)
+        assert evergreen, (
+            f"{label} default {default!r} is a frozen version pin. Use a "
+            f"'~family-latest' pointer or a curated auto-router: a pin cannot "
+            f"notice it has gone stale, and replay is unaffected because the "
+            f"ledger stamps the RESOLVED model."
+        )
+        offered = (cat.OPENROUTER_CURATED_ALIASES
+                   + cat.OPENROUTER_CURATED_ROUTERS)
+        assert default in offered, (
+            f"the {label} default must also be OFFERED in the curated set, or "
+            f"the dropdown's leading pick is a slug the dropdown does not list"
+        )
 
 
 def test_a_cheap_pointer_is_offered_so_the_cheap_slot_needs_no_pin():

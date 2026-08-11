@@ -884,15 +884,22 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 #       identifiers do not -- `tencent/hy3:free` was carried here until its promo
 #       ended and the slug stopped resolving. test_openrouter_slug_curation.py
 #       enforces this; a comment cannot.
-#   (d) Auto-routers are deliberately NOT offered. There are FIVE of them live,
-#       not the two this comment used to name -- `openrouter/auto`,
-#       `openrouter/auto-beta`, `openrouter/bodybuilder`, `openrouter/fusion`
-#       and `openrouter/pareto-code` (all priced `-1`, i.e. whatever they route
-#       to). The exclusion is not about which router: any of them picks a model
-#       by criteria we do not control, so one config resolves differently week
-#       to week. This pack stamps the resolved model for replay, so a router run
-#       is auditable AFTER the fact but not predictable before it -- and a
-#       default nobody can predict is the wrong default.
+#   (d) Auto-routers ARE now offered, as SELECTABLE ENTRIES ONLY -- never as a
+#       default (operator, 2026-08-10). This reverses the previous blanket
+#       exclusion, which read "any of them picks a model by criteria we do not
+#       control, so one config resolves differently week to week". That is still
+#       TRUE, and it is still why no router may be a default; it is not a reason
+#       to withhold the choice. See OPENROUTER_CURATED_ROUTERS below for which
+#       two, and why only two.
+#
+#       The budget objection was RETIRED as inconsistent, by the operator:
+#       "you can't budget against a -latest either." He is half right, and the
+#       measured half matters. A `~latest` alias carries a REAL published price
+#       (`~anthropic/claude-opus-latest` = $5/$25 per M on 2026-08-10), so it is
+#       discoverable at any moment and merely moves when the vendor ships. A
+#       router is priced `-1` -- not published, not discoverable, ever. Both
+#       change; only one can be looked up. That is a narrower difference than
+#       "unbudgetable" claimed, and it is not zero.
 #
 # Verified against live /api/v1/models on 2026-08-09: all eleven are listed.
 # They are offered even when the disk cache is cold, because a cold cache must
@@ -934,8 +941,59 @@ OPENROUTER_CURATED_ALIASES = (
 #: no version claim left to go stale. The guard test computes this set from the
 #: '~' prefix, so the removal below is not optional bookkeeping -- leaving the
 #: old dated pin here would fail `test_every_concrete_id_is_dated`.
+#: The auto-routers offered in the A/B slug dropdowns (operator, 2026-08-10:
+#: "pick the 1-2 best autos for my workflow and add them").
+#:
+#: TWO, BECAUSE ONLY TWO ARE ELIGIBLE -- this was measured against live
+#: /api/v1/models on 2026-08-10, not chosen by taste. The writer's passes are
+#: SCHEMA-CONSTRAINED, so a model that cannot be told to return JSON cannot serve
+#: a writer slot:
+#:
+#:     openrouter/auto          response_format  YES   ctx 2,000,000
+#:     openrouter/auto-beta     response_format  YES   ctx 2,000,000
+#:     openrouter/bodybuilder   supported_parameters EMPTY   ctx 128,000
+#:     openrouter/fusion        supported_parameters EMPTY   ctx 1,000,000
+#:     openrouter/pareto-code   supported_parameters EMPTY   ctx 2,000,000
+#:
+#: The last three declare NO parameters at all, so REQUIRE_JSON would drop them
+#: from a writer slot anyway. Listing them would put three dead entries in a
+#: dropdown -- the exact shape this pack's slug guards exist to prevent.
+#:
+#: WHY THE CHECK HAD TO BE MANUAL. The curated block deliberately BYPASSES
+#: `_filter_catalog_models` in the default warm view (see
+#: `openrouter_catalog_dropdown_choices`), so REQUIRE_JSON does not narrow it.
+#: Curated entries are policy, not discovery -- which means the JSON-capability
+#: judgement is made HERE, once, by a person, instead of being enforced later.
+#:
+#: THEY ARE SELECTABLE, NEVER DEFAULT. Neither is a recommended default and
+#: neither may become one: a router picks by criteria this pack does not control,
+#: so a router default is a config that resolves differently week to week. It is
+#: also the one case where `meta["resolved_models"]` earns its keep -- a router
+#: run is fully auditable AFTER the fact even though it is not predictable
+#: before it, so a trial tells you exactly which model wrote the episode.
+#:
+#: `response_format` on the ROUTER row is not a promise about the model it lands
+#: on. It says the router accepts the parameter, not that today's route honours
+#: it. Treat an unparseable writer pass on a router as expected variance, not a
+#: new bug.
+OPENROUTER_CURATED_ROUTERS: tuple[str, ...] = (
+    "openrouter/auto",        # the stable one -- start here
+    "openrouter/auto-beta",   # the experimental twin, same capabilities today
+)
+
+#: Every CONCRETE (non-alias) id, dated. The routers are concrete -- they carry
+#: no `~` -- so they are dated like any other pin even though a router is in
+#: practice the most evergreen thing on the board: it cannot go stale, it can
+#: only change what it points at. The date records that both were confirmed
+#: listed, text-capable and `response_format`-declaring on that day.
 OPENROUTER_VERIFIED_ON_BY_ID: dict[str, str] = {
-    "deepseek/deepseek-v4-pro": "2026-08-09",    # recommended technical default
+    # `deepseek/deepseek-v4-pro` was here as the recommended TECHNICAL default
+    # until 2026-08-10, when both slots moved to the auto-router. The dating rule
+    # is an EXACT match against shipped concrete ids, so a date for something no
+    # longer shipped is itself a defect -- it would read as a live claim about a
+    # slug this pack does not offer.
+    "openrouter/auto": "2026-08-10",
+    "openrouter/auto-beta": "2026-08-10",
 }
 
 
@@ -1017,6 +1075,13 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     if not explicit_narrowing:
         for mid in OPENROUTER_CURATED_ALIASES:
+            _add(mid)
+        # The auto-routers, LAST in the curated block so a router is never what
+        # the eye lands on first. Same default-view-only rule as the aliases:
+        # under explicit narrowing the operator asked for an exact set and gets
+        # it verbatim. Offered but never led with -- `lead` above is always a
+        # recommended default, and no router is one.
+        for mid in OPENROUTER_CURATED_ROUTERS:
             _add(mid)
 
     # The FULL alphabetical catalog (300+ slugs) is a long scroll that dates
