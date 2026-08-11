@@ -1,0 +1,408 @@
+{
+  "schema": "otr.video_evidence_manifest/1",
+  "manifest_version": 1,
+  "built": "2026-08-11",
+  "lab_repo": "vram-recipe-lab",
+  "lab_evidence_commit": "4d87cfa3278c39cbdde6f3cb8b16f241aeb58c02",
+  "doctrine": [
+    "Lab receipts are EVIDENCE: never re-measured here, never invented.",
+    "A digest of a file that is not shipped proves nothing to a reader without it -- every row records contained_in_evidence_commit.",
+    "Three separate columns, never inferred from one another: model-legal window, machine-qualified window, episode-policy cap.",
+    "APPEND-ONLY. Every receipt-producing commit bumps manifest_version and appends its rows; rows are never rewritten in place."
+  ],
+  "admission_unenforced": {
+    "wan_ti2v": "admission NOT enforced as qualified: the STATIC path (compute_real_frame_budget -> MotionBudgetError) does fire on this lane, but it uses a row its own comment disqualifies, and the coverage-plan path is inert because QUALIFIED_COST_ROWS is empty. Recalibration + qualification ship together in lane 5.",
+    "fastwan_8gb": "admission NOT enforced as qualified: this lane mirrors the same disqualified cost row from its own module and would go silently stale if recalibrated apart from wan_ti2v. Owned by lane 6.",
+    "wan_i2v": "admission NOT enforced: single-clip renders on this lane get no check before or after. Only f33 at 832x480 has warm evidence, so no envelope covers the f177 ceiling it declares.",
+    "humo": "admission NOT enforced: no cost row and no envelope key. Evidence is portrait 480x832x97 only, on two boot lanes with a 2.16 GiB gap between them (14.98 default, 13.22 diet).",
+    "humo_1.7B": "admission NOT enforced: no cost row, and safe_render_frames is None so the exact-fit guard is skipped entirely -- an over-ladder beat emits 177 frames stamped as if honest. Owned by lane 3.",
+    "humo_1.7B_169": "admission NOT enforced: inherits the 1.7B tier's missing cost row and has no landscape receipt of its own at any rung.",
+    "humo_14B_169": "admission NOT enforced: the ruled hero cast has a measured 13.06 GiB warm landscape f97 receipt under the diet boot, but a receipt is not a qualified cost row and nothing refuses an over-budget plan on this lane today.",
+    "ltx_audio_in": "admission NOT enforced: no cost row. The affine FIT is CUT for LTX because the HQ ladder is non-monotonic against the model's pixel scaling, so this lane needs conservative ABSOLUTE envelopes rather than a smoothed line.",
+    "ltx_video": "admission NOT enforced: no cost row, and its only datapoint is a FAILED chained diagnostic at 832x448 -- not the 832x480 it declares, and not a single-render number at all.",
+    "ltx_8gb": "admission NOT enforced: no cost row and NO measurement of any kind on this box, which is also why its low/high public marker is still provisional.",
+    "mesh_stage": "admission NOT enforced: no cost row; the lane's real preflight gap is the ungated hy3d graph, not a VRAM envelope."
+  },
+  "narratives": [
+    {
+      "path": "vram-recipe-lab/docs/PROMOTION_BRIEF.md",
+      "sha256": "bdb1945d0d41fa7ebbaeeba47c28e53bfc38a0c446bb49012ce9d98b63fc6f3d",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": true
+    },
+    {
+      "path": "vram-recipe-lab/docs/HUMO_BAKEOFF.md",
+      "sha256": "d48f715c960721df7506ff6fb8b740a645167a719b0a173040e6c368bb9b67e6",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": true
+    },
+    {
+      "path": "vram-recipe-lab/docs/HUMO_DIET.md",
+      "sha256": "15418e58f955c28e3483ee7e96fb4ccb407a386f50784def0e1275a119b08004",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": true
+    },
+    {
+      "path": "vram-recipe-lab/docs/ENVELOPE_LADDERS.md",
+      "sha256": "a312d938c3868b75378f0f758ceb792db080adab1d764fbe97c3be92c0922fdc",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": false
+    },
+    {
+      "path": "vram-recipe-lab/docs/WAN_RETENTION_FINDINGS.md",
+      "sha256": "3c59c3046f4d1ffa50e800dcc0ac9f80677030ff93a7e5308366dcfe7a7e6607",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": false
+    },
+    {
+      "path": "vram-recipe-lab/docs/H3_MUSIC_FOLLOWUP.md",
+      "sha256": "79acef32eab107d6134693c98687c5dae40d4a8d26842b6d1fa95dbde1b8f1b1",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": false
+    },
+    {
+      "path": "vram-recipe-lab/docs/VIDEO_RECIPE_ATTEMPTS.md",
+      "sha256": "af65dd89ca53f0e8ce84ec9784240b216234a92869b59c3f018d1c79be47e5bb",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": true
+    },
+    {
+      "path": "vram-recipe-lab/docs/H3_LICENSE_GRANT.md",
+      "sha256": "d51f6311f5589e512eb12e432565c1a7726242ae9bd0e33323e33501ab72bb35",
+      "present_on_disk": true,
+      "contained_in_evidence_commit": true
+    }
+  ],
+  "entries": [
+    {
+      "lane": "ltx_audio_in",
+      "envelope_key": "ltx_av_gguf_q3_832x480_f97",
+      "qa_verdict": "PARTIAL",
+      "note": "Exact cold/warm are 7.47/7.41 GiB; no receipt supports the 7.2 lower endpoint the corpus table printed.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/VIDEO_RECIPE_ATTEMPTS.md",
+        "sha256": "af65dd89ca53f0e8ce84ec9784240b216234a92869b59c3f018d1c79be47e5bb",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/ltx_audio_gguf_run4.json",
+          "sha256": "9558cf09bfddd733ba8a2409a9874f2d4b632dd369ed04c2fbb0a77608694c05",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        },
+        {
+          "path": "vram-recipe-lab/results/ltx_audio_gguf_run5.json",
+          "sha256": "f3706a0b2e4952eeaec3858e39c93481193b05617c13bb04e126ea14e60e603a",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "ltx_audio_in",
+      "envelope_key": "ltx_av_hq_1024x576_f193",
+      "qa_verdict": "SUPPORTED",
+      "note": "7.36 GiB warm / 585.3 s at the S3 HQ canvas.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/VIDEO_RECIPE_ATTEMPTS.md",
+        "sha256": "af65dd89ca53f0e8ce84ec9784240b216234a92869b59c3f018d1c79be47e5bb",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/ltx_audio_hq_h3_1024x576_193f_run2.json",
+          "sha256": "3b117663ff7ee754f4f6455d6fb2ccc476db6325987597a51f4cab04c5661be9",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "wan_ti2v",
+      "envelope_key": "wan_ti2v_5b_q5_832x480_f193",
+      "qa_verdict": "UNSUPPORTED_AS_WRITTEN",
+      "note": "Exact 832x480x193 Q5 warm receipt is 12.1 GiB, not the 12.5-13.2 GiB the corpus table printed; the row omitted rung and measurement surface.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/ENVELOPE_LADDERS.md",
+        "sha256": "a312d938c3868b75378f0f758ceb792db080adab1d764fbe97c3be92c0922fdc",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/wan_ti2v_5b_cmp_832x480_f193_run4.json",
+          "sha256": "56d64ed67dfee15ab840ef4563a4567b9d2c4d04df862b54501367b235046130",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "wan_i2v",
+      "envelope_key": "wan_i2v_14b_832x480_f33_exoneration",
+      "qa_verdict": "PARTIAL",
+      "note": "13.93 warm / 14.05 cold is supported ONLY at 832x480x33. The rung f33 must be stated with the number; f177 is unqualified.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/PROMOTION_BRIEF.md",
+        "sha256": "bdb1945d0d41fa7ebbaeeba47c28e53bfc38a0c446bb49012ce9d98b63fc6f3d",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/wan_i2v_14b_exoneration_832x480_f33_run1.json",
+          "sha256": "583ac449845b29a088014b46e424bb264c0404d8fb99d61891a22de8ff6e7079",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        },
+        {
+          "path": "vram-recipe-lab/results/wan_i2v_14b_exoneration_832x480_f33_run2.json",
+          "sha256": "d0557ff2a87e00079fd361eebf1d67830e7029e0307bd6403a94cd6e01508d9b",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "humo_1.7B",
+      "envelope_key": "humo_1p7b_default_480x832_f129",
+      "qa_verdict": "SUPPORTED_WITH_QUALIFIER",
+      "note": "OTR-side portrait f129 only; 15.12-15.23 GiB is not a lab-gated number.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/HUMO_BAKEOFF.md",
+        "sha256": "d48f715c960721df7506ff6fb8b740a645167a719b0a173040e6c368bb9b67e6",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/otr_side/humo_1_7b_bakeoff_take1.json",
+          "sha256": "05c9208a85bf41e8057e5776b23831d79be3880fa6b16041926738d7739680cb",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        },
+        {
+          "path": "vram-recipe-lab/results/otr_side/humo_1_7b_bakeoff_take2.json",
+          "sha256": "b2ef2069a545bd44ab3f496af671d5257224313c549160569f3b548b79da7063",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "humo_1.7B",
+      "envelope_key": "humo_1p7b_diet_480x832_f129",
+      "qa_verdict": "SUPPORTED",
+      "note": "12.84 GiB warm, portrait 480x832x129, diet boot.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/HUMO_DIET.md",
+        "sha256": "15418e58f955c28e3483ee7e96fb4ccb407a386f50784def0e1275a119b08004",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/humo_1p7b_diet_run2.json",
+          "sha256": "2efbf36ebfd49fffb3244da750e40e1e15b924277d83476bbd0c974dddb8a935",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "humo",
+      "envelope_key": "humo_14b_default_480x832_f97",
+      "qa_verdict": "SUPPORTED_WITH_QUALIFIER",
+      "note": "OTR-side portrait 480x832x97; 14.98 GiB is OVER the 14.5 GiB gate.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/HUMO_BAKEOFF.md",
+        "sha256": "d48f715c960721df7506ff6fb8b740a645167a719b0a173040e6c368bb9b67e6",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/otr_side/humo_14b_fp8_bakeoff_take1.json",
+          "sha256": "ed53c2249b3a23d64bf6b2e06833aef9d7a787c8ae8a05ccd2f915ccfb2d5938",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "humo_14B_169",
+      "envelope_key": "humo_14b_diet_landscape_832x480_f97",
+      "qa_verdict": "NUMERICALLY_SUPPORTED",
+      "note": "13.06 GiB warm / 13.17 cold, diet boot, LANDSCAPE -- the ruled hero cast. Human parity RULED 2026-08-10.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/ENVELOPE_LADDERS.md",
+        "sha256": "a312d938c3868b75378f0f758ceb792db080adab1d764fbe97c3be92c0922fdc",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97_run1.json",
+          "sha256": "1928315e4e1a676de3679ffebc72d07b4c109b6bcef069eebfde492b068e7266",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        },
+        {
+          "path": "vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97_run2.json",
+          "sha256": "75254dd40368f3ed3fc197208863d9a6e41494b3a547b3e94269ab5d871d7686",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "humo",
+      "envelope_key": "humo_14b_diet_portrait_480x832_f97",
+      "qa_verdict": "NUMERICALLY_SUPPORTED",
+      "note": "13.22 GiB warm / 13.14 cold, diet boot, portrait.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/ENVELOPE_LADDERS.md",
+        "sha256": "a312d938c3868b75378f0f758ceb792db080adab1d764fbe97c3be92c0922fdc",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/humo_14b_diet_portrait_480x832_f97_run1.json",
+          "sha256": "ce27eba4e7d9faffbb691f22af68310ed83a3f3587c8bc2086acb6f8d1cfdda5",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        },
+        {
+          "path": "vram-recipe-lab/results/humo_14b_diet_portrait_480x832_f97_run2.json",
+          "sha256": "87ddd92834a1ba14544c102623407f8a849ebaa9007a51b11192abe92a19a234",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "minimax_h3_audio_in",
+      "envelope_key": "h3_ref2va_864x480_f124_cold",
+      "qa_verdict": "PARTIAL_WRONG_SURFACE",
+      "note": "COLD 864x480x124 only. There is no warm pass and no 832x480 qualification. Ref2VA CANNOT classify H3 I2V or score/mime.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/HUMO_BAKEOFF.md",
+        "sha256": "d48f715c960721df7506ff6fb8b740a645167a719b0a173040e6c368bb9b67e6",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": true
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/h3_r2v_refaudio_tts_lipsync_exact_seed42_run1.json",
+          "sha256": "24fc96d2785c93e3a53c19cb39cf69dafd0907803b14eade3dc0d63ee4914711",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": true
+        }
+      ]
+    },
+    {
+      "lane": "minimax_h3_video",
+      "envelope_key": "h3_i2v_canonical_832x480_f107_FAILED",
+      "qa_verdict": "MEASURED_BELOW_RANGE_FAILURE",
+      "note": "15.390 GiB at canvas 832x480, model f107 -- BELOW the trained 124..362 range. Evidence of a failure below range, never evidence for a minimum.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/ENVELOPE_LADDERS.md",
+        "sha256": "a312d938c3868b75378f0f758ceb792db080adab1d764fbe97c3be92c0922fdc",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/h3_i2v_canonical_832x480_f107_run1.json",
+          "sha256": "180213dc163662f73e4cda2244f75cbabee4cf475e1a390ea650e6e889d10a1c",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "minimax_h3_music",
+      "envelope_key": "h3_music_score_f192_cold",
+      "qa_verdict": "SUPPORTED_COLD",
+      "note": "11.063 GiB cold at model f192. f277 reached 14.722 GiB and FAILS the 14.5 GiB gate -- lengths above f192 are not machine-qualified.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/H3_MUSIC_FOLLOWUP.md",
+        "sha256": "79acef32eab107d6134693c98687c5dae40d4a8d26842b6d1fa95dbde1b8f1b1",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/h3_music_followup_score_seed42_f192_run1.json",
+          "sha256": "7c5857736bda672e92507260acbf6a6782c48d4287a201134a352ae164234feb",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "wan_ti2v",
+      "envelope_key": "wan_ti2v_chained_177_plus_25_retention",
+      "qa_verdict": "DIAGNOSTIC_ONLY",
+      "note": "12.43 peak / +5.11 GiB retained, WHOLE-CHILD chained surface. Not a single-render envelope and never quotable as one.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/WAN_RETENTION_FINDINGS.md",
+        "sha256": "3c59c3046f4d1ffa50e800dcc0ac9f80677030ff93a7e5308366dcfe7a7e6607",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/otr_side/wan_retention/phase1_wan_ti2v_long_first.json",
+          "sha256": "ae7096b17339a6bad19a0fe83435879a7377edf3d2714ebc75794de4654fb50c",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "fastwan_8gb",
+      "envelope_key": "fastwan_chained_177_plus_25_retention",
+      "qa_verdict": "DIAGNOSTIC_ONLY",
+      "note": "12.57 peak / +5.33 GiB retained, whole-child chained surface.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/WAN_RETENTION_FINDINGS.md",
+        "sha256": "3c59c3046f4d1ffa50e800dcc0ac9f80677030ff93a7e5308366dcfe7a7e6607",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/otr_side/wan_retention/phase3_fastwan_8gb_long_first.json",
+          "sha256": "71c430b4368282df62129c951c2d17af5ba0146eb908c81d31d672059bb72dc4",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    },
+    {
+      "lane": "ltx_video",
+      "envelope_key": "ltx_video_chained_169_plus_169_retention",
+      "qa_verdict": "FAILED_DIAGNOSTIC",
+      "note": "14.59 peak / +3.06 retained at 832x448 -- NOT the 832x480 the lane declares, and a failed run. Cannot decide this lane's low/high marker.",
+      "narrative": {
+        "path": "vram-recipe-lab/docs/WAN_RETENTION_FINDINGS.md",
+        "sha256": "3c59c3046f4d1ffa50e800dcc0ac9f80677030ff93a7e5308366dcfe7a7e6607",
+        "present_on_disk": true,
+        "contained_in_evidence_commit": false
+      },
+      "receipts": [
+        {
+          "path": "vram-recipe-lab/results/otr_side/wan_retention/phase3_ltx_video_long_first.json",
+          "sha256": "736e5f4a9671ecce042855bd1a21dcce0f9c8ffa5b5dadaed690e16db936ca73",
+          "present_on_disk": true,
+          "contained_in_evidence_commit": false
+        }
+      ]
+    }
+  ]
+}

@@ -25,7 +25,7 @@ passed, `macbeth_probe` removed from both profiles). Detail lives in `docs/HANDO
 |---:|---|---|---|---|
 | 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
 | 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 5 | **MiniMax H3 -- VIDEO-PATH SPRINT SERIES** (reframed by the operator 2026-08-09; the old "does H3 belong in the dropdown" ruling is RETIRED, not pending). H3 becomes a run of sprints refining the video paths, each its own gated chunk. **Scope TBA -- do not invent the sprint list**; when the operator names sprint 1, add it here as its own row | section 0-QUINQUE | coder, several chunks | operator naming sprint 1 |
+| 5 | **VIDEO LANE BUILD -- SPRINT 1 NAMED AND RUNNING (operator 2026-08-11).** The H3 sprint series became the full 21-lane transplant: every video lane audited, fixed, wired, smoked and closed ONE AT A TIME. Corpus: `docs/2026-08-09-SPEC-lab-findings-into-otr.md` (master, r4-COMPLETE), `docs/2026-08-10-FINAL-QA-video-build-corpus.md` (the operative 21-lane order), `docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md` (per-lane detail), `docs/VIDEO_LANE_PREFLIGHT.md` (the gates), `docs/LANE_BUILD_LESSONS.md` (the ledger every lane reads first). **The live per-lane queue is the VIDEO LANE QUEUE table below -- resume from it.** | see the lane queue | coder, 21 chunks + an episode gate | UNBLOCKED |
 | 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
 | 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
 | 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
@@ -66,6 +66,65 @@ pointing the other way, and it costs the next window a re-grounding pass.
 20-clip accept-rate measurement, then the first full LOW episode) are the
 unblocked queue work, but see the LEMMY row: they exercise casting and
 dialogue, so they should not run mid-Lemmy.
+
+### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
+
+Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
+its QA before touching the next.** A lane may take several commits when
+measurement must be separated from a root fix, but no other lane starts between
+them. A lane's registration, public id, alias, node-87 strings,
+profile/variant, `ENGINE_MATRIX.md` row and canonical-workflow delta land
+ATOMICALLY with that lane -- there is no later global naming sweep.
+
+The per-lane loop is in `docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md`; the gate
+each lane must flip green is a row of `tests/test_lane_preflight_matrix.py`.
+Every open defect below is bound to a lane by an `EXPECTED_RED` entry in that
+suite, so the work list is executable rather than prose: run the suite, read
+your lane's rows.
+
+Status values: `DONE` (pushed green, preflight row green, smoke receipted),
+`OPEN` (the one lane in progress), `PARKED` (attempted, backed out, note
+written), `TODO`.
+
+| # | Lane (public / internal) | Owns | Status |
+|---:|---|---|---|
+| 0 | scaffolding | lessons ledger, preflight matrix suite, evidence manifest | TODO |
+| 1 | `wan21_high_i2v` / `wan_i2v` | S1, S8b-1 weight resolution, canvas + drift tests, a lane test file from scratch, boot/profile pin, solo smoke | TODO |
+| 2 | `humo14_high_audio_in_wide` / `humo_14B_169` | boot-contract mechanism with its first real consumer, S8b-4, S8b-6 manifest fields, S8b-8, the ruled `humo_diet` hero cast, f97 smoke | TODO |
+| 3 | `humo17_high_audio_in_portrait` / `humo_1.7B` | S8b-3 short-render refusal, S8b-6, S8b-7 stale text, diet/default compatibility | TODO |
+| 4 | `humo14_high_audio_in_portrait` / `humo` | the remaining HuMo lane, portrait f97 smoke | TODO |
+| 5 | `wan22_high_video` / `wan_ti2v` | S2 for this row, S8b-2 profile pin bug, S8b-7, S8b-5 Sage/isolation truth, retention instrument-then-fix | TODO |
+| 6 | `wan22_high_fast` / `fastwan_8gb` | its own injected cost row + pin, inherited retention behaviour | TODO |
+| 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | TODO |
+| 8 | `ltx098_low_video` / `ltx_8gb` | lab-first measurement before naming, S8b-11, S8b-13 Sage + node gates, profile-canvas reconciliation | TODO |
+| 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | TODO |
+| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | TODO |
+| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | TODO |
+| 12 | `viz_camera` | same visualizer checks, this lane only | TODO |
+| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | TODO |
+| 14 | `viz_mxc_mandala` | S8b-16 pycairo half (a NAMED dependency refusal), profile/canvas, continuity | TODO |
+| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | TODO |
+| 16 | `still_pan` | the now-proven still-lane rules, this lane only | TODO |
+| 17 | `still_flat` | same checklist independently | TODO |
+| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO |
+| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
+| 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
+| 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
+| 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
+
+**Standing defaults adopted for unattended builds (operator, 2026-08-10):**
+Q1 H3 commit granularity -- split video/audio-in only if each half ends green
+on its own, else one commit. Q2 H3 multi-clip mouth warning -- LEAVE AS IS
+(warn + `long_takes` + jump cut); promoting it to a refusal is an operator
+decision. Q3 WAN TI2V envelope row -- ship it DISQUALIFIED so admission
+honestly reports "not enforced" for that lane.
+
+**Out of scope tonight, queued here so it is not lost:** the mime
+dropdown-overrule build (`docs/2026-08-10-DESIGN-BRIEF-mime-overrule.md`) is
+the NEXT spec after this transplant, not a line item in it. And
+`google_omni_video` inherits `CONTINUITY_NONE` rather than declaring it -- a
+one-token fix on a cloud lane outside the 21-lane order, tracked by an
+`EXPECTED_RED` row in the preflight suite.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
