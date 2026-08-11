@@ -421,9 +421,13 @@ LEMMY_VOICE_POLICY = {
         "engine": "bark",
         "identity_kind": "preset",
         "identity_id": "v2/en_speaker_8",
-        # UNQUALIFIED: no audition has ever been run against the Cockney claim,
-        # on bark or on any other engine. When one is, put a receipt matching
-        # QUALIFICATION_RECEIPT_REQUIRED_FIELDS here and add the route below.
+        # STILL UNQUALIFIED, and the distinction now matters more, not less.
+        # An audition HAS been run since this comment was written -- G1 Test A,
+        # 2026-08-10 -- but it qualified INDEXTTS2, not bark. Nobody has ever
+        # auditioned the Cockney claim on bark, so this route keeps a null
+        # receipt. It stays here because it is still where `lemmy_row()` pins
+        # him when no qualified route applies (a preset bank, say), and a
+        # default has to exist even when it is unproven.
         "qualification_receipt": None,
     },
     # FILLED 2026-08-10 BY A REAL OPERATOR AUDITION -- G1 Test A, blinded.
