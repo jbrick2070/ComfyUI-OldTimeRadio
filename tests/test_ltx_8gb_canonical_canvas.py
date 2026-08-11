@@ -107,9 +107,13 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     # ltx_video LEFT this group deliberately on 2026-08-02 (kibitz r3): its
     # 169-frame decode floor is only true at one canvas, so an undeclared canvas
     # was a live channel for invalidating a static contract via
-    # OTR_LTX_RENDER_CANVAS. It now declares (832, 480). The invariant this test
-    # guards is unchanged -- an engine that declares NOTHING is still untouched.
-    for other in ("ltx_audio_in", "wan_i2v", "humo",
+    # OTR_LTX_RENDER_CANVAS. It now declares (832, 480). wan_i2v left the same
+    # way on 2026-08-11 (video transplant, lane 1) for the same reason -- with
+    # no declaration it fell through to 1472x832, 3.07x the pixels its tier was
+    # configured for, on a 14B fp8 lane at a 14.5 GiB gate. The invariant this
+    # test guards is unchanged -- an engine that declares NOTHING is still
+    # untouched -- and mesh_stage now carries the control.
+    for other in ("ltx_audio_in", "mesh_stage", "humo",
                   "still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None
@@ -159,10 +163,16 @@ def test_the_request_carries_the_DECLARED_canvas_not_the_landscape_default():
 def test_a_SIBLING_lane_still_takes_the_landscape_default():
     """The differential control: a lane that declares NOTHING must be
     untouched, or this was a global canvas rewrite rather than a per-adapter
-    declaration. wan_ti2v was that control until 2026-08-02, when it gained its
-    own declaration; wan_i2v still declares none and takes its place (humo
-    cannot -- it is a face family and takes the portrait canvas)."""
-    ledger = _ledger(engine="wan_i2v")
+    declaration.
+
+    The control has moved twice, which is itself the story: wan_ti2v held it
+    until 2026-08-02, wan_i2v until 2026-08-11, and each handover happened
+    because the lane gained a declaration of its own. mesh_stage holds it now
+    (humo cannot -- it is a face family and takes the portrait canvas). When
+    mesh_stage declares its canvas in lane 10, this control moves again rather
+    than the test being deleted: the invariant outlives every occupant.
+    """
+    ledger = _ledger(engine="mesh_stage")
     assert _canvas(rd.build_request_from_shot(_shot(ledger),
                                               ledger)) == LANDSCAPE
 

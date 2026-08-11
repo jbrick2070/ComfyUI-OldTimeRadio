@@ -29,12 +29,34 @@ _TIER = {
     "fastwan_8gb": "fastwan_8gb",
     "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
+    # The low/high convention (operator ruling 2026-08-09) lands ONE LANE AT A
+    # TIME with the video transplant, not as a family sweep -- so this dict
+    # grows by one row per lane and the `<vramtier>gb` rows above retire as
+    # their own lanes close. Lane 1, 2026-08-11: wan_i2v.
+    "wan22_high_i2v": "wan_i2v",
 }
 
 
 # --------------------------------------------------------------------------- #
 # resolver
 # --------------------------------------------------------------------------- #
+def test_the_naming_convention_rows_state_the_model_they_load():
+    """A public id is a claim about the model. `wan22_high_i2v` says Wan 2.2
+    because the weight is wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors --
+    this lane's CAPABILITIES row was corrected FROM a stale wan2.1 label once
+    already, and the naming table in the transplant spec reintroduced it. The
+    spec's `wan21_high_i2v` resolves as a legacy alias so nothing breaks either
+    way; flagged for the operator rather than silently chosen.
+    """
+    assert pub._PUBLIC_ENGINES["wan22_high_i2v"] == "wan_i2v"
+    assert pub._LEGACY_ENGINE_ALIASES["wan21_high_i2v"] == "wan_i2v"
+    assert "wan21_high_i2v" not in pub._PUBLIC_ENGINES, (
+        "two public ids on one internal id collapses _INTERNAL_TO_PUBLIC and "
+        "trips the module-scope bijection assert at IMPORT time")
+    assert vreg.CAPABILITIES["wan_i2v"]["model_requirements"] == ["wan2.2-i2v"]
+
+
+
 def test_public_engines_bijection():
     assert len(pub._PUBLIC_ENGINES) == len(pub._INTERNAL_TO_PUBLIC)
     assert pub._PUBLIC_ENGINES == _TIER

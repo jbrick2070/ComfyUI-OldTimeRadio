@@ -163,15 +163,12 @@ for _lane in _STILL_LANES + _PROCEDURAL_LANES:
 # then, the suite fails and says so.
 # ---------------------------------------------------------------------------
 EXPECTED_RED: dict = {
-    ("wan_i2v", "G1"): (
-        "S8b-1 / S1 -- _ckpt_path() defaults to a hardcoded "
-        "models/checkpoints/wan2.2-i2v.safetensors and _installed() is a bare "
-        "os.path.exists that never consults folder_paths, so the lane cannot "
-        "start on this box. OWNER: lane 1 (wan21_high_i2v)."),
-    ("wan_i2v", "G2"): (
-        "S1 -- render_canvas is declared in the working tree but not yet "
-        "committed with its rewritten comment and drift tests. "
-        "OWNER: lane 1 (wan21_high_i2v)."),
+    # LANE 1 CLOSED 2026-08-11 -- wan_i2v's G1 and G2 rows left this table when
+    # the lane went green. The defects were: a hardcoded
+    # models/checkpoints/wan2.2-i2v.safetensors default with a bare
+    # os.path.exists that never consulted folder_paths (S8b-1 / lesson L1), and
+    # an undeclared render_canvas that let the lane fall through to 1472x832
+    # (S1 / lesson L2). Both are now pinned by tests/test_wan_i2v.py.
     ("humo_14B_169", "G2"): (
         "S8b-4 -- request rewritten to 1472x832 while the graph renders "
         "832x480 (3.07x), and OTR_HUMO_WIDTH/HEIGHT can move it again. "

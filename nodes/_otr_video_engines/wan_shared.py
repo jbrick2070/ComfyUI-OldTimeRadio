@@ -32,6 +32,26 @@ _WAN_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
 
+def configured_models_root():
+    """Where THIS box keeps its models, off the ComfyUI runtime.
+
+    ONE spelling for the whole project: the same override chain
+    ``_otr_gguf_backend._models_root`` already uses, so a reader who finds the
+    answer in one place finds the same answer in the other. Inside a live
+    server this is irrelevant -- ``folder_paths`` is the authority and is
+    probed first. Outside one it is the difference between "this lane is not
+    installed" and the truth (lesson L1: a hardcoded root knows one location;
+    the operator's box is allowed to be somewhere else).
+
+    Pure, stdlib-only, never raises. Returns a path string that may not exist;
+    every caller probes existence for itself.
+    """
+    return os.path.expanduser(
+        os.environ.get("OTR_COMFYUI_MODELS_ROOT")
+        or os.environ.get("COMFYUI_MODELS_ROOT")
+        or r"C:\ComfyUI-Models")
+
+
 # --------------------------------------------------------------------------- #
 # M7 silent-clip contract proof (GO_FORWARD 4A) -- ffprobe the emitted mp4 and
 # PROVE the color/stream contract before the mux trusts the self-declared dict.
@@ -380,7 +400,20 @@ class WanInitImageMixin:
 
         An adapter that wants to CHECK its override against reality asks this;
         an adapter that just wants the historical answer keeps asking
-        ``_resolve_model_file``."""
+        ``_resolve_model_file``.
+
+        THE CONFIGURED MODELS ROOT IS THE THIRD PROBE (lane 1, 2026-08-11), and
+        it is why this helper is worth anything OFF the ComfyUI runtime. Inside
+        a live server ``folder_paths`` reads ``extra_model_paths.yaml`` and
+        finds the weights wherever the operator put them. Outside one -- in the
+        preflight matrix, in the CPU suite, in any tool that asks "is this lane
+        installed?" -- ``import folder_paths`` fails and the only remaining
+        probe was ``<comfy_root>/models/<category>``, which on a box whose
+        weights live somewhere else answers NO for a weight that is plainly
+        there. So the same override chain the rest of the project already uses
+        (``_otr_gguf_backend._models_root``) is consulted last: it changes no
+        answer that was previously a hit, and turns a false negative into the
+        truth. Additive by construction -- every earlier probe still wins."""
         for category in categories:
             try:
                 import folder_paths            # ComfyUI runtime only
@@ -389,9 +422,11 @@ class WanInitImageMixin:
                     return hit
             except Exception:                   # noqa: BLE001 -- no ComfyUI (tests)
                 pass
-            cand = os.path.join(self._comfy_root(), "models", category, name)
-            if os.path.exists(cand):
-                return cand
+            for root in (os.path.join(self._comfy_root(), "models"),
+                         configured_models_root()):
+                cand = os.path.join(root, category, name)
+                if os.path.exists(cand):
+                    return cand
         return None
 
     def _missing_loaders(self):
@@ -603,5 +638,5 @@ class WanInitImageMixin:
 __all__ = [
     "_parse_fps", "ffprobe_clip_fields", "ffprobe_counted_frames",
     "assemble_beat_segments", "validate_silent_clip_contract",
-    "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE",
+    "WanInitImageMixin", "_WAN_DEFAULT_NEGATIVE", "configured_models_root",
 ]

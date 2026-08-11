@@ -88,8 +88,8 @@ written), `TODO`.
 
 | # | Lane (public / internal) | Owns | Status |
 |---:|---|---|---|
-| 0 | scaffolding | lessons ledger, preflight matrix suite, evidence manifest | TODO |
-| 1 | `wan21_high_i2v` / `wan_i2v` | S1, S8b-1 weight resolution, canvas + drift tests, a lane test file from scratch, boot/profile pin, solo smoke | TODO |
+| 0 | scaffolding | lessons ledger, preflight matrix suite, evidence manifest | **DONE** `49adc824` |
+| 1 | `wan22_high_i2v` / `wan_i2v` | S1, S8b-1 weight resolution, canvas + drift tests, a lane test file from scratch, boot/profile pin, solo smoke | **DONE** -- 7/7 gates green, live 832x480 f33 smoke, receipt `docs/evidence/lane_receipts/lane01-wan22_high_i2v.md`. **Operator: the public id says `wan22`, not the spec table's `wan21` -- the lane loads a Wan 2.2 weight; the spec's string is a legacy alias, so both resolve. One line to swap. See lesson L8.** |
 | 2 | `humo14_high_audio_in_wide` / `humo_14B_169` | boot-contract mechanism with its first real consumer, S8b-4, S8b-6 manifest fields, S8b-8, the ruled `humo_diet` hero cast, f97 smoke | TODO |
 | 3 | `humo17_high_audio_in_portrait` / `humo_1.7B` | S8b-3 short-render refusal, S8b-6, S8b-7 stale text, diet/default compatibility | TODO |
 | 4 | `humo14_high_audio_in_portrait` / `humo` | the remaining HuMo lane, portrait f97 smoke | TODO |

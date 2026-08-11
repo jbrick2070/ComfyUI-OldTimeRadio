@@ -409,8 +409,11 @@ CAPABILITIES = {
     # eng_wan_i2v.render_clip passes free_after_use=True so umt5-fp8 + the 14B
     # fp8 UNET do not co-reside through the sampler on the 16 GB card; that
     # mitigation is MANDATORY, not optional. S5: model_requirements is the real
-    # Wan 2.2 I2V asset id (was the stale wan2.1 label; the engine ckpt default
-    # is wan2.2-i2v.safetensors).
+    # Wan 2.2 I2V asset id (was the stale wan2.1 label). Lane 1, 2026-08-11:
+    # the ckpt default named here used to be wan2.2-i2v.safetensors, which is a
+    # placeholder that exists on no box -- it is now the installed artifact,
+    # eng_wan_i2v._I2V_DEFAULT_UNET, under diffusion_models. The public menu id
+    # states 2.2 for the same reason this row does.
     "wan_i2v": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

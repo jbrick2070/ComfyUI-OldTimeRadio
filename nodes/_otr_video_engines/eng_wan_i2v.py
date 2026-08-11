@@ -13,9 +13,13 @@ Like ltx_video it runs IN-PROCESS in the main cu130 venv by default. Isolation i
 SageAttention is ACTIVE (``comfy.model_management.sage_attention_enabled()``, the
 real switch -- mere module residency from Comfy's import-time probe does not
 count, BUG-070). The headless WAN lane boots without ``--use-sage-attention`` so
-the in-process path is the norm. Registered DEFAULT-OFF / dark (empty
-``default_roles`` + gated behind ``OTR_ENABLE_WAN_I2V``); fails CLOSED until the
-operator enables it AND the checkpoint is on disk.
+the in-process path is the norm. Registered DARK -- empty ``default_roles``, so
+nothing selects it unless a profile's ``role_overrides`` does; it fails CLOSED
+until the checkpoint resolves on disk. ``OTR_ENABLE_WAN_I2V`` is VESTIGIAL and
+gates nothing: the registry IS the menu, and no code reads that variable
+(corrected lane 1, 2026-08-11 -- the old wording here said the lane was "gated
+behind" it, which sent a reader looking for a switch that does not exist while
+the real reason the lane would not start was a wrong checkpoint default).
 
 init_image aspect: the init is MATERIALIZED into the canvas (padded / cropped per
 ``aspect_policy`` with ONE uniform scale, default ``pad``) and the derived image
@@ -32,12 +36,18 @@ Config (env). READ THE SPLIT -- since the WAN recipe freeze (2026-07-27) the
 render knobs do NOT bind on a production leg:
 
 * STILL LIVE, every leg -- ASSET LOCATION only: ``OTR_ENABLE_WAN_I2V``
-  (vestigial opt-in flag); ``OTR_WAN_I2V_CKPT`` the primary checkpoint path the
-  load probe checks; ``OTR_WAN_I2V_UNET_NAME`` / ``OTR_WAN_I2V_CLIP_NAME`` /
+  (vestigial, read by nothing); ``OTR_WAN_I2V_CKPT`` an explicit full path that
+  wins over the default; ``OTR_WAN_I2V_UNET_NAME`` / ``OTR_WAN_I2V_CLIP_NAME`` /
   ``OTR_WAN_I2V_VAE_NAME`` loader basenames; ``OTR_WAN_I2V_LOADER``
   safetensors|gguf (else INFERRED from the resolved basename -- it stays live
-  WITH the name it follows); ``OTR_WAN_I2V_CLIP_DIR`` / ``OTR_WAN_I2V_VAE_DIR``
-  dir overrides.
+  WITH the name it follows); ``OTR_WAN_I2V_UNET_DIR`` / ``OTR_WAN_I2V_CLIP_DIR``
+  / ``OTR_WAN_I2V_VAE_DIR`` dir overrides.
+
+  NONE of them is REQUIRED to start the lane (lane 1, 2026-08-11). The UNET
+  default names the installed artifact and :meth:`WanI2VEngine._installed`
+  falls back to ``folder_paths``, so a box that installed the weight anywhere
+  ComfyUI knows about resolves with nothing set. That is the difference between
+  fixing this box and fixing the lane.
 * FROZEN IN CODE as ``WAN_I2V_RECIPE``, ignored-with-a-warning: ``OTR_WAN_STEPS``
   / ``OTR_WAN_CFG`` / ``OTR_WAN_SHIFT`` / ``OTR_WAN_SAMPLER`` /
   ``OTR_WAN_SCHEDULER`` / ``OTR_WAN_NEGATIVE``. These six were read INLINE in
@@ -95,6 +105,21 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 # HIGH/LOW MoE handoff (Path B) is a future option, not wired here.
 _WAN_MIN_FRAMES = 33
 _WAN_MAX_FRAMES = 177
+
+#: THE INSTALLED UNET BASENAME (lane 1, 2026-08-11). The default used to be
+#: ``checkpoints/wan2.2-i2v.safetensors`` -- a placeholder name in a placeholder
+#: category that exists on no box this project has ever run on, so
+#: ``assert_usable`` raised ``MISSING_MODEL`` before the first forward and the
+#: lane shipped DEAD. The artifact the operator actually installed is the
+#: low-noise 14B fp8-scaled single expert, and it lives under
+#: ``diffusion_models`` like every other Wan weight here (the sibling
+#: ``eng_wan_ti2v`` has always defaulted into that category).
+#:
+#: Naming it here rather than only in a launcher env is what makes the lane
+#: resolve with NOTHING set, which is the point: an env pin fixes one box, a
+#: correct default plus the ``folder_paths`` fallback in :meth:`_installed`
+#: fixes every box that installed the weight anywhere ComfyUI knows about.
+_I2V_DEFAULT_UNET = "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
 
 #: The defined recipe-receipt string threaded into the manifest.
 #:
@@ -233,13 +258,49 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         continuity=CONTINUITY_STRICT_FIRST_FRAME,
     )
 
+    #: THE CANVAS, DECLARED (lane 1, 2026-08-11). The profile has always said
+    #: 832x480, but with no declaration here ``build_request_from_shot`` fell
+    #: through to the 1472x832 landscape default -- 3.07x the pixels the tier
+    #: was configured for, and the likely cause of the 15.3 GB over-ceiling
+    #: measurement of 2026-08-08. ``declared_render_canvas`` is applied LAST and
+    #: overrules ledger and env, so declaring it is what actually closes the
+    #: channel; the profile keeps one job, a drift guard.
+    #:
+    #: THE RE-MEASUREMENT THIS COMMENT USED TO ASK FOR IS DONE, and the ruling
+    #: is KEEP. At the declared canvas the 14B fp8 measures 13.93 GiB warm /
+    #: 14.05 cold at 832x480x33 (vram-recipe-lab exoneration receipts, indexed
+    #: in docs/evidence/video_evidence_manifest.json), which fits the 14.5 GiB
+    #: gate. It does NOT displace wan_ti2v as the default WAN lane: a 0.10 GiB
+    #: cold margin is too thin to make a lane the one everything falls back to.
+    #: Honest bound: only the f33 rung has warm evidence, so the f177 ceiling
+    #: this contract declares is model-legal and NOT machine-qualified.
+    #: Both axes /32-legal (26 x 15).
+    render_canvas = (832, 480)
+
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
         return os.environ.get("OTR_WAN_I2V_CKPT") or os.path.join(
-            _COMFY_ROOT, "models", "checkpoints", "wan2.2-i2v.safetensors")
+            _COMFY_ROOT, "models", "diffusion_models", _I2V_DEFAULT_UNET)
 
     def _installed(self):
-        return os.path.exists(self._ckpt_path())
+        """The 14B UNET is present if the explicit path exists OR
+        ``folder_paths`` resolves its basename.
+
+        THE LANE-1 FIX (lesson L1). This was a bare ``os.path.exists`` on
+        :meth:`_ckpt_path`, which knows exactly one location; ``folder_paths``
+        knows every configured model root, including the
+        ``extra_model_paths.yaml`` entries that put this project's weights in
+        ``C:\\ComfyUI-Models`` rather than under the comfy root's ``models/``.
+        So a correctly installed weight read as missing and the lane refused
+        before its first forward. Mirrors ``eng_wan_ti2v._installed`` exactly --
+        the sibling has had this fallback all along, which is the whole reason
+        one WAN lane worked and the other did not.
+        """
+        if os.path.exists(self._ckpt_path()):
+            return True
+        return self._resolve_model_file(
+            ("diffusion_models", "unet", "checkpoints"),
+            self._loader_names()["unet"], "OTR_WAN_I2V_UNET_DIR") is not None
 
     def resolve_isolation(self):
         """Runtime isolation tier: ``in_process`` by default, escalating to
@@ -273,9 +334,14 @@ class WanI2VEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "wan_i2v checkpoint not found at %s; fetch the Wan 2.2 ckpt and "
-                "set OTR_WAN_I2V_CKPT (the core UNETLoader reads the basename)"
-                % self._ckpt_path(), kind="video")
+                "wan_i2v checkpoint %r did not resolve: not at %s, and "
+                "folder_paths found it in none of diffusion_models / unet / "
+                "checkpoints. Install the Wan 2.2 I2V UNET under a configured "
+                "models root, or point OTR_WAN_I2V_UNET_DIR at its directory, "
+                "or set OTR_WAN_I2V_CKPT to its full path (the core UNETLoader "
+                "reads the basename)"
+                % (self._loader_names()["unet"], self._ckpt_path()),
+                kind="video")
         missing = self._missing_loaders()
         if missing:
             raise EngineUnusable(

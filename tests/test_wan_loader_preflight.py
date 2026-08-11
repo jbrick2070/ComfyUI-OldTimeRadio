@@ -81,7 +81,16 @@ def test_assert_usable_ckpt_check_precedes_aux_check(tmp_path, monkeypatch):
     with pytest.raises(EngineUnusable) as exc:
         eng.assert_usable(host_caps={}, profile={})
     assert exc.value.reason is EngineUsabilityReason.MISSING_MODEL
-    assert "checkpoint not found" in str(exc.value)
+    message = str(exc.value)
+    # PRECEDENCE is the property, so assert it as precedence rather than as a
+    # phrase: the refusal must name the CHECKPOINT and must NOT have reached
+    # the aux loaders, which are staged and present here. (The wording moved on
+    # 2026-08-11, lane 1: the message now also names every route an operator
+    # can use to fix it -- folder_paths, OTR_WAN_I2V_UNET_DIR, OTR_WAN_I2V_CKPT
+    # -- because "not found" alone told nobody where it looked.)
+    assert "checkpoint" in message
+    assert "does-not-exist.safetensors" in message
+    assert "CLIP/umt5" not in message and "VAE" not in message
 
 
 def test_missing_loaders_lists_both_when_both_absent(tmp_path, monkeypatch):

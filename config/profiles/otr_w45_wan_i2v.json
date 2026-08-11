@@ -83,6 +83,8 @@
   "launch": {
     "sage_attention": true,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "OTR_WAN_I2V_CKPT": "C:\\ComfyUI-Models\\diffusion_models\\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+    }
   }
 }

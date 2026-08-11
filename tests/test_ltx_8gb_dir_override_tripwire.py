@@ -67,11 +67,26 @@ def eng(tmp_path, monkeypatch):
     (which has no `get_full_path`) misses. That makes "what the loader would
     find" a real answer from real code, not a lambda that agrees by
     construction.
+
+    THE FIXTURE MUST OWN EVERY ROOT, not just one (2026-08-11, video transplant
+    lane 1). `_resolve_model_file_by_token` gained a third and last probe --
+    the CONFIGURED models root, so a lane can resolve its weights off the
+    ComfyUI runtime on a box that keeps them outside the comfy tree. This
+    fixture controlled `_comfy_root` and nothing else, so it was silently
+    relying on the real box's other roots being invisible; the moment one was
+    probed, "I deleted the checkpoint" stopped meaning the checkpoint was gone
+    -- the operator's REAL ltx_8gb weight answered instead and two absence
+    assertions went green-for-the-wrong-reason. A fake model universe has to be
+    the WHOLE universe.
     """
     monkeypatch.setattr(m, "_LTX8_CKPT_MIN_BYTES", _TEST_FLOOR)
     root = tmp_path / "comfy"
     (root / "models" / "checkpoints").mkdir(parents=True)
     (root / "models" / "text_encoders").mkdir(parents=True)
+    empty_models_root = tmp_path / "no_other_models"
+    empty_models_root.mkdir()
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(empty_models_root))
+    monkeypatch.setenv("COMFYUI_MODELS_ROOT", str(empty_models_root))
     (root / "models" / "checkpoints" / m._LTX8_DEFAULT_CKPT).write_bytes(
         b"c" * (_TEST_FLOOR * 2))
     (root / "models" / "text_encoders" / m._LTX8_DEFAULT_T5).write_bytes(

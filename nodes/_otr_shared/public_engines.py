@@ -36,6 +36,21 @@ _PUBLIC_ENGINES = {
     "fastwan_8gb": "fastwan_8gb",
     "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
+    # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
+    # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
+    # is RETIRED by operator ruling 2026-08-09: it encoded "the card this lane
+    # was built for", which drifted badly from measured usage (`wan_8gb` really
+    # consumes 12.5-13.2 GiB and cannot run on an 8 GB card at production
+    # canvas). `low` / `high` is deliberately COARSE so a user self-selects by
+    # their own hardware, and it survives measurement drift.
+    #
+    # Renamed lanes MOVE their old public id into _LEGACY_ENGINE_ALIASES; they
+    # never keep a second row here, because two public ids on one internal id
+    # collapses _INTERNAL_TO_PUBLIC and trips the module-scope bijection assert
+    # below at IMPORT time -- which, since the director imports this module
+    # unguarded, empties most of the ComfyUI node menu rather than failing one
+    # lane cleanly.
+    "wan22_high_i2v": "wan_i2v",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -47,6 +62,17 @@ _LEGACY_ENGINE_ALIASES = {
     "flux_still": "still_pan",
     "still_kenburns": "still_motion",
     "visualizer": "viz_green",
+    # `wan21_high_i2v` is the string the naming table in
+    # docs/2026-08-09-SPEC-lab-findings-into-otr.md prints for this lane. The
+    # LANE IS WAN 2.2, not 2.1: the installed weight is
+    # wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors, the frozen recipe id is
+    # wan22_14b_i2v_single_pass_v1, and the CAPABILITIES row was corrected FROM
+    # a stale "wan2.1" label to "wan2.2-i2v" once already (registry.py, S5). So
+    # the live menu id states 2.2 and the spec's string resolves here instead of
+    # being a dead end. Flagged for the operator rather than changed silently --
+    # if the ruling really is `wan21`, swapping the two is one line each way and
+    # neither string ever stops resolving.
+    "wan21_high_i2v": "wan_i2v",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -63,6 +89,11 @@ _PUBLIC_LABEL = {
     "fastwan_8gb": "FastWan 2.2 TI2V 5B - 8GB (3-step)",
     "ltx23_16gb_audio_in": "LTX 2.3 - 16GB Audio In",
     "ltx23_16gb_video": "LTX 2.3 - 16GB Video",
+    # "high" is the measured bucket, not a quality claim: 13.93 GiB warm at
+    # 832x480x33 against a 14.5 GiB gate. The rung is named because only f33
+    # has warm evidence -- the f177 the contract allows is model-legal and not
+    # machine-qualified.
+    "wan22_high_i2v": "Wan 2.2 I2V 14B fp8 - high VRAM (13.9 GiB warm at f33)",
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

@@ -178,7 +178,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | viz_green | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_cpu | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_mandala | 1472x832 | shared landscape (by design for this family) |
-| wan_i2v | 1472x832 | SHARED LANDSCAPE DEFAULT (unclaimed) |
+| wan_i2v | 832x480 | declared |
 | wan_ti2v | 832x480 | declared |
 | word_razzle | 1472x832 | SHARED LANDSCAPE DEFAULT (unclaimed) |
 
@@ -259,7 +259,7 @@ and it read exactly like a measured number until someone looked.
 | viz_green | - | contract max | **MISSING: docs/2026-06-18-coverage-arch-wiring** |
 | viz_mxc_cpu | - | contract max | none cited |
 | viz_mxc_mandala | - | contract max | **MISSING: docs/2026-06-30-viz-rainbow** |
-| wan_i2v | - | contract max | docs/2026-07-25-still-plans-locked-build-spec.md |
+| wan_i2v | - | contract max | docs/2026-07-25-still-plans-locked-build-spec.md, docs/evidence |
 | wan_ti2v | - | contract max | none cited |
 | word_razzle | - | contract max | none cited |
 

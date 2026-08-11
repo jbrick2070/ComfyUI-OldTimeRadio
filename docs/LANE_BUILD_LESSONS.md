@@ -282,3 +282,102 @@ would have caught it, and the twin assertion added. A lane that hit nothing new
 still gets a line saying so.
 
 <!-- LANE LOG BEGINS -->
+
+## Lane 1 -- `wan22_high_i2v` (`wan_i2v`), closed 2026-08-11
+
+Three things bit. Two were the seed lessons doing their job; the third was new
+and is now L8.
+
+**What bit (1): the wrong default was only HALF the L1 defect.** The audit
+named `_installed()`'s bare `os.path.exists` as the killer, and it was -- but
+fixing only that still left the lane dead off the ComfyUI runtime, because the
+`folder_paths` fallback's last resort was `<comfy_root>/models/<category>` and
+this box keeps its weights in `C:\ComfyUI-Models`. Inside a live server
+`folder_paths` reads `extra_model_paths.yaml` and finds them; in the CPU suite,
+in the preflight matrix, in any tool that asks "is this lane installed?", the
+import fails and the answer was a confident, wrong NO.
+
+**Root cause:** two different questions were being answered by one probe --
+"where would the LOADER find this?" (folder_paths, live) and "is this weight on
+this box?" (any configured root, always). The second had no answer off the
+runtime.
+
+**Runnable check:** does the lane resolve its weight with NO environment
+variables set at all? Not "does it resolve on my machine", where a leftover
+`OTR_*_CKPT` export in the shell can make a dead lane look alive -- that is
+exactly what masked this: `wan_ti2v` read as installed only because an env pin
+happened to be exported, so the two WAN lanes looked different for a reason
+that had nothing to do with their code.
+
+**Fix:** `wan_shared.configured_models_root()` -- one spelling of "where this
+box keeps its models", the same override chain `_otr_gguf_backend._models_root`
+already used -- probed LAST in `_resolve_model_file_by_token`. Additive by
+construction: every earlier probe still wins, so it can only turn a false
+negative into the truth. It fixed all three WAN lanes at once, which is why it
+belongs in shared code and why the sibling lanes got non-regression coverage in
+the same chunk without being marked green.
+
+**Twin assertion:** `tests/test_wan_i2v.py::test_a_models_root_override_is_honoured`
+(behavioural, against a staged temp root) and
+`::test_weight_resolution_does_not_stop_at_one_hardcoded_location`.
+
+**What bit (2): a declaration moves a control that other tests lean on.**
+Declaring `render_canvas` on wan_i2v broke two tests in
+`tests/test_ltx_8gb_canonical_canvas.py` that used this lane as their
+"declares NOTHING" differential control, plus the `ENGINE_MATRIX.md` drift
+gate. All three were CORRECT failures -- the suite noticing that the world
+changed. The control has now moved twice (wan_ti2v 2026-08-02, wan_i2v
+2026-08-11) and is on `mesh_stage`.
+
+**Runnable check:** before declaring a canvas, grep the test tree for the
+lane's id used as a NEGATIVE control (`declared_render_canvas(x) is None`,
+"takes the landscape default", "declares nothing"). Move the control to a lane
+that still declares nothing and say in the test WHY it moved -- the invariant
+outlives every occupant, so the test is edited, never deleted.
+
+**What bit (3):** see L8 below -- the naming table said 2.1 and the weight says
+2.2.
+
+**What did NOT bite, worth recording:** the module-scope bijection assert
+(L5's blast radius) never fired, because the rename ADDED a public row for a
+lane that had none rather than adding a second row for a lane that already had
+one. The live menu was checked on the running server after the change -- 27
+options, `wan22_high_i2v (16:9)` present -- rather than only in the CPU suite,
+since an empty ComfyUI menu is precisely the failure a CPU suite cannot see.
+
+---
+
+## L8 -- A public id is a claim about the model, and claims go stale
+
+**Check:** does every user-facing id state the model version the lane actually
+LOADS? Check it against the weight basename and the frozen recipe id, not
+against the naming table in a spec.
+
+**Symptom:** none, ever, from the code's side. The lane runs perfectly while
+telling every user the wrong thing, and the id is durable -- it becomes a saved
+value in workflow graphs, so correcting it later costs an alias forever.
+
+**Root cause:** naming tables are written from memory at plan time, and a
+version number is exactly the kind of detail that survives a review because it
+looks like a typo rather than a claim.
+
+**Origin (lane 1):** the transplant spec's naming table prints
+`wan21_high_i2v` for this lane. The lane is Wan **2.2**: the installed weight is
+`wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, the frozen recipe id is
+`wan22_14b_i2v_single_pass_v1`, and `registry.CAPABILITIES` carries a dated
+comment recording that this row was corrected FROM a stale `wan2.1` label TO
+`wan2.2-i2v` once already. The same mislabel came back through a doc.
+
+**What was done, and why it is not a spec override:** the live menu id states
+`wan22_high_i2v`, and the spec's `wan21_high_i2v` is registered as a LEGACY
+ALIAS -- so it resolves rather than being a dead end, and neither spelling ever
+stops working. Swapping which one is live is one line each way. This is flagged
+for the operator in the morning report as the first thing to decide; it is not
+a silent choice, and it is not a spec edit.
+
+**Runnable check:** for every public id, assert the version token against the
+lane's own weight basename and recipe id.
+
+**Twin assertion:**
+`tests/test_public_engines.py::test_the_naming_convention_rows_state_the_model_they_load`
+and `tests/test_wan_i2v.py::test_the_lane_is_named_wan_2_2_because_that_is_what_it_loads`.
