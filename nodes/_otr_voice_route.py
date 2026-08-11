@@ -106,6 +106,17 @@ def sha256_of_file(path: str) -> Optional[str]:
         return None
 
 
+def _default_path_resolver(ref_path: str, repo_root: Optional[str]) -> str:
+    """Naive fallback: join a relative path onto ``repo_root``.
+
+    Correct only when references live inside the repo, which on a real install
+    they do NOT -- see ``path_resolver`` below.
+    """
+    if os.path.isabs(ref_path) or not repo_root:
+        return ref_path
+    return os.path.join(repo_root, ref_path)
+
+
 def validate_qualified_voice_route(
     record: Any,
     now_utc: datetime,
@@ -114,6 +125,7 @@ def validate_qualified_voice_route(
     bank_lookup: Optional[Callable[[str], Optional[dict]]] = None,
     repo_root: Optional[str] = None,
     require_local_bytes: bool = True,
+    path_resolver: Optional[Callable[[str], Optional[str]]] = None,
 ) -> RouteValidation:
     """Decide whether ``record`` authorizes rendering a character on a route.
 
@@ -124,9 +136,23 @@ def validate_qualified_voice_route(
                       the check that stops a policy approving one engine while
                       another renders.
     ``bank_lookup``   ``voice_ref_id -> bank row`` when the bank is available.
-    ``repo_root``     for resolving a relative ``ref_path``.
+    ``repo_root``     fallback root for a relative ``ref_path``.
     ``require_local_bytes`` hashing a local reference is the expensive check;
                       it stays ON by default and is only relaxed deliberately.
+    ``path_resolver`` maps a bank-relative ``ref_path`` to a real file.
+
+    WHY THE RESOLVER IS INJECTED, AND WHY IT MATTERS. Bank ref paths are written
+    ``models/TTS/refs/<engine>/<id>.wav``, which is relative to ComfyUI's MODELS
+    ROOT, not to this repo -- on this box that lands in
+    ``C:\\ComfyUI-Models\\TTS\\refs\\...``. Joining it onto the repo root instead
+    produces a path that has never existed, so a perfectly good route fails with
+    "reference file does not exist". That is exactly what happened the first time
+    a real qualified route was installed, and nothing before that could have
+    caught it: with ``approved_native_routes`` empty, this branch had never once
+    run against a live route. The naive join survives as a fallback; callers that
+    can resolve properly pass ``_resolve_ref_to_disk``, the SAME resolver the
+    render path uses, so validation and rendering cannot disagree about which
+    file they are discussing.
     """
     bad = []
 
@@ -253,9 +279,9 @@ def validate_qualified_voice_route(
             if not path:
                 fail("reference.absolute_path is missing for a local_wav route")
             elif require_local_bytes:
-                full = path
-                if not os.path.isabs(full) and repo_root:
-                    full = os.path.join(repo_root, path)
+                full = (path_resolver(path) if path_resolver
+                        else _default_path_resolver(path, repo_root))
+                full = full or path
                 if not os.path.isfile(full):
                     fail("reference file does not exist: %s" % (full,))
                 elif _is_sha256(src_sha):
@@ -411,6 +437,7 @@ def resolve_policy_route_claim(
     *,
     bank_entries: Sequence,
     repo_root: Optional[str] = None,
+    path_resolver: Optional[Callable[[str], Optional[str]]] = None,
 ) -> Optional[PolicyRouteClaim]:
     """Prove the selected route, or raise. ``None`` means nothing was selected.
 
@@ -465,6 +492,7 @@ def resolve_policy_route_claim(
         bank_lookup=_lookup,
         repo_root=repo_root,
         require_local_bytes=True,
+        path_resolver=path_resolver,
     )
     if not validation.ok:
         raise VoiceRouteError(
@@ -540,6 +568,7 @@ def resolve_and_verify_reference(
     bank_lookup: Optional[Callable[[str], Optional[dict]]] = None,
     repo_root: Optional[str] = None,
     verify_bytes: bool = True,
+    path_resolver: Optional[Callable[[str], Optional[str]]] = None,
 ) -> ResolvedReference:
     """Resolve a cast row's reference identity, proving a route if it has one.
 
@@ -644,9 +673,8 @@ def resolve_and_verify_reference(
                 "voice_route %r: ref_path is missing for a local_wav route"
                 % (route_id,))
         if verify_bytes:
-            full = ref_path
-            if not os.path.isabs(full) and repo_root:
-                full = os.path.join(repo_root, ref_path)
+            full = (path_resolver(ref_path) if path_resolver
+                    else _default_path_resolver(ref_path, repo_root)) or ref_path
             if not os.path.isfile(full):
                 raise VoiceRouteError(
                     "voice_route %r: reference file does not exist: %s"
@@ -689,5 +717,5 @@ __all__ = [
     "VoiceRouteError", "PolicyRouteClaim", "policy_character_key",
     "cast_row_matches_policy", "select_policy_route", "resolve_policy_route_claim",
     "ResolvedReference", "LEGACY_REFERENCE", "LEGACY_REFERENCE_IDENTITY",
-    "resolve_and_verify_reference",
+    "resolve_and_verify_reference", "_default_path_resolver",
 ]

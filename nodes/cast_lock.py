@@ -826,10 +826,32 @@ class CastLock:
         engine = target_engine
         if engine is None:
             engine = self._resolve_char_engine(voice_bank, bank_entries, "auto")
+        if engine is None:
+            # NO CHARACTER ENGINE AT ALL for this bank -- `bark_legacy` and
+            # `kokoro_builtin` are preset banks with no reference entries. A
+            # route for some other engine was never SELECTED here, so there is
+            # nothing to fail; raising would break a legitimate bank choice
+            # because an unrelated engine happens to be qualified.
+            #
+            # It is still said out loud, because "a qualified route quietly did
+            # not apply" is the failure this whole path exists to prevent -- the
+            # difference is that this one is the operator's own explicit choice
+            # of bank, not something happening behind their back.
+            log.warning(
+                "[OTR_CastLock] voice policy %r has approved route(s) but bank "
+                "%r resolves NO character voice engine -- no route applies to "
+                "this cast", (policy or {}).get("policy_version"), voice_bank)
+            return None
+
+        # Resolve reference paths the SAME way the render path does. A bank
+        # ref_path is relative to ComfyUI's MODELS root, not to this repo, so a
+        # naive repo-root join names a file that has never existed.
+        from ._otr_voice_node_common import _resolve_ref_to_disk
 
         return _ROUTE.resolve_policy_route_claim(
             policy, engine, datetime.now(timezone.utc),
             bank_entries=bank_entries, repo_root=_REPO_ROOT,
+            path_resolver=_resolve_ref_to_disk,
         )
 
     # ------------------------------------------------------------------ #

@@ -72,10 +72,33 @@ def _full_receipt(**over):
             "identity_id": "v2/en_speaker_8", "qualification_receipt": r}
 
 
-def test_no_route_is_currently_approved():
-    """The honest state as of 2026-08-10. If this fails, either a real audition
-    happened (update the test with its receipt) or a label crept back in."""
-    assert LEMMY_VOICE_POLICY["approved_native_routes"] == {}
+def test_the_indextts2_route_is_approved_and_carries_its_receipt():
+    """A REAL AUDITION HAPPENED, which is the branch the previous version of this
+    test named in its own docstring: *"If this fails, either a real audition
+    happened (update the test with its receipt) or a label crept back in."*
+
+    G1 Test A ran blinded on 2026-08-10. The operator ranked the candidate first
+    on Cockney, and -- without seeing any label -- heard the historic incumbent
+    as Indian rather than Cockney, which is the floor-evidence failure evidenced
+    properly instead of inferred from its filename.
+
+    So the assertion flips, but the thing being protected does not: a route may
+    only be here WITH the receipt that earned it. `is_qualified_route` is the
+    cheap legacy helper and may never authorize a selected route on its own --
+    but it must AGREE with the real validator rather than contradict it, so the
+    shipped route is checked against it here.
+    """
+    routes = LEMMY_VOICE_POLICY["approved_native_routes"]
+    assert set(routes) == {"indextts2"}
+    route = routes["indextts2"]
+    assert is_qualified_route(route), (
+        "the shipped route does not satisfy the legacy receipt helper -- a "
+        "compatibility check that says 'no' where the authority says 'yes' is "
+        "its own support ticket")
+    receipt = route["qualification_receipt"]
+    assert receipt["operator_verdict"].startswith("PASS")
+    assert receipt["audited_on"] == "2026-08-10"
+    assert receipt["identity_id"] == "idx_lemmy_algenib_cockney_v1"
 
 
 def test_the_canonical_route_is_routing_not_a_qualification_claim():

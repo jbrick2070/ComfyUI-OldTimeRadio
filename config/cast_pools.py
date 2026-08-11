@@ -426,14 +426,114 @@ LEMMY_VOICE_POLICY = {
         # QUALIFICATION_RECEIPT_REQUIRED_FIELDS here and add the route below.
         "qualification_receipt": None,
     },
-    # DELIBERATELY EMPTY (2026-08-10). Nothing is audition-proven Cockney -- not
-    # bark, not the six other char-voice engines. British != Cockney, and the one
-    # entry that used to sit here was the bare string described above.
+    # FILLED 2026-08-10 BY A REAL OPERATOR AUDITION -- G1 Test A, blinded.
     #
-    # This is the honest state, and it is also the useful one: the audition step
-    # now has a defined target to fill in rather than an approval to explain
-    # away. Populate it ONLY from a real operator audition.
-    "approved_native_routes": {},
+    # This dict was deliberately empty for exactly as long as nothing had been
+    # auditioned. What filled it is not a decision to trust the route; it is the
+    # evidence that the route earned it, and every field below points at
+    # something a second person could re-check.
+    #
+    # WHAT THE OPERATOR ACTUALLY HEARD, blind, without labels:
+    #   arm1 "best cockney ... preferred"   -> A, the candidate
+    #   arm2 second                         -> C, same speaker, NO Cockney ref
+    #   arm3 "not really cockney but an interesting indian"
+    #                                       -> B, vz_donor_marshal_indian
+    #
+    # THE THIRD LINE IS THE ONE THAT MATTERS, and it settles an argument this
+    # pack had with itself. An earlier draft claimed the `_indian` in the
+    # incumbent's id was evidence it violated Lemmy's Cockney floor. That was
+    # REJECTED, correctly: a filename is not evidence and the bank metadata never
+    # supported it. Here the same finding arrives the legitimate way -- a blinded
+    # listener, who could not see the id, independently heard the incumbent as
+    # Indian and not Cockney. The floor-evidence failure is now evidenced rather
+    # than inferred from a name.
+    #
+    # A ALSO BEAT C, which is the check people forget to run. Both arms are the
+    # same underlying speaker; the only difference is whether the reference clip
+    # was speaking Cockney. A ranking above C means IndexTTS2 carried the ACCENT
+    # through the clone, not merely the timbre.
+    #
+    # RUNTIME IDENTITY IS DERIVED, NEVER INVENTED. The adapter tracks no version
+    # string, and writing "1.0.0" would be precisely the evidence-shaped field
+    # this module exists to refuse. `engine_impl_version` is the sha256 of the
+    # adapter plus its worker script -- change the rendering code and it changes.
+    # `weight_revision` is the sha256 of a name+size manifest over all 65 files
+    # in the checkpoints dir -- swap the weights and it changes -- computed that
+    # way because hashing 4.7 GB of tensors on every check is not a contract
+    # anyone would keep.
+    "approved_native_routes": {
+        "indextts2": {
+            "route_id": "lemmy-indextts2-algenib-cockney-v1",
+            "route_contract_version": 1,
+            "qualification_record": {
+                "record_id": "g1-test-a-2026-08-10",
+                "status": "qualified",
+                "technical_verdict": "pass",
+                "engine": "indextts2",
+                "voice_ref_id": "idx_lemmy_algenib_cockney_v1",
+                "rights": {
+                    "status": "approved",
+                    "source": "self-generated Google TTS output (voice Algenib), "
+                              "used as a clone reference for LOCAL engines",
+                    "terms_snapshot_ref":
+                        "docs/2026-08-10-G0-RIGHTS-DECISION-CARD-lemmy.md",
+                    "terms_snapshot_date": "2026-08-10",
+                    "scope": "clone reference for local engines; tier left "
+                             "UNDETERMINED -- it governs what Google may do with "
+                             "our data, not our rights to the output",
+                    "decided_at": "2026-08-10T20:37:17Z",
+                    "revoked_at": None,
+                    "expires_at": None,
+                },
+                "runtime": {
+                    "model_id": "IndexTTS-2",
+                    "engine_impl_version": "b965453f355661a3",
+                    "weight_revision": "6238972345f704ef",
+                },
+                "reference": {
+                    "kind": "local_wav",
+                    "absolute_path":
+                        "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
+                    "source_ref_sha256":
+                        "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
+                    "bank_ref_sha256":
+                        "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
+                },
+                "audition_manifest": {
+                    "path": "otr/episodes/g1_lemmy_test_a/MANIFEST.json",
+                    "sha256":
+                        "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67",
+                },
+            },
+            # The LEGACY receipt shape (QUALIFICATION_RECEIPT_REQUIRED_FIELDS).
+            # Carried so `is_qualified_route` agrees with the real validator
+            # instead of contradicting it -- it may never AUTHORIZE a route, but
+            # a compatibility helper that says "no" where the authority says
+            # "yes" is its own support ticket.
+            "qualification_receipt": {
+                "artifact_path": "otr/episodes/g1_lemmy_test_a/",
+                "artifact_sha256":
+                    "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67",
+                "neutral_line": LEMMY_AUDITION_LINES["neutral_line"],
+                "emotional_line": LEMMY_AUDITION_LINES["emotional_line"],
+                "seed": 20260810,
+                "engine": "indextts2",
+                "engine_impl_version": "b965453f355661a3",
+                "identity_kind": "local_wav",
+                "identity_id": "idx_lemmy_algenib_cockney_v1",
+                "settings": "IndexTTS2 defaults, emo_vector=None, "
+                            "render_seed=20260810, sample_rate=22050, "
+                            "all three arms rendered identically",
+                "operator_verdict":
+                    "PASS (blinded, 2026-08-10). Best Cockney of the three and "
+                    "the preferred arm; clears the gravelly / Cockney / "
+                    "intelligibility floor; beats the incumbent, which the "
+                    "operator independently heard as Indian rather than Cockney "
+                    "without seeing its label.",
+                "audited_on": "2026-08-10",
+            },
+        },
+    },
 }
 
 # -----------------------------------------------------------------------------

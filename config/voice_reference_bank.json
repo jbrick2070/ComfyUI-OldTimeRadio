@@ -3498,6 +3498,22 @@
       "provider_voice_id": "Zubenelgenubi",
       "measured_median_f0_hz": 115.9,
       "gender_source": "measured_median_f0_2026-08-08"
+    },
+    {
+      "voice_ref_id": "idx_lemmy_algenib_cockney_v1",
+      "engine": "indextts2",
+      "gender": "male",
+      "timbre": [
+        "gravelly",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
+      "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
+      "commercial_clean": true
     }
   ]
 }

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 
 import pytest
 
@@ -115,30 +116,86 @@ def pin(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 # The shipped state: DORMANT. Nothing below may change any current render.
 # ---------------------------------------------------------------------------
-def test_the_shipped_policy_approves_nothing_so_the_repin_is_inert():
-    """If this ever fails, a route was added without an operator audition."""
-    from config.cast_pools import LEMMY_VOICE_POLICY
+def test_the_shipped_policy_now_carries_a_REAL_qualified_route():
+    """G1 Test A PASSED on 2026-08-10, so this dict is no longer empty.
 
-    assert LEMMY_VOICE_POLICY["approved_native_routes"] == {}
-    assert LEMMY_VOICE_POLICY["character_key"] == "lemmy"
+    It REPLACES `test_the_shipped_policy_approves_nothing_so_the_repin_is_inert`,
+    which pinned the pre-audition state and was correct for exactly as long as
+    nothing had been auditioned. What must never happen is a route appearing
+    WITHOUT the evidence, so the assertions below are about the evidence, not
+    about the route's existence.
+    """
+    from config.cast_pools import LEMMY_VOICE_POLICY as P
+
+    assert P["character_key"] == "lemmy"
+    route = P["approved_native_routes"]["indextts2"]
+    qual = route["qualification_record"]
+    assert qual["status"] == "qualified"
+    assert qual["technical_verdict"] == "pass"
+    assert qual["rights"]["status"] == "approved"
+    assert qual["voice_ref_id"] == "idx_lemmy_algenib_cockney_v1"
+    # A human said yes, and said what they heard. Nothing else can supply this.
+    verdict = route["qualification_receipt"]["operator_verdict"]
+    assert verdict.startswith("PASS"), verdict
+    assert "blinded" in verdict.lower()
+    # The runtime identity is derived from real artifacts, never a made-up
+    # version string -- both are 16 hex chars from a sha256.
+    for field in ("engine_impl_version", "weight_revision"):
+        value = qual["runtime"][field]
+        assert re.fullmatch(r"[0-9a-f]{16}", value), (field, value)
 
 
-def test_no_policy_route_means_the_bank_is_never_even_consulted(monkeypatch):
-    """The dormant path must not pay for a bank load, and must not raise when
-    the active engine is unresolved -- which is exactly preserve_ledger's
-    normal state."""
+def test_the_live_route_actually_validates_against_the_real_bank_and_disk():
+    """The end-to-end proof: the shipped receipt survives the real validator,
+    against the real bank, with the reference bytes re-hashed off disk."""
+    from datetime import datetime, timezone
+    from config.cast_pools import LEMMY_VOICE_POLICY as P
+    from nodes._otr_voice_bank import load_voice_bank
+    from nodes._otr_voice_node_common import _resolve_ref_to_disk
+
+    claim = ROUTE.resolve_policy_route_claim(
+        P, "indextts2", datetime.now(timezone.utc),
+        bank_entries=load_voice_bank()[0],
+        path_resolver=_resolve_ref_to_disk)
+    assert claim is not None
+    assert claim.voice_ref_id == "idx_lemmy_algenib_cockney_v1"
+    assert claim.voice_route["route_id"] == "lemmy-indextts2-algenib-cockney-v1"
+
+
+def test_a_bank_with_no_character_engine_is_reported_not_raised():
+    """`bark_legacy` is a PRESET bank with no reference entries, so no engine
+    resolves and the indextts2 route simply does not apply. Raising here would
+    break a legitimate bank choice because an unrelated engine is qualified --
+    which it did, the first time the route went live."""
+    out = CastLock().lock(script_json=_ledger(), voice_bank="bark_legacy",
+                          cast_voice_policy="auto_registry")
+    led = json.loads(out[0])
+    for entry in led["cast"]:
+        assert "voice_route" not in entry
+
+
+def test_a_dormant_policy_still_costs_nothing(monkeypatch):
+    """The empty-routes path must not pay for a bank load, and must not raise
+    when the active engine is unresolved. Still reachable: any policy whose
+    approved_native_routes is empty."""
     def explode(*a, **k):                       # pragma: no cover -- must not run
         raise AssertionError("dormant policy loaded the voice bank")
 
     monkeypatch.setattr("nodes._otr_voice_bank.load_voice_bank", explode)
+    monkeypatch.setattr("nodes.cast_lock._lemmy_voice_policy",
+                        lambda: _policy(None))
     assert CastLock()._resolve_policy_claim("default", None) is None
 
 
-def test_auto_registry_is_byte_identical_with_the_dormant_policy():
+def test_auto_registry_is_deterministic_with_the_live_route():
     a = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     b = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     assert a == b
-    assert "voice_route" not in a
+    # Lemmy is on the route; nobody else is.
+    rows = {e["char_id"]: e for e in json.loads(a)["cast"]}
+    assert rows["c02"]["voice_ref_id"] == "idx_lemmy_algenib_cockney_v1"
+    assert "voice_route" not in rows["c01"]
+    assert "voice_route" not in rows["a1"]
 
 
 # ---------------------------------------------------------------------------

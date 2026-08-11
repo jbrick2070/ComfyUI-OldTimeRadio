@@ -532,7 +532,7 @@ class OTRVoiceNodeBase:
             ])
             if route.get("reference_kind") == "local_wav":
                 path = str(route.get("ref_path") or "")
-                full = path if os.path.isabs(path) else os.path.join(_REPO_ROOT, path)
+                full = _resolve_ref_to_disk(path) or path
                 digest = _ROUTE.sha256_of_file(full) if path else None
                 if digest is None:
                     return float("nan")      # fail OPEN, never reuse
@@ -753,7 +753,8 @@ class OTRVoiceNodeBase:
                 if resolved_ref is None:
                     resolved_ref = _ROUTE.resolve_and_verify_reference(
                         cast, engine, bank_lookup=_route_bank_lookup,
-                        repo_root=_REPO_ROOT)
+                        repo_root=_REPO_ROOT,
+                        path_resolver=_resolve_ref_to_disk)
                     _resolved_refs[char_id] = resolved_ref
                 route_fields = resolved_ref.request_fields()
                 voice_ref_id = cast.get("voice_ref_id")
@@ -770,10 +771,7 @@ class OTRVoiceNodeBase:
                 if (resolved_ref.is_policy_route
                         and resolved_ref.reference_kind == "local_wav"
                         and ref_field == "voice_ref_path"):
-                    _routed = resolved_ref.ref_path
-                    if not os.path.isabs(_routed):
-                        _routed = os.path.join(_REPO_ROOT, _routed)
-                    voice_ref = _routed
+                    voice_ref = _resolve_ref_to_disk(resolved_ref.ref_path)                         or resolved_ref.ref_path
                 delivery_vector = None
                 _dv_source = "off"
                 if _delivery_on:
