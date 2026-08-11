@@ -438,7 +438,7 @@ Convention: `<model><version>_<low|high>_<capability>`.
 | `ltx_video` | `ltx23_high_video` | **UNMEASURED** | 6.8 s |
 | `wan_ti2v` | `wan22_high_video` | 12.5-13.2 GiB | 7.1 s |
 | `fastwan_8gb` | `wan22_high_fast` | ~12.6 GiB | 7.1 s |
-| `wan_i2v` | `wan21_high_i2v` | 13.9 warm / 14.1 cold | 7.1 s |
+| `wan_i2v` | `wan22_high_i2v` | 13.9 warm / 14.1 cold | 7.1 s |
 | `humo_1.7B` | `humo17_high_audio_in_portrait` | 12.84 GiB (diet boot) | 7.1 s |
 | `humo` | `humo14_high_audio_in_portrait` | 13.22 GiB (diet boot) | 3.9 s |
 | `humo_14B_169` | `humo14_high_audio_in_wide` | 13.06 GiB (diet boot) | 3.9 s |

@@ -262,10 +262,10 @@ def test_every_spelling_of_this_lane_still_resolves():
 
 
 def test_the_spec_naming_table_string_resolves_but_never_shows(engine):
-    """`wan21_high_i2v` is what the spec's table prints for this lane, and the
-    lane is Wan 2.2. The live menu states 2.2; the spec's string is a legacy
-    alias so it is not a dead end. Flagged for the operator, not silently
-    dropped."""
+    """RULED 2026-08-11: the lane is Wan 2.2 and `wan22_high_i2v` stands. The
+    `wan21` spelling was a single mistyped version number in the spec, since
+    corrected there; it keeps an alias row only so a paste from a stale copy of
+    that document still resolves rather than erroring."""
     assert pub._LEGACY_ENGINE_ALIASES["wan21_high_i2v"] == LANE
     menu = [o for o in vd._video_model_combo() if o != vd.ADD_CUSTOM]
     assert not any("wan21" in option for option in menu)

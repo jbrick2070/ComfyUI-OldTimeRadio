@@ -86,16 +86,18 @@ _LEGACY_ENGINE_ALIASES = {
     "flux_still": "still_pan",
     "still_kenburns": "still_motion",
     "visualizer": "viz_green",
-    # `wan21_high_i2v` is the string the naming table in
-    # docs/2026-08-09-SPEC-lab-findings-into-otr.md prints for this lane. The
-    # LANE IS WAN 2.2, not 2.1: the installed weight is
-    # wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors, the frozen recipe id is
-    # wan22_14b_i2v_single_pass_v1, and the CAPABILITIES row was corrected FROM
-    # a stale "wan2.1" label to "wan2.2-i2v" once already (registry.py, S5). So
-    # the live menu id states 2.2 and the spec's string resolves here instead of
-    # being a dead end. Flagged for the operator rather than changed silently --
-    # if the ruling really is `wan21`, swapping the two is one line each way and
-    # neither string ever stops resolving.
+    # RESOLVED BY THE OPERATOR 2026-08-11: the naming was decided all along and
+    # `wan21` was a single mistyped version number in the spec that everything
+    # downstream inherited. The lane loads a Wan 2.2 weight
+    # (wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors, recipe
+    # wan22_14b_i2v_single_pass_v1), so `wan22_high_i2v` is correct and stands;
+    # the spec and the transplant plan now say so too.
+    #
+    # This row stays anyway, and NOT because the spec needs it -- it does not.
+    # The string briefly existed in a reviewed document, so it survives in this
+    # session's kibitz runs and handoff log, and a person pasting from any of
+    # those should land on the lane rather than on a not-registered error. It is
+    # the cheapest possible way to make a retired typo harmless.
     "wan21_high_i2v": "wan_i2v",
     # MOVED out of _PUBLIC_ENGINES in lane 5 (2026-08-11). Every
     # saved graph, profile and variant carrying `wan_8gb` still

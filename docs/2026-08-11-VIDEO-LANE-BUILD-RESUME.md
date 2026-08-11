@@ -5,8 +5,8 @@ Everything else you need is linked from those two.
 
 ## Where it stands
 
-**5 of 21 lane packets confirmed working and pushed. Lane 6 is IN PROGRESS in
-the working tree.**
+**6 of 21 lane packets confirmed working and pushed. Nothing is in flight; the
+working tree carries only other windows' files.**
 
 | # | Lane | State |
 |---|---|---|
@@ -16,35 +16,33 @@ the working tree.**
 | 3 | `humo17_high_audio_in_portrait` + `_wide` | DONE `d226bea5` |
 | 4 | `humo14_high_audio_in_portrait` (`humo`) | DONE `b53ca2f1` |
 | 5 | `wan22_high_video` (`wan_ti2v`) | DONE `d0536e72` |
-| 6 | `wan22_high_fast` (`fastwan_8gb`) | **IN THE WORKING TREE -- see below** |
+| 6 | `wan22_high_fast` (`fastwan_8gb`) | DONE `930e3bda` |
 | 7-21 | LTX trio, mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
 
 "Confirmed working" = built, 7/7 preflight gates green, a live render smoked and
 PROBED (canvas, exact frame count, silence, no trim), full suite green, pushed.
 
-## Lane 6, exactly where I left it
+## Lane 7 is next: `ltx23_low_audio_in` (`ltx_audio_in`)
 
-Uncommitted in the working tree, and the naming half is DONE and verified live:
+Its work list, from the corpus and its RED preflight rows:
 
-- `nodes/_otr_shared/public_engines.py` -- `fastwan_8gb` removed from
-  `_PUBLIC_ENGINES`, `wan22_high_fast` added, label rewritten to sell
-  throughput. It was an IDENTITY row (public id == internal id) so it needs NO
-  alias row: a bare internal id already passes through `resolve_engine_id`
-  step 3. Verified: `fastwan_8gb`, `fastwan_8gb (16:9)` and `wan22_high_fast`
-  all resolve; the old id appears in NO menu option; menu still 27 rows.
-- `tests/test_public_engines.py` -- `_TIER` table updated to match.
-- `docs/ENGINE_MATRIX.md` + the three `otr_*_fastwan` variants regenerated.
-
-**Still owed for lane 6:** the full suite was running when this window ended
-(log: the scratchpad `lane6.log`), then a solo smoke at f81 on the `default`
-boot, a receipt at `docs/evidence/lane_receipts/lane06-wan22_high_fast.md`, the
-queue row, and the commit.
-
-If the suite came back red, expect the same shape lanes 1-5 all hit: a test
-asserting the OLD public id or the bare internal id. Fix it at the assertion,
-never by reverting the rename -- and see L8/lane-3 in
-`docs/LANE_BUILD_LESSONS.md` for the two patterns.
+- **S8b-9, the one that can DELETE the lane from the dropdown.**
+  `eng_ltx_av.py:177` is a bare module-scope `float()` on
+  `OTR_LTX_AV_RESERVE_VRAM_GB` -- the one env read the guarded `_env_num` was
+  never applied to. A malformed value raises at import, the guarded import in
+  `_otr_video_engines/__init__.py` swallows it, and the lane vanishes with
+  nothing in the log (reproduced once: registry 27 -> 26).
+  `tests/test_ltx_av_env_import_safety.py` claims to cover every module-scope
+  env read and omits exactly this one.
+- **S8b-10**, the ia2v stage-A base latent: `:819` halves the canvas to
+  416x240 and `240 % 32 == 16`. `assert_ltx_dims` only checks the full canvas,
+  and `tests/test_ltx_av_ia2v_canonical.py:62-63` PINS the illegal value.
+- **S3**, the HQ lane: declare `render_canvas = (1024, 576)` plus a named
+  profile supplying 1024x576 and 193 frames (measured 7.36 GiB warm / 585.3 s).
+  Do NOT touch the graph -- OTR's LTX graph is ahead of the lab's.
+- The missing `ContractEnvConflict` refusal that `eng_ltx_video.py` already has.
+- Public id + alias MOVE, profile/variant, matrix row, solo smoke.
 
 ## The per-lane loop (do not skip step 1)
 
@@ -84,13 +82,18 @@ never by reverting the rename -- and see L8/lane-3 in
   blip on the Wi-Fi path cost one push tonight; the work was already committed
   so nothing was at risk.
 
-## Two things the operator still owes a decision on
+## Naming: SETTLED 2026-08-11
 
-1. **`wan22_high_i2v` vs the spec's `wan21_high_i2v`.** The lane loads a Wan
-   **2.2** weight and the repo had already corrected this exact mislabel once.
-   I shipped `wan22` and registered the spec's string as a legacy alias, so both
-   resolve. One line to swap either way. Lesson L8.
-2. **The cold peaks run higher than the corpus headline** -- 14,604 MB (14B
+`wan22_high_i2v` is correct and stands. The spec's `wan21` was a single
+mistyped version number that every downstream document inherited -- the naming
+itself was never in doubt. Spec and transplant plan corrected; no code moved,
+because the build had used the right name from the start. The retired spelling
+keeps a legacy-alias row so a paste from a stale copy of any reviewed doc still
+resolves instead of erroring.
+
+## One thing the operator still owes a decision on
+
+1. **The cold peaks run higher than the corpus headline** -- 14,604 MB (14B
    wide f97), 15,261 MB (1.7B portrait f129), 13,800 MB (14B portrait f97), all
    absolute and COLD against a 13.06 GiB warm figure. Not a contradiction:
    different cache state, and these are device totals including the ~1.9 GB idle

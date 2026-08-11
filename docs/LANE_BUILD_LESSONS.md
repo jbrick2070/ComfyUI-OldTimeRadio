@@ -436,11 +436,22 @@ comment recording that this row was corrected FROM a stale `wan2.1` label TO
 `wan2.2-i2v` once already. The same mislabel came back through a doc.
 
 **What was done, and why it is not a spec override:** the live menu id states
-`wan22_high_i2v`, and the spec's `wan21_high_i2v` is registered as a LEGACY
-ALIAS -- so it resolves rather than being a dead end, and neither spelling ever
-stops working. Swapping which one is live is one line each way. This is flagged
-for the operator in the morning report as the first thing to decide; it is not
-a silent choice, and it is not a spec edit.
+`wan22_high_i2v`, and the spec's `wan21_high_i2v` was registered as a LEGACY
+ALIAS -- so it resolved rather than being a dead end, and neither spelling ever
+stopped working. Flagged for the operator rather than silently chosen, and not
+a spec edit.
+
+**OUTCOME, 2026-08-11: ruled `wan22_high_i2v`, and the diagnosis was better
+than the lesson's.** The operator's answer was that the naming had been decided
+all along -- `wan21` was ONE mistyped version number in the spec, and every
+downstream document inherited it. So the failure mode is narrower and more
+worrying than "claims go stale": a single typo at the source of a reviewed
+corpus propagates silently through every review round, because reviewers check
+consistency WITH the spec rather than the spec against the artifact. Seven
+review passes did not catch it; reading the weight filename did. The check
+below is unchanged and is exactly the one that works -- assert the version
+token against the lane's own weight basename and recipe id, never against
+another document.
 
 **Runnable check:** for every public id, assert the version token against the
 lane's own weight basename and recipe id.

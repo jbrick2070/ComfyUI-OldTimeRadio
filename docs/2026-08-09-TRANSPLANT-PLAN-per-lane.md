@@ -142,7 +142,7 @@ ceiling pinned at a measured rung, LoRA absence fails preflight closed, seed
 trap pinned. Its only realistic failure is the custom sampler node failing to
 register, which is a loud refusal.
 
-## 7. `wan21_high_i2v` -- CANNOT START TODAY (`wan_i2v`)
+## 7. `wan22_high_i2v` -- CANNOT START TODAY (`wan_i2v`)
 
 **.py (blocker)**
 - `_ckpt_path()` defaults to `models/checkpoints/wan2.2-i2v.safetensors`,
@@ -216,7 +216,7 @@ never by hand.
 | `ltx098_low_video` | 0.36-6.44 s | 9..161 q8 | CHAIN | scene still, seg 0 | ~5 segments |
 | `wan22_high_video` | 0.68-7.08 s | 17..177 q4 | CHAIN | scene still, seg 0 | ~5 segments |
 | `wan22_high_fast` | 0.68-7.08 s (3.24 s as profile-pinned) | 17..177 q4, pinned 81 | CHAIN | scene still, seg 0 | ~10 segments at the pin |
-| `wan21_high_i2v` | 1.32-7.08 s | 33..177 q4 | CHAIN | scene still, seg 0 | ~5 segments |
+| `wan22_high_i2v` | 1.32-7.08 s | 33..177 q4 | CHAIN | scene still, seg 0 | ~5 segments |
 | `humo17_high_audio_in_portrait` | 1.32-7.08 s | 33..177 q4 | JUMP | portrait (always) + fresh still per segment | ~5 segments = ~5 stills |
 | `humo14_high_audio_in_portrait` / `_wide` | 1.32-3.88 s | 33..97 q4 | JUMP | portrait (always) + fresh still per segment | ~8 segments = ~8 stills - the hungriest still consumers |
 | viz lanes (4) | unbounded | any | SINGLE | none (accepts_still False) | 1 render |
@@ -289,7 +289,7 @@ lane 1 starts with a real checklist rather than an empty file:
 **0. Evidence manifest (S9) -- not a lane, but first.** Everything below cites
 lab numbers; land the manifest so any claim is checkable without the lab repo.
 
-**1. `wan21_high_i2v` (wan_i2v) -- FIRST.** It is broken today, so the work is
+**1. `wan22_high_i2v` (wan_i2v) -- FIRST.** It is broken today, so the work is
 unambiguous; its blast radius is nil because it ships dark (`default_roles =
 ()`); its scope is small; and it exercises all four seed lessons at once --
 weight resolution (L1), a canvas declaration plus its drift test (L2), and a

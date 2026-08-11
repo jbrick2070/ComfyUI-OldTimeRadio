@@ -100,7 +100,7 @@ corpus puts it.
 - `config/profiles/otr_w45_wan_i2v.json` -- weight pin in `launch.env`, the
   LIVE channel (`extra_args` is documentation-only).
 
-## The one thing the operator should decide
+## Naming: RULED 2026-08-11 -- `wan22_high_i2v` stands
 
 The spec's naming table prints `wan21_high_i2v`. The lane is Wan **2.2** -- the
 weight is `wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, the frozen recipe
@@ -108,5 +108,10 @@ is `wan22_14b_i2v_single_pass_v1`, and `registry.CAPABILITIES` already carries a
 dated note recording that this exact row was corrected FROM `wan2.1` TO
 `wan2.2-i2v` once before. The live menu therefore says `wan22_high_i2v` and the
 spec's string is registered as a legacy alias, so BOTH resolve and neither ever
-becomes a dead end. Swapping which is live is one line each way. Recorded as
-lesson L8.
+becomes a dead end.
+
+**Operator ruling, 2026-08-11: `wan22_high_i2v` is correct and stands.** The
+naming had been decided all along; `wan21` was a single mistyped version number
+in the spec that everything downstream inherited. Spec and transplant plan
+corrected, and no code changed -- this lane had used the right name from the
+start. Recorded as lesson L8.

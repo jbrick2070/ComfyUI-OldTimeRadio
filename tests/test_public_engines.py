@@ -55,11 +55,14 @@ _TIER = {
 # --------------------------------------------------------------------------- #
 def test_the_naming_convention_rows_state_the_model_they_load():
     """A public id is a claim about the model. `wan22_high_i2v` says Wan 2.2
-    because the weight is wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors --
-    this lane's CAPABILITIES row was corrected FROM a stale wan2.1 label once
-    already, and the naming table in the transplant spec reintroduced it. The
-    spec's `wan21_high_i2v` resolves as a legacy alias so nothing breaks either
-    way; flagged for the operator rather than silently chosen.
+    because the weight is wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors and
+    the frozen recipe is wan22_14b_i2v_single_pass_v1.
+
+    RULED 2026-08-11: `wan21` was one mistyped version number in the spec that
+    every downstream document inherited; the naming itself was never in doubt.
+    Spec and transplant plan corrected, `wan22_high_i2v` stands, no code moved.
+    The retired string keeps a legacy-alias row so a paste from any stale copy
+    still resolves.
     """
     assert pub._PUBLIC_ENGINES["wan22_high_i2v"] == "wan_i2v"
     assert pub._LEGACY_ENGINE_ALIASES["wan21_high_i2v"] == "wan_i2v"
