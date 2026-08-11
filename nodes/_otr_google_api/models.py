@@ -22,11 +22,18 @@ GOOGLE_API_LEGACY_TEXT_MODELS = (
     "gemini-3.5-flash",
     "gemini-3.1-flash-lite",
 )
+#: RETIRED 2026-08-10: `gemini-2.0-flash` and `gemini-2.0-flash-lite` were
+#: removed from this tuple because they are GONE from Google's own catalog.
+#: Measured, not assumed -- `scripts/verify_google_slugs.py` fetched a COMPLETE
+#: terminal-page listing of 52 ids and neither was in it
+#: (`docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`). Offering a
+#: model the provider no longer lists is a dropdown entry that can only fail at
+#: request time, which is the exact `tencent/hy3:free` shape this pack's slug
+#: guards exist to prevent. The lane's DEFAULTS were never affected: both are
+#: `*-latest` pointers and both are still listed.
 GOOGLE_API_STABLE_TEXT_MODELS = (
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
 )
 GOOGLE_API_STATIC_TEXT_MODELS = (
     GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT,

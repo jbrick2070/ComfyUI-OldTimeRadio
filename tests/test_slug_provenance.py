@@ -619,6 +619,61 @@ def test_the_report_names_the_backlog_and_says_dates_were_not_written(records):
     assert "NEVER fails" in text
 
 
+def test_the_preflight_form_is_short_and_prints_no_verdict(records):
+    """The first cut printed the WHOLE report twice -- once before resolving the
+    key and once after -- which reads as a glitch and made a working run look
+    broken. The pre-flight is the offline half only."""
+    report = core.build_report(
+        records, prov.SLUG_PROVENANCE, catalog=None,
+        as_of=datetime.date(2026, 8, 10), is_pointer=prov.is_pointer,
+        unverified_kind=prov.UNVERIFIED)
+    pre = core.format_report(report, catalog=None,
+                             lane_authority=prov.LANE_AUTHORITY, final=False)
+    full = core.format_report(report, catalog=None,
+                              lane_authority=prov.LANE_AUTHORITY, final=True)
+    assert "pre-flight" in pre
+    assert "UNVERIFIED backlog" in pre
+    for forbidden in ("exit=", "No dates were written", "Catalog:"):
+        assert forbidden not in pre, forbidden
+    assert len(pre.split("\n")) < len(full.split("\n"))
+
+
+def test_a_nonzero_exit_says_what_it_MEANS(records):
+    """Exit 2 is the tool working, not the tool breaking. A bare non-zero code in
+    a terminal reads as a crash unless the output says otherwise -- and it was
+    read that way."""
+    catalog = core.CatalogFetch(frozenset({"nothing-we-ship"}), True, 1)
+    report = core.build_report(
+        records, prov.SLUG_PROVENANCE, catalog=catalog,
+        as_of=datetime.date(2026, 8, 10), is_pointer=prov.is_pointer,
+        unverified_kind=prov.UNVERIFIED)
+    text = core.format_report(report, catalog=catalog,
+                              lane_authority=prov.LANE_AUTHORITY)
+    assert report.exit_code == core.EXIT_SHIPPED_IDS_MISSING
+    assert "exit=2" in text
+    assert "not a crash" in text
+
+
+def test_every_exit_code_has_a_stated_meaning():
+    for code in (core.EXIT_OK, core.EXIT_SHIPPED_IDS_MISSING, core.EXIT_NOT_RUN,
+                 core.EXIT_AUTH_OR_TRANSPORT, core.EXIT_MALFORMED_CATALOG):
+        assert core.EXIT_MEANING.get(code), code
+
+
+def test_the_retired_google_2_0_ids_are_gone_from_both_lists(records):
+    """Measured absent from a complete catalog on 2026-08-10, so they must not
+    survive in the dropdown OR as a stale provenance row."""
+    from nodes._otr_google_api import models as gmodels
+
+    for dead in ("gemini-2.0-flash", "gemini-2.0-flash-lite"):
+        assert dead not in gmodels.GOOGLE_API_STATIC_TEXT_MODELS, dead
+        assert dead not in {r.provider_id for r in records}, dead
+        assert not any(pid == dead for pid, _l in prov.SLUG_PROVENANCE), dead
+    # The lane still works: its two defaults are pointers and both survive.
+    assert gmodels.GOOGLE_API_RECOMMENDED_CREATIVE_DEFAULT in gmodels.GOOGLE_API_STATIC_TEXT_MODELS
+    assert gmodels.GOOGLE_API_RECOMMENDED_TECHNICAL_DEFAULT in gmodels.GOOGLE_API_STATIC_TEXT_MODELS
+
+
 def test_the_verifier_core_performs_no_network_access(monkeypatch, records):
     """Belt and braces on the injection contract: break sockets outright and
     run everything the unit tests run."""

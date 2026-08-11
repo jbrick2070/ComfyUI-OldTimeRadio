@@ -264,11 +264,49 @@ def build_report(records: Sequence, provenance: Dict, *,
     )
 
 
+#: What each exit code MEANS, in the words a person reading a terminal needs.
+#: A non-zero exit reads as "the tool broke" unless the tool says otherwise, and
+#: exit 2 here means the opposite -- the tool worked and found something.
+EXIT_MEANING = {
+    EXIT_OK: "OK -- every shipped id was found, or nothing needed checking",
+    EXIT_SHIPPED_IDS_MISSING:
+        "FINDING (not a crash) -- the check ran fine and shipped ids are absent "
+        "from the catalog. This is the tool doing its job; act on the list above",
+    EXIT_NOT_RUN: "NOT RUN -- no API key, so the catalog was never fetched",
+    EXIT_AUTH_OR_TRANSPORT: "FAILED -- auth or transport error, nothing was checked",
+    EXIT_MALFORMED_CATALOG: "FAILED -- the catalog response was malformed",
+}
+
+
 def format_report(report: VerifierReport, *, catalog: Optional[CatalogFetch],
-                  lane_authority: Dict[str, str]) -> str:
+                  lane_authority: Dict[str, str], final: bool = True) -> str:
     """Human-readable text. The report lives HERE, not in a pytest print --
     a print under `pytest -q` capture is invisible, which is what silently
-    gutted the original mitigation."""
+    gutted the original mitigation.
+
+    ``final=False`` renders the short PRE-FLIGHT form: the offline half only, no
+    catalog section and no verdict trailer. The first cut printed the whole
+    report twice -- once before resolving the key and once after -- which reads
+    as a glitch rather than as two phases, and made a working run look broken.
+    """
+    if not final:
+        out = ["Google slug verification -- pre-flight (offline, no catalog yet)"]
+        out.append("")
+        out.append("UNVERIFIED backlog: %d identity(ies)" % len(report.unverified))
+        by_lane: Dict[str, int] = {}
+        for _pid, lane in report.unverified:
+            by_lane[lane] = by_lane.get(lane, 0) + 1
+        for lane in sorted(by_lane):
+            out.append("  %-13s %3d   authority: %s"
+                       % (lane, by_lane[lane], lane_authority.get(lane, "?")))
+        if report.ages:
+            out.append("Dated entries: %d, oldest %d day(s). Age NEVER fails."
+                       % (len(report.ages), max(d for _k, d in report.ages)))
+        if report.future_dated:
+            out.append("FUTURE-DATED (malformed evidence): %s"
+                       % ", ".join("%s@%s" % k for k in report.future_dated))
+        return "\n".join(out)
+
     out: List[str] = ["Google slug verification"]
 
     out.append("")
@@ -322,7 +360,8 @@ def format_report(report: VerifierReport, *, catalog: Optional[CatalogFetch],
 
     out.append("")
     out.append("No dates were written. A date is a human claim; commit it yourself.")
-    out.append("exit=%d" % report.exit_code)
+    out.append("exit=%d  %s" % (report.exit_code,
+                                EXIT_MEANING.get(report.exit_code, "")))
     return "\n".join(out)
 
 

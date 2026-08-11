@@ -130,13 +130,13 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     ("gemini-3.1-flash-lite", "google_api"): _catalog(_GOOGLE_RUN),
     ("gemini-2.5-flash", "google_api"):      _catalog(_GOOGLE_RUN),
     ("gemini-2.5-pro", "google_api"):        _catalog(_GOOGLE_RUN),
-    # MEASURED ABSENT on 2026-08-10 -- both were looked for in the completed
-    # listing and were not there. They stay `unverified` rather than gaining a
-    # fourth "checked and gone" kind, because absence is a LIVE fact the verifier
-    # reports (exit 2) and freezing it into data would be a date-shaped claim
-    # about someone else's service. The verifier names them on every run.
-    ("gemini-2.0-flash", "google_api"):      _UNSET,
-    ("gemini-2.0-flash-lite", "google_api"): _UNSET,
+    # `gemini-2.0-flash` and `gemini-2.0-flash-lite` USED TO SIT HERE. The
+    # 2026-08-10 verifier run found both absent from a completed catalog, so they
+    # were retired from `GOOGLE_API_STABLE_TEXT_MODELS` rather than left in a
+    # dropdown that could only fail at request time. They are gone from this
+    # table too -- provenance describes what the pack SHIPS, and a row for
+    # something no longer offered is the stale-entry defect in the other
+    # direction (`test_provenance_carries_nothing_the_pack_no_longer_ships`).
 
     # --- elevenlabs: its own endpoint was not fetched ------------------------
     ("eleven_multilingual_v2", "elevenlabs"): _UNSET,

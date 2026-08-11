@@ -46,7 +46,7 @@ def main(argv=None) -> int:
         is_pointer=prov.is_pointer, unverified_kind=prov.UNVERIFIED,
     )
     print(core.format_report(offline, catalog=None,
-                             lane_authority=prov.LANE_AUTHORITY))
+                             lane_authority=prov.LANE_AUTHORITY, final=False))
 
     from nodes._otr_google_api.client import get_json, resolve_api_key
 
