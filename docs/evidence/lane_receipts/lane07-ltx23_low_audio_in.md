@@ -45,11 +45,46 @@ The repo's own precedent treats the ceiling as 14,500 MB: `render_driver`
 recorded 1280x704 at 14,716 MB as a BREACH. Against 14.5 **GiB** (14,848 MB)
 the margin would be 383 MB instead.
 
-**Queued as row 7b, not fixed here:** the obvious lever is a diet-style boot
-contract (`--reserve-vram` + `--disable-pinned-memory`), which is the mechanism
-lane 2 built and proved for HuMo, and which is a CONFIGURATION change rather
-than a recipe change -- so it is available without touching the recipes. This
-lane currently declares no boot contract and smoked on stock `default`.
+### ROW 7b, RESOLVED 2026-08-11 -- the diet leg, and the answer is MARGINAL
+
+The operator refused to wave the 0.24% through and ordered the lever proved.
+It was. Both legs are cold, same recipe / canvas / frames / still, `VramPeakProbe`
+maxima, changing ONLY the boot:
+
+| Boot | absolute | net | margin under 14,500 MB |
+|---|---:|---:|---:|
+| `default` | 14,465 MB | 11,952 MB | 35 MB (0.24%) |
+| **`ltx_av_diet`** | **14,385 MB** | **11,872 MB** | **115 MB (0.11 GiB)** |
+
+**Decision rule applied: "clears but by < 0.3 GiB -> ship the diet contract and
+flag the lane MARGINAL."** 115 MB is under the 307 MB threshold, so the lane
+ships on the diet boot and the manifest says MARGINAL in words with both
+numbers. It is not called a pass.
+
+**The diet bought only 80 MB, and the reason is the design decision in the
+contract.** `reserve_vram_gb` is deliberately `None` for this lane:
+`_ltx_av_vram_reserve` bumps ComfyUI's `EXTRA_RESERVED_VRAM` to
+`OTR_LTX_AV_RESERVE_VRAM_GB` (default 4.0) across the graph run and only ever
+bumps UPWARD, so a boot `--reserve-vram 2.921` would be overwritten by the
+adapter's own 4.0 for the whole render window -- a knob that reaches nothing
+(L6) while looking in the profile like it did something. Only the
+pinned-memory half of the lever was available here, and on this lane it is
+worth 80 MB. **HuMo's ~1.9 GiB does not transfer**; that lane had both halves.
+
+`--disable-pinned-memory` was PROVEN in the live process argv (`/system_stats`),
+not merely written into the profile -- L6 again: a contract verified against the
+config it was meant to honour cannot tell "applied" from "written down".
+
+**Quality: BYTE-IDENTICAL.** The diet clip's sha256 is
+`36902e046c68c2da37e88e8c9d5bbebf760052734f4537f039c5ed8e752fb7ec` -- the same
+file, bit for bit, as the default-boot clip. So the diet costs nothing at all,
+and this is stronger parity evidence than HuMo's by-eye ruling. No operator
+eyes needed on the picture.
+
+**What this does NOT resolve.** 115 MB is still a thin margin on the absolute
+surface, and the lever is now nearly exhausted on this lane. If the ceiling has
+to be cleared with real headroom, the remaining moves are all outside a
+configuration change.
 
 **What is NOT available:** dropping to a smaller canvas. For the ia2v
 two-stage recipe the canvas must be /64 on both axes (see below), and

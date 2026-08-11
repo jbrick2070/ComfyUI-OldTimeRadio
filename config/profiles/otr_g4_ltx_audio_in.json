@@ -84,7 +84,9 @@
     "sage_attention": true,
     "extra_args": [],
     "env": {
-      "GEMMA4_12B_MAX_NEW_TOKENS": "3072"
-    }
+      "GEMMA4_12B_MAX_NEW_TOKENS": "3072",
+      "OTR_HEADLESS_DISABLE_PINNED": "1"
+    },
+    "boot_contract": "ltx_av_diet"
   }
 }

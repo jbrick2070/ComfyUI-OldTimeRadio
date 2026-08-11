@@ -1455,6 +1455,12 @@ class LtxAudioInEngine(_LtxAvBase):
     # the deleted ltx_av_music engine held). default_roles must be subset of roles.
     default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref", "init_image")
+    #: BOTH boots are legal for this lane (row 7b, 2026-08-11). `default` still
+    #: RENDERS -- it cleared the gate by 35 MB -- so forbidding it would refuse
+    #: a configuration that works. What the diet buys is MARGIN, and the receipt
+    #: says which boot produced which number rather than the profile pretending
+    #: only one exists.
+    compatible_boot_contracts = ("default", "ltx_av_diet")
     #: THE CANVAS, DECLARED (S3, lane 7, 2026-08-11). 1024x576.
     #:
     #: WHAT THIS REPLACES. The canvas used to be computed inline in the driver
