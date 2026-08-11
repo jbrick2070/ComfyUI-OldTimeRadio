@@ -650,6 +650,133 @@ test caught in a network outage, not a code defect.
 
 ---
 
+## L11 -- A derived canvas is a canvas, and the grid applies to it
+
+**Check:** does this lane compute any INTERMEDIATE resolution from the render
+canvas -- a half-canvas pass, a tile, a base latent, an upsample target? If so,
+run the same legality check on the derived value that you run on the full one,
+and derive the constraint on the FULL canvas from it.
+
+**Symptom:** none from the code's side, for weeks. The full canvas passes every
+gate, the render succeeds, and an illegal intermediate rides underneath it. The
+suite can even PIN the illegal value as correct.
+
+**Root cause:** `assert_ltx_dims` was called on the full canvas at two sites and
+never on the derived one. Nothing in the codebase knew the derived value
+existed except the graph builder that computed it.
+
+**Origin (lane 7):** `_build_graph_ia2v` halves the canvas for its stage-A
+motion pass (`base_w, base_h = width // 2, height // 2`). At the lane's live
+832x480 that is 416x240, and `240 % 32 == 16`. Three things asserted it was
+fine: the driver comment said "base 416x240 (all /32)",
+`tests/test_ltx_av_ia2v_canonical.py` pinned 416 and 240 as expected, and the
+full-canvas gate passed because 832x480 IS /32.
+
+**The arithmetic worth keeping, because it generalises:** stage B feeds that
+latent to `LTXVLatentUpsampler`, whose installed schema
+(`comfy_extras/nodes_lt_upsampler.py`) takes `samples` / `upscale_model` / `vae`
+and NO target size -- it "upsamples a video latent by a factor of 2", full stop.
+So the DELIVERED canvas is 2x the stage-A base, and therefore:
+
+* the stage-A latent is /32-legal **iff the full canvas is /64 on both axes**;
+* snapping the base up to fix it is NOT a fix -- base 416x256 delivers 832x512
+  against a declared 832x480, trading an illegal latent for a canvas lie.
+
+/64 rungs, with the aspect stated so nobody re-derives them: 1024x576 (exact
+16:9), 896x512 (7:4), 1280x704 (1.818, and the one that breached the ceiling).
+Only 1024x576 is both /64 and exact 16:9.
+
+**Runnable check:** grep the lane's graph builder for `// 2`, `* 2`, `//`, and
+any `width`/`height` arithmetic, then assert the result against the model's
+spatial multiple at the point it is computed -- not at the caller.
+
+**Twin assertion:** `eng_ltx_av._build_graph_ia2v` now calls
+`_AVD.assert_ltx_dims(base_w, base_h, length)` on the derived latent, and
+`tests/test_ltx_av_ia2v_canonical.py::test_two_stage_topology` pins the legal
+512x288 with the reasoning in the test.
+
+---
+
+## L12 -- Check a contract-bearing env var RAW, not after its own fallback
+
+**Check:** does the refusal that compares environment to declaration read the
+RAW `os.environ` string, or a module constant that a crash-guard has already
+normalised? If the latter, the refusal cannot see the disagreement it exists to
+catch.
+
+**Symptom:** the check passes, the operator's variable is ignored, and nothing
+says so. Strictly worse than having no check, because the check's existence
+reads as proof the case is handled.
+
+**Root cause:** two correct rules composed into a wrong one. `_env_num` exists
+so a typo cannot take the IMPORT down (it warns and returns the declared
+default) -- that is right. `assert_env_matches_contract` exists so an env value
+that disagrees with a declaration is a refusal -- also right. But comparing
+`_LTX_AV_MAX_FRAMES` (already fallen back to 497) against `max_frames=497`
+reports AGREEMENT for `OTR_LTX_AV_MAX_FRAMES=garbage`.
+
+**Origin (lane 7):** found by the kibitz r1 panel (codex, MUST-FIX 4) in the
+first draft of this lane's own refusal, before it shipped.
+
+**Runnable check:** for every contract-bearing variable, assert that BOTH a
+parseable disagreement AND an unparseable value raise. If the test only covers
+the parseable case, the fallback hole is still open.
+
+**Twin assertion:**
+`tests/test_ltx_av_driver_wiring.py::test_a_contract_bearing_env_var_is_checked_RAW_not_after_the_fallback`,
+parameterised over both shapes.
+
+---
+
+## Lane 7 -- `ltx23_low_audio_in` (`ltx_audio_in`), closed 2026-08-11
+
+Four owned defects, and the two biggest turned out to be one defect wearing two
+spec numbers. Full write-up in the receipt; what the NEXT lane must check:
+
+**What bit (1): S3 and S8b-10 were the same defect.** The spec listed them
+separately -- "declare render_canvas = (1024, 576)" and "the ia2v stage-A base
+416x240 is not /32-legal" -- and they read like a preference and a bug. They are
+one bug: the canvas was decided by an inline RECIPE-DEPENDENT branch in the
+driver that `declared_render_canvas` would have overruled anyway, and the value
+that branch chose has no legal stage A. Declaring 1024x576 fixes both, and the
+reason is arithmetic (L11), not spec obedience.
+
+**Runnable check:** when a spec lists a "declare X" item and a "Y is illegal"
+item on the same lane, check whether declaring X makes Y legal before treating
+them as two jobs.
+
+**What bit (2): the panel found a hole in my own fix before it shipped.** See
+L12. Worth recording because the fix LOOKED complete and had a passing test.
+
+**What bit (3): lane 5's rename never reached four other variants.** Five
+committed variants still carried `wan_8gb (16:9)` in node 87 --
+`otr_amd16_rocm`, `otr_amd8_rocm`, `otr_nv40_12gb`, `otr_upscale_ship`,
+`otr_sbcov_5`. Lane 5 regenerated only the variant whose profile it edited, so
+`scripts/build_variants.py --check` had been RED since that lane closed, and
+lane 7 could not tell its own drift from inherited drift.
+
+**Runnable check:** a rename regenerates **every** variant, not the lane's own
+-- node 87 carries an engine string in variants that have nothing to do with
+the renamed lane's profile. Run `scripts/build_variants.py --check` BEFORE
+starting a lane, so an inherited red is attributed to the lane that caused it.
+
+**What bit (4): the LTX boot lane enabled only one of the two LTX engines.**
+`_otr_soak_server_launch.cmd`'s `LTX` token set `OTR_ENABLE_LTX_VIDEO=1` and not
+`OTR_ENABLE_LTX_AV=1`, so this lane could not be smoked on the boot it declares
+without exporting a flag by hand. A boot lane you have to supplement by hand is
+not a boot lane; the token now enables both.
+
+**Runnable check:** before smoking, confirm the lane's engine is ENABLED by the
+boot token it declares -- read the launcher, then confirm on the running server
+that the engine appears in `/object_info`. A fail-closed `EngineUnusable` and a
+missing enable flag look identical from the smoke's exit code.
+
+**What did NOT bite:** the weight resolver, the manifest fields, the V-1
+self-probe and the admission honesty gate were all already green on this lane
+before the packet started (G1, G3, G4, G5, G7 never went red).
+
+---
+
 ## A process defect this ledger caught about ITSELF (2026-08-11, lane 7)
 
 Lanes 4, 5 and 6 closed green and pushed **without appending to this file**.

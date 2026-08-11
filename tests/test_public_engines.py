@@ -23,7 +23,6 @@ from nodes._otr_workflow_apply import (
 
 _TIER = {
     "ltx_8gb": "ltx_8gb",
-    "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
     # The low/high convention (operator ruling 2026-08-09) lands ONE LANE AT A
     # TIME with the video transplant, not as a family sweep -- so this dict
@@ -47,6 +46,11 @@ _TIER = {
     "wan22_high_video": "wan_ti2v",
     # Lane 6, 2026-08-11: an IDENTITY row on the way out needs no alias.
     "wan22_high_fast": "fastwan_8gb",
+    # Lane 7, 2026-08-11: the second MOVE. `ltx23_16gb_audio_in` left this
+    # table for _LEGACY_ENGINE_ALIASES in the same edit. `low` is measured --
+    # 7.36 GiB warm at the newly declared 1024x576x193 -- and the `16gb` token
+    # said the opposite of the truth on the cheapest local video lane there is.
+    "ltx23_low_audio_in": "ltx_audio_in",
 }
 
 

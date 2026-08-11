@@ -120,10 +120,15 @@ def test_ltx_audio_in_character_beat_uses_wide_scene_character_still(monkeypatch
 
 # ---- canvas clamp + scene-prompt join ----------------------------------------
 
-def test_ltx_audio_in_clamps_to_vram_safe_av_canvas(monkeypatch):
-    # 512x288 is the SINGLE-PASS recipes' M0-safe clamp; under ia2v_canonical
-    # the default is the canonical-native 1280x720 (locked in
-    # test_ltx_av_ia2v_canonical.py::test_ia2v_render_canvas_defaults_...).
+def test_ltx_audio_in_takes_its_OWN_declared_canvas(monkeypatch):
+    # Was `..._clamps_to_vram_safe_av_canvas`, asserting the 512x288 half of an
+    # inline recipe-dependent branch in the driver. Lane 7 (2026-08-11) deleted
+    # that branch: the lane DECLARES 1024x576 and the declaration is applied
+    # last, so one canvas answers for every recipe. The invariant this test
+    # guards -- this lane never takes the shared landscape default -- is
+    # unchanged, and is now asserted against the declaration rather than a
+    # literal, so the number can move without the test lying.
+    from nodes._otr_video_engines.eng_ltx_av import LtxAudioInEngine
     monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
@@ -131,7 +136,8 @@ def test_ltx_audio_in_clamps_to_vram_safe_av_canvas(monkeypatch):
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
     req = rd.build_request_from_shot(
         _shot("ltx_audio_in", "music_visual"), _ledger())
-    assert (req["canvas"]["w"], req["canvas"]["h"]) == (512, 288)
+    assert (req["canvas"]["w"],
+            req["canvas"]["h"]) == tuple(LtxAudioInEngine.render_canvas)
 
 
 def test_ltx_audio_in_music_open_gets_a_composed_prompt(monkeypatch):

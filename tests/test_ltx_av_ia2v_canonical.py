@@ -46,7 +46,7 @@ def ia2v_env(monkeypatch):
     return LtxAudioInEngine()
 
 
-def _graph(eng, image="still.png", w=832, h=480, length=121, seed=7):
+def _graph(eng, image="still.png", w=1024, h=576, length=121, seed=7):
     plan = {"text_prompt": "the radio is talking as it speaks", "seed": seed,
             "target_frame_count": length}
     return eng._build_graph(plan, length, w, h, "voice.wav", image)
@@ -59,8 +59,16 @@ def test_dev_default_recipe_is_ia2v(ia2v_env):
 def test_two_stage_topology(ia2v_env):
     g = _graph(ia2v_env)
     # STAGE A: half-canvas empty latent + soft inplace anchor + masked audio
-    assert g["emptylatent"]["inputs"]["width"] == 416      # 832 // 2
-    assert g["emptylatent"]["inputs"]["height"] == 240     # 480 // 2
+    # STAGE A IS A REAL LATENT AND LTX'S /32 GRID APPLIES TO IT (S8b-10, lane 7).
+    # These two lines used to pin 416x240 -- the exact halving of the old
+    # 832x480 canvas -- and `240 % 32 == 16`, so the suite was pinning an
+    # ILLEGAL latent as correct while the driver's comment claimed "(all /32)".
+    # 1024x576 halves to 512x288, and both are /32. The lane declares 1024x576
+    # for exactly this reason: LTXVLatentUpsampler doubles with no target size,
+    # so the delivered canvas IS 2x this base, and only a /64 canvas has a legal
+    # stage A. See LtxAudioInEngine.render_canvas.
+    assert g["emptylatent"]["inputs"]["width"] == 512      # 1024 // 2
+    assert g["emptylatent"]["inputs"]["height"] == 288     # 576 // 2
     assert g["emptylatent"]["inputs"]["length"] == 121
     assert g["inplace_base"]["inputs"]["strength"] == 0.7
     assert g["inplace_base"]["inputs"]["latent"] == W("emptylatent", 0)
@@ -126,7 +134,14 @@ def test_guide_image_conditioning_chain(ia2v_env):
     # canonical's FIXED 1920x1088 -> longer-edge 1536 keeps the guide SHARP
     # (downscaled) at ANY render canvas; the old 1.5x-of-canvas version built
     # a soft UPSCALED guide at 512x288 -- the production mouth prior killer.
-    for w, h in ((832, 480), (512, 288), (1280, 720)):
+    # The canvases here must be /64 on BOTH axes: the graph halves for stage A
+    # and that halved latent is now validated against LTX's /32 grid at its
+    # root (S8b-10). 832x480, 512x288 and 1280x720 all left this list in lane 7
+    # because their halves (416x240, 256x144, 640x360) are not /32 -- which is
+    # the defect this lane fixed, not a limitation of this test. The point of
+    # the test is unchanged and still tested: the guide chain's numbers are
+    # FIXED, whatever the canvas.
+    for w, h in ((1024, 576), (640, 384), (1280, 704)):
         g = _graph(ia2v_env, w=w, h=h)
         assert g["imagescale"]["inputs"]["image"] == W("loadimage", 0)
         assert g["imagescale"]["inputs"]["width"] == 1920
@@ -138,24 +153,41 @@ def test_guide_image_conditioning_chain(ia2v_env):
         assert g["inplace_refine"]["inputs"]["image"] == W("preprocess", 0)
 
 
-def test_ia2v_render_canvas_defaults_canonical_native(ia2v_env, tmp_path,
-                                                      monkeypatch):
-    # operator quality catch: under the two-stage recipe the AV canvas
-    # defaults to 832x480 (VRAM-laddered live: 704p breached the 14.5GB ceiling in the full pipeline; 512x288 was single-pass
-    # VRAM math -> 2.9x upscale mush); single-pass recipes keep 512x288.
+def test_the_canvas_is_ONE_declaration_and_not_a_per_recipe_branch(
+        ia2v_env, tmp_path, monkeypatch):
+    """THE DEFECT THIS REPLACES (S3, lane 7, 2026-08-11).
+
+    This test used to assert that the canvas was RECIPE-DEPENDENT -- 832x480
+    under ia2v_canonical, 512x288 under a single-pass recipe -- computed by an
+    inline branch in ``build_request_from_shot``. That branch has been deleted.
+
+    It could never have been the whole truth: ``declared_render_canvas`` is
+    applied LAST in the same function and overrules every earlier write, so the
+    moment this lane declared anything, the recipe branch became dead code. It
+    was ALSO wrong on its own terms -- 832x480 halves to 416x240 for the ia2v
+    stage-A latent and ``240 % 32 == 16``.
+
+    The lane now declares 1024x576 once, on the adapter, and the SAME canvas
+    comes back whatever the recipe. That is the property worth pinning: a
+    reader can answer "what does this lane render at?" from one place.
+    """
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
+    declared = tuple(LtxAudioInEngine.render_canvas)
+    assert declared == (1024, 576)
+    # /64 on both axes -- the ia2v two-stage graph's real constraint.
+    assert declared[0] % 64 == 0 and declared[1] % 64 == 0
 
     req = rd.build_request_from_shot(_announcer_open_shot(),
                                      _ltx_ledger(tmp_path))
-    assert (req["canvas"]["w"], req["canvas"]["h"]) == (832, 480)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == declared
     monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     req2 = rd.build_request_from_shot(_announcer_open_shot(),
                                       _ltx_ledger(tmp_path))
-    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (512, 288)
+    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == declared
 
 
 def test_videovae_split_survives_two_stage(ia2v_env):

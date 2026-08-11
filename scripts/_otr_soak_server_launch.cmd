@@ -86,7 +86,15 @@ if /i "%2"=="FLOOR" (
 ) else if /i "%2"=="LTX" (
   set OTR_ENABLE_HUMO=
   set OTR_ENABLE_LTX_VIDEO=1
-  echo [launch] LTX lane: Sage-free boot, OTR_ENABLE_LTX_VIDEO=1, HuMo OFF
+  rem OTR_ENABLE_LTX_AV added in lane 7 (2026-08-11). This token is THE LTX
+  rem boot lane and it was enabling only ONE of the two LTX engines, so the
+  rem audio-in lane could not be smoked on the boot it declares without the
+  rem operator exporting a flag by hand -- and a boot lane you have to
+  rem supplement by hand is not a boot lane. Both LTX engines stay DEFAULT-OFF
+  rem on every other token; this one turns them on together, which is what its
+  rem name has always promised.
+  set OTR_ENABLE_LTX_AV=1
+  echo [launch] LTX lane: Sage-free boot, OTR_ENABLE_LTX_VIDEO=1, OTR_ENABLE_LTX_AV=1, HuMo OFF
 ) else if /i "%2"=="WAN" (
   set OTR_ENABLE_HUMO=
   set OTR_ENABLE_WAN_I2V=1

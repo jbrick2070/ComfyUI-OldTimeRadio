@@ -1,6 +1,6 @@
 {
   "schema": "otr.video_evidence_manifest/1",
-  "manifest_version": 1,
+  "manifest_version": 2,
   "built": "2026-08-11",
   "lab_repo": "vram-recipe-lab",
   "lab_evidence_commit": "4d87cfa3278c39cbdde6f3cb8b16f241aeb58c02",
@@ -18,7 +18,7 @@
     "humo_1.7B": "admission NOT enforced: no cost row, and safe_render_frames is None so the exact-fit guard is skipped entirely -- an over-ladder beat emits 177 frames stamped as if honest. Owned by lane 3.",
     "humo_1.7B_169": "admission NOT enforced: inherits the 1.7B tier's missing cost row and has no landscape receipt of its own at any rung.",
     "humo_14B_169": "admission NOT enforced: the ruled hero cast has a measured 13.06 GiB warm landscape f97 receipt under the diet boot, but a receipt is not a qualified cost row and nothing refuses an over-budget plan on this lane today.",
-    "ltx_audio_in": "admission NOT enforced: no cost row. The affine FIT is CUT for LTX because the HQ ladder is non-monotonic against the model's pixel scaling, so this lane needs conservative ABSOLUTE envelopes rather than a smoothed line.",
+    "ltx_audio_in": "admission NOT enforced: no cost row. The affine FIT is CUT for LTX because the HQ ladder is non-monotonic against the model's pixel scaling, so this lane needs conservative ABSOLUTE envelopes rather than a smoothed line. Lane 7 (2026-08-11) DECLARED render_canvas = 1024x576, the canvas the ltx_av_hq_1024x576_f193 row measures, but that row is LAB WARM and this lane carries a live counter-receipt that in-pipeline peaks read higher than isolation probes (1280x704 breached at 14,716 MB in the full pipeline). The declaration is qualified by the lane's own solo smoke on this box, not by the lab row; until a cost row exists, admission stays unenforced here in words.",
     "ltx_video": "admission NOT enforced: no cost row, and its only datapoint is a FAILED chained diagnostic at 832x448 -- not the 832x480 it declares, and not a single-render number at all.",
     "ltx_8gb": "admission NOT enforced: no cost row and NO measurement of any kind on this box, which is also why its low/high public marker is still provisional.",
     "mesh_stage": "admission NOT enforced: no cost row; the lane's real preflight gap is the ungated hy3d graph, not a VRAM envelope."
@@ -508,6 +508,23 @@
       "seeds_cost_row": false,
       "receipt": "docs/evidence/lane_receipts/lane06-wan22_high_fast.md",
       "note": "Same dropped-field cause as wan_ti2v. Wall time is the comparable datum that DID survive: 70.5 s against wan_ti2v's 171.2 s for the identical render, 2.43x."
+    },
+    {
+      "lane": "ltx_audio_in",
+      "public_id": "ltx23_low_audio_in",
+      "canvas": "1024x576",
+      "model_frames": 193,
+      "delivered_frames": 193,
+      "boot_lane": "default (LTX token, Sage-free)",
+      "cache_state": "cold",
+      "surface": "absolute device total (VramPeakProbe max)",
+      "absolute_peak_mb": 14465,
+      "baseline_mb": 2513,
+      "net_mb": 11952,
+      "wall_time_s": 303.8,
+      "seeds_cost_row": true,
+      "receipt": "docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md",
+      "note": "Lane 7's declaration leg: the canvas moved 832x480 -> 1024x576 and this is the first measurement AT the declared canvas. ABSOLUTE clears the 14500 MB ceiling by only 35 MB (0.24%) and that is queue row 7b, an operator decision; NET is unremarkable and sits with the HuMo figures. The live absolute is 1.92x the lab warm number (7536 MB) for the identical config -- state the surface before comparing them. Recipe ia2v_canonical, Q3_K_M, LoRA on; no diet boot contract on this lane."
     }
   ]
 }

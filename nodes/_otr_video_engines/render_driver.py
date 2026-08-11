@@ -2523,34 +2523,23 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lxw, _lxh = 832, 480
         req["canvas"]["w"], req["canvas"]["h"] = _lxw, _lxh
-    # LTX-AV (audio-input) lane (M3 delta a): render at the M0-PROVEN-SAFE small
-    # native canvas (the 22B A2V model would blow the budget at the 480x832
-    # portrait (talk) / 1472x832 landscape (music) defaults set above), then let
-    # OTR_SilentComposite scale the clip to the deliverable. Diverges from
-    # ltx_video's 832x480 ON PURPOSE (heavier 22B). Env OTR_LTX_AV_RENDER_CANVAS
-    # (default 512x288; /32-friendly). The MEASURED per-recipe VRAM peaks (the
-    # fit lever is recipe/quant, NOT resolution -- see eng_ltx_av._quant_label +
-    # the per-beat PLAN log line + the bakeoff manifest), NOT a hardcoded MB here.
-    if str(shot.get("engine_id") or "") == "ltx_audio_in":
-        # ia2v_canonical canvas (lips-dont-talk kibitz + operator quality
-        # catch 2026-07-02): the 512x288 default was single-pass VRAM math
-        # and upscaled ~2.9x to the deliverable = the "really low quality"
-        # the operator flagged. Ladder walked LIVE: 1280x720 fails the /32
-        # grid gate (proof5b); 1280x704 BREACHED the 14.5GB ceiling in the
-        # full production pipeline (proof6: 14716 MB -- the isolation probes
-        # carried less resident state). 832x480 = 2.6x the old pixels, a
-        # 1.77x deliverable upscale, base 416x240 (all /32), and P1 proved
-        # articulation with a sharp guide at even smaller bases. Single-pass
-        # recipes keep the proven 512x288. Env-overridable either way.
-        _av_default = ("832x480"
-                       if _ia2v_talking_register_active("ltx_audio_in")
-                       else "512x288")
-        _avc = os.environ.get("OTR_LTX_AV_RENDER_CANVAS", _av_default)
-        try:
-            _avw, _avh = (int(x) for x in _avc.lower().split("x", 1))
-        except (ValueError, AttributeError):
-            _avw, _avh = 512, 288
-        req["canvas"]["w"], req["canvas"]["h"] = _avw, _avh
+    # THE ltx_audio_in INLINE CANVAS BRANCH WAS DELETED IN LANE 7 (2026-08-11).
+    #
+    # It computed the canvas here, RECIPE-DEPENDENTLY -- 832x480 when
+    # ia2v_canonical was live, 512x288 otherwise, either one overridable by
+    # OTR_LTX_AV_RENDER_CANVAS. That was three channels deciding one number
+    # while `declared_render_canvas` below is applied LAST and overrules all of
+    # them, so at most one of the three could ever have been true. The comment
+    # it carried also asserted the ia2v stage-A base "416x240 (all /32)", which
+    # is false -- 240 % 32 == 16 -- and that was S8b-10.
+    #
+    # The lane now DECLARES (1024, 576) on the adapter (LtxAudioInEngine.
+    # render_canvas), which is where the reasoning lives, and disagreement with
+    # OTR_LTX_AV_RENDER_CANVAS is a NAMED refusal in the adapter rather than a
+    # quiet re-plan here. The live receipts that walked the ladder -- 1280x720
+    # failing the /32 gate (proof5b) and 1280x704 breaching the 14.5 GB ceiling
+    # at 14,716 MB in the full production pipeline (proof6) -- are preserved at
+    # the declaration, because that is now the only place a reader needs to go.
     # A DECLARED RENDER CANVAS WINS (B5, 2026-07-27). LAST in the chain on
     # purpose: every write above is guarded by a mutually exclusive engine id
     # or family, so nothing can clobber this and this clobbers nothing -- and
@@ -2559,12 +2548,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # own declaration rather than the family/aspect logic above, so the two
     # mechanisms cannot disagree if a family mapping ever moves.
     #
-    # Declared today: `ltx_8gb` (512x288) and, since 2026-08-02, `ltx_video`
-    # (832x480). ltx_video joined because its 169-frame decode floor is
-    # CANVAS-DEPENDENT, so leaving the canvas to the env branch above left
-    # `OTR_LTX_RENDER_CANVAS` able to invalidate a STATIC frame contract
-    # without touching engine code. `ltx_audio_in` keeps its env
-    # branch until the general resolver lands (the O1 judgment's own scoping).
+    # Declared today: `ltx_8gb` (512x288); `ltx_video` (832x480) since
+    # 2026-08-02, because its 169-frame decode floor is CANVAS-DEPENDENT, so
+    # leaving the canvas to the env branch above left `OTR_LTX_RENDER_CANVAS`
+    # able to invalidate a STATIC frame contract without touching engine code;
+    # the four HuMo tiers and the three WAN lanes through the 2026-08-11 video
+    # transplant; and `ltx_audio_in` (1024x576) in lane 7, whose inline branch
+    # was DELETED rather than kept -- the sentence that used to sit here saying
+    # it "keeps its env branch until the general resolver lands" is no longer
+    # true, and a comment describing a mechanism that is gone is exactly the
+    # defect lesson L6 is about.
     _declared = declared_render_canvas(str(shot.get("engine_id") or ""))
     if _declared is not None:
         req["canvas"]["w"], req["canvas"]["h"] = _declared
@@ -5013,7 +5006,30 @@ def _clip_summary(clip):
     return {"engine_id": (clip or {}).get("engine_id"),
             "family": (clip or {}).get("family"),
             "frame_count": (clip or {}).get("frame_count"),
-            "path": path, "exists": exists, "size": size}
+            "path": path, "exists": exists, "size": size,
+            # THE TELEMETRY WAS BEING DROPPED HERE (relayed from the concurrent
+            # coder window, 2026-08-11; folded into lane 7 because this lane's
+            # solo smoke is what qualifies its new 1024x576 declaration, and a
+            # peak that never reaches disk cannot qualify anything).
+            #
+            # These six keys are produced by VramPeakProbe and the adapters'
+            # own receipts, and this summary -- the only shape that reaches the
+            # episode manifest (:5016) and the single-clip path (:5190) --
+            # returned six keys and none of them. So a lane could smoke green
+            # and leave no usable cost-row seed on disk; wan_ti2v and fastwan
+            # both did. Purely ADDITIVE: no existing key changes meaning.
+            #
+            # A cost row may be seeded ONLY from a true VramPeakProbe MAXIMUM.
+            # A single nvidia-smi reading is a LOWER BOUND, and a row built on
+            # a lower bound under-predicts -- which admits renders that then
+            # OOM. A missing peak must stay NULL here rather than be filled in
+            # from a watcher's sample.
+            "vram_peak_mb": (clip or {}).get("vram_peak_mb"),
+            "recipe": (clip or {}).get("recipe"),
+            "quant": (clip or {}).get("quant"),
+            "render_canvas": (clip or {}).get("render_canvas"),
+            "native_frame_count": (clip or {}).get("native_frame_count"),
+            "extension_mode": (clip or {}).get("extension_mode")}
 
 
 def _episode_facts(ep, meta):
@@ -5176,10 +5192,26 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     # the single-engine validation renders in the engine's NATIVE aspect: wide ->
     # 832x480 (the VRAM-safe proven render canvas, env OTR_VIDEO_RENDER_CANVAS),
     # else the portrait default.
+    # A DECLARED RENDER CANVAS WINS HERE TOO (lane 7, 2026-08-11). This was the
+    # THIRD channel deciding a canvas, and the only one `declared_render_canvas`
+    # did not reach: `build_request_from_shot` applies the declaration last, but
+    # `render_single` builds its own request and never asked. Every solo lane
+    # smoke runs through here, so every lane's smoke was validating the ASPECT
+    # DEFAULT rather than the declaration -- invisible for lanes 1-6 only
+    # because all six declared exactly what this path already defaulted to
+    # (832x480 wide, 480x832 portrait). The first lane to declare something else
+    # failed its own /32 guard on a live render, which is the gate working.
+    #
+    # An explicit `canvas=` argument still wins, so a caller can deliberately
+    # probe an off-declaration size; the declaration only replaces the DERIVED
+    # default.
     if canvas is None:
         try:
             _eng = _vreg.get_engine(engine_name)
-            if getattr(_eng, "render_aspect", "portrait") == "wide":
+            _declared = declared_render_canvas(engine_name)
+            if _declared is not None:
+                canvas = tuple(_declared)
+            elif getattr(_eng, "render_aspect", "portrait") == "wide":
                 _rc = os.environ.get("OTR_VIDEO_RENDER_CANVAS", "832x480")
                 try:
                     _rw, _rh = (int(x) for x in _rc.lower().split("x", 1))

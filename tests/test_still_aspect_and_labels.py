@@ -129,7 +129,11 @@ def test_label_suffix_is_aspect_derived():
     # video-tiers (2026-07-20): the four PUBLIC-aliased tier engines show their
     # public menu id (aspect suffix still derived from the internal engine).
     assert vd._label_for("ltx_video") == "ltx23_16gb_video (16:9)"
-    assert vd._label_for("ltx_audio_in") == "ltx23_16gb_audio_in (16:9)"
+    # ltx_audio_in took its low/high name in lane 7 (2026-08-11); ltx_video
+    # still carries the retiring `16gb` token because its own packet (lane 9)
+    # has not run. Both spellings living here at once is the one-lane-at-a-time
+    # rollout being visible, not a drift.
+    assert vd._label_for("ltx_audio_in") == "ltx23_low_audio_in (16:9)"
     assert vd._label_for("wan_ti2v") == "wan22_high_video (16:9)"
     assert vd._label_for("ltx_8gb") == "ltx_8gb (16:9)"
 

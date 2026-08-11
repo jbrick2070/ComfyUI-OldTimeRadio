@@ -167,7 +167,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | humo_1.7B_169 | 832x480 | engine _native_dims |
 | humo_14B_169 | 832x480 | engine _native_dims |
 | ltx_8gb | 512x288 | declared |
-| ltx_audio_in | 832x480 talking / 512x288 otherwise | driver env branch OTR_LTX_AV_RENDER_CANVAS |
+| ltx_audio_in | 1024x576 | declared |
 | ltx_video | 832x480 | declared |
 | mesh_stage | 1472x832 | SHARED LANDSCAPE DEFAULT (unclaimed) |
 | still_flat | 1472x832 | shared landscape (by design for this family) |

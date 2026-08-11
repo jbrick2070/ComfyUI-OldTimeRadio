@@ -40,33 +40,90 @@ def _shot(engine_id, role, **over):
 
 
 @pytest.mark.parametrize("engine", ["ltx_audio_in"])
-def test_render_canvas_clamped_to_m0_safe(engine, monkeypatch):
-    # 512x288 is the SINGLE-PASS M0-safe clamp; the ia2v_canonical default is
-    # the canonical-native 1280x720 (locked in test_ltx_av_ia2v_canonical.py).
+def test_the_declared_canvas_wins_over_the_landscape_default(engine,
+                                                             monkeypatch):
+    """The property the old M0 clamp was really protecting, stated directly.
+
+    This used to assert 512x288 -- the single-pass half of an inline,
+    RECIPE-DEPENDENT branch in ``build_request_from_shot``. Lane 7 deleted that
+    branch: the lane declares 1024x576 once and ``declared_render_canvas`` (the
+    LAST write in that function) applies it whatever the recipe. What mattered
+    then still matters now, and it is the only thing asserted here: this lane
+    does NOT fall through to the 480x832 portrait / 1472x832 landscape
+    defaults, which its 22B A2V unet cannot afford.
+    """
+    from nodes._otr_video_engines.eng_ltx_av import LtxAudioInEngine
     monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
     monkeypatch.setenv(
         "OTR_LTX_AV_UNET",
         r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
-    role = "music_visual"
-    req = rd.build_request_from_shot(_shot(engine, role), _ledger())
-    # the lane clamps to the M0-proven-safe native canvas (512x288), NOT the
-    # 480x832 portrait / 1472x832 landscape defaults
-    assert req["canvas"]["w"] == 512
-    assert req["canvas"]["h"] == 288
+    req = rd.build_request_from_shot(_shot(engine, "music_visual"), _ledger())
+    got = (req["canvas"]["w"], req["canvas"]["h"])
+    assert got == tuple(LtxAudioInEngine.render_canvas)
+    assert got not in ((480, 832), (1472, 832))
 
 
-def test_render_canvas_env_override(monkeypatch):
-    # single-pass pin (S4c: an ia2v bookend REQUIRES the radio-face still,
-    # out of scope for this canvas-env contract).
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+def test_an_env_canvas_that_disagrees_with_the_declaration_is_a_REFUSAL(
+        monkeypatch):
+    """NOT a quiet re-plan -- the same doctrine ltx_video and ltx_8gb enforce.
+
+    ``OTR_LTX_AV_RENDER_CANVAS`` used to WIN here, and this test asserted that
+    it did. It cannot win any more: the declaration is applied last. Handing an
+    operator who explicitly asked for 832x480 a 1024x576 render is its own
+    small lie, so the adapter refuses by name before any staging or GPU work.
+    On this lane the env is not cosmetic either -- ia2v halves the canvas for
+    stage A, so a canvas that is not /64 on both axes has no legal stage A.
+    """
+    from nodes._otr_video_engines.eng_ltx_av import (LtxAudioInEngine,
+                                                     assert_env_matches_contract)
+    from nodes._otr_video_engines.frame_contract import ContractEnvConflict
     monkeypatch.setenv("OTR_LTX_AV_RENDER_CANVAS", "832x480")
-    req = rd.build_request_from_shot(
-        _shot("ltx_audio_in", "music_visual"), _ledger())
-    assert (req["canvas"]["w"], req["canvas"]["h"]) == (832, 480)
+    with pytest.raises(ContractEnvConflict) as excinfo:
+        assert_env_matches_contract(LtxAudioInEngine.frame_contract,
+                                    LtxAudioInEngine.render_canvas)
+    msg = str(excinfo.value)
+    assert "OTR_LTX_AV_RENDER_CANVAS" in msg      # names the variable
+    assert "1024x576" in msg                      # names the legal value
+    assert "NO FALLBACK" in msg
+    # and it stays silent when the env AGREES with the declaration
+    monkeypatch.setenv("OTR_LTX_AV_RENDER_CANVAS", "1024x576")
+    assert_env_matches_contract(LtxAudioInEngine.frame_contract,
+                                LtxAudioInEngine.render_canvas)
+
+
+@pytest.mark.parametrize("raw,needle", [
+    ("193", "disagrees"),          # parses, and is not the declaration
+    ("not-a-number", "not an integer"),   # cannot be parsed at all
+])
+def test_a_contract_bearing_env_var_is_checked_RAW_not_after_the_fallback(
+        raw, needle, monkeypatch):
+    """The hole a reviewer found in the first draft of this check (kibitz r1).
+
+    ``_LTX_AV_MAX_FRAMES`` is parsed at IMPORT by ``_env_num``, which turns a
+    malformed value into the declared 497 with a warning. So a check written as
+    ``if _LTX_AV_MAX_FRAMES != contract.max_frames`` reports AGREEMENT for a
+    variable the operator set and this adapter is ignoring -- the exact silence
+    the refusal exists to break.
+
+    Two policies on purpose. ``_env_num`` still keeps a typo from taking the
+    import down and deleting the lane from the menu; but a CONTRACT-BEARING
+    variable is read RAW here, and both "parses to something else" and "does
+    not parse" are refusals, because the planner already partitioned the beat
+    against the declaration.
+    """
+    from nodes._otr_video_engines.eng_ltx_av import (LtxAudioInEngine,
+                                                     assert_env_matches_contract)
+    from nodes._otr_video_engines.frame_contract import ContractEnvConflict
+    monkeypatch.delenv("OTR_LTX_AV_RENDER_CANVAS", raising=False)
+    monkeypatch.setenv("OTR_LTX_AV_MAX_FRAMES", raw)
+    with pytest.raises(ContractEnvConflict) as excinfo:
+        assert_env_matches_contract(LtxAudioInEngine.frame_contract,
+                                    LtxAudioInEngine.render_canvas)
+    msg = str(excinfo.value)
+    assert "OTR_LTX_AV_MAX_FRAMES" in msg
+    assert needle in msg
+    assert "NO FALLBACK" in msg
 
 
 def test_ltx_audio_in_joins_scene_prompt_branch(monkeypatch):

@@ -70,17 +70,26 @@ dialogue, so they should not run mid-Lemmy.
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
 **WINDOW HANDOFF 2026-08-11: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
-first.** 6 of 21 packets confirmed working and pushed; **lane 7
-(`ltx23_low_audio_in`) is next.** Baselines to detect drift against: suite
-**9920 passed / 109 skipped / 1 xfailed**, Bug Bible **20 passed / 24
-skipped / 3 xfailed** at 264 entries. Box was left CLEAN (no resident
-server, VRAM at the ~1.9 GB desktop baseline).
+first.** 7 of 21 packets confirmed working and pushed; **lane 8
+(`ltx098_low_video` / `ltx_8gb`) is next.** Baselines to detect drift
+against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at 264 entries;
+`scripts/build_variants.py --check` **0 failures** (it had been RED since
+lane 5 -- see the lane 7 row). Box was left CLEAN (no resident server, VRAM
+at the ~2.1 GB desktop baseline).
 
-**The kibitz gate has NOT run on this build's CODE.** The corpus carries a
-full four-round arc plus two QA passes, and lanes 0-6 were built to that
-reviewed plan -- but no panel has seen the diffs. That is a real gap under
-the 2026-08-04 directive, not a scoped tail, and it is the operator's call
-whether the next window pays it before lane 7 or after the roster closes.
+**RUN `scripts/build_variants.py --check` BEFORE STARTING A LANE.** Lane 7
+inherited five red variants from lane 5 and had to distinguish them from its
+own. A red at the start of a lane belongs to whoever caused it.
+
+**The kibitz gate: r1 ran on lane 7, then the operator withdrew it mid-lane
+("skip the kibitz and code").** The r1 panel (codex `gpt-5.6-sol` high +
+antigravity) independently converged on the same disposition the driver
+anchor proposed AND found a real hole in the shipped fix before it landed --
+a contract-bearing env var was being compared AFTER its own crash-guard
+fallback, so a malformed value read as agreement (now lesson L12). Artifacts:
+`kibitz-runs/2026-08-11-lane07-ltx-audio-in/r1/`. Rounds r2-r4 were NOT run
+and this is not a four-round arc. **Lanes 0-6 have had no panel on their
+diffs at all** -- still open, still the operator's call.
 
 Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
 its QA before touching the next.** A lane may take several commits when
@@ -111,7 +120,8 @@ written), `TODO`.
 | 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** | TODO |
 | 6 | `wan22_high_fast` / `fastwan_8gb` | public surface + live proof; the cost row stays put with wan_ti2v's per Q3 | **DONE** -- 7/7 green before and after, live 832x480 f81 smoke in **70.5 s vs wan_ti2v's 171.2 s** on the same boot/still/rung (2.43x). Receipt `docs/evidence/lane_receipts/lane06-wan22_high_fast.md` |
-| 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | TODO |
+| 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | **DONE** -- 7/7 green. S3 and S8b-10 turned out to be ONE defect: the canvas was an inline recipe-dependent driver branch (832x480 ia2v / 512x288 single-pass) that `declared_render_canvas` overruled anyway, and 832x480 halves to the ia2v stage-A latent 416x240 with `240 % 32 == 16`. `LTXVLatentUpsampler` doubles with NO target size, so the delivered canvas IS 2x the stage-A base and only a /64 canvas has a legal stage A -- 1024x576 is the only rung that is /64 AND exact 16:9. Declared, branch deleted, halving validated at its root, env disagreement now a named refusal. Receipt `docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md`. **Three things this lane found that are NOT its own:** lane 5's rename never regenerated five other variants still carrying `wan_8gb (16:9)` (so `build_variants --check` had been RED since lane 5); the `LTX` boot token enabled only one of the two LTX engines; and `render_single` -- the path EVERY solo lane smoke uses -- never consulted `declared_render_canvas`, so lanes 1-6 all validated the aspect default and only coincidence made that invisible. All three fixed here. |
+| 7b | `ltx_audio_in` HEADROOM -- **operator decision** | The lane's live cold peak is **14,465 MB against a 14,500 MB ceiling: 35 MB, 0.24%**. It passes and it is not comfortable, and the live figure is **1.92x the lab's warm number** for the same config (7,536 MB) -- the second time this lane has caught a lab number reading low. A smaller canvas is NOT available: the ia2v two-stage recipe needs /64 on both axes and 1024x576 is the smallest exact-16:9 rung that qualifies. The lever that IS available without touching recipes is a diet-style boot contract (`--reserve-vram` + `--disable-pinned-memory`), the mechanism lane 2 built and proved for HuMo; this lane declares none and smoked on stock `default`. Decide: ship as-is, or spend one leg proving a diet contract | TODO |
 | 8 | `ltx098_low_video` / `ltx_8gb` | lab-first measurement before naming, S8b-11, S8b-13 Sage + node gates, profile-canvas reconciliation | TODO |
 | 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | TODO |
 | 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | TODO |

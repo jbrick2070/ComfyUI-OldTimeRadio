@@ -114,13 +114,52 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     # test guards is unchanged -- an engine that declares NOTHING is still
     # untouched -- and mesh_stage now carries the control.
     # `humo` left this list in lane 4 (2026-08-11) when the HuMo family
-    # closed -- the third occupant to leave. What remains are lanes whose
-    # own packets have not run yet.
-    for other in ("ltx_audio_in", "mesh_stage",
-                  "still_pan", "viz_mxc_cpu"):
+    # closed -- the third occupant to leave. `ltx_audio_in` left in lane 7 the
+    # same day: its ia2v graph halves the canvas for stage A and doubles it
+    # back with a fixed-x2 upsampler, so an undeclared canvas could produce a
+    # stage-A latent LTX's /32 grid rejects. It declares (1024, 576) now. What
+    # remains are lanes whose own packets have not run yet.
+    for other in ("mesh_stage", "still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None
     assert rd.declared_render_canvas("") is None
+
+
+def test_render_single_takes_the_DECLARATION_not_the_aspect_default(
+        monkeypatch):
+    """THE THIRD CANVAS CHANNEL, found on a live render in lane 7 (2026-08-11).
+
+    `build_request_from_shot` applies `declared_render_canvas` LAST so nothing
+    can clobber it -- but `render_single` builds its OWN request and never
+    asked. It derived the canvas from `render_aspect` plus
+    `OTR_VIDEO_RENDER_CANVAS`: wide -> 832x480, else the portrait default.
+
+    EVERY solo lane smoke runs through that function, so every lane was
+    validating the aspect default rather than its declaration. It stayed
+    invisible through six lanes because all six declared exactly what this path
+    already produced (832x480 wide, 480x832 portrait). `ltx_audio_in` was the
+    first lane to declare something else, and its stage-A /32 guard failed the
+    live render immediately -- which is how this was found.
+
+    Asserted here rather than on ltx_audio_in alone: the property belongs to
+    the declaration mechanism, not to one lane.
+    """
+    captured = {}
+    monkeypatch.setattr(rd, "build_request",
+                        lambda shot, assets, frames, canvas: captured.setdefault(
+                            "canvas", canvas) or {"canvas": canvas})
+    monkeypatch.setattr(rd, "_render_one",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop")))
+    monkeypatch.setenv("OTR_VIDEO_RENDER_CANVAS", "832x480")
+    rd.render_single(LANE, frame_count=9)
+    assert captured["canvas"] == DECLARED, (
+        "render_single handed %r to build_request while %s declares %r -- the "
+        "declaration must reach every request builder, not just the shot one"
+        % (captured["canvas"], LANE, DECLARED))
+    # an EXPLICIT canvas still wins, so an off-declaration probe stays possible
+    captured.clear()
+    rd.render_single(LANE, frame_count=9, canvas=(640, 384))
+    assert captured["canvas"] == (640, 384)
 
 
 @pytest.mark.parametrize("bad,needle", [

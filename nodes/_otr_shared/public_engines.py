@@ -29,7 +29,6 @@ from __future__ import annotations
 #: itself (its internal id IS its public id).
 _PUBLIC_ENGINES = {
     "ltx_8gb": "ltx_8gb",
-    "ltx23_16gb_audio_in": "ltx_audio_in",
     "ltx23_16gb_video": "ltx_video",
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
     # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
@@ -75,6 +74,13 @@ _PUBLIC_ENGINES = {
     # The label sells THROUGHPUT, never quality: same motion, same canvas,
     # same VRAM as wan22_high_video, about 2.7x sooner.
     "wan22_high_fast": "fastwan_8gb",
+    # Lane 7, 2026-08-11. `ltx23_16gb_audio_in` MOVED into
+    # _LEGACY_ENGINE_ALIASES in the same edit -- the second MOVE, and the same
+    # bijection reasoning as lane 5. `low` is the measured bucket: 7.2-7.5 GiB
+    # at 832x480x97 and 7.36 GiB at the newly declared 1024x576x193, both lab
+    # warm, against a 14.5 GiB gate -- comfortably the cheapest local video lane
+    # in the roster, which is exactly what the token is for.
+    "ltx23_low_audio_in": "ltx_audio_in",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -107,6 +113,13 @@ _LEGACY_ENGINE_ALIASES = {
     # 12.5-13.2 GiB -- it cannot run on an 8 GB card at
     # production canvas.
     "wan_8gb": "wan_ti2v",
+    # MOVED out of _PUBLIC_ENGINES in lane 7 (2026-08-11). The `16gb` token
+    # is retired for the same reason `8gb` was: it encoded the card the lane
+    # was built for rather than what it measures, and this is the CHEAPEST
+    # local video lane in the roster -- calling it the 16 GB tier told users
+    # the opposite of the truth. Every saved graph, profile and variant
+    # carrying the old string still resolves through here.
+    "ltx23_16gb_audio_in": "ltx_audio_in",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -122,8 +135,12 @@ _PUBLIC_LABEL = {
     "wan22_high_fast": (
         "FastWan 2.2 TI2V 5B 3-step - high VRAM (the SAME motion at the "
         "SAME canvas for the SAME VRAM as wan22_high_video, ~2.7x sooner)"),
-    "ltx23_16gb_audio_in": "LTX 2.3 - 16GB Audio In",
     "ltx23_16gb_video": "LTX 2.3 - 16GB Video",
+    # "low" is the measured bucket and the label says which rung it came from,
+    # per the lane-1 convention. Audio-conditioned, so the id says `audio_in`.
+    "ltx23_low_audio_in": (
+        "LTX 2.3 22B audio-in - low VRAM (7.36 GiB warm at 1024x576x193; "
+        "the cheapest local video lane)"),
     # "high" is the measured bucket, not a quality claim: 13.93 GiB warm at
     # 832x480x33 against a 14.5 GiB gate. The rung is named because only f33
     # has warm evidence -- the f177 the contract allows is model-legal and not

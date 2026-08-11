@@ -1,6 +1,6 @@
 {
   "id": "otr_16gb_ltx_audio_in",
-  "display_name": "16 GB - LTX 2.3 Audio In (ltx23_16gb_audio_in)",
+  "display_name": "LTX 2.3 Audio In - low VRAM (ltx23_low_audio_in)",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -62,8 +62,8 @@
   },
   "render": {
     "fps": 25,
-    "canvas_w": 832,
-    "canvas_h": 480,
+    "canvas_w": 1024,
+    "canvas_h": 576,
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,

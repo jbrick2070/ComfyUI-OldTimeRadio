@@ -38,6 +38,14 @@ MALFORMED = [
     ("OTR_LTX_AV_STEPS", "eight"),
     ("OTR_LTX_AV_CFG", "3.0.1"),
     ("OTR_LTX_AV_I2V_STRENGTH", ""),
+    # S8b-9, added in lane 7 (2026-08-11). THE TABLE WAS FOUR ROWS AND THE
+    # DOCSTRING ABOVE SAID "every module-scope environment read" -- and this
+    # fifth one, added later for the 2026-06-26 partial-unet-load reserve, was
+    # never routed through ``_env_num``. A test that claims total coverage of a
+    # defect class and misses a member of it is worse than no test: it is why
+    # the preflight matrix carried an EXPECTED_RED G6 row for this lane while
+    # this file sat green. The lesson is in docs/LANE_BUILD_LESSONS.md (L5).
+    ("OTR_LTX_AV_RESERVE_VRAM_GB", "four point oh"),
 ]
 
 #: The declared defaults these must fall back to. ``497`` is also the literal
@@ -48,6 +56,10 @@ DEFAULTS = {
     "_LTX_AV_STEPS": 8,
     "_LTX_AV_CFG": 3.0,
     "_LTX_AV_I2V_STRENGTH": 1.0,
+    # 4.0 NOT 3.0 deliberately: on a 16 GB card 3.0 left usable VRAM still above
+    # the 10537 MB unet, so it FULL-loaded and the activation peak grazed the
+    # spill cliff (~72 s/it, measured 2026-06-26). See eng_ltx_av.py:164-176.
+    "_LTX_AV_RESERVE_VRAM_GB": 4.0,
 }
 
 
@@ -67,7 +79,8 @@ def _import_with(env_overrides):
         "print('MAX', m._LTX_AV_MAX_FRAMES);"
         "print('STEPS', m._LTX_AV_STEPS);"
         "print('CFG', m._LTX_AV_CFG);"
-        "print('STRENGTH', m._LTX_AV_I2V_STRENGTH)"
+        "print('STRENGTH', m._LTX_AV_I2V_STRENGTH);"
+        "print('RESERVE', m._LTX_AV_RESERVE_VRAM_GB)"
     )
     env = dict(os.environ)
     env.update(env_overrides)
@@ -80,7 +93,8 @@ def _parsed(stdout):
     out = {}
     for line in stdout.splitlines():
         parts = line.split()
-        if len(parts) == 2 and parts[0] in ("MAX", "STEPS", "CFG", "STRENGTH"):
+        if len(parts) == 2 and parts[0] in ("MAX", "STEPS", "CFG", "STRENGTH",
+                                            "RESERVE"):
             out[parts[0]] = float(parts[1])
     return out
 
@@ -115,6 +129,7 @@ def test_a_malformed_env_value_falls_back_to_the_declared_default(name, bad):
     assert got["STEPS"] == DEFAULTS["_LTX_AV_STEPS"]
     assert got["CFG"] == DEFAULTS["_LTX_AV_CFG"]
     assert got["STRENGTH"] == DEFAULTS["_LTX_AV_I2V_STRENGTH"]
+    assert got["RESERVE"] == DEFAULTS["_LTX_AV_RESERVE_VRAM_GB"]
 
 
 def test_a_well_formed_env_value_is_still_honoured():

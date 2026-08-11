@@ -223,7 +223,7 @@ def test_decode_knobs_threaded_into_build_graph(monkeypatch):
     monkeypatch.delenv("OTR_LTX_AV_RECIPE", raising=False)
     eng = LtxAudioInEngine()
     graph = eng._build_graph(
-        {"text_prompt": "t", "seed": 0}, 105, 832, 480, "a.wav", "s.png")
+        {"text_prompt": "t", "seed": 0}, 105, 1024, 576, "a.wav", "s.png")
     dec = graph["decode"]["inputs"]
     assert dec["temporal_size"] == 256 and dec["temporal_overlap"] == 16
     assert dec["tile_size"] == 512 and dec["overlap"] == 64
@@ -234,7 +234,7 @@ def test_build_graph_default_decode_is_whole_clip(monkeypatch):
     monkeypatch.delenv("OTR_LTX_AV_RECIPE", raising=False)
     eng = LtxAudioInEngine()
     graph = eng._build_graph(
-        {"text_prompt": "t", "seed": 0}, 105, 832, 480, "a.wav", "s.png")
+        {"text_prompt": "t", "seed": 0}, 105, 1024, 576, "a.wav", "s.png")
     dec = graph["decode"]["inputs"]
     assert dec["temporal_size"] == 4096 and dec["temporal_overlap"] == 8
 

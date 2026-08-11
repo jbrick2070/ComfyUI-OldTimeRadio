@@ -17,8 +17,50 @@ working tree carries only other windows' files.**
 | 4 | `humo14_high_audio_in_portrait` (`humo`) | DONE `b53ca2f1` |
 | 5 | `wan22_high_video` (`wan_ti2v`) | DONE `d0536e72` |
 | 6 | `wan22_high_fast` (`fastwan_8gb`) | DONE `930e3bda` |
-| 7-21 | LTX trio, mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
+| 7 | `ltx23_low_audio_in` (`ltx_audio_in`) | DONE -- 7/7 green, live 1024x576 f193 smoke |
+| 7b | `ltx_audio_in` headroom | **OPERATOR DECISION -- read below** |
+| 8-21 | LTX pair, mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
+
+## THREE THINGS LANE 7 CHANGED FOR EVERY LANE AFTER IT
+
+**1. Run `scripts/build_variants.py --check` BEFORE starting a lane.** Lane 7
+inherited five RED variants from lane 5 -- they still carried `wan_8gb (16:9)`
+in node 87, because lane 5 regenerated only the variant whose profile it edited
+-- and had to separate them from its own drift. A red at the start of a lane
+belongs to whoever caused it. It is 46 variants / 0 failures right now.
+
+**2. A solo smoke means something different now.** `render_single` -- the path
+EVERY lane smoke runs through -- never consulted `declared_render_canvas`. It
+derived the canvas from `render_aspect` instead, so lanes 1-6 all validated the
+aspect default rather than their own declaration. Invisible for six lanes
+because all six declared exactly what that path already produced. Fixed;
+pinned by
+`test_ltx_8gb_canonical_canvas.py::test_render_single_takes_the_DECLARATION_not_the_aspect_default`.
+
+**3. A lane's VRAM peak now reaches disk.** The `_clip_summary` passthrough
+(relayed from the concurrent window, landed in lane 7's commit) means a smoke
+report carries `vram_peak_mb` / `recipe` / `quant` / `render_canvas` /
+`native_frame_count` / `extension_mode`. **One re-smoke each recovers the
+`wan_ti2v` and `fastwan` peaks** that were measured and dropped -- no
+measurement campaign, and it unblocks queue row 5a.
+
+## QUEUE ROW 7b -- the one thing only the operator can settle
+
+Lane 7's live COLD peak, stating both surfaces per the `f2470e31` ruling:
+
+* **ABSOLUTE 14,465 MB** against a 14,500 MB ceiling -- **35 MB, 0.24%**.
+* **NET 11,952 MB** (minus its own 2,513 MB pre-queue baseline) -- unremarkable,
+  sits with the HuMo figures (11,911 / 12,664 / 13,321), seed-eligible.
+
+It passes. On the will-it-fit question 0.24% is not headroom. A smaller canvas
+is NOT available: the ia2v two-stage recipe needs /64 on both axes and 1024x576
+is the smallest exact-16:9 rung that qualifies. The lever that IS available
+without touching a recipe is a diet-style boot contract -- the mechanism lane 2
+built and proved for HuMo. This lane declares none and smoked on stock
+`default`. Decide: ship as-is, or spend one leg proving a diet contract.
+
+Detail: `docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md`.
 
 "Confirmed working" = built, 7/7 preflight gates green, a live render smoked and
 PROBED (canvas, exact frame count, silence, no trim), full suite green, pushed.

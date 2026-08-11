@@ -185,15 +185,21 @@ EXPECTED_RED: dict = {
     # claiming 832x480 on a lane whose whole identity is the pillarbox.
     # LANE 4 CLOSED 2026-08-11 -- the last HuMo tier declares its canvas,
     # and BOTH its profiles stopped claiming landscape on the pillarbox.
-    ("ltx_audio_in", "G2"): (
-        "S3 -- the HQ lane must declare render_canvas = (1024, 576) at the "
-        "measured envelope; and S8b-10, the ia2v stage-A base latent 416x240 "
-        "is not /32-legal. OWNER: lane 7 (ltx23_low_audio_in)."),
-    ("ltx_audio_in", "G6"): (
-        "S8b-9 -- OTR_LTX_AV_RESERVE_VRAM_GB is a bare module-scope float(); "
-        "a malformed value raises at import, the guarded import swallows it, "
-        "and the lane VANISHES from the dropdown (registry 27 -> 26). "
-        "OWNER: lane 7 (ltx23_low_audio_in)."),
+    # LANE 7 CLOSED 2026-08-11 -- ltx_audio_in's G2 and G6 rows left this
+    # table. G6 was S8b-9: OTR_LTX_AV_RESERVE_VRAM_GB was the one module-scope
+    # numeric env read this adapter's own _env_num guard was never applied to,
+    # so a typo raised at import, the guarded import swallowed it, and the lane
+    # vanished from the dropdown (registry 27 -> 26) while frame_contract_for
+    # silently answered SINGLE_ONLY. G2 was S3 + S8b-10 together, and they
+    # turned out to be the same defect: the canvas was computed by an inline
+    # RECIPE-DEPENDENT branch in the driver (832x480 under ia2v, 512x288
+    # otherwise) that declared_render_canvas would have overruled anyway, and
+    # 832x480 halves to the ia2v stage-A latent 416x240 -- 240 % 32 == 16.
+    # Because LTXVLatentUpsampler doubles with NO target size, the delivered
+    # canvas IS 2x the stage-A base, so only a /64 canvas has a legal stage A.
+    # The lane declares (1024, 576), the halving is validated at its root, and
+    # an env canvas that disagrees is a named refusal. Pinned by
+    # tests/test_ltx_av_ia2v_canonical.py and tests/test_ltx_av_driver_wiring.py.
     ("ltx_8gb", "G6"): (
         "S8b-13 -- an LTX-Video 0.9.8 engine with NO assert_sage_not_patched "
         "gate at all, on the exact family BUG-070 was written for, and no "

@@ -48,7 +48,8 @@ import os
 
 from .._otr_shared import av_dims as _AVD
 from .._otr_shared.still_plan_helpers import StillPlanRow
-from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
+from .frame_contract import (CONTINUITY_SOFT_REFERENCE, ContractEnvConflict,
+                             FrameContract)
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
@@ -93,8 +94,10 @@ def _env_num(name, default, cast):
 # --- frame + canvas grounding (LTX-AV lane only; snap UP, never copy Lane A) ---
 _LTX_AV_MIN_FRAMES = _AVD._LTX_MIN_FRAMES        # 9 (8n+1 floor)
 _LTX_AV_MAX_FRAMES = _env_num("OTR_LTX_AV_MAX_FRAMES", 497, int)  # M0 initial
-_LTX_AV_NATIVE_W = 832
-_LTX_AV_NATIVE_H = 480
+# _LTX_AV_NATIVE_W/H were RETIRED in lane 7 (2026-08-11). They were a second
+# spelling of the render canvas, read by exactly one fallback, and they had
+# already drifted from the docstring that described them. The canvas now lives
+# in ONE place -- LtxAudioInEngine.render_canvas -- and _render_dims reads it.
 # Default sampler recipe (the M0-proven 8-step distilled-ish base pass; cfg 3.0
 # matched the probe). All env-overridable; never shared with eng_ltx_video.
 _LTX_AV_STEPS = _env_num("OTR_LTX_AV_STEPS", 8, int)
@@ -151,6 +154,87 @@ def _decode_temporal_knobs():
             "OTR_LTX_AV_DECODE_TEMPORAL_SIZE=%d (no clamp)" % (overlap, size))
     return size, overlap
 
+#: THE CANVAS THIS LANE RENDERS AT (S3, lane 7, 2026-08-11). Declared as a
+#: single static (w, h) because ``declared_render_canvas`` is applied LAST in
+#: ``build_request_from_shot`` and overrules every other channel -- see the
+#: ``LtxAudioInEngine.render_canvas`` docstring for WHY 1024x576 and not the
+#: 832x480 / 512x288 pair the driver used to compute inline.
+_LTX_AV_RENDER_CANVAS = (1024, 576)
+
+
+def assert_env_matches_contract(contract, declared_canvas=None):
+    """REFUSE when the environment moves what this lane's declaration froze.
+
+    The doctrine is already this repo's, and this lane was the last local LTX
+    adapter without it: ``eng_ltx_8gb`` enforces it, ``eng_ltx_video`` gained it
+    on 2026-08-02 (``eng_ltx_video.assert_env_matches_contract``), and here
+    ``OTR_LTX_AV_MAX_FRAMES`` could silently cap a render whose beat the planner
+    had ALREADY partitioned against the declared 497. The disagreement then
+    surfaced AFTER the GPU work as a segment mismatch -- expensive, and blamed
+    on the wrong layer.
+
+    ``frame_contract`` deliberately hardcodes the literal 497 rather than
+    binding to ``_LTX_AV_MAX_FRAMES`` (see the contract's own comment), so the
+    two CAN disagree; this is the check that makes the disagreement loud and
+    early instead of silent and late.
+
+    The canvas is part of the same promise. ``render_canvas`` already beats
+    ``OTR_LTX_AV_RENDER_CANVAS`` mechanically now that the declaration exists,
+    but handing an operator who explicitly asked for 832x480 a 1024x576 render
+    is its own small lie -- and on THIS lane the env is not cosmetic: the ia2v
+    two-stage graph halves the canvas for stage A, so an env canvas that is not
+    /64 on both axes produces an illegal stage-A latent. NO FALLBACK; the
+    message names the variable and the legal value.
+    """
+    declared_max = int(contract.max_frames)
+    # READ THE RAW ENVIRONMENT, not `_LTX_AV_MAX_FRAMES` (kibitz r1, codex
+    # MUST-FIX 4). That constant is resolved at IMPORT and a malformed value
+    # has already fallen back to 497 by the time anyone can compare it, so
+    # comparing the parsed constant reports agreement for a variable the
+    # operator set and this adapter is quietly ignoring. Two different
+    # policies, deliberately: `_env_num` keeps a malformed value from taking
+    # the IMPORT down (a crash-safety rule, the 7b fork), while a
+    # CONTRACT-BEARING variable that disagrees -- or cannot be parsed at all --
+    # is a refusal, because the planner already partitioned the beat against
+    # the declaration and the operator deserves to be told their knob is inert.
+    raw_max = (os.environ.get("OTR_LTX_AV_MAX_FRAMES") or "").strip()
+    if raw_max:
+        try:
+            want_max = int(raw_max)
+        except (TypeError, ValueError):
+            raise ContractEnvConflict(
+                "ltx_audio_in: OTR_LTX_AV_MAX_FRAMES=%r is not an integer. It "
+                "is contract-bearing -- the beat is partitioned against "
+                "max_frames=%d before any weight loads -- so an unparseable "
+                "value is a refusal here, not the import-time fallback. NO "
+                "FALLBACK -- unset the variable or give it a number."
+                % (raw_max, declared_max))
+        if want_max != declared_max:
+            raise ContractEnvConflict(
+                "ltx_audio_in: OTR_LTX_AV_MAX_FRAMES=%d disagrees with the "
+                "declared max_frames=%d. The beat was already partitioned "
+                "against the declaration, so honouring the environment would "
+                "render segments the plan did not ask for. NO FALLBACK -- "
+                "unset the variable or move the declaration."
+                % (want_max, declared_max))
+    raw_canvas = (os.environ.get("OTR_LTX_AV_RENDER_CANVAS") or "").strip()
+    if raw_canvas and declared_canvas:
+        try:
+            want = tuple(int(x) for x in raw_canvas.lower().split("x", 1))
+        except (ValueError, AttributeError):
+            want = None
+        if want is not None and want != tuple(declared_canvas):
+            raise ContractEnvConflict(
+                "ltx_audio_in: OTR_LTX_AV_RENDER_CANVAS=%s disagrees with the "
+                "declared render canvas %dx%d. This lane's ia2v_canonical "
+                "recipe renders stage A at exactly half the canvas and "
+                "upsamples x2, so the canvas is not a free knob: it must be /64 "
+                "on both axes or the stage-A latent is not /32-legal. NO "
+                "FALLBACK -- unset the variable, or move the render_canvas "
+                "declaration (and re-measure the envelope at the new canvas)."
+                % (raw_canvas, declared_canvas[0], declared_canvas[1]))
+
+
 # Weight sanity floors (GiB) -- catch a truncated / wrong download, NOT exact
 # byte checks. Q3_K_M unet ~9.3 GiB; Gemma-3 fp4 ~8.2 GiB; video VAE ~1.35 GiB.
 _GiB = 1024 ** 3
@@ -174,7 +258,16 @@ _FLOOR_PROJECTION_CKPT = 30 * _GiB
 # spill, 2026-06-26 live). 4.0 pushes usable BELOW the unet -> a true PARTIAL load
 # with ~4.4GB activation room -> steady, no spill. Raise it if a heavier desktop
 # still spills.
-_LTX_AV_RESERVE_VRAM_GB = float(os.environ.get("OTR_LTX_AV_RESERVE_VRAM_GB", "4.0"))
+# S8b-9 (lane 7, 2026-08-11): this was a BARE module-scope ``float()`` -- the one
+# numeric env read in this file that ``_env_num`` above was never applied to,
+# while its own safety test claimed to cover all of them. A malformed value
+# raised ValueError during import, the guarded import in
+# ``_otr_video_engines/__init__.py`` swallowed it, and the lane VANISHED from the
+# ComfyUI dropdown with nothing in the log (reproduced: registry 27 -> 26). Worse
+# than a dead lane: ``frame_contract_for`` resolves an adapter it cannot reach to
+# SINGLE_ONLY through its own broad except, so the lane silently reverted to
+# unbounded single-clip behaviour. Same guarded parser as the other four now.
+_LTX_AV_RESERVE_VRAM_GB = _env_num("OTR_LTX_AV_RESERVE_VRAM_GB", 4.0, float)
 
 
 @contextlib.contextmanager
@@ -816,7 +909,17 @@ class _LtxAvBase(_MC.MotionEngineBase):
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]
-        base_w, base_h = int(width) // 2, int(height) // 2  # exact canonical halving
+        # Exact canonical halving. STAGE A IS A REAL LATENT AND LTX'S /32 GRID
+        # APPLIES TO IT (S8b-10, lane 7): `assert_ltx_dims` was only ever called
+        # on the FULL canvas, so 832x480 -> 416x240 shipped for weeks with
+        # `240 % 32 == 16`, and the driver's own comment asserted "(all /32)".
+        # Validated at its ROOT here rather than trusting the caller: this graph
+        # halves, and `LTXVLatentUpsampler` doubles with no target size, so the
+        # delivered canvas IS 2x this base -- a full canvas that is not /64 on
+        # both axes has no legal stage A, and snapping the base would silently
+        # deliver a different canvas than the one declared.
+        base_w, base_h = int(width) // 2, int(height) // 2
+        _AVD.assert_ltx_dims(base_w, base_h, int(length))
         g = {
             "unet": {"class": "unet", "inputs": {"unet_name": self._unet_name()}},
             "lora": {"class": "lora", "inputs": {
@@ -1000,6 +1103,12 @@ class _LtxAvBase(_MC.MotionEngineBase):
         # absence of a LoRA load.
         _LOG.info("[OTR video] ltx_audio_in recipe=%s unet=%s",
                   recipe, os.path.basename(str(self._unet_name())))
+        # REFUSE FIRST: the env may not move what this lane's declarations
+        # froze, or the planner's partition and this render disagree and the
+        # mismatch surfaces AFTER the GPU work. Before any staging, any weight
+        # resolution, any graph build.
+        assert_env_matches_contract(type(self).frame_contract,
+                                    getattr(type(self), "render_canvas", None))
         plan = self._build_render_request(request)
         if not plan["audio_path"]:
             raise _wb.GraphExecutionError(
@@ -1155,12 +1264,21 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return int(c_get("w", 0) or 0), int(c_get("h", 0) or 0)
 
     def _render_dims(self, request):
-        """The render canvas: request.canvas.w/h when present, else the native
-        1472x832. Snapped to LTX's 32-multiple via assert_ltx_dims downstream."""
+        """The render canvas: ``request.canvas.w/h`` when present, else this
+        lane's OWN declaration. Validated by ``assert_ltx_dims`` downstream.
+
+        THE FALLBACK READS THE DECLARATION, not a duplicate literal (lane 7,
+        2026-08-11). It used to return ``_LTX_AV_NATIVE_W/H`` -- a second copy
+        of the canvas that had already drifted: the constants said 832x480
+        while this docstring said "the native 1472x832", so the comment was
+        wrong by two numbers and a harness call that passed no canvas rendered
+        something production never would. One spelling of the canvas, and it is
+        the one the driver applies.
+        """
         w, h = self._canvas_dims(request)
         if w and h:
             return w, h
-        return _LTX_AV_NATIVE_W, _LTX_AV_NATIVE_H
+        return tuple(type(self).render_canvas)
 
     def _build_render_request(self, request):
         """Pure: the normalized inference request the LTX-AV graph consumes."""
@@ -1337,12 +1455,68 @@ class LtxAudioInEngine(_LtxAvBase):
     # the deleted ltx_av_music engine held). default_roles must be subset of roles.
     default_roles = ("music_visual", "announcer_visual")
     required_inputs = ("text_prompt", "audio_ref", "init_image")
+    #: THE CANVAS, DECLARED (S3, lane 7, 2026-08-11). 1024x576.
+    #:
+    #: WHAT THIS REPLACES. The canvas used to be computed inline in the driver
+    #: (``render_driver.py``, the deleted ``ltx_audio_in`` branch) and it was
+    #: RECIPE-DEPENDENT: 832x480 when ia2v_canonical was live, 512x288
+    #: otherwise, either one overridable by ``OTR_LTX_AV_RENDER_CANVAS`` with no
+    #: refusal on conflict. That is three channels deciding one number, and
+    #: ``declared_render_canvas`` is applied LAST and overrules all of them, so
+    #: only one of the three could ever have been true.
+    #:
+    #: WHY 1024x576 AND NOT 832x480. Not a preference -- the ia2v_canonical
+    #: graph forces it. Stage A renders motion at EXACTLY half the canvas
+    #: (``_build_graph_ia2v``), and stage B feeds that latent to
+    #: ``LTXVLatentUpsampler``, whose installed schema
+    #: (``comfy_extras/nodes_lt_upsampler.py``) takes ``samples`` /
+    #: ``upscale_model`` / ``vae`` and NO target size: it "upsamples a video
+    #: latent by a factor of 2", full stop. So the delivered canvas IS 2x the
+    #: stage-A base, and the base is /32-legal only when the full canvas is /64
+    #: on BOTH axes. 832x480 halves to 416x240 and ``240 % 32 == 16`` -- that is
+    #: S8b-10, and it cannot be fixed by snapping the base, because snapping to
+    #: 416x256 would deliver 832x512 against a declared 832x480. 1024x576
+    #: halves to 512x288, which is legal, and is /64 on both axes.
+    #:
+    #: It is also the only exact-16:9 rung on the table: 832x480 is 26:15 and
+    #: delivers as 1872x1080 with side bars inside the 1920 frame, which
+    #: ``docs/2026-07-26-8gb-1080p-arc-judgment.md`` ruled against ("Pillarbox:
+    #: never"). 1024x576 scales to 1920x1080 with zero pad area.
+    #:
+    #: THE ENVELOPE, WITH ITS SURFACE STATED (L7). 1024x576x193 measured 7.36
+    #: GiB warm / 585.3 s in the lab. That is a LAB WARM number, and this exact
+    #: lane has a live receipt that in-pipeline peaks read HIGHER than isolation
+    #: probes -- 1280x704 breached the 14.5 GB ceiling at 14,716 MB in the full
+    #: production pipeline. 1024x576 is 0.65x those pixels and 1.48x the old
+    #: 832x480. The lane's solo smoke is what qualifies this number on THIS box;
+    #: until a receipt says otherwise the manifest says admission is not
+    #: enforced for this lane, in words.
+    #:
+    #: THE OTHER /64 RUNGS, so the next reader does not re-derive them. 896x512
+    #: and 1280x704 are also /64 on both axes and so also have legal stage-A
+    #: latents -- but neither is 16:9 (896x512 is 7:4 at 1.750, 1280x704 is
+    #: 1.818), and 1280x704 is the canvas that breached. 1024x576 is the only
+    #: rung that is /64 AND exact 16:9 (1024*9 == 576*16), so it is the only one
+    #: that both has a legal stage A and delivers to 1920x1080 with zero pad.
+    render_canvas = _LTX_AV_RENDER_CANVAS
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 497 (8*61+1).
     #: The LITERAL 497, not ``_LTX_AV_MAX_FRAMES`` -- that constant is
     #: ``int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))``, resolved at
     #: IMPORT, so binding the contract to it would let the environment rewrite
     #: a declaration the image phase already planned against. Env disagreement
     #: is a REFUSAL in 7b, never a silent re-plan.
+    #: 497 IS MODEL-LEGAL AND NOT MACHINE-QUALIFIED, and lane 7 (2026-08-11)
+    #: did NOT move it. Three different numbers, never inferred from one
+    #: another (L7): the model-legal maximum is 497; the longest MEASURED rung
+    #: at the declared 1024x576 canvas is 193 (lab warm); there is no episode
+    #: policy cap on this lane at all. Capping the declaration at 193 was
+    #: considered and rejected -- it would not narrow anything, because
+    #: `ltx_audio_in` is absent from `frame_contract.PLANNING_CAP_ENGINES`, so
+    #: a ceiling here would be a knob that reaches nothing (L6) while quietly
+    #: claiming the 193 rung is enforced. If a production cap is ever wanted it
+    #: is a separate planning change: allowlist the lane, then prove the
+    #: multi-clip partition. Until then the honest statement is this comment
+    #: plus the manifest's "admission NOT enforced" line.
     #: CONTINUITY: soft_reference, not strict. The i2v strength is
     #: recipe-dependent (0.7 ia2v motion pass / 0.75 sharp / 1.0 base), so
     #: frame 0 is a hard pin in some recipes and a soft anchor in others. A
