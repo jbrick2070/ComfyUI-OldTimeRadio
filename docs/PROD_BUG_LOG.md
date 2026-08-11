@@ -3521,3 +3521,66 @@ into it than it earned:**
    `null` on leg 5 even though the slot demonstrably resolved and served the
    run. Routing worked; the RECEIPT is incomplete. Not this defect, not fixed
    here, and static -- so it does not get its own PBUG.
+
+---
+
+## PBUG-20260811-01 -- forcing the LEMMY cameo kills the scifi_news_pro writer
+
+- surfaced: two live canonical headless legs, 2026-08-11 (`PROBE B_90w_forced`,
+  and the `BANKSWEEP scifi_news_pro` leg of the six-bank sweep the night before)
+- symptom: node 1 `OTR_LedgerScriptWriter` raises
+  `[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
+  exhausted; last defects: - BAD_LINE`. The run dies before any casting; no
+  episode, no assets.
+- root cause: NOT ESTABLISHED. What IS established is the trigger and that one
+  plausible explanation is ruled out. Reproduced at BOTH 30 and 90 target words
+  with `lemmy_cameo="always include"`, so it is not a word-budget squeeze; the
+  same lane at 30 words with the cameo on its natural roll gets the writer
+  through cleanly (it then fails elsewhere -- see PBUG-20260811-02). The
+  pre-locked LEMMY row is what the `scifi_fable2` script pass cannot satisfy.
+- fix: NONE YET. Recorded, not repaired.
+- verify idea: run the `scifi_news_pro` lane with `force_lemmy=True` through the
+  writer's script pass and assert it does not exhaust the markup ladder. A
+  cheaper unit-level version: assert the lane's script prompt/validator can
+  accept a pre-locked cameo row at all.
+- bible-worthy: probably not on its own -- it reads as one lane's prompt/validator
+  not tolerating a pre-locked row, rather than a portable contract. If a SECOND
+  lane shows the same shape, the class ("a pre-locked cast row the writer pass
+  cannot honour fails the whole render") would be.
+- status: OPEN
+
+**Reachability note, stated because it is my own change.** `lemmy_cameo` was
+whitelisted for headless drivers in `baf338ee` (Chunk D) so a qualification run
+could force the cameo deterministically. That commit did not CREATE this defect
+-- the widget has always existed and the GUI could always set it -- but it made
+the failure reachable from the sanctioned headless runner, which is how it was
+found. Four other banks force the cameo fine, so the whitelist is not the thing
+to revert.
+
+---
+
+## PBUG-20260811-02 -- scifi_news_pro dies at video render with no still for the closing-music beat
+
+- surfaced: live canonical headless leg, 2026-08-11 (`PROBE A_30w_noforce`,
+  profile `otr_w45_still_flat`, 30 words)
+- symptom: node 92 `OTR_VideoRenderBatch` raises `still-spine handoff missing
+  materialized scene still for shot shot_music_closing_001 beat
+  music_closing_001 engine still_flat`. The writer, casting and the whole audio
+  chain succeeded first (executed list includes nodes 1, 62, 63, 80-83).
+- root cause: NOT ESTABLISHED. The closing-music beat reached the still-spine
+  handoff without a materialized still. Five other banks on the SAME profile
+  produced one and published normally, so it is lane- or beat-topology-specific
+  rather than a profile defect.
+- fix: NONE YET. Recorded, not repaired.
+- verify idea: assert every beat the still-spine hands off has a materialized
+  still, naming the beat when one is missing -- the current message already
+  names it well, so the gap is a pre-handoff completeness check, not better
+  reporting.
+- bible-worthy: possibly. "A handoff consumed a per-beat artifact that was never
+  produced" is a portable shape. Hold until the root cause is known.
+- status: OPEN
+
+**Seen once.** Recorded because it is a live production failure with a named
+node and a named beat, which the admission rule admits; but it has not been
+reproduced, and the ONE observation came from a diagnostic leg rather than a
+normal render. Re-run before treating the cause as understood.

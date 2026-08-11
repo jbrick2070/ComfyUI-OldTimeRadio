@@ -66,23 +66,46 @@ was observed, and marks `scifi_news_pro` explicitly `unmeasured` rather than
 inheriting an assumption from its sibling -- assuming from a sibling is what made
 the map wrong the first time.
 
-## The separate issue: `scifi_news_pro` fails in the writer
+## `scifi_news_pro` -- probed, and the answer was not the one I expected
 
-    node 1 OTR_LedgerScriptWriter
-    [scifi_fable2] pass 'script' failed after 4 attempt(s):
-    markup ladder exhausted; last defects: - BAD_LINE
+Two diagnostic legs were run specifically to separate "this lane is broken" from
+"three characters do not fit in 30 words here". The hypothesis was that forcing
+the cameo pre-locks a THIRD speaking character and the lane's markup validator
+cannot fit three voices into 30 words -- which would have made it a non-defect.
 
-It died in the writer, before any casting ran, so nothing about the voice route or
-the cameo is implicated. Untested hypothesis worth one cheap experiment: forcing
-the cameo pre-locks a THIRD speaking character, and this lane may not fit three
-voices into 30 words past its markup validator. Re-running it at 30 words WITHOUT
-the forced cameo, and at a longer budget WITH it, separates "this lane is broken"
-from "three characters do not fit in 30 words here" -- very different findings,
-and the second is not a defect at all.
+**That hypothesis is wrong.** The matrix:
 
-Not admitted to `PROD_BUG_LOG.md`: the admission rule wants a verified production
-failure, and this one has a plausible benign explanation that has not been ruled
-out. Re-run first, then log it if it survives.
+| leg | words | cameo | outcome |
+|---|---|---|---|
+| sweep | 30 | **forced** | writer dies: markup ladder exhausted, `BAD_LINE` |
+| probe A | 30 | natural roll | writer + casting + audio OK; **video** dies: no still for `music_closing_001` |
+| probe B | 90 | **forced** | writer dies: markup ladder exhausted, `BAD_LINE` |
+
+Reading it:
+
+* **The word budget is not the factor.** Forcing the cameo breaks the writer at
+  30 AND at 90 words. Raising the budget changes nothing.
+* **The cameo IS the factor for the writer failure.** With the cameo on its
+  natural roll the writer sails through -- and so does the entire casting and
+  audio chain, nodes 1/62/63/80-83 all executed.
+* **There is a SECOND, unrelated defect underneath.** Probe A got past the
+  writer and then died at node 92 `OTR_VideoRenderBatch`:
+  `still-spine handoff missing materialized scene still for shot
+  shot_music_closing_001 beat music_closing_001 engine still_flat`. Five other
+  banks on the SAME `otr_w45_still_flat` profile produced that still and
+  published fine.
+
+Both are now recorded: **PBUG-20260811-01** (forced cameo kills the
+`scifi_fable2` writer, reproduced twice) and **PBUG-20260811-02** (missing
+closing-music still, seen once). Neither root cause is established, and both say
+so rather than guessing.
+
+**One reachability point I owe, because it is my own change.** `lemmy_cameo` was
+whitelisted for headless drivers in `baf338ee` so a qualification run could force
+the cameo deterministically. That did not create PBUG-01 -- the widget always
+existed and the GUI could always set it -- but it made the failure reachable from
+the sanctioned runner, which is how it surfaced. Four other banks force the cameo
+without trouble, so the whitelist is not the thing to revert.
 
 ## What this sweep did prove
 
