@@ -26,7 +26,50 @@ overrule any of them later at zero cost:
 - Q3 WAN TI2V envelope row: do NOT qualify it from lab numbers. Ship the row
   DISQUALIFIED (status quo, safe) so admission honestly reports "not
   enforced" for that lane; re-derivation from OTR-wrapper measurements is its
-  own later task.
+  own later task. **RESOLVED 2026-08-11:** coder window 1 produced the
+  OTR-side numbers this was waiting for (cold absolute 14,604 / 15,261 /
+  13,800 MB). Qualification may proceed on them, subject to the surface rule
+  immediately below.
+
+**COST-ROW DERIVATION SURFACE - OPERATOR-BINDING RULE (2026-08-11).**
+Derive cost rows from **NET** peaks (each leg's absolute peak MINUS that
+leg's own pre-queue baseline), never from absolute device totals. Reason,
+from source: `free_vram_mb()` returns `torch.cuda.mem_get_info()` FREE bytes
+(`motion_common.py:300-314`), and `compute_real_frame_budget` compares
+`overhead + per_frame*frames` against `free * margin`. Free ALREADY excludes
+the ~1.9 GB desktop baseline, so an `overhead` derived from an absolute peak
+double-charges that baseline on every prediction. That is not merely
+conservative - it is the precise failure mode that disqualified the shipped
+wan row, which "refuses EVERY segment length the coverage planner produces"
+(`motion_common.py:345-354`). The existing 0.85 margin is where conservatism
+belongs. COLD vs WARM: use COLD (production's real surface, the higher of the
+two) - that part of window 1's recommendation stands. And per r3, the
+qualification commit must include an ADMITS test proving the calibrated row
+accepts the planner's actual output (e.g. `_prebuilt([177, 177, 93])` at the
+measured free-VRAM level), not only that it can refuse.
+
+**BETTER STILL - MEASURE IN THE UNITS ADMISSION COMPARES IN (coder window 1,
+2026-08-11; ADOPTED into S7.1).** Baseline subtraction is a sound first-order
+correction but carries error, because the baseline is NOT constant across a
+render (ComfyUI evicts and reloads mid-window). The faithful instrument is to
+record `free_vram_mb()` at render start and its MINIMUM during the window;
+the difference is the render's true demand expressed in exactly the units
+`compute_real_frame_budget` compares against - no device totals, no baseline
+arithmetic. S7.1's instrumentation already opens this seam, so it costs
+nothing extra. Sequence: seed candidate rows from NET now, re-derive from
+free-units once S7.1 lands, and treat any disagreement as a finding.
+
+**Provenance quality gate on candidate rows (same source).** A cost row may
+be seeded ONLY from a true peak-probe maximum (`VramPeakProbe`, sampled
+across the render window). A single `nvidia-smi` reading is a LOWER BOUND,
+not a peak, and must never seed a row. Known state 2026-08-11: the three HuMo
+NET figures (11,911 / 12,664 / 13,321 MB) are probe maxima and usable;
+`wan_i2v`'s 11,826 is a single sample and is NOT usable; `wan_ti2v` and
+`fastwan_8gb` have no captured peak at all because
+`scripts/_otr_single_engine_smoke.py` surfaces a trimmed clip summary that
+drops the probe telemetry the adapters already produce. Fix the harness
+passthrough (~5 lines) rather than re-rendering - it makes every future
+lane's peak free.
 
 Known-open, scheduled to their own lanes: the WAN TI2V envelope row is
 unsupported as written and must be re-derived from OTR-wrapper numbers before

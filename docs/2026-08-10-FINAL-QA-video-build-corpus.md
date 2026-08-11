@@ -2,7 +2,15 @@
 
 Date: 2026-08-10
 
-Status: **QA-ONLY; NOT IMPLEMENTATION-READY; AWAITING REVIEW**
+Status: **SUPERSEDED 2026-08-11 - THIS REPORT'S 21-LANE PLAN IS THE OPERATIVE
+BUILD ORDER AND THE BUILD IS UNDER WAY** (lane 1 pushed green at `c262ab61`).
+The verdict below was accurate for the corpus state at the time of writing,
+BEFORE the r4 round landed its eight unlanded rulings. The master spec now
+reads "r4-COMPLETE, LANE-1 CLEARED" and an independent verification pass
+returned zero blockers. **Read the lane plan as live; read the verdict as
+history.** Do not stop a build window on the line below.
+
+Original status: QA-ONLY; NOT IMPLEMENTATION-READY; AWAITING REVIEW
 
 Mutation boundary: this report is the only intended deliverable from this pass.
 The four corpus documents, source code, tests, profiles, Bug Bible, production bug

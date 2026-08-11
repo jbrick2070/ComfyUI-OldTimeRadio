@@ -164,8 +164,9 @@ profile `role_overrides` (it ships dark with `default_roles = ()`).
 
 ## 8-10. HuMo lanes -- rename + the hero cast
 
-`humo17_high_face` (`humo_1.7B`), `humo14_high_face` (`humo`, portrait),
-`humo14_high_face_wide` (`humo_14B_169`, landscape).
+`humo17_high_audio_in_portrait` (`humo_1.7B`),
+`humo14_high_audio_in_portrait` (`humo`, portrait),
+`humo14_high_audio_in_wide` (`humo_14B_169`, landscape).
 
 **.py**
 - Declare `render_canvas = (832, 480)` on `humo_14B_169`. Today its request is
@@ -297,13 +298,14 @@ lane test suite written from scratch (it has NO `tests/test_wan_i2v.py` at
 all). Whatever shape that test file takes becomes the template every later
 lane copies.
 
-**2. Boot contracts (S8) + `humo14_high_face_wide` -- SECOND.** The first lane
+**2. Boot contracts (S8) + `humo14_high_audio_in_wide` -- SECOND.** The first lane
 that NEEDS a named boot lane, so build the mechanism and its first consumer
 together. Teaches: boot contract declaration, ShotLock-preflight enforcement
 (not render-time), receipt stamping, and receipt completeness (L4) via the
 HuMo manifest nulls. Ends with the hero cast measurable at 13.06 GiB.
 
-**3. `humo17_high_face` + `humo14_high_face` -- THIRD.** Same family, so the
+**3. `humo17_high_audio_in_portrait` + `humo14_high_audio_in_portrait` --
+THIRD.** Same family, so the
 lessons from lane 2 apply almost unchanged. Adds the short-render refusal fix
 (`safe_render_frames = None` skips the exact-fit guard, so an over-ladder beat
 ships SHORT and looks honest).
