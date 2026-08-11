@@ -43,6 +43,9 @@ ROLE_ENGINES = {
     "music_visual": "viz_green",
     "character_video": "humo_1.7B_169",
 }
+#: Internal ids that carry a PUBLIC menu id today. Read from the live table so
+#: the next lane's rename does not have to remember this file exists.
+from nodes._otr_shared.public_engines import _INTERNAL_TO_PUBLIC as _PUBLIC_ROWS
 _VIDEO_WIDGET = {
     "announcer_visual": "announcer_video_model",
     "music_visual": "music_video_model",
@@ -73,10 +76,22 @@ def test_all_slots_set_on_canonical_json():
     assert len(vd) == 1
     slots = wa.serialized_slot_names("OTR_VideoDirector", schemas)
     vals = vd[0]["widgets_values"]
+    # THE CONTRACT IS THAT THE SAVED VALUE RESOLVES, not that it is spelled a
+    # particular way (lane 3, 2026-08-11). humo_1.7B and humo_1.7B_169 gained
+    # public ids, so the applier now writes their generated menu LABEL where it
+    # used to write the bare internal id -- while an engine with no public row
+    # still gets its bare id. Asserting the literal engine id would have failed
+    # on a rename that is working correctly; asserting the generated label for
+    # every engine would assert a behaviour the applier does not have. What
+    # must hold either way is the round trip.
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    from nodes.otr_video_director import exact_menu_option_for
     for role, engine in ROLE_ENGINES.items():
         widget = _VIDEO_WIDGET[role]
         got = vals[slots.index(widget)]
-        assert got == engine, (role, widget, got)
+        assert resolve_engine_id(got) == engine, (role, widget, got)
+        if engine in _PUBLIC_ROWS:
+            assert got == exact_menu_option_for(engine), (role, widget, got)
 
 
 def test_image_keys_are_exactly_the_three():

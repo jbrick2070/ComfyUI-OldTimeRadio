@@ -266,11 +266,18 @@ def test_the_env_overrides_can_no_longer_contradict_the_declaration(
 
 
 def test_an_undeclared_sibling_tier_still_honours_its_overrides(monkeypatch):
-    """The refusal is scoped to tiers that DECLARE a canvas. Lane 3 and 4 own
-    the other tiers; this proves lane 2 did not change them."""
+    """The refusal is scoped to tiers that DECLARE a canvas.
+
+    The control has moved once already: `humo_1.7B` held it until lane 3 gave
+    it a declaration of its own, and `humo` (the portrait 14B) holds it now.
+    When lane 4 declares that one, this control moves again rather than the
+    test being deleted -- the invariant outlives every occupant, which is the
+    same shape as the ltx_8gb landscape-default control.
+    """
     monkeypatch.setenv("OTR_HUMO_WIDTH", "640")
     monkeypatch.setenv("OTR_HUMO_HEIGHT", "384")
-    assert vreg.get_engine("humo_1.7B")._native_dims() == (640, 384)
+    assert rd.declared_render_canvas("humo") is None
+    assert vreg.get_engine("humo")._native_dims() == (640, 384)
 
 
 def test_the_profile_canvas_agrees_with_the_declaration(profile):
@@ -341,3 +348,69 @@ def test_the_lane_has_an_evidence_row_and_an_admission_confession():
     assert LANE in manifest["admission_unenforced"], (
         "a measured receipt is not a qualified cost row; nothing refuses an "
         "over-budget plan on this lane yet and the receipts must say so")
+
+
+# ---------------------------------------------------------------------------
+# LANE 3 -- the 1.7B pair. Same family, so lane 2's lessons applied almost
+# unchanged; what was NEW here is the honesty guard that a VRAM knob was
+# gating.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("tier,canvas", [
+    ("humo_1.7B", (480, 832)),
+    ("humo_1.7B_169", (832, 480)),
+])
+def test_the_1p7b_pair_declares_its_canvas(tier, canvas):
+    engine = vreg.get_engine(tier)
+    assert tuple(engine.render_canvas) == canvas
+    assert rd.declared_render_canvas(tier) == canvas
+    assert canvas[0] % 32 == 0 and canvas[1] % 32 == 0
+
+
+def test_the_portrait_profile_stopped_claiming_landscape():
+    """`otr_w45_humo_1_7b.json` said 832x480 on the tier whose whole identity
+    is the pillarbox talking head. The declaration is what renders, so the
+    profile was lying to whoever read it."""
+    prof = load_profile("otr_w45_humo_1_7b")
+    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (480, 832)
+
+
+@pytest.mark.parametrize("tier", ["humo_1.7B", "humo_1.7B_169"])
+def test_the_longbeat_tier_keeps_BOTH_boot_contracts(tier):
+    """It is the auto-downgrade target -- the floor a heavy episode falls to --
+    so requiring the diet would remove the floor as a side effect."""
+    assert bc.compatible_contracts_for_engine(vreg.get_engine(tier)) == (
+        "default", "humo_diet")
+
+
+def test_the_exact_fit_guard_no_longer_hangs_off_a_VRAM_KNOB():
+    """S8b item 3. The honesty check read `if cap is not None and
+    target_fc > 0`, so an UNCAPPED tier skipped it entirely: a beat asking for
+    more than the 177-frame ceiling rendered 177 and returned them stamped
+    extension_mode "none" with native_frame_count == frame_count --
+    indistinguishable from an honest clip. The video ran out before the audio
+    and nothing said so.
+
+    Asserted against the SOURCE because the alternative is a live over-ladder
+    render, and the property is structural: the guard's condition must not
+    mention the cap."""
+    src = (REPO / "nodes" / "_otr_video_engines" / "eng_humo.py").read_text(
+        encoding="utf-8")
+    assert "if cap is not None and target_fc > 0:" not in src, (
+        "the exact-fit guard is conditional on a VRAM knob again")
+    assert "if target_fc > 0:" in src
+    # And the refusal must be able to explain BOTH shapes of the failure.
+    assert "This tier is uncapped" in src
+    assert "VRAM-safe cap" in src
+
+
+@pytest.mark.parametrize("tier,public", [
+    ("humo_1.7B", "humo17_high_audio_in_portrait"),
+    ("humo_1.7B_169", "humo17_high_audio_in_wide"),
+])
+def test_the_1p7b_public_ids_state_the_aspect(tier, public):
+    """Same checkpoint, same VRAM class -- the aspect IS the difference between
+    these two lanes, so the aspect belongs in the id rather than only in the
+    label suffix."""
+    assert vd.exact_menu_option_for(tier).startswith(public)
+    assert "audio_in" in public

@@ -909,19 +909,50 @@ class HuMoEngine(_MC.MotionEngineBase):
         # never reverses time); a SHORT render is now TERMINAL and LOUD, with
         # the remedy in the message. This can fail a beat that previously
         # "succeeded" -- those episodes had backwards lip sync.
-        if cap is not None and target_fc > 0:
+        # THE GUARD IS UNCONDITIONAL (S8b item 3, lane 3, 2026-08-11).
+        #
+        # It used to read ``if cap is not None and target_fc > 0``, which made
+        # the HONESTY check conditional on a VRAM knob -- two unrelated
+        # questions sharing one branch. An uncapped tier (`humo_1.7B`,
+        # `humo_1.7B_169`, `humo`) declares ``safe_render_frames = None``, so it
+        # skipped the exact fit entirely: a beat asking for more than the
+        # 177-frame ceiling rendered 177 and returned them stamped
+        # ``extension_mode: "none"`` with ``native_frame_count == frame_count``
+        # -- indistinguishable from an honest clip on any path that reaches
+        # ``render_shot`` without a stamped coverage plan. The video simply ran
+        # out before the audio, and nothing said so.
+        #
+        # ``fit_frames_to_target`` TRIMS a long render (always safe, never
+        # reverses time) and RAISES on a short one. Both answers are right for
+        # every tier; only the message needs to know whether a cap was involved.
+        #
+        # This can fail a beat that previously "succeeded" -- the same trade the
+        # 14B took on 2026-07-25. Those episodes shipped a face that stopped
+        # moving while the line kept going.
+        if target_fc > 0:
             try:
                 frames = _wb.fit_frames_to_target(
                     frames, target_fc)
             except _wb.MirrorExtensionForbidden as exc:
+                if cap is not None:
+                    limit_note = (
+                        "This tier's VRAM-safe cap is %d frame(s) and the beat "
+                        "needs %d. Raise OTR_HUMO_14B_SAFE_FRAMES if the card "
+                        "can afford it, route this beat to an uncapped HuMo "
+                        "tier, or give the beat a shorter line."
+                        % (int(cap), int(target_fc)))
+                else:
+                    limit_note = (
+                        "This tier is uncapped, so it rendered its %d-frame "
+                        "ceiling and the beat needs %d -- the beat is longer "
+                        "than any single HuMo render. Split it into segments "
+                        "through the coverage planner (JUMP, one fresh still "
+                        "each) or give the beat a shorter line."
+                        % (int(_HUMO_MAX_FRAMES), int(target_fc)))
                 raise _wb.GraphExecutionError(
-                    "%s: %s. This tier's VRAM-safe cap is %d frame(s) and the "
-                    "beat needs %d. NO FALLBACK -- fix the routing, not the "
-                    "frames: raise OTR_HUMO_14B_SAFE_FRAMES if the card can "
-                    "afford it, route this beat to an uncapped HuMo tier, or "
-                    "give the beat a shorter line. Mirroring it would play the "
-                    "mouth backwards." % (
-                        self.name, exc, int(cap), int(target_fc))) from exc
+                    "%s: %s. %s NO FALLBACK -- fix the routing, not the "
+                    "frames. Mirroring it would play the mouth backwards."
+                    % (self.name, exc, limit_note)) from exc
         out_path = otr_engine_tmp_mp4("otr_humo_")
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # Restore the proven HuMo VRAM discipline the refactor dropped: the frames
@@ -1153,6 +1184,19 @@ class HuMo17BEngine(HuMoEngine):
     name = "humo_1.7B"
     engine_version = "1"
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
+    #: THE CANVAS, DECLARED (lane 3, 2026-08-11). Portrait 480x832 is where the
+    #: diet leg was measured -- 12.84 GiB warm at 480x832x129 (HUMO_DIET,
+    #: indexed in docs/evidence/video_evidence_manifest.json) -- and without a
+    #: declaration the request fell through to the 1472x832 landscape default
+    #: on a lane whose entire identity is the pillarbox talking head. Both axes
+    #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is now a
+    #: named refusal; see :meth:`HuMoEngine._native_dims`.
+    render_canvas = (480, 832)
+    #: BOOT CONTRACTS (S8, lane 3). This tier declares BOTH, deliberately: it
+    #: is the LONG-BEAT lane and the auto-downgrade target, so requiring the
+    #: diet would regress a shipping lane and remove the floor a heavy episode
+    #: falls to. The diet is how a PROFILE casts it, not a demand it may make.
+    compatible_boot_contracts = ("default", "humo_diet")
     #: ITS OWN LADDER AND ITS OWN CAP, because it is its own MODEL (2026-08-02).
     #: The 14B base now carries a 14B-sized cap, and this tier must not inherit
     #: a memory bound measured on a checkpoint roughly eight times its size --
@@ -1218,6 +1262,15 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
 
     name = "humo_1.7B_169"
     render_aspect = "wide"
+    #: THE CANVAS, DECLARED (lane 3, 2026-08-11). The landscape twin of the
+    #: portrait 1.7B: same checkpoint, same VRAM class, 832x480 instead of
+    #: 480x832. It has NO receipt of its own at any rung -- the manifest says
+    #: so -- so this declaration fixes the request-vs-render channel and does
+    #: NOT claim an envelope. Both axes /32-legal (26 x 15).
+    render_canvas = (832, 480)
+    #: Same reasoning as its portrait twin: BOTH contracts, because this tier
+    #: has shipped under `default`.
+    compatible_boot_contracts = ("default", "humo_diet")
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives ``resolve_row_aspect`` to
     #: size portraits WIDE, and the plan's portrait row carries the WIDE

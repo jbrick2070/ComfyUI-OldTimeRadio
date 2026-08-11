@@ -115,9 +115,17 @@ def test_role_aspects_unknown_engine_falls_back_portrait():
 # Goal B -- label <-> id round-trip (display-only, value-safe)
 # --------------------------------------------------------------------------- #
 def test_label_suffix_is_aspect_derived():
+    # The SUFFIX is derived from the internal engine's render_aspect; the TOKEN
+    # in front of it is the public id when the lane has one. The 1.7B pair
+    # gained public ids in lane 3 (2026-08-11) and `humo` has not yet -- so
+    # these three lines are also the live proof that the suffix logic is
+    # independent of the naming rollout, and that a PORTRAIT public row reads
+    # `(portrait)` rather than the `(16:9)` every earlier public row happened
+    # to carry.
     assert vd._label_for("humo") == "humo (portrait)"
-    assert vd._label_for("humo_1.7B") == "humo_1.7B (portrait)"
-    assert vd._label_for("humo_1.7B_169") == "humo_1.7B_169 (16:9)"
+    assert vd._label_for("humo_1.7B") == (
+        "humo17_high_audio_in_portrait (portrait)")
+    assert vd._label_for("humo_1.7B_169") == "humo17_high_audio_in_wide (16:9)"
     # video-tiers (2026-07-20): the four PUBLIC-aliased tier engines show their
     # public menu id (aspect suffix still derived from the internal engine).
     assert vd._label_for("ltx_video") == "ltx23_16gb_video (16:9)"

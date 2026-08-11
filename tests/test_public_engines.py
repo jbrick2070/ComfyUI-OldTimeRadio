@@ -38,6 +38,11 @@ _TIER = {
     # aspect because a bare `humo14_high_face` hid which way its sibling
     # renders.
     "humo14_high_audio_in_wide": "humo_14B_169",
+    # Lane 3, 2026-08-11: the LONG-BEAT tier and its landscape twin. Same
+    # checkpoint, same VRAM class -- the aspect IS the difference, so it is in
+    # the id.
+    "humo17_high_audio_in_portrait": "humo_1.7B",
+    "humo17_high_audio_in_wide": "humo_1.7B_169",
 }
 
 
@@ -102,11 +107,24 @@ def test_resolve_all_menu_labels_round_trip_to_registered_internals():
 # --------------------------------------------------------------------------- #
 # menu relabel + exact_menu_option_for
 # --------------------------------------------------------------------------- #
+def _expected_label(public, internal):
+    """The menu label for a public row, aspect suffix and all.
+
+    Derived rather than hardcoded as ``(16:9)`` (lane 3, 2026-08-11): every
+    public row was landscape until `humo17_high_audio_in_portrait` arrived, and
+    a portrait lane's label reads `(portrait)`. Hardcoding the suffix would
+    have made the FIRST portrait row in the public table look like a bug.
+    """
+    return "%s%s%s" % (public, vd._aspect_suffix(internal),
+                       vd._descriptor_suffix(internal))
+
+
 def test_menu_shows_public_ids_uniquely():
     combo = vd._video_model_combo()
-    for public in _TIER:
-        assert ("%s (16:9)" % public) in combo
-        assert combo.count("%s (16:9)" % public) == 1
+    for public, internal in _TIER.items():
+        label = _expected_label(public, internal)
+        assert label in combo
+        assert combo.count(label) == 1
     # the renamed internal ids never leak into the menu
     assert "wan_ti2v (16:9)" not in combo
     assert "ltx_video (16:9)" not in combo
@@ -117,7 +135,8 @@ def test_menu_shows_public_ids_uniquely():
 
 @pytest.mark.parametrize("public,internal", list(_TIER.items()))
 def test_exact_menu_option_for_tier(public, internal):
-    assert vd.exact_menu_option_for(internal) == "%s (16:9)" % public
+    assert vd.exact_menu_option_for(internal) == _expected_label(
+        public, internal)
     # and it round-trips
     assert resolve_engine_id(vd.exact_menu_option_for(internal)) == internal
 

@@ -58,6 +58,12 @@ _PUBLIC_ENGINES = {
     # sibling renders 480x832. `high` comes from a measurement receipt: 13.06
     # GiB warm at 832x480x97 under the humo_diet boot.
     "humo14_high_audio_in_wide": "humo_14B_169",
+    # Lane 3, 2026-08-11. The LONG-BEAT lane (the 1.7B renders to 177 frames,
+    # 7.08 s, where the 14B stops at 97) and the auto-downgrade target. Its
+    # landscape twin closes with it: same checkpoint, same VRAM class, the
+    # aspect is the whole difference, so the aspect is in the id.
+    "humo17_high_audio_in_portrait": "humo_1.7B",
+    "humo17_high_audio_in_wide": "humo_1.7B_169",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -104,6 +110,12 @@ _PUBLIC_LABEL = {
     "humo14_high_audio_in_wide": (
         "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
         "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),
+    "humo17_high_audio_in_portrait": (
+        "HuMo 1.7B portrait - audio-driven face, high VRAM, LONG beats "
+        "(12.84 GiB warm at 480x832x129 on the humo_diet boot; 177 frames)"),
+    "humo17_high_audio_in_wide": (
+        "HuMo 1.7B 16:9 - audio-driven face, high VRAM, LONG beats "
+        "(same checkpoint as the portrait tier; UNMEASURED at this aspect)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),
