@@ -448,3 +448,41 @@ lane's own weight basename and recipe id.
 **Twin assertion:**
 `tests/test_public_engines.py::test_the_naming_convention_rows_state_the_model_they_load`
 and `tests/test_wan_i2v.py::test_the_lane_is_named_wan_2_2_because_that_is_what_it_loads`.
+
+## Lane 3 -- `humo17_high_audio_in_portrait` + `humo17_high_audio_in_wide`, closed 2026-08-11
+
+Two lanes in one packet because they are one checkpoint at two aspects. Almost
+everything came free from lane 2, which is the ledger working as designed. Two
+things were new.
+
+**What bit (1): a public rename breaks tests that hardcode the aspect suffix.**
+Three tests asserted `"%s (16:9)" % public`, which was true only because every
+public row so far happened to be landscape. The first PORTRAIT public row made
+a correct rename look like a bug in three places at once.
+
+**Runnable check:** before adding a public id for a lane, grep the test tree for
+`(16:9)` next to the naming tables and for the lane's bare internal id used as
+an expected widget VALUE. Derive the suffix from `_aspect_suffix(internal)`
+rather than writing it.
+
+**Twin assertion:** `tests/test_public_engines.py::_expected_label` is now the
+one place the label shape is built, and
+`test_still_aspect_and_labels.py::test_label_suffix_is_aspect_derived` pins a
+portrait public row explicitly.
+
+**What bit (2): a renamed lane changes what the APPLIER writes into node 87.**
+`test_slot_matrix_soak` asserted the saved widget value equalled the bare
+internal id. A lane with a public id gets its generated menu LABEL instead, so
+the assertion failed on behaviour that is correct. But asserting the generated
+label for EVERY engine would have been wrong the other way -- an engine with no
+public row still gets its bare id.
+
+**Runnable check:** the contract on a saved widget value is that it RESOLVES,
+not that it is spelled a particular way. Assert
+`resolve_engine_id(saved) == engine`, and assert the exact generated label only
+for lanes that actually carry a public row (read from `_INTERNAL_TO_PUBLIC`, so
+the next rename does not have to remember the file exists).
+
+**What did NOT bite:** the weight resolver, the boot contract, the manifest
+fields and the canvas-override refusal all came from lane 2 unchanged. Lane 3
+wrote no new resolution code at all.

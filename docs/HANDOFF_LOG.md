@@ -3,6 +3,173 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-11 -- HEAD d226bea5 (v2.0-alpha) -- OVERNIGHT AUTONOMOUS -- VIDEO LANE BUILD: scaffolding + lanes 1-3 of 21, all green and pushed
+
+Operator asleep. Four commits, each green and pushed before the next lane
+opened. No lane parked, no red pushed, no history rewritten, `git add` by name
+throughout (the tree carries other windows' dirty files and none were touched).
+
+### Per lane
+
+| # | Lane | State | Preflight row | Smoke receipt | Push |
+|---|---|---|---|---|---|
+| 0 | scaffolding | BUILT | n/a -- it IS the matrix | n/a | `49adc824` |
+| 1 | `wan22_high_i2v` (`wan_i2v`) | BUILT | 7/7 GREEN | `output/otr/episodes/_lane_smokes/lane01_wan_i2v/` | `b303afa3` |
+| 2 | `humo14_high_audio_in_wide` (`humo_14B_169`) | BUILT | 7/7 GREEN | `.../lane02_humo14_wide/` | `e19dd473` |
+| 3 | `humo17_high_audio_in_portrait` + `humo17_high_audio_in_wide` | BUILT | both 7/7 GREEN | `.../lane03_humo17_portrait/` | `d226bea5` |
+
+Full receipts: `docs/evidence/lane_receipts/lane01-*.md`, `lane02-*.md`,
+`lane03-*.md`.
+
+**Totals: 3 lane packets green (5 engines touched) plus the scaffolding, 0
+parked. Suite 9911 passed / 109 skipped / 1 xfailed. Bug Bible 20 passed.
+HEAD == origin.**
+
+### THE ONE THING TO DECIDE FIRST
+
+**The lane-1 public id says `wan22_high_i2v`; the spec's naming table says
+`wan21_high_i2v`.** The lane loads `wan2.2_i2v_low_noise_14B_fp8_scaled`, its
+frozen recipe id is `wan22_14b_i2v_single_pass_v1`, and `registry.CAPABILITIES`
+carries a dated note recording that this row was corrected FROM a stale
+`wan2.1` label TO `wan2.2-i2v` once already -- so the doc reintroduced a
+mislabel the repo had already fixed once. I shipped the id the evidence
+supports and registered the spec's string as a LEGACY ALIAS, so both resolve
+and neither is ever a dead end. Swapping which one is live is one line each
+way. Recorded as lesson L8.
+
+### The number that is not what the corpus implies
+
+Both HuMo smokes ran on the diet boot and peaked HIGHER than the headline:
+
+- `humo_14B_169` at f97: **14,604 MB absolute, COLD** -- 0.24 GiB under the
+  14.5 GiB gate, not the 1.44 GiB of headroom the corpus's 13.06 GiB implies.
+- `humo_1.7B` at f129: **15,261 MB absolute, COLD** -- over the gate on an
+  absolute basis.
+
+Neither contradicts the lab. The lab numbers are WARM and these are COLD, and
+these are device-TOTAL peaks including the ~1,940 MB the idle server already
+holds -- net of that, roughly 12.66 and 13.01 GiB, either side of the lab's
+12.84. The receipts say all of that rather than putting two surfaces in one
+column, which is what lesson L7 exists for. **Nothing is machine-qualified:
+`QUALIFIED_COST_ROWS` is still empty and the manifest says "admission NOT
+enforced" per lane, in words.** When lane 5 derives real cost rows it should use
+THIS surface, because it is the one production runs on.
+
+Worth noticing: the 1.7B peaks HIGHER than the 14B. Not backwards -- 129 frames
+versus 97 at the same pixel area. That tier's cost is dominated by frame count,
+not weights, so admission must not treat it as "the cheap one".
+
+### What each lane actually fixed
+
+**Lane 0 -- the scaffolding the per-lane loop reads.** `LANE_BUILD_LESSONS.md`
+seeded with L1-L7; `tests/test_lane_preflight_matrix.py` grading all 27
+registered engines on seven gates; a versioned evidence manifest. Three
+mechanisms make the matrix usable DURING a build rather than after it: named
+exemptions instead of skips (a skip reads as coverage in the summary line), a
+defect-ID-bound expected-red ledger, and strict unexpected-pass -- when a red
+row starts passing, the suite FAILS and says to delete the entry. That last one
+fired correctly on lanes 1, 2 and 3 the moment each fix landed.
+
+The manifest records that **nine cited receipts and three cited narratives are
+present on this box but ABSENT from lab commit `4d87cfa`**, the baseline the
+corpus names. Every row carries `contained_in_evidence_commit` beside its
+sha256, because a digest of a file nobody ships proves nothing to a reader
+without it.
+
+**Lane 1 -- wan_i2v could not start, and the reason was bigger than the audit
+found.** The hardcoded `checkpoints/wan2.2-i2v.safetensors` default was real,
+but fixing only that left the lane dead off the ComfyUI runtime: the
+`folder_paths` fallback's last resort was `<comfy_root>/models/<category>` and
+this box keeps its weights in `C:\ComfyUI-Models`. Two different questions --
+where would the LOADER look, and is this weight on this box -- were sharing one
+probe, and the second had no answer without a server.
+`wan_shared.configured_models_root()` is now the third and last probe.
+**All three WAN lanes resolve with NO environment variables set.** What masked
+it for so long: `wan_ti2v` read as installed only because an
+`OTR_WAN_TI2V_CKPT` export happened to be in the shell, so the two WAN lanes
+looked different for a reason that had nothing to do with their code.
+
+**Lane 2 -- the boot contract finally reaches argv.** `humo_diet` had been
+"configured" in the corpus for days and clamped exactly ONE of its two knobs:
+the launcher had a hook for `--reserve-vram` and none for
+`--disable-pinned-memory`, which appeared in ZERO non-doc files repo-wide.
+`nodes/_otr_shared/boot_contracts.py` names the contracts, maps each to the
+`launch.env` rows a launcher actually reads, and proves them against
+`comfy.cli_args` on the RUNNING server -- reading the profile text instead would
+be a check that cannot tell "applied" from "written down". Both flags confirmed
+on the real command line during the smoke. Also landed: S8b-4 (canvas declared
+at the size it was measured, and `OTR_HUMO_WIDTH/HEIGHT` now REFUSE to
+contradict a declaring tier instead of silently winning), S8b-6 (the render
+peak had been measured, logged, and dropped on the floor since 2026-08-06 --
+all four HuMo tiers now produce their manifest row), S8b-7 (the comment
+explaining the 97-frame cap still said 49).
+
+**Lane 3 -- an honesty check that a VRAM knob was gating.** The exact-fit guard
+read `if cap is not None and target_fc > 0`, so an UNCAPPED tier skipped it
+entirely: an over-ladder beat rendered its 177-frame ceiling and stamped the
+result as honest while the video ran out before the audio. Unconditional now,
+with a refusal that knows which shape of failure it is looking at. Also both
+1.7B canvases declared, and `otr_w45_humo_1_7b.json` stopped claiming 832x480
+on the tier whose whole identity is the pillarbox.
+
+### The ledger is working
+
+Lane 2 found HuMo carrying the IDENTICAL weight-resolution defect wan_i2v died
+of -- by READING L1 before writing code, not by a failed render. Lane 3 wrote
+no resolution code at all. That is the whole point of one-lane-at-a-time, and
+it paid on the first try.
+
+Three new lessons: **L8** a public id is a claim about the model and claims go
+stale; **L9** fixing a defect at its root can blind the gate that watched it
+(factoring two resolvers into one made G1 report four HuMo lanes as unresolved,
+on lanes that had just got strictly better); plus the lane-3 pair about renames
+breaking tests that hardcode an aspect suffix or a bare engine id.
+
+### Tests that failed CORRECTLY and were fixed at the assertion, never silenced
+
+Six across the three lanes. The most valuable: the `ltx_8gb` dir-override
+tripwire fixture controlled ONE models root and was silently relying on the
+others being invisible, so "I deleted the checkpoint" stopped meaning the
+checkpoint was gone the moment a third root was probed -- two absence
+assertions had been green for the wrong reason. A fake model universe has to be
+the WHOLE universe.
+
+### Remaining, in the queue
+
+`docs/GO_FORWARD_PLAN.md` item 5 carries all 22 rows with per-lane status. Next
+is **lane 4, `humo14_high_audio_in_portrait` (`humo`)** -- the last HuMo lane,
+and it should be quick: everything except its canvas declaration and public id
+came free in lanes 2 and 3.
+
+New row **2b**: moving the boot-contract check EARLIER. It runs inside
+`assert_usable` today, which receives the profile, so the check is real and
+fires wherever `assert_usable` is called -- but `assert_usable` itself still
+fires inside the render phase. S8 wants it at the ShotLock preflight, which
+needs `boot_contract` plumbed into the frozen director policy. Not something to
+improvise at the end of a night, so it is queued rather than half-done.
+
+### Housekeeping and notes
+
+- Two resident OTR headless servers (port 59189, started 00:56) were holding
+  9,969 MiB when I started. Killed selectively by CommandLine per section 4;
+  VRAM fell to 1,636 MiB. Every smoke ran under the 3.0 GiB idle gate, so no
+  leg needed an elevated-baseline stamp.
+- Two stale git worktrees sit under `.claude/worktrees/` on `claude/*` branches
+  carrying an older copy of the video engines. They were not in my way, and
+  deleting another window's branch overnight is not recoverable-friendly, so I
+  left them. They look like cleanup candidates.
+- `docs/2026-08-10-FINAL-QA-video-build-corpus.md` still carries its ORIGINAL
+  header verdict ("NOT IMPLEMENTATION-READY", "ready for the implementation
+  prompt? no") while the master spec says that pass re-ran and returned "start
+  lane 1 = YES, zero blockers". The 21-lane plan inside it is what I built from
+  and is clearly the later, adopted content -- but the header contradicts the
+  master. Worth one edit so the next window does not stop at the wrong gate.
+- On the standing kibitz directive: this corpus already carries four kibitz
+  rounds plus two independent QA passes, and tonight's brief was BUILD, not
+  re-plan, so I opened no new panels. If you want a panel on the code AS BUILT
+  rather than on the plan, that is a fresh arc worth running against the lane
+  1-3 diffs.
+
 ## 2026-08-10 -- HEAD ae06b00e (v2.0-alpha) -- CODER (G0 closed; Lemmy Branch A foundation shipped; the audition that "never happened" was on disk all along)
 
 Did: 6 commits this stretch (13 across the whole session). Everything CPU-only
