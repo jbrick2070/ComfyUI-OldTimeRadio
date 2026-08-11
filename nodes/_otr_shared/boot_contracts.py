@@ -60,6 +60,29 @@ HUMO_DIET = "humo_diet"
 #: and its second consumer land without a schema change.
 H3 = "h3"
 
+#: The LTX-AV diet (row 7b, operator ruling 2026-08-11). `ltx_audio_in` cleared
+#: the 14.5 GiB gate on the stock boot by **35 MB (0.24%)** at 1024x576x193 --
+#: a property of that minute on a lived-in desktop, not a property of the lane,
+#: since a browser opening moves the idle baseline back over it. The operator
+#: refused to wave that through and ruled: prove the lever.
+#:
+#: `reserve_vram_gb` is deliberately **None**, and that is the whole design
+#: decision here rather than an omission. This adapter already holds its own
+#: reserve in-process: `_ltx_av_vram_reserve` bumps ComfyUI's
+#: `EXTRA_RESERVED_VRAM` to `OTR_LTX_AV_RESERVE_VRAM_GB` (default 4.0) across
+#: the graph run, and it bumps only when its target EXCEEDS the current value.
+#: A boot `--reserve-vram 2.921` would therefore be overwritten by the
+#: adapter's own 4.0 for the entire render window -- a knob that reaches
+#: nothing (L6), while looking in the profile like it did something.
+#:
+#: So the untested lever on THIS lane is the pinned-memory one, which is also
+#: the half of the HuMo diet that could not be reproduced by `--reserve-vram`
+#: alone. Same shape as H3, without the Sage constraint (LTX-AV boots on the
+#: Sage-free LTX token already, but that is the token's business, not this
+#: contract's -- a contract that forbids an unrelated flag is how one lane's
+#: needs become another lane's mystery refusal).
+LTX_AV_DIET = "ltx_av_diet"
+
 #: name -> the boot state a server must be in. ``None`` means "this contract
 #: does not constrain that knob" -- distinct from False, which would REQUIRE it
 #: off. Being able to say "don't care" is what keeps a contract from silently
@@ -79,6 +102,11 @@ BOOT_CONTRACTS = {
         "reserve_vram_gb": None,
         "disable_pinned_memory": True,
         "sage_attention": False,
+    },
+    LTX_AV_DIET: {
+        "reserve_vram_gb": None,     # the adapter's own in-process 4.0 dominates
+        "disable_pinned_memory": True,
+        "sage_attention": None,
     },
 }
 
@@ -175,8 +203,28 @@ def check_running_server(name, state=None) -> list:
     """
     spec = contract_spec(name)
     state = running_server_boot_state() if state is None else dict(state)
+    constrained = [k for k in ("reserve_vram_gb", "disable_pinned_memory",
+                               "sage_attention") if spec.get(k) is not None]
     if not state.get("available"):
-        return []                      # unknowable here; the caller decides
+        # UNKNOWN IS NOT SATISFIED (retro bug hunt r1, 2026-08-11 -- both
+        # reviewers reached this independently). This returned a bare `[]` and
+        # the comment said "the caller decides". No caller decides:
+        # `assert_running_server` treats an empty list as MET and raises
+        # nothing, so a contract that constrains real clamps evaluated as
+        # compliant on any box where `comfy.cli_args` cannot be imported.
+        #
+        # A contract that constrains NOTHING (`default`) is genuinely satisfied
+        # by an unknown server -- there is nothing to violate -- so the
+        # distinction is drawn on what the SPEC asks for, not on whether we
+        # happened to be able to look.
+        if not constrained:
+            return []
+        return ["boot contract %r constrains %s, but the running server's boot "
+                "state could not be read (%s) -- UNKNOWN is not satisfied: a "
+                "clamp that cannot be verified may not be assumed"
+                % (name, ", ".join(constrained),
+                   state.get("unavailable_reason") or "comfy.cli_args "
+                   "unavailable")]
     problems = []
     want = spec["reserve_vram_gb"]
     if want is not None:
@@ -196,11 +244,24 @@ def check_running_server(name, state=None) -> list:
                "ON" if state.get("disable_pinned_memory") else "OFF"))
     want = spec["sage_attention"]
     got = state.get("sage_attention")
-    if want is not None and got is not None and bool(got) != bool(want):
-        problems.append(
-            "boot contract %r needs SageAttention %s; it is %s on this server"
-            % (name, "ACTIVE" if want else "ABSENT",
-               "ACTIVE" if got else "ABSENT"))
+    if want is not None:
+        if got is None:
+            # `running_server_boot_state` records `sage_probe_error` when the
+            # probe raises and NOTHING read it -- so a failed probe left
+            # `sage_attention = None` and this comparison skipped entirely,
+            # silently passing a Sage-constrained contract. Recording an error
+            # nobody reads is the same as swallowing it (retro bug hunt r1).
+            problems.append(
+                "boot contract %r needs SageAttention %s, but the probe could "
+                "not determine it (%s) -- an unverifiable Sage state is not a "
+                "pass on a lane Sage silently corrupts"
+                % (name, "ACTIVE" if want else "ABSENT",
+                   state.get("sage_probe_error") or "no reason recorded"))
+        elif bool(got) != bool(want):
+            problems.append(
+                "boot contract %r needs SageAttention %s; it is %s on this "
+                "server" % (name, "ACTIVE" if want else "ABSENT",
+                            "ACTIVE" if got else "ABSENT"))
     return problems
 
 

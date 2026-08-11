@@ -1040,10 +1040,22 @@ class HuMoEngine(_MC.MotionEngineBase):
         different ceilings) and whether the distill LoRA was in the graph,
         because those two facts are what a reader needs to know whether two
         clips are comparable. Versioned in the string, like the WAN lanes: bump
-        the version when the graph changes, never edit a shipped one."""
+        the version when the graph changes, never edit a shipped one.
+
+        RECEIPTS READ ``_lora_is_skipped``, NOT RAW TRUTHINESS (retro review
+        r1, 2026-08-11). This line was ``if self._loader_names().get("lora")``,
+        and the 1.7B tiers set that token to the STRING ``"none"`` -- which is
+        truthy. So both 1.7B engines rendered LoRA-free (the graph reads
+        ``_lora_is_skipped`` and skips the loader correctly) while stamping
+        ``humo_1p7B_v1_lora``, and ``use_lora=True`` alongside it. The graph and
+        the receipt disagreed about the same fact for six lanes, under a green
+        preflight row, and it reached a PUBLISHED artifact:
+        ``otr_credits_roll.py:238-239`` prints "lora" from ``use_lora``.
+        """
+        lora = self._loader_names().get("lora")
         return "%s_v1%s" % (
             self.name.replace(".", "p"),
-            "_lora" if self._loader_names().get("lora") else "")
+            "" if (not lora or self._lora_is_skipped(lora)) else "_lora")
 
     def _clip_telemetry(self, width, height):
         """``quant`` / ``use_lora`` / ``render_canvas`` for the manifest row.
@@ -1053,9 +1065,13 @@ class HuMoEngine(_MC.MotionEngineBase):
         audit to find. ``use_lora`` stays a BOOL -- the rollup groups on it and
         credits truthiness-tests it, so a filename here would make the rollup
         incoherent across engines."""
+        _lora = self._loader_names().get("lora")
         return {
             "quant": self._quant_label(),
-            "use_lora": bool(self._loader_names().get("lora")),
+            # SAME defect as _recipe_receipt above, same fix: the 1.7B tiers'
+            # "none" token is truthy, so this published use_lora=True for a
+            # render that never loaded one -- and credits print "lora" from it.
+            "use_lora": bool(_lora) and not self._lora_is_skipped(_lora),
             "render_canvas": "%dx%d" % (int(width), int(height)),
         }
 

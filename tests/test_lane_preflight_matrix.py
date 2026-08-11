@@ -572,13 +572,62 @@ def gate_g4_admission(name, eng):
     say "admission NOT enforced" IN WORDS, on disk, reachable in the manifest.
     A silently unguarded lane that looks guarded is the failure this forbids."""
     if mc.cost_row_may_refuse(name):
-        return []
+        return _receipt_lora_agrees_with_graph(name, eng)
     unenforced = _manifest().get("admission_unenforced") or {}
     reason = str(unenforced.get(name) or "").strip()
     if not reason:
         return ["is not in QUALIFIED_COST_ROWS and the evidence manifest does "
                 "not record it as admission-unenforced, so its receipts would "
                 "imply a guard that does not run"]
+    return _receipt_lora_agrees_with_graph(name, eng)
+
+
+def _receipt_lora_agrees_with_graph(name, eng):
+    """G4.2 -- a lane's LoRA receipt must equal what its GRAPH does.
+
+    THE DEFECT THIS CLOSES (retro bug hunt on lanes 0-6, 2026-08-11). The two
+    HuMo 1.7B tiers switch the distill LoRA off by setting its token to the
+    STRING "none", and the graph honours that through `_lora_is_skipped`. Both
+    receipts instead used raw truthiness -- and `bool("none")` is True -- so
+    those lanes rendered LoRA-free while stamping `_lora` and `use_lora=True`,
+    and `otr_credits_roll` printed "lora" into PUBLISHED credits.
+
+    It survived six lanes and a green G4 row because G4 only asked whether
+    admission was honestly declared; nothing compared a receipt against the
+    render it describes. That is a hole in the GATE, not just in one lane, so
+    the check lives here where every later lane inherits it.
+
+    Generic on purpose: any lane exposing `_lora_is_skipped` is checked, so a
+    future engine that adopts the skip-token idiom is covered on arrival
+    without anyone remembering this file exists.
+    """
+    skipped = getattr(eng, "_lora_is_skipped", None)
+    names = getattr(eng, "_loader_names", None)
+    telem = getattr(eng, "_clip_telemetry", None)
+    if not (callable(skipped) and callable(names) and callable(telem)):
+        return []
+    try:
+        token = (names() or {}).get("lora")
+        graph_loads = bool(token) and not skipped(token)
+        declared = bool(telem(832, 480).get("use_lora"))
+    except Exception:  # noqa: BLE001 -- a lane that cannot answer is not a lie
+        return []
+    if declared != graph_loads:
+        return ["its receipt says use_lora=%s while its GRAPH %s the LoRA "
+                "(token %r) -- a receipt that records a falsehood, and credits "
+                "publish this field" % (declared,
+                                        "loads" if graph_loads else "skips",
+                                        token)]
+    recipe = getattr(eng, "_recipe_receipt", None)
+    if callable(recipe):
+        try:
+            stamped = recipe().endswith("_lora")
+        except Exception:  # noqa: BLE001
+            return []
+        if stamped != graph_loads:
+            return ["its recipe receipt %s a _lora suffix while its GRAPH %s "
+                    "the LoRA" % ("carries" if stamped else "omits",
+                                  "loads" if graph_loads else "skips")]
     return []
 
 
@@ -860,3 +909,49 @@ def test_the_matrix_report_renders():
     report = "\n".join(lines)
     assert "lane" in report and len(lines) == len(ENGINE_NAMES) + 1
     print("\n" + report)
+
+
+def test_a_halving_two_stage_lane_declares_a_64_legal_canvas():
+    """L13 -- S8b-10 is a SHARED-MECHANISM defect, not one lane's.
+
+    Any adapter whose graph halves the canvas for a first stage and upsamples
+    with `LTXVLatentUpsampler` inherits it, because that node takes `samples` /
+    `upscale_model` / `vae` and NO target size -- its whole contract is "x2".
+    So the delivered canvas IS 2x the stage-A base, and stage A is /32-legal
+    only when the full canvas is /64 on BOTH axes.
+
+    It was recorded against `ltx_audio_in` in lane 7 and was live in
+    `eng_ltx_video`'s HQ two-stage path the whole time (416x240 at its declared
+    832x480). It hid because 1472x832 -- the old landscape default -- is also
+    /64, so the path was legal until the lane moved to 832x480 and nobody
+    rechecked the geometry against the new canvas.
+
+    Generic over the registry on purpose: a future adapter that adopts the
+    halve-then-x2 idiom is covered when it lands, not when someone remembers
+    this file exists.
+    """
+    offenders = []
+    for name in ENGINE_NAMES:
+        eng = vreg.get_engine(name)
+        src = _mro_source(type(eng))
+        halves = ("// 2" in src or "//2" in src)
+        fixed_x2 = "LTXVLatentUpsampler" in src
+        if not (halves and fixed_x2):
+            continue
+        canvas = getattr(eng, "render_canvas", None)
+        if not canvas:
+            offenders.append(
+                "%s halves its canvas and upsamples x2 but DECLARES NO CANVAS, "
+                "so its stage-A legality depends on whatever the driver hands "
+                "it" % name)
+            continue
+        w, h = int(canvas[0]), int(canvas[1])
+        if w % 64 or h % 64:
+            offenders.append(
+                "%s declares %dx%d, which is not /64 on both axes, so its "
+                "stage-A latent (%dx%d) is not /32-legal -- and snapping the "
+                "base would deliver a different canvas than the declaration"
+                % (name, w, h, w // 2, h // 2))
+    assert not offenders, (
+        "halve-then-fixed-x2 lanes must declare a /64 canvas (lesson L13):\n  "
+        + "\n  ".join(offenders))

@@ -777,6 +777,89 @@ before the packet started (G1, G3, G4, G5, G7 never went red).
 
 ---
 
+## L14 -- "I could not check" is not "it passed"
+
+**Check:** for every gate that reads external state -- a running server, a
+probe, an import that may not exist -- ask what it returns when it CANNOT LOOK.
+If that answer is indistinguishable from "satisfied", the gate is decorative on
+exactly the machines where it matters most.
+
+**Symptom:** a green check on a box that never verified anything. Nothing in
+the log, because from the caller's side an empty problem list IS success.
+
+**Root cause:** the unknown case was written as `return []` with a comment
+saying "the caller decides" -- and no caller decided. `assert_running_server`
+treats an empty list as met and raises nothing, so a contract constraining real
+VRAM clamps evaluated as COMPLIANT wherever `comfy.cli_args` could not be
+imported. The same shape appeared twice in one file: `running_server_boot_state`
+recorded `sage_probe_error` when the Sage probe raised, and NOTHING ever read
+that field, so a failed probe left `sage_attention = None` and the comparison
+skipped -- silently passing a Sage-constrained contract on the exact lanes Sage
+silently corrupts. **Recording an error nobody reads is swallowing it.**
+
+**And the test that should have caught it pinned the bug instead.** It was
+named `test_unknowable_is_not_the_same_as_satisfied` and its body asserted
+`check_running_server(HUMO_DIET) == []` -- the name stated the invariant, the
+body enforced its violation. That is why this survived six lanes of green runs.
+
+**The distinction that makes the fix correct:** a contract that constrains
+NOTHING (`default`) is genuinely satisfied by an unreadable server -- there is
+nothing to violate. A contract that constrains something is not. Draw the line
+on what the SPEC asks for, never on whether the check happened to be able to
+look.
+
+**Origin:** retro bug hunt r1 on lanes 0-6 (2026-08-11). Both reviewers reached
+it independently, which is itself the signal -- a defect two harnesses find
+without conferring is not a matter of taste.
+
+**Runnable check:** for each contract, assert that an `{"available": False}`
+state produces a REFUSAL when the contract constrains a knob, and an empty list
+when it does not. Assert a failed probe refuses too.
+
+**Twin assertion:** `tests/test_boot_contracts.py::test_unknowable_is_not_the_same_as_satisfied`
+(rewritten to assert its own name) and `::test_a_failed_sage_probe_is_not_a_pass`.
+
+---
+
+## L13 -- A defect found in one adapter is a defect in every adapter sharing the mechanism
+
+**Check:** when a lane's defect is caused by a SHARED mechanism -- a common
+helper, a node class both graphs use, an idiom copied between adapters -- sweep
+every other adapter that shares it BEFORE the lane closes. Do not record the
+defect against the lane you happened to find it in.
+
+**Symptom:** the ledger says the defect is fixed, the preflight row is green,
+and an identical instance of it is still live one file away. Worse, the second
+instance now has a written record saying the class of bug was dealt with.
+
+**Origin (lane 9, operator ruling 2026-08-11):** S8b-10 was recorded as an
+`ltx_audio_in` defect -- the ia2v stage-A latent being non-/32. It is nothing of
+the kind. It is a property of **any lane that halves its canvas and upsamples
+with a fixed-x2 `LTXVLatentUpsampler`**, because that node takes no target size.
+`eng_ltx_video`'s HQ two-stage path does exactly that and had the identical
+416x240 base at its declared 832x480. Lane 7 fixed one instance and the corpus
+never suggested there was a second.
+
+**Why it hid so long, which is the useful half:** `1472x832` is ALSO /64 on both
+axes. The two-stage path was legal at the old landscape default and became
+illegal the moment the lane moved to 832x480 -- and nobody rechecked the
+two-stage geometry against the new canvas. A canvas change can break a graph
+that has not changed.
+
+**The rule, stated so it can be run:** both axes must be **/64** for a
+halve-then-fixed-x2 recipe to have a legal stage A. 832x480 fails (480/64 =
+7.5); 1024x576 passes (16 and 9) and is true 16:9 besides.
+
+**Runnable check:** grep every adapter for `// 2` on a canvas dimension and for
+`LTXVLatentUpsampler`; every hit's declaring lane must have a /64 canvas.
+
+**Twin assertion:**
+`test_lane_preflight_matrix.py::test_a_halving_two_stage_lane_declares_a_64_legal_canvas`
+-- generic over the registry, so a future adapter adopting the idiom is covered
+on arrival rather than when someone remembers.
+
+---
+
 ## Lane 8 -- `ltx098_low_video` (`ltx_8gb`), closed 2026-08-11
 
 **What bit (1): adding a gate makes every test that used the gated function as

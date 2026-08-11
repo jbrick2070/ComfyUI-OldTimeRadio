@@ -159,10 +159,39 @@ def test_the_probe_reports_unavailable_off_a_comfy_server_rather_than_guessing()
 
 
 def test_unknowable_is_not_the_same_as_satisfied():
-    """Off a server the check returns NO problems -- it cannot know -- and the
-    CALLER decides. The distinction is only honest because the state dict says
-    available: False, which this pins."""
-    assert bc.check_running_server(bc.HUMO_DIET) == []
+    """THIS TEST'S NAME WAS RIGHT AND ITS BODY WAS WRONG (retro bug hunt r1,
+    2026-08-11 -- both reviewers reached the defect independently).
+
+    It asserted `check_running_server(HUMO_DIET) == []` off a server, with a
+    docstring explaining that the CALLER decides. No caller decided:
+    `assert_running_server` treats an empty list as MET and raises nothing. So
+    a contract constraining real VRAM clamps evaluated as COMPLIANT on any box
+    where `comfy.cli_args` cannot be imported -- and the test that should have
+    caught it pinned the bug under a name asserting the opposite.
+
+    The rule the name always stated, now enforced: a contract that CONSTRAINS
+    something is not satisfied by a server we cannot read. A contract that
+    constrains nothing still is -- there is nothing to violate.
+    """
+    problems = bc.check_running_server(bc.HUMO_DIET, state={"available": False})
+    assert problems, "a constrained contract may not pass on an unreadable server"
+    assert "UNKNOWN is not satisfied" in problems[0]
+    with pytest.raises(bc.BootContractError):
+        bc.assert_running_server(bc.HUMO_DIET, state={"available": False})
+    # ...and the stock contract constrains nothing, so it is genuinely met.
+    assert bc.check_running_server(bc.DEFAULT, state={"available": False}) == []
+
+
+def test_a_failed_sage_probe_is_not_a_pass():
+    """`running_server_boot_state` recorded `sage_probe_error` and NOTHING read
+    it, so a probe that raised left `sage_attention = None` and the comparison
+    skipped -- silently passing a Sage-constrained contract on the exact lanes
+    Sage silently corrupts. Recording an error nobody reads is swallowing it."""
+    state = {"available": True, "disable_pinned_memory": True,
+             "sage_attention": None, "sage_probe_error": "ImportError"}
+    problems = bc.check_running_server(bc.H3, state=state)
+    assert problems and "ImportError" in problems[0]
+    assert "not a pass" in problems[0]
 
 
 @pytest.mark.parametrize("state,needle", [
@@ -221,7 +250,22 @@ def test_the_hero_tier_keeps_default_because_it_has_shipped_under_it(engine):
 
 
 def test_the_cast_is_expressed_in_the_profile_not_by_an_engine_refusal(
-        engine, profile):
+        engine, profile, monkeypatch):
+    """The server state is now SUPPLIED, and that is the point of this edit.
+
+    `assert_usable` reaches `assert_running_server`, which since the retro bug
+    hunt refuses a constrained contract it cannot verify. On a CPU box
+    `comfy.cli_args` does not import, so this test was asking the engine to
+    prove a VRAM clamp on a machine with no server -- and passing only because
+    the check used to answer "satisfied" to that question.
+
+    So the fixture hands it a server that genuinely honours the diet. The
+    subject is unchanged (the cast lives in the profile, not in an engine
+    refusal); what changed is that the test no longer depends on the bug.
+    """
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": 2.921,
+        "disable_pinned_memory": True, "sage_attention": None})
     assert bc.check_engine_against_profile(engine, profile) == []
     assert engine.assert_usable(host_caps={}, profile=profile) == LANE
 
@@ -453,3 +497,50 @@ def test_every_humo_tier_now_declares_a_canvas_and_a_contract():
         assert tuple(engine.render_canvas) == canvas, tier
         assert bc.compatible_contracts_for_engine(engine) == (
             "default", "humo_diet"), tier
+
+
+@pytest.mark.parametrize("tier", ["humo", "humo_1.7B", "humo_1.7B_169",
+                                  "humo_14B_169"])
+def test_the_lora_receipt_AGREES_WITH_THE_GRAPH(tier):
+    """A RECEIPT THAT RECORDED A FALSEHOOD, for six lanes, under a green row.
+
+    Found by the retro bug hunt on lanes 0-6 (2026-08-11). The graph decides
+    whether the distill LoRA loads via ``_lora_is_skipped`` -- THE ONE reading
+    of "this tier runs LoRA-free" -- and the 1.7B tiers switch it off by
+    setting the token to the STRING ``"none"``. Both receipts instead used raw
+    truthiness, and ``bool("none")`` is ``True``. So both 1.7B engines rendered
+    LoRA-free while stamping ``humo_1p7B_v1_lora`` with ``use_lora=True``, and
+    ``otr_credits_roll.py:238-239`` printed "lora" into PUBLISHED credits for a
+    LoRA that never loaded.
+
+    THE PREVIOUS TEST COULD NOT CATCH THIS. It asserted
+    ``isinstance(use_lora, bool)`` -- shape, not truth -- and a wrong bool is
+    still a bool. This asserts the two fields against the SAME authority the
+    graph uses, so the receipt cannot disagree with the render again whatever
+    the token happens to be spelled.
+    """
+    engine = vreg.get_engine(tier)
+    token = engine._loader_names().get("lora")
+    graph_loads_lora = bool(token) and not engine._lora_is_skipped(token)
+
+    assert engine._clip_telemetry(832, 480)["use_lora"] is graph_loads_lora, (
+        "%s: use_lora must equal what the GRAPH does with token %r" % (tier, token))
+    assert engine._recipe_receipt().endswith("_lora") is graph_loads_lora, (
+        "%s: the recipe receipt's _lora suffix must equal what the GRAPH does "
+        "with token %r" % (tier, token))
+
+
+def test_a_lora_free_tier_is_not_credited_with_a_lora():
+    """The published consequence, pinned at the consumer's own rule.
+
+    `otr_credits_roll` appends the word "lora" on truthiness of `use_lora`
+    (`:238-239`). This asserts the 1.7B tiers -- the ones that genuinely run
+    LoRA-free -- produce a value that makes that branch NOT fire, so the fix is
+    pinned where the falsehood actually surfaced rather than only at its source.
+    """
+    for tier in ("humo_1.7B", "humo_1.7B_169"):
+        engine = vreg.get_engine(tier)
+        assert engine._lora_is_skipped(engine._loader_names().get("lora")), (
+            "%s is expected to run LoRA-free; if that changed, this test is the "
+            "wrong shape, not the engine" % tier)
+        assert not engine._clip_telemetry(832, 480)["use_lora"]
