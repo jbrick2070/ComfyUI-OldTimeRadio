@@ -219,15 +219,46 @@ def test_the_exclusion_the_contract_rests_on_is_real_and_covers_both_banks():
 #: An EXHAUSTIVE map whose keys are asserted equal to the shipped registry --
 #: the same shape `ENGINE_COVERAGE` uses in tests/test_slug_provenance.py, and
 #: for the same reason.
+#:
+#: CORRECTED 2026-08-11 FROM A LIVE SWEEP, and the correction is the lesson.
+#: The first version of this map was written from the bank list without
+#: measuring anything, and it asserted `scifi_news: cameo_allowed`. A six-bank
+#: render sweep with the cameo FORCED on every leg proved otherwise: that lane
+#: runs the `scifi_news_circuit` pipeline, which never calls `lock_cast()`, so
+#: it writes an EMPTY `cast_contract` -- no cast_seed, no lemmy_hit, no
+#: lemmy_policy -- and ignores both `lemmy_cameo` and `num_characters` (asked
+#: for 2 characters, produced 3).
+#:
+#: A map that claims a rule nobody measured is the exact defect this file's
+#: neighbours exist to catch, so the values below now say what was OBSERVED.
 BANK_CAMEO_POLICY = {
-    "media_archive": "cameo_allowed",
+    # PROVEN by live render, 2026-08-10/11: forced cameo produced a LEMMY row
+    # on the qualified IndexTTS2 route.
     "original": "cameo_allowed",
-    "scifi_news": "cameo_allowed",
-    "scifi_news_pro": "cameo_allowed",
-    "custom_source_bank": "cameo_allowed",   # operator-supplied; see docstring
+    "media_archive": "cameo_allowed",
+    # PROVEN by live render: forced cameo REFUSED, with
+    # lemmy_policy="source_fidelity_exclusion" recorded on the ledger.
     "public_domain": "source_fidelity_excluded",
     "shakespeare": "source_fidelity_excluded",
+    # MEASURED, NOT INTENDED-BY-ANYONE-I-CAN-CITE. The circuit lane owns its own
+    # cast and never consults the cameo. Whether that is by design or an
+    # oversight is an OPERATOR question, recorded rather than guessed at --
+    # see docs/2026-08-11-FINDING-lane-cast-contract-divergence.md.
+    "scifi_news": "lane_owns_its_cast",
+    # NOT MEASURED. Its leg failed in the WRITER before casting ran
+    # ("[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
+    # exhausted"), so nothing about its cameo behaviour was observed. Marked
+    # unmeasured rather than assumed from its sibling -- that assumption is the
+    # one that made this map wrong the first time.
+    "scifi_news_pro": "unmeasured",
+    # Operator-supplied; the shipped map cannot see a bank this repo has never
+    # heard of. See the docstring on the completeness test below.
+    "custom_source_bank": "cameo_allowed",
 }
+
+#: The policies whose claim is "Lemmy may appear here" -- the only ones the
+#: `_source_bank_excludes_lemmy` cross-check can speak about.
+_CAMEO_ALLOWED_POLICIES = ("cameo_allowed", "lane_owns_its_cast", "unmeasured")
 
 
 def _shipped_bank_ids():
@@ -274,12 +305,26 @@ def test_every_shipped_bank_has_a_DECIDED_cameo_policy():
 
 
 def test_the_decided_policy_matches_what_the_code_actually_does():
-    """The map above is a claim; this is the check that it is true."""
+    """The map above is a claim; this is the check that it is true.
+
+    Scoped to what `_source_bank_excludes_lemmy` can actually answer: it decides
+    SOURCE FIDELITY, and nothing else. `lane_owns_its_cast` and `unmeasured`
+    banks are not excluded BY IT -- they simply never reach the cameo path -- so
+    asserting exclusion for them would be testing the wrong function.
+    """
     from nodes._otr_casting import _source_bank_excludes_lemmy
 
     for bank, policy in sorted(BANK_CAMEO_POLICY.items()):
         expected = (policy == "source_fidelity_excluded")
         assert _source_bank_excludes_lemmy(bank) is expected, (bank, policy)
+        if policy in _CAMEO_ALLOWED_POLICIES:
+            assert not _source_bank_excludes_lemmy(bank), bank
+
+
+def test_every_policy_value_is_one_we_defined():
+    known = set(_CAMEO_ALLOWED_POLICIES) | {"source_fidelity_excluded"}
+    for bank, policy in BANK_CAMEO_POLICY.items():
+        assert policy in known, (bank, policy)
 
 
 def test_public_domain_story_is_a_CORPUS_DIRECTORY_not_a_bank_id():
