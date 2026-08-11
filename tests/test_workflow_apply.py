@@ -319,6 +319,42 @@ def test_patch_creative_allows_whitelisted(schemas, master_copy):
     assert writer["widgets_values"][slots.index("target_words")] == 30
 
 
+def test_patch_creative_can_force_the_lemmy_cameo(schemas, master_copy):
+    """Chunk D. A qualification render must be able to force the cameo
+    DETERMINISTICALLY -- an acceptance run that waits on an 11% roll is not an
+    acceptance run, and hand-patching the graph is the ad-hoc JSON edit this
+    seam exists to prevent."""
+    writer = [n for n in master_copy["nodes"]
+              if n["type"] == "OTR_LedgerScriptWriter"][0]
+    wa.patch_creative(master_copy, writer["id"], "lemmy_cameo",
+                      "always include", schemas=schemas)
+    slots = wa.serialized_slot_names("OTR_LedgerScriptWriter", schemas)
+    assert writer["widgets_values"][slots.index("lemmy_cameo")] == "always include"
+
+
+def test_the_forced_value_is_one_the_writer_actually_accepts():
+    """Guards against whitelisting a dial and then setting a string it does not
+    take. `_LEMMY_CAMEO_FORCE.get()` returns None for an unknown key, which is
+    the NATURAL ROLL -- so a typo here would silently render an episode without
+    the cameo while looking like it forced one."""
+    from nodes.OTR_LedgerScriptWriter import _LEMMY_CAMEO_FORCE
+
+    assert _LEMMY_CAMEO_FORCE["always include"] is True
+    assert _LEMMY_CAMEO_FORCE["never include"] is False
+    assert _LEMMY_CAMEO_FORCE["roll (~11% chance)"] is None
+    assert _LEMMY_CAMEO_FORCE.get("force") is None      # the value a review invented
+
+
+def test_whitelisting_the_cameo_did_not_open_a_route_or_engine_field():
+    """The chunk adds exactly ONE creative dial. Managed voice/engine/route
+    fields stay off the whitelist in BOTH copies."""
+    for name in ("voice_bank", "char_voice_engine", "announcer_voice_engine",
+                 "engine", "voice_route", "cast_voice_policy"):
+        assert name not in wa.CREATIVE_WHITELIST, name
+        assert name not in otr_api.CREATIVE_WHITELIST, name
+    assert "lemmy_cameo" in wa.CREATIVE_WHITELIST
+
+
 def test_patch_creative_refuses_managed_engine_widget(schemas, master_copy):
     director = [n for n in master_copy["nodes"] if n["type"] == "OTR_VideoDirector"][0]
     with pytest.raises(ProfileError, match="not on the creative whitelist"):

@@ -781,6 +781,11 @@ CREATIVE_WHITELIST = frozenset({
     # Google BYO API concrete model pickers are pure headless bindings for
     # the virtual google_api:slot-a/b LLM rows, not managed media engines.
     "google_api_slot_a_model", "google_api_slot_b_model",
+    # lemmy_cameo -- the recurring-cameo dial on node 1; mirror of the package
+    # whitelist. A creative dial, never a route/engine/reference field. Lets a
+    # qualification run force the cameo deterministically instead of waiting on
+    # an 11% roll; source-fidelity exclusion still overrides it.
+    "lemmy_cameo",
 })
 
 

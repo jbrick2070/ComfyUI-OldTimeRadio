@@ -710,6 +710,21 @@ CREATIVE_WHITELIST = frozenset({
     # LLM rows. They are content/model-selection widgets on the writer, not
     # managed audio/image/video engine widgets.
     "google_api_slot_a_model", "google_api_slot_b_model",
+    # lemmy_cameo is a pure CREATIVE dial on node 1 -- it decides whether the
+    # recurring cameo character joins the cast ("roll (~11% chance)" /
+    # "always include" / "never include"). apply_profile never manages it.
+    #
+    # WHITELISTED SO A QUALIFICATION RUN CAN FORCE HIM DETERMINISTICALLY. An
+    # acceptance render that has to wait for an 11% roll is not an acceptance
+    # render, and the alternative -- hand-patching the graph -- is the ad-hoc
+    # JSON edit this seam exists to prevent.
+    #
+    # It cannot be used to smuggle him into a source-faithful adaptation:
+    # `_source_bank_excludes_lemmy` overrides `force_lemmy` unconditionally, so
+    # "always include" on a shakespeare/public_domain bank still yields
+    # `lemmy_policy = "source_fidelity_exclusion"`. This entry adds a creative
+    # dial, never a route, engine, reference or other managed/runtime field.
+    "lemmy_cameo",
 })
 
 
