@@ -8,9 +8,13 @@ provable claim on ONE named row -- and the most important assertions in this fil
 are the NEGATIVE ones: that the generic selector, the seed, and every unclaimed
 row behave exactly as they did before this path existed.
 
-The shipped policy has an EMPTY ``approved_native_routes``, so the mechanism is
-inert in production until an operator audition fills it in. These tests inject a
-policy to exercise the machinery that day will switch on.
+THAT DAY CAME. This file was written while ``approved_native_routes`` was EMPTY
+and the mechanism was inert, and most tests below still INJECT a policy so the
+machinery can be exercised in isolation. But G1 Test A passed on 2026-08-10, so
+the shipped policy now carries a real qualified IndexTTS2 route, and the tests
+that matter most are the ones using it UNINJECTED -- they fail if the receipt in
+`config/cast_pools.py` stops validating, stops reaching the durable record, or
+starts applying to an episode that never cast him.
 
 Headless. No engine, no model, no GPU.
 """
@@ -175,6 +179,49 @@ def test_a_bank_with_no_character_engine_is_reported_not_raised():
     led = json.loads(out[0])
     for entry in led["cast"]:
         assert "voice_route" not in entry
+
+
+def test_the_route_survives_the_DURABLE_stamp(monkeypatch):
+    """Plan section 7 step 3's last clause: cast data is preserved on durable
+    reload. It was the one acceptance item with no test.
+
+    Not a hypothetical: `stamp_durable` replaces the `cast` section WHOLESALE on
+    the singleton, so a route stamped only on the local wire dict would reach the
+    voice node and then vanish from the persisted ledger -- the receipt would name
+    a route the durable record never mentions.
+
+    Production already proved this works (the 2026-08-11 sweep's on-disk ledger
+    carries `voice_route` on Lemmy's row), but a live episode is an expensive
+    regression detector. This is the cheap one.
+
+    Deliberately does NOT use the `pin` fixture: it exercises the REAL shipped
+    policy and the REAL qualified route, so it fails if the receipt in
+    `cast_pools.py` stops reaching the durable record.
+    """
+    captured = {}
+
+    import nodes.production_ledger as pl
+
+    def spy(*, sections=None, meta_updates=None, source=""):
+        captured["sections"] = sections
+        captured["source"] = source
+        return "test-mode"
+
+    monkeypatch.setattr(pl, "stamp_durable", spy)
+    monkeypatch.setattr("nodes.cast_lock.stamp_durable", spy, raising=False)
+
+    CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")
+
+    cast = (captured.get("sections") or {}).get("cast")
+    assert cast, "the durable stamp received no cast section at all"
+    lemmy = [c for c in cast
+             if str(c.get("name") or "").upper() == "LEMMY"]
+    assert lemmy, "LEMMY is missing from the durably-stamped cast"
+    route = lemmy[0].get("voice_route") or {}
+    assert route.get("route_id") == "lemmy-indextts2-algenib-cockney-v1", route
+    assert route.get("source_ref_sha256"), (
+        "the durable route lost its reference hash -- the receipt would name a "
+        "route nobody could re-verify")
 
 
 def test_no_claimed_row_means_no_claim_at_all(pin, monkeypatch):
