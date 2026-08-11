@@ -48,7 +48,13 @@
     "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
-    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
   },
   "video": {
     "device_policy": "cuda",
@@ -62,8 +68,8 @@
   },
   "render": {
     "fps": 25,
-    "canvas_w": 832,
-    "canvas_h": 480,
+    "canvas_w": 1024,
+    "canvas_h": 576,
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,
@@ -71,7 +77,13 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": ["ltx-2.3-22b-dev-gguf", "ltx-2.3-distilled-lora", "gemma-3-12b", "ltx-2.3-video-vae", "ltx-2.3-22b-dev"],
+    "required_models": [
+      "ltx-2.3-22b-dev-gguf",
+      "ltx-2.3-distilled-lora",
+      "gemma-3-12b",
+      "ltx-2.3-video-vae",
+      "ltx-2.3-22b-dev"
+    ],
     "required_keys": []
   },
   "launch": {

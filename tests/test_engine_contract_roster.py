@@ -22,6 +22,15 @@ import pytest
 import nodes._otr_video_engines  # noqa: F401  -- populate the registry
 from nodes._otr_video_engines import frame_contract as fc
 from nodes._otr_video_engines import registry as vreg
+from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine as _LV
+
+#: ltx_video's canvas, READ FROM THE DECLARATION rather than repeated as a
+#: literal. It moved 832x480 -> 1024x576 by operator ruling on 2026-08-11: the
+#: HQ two-stage path halves for stage A and upsamples with a fixed-x2 node, so
+#: both axes must be /64 or the stage-A latent is not /32-legal. Two sites in
+#: this file pinned the old number, and a literal would have made the ruling
+#: look like a regression in both at once (lesson L10).
+_LV_CANVAS = tuple(_LV.render_canvas)
 
 
 def _engines():
@@ -526,11 +535,12 @@ def test_every_ltx_video_profile_renders_at_the_canvas_the_engine_declares():
         if w is None or h is None:
             continue
         checked += 1
-        assert (int(w), int(h)) == (832, 480), (
-            "%s renders ltx_video at %sx%s, but the adapter declares 832x480 "
+        assert (int(w), int(h)) == _LV_CANVAS, (
+            "%s renders ltx_video at %sx%s, but the adapter declares %sx%s "
             "and its frame contract describes what it produces THERE. The "
             "decode floor is canvas-dependent, so re-measure the decode band "
-            "at the new canvas before moving this." % (path.name, w, h))
+            "at the new canvas before moving this."
+            % (path.name, w, h, _LV_CANVAS[0], _LV_CANVAS[1]))
     assert checked >= 3, "expected to check the shipped ltx_video profiles"
 
 
@@ -555,7 +565,7 @@ def test_ltx_video_DECLARES_its_render_canvas_so_the_env_cannot_move_it():
         # 169 floor was measured -- but it is not where production renders,
         # and the declaration is what the contract was written against.)
         os.environ["OTR_LTX_RENDER_CANVAS"] = "1472x832"
-        assert rd.declared_render_canvas("ltx_video") == (832, 480), (
+        assert rd.declared_render_canvas("ltx_video") == _LV_CANVAS, (
             "the declaration must not follow OTR_LTX_RENDER_CANVAS -- it is the "
             "channel the declaration exists to overrule")
     finally:

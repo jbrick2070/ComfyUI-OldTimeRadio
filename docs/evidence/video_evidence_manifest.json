@@ -1,6 +1,6 @@
 {
   "schema": "otr.video_evidence_manifest/1",
-  "manifest_version": 3,
+  "manifest_version": 4,
   "built": "2026-08-11",
   "lab_repo": "vram-recipe-lab",
   "lab_evidence_commit": "4d87cfa3278c39cbdde6f3cb8b16f241aeb58c02",
@@ -18,7 +18,7 @@
     "humo_1.7B": "admission NOT enforced: no cost row, and safe_render_frames is None so the exact-fit guard is skipped entirely -- an over-ladder beat emits 177 frames stamped as if honest. Owned by lane 3.",
     "humo_1.7B_169": "admission NOT enforced: inherits the 1.7B tier's missing cost row and has no landscape receipt of its own at any rung.",
     "humo_14B_169": "admission NOT enforced: the ruled hero cast has a measured 13.06 GiB warm landscape f97 receipt under the diet boot, but a receipt is not a qualified cost row and nothing refuses an over-budget plan on this lane today.",
-    "ltx_audio_in": "admission NOT enforced: no cost row. The affine FIT is CUT for LTX because the HQ ladder is non-monotonic against the model's pixel scaling, so this lane needs conservative ABSOLUTE envelopes rather than a smoothed line. Lane 7 (2026-08-11) DECLARED render_canvas = 1024x576, the canvas the ltx_av_hq_1024x576_f193 row measures, but that row is LAB WARM and this lane carries a live counter-receipt that in-pipeline peaks read higher than isolation probes (1280x704 breached at 14,716 MB in the full pipeline). The declaration is qualified by the lane's own solo smoke on this box, not by the lab row; until a cost row exists, admission stays unenforced here in words.",
+    "ltx_audio_in": "admission NOT enforced: no cost row. **MARGINAL** (operator decision rule, row 7b, 2026-08-11): this lane clears the 14,500 MB ceiling by only 115 MB (0.11 GiB) on its ltx_av_diet boot, which is UNDER the 0.3 GiB threshold, so it is flagged marginal rather than passed. Both numbers, same recipe / canvas / frames / still, cold, VramPeakProbe maxima: default boot 14,465 MB absolute; ltx_av_diet boot 14,385 MB absolute / 11,872 MB net. The diet bought only 80 MB because the reserve half of the lever is INERT on this lane -- the adapter's own in-process 4.0 GB EXTRA_RESERVED_VRAM dominates any boot --reserve-vram for the whole render window -- so only --disable-pinned-memory was available. Output is BYTE-IDENTICAL between the two boots (sha256 36902e04...), so the diet costs nothing in quality. The affine FIT stays CUT for LTX (non-monotonic HQ ladder); this lane needs conservative ABSOLUTE envelopes.",
     "ltx_video": "admission NOT enforced: no cost row, and its only datapoint is a FAILED chained diagnostic at 832x448 -- not the 832x480 it declares, and not a single-render number at all.",
     "ltx_8gb": "admission NOT enforced: no cost row. The 'NO measurement of any kind on this box' that made its low/high marker provisional is CLOSED by lane 8 (2026-08-11): 9,106 MB absolute / 6,835 MB net, cold, at 512x288x161 in 22.1 s, a VramPeakProbe maximum. That qualifies the `low` MARKER; it is still not a cost row, and nothing refuses an over-budget plan on this lane today. Note what the number does NOT say: 6.8 GiB net is not a promise that the lane fits an 8 GB card, which is the exact claim the retired `8gb` token made without evidence.",
     "mesh_stage": "admission NOT enforced: no cost row; the lane's real preflight gap is the ungated hy3d graph, not a VRAM envelope."
@@ -542,6 +542,23 @@
       "seeds_cost_row": true,
       "receipt": "docs/evidence/lane_receipts/lane08-ltx098_low_video.md",
       "note": "The FIRST measurement of any kind for this lane on this box, and the one the low/high marker was waiting on. Cheapest lane in the roster: 1.75x cheaper than ltx23_low_audio_in by NET and 13.8x faster per beat. Recipe ltx098_distilled_2b_i2v_single_pass_v2, no quant. 5,394 MB of absolute headroom under the ceiling."
+    },
+    {
+      "lane": "ltx_audio_in",
+      "public_id": "ltx23_low_audio_in",
+      "canvas": "1024x576",
+      "model_frames": 193,
+      "delivered_frames": 193,
+      "boot_lane": "ltx_av_diet",
+      "cache_state": "cold",
+      "surface": "absolute device total (VramPeakProbe max)",
+      "absolute_peak_mb": 14385,
+      "baseline_mb": 2513,
+      "net_mb": 11872,
+      "wall_time_s": 297.7,
+      "seeds_cost_row": true,
+      "receipt": "docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md",
+      "note": "ROW 7b, the operator-ordered diet leg. Paired with this lane's default-boot leg above: same recipe, canvas, frames and still, only the boot differs. --disable-pinned-memory PROVEN in the live process argv. Improvement 80 MB; margin 115 MB, MARGINAL under the 0.3 GiB rule. The rendered clip is BYTE-IDENTICAL to the default-boot one (same sha256), which is stronger parity evidence than HuMo's by-eye ruling and means the diet is free."
     }
   ]
 }

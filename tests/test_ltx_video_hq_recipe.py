@@ -51,7 +51,7 @@ def hq_env(monkeypatch):
     return LtxVideoEngine()
 
 
-def _graph(eng, image="still.png", w=832, h=480, length=121, seed=7):
+def _graph(eng, image="still.png", w=1024, h=576, length=121, seed=7):
     plan = {"text_prompt": "a vintage radio station interior", "seed": seed,
             "target_frame_count": length}
     return eng._build_graph_hq(plan, length, w, h, image)
@@ -109,8 +109,13 @@ def test_two_stage_topology(hq_env):
     g = _graph(hq_env)
     # STAGE A: half-canvas empty latent + soft inplace anchor; the sampler's
     # latent is the inplace output DIRECT (pure video latent -- no AV concat)
-    assert g["emptylatent"]["inputs"]["width"] == 416      # 832 // 2
-    assert g["emptylatent"]["inputs"]["height"] == 240     # 480 // 2
+    # 416x240 until the 2026-08-11 canvas ruling: this lane halves for stage A
+    # and upsamples with a FIXED-x2 node, so both axes must be /64 or the
+    # stage-A latent is not /32-legal. 480 is not /64 and `240 % 32 == 16` --
+    # this recipe never had a legal stage A at the old canvas, and these two
+    # lines pinned the illegal value as correct. See lesson L13.
+    assert g["emptylatent"]["inputs"]["width"] == 512      # 1024 // 2
+    assert g["emptylatent"]["inputs"]["height"] == 288     # 576 // 2
     assert g["emptylatent"]["inputs"]["length"] == 121
     assert g["inplace_base"]["inputs"]["strength"] == 0.7
     assert g["inplace_base"]["inputs"]["latent"] == W("emptylatent", 0)
@@ -157,7 +162,8 @@ def test_half_distilled_lora(hq_env):
 
 
 def test_guide_chain_canvas_independent(hq_env):
-    g = _graph(hq_env, w=512, h=288)   # tiny canvas: guide numbers UNCHANGED
+    # A SMALLER canvas, still /64 on both axes so stage A stays legal.
+    g = _graph(hq_env, w=640, h=384)   # small canvas: guide numbers UNCHANGED
     assert g["imagescale"]["inputs"]["width"] == 1920
     assert g["imagescale"]["inputs"]["height"] == 1088
     assert g["resizelonger"]["inputs"]["longer_edge"] == 1536
@@ -188,7 +194,7 @@ def test_single_pass_graph_unchanged(hq_env, monkeypatch):
     """The frozen GGUF-mini graph is byte-identical under the recipe layer."""
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     plan = {"text_prompt": "x", "seed": 1, "target_frame_count": 121}
-    g = hq_env._build_graph(plan, 121, 832, 480)
+    g = hq_env._build_graph(plan, 121, 1024, 576)
     assert g["lora"]["inputs"]["strength_model"] == 0.7
     assert g["lora"]["inputs"]["lora_name"].endswith(
         "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")

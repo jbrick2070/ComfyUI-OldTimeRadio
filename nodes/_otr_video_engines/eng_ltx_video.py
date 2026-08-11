@@ -51,6 +51,7 @@ import logging
 import os
 
 from . import motion_common as _MC
+from . import recipe_departures as _RD
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import (CONTINUITY_STRICT_FIRST_FRAME, ContractEnvConflict,
                              FrameContract)
@@ -147,6 +148,49 @@ def _env_int(name, default, floor):
 _LTX_DECODE_FLOOR_DEFAULT = 169
 
 
+#: THE CONSENT ACT (lane 9, 2026-08-11). ``eng_ltx_8gb``, ``wan_ti2v`` and
+#: ``wan_i2v`` all carry one; this adapter was the last frozen lane without a
+#: sanctioned way to MEASURE, and that gap is a real blocker rather than a
+#: tidiness point: S8b-14 asks for a ROOT resolution of the fixed-169 contract,
+#: the root is "is the 169 decode floor actually required at 832x480?", and that
+#: question can only be answered by rendering rungs below 169 -- which
+#: ``assert_env_matches_contract`` refuses, correctly, on every production leg.
+#:
+#: Without this, the only ways to measure were to edit a declaration mid-run
+#: (measuring with the thing under test moved) or to skip the measurement and
+#: log the trim ratio -- which is the "deferred logging" the corpus rejects.
+#:
+#: DEFAULT OFF, and never inferred from an ambient condition: a signal you can
+#: arrive at by accident is one a production leg can arrive at by accident. When
+#: set, the two CONTRACT-BEARING variables bind again and every clip stamps a
+#: ``+prequalification[...]`` recipe receipt naming exactly what it departed
+#: from, so a sweep artifact can never be mistaken for a production one.
+PREQUALIFICATION_ENV = "OTR_LTX_VIDEO_PREQUALIFICATION"
+_TRUTHY = ("1", "true", "yes", "on")
+
+
+def prequalification_active():
+    """True when the operator has explicitly opened this lane for measurement."""
+    return (os.environ.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
+        in _TRUTHY
+
+
+def _quant_label(unet_name):
+    """The GGUF quant / precision token from a unet basename (``Q3_K_M``,
+    ``fp8``, ...), or ``""`` when the basename carries none. Pure.
+
+    Deliberately a MODULE function taking the name, not a method reading self:
+    ``eng_ltx_av._quant_label`` is a method and these two modules must not
+    import each other (the cross-lane coupling this build keeps paying for), so
+    the duplication is the lesser cost -- and this shape is trivially testable
+    without building an engine.
+    """
+    import re
+    m = re.search(r"(Q\d+(?:_[A-Za-z0-9]+)*|fp8|fp16|bf16)",
+                  os.path.basename(str(unet_name or "")))
+    return m.group(1) if m else ""
+
+
 def assert_env_matches_contract(contract):
     """REFUSE when the environment moves what the declaration froze.
 
@@ -175,6 +219,21 @@ def assert_env_matches_contract(contract):
     cap = _env_int("OTR_LTX_MAX_FRAMES", _LTX_MAX_FRAMES_DEFAULT, _LTX_MIN_FRAMES)
     floor = _env_int("OTR_LTX_MIN_DECODE_FRAMES", _LTX_DECODE_FLOOR_DEFAULT,
                      _LTX_MIN_FRAMES)
+    if prequalification_active():
+        # THE CONSENT ACT, and it is the ONLY thing that opens these two.
+        # LOUD on every leg -- a measurement run that looks like a production
+        # run in the log is how a sweep clip ends up quoted as an episode. The
+        # range checks in `_env_int` still apply, so this opens the values, not
+        # the validation. The clip's own receipt carries the departures.
+        if cap != declared_max or floor != declared_min:
+            _LOG.warning(
+                "[ltx_video] PREQUALIFICATION: %s is set, so the contract-"
+                "bearing env vars BIND for this MEASUREMENT run -- "
+                "min_decode=%d (declared %d), max=%d (declared %d). Every clip "
+                "stamps a %s receipt. This is NOT a production leg.",
+                PREQUALIFICATION_ENV, floor, declared_min, cap, declared_max,
+                _RD.PREQUALIFICATION_SUFFIX)
+        return
     if cap != declared_max:
         raise ContractEnvConflict(
             "ltx_video: OTR_LTX_MAX_FRAMES=%d disagrees with the declared "
@@ -241,10 +300,21 @@ def _ltx_frame_length(target_frame_count, fallback):
     # have their own decode behavior) -- the floor never exceeds the cap.
     floor = min(floor, cap)
     if length < floor:
+        # THE TRIM RATIO, LOUD (S8b-14, lane 9, 2026-08-11). The floor is not
+        # moved in this commit by operator ruling -- whether 169 is right at the
+        # newly declared 1024x576 is UNMEASURED, and the 169 band was measured
+        # at 1472x832 -- so the COST is made visible instead of guessed away.
+        # A 50-frame beat renders 169 and the composite truncates 119 of them:
+        # ~3.4x the GPU work, and until this line it was untracked.
         _LOG.warning("[eng_ltx_video] frame ask %d below the decode floor %d "
                      "-- raising (the wrapper VAEDecode fails outside its "
                      "tiled band at this canvas; the composite truncates to "
-                     "the beat window)", length, floor)
+                     "the beat window). TRIM RATIO %.2fx: %d of %d rendered "
+                     "frames are discarded. The floor is measured at 1472x832, "
+                     "NOT at the declared canvas -- re-deriving it is its own "
+                     "measurement leg.",
+                     length, floor, float(floor) / max(1, length),
+                     floor - length, floor)
         length = floor
     return ((length - 1) // 8) * 8 + 1
 
@@ -512,7 +582,26 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: shorter beats at 832x480 and cut a lot of trimmed work, but it needs its
     #: own decode measurements at this canvas, which cost GPU time and are not a
     #: thing to guess at while a campaign is running. Tracked, not assumed.
-    render_canvas = (832, 480)
+    #: 832x480 -> 1024x576 (OPERATOR RULING, lane 9, 2026-08-11). The HQ
+    #: two-stage path renders stage A at exactly half the canvas and upsamples
+    #: with a FIXED-x2 `LTXVLatentUpsampler` that takes no target size, so both
+    #: axes must be /64 for stage A to be /32-legal. 832x480 fails on height
+    #: (480/64 = 7.5) and that IS the bug -- the base was 416x240 with
+    #: `240 % 32 == 16`. 1024x576 passes (16 and 9), gives stage A 512x288, and
+    #: is true 16:9 so it delivers to 1920x1080 with zero pad area.
+    #:
+    #: WHY THIS HID FOR SO LONG, and it is the useful part: 1472x832 is ALSO
+    #: /64 on both axes. The two-stage path was legal at the old landscape
+    #: default and silently became illegal when the lane moved to 832x480 --
+    #: and nobody rechecked the two-stage geometry against the new canvas.
+    #:
+    #: THE DECODE FLOOR IS DELIBERATELY NOT MOVED WITH IT. `frame_contract`
+    #: still declares 169 and the env refusal still stands. Whether 169 is the
+    #: right floor AT 1024x576 is UNMEASURED -- the 169 band was measured at
+    #: 1472x832 -- and bundling that guess into a canvas fix is exactly what
+    #: the operator forbade. It gets its own leg. Until then the trim ratio is
+    #: logged LOUD on every render so the cost is visible rather than silent.
+    render_canvas = (1024, 576)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
     engine_version = "1"
@@ -1024,7 +1113,31 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         lora_name, _lora_path = self._hq_lora_file()
+        # S8b-10 RECURS HERE, and the corpus never flagged it (lane 9,
+        # 2026-08-11). It assigned the stage-A /32 defect to `ltx_audio_in`
+        # alone, but THIS recipe halves the canvas exactly the same way and
+        # feeds the result to the same fixed-x2 `LTXVLatentUpsampler`. At this
+        # lane's DECLARED 832x480 the base is 416x240 and `240 % 32 == 16`, so
+        # the HQ two-stage path has never had a legal stage-A latent.
+        #
+        # Guarded at its ROOT rather than left to fail deep in the sampler --
+        # and NOT silently snapped, because snapping to 416x256 would deliver
+        # 832x512 against a declared 832x480 (lesson L11: the delivered canvas
+        # IS 2x this base, so only a /64-on-both-axes canvas has a legal stage
+        # A). Which canvas this lane should declare is entangled with S8b-14's
+        # canvas-dependent 169 decode floor and is an operator decision, so this
+        # refuses loudly instead of guessing.
         base_w, base_h = int(width) // 2, int(height) // 2  # exact halving
+        for _axis, _val in (("width", base_w), ("height", base_h)):
+            if _val % 32 != 0:
+                raise ValueError(
+                    "ltx_video hq_two_stage stage-A %s %d is not a multiple of "
+                    "32 (from a %dx%d canvas). The two-stage recipe halves the "
+                    "canvas and upsamples x2 with no target size, so the canvas "
+                    "must be /64 on BOTH axes or stage A is an illegal latent. "
+                    "NO FALLBACK -- snapping the base would deliver a different "
+                    "canvas than the one declared. See lesson L11."
+                    % (_axis, _val, int(width), int(height)))
         g = {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": self._unet_name()}},
@@ -1364,9 +1477,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # PATCHED reference to the base unet, so evicting "unet" under
         # free_after_use would DANGLE the patcher (the sampler would have no
         # weights). The terminal is kept for the IMAGE read-out.
-        results = _wb.run_graph(graph, classes, free_after_use=True,
-                                keep={"unet", "lora", self._TERMINAL})
-        images = results[self._TERMINAL][0]                   # VAEDecodeTiled IMAGE batch
+        # NVML peak probe spans the whole render window (lane 9, 2026-08-11) --
+        # the same shape wan_ti2v uses. Without it this lane produced NO
+        # vram_peak_mb at all, so every envelope built on it was built on the
+        # driver's instantaneous fallback read (L4), and a measurement run under
+        # the consent act would have had no number to report.
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
+        try:
+            results = _wb.run_graph(graph, classes, free_after_use=True,
+                                    keep={"unet", "lora", self._TERMINAL})
+            images = results[self._TERMINAL][0]               # VAEDecodeTiled IMAGE batch
+        finally:
+            render_peak = probe.stop()
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers
         # The LoRA-wrapped unet is the resident MODEL patcher (V-4 teardown).
@@ -1392,7 +1514,42 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 # frame, so every delivered frame is a rendered frame and
                 # ``"none"`` is a fact about this path.
                 "native_frame_count": n,
-                "extension_mode": "none"}
+                "extension_mode": "none",
+                "vram_peak_mb": render_peak,
+                **self._clip_telemetry(width, height)}
+
+    def _clip_telemetry(self, width, height):
+        """``recipe`` / ``quant`` / ``use_lora`` / ``render_canvas`` for the
+        manifest row -- the L4 fields this adapter never PRODUCED.
+
+        The plumbing above it has been complete since S-B/E5: `render_driver`
+        carries these onto the manifest and `otr_video_render_batch` rolls them
+        up. This lane simply never emitted them, so every `ltx_video` clip
+        shipped `null` for all four -- the same hole `wan_ti2v` closed for the
+        WAN family, found here by lane 9 needing a receipt to stamp its
+        MEASUREMENT departures onto.
+
+        `recipe` carries the prequalification suffix when the consent act is
+        open, so a sweep artifact names the cell that produced it rather than
+        being indistinguishable from a production leg (that is the whole safety
+        property of the consent act, and it lives here).
+        """
+        recipe = self._recipe()
+        if prequalification_active():
+            frozen = {"min_decode_frames": _LTX_DECODE_FLOOR_DEFAULT,
+                      "max_frames": _LTX_MAX_FRAMES_DEFAULT}
+            resolved = {
+                "min_decode_frames": _env_int(
+                    "OTR_LTX_MIN_DECODE_FRAMES", _LTX_DECODE_FLOOR_DEFAULT,
+                    _LTX_MIN_FRAMES),
+                "max_frames": _env_int("OTR_LTX_MAX_FRAMES",
+                                       _LTX_MAX_FRAMES_DEFAULT, _LTX_MIN_FRAMES),
+            }
+            recipe = "%s%s" % (recipe, _RD.receipt_suffix(frozen, resolved))
+        return {"recipe": recipe,
+                "quant": _quant_label(self._unet_name()),
+                "use_lora": True,       # both recipe paths wire the distilled LoRA
+                "render_canvas": "%dx%d" % (int(width), int(height))}
 
     def _render_clip_hq(self, request, prepared, plan):
         """S5: drive ONE silent two-stage HQ clip (hq_two_stage recipe). The

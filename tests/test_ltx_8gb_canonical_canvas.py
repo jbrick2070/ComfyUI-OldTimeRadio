@@ -219,12 +219,20 @@ def test_a_SIBLING_lane_still_takes_the_landscape_default():
                                               ledger)) == LANDSCAPE
 
 
-def test_ltx_video_keeps_its_own_measured_canvas():
-    """BUG-LOCAL-412's 832x480 is a measured quality decision with its own
-    history; the new branch sits AFTER it and must not disturb it."""
+def test_ltx_video_keeps_its_own_declared_canvas():
+    """ltx_video keeps ITS canvas; the ltx_8gb branch sits after it and must
+    not disturb it. That is the property, and it is unchanged.
+
+    The number moved 832x480 -> 1024x576 by operator ruling (2026-08-11):
+    the HQ two-stage path halves for stage A and upsamples with a fixed-x2
+    node, so both axes must be /64 or stage A is illegal. Read from the
+    declaration rather than repeated here, so the next move does not make
+    this test lie (lesson L10).
+    """
+    from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
     ledger = _ledger(engine="ltx_video")
-    assert _canvas(rd.build_request_from_shot(_shot(ledger),
-                                              ledger)) == (832, 480)
+    got = _canvas(rd.build_request_from_shot(_shot(ledger), ledger))
+    assert got == tuple(LtxVideoEngine.render_canvas)
 
 
 # ---------------------------------------------------------------------------

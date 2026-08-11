@@ -107,10 +107,15 @@ def test_assert_soak_ok_rejects_violations(mutate):
         rd.assert_soak_ok(report)
 
 
-def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
-    """BUG-LOCAL-412 (6/5 parity): ltx_video renders at its native 832x480
-    (LTX-2B mushes above 480p; the composite scales it up) while still_pan
-    keeps the full 1472x832 landscape canvas.
+def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch):
+    """ltx_video renders at the canvas it DECLARES while still_pan keeps the
+    full 1472x832 landscape canvas.
+
+    The declaration moved 832x480 -> 1024x576 by operator ruling on 2026-08-11
+    (lane 9): the HQ two-stage path halves the canvas and upsamples with a
+    fixed-x2 node, so both axes must be /64 or stage A is an illegal latent --
+    832x480 fails on height. Asserted against the DECLARATION rather than a
+    literal, so the number can move again without this test lying (lesson L10).
 
     still_pan stays env-overridable. ltx_video STOPPED being so on 2026-08-02:
     it declares a render_canvas, which wins, because its frame contract is a
@@ -132,9 +137,11 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
                 "target_frame_count": 169, "source_line_ids": ["b001"],
                 "char_id": "", "creative": {}}
 
+    from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
+    declared = tuple(LtxVideoEngine.render_canvas)
     req_ltx = rd.build_request_from_shot(shot("ltx_video", "text_to_video"),
                                          ledger)
-    assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == (832, 480)
+    assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == declared
     req_flux = rd.build_request_from_shot(shot("still_pan", "static_image_gen"),
                                           ledger)
     assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
@@ -149,7 +156,7 @@ def test_ltx_renders_native_832x480_others_keep_landscape(monkeypatch):
     # env branch untouched -- see the assertion above.
     monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
     req2 = rd.build_request_from_shot(shot("ltx_video", "text_to_video"), ledger)
-    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == (832, 480), (
+    assert (req2["canvas"]["w"], req2["canvas"]["h"]) == declared, (
         "a declared render canvas must beat OTR_LTX_RENDER_CANVAS")
 
     from nodes._otr_video_engines import eng_ltx_video as _lv
