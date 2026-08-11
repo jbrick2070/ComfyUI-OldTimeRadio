@@ -18,9 +18,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 
 import pytest
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from nodes import _otr_voice_route as ROUTE
 from nodes.cast_lock import CastLock
@@ -210,6 +213,89 @@ def test_the_exclusion_the_contract_rests_on_is_real_and_covers_both_banks():
         assert _source_bank_excludes_lemmy(excluded), excluded
     for allowed in ("original", "archive", None, ""):
         assert not _source_bank_excludes_lemmy(allowed), allowed
+
+
+#: Every SHIPPED source bank, and whether the Lemmy cameo may appear in it.
+#: An EXHAUSTIVE map whose keys are asserted equal to the shipped registry --
+#: the same shape `ENGINE_COVERAGE` uses in tests/test_slug_provenance.py, and
+#: for the same reason.
+BANK_CAMEO_POLICY = {
+    "media_archive": "cameo_allowed",
+    "original": "cameo_allowed",
+    "scifi_news": "cameo_allowed",
+    "scifi_news_pro": "cameo_allowed",
+    "custom_source_bank": "cameo_allowed",   # operator-supplied; see docstring
+    "public_domain": "source_fidelity_excluded",
+    "shakespeare": "source_fidelity_excluded",
+}
+
+
+def _shipped_bank_ids():
+    import json
+    import os
+
+    path = os.path.join(REPO_ROOT, "nodes", "story_packs", "banks.json")
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    banks = data if isinstance(data, list) else data.get("banks", data)
+    if isinstance(banks, dict):
+        banks = list(banks.values())
+    return {str(b.get("source_bank_id") or b.get("id"))
+            for b in banks if isinstance(b, dict)}
+
+
+def test_every_shipped_bank_has_a_DECIDED_cameo_policy():
+    """THE MAINTENANCE HAZARD, converted into a build failure.
+
+    The exclusion is a hardcoded frozenset of two names
+    (`_LEMMY_EXCLUDED_SOURCE_BANK_IDS`), so a NEW source-faithful bank would
+    escape it silently -- nothing would fail, Lemmy would simply start appearing
+    in an adaptation. That is not hypothetical bookkeeping: the operator's rule
+    is that `always include` must NEVER override source fidelity, and today that
+    rule rests entirely on someone remembering to edit a set.
+
+    Asserting the map is EQUAL to the shipped registry means a new bank cannot be
+    added without someone deciding, in writing, which side it is on.
+
+    WHAT THIS CANNOT COVER, said plainly: `custom_source_bank` and any user bank
+    dropped under `user_packs/source_banks/<id>/` carry ids this repo has never
+    seen. No static map can know whether an operator's own bank is a faithful
+    adaptation. If a user ships a fidelity bank, its exclusion is their call.
+    """
+    shipped = _shipped_bank_ids()
+    undecided = sorted(shipped - set(BANK_CAMEO_POLICY))
+    stale = sorted(set(BANK_CAMEO_POLICY) - shipped)
+    assert not undecided, (
+        "shipped bank(s) with no cameo decision: %s -- add each to "
+        "BANK_CAMEO_POLICY as cameo_allowed or source_fidelity_excluded, and if "
+        "it is a faithful adaptation add it to _LEMMY_EXCLUDED_SOURCE_BANK_IDS "
+        "too" % undecided)
+    assert not stale, "BANK_CAMEO_POLICY names bank(s) no longer shipped: %s" % stale
+
+
+def test_the_decided_policy_matches_what_the_code_actually_does():
+    """The map above is a claim; this is the check that it is true."""
+    from nodes._otr_casting import _source_bank_excludes_lemmy
+
+    for bank, policy in sorted(BANK_CAMEO_POLICY.items()):
+        expected = (policy == "source_fidelity_excluded")
+        assert _source_bank_excludes_lemmy(bank) is expected, (bank, policy)
+
+
+def test_public_domain_story_is_a_CORPUS_DIRECTORY_not_a_bank_id():
+    """Pinned because a review mistook one for the other and filed it as a
+    fidelity breach.
+
+    `config/source_banks/public_domain_story/` holds fetched source TEXTS
+    (`scripts/otr_fetch_public_domain.py --dest-dir ...`), and every occurrence
+    of the string as a `source_bank_id` VALUE lives in
+    `docs/multimodal-story-schema/schema-examples/`. The shipped runtime id is
+    `public_domain`, which IS excluded. If that ever stops being true -- if a
+    bank really is named `public_domain_story` -- this test fails and the
+    exclusion set genuinely does need it.
+    """
+    assert "public_domain_story" not in _shipped_bank_ids()
+    assert "public_domain" in _shipped_bank_ids()
 
 
 def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
