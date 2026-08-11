@@ -244,7 +244,7 @@ class CastLock:
         # None here by design and the claim path loads its own only if a route is
         # actually selected -- which keeps the dormant case free of bank I/O.
         policy_claim = self._resolve_policy_claim(
-            voice_bank, target_engine, bank_entries=bank_entries)
+            voice_bank, target_engine, bank_entries=bank_entries, cast=cast)
 
         if cast_voice_policy == "auto_registry":
             self._auto_registry(
@@ -609,7 +609,8 @@ class CastLock:
                 bank_entries=bank_entries, voice_device=voice_device)
             if policy_claim is None:
                 policy_claim = self._resolve_policy_claim(
-                    voice_bank, target_engine, bank_entries=bank_entries)
+                    voice_bank, target_engine, bank_entries=bank_entries,
+                    cast=cast)
 
         if target_engine is None:
             report.append(
@@ -798,7 +799,7 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     def _resolve_policy_claim(self, voice_bank, target_engine,
-                              bank_entries=None):
+                              bank_entries=None, cast=None):
         """Prove the character voice policy's selected route, or return None.
 
         None means NOTHING WAS SELECTED, which is every render shipping today:
@@ -815,6 +816,29 @@ class CastLock:
         policy = _lemmy_voice_policy()
         if not (policy or {}).get("approved_native_routes"):
             return None                      # dormant -- do not touch the bank
+
+        # NO CLAIMED ROW, NO CLAIM (operator contract, 2026-08-10). A route
+        # guard may only speak about a cast this episode actually has.
+        #
+        # THIS IS NOT A MICRO-OPTIMISATION, IT IS THE FIDELITY RULE. Lemmy is a
+        # recurring-cameo character and the source-faithful banks EXCLUDE him
+        # outright -- `_source_bank_excludes_lemmy` in `_otr_casting.py` covers
+        # `shakespeare` and `public_domain` (and their bake-off variants), and it
+        # overrides BOTH the entropy roll and the operator's `always include`
+        # setting. So a Shakespeare episode legitimately has no Lemmy row, and
+        # anything this method decides about his route there is a decision about
+        # nobody. Without this check the fail-closed raise added minutes earlier
+        # could abort an episode that never cast him.
+        #
+        # `always include` must never override source fidelity, and this method
+        # must never be the thing that makes it look like it did.
+        if cast is not None:
+            character_key = _ROUTE.policy_character_key(policy)
+            if character_key and not any(
+                _ROUTE.cast_row_matches_policy(entry, character_key)
+                for entry in cast if isinstance(entry, dict)
+            ):
+                return None
 
         # A policy with real routes needs a concrete engine to prove agreement
         # against, even in preserve_ledger, where `lock` deliberately leaves the

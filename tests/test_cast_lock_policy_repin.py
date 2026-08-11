@@ -174,6 +174,44 @@ def test_a_bank_with_no_character_engine_is_reported_not_raised():
         assert "voice_route" not in entry
 
 
+def test_no_claimed_row_means_no_claim_at_all(pin, monkeypatch):
+    """OPERATOR CONTRACT 2026-08-10: a route guard may only speak about a cast
+    this episode actually has.
+
+    THIS IS THE FIDELITY RULE, not an optimisation. Lemmy is a recurring-cameo
+    character and the source-faithful banks EXCLUDE him outright --
+    `_source_bank_excludes_lemmy` in `_otr_casting.py` covers `shakespeare` and
+    `public_domain` plus their bake-off variants, and it overrides BOTH the
+    entropy roll and the operator's `always include` setting. A Shakespeare
+    episode legitimately has no Lemmy row, so nothing about his route may fire
+    there -- including the fail-closed raise below, which would otherwise abort
+    an episode that never cast him.
+    """
+    pin()
+    # Make the engine unresolvable: without the no-claimed-row check this is
+    # exactly the state that raises.
+    monkeypatch.setattr(CastLock, "_resolve_char_engine",
+                        staticmethod(lambda *a, **k: None))
+    cast = [{"char_id": "c01", "name": "MACBETH", "gender": "male",
+             "voice_preset": "v2/en_speaker_1"}]
+    out = CastLock().lock(script_json=_ledger(cast),
+                          cast_voice_policy="auto_registry")
+    led = json.loads(out[0])
+    assert all("voice_route" not in e for e in led["cast"])
+
+
+def test_the_exclusion_the_contract_rests_on_is_real_and_covers_both_banks():
+    """If this ever narrows, the test above is guarding a rule that no longer
+    exists. `always include` must never override source fidelity."""
+    from nodes._otr_casting import _source_bank_excludes_lemmy
+
+    for excluded in ("shakespeare", "public_domain",
+                     "shakespeare_v2", "public_domain_v3"):
+        assert _source_bank_excludes_lemmy(excluded), excluded
+    for allowed in ("original", "archive", None, ""):
+        assert not _source_bank_excludes_lemmy(allowed), allowed
+
+
 def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
         monkeypatch, pin):
     """The other half of the bark_legacy carve-out, and the reason it is not a
@@ -425,16 +463,26 @@ def test_a_genderless_claimed_row_is_still_pinned(pin):
     assert led["cast"][0]["voice_ref_id"] == PINNED_REF
 
 
-def test_a_proved_route_with_no_matching_row_is_reported_not_raised(pin):
-    """The route proved itself; that this episode did not cast Lemmy is an
-    ordinary fact about the episode."""
+def test_an_episode_without_the_claimed_row_is_left_entirely_alone(pin):
+    """SUPERSEDED BEHAVIOUR, deliberately. This test used to assert that the
+    route resolved and THEN reported "no cast row matches".
+
+    Under the operator contract of 2026-08-10 the claim is not resolved at all
+    when no row matches, so there is nothing to report. That is the better
+    answer: on a source-faithful bank Lemmy is excluded BY DESIGN, and emitting
+    "a qualified route did not apply" on every Shakespeare episode would be
+    noise dressed as diligence -- it would train the reader to ignore the one
+    line that should mean something.
+    """
     pin()
     cast = [{"char_id": "c01", "name": "MONTY", "gender": "male",
              "voice_preset": "v2/en_speaker_1"}]
     out = CastLock().lock(script_json=_ledger(cast),
                           cast_voice_policy="preserve_ledger")
-    assert "no cast row matches" in out[2]
     assert "voice_route" not in out[0]
+    assert "no cast row matches" not in out[2]
+    # preserve_ledger's own contract still holds: nothing was re-cast.
+    assert "preserved" in out[2]
 
 
 def test_a_failed_route_stops_the_lock(pin, tmp_path):
