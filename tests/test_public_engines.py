@@ -34,6 +34,10 @@ _TIER = {
     # grows by one row per lane and the `<vramtier>gb` rows above retire as
     # their own lanes close. Lane 1, 2026-08-11: wan_i2v.
     "wan22_high_i2v": "wan_i2v",
+    # Lane 2, 2026-08-11: the ruled hero cast. The id states audio_in and the
+    # aspect because a bare `humo14_high_face` hid which way its sibling
+    # renders.
+    "humo14_high_audio_in_wide": "humo_14B_169",
 }
 
 

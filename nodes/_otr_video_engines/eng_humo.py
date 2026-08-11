@@ -302,22 +302,45 @@ class HuMoEngine(_MC.MotionEngineBase):
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
 
     # ---- config resolution (env override -> box default) ----
-    def _ckpt_path(self):
-        # Explicit override wins; else resolve the default 14B UNET via ComfyUI
-        # folder_paths (honors extra_model_paths.yaml), else a best-effort join
-        # for the cheap existence check (headless / no folder_paths).
-        env = os.environ.get("OTR_HUMO_CKPT")
-        if env:
-            return env
-        name = os.environ.get("OTR_HUMO_UNET_NAME") or _HUMO_DEFAULT_UNET
+    @staticmethod
+    def _resolve_unet(env_explicit, env_name, default_name):
+        """ONE UNET resolver for every HuMo tier (lane 2, 2026-08-11).
+
+        Order: an explicit full-path env wins; then ComfyUI ``folder_paths``
+        (which honours ``extra_model_paths.yaml`` and is the resolution the
+        LOADER node will actually do); then the standard
+        ``<comfy_root>/models/diffusion_models``; then the CONFIGURED models
+        root. Returns the joined comfy-root path when nothing exists anywhere,
+        so the refusal message still names a concrete place it looked.
+
+        THE LAST PROBE IS THE LANE-1 LESSON, INHERITED (L1). Both HuMo
+        ``_ckpt_path`` implementations stopped at the comfy-root join, which on
+        a box that keeps its weights in a configured root elsewhere answers a
+        confident wrong NO off the ComfyUI runtime -- the identical shape that
+        shipped wan_i2v dead. Two copies of the same chain was also two places
+        to fix it, so there is now one.
+        """
+        if env_explicit and os.environ.get(env_explicit):
+            return os.environ[env_explicit]
+        name = os.environ.get(env_name) or default_name
         try:
             import folder_paths  # type: ignore
-            p = folder_paths.get_full_path("diffusion_models", name)
-            if p:
-                return p
-        except Exception:  # noqa: BLE001 - headless/CPU: fall back to a join
+            hit = folder_paths.get_full_path("diffusion_models", name)
+            if hit:
+                return hit
+        except Exception:  # noqa: BLE001 - headless/CPU: fall through to joins
             pass
-        return os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
+        from .wan_shared import configured_models_root
+        joined = os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
+        if os.path.exists(joined):
+            return joined
+        configured = os.path.join(
+            configured_models_root(), "diffusion_models", name)
+        return configured if os.path.exists(configured) else joined
+
+    def _ckpt_path(self):
+        return self._resolve_unet(
+            "OTR_HUMO_CKPT", "OTR_HUMO_UNET_NAME", _HUMO_DEFAULT_UNET)
 
     def _installed(self):
         """True iff the primary checkpoint exists on disk (no import -- cheap,
@@ -348,7 +371,34 @@ class HuMoEngine(_MC.MotionEngineBase):
                 "humo checkpoint not found at %s; install the HuMo wrapper + "
                 "ckpt and verify on the GPU box (set OTR_HUMO_CKPT)"
                 % self._ckpt_path(), kind="video")
+        self._assert_boot_contract(profile)
         return self.name
+
+    def _assert_boot_contract(self, profile):
+        """The profile's boot contract must be one this tier is proven on, and
+        the RUNNING SERVER must actually be in that state (S8, lane 2).
+
+        Two checks, deliberately separate. The first is pure and always runs:
+        does this engine claim the contract the profile selected? The second
+        probes ``comfy.cli_args`` -- what this process was really started with
+        -- and is a NO-OP off a ComfyUI server, because the CPU suite cannot
+        know and pretending otherwise would make the branch unreachable while
+        the tests stayed green.
+
+        Why the server probe and not the profile text: a check that reads the
+        same config the launcher was supposed to honour cannot distinguish
+        "applied" from "written down", so a dead channel would produce a
+        falsely PASSING check -- which is precisely how `launch.extra_args`
+        went years describing a clamp it never applied.
+        """
+        from .._otr_shared import boot_contracts as _bc
+        problems = _bc.check_engine_against_profile(self, profile or {})
+        if problems:
+            raise EngineUnusable(
+                self.name, self.family,
+                EngineUsabilityReason.INCOMPATIBLE_PROFILE,
+                "; ".join(problems), kind="video")
+        _bc.assert_running_server(_bc.contract_for_profile(profile or {}))
 
     #: Terminal node of the graph (its IMAGE output is encoded to the clip).
     _TERMINAL = "vaedecode"
@@ -627,11 +677,33 @@ class HuMoEngine(_MC.MotionEngineBase):
         480x832 (the classic talking-head pillarbox, humo_1.7B) or 'wide' 832x480
         (the 16:9 character beat, humo_1.7B_169). The aspect is the engine's
         identity, so the operator picks the look with ONE dropdown choice.
-        Explicit OTR_HUMO_WIDTH/HEIGHT still win (manual override)."""
+
+        ON A TIER THAT DECLARES A CANVAS, THE ENV OVERRIDES CANNOT WIN
+        (lane 2, 2026-08-11). ``render_canvas`` is applied LAST in the request
+        chain and overrules ledger and env, so a tier that declares one and then
+        renders at ``OTR_HUMO_WIDTH``/``HEIGHT`` would reopen the exact
+        request-versus-render disagreement the declaration exists to close --
+        and it would reopen it INVISIBLY, because the request would keep saying
+        the declared size. Two channels naming one canvas are not allowed to
+        disagree, so a contradicting override is a NAMED refusal rather than a
+        silent winner. An override that AGREES is fine and passes through; a
+        tier that declares nothing keeps the old behaviour untouched.
+        """
         from .._otr_shared.aspect import humo_dims_for_aspect
         _dw, _dh = humo_dims_for_aspect(self.render_aspect)
         w = int(os.environ.get("OTR_HUMO_WIDTH", _dw))
         h = int(os.environ.get("OTR_HUMO_HEIGHT", _dh))
+        declared = getattr(self, "render_canvas", None)
+        if declared and (w, h) != (int(declared[0]), int(declared[1])):
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "%s declares render_canvas %dx%d, but OTR_HUMO_WIDTH/HEIGHT "
+                "ask for %dx%d. The declaration is applied last and overrules "
+                "the request, so honouring the override here would render one "
+                "size while every receipt reported the other. Unset the "
+                "overrides, or set them to the declared canvas."
+                % (self.name, int(declared[0]), int(declared[1]), w, h),
+                kind="video")
         return w, h
 
     def _build_graph(self, image_name, audio_name, plan, length, width, height,
@@ -899,7 +971,60 @@ class HuMoEngine(_MC.MotionEngineBase):
         # zero here by construction.
         return {"out_path": path, "frame_count": n,
                 "native_frame_count": n,
-                "extension_mode": "none"}
+                "extension_mode": "none",
+                # THE MANIFEST ROW, FILLED (S8b item 6, lane 2, 2026-08-11).
+                # ``render_peak`` has been MEASURED and LOGGED a few lines up
+                # since 2026-08-06 and then dropped on the floor, so every HuMo
+                # clip reached the ledger with vram_peak_mb / recipe / quant /
+                # render_canvas null -- and `render_driver` fell back to an
+                # INSTANTANEOUS VRAM read, which is a sample at an arbitrary
+                # moment wearing the name of a peak. S2's envelope work is built
+                # on these numbers, so a plausible wrong one is worse here than
+                # a missing one. The WAN lanes closed the same gap at
+                # eng_wan_ti2v.py; this mirrors it, and ONE stamp serves all
+                # four registered HuMo tiers because they share this return.
+                "vram_peak_mb": int(render_peak) if render_peak else None,
+                "recipe": self._recipe_receipt(),
+                **self._clip_telemetry(width, height)}
+
+    def _recipe_receipt(self):
+        """The receipt string threaded onto the manifest row.
+
+        Carries the TIER (the four HuMo engines are different weights and
+        different ceilings) and whether the distill LoRA was in the graph,
+        because those two facts are what a reader needs to know whether two
+        clips are comparable. Versioned in the string, like the WAN lanes: bump
+        the version when the graph changes, never edit a shipped one."""
+        return "%s_v1%s" % (
+            self.name.replace(".", "p"),
+            "_lora" if self._loader_names().get("lora") else "")
+
+    def _clip_telemetry(self, width, height):
+        """``quant`` / ``use_lora`` / ``render_canvas`` for the manifest row.
+
+        ``render_canvas`` is exactly the field that would have answered the
+        14B request-vs-render question immediately instead of costing a lane
+        audit to find. ``use_lora`` stays a BOOL -- the rollup groups on it and
+        credits truthiness-tests it, so a filename here would make the rollup
+        incoherent across engines."""
+        return {
+            "quant": self._quant_label(),
+            "use_lora": bool(self._loader_names().get("lora")),
+            "render_canvas": "%dx%d" % (int(width), int(height)),
+        }
+
+    def _quant_label(self):
+        """The quant token of the UNET actually loaded, read off the RESOLVED
+        basename rather than assumed, so a swapped weight cannot leave a
+        receipt describing the file it replaced. ``None`` when the name carries
+        no recognisable token."""
+        name = str(self._loader_names().get("unet") or "").lower()
+        for token in ("fp8_e5m2", "fp8_e4m3fn", "fp8", "fp16", "bf16",
+                      "q8_0", "q6_k", "q5_k_m", "q5_k_s", "q4_k_m", "q4_k_s",
+                      "q3_k_m"):
+            if token in name:
+                return token.upper() if token.startswith("q") else token
+        return None
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
@@ -994,6 +1119,15 @@ class HuMoEngine(_MC.MotionEngineBase):
             # floor of ``canonicalize``.
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
+            # S8b item 6 (lane 2): the identity/telemetry fields the driver and
+            # the render-batch rollup have carried for months with nothing
+            # producing them. Passed through rather than recomputed, so the
+            # receipt describes THIS render and not a fresh read taken later.
+            "vram_peak_mb": raw.get("vram_peak_mb"),
+            "recipe": raw.get("recipe"),
+            "quant": raw.get("quant"),
+            "use_lora": raw.get("use_lora"),
+            "render_canvas": raw.get("render_canvas"),
         }
 
 
@@ -1039,18 +1173,12 @@ class HuMo17BEngine(HuMoEngine):
     still_plan = _HUMO_STILL_PLAN
 
     def _ckpt_path(self):
-        env = os.environ.get("OTR_HUMO_17B_CKPT")
-        if env:
-            return env
-        name = os.environ.get("OTR_HUMO_17B_UNET_NAME") or _HUMO_17B_UNET
-        try:
-            import folder_paths  # type: ignore
-            p = folder_paths.get_full_path("diffusion_models", name)
-            if p:
-                return p
-        except Exception:  # noqa: BLE001 - headless/CPU: fall back to a join
-            pass
-        return os.path.join(_COMFY_ROOT, "models", "diffusion_models", name)
+        # Same resolver as every other tier (lane 2) -- this was a second copy
+        # of the chain, so it was a second place the L1 defect had to be fixed.
+        # The 1.7B lane's own packet is lane 3; it is NOT marked green by this,
+        # it just stops carrying a bug lane 1 already paid for.
+        return self._resolve_unet(
+            "OTR_HUMO_17B_CKPT", "OTR_HUMO_17B_UNET_NAME", _HUMO_17B_UNET)
 
     def _loader_names(self):
         names = super()._loader_names()
@@ -1120,6 +1248,31 @@ class HuMo14BLandscapeEngine(HuMoEngine):
 
     name = "humo_14B_169"
     render_aspect = "wide"
+    #: THE CANVAS, DECLARED (lane 2, 2026-08-11). This tier's request was being
+    #: rewritten to the 1472x832 landscape default while the graph rendered
+    #: 832x480 -- a 3.07x pixel disagreement, harmless ONLY because
+    #: ``_aspect_plan``'s output is never read by ``_build_graph``. It becomes a
+    #: real error the moment admission, still sizing or composite scaling
+    #: trusts ``request.canvas``, and S2's admission work is exactly that.
+    #:
+    #: 832x480 is not a preference, it is where the hero cast was MEASURED:
+    #: 13.06 GiB warm / 13.17 cold at 832x480x97 under the ``humo_diet`` boot
+    #: (ENVELOPE_LADDERS job A, indexed in
+    #: docs/evidence/video_evidence_manifest.json), 1.44 GiB under the gate,
+    #: against 14.98 GiB unclamped. Declaring it makes the request match the
+    #: render the number was taken from. Both axes /32-legal (26 x 15).
+    #: See :meth:`HuMoEngine._native_dims` for why OTR_HUMO_WIDTH/HEIGHT now
+    #: refuse rather than silently win on a declaring tier.
+    render_canvas = (832, 480)
+    #: BOOT CONTRACTS THIS TIER IS PROVEN ON (S8, lane 2). ``default`` stays in
+    #: the list because this tier HAS shipped under it -- only a lane that never
+    #: did may REQUIRE a contract, and dropping default here would retire a
+    #: shipping lane by side effect. What ``default`` costs is stated rather
+    #: than hidden: 14.98 GiB, which is OVER the 14.5 GiB gate. The hero cast is
+    #: therefore expressed where casting belongs, in the PROFILE
+    #: (`otr_w45_humo_14b_169.json` selects `humo_diet`), not by an engine
+    #: refusing a boot it can technically run.
+    compatible_boot_contracts = ("default", "humo_diet")
     #: S1b per-model still plan (see ``_HUMO_169_STILL_PLAN`` -- the LANDSCAPE
     #: HuMo plan). ``render_aspect="wide"`` drives portraits WIDE via
     #: ``resolve_row_aspect``, and the plan's portrait row carries the WIDE
@@ -1134,9 +1287,12 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: 2026-07-26). This tier inherited HuMoEngine's ``max_frames=177`` for
     #: exactly as long as it took a panel to read ``render_clip``, which does
     #: ``render_max = cap if cap is not None else _HUMO_MAX_FRAMES`` -- and
-    #: ``cap`` is ``safe_render_frames`` = 49 HERE and None on all three
-    #: siblings. So the inherited contract advertised 3.6x the frames this
-    #: engine will actually render, and any beat over 49 frames raises
+    #: ``cap`` is ``safe_render_frames`` = **97** HERE (it was 49 when this
+    #: comment was written and became 97 on 2026-08-02; corrected lane 2,
+    #: 2026-08-11, because a stale number in the comment that explains a
+    #: number is worse than no comment) and None on all three
+    #: siblings. So the inherited contract advertised 1.8x the frames this
+    #: engine will actually render, and any beat over 97 frames raises
     #: ``MirrorExtensionForbidden`` today (mirroring an audio-synced lane would
     #: play the mouth backwards, which is correctly forbidden rather than
     #: worked around).
@@ -1146,8 +1302,11 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: against the subclass's runtime behaviour. A subclass that changes what it
     #: renders must change what it declares, and 49 is the number.
     #:
-    #: 49 = 4*12+1, so it is on the shared 4n+1 ladder and the quantum is
-    #: unchanged. min stays 33: below that has hung this hardware.
+    #: 97 = 4*24+1, so it is on the shared 4n+1 ladder and the quantum is
+    #: unchanged. min stays 33: below that has hung this hardware. 97 frames at
+    #: 25 fps is 3.88 s per render, which is the hero cast's real CONTENT
+    #: constraint -- longer hero beats chain as JUMP segments (soft_reference),
+    #: one fresh still each. That is a stills-budget fact, not a VRAM one.
     frame_contract = FrameContract(
         min_frames=_HUMO_MIN_FRAMES,
         max_frames=_HUMO_14B_SAFE_RENDER_FRAMES,

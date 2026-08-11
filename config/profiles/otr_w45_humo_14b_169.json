@@ -83,6 +83,10 @@
   "launch": {
     "sage_attention": true,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "OTR_HEADLESS_RESERVE_VRAM_GB": "2.921",
+      "OTR_HEADLESS_DISABLE_PINNED": "1"
+    },
+    "boot_contract": "humo_diet"
   }
 }

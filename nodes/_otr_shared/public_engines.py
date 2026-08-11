@@ -51,6 +51,13 @@ _PUBLIC_ENGINES = {
     # unguarded, empties most of the ComfyUI node menu rather than failing one
     # lane cleanly.
     "wan22_high_i2v": "wan_i2v",
+    # Lane 2, 2026-08-11. The id STATES what the lane is, per the operator's
+    # 2026-08-10 refinements: audio-conditioned lanes say `audio_in` (HuMo is
+    # audio-driven and now says so), and the aspect is in the id rather than
+    # only in the label suffix -- the bare `humo14_high_face` hid that its
+    # sibling renders 480x832. `high` comes from a measurement receipt: 13.06
+    # GiB warm at 832x480x97 under the humo_diet boot.
+    "humo14_high_audio_in_wide": "humo_14B_169",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -94,6 +101,9 @@ _PUBLIC_LABEL = {
     # has warm evidence -- the f177 the contract allows is model-legal and not
     # machine-qualified.
     "wan22_high_i2v": "Wan 2.2 I2V 14B fp8 - high VRAM (13.9 GiB warm at f33)",
+    "humo14_high_audio_in_wide": (
+        "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
+        "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

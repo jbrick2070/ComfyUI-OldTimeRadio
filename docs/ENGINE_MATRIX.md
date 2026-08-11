@@ -243,10 +243,10 @@ and it read exactly like a measured number until someone looked.
 | fastwan_8gb | - | contract max | docs/2026-07-31-arm-c-fastwan-BUILD-SPEC.md |
 | google_omni_video | - | contract max | none cited |
 | google_veo_video | - | contract max | none cited |
-| humo | 97 | safe_render_frames | none cited |
-| humo_1.7B | - | contract max | none cited |
-| humo_1.7B_169 | - | contract max | none cited |
-| humo_14B_169 | 97 | safe_render_frames | none cited |
+| humo | 97 | safe_render_frames | docs/evidence |
+| humo_1.7B | - | contract max | docs/evidence |
+| humo_1.7B_169 | - | contract max | docs/evidence |
+| humo_14B_169 | 97 | safe_render_frames | docs/evidence |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | none cited |

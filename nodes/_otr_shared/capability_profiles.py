@@ -162,10 +162,26 @@ _UPSCALE_STAGE_KEYS = {
 _UPSCALE_STAGE_OPTIONAL_KEYS = {
     "device": lambda v: isinstance(v, str) and bool(v),
 }
+#: OPTIONAL launch keys (S8 boot contracts, 2026-08-11). ``boot_contract`` NAMES
+#: the server start-up state this profile's lanes need -- see
+#: ``nodes/_otr_shared/boot_contracts.py``. It is OPTIONAL on purpose: the key
+#: set is closed-validated, so adding a required key here would break all ~20
+#: shipped profiles at once, and a profile that names no contract is on the
+#: stock ``default`` boot, which is exactly what every one of them meant before
+#: this key existed.
+#:
+#: The NAME is the contract; the knobs it implies still ride ``launch.env``,
+#: which is the only channel a launcher reads. Naming it separately is what
+#: lets preflight say "this profile asked for humo_diet and the server was not
+#: started for it" instead of diffing env dictionaries and guessing intent.
+_LAUNCH_OPTIONAL_KEYS = {
+    "boot_contract": lambda v: isinstance(v, str) and bool(v),
+}
 #: section name -> its optional-key spec (missing = no optional keys).
 _SECTION_OPTIONAL_KEYS = {
     "video": _VIDEO_OPTIONAL_KEYS,
     "upscale_stage": _UPSCALE_STAGE_OPTIONAL_KEYS,
+    "launch": _LAUNCH_OPTIONAL_KEYS,
 }
 _IMAGE_KEYS = {
     "dtype_policy": lambda v: v in _DTYPE_POLICIES,

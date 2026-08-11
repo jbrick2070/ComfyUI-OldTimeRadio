@@ -118,6 +118,18 @@ rem same aggressive offload / sysmem spill a low-VRAM user hits. Default UNSET =
 rem no clamp = byte-identical to every prior boot (no other lane sets it).
 set _OTR_RESERVE=
 if defined OTR_HEADLESS_RESERVE_VRAM_GB set _OTR_RESERVE=--reserve-vram %OTR_HEADLESS_RESERVE_VRAM_GB%
+rem Pinned-host-memory clamp (S8 boot contracts, 2026-08-11). The OTHER half of
+rem the HuMo diet: --reserve-vram alone does not reproduce the measured 13.06
+rem GiB envelope. Until this line existed, --disable-pinned-memory appeared in
+rem ZERO non-doc files repo-wide, so a profile that "configured" the diet
+rem clamped exactly one of its two knobs and the other was documentation. See
+rem nodes/_otr_shared/boot_contracts.py, which names the contracts, and which
+rem PROVES them against comfy.cli_args on the running server rather than
+rem against the profile text -- a check that reads the same config the launcher
+rem was meant to honour cannot tell "applied" from "written down". Default
+rem UNSET = no clamp = byte-identical to every prior boot.
+set _OTR_PINNED=
+if defined OTR_HEADLESS_DISABLE_PINNED set _OTR_PINNED=--disable-pinned-memory
 rem CUSTOM NODES (2026-06-12, Desktop-v2 install move): the install root's
 rem custom_nodes holds ONLY the OldTimeRadio junction -- the wrapper packs
 rem (ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...) live in
@@ -162,6 +174,7 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe ^
   --extra-model-paths-config "%~dp0_otr_headless_model_paths.yaml" ^
   --disable-metadata ^
   %_OTR_RESERVE% ^
+  %_OTR_PINNED% ^
   %_OTR_VERBOSE% ^
   >> "%~1" 2>&1
 rem --disable-metadata (2026-06-12): the core V3 SaveGLB node (mesh_stage) does

@@ -70,6 +70,11 @@ SAGE_SENSITIVE = frozenset({
 WEIGHT_RESOLVER_METHODS = (
     "_installed", "_ckpt_path", "_weight_paths", "_unet_path",
     "_primary_weight_path", "_model_paths",
+    # `_resolve_unet` is the ONE HuMo resolver every tier delegates to (lane 2).
+    # A lane that factors its resolution into a shared helper must not read as
+    # unresolved just because the delegation moved the tokens one call away --
+    # the gate follows the names it is given, so the name goes here.
+    "_resolve_unet",
 )
 
 #: Any of these in a resolver proves it goes THROUGH ComfyUI's configured model
@@ -169,10 +174,12 @@ EXPECTED_RED: dict = {
     # os.path.exists that never consulted folder_paths (S8b-1 / lesson L1), and
     # an undeclared render_canvas that let the lane fall through to 1472x832
     # (S1 / lesson L2). Both are now pinned by tests/test_wan_i2v.py.
-    ("humo_14B_169", "G2"): (
-        "S8b-4 -- request rewritten to 1472x832 while the graph renders "
-        "832x480 (3.07x), and OTR_HUMO_WIDTH/HEIGHT can move it again. "
-        "OWNER: lane 2 (humo14_high_audio_in_wide)."),
+    # LANE 2 CLOSED 2026-08-11 -- humo_14B_169's G2 row left this table. The
+    # defect was S8b-4: the request was rewritten to 1472x832 while the graph
+    # rendered 832x480 (3.07x), and OTR_HUMO_WIDTH/HEIGHT could move it again,
+    # so 832x480 was a default rather than a runtime guarantee. The tier now
+    # declares its measured canvas and a contradicting override is a named
+    # refusal. Pinned by tests/test_boot_contracts.py.
     ("humo_1.7B", "G2"): (
         "S8b-4 sibling -- no HuMo lane declares a render_canvas today. "
         "OWNER: lane 3 (humo17_high_audio_in_portrait)."),

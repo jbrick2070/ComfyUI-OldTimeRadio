@@ -347,6 +347,73 @@ since an empty ComfyUI menu is precisely the failure a CPU suite cannot see.
 
 ---
 
+## Lane 2 -- `humo14_high_audio_in_wide` (`humo_14B_169`), closed 2026-08-11
+
+**THE LEDGER PAID FOR ITSELF ON THE FIRST TRY.** L1 says to check weight
+resolution before writing code. HuMo had the identical defect wan_i2v died of --
+both `_ckpt_path` implementations stopped at
+`<comfy_root>/models/diffusion_models`, so off the ComfyUI runtime a correctly
+installed HuMo read as MISSING. Found by reading the ledger, not by a failed
+render. Two copies of the chain were also two places to fix it; there is now one
+resolver shared by all four tiers.
+
+**What bit (1): a mechanism with no consumer is a mechanism that does not
+work.** The `humo_diet` boot contract had been "configured" in the corpus for
+days, and `--reserve-vram` had a launcher hook while `--disable-pinned-memory`
+had none -- so a profile selecting the diet would have clamped exactly one of
+its two knobs and the other was a markdown string. The knob only became real
+when a lane needed it.
+
+**Runnable check:** for every boot/profile field a lane depends on, trace it to
+the argv or env that consumes it, and then verify against the RUNNING process
+rather than the config. `Select-String` the server log for the flag, or read
+`comfy.cli_args.args`. A check that reads the same config the launcher was meant
+to honour cannot tell "applied" from "written down".
+
+**Twin assertion:**
+`tests/test_boot_contracts.py::test_the_launcher_turns_both_diet_knobs_into_argv`
+-- which asserts the hook exists AND that the variable reaches the command line,
+because declared is not applied.
+
+**What bit (2): the smoke's number was not the corpus's number, and that is
+L7 rather than a contradiction.** The live cold render peaked at 14,604 MB
+absolute against a headline 13.06 GiB warm. Different cache state (cold, model
+load inside the window) and different measurement surface (device-total,
+including the ~1,940 MB idle baseline; net of it, roughly 12.66 GiB). Both are
+true; neither is the other.
+
+**Runnable check:** before comparing any two VRAM numbers, state the surface and
+the cache state of each. If either is unknown, they are not comparable, and a
+receipt that puts them in one column is manufacturing agreement.
+
+---
+
+## L9 -- Fix a defect at its root and the gate that watched it may go blind
+
+**Check:** after refactoring a resolver, a stamp or a guard into a shared
+helper, re-run the checks that watched the OLD shape. A gate that looks for a
+token inside a named method stops seeing it the moment the token moves one call
+away.
+
+**Symptom:** a gate flips RED on four lanes that just got BETTER, or -- far
+worse in the other direction -- stays green while the thing it watched is gone.
+
+**Origin (lane 2):** factoring both HuMo `_ckpt_path` chains into one
+`_resolve_unet` made preflight G1 report all four HuMo tiers as resolving a
+hardcoded default, because the gate searched a fixed list of resolver method
+names and `_resolve_unet` was not on it. The lanes were strictly more correct
+than before. The gate was right to be narrow -- a whole-module search would let
+an unrelated `folder_paths` mention launder a hardcoded path -- so the fix was
+to teach it the new name, not to widen it.
+
+**Runnable check:** when a lane's preflight row changes state in a commit that
+was not about that gate, the gate is the suspect, not the lane.
+
+**Twin assertion:** `WEIGHT_RESOLVER_METHODS` in the preflight suite is a named,
+commented list rather than a heuristic, so adding a resolver is an explicit act.
+
+---
+
 ## L8 -- A public id is a claim about the model, and claims go stale
 
 **Check:** does every user-facing id state the model version the lane actually
