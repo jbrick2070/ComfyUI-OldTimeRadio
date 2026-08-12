@@ -51,18 +51,14 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-12: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
-first -- its NEWEST section is at the top.** **20 of 21 packets** confirmed
-working and pushed. **Lane 21 (the standalone `h3_low_mime` runner) is the LAST
-one, and it is UNLIKE every lane before it -- not registered, and it KEEPS its
-audio where 19 and 20 both prove silence.** Lane 20 was the cheapest lane left -- lane 19 already wrote the module it
-lives in, so it is a second registration rather than a new engine. The resume
-doc carries everything lane 20 needs (weights, the live node schema, the one
-unverified Autogrow socket, the mouth-policy site, the roster tests it will turn
-red) so none of it has to be rediscovered.
+**ALL 21 PACKETS ARE CLOSED (2026-08-12).** Lanes 0-21 are built, receipted
+and pushed; the preflight matrix is 29 engines x 7 gates with ZERO non-green
+cells and ZERO `EXPECTED_RED` entries. Per-lane detail lives in
+`docs/evidence/lane_receipts/` and the closed diagnoses in `docs/HANDOFF_LOG.md`
+-- **not here**.
 
-Lane 19's own note, kept because it is still the right warning for lanes 20-21:
-it is a DIFFERENT KIND OF LANE from everything lanes 10-18 did.
+**WHAT IS ACTUALLY LEFT IS THE RENDER GATE**, and it is the only forward item in
+this section: the operator's 45-word render of EVERY visual path. Status below.
 
 **THE WHOLE CHEAP SHELF IS GREEN** -- four visualizers, four still families,
 8/8 with INERT G2 rows and declared continuity. All four still families refuse
@@ -197,343 +193,95 @@ written), `TODO`.
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | **DONE** -- `scripts/otr_h3_mime_runner.py`, live run PASS: 864x480, model f90 = **3.750 s exactly at the model's own 24 fps**, and **`nb_streams=2` -- one video plus ONE audio stream**, the inversion this lane exists for. Lossless FLAC score stem from the same decode, plus a ducked voice-over review copy with the picture COPIED not re-encoded; both originals preserved. Registers nothing, and the test asserts that from both sides. **Three live API-boundary failures before the pass** (input dir, DynamicCombo serialization, the `/history` key that says `images` for an mp4) -- all three invisible to a CPU test, recorded as **L27**. Receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. **One operator ruling owed:** CLAUDE.md 0A says "no other runner" and should be amended to name this script |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | **THREE OF FOUR MET 2026-08-12.** The preflight matrix is **29 engines x 7 gates with ZERO non-green cells and ZERO `EXPECTED_RED` entries** -- the table is empty for the first time since it was written. All **21 lane receipts** are present in `docs/evidence/lane_receipts/`. The last expected-red (`google_omni_video` G3) was closed here rather than left: it was the one lane the 21-lane transplant deliberately did not own, and row 22's own contract is what brought it in. Its comment had reasoned "CONTINUITY none" since the lane was written while the call inherited the default -- L3 exactly, and one keyword to fix. **REMAINING: the render gate, and the operator SUPERSEDED it** -- "we need a 45 word render of every visual path" (2026-08-12) replaces "ONE end-to-end episode". That sweep is the last thing in the queue |
 
-### OPERATOR DIRECTIVES 2026-08-12 (pre-sleep) -- THE ORDER OF WHAT IS LEFT
+### THE 45-WORD RENDER GATE -- THE ONE OPEN ITEM (live status 2026-08-12)
 
-Three messages, in the order they were sent, and they reorder the tail of this
-queue:
+Operator acceptance gate, superseding row 22's single end-to-end episode:
+**"we need a 45 word render of every visual path"**. Runner:
+`scripts/otr_w45_campaign.py`. Roster is 21 legs -- 19 incumbent lanes on one
+boot, then `minimax_h3_video` + `minimax_h3_audio_in` on a SECOND boot, because
+both REQUIRE the `h3` contract's `--reserve-vram 12`, which would starve
+`wan_i2v` and the HuMo tiers on a shared server.
 
-1. **"we need a 45 word render of every visual path so that's probably first"**
-   -- the acceptance gate is a 45-word episode render through EVERY visual path,
-   not row 22's single end-to-end episode. Row 22 is superseded by it.
-2. **"lemmy fixers first" / "i want the lemmy fixed before a big video test"**
-   -- Lemmy comes BEFORE that render sweep.
-3. **"try to get all 21 done"** -- lanes 20 and 21 still close.
+**5 of 21 passed. 16 remain.** Full results: `tmp/_w45_results.json`.
 
-**The order the coder window took, and why:** finish lane 19 (already in flight;
-leaving it uncommitted is the one outcome nobody wants) -> **Lemmy fixers** ->
-lanes 20 + 21 -> **the 45-word sweep LAST**. Lanes 20 and 21 each ADD a visual
-path, so running the sweep before them would mean running it twice.
+| verdict | legs |
+|---------|------|
+| PASS | still_pan, still_motion, still_word, viz_camera, viz_mxc_cpu |
+| FAIL, fixed, re-run owed | still_flat (PBUG-20260812-02), viz_green (PBUG-20260812-03) |
+| never run | viz_mxc_mandala, mesh_stage, ltx_8gb, fastwan_8gb, ltx_video, ltx_audio_in, humo x4, wan_i2v, wan_ti2v, + the H3 pair |
 
-**The Lemmy work list is already triaged** in "WHAT REMAINS ON THE LEMMY SPRINT"
-below. Coder-actionable, no operator input: **chunk A1** (a LIVE cache defect --
-`OTR_INDEXTTS2_EMO_ALPHA` changes the render without changing the cache key),
-**chunk B** (shared voice-ref path resolution), **chunk C 2/3/5** (SceneSequencer
-coverage at 22050/44100), **chunks A2-A4** (v2 identity + replay bridge, which
-the operator pre-ruled AUTO-PROMOTE on a clean replay). **Chunk E is operator
-only** and Branch B stays unbuilt -- it existed for a G1 failure, and G1 passed.
+**NEITHER FAILURE WAS A VIDEO BUG.** Both died in `OTR_LedgerScriptWriter`
+before any video work, and the leg verdict said only "no new file in otr/obs",
+which is what made them read as video-lane problems. Every writer defect found
+this day is in `_otr_scifi_fable2.py`.
 
-### LANE 19 DIAGNOSIS -- `h3_low_video` / `minimax_h3_video` -- **ACTED ON AND CLOSED 2026-08-12**
+**THE THREE STALE HEAVY-LANE FAILURES FROM 08-03 ARE MOSTLY ALREADY FIXED**, so
+do not budget for them: `ltx_audio_in` died of PBUG-20260812-03 (fixed),
+`wan_i2v` of a checkpoint path (fixed 08-11 by lane 1's `folder_paths`
+fallback -- `_installed()` now True, weight present), and only `wan_ti2v`'s
+`OTR_CastLock` freeze cascade (`freeze_verdict='needs_full_rerun'`) is genuinely
+unknown.
 
-**Everything below was coded, smoked and pushed.** Kept as the record of what the
-packet contained; the outcome lives in
-`docs/evidence/lane_receipts/lane19-h3_low_video.md`. Three things the diagnosis
-got right and one it could not have known:
+**RUN ORDER:** reset + boot per CLAUDE.md 4/5, run the 19 incumbent lanes, then
+reboot with `OTR_HEADLESS_RESERVE_VRAM_GB=12` + `OTR_HEADLESS_DISABLE_PINNED=1`
+and run `--only minimax_h3_video,minimax_h3_audio_in`.
 
-* **G2 really does invert**, and the diagnosis was right to say so. What it left
-  open -- "say why the trained shape is not the declared one" -- resolved through
-  the PUBLIC ID: `low` means measured under ~8 GiB, so 864x480 (7.28 GiB) is the
-  only canvas at which the id the corpus assigned is true. 1344x768 measures
-  9.15 GiB and is 6.6x slower.
-* **The frame numbers checked out exactly.** `(129,146,...,377)` was reproduced
-  by deriving it from `align_frame_count` rather than transcribing it.
-* **The 832x480 FAILED leg is more informative than it looks**: it is the only
-  H3 leg booted WITHOUT `--reserve-vram 12`, which is how the boot-contract bug
-  (L24) was found.
-* **COULD NOT HAVE KNOWN:** the `h3` boot contract could not be satisfied on any
-  server at all, because the Sage probe's absolute `nodes.` import raised inside
-  ComfyUI (L23). No amount of static diagnosis reaches that one.
+**DIAGNOSIS IS NOW CHEAPER THAN IT WAS.** `scripts/otr_api.py`
+`describe_execution_error` names the failing NODE, exception type and the tail
+of the traceback instead of truncating the history repr at 500 chars mid-frame;
+that truncation cost the diagnosis of both writer failures. And a
+`scifi_news_pro` leg now persists its seed / frame card / stance BEFORE the
+passes that can die on them, so a dead leg is reproducible.
 
-The original diagnosis follows, unedited.
+### THE FABLE2 WRITER -- OPEN, AND IT IS THE ONLY BANK ON THIS WRITER
 
-**Grounded against the INSTALLED node at
-`C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\comfy_extras\nodes_minimax_h3.py`
-and the real weights on disk, at `058b868d`.** Nothing is half-edited; the tree
-is clean. Pre-lane `build_variants.py --check` was **46 / 0**.
+**`scifi_news_pro` is the ONLY bank routed to `scifi_news_pro_multipass`**
+(`nodes/story_packs/banks.json`), and `grep -rl "TITLE:" nodes/story_packs/`
+returns exactly one file. Every other bank's Python owns the speaker labels.
 
-**READ THIS FIRST: lanes 10-18's DEFAULT ANSWERS DO NOT TRANSFER HERE.** Those
-were repairs to CPU/procedural lanes. This is a new 21 GB diffusion adapter, and
-at least two of the shelf's conclusions INVERT.
+**So the cross-bank writer gate cannot qualify this writer.** Five green banks
+proved the pipeline, not `_otr_scifi_fable2.py`. Coverage is repeated
+`scifi_news_pro` runs across distinct sources -- three axes vary per run: the
+news item, one of 14 frame cards, one of 6 stances (`OTR_FABLE2_SEED` pins the
+card/stance deal, not the news item and not the sampling).
 
-**IT IS INSTALLED AND SMOKEABLE.** Both weights are present (~20.97 GB each):
-`C:\ComfyUI-Models\diffusion_models\minimax_h3_fl2va_pruned_int8_convrot.safetensors`
-and `..._ref2va_...`. The four node classes exist in the running core:
-`EmptyMiniMaxH3LatentAV`, `MiniMaxH3ImageToVideo`, `MiniMaxH3ReferenceToVideo`,
-`MiniMaxH3SigmaShift`. Confirm them live in `/object_info` before submitting
-(lane 7's rule), and note the 21 GB weight against a 16 GB card -- the pruned
-int8 build plus offload is the whole reason this fits.
+**SHIPPED from the r1 arc** (Fable cold -> driver -> Codex -> Antigravity ->
+driver judged; `kibitz-runs/2026-08-12-writer-genre-slippage/`): the repair turn
+now CARRIES THE REJECTED DRAFT. It never did -- the retry ordered the model to
+"keep the same wording" about a text it had never been shown, so every attempt
+after the first was a cold regeneration, which is why four attempts produced
+four DIFFERENT malformed shapes. Temperature now decays only when the draft
+actually rode along.
 
-**THE FRAME GRID, FROM THE NODE ITSELF -- and the spec's numbers CHECK OUT.**
-```python
-FPS = 24                       # the MODEL's rate. The canvas is 25.
-def align_frame_count(n):      # the real grid rule
-    while n % 17 != 5: n += 1  # i.e. 17k + 5: ... 124, 141, 158 ... 362 ...
-```
-`length` input: `default=124, min=5, max=3600, step=17`, tooltip "trained range
-is ~124-362, longer is untested". So the spec's
-`discrete_frames = (129,146,164,182,200,...,377)` is the 24->25 CONVERSION of
-that grid and is right -- **pin it against `align_frame_count`, never against a
-doc** (lesson L3's third half, which is exactly what this lane is).
+**STILL OPEN, in build order:**
 
-**THE EVIDENCE MANIFEST ALREADY HAS A FAILURE THAT PROVES THE GRID MATTERS:**
-`h3_i2v_canonical_832x480_f107_FAILED`, verdict `MEASURED_BELOW_RANGE_FAILURE`.
-f107 is BELOW the trained 124 floor. Do not treat the floor as advisory.
+1. **Supply a format example.** `scifi_news_pro.json` has `"examples": []` and
+   `_run_markup_ladder`'s one-shot `format_example` path is DEAD CODE -- nothing
+   passes it. The grammar is described and never demonstrated. The example must
+   use a DISTINCT domain with an explicit do-not-copy instruction, or the model
+   may lift its cast.
+2. **Retire the CANDIDATE, not the episode** -- `PRODUCTION_SPRINT_LESSONS`
+   lesson 35, which this ladder violates by raising `Fable2ScriptError` after
+   four attempts. **The trap, and it is the operator's ledger rule:** a fresh
+   candidate must NOT inherit the dead candidate's ledger writes to
+   `led.data["cast"]`, `led.data["scenes"]` and `meta["fable2"]`. Reset or
+   re-instantiate before retrying. This one gets a panel round before it is
+   written.
 
-**G2 -- AND THIS IS WHERE THE SHELF'S ANSWER INVERTS.** Lanes 11-18 all closed
-G2 by declaring the profile canvas channel INERT, because no cheap lane had a
-native canvas. **H3 does have canvas structure**, so DECLARE rather than
-document inert -- but declare the RIGHT thing, and check these first:
-* `width`/`height` are `step=32` on every H3 node, so the declaration must be
-  /32-legal (the same rule every declaring lane has).
-* The module encodes a trained shape: `BASE_SHORT_EDGE = 768`,
-  `MAX_PIXELS = 768*1344`, and `adapt_canvas()` rounds per-axis to 32 under an
-  area cap. **`adapt_canvas` is called ONLY at line 241, inside
-  `MiniMaxH3ReferenceToVideo`, to size REFERENCE media -- it does NOT rewrite
-  the generation canvas.** So the generation canvas is genuinely the caller's,
-  and the 768/area numbers are what the model was TRAINED at, not what the node
-  enforces. Say which of those you are declaring and why (L7: state the
-  surface).
-* Existing receipts sit at 832x480 (the FAILED f107 leg) and 864x480 (the
-  ref2va cold leg). Neither is a 768 short edge. If you declare 832x480,
-  say why the trained shape is not the declared one.
+**REJECTED, do not re-open:** upstream address-shaped roster names (both
+mechanical lanes rejected it independently -- unproven causal theory, and it
+moves `CastShape.name`, which is the ledger join key into casting, credits,
+portraits and voices); prefix/fuzzy matching of abbreviated cues; loosening the
+parser. Prefix matching is deterministic Python making an attribution judgment,
+and a plausible-but-wrong match silently changes who knows what.
 
-**THE 24 -> 25 CONVERSION IS THE LANE'S REAL DELIVERABLE.** `FPS = 24` in the
-node; the canvas rate is 25. Without a conversion every H3 beat drifts ~4% and
-the mouth slides ~320 ms over 8 s (L3's origin story, and the local encoder can
-only LABEL a rate, never resample -- `wrapper_bridge` `-r` before `-i pipe:0`).
-Apply a nearest-source-frame integer index map to the uint8 batch immediately
-before `encode_frames_to_silent_mp4`. 200 canvas frames must be exactly 8.000 s.
+### CLOSED LANE DIAGNOSES -- MOVED OUT 2026-08-12
 
-**H3 IS THE FIRST ENGINE THAT NATIVELY PRODUCES AUDIO**, which makes G5 real
-rather than ceremonial here. The latent is a NestedTensor PAIR --
-`video [B,24,T,H/16,W/16]` and `audio [B,32,2,T40]` (`AUDIO_LATENT_FPS = 40`).
-Every `has_audio: False` in this repo is a hand-written literal; on this lane it
-would be a receipt that LIES. Call `wan_shared.validate_silent_clip_contract` on
-its OWN emitted clip in `canonicalize`, and make sure the delivered mp4 really
-has no audio stream (the mux is the only thing that may add audio, V-1).
-
-**Scope discipline the corpus is explicit about:** register `minimax_h3_video`
-ONLY in this lane. `minimax_h3_audio_in` is lane 20, even though both adapters
-share one implementation module -- one internal engine cannot carry both modes,
-and two public ids must never map to one internal id (L5's import-time bijection
-assert, whose blast radius is most of OTR vanishing from the menu).
-
-**Also in this packet, per the spec:** `assert_sage_not_patched` (the
-`eng_ltx_video` pattern, NOT wan_i2v's sidecar escalation, which has no runner);
-an `h3` boot-contract profile (`sage_attention: false` +
-`--disable-pinned-memory`); seed 43 in the PROFILE's `seed_policy`, never in the
-adapter; and the `frame_contract.py:108` docstring fix (it teaches Veo's menu as
-`(96,144,192)`, the exact value a test asserts is wrong).
-
-**Do NOT extend the mouth policy in this lane.** `render_driver`'s
-`"ltx_audio_in"` equality test becomes a membership test in LANE 20, with the
-`minimax_h3_audio_in` registration it exists for. Doing it here would wire a
-policy to an engine that is not registered yet.
-
-### LANE 15 DIAGNOSIS -- `still_motion` -- **ACTED ON AND CLOSED 2026-08-11**
-
-**All four items below were coded, smoked and pushed.** Kept only as the record
-of what the packet contained; the outcome, the live refusal and what was
-deliberately left open live in `docs/evidence/lane_receipts/lane15-still_motion.md`.
-Two things the diagnosis got right and one it understated:
-
-* The stale degrade-chain argument WAS stale -- verified by grep, and the
-  refusal shipped. Recorded as lesson **L21**.
-* S8b-12's two halves really do have different blast radii: the ffmpeg gate is
-  a shared-base sweep, the refusal is per-family. Lane 15 did NOT widen the
-  refusal to lanes 16-17.
-* UNDERSTATED: `even_dim()` in the still builders is a real difference from the
-  visualizer path -- a yuv420p mod-2 codec snap. It does not change the G2
-  answer (no-op at every canvas in play) but lanes 16-17 should know it exists.
-
-The original diagnosis follows, unedited.
-
-**This lane is NOT another visualizer repeat.** Lanes 11-14 were two one-line
-declarations each. This one carries a BEHAVIOUR CHANGE to the shared still shelf
-and needs its blast radius thought about before a line is written.
-
-**G2 -- the only red gate, and the answer is almost certainly INERT.**
-Six profiles set `render.canvas_w/h` on this lane (`8gb_lite`, `cpu_floor`,
-`otr_mac_mps`, `otr_w45_still_motion`, plus two untracked `otr_sbcov_*`).
-`_CheapFamilyBase.render_clip` takes `w, h, fps` from `_canvas_dims(request)`
-and hands them to `ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)` --
-no native canvas, so lesson **L19** says do NOT declare one; declaring would
-overrule `OTR_VIDEO_LANDSCAPE_CANVAS` for this lane alone. **But re-check the
-premise yourself** (that is L19's own rule): these lanes reach ffmpeg through
-`wrapper_bridge.ffmpeg_still_motion_cmd` / `ffmpeg_still_static_cmd`, which
-lanes 11-14 never touched -- confirm neither builder imposes a size, an
-even-dimension snap or a scale/pad geometry of its own before reusing the
-answer. If clean: add `still_motion` to `PROFILE_CANVAS_DOCUMENTED_DEAD` with
-the mechanism written out and drop its `EXPECTED_RED` G2 row.
-
-**S8b-12(a) -- the ffmpeg preflight gate, and it is a SHARED-BASE fix (L13).**
-`_CheapFamilyBase.assert_usable` (`cheap_families.py:123-126`) returns the name
-UNCONDITIONALLY with a comment saying "the real ffmpeg check runs in
-render_clip". Every viz lane gates ffmpeg at BOTH boundaries; these four gate it
-at neither preflight nor `load()`. Same shape as lane 10's node gate: a missing
-dependency surfaces mid-render instead of at preflight. Fixing it on the base
-sweeps **all four still lanes at once** -- that is correct and expected per L13,
-and lane 10's continuity fix is the precedent -- but check for tests that call
-`assert_usable` on these families as a PROXY for something else first (lane 8's
-lesson: they will go red on a box without ffmpeg, and the fix is at the fixture,
-never by weakening the gate).
-
-**S8b-12(b) -- the missing-still DARK FLOOR, and this is the real decision.**
-`render_clip` (`cheap_families.py:204-215`) emits a dark lavfi floor when the
-still is missing, for `still_motion` / `still_pan` / `still_flat`; only
-`still_word` sets `_require_still = True`. The spec calls this "the historical
-black-beat defect, still reachable", and **NO FALLBACKS (operator 2026-07-02)**
-points at refusing. Two things to weigh and RECORD rather than assume:
-* The base comment says the default False "keeps every other cheap family's
-  always-renders floor behavior byte-identical" -- so flipping it is a real
-  behaviour change, and `still_motion` is documented in several places as the
-  terminus of the old `humo -> humo_1.7B -> still_motion` degrade chain. That
-  chain was RIPPED in 2026-07-02 (no `UNIVERSAL_FLOOR`, no auto-default role),
-  so the terminus argument is probably stale -- **verify that before relying on
-  it**, because it is the only thing standing between "refuse" and a broken
-  episode path.
-* Scope: the corpus assigns the refusal to THIS lane, not to all four. Setting
-  `_require_still` on `StillMotionFamily` alone is the one-lane move; changing
-  the BASE default would take lanes 16-17 with it and is not this packet's call.
-
-**S8b-15 -- `still_plan` is read by NOTHING in production.** Confirmed still
-true at `eb3f8412`: `grep -rl still_plan nodes/` returns only
-`still_plan_helpers.py`, the adapters that DECLARE it, and the audit. G7.4 is
-already GREEN (declared + audit-clean), so this is not a gate failure -- it is
-lesson **L6** ("a configured knob that reaches nothing"), and the honest options
-are to wire it or to document it audit-only in the lane's row. Do NOT let a
-green G7 row read as "still_plan is working". The dead
-`routing_state.enable_ltx_i2v` token named in the same S8b item belongs to the
-LTX lanes, not here -- leave it.
-
-**Smoke reality:** CPU/ffmpeg only, no GPU, no VRAM number to report (G4 exempt).
-A real smoke needs a still on disk; `--portrait <png>` supplies it. Smoke the
-REFUSAL too if you land 12(b) -- `--expect-fail` exists for exactly that, and a
-refusal that has never been fired is a refusal nobody has tested.
-
-### LANE 10 DIAGNOSIS -- `mesh_stage` -- **ACTED ON AND CLOSED 2026-08-11**
-
-**Every root cause below was confirmed against the live gates and fixed.** The
-block is kept only so the next reader can see what a fully-diagnosed lane looked
-like going in; the outcome, the live smoke and what was deliberately left open
-live in `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Two corrections the
-diagnosis earned in the doing, worth carrying forward:
-
-* **G1's L1 half -- CORRECTED 2026-08-11, and the correction is the useful
-  part.** This block first said "the lane was DEAD ON THIS BOX". **It was not,
-  and the operator caught it.** `_ckpt_path` is byte-identical to `37254f39`
-  where mesh_stage was rendering in June, and under the launcher the old
-  resolver FOUND the weight: `HF_HOME=C:\ComfyUI-Models\huggingface`, whose
-  sibling probe is `C:\ComfyUI-Models\checkpoints`. What the probe actually
-  measured was a BARE SHELL, where the launcher-set `HF_HOME` is absent. That is
-  still a real defect and it is exactly Bug Bible **12.88** -- "where would the
-  LOADER find this" and "is this weight on this box" sharing one probe, so every
-  OFF-RUNTIME caller got a confident wrong NO -- but it was never an outage. The
-  fix is unchanged; the severity claim was wrong. Detail in the lane 10 receipt.
-* **G5's fix belongs in `list_directory_frames`, not only in
-  `validate_directory_clip`.** The tolerant `frame_dir_summary` -- which the
-  manifests and `_clip_summary` read and which never raises -- shares the same
-  listing rule, so a proof placed only in the strict validator would still let a
-  receipt call an impostor directory real.
-
-The original diagnosis follows, unedited.
-
-**Read `docs/LANE_BUILD_LESSONS.md` first anyway (step 1 of the loop), then
-code.** All four red gates were root-caused against the real files before the
-window handed off. Nothing is half-edited on disk -- the tree is clean at
-`77fa4dad`. Pre-lane `build_variants.py --check` was **46 / 0**.
-
-**G1 -- two defects in one row.**
-(a) *S8b-16*: `eng_mesh_stage._node_candidates()` names ten hy3d classes but
-they are resolved ONLY inside `load()` (`:571`), so `assert_usable` (`:449`)
-passes and the render dies after the checkpoint is paid for. Fix is lane 8's
-exact pattern: gate at preflight, collect EVERY miss before raising (naming one
-at a time turns a fresh install into a sequence of failed renders), read the
-ACTIVE candidate set, and order the gate BEFORE weight resolution with a test
-that can fail (make weight resolution raise `RuntimeError`, so a mis-ordered
-gate fails with the wrong exception type).
-(b) *L1, the wan_i2v killer*: `_ckpt_path()` (`:387-406`) walks a hardcoded
-`<comfy_root>/models/checkpoints` + `HF_HOME` list and NEVER consults
-`folder_paths`. Lane 1 already built the shared answer --
-`wan_shared.configured_models_root()`, probed LAST so it can only turn a false
-negative into the truth. Reuse it; do not write a third resolver.
-
-**G2 -- the canvas, and an inline branch that must die.**
-The lane declares no `render_canvas`, so `build_request_from_shot` falls to the
-1472x832 landscape default. `render_clip` (`:693-700`) then carries a
-MAGIC-NUMBER SNIFF: `if w == 832 and h == 480 and not request.canvas.w: w, h =
-DEFAULT_W, DEFAULT_H`. That is the same shape lane 7 deleted -- an inline
-canvas branch a declaration would overrule anyway. **Declare
-`render_canvas = (DEFAULT_W, DEFAULT_H)` = 1472x832** (it describes the RUNTIME,
-which is L2's rule; /32-legal on both axes; no halving/upsampler on this lane so
-L11/L13's /64 rule does NOT apply), DELETE the branch, and move the one
-selecting profile. **`config/profiles/otr_w45_mesh_stage.json` sets
-`render.canvas_w/h = 832x480`** -- and that channel is DEAD: `canvas_w` is
-schema-validated in `_otr_shared/capability_profiles.py:194` and read by NO
-driver (only the `OTR_VideoDirector` widget and the declaration reach
-`request["canvas"]`). That is L6's "configured knob that reaches nothing".
-Per lane 4's G2.3, enumerate EVERY profile resolving to this engine -- there is
-exactly one, verified.
-
-**G3 -- the shared base, and this is the scope decision.**
-`_CheapFamilyBase.frame_contract` (`cheap_families.py:98`) never passes
-`continuity=`, so `CONTINUITY_NONE` is the dataclass default. The comment above
-it already REASONS about continuity, which is what makes this a declaration bug
-rather than a wrong value. **Ten lanes are G3-RED for this identical reason**;
-five share `_CheapFamilyBase` (`mesh_stage`, `still_flat/motion/pan/word` --
-`still_parallax` too), and `google_omni_video` + the four `viz_*` lanes have the
-same defect through their OWN contracts. **L13 says fix the shared mechanism and
-sweep every adapter sharing it before the lane closes** -- so adding
-`continuity=CONTINUITY_NONE` to the base will flip the four still lanes' G3
-rows GREEN, and their `EXPECTED_RED` entries MUST be deleted in the same commit
-or the strict unexpected-pass gate fails and tells you. That is correct and
-expected; it does NOT mean lane 10 has taken over lanes 11-18 (their G2 rows and
-everything else stay red and stay theirs). The viz lanes and
-`google_omni_video` are NOT reached by the base fix -- leave them red.
-For `mesh_stage` the honest value IS `CONTINUITY_NONE`: `build_blender_cmd`
-takes `start_angle`/`arc_degrees`, so a chained successor would need the
-predecessor's terminal ORBIT ANGLE threaded forward and nothing does that. Say
-that in the declaration comment rather than just passing the constant.
-
-**G5 -- do NOT bolt an mp4 probe onto a PNG directory.**
-The gate is LEXICAL: it greps `canonicalize` for the string
-`validate_silent_clip_contract` (`test_lane_preflight_matrix.py:634-645`). That
-function ffprobes an mp4; **this is the only directory-clip lane in the tree**
-(`"type": "directory"`, `eng_mesh_stage.py:782`) and emits straight-alpha PNGs.
-`canonicalize` (`:789`) already calls `validate_directory_clip`, which proves
-the FRAMES on disk (exists, nonzero, count == declared == ledger target) -- but
-its audio check reads `has_audio is not False` off the dict the adapter itself
-wrote, i.e. **declaration checking declaration**, which is exactly L4's
-complaint. And `list_directory_frames` accepts frames by FILENAME EXTENSION, so
-a file named `.png` containing anything at all passes.
-The root fix: make the directory contract PROVE the artifact -- read each
-frame's magic bytes and confirm it really is a PNG/EXR, which is what makes "no
-audio stream" a structural fact about the bytes rather than a naming
-convention. Then teach G5 that a directory-clip lane satisfies the audio law
-through that named function. **Teaching the gate a new name is the sanctioned
-move** (L9: G1 was taught `_resolve_unet` rather than widened) -- widening it to
-accept any validator would let a future lane launder a missing proof.
-
-**Smoke reality for this lane, so it is not a surprise:** it needs
-`OTR_BLENDER_EXE` (hydrated from the User env by the launcher), the hy3d
-checkpoint, a `mesh_fodder` still (NOT a cinematic scene still -- see
-`requires_mesh_fodder`), and it runs a torch mesher then a VRAM barrier then a
-Blender spawn. It emits a DIRECTORY, so the smoke's artifact check is
-`frame_dir_summary`, not ffprobe on an mp4. There is a cube self-test
-(`_run_selftest`) that gates the first Blender use.
-
-**Standing defaults adopted for unattended builds (operator, 2026-08-10):**
-Q1 H3 commit granularity -- split video/audio-in only if each half ends green
-on its own, else one commit. Q2 H3 multi-clip mouth warning -- LEAVE AS IS
-(warn + `long_takes` + jump cut); promoting it to a refusal is an operator
-decision. Q3 WAN TI2V envelope row -- ship it DISQUALIFIED so admission
-honestly reports "not enforced" for that lane.
-
-**Out of scope tonight, queued here so it is not lost:** the mime
-dropdown-overrule build (`docs/2026-08-10-DESIGN-BRIEF-mime-overrule.md`) is
-the NEXT spec after this transplant, not a line item in it. And
-`google_omni_video` inherits `CONTINUITY_NONE` rather than declaring it -- a
-one-token fix on a cloud lane outside the 21-lane order, tracked by an
-`EXPECTED_RED` row in the preflight suite.
+The full lane 10 / 15 / 19 diagnosis write-ups (313 lines) lived here after
+they were acted on and closed. Per this file's own rule -- *if a thing is
+DONE, it does not belong here* -- they now live in `docs/HANDOFF_LOG.md`
+under "CLOSED LANE DIAGNOSES", alongside the per-lane receipts in
+`docs/evidence/lane_receipts/`. Nothing was deleted.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
@@ -2914,3 +2662,68 @@ here because each has been re-proposed at least once:
 - `workflows/otr_canonical.json` (the workflow source of truth)
 
 
+
+---
+
+## PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+
+**Status: PARKED, not rejected.** Operator: *"park it on go forward."* Raised
+after the operator observed we should have far more voices than the writer is
+being offered. He was right, by a wide margin.
+
+### The finding, measured live
+
+| pool | count | what it serves |
+|------|-------|----------------|
+| Bark `VOICE_PROFILES` (`config/cast_pools.py`) | **10** (6M/4F) | what the writer's casting menu offers |
+| Kokoro presets on disk | 4 | ANNOUNCER only, a separate namespace |
+| **Voice reference bank** (`config/voice_reference_bank.json`) | **204 declared, 153 resolvable on disk** (97M/106F/1N) | IndexTTS2 / Dia / Chatterbox cloning |
+
+`_otr_voice_bank.default_char_engine()` returns **`indextts2`**, promoted to the
+shipped character-voice default on 2026-06-04. It is a zero-shot CLONING engine:
+`requires_voice_ref = True`, `voice_ref_kind = "wav_path"`. Every reference clip
+is a distinct voice.
+
+So the writer casts from **10 Bark presets** while the engine that actually
+speaks the characters draws from a **153-voice reference bank**.
+`_otr_casting.py` states it outright -- *"Open-character voices are always drawn
+from the Bark pool (VOICE_PROFILES in config/cast_pools.py), so the tts_model is
+Bark by construction"* -- and `_assert_unique_bark_voices` enforces uniqueness
+across those 10.
+
+### Why this is parked rather than done
+
+`MAX_SPEAKING_CAST = 10` was set from the Bark pool and is therefore a Bark
+artifact, not a real ceiling. But raising the constant alone achieves NOTHING:
+`_deal_voice_menu` builds the menu from `VOICE_PROFILES` and refuses with
+*"voice stock capacity 10 < cast size N"*. The actual work is pointing the
+casting menu at the reference bank when the character engine is a cloning
+engine.
+
+**That is why it is parked and not done unilaterally.** It changes what
+`voice_preset` and `tts_model` MEAN on every cast row, and cast rows are ledger
+JOIN KEYS -- `cast[].name` / `char_id` / `voice_preset` / `voice_ref_id` /
+`voice_engine`, joined from `lines[].speaker` and `beats[].char_id`. Under the
+operator's hard rule (*the writer must OBEY the ledger for downstream content; a
+hole in the ledger is a broken render*), a change of that shape needs every
+field's owner enumerated BEFORE the call is moved, not after.
+
+### What the work is, when it is taken up
+
+1. Enumerate every consumer of a cast row's voice fields -- casting, TTS
+   dispatch, per-beat audio slicing, credits, portraits, captions, `obs_publish`
+   -- and name the new owner of each field. Exactly one owner each.
+2. Make the casting menu engine-aware: Bark presets when the character engine is
+   Bark, reference-bank entries when it is a cloning engine. Gender and
+   `commercial_clean` already exist on bank rows.
+3. Replace `_assert_unique_bark_voices` with an engine-agnostic
+   one-voice-per-character invariant. The rule itself is right and must survive:
+   two characters sharing a voice is a correctness defect.
+4. Derive `MAX_SPEAKING_CAST` from the ACTIVE engine's pool instead of a
+   constant. `tests/test_cast_size_is_a_request.py` already asserts the constant
+   matches the live stock, so it will report the drift rather than hide it.
+5. Prove on `scifi_news_pro` (the only bank on the fable2 writer) with a cast
+   larger than 10 and complete speaker-to-`char_id` equality in the ledger.
+
+Related and already shipped: `num_characters` is now a REQUEST rather than a cap
+(operator directive, all banks) -- see `tests/test_cast_size_is_a_request.py`.

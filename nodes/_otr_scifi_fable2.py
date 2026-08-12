@@ -3080,6 +3080,32 @@ def run_scifi_fable2_episode(
     cards, stance = _deal(rng, _load_frame_deck())
     f2["cards_dealt"] = [dict(card) for card in cards]
     f2["stance"] = dict(stance)
+
+    # PERSIST THE DEAL BEFORE ANY PASS THAT CAN DIE ON IT.
+    #
+    # `seed`, `cards_dealt` and `stance` were written into `meta["fable2"]` in
+    # memory and the ledger was not saved again until the whole pipeline had
+    # finished -- so an episode that died in the SCRIPT pass recorded none of
+    # them. Three consecutive `scifi_news_pro` failures on 2026-08-12 were
+    # therefore UNREPRODUCIBLE: the on-disk ledger had no `fable2` block, the
+    # exception message did not carry the deal, and nothing logged it. We could
+    # not even say which of the 14 frame cards or 6 stances had been dealt.
+    #
+    # That is the same defect class as a truncated traceback: the failure path
+    # discards the evidence needed to diagnose it. It also blocks the one thing
+    # the review panel asked for -- holding the deal constant while varying one
+    # input -- because you cannot hold constant what a failed run never wrote
+    # down.
+    #
+    # Logged as well as saved: a leg that dies before `obs_publish` still leaves
+    # its deal in the server log, which is where a stuck run gets read first.
+    log.info(
+        "[scifi_fable2] deal: seed=%s frame_card=%r stance=%r",
+        seed,
+        cards[0].get("name") if cards else None,
+        stance.get("name") if isinstance(stance, Mapping) else stance,
+    )
+    led.save()
     fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_pitch"):
         pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max)

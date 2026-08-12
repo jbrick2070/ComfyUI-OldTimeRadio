@@ -461,7 +461,11 @@ def test_real_runner_invokes_every_window_and_pitch_sees_tail(monkeypatch):
     payload = _payload(body=_long_body())
     windows = F2._build_digest_windows(payload)
     meta: dict = {}
-    led = SimpleNamespace(data={"meta": meta})
+    # `save` is part of the real Ledger interface, and the pipeline now
+    # persists the frame-card/stance deal before the passes that can die
+    # on it. A double that omits a method the real object has is an
+    # incomplete double, not a reason to make production defensive.
+    led = SimpleNamespace(data={"meta": meta}, save=lambda: True)
 
     technical_digests, creative_prompts, dossier = _run_until_treatment(
         monkeypatch,
@@ -497,7 +501,11 @@ def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
         raise AssertionError("coverage must fail before a model call")
 
     meta: dict = {}
-    led = SimpleNamespace(data={"meta": meta})
+    # `save` is part of the real Ledger interface, and the pipeline now
+    # persists the frame-card/stance deal before the passes that can die
+    # on it. A double that omits a method the real object has is an
+    # incomplete double, not a reason to make production defensive.
+    led = SimpleNamespace(data={"meta": meta}, save=lambda: True)
     with pytest.raises(F2.Fable2DossierError, match="coverage ends"):
         F2.run_scifi_fable2_episode(
             payload=payload,
