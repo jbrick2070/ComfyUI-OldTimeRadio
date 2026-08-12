@@ -1689,6 +1689,35 @@ _STAGE_DIRECTION_CODES = (
 )
 
 
+def require_ledger_save(led, what: str) -> None:
+    """Save the ledger and REFUSE if it did not land.
+
+    ``Ledger.save()`` returns the path on success and **None on failure, and
+    never raises** (`production_ledger.py`). So a bare ``led.save()`` is a write
+    that can silently not happen -- and the ledger is the source of truth every
+    downstream node reads from DISK. A boundary that "saved" without saving
+    hands the next node stale or absent state and the render goes wrong
+    somewhere else entirely, with nothing pointing back here.
+
+    This is the third form of one defect this session: PBUG-20260812-02 (a
+    value that could not serialize), PBUG-20260812-04 (a model reaching the
+    ledger), and the deal receipt that could silently not persist. In each case
+    the write failed quietly and the consequence surfaced far away.
+
+    Use at REQUIRED boundaries -- where the next stage reads what this one
+    wrote. Diagnostic checkpoints may still warn and continue, but they must
+    say so out loud rather than swallowing the result.
+    """
+    if led.save() is None:
+        raise Fable2Error(
+            "ledger_save",
+            "the ledger did not persist after %s -- refusing to continue, "
+            "because every downstream node reads it from disk and would read "
+            "stale or missing state. The preceding [OTR_Ledger] warning names "
+            "the cause and the offending field." % what,
+        )
+
+
 def _speaker_identity_key(value: str) -> str:
     """Case/spacing-insensitive speaker identity, matching the parser's own."""
     return " ".join(str(value).split()).casefold()
@@ -2934,7 +2963,8 @@ def _assemble(
     from ._otr_readiness import stamp_text_for_tts_delivery
     stamp_text_for_tts_delivery(led)
 
-    led.save()
+    # REQUIRED: the TTS delivery stamp is what the voice nodes read.
+    require_ledger_save(led, "the TTS delivery-text stamp")
 
 
 # ---------------------------------------------------------------------------
@@ -3277,7 +3307,9 @@ def run_scifi_fable2_episode(
     # (operator directive). It was the last of the fable2 lane's content
     # refusals -- a fully assembled episode thrown away for a word.
     f2["pass_receipts"] = receipts
-    led.save()
+    # REQUIRED: the completed episode's receipts and every f2 field the
+    # downstream consumers key on.
+    require_ledger_save(led, "the fable2 pass receipts")
     f2 = _fable2_meta(led)
 
     canon = _OTRC.episode_canon_from_outline_dict({
