@@ -53,11 +53,20 @@ item, close its ROW in the same push.**
 
 **WINDOW HANDOFF 2026-08-11 (lane-14 wrap): read
 `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **14 of 21 packets**
-confirmed working and pushed; **lane 15 (`still_motion`) is NEXT** -- the first
-of the four STILL lanes, and a different shape of work from the visualizers:
-G3 is already green there (lane 10's shared-base fix), so its packet is
-G7.4/S8b-15 `still_plan` authority plus S8b-12's ffmpeg gate and missing-still
-refusal, and its own G2 decision. Baselines to
+confirmed working and pushed; **lane 15 (`still_motion`) is NEXT and is ALREADY
+DIAGNOSED -- see the LANE 15 DIAGNOSIS block below and start coding.** It is a
+different shape of work from the visualizers: G3 is already green there (lane
+10's shared-base fix), G2 is the only red gate, and the packet's real content is
+S8b-12's ffmpeg preflight gate (a SHARED-BASE fix that sweeps all four still
+lanes) plus the missing-still dark-floor refusal, which is a genuine BEHAVIOUR
+CHANGE and the one thing in the remaining queue that needs thinking about rather
+than pattern-matching.
+
+**Why this window stopped here rather than starting lane 15:** lanes 10-14 all
+closed green and pushed, the tree is clean, and lane 15 is the first remaining
+packet big enough that starting it late would risk leaving a half-edited lane in
+the tree -- which breaks "one lane open at a time" worse than a clean pause. The
+diagnosis below is the trade: the next window codes instead of re-deriving. Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -161,7 +170,7 @@ written), `TODO`.
 | 12 | `viz_camera` | same visualizer checks, this lane only | **DONE** -- 7/7 green, live smoke. Same two answers as lane 11 (channel INERT + `continuity=`), with the L19 premise re-checked on this engine's own render path. Receipt: `docs/evidence/lane_receipts/lane12-viz_camera.md` |
 | 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | **DONE** -- 7/7 green, live smoke. Same two answers again, premise re-derived on its own painter. Still HOLDS the "declares NOTHING" canvas control (it declared nothing, so the control did not move). Receipt: `docs/evidence/lane_receipts/lane13-viz_mxc_cpu.md` |
 | 14 | `viz_mxc_mandala` | S8b-16 pycairo half, profile/canvas, continuity | **DONE** -- 7/7 green, live smoke. The pycairo NAMED refusal was ALREADY in place (verified, not rebuilt, and already covered by a forced-ImportError test). Same two answers as 11-13, premise re-checked hardest here. **ALL FOUR VISUALIZERS NOW CLOSED.** Receipt: `docs/evidence/lane_receipts/lane14-viz_mxc_mandala.md` |
-| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal. **G3 already GREEN** (lane 10's shared-base fix); G2 is still yours | TODO |
+| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **OPEN -- DIAGNOSED 2026-08-11 at the lane-14 wrap, no code written. See the LANE 15 DIAGNOSIS block below; START CODING, do not re-diagnose.** G3 already GREEN (lane 10's shared-base fix); G2 is the only red gate |
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only. **G3 already GREEN**; also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` when this lane declares | TODO |
 | 17 | `still_flat` | same checklist independently. **G3 already GREEN** | TODO |
 | 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract. **G3 already GREEN** | TODO |
@@ -169,6 +178,75 @@ written), `TODO`.
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
+
+### LANE 15 DIAGNOSIS -- `still_motion` (done 2026-08-11, act on it)
+
+**Read `docs/LANE_BUILD_LESSONS.md` first anyway (step 1 of the loop), then
+code.** Grounded against the real files at `eb3f8412`; nothing is half-edited on
+disk and the tree is clean. Pre-lane `build_variants.py --check` was **46 / 0**.
+
+**This lane is NOT another visualizer repeat.** Lanes 11-14 were two one-line
+declarations each. This one carries a BEHAVIOUR CHANGE to the shared still shelf
+and needs its blast radius thought about before a line is written.
+
+**G2 -- the only red gate, and the answer is almost certainly INERT.**
+Six profiles set `render.canvas_w/h` on this lane (`8gb_lite`, `cpu_floor`,
+`otr_mac_mps`, `otr_w45_still_motion`, plus two untracked `otr_sbcov_*`).
+`_CheapFamilyBase.render_clip` takes `w, h, fps` from `_canvas_dims(request)`
+and hands them to `ffmpeg_still_motion_cmd(still, out_path, w, h, fps, n)` --
+no native canvas, so lesson **L19** says do NOT declare one; declaring would
+overrule `OTR_VIDEO_LANDSCAPE_CANVAS` for this lane alone. **But re-check the
+premise yourself** (that is L19's own rule): these lanes reach ffmpeg through
+`wrapper_bridge.ffmpeg_still_motion_cmd` / `ffmpeg_still_static_cmd`, which
+lanes 11-14 never touched -- confirm neither builder imposes a size, an
+even-dimension snap or a scale/pad geometry of its own before reusing the
+answer. If clean: add `still_motion` to `PROFILE_CANVAS_DOCUMENTED_DEAD` with
+the mechanism written out and drop its `EXPECTED_RED` G2 row.
+
+**S8b-12(a) -- the ffmpeg preflight gate, and it is a SHARED-BASE fix (L13).**
+`_CheapFamilyBase.assert_usable` (`cheap_families.py:123-126`) returns the name
+UNCONDITIONALLY with a comment saying "the real ffmpeg check runs in
+render_clip". Every viz lane gates ffmpeg at BOTH boundaries; these four gate it
+at neither preflight nor `load()`. Same shape as lane 10's node gate: a missing
+dependency surfaces mid-render instead of at preflight. Fixing it on the base
+sweeps **all four still lanes at once** -- that is correct and expected per L13,
+and lane 10's continuity fix is the precedent -- but check for tests that call
+`assert_usable` on these families as a PROXY for something else first (lane 8's
+lesson: they will go red on a box without ffmpeg, and the fix is at the fixture,
+never by weakening the gate).
+
+**S8b-12(b) -- the missing-still DARK FLOOR, and this is the real decision.**
+`render_clip` (`cheap_families.py:204-215`) emits a dark lavfi floor when the
+still is missing, for `still_motion` / `still_pan` / `still_flat`; only
+`still_word` sets `_require_still = True`. The spec calls this "the historical
+black-beat defect, still reachable", and **NO FALLBACKS (operator 2026-07-02)**
+points at refusing. Two things to weigh and RECORD rather than assume:
+* The base comment says the default False "keeps every other cheap family's
+  always-renders floor behavior byte-identical" -- so flipping it is a real
+  behaviour change, and `still_motion` is documented in several places as the
+  terminus of the old `humo -> humo_1.7B -> still_motion` degrade chain. That
+  chain was RIPPED in 2026-07-02 (no `UNIVERSAL_FLOOR`, no auto-default role),
+  so the terminus argument is probably stale -- **verify that before relying on
+  it**, because it is the only thing standing between "refuse" and a broken
+  episode path.
+* Scope: the corpus assigns the refusal to THIS lane, not to all four. Setting
+  `_require_still` on `StillMotionFamily` alone is the one-lane move; changing
+  the BASE default would take lanes 16-17 with it and is not this packet's call.
+
+**S8b-15 -- `still_plan` is read by NOTHING in production.** Confirmed still
+true at `eb3f8412`: `grep -rl still_plan nodes/` returns only
+`still_plan_helpers.py`, the adapters that DECLARE it, and the audit. G7.4 is
+already GREEN (declared + audit-clean), so this is not a gate failure -- it is
+lesson **L6** ("a configured knob that reaches nothing"), and the honest options
+are to wire it or to document it audit-only in the lane's row. Do NOT let a
+green G7 row read as "still_plan is working". The dead
+`routing_state.enable_ltx_i2v` token named in the same S8b item belongs to the
+LTX lanes, not here -- leave it.
+
+**Smoke reality:** CPU/ffmpeg only, no GPU, no VRAM number to report (G4 exempt).
+A real smoke needs a still on disk; `--portrait <png>` supplies it. Smoke the
+REFUSAL too if you land 12(b) -- `--expect-fail` exists for exactly that, and a
+refusal that has never been fired is a refusal nobody has tested.
 
 ### LANE 10 DIAGNOSIS -- `mesh_stage` -- **ACTED ON AND CLOSED 2026-08-11**
 
