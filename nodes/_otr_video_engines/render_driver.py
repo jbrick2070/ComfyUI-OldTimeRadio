@@ -2067,8 +2067,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # its render_clip (_require_still), never a silent black card (no fallbacks).
     # UPDATED 2026-08-11: still_pan LEFT that comparison in lane 16 and
     # still_motion in lane 15 -- both now set _require_still too, so a missing
-    # still is a refusal on three of the four. still_flat (lane 17) is the last
-    # one still carrying the dark floor, and that is its own packet's call.
+    # still is a refusal on three of the four -- and lane 17 made it FOUR:
+    # still_flat took the refusal too, so no still family paints a dark floor.
     if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _visual_beat_id
@@ -2136,12 +2136,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         else:
             init_image = ""
             init_source = "missing_scene_still"
+            # The engine list in this message was FACTUALLY WRONG from lane 15
+            # onward and is emitted at RUNTIME, so it misled exactly the person
+            # debugging a missing still. All four still families now refuse.
             _LOG.warning(
-                "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s "
-                "has NO scene still in the ledger -- a cheap family (still_pan/still_flat) "
-                "synthesizes its dark floor; a still-REQUIRED engine (still_word/"
-                "ltx_audio_in) fails LOUD in render_clip (no fallbacks). Investigate "
-                "the image phase for beat %s.", _eng, _bid, _bid)
+                "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s has NO "
+                "scene still in the ledger. Every still family (still_motion / "
+                "still_pan / still_flat / still_word) and ltx_audio_in now "
+                "FAIL LOUD in render_clip rather than painting a dark floor "
+                "(no fallbacks). Investigate the image phase for beat %s.",
+                _eng, _bid, _bid)
     # LTX audio-in bookends use a WIDE radio-FACE init under the ia2v talking
     # register. Music remains a radio in every visual mode; when its effective
     # engine is explicitly audio-driven, it gets the same radio-with-lips asset

@@ -52,22 +52,21 @@ item, close its ROW in the same push.**
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
 **WINDOW HANDOFF 2026-08-11 (lane-15 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **16 of 21 packets**
-confirmed working and pushed; **lane 17 (`still_flat`) is NEXT.**
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **17 of 21 packets**
+confirmed working and pushed; **lane 18 (`still_word`) is NEXT and is mostly
+VERIFICATION.**
 
-**What lanes 15-16 already did for lanes 17-18, so you do not redo it:** the
-ffmpeg PREFLIGHT gate is on the shared `_CheapFamilyBase.assert_usable`, so all
-four still lanes inherit it; G3 was already green from lane 10. What is left per
-lane is G2 and the **`_require_still` decision**, which is being taken one lane
-at a time on purpose -- the base default is still `False`.
+**The still shelf is finished except for one G2 row.** All four families now
+refuse a missing still (`still_word` was first in Sprint B; lanes 15-17 gave the
+other three the same refusal, one lane at a time on its own evidence), and the
+ffmpeg PREFLIGHT gate is on the shared base so all four have it. The synthesised
+dark floor now has NO registered occupant and is kept deliberately as a control
+for a future `uses_still = False` family, with both halves asserted (**L22**).
 
-**Who has ruled on the missing-still refusal** (also pinned in
-`test_which_still_families_REFUSE_a_missing_still_is_pinned_per_lane`):
-`still_word` always did, `still_motion` in lane 15, `still_pan` in lane 16,
-**`still_flat` is lane 17's call and is the last family still painting the dark
-floor.** `still_word` already had both halves, so lane 18 is mostly verification
-(lane 14's rule: run the acceptance check before implementing an assigned
-defect -- it may already be closed). Baselines to
+**So lane 18 owns exactly one thing: `still_word`'s G2 row**, the last red gate
+on this shelf. Its two assigned defects are already closed -- verify them (lane
+14's rule) rather than rebuilding them. After that the remaining queue is lanes
+19-21 (the H3 lanes and the standalone mime runner) and the row-22 episode gate. Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -179,8 +178,8 @@ written), `TODO`.
 | 14 | `viz_mxc_mandala` | S8b-16 pycairo half, profile/canvas, continuity | **DONE** -- 7/7 green, live smoke. The pycairo NAMED refusal was ALREADY in place (verified, not rebuilt, and already covered by a forced-ImportError test). Same two answers as 11-13, premise re-checked hardest here. **ALL FOUR VISUALIZERS NOW CLOSED.** Receipt: `docs/evidence/lane_receipts/lane14-viz_mxc_mandala.md` |
 | 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **DONE** -- 7/7 green, two live smoke legs (a render AND the refusal firing). Closed the **black-beat defect** (`_require_still`, scoped to this lane) and put the ffmpeg gate at PREFLIGHT on the shared base, which **all four still lanes inherit**. Receipt: `docs/evidence/lane_receipts/lane15-still_motion.md` |
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only | **DONE** -- 7/7 green, two live smoke legs (render + refusal). Took the `_require_still` call lane 15 left open, on its own evidence. Still HOLDS the "declares NOTHING" canvas control (it declared nothing). Receipt: `docs/evidence/lane_receipts/lane16-still_pan.md` |
-| 17 | `still_flat` | same checklist independently | TODO -- G3 green, ffmpeg gate inherited; **G2 and the `_require_still` call are yours.** Note this lane uses `ffmpeg_still_static_cmd` (fit+pad), NOT the pan builder -- so **re-check the L19 premise on THAT builder** rather than reusing lanes 15/16's. **You are the LAST family carrying the dark lavfi floor**: if you take the refusal, `render_clip`'s `else:` branch becomes DEAD CODE and should be deleted in the same commit, not left as a floor nothing can reach (the parameter list of `test_the_no_still_LAVFI_FLOOR_still_renders_for_the_families_that_keep_it` is that branch's live scope) |
-| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO -- **both halves are now DONE for you**: it always had `_require_still = True`, and the ffmpeg gate arrived with lane 15's base fix. Verify rather than rebuild (lane 14's lesson), then close G2 |
+| 17 | `still_flat` | same checklist independently | **DONE** -- 7/7 green, two live smoke legs. Took the refusal too, so **ALL FOUR still families now refuse a missing still**. Premise re-checked on a THIRD builder (`ffmpeg_still_static_cmd`, fit+pad). The dark-floor branch is KEPT as a control with no occupant (lesson **L22** -- lane 16's "delete it" instruction was REVISED), with both halves asserted. Receipt: `docs/evidence/lane_receipts/lane17-still_flat.md` |
+| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO -- **both halves are already DONE for you**: it always had `_require_still = True` (it was FIRST, Sprint B 2026-07-03) and the ffmpeg preflight gate arrived with lane 15's base fix. So VERIFY rather than rebuild (lane 14's rule: run the acceptance check before implementing an assigned defect), then close **G2, the last red gate on this shelf** -- it will almost certainly be INERT like the other three, but this lane renders through `ffmpeg_still_static_cmd` like `still_flat`, so say which builder you checked |
 | 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |

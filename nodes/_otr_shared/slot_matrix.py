@@ -38,7 +38,11 @@ ALL_ROLES: tuple = tuple(ROLE_TO_PROFILE_KEY.keys())
 IMAGE_KEYS: tuple = ("announcer_image", "music_image", "character_image")
 
 #: Named baselines for the slots NOT under test: a still video carrier that fits
-#: every role + always renders, and the gen-1 image engine.
+#: every role, and the gen-1 image engine. ("+ always renders" was here and is no
+#: longer true -- lane 17 gave still_flat `_require_still`, so a MISSING still is
+#: a loud refusal. Harmless today because this module only builds profile dicts
+#: and workflow JSON offline and never calls render_clip, but a future live soak
+#: built on this baseline must supply a still.)
 DEFAULT_VIDEO_BASELINE = "still_flat"
 DEFAULT_IMAGE_BASELINE = "flux_gen1"
 

@@ -292,7 +292,7 @@ _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
     if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu", "viz_mxc_mandala",
-                 "still_motion", "still_pan"):
+                 "still_motion", "still_pan", "still_flat"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -332,9 +332,13 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         #
         # LANE 16 CLOSED 2026-08-11 -- still_pan's G2 row left the same way, and
         # it took the _require_still call lane 15 had deliberately left for it:
-        # same evidence, its own lane. still_flat (17) and still_word (18) keep
-        # their G2 rows; still_flat is now the LAST family carrying the dark
-        # lavfi floor, which is lane 17's call to make on its own evidence.
+        # same evidence, its own lane.
+        #
+        # LANE 17 CLOSED 2026-08-11 -- still_flat's G2 row left too, premise
+        # re-checked on a THIRD builder (ffmpeg_still_static_cmd, fit+pad). It
+        # also took the refusal, so ALL FOUR still families now refuse a missing
+        # still and the synthesised dark floor has no registered occupant left.
+        # still_word (18) is the last G2 row on this shelf.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -555,6 +559,15 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "the even_dim() snap is a yuv420p mod-2 codec requirement, not a size "
         "of its own. Declaring would overrule OTR_VIDEO_LANDSCAPE_CANVAS for "
         "this lane alone. Lane 16, 2026-08-11."),
+    "still_flat": (
+        "INERT, and the premise was re-checked on a THIRD builder: this lane "
+        "sets _still_motion=False, so it renders through "
+        "wrapper_bridge.ffmpeg_still_static_cmd (scale to FIT + pad, nothing "
+        "cropped), not the pan builder lanes 15-16 verified. Same answer -- it "
+        "takes the caller's width/height and letterboxes into them, so there "
+        "is no native canvas; the even_dim() snap is a yuv420p mod-2 codec "
+        "requirement. Declaring would overrule OTR_VIDEO_LANDSCAPE_CANVAS for "
+        "this lane alone. Lane 17, 2026-08-11."),
 }
 
 

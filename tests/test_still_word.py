@@ -55,10 +55,26 @@ def test_still_word_in_video_combo_and_parses():
     assert "still_word" in parsed                  # selectable in the dropdown
 
 
-def test_still_flat_sibling_unchanged_no_require_still():
-    # the sibling keeps its always-renders floor (byte-identical behavior).
-    assert cheap_families.StillFlatFamily._require_still is False
+def test_still_word_was_the_FIRST_to_require_a_still_and_is_no_longer_alone():
+    """Sprint B (2026-07-03) made `still_word` the ONLY family that refuses a
+    missing still, and this test guarded that scoping by asserting its
+    `still_flat` sibling still had the always-renders floor.
+
+    It went RED in lane 17 (2026-08-11), which is the guard working: lanes 15-17
+    gave `still_motion`, `still_pan` and `still_flat` the same refusal, one lane
+    at a time and each on its own evidence, so ALL FOUR now require a still.
+    Sprint B's reasoning was simply generalised -- "a silent black floor would
+    swallow a mint failure exactly where it matters" turned out to matter
+    everywhere, not only on a word card.
+
+    The per-lane ledger of who ruled lives in
+    `tests/test_video_cheap_render.py::test_which_still_families_REFUSE_a_missing_still_is_pinned_per_lane`;
+    what THIS test keeps saying is that `still_word` was first and that the base
+    default is still opt-in, so a new cheap family inherits nothing.
+    """
     assert cheap_families.StillWordFamily._require_still is True
+    assert cheap_families.StillFlatFamily._require_still is True     # lane 17
+    assert cheap_families._CheapFamilyBase._require_still is False   # opt IN
 
 
 # --------------------------------------------------------------------------- #

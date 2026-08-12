@@ -672,8 +672,14 @@ def ffmpeg_lavfi_floor_cmd(out_path, width, height, fps, frame_count,
     fallback chain was ripped 2026-07-02, and lanes 15-16 gave ``still_motion``
     and ``still_pan`` ``_require_still``, so a missing still is now a REFUSAL on
     three of the four cheap families rather than a black beat. ``still_flat`` is
-    the only caller that still reaches this on a missing still; when lane 17
-    rules, this function's last floor caller may go with it."""
+    the only caller that still reached this on a missing still.
+
+    LANE 17 RULED (2026-08-11): it took the refusal too, so NO registered
+    engine reaches this on a missing still any more. The command is KEPT for a
+    ``uses_still = False`` family that synthesises its own picture -- a
+    documented capability of the cheap shelf with no occupant today -- and
+    `tests/test_video_cheap_render.py` asserts both that nothing reaches it and
+    that it still works when something does."""
     n = max(1, int(frame_count))
     w, h = even_dim(width), even_dim(height)
     src = source or ("color=c=0x0A0E14:s=%dx%d:r=%d" % (w, h, int(fps)))

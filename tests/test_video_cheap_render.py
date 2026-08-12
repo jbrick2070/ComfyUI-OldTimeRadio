@@ -8,15 +8,18 @@ present); the ffmpeg-running tests skip cleanly without it.
 terminus the A-S6 chain humo -> humo_1.7B -> still_motion converges on" OPENED
 THIS DOCSTRING and is no longer true, twice over. The chain was RIPPED on
 2026-07-02 (no UNIVERSAL_FLOOR, no auto-default role, nothing degrades here),
-and as of lanes 15-16 `still_motion` and `still_pan` REFUSE a missing still
-rather than painting a black beat -- so three of the four families now fail
-LOUD on the case the "always succeeds" claim was really about. `still_flat` is
-the last one carrying the dark lavfi floor and that is lane 17's call.
+and lanes 15-17 gave `still_motion`, `still_pan` and `still_flat` the
+missing-still refusal `still_word` always had -- so ALL FOUR now fail LOUD on
+the case the "always succeeds" claim was really about, and the synthesised dark
+floor has no registered occupant left. That branch is KEPT for a
+`uses_still = False` family (a documented shelf capability with no occupant
+today) and both halves of that claim are asserted below.
 
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
+import inspect
 import pathlib
 import shutil
 import subprocess
@@ -204,26 +207,85 @@ def test_each_family_renders_silent_clip(name, tmp_path):
         p.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
-@pytest.mark.parametrize("name", ("still_flat",))
-def test_the_no_still_LAVFI_FLOOR_still_renders_for_the_families_that_keep_it(name):
-    """The coverage the lane-15 fixture fix would otherwise have cost.
+def test_the_synthesised_floor_is_UNREACHABLE_from_every_registered_engine():
+    """Lane 17 (2026-08-11) -- the dark lavfi floor now has NO occupant.
 
-    `test_each_family_renders_silent_clip` stages a real still for every
-    still-consuming family -- correct, because the refusing families need one.
-    That stopped driving `render_clip`'s `else:` branch (the synthesized dark
-    lavfi floor) end to end, so it gets its own case here.
+    This test replaces the shrinking parametrized list that lanes 15-16 used to
+    track who still painted a floor. With `still_flat` taking the refusal, all
+    four registered still families either require a still or (mesh_stage)
+    override `render_clip` entirely, so nothing can reach that `else:` branch.
 
-    THE PARAMETER LIST IS THE LIVE SCOPE OF THE DARK FLOOR, and it shrinks as
-    lanes rule: `still_pan` was here until lane 16 gave it `_require_still`
-    (2026-08-11), leaving `still_flat` as the LAST family that still paints a
-    floor rather than refusing. When lane 17 rules, this test goes away with the
-    branch -- and if this list ever empties while the `else:` branch survives,
-    that branch is dead code and should be deleted, not left as a floor nobody
-    reaches.
+    ASSERTED rather than asserted-by-absence: the branch is KEPT deliberately
+    (it serves `uses_still = False`, a documented capability of this shelf with
+    no occupant today -- lane 4's rule that a control whose last occupant leaves
+    gets REWRITTEN, not deleted). A claim that nothing reaches it is only worth
+    anything if something checks, and if a future family DOES reach it, this
+    test tells its author to record the ruling rather than letting a black beat
+    quietly become reachable again.
     """
-    eng = vreg.get_engine(name)
-    clip = eng.render_clip(_req(frames=6), None)          # no asset_refs
+    from nodes._otr_video_engines.cheap_families import _CheapFamilyBase
+
+    #: Subclasses that do NOT use the base's `render_clip`, and why that means
+    #: the floor branch cannot be reached through them. FAIL-CLOSED BY DESIGN:
+    #: an override this table does not name fails the assertion below rather
+    #: than being skipped.
+    #:
+    #: The first draft of this test skipped any override whose source text did
+    #: not mention `_require_still`. That was UNSOUND -- an override that
+    #: delegates with `super().render_clip(...)` mentions nothing, differs from
+    #: the base method, and would have been silently skipped WHILE ACTUALLY
+    #: RUNNING the base's floor logic. A false pass in the one test that is the
+    #: sole evidence for "unreachable" is worse than no test (QA, lane 17).
+    DECLARED_OVERRIDES = {
+        "mesh_stage": ("overrides render_clip entirely (hy3d -> Blender), never "
+                       "delegates to the base, and refuses a missing still with "
+                       "its own FileNotFoundError"),
+    }
+
+    reachable, undeclared = [], []
+    for name in sorted(vreg.all_engine_names()):
+        eng = vreg.get_engine(name)
+        if not isinstance(eng, _CheapFamilyBase):
+            continue
+        if type(eng).render_clip is not _CheapFamilyBase.render_clip:
+            if name not in DECLARED_OVERRIDES:
+                undeclared.append(name)
+            continue
+        if getattr(eng, "uses_still", False) and eng._require_still:
+            continue                       # refuses instead of flooring
+        reachable.append(name)
+
+    assert not undeclared, (
+        "these cheap families OVERRIDE render_clip and are not declared in "
+        "DECLARED_OVERRIDES: %s. This test cannot tell statically whether such "
+        "an override delegates to the base (and so can reach the floor) or "
+        "replaces it. Say which, in that table, with the reason -- do not let "
+        "it be skipped silently." % undeclared)
+    assert not reachable, (
+        "these engines can still reach the synthesised dark floor on a missing "
+        "still: %s. That is not necessarily wrong -- a uses_still=False family "
+        "SHOULD synthesise -- but it must be a recorded ruling in its lane "
+        "packet, not a default nobody chose (S8b-12(b), lesson L21)."
+        % reachable)
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
+def test_the_synthesised_floor_STILL_WORKS_for_a_uses_still_False_family():
+    """...and the branch it protects is still functional, proved on a real
+    render rather than assumed from the fact that it compiles.
+
+    A control with no occupant is only worth keeping if it still WORKS when one
+    arrives, so a minimal `uses_still = False` family stands in for the future
+    occupant. Without this, "kept deliberately" would rot into "left behind".
+    """
+    from nodes._otr_video_engines.cheap_families import _CheapFamilyBase
+
+    class _SynthesisingFamily(_CheapFamilyBase):
+        name = "synthesised_floor_probe"
+        family = "abstract"
+        uses_still = False                 # -> `still` is "" -> the else: branch
+
+    clip = _SynthesisingFamily().render_clip(_req(frames=6), None)
     p = pathlib.Path(clip["path"])
     try:
         assert p.exists() and p.stat().st_size > 0
@@ -260,7 +322,8 @@ def test_ffmpeg_is_gated_at_PREFLIGHT_for_every_cheap_family(monkeypatch):
         assert name in str(exc.value)      # names ITSELF, not the base class
 
 
-@pytest.mark.parametrize("name", ("still_motion", "still_pan"))
+@pytest.mark.parametrize("name", ("still_motion", "still_pan",
+                                  "still_flat", "still_word"))
 def test_the_refusing_families_REFUSE_a_missing_still_not_a_black_beat(name,
                                                                       tmp_path):
     """S8b-12(b) -- THE BLACK-BEAT DEFECT, per refusing family.
@@ -299,17 +362,18 @@ def test_which_still_families_REFUSE_a_missing_still_is_pinned_per_lane():
       still_word    True   -- always did (Sprint B; a word card cannot be black)
       still_motion  True   -- lane 15, closing the black-beat defect
       still_pan     True   -- lane 16, same evidence, its own lane
-      still_flat    False  -- LANE 17'S CALL, not yet made
+      still_flat    True   -- lane 17, finishing the shelf
+      mesh_stage    False  -- INERT there (see below), refuses by other means
       the BASE      False  -- so a new cheap family opts IN, never inherits it
 
-    When lane 17 rules, update this list in the same commit. If the base default
-    ever flips instead, that is a shelf-wide decision and it needs its own
-    argument -- not a quiet edit here.
+    All four still families have now ruled. If the base default ever flips
+    instead, that is a shelf-wide decision and it needs its own argument -- not
+    a quiet edit here.
     """
     from nodes._otr_video_engines.cheap_families import _CheapFamilyBase
 
     ruled = {"still_word": True, "still_motion": True, "still_pan": True,
-             "still_flat": False,
+             "still_flat": True,
              # mesh_stage extends this base for the frame contract and the
              # canvas/still helpers, but OVERRIDES render_clip completely (hy3d
              # -> Blender), so it never reaches the branch `_require_still`

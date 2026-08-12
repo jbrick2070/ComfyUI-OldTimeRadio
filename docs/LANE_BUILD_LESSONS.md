@@ -1413,6 +1413,102 @@ shape of a failed mint) and
 
 ---
 
+## L22 -- Unoccupied is not dead, and a kept branch owes two proofs
+
+**Check:** when the last caller of a branch goes away, ask whether the branch
+serves a DOCUMENTED CAPABILITY that merely has no user right now, or whether
+nothing could ever reach it. Delete only the second. And if you keep it, prove
+BOTH halves -- that nothing reaches it today, and that it still works when
+something does.
+
+**Symptom of getting it wrong in either direction:** delete an unoccupied
+control and the next family that needs it silently gets a different behaviour
+(and the helpers it called become orphans). Keep dead code and it rots
+untested, which is how a "safety net" turns out to be broken the one time it is
+finally reached.
+
+**Origin (lane 17, 2026-08-11):** lanes 15-17 gave all four still families the
+missing-still refusal, which emptied the last caller of `render_clip`'s
+synthesised dark-floor `else:` branch. Lane 16 had written down, confidently,
+that the branch should then be DELETED as dead code. On reaching it that was
+wrong: the branch serves `uses_still = False`, and the attribute's own comment
+documents that capability ("False families always synthesize a procedural
+floor"). No such family is registered today -- so it is a control with no
+occupant, exactly the shape lane 4 ruled on when the HuMo family closed and the
+"declares NOTHING" canvas control lost its last holder.
+
+**The two proofs, because "kept deliberately" is otherwise indistinguishable
+from "left behind":**
+
+1. A registry-walking test that FAILS if any engine can reach the branch, whose
+   message tells that engine's author to record the ruling rather than letting
+   the old behaviour quietly become reachable again.
+2. A test that renders THROUGH the branch using a minimal stand-in for the
+   future occupant, so the capability is proved functional rather than assumed
+   from the fact that it still compiles.
+
+**Runnable check:** for every branch you are about to delete because "nothing
+calls it", grep the field or flag that selects it for a comment DESCRIBING when
+it should be used. A documented capability with no occupant is a control; an
+undocumented one with no occupant is dead code.
+
+**Twin assertion:**
+`tests/test_video_cheap_render.py::test_the_synthesised_floor_is_UNREACHABLE_from_every_registered_engine`
+and `::test_the_synthesised_floor_STILL_WORKS_for_a_uses_still_False_family`.
+
+---
+
+## Lane 17 -- `still_flat`, closed 2026-08-11 -- AND THE STILL SHELF IS FINISHED
+
+Third still lane; all four families now refuse a missing still. Its own lesson
+is L22 above. Two more things.
+
+**What paid off: a different builder was the reason to re-check, and it was the
+only lane where that mattered.** `still_flat` sets `_still_motion = False`, so
+it renders through `ffmpeg_still_static_cmd` (fit+pad) rather than the pan
+builder lanes 15-16 verified. Same answer, but arrived at rather than assumed --
+and the smoke corroborated it: lanes 15/16 hash IDENTICALLY (shared pan
+builder), this lane hashes DIFFERENTLY. **Same-builder lanes match,
+different-builder lanes do not**, so the "they share a builder" claim is now
+falsifiable in both directions rather than just one.
+
+**What bit: a second scope guard fired, from a DIFFERENT sprint.** Lane 16
+fired lane 15's guard; lane 17 fired Sprint B's (2026-07-03), which had asserted
+since `still_word` shipped that its `still_flat` sibling still had the
+always-renders floor. Rewritten, not deleted: Sprint B's reasoning -- "a silent
+black floor would swallow a mint failure exactly where it matters" -- was never
+wrong, it was NARROW. It matters everywhere.
+
+**Runnable check:** when your change fires a guard written by an older sprint,
+read that sprint's REASONING before editing its test. If the reasoning
+generalises, you are completing it and the test should say so; if it does not,
+you are violating it and should stop.
+
+**What bit (3), caught by QA: the test that PROVES the kept branch is
+unreachable could itself have produced a FALSE PASS.** Its first draft skipped
+any subclass whose `render_clip` override did not mention `_require_still` in
+its source. A future family that overrides `render_clip` but DELEGATES with
+`super().render_clip(...)` satisfies that -- short body, no mention, different
+method object -- and would have been skipped while actually running the base's
+floor logic.
+
+**Runnable check:** a test that proves a NEGATIVE ("nothing reaches this") must
+be FAIL-CLOSED on the unknown case. If it cannot tell statically whether a
+subject qualifies, it must demand an explicit declaration and fail without one
+-- never `continue`. Source-sniffing a method body is a guess; requiring the
+override to be named in a table with its reason is a decision.
+
+**And a stale-text pattern worth naming, since lanes 15-17 all hit it:** a
+behaviour change on a shared shelf leaves stale prose in roughly a DOZEN places
+-- class docstrings, attribute comments, a helper's docstring in another module,
+a slot-matrix constant, a test module header, and (worst) a RUNTIME LOG MESSAGE
+that misleads the operator at the exact moment they are debugging the failure
+you just introduced. Grep for the CLAIM, not the file: "always renders",
+"terminus", "floor", "fails LOUD". The log message is the one to fix first --
+a comment misleads a reader who chose to look, a log misleads one who did not.
+
+---
+
 ## Lane 16 -- `still_pan`, closed 2026-08-11
 
 Lane 15's two answers, taken on this lane's own evidence. Nothing new bit; two
@@ -1447,6 +1543,20 @@ test's parameter list is now the LIVE SCOPE of that branch. If lane 17 gives
 `still_flat` the refusal too, that list empties -- and an empty list with the
 `else:` branch still in `render_clip` means DEAD CODE. Delete the branch then,
 rather than leaving a floor nothing can reach.
+
+> **REVISED BY LANE 17 (2026-08-11), and the revision is the lesson.** That
+> instruction was wrong. When the list emptied, the branch turned out to be a
+> CONTROL WITH NO OCCUPANT, not dead code: it serves `uses_still = False`, a
+> capability this shelf's own attribute comment documents ("False families
+> always synthesize a procedural floor"), which simply has no registered family
+> today. Lane 4 already ruled on that shape -- rewrite with the reason, never
+> delete, because the invariant outlives every occupant -- and deleting would
+> have stranded `_lavfi_source` and `ffmpeg_lavfi_floor_cmd` too.
+>
+> **The distinction to carry:** code no caller can reach is dead; code no
+> caller *currently* reaches, for a documented capability, is unoccupied. Test
+> the difference rather than guessing it -- lane 17 asserts BOTH that nothing
+> reaches the branch today and that it still works when something does.
 
 **What bit (3): a shared base has inheritors you did not picture.** Making the
 scope guard GENERIC over the registry (rather than four names) immediately

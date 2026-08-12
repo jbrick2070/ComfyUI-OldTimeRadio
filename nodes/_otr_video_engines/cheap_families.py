@@ -122,14 +122,28 @@ class _CheapFamilyBase:
     engine_version = "1"
     #: True when this family animates a provided still (asset_refs.init_image /
     #: still) with a pan; False families always synthesize a procedural
-    #: floor. Either way render_clip ALWAYS produces a valid silent clip.
+    #: floor. A ``uses_still`` family that is ALSO ``_require_still`` (all four
+    #: still families, as of lanes 15-17) REFUSES instead of flooring, so the
+    #: old "either way render_clip ALWAYS produces a valid silent clip" is no
+    #: longer true and was removed.
     uses_still = False
     #: When True a MISSING/absent base still is a LOUD failure (NO dark lavfi
     #: floor fallback) instead of the synthesized slate. still_word sets this:
     #: its whole contract is "hold the minted word/title still" -- a silent
     #: black floor would swallow a mint failure exactly where it matters
-    #: (NO FALLBACKS, operator directive 2026-07-02). Default False keeps every
-    #: other cheap family's always-renders floor behavior byte-identical.
+    #: (NO FALLBACKS, operator directive 2026-07-02).
+    #:
+    #: ``still_word`` was FIRST and is no longer alone: lanes 15, 16 and 17 gave
+    #: ``still_motion``, ``still_pan`` and ``still_flat`` the same refusal, one
+    #: lane at a time and each on its own evidence, because Sprint B's reasoning
+    #: generalised -- a silent black floor swallows a mint failure wherever it
+    #: happens, not only on a word card.
+    #:
+    #: THE DEFAULT STAYS False, deliberately: it is the right default for a
+    #: ``uses_still = False`` family that synthesises its own picture, so a new
+    #: cheap family OPTS IN to refusing rather than inheriting it unnoticed.
+    #: Who has ruled is pinned in
+    #: ``tests/test_video_cheap_render.py::test_which_still_families_REFUSE_a_missing_still_is_pinned_per_lane``.
     _require_still = False
 
     def load(self) -> None:  # cheap families hold no resident weights
@@ -253,14 +267,35 @@ class _CheapFamilyBase:
                 cmd = _wb.ffmpeg_still_static_cmd(still, out_path, w, h, fps, n)
         elif self._require_still:
             # NO FALLBACKS (operator 2026-07-02): a still-REQUIRED family
-            # (still_word) refuses the dark lavfi floor -- a missing base still
-            # is a mint failure and must be LOUD, never a silently-black clip.
+            # refuses the dark lavfi floor -- a missing base still is a mint
+            # failure and must be LOUD, never a silently-black clip.
+            # ALL FOUR still families take this path now (still_word from the
+            # start; still_motion lane 15, still_pan 16, still_flat 17).
             raise RuntimeError(
                 "%s requires a base still but none was provided/exists "
                 "(asset_refs still/init_image=%r) -- refusing the dark floor "
                 "(NO FALLBACKS). The image phase must mint this beat's still "
                 "before the video render." % (self.name, still))
         else:
+            # THE SYNTHESISED FLOOR -- UNREACHABLE FROM ANY REGISTERED ENGINE
+            # TODAY, AND DELIBERATELY KEPT (lane 17, 2026-08-11).
+            #
+            # It is reached only by a family with `uses_still = False` (which
+            # empties `still` above) or one that has not taken the refusal. All
+            # four registered still families now do both the opposite, so today
+            # nothing reaches this line -- `test_the_synthesised_floor_is_
+            # UNREACHABLE_from_every_registered_engine` asserts exactly that,
+            # so the claim cannot rot into a guess.
+            #
+            # Lane 16's ledger entry said this branch should be DELETED as dead
+            # code the moment the last family ruled. That was revised on
+            # reaching it: `uses_still = False` is a DOCUMENTED capability of
+            # this shelf (see the attribute's own comment -- "False families
+            # always synthesize a procedural floor"), so this is a control with
+            # no occupant, not dead code. Lane 4's precedent governs: a control
+            # whose last occupant leaves gets REWRITTEN with the reason, never
+            # deleted, because the invariant outlives every occupant. Deleting
+            # it would also strand `_lavfi_source` and `ffmpeg_lavfi_floor_cmd`.
             cmd = _wb.ffmpeg_lavfi_floor_cmd(
                 out_path, w, h, fps, n, source=self._lavfi_source(w, h, fps))
         _wb.run_ffmpeg(cmd)
@@ -428,8 +463,10 @@ class StillPanFamily(_CheapFamilyBase):
     #: means MINTING FAILED, and the dark lavfi floor turned that into a silent
     #: black beat the composite positioned like any other (L21).
     #:
-    #: ``still_flat`` (lane 17) is STILL untouched -- the base default stays
-    #: False, and that lane makes its own call on its own evidence.
+    #: ``still_flat`` took the same refusal in lane 17, so ALL FOUR still
+    #: families now refuse. The base default stays False regardless: it is the
+    #: right default for a ``uses_still = False`` family that synthesises its
+    #: own picture (a documented shelf capability with no occupant today).
     _require_still = True
     uses_still = True               # animate a provided still (pan) when present
     accepts_still = True            # C1: mint the selected still (coverage gate) so an
@@ -442,7 +479,9 @@ class StillFlatFamily(_CheapFamilyBase):
     """A DEAD-FLAT still: the selected image held STATIC (no pan/zoom, fit+pad so a
     face is NEVER cropped) for the beat -- the 'I want stills, not video' option
     (operator 2026-06-18). Eligible in every role; CPU/ffmpeg-only, no weights, no
-    VRAM, always renders -> commercial-clean + validated. ``accepts_still`` so the
+    VRAM -> commercial-clean + validated. ("always renders" was here and is no
+    longer true: lane 17 gave this family `_require_still`, so a MISSING still
+    is a loud refusal rather than a black hold.) ``accepts_still`` so the
     image dispatcher mints the role's selected still for it (the central coverage
     gate); ``_still_motion=False`` selects the flat hold over the pan."""
     name = "still_flat"
@@ -456,6 +495,23 @@ class StillFlatFamily(_CheapFamilyBase):
     uses_still = True               # display the provided still...
     _still_motion = False           # ...STATIC (flat hold, fit+pad, no crop)
     accepts_still = True            # mint the selected still for it (coverage gate)
+    #: S8b-12(b), lane 17, 2026-08-11 -- the LAST still family to rule, and the
+    #: one where the case is strongest: this engine's entire contract is "hold
+    #: the chosen image". A missing still is not a degraded version of that, it
+    #: is the absence of the thing, and the dark lavfi floor turned it into a
+    #: silent black beat the composite positioned like any other.
+    #:
+    #: Same evidence as lanes 15-16, re-run on this lane: ``default_roles`` is
+    #: empty, nothing routes here automatically (the chain was ripped
+    #: 2026-07-02; the only "floor" references left are a campaign-harness
+    #: DETECTOR and comments), and ``accepts_still`` means the dispatcher mints
+    #: this lane's still -- so absent means MINTING FAILED.
+    #:
+    #: With this, all four still families refuse. The base default stays False
+    #: anyway: it is the correct default for a ``uses_still = False`` family
+    #: that synthesises its own picture, which is a documented capability of
+    #: this shelf with no occupant today (see the render_clip note).
+    _require_still = True
 
 
 @register
