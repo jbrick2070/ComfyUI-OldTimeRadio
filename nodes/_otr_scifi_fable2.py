@@ -3146,7 +3146,22 @@ def run_scifi_fable2_episode(
         cards[0].get("name") if cards else None,
         stance.get("name") if isinstance(stance, Mapping) else stance,
     )
-    led.save()
+    # CHECK THE RETURN. `Ledger.save()` returns the path on success and **None
+    # on failure, and never raises** -- so an unchecked call is a receipt that
+    # can silently not happen, which is precisely the defect this block exists
+    # to fix. The episode is still renderable without the receipt, so this warns
+    # rather than raising; killing an episode over a diagnostic would be a worse
+    # trade than losing the diagnostic. The log line above already carries the
+    # deal, so a failed save degrades to log-only rather than to nothing.
+    if led.save() is None:
+        log.warning(
+            "[scifi_fable2] the deal receipt did NOT persist -- if this leg "
+            "dies later, seed=%s / frame_card=%r / stance=%r are recoverable "
+            "only from the line above, not from the ledger",
+            seed,
+            cards[0].get("name") if cards else None,
+            stance.get("name") if isinstance(stance, Mapping) else stance,
+        )
     fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "fable2_pitch"):
         pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max)
