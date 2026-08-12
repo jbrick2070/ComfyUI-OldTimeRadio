@@ -2730,12 +2730,25 @@ Related and already shipped: `num_characters` is now a REQUEST rather than a cap
 
 ---
 
-## TWO CODER WINDOWS, 2026-08-12 -- OWNERSHIP SPLIT (operator ruling)
+## LEMMY IS PARKED AND GATED, 2026-08-12 (operator ruling -- CORRECTED)
 
-The operator has a second window that originally coded Lemmy and has been parked
-since. Lemmy work goes THERE, not to the story/video window. CLAUDE.md's rule is
-one coder window in the code at a time, serialized through this file -- so here
-is the split. **The file sets are disjoint; that is what makes this safe.**
+The operator has a second window that originally coded Lemmy. When Lemmy is
+taken up, it goes THERE -- it holds the design context for chunks A2-A4, and the
+operator wants the Lemmy fixes well documented.
+
+**But it is NOT handed off yet.** Operator, 2026-08-12: *"I'm not handing Lemmy
+until your story fixes are done, all sweeps."* So this is a QUEUE, not a
+parallel split -- which is also the stricter reading of CLAUDE.md's one-coder-
+window rule, and avoids the concurrent-git hazard described at the end of this
+section entirely.
+
+**THE GATE, both parts:**
+1. the story-writer fixes are done (see "THE FABLE2 WRITER" above), and
+2. **all sweeps are done** -- the 21-lane 45-word render gate, both boots.
+
+Until both are met, the Lemmy window stays parked and this window is the only
+one in the code. The work list below is kept ready so the handoff costs nothing
+when the gate opens.
 
 ### WINDOW A -- LEMMY (the window that coded it)
 
