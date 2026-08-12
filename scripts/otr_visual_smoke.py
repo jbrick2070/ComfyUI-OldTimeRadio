@@ -383,7 +383,7 @@ def _cmd_replay(args):
         print("[smoke] UNEXPECTED executed nodes: %s" % detail["unexpected"],
               flush=True)
     if err:
-        print("[smoke] error: %s" % err[:400], flush=True)
+        print("[smoke] error: %s" % err, flush=True)
     ok_all = (status == "SUCCESS") and vok and audio_ok
     print("[smoke] %s" % ("PASS" if ok_all else "FAIL"), flush=True)
     return 0 if ok_all else 1

@@ -274,6 +274,64 @@ def _build_meta_paths(
     return paths
 
 
+def _where_unserializable(ledger, exc) -> str:
+    """`" -- at meta.visual_card (VisualStyleCardModel)"`, or `""`.
+
+    WHY. `json.dumps` names the offending TYPE and nothing else:
+
+        Object of type VisualStyleCardModel is not JSON serializable
+
+    The ledger carries 600+ keys, so that message starts a hunt rather than
+    ending one. This has now cost real diagnosis time TWICE in one day --
+    PBUG-20260812-02 (a bound method reaching the writer's prompt) and
+    PBUG-20260812-04 (a live pydantic model left in `meta` by a `dict.update`).
+    Both were one `dict.update` away from any future recurrence, so the class is
+    worth naming rather than the instance.
+
+    Runs ONLY on the failure path, so a healthy save pays nothing. Returns ""
+    for any non-serialization failure (disk, permissions, rename) and can never
+    itself raise -- a diagnostic that throws inside an error handler would
+    replace a reported failure with a confusing one.
+    """
+    try:
+        if not isinstance(exc, TypeError) or "not JSON serializable" not in str(exc):
+            return ""
+
+        # Container ids already entered. Without this a self-referencing ledger
+        # recurses until RecursionError -- which the outer handler would catch,
+        # so nothing hangs, but the diagnosis is LOST exactly when the structure
+        # is at its most confusing. Cheaper to walk cycles correctly.
+        seen = set()
+
+        def walk(node, path):
+            if isinstance(node, (str, int, float, bool)) or node is None:
+                return None
+            if isinstance(node, (dict, list, tuple)):
+                if id(node) in seen:
+                    return None
+                seen.add(id(node))
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if not isinstance(key, (str, int, float, bool)) and key is not None:
+                        return "%s{key %r}" % (path, type(key).__name__)
+                    hit = walk(value, "%s.%s" % (path, key) if path else str(key))
+                    if hit:
+                        return hit
+                return None
+            if isinstance(node, (list, tuple)):
+                for index, value in enumerate(node):
+                    hit = walk(value, "%s[%d]" % (path, index))
+                    if hit:
+                        return hit
+                return None
+            return "%s (%s)" % (path, type(node).__name__)
+
+        found = walk(ledger, "")
+        return " -- at %s" % found if found else ""
+    except Exception:  # pragma: no cover -- never mask the real failure
+        return ""
+
+
 def save_ledger_safe(path: Path, ledger: dict) -> bool:
     """Write a ledger dict back to disk with schema_version + meta.paths
     stamped. ATOMIC via tempfile + ``os.replace`` (BUG-LOCAL-127).
@@ -390,7 +448,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
             raise
         return True
     except Exception as exc:
-        log.warning("[OTR_Ledger] ledger save failed (%s): %s", path, exc)
+        log.warning("[OTR_Ledger] ledger save failed (%s): %s%s",
+                    path, exc, _where_unserializable(ledger, exc))
         return False
 
 

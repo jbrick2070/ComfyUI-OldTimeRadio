@@ -73,7 +73,7 @@ def main(argv=None) -> int:
     prompt_id = submit_prompt(api)
     print("[single] QUEUED prompt_id=%s" % prompt_id, flush=True)
     status, err = poll_history(prompt_id, timeout_s=args.timeout)
-    print("[single] history status=%s %s" % (status, err[:300]), flush=True)
+    print("[single] history status=%s %s" % (status, err), flush=True)
 
     report = {}
     try:

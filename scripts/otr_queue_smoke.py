@@ -58,7 +58,7 @@ def main() -> int:
     status, err = otr_api.poll_history(pid, timeout_s=args.timeout,
                                        poll_s=15, on_tick=tick)
     print(f"[smoke] RESULT {status} after {int(time.time() - t0)}s "
-          f"{(err or '')[:400]}", flush=True)
+          f"{err or ''}", flush=True)
     return 0 if status == "SUCCESS" else 1
 
 

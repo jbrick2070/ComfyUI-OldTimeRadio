@@ -118,7 +118,7 @@ def main(argv=None) -> int:
     status, err = poll_history(prompt_id, timeout_s=args.timeout)
     wall = time.time() - started
     print("[lumina-smoke] history status=%s (%.1fs) %s"
-          % (status, wall, err[:300]), flush=True)
+          % (status, wall, err), flush=True)
 
     landed = []
     if os.path.isdir(glob_dir):

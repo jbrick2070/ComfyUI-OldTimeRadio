@@ -505,7 +505,7 @@ def main(argv=None) -> int:
     print("[mime] QUEUED %s" % prompt_id, flush=True)
     status, err = poll_history(prompt_id, timeout_s=args.timeout)
     elapsed = round(time.time() - t0, 1)
-    print("[mime] history status=%s %s" % (status, err[:300]), flush=True)
+    print("[mime] history status=%s %s" % (status, err), flush=True)
     if status != "SUCCESS":
         print("[mime] FAIL: render did not succeed", flush=True)
         return 1

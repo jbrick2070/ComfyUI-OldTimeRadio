@@ -708,6 +708,76 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     return prompt_id
 
 
+#: How much of the failing traceback to keep. The frames that name OUR code are
+#: at the END, so the tail is what matters.
+_ERROR_TRACEBACK_FRAMES = 12
+
+
+def describe_execution_error(messages) -> str:
+    """A readable diagnosis of a ComfyUI execution error.
+
+    REPLACES ``str(messages)[:500]``, which cost real diagnosis time twice on
+    2026-08-12. That truncation stringified the whole history payload -- a list
+    of ``[event_name, payload]`` pairs, most of it timestamps and cache lists --
+    and cut it at 500 characters, which landed INSIDE the traceback:
+
+        'traceback': ['  File "C
+
+    The node that died, the exception type, and every frame naming our code
+    were all past the cut. Both live writer failures therefore had to be
+    re-diagnosed out of an unrelated server log. A campaign leg costs minutes to
+    hours, so a lost traceback is not a lost line -- it is a lost leg.
+
+    Pulls the named fields out instead of truncating a repr, and keeps the TAIL
+    of the traceback because that is where our frames are. Falls back to the old
+    behaviour for any payload shape it does not recognise: a diagnosis helper
+    must never be the reason a failure goes unreported.
+    """
+    if not messages:
+        return "execution error"
+    try:
+        for entry in messages:
+            if not (isinstance(entry, (list, tuple)) and len(entry) == 2):
+                continue
+            name, payload = entry
+            if not isinstance(payload, dict):
+                continue
+
+            # A CANCELLED/INTERRUPTED prompt is a DIFFERENT event carrying NO
+            # exception fields at all (ComfyUI `execution.py`
+            # `handle_execution_error`). Reading it as an error would report
+            # "raised ?" and hide the real reason -- and on an unattended
+            # campaign an interrupt usually means an OOM kill or a stopped
+            # server, which is a very different investigation from a node bug.
+            if name == "execution_interrupted":
+                return ("node %s (%s) was INTERRUPTED -- cancelled, or the "
+                        "server went down mid-prompt. This is not a node "
+                        "exception; check VRAM and the server log."
+                        % (payload.get("node_id", "?"),
+                           payload.get("node_type", "?")))
+
+            if name != "execution_error":
+                continue
+            lines = [
+                "node %s (%s) raised %s" % (
+                    payload.get("node_id", "?"),
+                    payload.get("node_type", "?"),
+                    payload.get("exception_type", "?"),
+                ),
+                str(payload.get("exception_message", "")).strip(),
+            ]
+            frames = payload.get("traceback") or []
+            if isinstance(frames, (list, tuple)) and frames:
+                lines.append("traceback (last %d frames):"
+                             % min(len(frames), _ERROR_TRACEBACK_FRAMES))
+                lines.extend(str(f).rstrip()
+                             for f in frames[-_ERROR_TRACEBACK_FRAMES:])
+            return "\n".join(line for line in lines if line)
+    except Exception:
+        pass
+    return str(messages)[:500]
+
+
 def poll_history(
     prompt_id: str,
     timeout_s: int | None = DEFAULT_TIMEOUT_S,
@@ -746,7 +816,7 @@ def poll_history(
         if status.get("completed", False):
             return ("SUCCESS", "")
         if status.get("status_str") == "error":
-            return ("FAIL", str(status.get("messages", "execution error"))[:500])
+            return ("FAIL", describe_execution_error(status.get("messages")))
         time.sleep(poll_s)
     return ("TIMEOUT", "")
 

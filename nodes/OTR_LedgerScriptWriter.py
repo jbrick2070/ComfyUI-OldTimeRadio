@@ -6303,10 +6303,26 @@ class OTR_LedgerScriptWriter:
                 technical_model_id=resolved["technical_model"],
                 is_visual_storybased=_is_dynamic_style,
             )
+        # POP THE MODEL BEFORE MERGING (PBUG-20260812-04). `visual_card` is the
+        # only value in this delta that is not JSON -- it is a live
+        # `VisualStyleCardModel`, added by `run_story_brief_reflection` at
+        # `_otr_story_brief.py:643`. `meta.update()` put it straight into the
+        # ledger, and although the serialized copy is written below as
+        # `meta["visual_style_card"]`, the RAW MODEL stayed alongside it. The
+        # very next `led.save()` then died:
+        #
+        #   [Ledger] save failed: Object of type VisualStyleCardModel is not
+        #   JSON serializable
+        #   RuntimeError: failed to save ledger after visual_style pack embedding
+        #
+        # `meta` is the ledger. Nothing that is not JSON may enter it -- the
+        # model is a WORKING VALUE for the composer below, not ledger content.
+        # Nothing reads `meta["visual_card"]`; the only reader took it from this
+        # delta, and now takes it from this local instead.
+        _card = _brief_delta.pop("visual_card", None)
         meta.update(_brief_delta)
 
         if _is_dynamic_style:
-            _card = _brief_delta.get("visual_card")
             if _card is not None:
                 # Dynamic reflection succeeded -> compose pack from card.
                 # Code/composer defects raise LOUD per Section 5 (never floored).

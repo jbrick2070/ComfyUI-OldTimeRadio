@@ -106,10 +106,42 @@ def _say(msg: str) -> None:
     print("[bank-gate] %s  %s" % (_now(), msg), flush=True)
 
 
+#: Where the failure report starts. Everything before it is setup chatter.
+_FAILURE_MARKERS = ("[canonical-api] RESULT FAIL", "[canonical-api] ERROR",
+                    "Traceback (most recent call last)")
+
+
+def failure_region(log_text: str) -> str:
+    """The tail of the log from the first failure marker onward.
+
+    SCOPED, because scanning the WHOLE log was wrong and produced a wrong
+    verdict on its first live run (2026-08-12, the `public_domain` leg). The
+    runner echoes the applied profile at startup -- including
+    `OTR_LedgerScriptWriter.target_words` -- so the writer's node name appears
+    in EVERY leg log regardless of what failed. A substring test over the whole
+    file therefore reported WRITER for a leg that died in the runner itself.
+    A misleading verdict is worse than none: it sends the next session to the
+    wrong file.
+
+    Returns "" when the log carries no failure marker at all. Falling back to
+    the whole log would make this function answer a question it cannot answer:
+    a PASSING log would classify as WRITER purely on the startup echo.
+    """
+    starts = [i for i in (log_text.find(m) for m in _FAILURE_MARKERS) if i >= 0]
+    return log_text[min(starts):] if starts else ""
+
+
 def classify_failure(log_text: str) -> str:
-    """WRITER vs DOWNSTREAM, from the leg log."""
+    """WRITER vs DOWNSTREAM vs HARNESS, from the failure region only."""
+    region = failure_region(log_text)
+    if not region:
+        return "UNKNOWN"
+    # A traceback rooted in scripts/ is the HARNESS failing, not the pipeline --
+    # the leg proved nothing about the writer or the engine and must be re-run.
+    if "Traceback (most recent call last)" in region and "scripts\\" in region:
+        return "HARNESS"
     for marker in WRITER_MARKERS:
-        if marker in log_text:
+        if marker in region:
             return "WRITER"
     return "DOWNSTREAM"
 

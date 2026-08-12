@@ -3930,3 +3930,68 @@ only visible because the cameo was FORCED and then did not appear.
   the retry loop burns its budget on identical failures". Deferred with
   PBUG-20260812-02 until both writer defects are settled.
 - status: FIXED (prompt-only), pending the cross-bank gate and a live re-run.
+
+## PBUG-20260812-04 -- a live pydantic model rode `dict.update` into the ledger, and the writer died saving it
+
+- surfaced: LIVE headless leg, 2026-08-12 08:17, the `public_domain` leg of the
+  cross-bank writer gate (`scripts/otr_writer_bank_gate.py`, profile
+  `otr_w45_still_flat`, 45 words). `OTR_LedgerScriptWriter` ran 123.66 s then
+  raised. Verdict: `FAIL (exit=1) 2.2 min`.
+- symptom, from `tmp/_bankgate_server.log:1845`:
+
+      [Ledger] save failed: Object of type VisualStyleCardModel is not JSON serializable
+      RuntimeError: failed to save ledger after visual_style pack embedding
+        at nodes/OTR_LedgerScriptWriter.py:6394, in _run_writer_tail
+
+- **root cause.** `run_story_brief_reflection` returns a meta delta that, on the
+  dynamic-visual-style path, carries `visual_card` as a LIVE
+  `VisualStyleCardModel` rather than a dict (`nodes/_otr_story_brief.py:643`).
+  `OTR_LedgerScriptWriter` merged that whole delta with `meta.update(_brief_delta)`
+  -- and **`meta` IS the ledger.** A serialized copy is written moments later as
+  `meta["visual_style_card"] = _card.model_dump()`, which is what made this look
+  handled; but writing the copy never removed the raw model sitting beside it.
+  The next `led.save()` called `json.dumps(ledger)`, which refused.
+- **NOT bank-specific, and the first read of it was wrong.** The reviewing panel
+  proposed that `public_domain`'s extra `meta.provenance.*` block was involved.
+  It is not. The trigger is `_is_dynamic_style` -- `meta["visual_style"] ==
+  DYNAMIC_STYLE_ID` -- so **any bank can hit this whenever the visual-style roll
+  lands on dynamic.** Every leg of the 45-word campaign runs
+  `--visual-style "roll (any style)"`, so this defect was live for the whole
+  sweep and would have kept taking legs at random.
+- fix: SHIPPED, two parts.
+  1. **The defect.** `_card = _brief_delta.pop("visual_card", None)` BEFORE the
+     `meta.update`, so the model never enters the ledger at all. It is a working
+     value for the pack composer, not ledger content. Verified nothing reads
+     `meta["visual_card"]`: the single reader took it from the delta and now
+     takes it from that local.
+  2. **The diagnosability.** `json.dumps` names only the offending TYPE, and the
+     ledger carries 600+ keys, so the message started a hunt instead of ending
+     one. `_where_unserializable` (`nodes/_otr_ledger.py`) now walks the ledger
+     ON THE FAILURE PATH ONLY and appends the dotted location:
+     `-- at meta.visual_card (VisualStyleCardModel)`. It handles cycles by id,
+     returns "" for any non-serialization failure so a disk or permission error
+     is never dressed up as one, and cannot itself raise.
+- **THIS IS THE SECOND NON-JSON VALUE TO REACH `json.dumps` IN ONE DAY**, after
+  PBUG-20260812-02's bound method. Different objects, same shape of mistake, and
+  both were one `dict.update` away from recurring -- which is why the fix names
+  the class (a locator for any unserializable value) and not just this field.
+  Note also that -02's guard would NOT have caught this one: that test sweeps
+  pydantic field DEFAULTS, whereas this was a value placed into a dict at
+  runtime. The two guards are complementary, not redundant.
+- verify: `tests/test_ledger_unserializable_diagnosis.py` -- 19 tests. The live
+  shape is located by dotted path; an offender nested in a list is found; a
+  clean ledger reports nothing; disk/permission/other errors get no path; a
+  recursive ledger still yields its diagnosis rather than losing it to a
+  RecursionError; a shared subtree is not mistaken for a cycle; a hostile
+  `__repr__` cannot take down the handler; and end to end
+  `save_ledger_safe` returns False, logs the path, and leaves NO partial ledger.
+- **not yet proven on a live leg.** The running gate booted before this fix, so
+  its `public_domain` leg must be re-run. That re-run is owed anyway: that leg
+  was also corrupted by an unrelated harness fault (see below).
+- **harness fault, same leg, NOT a product defect:** the leg log also shows
+  `NameError: name 'describe_execution_error' is not defined` at
+  `scripts/otr_api.py:749`. That was self-inflicted -- `otr_api.py` was edited
+  between two edits while the gate was spawning subprocesses that import it, so
+  that leg imported a half-applied file. **Never edit a module mid-campaign when
+  legs import it per-subprocess.** The file is consistent now.
+- status: FIXED, pending a live re-run of the `public_domain` leg.
