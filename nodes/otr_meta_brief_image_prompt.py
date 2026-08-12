@@ -1221,9 +1221,7 @@ def derive_scene_still_targets(lines, fps: int = 25,
         # reaches video dispatch too late to repair safely.
         _add("music_opening_001", "scene_beat", "music_visual",
              "scene_open_pretiming")
-    if include_synthetic_closing and not any(
-            str(ln.get("speaker_role") or "").strip().lower() == "music_close"
-            for _bid, ln in _iter_beat_lines(lines)):
+    if include_synthetic_closing:
         # EpisodeAssembler mirrors the closing cue into ledger.lines after
         # this node has already produced image_prompts.  Reserve the same
         # deterministic line id that the assembler will mint so ShotLock's
@@ -1231,6 +1229,34 @@ def derive_scene_still_targets(lines, fps: int = 25,
         # This is intentionally optimistic like the synthetic opening target:
         # an unused still is cheap; a missing still reaches video dispatch too
         # late to repair safely.
+        #
+        # UNCONDITIONAL, exactly like the opening reservation above (live fix
+        # 2026-08-12). This used to read
+        # `not any(speaker_role == "music_close")`, which asks a DIFFERENT
+        # question than the one that matters: it suppressed the reservation
+        # whenever ANY closing cue existed, including the pre-audio sentinel
+        # carrying its AUTHORED id (`shot_006_music`). The assembler then
+        # mirrored that cue under its own deterministic id, and the still for
+        # THAT id had never been minted. `fastwan_8gb` died on it:
+        #
+        #   RenderError: still-spine handoff missing materialized scene still
+        #   for shot shot_music_closing_001 beat music_closing_001
+        #
+        # NO GUARD IS NEEDED AT ALL. `_add` already deduplicates by exact
+        # beat id through `seen`, so when the real `music_closing_001` line is
+        # present the ordinary per-beat loop has already claimed the id and
+        # this call is a no-op. An explicit scan would be a second copy of that
+        # policy, which is how the two branches drifted apart in the first
+        # place -- so the closing branch is now literally the opening branch's
+        # twin, and for the reason the opening one already gives.
+        #
+        # SCOPE, and it is the important half: this backstop can only ever
+        # cover `_001`. `EpisodeAssembler` mints one row per chunk
+        # (`music_{cue}_{NNN}`), so a multi-chunk closing produces `_002`,
+        # `_003`... which no reservation reaches. Those are covered because the
+        # image producer now reads ShotLock's POST-AUDIO ledger, where every
+        # minted mirror already exists and the ordinary loop sees them all.
+        # The wiring is the general fix; this is the single-chunk backstop.
         _add("music_closing_001", "scene_beat", "music_visual",
              "scene_close_pretiming")
     return targets, warnings

@@ -3567,23 +3567,72 @@ to revert.
   materialized scene still for shot shot_music_closing_001 beat
   music_closing_001 engine still_flat`. The writer, casting and the whole audio
   chain succeeded first (executed list includes nodes 1, 62, 63, 80-83).
-- root cause: NOT ESTABLISHED. The closing-music beat reached the still-spine
-  handoff without a materialized still. Five other banks on the SAME profile
-  produced one and published normally, so it is lane- or beat-topology-specific
-  rather than a profile defect.
-- fix: NONE YET. Recorded, not repaired.
-- verify idea: assert every beat the still-spine hands off has a materialized
-  still, naming the beat when one is missing -- the current message already
-  names it well, so the gap is a pre-handoff completeness check, not better
-  reporting.
-- bible-worthy: possibly. "A handoff consumed a per-beat artifact that was never
-  produced" is a portable shape. Hold until the root cause is known.
-- status: OPEN
+- **REPRODUCED 2026-08-12** on a NORMAL render, which is what the entry below
+  asked for: the `fastwan_8gb` leg of the 45-word every-visual-path sweep died
+  identically -- `still-spine handoff missing materialized scene still for shot
+  shot_music_closing_001 beat music_closing_001 engine fastwan_8gb`. Same beat,
+  same shot id, different engine and different bank. Not lane-specific.
+- **ROOT CAUSE, now established, and it is TWO layers.**
 
-**Seen once.** Recorded because it is a live production failure with a named
-node and a named beat, which the admission rule admits; but it has not been
-reproduced, and the ONE observation came from a diagnostic leg rather than a
-normal render. Re-run before treating the cause as understood.
+  **The general fault: the image producer was planning stills from the
+  PRE-AUDIO ledger.** `OTR_MetaBriefImagePromptGen` took its `script_json` from
+  `OTR_LedgerFreezeCascade`, which carries the closing cue under its AUTHORED id
+  (e.g. `shot_006_music`). `EpisodeAssembler` mints the real mirrors afterwards
+  as `music_{cue}_{NNN}` -- one row PER CHUNK -- and `OTR_ShotLock`'s overlay is
+  what forwards every validated mirror. So the producer was planning against
+  ids the finished episode does not use, and no scan of the pre-audio ledger can
+  recover ids that do not exist yet.
+
+  **The local fault: a reservation that suppressed itself.** A synthetic
+  `music_closing_001` backstop existed for exactly this case, but its guard read
+  `not any(speaker_role == "music_close")` -- so the PRE-AUDIO sentinel, under
+  its authored id, suppressed the reservation that was supposed to cover it.
+  The OPENING reservation directly above it is unconditional and says why: *"an
+  unused still costs one render; a missing one reaches video dispatch too late
+  to repair safely."* The two branches disagreed, and the closing one lost.
+
+- **fix: SHIPPED, both layers.**
+  1. **The general one.** Canonical link 255 retargeted so the image producer
+     reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json`
+     (`[255,62,1,89,0] -> [255,90,0,89,0]`). Every minted mirror -- `_001`,
+     `_002`, `_003` -- is then visible to the ordinary per-beat loop. **This is
+     the fix that scales**; a reservation can only ever name one id.
+  2. **The backstop.** The closing reservation is now UNCONDITIONAL, the twin of
+     the opening one. No guard is needed: `_add` already deduplicates by exact
+     beat id, so when the real line is present the ordinary row has claimed the
+     id and the call is a no-op. The explicit guard was a second copy of that
+     policy, which is how the branches drifted apart to begin with.
+- verify: `tests/test_canonical_still_spine_wiring.py` (6) pins the wiring by
+  NODE TYPE, because every one of the 95 still-spine helper tests and all 538
+  workflow tests passed both before and after the retarget -- the defect lived
+  where nothing was watching. `tests/test_still_spine_helpers.py` adds: a close
+  cue under ANOTHER id still earns the reservation (the live bug, inverted); the
+  ordinary row WINS when the real id is present, asserted on `source` rather
+  than a count, since a count cannot tell a reserved row from a deduplicated
+  one; and a MULTI-CHUNK closing is covered only via the post-audio ledger,
+  which pins the backstop's scope so nobody mistakes it for the general fix.
+  The still-plan parity fixture moved by exactly one thing across all 29
+  engines: `still_music_closing_001` now sits beside `still_music_opening_001`.
+- **NOT YET PROVEN ON A LIVE LEG.** A green suite and a regenerated parity
+  fixture prove static behaviour, not that the route publishes. The exact
+  canonical `fastwan_8gb` leg must be re-run and its final ledger's closing ids,
+  materialized still paths and published asset recorded before this is closed.
+- **OPEN, ADJACENT, FOUND BY THE SAME REVIEW** -- recorded here so they are not
+  lost, and NOT fixed in this change:
+  - `OTR_ShotLock._same_frozen_episode()` does NOT fail closed. An identity
+    mismatch logs a warning and returns the PRE-AUDIO ledger, and every overlay
+    exception is swallowed to the same fallback -- which silently restores the
+    exact input shape that caused this bug. The sprint lessons require a
+    post-audio identity mismatch to stop the join loudly.
+  - `OTR_ShotLock.IS_CHANGED` covers routing-environment state but NOT the
+    ledger it reads from disk, and `audio_done` carries duration metadata with
+    no content identity. So image planning now depends on a hidden disk read
+    that is absent from the dependency signature (Bug Bible 06.01).
+- bible-worthy: yes, once the live re-run lands -- but the portable shape is
+  sharper than first recorded. Not "a handoff consumed an artifact that was
+  never produced" but **"a producer planned against ids that a later stage
+  renames, and its own backstop keyed off the wrong field."**
+- status: ROOT CAUSE ESTABLISHED, FIX SHIPPED, awaiting the live re-run.
 
 ---
 

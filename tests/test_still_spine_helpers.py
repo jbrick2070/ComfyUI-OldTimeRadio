@@ -323,11 +323,87 @@ class TestSceneStillObjects:
         assert close["kind"] == "scene_beat"
         assert close["role"] == "music_visual"
 
-    def test_existing_close_line_is_not_duplicated(self):
+    def test_a_close_cue_under_ANOTHER_id_still_earns_the_reservation(self):
+        """THE LIVE BUG, inverted (2026-08-12, `fastwan_8gb`).
+
+        This test used to assert the OPPOSITE -- that an existing `music_close`
+        line under any id suppressed the `music_closing_001` reservation -- and
+        it passed, encoding the defect as correct behaviour. `_lines_timed()`'s
+        sentinel carries the close ROLE under the id `b005`, which is exactly
+        the pre-audio shape: the assembler later mirrors that cue under its own
+        deterministic id, and the still for THAT id was never minted:
+
+            RenderError: still-spine handoff missing materialized scene still
+            for shot shot_music_closing_001 beat music_closing_001
+
+        A close cue under a different id is precisely when the reservation is
+        NEEDED, not when it is redundant.
+        """
         from nodes import otr_meta_brief_image_prompt as mbp
+        lines = _lines_timed()
+        assert any(str(ln.get("speaker_role") or "") == "music_close"
+                   for _bid, ln in mbp._iter_beat_lines(lines)), (
+            "fixture drift: no close cue, so this proves nothing")
+        assert not any(bid == "music_closing_001"
+                       for bid, _ln in mbp._iter_beat_lines(lines))
+
         targets, _w = mbp.derive_scene_still_targets(
+            lines, include_synthetic_closing=True)
+        assert [row["beat_id"] for row in targets].count("music_closing_001") == 1
+
+    def test_the_ORDINARY_row_wins_when_the_real_id_is_present(self):
+        """When the mirrored line itself is there, the per-beat loop claims the
+        id and the reservation is a no-op via `_add`'s dedup.
+
+        ASSERTS THE SOURCE, not just the count. A count of 1 cannot tell an
+        ordinary row from a reserved one -- `_add` deduplicates by beat id, so
+        either path yields exactly one row and the test would pass while the
+        wrong one won. The ordinary row carries the role map as its source; the
+        backstop carries `scene_close_pretiming`.
+        """
+        from nodes import otr_meta_brief_image_prompt as mbp
+        lines = list(_lines_timed())
+        lines.append({"line_id": "music_closing_001", "speaker_role": "music_close",
+                      "start_s": 60.0, "dur_s": 3.0, "text": "theme out"})
+        targets, _w = mbp.derive_scene_still_targets(
+            lines, include_synthetic_closing=True)
+        rows = [r for r in targets if r["beat_id"] == "music_closing_001"]
+        assert len(rows) == 1
+        assert rows[0]["source"] != "scene_close_pretiming", (
+            "the reservation won over the real line -- the ordinary per-beat "
+            "row should have claimed the id first")
+
+    def test_a_MULTI_CHUNK_closing_needs_the_post_audio_ledger(self):
+        """THE SCOPE OF THE BACKSTOP, pinned so nobody mistakes it for general.
+
+        `EpisodeAssembler` mints one row per chunk (`music_{cue}_{NNN}`), so a
+        long closing cue becomes `music_closing_001`, `_002`, `_003`. The
+        reservation can only ever name `_001`. Those later chunks are covered
+        ONLY because the image producer reads ShotLock's POST-AUDIO ledger,
+        where every minted mirror already exists -- which is why the canonical
+        link 255 retarget is the general fix and this reservation is the
+        single-chunk backstop.
+        """
+        from nodes import otr_meta_brief_image_prompt as mbp
+        # Pre-audio: no mirrors yet. Only _001 is reserved; _002 is unreachable.
+        pre, _w = mbp.derive_scene_still_targets(
             _lines_timed(), include_synthetic_closing=True)
-        assert [row["beat_id"] for row in targets].count("music_closing_001") == 0
+        ids = [r["beat_id"] for r in pre]
+        assert "music_closing_001" in ids
+        assert "music_closing_002" not in ids
+
+        # Post-audio: the assembler's rows are present, so the ordinary loop
+        # covers every chunk without any reservation being involved.
+        lines = list(_lines_timed())
+        for chunk in (1, 2, 3):
+            lines.append({"line_id": "music_closing_%03d" % chunk,
+                          "speaker_role": "music_close",
+                          "start_s": 60.0 + chunk, "dur_s": 1.0, "text": ""})
+        post, _w = mbp.derive_scene_still_targets(
+            lines, include_synthetic_closing=True)
+        post_ids = [r["beat_id"] for r in post]
+        for chunk in (1, 2, 3):
+            assert "music_closing_%03d" % chunk in post_ids, chunk
 
     def test_image_producer_reserves_future_opening_music_target(self):
         """The mirror of the closing reservation, and the live bug that proved
