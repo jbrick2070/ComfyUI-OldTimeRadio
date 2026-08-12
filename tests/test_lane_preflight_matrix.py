@@ -291,7 +291,7 @@ _CHEAP_LANE_OWNERS = {
 _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
-    if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu"):
+    if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu", "viz_mxc_mandala"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -314,9 +314,14 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         # scanline/vignette/font tables are all request-derived). Declaring
         # would have been worst on THIS lane: its stated purpose is running on
         # ANY box, and a pinned canvas is the opposite of portable.
-        # viz_mxc_mandala is NOT covered by any of the three and keeps both
-        # rows -- lane 14 must re-check its own path, since that lane is the
-        # one with a NAMED pycairo dependency and could differ.
+        # LANE 14 CLOSED 2026-08-11 -- viz_mxc_mandala's two rows left last, and
+        # it was the one genuinely worth suspecting: the only visualizer with a
+        # NAMED external dependency, painting through a graphics library rather
+        # than numpy. Re-checked anyway and the premise held (an ImageSurface is
+        # whatever size you ask for). ALL FOUR VISUALIZERS ARE NOW CLOSED, and
+        # every one of them closed by declaring the profile canvas channel INERT
+        # rather than by declaring a canvas -- if a future procedural lane finds
+        # itself wanting to declare one, that is the anomaly, not the default.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -505,6 +510,16 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "is the tier whose stated purpose is running on ANY box, so pinning a "
         "canvas here would be the opposite of what it is for. "
         "Lane 13, 2026-08-11."),
+    "viz_mxc_mandala": (
+        "INERT, and this was the visualizer most likely to have needed a real "
+        "declaration -- the only one with a NAMED external dependency, painting "
+        "through a graphics library rather than numpy -- so the premise was "
+        "re-checked with more suspicion, not less. It holds: render_clip "
+        "allocates cairo.ImageSurface(FORMAT_ARGB32, w, h) from the request's "
+        "own dimensions, paint_mandala(ctx, w, h, ...) and "
+        "mandala_surface_to_rgb take the same pair, and so do the scanline and "
+        "vignette tables and the encoder. Cairo imposes no canvas of its own -- "
+        "an ImageSurface is whatever size you ask for. Lane 14, 2026-08-11."),
 }
 
 

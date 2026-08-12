@@ -1364,6 +1364,48 @@ could never have caught this is stated in the test itself.
 
 ---
 
+## Lane 14 -- `viz_mxc_mandala`, closed 2026-08-11 -- AND THE FAMILY IS CLOSED
+
+The last visualizer. **All four closed the same way: profile canvas channel
+INERT, continuity declared per lane.** Four separate one-line contract fixes in
+four modules, because this family shares no base -- lane 10's `_CheapFamilyBase`
+fix reached the still shelf instead.
+
+**What bit (1): the lane that LOOKED stateful and was not.** This is the only
+visualizer that reuses a drawing context across frames -- one
+`cairo.ImageSurface` + `Context` allocated before the loop. That reads exactly
+like carried state, and carried state is what `CONTINUITY_NONE` would be lying
+about. It is not: `paint_mandala` repaints the full field every frame from that
+frame's own audio analysis, and nothing reads a predecessor frame's PIXELS. The
+reuse is an allocation optimisation.
+
+**Runnable check:** when a render loop hoists an object out of the frame loop,
+ask whether the loop READS it or only WRITES it. A reused buffer that is fully
+overwritten each iteration carries no continuity; one that is read before being
+written does, and then `CONTINUITY_NONE` would be a false declaration.
+
+**What bit (2): the assigned defect was already fixed, and saying so is the
+work.** The corpus assigns this lane "the pycairo half of S8b-16 (a NAMED
+dependency refusal)". It was already in `assert_usable` AND `load()`, with
+separate messages for cairo and ffmpeg, and already covered by a test that
+forces the ImportError via `monkeypatch.setitem(sys.modules, "cairo", None)` so
+it runs even where pycairo IS installed. The lane's job there was to VERIFY and
+record it as already-green -- not to rebuild it, and not to claim it.
+
+**Runnable check:** before implementing a defect a corpus assigns you, run its
+own acceptance check first. A spec written weeks earlier may describe a hole
+someone has since filled, and re-implementing it is how a second, divergent
+copy of a guard gets born.
+
+**What did NOT bite:** L19 held again even here -- an `ImageSurface` is whatever
+size you ask for, so a graphics library imposes no canvas. That was the last
+plausible candidate for a procedural lane with a native canvas, which is why the
+family's four-for-four record is now a useful default: **if a future procedural
+lane wants to declare a canvas, that is the anomaly and it owes the L19 argument
+explicitly.**
+
+---
+
 ## Lane 13 -- `viz_mxc_cpu`, closed 2026-08-11
 
 **Nothing new bit.** Third visualizer, same two answers, premise re-derived

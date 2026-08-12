@@ -36,8 +36,8 @@ import logging
 import os
 
 from . import motion_common as _MC
+from .frame_contract import CONTINUITY_NONE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
-from .frame_contract import FrameContract
 
 _LOG = logging.getLogger("OTR.video.viz_mxc_mandala")
 
@@ -62,6 +62,23 @@ class VizMxcMandalaEngine:
     #: non-audio slot never triggers an image model (the operator's z_image complaint).
     accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch
+    #: NO ``render_canvas`` DECLARATION, deliberately (lane 14, 2026-08-11 --
+    #: lesson L19). This is the visualizer most likely to have needed one, since
+    #: it is the only lane in the family with a NAMED external dependency and it
+    #: paints through a real graphics library rather than numpy -- so the premise
+    #: was re-checked here with more suspicion than on lanes 11-13, not less.
+    #: It holds: ``render_clip`` allocates the surface as
+    #: ``cairo.ImageSurface(FORMAT_ARGB32, w, h)`` from the request's own
+    #: dimensions, ``paint_mandala(ctx, w, h, ...)`` lays the mandala out from
+    #: the same pair, the scanline/vignette tables and ``mandala_surface_to_rgb``
+    #: take them too, and the encoder is handed them last. Cairo imposes no
+    #: canvas of its own -- an ImageSurface is whatever size you ask for.
+    #:
+    #: So the 1472x832 an episode hands this lane is ``OTR_VIDEO_LANDSCAPE_CANVAS``'s
+    #: default -- an operator lever -- and declaring would overrule it for this
+    #: lane alone, because ``declared_render_canvas`` is applied LAST. The
+    #: profile canvas channel is declared INERT instead, in
+    #: ``test_lane_preflight_matrix.PROFILE_CANVAS_DOCUMENTED_DEAD``.
     #: S1 (2026-07-25) per-model still plan (spec section 3, Shape C --
     #: "nothing"). Empty tuple = EXPLICIT "needs no images"; a missing
     #: ``still_plan`` would be UNKNOWN and fail closed by the S1 audit.
@@ -73,12 +90,23 @@ class VizMxcMandalaEngine:
     #: is no ceiling and no split. CONTINUITY none: nothing here consumes a
     #: supplied first frame, which is exactly why these beats may jump cut
     #: without owing the image phase a still at all.
+    #:
+    #: ``continuity=`` IS PASSED (lane 14, 2026-08-11 -- lesson L3), closing the
+    #: last of the four visualizers. The sentence above had claimed "CONTINUITY
+    #: none" since this engine was written while the keyword was never passed,
+    #: so the value was a dataclass DEFAULT. True here for a reason worth
+    #: stating precisely, because this lane LOOKS stateful and is not: the cairo
+    #: surface and context ARE reused across frames for allocation reasons, but
+    #: ``paint_mandala`` repaints the full field every frame from that frame's
+    #: own audio analysis, and nothing reads a predecessor frame's PIXELS. So
+    #: there is no terminal state a successor segment could inherit.
     frame_contract = FrameContract(
         min_frames=1,
         max_frames=0,
         quantum=1,
         native_fps=25,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     engine_version = "1"
     fallback_engine = None              # NO FALLBACKS: a failed beat fails LOUD

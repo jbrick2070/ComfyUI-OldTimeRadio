@@ -75,6 +75,92 @@ def test_engine_family_map():
     assert rd.engine_family(NAME) == "abstract"
 
 
+def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
+    """G3.3 / lesson L3 (lane 14, 2026-08-11) -- the last of the four.
+
+    The class comment had claimed "CONTINUITY none" since this engine was
+    written while `continuity=` was never passed, so the value was a dataclass
+    DEFAULT -- the right answer nobody had decided.
+
+    NONE is true here for a reason worth stating precisely, because this lane
+    LOOKS stateful and is not: the cairo surface and context ARE reused across
+    frames (for allocation reasons), but `paint_mandala` repaints the full field
+    every frame from that frame's own audio analysis and nothing reads a
+    predecessor frame's PIXELS. So no terminal state exists to inherit.
+
+    Cairo-free: reads the declaration and the AST, never imports the library.
+    """
+    import inspect
+
+    from nodes._otr_video_engines import frame_contract as fcm
+    from nodes._otr_video_engines.eng_viz_mandala import VizMxcMandalaEngine
+
+    eng = vreg.get_engine(NAME)
+    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
+    # DECLARED, not defaulted -- AST, not source TEXT (lesson L20: the comment
+    # above the declaration contains the same literal, so a substring check
+    # would pass with the real keyword deleted; and the resolved VALUE cannot
+    # catch it either, because the dataclass default is the same constant).
+    assert fcm.declares_continuity_kwarg(eng)
+    render_src = inspect.getsource(VizMxcMandalaEngine.render_clip)
+    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
+                                 "continuity_frame"):
+        assert consumes_predecessor not in render_src
+
+
+def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
+    """G2 / lesson L19 (lane 14, 2026-08-11), premise re-checked with suspicion.
+
+    This is the visualizer most likely to have needed a real canvas: the only
+    one with a NAMED external dependency, painting through a graphics library
+    rather than numpy. It still has no native canvas -- `render_clip` allocates
+    `cairo.ImageSurface(FORMAT_ARGB32, w, h)` from the request's own dimensions,
+    `paint_mandala(ctx, w, h, ...)` and `mandala_surface_to_rgb` take the same
+    pair, and so do the scanline/vignette tables and the encoder. Cairo imposes
+    no canvas of its own.
+
+    So the 1472x832 an episode hands it is `OTR_VIDEO_LANDSCAPE_CANVAS`'s
+    default -- an operator lever -- and declaring would overrule it for this
+    lane alone.
+
+    Cairo-free by construction: `_canvas_dims` is a pure request read.
+    """
+    from nodes._otr_video_engines.eng_viz_mandala import VizMxcMandalaEngine
+
+    eng = vreg.get_engine(NAME)
+    assert getattr(eng, "render_canvas", None) is None
+    assert rd.declared_render_canvas(NAME) is None
+    for size in ((1472, 832), (832, 480), (640, 384), (1024, 576)):
+        got = VizMxcMandalaEngine()._canvas_dims(
+            {"canvas": {"w": size[0], "h": size[1], "fps": 25}})
+        assert got == size
+
+
+def test_the_landscape_lever_still_reaches_this_lane(monkeypatch):
+    """The half that would otherwise rot silently: if a future change declares
+    a canvas here, this is the test that says what it cost."""
+    ledger = {
+        "episode_id": "ep_lane14",
+        "images": {"images": [{"beat_id": "b001", "kind": "scene_beat",
+                               "path": "C:/tmp/scene_b001.png"}]},
+        "video": {"fps": 25, "canonical_canvas": None,
+                  "shots": [{"shot_id": "shot_b001", "role": "music_visual",
+                             "group_id": "grp_music_visual",
+                             "engine_id": NAME, "family": "",
+                             "target_frame_count": 25}]},
+    }
+    shot = ledger["video"]["shots"][0]
+
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)
+
+    monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "1024x576")
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1024, 576), (
+        "the operator's landscape lever no longer reaches viz_mxc_mandala -- if "
+        "a render_canvas declaration was added, that is what it cost")
+
+
 def test_cold_import_no_heavy_libs():
     code = (
         "import sys;"
