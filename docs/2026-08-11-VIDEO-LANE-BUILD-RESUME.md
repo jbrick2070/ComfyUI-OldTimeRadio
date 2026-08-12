@@ -5,10 +5,16 @@ Everything else you need is linked from those two.
 
 ## Where it stands
 
-**9 of 21 lane packets confirmed working and pushed, covering 9 distinct
-engines across 16 live legs. Lane 10 (`mesh_stage`) is NEXT and is the most
-defective lane left -- 4 red gates. Nothing is in flight; the working tree
-carries only other windows' files.**
+**18 of 21 lane packets confirmed working and pushed. Lane 19
+(`h3_low_video` / `minimax_h3_video`) is NEXT, and it is the first NEW-ENGINE
+packet -- lanes 10-18 repaired lanes that already existed. Nothing is in
+flight; the working tree carries only other windows' files.**
+
+**THE WHOLE CHEAP SHELF IS GREEN** (lanes 11-18: four visualizers, four still
+families). All eight closed G2 by declaring their profile canvas channel INERT
+rather than by declaring a canvas -- see **L19**, and treat a declaration on a
+procedural lane as the anomaly that owes an argument. All four still families
+now REFUSE a missing still instead of painting a black beat.
 
 | # | Lane | State |
 |---|---|---|
@@ -24,8 +30,27 @@ carries only other windows' files.**
 | 8 | `ltx098_low_video` (`ltx_8gb`) | DONE `c6a99764` -- live 512x288 f161 |
 | 9 | `ltx23_high_video` (`ltx_video`) | DONE -- both legs run; floor 169 -> 9 |
 | 9b | `ltx_video` headroom | **OPEN** -- no diet boot ever tried, no headroom at f169 |
-| 10-21 | mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
+| 10 | `mesh_stage` | DONE `8e1f02bf` -- 4 red gates closed; the lane was DEAD on this box (L1) |
+| 11 | `viz_green` | DONE `28b4e1b5` -- a canvas declaration REVERTED after a Codex consult (L19) |
+| 12 | `viz_camera` | DONE `8699fe29` -- + the G3 gate its own docs had disabled (L20) |
+| 13 | `viz_mxc_cpu` | DONE `f44993de` |
+| 14 | `viz_mxc_mandala` | DONE `eb3f8412` -- visualizer family closed |
+| 15 | `still_motion` | DONE `95b6b8ca` -- **the black-beat defect** closed (L21) |
+| 16 | `still_pan` | DONE `fc7812dd` |
+| 17 | `still_flat` | DONE `b79af369` -- still shelf closed; the floor is now an unoccupied control (L22) |
+| 18 | `still_word` | DONE -- verification lane; **the whole cheap shelf is green** |
+| 19-21 | the H3 trio (two adapters + the standalone mime runner) | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
+
+**Baselines at the lane-18 wrap:** full suite **9985 passed / 109 skipped /
+1 xfailed**, nothing deselected; Bug Bible **20/24/3 at 272**;
+`build_variants.py --check` **0 failures** (its "46 variants" count is
+workstation-dependent -- `git ls-files` counts 45; compare the FAILURES, not
+the count). Box left clean.
+
+**Two things wait on the OPERATOR, neither blocking:** the leaked
+`otr_sbcov_*` variants that make `--check` crash on a fresh clone, and that
+variant-count caveat. Both are written up in `docs/GO_FORWARD_PLAN.md`.
 
 ## THREE THINGS LANE 7 CHANGED FOR EVERY LANE AFTER IT
 

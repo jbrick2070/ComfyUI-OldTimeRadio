@@ -1458,6 +1458,55 @@ and `::test_the_synthesised_floor_STILL_WORKS_for_a_uses_still_False_family`.
 
 ---
 
+## Lane 18 -- `still_word`, closed 2026-08-11 -- AND THE CHEAP SHELF IS FINISHED
+
+Two of this lane's three assigned items were already closed. The lane's value
+was finding that out FIRST and then making it hold.
+
+**What paid off: lane 14's rule, applied a second time.** The corpus assigned
+"preserve the missing-still refusal, add/verify the ffmpeg contract". Running
+the acceptance check before writing anything showed both were done -- the
+refusal since Sprint B (this family was FIRST), the ffmpeg gate inherited from
+lane 15's shared-base fix. Nothing was implemented.
+
+**But "already done" is only safe once something holds it that way.** Before
+this lane, `still_word` had NO test asserting the ffmpeg gate -- it was
+inherited behaviour nobody checked here. The lane's deliverable is therefore the
+acceptance check itself, kept as a test on the lane that owns the contracts, and
+exercising both (firing the refusal through `render_clip`, firing the gate with
+`find_ffmpeg` stubbed empty) rather than reading flags.
+
+**Runnable check:** when a packet turns out to be already-done, ask what would
+tell you if it stopped being done. If the answer is "nothing on this lane",
+the packet's real work is the test, not the fix.
+
+**The evidence trick that paid off three lanes running -- a builder partition.**
+All four still lanes were smoked from the same still at the same canvas and
+frame count:
+
+| lanes | builder | sha256 (16) |
+|---|---|---|
+| 15, 16 | `ffmpeg_still_motion_cmd` (cover+crop) | `3692f155b93b5f87` |
+| 17, 18 | `ffmpeg_still_static_cmd` (fit+pad) | `56d48f215d58868c` |
+
+Two builders, two digests, exactly partitioned. Every one of those lanes' G2
+arguments rests on "these lanes share a render path and that path has no native
+canvas" -- now demonstrated in BOTH directions (shared paths match, distinct
+paths differ) instead of asserted. It cost nothing; the renders already existed.
+
+**Runnable check:** when several lanes' reasoning depends on them sharing (or
+not sharing) a code path, hash their artifacts from identical inputs. A claim
+that predicts both a match and a mismatch is falsifiable; one that predicts only
+matches is not.
+
+**The shelf-wide finding, worth stating once:** eight cheap lanes, eight INERT
+G2 rows. Not one of them has a native canvas, and every one would have lost the
+`OTR_VIDEO_LANDSCAPE_CANVAS` operator lever by declaring one. That makes INERT
+the DEFAULT for a procedural/CPU lane and a declaration the anomaly -- a future
+lane that wants to declare owes the L19 argument explicitly.
+
+---
+
 ## Lane 17 -- `still_flat`, closed 2026-08-11 -- AND THE STILL SHELF IS FINISHED
 
 Third still lane; all four families now refuse a missing still. Its own lesson

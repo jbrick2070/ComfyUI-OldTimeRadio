@@ -85,6 +85,45 @@ _META = {"episode_title": "The Signal From Deck Nine",
                                "lighting": ["moody"]}}
 
 
+def test_lane_18s_two_assigned_defects_were_ALREADY_CLOSED(monkeypatch):
+    """Lane 18 (2026-08-11) -- VERIFICATION, not implementation.
+
+    The corpus assigns this lane "preserve its existing missing-still refusal,
+    add/verify the ffmpeg and single-authority contract". Both were already
+    done when the packet opened, and lane 14's rule is to RUN THE ACCEPTANCE
+    CHECK before implementing an assigned defect -- a spec written weeks earlier
+    may describe a hole someone has since filled, and re-implementing is how a
+    second, divergent copy of a guard gets born.
+
+    So this test IS the acceptance check, kept so the two contracts cannot
+    quietly regress on the lane that owns them:
+
+      * the missing-still refusal -- Sprint B, 2026-07-03 (this family was
+        FIRST; lanes 15-17 followed);
+      * the ffmpeg PREFLIGHT gate -- inherited from lane 15's shared-base fix,
+        so a missing encoder refuses before the writer/TTS/stills are paid for.
+    """
+    from nodes._otr_shared import scope_draw as sd
+    from nodes._otr_video_engines import registry as vreg
+
+    eng = vreg.get_engine("still_word")
+
+    # 1. the missing-still refusal, exercised rather than read off the flag
+    assert eng._require_still is True
+    with pytest.raises(RuntimeError) as exc:
+        eng.render_clip({"shot_id": "s1", "canvas": {"w": 96, "h": 64, "fps": 25},
+                         "timing": {"target_frame_count": 6},
+                         "text_prompt": "a word card"}, None)
+    assert "still_word" in str(exc.value)
+    assert "image phase" in str(exc.value).lower()
+
+    # 2. the ffmpeg preflight gate
+    monkeypatch.setattr(sd, "find_ffmpeg", lambda *a, **k: "")
+    with pytest.raises(vreg.EngineUnusable) as gate:
+        eng.assert_usable(host_caps={}, profile={})
+    assert "ffmpeg" in str(gate.value) and "still_word" in str(gate.value)
+
+
 def test_word_mode_renders_the_spoken_line():
     out = ip.compose_still_word_prompt(_META, "character_video",
                                        "We have to go back.")

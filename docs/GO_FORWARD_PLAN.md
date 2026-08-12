@@ -52,21 +52,25 @@ item, close its ROW in the same push.**
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
 **WINDOW HANDOFF 2026-08-11 (lane-15 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **17 of 21 packets**
-confirmed working and pushed; **lane 18 (`still_word`) is NEXT and is mostly
-VERIFICATION.**
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **18 of 21 packets**
+confirmed working and pushed; **lane 19 (`h3_low_video` / `minimax_h3_video`)
+is NEXT -- and it is a DIFFERENT KIND OF LANE from everything lanes 10-18 did.**
 
-**The still shelf is finished except for one G2 row.** All four families now
-refuse a missing still (`still_word` was first in Sprint B; lanes 15-17 gave the
-other three the same refusal, one lane at a time on its own evidence), and the
-ffmpeg PREFLIGHT gate is on the shared base so all four have it. The synthesised
-dark floor now has NO registered occupant and is kept deliberately as a control
-for a future `uses_still = False` family, with both halves asserted (**L22**).
+**THE WHOLE CHEAP SHELF IS GREEN** -- four visualizers, four still families,
+8/8 with INERT G2 rows and declared continuity. All four still families refuse
+a missing still, the ffmpeg gate is at preflight on the shared base, and the
+synthesised dark floor is kept as a control with no occupant (**L22**), asserted
+both ways.
 
-**So lane 18 owns exactly one thing: `still_word`'s G2 row**, the last red gate
-on this shelf. Its two assigned defects are already closed -- verify them (lane
-14's rule) rather than rebuilding them. After that the remaining queue is lanes
-19-21 (the H3 lanes and the standalone mime runner) and the row-22 episode gate. Baselines to
+**Lanes 19-21 are NEW ENGINE work, not repairs.** Lanes 10-18 fixed lanes that
+already existed; 19 and 20 ADD the two MiniMax H3 adapters (one shared
+implementation module, two registrations, two public ids) and 21 is a
+standalone `h3_low_mime` runner that is NOT registered this build. Read
+`docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md` section 1 for the full H3 spec
+before starting -- it is the largest surface in the campaign and the corpus
+explicitly put it LAST so it inherits every lesson. Nothing on this shelf's
+lessons transfers automatically: H3 has a real frame grid (124..362 step 17), a
+24->25 fps conversion, a Sage gate and a mouth-policy carve-out. Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -179,7 +183,7 @@ written), `TODO`.
 | 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **DONE** -- 7/7 green, two live smoke legs (a render AND the refusal firing). Closed the **black-beat defect** (`_require_still`, scoped to this lane) and put the ffmpeg gate at PREFLIGHT on the shared base, which **all four still lanes inherit**. Receipt: `docs/evidence/lane_receipts/lane15-still_motion.md` |
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only | **DONE** -- 7/7 green, two live smoke legs (render + refusal). Took the `_require_still` call lane 15 left open, on its own evidence. Still HOLDS the "declares NOTHING" canvas control (it declared nothing). Receipt: `docs/evidence/lane_receipts/lane16-still_pan.md` |
 | 17 | `still_flat` | same checklist independently | **DONE** -- 7/7 green, two live smoke legs. Took the refusal too, so **ALL FOUR still families now refuse a missing still**. Premise re-checked on a THIRD builder (`ffmpeg_still_static_cmd`, fit+pad). The dark-floor branch is KEPT as a control with no occupant (lesson **L22** -- lane 16's "delete it" instruction was REVISED), with both halves asserted. Receipt: `docs/evidence/lane_receipts/lane17-still_flat.md` |
-| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO -- **both halves are already DONE for you**: it always had `_require_still = True` (it was FIRST, Sprint B 2026-07-03) and the ffmpeg preflight gate arrived with lane 15's base fix. So VERIFY rather than rebuild (lane 14's rule: run the acceptance check before implementing an assigned defect), then close **G2, the last red gate on this shelf** -- it will almost certainly be INERT like the other three, but this lane renders through `ffmpeg_still_static_cmd` like `still_flat`, so say which builder you checked |
+| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | **DONE** -- 7/7 green, two live smoke legs. Two of its three items were ALREADY closed (Sprint B's refusal; lane 15's inherited ffmpeg gate) and were verified rather than rebuilt -- the lane's deliverable is the acceptance check, since nothing had asserted the gate on this lane before. **THE WHOLE CHEAP SHELF IS NOW GREEN.** Receipt: `docs/evidence/lane_receipts/lane18-still_word.md` |
 | 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
