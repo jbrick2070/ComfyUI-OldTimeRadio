@@ -3,6 +3,77 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-12 -- HEAD ae76fb3f (v2.0-alpha) -- CODER (the 45-word sweep found four defects, none of them video)
+
+Did: ran the operator's 45-word every-visual-path sweep and spent the day on
+what it found. **8 of 21 legs PASS, 3 FAIL, 10 never run** -- and NOT ONE of the
+three failures was a video defect. `still_flat` and `viz_green` had died in the
+WRITER before any video work; both now PASS live (18.7 min / 11.0 min, real
+coverage, 10 and 13 clips), which is the live proof for PBUG-20260812-02 and -03.
+`fastwan_8gb` is the only genuine render failure and reproduced the OPEN
+still-spine PBUG-20260811-02.
+  WRITER: `9d03cba9` PBUG-02 -- `CastShape.register` collided with a metaclass
+  attribute, so pydantic adopted it as the field DEFAULT: a required field went
+  silently optional, **the JSON schema handed to the writer stopped requiring
+  it**, and an omitted value reached the prompt as a bound-method repr. Swept all
+  92 pydantic models; it was the only offender. `3a5cf77f` PBUG-03 stage-direction
+  repair note. `39b29d0f` PBUG-04 -- a live `VisualStyleCardModel` rode
+  `meta.update()` into the ledger; plus `describe_execution_error`, replacing a
+  `str(messages)[:500]` truncation that cut mid-traceback and had cost the
+  diagnosis of BOTH writer failures.
+  `2572b493` -- **the repair ladder never sent the rejected draft back.** The
+  retry ordered the model to keep the same wording about a text it had never
+  been shown, so every attempt after the first was a cold regeneration; that is
+  why four attempts produced four DIFFERENT shapes. The module's own docstring
+  proved the intent: it decays to 0.30 and calls that rung "repeats 0.30 WITH THE
+  DEFECT QUOTE". `45d1d3f8` -- the one-shot `format_example` path was DEAD CODE.
+  `8a7a4d62` -- fix B silently ate part of fix A's budget.
+  STILL-SPINE: `3446af3f` + `ae76fb3f` -- canonical link 255 retargeted so the
+  image producer reads ShotLock's POST-AUDIO ledger (23 nodes / 56 links
+  unchanged, acyclic, `validate_canonical_workflow` OK, 50 variants regenerated,
+  4 `.env.json` master_hash re-stamped, ONE-line JSON diff), and both music
+  reservations made unconditional.
+  ALSO: `98fb258f` num_characters is a REQUEST not a cap (all banks);
+  `bf1d02a1` a cross-bank writer gate; `f9b51675` the sweep can pin its bank;
+  `61ae356c` required ledger saves refuse instead of continuing silently.
+  Suite **10281 passed / 110 skipped / 1 xfailed**, nothing deselected.
+  Bug Bible **20/24/3** at survival-guide `69ee6b2`, **273 entries** (promoted
+  **12.97**, index 386 rows). `build_variants --check` 50 variants, 0 failures.
+  Box CLEAN: no server, port 8000 clear, VRAM 1510 MiB.
+
+Current step: the 45-word render gate is the one open queue item, STOPPED at
+8/21 by choice -- five of the remaining legs need a scene still and would have
+reproduced the still-spine defect. The still-spine repair is a CANDIDATE UNDER
+QA, explicitly not shipped: it needs a canonical `fastwan_8gb` leg with
+60-second opening AND closing cues, because `_MUSIC_MAX_CHUNK_DUR_S = 22.0`
+makes that THREE chunks and the original short cue never exercised the chunked
+path.
+
+Next: reset + boot per CLAUDE.md 4/5 and restart the sweep from `ltx_video`
+(ten incumbent legs), then reboot with `OTR_HEADLESS_RESERVE_VRAM_GB=12` +
+`OTR_HEADLESS_DISABLE_PINNED=1` for the H3 pair. Then the highest-value open
+item: **verify whether `compose_line_draft` really never sends the rejected line
+back** -- if it does not, that is fix A's exact defect in the writer FIVE banks
+share, where today's work touched only `scifi_news_pro`. Blocked on nobody.
+LEMMY IS GATED behind this: the operator will hand it to the window that coded
+it once the story fixes AND all sweeps are done.
+
+Models: Opus 5 drove and judged. Sonnet 5 ran post-coding QA on every diff --
+it caught a live SyntaxError I had just written, a budget guard that dropped the
+draft for exactly the full-length episodes it claimed to serve, and it verified
+all 158 parity cells I had only sampled. Full `kibitz-plugin:kibitz` arcs ran on
+the writer (r1, Fable cold -> driver -> Codex -> Antigravity -> judged) and on
+candidate retirement (r2). **Two SCOPED tails, not full four-round arcs**, with
+scope receipts: `kibitz-runs/2026-08-12-writer-stage-direction-note/r2/` and
+`2026-08-12-api-workflow-qa/r3/`. The Antigravity lane produced NO review twice
+(tool-call narration only) and is reported as such, not as a two-lane panel.
+Three reviewers each overturned something I asserted: the architecture direction
+on the still-spine, a parity claim I had only sampled, and an opening-branch
+symmetry I invented and then cited as proof my fix was right.
+Commits: 3a5cf77f, 9d03cba9, bf1d02a1, 39b29d0f, 98fb258f, 75aa147d, 2572b493,
+736c2eb5, 45d1d3f8, 1eba7ab3, 8a7a4d62, f9b51675, 61ae356c, b0408688, 312bdc24,
+17850c35, 3446af3f, ae76fb3f (+ survival-guide 69ee6b2).
+
 ## 2026-08-11 -- HEAD 18de7131 (v2.0-alpha) -- CODER (video lanes 10-18 closed: mesh_stage + the whole cheap shelf; lane 19 diagnosed)
 
 Did: nine lane packets closed green and pushed, one per commit, each with a

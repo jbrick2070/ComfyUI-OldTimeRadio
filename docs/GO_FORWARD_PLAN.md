@@ -193,87 +193,160 @@ written), `TODO`.
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | **DONE** -- `scripts/otr_h3_mime_runner.py`, live run PASS: 864x480, model f90 = **3.750 s exactly at the model's own 24 fps**, and **`nb_streams=2` -- one video plus ONE audio stream**, the inversion this lane exists for. Lossless FLAC score stem from the same decode, plus a ducked voice-over review copy with the picture COPIED not re-encoded; both originals preserved. Registers nothing, and the test asserts that from both sides. **Three live API-boundary failures before the pass** (input dir, DynamicCombo serialization, the `/history` key that says `images` for an mp4) -- all three invisible to a CPU test, recorded as **L27**. Receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. **One operator ruling owed:** CLAUDE.md 0A says "no other runner" and should be amended to name this script |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | **THREE OF FOUR MET 2026-08-12.** The preflight matrix is **29 engines x 7 gates with ZERO non-green cells and ZERO `EXPECTED_RED` entries** -- the table is empty for the first time since it was written. All **21 lane receipts** are present in `docs/evidence/lane_receipts/`. The last expected-red (`google_omni_video` G3) was closed here rather than left: it was the one lane the 21-lane transplant deliberately did not own, and row 22's own contract is what brought it in. Its comment had reasoned "CONTINUITY none" since the lane was written while the call inherited the default -- L3 exactly, and one keyword to fix. **REMAINING: the render gate, and the operator SUPERSEDED it** -- "we need a 45 word render of every visual path" (2026-08-12) replaces "ONE end-to-end episode". That sweep is the last thing in the queue |
 
-### THE 45-WORD RENDER GATE -- THE ONE OPEN ITEM (live status 2026-08-12)
+### THE 45-WORD RENDER GATE -- THE OPEN ITEM (live status 2026-08-12, sweep STOPPED)
 
-Operator acceptance gate, superseding row 22's single end-to-end episode:
-**"we need a 45 word render of every visual path"**. Runner:
-`scripts/otr_w45_campaign.py`. Roster is 21 legs -- 19 incumbent lanes on one
-boot, then `minimax_h3_video` + `minimax_h3_audio_in` on a SECOND boot, because
-both REQUIRE the `h3` contract's `--reserve-vram 12`, which would starve
-`wan_i2v` and the HuMo tiers on a shared server.
+Operator acceptance gate: a 45-word render of EVERY visual path. Runner
+`scripts/otr_w45_campaign.py`, 21 legs -- 19 incumbent lanes on one boot, then
+`minimax_h3_video` + `minimax_h3_audio_in` on a SECOND boot with
+`--reserve-vram 12` (they would starve `wan_i2v` and the HuMo tiers on a shared
+server). Results in `tmp/_w45_results.json`; run 1 preserved at
+`tmp/_w45_results_run1_20260812.json`.
 
-**5 of 21 passed. 16 remain.** Full results: `tmp/_w45_results.json`.
+**8 PASS, 3 FAIL, 10 NEVER RUN.** The sweep was STOPPED deliberately, mid-run,
+to fix a defect that would otherwise have consumed five of the remaining legs.
 
 | verdict | legs |
 |---------|------|
-| PASS | still_pan, still_motion, still_word, viz_camera, viz_mxc_cpu |
-| FAIL, fixed, re-run owed | still_flat (PBUG-20260812-02), viz_green (PBUG-20260812-03) |
-| never run | viz_mxc_mandala, mesh_stage, ltx_8gb, fastwan_8gb, ltx_video, ltx_audio_in, humo x4, wan_i2v, wan_ti2v, + the H3 pair |
+| PASS | still_flat, still_pan, still_motion, still_word, viz_camera, viz_green, viz_mxc_cpu, viz_mxc_mandala |
+| FAIL | mesh_stage, ltx_8gb, fastwan_8gb |
+| never run | ltx_video, ltx_audio_in, humo x4, wan_i2v, wan_ti2v, + the H3 pair |
 
-**NEITHER FAILURE WAS A VIDEO BUG.** Both died in `OTR_LedgerScriptWriter`
-before any video work, and the leg verdict said only "no new file in otr/obs",
-which is what made them read as video-lane problems. Every writer defect found
-this day is in `_otr_scifi_fable2.py`.
+**NOT ONE OF THE THREE FAILURES WAS A VIDEO DEFECT.** That is the headline of
+the whole sweep so far:
 
-**THE THREE STALE HEAVY-LANE FAILURES FROM 08-03 ARE MOSTLY ALREADY FIXED**, so
-do not budget for them: `ltx_audio_in` died of PBUG-20260812-03 (fixed),
-`wan_i2v` of a checkpoint path (fixed 08-11 by lane 1's `folder_paths`
-fallback -- `_installed()` now True, weight present), and only `wan_ti2v`'s
-`OTR_CastLock` freeze cascade (`freeze_verdict='needs_full_rerun'`) is genuinely
-unknown.
+- `mesh_stage` -- died in `OTR_CastLock`; the freeze cascade stamped
+  `needs_full_rerun` because a cast member (MARIA) owned no line. Rolled the
+  shakespeare bank. OPEN -- see the cast-coverage section below.
+- `ltx_8gb` -- died in the fable2 WRITER, markup ladder exhausted. That server
+  carried fix A but NOT fix B, so it is evidence that carrying the rejected
+  draft ALONE was not enough -- the post-fix data point the judging pass asked
+  for.
+- `fastwan_8gb` -- the only genuine render failure, and it is the still-spine
+  (PBUG-20260811-02, reproduced). Candidate repair under QA.
 
-**RUN ORDER:** reset + boot per CLAUDE.md 4/5, run the 19 incumbent lanes, then
-reboot with `OTR_HEADLESS_RESERVE_VRAM_GB=12` + `OTR_HEADLESS_DISABLE_PINNED=1`
-and run `--only minimax_h3_video,minimax_h3_audio_in`.
+**RESTART FROM `ltx_video`.** Reset + boot per CLAUDE.md sections 4 and 5, then
+run `--only` over the ten remaining incumbent legs, then reboot with
+`OTR_HEADLESS_RESERVE_VRAM_GB=12` and `OTR_HEADLESS_DISABLE_PINNED=1` for
+`--only minimax_h3_video,minimax_h3_audio_in`.
 
-**DIAGNOSIS IS NOW CHEAPER THAN IT WAS.** `scripts/otr_api.py`
-`describe_execution_error` names the failing NODE, exception type and the tail
-of the traceback instead of truncating the history repr at 500 chars mid-frame;
-that truncation cost the diagnosis of both writer failures. And a
+**THE SWEEP CAN NOW PIN ITS BANK** (`--source-bank`, shipped `f9b51675`).
+Rolling stays the DEFAULT because it is how both writer defects were found. Pin
+when the question is "does this engine render"; roll when it is "does the
+pipeline hold across banks". Two legs were spent proving something about the
+writer before this existed.
+
+**Diagnosis is far cheaper than it was.** `scripts/otr_api.py`
+`describe_execution_error` names the failing NODE, the exception type and the
+tail of the traceback instead of truncating the history repr at 500 characters
+mid-frame -- that truncation cost the diagnosis of both writer failures. And a
 `scifi_news_pro` leg now persists its seed / frame card / stance BEFORE the
-passes that can die on them, so a dead leg is reproducible.
+passes that can die on them, so a dead leg is reproducible; three earlier deaths
+were not.
 
-### THE FABLE2 WRITER -- OPEN, AND IT IS THE ONLY BANK ON THIS WRITER
+### THE STILL-SPINE REPAIR -- CANDIDATE UNDER QA, NOT SHIPPED (2026-08-12)
 
-**`scifi_news_pro` is the ONLY bank routed to `scifi_news_pro_multipass`**
-(`nodes/story_packs/banks.json`), and `grep -rl "TITLE:" nodes/story_packs/`
-returns exactly one file. Every other bank's Python owns the speaker labels.
+`PBUG-20260811-02` moved from "root cause NOT ESTABLISHED" to established, on a
+live reproduction (`fastwan_8gb`), and a candidate repair is committed
+(`3446af3f`, `ae76fb3f`). **It is NOT proven and must not be called fixed.**
 
-**So the cross-bank writer gate cannot qualify this writer.** Five green banks
-proved the pipeline, not `_otr_scifi_fable2.py`. Coverage is repeated
-`scifi_news_pro` runs across distinct sources -- three axes vary per run: the
-news item, one of 14 frame cards, one of 6 stances (`OTR_FABLE2_SEED` pins the
-card/stance deal, not the news item and not the sampling).
+- **The general fault:** the image producer planned stills from the PRE-AUDIO
+  ledger, so it planned against ids the finished episode does not use --
+  `EpisodeAssembler` mints one row PER CHUNK (`music_{cue}_{NNN}`). Fixed by
+  retargeting canonical link 255 to ShotLock's post-audio ledger. **This is the
+  fix that scales;** a reservation can only ever name `_001`.
+- **The local fault:** BOTH the opening and closing reservations suppressed
+  themselves on a ROLE test, so a pre-audio sentinel under an authored id killed
+  the reservation meant to cover it. Both are unconditional now, since `_add`
+  already dedupes by beat id. **Hardening -- NOT the multi-chunk solution.**
+- **STILL OPEN, flagged independently by two cross-checks:**
+  - `OTR_ShotLock.overlay_audio_timing` swallows every exception and returns the
+    PRE-AUDIO ledger, and a `_same_frozen_episode` mismatch does the same,
+    warning rather than raising. **So the fix's premise can silently fail** and a
+    multi-chunk `_002`/`_003` would die exactly as before. Bible **12.57**
+    already prescribes the answer: reject mismatches. Untestable today --
+    `overlay_audio_timing` short-circuits under `OTR_TEST_MODE=1`.
+  - `ShotLock.IS_CHANGED` covers routing environment state but NOT the ledger it
+    reads from disk, so image planning depends on a hidden disk read outside the
+    dependency signature (Bible 06.01).
+- **ACCEPTANCE TEST before this closes:** a canonical `fastwan_8gb` leg with
+  **60-second opening AND closing cues**. `_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a
+  60 s cue becomes THREE 20 s chunks; the original short cue never exercises the
+  chunked path, which is the half the reservations cannot reach.
 
-**SHIPPED from the r1 arc** (Fable cold -> driver -> Codex -> Antigravity ->
-driver judged; `kibitz-runs/2026-08-12-writer-genre-slippage/`): the repair turn
-now CARRIES THE REJECTED DRAFT. It never did -- the retry ordered the model to
-"keep the same wording" about a text it had never been shown, so every attempt
-after the first was a cold regeneration, which is why four attempts produced
-four DIFFERENT malformed shapes. Temperature now decays only when the draft
-actually rode along.
+### THE FABLE2 WRITER -- TWO FIXES SHIPPED, THE THIRD SHELVED ON EVIDENCE
 
-**STILL OPEN, in build order:**
+**`scifi_news_pro` is the ONLY bank routed to this writer**
+(`banks.json: scifi_news_pro_multipass`; a grep for the whole-play grammar
+across `nodes/story_packs/` returns exactly one file). Every other bank's Python
+owns the speaker labels. **So the cross-bank writer gate CANNOT qualify this
+writer** -- five green banks proved the pipeline, not `_otr_scifi_fable2.py`.
+Coverage is repeated `scifi_news_pro` runs across distinct sources. Three axes
+vary per run: the news item, one of 14 frame cards, one of 6 stances
+(`OTR_FABLE2_SEED` pins the card/stance deal, not the news item and not the
+sampling).
 
-1. **Supply a format example.** `scifi_news_pro.json` has `"examples": []` and
-   `_run_markup_ladder`'s one-shot `format_example` path is DEAD CODE -- nothing
-   passes it. The grammar is described and never demonstrated. The example must
-   use a DISTINCT domain with an explicit do-not-copy instruction, or the model
-   may lift its cast.
-2. **Retire the CANDIDATE, not the episode** -- `PRODUCTION_SPRINT_LESSONS`
-   lesson 35, which this ladder violates by raising `Fable2ScriptError` after
-   four attempts. **The trap, and it is the operator's ledger rule:** a fresh
-   candidate must NOT inherit the dead candidate's ledger writes to
-   `led.data["cast"]`, `led.data["scenes"]` and `meta["fable2"]`. Reset or
-   re-instantiate before retrying. This one gets a panel round before it is
-   written.
+**SHIPPED** (r1 arc: Fable cold -> driver -> Codex -> Antigravity -> judged;
+artifacts in `kibitz-runs/2026-08-12-writer-genre-slippage/`):
 
-**REJECTED, do not re-open:** upstream address-shaped roster names (both
-mechanical lanes rejected it independently -- unproven causal theory, and it
-moves `CastShape.name`, which is the ledger join key into casting, credits,
-portraits and voices); prefix/fuzzy matching of abbreviated cues; loosening the
-parser. Prefix matching is deterministic Python making an attribution judgment,
-and a plausible-but-wrong match silently changes who knows what.
+- `2572b493` -- **the repair turn now carries the rejected draft.** It never did:
+  the retry ordered the model to keep the same wording about a text it had never
+  been shown, so every attempt after the first was a COLD REGENERATION -- which
+  is why four attempts produced four DIFFERENT malformed shapes instead of
+  converging. Temperature decays only when the draft actually rode along.
+- `45d1d3f8` -- **the one-shot format example was DEAD CODE.** The parameter and
+  both use sites existed; nothing ever passed one, and the pack's `examples` was
+  empty. Now a gardening-programme example, deliberately a different domain
+  because it arrives as the model's own assistant turn, validated against the
+  real parser.
+- `8a7a4d62` -- fix B silently ate part of fix A's budget: the guard counted only
+  prompt plus draft, never the example B injects on every call.
+- `61ae356c` -- required ledger saves REFUSE instead of continuing silently.
+
+**SHELVED, deliberately -- the candidate-retirement ladder (lesson 35).** A
+judging pass found that the ALTERNATE PRODUCER SLOT every lane assumed -- Fable
+proposed it, the driver accepted it, Codex and Antigravity both wrote MUST-FIX
+items for it -- **does not exist**: `_ALLOWED_SLOTS = ("creative", "technical")`
+and `repair_slot_fn` is never passed in this module. Building it means a new
+widget plus canonical JSON wiring, which is its own project. All three dead legs
+also predate fixes A and B, so the failure mode may already be largely closed.
+**Gate the build on post-fix evidence that legs still exhaust.**
+
+**CUT, do not re-open:** upstream address-shaped roster names (both mechanical
+lanes rejected it independently -- `CastShape.name` is the ledger join key into
+casting, credits, portraits and voices); prefix or fuzzy matching of abbreviated
+speaker cues; loosening the parser.
+
+### CAST COVERAGE -- OPEN, and it is a defect class rather than a lane
+
+A cast member with NO line hard-fails the freeze cascade for EVERY bank, but
+**only 2 of 10 packs tell their writer** (`scifi_news`, `scifi_news_pro`). Four
+narrative packs share an identical six-stage structure and are all silent --
+including `folger_scene_adaptation`, the shakespeare pack `mesh_stage` died on.
+
+The obvious seam is WRONG: `outline_phase_system` plans ONE phase and cannot
+enforce an episode-level invariant. Codex placed the check after the Stage-2
+loop (`_otr_outline.py:1862`), BEFORE any Stage-3 call, and refuted the driver's
+premise that a retry path already exists there -- `generate_outline()` completes
+every Stage-2 and Stage-3 call and then only RAISES.
+
+**Codex's cross-bank findings, each a claim to verify before building:**
+
+1. **The legacy line composer has fix A's defect class** -- every attempt in
+   `compose_line_draft` reuses unchanged `messages` and never sends the rejected
+   line or the reason back. **If true, this is the same cold-regeneration bug in
+   the writer five banks share.** Highest-value open item in this document.
+2. `_otr_scifi_codex.py` has **NO `led.save()` at all**, so a P3/P5 death loses
+   every accepted-stage receipt.
+3. `scifi_news` ALREADY closes the coverage asymmetry through a fresh-candidate
+   loop. It is the model to copy and must NOT be modified.
+4. A deterministic sorted round-robin already assigns story speakers on the
+   multi-cast fallback, which would violate "no deterministic Python deciding
+   story" and could satisfy any coverage check without a model choosing.
+5. Unchecked `led.save()` remain at `OTR_LedgerScriptWriter.py` lines 4774, 4868,
+   4913, 5077, 5759, 5896, 5945 and 5990. Line 4245 is a diagnostic stamp: warn,
+   then preserve the original halt.
+6. Pack `examples` are POPULATED in three of the four packs and INERT by design
+   (`_otr_story_pack.py:155-159`). Do not "fix" them.
 
 ### CLOSED LANE DIAGNOSES -- MOVED OUT 2026-08-12
 
@@ -285,14 +358,14 @@ under "CLOSED LANE DIAGNOSES", alongside the per-lane receipts in
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-11 (lane-10 wrap) |
+| Thing | Value as of 2026-08-12 (story-writer + still-spine wrap) |
 |---|---|
-| Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-11 at the lane-10 wrap, one commit past `e9800c89`) |
+| Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-12 at the story-writer wrap, `ae76fb3f`) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9963 passed / 109 skipped / 1 xfailed, exit 0** (measured 2026-08-11 at the lane-10 wrap, NOTHING deselected). Was **9950** at `e9800c89`; lane 10 adds 14 tests and replaces 1, so +13. **The "9822 / 111 skipped / 3 deselected" figure in `docs/2026-08-11-RESPONSE-lemmy-sprint-goforward-check.md` is STALE and its 3-test deselection must not be adopted** -- that window's commits were docs-only and a fresh run at its own HEAD gives 9950/109/1 with nothing deselected. Deselecting to get a green number hides real failures |
-| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `1ad7bb3` (**272** entries, audited through **2026-08-11**). **Lane 10 promoted NOTHING, deliberately, and the reason is the ADMISSION RULE.** Its two findings are L1's third instance (already a Bible rule from lane 1 -- covered, not new) and the new L17 (a validator reading a field the validated component wrote is not proof). L17 is portable and Bible-shaped, but it was found by READING the gate, not by a live production failure -- and a static-audit finding "never creates a new PBUG or Bible rule on its own". It is recorded in `docs/LANE_BUILD_LESSONS.md` with a twin assertion instead. If a live render ever ships a mis-typed frame past this, THAT artifact admits it. NEVER re-scrape indexed history |
+| Suite | **10281 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
+| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `69ee6b2` (**273** entries, index **386** rows). This session PROMOTED ONE: **12.97**, a model field name that collides with its base class (from PBUG-20260812-02, admitted on a live leg). It checked the others against the index FIRST and promoted no duplicate -- **PBUG-20260811-02's class is already 12.57**, whose own rule (resolve the durable owner, prove same-run identity, REJECT mismatches) also condemns the warn-and-continue fallback OTR still has open. NEVER re-scrape indexed history |
 | Variants | `build_variants.py --check` **46 variants / 0 failures** on THIS box. **THAT COUNT IS WORKSTATION-DEPENDENT and 46 is not the repo's number** (lane 11, 2026-08-11): `git ls-files` counts **45** tracked variants, and the 46th on disk is another window's untracked `otr_upscale_ltx_probe.json`. The gate globs the DIRECTORY, so its headline silently counts files the repo has never seen -- the same defect class as the sbcov crash above. Compare `--check`'s 0 FAILURES, not its count. **RUN IT BEFORE STARTING A LANE** -- it had been RED since lane 5 and lane 7 had to separate inherited drift from its own; a red at the start of a lane belongs to whoever caused it |
-| Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
+| Canonical workflow | **TOUCHED 2026-08-12** -- link 255 retargeted so `OTR_MetaBriefImagePromptGen` reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json` instead of the pre-audio freeze cascade (`[255,62,1,89,0] -> [255,90,0,89,0]`). Validated: 23 nodes / 56 links unchanged, acyclic, referential integrity clean, `validate_canonical_workflow` OK, 50 variants REGENERATED (`--check` 0 failures) and 4 hand-kept `.env.json` master_hash re-stamped. **The diff is ONE line** -- a first attempt round-tripped the JSON and reformatted all 3506 lines; that was reverted and redone as a surgical string edit |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
 
 A window that reads a different suite number has inherited drift -- find out
