@@ -86,6 +86,13 @@ CLOUD_PREFIXES = ("cloud_", "google_")
 CLOUD_BY_NAME = frozenset({"word_razzle"})
 
 #: Engine -> profile stem. Convention first, exceptions named explicitly.
+#: The roll sentinel, taken from the writer's own rolls module so this file
+#: cannot drift from the string the node actually accepts.
+try:
+    from nodes._otr_rolls import BANK_SENTINEL
+except Exception:                                   # pragma: no cover
+    BANK_SENTINEL = "roll (any eligible bank)"
+
 PROFILE_PREFIX = "otr_w45_"
 PROFILE_EXCEPTIONS = {
     "fastwan_8gb": "otr_w45_fastwan",
@@ -713,7 +720,8 @@ def verify_asset(started_at: float) -> dict:
             "reuse": reuse, "delivered": sorted(set(engines))}
 
 
-def run_leg(engine: str, profile: str, words: int) -> dict:
+def run_leg(engine: str, profile: str, words: int,
+            source_bank: str = BANK_SENTINEL) -> dict:
     log_path = REPO / "tmp" / ("_w45_%s.log" % engine)
     _say("LEG %s (profile %s) -> %s" % (engine, profile, log_path.name))
     started_at = time.time()
@@ -721,7 +729,7 @@ def run_leg(engine: str, profile: str, words: int) -> dict:
     cmd = [PY, str(REPO / "scripts" / "otr_canonical_api_run.py"),
            "--profile", profile,
            "--words", str(words),
-           "--source-bank", "roll (any eligible bank)",
+           "--source-bank", source_bank,
            "--visual-style", "roll (any style)",
            "--timeout", str(LEG_TIMEOUT_S)]
     env = dict(os.environ, PYTHONUTF8="1")
@@ -802,6 +810,25 @@ def run_leg(engine: str, profile: str, words: int) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--words", type=int, default=45)
+    # PIN THE BANK SO A WRITER DEFECT CANNOT MASK A VIDEO LANE.
+    #
+    # Every leg rolled its bank, and that is wrong for what this campaign
+    # MEASURES. The gate is "a 45-word render of every VISUAL path" -- the bank
+    # is not the variable under test, it is noise on top of it. On 2026-08-12
+    # `ltx_8gb` rolled `scifi_news_pro`, died in `OTR_LedgerScriptWriter` after
+    # four markup attempts, and the LTX video lane was never exercised at all:
+    # a writer defect consumed a video leg and reported it as a lane failure.
+    # `mesh_stage` was lost the same way to a cast-coverage gap on shakespeare.
+    #
+    # Rolling still has a place -- it is how both of those writer defects were
+    # FOUND -- so the sentinel remains the default and this is opt-in. Use it
+    # when the question is "does this engine render", and roll when the question
+    # is "does the pipeline hold up across banks".
+    ap.add_argument("--source-bank", default=BANK_SENTINEL,
+                    help="pin the source bank (default: roll). Pin it when the "
+                         "engine is the variable under test, so a writer defect "
+                         "on an unlucky roll cannot be reported as a lane "
+                         "failure.")
     ap.add_argument("--only", default=None,
                     help="comma-separated engine names to run instead of all")
     args = ap.parse_args(argv)
@@ -854,7 +881,7 @@ def main(argv=None) -> int:
     try:
         for engine, profile in legs:
             reset_between_legs()
-            results.append(run_leg(engine, profile, args.words))
+            results.append(run_leg(engine, profile, args.words, args.source_bank))
             (REPO / "tmp" / "_w45_results.json").write_text(
                 json.dumps(results, indent=2), encoding="utf-8")
     finally:
