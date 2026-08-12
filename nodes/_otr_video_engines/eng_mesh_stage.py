@@ -64,6 +64,7 @@ from .cheap_families import _CheapFamilyBase
 from .directory_clip import validate_directory_clip
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
+from .wan_shared import configured_models_root
 
 _LOG = logging.getLogger("OTR.video.eng_mesh_stage")
 
@@ -79,9 +80,13 @@ STAGE_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "otr_mesh_stage_blender.py")
 MESHER_ID = "hy3d2mv"
 MESHER_VERSION = "1"
 
-#: E-6 canvas contract: mesh_stage sets the landscape canvas EXPLICITLY when
-#: the request leaves it unset (the cheap-family default is 832x480 -- the
-#: proven look-QA landscape canvas is 1472x832).
+#: E-6 canvas contract: the proven look-QA landscape canvas, and since lane 10
+#: (2026-08-11) the lane's DECLARED ``render_canvas`` -- see
+#: ``MeshStageEngine.render_canvas``. It used to be reachable only through an
+#: inline 832x480 sniff inside ``render_clip``; a declaration is applied LAST by
+#: ``build_request_from_shot`` and by ``render_single``, so it overrules the
+#: driver default, the ledger and the env on every request-building path
+#: instead of on the one path that happened to run (lesson L2).
 DEFAULT_W = 1472
 DEFAULT_H = 832
 
@@ -373,6 +378,28 @@ class MeshStageEngine(_CheapFamilyBase):
     #: Any future single-image-subject 3D mesher declares it too.
     requires_mesh_fodder = True
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
+    #: THE DECLARED CANVAS (lane 10, 2026-08-11 -- lesson L2). 1472x832 is what
+    #: this lane has always rendered; what it did NOT have was a way to say so.
+    #: The size was chosen by an inline sniff in ``render_clip`` -- "if the
+    #: request says 832x480 and carries no explicit canvas, make it 1472x832" --
+    #: which is the same shape lane 7 deleted: an inline branch that a
+    #: declaration overrules anyway, on the one code path that happened to run.
+    #:
+    #: It describes the RUNTIME, not a preference: Blender is told exactly these
+    #: dimensions (``build_blender_cmd`` -w/-h) and ``validate_frame_dir``
+    #: REFUSES a published frame whose PIL size is anything else, so the
+    #: declaration and the pixels on disk cannot disagree without a raise.
+    #:
+    #: /32-legal on both axes (1472 = 46*32, 832 = 26*32). The /64 rule of
+    #: lesson L13 does not reach this lane -- there is no halved stage and no
+    #: fixed-x2 upsampler here, the frames come out of Blender at full size --
+    #: though 1472x832 happens to satisfy it anyway.
+    #:
+    #: The lane's ONE profile (``config/profiles/otr_w45_mesh_stage.json``)
+    #: carries the same numbers, so the config an operator reads agrees with
+    #: the render. That channel is a DRIFT GUARD, not an input: nothing reads
+    #: ``render.canvas_w/h`` on the way to a request.
+    render_canvas = (DEFAULT_W, DEFAULT_H)
 
     _selftest_passed = False            # E-6: cube probe gates the first use
 
@@ -384,26 +411,63 @@ class MeshStageEngine(_CheapFamilyBase):
     def _blender_exe():
         return os.environ.get("OTR_BLENDER_EXE", "")
 
+    #: The hy3d all-in-one checkpoint basenames, most specific first. The
+    #: LOADER is handed the BARE BASENAME (``ckpt_name``), which ComfyUI
+    #: resolves through ``folder_paths`` -- so the preflight probe must ask
+    #: ``folder_paths`` too, or it answers a different question than the one
+    #: the render will ask.
+    CKPT_NAMES = ("hunyuan3d-dit-v2-mv.safetensors",
+                  "hunyuan3d-dit-v2-mv-fp16.safetensors",
+                  "hunyuan3d-dit-v2-0.safetensors")
+
     def _ckpt_path(self):
+        """Resolve the hy3d checkpoint: the ``OTR_HY3D_CKPT`` pin, then
+        ``folder_paths``, then the historical directory list, then THIS BOX's
+        configured models root.
+
+        LESSON L1, THE wan_i2v KILLER (lane 10, 2026-08-11). This walked a
+        hardcoded ``<comfy_root>/models/checkpoints`` plus an ``HF_HOME``
+        sibling and never consulted ``folder_paths`` at all -- so inside a live
+        server it could not see a checkpoint registered through
+        ``extra_model_paths.yaml``, and outside one (the CPU suite, the
+        preflight matrix, any tool asking "is this lane installed?") it answered
+        a confident NO for a weight installed under this box's real models root.
+
+        The probe order is ADDITIVE BY CONSTRUCTION: every prior probe still
+        wins, and ``configured_models_root()`` -- lane 1's ONE spelling of
+        "where this box keeps its models", reused here rather than reimplemented
+        a third time -- is consulted LAST, so it can only turn a false negative
+        into the truth.
+
+        Returns a path that may not exist when nothing resolves (the caller,
+        ``_installed``, probes existence), so the refusal can NAME a file.
+        """
         explicit = os.environ.get("OTR_HY3D_CKPT")
         if explicit:
             return explicit
+        for name in self.CKPT_NAMES:
+            try:
+                import folder_paths            # ComfyUI runtime only
+                hit = folder_paths.get_full_path("checkpoints", name)
+            except Exception:  # noqa: BLE001 -- no ComfyUI (CPU suite / tools)
+                hit = None
+            if hit:
+                return hit
         candidate_dirs = [os.path.join(_COMFY_ROOT, "models", "checkpoints")]
         hf_home = os.environ.get("HF_HOME", "")
         if hf_home:
             candidate_dirs.append(
                 os.path.join(os.path.dirname(hf_home), "checkpoints"))
-        names = ("hunyuan3d-dit-v2-mv.safetensors",
-                 "hunyuan3d-dit-v2-mv-fp16.safetensors",
-                 "hunyuan3d-dit-v2-0.safetensors")
+        candidate_dirs.append(
+            os.path.join(configured_models_root(), "checkpoints"))
         for d in candidate_dirs:
-            for name in names:
+            for name in self.CKPT_NAMES:
                 p = os.path.join(d, name)
                 if os.path.exists(p):
                     return p
         fallback_dir = (os.path.join(os.path.dirname(hf_home), "checkpoints")
                         if hf_home else candidate_dirs[0])
-        return os.path.join(fallback_dir, names[0])
+        return os.path.join(fallback_dir, self.CKPT_NAMES[0])
 
     def _ckpt_name(self):
         return os.environ.get("OTR_HY3D_CKPT_NAME") or os.path.basename(
@@ -444,8 +508,8 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.join(out, "otr", "episodes", "_shared", "mesh_cache")
 
     # ---- usability ladder (fail-closed; ORDER MATTERS; no heavy import) ----
-    # Blender exe -> hy3d checkpoint. NEVER the cache/mesh dir (the
-    # 3D-plan 7.1 deadlock lesson: meshes are GENERATED at render time).
+    # Blender exe -> hy3d NODE CLASSES -> hy3d checkpoint. NEVER the cache/mesh
+    # dir (the 3D-plan 7.1 deadlock lesson: meshes are GENERATED at render time).
     def assert_usable(self, host_caps, profile, request_template=None):
         blender = self._blender_exe()
         if not blender or not os.path.exists(blender):
@@ -455,6 +519,7 @@ class MeshStageEngine(_CheapFamilyBase):
                 "the portable blender.exe under the env-pointed tools dir; "
                 "got %r -- no dev-path hardcode, fail-closed LOUD)"
                 % (self.name, blender), kind="video")
+        self._assert_node_classes_present()
         if not self._installed():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
@@ -464,6 +529,45 @@ class MeshStageEngine(_CheapFamilyBase):
                 "(probe-first)" % (self.name, self._ckpt_path()),
                 kind="video")
         return self.name
+
+    def _assert_node_classes_present(self):
+        """THE NODE GATE (S8b-16, lane 10, 2026-08-11).
+
+        ``_node_candidates()`` names ten core hy3d classes and they were
+        resolved ONLY inside :meth:`load` -- so ``assert_usable`` passed on a
+        box with no hy3d nodes and the render died at ``load()``, mid-beat,
+        AFTER the checkpoint had been paid for. Preflight is the whole point of
+        preflight: a refusal that costs nothing beats one that costs a load.
+
+        Three properties this gate keeps, each of which had to be argued for
+        (lane 8 built the same shape and its lessons are why these are here):
+
+        * It runs BEFORE weight resolution, so a missing class refuses without
+          touching the checkpoint. ``tests/test_video_mesh_stage.py`` pins the
+          order by making weight resolution RAISE -- a mis-ordered gate then
+          fails with the wrong exception type instead of quietly passing.
+        * It reads the ACTIVE candidate set (``_node_candidates()``), never a
+          fixed list, so a future recipe branch that swaps a class is gated on
+          what it will really execute.
+        * It collects EVERY miss before raising. Naming one class at a time
+          turns a fresh install into a sequence of failed renders.
+        """
+        from . import wrapper_bridge as _wb
+        mapping = _wb.node_class_mappings()
+        missing = []
+        for _logical, candidates in self._node_candidates().items():
+            try:
+                _wb.resolve_node_class(candidates, mapping)
+            except Exception:  # noqa: BLE001 -- collect every missing class
+                missing.append("/".join(candidates))
+        if missing:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "%s missing required ComfyUI node class(es): %s -- the hy3d "
+                "mesher runs on ComfyUI CORE nodes, so this means the install "
+                "predates them or the 3D extras are disabled; update ComfyUI "
+                "and re-run the GPU probe" % (self.name, ", ".join(missing)),
+                kind="video")
 
     # ---- E-1: the native hy3d graph (A4-audited vs the install) ----
     def _node_candidates(self):
@@ -690,15 +794,14 @@ class MeshStageEngine(_CheapFamilyBase):
         """portrait -> (cache | hy3d mesh-gen) -> VRAM BARRIER -> Blender
         turntable stage -> validate -> ATOMIC publish -> directory clip."""
         get = self._get(request)
+        # The canvas comes from the REQUEST, which the ``render_canvas``
+        # declaration has already decided (lane 10): the inline "if the request
+        # looks like 832x480 and carries no explicit canvas, rewrite it to
+        # 1472x832" sniff that used to live here is gone. It only ever fired on
+        # the paths that reached this function, it could not be read by
+        # admission or by the still/composite sizing, and a declaration
+        # overrules it everywhere anyway.
         w, h, fps = self._canvas_dims(request)
-        if w == 832 and h == 480:
-            canvas = get("canvas") or {}
-            c_get = canvas.get if isinstance(canvas, dict) else (
-                lambda k, d=None: getattr(canvas, k, d))
-            if not int(c_get("w", 0) or 0):
-                # E-6: the canvas contract is EXPLICIT -- never inherit the
-                # cheap-family 832x480 default silently.
-                w, h = DEFAULT_W, DEFAULT_H
         n = self._frame_count(request, fps)
         still = self._still_path(request)
         if not still or not os.path.exists(still):
@@ -788,7 +891,20 @@ class MeshStageEngine(_CheapFamilyBase):
 
     def canonicalize(self, raw, request, profile):
         """Canonicalize-time enforcement: the Track-3 directory-clip validator
-        runs HERE (type/rgba/straight/silent/count==disk==ledger target)."""
+        runs HERE (type/rgba/straight/silent/count==disk==ledger target).
+
+        THE V-1 SELF-PROBE FOR THIS LANE (gate G5, lane 10, 2026-08-11).
+        ``validate_directory_clip`` is the directory-clip twin of
+        ``wan_shared.validate_silent_clip_contract``: this is the ONLY lane in
+        the roster that delivers a frame DIRECTORY rather than an mp4, so there
+        is no container for ffprobe to read and bolting an mp4 probe onto a PNG
+        directory would prove nothing about either. The proof is structural
+        instead -- every frame's MAGIC BYTES are read and must really be a
+        PNG/EXR still, and a still image carries no audio stream. Before that,
+        the only "evidence" of silence was this adapter's own ``has_audio:
+        False`` literal being read back by the validator: a declaration
+        checking a declaration.
+        """
         get = self._get(request)
         timing = get("timing") or {}
         t_get = timing.get if isinstance(timing, dict) else (

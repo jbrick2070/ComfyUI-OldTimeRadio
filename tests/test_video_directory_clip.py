@@ -83,6 +83,56 @@ def test_validator_rejects_missing_dir_and_zero_byte_frame(tmp_path):
         dc.validate_directory_clip(_dir_clip(d))
 
 
+# --------------------------------------------------------------------------- #
+# THE V-1 AUDIO LAW FOR A DIRECTORY CLIP (lane 10, 2026-08-11 -- lesson L4)
+#
+# Every mp4 lane proves silence by ffprobing the emitted file for audio
+# streams. A directory has no container to probe, and the old contract's only
+# audio evidence was `has_audio is not False` read off the dict the adapter
+# itself wrote -- a declaration checking a declaration. The replacement is
+# structural: a PNG/EXR still has no audio stream to carry, so PROVE from the
+# bytes that every frame really is one.
+# --------------------------------------------------------------------------- #
+def test_a_frame_is_proved_by_its_MAGIC_BYTES_not_its_extension(tmp_path):
+    """`list_directory_frames` selects frames by filename extension, so before
+    this a file named 0001.png containing an mp4 -- or a WAV, which is the case
+    that makes this an AUDIO law and not a tidiness rule -- counted as a frame
+    and shipped as proof of silence."""
+    d = tmp_path / "frames"
+    _write_frames(d, n=3)
+    (d / "frame_0001.png").write_bytes(b"\x00\x00\x00\x20ftypisom" + b"\x00" * 64)
+    with pytest.raises(ValueError, match="NOT a png"):
+        dc.validate_directory_clip(_dir_clip(d, n=3))
+    # The one that would have been quietest of all: real audio, named .png.
+    (d / "frame_0001.png").write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
+    with pytest.raises(ValueError) as exc:
+        dc.list_directory_frames(str(d))
+    assert "frame_0001.png" in str(exc.value)
+
+
+def test_the_magic_byte_proof_accepts_a_real_exr(tmp_path):
+    """EXR is half of the declared FRAME_EXTS contract, so it is proved rather
+    than merely tolerated -- otherwise the first EXR lane discovers this the
+    hard way."""
+    d = tmp_path / "frames"
+    os.makedirs(d)
+    (d / "frame_0000.exr").write_bytes(b"\x76\x2f\x31\x01" + b"\x00" * 32)
+    assert len(dc.list_directory_frames(str(d))) == 1
+    assert dc.prove_frame_is_a_silent_image(
+        str(d / "frame_0000.exr")) == ".exr"
+
+
+def test_the_tolerant_summary_also_refuses_an_impostor_frame(tmp_path):
+    """`frame_dir_summary` is the read path the manifests and _clip_summary
+    use, and it never raises -- so if the proof lived only in the strict
+    validator, a receipt could still call an impostor directory real."""
+    d = tmp_path / "frames"
+    _write_frames(d, n=2)
+    assert dc.frame_dir_summary(str(d), expect_frames=2)[0] is True
+    (d / "frame_0001.png").write_bytes(b"not a png at all")
+    assert dc.frame_dir_summary(str(d), expect_frames=2)[0] is False
+
+
 def test_validator_rejects_ledger_target_mismatch(tmp_path):
     d = tmp_path / "frames"
     _write_frames(d)

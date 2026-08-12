@@ -61,6 +61,16 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
 - G5.1 The adapter's canonicalize path runs `validate_silent_clip_contract`
   on its OWN emitted file. A `has_audio: False` literal is not evidence.
   *Origin: H3 natively produces audio; literals lie.*
+- G5.1a A DIRECTORY-CLIP lane satisfies G5.1 through the NAMED twin
+  `validate_directory_clip`, which proves every frame is really a PNG/EXR
+  from its MAGIC BYTES -- a still image has no audio stream to carry, so the
+  silence is a fact about the bytes. The gate is taught that name per lane
+  (`DIRECTORY_CLIP_AUDIO_LAW`), never widened to accept any validator, and a
+  twin assertion checks the named function actually refuses a mis-named
+  non-image. *Origin: `mesh_stage` is the only directory-clip lane; its audio
+  check read `has_audio` off the dict the adapter itself wrote, while frames
+  were accepted by FILENAME EXTENSION -- so a file named `.png` containing a
+  WAV counted as proof of silence (lane 10, 2026-08-11).*
 - G5.2 A keeps-audio lane (the standalone music runner) declares a NAMED
   exemption here and never registers into episode assembly without a
   standalone-only boundary.

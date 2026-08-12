@@ -50,6 +50,34 @@ def _write_png(path, w=16, h=16, mode="RGBA"):
     return path
 
 
+def _hy3d_class_names():
+    names = set()
+    for candidates in MeshStageEngine()._node_candidates().values():
+        names.update(candidates)
+    return names
+
+
+@pytest.fixture(autouse=True)
+def _hy3d_node_classes_present(monkeypatch):
+    """Satisfy assert_usable's NODE GATE so these tests stay about their own
+    subject (S8b-16, lane 10, 2026-08-11).
+
+    ``assert_usable`` gained a node-class gate: all ten core hy3d classes must
+    resolve at preflight rather than surfacing at ``load()`` mid-render. That is
+    correct, and it makes every test that calls the real ``assert_usable`` on a
+    CPU box -- where ComfyUI's registry is empty -- refuse before its actual
+    subject (the Blender pin, the checkpoint ladder) is ever reached.
+
+    Fixed at the fixture, never by weakening the gate (lane 8 learned this one
+    first, lesson L9): hand it a mapping in which every candidate exists. The
+    tests that mean to exercise the gate itself override this.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    names = _hy3d_class_names()
+    monkeypatch.setattr(_wb, "node_class_mappings",
+                        lambda mapping=None: {n: object for n in names})
+
+
 # --------------------------------------------------------------------------- #
 # Registration: selectable-not-default + the E-5/E-7 posture
 # --------------------------------------------------------------------------- #
@@ -149,6 +177,147 @@ def test_mesh_stage_assert_usable_blender_then_ckpt(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_HY3D_CKPT", str(ckpt))
     monkeypatch.setenv("OTR_MESH_CACHE_DIR", str(tmp_path / "never_created"))
     assert eng.assert_usable(host_caps={}, profile={}) == "mesh_stage"
+
+
+# --------------------------------------------------------------------------- #
+# G1a / S8b-16 -- THE NODE GATE (lane 10, 2026-08-11)
+#
+# The ten core hy3d classes used to resolve ONLY inside load(), so a box
+# without them passed preflight and died mid-render, after the checkpoint had
+# been paid for. Three properties are pinned, because a gate whose behaviour is
+# only asserted as "it exists somewhere in the function" is not pinned at all.
+# --------------------------------------------------------------------------- #
+def _usable_env(monkeypatch, tmp_path):
+    """Everything BUT the node classes satisfied, so a refusal can only be
+    about the gate under test."""
+    blender = tmp_path / "blender.exe"
+    blender.write_bytes(b"MZ")
+    ckpt = tmp_path / "hy3d.safetensors"
+    ckpt.write_bytes(b"\x00" * 8)
+    monkeypatch.setenv("OTR_BLENDER_EXE", str(blender))
+    monkeypatch.setenv("OTR_HY3D_CKPT", str(ckpt))
+
+
+def test_the_hy3d_node_classes_are_refused_at_PREFLIGHT_not_at_load(
+        monkeypatch, tmp_path):
+    """An empty ComfyUI registry must be a NAMED EngineUnusable out of
+    assert_usable -- not a RuntimeError out of load() halfway through a beat."""
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    eng = vreg.get_engine("mesh_stage")
+    _usable_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda mapping=None: {})
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable(host_caps={}, profile={})
+    assert exc.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
+    assert "node class" in str(exc.value)
+
+
+def test_the_node_gate_names_EVERY_missing_class_not_just_the_first(
+        monkeypatch, tmp_path):
+    """Naming one class at a time turns a fresh install into a sequence of
+    failed renders. The operator gets the whole list in one refusal."""
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    eng = vreg.get_engine("mesh_stage")
+    _usable_env(monkeypatch, tmp_path)
+    absent = {"VoxelToMesh", "SaveGLB", "VAEDecodeHunyuan3D"}
+    present = {n: object for n in _hy3d_class_names() - absent}
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda mapping=None: present)
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable(host_caps={}, profile={})
+    message = str(exc.value)
+    for cls in absent:
+        assert cls in message, message
+    assert "ImageOnlyCheckpointLoader" not in message   # the installed ones
+
+
+def test_the_node_gate_reads_the_ACTIVE_candidate_set(monkeypatch, tmp_path):
+    """It must gate on what the graph will really execute, never on a fixed
+    list copied beside it -- so a future recipe branch that swaps a class is
+    covered on arrival rather than when someone remembers this gate exists."""
+    eng = vreg.get_engine("mesh_stage")
+    _usable_env(monkeypatch, tmp_path)
+    # The autouse fixture already installed a mapping holding every REAL hy3d
+    # class, so the only way this refusal can happen is the gate reading the
+    # candidate set live. (Rebuilding the mapping here would defeat the test:
+    # it would be built FROM the patched candidates and resolve the invented
+    # class happily -- which is exactly how the first draft of this test
+    # passed for the wrong reason.)
+    monkeypatch.setattr(type(eng), "_node_candidates",
+                        lambda self: {"invented": ("AnEngineOnlyThisTestKnows",)})
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng.assert_usable(host_caps={}, profile={})
+    assert "AnEngineOnlyThisTestKnows" in str(exc.value)
+
+
+def test_the_node_gate_runs_BEFORE_any_weight_is_resolved(monkeypatch,
+                                                          tmp_path):
+    """AN ORDERING CLAIM NEEDS A TEST THAT CAN FAIL (lane 8's lesson).
+
+    "The gate is first so a refusal costs nothing" passes trivially if the gate
+    is anywhere in the function. So weight resolution is made to RAISE: a
+    correctly ordered gate still raises EngineUnusable about node classes, and
+    a mis-ordered one fails with RuntimeError -- the wrong exception type --
+    instead of quietly looking fine.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    eng = vreg.get_engine("mesh_stage")
+    _usable_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda mapping=None: {})
+
+    def _explode(self):
+        raise RuntimeError("weight resolution must not be reached")
+
+    monkeypatch.setattr(type(eng), "_ckpt_path", _explode)
+    monkeypatch.setattr(type(eng), "_installed", _explode)
+    with pytest.raises(vreg.EngineUnusable):
+        eng.assert_usable(host_caps={}, profile={})
+
+
+# --------------------------------------------------------------------------- #
+# G1b / lesson L1 -- WEIGHT RESOLUTION (lane 10, 2026-08-11)
+# --------------------------------------------------------------------------- #
+def test_the_configured_models_root_is_honoured(monkeypatch, tmp_path):
+    """THE wan_i2v KILLER, on this lane. The resolver walked a hardcoded
+    <comfy_root>/models/checkpoints plus an HF_HOME sibling, so a checkpoint
+    installed under this box's real models root read as NOT INSTALLED -- a
+    confident, wrong NO from every tool that asks "is this lane usable?".
+
+    Behavioural, against a staged temp root, with NO env pin in play: this is
+    exactly what a leftover OTR_HY3D_CKPT export would otherwise mask.
+    """
+    eng = vreg.get_engine("mesh_stage")
+    monkeypatch.delenv("OTR_HY3D_CKPT", raising=False)
+    monkeypatch.delenv("HF_HOME", raising=False)
+    root = tmp_path / "models_root"
+    (root / "checkpoints").mkdir(parents=True)
+    weight = root / "checkpoints" / "hunyuan3d-dit-v2-mv.safetensors"
+    weight.write_bytes(b"\x00" * 8)
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(root))
+    assert eng._ckpt_path() == str(weight)
+    assert eng._installed() is True
+
+
+def test_weight_resolution_does_not_stop_at_one_hardcoded_location():
+    """Lesson L1 as a property rather than a path: the resolver must reach
+    ComfyUI's own resolver, so a weight registered through
+    extra_model_paths.yaml is found where the LOADER would find it. The graph
+    hands SaveGLB's sibling loader a BARE TOKEN (ckpt_name), and ComfyUI
+    resolves that through folder_paths -- so a preflight that never asks
+    folder_paths is answering a different question than the render asks."""
+    import inspect
+    src = inspect.getsource(MeshStageEngine._ckpt_path)
+    assert "folder_paths" in src
+    assert "configured_models_root" in src
+
+
+def test_the_env_pin_still_wins_over_every_probe(monkeypatch, tmp_path):
+    """The probe order is ADDITIVE: the operator's explicit pin is answered
+    first and nothing below it can move the answer."""
+    eng = vreg.get_engine("mesh_stage")
+    pinned = tmp_path / "operators_own.safetensors"
+    monkeypatch.setenv("OTR_HY3D_CKPT", str(pinned))
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path / "elsewhere"))
+    assert eng._ckpt_path() == str(pinned)
 
 
 # --------------------------------------------------------------------------- #
@@ -305,10 +474,85 @@ def test_canonicalize_enforces_directory_contract(tmp_path):
         eng.canonicalize(bad, {"timing": {"target_frame_count": 2}}, {})
 
 
-def test_default_canvas_is_explicit_1472x832():
-    # E-6: when the request leaves the canvas unset, mesh_stage uses the
-    # EXPLICIT landscape contract -- never the silent cheap-family 832x480.
+def test_the_lane_DECLARES_its_canvas_1472x832():
+    """G2 / lesson L2 (lane 10, 2026-08-11) -- THE CANVAS PIN.
+
+    E-6 has always been "the canvas is EXPLICIT, never the silent cheap-family
+    832x480", and until this lane it was enforced by an inline sniff inside
+    render_clip: if the request looked like 832x480 and carried no explicit
+    canvas, rewrite it. That is a declaration everywhere except where anything
+    could read it -- admission, still sizing and composite scaling all read
+    request.canvas, which still said 832x480 or 1472x832 depending on which
+    request builder ran.
+
+    A declaration is applied LAST by build_request_from_shot AND by
+    render_single, so it overrules the driver default, the ledger and the env
+    on every path. Pinned through the driver, not just as a class attribute,
+    because the attribute existing is not the property anyone depends on.
+    """
+    eng = vreg.get_engine("mesh_stage")
+    assert tuple(eng.render_canvas) == (1472, 832)
     assert (ms.DEFAULT_W, ms.DEFAULT_H) == (1472, 832)
+    assert rd.declared_render_canvas("mesh_stage") == (1472, 832)
+    # /32-legal on both axes -- the latent-grid rule every declaring lane owes.
+    assert 1472 % 32 == 0 and 832 % 32 == 0
+
+
+def test_the_profile_canvas_agrees_with_the_declaration():
+    """G2.3. The profile channel is a DRIFT GUARD, not an input: nothing reads
+    render.canvas_w/h on the way to a request, so the only thing it can do is
+    tell an operator a number. It must be the number that renders.
+
+    Read from the declaration rather than repeated as a literal, so the next
+    move of the canvas cannot make this test lie (lesson L10). Per lane 4's
+    G2.3, EVERY profile resolving to this engine is enumerated -- not the one
+    a human would think to check."""
+    import json as _json
+    from nodes._otr_shared import public_engines as pub
+    declared = tuple(vreg.get_engine("mesh_stage").render_canvas)
+    checked = 0
+    for path in sorted((REPO_ROOT / "config" / "profiles").glob("*.json")):
+        prof = _json.loads(path.read_text(encoding="utf-8"))
+        picks = {pub.resolve_engine_id(v)
+                 for k, v in (prof.get("role_overrides") or {}).items()
+                 if k.endswith("_visual")}
+        slot = (prof.get("slot_overrides") or {}).get("video_render_engine")
+        if slot:
+            picks.add(pub.resolve_engine_id(slot))
+        if "mesh_stage" not in picks:
+            continue
+        render = prof.get("render") or {}
+        if not (render.get("canvas_w") and render.get("canvas_h")):
+            continue
+        checked += 1
+        assert (render["canvas_w"], render["canvas_h"]) == declared, path.name
+    assert checked, "no profile selects mesh_stage with a canvas -- G2.3 would " \
+                    "be vacuous, so the enumeration itself is asserted"
+
+
+def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
+    """G3.3 / lesson L3 (lane 10). CONTINUITY_NONE was inherited as a dataclass
+    DEFAULT here -- the right value arrived at by nobody deciding it, which is
+    the same shape a wrong value would have had.
+
+    NONE is honest for this lane for a reason specific to it: build_blender_cmd
+    takes start_angle / arc_degrees, so a chained successor segment would need
+    the predecessor's terminal ORBIT ANGLE threaded forward to continue the
+    turntable, and nothing threads it. A chain would snap the camera back to
+    the arc's start at every segment boundary.
+    """
+    import inspect
+    from nodes._otr_video_engines import cheap_families as cf
+    from nodes._otr_video_engines import frame_contract as fcm
+    eng = vreg.get_engine("mesh_stage")
+    contract = fcm.frame_contract_for(eng)
+    assert contract.continuity == fcm.CONTINUITY_NONE
+    # DECLARED, not defaulted: the keyword is passed at the declaration site.
+    assert "continuity=" in inspect.getsource(cf._CheapFamilyBase)
+    # ...and the arc arguments that make NONE the honest answer are still real,
+    # so this reasoning cannot quietly stop applying.
+    sig = inspect.signature(ms.build_blender_cmd).parameters
+    assert "start_angle" in sig and "arc_degrees" in sig
 
 
 # --------------------------------------------------------------------------- #

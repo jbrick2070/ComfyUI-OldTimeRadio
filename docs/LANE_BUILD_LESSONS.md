@@ -1108,3 +1108,118 @@ on Windows is `PermissionError: [WinError 32]` and kills the render at the
 staging seam before any GPU work, with an error that names nothing about init
 images. Keep a lane's still in the lane's own directory. Flagged for its own
 fix; every in-process adapter shares that helper.
+
+---
+
+## L17 -- A gate that reads a DECLARATION cannot be proof, whatever it is named
+
+**Check:** for every validator this lane relies on, ask WHERE THE FIELD IT
+CHECKS CAME FROM. If the answer is "the adapter under validation wrote it", the
+check is a declaration agreeing with itself and proves nothing -- no matter how
+strict it looks or how green it reports. Then ask what artifact on disk could
+answer the same question, and check THAT.
+
+**Symptom:** none, ever, from inside. The validator raises correctly on
+malformed dicts, its tests pass, the gate is green, and the property it exists
+to establish has never once been established.
+
+**Root cause:** the two halves of a contract -- what the clip CLAIMS and what
+the bytes ARE -- were both routed through the same dict. `has_audio is not
+False` in `validate_directory_clip` read the literal `has_audio: False` that
+`_directory_clip` had hand-written four lines earlier. Meanwhile
+`list_directory_frames` selected frames by FILENAME EXTENSION, so a file named
+`0001.png` containing an mp4 -- or a WAV, which is the case that makes this an
+AUDIO defect and not a tidiness one -- counted as a frame and shipped as
+evidence of silence.
+
+**Origin (lane 10, 2026-08-11):** `mesh_stage` is the only directory-clip lane
+in the roster, so its G5 row could not be closed by copying what nine mp4 lanes
+do. Bolting an ffprobe onto a PNG directory would have satisfied the gate's
+string match and proved nothing about anything -- which is the trap worth
+recording, because it is the cheap move and it looks like compliance.
+
+**The fix shape, which generalises:** find the STRUCTURAL fact that makes the
+claim true and prove that instead. A PNG/EXR is a still-image format with no
+audio stream to carry, so proving each frame really is one -- from its magic
+bytes, not its name -- makes silence a fact about the bytes. Put the proof in
+the SHARED listing helper, not the strict validator, so the tolerant read path
+(`frame_dir_summary`, which the manifests and `_clip_summary` use and which
+never raises) inherits it too; otherwise a receipt can still call an impostor
+directory real while the validator would have refused it.
+
+**And the half that keeps the gate honest.** Teaching a LEXICAL gate a new
+function name buys a green row for a STRING, so the named function needs a test
+that fails when the proof behind it rots. Teach the name per lane, never widen
+the gate to "any validator" -- that would let a future lane launder a missing
+proof past it (L9, same shape, opposite direction).
+
+**Runnable check:** for each field a validator enforces, name the writer. If the
+writer is the thing being validated, the check is decorative. And for every gate
+taught a new name, assert the named function REFUSES the case it exists to
+catch -- here, a file with a frame extension whose bytes are not an image.
+
+**Twin assertion:**
+`test_lane_preflight_matrix.py::test_the_directory_clip_audio_law_really_proves_the_frames`
+(the guard on the teaching) and
+`tests/test_video_directory_clip.py::test_a_frame_is_proved_by_its_MAGIC_BYTES_not_its_extension`.
+
+---
+
+## Lane 10 -- `mesh_stage`, closed 2026-08-11
+
+Four red gates, the most defective lane left. Both new lessons above are this
+lane's -- L17 is G5, and G1 turned out to be L1's third instance. Three more
+things worth the next lane's attention.
+
+**What bit (1): the lane was DEAD ON THIS BOX and nine months of green tests
+never said so.** L1 predicted the shape and the ledger caught it before any GPU
+time was spent -- but the measurement is worth writing down, because it is the
+starkest instance yet. With no env pin anywhere (`OTR_HY3D_CKPT` is absent from
+the process env, the User env, the Machine env, and the launcher hydrates only
+`OTR_BLENDER_EXE`), the old resolver's single path
+`<comfy_root>/models/checkpoints/hunyuan3d-dit-v2-mv.safetensors` **does not
+exist**, while the 4.93 GB weight sits in `C:\ComfyUI-Models\checkpoints`. So
+`_installed()` answered False and `assert_usable` refused, naming a file nobody
+had ever installed under that name.
+
+**Runnable check:** for every lane, resolve its primary weight with NO `OTR_*`
+env pins set at all and compare against what is actually on disk. "It works on
+my box" is not the question; a leftover export is exactly what hides this, and
+the lane can be dead for months while every CPU test passes.
+
+**What bit (2): the differential control moved for the FOURTH time, and the
+handover is now the interesting part.** `mesh_stage` held the "declares
+NOTHING" canvas control in `test_ltx_8gb_canonical_canvas.py`; it passes to
+`still_pan` (lane 16). Four handovers in ten days, each because the occupant
+gained a declaration of its own. The list is down to two lanes.
+
+**Runnable check:** unchanged from lane 1 -- before declaring a canvas, grep the
+test tree for the lane's id used as a NEGATIVE control. What lane 10 adds: when
+the control list is nearly empty, say in the test WHERE it goes next, because
+the last occupant leaving is what turns "move the control" into "delete the
+test", and the invariant outlives every occupant.
+
+**What bit (3): a shared-mechanism fix flips OTHER lanes green, and the ledger
+insists you say so in the same commit.** Adding `continuity=` to
+`_CheapFamilyBase` flipped the four still lanes' G3 rows, and the strict
+unexpected-pass gate FAILED until their `EXPECTED_RED` entries were deleted --
+which is the gate working exactly as designed. The discipline that matters is
+the other half: the four visualizers and `google_omni_video` have the identical
+defect through their OWN contracts, were NOT reached by the base fix, and stay
+red. A sweep that reports lanes it did not touch is worse than no sweep, because
+the next window reads the ledger and believes it.
+
+**What did NOT bite:** the boot lane (this lane needs no token -- the registry
+IS the menu), the still plan, the public surface, the admission honesty row, and
+the atomic-publish/stale-tmp machinery were all green before the packet started
+and stayed green. The E-1..E-4 chain -- cache key, mesher, VRAM barrier, cube
+self-test, validate, atomic publish -- ran end to end on the first live attempt.
+
+**An OPEN gap this lane deliberately did not close, so the next reader does not
+assume it did:** `_directory_clip` returns no `vram_peak_mb` / `recipe` /
+`quant` / `render_canvas`, so the smoke report carries a null peak and this lane
+has NO measured VRAM number. G4 is green because the manifest records it as
+admission-unenforced in words, which is honest. But a peak here needs a probe
+threaded through a torch mesher AND a Blender subprocess -- two different
+measurement surfaces (L7) -- so it is a measurement design question, not a
+passthrough like lane 9's. **Nothing in lane 10's receipt may seed a cost row.**

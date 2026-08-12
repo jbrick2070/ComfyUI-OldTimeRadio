@@ -169,7 +169,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | ltx_8gb | 512x288 | declared |
 | ltx_audio_in | 1024x576 | declared |
 | ltx_video | 1024x576 | declared |
-| mesh_stage | 1472x832 | SHARED LANDSCAPE DEFAULT (unclaimed) |
+| mesh_stage | 1472x832 | declared |
 | still_flat | 1472x832 | shared landscape (by design for this family) |
 | still_motion | 1472x832 | shared landscape (by design for this family) |
 | still_pan | 1472x832 | shared landscape (by design for this family) |

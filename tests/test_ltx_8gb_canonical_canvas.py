@@ -112,14 +112,17 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     # no declaration it fell through to 1472x832, 3.07x the pixels its tier was
     # configured for, on a 14B fp8 lane at a 14.5 GiB gate. The invariant this
     # test guards is unchanged -- an engine that declares NOTHING is still
-    # untouched -- and mesh_stage now carries the control.
+    # untouched -- and still_pan now carries the control.
     # `humo` left this list in lane 4 (2026-08-11) when the HuMo family
     # closed -- the third occupant to leave. `ltx_audio_in` left in lane 7 the
     # same day: its ia2v graph halves the canvas for stage A and doubles it
     # back with a fixed-x2 upsampler, so an undeclared canvas could produce a
-    # stage-A latent LTX's /32 grid rejects. It declares (1024, 576) now. What
-    # remains are lanes whose own packets have not run yet.
-    for other in ("mesh_stage", "still_pan", "viz_mxc_cpu"):
+    # stage-A latent LTX's /32 grid rejects. It declares (1024, 576) now.
+    # `mesh_stage` left in lane 10: it had been choosing 1472x832 with an
+    # inline sniff inside render_clip, which is a declaration everywhere except
+    # where anything could read it, and it declares (1472, 832) properly now.
+    # What remains are lanes whose own packets have not run yet.
+    for other in ("still_pan", "viz_mxc_cpu"):
         assert rd.declared_render_canvas(other) is None
     assert rd.declared_render_canvas("an_engine_that_does_not_exist") is None
     assert rd.declared_render_canvas("") is None
@@ -207,14 +210,15 @@ def test_a_SIBLING_lane_still_takes_the_landscape_default():
     untouched, or this was a global canvas rewrite rather than a per-adapter
     declaration.
 
-    The control has moved twice, which is itself the story: wan_ti2v held it
-    until 2026-08-02, wan_i2v until 2026-08-11, and each handover happened
-    because the lane gained a declaration of its own. mesh_stage holds it now
-    (humo cannot -- it is a face family and takes the portrait canvas). When
-    mesh_stage declares its canvas in lane 10, this control moves again rather
-    than the test being deleted: the invariant outlives every occupant.
+    The control has moved three times, which is itself the story: wan_ti2v held
+    it until 2026-08-02, wan_i2v until 2026-08-11 morning, mesh_stage until
+    lane 10 that same day, and every handover happened because the lane gained
+    a declaration of its own. still_pan holds it now (humo cannot -- it is a
+    face family and takes the portrait canvas). When still_pan declares its
+    canvas in lane 16, this control moves again rather than the test being
+    deleted: the invariant outlives every occupant.
     """
-    ledger = _ledger(engine="mesh_stage")
+    ledger = _ledger(engine="still_pan")
     assert _canvas(rd.build_request_from_shot(_shot(ledger),
                                               ledger)) == LANDSCAPE
 

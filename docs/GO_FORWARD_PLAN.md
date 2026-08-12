@@ -51,14 +51,23 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11 (lane-9 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** 9 of 21 packets
-confirmed working and pushed; **lane 10 (`mesh_stage`) is NEXT and is the most
-defective lane left (4 red gates).** Baselines to detect drift against: Bug
-Bible **20 passed / 24 skipped / 3 xfailed** at **268** entries; full suite
-**9949 passed / 109 skipped / 1 xfailed**; `scripts/build_variants.py --check`
-**46 variants, 0 failures**. Box was left CLEAN (no resident server, VRAM at
-the ~1.8 GB desktop baseline).
+**WINDOW HANDOFF 2026-08-11 (lane-10 wrap): read
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **10 of 21 packets**
+confirmed working and pushed; **lane 11 (`viz_green`) is NEXT.** Baselines to
+detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
+**272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
+DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
+test_` functions and REPLACES one -- `test_default_canvas_is_explicit_1472x832`
+became `test_the_lane_DECLARES_its_canvas_1472x832` -- so the net is +13, which
+is the number to check drift against); `scripts/build_variants.py --check`
+**46 variants, 0 failures**. Box was left CLEAN (no resident server, port 8000
+clear, VRAM 657 MiB).
+
+**What lane 10 already did for lanes 15-18:** their **G3 rows are GREEN** --
+`continuity=` landed on the shared `_CheapFamilyBase`, so those four packets
+inherit it and their `EXPECTED_RED` G3 entries are already gone. The four
+visualizers (lanes 11-14) do NOT share that base and their G3 rows are still
+red and still theirs. Do not read the still lanes' green as a claim about yours.
 
 **RUN `scripts/build_variants.py --check` BEFORE STARTING A LANE.** Lane 7
 inherited five red variants from lane 5 and had to distinguish them from its
@@ -131,21 +140,40 @@ written), `TODO`.
 | 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** | TODO |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
-| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **OPEN -- FULLY DIAGNOSED 2026-08-11, no code written. Every root cause below is grounded in the real files; START CODING, do not re-diagnose.** See the LANE 10 DIAGNOSIS block under this table. |
-| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | TODO |
+| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **DONE** -- 4/4 red gates green, live smoke PASS (50 frames at the declared 1472x832, magic-byte proved). Receipt: `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Its G3 fix also closed the FOUR still lanes' G3 rows (shared `_CheapFamilyBase`) |
+| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration. **NOTE: G3 is still yours** -- lane 10's continuity fix landed on `_CheapFamilyBase`, which the visualizers do NOT share | TODO |
 | 12 | `viz_camera` | same visualizer checks, this lane only | TODO |
 | 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | TODO |
 | 14 | `viz_mxc_mandala` | S8b-16 pycairo half (a NAMED dependency refusal), profile/canvas, continuity | TODO |
-| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | TODO |
-| 16 | `still_pan` | the now-proven still-lane rules, this lane only | TODO |
-| 17 | `still_flat` | same checklist independently | TODO |
-| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO |
+| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal. **G3 already GREEN** (lane 10's shared-base fix); G2 is still yours | TODO |
+| 16 | `still_pan` | the now-proven still-lane rules, this lane only. **G3 already GREEN**; also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` when this lane declares | TODO |
+| 17 | `still_flat` | same checklist independently. **G3 already GREEN** | TODO |
+| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract. **G3 already GREEN** | TODO |
 | 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
 
-### LANE 10 DIAGNOSIS -- `mesh_stage` (done 2026-08-11, act on it)
+### LANE 10 DIAGNOSIS -- `mesh_stage` -- **ACTED ON AND CLOSED 2026-08-11**
+
+**Every root cause below was confirmed against the live gates and fixed.** The
+block is kept only so the next reader can see what a fully-diagnosed lane looked
+like going in; the outcome, the live smoke and what was deliberately left open
+live in `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Two corrections the
+diagnosis earned in the doing, worth carrying forward:
+
+* **G1's L1 half was not theoretical -- the lane was DEAD ON THIS BOX.** With no
+  `OTR_HY3D_CKPT` pin anywhere (process, User, Machine; the launcher hydrates
+  only `OTR_BLENDER_EXE`), the old resolver's one path did not exist while the
+  4.93 GB weight sat in `C:\ComfyUI-Models\checkpoints`, so `assert_usable`
+  refused. The diagnosis called it a resolver defect; it was an outage.
+* **G5's fix belongs in `list_directory_frames`, not only in
+  `validate_directory_clip`.** The tolerant `frame_dir_summary` -- which the
+  manifests and `_clip_summary` read and which never raises -- shares the same
+  listing rule, so a proof placed only in the strict validator would still let a
+  receipt call an impostor directory real.
+
+The original diagnosis follows, unedited.
 
 **Read `docs/LANE_BUILD_LESSONS.md` first anyway (step 1 of the loop), then
 code.** All four red gates were root-caused against the real files before the
@@ -247,12 +275,12 @@ one-token fix on a cloud lane outside the 21-lane order, tracked by an
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-11 (lane-8 wrap) |
+| Thing | Value as of 2026-08-11 (lane-10 wrap) |
 |---|---|
-| Branch / HEAD | `v2.0-alpha` @ `7afe40e5`, == `origin/v2.0-alpha` (measured 2026-08-11 at the lane-8 wrap) |
+| Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-11 at the lane-10 wrap, one commit past `e9800c89`) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **9937 passed / 109 skipped / 1 xfailed, exit 0** (measured 2026-08-11 at `7afe40e5`, NOTHING deselected -- the three foreign failures in the box below are GONE, the concurrent window committed its wan_i2v canvas edit). Was 9920 before this window; +17 are new coverage from lanes 7-8 and the retro bug hunt |
-| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `12005e3` (**268** entries, index **380** rows, audited through **2026-08-11**). +4 entries this window (12.89-12.92) from the lane 0-8 delta; 4 more records indexed as already-covered. NEVER re-scrape indexed history |
+| Suite | **9963 passed / 109 skipped / 1 xfailed, exit 0** (measured 2026-08-11 at the lane-10 wrap, NOTHING deselected). Was **9950** at `e9800c89`; lane 10 adds 14 tests and replaces 1, so +13. **The "9822 / 111 skipped / 3 deselected" figure in `docs/2026-08-11-RESPONSE-lemmy-sprint-goforward-check.md` is STALE and its 3-test deselection must not be adopted** -- that window's commits were docs-only and a fresh run at its own HEAD gives 9950/109/1 with nothing deselected. Deselecting to get a green number hides real failures |
+| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `1ad7bb3` (**272** entries, audited through **2026-08-11**). **Lane 10 promoted NOTHING, deliberately, and the reason is the ADMISSION RULE.** Its two findings are L1's third instance (already a Bible rule from lane 1 -- covered, not new) and the new L17 (a validator reading a field the validated component wrote is not proof). L17 is portable and Bible-shaped, but it was found by READING the gate, not by a live production failure -- and a static-audit finding "never creates a new PBUG or Bible rule on its own". It is recorded in `docs/LANE_BUILD_LESSONS.md` with a twin assertion instead. If a live render ever ships a mis-typed frame past this, THAT artifact admits it. NEVER re-scrape indexed history |
 | Variants | `build_variants.py --check` **46 variants / 0 failures**. **RUN THIS BEFORE STARTING A LANE** -- it had been RED since lane 5 (five variants still carried `wan_8gb (16:9)`) and lane 7 had to separate inherited drift from its own. A red at the start of a lane belongs to whoever caused it |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |

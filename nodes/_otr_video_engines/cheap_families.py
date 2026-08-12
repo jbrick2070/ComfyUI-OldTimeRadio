@@ -24,7 +24,7 @@ import logging
 
 from .registry import register
 from .._otr_shared.still_plan_helpers import StillPlanRow
-from .frame_contract import FrameContract
+from .frame_contract import CONTINUITY_NONE, FrameContract
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 log = logging.getLogger("OTR.video.cheap_families")
@@ -95,11 +95,28 @@ class _CheapFamilyBase:
     #: and has no mechanism that would consume a predecessor's terminal frame.
     #: Inherited by still_motion / still_pan / still_flat / still_word AND by
     #: mesh_stage, whose camera walk is equally unbounded.
+    #:
+    #: ``continuity=`` IS PASSED, and that is the point (lane 10, 2026-08-11,
+    #: lesson L3 + L13). The comment above had REASONED about continuity since
+    #: the shelf was written while the keyword was never passed, so every lane
+    #: sharing this base inherited ``CONTINUITY_NONE`` as a dataclass DEFAULT --
+    #: the right value arrived at by nobody deciding it, which is exactly the
+    #: shape a wrong value would have had. Six lanes read it (the four still
+    #: families, ``mesh_stage``, ``still_parallax``), so it is fixed at the
+    #: shared mechanism rather than per lane.
+    #:
+    #: NONE is also the honest answer for ``mesh_stage`` specifically, and its
+    #: reason is different from the still shelf's: ``build_blender_cmd`` takes
+    #: ``start_angle`` / ``arc_degrees``, so a chained successor segment would
+    #: need the predecessor's TERMINAL ORBIT ANGLE threaded forward to continue
+    #: the turntable, and nothing threads it. Until something does, a chain
+    #: would snap the camera back to the arc's start on every segment boundary.
     frame_contract = FrameContract(
         min_frames=1,
         max_frames=0,
         quantum=1,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     engine_version = "1"
     #: True when this family animates a provided still (asset_refs.init_image /

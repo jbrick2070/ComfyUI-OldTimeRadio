@@ -212,21 +212,40 @@ EXPECTED_RED: dict = {
     # by 2.7x the pixels on the tier that exists because it cannot afford them.
     # 512x288 stands: it is the 2026-07-26 arc judgment's ruled canvas (exact
     # 16:9, /32-clean, zero pad area) and the profiles moved to it.
-    ("mesh_stage", "G1"): (
-        "S8b-16 -- the hy3d CHECKPOINT is gated but the hy3d GRAPH is not: "
-        "the ten node classes resolve only inside load(), so preflight passes "
-        "and the render dies. OWNER: lane 10 (mesh_stage)."),
-    ("mesh_stage", "G2"): (
-        "S8b-11 -- profile canvas read by nothing; the lane renders at the "
-        "1472x832 landscape default. OWNER: lane 10 (mesh_stage)."),
-    ("mesh_stage", "G3"): (
-        "S8b/L3 -- the FrameContract never names continuity, so "
-        "CONTINUITY_NONE is inherited rather than decided. "
-        "OWNER: lane 10 (mesh_stage)."),
-    ("mesh_stage", "G5"): (
-        "L4 -- canonicalize never probes its own emitted file, so this "
-        "lane's silence is declared and not proved. "
-        "OWNER: lane 10 (mesh_stage)."),
+    # LANE 10 CLOSED 2026-08-11 -- mesh_stage's G1, G2, G3 and G5 rows all left
+    # this table, and the G3 fix took the four still lanes' rows with it.
+    # G1 was two defects in one row. S8b-16: `_node_candidates()` named ten core
+    # hy3d classes that resolved only inside `load()`, so preflight passed and
+    # the render died mid-beat after the checkpoint was paid for -- there is now
+    # a node gate in `assert_usable`, ordered before weight resolution, reading
+    # the ACTIVE candidate set and collecting every miss. And lesson L1, the
+    # wan_i2v killer: `_ckpt_path` walked a hardcoded models/checkpoints plus an
+    # HF_HOME sibling and never consulted `folder_paths`, so a checkpoint
+    # registered through extra_model_paths.yaml was invisible on the runtime and
+    # one installed under this box's real models root was invisible off it. It
+    # now probes the env pin, `folder_paths`, the historical dirs, then lane 1's
+    # `wan_shared.configured_models_root()` LAST -- additive, so it can only turn
+    # a false negative into the truth.
+    # G2 was S8b-11 plus an inline branch: the lane declared no render_canvas and
+    # picked its size with a magic-number sniff inside render_clip (832x480 and
+    # no explicit canvas -> 1472x832), the same shape lane 7 deleted. It declares
+    # (1472, 832) now -- what Blender is actually told and what
+    # `validate_frame_dir` refuses to publish anything else at -- the branch is
+    # gone, and its one profile carries the same numbers as a drift guard.
+    # G3 was the shared `_CheapFamilyBase.frame_contract`, whose comment had
+    # reasoned about continuity for months while never passing `continuity=`.
+    # Per lesson L13 that is a defect in every adapter sharing the mechanism, so
+    # it was fixed at the base and the four still lanes' G3 rows came out in the
+    # same commit. The viz lanes and google_omni_video have the identical defect
+    # through their OWN contracts and stay red below -- a shared fix that did not
+    # reach them must not be reported as though it had.
+    # G5 was L4 exactly: `canonicalize` called `validate_directory_clip`, whose
+    # audio check read `has_audio is not False` off the dict this adapter wrote
+    # -- a declaration checking a declaration -- while frames were accepted by
+    # FILENAME EXTENSION, so a file named .png containing anything at all
+    # counted. The directory contract now PROVES each frame from its magic
+    # bytes, which is what makes "no audio stream" a fact about the bytes, and
+    # G5 is taught that named function for directory-clip lanes only.
     ("google_omni_video", "G3"): (
         "L3 -- CONTINUITY_NONE is inherited rather than declared on this "
         "text-to-video cloud lane. NONE is near-certainly the right answer "
@@ -250,6 +269,17 @@ _CHEAP_LANE_OWNERS = {
     "still_flat": "lane 17 (still_flat)",
     "still_word": "lane 18 (still_word)",
 }
+#: The four still lanes reach their FrameContract through `_CheapFamilyBase`,
+#: and lane 10 fixed it there (lesson L13: a defect in a shared mechanism is a
+#: defect in every adapter sharing it, and it gets swept before the lane that
+#: found it closes). So their G3 rows left this table with mesh_stage's, in the
+#: same commit -- the strict unexpected-pass gate insists on exactly that.
+#: The four visualizers are NOT reached by that fix: each declares its own
+#: contract and inherits the default independently, so each stays red until its
+#: own packet runs. Their G2 rows are untouched either way -- a shared contract
+#: fix says nothing about a lane's canvas.
+_G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
+                             "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -257,9 +287,11 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         "the lane renders at the 1472x832 driver default. Its packet decides "
         "whether to declare the canvas or document the channel dead. "
         "OWNER: %s." % _owner)
-    EXPECTED_RED[(_lane, "G3")] = (
-        "L3 -- the FrameContract never names continuity, so CONTINUITY_NONE "
-        "is inherited rather than decided. OWNER: %s." % _owner)
+    if _lane not in _G3_STILL_DEFAULTED_LANES:
+        EXPECTED_RED[(_lane, "G3")] = (
+            "L3 -- the FrameContract never names continuity, so "
+            "CONTINUITY_NONE is inherited rather than decided. OWNER: %s."
+            % _owner)
 
 
 # ---------------------------------------------------------------------------
@@ -631,17 +663,43 @@ def _receipt_lora_agrees_with_graph(name, eng):
     return []
 
 
+#: Lanes that deliver a frame DIRECTORY instead of an mp4, and the named
+#: function that carries the audio law for them.
+#:
+#: G5 is a LEXICAL gate: it greps the canonicalize path for the name of the
+#: function that proves silence. `validate_silent_clip_contract` ffprobes an
+#: mp4 for audio streams, and `mesh_stage` -- the only directory-clip lane in
+#: the roster (`"type": "directory"`, straight-alpha PNG frames) -- has no
+#: container to probe. `validate_directory_clip` is its twin: it reads every
+#: frame's MAGIC BYTES through `list_directory_frames` and refuses anything
+#: that is not really a PNG/EXR still, which makes "carries no audio stream" a
+#: structural fact about the bytes rather than a naming convention.
+#:
+#: TEACHING THE GATE A NEW NAME IS THE SANCTIONED MOVE, and widening it is not
+#: (lesson L9: G1 was taught `_resolve_unet` rather than made to accept any
+#: resolver). A gate that accepted "some validator, whatever it is called"
+#: would let a future lane launder a missing proof past it. The mapping is
+#: per-lane and explicit, and `test_the_directory_clip_audio_law_really_proves_the_frames`
+#: below asserts the named function actually refuses a mis-named non-image --
+#: so the name cannot go on meaning something after the proof behind it rots.
+DIRECTORY_CLIP_AUDIO_LAW = {
+    "mesh_stage": "validate_directory_clip",
+}
+
+
 def gate_g5_audio_law(name, eng):
     """G5.1 the adapter's canonicalize path runs validate_silent_clip_contract
-    on its OWN emitted file. A has_audio: False literal is not evidence."""
+    -- or, for a directory-clip lane, its named twin -- on its OWN emitted
+    artifact. A has_audio: False literal is not evidence."""
     canon = getattr(eng, "canonicalize", None)
     if canon is None:
         return []
     src = _defining_module_source(eng, "canonicalize")
-    if "validate_silent_clip_contract" not in src:
-        return ["its canonicalize path never calls "
-                "validate_silent_clip_contract, so silence is DECLARED and "
-                "never proved on the emitted file (lesson L4)"]
+    wanted = DIRECTORY_CLIP_AUDIO_LAW.get(name, "validate_silent_clip_contract")
+    if wanted not in src:
+        return ["its canonicalize path never calls %s, so silence is DECLARED "
+                "and never proved on the emitted artifact (lesson L4)"
+                % wanted]
     return []
 
 
@@ -909,6 +967,48 @@ def test_the_matrix_report_renders():
     report = "\n".join(lines)
     assert "lane" in report and len(lines) == len(ENGINE_NAMES) + 1
     print("\n" + report)
+
+
+def test_the_directory_clip_audio_law_really_proves_the_frames(tmp_path):
+    """The guard on G5's exemption-by-name (lane 10, 2026-08-11).
+
+    G5 is lexical, so teaching it that `validate_directory_clip` carries the
+    audio law for a directory-clip lane buys a green row for a STRING. If the
+    proof behind that string ever rots -- someone drops the magic-byte read
+    back to an extension check, say -- the gate would keep saying "silence
+    proved" about a directory that could hold anything. That is precisely how a
+    ledger becomes a rubber stamp, so the named function is exercised here:
+    a file called `0001.png` whose bytes are not a PNG must be REFUSED.
+
+    Mutation-checked by construction: revert `prove_frame_is_a_silent_image` to
+    trusting the extension and this test goes red immediately.
+    """
+    from nodes._otr_video_engines import directory_clip as dc
+
+    for lane, fn_name in DIRECTORY_CLIP_AUDIO_LAW.items():
+        assert lane in ENGINE_NAMES, lane
+        fn = getattr(dc, fn_name, None)
+        assert callable(fn), (
+            "G5 accepts %r as %s's audio law, but "
+            "nodes/_otr_video_engines/directory_clip.py defines no such "
+            "function -- the gate would be matching a string that means "
+            "nothing" % (fn_name, lane))
+
+    d = tmp_path / "frames"
+    d.mkdir()
+    # A REAL frame: the PNG signature, so the honest case still passes.
+    (d / "0001.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+    clip = {"type": "directory", "path": str(d), "pixel_format": "rgba",
+            "alpha": "straight", "has_audio": False, "frame_count": 1}
+    assert len(dc.validate_directory_clip(clip, expect_frames=1)) == 1
+
+    # The same directory with an IMPOSTOR: named .png, containing an mp4's
+    # ftyp box. Nothing about the name changed; everything about the proof did.
+    (d / "0002.png").write_bytes(b"\x00\x00\x00\x20ftypisom" + b"\x00" * 32)
+    clip["frame_count"] = 2
+    with pytest.raises(ValueError) as excinfo:
+        dc.validate_directory_clip(clip, expect_frames=2)
+    assert "0002.png" in str(excinfo.value)
 
 
 def test_a_halving_two_stage_lane_declares_a_64_legal_canvas():
