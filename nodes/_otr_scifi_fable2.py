@@ -1827,6 +1827,71 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     return ""
 
 
+#: Characters per token for English prose, which tokenizes near 4.0 on the
+#: models this pipeline runs. The three factors below MULTIPLY, so stacking
+#: a pessimistic value here on top of two safety margins is not caution --
+#: it compounds into dropping drafts that fit comfortably. The first version
+#: did exactly that and lost the ceiling-length episodes the guard exists
+#: for. Sanity-checked at the structural ceiling: even if real tokenization
+#: were 3.5, a 1520-word draft plus its prompt and reply still fits 8192.
+_CHARS_PER_TOKEN = 4.0
+
+#: Headroom on the estimated reply. The corrected episode is about the same
+#: length as the draft being corrected, plus slack for a model that expands
+#: slightly while repairing.
+_REPAIR_REPLY_MARGIN = 1.15
+
+#: Safety margin on the whole turn, covering the system prompt, the defect list
+#: and tokenizer variance -- none of which are measured here.
+_REPAIR_TURN_HEADROOM = 1.10
+
+
+def _draft_fits_repair_turn(base_user: str, draft: str) -> bool:
+    """Whether the rejected draft can ride along without crowding the reply.
+
+    Budgets the WHOLE TURN -- prompt plus the reply the model still has to
+    write -- rather than allowing the prompt a flat fraction of the window.
+
+    THE FLAT FRACTION WAS WRONG AND QA CAUGHT IT (2026-08-12). The first
+    version allowed the prompt 55% of an 8192-token window at a pessimistic 3
+    chars/token, i.e. ~13.5k characters for base_user + draft. Measured against
+    REAL inputs, a full-length episode blows straight through that: a maxed
+    3600-char digest gives a ~6.1k-char `base_user`, and a 1520-word draft (the
+    documented structural ceiling) is ~9.2k characters -- 15.3k together. So
+    the guard dropped the draft for exactly the full-length episodes its own
+    comment said it existed to serve, silently restoring the cold-regeneration
+    bug this change was written to fix. Worse, the test that was supposed to
+    cover it asserted on a 400-character toy play, so it passed throughout.
+
+    Approximate by design: an exact tokenizer count would bind this to one
+    provider's tokenizer, and the decision only has to be SAFE. The asymmetry
+    still holds -- "no" costs one cold repair turn, "yes" when it does not fit
+    truncates the prompt -- which is what the margins are for.
+    """
+    if not draft:
+        return False
+    # Read lazily with a floor. The catalog owns the real number and honours
+    # OTR_HARD_VRAM_CONTEXT_LIMIT for bigger hardware; a module-level import
+    # here would add an import-order dependency for a heuristic, and a missing
+    # catalog must not be able to break script generation.
+    cap = 8192
+    try:
+        from . import _otr_model_catalog as _catalog
+
+        cap = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or cap
+    except Exception:                       # pragma: no cover -- flat/test load
+        try:
+            import _otr_model_catalog as _catalog  # type: ignore
+
+            cap = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or cap
+        except Exception:
+            pass
+    prompt_tokens = (len(base_user) + len(draft)) / _CHARS_PER_TOKEN
+    reply_tokens = (len(draft) / _CHARS_PER_TOKEN) * _REPAIR_REPLY_MARGIN
+    needed = (prompt_tokens + reply_tokens) * _REPAIR_TURN_HEADROOM
+    return needed <= cap
+
+
 def _run_markup_ladder(
     creative_fn,
     *,
@@ -1850,12 +1915,63 @@ def _run_markup_ladder(
     traces: "list[PassAttemptTrace]" = []
     extra_user: "str | None" = None
     last_defect_text = ""
+    #: The draft the NEXT attempt has to repair. Empty until an attempt is
+    #: rejected, and reset to "" whenever the draft could not be carried.
+    rejected_draft = ""
+    cold_regenerations = 0
+    last_temp: "float | None" = None
 
     for temp in temps:
         attempt = len(traces) + 1
+        # A REPAIR TURN CARRIES THE DRAFT IT IS REPAIRING (r1 2026-08-12).
+        #
+        # It did not, and that was the defect. The retry said "Keep the same
+        # story, cast, events, and wording wherever the format is already
+        # valid" -- to a model that had never been shown the text. Every
+        # attempt after the first was a COLD REGENERATION carrying a list of
+        # complaints about an invisible draft, which is why four attempts
+        # produced four DIFFERENT malformed shapes instead of converging on one
+        # repaired script, and why a precisely-worded repair rule
+        # (PBUG-20260812-03) bought so little: it named the offending row to a
+        # model that then had to rewrite the whole play from nothing.
+        #
+        # `_MARKUP_LADDER_TEMPS` is the proof this was never intended: it
+        # decays to 0.30 and its own docstring calls that rung "repeats 0.30
+        # WITH THE DEFECT QUOTE". The temperature was lowered toward
+        # determinism FOR a repair context the code never supplied.
+        draft_block = ""
+        if extra_user and rejected_draft:
+            draft_block = (
+                "\n\nTHE DRAFT YOU MUST REPAIR (your previous attempt, "
+                "verbatim). Return the corrected FULL episode. Keep every "
+                "line that is already legal exactly as written -- change only "
+                "what the defects below name:\n"
+                "-----BEGIN REJECTED DRAFT-----\n"
+                f"{rejected_draft}\n"
+                "-----END REJECTED DRAFT-----"
+            )
         user_content = (
-            f"{base_user}\n\n{extra_user}" if extra_user else base_user
+            f"{base_user}{draft_block}\n\n{extra_user}"
+            if extra_user else base_user
         )
+        # TEMPERATURE DECAYS ONLY WHEN THE DRAFT ACTUALLY WENT WITH IT.
+        # Near-deterministic sampling is right for surgical repair and wrong
+        # for regeneration: a cold rung at 0.30 re-derives the same wrong
+        # structure it just produced.
+        #
+        # HOLD THE PREVIOUS RUNG, DO NOT RESET TO THE OPENING TEMPERATURE.
+        # Resetting was the first version and QA caught it: with the draft
+        # dropped on attempt 2 the real sequence became 0.75, 0.49, 0.75, 0.30
+        # -- a RISE, breaking `_MARKUP_LADDER_TEMPS`'s documented invariant
+        # ("the markup ladder NEVER raises temperature") and putting the
+        # last-chance attempt at full exploration instead of the narrowed rung
+        # the ladder's whole "depth, not temperature" design calls for.
+        # Holding gives 0.75, 0.49, 0.49, 0.30: still non-increasing, and still
+        # away from the near-deterministic rung that a cold retry must avoid.
+        if attempt > 1 and not draft_block and last_temp is not None:
+            temp = max(temp, last_temp)
+            cold_regenerations += 1
+        last_temp = temp
         if format_example is None:
             messages = ProviderCapacityMessages([
                 {"role": "system", "content": system},
@@ -1900,6 +2016,13 @@ def _run_markup_ladder(
                 "output_budget_mode": "provider_capacity",
                 "requested_max_new_tokens": None,
                 "attempt_trace": trace_tuple,
+                # How many retries had to regenerate COLD because the
+                # rejected draft did not fit the repair turn. Was declared
+                # and incremented but never read -- and a comment claimed
+                # it reached the trace, which nothing did. A budget guard
+                # whose activations are invisible is a silent revert to the
+                # cold-regeneration bug.
+                "cold_regenerations": cold_regenerations,
             }
 
         defect_rows = tuple(str(defect) for defect in defects)
@@ -1912,6 +2035,14 @@ def _run_markup_ladder(
         ))
         defects_by_attempt.append(list(defect_rows))
         last_defect_text = rendered
+        # Carry this draft into the next turn -- unless it will not fit. The
+        # budget check is deliberate rather than assumed: a 45-word episode's
+        # draft is small, but this ladder also serves full-length episodes, and
+        # silently overflowing the window would trade a diagnosable format
+        # failure for a truncated prompt. When it does not fit we say so in the
+        # diagnostics and fall back to regeneration WITHOUT decaying the
+        # temperature.
+        rejected_draft = raw if _draft_fits_repair_turn(base_user, raw) else ""
         extra_user = (
             "Repair only the malformed FORMAT defects below. Return the "
             "complete episode from TITLE through END as plain text. Keep "
