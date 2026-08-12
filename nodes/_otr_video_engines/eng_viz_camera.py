@@ -19,7 +19,7 @@ import os
 
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
-from .frame_contract import FrameContract
+from .frame_contract import CONTINUITY_NONE, FrameContract
 
 _LOG = logging.getLogger("OTR.video.viz_camera")
 
@@ -37,6 +37,19 @@ class VizCameraEngine:
     required_inputs = ()
     accepts_still = False
     render_aspect = "wide"
+    #: NO ``render_canvas`` DECLARATION, deliberately (lane 12, 2026-08-11 --
+    #: lesson L19, and the premise was re-checked here rather than inherited).
+    #: ``render_clip`` paints and encodes at exactly the ``w, h`` the request
+    #: carries: `paint_golden_camera_frame`, the scanline and vignette tables
+    #: and the encoder are all built from those two numbers, and there is no
+    #: latent grid, trained input size or canvas-dependent constant anywhere in
+    #: the path. So the 1472x832 an episode hands this lane is the default of
+    #: ``OTR_VIDEO_LANDSCAPE_CANVAS`` -- an operator lever -- and NOT a fact
+    #: about the engine. Because ``declared_render_canvas`` is applied LAST and
+    #: overrules every earlier channel, declaring here would silently make this
+    #: the one visualizer that ignores that lever. The profile canvas channel is
+    #: declared INERT instead, in
+    #: ``test_lane_preflight_matrix.PROFILE_CANVAS_DOCUMENTED_DEAD``.
     #: S1 (2026-07-25) per-model still plan (spec
     #: ``docs/2026-07-25-still-plans-locked-build-spec.md`` section 3, Shape
     #: C -- "nothing"). ``viz_camera`` mints NO still. The empty tuple is
@@ -50,12 +63,24 @@ class VizCameraEngine:
     #: is no ceiling and no split. CONTINUITY none: nothing here consumes a
     #: supplied first frame, which is exactly why these beats may jump cut
     #: without owing the image phase a still at all.
+    #:
+    #: ``continuity=`` IS PASSED (lane 12, 2026-08-11 -- lesson L3). The
+    #: sentence above had claimed "CONTINUITY none" since this engine was
+    #: written while the keyword was never passed, so the value was a dataclass
+    #: DEFAULT -- the right answer nobody had decided. It is true here for a
+    #: reason this lane can state: ``render_clip`` paints every frame from the
+    #: beat's own audio analysis and a per-beat rng key, and reads no
+    #: predecessor frame, so no terminal state exists for a successor segment
+    #: to inherit. Declared per lane because each visualizer owns its own
+    #: contract -- there is no shared base here (lane 10's `_CheapFamilyBase`
+    #: fix reached the still shelf, not this family).
     frame_contract = FrameContract(
         min_frames=1,
         max_frames=0,
         quantum=1,
         native_fps=25,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     engine_version = "1"
     fallback_engine = None

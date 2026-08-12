@@ -245,6 +245,54 @@ def frame_contract_for(engine) -> FrameContract:
     return value if isinstance(value, FrameContract) else SINGLE_ONLY
 
 
+def declares_continuity_kwarg(engine) -> bool:
+    """True iff a ``FrameContract(...)`` call in this engine's class body passes
+    ``continuity`` as a KEYWORD -- i.e. the join mode was DECIDED, not defaulted.
+
+    The value alone cannot answer this. ``CONTINUITY_NONE`` is the dataclass
+    default, so a lane that never thought about chaining and a lane that
+    concluded NONE after reading its own render path are byte-identical at
+    runtime. That is exactly why G3.3 asks the question at all (lesson L3).
+
+    AST-BASED, AND THAT IS THE POINT (lane 12, 2026-08-11). The check used to be
+    a substring search for ``"continuity="`` over the class's SOURCE TEXT. It
+    worked while nobody discussed continuity in a comment, and it silently
+    rotted the moment lanes 10-12 began WRITING DOWN why each lane's value is
+    NONE -- every one of those comments contains that literal, so the check
+    would have gone green for a lane whose real declaration had been deleted,
+    satisfied by the paragraph explaining the declaration it no longer had.
+    Found by a post-coding QA pass on a test written minutes earlier.
+
+    Comments are not AST nodes, so prose cannot satisfy this. Lives here rather
+    than in the preflight suite because the gate and every lane's own test must
+    ask the SAME question -- two readers of one invariant is how they drift.
+
+    Never raises: unreadable or unparseable source answers False, which is the
+    safe direction (it reports "not declared", never a false pass).
+    """
+    if engine is None:
+        return False
+    import ast
+    import inspect
+    import textwrap
+
+    for base in type(engine).__mro__:
+        if base is object:
+            continue
+        try:
+            tree = ast.parse(textwrap.dedent(inspect.getsource(base)))
+        except Exception:  # noqa: BLE001 -- unreadable source is not a pass
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", "") or getattr(node.func, "attr", "")
+            if name == "FrameContract" and any(
+                    kw.arg == "continuity" for kw in node.keywords):
+                return True
+    return False
+
+
 def can_split(engine) -> bool:
     """True iff a beat could ever need more than one clip on this adapter.
 

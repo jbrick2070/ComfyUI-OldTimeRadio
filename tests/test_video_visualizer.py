@@ -67,9 +67,12 @@ def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
 
     eng = vreg.get_engine("viz_green")
     assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
-    # DECLARED, not defaulted: the keyword is present at the declaration site.
-    src = inspect.getsource(VisualizerEngine)
-    assert "continuity=" in src
+    # DECLARED, not defaulted -- read from the AST, not the source TEXT. A
+    # substring check for "continuity=" is satisfied by the comment above the
+    # declaration explaining it (the lane 12 QA finding), so it would pass with
+    # the real keyword deleted; the resolved VALUE cannot catch it either,
+    # because the dataclass default is the same constant.
+    assert fcm.declares_continuity_kwarg(eng)
     # ...and the property that makes NONE honest is still true: nothing in the
     # render path consumes a predecessor frame.
     render_src = inspect.getsource(VisualizerEngine.render_clip)

@@ -291,7 +291,7 @@ _CHEAP_LANE_OWNERS = {
 _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
-    if _lane == "viz_green":
+    if _lane in ("viz_green", "viz_camera"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -304,6 +304,13 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         # that silently ignores the lever, on a lane with no native canvas to
         # pin. Lesson L2's own override-path check is what catches it, and the
         # draft had walked past that check. Its G3 row left in the same commit.
+        #
+        # LANE 12 CLOSED 2026-08-11 -- viz_camera's two rows left the same way,
+        # after re-checking the PREMISE on its own render path rather than
+        # assuming the family shares one (L19's runnable check). It does: every
+        # painter, table and encoder call is built from the request's w/h.
+        # viz_mxc_cpu and viz_mxc_mandala are NOT covered by either lane and
+        # keep both their rows.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -471,6 +478,16 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "so the field cannot decide this lane's size and is declared inert "
         "here rather than reconciled to a number that would be equally unable "
         "to decide it. Lane 11, 2026-08-11."),
+    "viz_camera": (
+        "INERT, same mechanism and same reason as viz_green, and the premise "
+        "was RE-CHECKED on this engine rather than inherited (L19 says copy "
+        "the reasoning, not the shape). `eng_viz_camera.render_clip` builds "
+        "paint_golden_camera_frame, the scanline table, the vignette and the "
+        "encoder from the request's own w/h -- no latent grid, no trained "
+        "input size, no canvas-dependent constant -- so the 1472x832 an "
+        "episode hands it is OTR_VIDEO_LANDSCAPE_CANVAS's default, an operator "
+        "lever, not a property of the lane. Declaring would overrule that "
+        "lever for this lane alone. Lane 12, 2026-08-11."),
 }
 
 
@@ -613,6 +630,14 @@ CANVAS_RATE_LANES = frozenset(_UNBOUNDED_CONTRACT_LANES)
 PROVIDER_RATE_LANES = frozenset(_CLOUD_LANES)
 
 
+#: G3.3's reader, and it lives in the ENGINE module rather than here on purpose
+#: (lane 12, 2026-08-11): this gate and every lane's own continuity test must
+#: ask the SAME question, and two readers of one invariant is how they drift.
+#: It is AST-based because the substring check it replaced was satisfiable by
+#: the COMMENT explaining the declaration -- see its docstring.
+declares_continuity_kwarg = fc.declares_continuity_kwarg
+
+
 def gate_g3_contract(name, eng):
     """G3.1 native_fps == target_fps == 25 (a 24 fps model declares 25 and
     converts at delivery). G3.2 discrete menus in FRAMES. G3.3 continuity
@@ -647,9 +672,8 @@ def gate_g3_contract(name, eng):
                 "discrete_frames %r contains a rung below the canvas rate -- "
                 "THE UNIT IS FRAMES, NOT SECONDS (frame_contract.py:104-112)"
                 % (vals,))
-    src = _mro_source(type(eng))
-    if "continuity=" not in src:
-        bad.append("never names continuity= at its FrameContract declaration, "
+    if not declares_continuity_kwarg(eng):
+        bad.append("never passes continuity= at its FrameContract declaration, "
                    "so it inherits the CONTINUITY_NONE default silently and "
                    "refuses chaining without saying so (lesson L3)")
     return bad
@@ -1023,6 +1047,43 @@ def test_the_matrix_report_renders():
     report = "\n".join(lines)
     assert "lane" in report and len(lines) == len(ENGINE_NAMES) + 1
     print("\n" + report)
+
+
+def test_g3_cannot_be_satisfied_by_a_COMMENT_about_continuity():
+    """The guard on G3.3's own reading (lane 12, 2026-08-11).
+
+    G3.3 used to be a substring search for `"continuity="` over the class's
+    SOURCE TEXT. That is exactly satisfiable by a COMMENT -- and lanes 10, 11
+    and 12 each added a comment explaining why their value is NONE, every one
+    of which contains that literal. From that point the gate would have gone
+    green for a lane whose real declaration had been deleted, satisfied by the
+    paragraph explaining the declaration it no longer had.
+
+    Caught by the post-coding QA pass on lane 12, on a test written minutes
+    earlier. The reader is now `declares_continuity_kwarg`, which parses the
+    AST -- comments are not nodes.
+
+    Asserted with a class that TALKS about `continuity=` in a comment and a
+    docstring while passing nothing, so this test fails the moment the gate
+    goes back to reading text.
+    """
+    class _TalksButDoesNotDeclare:
+        """A lane whose docstring mentions continuity=CONTINUITY_NONE."""
+        #: continuity=CONTINUITY_NONE -- discussed at length, never passed.
+        frame_contract = fc.FrameContract(min_frames=1, max_frames=0, quantum=1,
+                                          allow_tail_trim=True)
+
+    class _ActuallyDeclares:
+        frame_contract = fc.FrameContract(min_frames=1, max_frames=0, quantum=1,
+                                          allow_tail_trim=True,
+                                          continuity=fc.CONTINUITY_NONE)
+
+    assert not declares_continuity_kwarg(_TalksButDoesNotDeclare())
+    assert declares_continuity_kwarg(_ActuallyDeclares())
+    # And the resolved VALUE is identical for both, which is why a value check
+    # could never have caught this either -- the default is the same constant.
+    assert (_TalksButDoesNotDeclare.frame_contract.continuity
+            == _ActuallyDeclares.frame_contract.continuity == fc.CONTINUITY_NONE)
 
 
 def test_the_directory_clip_audio_law_really_proves_the_frames(tmp_path):

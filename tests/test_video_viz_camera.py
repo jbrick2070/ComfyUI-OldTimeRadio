@@ -66,6 +66,90 @@ def test_engine_family_map():
     assert rd.engine_family(NAME) == "abstract"
 
 
+def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
+    """G3.3 / lesson L3 (lane 12, 2026-08-11).
+
+    The class comment had claimed "CONTINUITY none" since this engine was
+    written while `continuity=` was never passed, so the value was a dataclass
+    DEFAULT -- the right answer nobody had decided, which is the same shape a
+    wrong one would have had.
+
+    NONE is true here for a reason this lane can state: `render_clip` paints
+    every frame from the beat's own audio analysis and a per-beat rng key, and
+    reads no predecessor frame, so no terminal state exists for a successor to
+    inherit.
+
+    Declared per lane because each visualizer owns its contract -- lane 10's
+    shared-base fix reached the still shelf, not this family.
+    """
+    import inspect
+
+    from nodes._otr_video_engines import frame_contract as fcm
+    from nodes._otr_video_engines.eng_viz_camera import VizCameraEngine
+
+    eng = vreg.get_engine(NAME)
+    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
+    # DECLARED, not defaulted -- and read from the AST, not the source TEXT.
+    # A substring check for "continuity=" is satisfied by the comment above the
+    # declaration explaining it (the lane 12 QA finding), so it would pass with
+    # the real keyword deleted. The resolved VALUE cannot catch it either: the
+    # dataclass default is the same constant.
+    assert fcm.declares_continuity_kwarg(eng)
+    render_src = inspect.getsource(VizCameraEngine.render_clip)
+    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
+                                 "continuity_frame"):
+        assert consumes_predecessor not in render_src
+
+
+def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
+    """G2 / lesson L19 (lane 12, 2026-08-11).
+
+    This lane must NOT declare a `render_canvas`. It has no native canvas:
+    `render_clip` builds the painter, the scanline table, the vignette and the
+    encoder from the request's own w/h. The 1472x832 an episode hands it is the
+    default of `OTR_VIDEO_LANDSCAPE_CANVAS` -- an operator lever -- and since
+    `declared_render_canvas` is applied LAST, declaring would silently make
+    this the one visualizer that ignores that lever.
+
+    The premise was re-checked on THIS engine rather than inherited from
+    viz_green, which is L19's own runnable check.
+    """
+    from nodes._otr_video_engines.eng_viz_camera import VizCameraEngine
+
+    eng = vreg.get_engine(NAME)
+    assert getattr(eng, "render_canvas", None) is None
+    assert rd.declared_render_canvas(NAME) is None
+    for size in ((1472, 832), (832, 480), (640, 384), (1024, 576)):
+        got = VizCameraEngine()._canvas_dims(
+            {"canvas": {"w": size[0], "h": size[1], "fps": 25}})
+        assert got == size
+
+
+def test_the_landscape_lever_still_reaches_this_lane(monkeypatch):
+    """The half that would otherwise rot silently: if a future change declares
+    a canvas here, this is the test that says what it cost."""
+    ledger = {
+        "episode_id": "ep_lane12",
+        "images": {"images": [{"beat_id": "b001", "kind": "scene_beat",
+                               "path": "C:/tmp/scene_b001.png"}]},
+        "video": {"fps": 25, "canonical_canvas": None,
+                  "shots": [{"shot_id": "shot_b001", "role": "music_visual",
+                             "group_id": "grp_music_visual",
+                             "engine_id": NAME, "family": "",
+                             "target_frame_count": 25}]},
+    }
+    shot = ledger["video"]["shots"][0]
+
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)
+
+    monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "1024x576")
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1024, 576), (
+        "the operator's landscape lever no longer reaches viz_camera -- if a "
+        "render_canvas declaration was added, that is what it cost")
+
+
 def _req(frames=3, w=96, h=64, seed=7, audio=None):
     r = {"shot_id": "s1", "canvas": {"w": w, "h": h, "fps": 25},
          "timing": {"target_frame_count": frames}, "seed_bundle": {"request_seed": seed}}

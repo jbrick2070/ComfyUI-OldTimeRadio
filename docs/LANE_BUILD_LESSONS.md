@@ -1312,6 +1312,89 @@ is the gate lane 10 had to build from scratch.
 
 ---
 
+## L20 -- Documenting a rule can DISABLE the check that enforces it
+
+**Check:** for every LEXICAL gate -- one that greps source text for a token --
+ask whether the PROSE explaining the rule contains that same token. If it does,
+the gate is now satisfiable by its own documentation, and the better the
+comments get the weaker the gate gets.
+
+**Symptom:** perfect. Every lane green, every lane commented, and the check
+enforcing nothing. There is no failure to notice because the gate never fires;
+the only observable is that a deliberate mutation stops being caught.
+
+**Root cause:** G3.3 asked `"continuity=" not in _mro_source(type(eng))` -- a
+substring search over the class's source, comments included. That was sound
+while nobody wrote about continuity. Then lanes 10, 11 and 12 each added a
+comment explaining WHY their lane's value is `CONTINUITY_NONE`, and every one of
+those comments contains the literal `continuity=`. From that moment the gate
+would have gone green for a lane whose real declaration had been deleted,
+satisfied by the paragraph explaining the declaration it no longer had.
+
+**And the value cannot rescue it, which is what makes this class nasty.**
+`CONTINUITY_NONE` is the dataclass DEFAULT, so a lane that never considered
+chaining and a lane that concluded NONE after reading its own render path are
+byte-identical at runtime. "Assert the resolved value" -- the usual answer to a
+weak lexical check -- proves nothing here. The only readable difference is
+whether the keyword was PASSED, which is a fact about syntax, not about values.
+
+**Origin (lane 12, 2026-08-11):** found by the post-coding QA pass, on a test
+written minutes earlier in the same session, after the same weak assertion had
+already shipped in lanes 10 and 11. Three lanes wrote the identical tautology
+without noticing, which is the argument for the QA pass existing.
+
+**The fix, and why it is not just "use a regex":** the reader is now
+`frame_contract.declares_continuity_kwarg`, which parses the AST and looks for a
+`FrameContract(...)` call with a `continuity` keyword. Comments are not AST
+nodes, so prose cannot satisfy it. It lives in the ENGINE module, not the
+preflight suite, because the gate and every lane's own test must ask the SAME
+question -- two readers of one invariant is how they drift apart.
+
+**Runnable check:** every lexical gate needs a test that feeds it something
+which TALKS about the rule without following it, and asserts refusal. If you
+cannot write that test, the gate is reading text when it should be reading
+structure.
+
+**Twin assertion:**
+`test_lane_preflight_matrix.py::test_g3_cannot_be_satisfied_by_a_COMMENT_about_continuity`
+-- two synthetic classes, one that documents `continuity=` in a comment and a
+docstring while passing nothing, one that actually passes it, with an explicit
+assertion that their resolved VALUES are identical so the reason a value check
+could never have caught this is stated in the test itself.
+
+---
+
+## Lane 12 -- `viz_camera`, closed 2026-08-11
+
+**Nothing new bit, and that is the entry.** Both red gates were the two lane 11
+had just solved, both answers transferred unchanged, and the lane cost one
+import, one keyword, two gate-table entries and three tests. A lane that sails
+through is evidence the ledger is working and is recorded as such.
+
+The one thing worth stating, because it is the difference between reuse and
+cargo-culting: **L19's transfer was EARNED, not assumed.** L19 says copy the
+reasoning, not the shape, so `eng_viz_camera.render_clip` was read to confirm
+the premise holds here -- every painter call, the scanline table, the vignette
+and the encoder are built from the request's own `w, h`, with no latent grid, no
+trained input size and no canvas-dependent constant. It does hold, so the lane
+declared no canvas and documented its profile channel INERT, exactly as lane 11
+did. Had the premise failed, the same two lines would have been the wrong fix.
+
+**Runnable check for lanes 13 and 14:** before reusing lane 11/12's G2 answer,
+grep your engine's render path for any dimension that is NOT derived from the
+request -- a hardcoded tile, a fixed table size, a constant the painter enforces.
+One hit means your lane may have a native canvas and the L19 reasoning does not
+transfer.
+
+**A GPU-time judgment recorded so it is not read as a gap:** lane 11 smoked two
+legs to prove the `OTR_VIDEO_LANDSCAPE_CANVAS` lever reaches a declaration-free
+lane live. Lane 12 smoked ONE, because that property is about the DRIVER, not
+the engine, and it is now pinned CPU-side per lane by a test driving the real
+`build_request_from_shot`. Re-rendering to re-prove a driver fact already in
+evidence is not diligence, it is duplication.
+
+---
+
 ## Lane 10 -- `mesh_stage`, closed 2026-08-11
 
 Four red gates, the most defective lane left. Both new lessons above are this
