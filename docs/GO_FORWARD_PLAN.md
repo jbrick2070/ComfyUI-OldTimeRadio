@@ -23,12 +23,6 @@ passed, `macbeth_probe` removed from both profiles). Detail lives in `docs/HANDO
 
 | # | Item | Where | Kind | Blocked on |
 |---:|---|---|---|---|
-| 3 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` actually ATTEND to the prepended reference, or accept and ignore it? Two arms on SEPARATE fresh boots (`OTR_PORTRAIT_REFERENCE=0` control asserts `portrait_anchor_mode == 'seed'`, not `''`) | section 1 | render x2 + **operator eyeball** | operator's eyes |
-| 4 | **WAN 8-GB low-VRAM launch contract** -- CODE-COMPLETE, PROOF-INCOMPLETE | OPEN BUGS / section 1466 | operator decision + proof leg | ONE operator call |
-| 5 | **VIDEO LANE BUILD -- SPRINT 1 NAMED AND RUNNING (operator 2026-08-11).** The H3 sprint series became the full 21-lane transplant: every video lane audited, fixed, wired, smoked and closed ONE AT A TIME. Corpus: `docs/2026-08-09-SPEC-lab-findings-into-otr.md` (master, r4-COMPLETE), `docs/2026-08-10-FINAL-QA-video-build-corpus.md` (the operative 21-lane order), `docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md` (per-lane detail), `docs/VIDEO_LANE_PREFLIGHT.md` (the gates), `docs/LANE_BUILD_LESSONS.md` (the ledger every lane reads first). **The live per-lane queue is the VIDEO LANE QUEUE table below -- resume from it.** | see the lane queue | coder, 21 chunks + an episode gate | UNBLOCKED |
-| 6 | **Video matrix pattern** -- did NOT converge because ~32 engines need a human-authored one-line `doc_purpose` and a decided `family -> display_group` taxonomy | section 0 | **operator/planner WRITES CONTENT**, then coder | operator's words |
-| 7 | **The 23 already-shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | PBUG-20260807-01 | **operator DECIDES**, then coder/render | operator's call |
-| 9 | **Cloud stack test-and-build** (operator-added 2026-08-07 evening) -- prove the two new all-cloud profiles `otr_cloud_low` / `otr_cloud_hq` end-to-end. Order: ratify OpenRouter slugs -> content-addressed audio cache (chunk 2 SHIPPED 2026-08-08) -> Macbeth safety probe per arm -> 20-clip accept-rate measurement -> first full LOW episode through the canonical workflow, then HQ. **Next chunk: Macbeth probe (requires a live cloud leg).** Decision record with all verified prices: `docs/2026-08-07-cloud-stack-final-plan.md`. Coding chunks get the full kibitz arc per the 2026-08-04 directive | `config/profiles/otr_cloud_{low,hq}.json` + plan doc | coder + render legs | operator's call on next chunk timing |
 
 Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
 platform tests -> **12** install path -> **13** product docs + v2 release.
@@ -47,25 +41,13 @@ QUEUE. The unblocked work lives in **STILL OPEN, SMALL, UNSCHEDULED** below and
 in the 6-STATUS follow-ups. Take the topmost item there instead of forcing a
 blocked row, and do not read the queue's silence as "nothing to do".
 
-**ITEM 1 SHIPPED 2026-08-09 -- the row above is a tombstone, not work.** It is
-recorded here because the ROUTE to it is the lesson. This file asserted for a
-day that item 1 was blocked on a missing `OPENROUTER_API_KEY`, and a coder
-window repeated that to the operator as fact. It was false: the key sits in the
-**User** environment scope on this box (73 chars, `sk-or-` prefix), so every
-process a coder window spawns inherits it, proven by a plain venv run of
-`nodes._otr_openrouter_backend.openrouter_enabled()` returning **True** with no
-launcher involved. **Grep or measure before repeating a blocker out of this
-file** -- that is the lesson, and it has now cost two windows.
-**A SECOND INSTANCE, 2026-08-09 (late):** this queue row itself stayed at
-"UNBLOCKED, needs a live leg" for most of a day AFTER `262dfa8f` shipped it and
-the leg ran. A row that describes finished work as pending is the same defect
-pointing the other way, and it costs the next window a re-grounding pass.
-**When you close an item, close its ROW in the same push.** **Item 8 SHIPPED
-2026-08-08 and item 9-C3 (Macbeth safety probe) SHIPPED + DISCHARGED
-2026-08-08 evening** -- both closed, detail in `docs/HANDOFF_LOG.md`. Item 9's remaining chunks (the
-20-clip accept-rate measurement, then the first full LOW episode) are the
-unblocked queue work, but see the LEMMY row: they exercise casting and
-dialogue, so they should not run mid-Lemmy.
+**GREP OR MEASURE BEFORE REPEATING A BLOCKER OUT OF THIS FILE.** This file
+once asserted for a day that item 1 was blocked on a missing
+`OPENROUTER_API_KEY`; the key was in the User env all along and a window
+repeated the claim to the operator as fact. It has cost two windows. The
+same defect points the other way too: a row describing finished work as
+pending costs the next window a re-grounding pass. **When you close an
+item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
@@ -82,15 +64,48 @@ the ~1.8 GB desktop baseline).
 inherited five red variants from lane 5 and had to distinguish them from its
 own. A red at the start of a lane belongs to whoever caused it.
 
-**The kibitz gate: r1 ran on lane 7, then the operator withdrew it mid-lane
-("skip the kibitz and code").** The r1 panel (codex `gpt-5.6-sol` high +
-antigravity) independently converged on the same disposition the driver
-anchor proposed AND found a real hole in the shipped fix before it landed --
-a contract-bearing env var was being compared AFTER its own crash-guard
-fallback, so a malformed value read as agreement (now lesson L12). Artifacts:
-`kibitz-runs/2026-08-11-lane07-ltx-audio-in/r1/`. Rounds r2-r4 were NOT run
-and this is not a four-round arc. **Lanes 0-6 have had no panel on their
-diffs at all** -- still open, still the operator's call.
+**REVIEW ROUTING -- OPERATOR DIRECTIVE 2026-08-11 (supersedes the 2026-08-04
+full-kibitz gate while it stands).** Operator, handing the build off while away:
+"skip the kibitz ... do a coding post QA with Sonnet ... using Codex CLI for
+your quandaries and Sonnet QA for post QA, no full r1-r3 is needed." So, per
+coding item:
+* **NO full `kibitz-plugin:kibitz` r1-r4 arc.** Do not open one, and do not
+  report a scoped tail as an arc.
+* **Codex CLI is the consult of record for a QUANDARY** -- a genuine fork, a
+  defect whose model you doubt, a third failed fix. Use it instead of guessing
+  or instead of stopping to ask.
+* **Sonnet 5 runs the post-coding QA** on the finished diff, before the push.
+  Lane 9 proves it earns its keep: it found a stray table cell carrying stale
+  contradictory text and a superseded comment block, both real, both fixed
+  pre-push.
+* **KEEP CODING.** The operator is away and explicitly asked that the window
+  not stop. Take routine judgment calls yourself, record them in the receipt,
+  and only escalate what is genuinely irreversible or outside the queue.
+The two-strikes floor from `CLAUDE.md` still stands underneath this: if a bug
+survives two of your fixes, consult before the third swing -- that consult is
+Codex CLI now, not a four-round panel.
+
+**WHAT DROPPING THE PANEL DOES NOT DROP (operator, 2026-08-11, explicit):
+"of course Bug Bible to be run at every turn, check for BOM, that always
+stands."** Routing reviews to Codex + Sonnet removes ONE gate and nothing else.
+Every turn, unchanged:
+* **Bug Bible regression EVERY TURN**, not just at wrap-up -- `cd` to
+  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide` and run
+  the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
+  path fails to collect). Baseline **20 passed / 24 skipped / 3 xfailed at 272
+  entries**. Sync to the Bible repo's origin/main first; never pin a stale copy.
+* **BOM check on every touched file, always** -- UTF-8, NO BOM. First three
+  bytes must not be `EF BB BF`. Never write Python source with `Set-Content` /
+  `Out-File` (they inject BOM or mojibake); use
+  `[System.IO.File]::WriteAllText(..., UTF8)` or the file tools.
+* Plus the standing per-change set: full suite, `build_variants.py --check`,
+  AST parse on touched `.py`, dead-ref grep, and HEAD == origin after the push.
+
+**Panel history:** lane 7 ran an r1 panel (it found lesson L12 before the
+fix shipped; artifacts `kibitz-runs/2026-08-11-lane07-ltx-audio-in/r1/`).
+No lane has had a full four-round arc, and lanes 0-6 have had no panel on
+their diffs at all -- still the operator's call. Live routing is the
+REVIEW ROUTING block above, not this history.
 
 Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
 its QA before touching the next.** A lane may take several commits when
@@ -111,22 +126,12 @@ written), `TODO`.
 
 | # | Lane (public / internal) | Owns | Status |
 |---:|---|---|---|
-| 0 | scaffolding | lessons ledger, preflight matrix suite, evidence manifest | **DONE** `49adc824` |
-| 1 | `wan22_high_i2v` / `wan_i2v` | S1, S8b-1 weight resolution, canvas + drift tests, a lane test file from scratch, boot/profile pin, solo smoke | **DONE** -- 7/7 gates green, live 832x480 f33 smoke, receipt `docs/evidence/lane_receipts/lane01-wan22_high_i2v.md`. **RULED 2026-08-11: `wan22_high_i2v` is correct and stands.** The spec's `wan21` was one mistyped version number that every downstream doc inherited; spec and transplant plan are corrected and no code moved. The retired spelling keeps an alias row so a paste from a stale copy still resolves. |
-| 2 | `humo14_high_audio_in_wide` / `humo_14B_169` | boot-contract mechanism with its first real consumer, S8b-4, S8b-6 manifest fields, S8b-8, the ruled `humo_diet` hero cast, f97 smoke | **DONE** -- 7/7 gates green, live 832x480 f97 smoke under the diet boot, receipt `docs/evidence/lane_receipts/lane02-humo14_high_audio_in_wide.md`. **Operator: the live COLD peak was 14,604 MB absolute (0.24 GiB under the gate), not the 1.44 GiB of headroom the corpus headline implies -- different cache state and surface, both true, see the receipt.** REMAINDER: moving the boot check from `assert_usable` into the ShotLock preflight needs `boot_contract` plumbed into the frozen director policy; queued as row 2b. |
+| 0-9 | **CLOSED -- 9 packets, 9 engines, 16 live legs.** Detail lives in `docs/evidence/lane_receipts/lane0*.md` and `docs/HANDOFF_LOG.md`, never here | scaffolding, 3 WAN, 4 HuMo, 3 LTX | **DONE** through `77fa4dad` |
 | 2b | boot-contract enforcement TIMING | plumb `boot_contract` into the frozen director policy so the check fires at ShotLock preflight instead of inside the render phase; keep the render-time check as defence in depth | TODO |
-| 3 | `humo17_high_audio_in_portrait` / `humo_1.7B` (+ `humo17_high_audio_in_wide` / `humo_1.7B_169`) | S8b-3 short-render refusal, canvas declarations, diet/default compatibility, the portrait profile that claimed landscape | **DONE** -- both rows 7/7 green, live 480x832 f129 smoke, receipt `docs/evidence/lane_receipts/lane03-humo17_high_audio_in_portrait.md`. Peak 15,261 MB absolute COLD (higher than the 14B's because it is 129 frames vs 97, not because it is heavier). |
-| 4 | `humo14_high_audio_in_portrait` / `humo` | the remaining HuMo lane, portrait f97 smoke | **DONE** -- 7/7 green, live 480x832 f97 smoke, peak 13,800 MB. **The HuMo family is CLOSED: 4 tiers, 4 declarations.** BOTH its profiles were claiming landscape; G2.3 caught the second one. Receipt `docs/evidence/lane_receipts/lane04-humo14_high_audio_in_portrait.md` |
-| 5 | `wan22_high_video` / `wan_ti2v` | S8b-2 LIVE profile pin bug, S8b-7 stale comment, the first naming MOVE | **DONE** -- 7/7 green, live 832x480 f81 smoke on the `default` boot. The 17-frame pin was chopping every beat into 0.68 s segments AND three tests were asserting 17 as correct. Receipt `docs/evidence/lane_receipts/lane05-wan22_high_video.md`. **Open: 81 is NOT re-measured on real 8 GB hardware.** |
 | 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** | TODO |
-| 6 | `wan22_high_fast` / `fastwan_8gb` | public surface + live proof; the cost row stays put with wan_ti2v's per Q3 | **DONE** -- 7/7 green before and after, live 832x480 f81 smoke in **70.5 s vs wan_ti2v's 171.2 s** on the same boot/still/rung (2.43x). Receipt `docs/evidence/lane_receipts/lane06-wan22_high_fast.md` |
-| 7 | `ltx23_low_audio_in` / `ltx_audio_in` | S3 HQ canvas + profile, S8b-9 import safety, S8b-10 stage-A /32 legality, env/contract refusal | **DONE** -- 7/7 green. S3 and S8b-10 turned out to be ONE defect: the canvas was an inline recipe-dependent driver branch (832x480 ia2v / 512x288 single-pass) that `declared_render_canvas` overruled anyway, and 832x480 halves to the ia2v stage-A latent 416x240 with `240 % 32 == 16`. `LTXVLatentUpsampler` doubles with NO target size, so the delivered canvas IS 2x the stage-A base and only a /64 canvas has a legal stage A -- 1024x576 is the only rung that is /64 AND exact 16:9. Declared, branch deleted, halving validated at its root, env disagreement now a named refusal. Receipt `docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md`. **Three things this lane found that are NOT its own:** lane 5's rename never regenerated five other variants still carrying `wan_8gb (16:9)` (so `build_variants --check` had been RED since lane 5); the `LTX` boot token enabled only one of the two LTX engines; and `render_single` -- the path EVERY solo lane smoke uses -- never consulted `declared_render_canvas`, so lanes 1-6 all validated the aspect default and only coincidence made that invisible. All three fixed here. |
-| 7b | `ltx_audio_in` HEADROOM | **DONE 2026-08-11 -- MARGINAL.** Operator ordered the lever proved rather than waving the 0.24% through. Diet leg run: `default` 14,465 MB vs `ltx_av_diet` **14,385 MB** absolute (11,872 net), margin **115 MB / 0.11 GiB** -- clears, but UNDER the 0.3 GiB threshold, so decision rule 2 applied: ship the diet contract, flag the lane MARGINAL in the manifest with both numbers, do not call it a pass. The diet bought only 80 MB because `reserve_vram_gb` is inert on this lane (the adapter's own in-process 4.0 GB `EXTRA_RESERVED_VRAM` dominates any boot value), so only `--disable-pinned-memory` was available -- **HuMo's ~1.9 GiB does not transfer.** Flag PROVEN in live argv, not just in the profile. Output is **BYTE-IDENTICAL** between boots (same sha256), so the diet is free and needs no quality hold. Lever now nearly exhausted here | DONE |
-| 8 | `ltx098_low_video` / `ltx_8gb` | lab-first measurement before naming, S8b-11, S8b-13 Sage + node gates, profile-canvas reconciliation | **DONE** -- 7/7 green, live 512x288 f161 smoke in **22.1 s**. S8b-13: this was the only one of the three LTX lanes with NO `assert_sage_not_patched`, on the exact family BUG-070 was written for (int8-PV Sage process-ABORTS LTX with no traceback, so "no gate" meant a dead process, not degraded output); added FIRST, before any weight resolves, with a test that proves the ordering. Node gate added too -- a missing LTXV class used to surface at `load()` after the checkpoint was paid for. S8b-11: two profiles claimed 832x480 on a lane declaring 512x288, 2.7x the pixels on the tier that exists because it cannot afford them; profiles moved, 512x288 stands as the 07-26 judgment's ruled canvas. **The `low` marker is no longer provisional**: 9,106 MB absolute / **6,835 MB net**, cold -- the cheapest lane in the roster, 1.75x cheaper than lane 7 by NET and 13.8x faster per beat. `ltx_8gb` was an IDENTITY row so it needed no alias, and the label states the measured COST, never "runs on an 8 GB card". Receipt `docs/evidence/lane_receipts/lane08-ltx098_low_video.md` |
-| 9 | `ltx23_high_video` / `ltx_video` | lab-first single-render measurement, S8b-11, a ROOT resolution of S8b-14 (fixed-169) | **DONE** -- 7/7 green before and after (this lane never had an `EXPECTED_RED`). Both legs run. **LEG 2, the marker:** 15,916 MB absolute / **13,313 MB net**, cold, at 1024x576x169 in 147.5 s, a `VramPeakProbe` maximum -- and this adapter's FIRST real peak, because `_render_clip_hq` (the path the installed dev-family unet actually routes to) had no probe and `_clip_from_raw` dropped five of the seven receipt fields, so `render_driver`'s `or _mc.vram_used_mb()` fallback would have reported **4,124 MB**, a 3.9x understatement shaped exactly like a peak (L15). **LEG 1, the decode band:** swept at the declared canvas under the consent act -- f9/f49/f97/f121/f137 ALL decode clean, including the exact pair (121, 137) that fails at 1472x832. **S8b-14 resolved at its root:** the 169 floor is CANVAS-DEPENDENT, not a property of the engine (L16); floor 169 -> 9 and the contract is the honest `min_frames=9, max_frames=169, quantum=8`. A 2 s beat now renders 49 frames in 75.4 s instead of 169 in 147.5 s, discarding nothing; `partition_beat` independently moved a 442-frame beat from `3: 169,169,169` (65 surplus) to `3: 169,169,113` (9 surplus). **Operator-gated on eyes, not arithmetic:** the solo smoke is a SHORT-BEAT A/B (`ab_BEFORE_vs_AFTER_f49.mp4`) because a short render is a re-paced complete arc, not the truncation of a long one. The f49 sweep clip is BYTE-IDENTICAL to the post-change production smoke, so the env-forced floor and the shipped default render the same bytes. Naming MOVE: `ltx23_16gb_video` -> `_LEGACY_ENGINE_ALIASES`, retiring the LAST `16gb` token. Receipt `docs/evidence/lane_receipts/lane09-ltx23_high_video.md`. **Open, and NOT this lane's:** 15,916 MB absolute is over the 14.5 GiB ceiling and 97.6% of the card, so the lane has NO measured headroom at f169 and no diet boot has been tried on it |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
-| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | TODO |
+| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **OPEN -- FULLY DIAGNOSED 2026-08-11, no code written. Every root cause below is grounded in the real files; START CODING, do not re-diagnose.** See the LANE 10 DIAGNOSIS block under this table. |
 | 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | TODO |
 | 12 | `viz_camera` | same visualizer checks, this lane only | TODO |
 | 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | TODO |
@@ -139,6 +144,92 @@ written), `TODO`.
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
+
+### LANE 10 DIAGNOSIS -- `mesh_stage` (done 2026-08-11, act on it)
+
+**Read `docs/LANE_BUILD_LESSONS.md` first anyway (step 1 of the loop), then
+code.** All four red gates were root-caused against the real files before the
+window handed off. Nothing is half-edited on disk -- the tree is clean at
+`77fa4dad`. Pre-lane `build_variants.py --check` was **46 / 0**.
+
+**G1 -- two defects in one row.**
+(a) *S8b-16*: `eng_mesh_stage._node_candidates()` names ten hy3d classes but
+they are resolved ONLY inside `load()` (`:571`), so `assert_usable` (`:449`)
+passes and the render dies after the checkpoint is paid for. Fix is lane 8's
+exact pattern: gate at preflight, collect EVERY miss before raising (naming one
+at a time turns a fresh install into a sequence of failed renders), read the
+ACTIVE candidate set, and order the gate BEFORE weight resolution with a test
+that can fail (make weight resolution raise `RuntimeError`, so a mis-ordered
+gate fails with the wrong exception type).
+(b) *L1, the wan_i2v killer*: `_ckpt_path()` (`:387-406`) walks a hardcoded
+`<comfy_root>/models/checkpoints` + `HF_HOME` list and NEVER consults
+`folder_paths`. Lane 1 already built the shared answer --
+`wan_shared.configured_models_root()`, probed LAST so it can only turn a false
+negative into the truth. Reuse it; do not write a third resolver.
+
+**G2 -- the canvas, and an inline branch that must die.**
+The lane declares no `render_canvas`, so `build_request_from_shot` falls to the
+1472x832 landscape default. `render_clip` (`:693-700`) then carries a
+MAGIC-NUMBER SNIFF: `if w == 832 and h == 480 and not request.canvas.w: w, h =
+DEFAULT_W, DEFAULT_H`. That is the same shape lane 7 deleted -- an inline
+canvas branch a declaration would overrule anyway. **Declare
+`render_canvas = (DEFAULT_W, DEFAULT_H)` = 1472x832** (it describes the RUNTIME,
+which is L2's rule; /32-legal on both axes; no halving/upsampler on this lane so
+L11/L13's /64 rule does NOT apply), DELETE the branch, and move the one
+selecting profile. **`config/profiles/otr_w45_mesh_stage.json` sets
+`render.canvas_w/h = 832x480`** -- and that channel is DEAD: `canvas_w` is
+schema-validated in `_otr_shared/capability_profiles.py:194` and read by NO
+driver (only the `OTR_VideoDirector` widget and the declaration reach
+`request["canvas"]`). That is L6's "configured knob that reaches nothing".
+Per lane 4's G2.3, enumerate EVERY profile resolving to this engine -- there is
+exactly one, verified.
+
+**G3 -- the shared base, and this is the scope decision.**
+`_CheapFamilyBase.frame_contract` (`cheap_families.py:98`) never passes
+`continuity=`, so `CONTINUITY_NONE` is the dataclass default. The comment above
+it already REASONS about continuity, which is what makes this a declaration bug
+rather than a wrong value. **Ten lanes are G3-RED for this identical reason**;
+five share `_CheapFamilyBase` (`mesh_stage`, `still_flat/motion/pan/word` --
+`still_parallax` too), and `google_omni_video` + the four `viz_*` lanes have the
+same defect through their OWN contracts. **L13 says fix the shared mechanism and
+sweep every adapter sharing it before the lane closes** -- so adding
+`continuity=CONTINUITY_NONE` to the base will flip the four still lanes' G3
+rows GREEN, and their `EXPECTED_RED` entries MUST be deleted in the same commit
+or the strict unexpected-pass gate fails and tells you. That is correct and
+expected; it does NOT mean lane 10 has taken over lanes 11-18 (their G2 rows and
+everything else stay red and stay theirs). The viz lanes and
+`google_omni_video` are NOT reached by the base fix -- leave them red.
+For `mesh_stage` the honest value IS `CONTINUITY_NONE`: `build_blender_cmd`
+takes `start_angle`/`arc_degrees`, so a chained successor would need the
+predecessor's terminal ORBIT ANGLE threaded forward and nothing does that. Say
+that in the declaration comment rather than just passing the constant.
+
+**G5 -- do NOT bolt an mp4 probe onto a PNG directory.**
+The gate is LEXICAL: it greps `canonicalize` for the string
+`validate_silent_clip_contract` (`test_lane_preflight_matrix.py:634-645`). That
+function ffprobes an mp4; **this is the only directory-clip lane in the tree**
+(`"type": "directory"`, `eng_mesh_stage.py:782`) and emits straight-alpha PNGs.
+`canonicalize` (`:789`) already calls `validate_directory_clip`, which proves
+the FRAMES on disk (exists, nonzero, count == declared == ledger target) -- but
+its audio check reads `has_audio is not False` off the dict the adapter itself
+wrote, i.e. **declaration checking declaration**, which is exactly L4's
+complaint. And `list_directory_frames` accepts frames by FILENAME EXTENSION, so
+a file named `.png` containing anything at all passes.
+The root fix: make the directory contract PROVE the artifact -- read each
+frame's magic bytes and confirm it really is a PNG/EXR, which is what makes "no
+audio stream" a structural fact about the bytes rather than a naming
+convention. Then teach G5 that a directory-clip lane satisfies the audio law
+through that named function. **Teaching the gate a new name is the sanctioned
+move** (L9: G1 was taught `_resolve_unet` rather than widened) -- widening it to
+accept any validator would let a future lane launder a missing proof.
+
+**Smoke reality for this lane, so it is not a surprise:** it needs
+`OTR_BLENDER_EXE` (hydrated from the User env by the launcher), the hy3d
+checkpoint, a `mesh_fodder` still (NOT a cinematic scene still -- see
+`requires_mesh_fodder`), and it runs a torch mesher then a VRAM barrier then a
+Blender spawn. It emits a DIRECTORY, so the smoke's artifact check is
+`frame_dir_summary`, not ffprobe on an mp4. There is a cube self-test
+(`_run_selftest`) that gates the first Blender use.
 
 **Standing defaults adopted for unattended builds (operator, 2026-08-10):**
 Q1 H3 commit granularity -- split video/audio-in only if each half ends green
@@ -169,16 +260,12 @@ one-token fix on a cloud lane outside the 21-lane order, tracked by an
 A window that reads a different suite number has inherited drift -- find out
 why before building on it.
 
-### ~~THE SUITE IS RED AND IT IS NOT YOURS~~ -- RESOLVED 2026-08-11
+### WHEN THE SUITE IS RED, CHECK `git status` FIRST
 
-That box named three failures caused by a concurrent window's uncommitted
-`render_canvas = (832, 480)` on `eng_wan_i2v.py`. **They are gone.** That
-window committed its edit, and the suite now reads **9937 / 109 / 1 with
-NOTHING deselected**. The workaround it described -- deselecting three tests
-to read a real number -- is retired; a window that still deselects them is
-hiding real failures. Kept as a tombstone because the SHAPE recurs: when the
-suite is red, check `git status` for another window's in-flight work before
-diagnosing, and never sweep their files into your commit.
+Standing gotcha, learned 2026-08-11: three "failures" were a concurrent
+window's uncommitted edit, not a defect. Check for another window's
+in-flight work before diagnosing -- and never sweep their files into your
+commit. Deselecting tests to get a green number hides real failures.
 
 ### LEMMY COCKNEY -- NOT BLOCKED (corrected 2026-08-10), Phase 1 shipped, 2-4 open
 
@@ -241,12 +328,6 @@ waiting on me?" without reading the whole file.
 
 | # | What | What kind of answer | Where the detail is |
 |---:|---|---|---|
-| 1 | **The 23 shipped bad-open episodes** -- rerender/republish, or tombstone as known-bad and exclude from publication | A DECISION. Then a coder/render window executes it | PBUG-20260807-01, `docs/PROD_BUG_LOG.md` |
-| 2 | **Reference A/B verdict** -- does `z_image_turbo_nvfp4` ATTEND to the prepended reference, or accept and ignore it? | YOUR EYES on two arms. Two renders on SEPARATE fresh boots; the code side is ready | section 1 |
-| 3 | **WAN 8-GB launch contract** -- after profile retirement, who owns a tier's native render ceiling? | RATIFY A SHAPE. Proposed: the adapter DECLARES its own tier ceiling, the widget becomes an override, `0` means "use the adapter's contract" | 8 GB / profile cluster |
-| 4 | **MiniMax H3 sprint series** -- name SPRINT 1 | NAME THE SCOPE. Do not let a window invent the sprint list | 0-QUINQUE |
-| 5 | **Video matrix pattern** -- ~32 engines each need a one-line `doc_purpose`, and the `family -> display_group` taxonomy must be decided | WRITE CONTENT. No review round can produce it; this is absent human-owned data | section 0 |
-| 6 | **Bug Bible bulk fan-out** -- 9+ closed candidates + the duplicate-`legacy_id` cleanup | ONE FAN-OUT SESSION. A window may promote a SINGLE uncovered entry, but the log's contract reserves the bulk pass for you | Bug Bible promotion field |
 | ~~7~~ | ~~**The 8 swept survival-guide guards**~~ **DECIDED 2026-08-10: KEEP THEM.** The operator delegated the call (*"between you and Sonnet you can ensure we keep or remove those tests"*) after the original question was found to carry a false premise. Two corrections of record: `656c36e` touched TWO files, not eight (`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`), so the 8 `test_otr_*` items are FUNCTIONS in one file; and **none of them is video-related** -- they guard positioned-media timeline ownership, explicit word delivery, outer-word-fit fail-closed, protected-suffix surface, cast-role identity, rename transactions, canonical ledger text metrics, and P5 text transport. New video-lane tests would replace NONE of them, so deleting cost coverage and bought nothing. A follow-up commit in that repo should document what rode along in `656c36e` | -- | -- |
 | ~~8~~ | ~~**`otr_upscaled_dir()` is DEAD**~~ **ANSWERED 2026-08-10: DELETE. Executed -- helper, `__all__` entry, contract-test reference and a dangling history mention all removed.** | -- | -- |
 | ~~9~~ | ~~**`meta.perfect_run_spacesaver`**~~ **ANSWERED 2026-08-10, and the answer REOPENED IT AS A FEATURE, not a cleanup.** Operator: *"once people get the workflow going wouldn't it be nice not to store all the little files on their drive and just save the last otr/obs episode ... if it doesn't work let's rip it out and design a new one, or keep it actually and make it work as intended"*. So: the flag is NOT to be quietly dropped -- it either becomes real or is replaced by a designed successor. Scoped as a coder item below | -- | -- |
@@ -426,14 +507,10 @@ engine resolves there -- it now logs and declines instead.
 **Branch B stays unbuilt.** It was only ever for a G1 failure, and G1 passed.
 
 
-### SLUG PROVENANCE -- SHIPPED 2026-08-10 (`4bc760c8`). Two live findings owed to the operator.
+### GOOGLE SLUGS -- TWO OPERATOR CALLS OWED (the build shipped `4bc760c8`)
 
-Built to `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` (r1-r4 arc
-closed; 7 delivered external reviews, not 8 -- r3 was a documented single-lane
-round, agy timed out). Provenance is now keyed on `(provider_id,
-authority_lane)` off the shared inventory, so the guard finally sees the id
-`cloud_media_invoke` actually sends rather than the display name it used to date.
-Dates come from a real catalog run: `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
+Verifier: `python scripts/verify_google_slugs.py` (exit 0/2/3/4/5; never
+writes a date back). Measurement: `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
 
 **TWO THINGS NEED THE OPERATOR, and neither is a code defect:**
 
@@ -2241,12 +2318,6 @@ the credit week; late-week, drop to the $0 rungs instead of grinding a paid pool
 
 | Rung | Model / tool | Cost | Use for | Never for |
 |---:|---|---|---|---|
-| 1 | Local Qwen on the 4060 (`10.55.0.2:1234`, LM Studio/ACPX): `qwen3-coder-30b-a3b-instruct` | $0 | Read-only FIRST-PASS triage of failures, logs, diffs before any credit spend | Final diagnosis, patches, tests, live qualification; NEVER loaded on the 5080 (ComfyUI renders only) |
-| 2 | agy / Antigravity, `KIBITZ_AGY_MODEL="Gemini 3.6 Flash (High)"` (DISPLAY name exactly -- a wrong id silently kills agy and the arc runs codex-only; check antigravity.log per round) | $0 | Default grounded reviewer for ALL mechanical review; panelist on every kibitz | -- |
-| 3 | Codex CLI `gpt-5.6-sol` (high) | weekly credits | The second opinion of record: the mandatory kibitz panel, pre-execution grounding of big blocks, live-failure kibitz, HANDOFF_CODEX grind delegation | Verify `codex_model_selected.txt` every arc (a stale skill cache once drifted to gpt-5.5 mid-arc unnoticed) |
-| 4 | Claude (Cowork, this) | weekly credits | The actual work: planner + coder windows, anchor/judge on every panel, live-run drive | Babysitting renders (the Codex-app overnight monitor owns that); single-small-item windows (batch per Window packing) |
-| 5 | Cloud roundtable (OpenRouter) | real $ | Genuine R1 ideas passes only; <$20 autonomy rule applies | Mechanical/grounding review (that is rungs 2-3) |
-| 6 | Fable | scarce | Single final gate on a high-stakes structural change (CLAUDE.md section 9 reality exception) | Anything else |
 
 Production (in-pipeline, all $0/local, offline-first): writers = Mistral-Nemo (ctx cap
 16384) + `gemma-4-12b` (saved runtime-qualified local default); stills/video-init =

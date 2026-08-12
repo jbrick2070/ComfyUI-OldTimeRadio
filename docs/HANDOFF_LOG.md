@@ -3,6 +3,85 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-11 -- HEAD 77fa4dad (v2.0-alpha) -- CODER (lane 9 closed on two live legs, the decode floor moved 169 -> 9, lane 10 diagnosed, Bible 268 -> 272)
+
+Did: closed lane 9 `ltx23_high_video` (`77fa4dad`). Preflight was 7/7 green
+  BEFORE the lane opened, so the work was measurement, not gate-flipping.
+  **Reading `LANE_BUILD_LESSONS.md` first (loop step 1) caught, before any GPU
+  time, that the lane could not have reported an honest number:** `7afe40e5`
+  routed the L4 receipt fields to `render_clip`, but this box's
+  `ltx-2.3-22b-dev-Q3_K_M.gguf` makes `_detect_recipe` select `hq_two_stage`,
+  which had NO `VramPeakProbe` and never called `_clip_telemetry`; and
+  `_clip_from_raw` dropped five of seven fields besides. Since `render_driver`
+  reads `clip.get("vram_peak_mb") or _mc.vram_used_mb()`, the marker leg would
+  have reported **4,124 MB against a true peak of 15,916 MB** -- a 3.9x
+  understatement shaped exactly like a peak, and by L10 PROVENANCE a lower
+  bound that must never seed a cost row. Fixed and pinned by a new
+  `tests/test_ltx_video_receipt_seam.py` (11 tests, every one verified to FAIL
+  against the pre-fix file by reverting and re-running, not assumed).
+  **LEG 2, the marker:** 15,916 MB absolute / **13,313 MB net**, cold,
+  1024x576x169 in 147.5 s, a `VramPeakProbe` maximum; canvas and frame count
+  PROBED, silence proved on the emitted file, no trim. State the surface (L7):
+  absolute is OVER the 14.5 GiB ceiling and 97.6% of the card, net is under.
+  **LEG 1, the decode band:** swept at the declared canvas under the consent
+  act -- f9/f49/f97/f121/f137 ALL decode clean, including the exact pair (121,
+  137) that raises the tensor 256-vs-128 mismatch at 1472x832. Every clip
+  stamped `+prequalification[min_decode_frames=9]` and probed for content and
+  motion, because a decode that returns is not a decode that made a picture.
+  **S8b-14 resolved at its root:** the floor was a canvas-dependent DECODE
+  constraint, never a look choice -- 169 -> 9, contract now the honest
+  `min_frames=9, max_frames=169, quantum=8`. A 2 s beat renders 49 frames in
+  75.4 s instead of 169 in 147.5 s, discarding nothing; `partition_beat`
+  independently moved a 442-frame beat from `3: 169,169,169` (65 surplus) to
+  `3: 169,169,113` (9 surplus). Operator gated the LOOK change on eyes, so the
+  solo smoke is a short-beat A/B (`ab_BEFORE_vs_AFTER_f49.mp4`); the f49 sweep
+  clip is BYTE-IDENTICAL to the post-change production smoke, proving the
+  env-forced floor and the shipped default render the same bytes. Naming MOVE
+  `ltx23_16gb_video` -> `_LEGACY_ENGINE_ALIASES`, retiring the LAST `16gb`
+  token; verified on the running server (28 menu rows, all four spellings
+  resolve, retired id absent). Six tests went red on the floor move and every
+  one was correct -- two were asserting nothing once the default moved, incl. a
+  roster test whose `min_frames - 72` offset went NEGATIVE and got clamped back
+  up by `_env_int`, so its "disagreement" agreed. New lessons **L15** (a fix
+  lands on the path you tested, not the path that runs) and **L16** (a constant
+  measured at one canvas is not a fact about the engine).
+  **Bible 268 -> 272** (`1ad7bb3`, pushed, lockstep MATCH): 12.93/12.94/12.95/
+  12.96, all four live-verified per the admission rule, written portable, with
+  coverage-index rows and the README count synced (Three-File Contract). The
+  indexed history was NOT re-scraped.
+  **Lane 10 `mesh_stage` is FULLY DIAGNOSED and uncoded** -- all four red gates
+  root-caused against the real files, written up in GO_FORWARD's LANE 10
+  DIAGNOSIS block. Headline: G3's continuity defect lives in the SHARED
+  `_CheapFamilyBase` contract and 10 lanes carry it, so L13's sweep rule makes
+  the four still lanes' G3 rows flip green with it.
+Current step: lane 9 DONE and pushed; lane 10 OPEN, diagnosed, zero code
+  written, working tree clean at `77fa4dad`. Row 9b (`ltx_video` headroom --
+  no diet boot ever tried, no measured headroom at f169) is queued behind it.
+Next: START CODING lane 10 from the diagnosis block -- do not re-diagnose. G1
+  (preflight node gate + `configured_models_root` reuse), G2 (declare
+  1472x832, delete the magic-number branch, move the one dead profile), G3
+  (declare continuity on the shared base and delete the still lanes' G3
+  EXPECTED_RED rows in the same commit), G5 (prove the frames are really PNG,
+  then teach the gate that name -- do NOT bolt an mp4 probe onto a PNG
+  directory). Blocked on nobody.
+Models: rung 4 (Claude coding + judging) throughout; rung 1 not needed (no
+  failure required triage). Operator also re-affirmed at handoff that dropping
+  the panel drops ONE gate and nothing else: **Bug Bible EVERY TURN and the BOM
+  check ALWAYS STAND** -- written into GO_FORWARD's review-routing block so the
+  next window cannot read "no kibitz" as "fewer gates".
+  **NO kibitz arc ran and none is claimed** -- the
+  operator withdrew it for this stretch and routed reviews to Codex CLI for
+  quandaries + Sonnet 5 for post-coding QA. The Sonnet QA DID run on lane 9's
+  finished diff and found two real stale spots (a stray GO_FORWARD table cell
+  carrying contradictory pre-fix text, and a superseded comment block), both
+  fixed before the push; its one NIT (a dead `ltx_recipe` field) was spun off
+  rather than folded in.
+Commits: `77fa4dad` (OTR, pushed, lockstep verified) + `1ad7bb3` (Bible repo,
+  pushed, lockstep verified). Suite **9950 passed / 109 skipped / 1 xfailed**;
+  Bug Bible **20 passed / 24 skipped / 3 xfailed** at 272 entries;
+  `build_variants.py --check` **46 variants / 0 failures**. Box left CLEAN --
+  no resident server, port 8000 clear, VRAM at the ~1.67 GB desktop baseline.
+
 ## 2026-08-11 -- HEAD 7afe40e5 (v2.0-alpha) -- CODER (lanes 7 + 8 closed, row 7b proved, retro bug hunt on lanes 0-6, Bible 264 -> 268)
 
 Did: closed lane 7 `ltx23_low_audio_in` (`57665ee8`) and lane 8
