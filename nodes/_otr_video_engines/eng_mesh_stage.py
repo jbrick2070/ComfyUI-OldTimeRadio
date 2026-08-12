@@ -439,13 +439,24 @@ class MeshStageEngine(_CheapFamilyBase):
         ``folder_paths``, then the historical directory list, then THIS BOX's
         configured models root.
 
-        LESSON L1, THE wan_i2v KILLER (lane 10, 2026-08-11). This walked a
-        hardcoded ``<comfy_root>/models/checkpoints`` plus an ``HF_HOME``
-        sibling and never consulted ``folder_paths`` at all -- so inside a live
-        server it could not see a checkpoint registered through
-        ``extra_model_paths.yaml``, and outside one (the CPU suite, the
-        preflight matrix, any tool asking "is this lane installed?") it answered
-        a confident NO for a weight installed under this box's real models root.
+        LESSON L1 / Bug Bible 12.88 (lane 10, 2026-08-11), and note carefully
+        WHICH HALF was broken -- the first write-up of this got it wrong.
+
+        This walked a hardcoded ``<comfy_root>/models/checkpoints`` plus an
+        ``HF_HOME`` sibling and never consulted ``folder_paths``. **Under the
+        launcher that was ENOUGH and this lane rendered fine**: the soak
+        launcher sets ``HF_HOME=C:\\ComfyUI-Models\\huggingface``, whose sibling
+        probe is ``C:\\ComfyUI-Models\\checkpoints`` -- exactly where the weight
+        lives. 3D has been rendering since June on that path and the resolver
+        was byte-identical then (verified by diffing ``37254f39``).
+
+        What was genuinely broken is 12.88's actual subject: "is this weight on
+        this box?" had no answer OFF the runtime. In a bare shell -- the CPU
+        suite, the preflight matrix, any doctor/"is this lane installed?" tool
+        -- ``HF_HOME`` is unset, the comfy-root join does not exist on a box
+        that keeps models elsewhere, and the probe returns a confident wrong NO.
+        A checkpoint registered only through ``extra_model_paths.yaml`` was also
+        invisible even in-process, because ``folder_paths`` was never asked.
 
         The probe order is ADDITIVE BY CONSTRUCTION: every prior probe still
         wins, and ``configured_models_root()`` -- lane 1's ONE spelling of

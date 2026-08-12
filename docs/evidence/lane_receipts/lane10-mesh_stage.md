@@ -40,24 +40,45 @@ and it collects EVERY miss before raising. The ordering test makes weight
 resolution RAISE `RuntimeError`, so a mis-ordered gate fails with the wrong
 exception type instead of passing quietly.
 
-**(b) Lesson L1 -- and this lane was DEAD on this box, measured.**
-`_ckpt_path()` walked a hardcoded `<comfy_root>/models/checkpoints` plus an
-`HF_HOME` sibling and never consulted `folder_paths`. Probed on the real
-Windows box with no env pin in play:
+**(b) Lesson L1 / Bug Bible 12.88 -- and THE FIRST VERSION OF THIS SECTION WAS
+WRONG. Corrected 2026-08-11 after the operator said 3D had been working.**
+
+The original claim here was "this lane was DEAD on this box". **It was not.**
+The operator was right and the diff proves it: `_ckpt_path` is BYTE-IDENTICAL to
+the version running at `37254f39` when mesh_stage was rendering in June, so
+nothing regressed -- and under the soak launcher the old resolver FOUND the
+weight every time:
 
 ```
-OTR_HY3D_CKPT = None            (not in the process env, not in User, not in Machine,
-                                 and the launcher hydrates OTR_BLENDER_EXE only)
-OLD hardcoded default exists -> False
-NEW resolver               -> C:\ComfyUI-Models\checkpoints\hunyuan3d-dit-v2-mv.safetensors
-NEW _installed             -> True
+launcher sets  HF_HOME = C:\ComfyUI-Models\huggingface
+old 2nd probe  dirname(HF_HOME) + "checkpoints" = C:\ComfyUI-Models\checkpoints
+               hunyuan3d-dit-v2-mv.safetensors   exists = True     <-- found
+old 1st probe  <comfy_root>/models/checkpoints    exists = False
 ```
 
-The 4.93 GB weight has been sitting in `C:\ComfyUI-Models\checkpoints` the
-whole time. `_installed()` returned **False**, so `assert_usable` raised
-`MISSING_MODEL` naming a file nobody ever installed under that path -- the
-wan_i2v killer, third instance, and the reason the smoke below is the first
-time this lane has rendered without an operator exporting a pin by hand.
+**What my probe actually measured** was a BARE SHELL, where `HF_HOME` is unset
+because the launcher (not the User env) sets it. That is a real defect, but a
+narrower and different one -- and it is precisely what Bible **12.88** is about:
+*"where would the LOADER find this?"* (`folder_paths`, in-process only) and
+*"is this weight on this box?"* (must be answerable OUTSIDE one) were sharing a
+single probe, so every off-runtime caller -- the CPU suite, the preflight
+matrix, any "is this lane installed?" tool -- got a confident wrong NO. A
+checkpoint registered only via `extra_model_paths.yaml` was invisible in-process
+too, since `folder_paths` was never asked at all.
+
+**The fix is unchanged and still correct** -- env pin, then `folder_paths`, then
+the historical dirs, then `configured_models_root()` LAST, additive by
+construction so it can only turn a false negative into truth. What changes is
+the SEVERITY and the lesson: this was never a production outage, and the smoke
+below is not "the first time this lane rendered". It is the first time the lane
+answers honestly to something that is not a running ComfyUI.
+
+**Why the wrong version got written, since that is the transferable part:** the
+probe was run in the environment that was convenient (a bare shell) rather than
+the one production uses (the launcher), and a False came back. L1's own runnable
+check says to resolve "with NO environment variables set at all" -- which is the
+right test for the OFF-RUNTIME question and the wrong one for "is the lane
+broken". Both questions needed asking; only one was.
 
 The fix reuses lane 1's shared answer rather than writing a third resolver:
 env pin -> `folder_paths` -> the historical dirs -> `wan_shared.configured_models_root()`

@@ -364,11 +364,17 @@ like going in; the outcome, the live smoke and what was deliberately left open
 live in `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Two corrections the
 diagnosis earned in the doing, worth carrying forward:
 
-* **G1's L1 half was not theoretical -- the lane was DEAD ON THIS BOX.** With no
-  `OTR_HY3D_CKPT` pin anywhere (process, User, Machine; the launcher hydrates
-  only `OTR_BLENDER_EXE`), the old resolver's one path did not exist while the
-  4.93 GB weight sat in `C:\ComfyUI-Models\checkpoints`, so `assert_usable`
-  refused. The diagnosis called it a resolver defect; it was an outage.
+* **G1's L1 half -- CORRECTED 2026-08-11, and the correction is the useful
+  part.** This block first said "the lane was DEAD ON THIS BOX". **It was not,
+  and the operator caught it.** `_ckpt_path` is byte-identical to `37254f39`
+  where mesh_stage was rendering in June, and under the launcher the old
+  resolver FOUND the weight: `HF_HOME=C:\ComfyUI-Models\huggingface`, whose
+  sibling probe is `C:\ComfyUI-Models\checkpoints`. What the probe actually
+  measured was a BARE SHELL, where the launcher-set `HF_HOME` is absent. That is
+  still a real defect and it is exactly Bug Bible **12.88** -- "where would the
+  LOADER find this" and "is this weight on this box" sharing one probe, so every
+  OFF-RUNTIME caller got a confident wrong NO -- but it was never an outage. The
+  fix is unchanged; the severity claim was wrong. Detail in the lane 10 receipt.
 * **G5's fix belongs in `list_directory_frames`, not only in
   `validate_directory_clip`.** The tolerant `frame_dir_summary` -- which the
   manifests and `_clip_summary` read and which never raises -- shares the same

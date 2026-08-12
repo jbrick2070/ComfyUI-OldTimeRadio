@@ -3,6 +3,89 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-11 -- HEAD 18de7131 (v2.0-alpha) -- CODER (video lanes 10-18 closed: mesh_stage + the whole cheap shelf; lane 19 diagnosed)
+
+Did: nine lane packets closed green and pushed, one per commit, each with a
+  receipt in `docs/evidence/lane_receipts/`: **10** `mesh_stage` `8e1f02bf`,
+  **11** `viz_green` `28b4e1b5`, **12** `viz_camera` `8699fe29`, **13**
+  `viz_mxc_cpu` `f44993de`, **14** `viz_mxc_mandala` `eb3f8412`, **15**
+  `still_motion` `95b6b8ca`, **16** `still_pan` `fc7812dd`, **17** `still_flat`
+  `b79af369`, **18** `still_word` `058b868d`. Plus `2e7586d2` correcting a claim
+  lane 10 shipped, and `18de7131` diagnosing lane 19. **THE WHOLE CHEAP SHELF IS
+  GREEN** -- four visualizers and four still families, 8/8.
+
+Three things were actually BROKEN, not untidy:
+  1. **`mesh_stage` answered "not installed" to everything that was not a
+     running ComfyUI** -- Bug Bible **12.88**. `_ckpt_path` never consulted
+     `folder_paths`, so the CPU suite, the preflight matrix and any "is this
+     lane installed?" tool got a confident wrong NO, and a weight registered via
+     `extra_model_paths.yaml` was invisible in-process too. It now probes env
+     pin -> `folder_paths` -> historical dirs -> `configured_models_root()` last.
+     **CORRECTION, operator-caught:** the receipt first called this an OUTAGE
+     ("the lane was DEAD on this box"). It was not. `_ckpt_path` is
+     byte-identical to `37254f39` where 3D was rendering in June, and under the
+     launcher `HF_HOME=C:\ComfyUI-Models\huggingface` makes the old sibling
+     probe resolve to `C:\ComfyUI-Models\checkpoints` -- the weight, found,
+     every time. My probe ran in a bare shell where the launcher-set `HF_HOME`
+     is absent. Fix unchanged, severity claim withdrawn, receipt + lessons +
+     GO_FORWARD + the Bible index row all corrected.
+  2. **The black-beat defect.** A failed still mint produced a silent black clip
+     the composite positioned like any other beat. All four still families
+     refuse now, each proved by firing the refusal against the LIVE server --
+     before this, that path returned a clean black mp4 and `ok: true`.
+  3. **Gate G3.3 was satisfied by the comment explaining it.** Lanes 10-12 each
+     added a comment containing `continuity=`, which the substring gate matched;
+     it would have passed with the real keyword deleted. Reads the AST now.
+
+Twelve live smokes, box reset before each, artifacts + sha256 in every receipt.
+  Two are evidence rather than ceremony: leg B on lane 11 is BYTE-IDENTICAL to
+  the render its (reverted) declaration produced, proving the declaration bought
+  nothing; and the four still lanes partition exactly by builder --
+  15+16 `3692f155`, 17+18 `56d48f21`.
+
+Baselines: suite **9950 -> 9985 passed / 109 skipped / 1 xfailed**, NOTHING
+  deselected, green at every lane boundary. Bug Bible **20/24/3 at 272** every
+  turn. `build_variants.py --check` 0 failures throughout. Box left CLEAN --
+  no resident server, port 8000 clear, VRAM 1,213 MiB.
+
+Bible delta: **1 record indexed, 0 promoted** (survival-guide `dcf9e76`). Only
+  the `mesh_stage` outage met the admission rule, and it is 12.88's class for
+  the third time. Lessons L17-L22 all came from review/QA passes, and a
+  static-audit finding never creates a Bible rule on its own; L20 and L19 are
+  logged in the index header as the candidates if a live failure admits them.
+
+Current step: **18 of 21 packets. Lane 19 (`h3_low_video` /
+  `minimax_h3_video`) is next and is DIAGNOSED, not started** -- see the LANE 19
+  DIAGNOSIS block in GO_FORWARD. It is the first NEW-ENGINE packet; lanes 10-18
+  were repairs. Grounded against the INSTALLED node: both ~20.97 GB weights and
+  all four node classes are present so it is smokeable, `align_frame_count` is
+  17k+5 which CONFIRMS the spec's 129..377 canvas menu, and `h3_i2v_..._f107_
+  FAILED` in the evidence manifest proves the 124 floor is not advisory.
+
+Next: code lane 19 from that block. **The cheap shelf's default INVERTS there**
+  -- lanes 11-18 all closed G2 by declaring the profile canvas channel INERT
+  because no cheap lane had a native canvas; H3 has canvas structure and should
+  DECLARE. Do NOT extend the mouth policy in 19 (that is lane 20, with the
+  registration it exists for). Blocked on nothing.
+
+Operator decisions waiting (neither blocks the queue, both in GO_FORWARD): the
+  leaked `otr_sbcov_*` variants that make `build_variants --check` CRASH on a
+  fresh clone -- their own generator says the profiles were never meant to be
+  committed, so delete the twelve artifacts or commit the six sources; and the
+  workstation-dependent "46 variants" baseline (`git ls-files` counts 45).
+
+Models: Claude coded and judged throughout. Per the operator's 2026-08-11
+  routing this window ran **NO kibitz arc at all** -- not a full r1-r4, not a
+  scoped tail. The review was **Codex CLI once, on lane 11's genuine fork**
+  (it refuted my canvas declaration and found the sbcov provenance in
+  `tmp/_gen_profiles.py`), plus **Sonnet 5 post-coding QA on every lane's diff
+  before its push**, which caught the G3.3 tautology, a false-pass in lane 17's
+  key test, and a misleading RUNTIME log message.
+
+Commits: `8e1f02bf`, `2e7586d2`, `28b4e1b5`, `8699fe29`, `f44993de`,
+  `eb3f8412`, `95b6b8ca`, `fc7812dd`, `b79af369`, `058b868d`, `18de7131`;
+  survival-guide `dcf9e76`.
+
 ## 2026-08-11 -- HEAD 80fba0ce (v2.0-alpha) -- CODER (Lemmy Branch A shipped + proven live; three PBUGs found by a bank sweep)
 
 Did: plan 5.2 (`e791344b`) CastLock re-pin ordering, 5.3 (`fdc016ef`) reference

@@ -1780,21 +1780,41 @@ Four red gates, the most defective lane left. Both new lessons above are this
 lane's -- L17 is G5, and G1 turned out to be L1's third instance. Three more
 things worth the next lane's attention.
 
-**What bit (1): the lane was DEAD ON THIS BOX and nine months of green tests
-never said so.** L1 predicted the shape and the ledger caught it before any GPU
-time was spent -- but the measurement is worth writing down, because it is the
-starkest instance yet. With no env pin anywhere (`OTR_HY3D_CKPT` is absent from
-the process env, the User env, the Machine env, and the launcher hydrates only
-`OTR_BLENDER_EXE`), the old resolver's single path
-`<comfy_root>/models/checkpoints/hunyuan3d-dit-v2-mv.safetensors` **does not
-exist**, while the 4.93 GB weight sits in `C:\ComfyUI-Models\checkpoints`. So
-`_installed()` answered False and `assert_usable` refused, naming a file nobody
-had ever installed under that name.
+**What bit (1): I CALLED IT AN OUTAGE AND IT WAS NOT -- the operator caught it,
+and the mistake is more useful than the finding.** The first version of this
+entry said "the lane was DEAD ON THIS BOX and nine months of green tests never
+said so". Then the operator said 3D had been working before the refactor, which
+is checkable in one command, and he was right:
 
-**Runnable check:** for every lane, resolve its primary weight with NO `OTR_*`
-env pins set at all and compare against what is actually on disk. "It works on
-my box" is not the question; a leftover export is exactly what hides this, and
-the lane can be dead for months while every CPU test passes.
+* `_ckpt_path` is **byte-identical** to `37254f39`, where mesh_stage was
+  rendering in June -- nothing regressed.
+* Under the soak launcher, `HF_HOME=C:\ComfyUI-Models\huggingface`, so the old
+  resolver's second probe is `dirname(HF_HOME) + "checkpoints"` =
+  `C:\ComfyUI-Models\checkpoints` -- **exactly where the weight is.** It
+  resolved every time.
+
+What my probe measured was a BARE SHELL, where `HF_HOME` is unset because the
+LAUNCHER sets it, not the User env. That is still a genuine defect -- it is Bug
+Bible **12.88**: "where would the LOADER find this?" and "is this weight on this
+box?" were sharing one probe, so every off-runtime caller (CPU suite, preflight
+matrix, any doctor tool) got a confident wrong NO, and a weight registered only
+through `extra_model_paths.yaml` was invisible in-process too. The fix stands
+unchanged. The SEVERITY claim was invented by the environment I happened to test
+in.
+
+**Runnable check, corrected -- and this is the version that would have caught
+me:** resolving with NO env pins tells you about the OFF-RUNTIME question, and
+that is the only question it answers. Before calling a lane BROKEN, resolve it
+the way PRODUCTION resolves it -- read the launcher and reproduce its env
+(`HF_HOME`, `*_DIR`, hydrated User vars). Two probes, two questions:
+
+    bare shell   -> "can anything off-runtime answer honestly?"   (12.88)
+    launcher env -> "is the lane actually broken for the operator?" (severity)
+
+Asking only the first and reporting the second is how a resolver defect gets
+written up as an outage. **And when the operator says "that used to work",
+diff it before arguing** -- `git log --follow` on the one file settled this in
+about a minute, and the receipt had already claimed otherwise in writing.
 
 **What bit (2): the differential control moved for the FOURTH time, and the
 handover is now the interesting part.** `mesh_stage` held the "declares
