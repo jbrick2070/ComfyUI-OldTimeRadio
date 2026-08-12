@@ -26,7 +26,7 @@ import os
 
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
-from .frame_contract import FrameContract
+from .frame_contract import CONTINUITY_NONE, FrameContract
 
 _LOG = logging.getLogger("OTR.video.viz_mxc")
 
@@ -51,6 +51,24 @@ class VizMxcCpuEngine:
     #: non-audio slot never triggers an image model (the operator's z_image complaint).
     accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch
+    #: NO ``render_canvas`` DECLARATION, deliberately (lane 13, 2026-08-11 --
+    #: lesson L19, premise re-checked on THIS engine's own render path rather
+    #: than inherited from lanes 11-12). ``render_clip`` derives every geometric
+    #: fact from the request's ``w, h``: ``paint_rainbow_frame`` gets them
+    #: directly and lays the dial out through ``ring_geom(w, h)``, the scanline
+    #: table, the vignette and the small font are built from them, and the
+    #: encoder is handed the same pair. No latent grid, no trained input size,
+    #: no canvas-dependent constant anywhere.
+    #:
+    #: So the 1472x832 an episode hands this lane is the default of
+    #: ``OTR_VIDEO_LANDSCAPE_CANVAS`` -- an operator lever -- and not a fact
+    #: about the engine. ``declared_render_canvas`` is applied LAST and overrules
+    #: every earlier channel, so declaring here would silently make this the one
+    #: visualizer that ignores that lever. Especially wrong on THIS lane, whose
+    #: whole point is that it "runs on ANY box (AMD / Mac / Intel)" -- pinning a
+    #: canvas is the opposite of portable. The profile canvas channel is
+    #: declared INERT instead, in
+    #: ``test_lane_preflight_matrix.PROFILE_CANVAS_DOCUMENTED_DEAD``.
     #: S1 (2026-07-25) per-model still plan (spec section 3, Shape C --
     #: "nothing"). Empty tuple = EXPLICIT "needs no images"; a missing
     #: ``still_plan`` would be UNKNOWN and fail closed by the S1 audit.
@@ -62,12 +80,23 @@ class VizMxcCpuEngine:
     #: is no ceiling and no split. CONTINUITY none: nothing here consumes a
     #: supplied first frame, which is exactly why these beats may jump cut
     #: without owing the image phase a still at all.
+    #:
+    #: ``continuity=`` IS PASSED (lane 13, 2026-08-11 -- lesson L3). The sentence
+    #: above had claimed "CONTINUITY none" since this engine was written while
+    #: the keyword was never passed, so the value was a dataclass DEFAULT -- the
+    #: right answer nobody had decided. True here for a stateable reason:
+    #: ``render_clip`` paints every frame from the beat's own audio analysis and
+    #: a per-beat rng key, and reads no predecessor frame, so no terminal state
+    #: exists for a successor segment to inherit. Declared per lane because each
+    #: visualizer owns its own contract (lane 10's shared-base fix reached the
+    #: still shelf, not this family).
     frame_contract = FrameContract(
         min_frames=1,
         max_frames=0,
         quantum=1,
         native_fps=25,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     engine_version = "1"
     fallback_engine = None              # NO FALLBACKS: a failed beat fails LOUD

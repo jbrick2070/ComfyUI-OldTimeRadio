@@ -291,7 +291,7 @@ _CHEAP_LANE_OWNERS = {
 _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
-    if _lane in ("viz_green", "viz_camera"):
+    if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -309,8 +309,14 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         # after re-checking the PREMISE on its own render path rather than
         # assuming the family shares one (L19's runnable check). It does: every
         # painter, table and encoder call is built from the request's w/h.
-        # viz_mxc_cpu and viz_mxc_mandala are NOT covered by either lane and
-        # keep both their rows.
+        # LANE 13 CLOSED 2026-08-11 -- viz_mxc_cpu's two rows left the same way,
+        # premise re-checked again on its own painter (ring_geom(w, h) and the
+        # scanline/vignette/font tables are all request-derived). Declaring
+        # would have been worst on THIS lane: its stated purpose is running on
+        # ANY box, and a pinned canvas is the opposite of portable.
+        # viz_mxc_mandala is NOT covered by any of the three and keeps both
+        # rows -- lane 14 must re-check its own path, since that lane is the
+        # one with a NAMED pycairo dependency and could differ.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -488,6 +494,17 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "episode hands it is OTR_VIDEO_LANDSCAPE_CANVAS's default, an operator "
         "lever, not a property of the lane. Declaring would overrule that "
         "lever for this lane alone. Lane 12, 2026-08-11."),
+    "viz_mxc_cpu": (
+        "INERT, same mechanism as viz_green and viz_camera, premise RE-CHECKED "
+        "on this engine's own path (L19). `eng_viz_rainbow.render_clip` hands "
+        "paint_rainbow_frame the request's w/h and lays the dial out through "
+        "ring_geom(w, h); the scanline table, the vignette, the small font and "
+        "the encoder are all built from the same pair. No latent grid, no "
+        "trained input size, no canvas-dependent constant. Declaring would "
+        "overrule OTR_VIDEO_LANDSCAPE_CANVAS for this lane alone -- and this "
+        "is the tier whose stated purpose is running on ANY box, so pinning a "
+        "canvas here would be the opposite of what it is for. "
+        "Lane 13, 2026-08-11."),
 }
 
 

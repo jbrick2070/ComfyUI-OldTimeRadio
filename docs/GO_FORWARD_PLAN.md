@@ -51,10 +51,10 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11 (lane-12 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **12 of 21 packets**
-confirmed working and pushed; **lane 13 (`viz_mxc_cpu`) is NEXT -- and read
-lesson L19 before you touch its canvas row.** Baselines to
+**WINDOW HANDOFF 2026-08-11 (lane-13 wrap): read
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **13 of 21 packets**
+confirmed working and pushed; **lane 14 (`viz_mxc_mandala`) is NEXT -- read
+lessons L19 and L20 before you touch its canvas or continuity rows.** Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -68,12 +68,11 @@ clear, VRAM 657 MiB).
 * **Lanes 15-18 (still lanes): your G3 rows are GREEN.** Lane 10 put
   `continuity=` on the shared `_CheapFamilyBase`, so those four packets inherit
   it and their `EXPECTED_RED` G3 entries are gone. Your G2 rows are still yours.
-* **Lanes 13-14 (the two `viz_mxc_*` visualizers): your G3 rows are STILL RED
-  and still yours.** The visualizers do NOT share a base -- each declares its
-  own `FrameContract` in its own module -- so lanes 11 and 12 fixing
-  `viz_green` and `viz_camera` reached neither of you. It is a one-line
-  `continuity=CONTINUITY_NONE` plus the reason.
-* **Lanes 13-14, on G2: READ LESSON L19 BEFORE YOU DECLARE A CANVAS.** Lane 11
+* **Lane 14 (`viz_mxc_mandala`): your G2 and G3 rows are STILL RED and still
+  yours.** The visualizers do NOT share a base -- each declares its own
+  `FrameContract` in its own module -- so lanes 11-13 reached none of you. G3
+  is a one-line `continuity=CONTINUITY_NONE` plus the reason.
+* **Lane 14, on G2: READ LESSON L19 BEFORE YOU DECLARE A CANVAS.** Lane 11
   drafted `render_canvas = (1472, 832)` on a measured-looking argument and it
   was WRONG: that number is the default of `OTR_VIDEO_LANDSCAPE_CANVAS`, an
   operator lever, and a declaration is applied LAST and would silently disable
@@ -156,8 +155,8 @@ written), `TODO`.
 | 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **DONE** -- 4/4 red gates green, live smoke PASS (50 frames at the declared 1472x832, magic-byte proved). Receipt: `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Its G3 fix also closed the FOUR still lanes' G3 rows (shared `_CheapFamilyBase`) |
 | 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | **DONE** -- 7/7 green, two live smoke legs. Its G2 closed by declaring the profile canvas channel INERT, **not** by declaring a canvas: a declaration would overrule `OTR_VIDEO_LANDSCAPE_CANVAS` on a lane with no native canvas (lesson L19, found by the Codex consult). Receipt: `docs/evidence/lane_receipts/lane11-viz_green.md` |
 | 12 | `viz_camera` | same visualizer checks, this lane only | **DONE** -- 7/7 green, live smoke. Same two answers as lane 11 (channel INERT + `continuity=`), with the L19 premise re-checked on this engine's own render path. Receipt: `docs/evidence/lane_receipts/lane12-viz_camera.md` |
-| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity -- **very likely lane 11/12's two answers again, but READ L19 and CHECK YOUR OWN RENDER PATH FIRST**: grep it for any dimension not derived from the request (a hardcoded tile, a fixed table, a constant the painter enforces). One hit means this lane may have a native canvas and the reasoning does NOT transfer. Also HOLDS the "declares NOTHING" canvas differential control alongside `still_pan` | TODO |
-| 14 | `viz_mxc_mandala` | S8b-16 pycairo half (a NAMED dependency refusal), profile/canvas, continuity | TODO |
+| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | **DONE** -- 7/7 green, live smoke. Same two answers again, premise re-derived on its own painter. Still HOLDS the "declares NOTHING" canvas control (it declared nothing, so the control did not move). Receipt: `docs/evidence/lane_receipts/lane13-viz_mxc_cpu.md` |
+| 14 | `viz_mxc_mandala` | S8b-16 pycairo half (a NAMED dependency refusal), profile/canvas, continuity. **The LAST visualizer, and the one most likely to differ** -- it is the only one with a named external dependency, so RE-CHECK its render path against L19 rather than assuming lanes 11-13's answers. Its G2/G3 rows are still red and still yours | TODO |
 | 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal. **G3 already GREEN** (lane 10's shared-base fix); G2 is still yours | TODO |
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only. **G3 already GREEN**; also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` when this lane declares | TODO |
 | 17 | `still_flat` | same checklist independently. **G3 already GREEN** | TODO |

@@ -1364,6 +1364,41 @@ could never have caught this is stated in the test itself.
 
 ---
 
+## Lane 13 -- `viz_mxc_cpu`, closed 2026-08-11
+
+**Nothing new bit.** Third visualizer, same two answers, premise re-derived
+against this engine's own painter before either was reused (`ring_geom(w, h)`,
+the scanline/vignette/font tables and the encoder are all request-derived).
+
+**One thing this lane adds to L19, and it is a sharper version of the rule:**
+the argument against declaring is strongest exactly where the temptation is
+weakest to notice. This tier's stated purpose is running "on ANY box (AMD / Mac
+/ Intel), no GPU, no shaders", and seven profiles select it including
+`otr_amd16_rocm`, `otr_amd8_rocm` and `otr_mac_mps`. Pinning a canvas on the
+lane that exists to be PORTABLE would have been the single worst place to do
+it -- and the diff would have looked identical to the other two.
+
+**Runnable check:** before declaring anything on a lane, read its module
+docstring for what the lane is FOR. A declaration that contradicts the lane's
+stated purpose is a design error even when every gate goes green.
+
+**What the QA pass corrected, and it is a naming trap worth inheriting:**
+the first draft of this receipt said the "declares NOTHING" differential control
+"stays on this lane". It was never on this lane.
+`test_ltx_8gb_canonical_canvas.py` holds TWO things that read alike:
+`test_a_SIBLING_lane_still_takes_the_landscape_default` is the real control
+(it drives `build_request_from_shot`) and is pinned to **`still_pan` alone**;
+`test_engines_that_declare_NOTHING_are_left_alone` is a weaker list assertion
+(`declared_render_canvas(x) is None`) that does include `viz_mxc_cpu`. Nothing
+had to move because nothing was there -- not because it was already right.
+
+**Runnable check:** when a receipt claims a test "did not need to change",
+open the test and confirm WHICH assertion it is. Two tests in one file, both
+about lanes that declare nothing, are one careless sentence apart -- and the
+sentence would have told lane 16 the control had already been handed over.
+
+---
+
 ## Lane 12 -- `viz_camera`, closed 2026-08-11
 
 **Nothing new bit, and that is the entry.** Both red gates were the two lane 11

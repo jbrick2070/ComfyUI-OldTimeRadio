@@ -71,6 +71,86 @@ def test_engine_family_map():
     assert rd.engine_family(NAME) == "abstract"
 
 
+def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
+    """G3.3 / lesson L3 (lane 13, 2026-08-11).
+
+    The class comment had claimed "CONTINUITY none" since this engine was
+    written while `continuity=` was never passed, so the value was a dataclass
+    DEFAULT -- the right answer nobody had decided.
+
+    NONE is true here for a stateable reason: `render_clip` paints every frame
+    from the beat's own audio analysis and a per-beat rng key, and reads no
+    predecessor frame, so no terminal state exists for a successor to inherit.
+    """
+    import inspect
+
+    from nodes._otr_video_engines import frame_contract as fcm
+    from nodes._otr_video_engines.eng_viz_rainbow import VizMxcCpuEngine
+
+    eng = vreg.get_engine(NAME)
+    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
+    # DECLARED, not defaulted -- read from the AST, not the source TEXT. A
+    # substring check for "continuity=" is satisfied by the comment above the
+    # declaration explaining it (lesson L20), so it would pass with the real
+    # keyword deleted; the resolved VALUE cannot catch it either, because the
+    # dataclass default is the same constant.
+    assert fcm.declares_continuity_kwarg(eng)
+    render_src = inspect.getsource(VizMxcCpuEngine.render_clip)
+    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
+                                 "continuity_frame"):
+        assert consumes_predecessor not in render_src
+
+
+def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
+    """G2 / lesson L19 (lane 13, 2026-08-11), premise re-checked on THIS engine.
+
+    `render_clip` hands `paint_rainbow_frame` the request's w/h and lays the
+    dial out through `ring_geom(w, h)`; the scanline table, the vignette, the
+    small font and the encoder are built from the same pair. There is no latent
+    grid, no trained input size and no canvas-dependent constant, so the
+    1472x832 an episode hands this lane is `OTR_VIDEO_LANDSCAPE_CANVAS`'s
+    default -- an operator lever -- not a property of the engine.
+
+    Declaring would overrule that lever for this lane alone, and this is the
+    tier whose stated purpose is running on ANY box, so a pinned canvas would
+    be the opposite of what it exists for.
+    """
+    from nodes._otr_video_engines.eng_viz_rainbow import VizMxcCpuEngine
+
+    eng = vreg.get_engine(NAME)
+    assert getattr(eng, "render_canvas", None) is None
+    assert rd.declared_render_canvas(NAME) is None
+    for size in ((1472, 832), (832, 480), (640, 384), (1024, 576)):
+        got = VizMxcCpuEngine()._canvas_dims(
+            {"canvas": {"w": size[0], "h": size[1], "fps": 25}})
+        assert got == size
+
+
+def test_the_landscape_lever_still_reaches_this_lane(monkeypatch):
+    """The half that would otherwise rot silently: if a future change declares
+    a canvas here, this is the test that says what it cost."""
+    ledger = {
+        "episode_id": "ep_lane13",
+        "images": {"images": [{"beat_id": "b001", "kind": "scene_beat",
+                               "path": "C:/tmp/scene_b001.png"}]},
+        "video": {"fps": 25, "canonical_canvas": None,
+                  "shots": [{"shot_id": "shot_b001", "role": "music_visual",
+                             "group_id": "grp_music_visual",
+                             "engine_id": NAME, "family": "",
+                             "target_frame_count": 25}]},
+    }
+    shot = ledger["video"]["shots"][0]
+
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)
+
+    monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "1024x576")
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1024, 576), (
+        "the operator's landscape lever no longer reaches viz_mxc_cpu -- if a "
+        "render_canvas declaration was added, that is what it cost")
+
+
 def _req(frames=3, w=96, h=64, seed=7, audio=None):
     r = {"shot_id": "s1", "canvas": {"w": w, "h": h, "fps": 25},
          "timing": {"target_frame_count": frames}, "seed_bundle": {"request_seed": seed}}
