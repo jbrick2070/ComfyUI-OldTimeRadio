@@ -1984,7 +1984,11 @@ def _run_markup_ladder(
                     "role": "user",
                     "content": (
                         "Before the real assignment: show the exact output "
-                        "FORMAT once, as a tiny example episode."
+                        "FORMAT once, as a tiny example episode on any subject "
+                        "at all. It is a FORMAT sample only -- the assignment "
+                        "that follows will have its own title, its own cast and "
+                        "its own subject, and you must not carry this example's "
+                        "characters, setting or story into it."
                     ),
                 },
                 {"role": "assistant", "content": format_example},
@@ -2062,6 +2066,42 @@ def _run_markup_ladder(
     )
 
 
+#: One valid episode, shown to the model as its own prior output.
+#:
+#: THE GRAMMAR WAS DESCRIBED AND NEVER DEMONSTRATED. `_run_markup_ladder` has
+#: always accepted a `format_example` and built a one-shot user/assistant turn
+#: from it -- and NOTHING EVER PASSED ONE, so that path was dead code and the
+#: pack's own `"examples": []` was empty. The r1 review arc reached the same
+#: conclusion from two directions: showing one conversion is worth more than any
+#: rule sentence, and the failing legs were structural-compliance failures
+#: rather than instruction-following failures.
+#:
+#: DELIBERATELY A DIFFERENT DOMAIN. A sci-fi example beside a sci-fi assignment
+#: invites the model to lift the example's cast or premise, which would be a
+#: FIDELITY defect worse than the format error it fixes. A gardening programme
+#: cannot be mistaken for the assignment.
+#:
+#: THE SECOND SCENE IS THE WHOLE POINT. It shows the conversion the failing legs
+#: kept getting wrong -- an event that a screenplay would narrate ("she crosses
+#: to the window") carried instead by somebody SAYING it. Radio has no camera:
+#: anything the audience must know is spoken or scored.
+_FABLE2_FORMAT_EXAMPLE = """TITLE: The Frost Warning
+MUSIC: a slow fiddle, up and under
+ANNOUNCER: Tonight, from the allotments: The Frost Warning.
+SCENE 1: a potting shed, before dawn
+MAUD: You are up early for a woman who hates mornings.
+PERCY: The radio said frost. I came to cover the seedlings.
+MAUD: Then hand me the fleece and stop apologising to a tray of beans.
+SCENE 2: outside, the beds
+PERCY: Careful -- you are walking straight through the onion row.
+MAUD: I am not, I am walking round it, and you are holding the torch wrong.
+PERCY: There. The last row is covered.
+ANNOUNCER: The frost came at four, and found nothing to take.
+CODA: The beans lived. The argument continued.
+MUSIC: the fiddle returns, and out
+END."""
+
+
 def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                  envelope: SceneEnvelope, cast_names: "list[str]",
                  ) -> "tuple[str, ParsedScript, dict]":
@@ -2076,6 +2116,7 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
         envelope=envelope,
         cast_names=cast_names,
         initial_temperature=_TEMP["script"],
+        format_example=_FABLE2_FORMAT_EXAMPLE,
     )
 
 
