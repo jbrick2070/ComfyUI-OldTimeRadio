@@ -21,8 +21,9 @@ without rendering).
 from __future__ import annotations
 
 import logging
+import os
 
-from .registry import register
+from .registry import EngineUnusable, EngineUsabilityReason, register
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .frame_contract import CONTINUITY_NONE, FrameContract
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
@@ -138,8 +139,36 @@ class _CheapFamilyBase:
         return None
 
     def assert_usable(self, host_caps, profile, request_template=None):
-        """Cheap families are usable wherever ffmpeg exists; the real ffmpeg
-        check runs in render_clip. Returns the validated name (no heavy dep)."""
+        """Fail CLOSED on a missing ffmpeg, HERE, at preflight.
+
+        S8b-12(a), lane 15, 2026-08-11. This used to `return self.name`
+        unconditionally, under a comment saying "the real ffmpeg check runs in
+        render_clip" -- which is true and is the whole problem: render_clip runs
+        mid-beat, after the writer, the TTS, the master freeze and the stills
+        have all been paid for, so a box without ffmpeg discovered it at the
+        most expensive possible moment. Every viz_* lane already gates ffmpeg at
+        BOTH boundaries; these four gated it at neither, which is the same shape
+        of hole lane 8 closed on ltx_8gb's node classes and lane 10 on
+        mesh_stage's.
+
+        SHARED-BASE FIX (lesson L13): this lands once and covers all four still
+        families, because they share this method. That is deliberate -- a
+        defect in a shared mechanism is a defect in every adapter sharing it,
+        and fixing it per lane would leave three lanes with the hole and a
+        ledger claiming the class was dealt with.
+
+        The probe is `scope_draw.find_ffmpeg`, the same one the visualizers use,
+        so there is ONE answer to "is ffmpeg here" across the whole CPU shelf.
+        `OTR_FFMPEG` is honoured identically.
+        """
+        from .._otr_shared import scope_draw as _sd
+        if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "%s needs ffmpeg on PATH (or set OTR_FFMPEG) -- refused at "
+                "PREFLIGHT so a missing encoder costs nothing, instead of "
+                "surfacing mid-render after the writer, TTS and stills are "
+                "already paid for" % self.name, kind="video")
         return self.name
 
     def prepare(self, host_caps, profile, session_ctx):  # pragma: no cover
@@ -200,11 +229,15 @@ class _CheapFamilyBase:
         ``uses_still``; otherwise the family's libavfilter source is synthesized.
         Output is the platform's silent bt709 / yuv420p contract (V-1: only
         OTR_MasterAudioMux ever adds audio). This family's canonicalize() is
-        identity, so the canonical clip is returned here directly. With valid
-        inputs it ALWAYS succeeds -- the fallback-chain terminus the A-S6 chain
-        humo -> humo_1.7B -> still_motion converges on."""
+        identity, so the canonical clip is returned here directly.
+
+        "With valid inputs it ALWAYS succeeds -- the fallback-chain terminus the
+        A-S6 chain humo -> humo_1.7B -> still_motion converges on" USED TO BE
+        THE NEXT SENTENCE, and it has been false since 2026-07-02: that chain
+        was ripped, nothing degrades here, and as of lane 15 ``still_motion``
+        REFUSES a missing still rather than painting a black beat. A docstring
+        describing a mechanism that is gone is the defect lesson L6 is about."""
         from . import wrapper_bridge as _wb       # lazy import: cold-import clean
-        import os
         from ._tmp import otr_engine_tmp_mp4
         w, h, fps = self._canvas_dims(request)
         n = self._frame_count(request, fps)
@@ -325,6 +358,30 @@ class StillMotionFamily(_CheapFamilyBase):
     accepts_still = True            # C1: mint the selected still (coverage gate) so
     #                                 a still_motion beat shows the chosen image, not
     #                                 the dark floor (D2 BLACK fix)
+    #: S8b-12(b), lane 15, 2026-08-11 -- THE BLACK-BEAT DEFECT, CLOSED HERE.
+    #: A missing base still used to emit the dark lavfi floor: a silent, black,
+    #: structurally VALID clip that the composite then positioned like any other
+    #: beat. The spec calls it "the historical black-beat defect, still
+    #: reachable", and NO FALLBACKS (operator 2026-07-02) says a failure must be
+    #: LOUD rather than watchable-and-wrong.
+    #:
+    #: Safe to flip, and that was VERIFIED rather than assumed, because the
+    #: argument against it is stale. This family was once the terminus of the
+    #: ``humo -> humo_1.7B -> still_motion`` degrade chain -- but that chain was
+    #: RIPPED on 2026-07-02: ``UNIVERSAL_FLOOR`` / ``FLOOR_NAMES`` /
+    #: ``make_fallback_of`` are gone (only comments recording the rip remain),
+    #: ``default_roles`` is empty, and nothing degrades here automatically. So
+    #: this engine renders only because an operator SELECTED it, and
+    #: ``accepts_still`` means the image dispatcher mints its still. A missing
+    #: still therefore means MINTING FAILED -- exactly the case that must not
+    #: ship as a black beat.
+    #:
+    #: SCOPED TO THIS LANE deliberately: the base default stays False, so
+    #: ``still_pan`` (lane 16) and ``still_flat`` (lane 17) are byte-identical
+    #: until their own packets decide. ``check_ltx_open_health`` is untouched --
+    #: it detects a degraded OPEN after the fact and is about engine SELECTION,
+    #: not about a still that failed to mint.
+    _require_still = True
 
 
 # 2026-06-18: the cheap ``visualizer`` floor stub was SUPERSEDED by the real

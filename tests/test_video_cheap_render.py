@@ -162,9 +162,28 @@ def test_still_pan_fits_all_roles_bug401():
 # --- real ffmpeg renders (the floor leaf) ---------------------------------- #
 @pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
 @pytest.mark.parametrize("name", _FAMILIES)
-def test_each_family_renders_silent_clip(name):
+def test_each_family_renders_silent_clip(name, tmp_path):
+    """Every cheap family emits a valid silent clip. THE SUBJECT IS THE CLIP
+    CONTRACT -- yuv420p, exact frame count, no audio stream -- not whether a
+    family will render from nothing.
+
+    FIXED AT THE FIXTURE, lane 15 (2026-08-11). `still_motion` now sets
+    `_require_still` (S8b-12(b): a missing still was painting a black beat), so
+    this test's old "call render_clip with no asset_refs" shape made it assert
+    the ABSENCE of that refusal for one family, which was never its point.
+    Every still-consuming family is handed a real still; the families that
+    synthesise their own floor are unchanged. Lane 8's rule: give the new gate
+    what it wants, never weaken the gate to keep a proxy test green.
+    """
     eng = vreg.get_engine(name)
-    clip = eng.render_clip(_req(frames=6), None)
+    kwargs = {}
+    if getattr(eng, "uses_still", False):
+        still = tmp_path / "still.png"
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi",
+                        "-i", "color=c=0x223344:s=80x80", "-frames:v", "1",
+                        str(still)], check=True, capture_output=True)
+        kwargs["asset_refs"] = {"init_image": str(still)}
+    clip = eng.render_clip(_req(frames=6, **kwargs), None)
     p = pathlib.Path(clip["path"])
     try:
         assert p.exists() and p.stat().st_size > 0
@@ -175,6 +194,103 @@ def test_each_family_renders_silent_clip(name):
         assert eng.canonicalize(clip, _req(), {}) is clip   # identity
     finally:
         p.unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")
+@pytest.mark.parametrize("name", ("still_pan", "still_flat"))
+def test_the_no_still_LAVFI_FLOOR_still_renders_for_the_families_that_keep_it(name):
+    """The coverage the lane-15 fixture fix would otherwise have cost.
+
+    `test_each_family_renders_silent_clip` now stages a real still for every
+    still-consuming family -- correct, because `still_motion` refuses without
+    one. But all three parametrized families set `uses_still`, so that test
+    stopped driving `render_clip`'s `else:` branch (the synthesized dark lavfi
+    floor) end to end. That branch is still LIVE for `still_pan` and
+    `still_flat`, whose `_require_still` stays False until lanes 16-17 rule.
+
+    So it gets its own case, and this doubles as the BEHAVIOURAL half of the
+    scope guard: `test_the_other_still_families_are_UNCHANGED_by_that_refusal`
+    asserts the flag is False, and this proves what that flag still buys them.
+    """
+    eng = vreg.get_engine(name)
+    clip = eng.render_clip(_req(frames=6), None)          # no asset_refs
+    p = pathlib.Path(clip["path"])
+    try:
+        assert p.exists() and p.stat().st_size > 0
+        assert clip["frame_count"] == 6 and clip["has_audio"] is False
+        fields = _probe(p, "nb_read_frames", "pix_fmt")
+        assert "yuv420p" in fields and "6" in fields
+        assert not _has_audio(p)
+    finally:
+        p.unlink(missing_ok=True)
+
+
+def test_ffmpeg_is_gated_at_PREFLIGHT_for_every_cheap_family(monkeypatch):
+    """S8b-12(a), lane 15 (2026-08-11) -- the SHARED-BASE ffmpeg gate.
+
+    `assert_usable` used to `return self.name` unconditionally, under a comment
+    saying the real check runs in `render_clip`. That is true and is the whole
+    problem: `render_clip` runs mid-beat, after the writer, the TTS, the master
+    freeze and the stills are already paid for. Every viz_* lane gates ffmpeg at
+    both boundaries; these four gated it at neither.
+
+    Asserted over ALL FOUR families, because the fix is on `_CheapFamilyBase`
+    and lesson L13 says a shared-mechanism fix must be shown to cover every
+    adapter sharing it -- not just the lane that happened to find it.
+    """
+    from nodes._otr_shared import scope_draw as sd
+
+    monkeypatch.setattr(sd, "find_ffmpeg", lambda *a, **k: "")
+    for name in _FAMILIES + ("still_word",):
+        eng = vreg.get_engine(name)
+        with pytest.raises(vreg.EngineUnusable) as exc:
+            eng.assert_usable(host_caps={}, profile={})
+        assert exc.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
+        assert "ffmpeg" in str(exc.value)
+        assert name in str(exc.value)      # names ITSELF, not the base class
+
+
+def test_still_motion_REFUSES_a_missing_still_instead_of_a_black_beat(tmp_path):
+    """S8b-12(b), lane 15 (2026-08-11) -- THE BLACK-BEAT DEFECT.
+
+    A missing base still used to emit the dark lavfi floor: a silent, black,
+    structurally VALID clip the composite then positioned like any other beat.
+    NO FALLBACKS (operator 2026-07-02) says that failure must be LOUD.
+
+    The refusal must name the engine and say what to do, because the operator
+    reading it is looking at a beat that produced nothing.
+    """
+    eng = vreg.get_engine("still_motion")
+    assert eng._require_still is True
+    with pytest.raises(RuntimeError) as exc:
+        eng.render_clip(_req(frames=6), None)
+    assert "still_motion" in str(exc.value)
+    assert "image phase" in str(exc.value).lower()
+
+    # A still that is DECLARED but absent from disk must refuse too -- the
+    # common shape of a failed mint is a path that was written into the ledger
+    # and never produced.
+    ghost = tmp_path / "never_minted.png"
+    with pytest.raises(RuntimeError):
+        eng.render_clip(
+            _req(frames=6, asset_refs={"init_image": str(ghost)}), None)
+
+
+def test_the_other_still_families_are_UNCHANGED_by_that_refusal(tmp_path):
+    """The scope guard on S8b-12(b). The refusal is set on `still_motion`
+    ALONE; the base default stays False so `still_pan` (lane 16) and
+    `still_flat` (lane 17) are byte-identical until their own packets decide.
+
+    Without this, the next lane cannot tell whether its family already refuses
+    -- and a silent widening of a behaviour change across three lanes is
+    exactly what the one-lane-at-a-time law exists to prevent.
+    """
+    from nodes._otr_video_engines.cheap_families import _CheapFamilyBase
+
+    assert _CheapFamilyBase._require_still is False
+    assert vreg.get_engine("still_pan")._require_still is False
+    assert vreg.get_engine("still_flat")._require_still is False
+    assert vreg.get_engine("still_word")._require_still is True   # always was
 
 
 @pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE), reason="ffmpeg not on PATH")

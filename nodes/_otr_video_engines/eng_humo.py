@@ -1209,8 +1209,18 @@ class HuMo17BEngine(HuMoEngine):
     (defaults: 20 steps -- the distill shortcut is gone so it needs more steps --
     and cfg 1.0, dropped from 5.0 which produced a blue colour cast, fixed
     2026-06-17). Shares roles / required_inputs / requires_flag / the in-process
-    graph topology with the 14B base; only the tier config differs. Degrades on
-    to the zero-VRAM still floor (humo -> humo_1.7B -> still_motion)."""
+    graph topology with the 14B base; only the tier config differs.
+
+    "Degrades on to the zero-VRAM still floor (humo -> humo_1.7B ->
+    still_motion)" USED TO END THIS DOCSTRING, four lines above
+    ``fallback_engine = None``. It has been false since NO FALLBACKS (operator
+    2026-07-02) ripped ``UNIVERSAL_FLOOR`` / ``FLOOR_NAMES`` /
+    ``make_fallback_of``: this tier degrades onto NOTHING and a failed beat
+    fails the episode LOUD. Corrected in lane 15 (2026-08-11), which had to
+    grep that chain's machinery to prove it was gone before ``still_motion``
+    could stop painting a black beat on a missing still -- and found this
+    sentence still asserting the opposite one file over. A docstring
+    contradicting the attribute below it is the defect lesson L6 is about."""
 
     name = "humo_1.7B"
     engine_version = "1"

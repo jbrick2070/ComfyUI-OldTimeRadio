@@ -291,7 +291,8 @@ _CHEAP_LANE_OWNERS = {
 _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
-    if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu", "viz_mxc_mandala"):
+    if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu", "viz_mxc_mandala",
+                 "still_motion"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -322,6 +323,13 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         # every one of them closed by declaring the profile canvas channel INERT
         # rather than by declaring a canvas -- if a future procedural lane finds
         # itself wanting to declare one, that is the anomaly, not the default.
+        #
+        # LANE 15 CLOSED 2026-08-11 -- still_motion's G2 row left the same way,
+        # its G3 row having already gone green off lane 10's shared-base fix.
+        # It is the FIRST non-visualizer to take the INERT answer, and it was
+        # re-checked against a different ffmpeg path (wrapper_bridge's still
+        # builders, not scope_draw's encoder). still_pan / still_flat /
+        # still_word keep their G2 rows -- lanes 16-18 each decide their own.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -520,6 +528,20 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "mandala_surface_to_rgb take the same pair, and so do the scanline and "
         "vignette tables and the encoder. Cairo imposes no canvas of its own -- "
         "an ImageSurface is whatever size you ask for. Lane 14, 2026-08-11."),
+    "still_motion": (
+        "INERT, and the premise was re-checked on a path NONE of the four "
+        "visualizers touch: these lanes reach ffmpeg through "
+        "wrapper_bridge.ffmpeg_still_motion_cmd, not scope_draw's encoder. It "
+        "still holds -- the builder takes the caller's width/height and scales "
+        "the still to COVER them, so the canvas is whatever the request "
+        "carried. The one difference found in the whole family sweep is that "
+        "these builders pass the dims through even_dim() first; that is a "
+        "yuv420p mod-2 CODEC requirement applied to whatever it is given (and "
+        "a no-op at every canvas in play, since 1472x832 and 832x480 are "
+        "already even), not a native canvas. So the 1472x832 an episode hands "
+        "this lane is OTR_VIDEO_LANDSCAPE_CANVAS's default -- an operator "
+        "lever -- and declaring would overrule it for this lane alone. "
+        "Lane 15, 2026-08-11."),
 }
 
 

@@ -1364,6 +1364,97 @@ could never have caught this is stated in the test itself.
 
 ---
 
+## L21 -- A fallback is only safe to remove once you prove nothing still falls back
+
+**Check:** before turning a silent degrade into a refusal, enumerate what still
+routes to the thing you are hardening. Not "is the fallback chain documented as
+removed" -- grep for the machinery by NAME and confirm only comments remain,
+then check whether anything ELSE reaches this lane automatically.
+
+**Symptom of getting it wrong:** an episode that used to ship watchable turns
+into a hard failure mid-render, and the failure is correct in principle and
+catastrophic in practice because it fires on a path nobody knew was live.
+
+**Why it is worth a lesson rather than a shrug:** the argument AGAINST removing
+a fallback is usually a stale comment. `still_motion` is described in several
+files as "the fallback-chain terminus the A-S6 chain humo -> humo_1.7B ->
+still_motion converges on" -- including in its own render docstring. That chain
+was RIPPED on 2026-07-02. So the strongest-sounding reason to keep the dark
+floor was a sentence describing a mechanism that had not existed for six weeks.
+
+**The check that resolved it (lane 15, 2026-08-11), in order:**
+
+1. grep the machinery by name -- `UNIVERSAL_FLOOR`, `FLOOR_NAMES`,
+   `make_fallback_of`. Only comments recording the rip came back.
+2. `default_roles` is empty, so no role auto-selects it.
+3. grep for anything else routing TO the lane. One hit,
+   `check_ltx_open_health`, and reading it showed a POST-HOC manifest detector
+   about engine SELECTION -- not a router, and not about a missing still.
+4. Only then: what does a missing input actually MEAN here? With
+   `accepts_still = True` the dispatcher mints the still, so absent means
+   MINTING FAILED -- the exact case that must not ship quietly.
+
+**And scope it, then pin the scope.** The refusal went on `StillMotionFamily`
+alone; the shared base default stays `False` so the two sibling lanes are
+byte-identical until their own packets decide. That is pinned by a test naming
+all four families, because otherwise the next lane cannot tell whether its
+family already refuses -- and a behaviour change spreading silently across three
+lanes is what one-lane-at-a-time exists to prevent.
+
+**Runnable check:** a commit that removes a fallback cites, in its message, the
+grep that proves nothing still uses it. "The docs say the chain was removed" is
+not that grep.
+
+**Twin assertion:**
+`tests/test_video_cheap_render.py::test_still_motion_REFUSES_a_missing_still_instead_of_a_black_beat`
+(both shapes: no still declared, and a declared-but-absent path -- the common
+shape of a failed mint) and
+`::test_the_other_still_families_are_UNCHANGED_by_that_refusal`.
+
+---
+
+## Lane 15 -- `still_motion`, closed 2026-08-11
+
+The first still lane and the first packet in this run to change BEHAVIOUR rather
+than declarations. Both new items are above (L21) or already known; three things
+for the next lane.
+
+**What bit (1): the assigned defect had two halves with different blast radii.**
+S8b-12 is one spec item but the ffmpeg preflight gate lives on the SHARED base
+(so it sweeps all four still lanes, per L13) while the missing-still refusal is
+per-family. Fixing both "as one item" would have widened a behaviour change to
+three lanes that never asked for it.
+
+**Runnable check:** when a spec item names a defect on "the four X lanes", ask
+for EACH half whether it lives on the shared base or the subclass. The answer
+decides whether the fix is a sweep or a one-liner, and they can differ inside a
+single numbered item.
+
+**What bit (2): a proxy test again, and the fixture fix again.** Adding
+`_require_still` turned `test_each_family_renders_silent_clip[still_motion]`
+red -- it called `render_clip` with no `asset_refs`, so it had quietly become an
+assertion that this family renders from nothing, which was never its subject
+(the clip CONTRACT was). Fixed by handing every still-consuming family a real
+still. This is the third time in six lanes that a gate exposed a proxy test;
+lane 8 wrote the rule and it keeps paying.
+
+**What bit (3): a green gate row can certify the wrong thing.** G7.4 is GREEN
+for `still_plan` -- declared and audit-clean -- while `still_plan` is read by
+NOTHING in production (S8b-15, re-verified at `eb3f8412`). The row is honest
+about what it checks and misleading about what a reader assumes, so the receipt
+says in words that a green G7 does not mean the plan is wired. It was NOT wired
+by this lane: giving it a consumer is a design change across every adapter that
+declares one.
+
+**Runnable check:** for every gate a lane leaves green, ask what a reader would
+ASSUME it proves, and write down the gap where the assumption is wider than the
+assertion.
+
+**What did NOT bite:** G3 was already green -- inherited free from lane 10's
+`_CheapFamilyBase` fix. The ledger's whole argument, collected five lanes later.
+
+---
+
 ## Lane 14 -- `viz_mxc_mandala`, closed 2026-08-11 -- AND THE FAMILY IS CLOSED
 
 The last visualizer. **All four closed the same way: profile canvas channel

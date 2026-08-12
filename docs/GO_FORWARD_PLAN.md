@@ -51,22 +51,18 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11 (lane-14 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **14 of 21 packets**
-confirmed working and pushed; **lane 15 (`still_motion`) is NEXT and is ALREADY
-DIAGNOSED -- see the LANE 15 DIAGNOSIS block below and start coding.** It is a
-different shape of work from the visualizers: G3 is already green there (lane
-10's shared-base fix), G2 is the only red gate, and the packet's real content is
-S8b-12's ffmpeg preflight gate (a SHARED-BASE fix that sweeps all four still
-lanes) plus the missing-still dark-floor refusal, which is a genuine BEHAVIOUR
-CHANGE and the one thing in the remaining queue that needs thinking about rather
-than pattern-matching.
+**WINDOW HANDOFF 2026-08-11 (lane-15 wrap): read
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **15 of 21 packets**
+confirmed working and pushed; **lane 16 (`still_pan`) is NEXT.**
 
-**Why this window stopped here rather than starting lane 15:** lanes 10-14 all
-closed green and pushed, the tree is clean, and lane 15 is the first remaining
-packet big enough that starting it late would risk leaving a half-edited lane in
-the tree -- which breaks "one lane open at a time" worse than a clean pause. The
-diagnosis below is the trade: the next window codes instead of re-deriving. Baselines to
+**What lane 15 already did for lanes 16-18, so you do not redo it:** the ffmpeg
+PREFLIGHT gate is on the shared `_CheapFamilyBase.assert_usable`, so all four
+still lanes inherit it; G3 was already green from lane 10. What is left per lane
+is G2 (almost certainly INERT again -- re-check the builder yourself, L19) and
+the **`_require_still` decision**, which lane 15 deliberately scoped to itself:
+the base default is still `False`, so `still_pan` and `still_flat` behave
+exactly as they always have until their own packets rule. `still_word` already
+had the refusal and now has the gate, so lane 18 is mostly verification. Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -77,10 +73,16 @@ is the number to check drift against); `scripts/build_variants.py --check`
 clear, VRAM 657 MiB).
 
 **What is already done FOR you, and what is not:**
-* **Lanes 15-18 (still lanes): your G3 rows are GREEN.** Lane 10 put
-  `continuity=` on the shared `_CheapFamilyBase`, so those four packets inherit
-  it and their `EXPECTED_RED` G3 entries are gone. Your G2 rows are still yours.
-* **Lanes 15-18 (still lanes), on G2: READ LESSON L19 FIRST.** All four
+* **Lanes 16-18 (the remaining still lanes): your G3 rows are GREEN** (lane 10
+  put `continuity=` on the shared `_CheapFamilyBase`) **and your ffmpeg
+  PREFLIGHT gate is already inherited** (lane 15 put it on the same base). Your
+  G2 rows are still yours, and so is the `_require_still` call -- lane 15 took
+  the refusal for `still_motion` ALONE and left the base default False.
+* **Lanes 16-18 (the remaining still lanes), on G2: READ LESSON L19 FIRST.**
+  Lane 15 already took the INERT answer for `still_motion` and its receipt
+  records the one wrinkle these lanes share: the still builders pass dims
+  through `even_dim()`, a yuv420p mod-2 CODEC snap, which is not a native
+  canvas and is a no-op at every canvas in play. All four
   visualizers closed G2 by declaring the profile canvas channel INERT, never by
   declaring a canvas -- four for four. Your lanes render through ffmpeg from a
   supplied still, so check whether YOUR path has a size of its own before
@@ -170,20 +172,32 @@ written), `TODO`.
 | 12 | `viz_camera` | same visualizer checks, this lane only | **DONE** -- 7/7 green, live smoke. Same two answers as lane 11 (channel INERT + `continuity=`), with the L19 premise re-checked on this engine's own render path. Receipt: `docs/evidence/lane_receipts/lane12-viz_camera.md` |
 | 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | **DONE** -- 7/7 green, live smoke. Same two answers again, premise re-derived on its own painter. Still HOLDS the "declares NOTHING" canvas control (it declared nothing, so the control did not move). Receipt: `docs/evidence/lane_receipts/lane13-viz_mxc_cpu.md` |
 | 14 | `viz_mxc_mandala` | S8b-16 pycairo half, profile/canvas, continuity | **DONE** -- 7/7 green, live smoke. The pycairo NAMED refusal was ALREADY in place (verified, not rebuilt, and already covered by a forced-ImportError test). Same two answers as 11-13, premise re-checked hardest here. **ALL FOUR VISUALIZERS NOW CLOSED.** Receipt: `docs/evidence/lane_receipts/lane14-viz_mxc_mandala.md` |
-| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **OPEN -- DIAGNOSED 2026-08-11 at the lane-14 wrap, no code written. See the LANE 15 DIAGNOSIS block below; START CODING, do not re-diagnose.** G3 already GREEN (lane 10's shared-base fix); G2 is the only red gate |
-| 16 | `still_pan` | the now-proven still-lane rules, this lane only. **G3 already GREEN**; also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` when this lane declares | TODO |
-| 17 | `still_flat` | same checklist independently. **G3 already GREEN** | TODO |
-| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract. **G3 already GREEN** | TODO |
+| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **DONE** -- 7/7 green, two live smoke legs (a render AND the refusal firing). Closed the **black-beat defect** (`_require_still`, scoped to this lane) and put the ffmpeg gate at PREFLIGHT on the shared base, which **all four still lanes inherit**. Receipt: `docs/evidence/lane_receipts/lane15-still_motion.md` |
+| 16 | `still_pan` | the now-proven still-lane rules, this lane only | TODO -- **G3 already GREEN and the ffmpeg preflight gate is ALREADY INHERITED** (lane 15's shared-base fix). So your packet is: G2 (almost certainly INERT again -- but re-check `ffmpeg_still_motion_cmd` yourself, L19), and the **`_require_still` decision, which lane 15 deliberately did NOT make for you** -- the base default is still `False`. Also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` if this lane ever declares |
+| 17 | `still_flat` | same checklist independently | TODO -- same three: G3 green, ffmpeg gate inherited, G2 + the `_require_still` call are yours. Note this lane uses `ffmpeg_still_static_cmd` (fit+pad), NOT the pan builder |
+| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | TODO -- **both halves are now DONE for you**: it always had `_require_still = True`, and the ffmpeg gate arrived with lane 15's base fix. Verify rather than rebuild (lane 14's lesson), then close G2 |
 | 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
 
-### LANE 15 DIAGNOSIS -- `still_motion` (done 2026-08-11, act on it)
+### LANE 15 DIAGNOSIS -- `still_motion` -- **ACTED ON AND CLOSED 2026-08-11**
 
-**Read `docs/LANE_BUILD_LESSONS.md` first anyway (step 1 of the loop), then
-code.** Grounded against the real files at `eb3f8412`; nothing is half-edited on
-disk and the tree is clean. Pre-lane `build_variants.py --check` was **46 / 0**.
+**All four items below were coded, smoked and pushed.** Kept only as the record
+of what the packet contained; the outcome, the live refusal and what was
+deliberately left open live in `docs/evidence/lane_receipts/lane15-still_motion.md`.
+Two things the diagnosis got right and one it understated:
+
+* The stale degrade-chain argument WAS stale -- verified by grep, and the
+  refusal shipped. Recorded as lesson **L21**.
+* S8b-12's two halves really do have different blast radii: the ffmpeg gate is
+  a shared-base sweep, the refusal is per-family. Lane 15 did NOT widen the
+  refusal to lanes 16-17.
+* UNDERSTATED: `even_dim()` in the still builders is a real difference from the
+  visualizer path -- a yuv420p mod-2 codec snap. It does not change the G2
+  answer (no-op at every canvas in play) but lanes 16-17 should know it exists.
+
+The original diagnosis follows, unedited.
 
 **This lane is NOT another visualizer repeat.** Lanes 11-14 were two one-line
 declarations each. This one carries a BEHAVIOUR CHANGE to the shared still shelf
