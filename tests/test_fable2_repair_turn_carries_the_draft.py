@@ -149,7 +149,7 @@ def test_temperature_HOLDS_when_the_draft_could_not_be_carried(monkeypatch):
     current failure mode. If the draft cannot ride, the retry must at least be
     free to explore."""
     monkeypatch.setattr(fable2, "_draft_fits_repair_turn",
-                        lambda base_user, draft: False)
+                        lambda base_user, draft, system="": False)
     writer = ScriptedWriter([BAD, BAD, play()])
     run_ladder(writer, temperature=0.75)
     assert writer.temps[1] == 0.75, (
@@ -217,7 +217,7 @@ def test_the_temperature_sequence_is_NON_INCREASING_even_when_a_draft_drops():
     rise, and a last-chance attempt at full exploration."""
     calls = {"n": 0}
 
-    def only_second_drops(base_user, draft):
+    def only_second_drops(base_user, draft, system=""):
         calls["n"] += 1
         return calls["n"] != 1          # attempt 2's draft is dropped
 

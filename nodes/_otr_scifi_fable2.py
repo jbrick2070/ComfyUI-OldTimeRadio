@@ -1846,7 +1846,8 @@ _REPAIR_REPLY_MARGIN = 1.15
 _REPAIR_TURN_HEADROOM = 1.10
 
 
-def _draft_fits_repair_turn(base_user: str, draft: str) -> bool:
+def _draft_fits_repair_turn(base_user: str, draft: str,
+                            system: str = "") -> bool:
     """Whether the rejected draft can ride along without crowding the reply.
 
     Budgets the WHOLE TURN -- prompt plus the reply the model still has to
@@ -1886,7 +1887,20 @@ def _draft_fits_repair_turn(base_user: str, draft: str) -> bool:
             cap = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or cap
         except Exception:
             pass
-    prompt_tokens = (len(base_user) + len(draft)) / _CHARS_PER_TOKEN
+    # COUNT THE WHOLE TURN, INCLUDING WHAT THE OTHER FIXES ADDED.
+    #
+    # This counted only `base_user + draft`, and that was already wrong by the
+    # time it shipped: the one-shot FORMAT EXAMPLE is injected as its own
+    # user+assistant pair on EVERY call, and the system prompt rides along too.
+    # Neither was in the arithmetic. So the fix that shows the model the grammar
+    # silently ate part of the budget the fix that shows it the draft depends
+    # on -- and this guard's failure mode is to drop the draft, i.e. to revert
+    # the repair loop to cold regeneration without saying so.
+    #
+    # Both are now counted. `_FABLE2_FORMAT_EXAMPLE` is the real string rather
+    # than an estimate, and the system prompt is passed in.
+    overhead = len(_FABLE2_FORMAT_EXAMPLE) + len(system or "")
+    prompt_tokens = (len(base_user) + len(draft) + overhead) / _CHARS_PER_TOKEN
     reply_tokens = (len(draft) / _CHARS_PER_TOKEN) * _REPAIR_REPLY_MARGIN
     needed = (prompt_tokens + reply_tokens) * _REPAIR_TURN_HEADROOM
     return needed <= cap
@@ -2046,7 +2060,8 @@ def _run_markup_ladder(
         # failure for a truncated prompt. When it does not fit we say so in the
         # diagnostics and fall back to regeneration WITHOUT decaying the
         # temperature.
-        rejected_draft = raw if _draft_fits_repair_turn(base_user, raw) else ""
+        rejected_draft = (raw if _draft_fits_repair_turn(base_user, raw, system)
+                          else "")
         extra_user = (
             "Repair only the malformed FORMAT defects below. Return the "
             "complete episode from TITLE through END as plain text. Keep "
