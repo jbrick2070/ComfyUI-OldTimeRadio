@@ -1,23 +1,32 @@
 """MiniMax H3 (33.1B packed AV DiT) -- the SHARED implementation module.
 
-LANE 19 registers exactly ONE adapter out of this file: ``minimax_h3_video``
-(public ``h3_low_video``), the FL2VA first-frame-to-video route. The second
-adapter, ``minimax_h3_audio_in`` (ref2va, public ``h3_low_audio_in``), is LANE
-20 and is deliberately NOT registered here yet -- one internal engine cannot
-carry both modes, and two public ids mapping to one internal id collapses
-``public_engines._INTERNAL_TO_PUBLIC`` and trips its module-scope bijection
-assert at IMPORT time, which empties most of the ComfyUI menu rather than
-failing one lane cleanly (lesson L5).
+TWO ADAPTERS, TWO INTERNAL IDS, ONE IMPLEMENTATION. This file registers both
+halves of the MiniMax H3 stack, and they were built one lane apart:
+
+* ``minimax_h3_video`` (public ``h3_low_video``) -- LANE 19. The FL2VA route:
+  a still pinned as the FIRST FRAME, no audio anywhere in its graph.
+* ``minimax_h3_audio_in`` (public ``h3_low_audio_in``) -- LANE 20. The REF2VA
+  route: a reference portrait plus the beat's own audio, on a DIFFERENT 21 GB
+  DiT, loading an audio VAE it uses only to ENCODE that reference.
+
+They share :class:`_MiniMaxH3Base` and differ in five places -- the DiT, the
+conditioner node, the graph, the family/inputs, and CONTINUITY. **Two internal
+ids, never one.** One internal engine cannot carry both modes, and two public
+ids mapping to ONE internal id collapses ``public_engines._INTERNAL_TO_PUBLIC``
+and trips its module-scope bijection assert at IMPORT time, which empties most
+of the ComfyUI menu rather than failing one lane cleanly (lesson L5).
 
 WHAT THIS ENGINE IS. H3 is the first LOCAL engine that natively produces AUDIO:
 its latent is a NestedTensor PAIR -- video ``[B,24,T,H/16,W/16]`` and audio
 ``[B,32,2,T40]`` -- and the installed core nodes decode each half with its own
-VAE. **This lane decodes the VIDEO half only.** There is no audio VAE in its
-graph, so the emitted clip is silent BY CONSTRUCTION as well as by proof (V-1:
-only ``OTR_MasterAudioMux`` ever adds audio). That construction is not taken on
-trust; ``canonicalize`` ffprobes this lane's OWN emitted file before writing
-``has_audio: False``, because on this engine that literal is the one field in
-the roster that could be a lie.
+VAE. **NEITHER lane decodes the audio half.** No ``VAEDecodeAudio`` exists in
+either graph, so both emitted clips are silent BY CONSTRUCTION as well as by
+proof (V-1: only ``OTR_MasterAudioMux`` ever adds audio). Note the distinction
+lane 20 makes easy to get wrong: it LOADS an audio VAE and still emits silence,
+because that VAE encodes the reference audio into the conditioning and decodes
+nothing. Neither construction is taken on trust; ``canonicalize`` ffprobes the
+lane's OWN emitted file before writing ``has_audio: False``, because on this
+engine that literal is the one field in the roster that could be a lie.
 
 THE TWO NUMBERS THAT MAKE THIS LANE DIFFERENT
 ---------------------------------------------
@@ -52,13 +61,13 @@ shape -- ``BASE_SHORT_EDGE = 768``, ``MAX_PIXELS = 768*1344`` -- but
 ``MiniMaxH3ReferenceToVideo``, to size REFERENCE media. It does not rewrite the
 generation canvas, so the generation canvas is genuinely the caller's and those
 numbers describe what the model was TRAINED at, not what the node enforces.
-This lane declares **864x480** and the reasoning is in :attr:`render_canvas`.
+Both lanes declare **864x480** and the reasoning is in :attr:`render_canvas`.
 
 BOOT. Sage silently turns H3 output into noise, video and audio, with no error
-(Comfy-Org/ComfyUI#15263; the per-model KJ probe FAILED on sm_120), so this lane
-is in the preflight matrix's ``SAGE_SENSITIVE`` set and refuses by name before
-any weight resolves. It also REQUIRES the named ``h3`` boot contract, which it
-may do because it has never shipped under ``default``.
+(Comfy-Org/ComfyUI#15263; the per-model KJ probe FAILED on sm_120), so BOTH
+lanes are in the preflight matrix's ``SAGE_SENSITIVE`` set and refuse by name
+before any weight resolves. Both also REQUIRE the named ``h3`` boot contract,
+which they may do because neither has ever shipped under ``default``.
 
 Cold-import clean (V-12): module scope imports the stdlib and the dep-free
 shared helpers only; torch / numpy / PIL / ffmpeg / the ComfyUI node registry
@@ -84,7 +93,8 @@ from . import motion_common as _MC
 from . import wan_shared as _WS
 from .._otr_shared.role_compat import ROLES
 from .._otr_shared.still_plan_helpers import StillPlanRow
-from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
+from .frame_contract import (
+    CONTINUITY_SOFT_REFERENCE, CONTINUITY_STRICT_FIRST_FRAME, FrameContract)
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
@@ -205,17 +215,35 @@ _H3_DEFAULT_CLIP = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
 #: module docstring; it belongs to lane 20, which encodes reference audio.
 _H3_DEFAULT_VAE = "minimax_h3_video_vae_fp16.safetensors"
 
+#: The REF2VA DiT -- lane 20's, and a DIFFERENT 21 GB repack from lane 19's.
+#: The two are the same size and differ by one token in the name, which is
+#: exactly the kind of pair a single hardcoded default gets wrong silently, so
+#: each adapter names its own through ``_UNET_DEFAULT``.
+_H3_DEFAULT_UNET_REF2VA = "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+#: The AUDIO VAE. Lane 20 only: ``MiniMaxH3ReferenceToVideo`` requires it to
+#: encode reference audio. Lane 19 has no audio in its graph at all.
+_H3_DEFAULT_AUDIO_VAE = "minimax_h3_audio_vae_fp32.safetensors"
+
 #: ``(env_name_suffix, folder_paths categories, default token, min bytes)`` for
-#: every weight this lane loads. The byte floors distinguish the real artifact
+#: the weights BOTH lanes load. The byte floors distinguish the real artifact
 #: from a truncated download: a partial 21 GB fetch otherwise reaches the loader
 #: and the operator gets a deep safetensors traceback instead of the named
 #: refusal that tells them to re-fetch. Each floor is ~80% of the real file, so
 #: it catches truncation without pinning a repack's exact size.
+#:
+#: The UNET row's token is a PLACEHOLDER replaced per adapter from
+#: ``_UNET_DEFAULT`` -- see :meth:`_MiniMaxH3Base._weight_rows`.
 _H3_WEIGHTS = (
-    ("UNET", ("diffusion_models", "unet"), _H3_DEFAULT_UNET, 16 * 1024 ** 3),
+    ("UNET", ("diffusion_models", "unet"), None, 16 * 1024 ** 3),
     ("CLIP", ("text_encoders", "clip"), _H3_DEFAULT_CLIP, 12 * 1024 ** 3),
     ("VAE", ("vae",), _H3_DEFAULT_VAE, 4 * 1024 ** 3),
 )
+
+#: Lane 20's extra row, appended by the audio-in adapter only. Listed here
+#: rather than inside that class so every weight this module can load is in one
+#: place with its floor beside it.
+_H3_AUDIO_VAE_ROW = ("AUDIO_VAE", ("vae",), _H3_DEFAULT_AUDIO_VAE,
+                     256 * 1024 ** 2)
 
 #: FROZEN IN CODE, and it is the lab's hash-pinned topology values, not a
 #: preference: ``res_multistep`` / ``simple`` / 20 steps / denoise 1.0 /
@@ -281,13 +309,28 @@ _H3_STILL_PLAN = (
 )
 
 
-@register
-class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
-    """``minimax_h3_video`` -- MiniMax H3 FL2VA, first frame to silent video."""
+class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
+    """Everything the two H3 adapters share -- NOT registered, never selectable.
 
-    name = "minimax_h3_video"
-    family = "image_to_video"
-    #: Wide: the director mints a landscape init still for this lane.
+    LANE 20 (2026-08-12) split this out of the lane-19 class. The two adapters
+    are the same 33.1B stack at the same canvas on the same boot with the same
+    grid, and they differ in exactly five places: the DiT they load, the node
+    they condition through, the graph they build, the family/inputs they declare
+    and -- the one that is a real decision rather than a detail -- their
+    CONTINUITY.
+
+    The split is a refactor with no behaviour change for lane 19: every method
+    below moved verbatim, and ``tests/test_minimax_h3_video.py`` still holds the
+    whole lane-19 contract against the registered class through its MRO.
+
+    Deliberately NOT a place for a per-lane value. Anything that differs between
+    the two adapters belongs in the subclass, where the difference is visible; a
+    base-class value with a subclass override is how one lane silently inherits
+    the other's answer (which is the exact shape of L19's "copy the reasoning,
+    not the shape").
+    """
+
+    #: Wide: the director mints a landscape init still for both lanes.
     render_aspect = "wide"
 
     #: THE RENDER CANVAS, DECLARED -- and this lane DECLARES one where all eight
@@ -337,33 +380,11 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     still_plan = _H3_STILL_PLAN
     roles = ROLES
     default_roles = ()
-    required_inputs = ("init_image",)
 
-    #: THE FRAME LADDER, PUBLISHED IN CANVAS FRAMES. ``discrete_frames`` is the
-    #: 17k+5 model grid over the trained band, converted to 25 fps: 129 .. 377.
-    #: Both tuples are derived from ``align_frame_count`` at import, so the menu
-    #: cannot drift from the grid the node will actually snap to.
-    #:
-    #: ``allow_tail_trim`` is mandatory for a discrete menu (a fixed set of
-    #: lengths cannot sum to an arbitrary beat) and it is honest here: the
-    #: surplus is dropped in REAL delivered frames, in order, never mirrored.
-    #:
-    #: CONTINUITY -- decided, not defaulted. ``MiniMaxH3ImageToVideo`` pins the
-    #: supplied still as a keyframe at ``resolved_frame_index 0`` and the node's
-    #: own docstring records that keyframe condition latents are "re-injected
-    #: every step (never denoised)". That is a first-frame lock of the same
-    #: class as ``LTXVImgToVideo(strength=1.0)`` on the incumbent chained lanes:
-    #: a LATENT-space pin through a VAE round trip, not a byte copy of the
-    #: source pixels. The lab's continuation experiment is the measurement --
-    #: prior-clip-last to next-clip-first scored SSIM 0.900 / PSNR 33.4 dB and
-    #: its seam gate passed. Declaring NONE instead would refuse chaining and
-    #: turn every multi-segment H3 beat into jump cuts it does not need.
-    frame_contract = FrameContract(
-        discrete_frames=H3_CANVAS_RUNGS,
-        native_fps=H3_CANVAS_FPS,
-        allow_tail_trim=True,
-        continuity=CONTINUITY_STRICT_FIRST_FRAME,
-    )
+    #: The DiT each lane loads -- the ONE weight that differs between them.
+    #: Subclasses set it; there is deliberately no default, so a future third
+    #: adapter cannot silently inherit whichever repack happened to be first.
+    _UNET_DEFAULT = None
 
     #: MiniMax H3 Community License, plus written authorization from MiniMax
     #: dated 2026-08-07 (docs/H3_LICENSE_ATTESTATION.md). NOT OSI, so this is
@@ -377,17 +398,58 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = H3_CANVAS_FPS
 
-    #: This lane REQUIRES the named ``h3`` boot contract, which it is allowed to
-    #: do because it has never shipped under ``default`` (boot_contracts' own
-    #: rule -- requiring a contract on a lane that already ships would regress
-    #: it). Sage-free is non-negotiable here: Sage does not degrade H3, it
-    #: replaces the output with noise and reports success.
+    #: BOTH lanes REQUIRE the named ``h3`` boot contract, which they are allowed
+    #: to do because neither has ever shipped under ``default`` (boot_contracts'
+    #: own rule -- requiring a contract on a lane that already ships would
+    #: regress it). Sage-free is non-negotiable here: Sage does not degrade H3,
+    #: it replaces the output with noise and reports success.
     compatible_boot_contracts = ("h3",)
 
     #: Terminal node of the graph (its IMAGE output becomes the clip).
     _TERMINAL = "decode"
 
+    #: The graph spine both lanes share. The CONDITIONER is per-lane and lives
+    #: in ``_EXTRA_NODE_CANDIDATES`` beside the inputs only that lane stages.
+    _CORE_NODE_CANDIDATES = {
+        "unet": ("UNETLoader",),
+        "clip": ("CLIPLoader",),
+        "vae": ("VAELoader",),
+        "guider": ("BasicGuider",),
+        "noise": ("RandomNoise",),
+        "sampler": ("KSamplerSelect",),
+        "sched": ("BasicScheduler",),
+        "sample": ("SamplerCustomAdvanced",),
+        "decode": ("VAEDecode",),
+    }
+    _EXTRA_NODE_CANDIDATES: dict = {}
+
+    #: The recipe receipt stamped into this lane's clips.
+    _RECIPE_RECEIPT = ""
+
+    #: Fallback prompt when the beat carries none.
+    _DEFAULT_PROMPT = _H3_DEFAULT_PROMPT
+
     # ---- loader tokens ------------------------------------------------- #
+    def _weight_rows(self):
+        """The weight table for THIS adapter: the shared rows with the UNET's
+        token filled in from ``_UNET_DEFAULT``, plus whatever the lane adds.
+
+        One seam, so preflight, the byte floors, the identity and the graph all
+        read the same list and a lane cannot check one set of weights while
+        loading another.
+        """
+        if not self._UNET_DEFAULT:
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
+                "%s declares no _UNET_DEFAULT, so it does not say which H3 DiT "
+                "it loads" % self.name, kind="video")
+        rows = []
+        for label, cats, default, floor in _H3_WEIGHTS:
+            if label == "UNET":
+                default = self._UNET_DEFAULT
+            rows.append((label, cats, default, floor))
+        return tuple(rows)
+
     def _token_for(self, label, default):
         return os.environ.get("OTR_MINIMAX_H3_%s_NAME" % label) or default
 
@@ -401,7 +463,7 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         preflight cannot pass on a file the loader will not find (lesson L1).
         """
         out = {}
-        for label, categories, default, _floor in _H3_WEIGHTS:
+        for label, categories, default, _floor in self._weight_rows():
             token = self._token_for(label, default)
             out[label] = (token, self._resolve_model_file(
                 categories, token, "OTR_MINIMAX_H3_%s_DIR" % label))
@@ -438,8 +500,16 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         Not cached: the job is to notice a weight that MOVED, so the receipts
         are re-stat'ed on every ask (three stats, never a hash of 21 GB).
         """
-        parts = [self.name, H3_RECIPE_RECEIPT]
-        for label, _cats, _default, _floor in _H3_WEIGHTS:
+        # ``self._recipe_receipt()``, never the module constant. This read
+        # ``H3_RECIPE_RECEIPT`` directly, which is lane 19's receipt -- so the
+        # moment a second adapter shared this method, lane 20's identity
+        # described lane 19's recipe. It stayed DISTINCT between the lanes only
+        # because the DiT token below differs, so nothing would have reused the
+        # wrong session; it would simply have been a receipt that lies about
+        # which recipe produced the handles. Exactly the hardcoded-per-lane
+        # value in a shared base that this class's own docstring warns about.
+        parts = [self.name, self._recipe_receipt()]
+        for label, _cats, _default, _floor in self._weight_rows():
             token, path = self._weight_paths()[label]
             parts.append(token)
             parts.append(repr(self._wan_file_receipt(path or "")))
@@ -466,43 +536,33 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         configuration this lane has evidence for -- and the operator's standing
         rule is that a measured recipe is not on the table.
         """
-        return {
-            "unet": ("UNETLoader",),
-            "clip": ("CLIPLoader",),
-            "vae": ("VAELoader",),
-            "loadimage": ("LoadImage",),
-            "h3": ("MiniMaxH3ImageToVideo",),
-            "guider": ("BasicGuider",),
-            "noise": ("RandomNoise",),
-            "sampler": ("KSamplerSelect",),
-            "sched": ("BasicScheduler",),
-            "sample": ("SamplerCustomAdvanced",),
-            "decode": ("VAEDecode",),
-        }
+        out = dict(self._CORE_NODE_CANDIDATES)
+        out.update(self._EXTRA_NODE_CANDIDATES)
+        return out
 
     def _recipe_receipt(self):
-        return H3_RECIPE_RECEIPT
+        return self._RECIPE_RECEIPT
 
-    def _build_graph(self, request, image_name, plan, model_length, width, height):
-        """The declarative FL2VA graph (``wrapper_bridge.run_graph`` format).
+    def _sampler_spine(self, plan):
+        """The loaders + sampler both H3 graphs share, in run_graph format.
 
-        It is the lab's hash-pinned topology MINUS the audio half: no
-        ``VAELoader`` for the audio VAE, no ``VAEDecodeAudio``, no
-        ``CreateVideo`` / ``SaveVideo``. OTR takes the decoded IMAGE batch and
-        writes its own always-silent bt709 mp4, which is what makes V-1 a
-        property of the graph and not only of a check.
+        Everything here is IDENTICAL between the two lanes -- the same three
+        loaders, the same frozen recipe, the same guider/noise/scheduler/sampler
+        chain, the same single ``VAEDecode`` terminal. What differs is the
+        CONDITIONER, which each lane supplies from ``_conditioner_nodes`` and
+        which this spine reads through the ``h3`` node's two outputs
+        (conditioning at slot 0, the AV latent at slot 1).
 
-        ``last_frame`` is deliberately never wired. It is H3's first/LAST
-        interpolation endpoint, which is a different capability from the
-        first-frame chaining this lane declares -- supplying it would make the
-        render interpolate toward a frame the coverage planner never chose.
+        NEITHER lane decodes the audio half. Both graphs are the lab's pinned
+        topology minus ``VAEDecodeAudio`` / ``CreateVideo`` / ``SaveVideo``: OTR
+        takes the decoded IMAGE batch and writes its own always-silent bt709
+        mp4, which is what makes V-1 a property of the GRAPH and not only of a
+        check. Lane 20 loads the audio VAE because its CONDITIONER needs it to
+        encode reference audio -- never to decode any.
         """
         from . import wrapper_bridge as _wb
         W = _wb.Wire
-        get = request.get if isinstance(request, dict) else (
-            lambda k, d=None: getattr(request, k, d))
         names = self._weight_paths()
-        prompt = get("text_prompt") or _H3_DEFAULT_PROMPT
         return {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": names["UNET"][0],
@@ -513,13 +573,6 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                 "device": H3_RECIPE["clip_device"]}},
             "vae": {"class": "vae",
                     "inputs": {"vae_name": names["VAE"][0]}},
-            "loadimage": {"class": "loadimage", "inputs": {"image": image_name}},
-            "h3": {"class": "h3",
-                   "inputs": {"clip": W("clip", 0), "vae": W("vae", 0),
-                              "prompt": prompt,
-                              "width": int(width), "height": int(height),
-                              "length": int(model_length),
-                              "first_frame": W("loadimage", 0)}},
             "guider": {"class": "guider",
                        "inputs": {"model": W("unet", 0),
                                   "conditioning": W("h3", 0)}},
@@ -541,6 +594,65 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             "decode": {"class": "decode",
                        "inputs": {"samples": W("sample", 0), "vae": W("vae", 0)}},
         }
+
+    def _build_graph(self, request, staged, plan, model_length, width, height):
+        """Spine + this lane's conditioner. ``staged`` is whatever the lane's
+        ``_stage_inputs`` produced (a basename, or a dict of them)."""
+        graph = self._sampler_spine(plan)
+        graph.update(self._conditioner_nodes(
+            request, staged, plan, model_length, width, height))
+        return graph
+
+    # ---- per-lane seams (subclasses implement) ------------------------- #
+    def _assert_required_inputs(self, plan):
+        """Refuse a request missing what this lane needs, BEFORE anything is
+        staged and long before the GPU. Subclasses implement."""
+        raise NotImplementedError
+
+    def _stage_inputs(self, request, plan, width, height):
+        """Put this lane's inputs where ComfyUI's loaders can read them and
+        return whatever ``_conditioner_nodes`` needs to wire them."""
+        raise NotImplementedError
+
+    def _conditioner_nodes(self, request, staged, plan, model_length,
+                           width, height):
+        """The ``h3`` conditioner node plus any input-loader nodes it wires.
+        Must expose conditioning at ``h3`` slot 0 and the AV latent at slot 1."""
+        raise NotImplementedError
+
+    def _prompt_for(self, request):
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        return get("text_prompt") or self._DEFAULT_PROMPT
+
+    @staticmethod
+    def _ref_path(ref):
+        """A filesystem path out of an ``audio_ref`` that may be a bare string
+        OR a mapping carrying a ``path`` key (the AudioRef shape). Same helper
+        shape ``eng_ltx_av`` uses for the same field."""
+        if not ref:
+            return ""
+        if isinstance(ref, str):
+            return ref
+        if isinstance(ref, dict):
+            return ref.get("path") or ""
+        return getattr(ref, "path", "") or ""
+
+    def _build_render_request(self, request):
+        """The shared Wan-style request PLUS ``audio_path``.
+
+        ``WanInitImageMixin._build_render_request`` has no audio field -- the
+        WAN lanes have no audio input -- so the audio-in lane would silently see
+        ``None`` and refuse every beat. Added on the BASE rather than only on
+        lane 20 so the two lanes' plans have one shape, and it is inert for lane
+        19 (a request with no ``audio_ref`` yields "").
+        """
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        plan = super()._build_render_request(request)
+        plan["audio_path"] = self._ref_path(get("audio_ref"))
+        plan["text_prompt"] = get("text_prompt") or ""
+        return plan
 
     # ---- preflight ----------------------------------------------------- #
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -564,17 +676,17 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         self._assert_boot_contract(profile)
         paths = self._weight_paths()
         missing = ["%s=%s" % (label, paths[label][0])
-                   for label, _cats, _default, _floor in _H3_WEIGHTS
+                   for label, _cats, _default, _floor in self._weight_rows()
                    if not paths[label][1]]
         if missing:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "minimax_h3_video weight(s) not found: %s -- drop them in the "
+                "%s weight(s) not found: %s -- drop them in the "
                 "matching models/ folder or register it in "
                 "extra_model_paths.yaml (the OTR_MINIMAX_H3_*_NAME variables "
                 "only name a file, they cannot make the loader find one)"
-                % ", ".join(missing), kind="video")
-        for label, _cats, _default, floor in _H3_WEIGHTS:
+                % (self.name, ", ".join(missing)), kind="video")
+        for label, _cats, _default, floor in self._weight_rows():
             token, path = paths[label]
             try:
                 size = os.path.getsize(path)
@@ -583,9 +695,9 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             if size < floor:
                 raise EngineUnusable(
                     self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                    "minimax_h3_video %s weight %r is only %d bytes (< the %d "
-                    "floor) -- that is a truncated or wrong file, not the H3 "
-                    "artifact; re-fetch it" % (label, token, size, floor),
+                    "%s %s weight %r is only %d bytes (< the %d floor) -- that is "
+                    "a truncated or wrong file, not the H3 artifact; re-fetch "
+                    "it" % (self.name, label, token, size, floor),
                     kind="video")
         from . import wrapper_bridge as _wb
         mapping = _wb.node_class_mappings()
@@ -598,10 +710,10 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if absent:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "minimax_h3_video missing required ComfyUI node class(es): %s "
-                "(MiniMax H3 needs a ComfyUI carrying comfy_extras/"
-                "nodes_minimax_h3.py -- update ComfyUI and restart)"
-                % ", ".join(absent), kind="video")
+                "%s missing required ComfyUI node class(es): %s (MiniMax H3 "
+                "needs a ComfyUI carrying comfy_extras/nodes_minimax_h3.py -- "
+                "update ComfyUI and restart)"
+                % (self.name, ", ".join(absent)), kind="video")
         return self.name
 
     def _assert_boot_contract(self, profile):
@@ -638,7 +750,7 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 for label, (token, path) in sorted(self._weight_paths().items())
                 if not path)
             raise RuntimeError(
-                "minimax_h3_video not installed: missing %s" % missing)
+                "%s not installed: missing %s" % (self.name, missing))
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._loaded = True
@@ -650,10 +762,7 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         from ._tmp import otr_engine_tmp_mp4
         plan = self._build_render_request(request)
-        if not plan["init_image"]:
-            raise _wb.GraphExecutionError(
-                "minimax_h3_video requires init_image (got %r)"
-                % plan["init_image"])
+        self._assert_required_inputs(plan)
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
@@ -664,10 +773,11 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # refused here rather than inside the graph.
         if int(width) % 32 or int(height) % 32:
             raise _wb.GraphExecutionError(
-                "minimax_h3_video was handed a %dx%d canvas; both axes must be "
-                "/32-legal (every H3 node declares width/height at step=32 and "
-                "the latent is H/16 x W/16). This lane declares %dx%d."
-                % (width, height, self.render_canvas[0], self.render_canvas[1]))
+                "%s was handed a %dx%d canvas; both axes must be /32-legal "
+                "(every H3 node declares width/height at step=32 and the latent "
+                "is H/16 x W/16). This lane declares %dx%d."
+                % (self.name, width, height,
+                   self.render_canvas[0], self.render_canvas[1]))
         # THE LENGTH IS DECIDED BEFORE ANYTHING IS STAGED TOO (B4). The ask
         # arrives in CANVAS frames; the graph is driven in MODEL frames.
         target_frames = int(plan.get("target_frame_count") or 0)
@@ -677,17 +787,17 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                         else model_frames_for_canvas(canvas_rung))
         if canvas_rung is None or model_length is None:
             raise _wb.GraphExecutionError(
-                "minimax_h3_video was asked for %d canvas frame(s); its legal "
-                "menu is %d..%d at 25 fps (the model's 17k+5 grid over its "
-                "trained %d..%d band, converted from 24 fps). NO FALLBACK -- "
-                "rendering a shorter clip and padding it back up is not a "
-                "render of the ask, and on a chained lane the next segment "
-                "would begin on a manufactured frame."
-                % (target_frames, H3_CANVAS_RUNGS[0], H3_CANVAS_RUNGS[-1],
+                "%s was asked for %d canvas frame(s); its legal menu is "
+                "%d..%d at 25 fps (the model's 17k+5 grid over its trained "
+                "%d..%d band, converted from 24 fps). NO FALLBACK -- rendering "
+                "a shorter clip and padding it back up is not a render of the "
+                "ask, and on a chained lane the next segment would begin on a "
+                "manufactured frame."
+                % (self.name, target_frames,
+                   H3_CANVAS_RUNGS[0], H3_CANVAS_RUNGS[-1],
                    H3_MODEL_RUNGS[0], H3_MODEL_RUNGS[-1]))
-        image_name = self._materialize_init_image(
-            request, plan["init_image"], width, height)
-        graph = self._build_graph(request, image_name, plan, model_length,
+        staged = self._stage_inputs(request, plan, width, height)
+        graph = self._build_graph(request, staged, plan, model_length,
                                   width, height)
         # free_after_use: the 15 GB Qwen3-VL encoder is freed the moment the
         # conditioning exists, before the sampler ever runs. `keep` holds the
@@ -716,10 +826,10 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # remap bug.
         if len(frames) != model_length:
             raise _wb.GraphExecutionError(
-                "minimax_h3_video asked its graph for %d model frame(s) and "
-                "decoded %d. NO FALLBACK -- padding the difference is how a "
-                "render that did not happen gets counted as one."
-                % (model_length, len(frames)))
+                "%s asked its graph for %d model frame(s) and decoded %d. NO "
+                "FALLBACK -- padding the difference is how a render that did "
+                "not happen gets counted as one."
+                % (self.name, model_length, len(frames)))
         # THE 24 -> 25 CONVERSION, and it is this lane's real deliverable.
         # Nearest-source-frame resampling of the uint8 batch, immediately before
         # the encoder. Relabelling instead would make every beat ~4% short: the
@@ -728,9 +838,9 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # 7.68 s while the ledger and the audio both expect 8.000 s.
         frames = frames[list(canvas_index_map(model_length, canvas_rung))]
         _LOG.info(
-            "[OTR video] minimax_h3_video 24->25 conversion: %d model frame(s) "
-            "at %d fps (%.3f s) -> %d canvas frame(s) at %d fps (%.3f s)",
-            model_length, H3_MODEL_FPS, model_length / float(H3_MODEL_FPS),
+            "[OTR video] %s 24->25 conversion: %d model frame(s) at %d fps "
+            "(%.3f s) -> %d canvas frame(s) at %d fps (%.3f s)",
+            self.name, model_length, H3_MODEL_FPS, model_length / float(H3_MODEL_FPS),
             canvas_rung, H3_CANVAS_FPS, canvas_rung / float(H3_CANVAS_FPS))
         # THE TAIL TRIM, in REAL delivered frames. An ask off the menu renders
         # the next legal rung UP and drops the surplus in order -- no mirror, no
@@ -741,20 +851,20 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if canvas_rung > target_frames >= H3_CANVAS_RUNGS[0]:
             frames = frames[:target_frames]
             _LOG.info(
-                "[OTR video] minimax_h3_video tail trim: delivered %d of %d "
-                "canvas frame(s) (nearest legal rung at or above the %d-frame "
-                "ask) @ %dx%d", len(frames), canvas_rung, target_frames,
+                "[OTR video] %s tail trim: delivered %d of %d canvas frame(s) "
+                "(nearest legal rung at or above the %d-frame ask) @ %dx%d",
+                self.name, len(frames), canvas_rung, target_frames,
                 width, height)
-        out_path = otr_engine_tmp_mp4("otr_minimax_h3_")
+        out_path = otr_engine_tmp_mp4("otr_%s_" % self.name)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
                                                   self.target_fps)
         # M7: PROVE the silent bt709/yuv420p contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         if not os.environ.get("OTR_TEST_MODE"):
             _LOG.info(
-                "[OTR video] minimax_h3_video VRAM render-phase peak %s MB @ "
-                "%dx%d model_len=%d canvas_len=%d",
-                render_peak, width, height, model_length, n)
+                "[OTR video] %s VRAM render-phase peak %s MB @ %dx%d "
+                "model_len=%d canvas_len=%d",
+                self.name, render_peak, width, height, model_length, n)
         return {"out_path": path, "frame_count": n,
                 "vram_peak_mb": render_peak,
                 "recipe": self._recipe_receipt(),
@@ -793,12 +903,14 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
         Every other adapter writes ``has_audio: False`` because its model has no
         audio to emit. H3 does: its latent is a video+audio pair and the
-        installed nodes ship a decoder for each half. This lane's graph carries
-        no audio VAE, so the file is silent by construction -- but "by
+        installed nodes ship a decoder for each half. NEITHER H3 lane wires
+        ``VAEDecodeAudio``, so both files are silent by construction -- and note
+        that lane 20 LOADS an audio VAE without decoding anything with it, which
+        is exactly the sort of distinction a reader gets wrong. "By
         construction" is precisely the kind of claim that survives a graph edit
         it should not survive, and G5 exists because a declaration checking a
         declaration proves nothing (lesson L4). So the container is re-probed
-        HERE, at the seam where the field is written.
+        HERE, at the seam where the field is written, on BOTH lanes.
         """
         raw = raw or {}
         path = raw.get("out_path", "")
@@ -810,8 +922,234 @@ class MiniMaxH3VideoEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return clip
 
 
+@register
+class MiniMaxH3VideoEngine(_MiniMaxH3Base):
+    """``minimax_h3_video`` -- MiniMax H3 FL2VA, first frame to silent video.
+
+    LANE 19. Conditions on a still pinned as the FIRST FRAME, on the fl2va DiT.
+    No audio anywhere in its graph -- not decoded and not even loaded.
+    """
+
+    name = "minimax_h3_video"
+    family = "image_to_video"
+    _UNET_DEFAULT = _H3_DEFAULT_UNET
+    _RECIPE_RECEIPT = H3_RECIPE_RECEIPT
+    required_inputs = ("init_image",)
+
+    _EXTRA_NODE_CANDIDATES = {
+        "loadimage": ("LoadImage",),
+        "h3": ("MiniMaxH3ImageToVideo",),
+    }
+
+    #: THE FRAME LADDER, PUBLISHED IN CANVAS FRAMES. ``discrete_frames`` is the
+    #: 17k+5 model grid over the trained band, converted to 25 fps: 129 .. 377.
+    #: Both tuples are derived from ``align_frame_count`` at import, so the menu
+    #: cannot drift from the grid the node will actually snap to.
+    #:
+    #: ``allow_tail_trim`` is mandatory for a discrete menu (a fixed set of
+    #: lengths cannot sum to an arbitrary beat) and it is honest here: the
+    #: surplus is dropped in REAL delivered frames, in order, never mirrored.
+    #:
+    #: CONTINUITY -- decided, not defaulted, and NOT what lane 20 declares.
+    #: ``MiniMaxH3ImageToVideo`` pins the supplied still as a keyframe at
+    #: ``resolved_frame_index 0`` and the node's own docstring records that
+    #: keyframe condition latents are "re-injected every step (never denoised)".
+    #: That is a first-frame lock of the same class as
+    #: ``LTXVImgToVideo(strength=1.0)`` on the incumbent chained lanes: a
+    #: LATENT-space pin through a VAE round trip, not a byte copy of the source
+    #: pixels. The lab's continuation experiment is the measurement --
+    #: prior-clip-last to next-clip-first scored SSIM 0.900 / PSNR 33.4 dB and
+    #: its seam gate passed. Declaring NONE instead would refuse chaining and
+    #: turn every multi-segment H3 beat into jump cuts it does not need.
+    frame_contract = FrameContract(
+        discrete_frames=H3_CANVAS_RUNGS,
+        native_fps=H3_CANVAS_FPS,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_STRICT_FIRST_FRAME,
+    )
+
+    def _assert_required_inputs(self, plan):
+        from . import wrapper_bridge as _wb
+        if not plan.get("init_image"):
+            raise _wb.GraphExecutionError(
+                "%s requires init_image (got %r)"
+                % (self.name, plan.get("init_image")))
+
+    def _stage_inputs(self, request, plan, width, height):
+        return self._materialize_init_image(
+            request, plan["init_image"], width, height)
+
+    def _conditioner_nodes(self, request, staged, plan, model_length,
+                           width, height):
+        """``MiniMaxH3ImageToVideo`` with the still as ``first_frame``.
+
+        ``last_frame`` is deliberately never wired. It is H3's first/LAST
+        interpolation endpoint, which is a different capability from the
+        first-frame chaining this lane declares -- supplying it would make the
+        render interpolate toward a frame the coverage planner never chose.
+        """
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        return {
+            "loadimage": {"class": "loadimage", "inputs": {"image": staged}},
+            "h3": {"class": "h3",
+                   "inputs": {"clip": W("clip", 0), "vae": W("vae", 0),
+                              "prompt": self._prompt_for(request),
+                              "width": int(width), "height": int(height),
+                              "length": int(model_length),
+                              "first_frame": W("loadimage", 0)}},
+        }
+
+
+@register
+class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
+    """``minimax_h3_audio_in`` -- MiniMax H3 REF2VA, audio-conditioned video.
+
+    LANE 20. The sibling of :class:`MiniMaxH3VideoEngine` and a genuinely
+    different capability, not a variant: it conditions on REFERENCE media --
+    a portrait and the beat's own audio -- through
+    ``MiniMaxH3ReferenceToVideo``, on the **ref2va** DiT rather than fl2va.
+
+    THE AUDIO VAE IS LOADED, AND IT STILL DECODES NOTHING. ``audio_vae`` is a
+    required input of the reference node, which uses it to ENCODE the reference
+    audio into the conditioning. No ``VAEDecodeAudio`` exists in this graph
+    either, so the emitted clip is silent by construction exactly like lane 19's
+    and ``canonicalize`` re-probes it (V-1). "Loads an audio VAE" and "emits
+    audio" are different claims and only the first is true here.
+    """
+
+    name = "minimax_h3_audio_in"
+    #: The family the mouth policy and the ambient-audio router both read.
+    #: ``audio_conditioned_video`` is the EXISTING family ``ltx_audio_in`` uses;
+    #: minting a new one would put this lane outside
+    #: ``content_oracle.MOTION_FAMILIES`` and make its frozen clips
+    #: motion-EXEMPT, which is the trap the transplant plan names by name.
+    family = "audio_conditioned_video"
+    _UNET_DEFAULT = _H3_DEFAULT_UNET_REF2VA
+    _RECIPE_RECEIPT = "minimax_h3_ref2va_int8_res_multistep_20step_v1"
+
+    #: HARD-requires both: the reference node takes a portrait AND the audio it
+    #: is meant to move to. A beat missing either is refused before staging.
+    required_inputs = ("audio_ref", "init_image")
+
+    _EXTRA_NODE_CANDIDATES = {
+        "audiovae": ("VAELoader",),
+        "loadimage": ("LoadImage",),
+        "loadaudio": ("LoadAudio",),
+        "h3": ("MiniMaxH3ReferenceToVideo",),
+    }
+
+    _DEFAULT_PROMPT = (
+        "a medium close shot of <Picture 1> speaking directly to camera, lip "
+        "movements matching <Audio 1> precisely, warm cinematic light")
+
+    #: SAME ladder as lane 19 -- same model grid, same 24->25 conversion -- and
+    #: a DIFFERENT continuity, which is the one contract decision this lane does
+    #: not inherit.
+    #:
+    #: CONTINUITY IS ``soft_reference``, DECIDED. Lane 19 wires ``first_frame``,
+    #: which ``MiniMaxH3ImageToVideo`` pins as a keyframe at
+    #: ``resolved_frame_index 0`` and re-injects every step -- a real first-frame
+    #: lock, so it earns STRICT. ``MiniMaxH3ReferenceToVideo`` has no
+    #: ``first_frame`` input at all: its ``ref_images`` are IDENTITY references
+    #: presented to the tokenizer as ``<Picture i>``, and nothing pins frame 0 to
+    #: any of them. Claiming STRICT here would promise the coverage planner a
+    #: seam this node cannot deliver, and the visible cost of a wrong strict
+    #: claim is a jump at a join the plan said was seamless. A jump cut is
+    #: honest; that is what SOFT means (same reasoning ``google_veo_video``
+    #: records for its own endpoints).
+    frame_contract = FrameContract(
+        discrete_frames=H3_CANVAS_RUNGS,
+        native_fps=H3_CANVAS_FPS,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
+
+    def _assert_required_inputs(self, plan):
+        from . import wrapper_bridge as _wb
+        if not plan.get("init_image"):
+            raise _wb.GraphExecutionError(
+                "%s requires init_image -- the reference node needs a portrait "
+                "to present as <Picture 1> (got %r)"
+                % (self.name, plan.get("init_image")))
+        if not plan.get("audio_path"):
+            raise _wb.GraphExecutionError(
+                "%s requires audio_ref -- this is the AUDIO-CONDITIONED lane "
+                "and without the beat's audio it would render an unconditioned "
+                "clip while its receipt claimed lip-sync (got %r)"
+                % (self.name, plan.get("audio_path")))
+
+    def _stage_inputs(self, request, plan, width, height):
+        """Stage the portrait and the audio where ComfyUI's loaders read them.
+
+        The portrait goes through ``_materialize_init_image`` for the same
+        reason every other lane does -- ONE uniform scale, never a silent
+        stretch (N9). The audio is staged BYTE-FOR-BYTE: resampling or trimming
+        it here would change the thing the model is being asked to lip-sync to,
+        and the node's own encoder already resamples to the audio VAE's rate.
+        """
+        from . import wrapper_bridge as _wb
+        return {
+            "image": self._materialize_init_image(
+                request, plan["init_image"], width, height),
+            "audio": _wb.stage_into_comfy_input(plan["audio_path"]),
+        }
+
+    def _conditioner_nodes(self, request, staged, plan, model_length,
+                           width, height):
+        """``MiniMaxH3ReferenceToVideo`` with one picture and one audio.
+
+        THE REFERENCE SOCKETS ARE ``COMFY_AUTOGROW_V3`` and take PLAIN DICTS
+        here. In the lab's API graph they serialize dotted
+        (``"ref_images.ref_image_0"``) because ComfyUI's prompt EXECUTOR
+        flattens and reassembles them; this adapter calls the node class
+        directly through ``wrapper_bridge``, whose ``run_graph`` invokes
+        ``FUNCTION`` -- and a V3 node's ``FUNCTION`` is ``EXECUTE_NORMALIZED``,
+        a plain passthrough to ``execute(**kwargs)``. So ``execute`` receives
+        exactly the dict it iterates (``(ref_images or {}).values()``).
+        ``_iter_wires`` recurses dicts, so the Wires inside resolve normally.
+
+        ``ref_videos`` / ``ref_video_audios`` are deliberately never wired: this
+        lane conditions a still portrait on a voice, and a reference VIDEO is a
+        different capability with its own cost (reference tokens ride every
+        sampling step).
+        """
+        from . import wrapper_bridge as _wb
+        W = _wb.Wire
+        names = self._weight_paths()
+        return {
+            "audiovae": {"class": "audiovae",
+                         "inputs": {"vae_name": names["AUDIO_VAE"][0]}},
+            "loadimage": {"class": "loadimage",
+                          "inputs": {"image": staged["image"]}},
+            "loadaudio": {"class": "loadaudio",
+                          "inputs": {"audio": staged["audio"]}},
+            "h3": {"class": "h3",
+                   "inputs": {"clip": W("clip", 0), "vae": W("vae", 0),
+                              "audio_vae": W("audiovae", 0),
+                              "prompt": self._prompt_for(request),
+                              "width": int(width), "height": int(height),
+                              "length": int(model_length),
+                              # 'match' scales each reference DOWN to the
+                              # generation's pixel area. 'max' uses a 2048 short
+                              # edge for identity fidelity and the node's own
+                              # tooltip warns it can be several times slower,
+                              # because reference tokens ride through every
+                              # sampling step. The lab's passing lip-sync leg
+                              # used 'match'; this lane ships what was measured.
+                              "ref_image_size": "match",
+                              "ref_images": {"ref_image_0": W("loadimage", 0)},
+                              "ref_audios": {"ref_audio_0": W("loadaudio", 0)}}},
+        }
+
+    def _weight_rows(self):
+        """The shared three plus the audio VAE this lane's conditioner needs."""
+        return super()._weight_rows() + (_H3_AUDIO_VAE_ROW,)
+
+
 __all__ = [
-    "MiniMaxH3VideoEngine", "align_frame_count", "model_rungs",
+    "MiniMaxH3VideoEngine", "MiniMaxH3AudioInEngine",
+    "align_frame_count", "model_rungs",
     "canvas_frames_for_model", "model_frames_for_canvas", "canvas_index_map",
     "H3_MODEL_RUNGS", "H3_CANVAS_RUNGS", "H3_MODEL_FPS", "H3_CANVAS_FPS",
     "H3_RECIPE", "H3_RECIPE_RECEIPT",

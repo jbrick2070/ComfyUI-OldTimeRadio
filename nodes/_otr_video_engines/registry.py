@@ -501,6 +501,22 @@ CAPABILITIES = {
         "model_requirements": ["minimax-h3-fl2va-int8",
                                "qwen3vl-32b-minimax-h3-nvfp4",
                                "minimax-h3-video-vae"]},
+    # minimax_h3_audio_in (lane 20, 2026-08-12): the REF2VA sibling -- the same
+    # 33.1B stack conditioned on a reference portrait plus the beat's own audio.
+    # Same capability shape as minimax_h3_video except for the assets: it loads
+    # a DIFFERENT 21 GB DiT (ref2va, not fl2va) and it ADDS the audio VAE, which
+    # its conditioner needs to ENCODE reference audio. It still decodes no
+    # audio, so the lane is silent like its sibling -- "loads an audio VAE" and
+    # "emits audio" are different claims and only the first is true.
+    "minimax_h3_audio_in": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": True,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["minimax-h3-ref2va-int8",
+                               "qwen3vl-32b-minimax-h3-nvfp4",
+                               "minimax-h3-video-vae",
+                               "minimax-h3-audio-vae"]},
     # CLOUD partner video rows (S3 core, 2026-07-02, pass04 secs 5+7): the
     # render happens PROVIDER-SIDE (zero local VRAM); cpu_ok True (any box with
     # ffmpeg + credits can run them). NO enable flag (operator directive

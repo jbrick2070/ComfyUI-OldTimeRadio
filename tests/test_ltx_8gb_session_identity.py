@@ -181,6 +181,11 @@ _ENGINES_WITH_A_SESSION = {
     # after it was written. Its identity is engine + frozen recipe + a re-stat
     # of all three weights (never a hash of 21 GB).
     "minimax_h3_video",        # 2026-08-12, lane 19
+    # LANE 20, 2026-08-12. Inherits the identity from `_MiniMaxH3Base` -- and
+    # it is NOT the same tuple as its sibling's, because the identity is built
+    # from `_weight_rows()`: this lane's names a different DiT and one more
+    # weight, so the two lanes can never be mistaken for one session.
+    "minimax_h3_audio_in",     # 2026-08-12, lane 20
 }
 
 

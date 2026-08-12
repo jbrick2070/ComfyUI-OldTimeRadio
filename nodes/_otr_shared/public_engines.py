@@ -127,6 +127,17 @@ _PUBLIC_ENGINES = {
     # audio-conditioned route is lane 20's `h3_low_audio_in`, a SEPARATE public
     # id on a SEPARATE internal id.
     "h3_low_video": "minimax_h3_video",
+    # Lane 20, 2026-08-12. The SECOND public id on the H3 stack, and it maps to
+    # a SEPARATE internal engine -- which is the whole reason lane 19 registered
+    # only one adapter. Two public ids on ONE internal id collapses
+    # _INTERNAL_TO_PUBLIC and trips the bijection assert below at IMPORT time.
+    #
+    # `audio_in` states the capability, matching `ltx23_low_audio_in`: this lane
+    # conditions on the beat's own audio through MiniMaxH3ReferenceToVideo. Its
+    # `low` is the same measured bucket as its sibling -- the lab's ref2va leg
+    # at 864x480 model f124 measures 7.20 GiB, and the seed-43 lip-sync leg at
+    # 832x480 f192 measured 6.88 GiB cold.
+    "h3_low_audio_in": "minimax_h3_audio_in",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -237,6 +248,12 @@ _PUBLIC_LABEL = {
     "h3_low_video": (
         "MiniMax H3 33B silent video - low VRAM (7.3 GiB at 864x480; needs the "
         "sage-free h3 boot, and it is the slowest local lane by far)"),
+    # Same two warnings as its sibling, plus what it actually adds: this is the
+    # only LOCAL lane that conditions on a reference PORTRAIT and audio together.
+    "h3_low_audio_in": (
+        "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; reference "
+        "portrait + the beat's own audio; needs the sage-free h3 boot, and it "
+        "is as slow as its silent sibling)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

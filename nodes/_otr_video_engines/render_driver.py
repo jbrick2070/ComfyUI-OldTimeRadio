@@ -765,6 +765,18 @@ def _still_spine_manifest_object_ids(images):
 
 
 def _still_spine_requires_scene(shot, engine_id, family):
+    # CORRECTED 2026-08-12 (lane 20 QA). An earlier draft of this comment said
+    # `minimax_h3_audio_in` was "deliberately NOT in this list" and therefore
+    # kept a portrait spine. That was FALSE about the code below it: this
+    # function also returns True for any non-face engine that declares
+    # `init_image` (and for the whole `audio_conditioned_video` family), so the
+    # H3 audio-in lane takes the scene SPINE exactly like `ltx_audio_in`.
+    #
+    # That is fine and intended -- the spine decides which stills get MINTED,
+    # and a per-beat scene still is useful to have. The thing that had to be
+    # fixed is one level up, where `_engine_scene_init_required` OVERWRITES
+    # init_image with that scene still; both audio-in lanes are excluded there
+    # so the reference the model lip-syncs stays a face.
     if str(engine_id or "") in (
             "still_pan", "still_flat", "still_word", "ltx_audio_in"):
         return True
@@ -1526,6 +1538,24 @@ def ltx_prompt_diversity_status(trace):
             "ok": (len(shas) < 2) or distinct > 1, "sha8s": shas}
 
 
+#: The AUDIO-IN engines that count as a talking head on a `character_video`
+#: beat. A MEMBERSHIP test since lane 20 (2026-08-12); it was an equality test
+#: on `ltx_audio_in` while that was the only such lane.
+#:
+#: THIS IS LOAD-BEARING AND IT FAILS AT PLAN TIME, not at render time. An
+#: audio-in beat that is neither a character face nor a cabinet role raises
+#: `MouthPolicyError` -- `mouth_owner_for_beat` refuses to guess whether the
+#: still it will animate has lips. So registering an `audio_conditioned_video`
+#: engine WITHOUT adding it here does not degrade anything: it makes every
+#: character beat on that engine fail before a single weight loads.
+#:
+#: THE WRONG FIX, named so nobody reaches for it: minting a new family to dodge
+#: the check. A family outside `content_oracle.MOTION_FAMILIES` makes frozen
+#: clips motion-EXEMPT, so the beat would stop being checked for motion at all
+#: -- trading a loud plan-time refusal for a silent quality hole.
+_AUDIO_IN_CHARACTER_ENGINES = ("ltx_audio_in", "minimax_h3_audio_in")
+
+
 def _is_character_face_beat(shot):
     """The ROLE-driven 'talking head' signal: a beat that needs the character's OWN
     clean voice + a character prompt, NOT the ambient master slice + scene prompt the
@@ -1545,7 +1575,8 @@ def _is_character_face_beat(shot):
         return False
     if engine_family(str((shot or {}).get("engine_id") or ""), "") == "audio_driven_face":
         return True
-    if str((shot or {}).get("engine_id") or "") == "ltx_audio_in" and role == "character_video":
+    if (str((shot or {}).get("engine_id") or "") in _AUDIO_IN_CHARACTER_ENGINES
+            and role == "character_video"):
         return True
     return False
 
@@ -2008,10 +2039,24 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # scene beat would then show the wrong image). audio_driven_face keeps the
     # portrait by design (not in _SCENE_INIT_FAMILIES); fodder engines are excluded
     # by the guard; text engines are unchanged (LTX text-only by design).
+    # `minimax_h3_audio_in` joins ltx_audio_in's exclusion (lane 20,
+    # 2026-08-12), and it is a CORRECTNESS fix rather than a preference. This
+    # branch OVERWRITES init_image with the beat's wide scene still. On that
+    # lane init_image is the reference the model is asked to lip-sync -- it is
+    # presented to the tokenizer as `<Picture 1>` and its own prompt says
+    # "a medium close shot of <Picture 1> speaking directly to camera" -- so
+    # handing it an establishing shot with no face in it does not fail, it
+    # renders the wrong identity, silently, on every beat.
+    #
+    # Caught by the post-coding QA pass: the lane's comment on
+    # `_still_spine_requires_scene` claimed it kept the portrait while this
+    # generic rule took it anyway, and the test that was meant to prove it was
+    # LEXICAL (it grepped the source instead of calling the function) so it
+    # passed against the wrong behaviour.
     _engine_scene_init_required = (
         "init_image" in _required_inputs_for_engine(_eng_id, _family)
         and _family not in ("audio_driven_face", "character_3d")
-        and _eng_id != "ltx_audio_in"
+        and _eng_id not in ("ltx_audio_in", "minimax_h3_audio_in")
     )
     _engine_scene_init_optional = bool(
         _eng_id and _vreg.is_registered(_eng_id)

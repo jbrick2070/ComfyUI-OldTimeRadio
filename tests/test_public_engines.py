@@ -68,6 +68,11 @@ _TIER = {
     # at H3's trained 1344x768, so the lane declares the canvas where the token
     # is true rather than applying the token to whatever it renders.
     "h3_low_video": "minimax_h3_video",
+    # Lane 20, 2026-08-12: the second H3 public id, and it maps to a SEPARATE
+    # internal engine. That separation is the whole reason lane 19 registered
+    # only one adapter -- two public ids on one internal id collapses
+    # _INTERNAL_TO_PUBLIC and trips the bijection assert at IMPORT time.
+    "h3_low_audio_in": "minimax_h3_audio_in",
 }
 
 

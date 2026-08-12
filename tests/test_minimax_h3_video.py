@@ -624,12 +624,30 @@ def test_exactly_one_public_id_resolves_to_this_lane():
     assert hits == ["h3_low_video"]
 
 
-def test_lane_20s_adapter_is_NOT_registered_by_this_lane():
-    """Scope discipline: one internal engine cannot carry both H3 modes, and two
-    public ids on one internal id trips the bijection assert at import time."""
-    assert "minimax_h3_audio_in" not in vreg.all_engine_names()
-    assert "minimax_h3_audio_in" not in vreg.CAPABILITIES
-    assert "h3_low_audio_in" not in pub._PUBLIC_ENGINES
+def test_lane_20s_adapter_arrived_as_a_SEPARATE_internal_engine():
+    """The scope guard this lane wrote, and the shape it was guarding FOR.
+
+    Lane 19 asserted `minimax_h3_audio_in` was absent -- scope discipline while
+    the second adapter was lane 20's to register. Lane 20 (2026-08-12) is the
+    commit that legitimately retires that assertion, and a guard that fires when
+    its condition changes has to be UPDATED there rather than deleted: what lane
+    19 actually cared about was never "the sibling does not exist", it was "the
+    sibling never shares this lane's internal id".
+
+    So the invariant survives its own trigger. Two public ids, two SEPARATE
+    internal engines, and the module-scope bijection assert in `public_engines`
+    -- which empties most of the ComfyUI menu at IMPORT time if it ever trips --
+    still holds (lesson L5).
+    """
+    assert "minimax_h3_audio_in" in vreg.all_engine_names()
+    assert "minimax_h3_audio_in" in vreg.CAPABILITIES
+    assert pub.resolve_engine_id("h3_low_audio_in") == "minimax_h3_audio_in"
+    assert pub.resolve_engine_id("h3_low_video") == "minimax_h3_video"
+    # ONE public id per internal engine, both ways.
+    assert len(pub._PUBLIC_ENGINES) == len(pub._INTERNAL_TO_PUBLIC)
+    assert sorted(k for k, v in pub._PUBLIC_ENGINES.items()
+                  if v.startswith("minimax_h3")) == [
+        "h3_low_audio_in", "h3_low_video"]
 
 
 def test_the_still_plan_is_declared_and_validates(engine):

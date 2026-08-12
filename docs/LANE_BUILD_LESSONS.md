@@ -1534,6 +1534,149 @@ and `::test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it`
 
 ---
 
+## L26 -- A LEXICAL test does not just fail on comments; it PASSES on wrong code
+
+**Check:** does any test prove a behaviour by reading SOURCE TEXT --
+`inspect.getsource`, a grep, a substring -- rather than by calling the thing?
+If so it can pass while the behaviour is the opposite of what it claims.
+
+**This is L20's other half, and it took three strikes in one session to see it.**
+L20 records that prose containing a gate's token can SATISFY the gate. Lane 19
+found the inverse: a comment can BREAK a gate (a test grepping the adapter for
+`VAEDecodeAudio` failed on the docstring explaining its absence), and a source
+grep for an import failed on the comment quoting the broken line. Both were
+merely annoying -- they went red on correct code.
+
+**Lane 20's was the expensive one: it went GREEN on wrong code.** The lane
+claimed in a comment that it kept a portrait spine, and the test written to
+prove it asserted that the engine id did not appear in the first 400 characters
+of a function's source. It passed. The function returned `True` anyway through
+a generic rule further down, and a second mechanism then OVERWROTE the lane's
+`init_image` with a wide scene still -- on a lane whose `init_image` IS the
+reference the model lip-syncs. Nothing raises; it renders the wrong identity on
+every beat. Found by the post-coding QA pass, which CALLED the function.
+
+**Runnable check:** for every assertion about behaviour, ask "what does this
+test do if the function returns the opposite?" If the answer is "still passes,
+because it never called it", the test is prose about prose. Call the function,
+compare the value, and if the value depends on a branch in another module,
+evaluate that branch's real condition rather than describing it.
+
+**And the corollary that actually catches these:** a comment asserting what the
+code below it does is a claim that needs the same proof as the code. When you
+write "this lane is deliberately NOT in this list, so it gets X", run it.
+
+**Twin assertion:** `tests/test_minimax_h3_audio_in.py::
+test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs`, paired
+with `::test_this_lane_DOES_take_the_scene_still_SPINE_like_its_incumbent` --
+kept as a PAIR because the original error was conflating two questions (which
+stills get minted, and which one becomes `init_image`) into one wrong sentence.
+
+---
+
+## L25 -- A guard that fires when its condition changes must be UPDATED, not deleted
+
+**Check:** when a scope guard you wrote goes red because the thing it forbade
+has legitimately arrived, ask what it was guarding FOR. Delete it only if the
+answer is nothing.
+
+**Where it came from:** lane 19 wrote
+`test_lane_20s_adapter_is_NOT_registered_by_this_lane` -- scope discipline while
+the sibling was somebody else's packet. Lane 20 is the commit that legitimately
+retires that assertion, and deleting it would have thrown away the invariant it
+existed to protect. What lane 19 actually cared about was never "the sibling
+does not exist"; it was "the sibling never shares this lane's internal id",
+because two public ids on one internal id trips a module-scope bijection assert
+at IMPORT time and empties most of the ComfyUI menu (L5).
+
+So the test was REWRITTEN to assert the surviving invariant: two public ids, two
+separate internal engines, bijection intact. The guard outlived its own trigger.
+
+**The generalisation:** a temporal guard ("not yet") and a structural guard
+("never like this") look identical while the temporal condition holds. When it
+stops holding, the structural half is what you keep -- and it is usually the
+half worth having.
+
+**Twin assertion:** `tests/test_minimax_h3_video.py::
+test_lane_20s_adapter_arrived_as_a_SEPARATE_internal_engine`.
+
+---
+
+## Lane 20 -- `h3_low_audio_in` / `minimax_h3_audio_in`, closed 2026-08-12
+
+Full receipt: `docs/evidence/lane_receipts/lane20-h3_low_audio_in.md`. The
+cheapest lane in the campaign because lane 19 paid for it, and it rendered live
+on the FIRST attempt against lane 19's three.
+
+**What did NOT bite, and why that is the finding.** The boot contract, the
+staging, the canvas guard, the length arithmetic, the 24->25 conversion and the
+V-1 probe were all inherited and all correct on the first try. A shared
+implementation module is worth building when the second lane is a REGISTRATION
+plus a conditioner rather than an engine.
+
+**What bit (1): the ONE value that must not be inherited is the one a reader
+would assume is shared.** Both lanes are the same model at the same canvas on
+the same grid -- so `continuity` looks like base-class material, and it is not.
+Lane 19 earns `strict_first_frame` because `MiniMaxH3ImageToVideo` pins a
+keyframe at index 0; `MiniMaxH3ReferenceToVideo` has **no `first_frame` input at
+all**, so lane 20 is `soft_reference`. Putting continuity on the base with a
+subclass override would have made STRICT the silent default for whichever lane
+forgot -- the exact shape L19 warns about (copy the reasoning, not the shape).
+
+**Runnable check:** before hoisting a value into a shared base, ask whether the
+two lanes would both be CORRECT if one of them forgot to override it. If not,
+it is not base material, and the base should refuse to supply it at all.
+`_UNET_DEFAULT = None` on the base does exactly that -- `_weight_rows()` raises
+a named refusal rather than guessing which 21 GB DiT this adapter meant.
+
+**What bit (2): a plan-time gate fails LOUD and EARLY, which makes it easy to
+under-test.** Extending the mouth policy is a one-line membership change, so the
+tempting test asserts the mapping. The test that earns its keep asserts the
+CONSEQUENCE: `mouth_owner_for_beat` RAISES `MouthPolicyError` for this
+engine/family/role when `is_character_face` is False. That is what would have
+happened on every H3 character beat -- before a single weight loaded -- had the
+line not been extended in the same commit.
+
+**What bit (4): the refactor introduced exactly one defect, and it was the one
+this lane's own docstring warns about.** `session_identity` read the
+module-level `H3_RECIPE_RECEIPT` -- lane 19's receipt -- so the moment a second
+adapter shared that method, lane 20's identity described lane 19's recipe. It
+stayed DISTINCT between the lanes anyway (the DiT token in the same tuple
+differs), so no session would have been wrongly reused; it would simply have
+been a receipt that lies. Written by the same hand, in the same change, as the
+paragraph forbidding it.
+
+**Runnable check, and it is the reusable part:** after hoisting a method into a
+shared base, CALL IT ON BOTH SUBCLASSES AND DIFF THE RESULTS. Every per-lane
+value in the output must actually differ. Neither lane's own tests would have
+caught this -- both pass in isolation, because each one only ever looks at
+itself. A hardcoded constant in a shared method is invisible until two callers
+are compared side by side.
+
+**Runnable check:** for a registration that joins an existing FAMILY, grep the
+family's name and the incumbent lane's id across the driver and judge each hit:
+which are correctly lane-specific and which are membership tests waiting to
+happen. `_still_spine_requires_scene` was the one that correctly stayed
+lane-specific here -- `ltx_audio_in` consumes a wide SCENE still, while this
+lane presents a portrait as `<Picture 1>`.
+
+**What bit (3): the API serialization is not the in-process call.** The lab's
+`COMFY_AUTOGROW_V3` reference sockets serialize DOTTED
+(`"ref_images.ref_image_0"`) because ComfyUI's prompt EXECUTOR flattens the
+schema and reassembles the dict. Calling the node class directly bypasses the
+executor, and a V3 node's `FUNCTION` is `EXECUTE_NORMALIZED` -- a plain
+passthrough -- so `execute` must receive the dict it iterates. Reading the
+runtime settled in minutes what a live experiment would have spent a 4-minute
+render on.
+
+**Runnable check:** when copying a graph from an API/JSON recipe into an
+in-process `run_graph` call, resolve the node's `FUNCTION` first and read what
+it does with kwargs. A dotted key that the executor owns is not a key the node
+accepts, and the failure mode is a socket that looks connected and resolves to
+nothing -- which renders successfully, with no references.
+
+---
+
 ## Lane 19 -- `h3_low_video` / `minimax_h3_video`, closed 2026-08-12 -- THE FIRST NEW ENGINE
 
 Full receipt: `docs/evidence/lane_receipts/lane19-h3_low_video.md`. Lanes 10-18
