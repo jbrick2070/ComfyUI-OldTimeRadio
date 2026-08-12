@@ -1413,6 +1413,58 @@ shape of a failed mint) and
 
 ---
 
+## Lane 16 -- `still_pan`, closed 2026-08-11
+
+Lane 15's two answers, taken on this lane's own evidence. Nothing new bit; two
+things are worth the next lane's attention.
+
+**What paid off (1): the scope guard fired, which is why lane 15 wrote it.**
+Lane 15 pinned `still_pan._require_still is False`. Lane 16 flipped it and that
+test went RED -- exactly its job on a SHARED base, where a behaviour change can
+otherwise spread by inheritance instead of by decision. It is rewritten as a
+LEDGER of who has ruled (`still_word` always, `still_motion` 15, `still_pan` 16,
+`still_flat` not yet, base False) so the next lane reads its own status in one
+line rather than inferring it.
+
+**Runnable check:** when a packet changes a flag on a shared base's subclass,
+the test that pins WHO HAS THE FLAG must list every sibling and name the lane
+that ruled. "Assert my lane is True" tells the next lane nothing.
+
+**What paid off (2): a byte-identical smoke proved a claim I would otherwise
+have asserted.** The G2 justification says `still_pan` and `still_motion` share
+one ffmpeg builder, so neither has a native canvas. Their two smokes -- distinct
+files, same still, same canvas, same frame count -- have the SAME sha256
+(`3692f155...`). That is the shared builder demonstrated rather than described,
+and it cost nothing because both renders already existed.
+
+**Runnable check:** when two lanes are claimed to share a render path, hash
+their artifacts. Identical inputs through a genuinely shared deterministic
+builder produce identical bytes; if they do not, the "shared" claim has a
+qualifier nobody has written down.
+
+**A cleanup rule this lane started, for lane 17 to finish:** the dark-floor
+test's parameter list is now the LIVE SCOPE of that branch. If lane 17 gives
+`still_flat` the refusal too, that list empties -- and an empty list with the
+`else:` branch still in `render_clip` means DEAD CODE. Delete the branch then,
+rather than leaving a floor nothing can reach.
+
+**What bit (3): a shared base has inheritors you did not picture.** Making the
+scope guard GENERIC over the registry (rather than four names) immediately
+failed -- because **`mesh_stage` also extends `_CheapFamilyBase`**. It takes the
+frame contract and the canvas/still helpers but OVERRIDES `render_clip`
+entirely, so `_require_still` is INERT there; it refuses a missing still with
+its own `FileNotFoundError`. Nothing was broken, and the four-name version of
+the guard would have gone on passing forever without ever mentioning the fifth
+inheritor.
+
+**Runnable check:** write shelf-scope guards as `set(registry) - set(ruled)`,
+never as a list of names you can picture. The difference is the inheritor you
+forgot -- and when one turns up, record whether the shared field APPLIES to it
+(here it does not) and what does the job instead, because "the flag does not
+apply here" is only safe paired with what does.
+
+---
+
 ## Lane 15 -- `still_motion`, closed 2026-08-11
 
 The first still lane and the first packet in this run to change BEHAVIOUR rather

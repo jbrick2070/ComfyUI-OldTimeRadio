@@ -396,10 +396,15 @@ class StillMotionFamily(_CheapFamilyBase):
 @register
 class StillPanFamily(_CheapFamilyBase):
     """A provided still given a slow pan/zoom (cover+crop) for the beat --
-    the 'still, but moving' option. CPU/ffmpeg-only, no weights, no VRAM, always
-    renders -> commercial-clean. The still is minted by the SEPARATELY-chosen image
+    the 'still, but moving' option. CPU/ffmpeg-only, no weights, no VRAM ->
+    commercial-clean. The still is minted by the SEPARATELY-chosen image
     engine; this family only animates it (so it is independent of the image engine).
-    ``_still_motion`` defaults True (the pan); contrast ``still_flat`` (flat hold)."""
+    ``_still_motion`` defaults True (the pan); contrast ``still_flat`` (flat hold).
+
+    "always renders" was in that first sentence and is NO LONGER TRUE (lane 16,
+    2026-08-11): a MISSING still is now a LOUD refusal rather than a dark floor.
+    It still always renders when it HAS its still, which is every beat where the
+    image phase did its job."""
     name = "still_pan"
     family = "static_image_gen"
     #: S1 per-model still plan (Shape A).
@@ -412,6 +417,20 @@ class StillPanFamily(_CheapFamilyBase):
     default_roles = ()              # selectable peer; not the in-stack default
     required_inputs = ("text_prompt",)
     commercial_clean = True         # own ffmpeg + the chosen still; no model license
+    #: S8b-12(b), lane 16, 2026-08-11 -- the black-beat defect, closed here too.
+    #: Lane 15 deliberately did NOT make this call for this lane; it is made now,
+    #: on this lane's own evidence, and the evidence is the same:
+    #: ``default_roles`` is empty and nothing routes here automatically (the
+    #: ``UNIVERSAL_FLOOR`` / ``FLOOR_NAMES`` / ``make_fallback_of`` machinery was
+    #: ripped 2026-07-02 and only comments recording the rip remain), so this
+    #: engine renders because an operator SELECTED it -- and ``accepts_still``
+    #: means the image dispatcher mints its still. A missing still therefore
+    #: means MINTING FAILED, and the dark lavfi floor turned that into a silent
+    #: black beat the composite positioned like any other (L21).
+    #:
+    #: ``still_flat`` (lane 17) is STILL untouched -- the base default stays
+    #: False, and that lane makes its own call on its own evidence.
+    _require_still = True
     uses_still = True               # animate a provided still (pan) when present
     accepts_still = True            # C1: mint the selected still (coverage gate) so an
     #                                 opener/beat that picks still_pan shows the chosen

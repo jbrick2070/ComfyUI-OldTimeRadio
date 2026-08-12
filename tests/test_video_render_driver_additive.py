@@ -329,9 +329,16 @@ def test_seedance_preflight_requires_engine_init_image():
 
 
 def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black():
-    # No scene still for the opener -> init stays empty (the cheap family will
-    # draw its floor) but the degrade is LOUD (the branch warns), never a silent
-    # scene_still claim. init_source falls back to "none".
+    # No scene still for the opener -> init stays empty, but the degrade is LOUD
+    # (the branch warns), never a silent scene_still claim. init_source falls
+    # back to "none".
+    #
+    # "(the cheap family will draw its floor)" was in that first line and is no
+    # longer true for THIS engine (lane 16, 2026-08-11): still_pan now sets
+    # _require_still, so the downstream render_clip RAISES instead of painting a
+    # floor. The subject here is one layer up -- what build_request_from_shot
+    # puts on the request -- so the assertions are unchanged and still correct;
+    # only the aside about what happens next was wrong.
     led = _still_pan_opener_ledger()
     led["images"]["images"] = [r for r in led["images"]["images"]
                                if r["object_id"] != "still_b000_music_open"]

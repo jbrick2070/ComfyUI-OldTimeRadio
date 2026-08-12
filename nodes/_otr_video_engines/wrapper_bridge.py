@@ -664,8 +664,16 @@ def ffmpeg_still_static_cmd(still_path, out_path, width, height, fps, frame_coun
 def ffmpeg_lavfi_floor_cmd(out_path, width, height, fps, frame_count,
                            *, source=None, ffmpeg="ffmpeg", crf=20):
     """Synthesize a silent bt709 floor clip of exactly ``frame_count`` frames from
-    a libavfilter ``source`` (default a dark slate field). No input file required,
-    so the radio floor ALWAYS renders (the fallback-chain terminus)."""
+    a libavfilter ``source`` (default a dark slate field). No input file is
+    required, so this command always succeeds once it is REACHED.
+
+    "so the radio floor ALWAYS renders (the fallback-chain terminus)" ended this
+    docstring and is stale twice over (corrected lane 16, 2026-08-11): the
+    fallback chain was ripped 2026-07-02, and lanes 15-16 gave ``still_motion``
+    and ``still_pan`` ``_require_still``, so a missing still is now a REFUSAL on
+    three of the four cheap families rather than a black beat. ``still_flat`` is
+    the only caller that still reaches this on a missing still; when lane 17
+    rules, this function's last floor caller may go with it."""
     n = max(1, int(frame_count))
     w, h = even_dim(width), even_dim(height)
     src = source or ("color=c=0x0A0E14:s=%dx%d:r=%d" % (w, h, int(fps)))

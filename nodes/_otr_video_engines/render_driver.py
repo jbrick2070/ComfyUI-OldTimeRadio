@@ -2063,8 +2063,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # still_word (Sprint B, 2026-07-03) JOINS still_pan/still_flat here: it is a
     # static_image_gen flat-hold engine that conditions on the beat's minted scene
     # still (which carries the word/title prompt from compose_still_word_prompt).
-    # Unlike still_pan/still_flat it has NO floor -- a missing still fails LOUD in
+    # Unlike still_flat it has NO floor -- a missing still fails LOUD in
     # its render_clip (_require_still), never a silent black card (no fallbacks).
+    # UPDATED 2026-08-11: still_pan LEFT that comparison in lane 16 and
+    # still_motion in lane 15 -- both now set _require_still too, so a missing
+    # still is a refusal on three of the four. still_flat (lane 17) is the last
+    # one still carrying the dark floor, and that is its own packet's call.
     if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _visual_beat_id

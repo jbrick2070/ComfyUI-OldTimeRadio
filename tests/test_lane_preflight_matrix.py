@@ -292,7 +292,7 @@ _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
     if _lane in ("viz_green", "viz_camera", "viz_mxc_cpu", "viz_mxc_mandala",
-                 "still_motion"):
+                 "still_motion", "still_pan"):
         # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
         # declaring its profile channel INERT (see
         # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
@@ -328,8 +328,13 @@ for _lane, _owner in _CHEAP_LANE_OWNERS.items():
         # its G3 row having already gone green off lane 10's shared-base fix.
         # It is the FIRST non-visualizer to take the INERT answer, and it was
         # re-checked against a different ffmpeg path (wrapper_bridge's still
-        # builders, not scope_draw's encoder). still_pan / still_flat /
-        # still_word keep their G2 rows -- lanes 16-18 each decide their own.
+        # builders, not scope_draw's encoder).
+        #
+        # LANE 16 CLOSED 2026-08-11 -- still_pan's G2 row left the same way, and
+        # it took the _require_still call lane 15 had deliberately left for it:
+        # same evidence, its own lane. still_flat (17) and still_word (18) keep
+        # their G2 rows; still_flat is now the LAST family carrying the dark
+        # lavfi floor, which is lane 17's call to make on its own evidence.
         continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
@@ -542,6 +547,14 @@ PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
         "this lane is OTR_VIDEO_LANDSCAPE_CANVAS's default -- an operator "
         "lever -- and declaring would overrule it for this lane alone. "
         "Lane 15, 2026-08-11."),
+    "still_pan": (
+        "INERT, same mechanism as still_motion and the same builder: "
+        "_still_motion defaults True on this family, so it renders through "
+        "wrapper_bridge.ffmpeg_still_motion_cmd, which takes the caller's "
+        "width/height and scales the still to COVER them. No native canvas; "
+        "the even_dim() snap is a yuv420p mod-2 codec requirement, not a size "
+        "of its own. Declaring would overrule OTR_VIDEO_LANDSCAPE_CANVAS for "
+        "this lane alone. Lane 16, 2026-08-11."),
 }
 
 
