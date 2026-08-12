@@ -283,6 +283,28 @@ class Pitch(BaseModel):
     ]
 
 
+#: The ONLY real ceiling on speaking characters: one per distinct voice.
+#:
+#: OPERATOR DIRECTIVE 2026-08-12, ALL BANKS: *"remove the cap, the story can
+#: have as many characters as it wants."* So `num_characters` is now a REQUEST,
+#: not a gate -- exactly like `target_words` (see the no-word-count-chasing
+#: rule). Nothing refuses a story for wanting a third voice.
+#:
+#: What survives is PHYSICAL, not policy. `_make_casting_validator` enforces
+#: *"two characters never share a voice"*, and `_deal_voice_menu` refuses when
+#: stock is short, so the cast cannot exceed the voice pool without either
+#: giving two characters one voice (a correctness defect the operator calls out
+#: by name) or failing at casting AFTER the whole script is written. Gating here
+#: fails closed EARLY and says why.
+#:
+#: Kept as a constant rather than read from the pool at import time, because
+#: pydantic needs a literal when the class is built and an import-order
+#: dependency here would be worse than a number with a test on it.
+#: `tests/test_cast_size_is_a_request.py` asserts this equals the live stock, so
+#: a pool that grows or shrinks reports the drift instead of hiding it.
+MAX_SPEAKING_CAST = 10
+
+
 class CastShape(BaseModel):
     """Canonical structural cast-name source."""
 
@@ -316,7 +338,8 @@ class Treatment(BaseModel):
     title: str
     dramatic_question: str
     setting: str
-    cast_shapes: list[CastShape] = Field(min_length=1, max_length=8)
+    cast_shapes: list[CastShape] = Field(min_length=1,
+                                         max_length=MAX_SPEAKING_CAST)
     turn: str
     priced_ending: dict[str, str]
     news_thread: str
@@ -370,7 +393,7 @@ class NewsCloseRead(BaseModel):
 
 
 class CastingVoices(BaseModel):
-    cast: list[CastVoice] = Field(min_length=1, max_length=8)
+    cast: list[CastVoice] = Field(min_length=1, max_length=MAX_SPEAKING_CAST)
 
     @model_validator(mode="before")
     @classmethod
@@ -843,13 +866,21 @@ def _filter_dossier_entities(dossier: DossierLLM,
 
 
 def _make_pitch_validator(cards, n_max: int):
-    """Restore the dealt card identity and enforce the structural cast ceiling."""
+    """Restore the dealt card identity, and gate on the REAL ceiling only.
+
+    ``n_max`` is the operator's REQUESTED cast size and is deliberately NOT
+    enforced (operator directive 2026-08-12, all banks: *"remove the cap, the
+    story can have as many characters as it wants"*). It survives as the number
+    the prompt ASKS for; see :data:`MAX_SPEAKING_CAST` for what actually binds.
+    """
+    del n_max
     card_name = cards[0]["name"]
 
     def _check(pitch: Pitch) -> "str | None":
         pitch.frame_card = card_name
-        if pitch.cast_size > n_max:
-            return f"pitch cast_size {pitch.cast_size} > N_MAX {n_max}"
+        if pitch.cast_size > MAX_SPEAKING_CAST:
+            return (f"pitch cast_size {pitch.cast_size} > {MAX_SPEAKING_CAST}, "
+                    f"the number of distinct voices in stock")
         return None
 
     return _check
@@ -861,12 +892,14 @@ def _make_treatment_validator(
     provenance: "dict[str, str]",
     digest: str = "",
 ):
-    """Validate only the structural cast ceiling."""
-    del dossier, provenance, digest
+    """Gate the cast on the REAL ceiling -- the voice stock, not the request."""
+    del dossier, provenance, digest, n_max
 
     def _check(model: Treatment) -> "str | None":
-        if len(model.cast_shapes) > n_max:
-            return f"cast_shapes {len(model.cast_shapes)} > N_MAX {n_max}"
+        if len(model.cast_shapes) > MAX_SPEAKING_CAST:
+            return (f"cast_shapes {len(model.cast_shapes)} > "
+                    f"{MAX_SPEAKING_CAST}, the number of distinct voices in "
+                    f"stock")
         return None
 
     return _check
@@ -1433,7 +1466,9 @@ def _pass_pitch(
         f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
         f"FRAME CARD DEALT: {card['name']} -- {card['shape']}\n\n"
         f"EDITORIAL STANCE: {stance['name']} -- {stance['note']}\n\n"
-        f"N_MAX (speaking-character ceiling): {n_max}\nWrite the pitch now."
+        f"REQUESTED cast size: {n_max}. This is a REQUEST, not a limit -- use "
+        f"as many speaking characters as the story genuinely needs, up to "
+        f"{MAX_SPEAKING_CAST}.\nWrite the pitch now."
     )
     try:
         # LLM slot: creative -- P1 pitch.
@@ -1467,7 +1502,9 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
         f"EDITORIAL STANCE: {stance['name']} -- {stance['note']}\n\n"
         f"WINNING PITCH:\n"
         f"{json.dumps(pitch.model_dump(), ensure_ascii=False, indent=2)}\n\n"
-        f"N_MAX (speaking-character ceiling): {n_max}\n"
+        f"REQUESTED cast size: {n_max}. This is a REQUEST, not a limit -- use "
+        f"as many speaking characters as the story genuinely needs, up to "
+        f"{MAX_SPEAKING_CAST}.\n"
         f"Write the treatment now."
     )
     try:

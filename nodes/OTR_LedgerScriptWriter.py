@@ -66,7 +66,8 @@ Widget surface (current as of 2026-05-23):
         target_words      INT     (canonical length unit; radio ~140 wpm
                                    conversion is only for the est_minutes
                                    output, never for story planning)
-        num_characters    INT     (1-6 speaking characters; 1 = monologue)
+        num_characters    INT     (REQUESTED speaking characters, 1 = monologue;
+                                   a request, not a cap -- the story may use more)
     optional:
         seed              INT     (C7 byte-identity seed; shuffle-on
                                    randomizes per Queue Prompt)
@@ -205,6 +206,16 @@ __all__ = ["OTR_LedgerScriptWriter"]
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
+
+#: Widget bound for `num_characters`, mirroring `_otr_scifi_fable2`'s
+#: `MAX_SPEAKING_CAST` (one speaking character per distinct voice in stock).
+#:
+#: DUPLICATED ON PURPOSE, not imported. `INPUT_TYPES` runs at node-registration
+#: time, and reaching into the writer module from there would make widget
+#: construction depend on import order -- a far worse failure than a number.
+#: `tests/test_cast_size_is_a_request.py` asserts the two agree, so drift is
+#: reported rather than silently shipped.
+_FABLE2_MAX_CAST = 10
 
 VOICED_ROLES = {"character", "announcer"}
 """Speaker roles that produce spoken dialogue. These trigger an LLM
@@ -1650,7 +1661,10 @@ def _resolve_inputs(
     )
 
     target_words = _resolve_target_words(target_words)
-    num_characters = max(1, min(6, int(num_characters)))
+    # A REQUEST, not a cap (operator directive 2026-08-12, all banks). The
+    # only real ceiling is the voice stock, enforced in the writer against
+    # `MAX_SPEAKING_CAST`, because two characters never share a voice.
+    num_characters = max(1, min(_FABLE2_MAX_CAST, int(num_characters)))
 
     # Phase 2A: act_count resolution. The widget is a combo --
     # "auto" (the default) means auto-derive via
@@ -2756,10 +2770,14 @@ class OTR_LedgerScriptWriter:
                     ),
                 }),
                 "num_characters": ("INT", {
-                    "default": 2, "min": 1, "max": 6, "step": 1,
+                    "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
                     "tooltip": (
-                        "Number of speaking characters (plus ANNOUNCER "
-                        "bookends). 1 = monologue/diary mode."
+                        "REQUESTED number of speaking characters (plus "
+                        "ANNOUNCER bookends). 1 = monologue/diary mode. This "
+                        "is a request, not a cap: a story that genuinely needs "
+                        "another voice may use one. The real ceiling is the "
+                        "voice stock, because two characters never share a "
+                        "voice."
                     ),
                 }),
             },
