@@ -213,13 +213,16 @@ def test_music_visual_fodder_shares_one_id_across_open_and_close():
     fodder = [o for o in payload["objects"]
               if o["kind"] == "mesh_fodder" and o["role"] == "music_visual"]
     beat_ids = {o["beat_id"] for o in fodder}
-    # `music_closing_001` joined this set on 2026-08-12. The closing still is
-    # now RESERVED whenever no line already carries that exact id -- previously
-    # any `music_close` role suppressed it, which is how `fastwan_8gb` reached
-    # video dispatch with no still for the assembler's mirrored closing beat.
-    # `b099` here carries the close ROLE under a different id, i.e. exactly the
-    # case the reservation exists for, so a third fodder beat is correct.
-    assert beat_ids == {"b005", "b099", "music_closing_001"}
+    # BOTH mirror ids joined this set on 2026-08-12. The opening and closing
+    # stills are now reserved UNCONDITIONALLY; previously each was suppressed by
+    # the mere presence of its own role, so a cue carrying that role under an
+    # AUTHORED id (`b005`, `b099` here -- exactly this fixture) killed the
+    # reservation meant to cover the assembler's mirrored id. That is how
+    # `fastwan_8gb` reached video dispatch with no still for
+    # `music_closing_001`; the opening branch carried the identical defect and
+    # was fixed in the same change.
+    assert beat_ids == {"b005", "b099",
+                        "music_opening_001", "music_closing_001"}
     # THE ASSERTION THIS TEST IS ACTUALLY ABOUT, and it is unchanged: every
     # music_visual fodder beat shares ONE recurring on-air object.
     ids = {o["mesh_subject_id"] for o in fodder}

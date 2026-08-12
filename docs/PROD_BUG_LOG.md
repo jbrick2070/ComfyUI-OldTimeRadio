@@ -3583,25 +3583,42 @@ to revert.
   ids the finished episode does not use, and no scan of the pre-audio ledger can
   recover ids that do not exist yet.
 
-  **The local fault: a reservation that suppressed itself.** A synthetic
-  `music_closing_001` backstop existed for exactly this case, but its guard read
-  `not any(speaker_role == "music_close")` -- so the PRE-AUDIO sentinel, under
-  its authored id, suppressed the reservation that was supposed to cover it.
-  The OPENING reservation directly above it is unconditional and says why: *"an
-  unused still costs one render; a missing one reaches video dispatch too late
-  to repair safely."* The two branches disagreed, and the closing one lost.
+  **The local fault: a reservation that suppressed itself -- IN BOTH BRANCHES.**
+  A synthetic `music_closing_001` backstop existed for exactly this case, but
+  its guard read `not any(speaker_role == "music_close")` -- so the PRE-AUDIO
+  sentinel, under its authored id, suppressed the reservation that was supposed
+  to cover it.
 
-- **fix: SHIPPED, both layers.**
+  **CORRECTION, 2026-08-12, found by an independent cross-check after the first
+  fix shipped (`3446af3f`).** That commit, this entry and the code comment all
+  asserted the OPENING reservation was already unconditional and that only the
+  closing branch had drifted. **That was false.** The opening carried the
+  identical role guard -- `not any(speaker_role == "music_open")` -- so a
+  pre-audio opening sentinel under an authored id suppressed
+  `music_opening_001` exactly as `shot_006_music` suppressed the closing one.
+  The symmetry claimed did not exist; the same defect sat one branch away,
+  unfixed, while being cited as the proof that the fix was right. Both branches
+  are unconditional now.
+
+- **CANDIDATE REPAIR, UNDER QA -- not proven, and deliberately not
+  worded as shipped.** Two layers. The wiring and the closing
+  backstop are committed (`3446af3f`); the opening backstop is in the
+  working tree at the time of writing. Static QA only: a green suite
+  and a regenerated parity fixture prove STATIC behaviour, not that
+  the route publishes.
   1. **The general one.** Canonical link 255 retargeted so the image producer
      reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json`
      (`[255,62,1,89,0] -> [255,90,0,89,0]`). Every minted mirror -- `_001`,
      `_002`, `_003` -- is then visible to the ordinary per-beat loop. **This is
      the fix that scales**; a reservation can only ever name one id.
-  2. **The backstop.** The closing reservation is now UNCONDITIONAL, the twin of
-     the opening one. No guard is needed: `_add` already deduplicates by exact
-     beat id, so when the real line is present the ordinary row has claimed the
-     id and the call is a no-op. The explicit guard was a second copy of that
-     policy, which is how the branches drifted apart to begin with.
+  2. **The backstop, BOTH ENDS.** The opening and closing reservations are now
+     unconditional twins. No guard is needed: `_add` already deduplicates by
+     exact beat id, so when the real line is present the ordinary row has
+     claimed the id and the call is a no-op. Each explicit guard was a second
+     copy of that policy, which is how they drifted.
+     **This is symmetry and hardening -- it is NOT the multi-chunk solution.**
+     A reservation can only ever name `_001`; `_002`/`_003` are covered solely
+     by reading the post-audio ledger.
 - verify: `tests/test_canonical_still_spine_wiring.py` (6) pins the wiring by
   NODE TYPE, because every one of the 95 still-spine helper tests and all 538
   workflow tests passed both before and after the retarget -- the defect lived
@@ -3632,7 +3649,52 @@ to revert.
   sharper than first recorded. Not "a handoff consumed an artifact that was
   never produced" but **"a producer planned against ids that a later stage
   renames, and its own backstop keyed off the wrong field."**
-- status: ROOT CAUSE ESTABLISHED, FIX SHIPPED, awaiting the live re-run.
+- **status: ROOT CAUSE ESTABLISHED; CANDIDATE WIRING/BACKSTOP REPAIR UNDER
+  QA. NOT FIXED, NOT SHIPPED.** Do not mark either until a canonical live
+  re-run proves every required music mirror has a materialized still and
+  the episode publishes. Operator directive 2026-08-12, after the first
+  version of this entry claimed both prematurely.
+  - The operator's note also recorded that the OPENING reservation remained
+    role-guarded and owed follow-up hardening. That guard has since been
+    removed in the same candidate, so both reservations are now
+    unconditional -- but that is HARDENING, it is still unproven live, and
+    it changes nothing about the status above.
+- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical `fastwan_8gb`
+  leg with 60-SECOND opening AND closing cues -- long enough to chunk
+  (`_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a 60 s cue becomes THREE 20 s
+  chunks) -- proving every emitted `music_opening_00N` and
+  `music_closing_00N` has a required target, a materialized still, and a
+  published asset in `otr/obs/`. The original short cue does not exercise
+  the chunked path at all.
+- **The live FastWan reproduction and the root-cause evidence above STAND.**
+  Only the repair/status wording is downgraded.
+- **OPEN, ADJACENT, FOUND BY THE SAME REVIEW** -- recorded here so they are not
+  lost, and NOT fixed in this change:
+  - `OTR_ShotLock._same_frozen_episode()` does NOT fail closed. An identity
+    mismatch logs a warning and returns the PRE-AUDIO ledger, and every overlay
+    exception is swallowed to the same fallback -- which silently restores the
+    exact input shape that caused this bug. The sprint lessons require a
+    post-audio identity mismatch to stop the join loudly.
+  - `OTR_ShotLock.IS_CHANGED` covers routing-environment state but NOT the
+    ledger it reads from disk, and `audio_done` carries duration metadata with
+    no content identity. So image planning now depends on a hidden disk read
+    that is absent from the dependency signature (Bug Bible 06.01).
+- bible-worthy: yes, once the live re-run lands -- but the portable shape is
+  sharper than first recorded. Not "a handoff consumed an artifact that was
+  never produced" but **"a producer planned against ids that a later stage
+  renames, and its own backstop keyed off the wrong field."**
+- status: **OPEN.** Root cause established and the repair is written, but
+  this stays OPEN until a canonical live leg proves it. Two cross-checks
+  independently warned against calling it shipped on a green suite alone,
+  and the first version of this entry did exactly that while also
+  mis-stating the opening branch.
+- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical `fastwan_8gb`
+  leg with 60-SECOND opening AND closing cues -- long enough to chunk
+  (`_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a 60 s cue becomes THREE 20 s
+  chunks) -- proving every emitted `music_opening_00N` and
+  `music_closing_00N` has a required target, a materialized still, and a
+  published asset in `otr/obs/`. The original short cue does not exercise
+  the chunked path at all.
 
 ---
 

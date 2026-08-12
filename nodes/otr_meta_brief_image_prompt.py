@@ -1184,9 +1184,25 @@ def derive_scene_still_targets(lines, fps: int = 25,
                  char_id=str(ln.get("char_id") or ""))
         else:
             _add(bid, "scene_beat", role, "scene_role_map")
-    if not any(
-            str(ln.get("speaker_role") or "").strip().lower() == "music_open"
-            for _bid, ln in _iter_beat_lines(lines)):
+    if True:
+        # UNCONDITIONAL, and it was NOT until 2026-08-12.
+        #
+        # This read `not any(speaker_role == "music_open")` -- the SAME defect
+        # the closing branch below was just fixed for, one branch away. A
+        # pre-audio opening sentinel carrying its AUTHORED id suppressed the
+        # `music_opening_001` reservation meant to cover it, exactly as
+        # `shot_006_music` suppressed the closing one and killed `fastwan_8gb`.
+        #
+        # I asserted in the closing branch's comment, in PBUG-20260811-02 and in
+        # commit 3446af3f that THIS branch was already unconditional and that
+        # the closing one had drifted away from it. That was wrong: both were
+        # guarded, and the symmetry I claimed did not exist. A cross-check
+        # caught it. The two are symmetric NOW.
+        #
+        # No guard is needed: `_add` deduplicates by exact beat id through
+        # `seen`, so when the real line is present the ordinary per-beat row has
+        # already claimed the id and this call is a no-op.
+        #
         # THE OPENING OWES THE SAME RESERVATION THE CLOSING GETS BELOW, AND FOR
         # THE SAME REASON. Found live, 2026-07-29, profile otr_w45_word_razzle.
         #
