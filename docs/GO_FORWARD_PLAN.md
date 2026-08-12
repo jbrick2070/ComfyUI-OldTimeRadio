@@ -51,10 +51,17 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11 (lane-15 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **18 of 21 packets**
-confirmed working and pushed; **lane 19 (`h3_low_video` / `minimax_h3_video`)
-is NEXT -- and it is a DIFFERENT KIND OF LANE from everything lanes 10-18 did.**
+**WINDOW HANDOFF 2026-08-12: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
+first -- its NEWEST section is at the top.** **19 of 21 packets** confirmed
+working and pushed. **Lane 20 (`h3_low_audio_in` / `minimax_h3_audio_in`) is
+NEXT, and it is the CHEAPEST lane left** -- lane 19 already wrote the module it
+lives in, so it is a second registration rather than a new engine. The resume
+doc carries everything lane 20 needs (weights, the live node schema, the one
+unverified Autogrow socket, the mouth-policy site, the roster tests it will turn
+red) so none of it has to be rediscovered.
+
+Lane 19's own note, kept because it is still the right warning for lanes 20-21:
+it is a DIFFERENT KIND OF LANE from everything lanes 10-18 did.
 
 **THE WHOLE CHEAP SHELF IS GREEN** -- four visualizers, four still families,
 8/8 with INERT G2 rows and declared continuity. All four still families refuse

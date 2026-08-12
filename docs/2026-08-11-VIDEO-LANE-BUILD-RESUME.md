@@ -1,4 +1,117 @@
-# RESUME HERE -- video lane build, window handoff 2026-08-11
+# RESUME HERE -- video lane build
+
+## WINDOW HANDOFF 2026-08-12 -- lane 19 CLOSED, two Lemmy fixers CLOSED
+
+**19 of 21 packets done. Lane 20 is next and it is the CHEAPEST lane left**,
+because lane 19 already wrote the module it lives in. Everything below is what
+lane 20 needs and would otherwise have to rediscover. Box left CLEAN (no
+resident server, port 8000 clear, VRAM 1,345 MiB). HEAD == origin at `38d15fa9`.
+
+**What landed, both pushed and lockstep-verified:**
+
+* `be4aadff` -- **lane 19, `h3_low_video` / `minimax_h3_video`.** 7/7 gates green
+  on arrival, live smoke PASS. Receipt:
+  `docs/evidence/lane_receipts/lane19-h3_low_video.md`.
+* `38d15fa9` -- **Lemmy chunks A1 and B**, per the operator's "lemmy fixers
+  first" directive, plus `PBUG-20260812-01`.
+
+**Baselines now:** full suite **10067 passed / 110 skipped / 1 xfailed**, nothing
+deselected (was 9985 at the lane-18 wrap; +58 for lane 19's rows across the
+parametrized roster suites, +24 for the two Lemmy test files). Bug Bible
+**20/24/3 at 272**. `build_variants.py --check` **47 variants, 0 failures**
+(was 46; lane 19 added one).
+
+### THE OPERATOR'S ORDERING, given 2026-08-12 before sleeping
+
+Three messages, and they reorder the tail of the queue:
+
+1. **"we need a 45 word render of every visual path so that's probably first"**
+   -- that sweep is the acceptance gate, superseding row 22's single episode.
+2. **"lemmy fixers first" / "i want the lemmy fixed before a big video test"**.
+3. **"try to get all 21 done"**.
+
+**Order this window took, and the one to continue:** lane 19 -> Lemmy fixers ->
+**lanes 20 + 21** -> **the 45-word sweep LAST**. Lanes 20 and 21 each ADD a
+visual path, so sweeping before them means sweeping twice.
+
+### LANE 20 -- everything already known, so do not re-derive it
+
+**It is a SECOND registration out of `nodes/_otr_video_engines/eng_minimax_h3.py`,
+not a new module.** Same weights root, same boot contract, same frame grid, same
+canvas, same preflight. Suggested shape: extract the shared half into a base
+(weights, `session_identity`, `assert_usable`, `_assert_boot_contract`, `load`,
+`canonicalize`, `render_clip`) and leave per-adapter only `name` / `family` /
+`required_inputs` / `frame_contract` / `_node_candidates` / `_build_graph`.
+
+* **Weights, all present:** DiT `minimax_h3_ref2va_pruned_int8_convrot.safetensors`
+  (note **ref2va**, not fl2va), the same `qwen3vl_32b_minimax_h3_nvfp4_awq`
+  encoder, the same `minimax_h3_video_vae_fp16`, **plus**
+  `minimax_h3_audio_vae_fp32.safetensors` -- which lane 19 deliberately does NOT
+  load and lane 20 does.
+* **The node is `MiniMaxH3ReferenceToVideo`**, confirmed live. Its reference
+  sockets are `COMFY_AUTOGROW_V3`. In the lab's API graph they serialize DOTTED
+  (`"ref_images.ref_image_0"`, `"ref_audios.ref_audio_0"`); `execute` consumes
+  plain dicts (`(ref_images or {}).values()`), so an in-process call through
+  `wrapper_bridge` should pass `ref_images={"ref_image_0": Wire(...)}`.
+  **THIS IS THE ONE UNVERIFIED THING -- prove it on the live server before
+  building around it.** `_iter_wires` does recurse dicts, and lane 19 proved
+  V3 node classes execute fine through `run_graph`.
+* **Ground-truth recipe:** `vram-recipe-lab/recipes/
+  h3_jobd_lipsync_refaudio_seed43_f192.json` -- a lip-sync ref2va leg at
+  832x480 f192 seed 43 that PASSED cold at 6.88 GiB in 436 s. Its prompt uses
+  the `<Picture 1>` / `<Audio 1>` tag convention the node's docstring requires.
+* **Continuity is `soft_reference`, NOT strict** -- and the contrast with lane 19
+  is the point. Lane 19 wires `first_frame`, a keyframe pinned at
+  `resolved_frame_index 0` and re-injected every step. ref2va's `ref_images` are
+  IDENTITY references with no frame-0 guarantee, which is exactly what
+  `CONTINUITY_SOFT_REFERENCE` means. Do not copy lane 19's answer.
+* **THE MOUTH POLICY, and it must land in the SAME commit.**
+  `render_driver.py:1548` (`_is_character_face_beat`) tests
+  `engine_id == "ltx_audio_in"` by EQUALITY; it becomes a membership test
+  including `minimax_h3_audio_in`. Without it every H3 character beat raises
+  `MouthPolicyError` at plan time -- `mouth_owner_for_beat` refuses an audio-in
+  beat that is neither a character face nor a cabinet role. **Do NOT mint a new
+  family to dodge this:** a family outside `content_oracle.MOTION_FAMILIES`
+  makes frozen clips motion-EXEMPT. Check `render_driver.py:769`
+  (`_still_spine_requires_scene`) too -- another `ltx_audio_in` literal list.
+* **Profile:** seed 43 in `seed_policy`, `boot_contract: "h3"`, canvas 864x480,
+  modelled on `config/profiles/otr_h3_low_video.json`.
+* **Roster tests it WILL turn red** (all of them fixed at the fixture, never by
+  weakening a gate -- see lane 19's L23/lane 8's lesson): `test_public_engines`
+  (`_TIER`), `test_still_plan_parity` (regenerate the fixture with
+  `python tests/test_still_plan_parity.py --regenerate`, then CHECK the diff is
+  additive), `test_still_plan_layer2_parity` (framing_geometry must be VERBATIM
+  the producer constant), `test_multiclip_session_identity_roster`,
+  `test_ltx_8gb_session_identity.py::_ENGINES_WITH_A_SESSION`,
+  `test_boot_contracts`, and `tests/_s28_forbidden_sweep` (never name a local
+  variable `alias`).
+
+### LEMMY -- what is left after this window
+
+`GO_FORWARD_PLAN.md` "WHAT REMAINS ON THE LEMMY SPRINT" is updated. A1 and B are
+**DONE**. Still open, none blocking:
+
+* **Chunk C** -- and READ THIS BEFORE STARTING IT. The UNIT half is already
+  covered: `tests/test_lemmy_index_rate_to_bus.py` proves duration, pitch, the
+  no-op-only-when-equal rule, CPU/float32, and every shipped engine rate landing
+  on the 48000 bus; `tests/test_voice_mixed_rate_resample.py` covers the mixed-rate
+  pack. What is genuinely uncovered is the **SceneSequencer INTEGRATION** path --
+  driving `scene_sequencer`'s dialogue assembly with 22050 clips, since
+  `tests/test_sequencer_ledger.py` carries no 22050 fixture. Scope chunk C to
+  that, not to the unit.
+* **Chunks A2 -> A3 -> A4** -- v2 identity + replay bridge. The operator
+  pre-ruled **AUTO-PROMOTE on a clean replay**: if A4 reproduces all six frozen
+  clip hashes, A2/A3 rewrite the receipt's identity fields with no second
+  sign-off.
+* **Chunk E** -- release/OBS editorial-recast audit. **Operator only.**
+* **Branch B stays unbuilt** -- it existed for a G1 failure, and G1 passed.
+* **A live forced-Lemmy render would settle chunk B's status.** The resolver bug
+  is proved by the filesystem and by replaying the old code, but NOT by a
+  captured live failure, so it is deliberately not in `PROD_BUG_LOG.md`.
+
+---
+
+# The 2026-08-11 handoff follows, unedited
 
 Read this, then `docs/GO_FORWARD_PLAN.md` item 5 (the VIDEO LANE QUEUE table).
 Everything else you need is linked from those two.
