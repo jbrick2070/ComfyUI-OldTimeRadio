@@ -30,7 +30,7 @@ import os
 
 from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
-from .frame_contract import FrameContract
+from .frame_contract import CONTINUITY_NONE, FrameContract
 
 _LOG = logging.getLogger("OTR.video.viz_green")
 
@@ -51,6 +51,34 @@ class VisualizerEngine:
     #: image model at all (the accessible floor). See docs/2026-06-18-coverage-arch-wiring/.
     accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch exists
+    #: THIS LANE DELIBERATELY DECLARES NO ``render_canvas`` (lane 11,
+    #: 2026-08-11). It was drafted with one and the draft was WRONG; the
+    #: reasoning is recorded because the mistake is an easy one to repeat.
+    #:
+    #: The tempting argument: measured on this box, the two request builders
+    #: disagree -- ``build_request_from_shot`` hands this lane (1472, 832) while
+    #: ``render_single``, which every solo lane smoke uses, hands it (832, 480)
+    #: -- so declaring 1472x832 would make them agree on what production ships.
+    #:
+    #: Why that is wrong HERE. This engine has NO native canvas: ``render_clip``
+    #: paints and encodes at exactly the size the request carries, with no
+    #: latent grid, no fixed model input and no canvas-dependent constant. The
+    #: 1472x832 it receives in an episode is not a property of the lane at all
+    #: -- it is ``OTR_VIDEO_LANDSCAPE_CANVAS``'s default, an OPERATOR LEVER.
+    #: Because ``declared_render_canvas`` is applied LAST and overrules every
+    #: earlier channel, declaring would silently make this lane the one member
+    #: of the procedural family that ignores that lever, and would pin the smoke
+    #: path too. That is a real behaviour change wearing a documentation label,
+    #: and lesson L2's own precision note is exactly the check that catches it:
+    #: a canvas declaration must agree with the OVERRIDE PATH or state that the
+    #: overrides are unsupported -- never quietly disable them.
+    #:
+    #: The lane's honest G2 position is therefore that its PROFILE canvas
+    #: channel is INERT, declared as such in
+    #: ``test_lane_preflight_matrix.PROFILE_CANVAS_DOCUMENTED_DEAD``. Inert, not
+    #: dead: the number IS carried (profile -> applier -> node-87 director
+    #: widgets -> ``request["canvas"]``) and is then OVERWRITTEN by the landscape
+    #: default for every non-face family, of which ``abstract`` is one. See L18.
     #: S1 (2026-07-25) per-model still plan (spec section 3, Shape C --
     #: "nothing"). The empty tuple is the EXPLICIT "needs no images"
     #: declaration; a missing ``still_plan`` would be treated as UNKNOWN
@@ -63,12 +91,28 @@ class VisualizerEngine:
     #: is no ceiling and no split. CONTINUITY none: nothing here consumes a
     #: supplied first frame, which is exactly why these beats may jump cut
     #: without owing the image phase a still at all.
+    #:
+    #: ``continuity=`` IS PASSED (lane 11, 2026-08-11 -- lesson L3). The
+    #: sentence above had said "CONTINUITY none" since this engine was written
+    #: while the keyword was never passed, so the value was a dataclass DEFAULT:
+    #: the right answer that nobody had actually decided, which is the same
+    #: shape a wrong one would have had. It is TRUE here for a reason this lane
+    #: can state -- ``render_clip`` paints every frame from the beat's own audio
+    #: analysis and reads no predecessor frame at all, so there is no terminal
+    #: state a successor segment could inherit even if something wanted to.
+    #:
+    #: Scoped to THIS lane deliberately. The other three visualizers carry the
+    #: identical defect but each declares its OWN contract in its own module --
+    #: there is no shared base here, unlike the still shelf's
+    #: ``_CheapFamilyBase`` that lane 10 fixed once for four lanes -- so L13's
+    #: sweep rule does not reach them and lanes 12-14 each close their own.
     frame_contract = FrameContract(
         min_frames=1,
         max_frames=0,
         quantum=1,
         native_fps=25,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     engine_version = "1"
     #: NO FALLBACKS (547671d): a failed beat fails the episode LOUD.

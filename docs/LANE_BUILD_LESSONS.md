@@ -1211,6 +1211,107 @@ later lane reads when it decides how to close its own G2 row.
 
 ---
 
+## L19 -- A `render_canvas` declaration is a LEVER REMOVAL, so a lane with no native canvas must not declare one
+
+**Check:** before declaring a canvas, ask what that number IS. If it is a
+property of the lane -- a latent grid, a trained input size, a canvas-dependent
+constant the lane enforces -- declare it. If it is the value of an operator
+knob the lane merely receives, do NOT: `declared_render_canvas` is applied LAST
+and overrules every earlier channel, so declaring silently disables that knob
+for this lane alone.
+
+**Symptom:** none, and it reads as tidying up. Every gate goes green, the smoke
+agrees with production for the first time, and the change is described in the
+commit as a declaration of existing behaviour. What actually shipped is that one
+lane stopped honouring an env var its siblings still honour, decided by which
+lane's packet happened to run first.
+
+**Root cause:** two different facts wear the same number. `build_request_from_shot`
+hands every non-face family `OTR_VIDEO_LANDSCAPE_CANVAS`'s default of 1472x832,
+and `render_single` hands wide lanes `OTR_VIDEO_RENDER_CANVAS`'s 832x480. A lane
+that renders at "1472x832 in production" may be stating a fact about the DRIVER's
+default, not about itself -- and the difference is invisible until someone moves
+the knob.
+
+**Origin (lane 11, 2026-08-11):** `viz_green`'s first draft declared
+(1472, 832) on exactly the measured argument above -- the two builders disagreed,
+so the smoke was validating a size production never uses, which is lane 7's
+finding almost word for word. But this engine paints and encodes at whatever the
+request carries: no latent grid, no fixed model input, nothing canvas-dependent.
+Found by the Codex consult, which read the override path the draft had not.
+
+**Lesson L2 ALREADY CONTAINED THIS CHECK** and it was walked past: "a canvas
+declaration must therefore either agree with those overrides or the lane must
+state that they are unsupported once a canvas is declared. Check the OVERRIDE
+PATH, not just the default." L19 exists because a check buried inside another
+lesson's supporting paragraph did not fire when it mattered. If a check keeps
+getting missed, promote it to its own entry.
+
+**And the measurement that settles it, worth copying as a technique:** the same
+smoke was run twice -- once with the declaration, once with the declaration
+removed and `OTR_VIDEO_RENDER_CANVAS=1472x832` instead -- and the two mp4s have
+the SAME sha256. Byte-identical output proves the declaration was purely
+canvas-SELECTION and bought nothing the lever did not already do. When arguing
+about whether a change is behavioural, render it both ways and diff the digest.
+
+**Runnable check:** for every lane that declares a canvas, assert the lane has a
+canvas-dependent property that justifies pinning (a grid multiple it enforces, a
+measured constant, a graph that would break). For every lane that does NOT
+declare one, assert the operator lever still reaches it through the REAL request
+builder -- so a future declaration cannot be added without a test saying what it
+cost.
+
+**Twin assertion:**
+`tests/test_video_visualizer.py::test_the_landscape_lever_still_reaches_this_lane`
+(drives `build_request_from_shot` with `OTR_VIDEO_LANDSCAPE_CANVAS` moved) and
+`::test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size`.
+
+---
+
+## Lane 11 -- `viz_green`, closed 2026-08-11
+
+Two red gates, and the lane's own lesson is that **its first draft closed the
+harder one the wrong way and the fix was to delete the code it had added.**
+Full write-up in the receipt; what the NEXT lane must check:
+
+**What bit (1): "make the smoke agree with production" is not always a reason
+to declare.** See L19. The draft's reasoning was lane 7's, correctly recalled
+and wrongly applied -- lane 7's lane had a canvas-dependent graph; this one has
+none.
+
+**Runnable check:** when reusing a previous lane's argument, check the PREMISE
+that made it true there, not just the shape of the conclusion.
+
+**What bit (2): the consult earned its keep, and it earned it by reading a file
+I never opened.** `tmp/_gen_profiles.py` -- a July generator script sitting in
+`tmp/` -- states in its own docstring that the six `otr_sbcov_*` profiles are
+"throwaway smoke config ... DELETED after the sweep. NOT committed." That
+inverts the whole sbcov question from "six missing build inputs, should we adopt
+them?" to "twelve LEAKED artifacts of a finished sweep, should they be deleted?"
+-- and I had spent the analysis reasoning from git metadata alone.
+
+**Runnable check:** when a file's provenance is the question, look for the thing
+that WROTE it before reasoning from `git log`. A generator left in `tmp/` is
+evidence, and `git log --all` on an untracked file is silent by construction.
+
+**What bit (3): the pre-lane gate number is workstation-dependent.**
+`build_variants.py --check` reports "46 variants" here; `git ls-files` counts
+**45**. The 46th is another window's untracked `otr_upscale_ltx_probe.json`. The
+gate globs the DIRECTORY, so its headline count silently includes files the repo
+has never seen -- which is the same defect class as the sbcov crash one level
+up.
+
+**Runnable check:** a count quoted as a baseline must say whether it counts
+TRACKED files or on-disk files. `git ls-files <dir> | wc -l` and a directory
+glob are different numbers on any working tree, and only one of them is
+reproducible on a fresh clone.
+
+**What did NOT bite:** G1, G5 and G7 were green before the packet and stayed
+green -- this lane already probed its own emitted mp4 for the audio law, which
+is the gate lane 10 had to build from scratch.
+
+---
+
 ## Lane 10 -- `mesh_stage`, closed 2026-08-11
 
 Four red gates, the most defective lane left. Both new lessons above are this

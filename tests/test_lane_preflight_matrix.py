@@ -278,9 +278,33 @@ _CHEAP_LANE_OWNERS = {
 #: contract and inherits the default independently, so each stays red until its
 #: own packet runs. Their G2 rows are untouched either way -- a shared contract
 #: fix says nothing about a lane's canvas.
+#: `viz_green` joins them in lane 11 -- but for the opposite reason, and the
+#: difference matters. The still lanes came green for FREE off a shared base
+#: they did not own. `viz_green` is NOT in this tuple even though its G3 row
+#: also left the table in lane 11 -- it leaves via the `continue` below, which
+#: drops BOTH of its rows, and listing it here as well would be a membership
+#: nothing ever reads. The distinction is the point: the still lanes came green
+#: off a shared base, while `viz_green` declares its OWN contract in its own
+#: module and lane 11 passed `continuity=` there by hand. The other three
+#: visualizers each declare their own too, so nothing lane 11 did reaches them
+#: and lanes 12-14 each still owe their own one-line declaration.
 _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
                              "still_word")
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
+    if _lane == "viz_green":
+        # LANE 11 CLOSED 2026-08-11 -- viz_green's G2 row left this table by
+        # declaring its profile channel INERT (see
+        # PROFILE_CANVAS_DOCUMENTED_DEAD above) rather than by declaring a
+        # canvas. The first draft of this lane DID declare (1472, 832), on the
+        # measured argument that build_request_from_shot already hands it
+        # exactly that while render_single hands it 832x480. A Codex consult
+        # broke that framing and was right: the 1472x832 is the default of
+        # OTR_VIDEO_LANDSCAPE_CANVAS, an operator lever, and a declaration is
+        # applied LAST -- so declaring would have made this the one visualizer
+        # that silently ignores the lever, on a lane with no native canvas to
+        # pin. Lesson L2's own override-path check is what catches it, and the
+        # draft had walked past that check. Its G3 row left in the same commit.
+        continue
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
         "render.canvas_w/h, so the configured number reaches the node-87 "
@@ -430,7 +454,24 @@ def _is_32_legal(canvas):
 #: silently overruled is a TRAP -- the operator edits the profile, watches the
 #: widget change, and concludes it took effect. Any lane documenting itself
 #: here must say the second thing.
-PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {}
+PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {
+    "viz_green": (
+        "INERT, and this lane cannot honestly declare a canvas instead. "
+        "`eng_visualizer.render_clip` paints and encodes at exactly the size "
+        "the request carries -- no latent grid, no fixed model input, no "
+        "canvas-dependent constant -- so it has no native canvas to declare. "
+        "The 1472x832 an episode hands it is not a property of the lane: it is "
+        "the default of OTR_VIDEO_LANDSCAPE_CANVAS, an operator lever, applied "
+        "by build_request_from_shot to every non-face family. Declaring would "
+        "overrule that lever (declared_render_canvas is applied LAST), making "
+        "this the one visualizer that ignores it -- a behaviour change wearing "
+        "a documentation label, which lesson L2's own override-path check "
+        "exists to catch. What the profiles set IS carried (profile -> applier "
+        "-> node-87 director widgets -> request canvas) and then overwritten, "
+        "so the field cannot decide this lane's size and is declared inert "
+        "here rather than reconciled to a number that would be equally unable "
+        "to decide it. Lane 11, 2026-08-11."),
+}
 
 
 def gate_g2_canvas(name, eng):

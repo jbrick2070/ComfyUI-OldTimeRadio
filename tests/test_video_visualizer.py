@@ -45,6 +45,39 @@ def test_serves_all_three_visual_roles():
         "announcer_visual", "music_visual", "character_video"}
 
 
+def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
+    """G3.3 / lesson L3 (lane 11, 2026-08-11).
+
+    The class comment had said "CONTINUITY none" since this engine was written
+    while `continuity=` was never passed, so the value was a dataclass DEFAULT
+    -- the right answer nobody had decided, which is the same shape a wrong one
+    would have had.
+
+    NONE is true here for a reason this lane can state: `render_clip` paints
+    every frame from the beat's own audio analysis and reads no predecessor
+    frame, so there is no terminal state a successor segment could inherit.
+
+    Scoped to THIS lane on purpose -- the other three visualizers each declare
+    their own contract in their own module (no shared base, unlike the still
+    shelf's `_CheapFamilyBase`), so lanes 12-14 each close their own.
+    """
+    import inspect
+
+    from nodes._otr_video_engines import frame_contract as fcm
+
+    eng = vreg.get_engine("viz_green")
+    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
+    # DECLARED, not defaulted: the keyword is present at the declaration site.
+    src = inspect.getsource(VisualizerEngine)
+    assert "continuity=" in src
+    # ...and the property that makes NONE honest is still true: nothing in the
+    # render path consumes a predecessor frame.
+    render_src = inspect.getsource(VisualizerEngine.render_clip)
+    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
+                                 "continuity_frame"):
+        assert consumes_predecessor not in render_src
+
+
 # --------------------------------------------------------------------------- #
 # assert_usable -- LOUD, no fallback
 # --------------------------------------------------------------------------- #
@@ -130,6 +163,71 @@ def test_canvas_dims_default_is_16x9():
     w, h = VisualizerEngine()._canvas_dims({})
     assert (w, h) == (1472, 832)                # wide default
     assert w > h
+
+
+def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
+    """G2 (lane 11, 2026-08-11) -- THE PROPERTY, WHICH IS THE OPPOSITE OF A PIN.
+
+    This lane's first draft DECLARED `render_canvas = (1472, 832)`, on the
+    measured argument that `build_request_from_shot` already hands it exactly
+    that while `render_single` hands it 832x480. A Codex consult broke that
+    framing and was right: 1472x832 is not a property of this lane at all, it
+    is the default of `OTR_VIDEO_LANDSCAPE_CANVAS` -- an OPERATOR LEVER --
+    applied by the driver to every non-face family. Since
+    `declared_render_canvas` is applied LAST and overrules every earlier
+    channel, declaring would have made viz_green the one visualizer that
+    silently ignores that lever, and would have pinned the smoke path too.
+
+    Lesson L2's own precision note is the check that catches this: a canvas
+    declaration must agree with the OVERRIDE PATH or state that the overrides
+    are unsupported. Never quietly disable them.
+
+    So the assertion is that this lane declares NOTHING and paints whatever it
+    is given -- which is exactly what makes its profile canvas channel INERT
+    rather than reconcilable (see PROFILE_CANVAS_DOCUMENTED_DEAD).
+    """
+    from nodes._otr_video_engines import render_driver as rd
+
+    eng = vreg.get_engine("viz_green")
+    assert getattr(eng, "render_canvas", None) is None
+    assert rd.declared_render_canvas("viz_green") is None
+    # It paints at whatever size the request carries -- including sizes no
+    # profile or default would ever produce.
+    for size in ((1472, 832), (832, 480), (640, 384), (1024, 576)):
+        got = VisualizerEngine()._canvas_dims(
+            {"canvas": {"w": size[0], "h": size[1], "fps": 25}})
+        assert got == size
+
+
+def test_the_landscape_lever_still_reaches_this_lane(monkeypatch):
+    """The half that would otherwise rot silently.
+
+    Asserting "declares nothing" proves the attribute is absent, not that the
+    operator's lever still works. If a future change declares a canvas here,
+    this is the test that says what it costs.
+    """
+    from nodes._otr_video_engines import render_driver as rd
+
+    ledger = {
+        "episode_id": "ep_lane11",
+        "images": {"images": [{"beat_id": "b001", "kind": "scene_beat",
+                               "path": "C:/tmp/scene_b001.png"}]},
+        "video": {"fps": 25, "canonical_canvas": None,
+                  "shots": [{"shot_id": "shot_b001", "role": "music_visual",
+                             "group_id": "grp_music_visual",
+                             "engine_id": "viz_green", "family": "",
+                             "target_frame_count": 25}]},
+    }
+    shot = ledger["video"]["shots"][0]
+
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1472, 832)   # the default
+
+    monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "1024x576")
+    req = rd.build_request_from_shot(shot, ledger)
+    assert (req["canvas"]["w"], req["canvas"]["h"]) == (1024, 576), (
+        "the operator's landscape lever no longer reaches viz_green -- if a "
+        "render_canvas declaration was added, that is what it cost")
 
 
 # --------------------------------------------------------------------------- #

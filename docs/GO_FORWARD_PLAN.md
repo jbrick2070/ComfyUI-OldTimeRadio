@@ -51,9 +51,10 @@ item, close its ROW in the same push.**
 
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
-**WINDOW HANDOFF 2026-08-11 (lane-10 wrap): read
-`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **10 of 21 packets**
-confirmed working and pushed; **lane 11 (`viz_green`) is NEXT.** Baselines to
+**WINDOW HANDOFF 2026-08-11 (lane-11 wrap): read
+`docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md` first.** **11 of 21 packets**
+confirmed working and pushed; **lane 12 (`viz_camera`) is NEXT -- and read
+lesson L19 before you touch its canvas row.** Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
 **272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
 DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
@@ -63,11 +64,22 @@ is the number to check drift against); `scripts/build_variants.py --check`
 **46 variants, 0 failures**. Box was left CLEAN (no resident server, port 8000
 clear, VRAM 657 MiB).
 
-**What lane 10 already did for lanes 15-18:** their **G3 rows are GREEN** --
-`continuity=` landed on the shared `_CheapFamilyBase`, so those four packets
-inherit it and their `EXPECTED_RED` G3 entries are already gone. The four
-visualizers (lanes 11-14) do NOT share that base and their G3 rows are still
-red and still theirs. Do not read the still lanes' green as a claim about yours.
+**What is already done FOR you, and what is not:**
+* **Lanes 15-18 (still lanes): your G3 rows are GREEN.** Lane 10 put
+  `continuity=` on the shared `_CheapFamilyBase`, so those four packets inherit
+  it and their `EXPECTED_RED` G3 entries are gone. Your G2 rows are still yours.
+* **Lanes 12-14 (the other visualizers): your G3 rows are STILL RED and still
+  yours.** The visualizers do NOT share a base -- each declares its own
+  `FrameContract` in its own module -- so lane 11 fixing `viz_green` reached
+  none of you. It is a one-line `continuity=CONTINUITY_NONE` plus the reason.
+* **Lanes 12-14, on G2: READ LESSON L19 BEFORE YOU DECLARE A CANVAS.** Lane 11
+  drafted `render_canvas = (1472, 832)` on a measured-looking argument and it
+  was WRONG: that number is the default of `OTR_VIDEO_LANDSCAPE_CANVAS`, an
+  operator lever, and a declaration is applied LAST and would silently disable
+  it for one lane. The right close for a procedural lane with no native canvas
+  is `PROFILE_CANVAS_DOCUMENTED_DEAD` with the mechanism written out. Copy the
+  REASONING, not the shape -- if your lane does have a canvas-dependent
+  property, declaring may be right for you.
 
 **RUN `scripts/build_variants.py --check` BEFORE STARTING A LANE.** Lane 7
 inherited five red variants from lane 5 and had to distinguish them from its
@@ -141,9 +153,9 @@ written), `TODO`.
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** | TODO |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
 | 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **DONE** -- 4/4 red gates green, live smoke PASS (50 frames at the declared 1472x832, magic-byte proved). Receipt: `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Its G3 fix also closed the FOUR still lanes' G3 rows (shared `_CheapFamilyBase`) |
-| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration. **NOTE: G3 is still yours** -- lane 10's continuity fix landed on `_CheapFamilyBase`, which the visualizers do NOT share | TODO |
-| 12 | `viz_camera` | same visualizer checks, this lane only | TODO |
-| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | TODO |
+| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | **DONE** -- 7/7 green, two live smoke legs. Its G2 closed by declaring the profile canvas channel INERT, **not** by declaring a canvas: a declaration would overrule `OTR_VIDEO_LANDSCAPE_CANVAS` on a lane with no native canvas (lesson L19, found by the Codex consult). Receipt: `docs/evidence/lane_receipts/lane11-viz_green.md` |
+| 12 | `viz_camera` | same visualizer checks, this lane only. **READ L19 FIRST** -- lane 11's answer for a procedural lane was `PROFILE_CANVAS_DOCUMENTED_DEAD`, not a `render_canvas`; copy the reasoning, not just the shape. G3 is a one-line `continuity=` at this lane's OWN contract (no shared base here) | TODO |
+| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity -- same two answers as lane 11 unless this lane has a native canvas lane 11 lacked. Also HOLDS the "declares NOTHING" canvas differential control alongside `still_pan` | TODO |
 | 14 | `viz_mxc_mandala` | S8b-16 pycairo half (a NAMED dependency refusal), profile/canvas, continuity | TODO |
 | 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal. **G3 already GREEN** (lane 10's shared-base fix); G2 is still yours | TODO |
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only. **G3 already GREEN**; also HOLDS the "declares NOTHING" canvas differential control (`test_ltx_8gb_canonical_canvas.py`) -- move it to `viz_mxc_cpu` when this lane declares | TODO |
@@ -281,7 +293,7 @@ one-token fix on a cloud lane outside the 21-lane order, tracked by an
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
 | Suite | **9963 passed / 109 skipped / 1 xfailed, exit 0** (measured 2026-08-11 at the lane-10 wrap, NOTHING deselected). Was **9950** at `e9800c89`; lane 10 adds 14 tests and replaces 1, so +13. **The "9822 / 111 skipped / 3 deselected" figure in `docs/2026-08-11-RESPONSE-lemmy-sprint-goforward-check.md` is STALE and its 3-test deselection must not be adopted** -- that window's commits were docs-only and a fresh run at its own HEAD gives 9950/109/1 with nothing deselected. Deselecting to get a green number hides real failures |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `1ad7bb3` (**272** entries, audited through **2026-08-11**). **Lane 10 promoted NOTHING, deliberately, and the reason is the ADMISSION RULE.** Its two findings are L1's third instance (already a Bible rule from lane 1 -- covered, not new) and the new L17 (a validator reading a field the validated component wrote is not proof). L17 is portable and Bible-shaped, but it was found by READING the gate, not by a live production failure -- and a static-audit finding "never creates a new PBUG or Bible rule on its own". It is recorded in `docs/LANE_BUILD_LESSONS.md` with a twin assertion instead. If a live render ever ships a mis-typed frame past this, THAT artifact admits it. NEVER re-scrape indexed history |
-| Variants | `build_variants.py --check` **46 variants / 0 failures**. **RUN THIS BEFORE STARTING A LANE** -- it had been RED since lane 5 (five variants still carried `wan_8gb (16:9)`) and lane 7 had to separate inherited drift from its own. A red at the start of a lane belongs to whoever caused it |
+| Variants | `build_variants.py --check` **46 variants / 0 failures** on THIS box. **THAT COUNT IS WORKSTATION-DEPENDENT and 46 is not the repo's number** (lane 11, 2026-08-11): `git ls-files` counts **45** tracked variants, and the 46th on disk is another window's untracked `otr_upscale_ltx_probe.json`. The gate globs the DIRECTORY, so its headline silently counts files the repo has never seen -- the same defect class as the sbcov crash above. Compare `--check`'s 0 FAILURES, not its count. **RUN IT BEFORE STARTING A LANE** -- it had been RED since lane 5 and lane 7 had to separate inherited drift from its own; a red at the start of a lane belongs to whoever caused it |
 | Canonical workflow | untouched; `git diff <BUILD_START_HEAD>..HEAD -- workflows/otr_canonical.json` EMPTY. **Note the form:** a bare `git diff -- workflows/` run AFTER committing is VACUOUS -- committed changes have already left the worktree |
 | Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
 
@@ -350,6 +362,66 @@ pre-locked LEMMY row still has no ensemble slot and is still cast on GENDER
 ALONE. **A pin there still owes a DECLARED re-baseline** -- Branch A did not,
 measured (unclaimed rows are byte-identical against a no-policy baseline at both
 `allow_voice_reuse` settings), but that result does not transfer.
+
+### OPERATOR DECISION -- six committed variants whose SOURCE PROFILES are untracked (raised 2026-08-11, lane 11)
+
+**`scripts/build_variants.py --check` CRASHES ON A FRESH CLONE.** Not fails --
+crashes. Found while closing lane 11, verified rather than reasoned, and it is
+the gate the build law requires green before EVERY lane.
+
+`workflows/variants/otr_sbcov_{1..6}.json` + their `.launch.md` recipes are
+**COMMITTED**. Their six source profiles `config/profiles/otr_sbcov_{1..6}.json`
+are **UNTRACKED** -- `git log --all` on them is empty, they are NOT gitignored,
+they are dated 2026-07-20 and marked `status: draft`. So the repo ships six
+generated artifacts whose sources it has never tracked.
+
+`--check` regenerates every committed variant from its profile id. A missing
+profile raises `ProfileError`; the loop catches only `EmitRefused`. Measured:
+
+| | MRO |
+|---|---|
+| `EmitRefused` | `EmitRefused -> RuntimeError -> Exception` |
+| `ProfileError` | `ProfileError -> ValueError -> Exception` |
+| caught by `except EmitRefused`? | **False** |
+
+It reports "46 variants, 0 failures" on this box **only because those six
+untracked files happen to exist here.**
+
+**THE PROVENANCE SETTLES IT, and it was found by the Codex consult reading a
+file I had not opened.** `tmp/_gen_profiles.py` (2026-07-20) is the generator
+that wrote all six, and its own docstring says:
+
+> "These are throwaway smoke config (like a temp probe script) -- written into
+> config/profiles/ because load_profile() only reads that dir, and DELETED
+> after the sweep. **NOT committed.**"
+
+So the profiles are behaving exactly as designed. **What leaked is the OTHER
+half: the twelve generated `otr_sbcov_*` variant + recipe artifacts got
+committed and should not have been.** The question is therefore not "adopt six
+sources?" but:
+
+**Your call:**
+1. **DELETE the twelve leaked `workflows/variants/otr_sbcov_{1..6}.json` +
+   `.launch.md` artifacts** (recommended -- it matches the stated intent, and
+   they are unreproducible on any box without the throwaway profiles), OR
+2. **COMMIT the six profiles** if the sbcov sweep is in fact still live work
+   and those variants are meant to ship.
+
+A coder window must not pick: deleting committed artifacts changes what ships.
+**Independently of the choice, `--check` should catch `ProfileError` and report
+a named failure instead of crashing** -- a plain robustness bug any window may
+fix once you have decided.
+
+**Not blocking lane 11 any more.** The lane closed 7/7 on its own merits by
+declaring its profile canvas channel INERT rather than reconciling it, which
+makes G2.3 skip the profile comparison entirely -- so `otr_sbcov_4.json` is
+irrelevant to it. Detail: `docs/evidence/lane_receipts/lane11-viz_green.md`.
+
+**Related, same defect class, found the same way:** the "46 variants" figure
+quoted as a baseline in this file is WORKSTATION-DEPENDENT. `git ls-files`
+counts **45** tracked variants; the 46th on disk is another window's untracked
+`otr_upscale_ltx_probe.json`. `--check` globs the directory, so its headline
+count silently includes files the repo has never seen.
 
 ### WAITING ON THE OPERATOR -- the whole list, in one place (2026-08-09)
 
