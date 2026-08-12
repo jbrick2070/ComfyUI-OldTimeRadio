@@ -2727,3 +2727,55 @@ field's owner enumerated BEFORE the call is moved, not after.
 
 Related and already shipped: `num_characters` is now a REQUEST rather than a cap
 (operator directive, all banks) -- see `tests/test_cast_size_is_a_request.py`.
+
+---
+
+## TWO CODER WINDOWS, 2026-08-12 -- OWNERSHIP SPLIT (operator ruling)
+
+The operator has a second window that originally coded Lemmy and has been parked
+since. Lemmy work goes THERE, not to the story/video window. CLAUDE.md's rule is
+one coder window in the code at a time, serialized through this file -- so here
+is the split. **The file sets are disjoint; that is what makes this safe.**
+
+### WINDOW A -- LEMMY (the window that coded it)
+
+Owns: `nodes/scene_sequencer.py`, `nodes/_otr_audio_engines/**`,
+`nodes/_otr_voice_bank.py`, `config/voice_reference_bank.json`, and the Lemmy
+tests.
+
+Work list, already triaged in "WHAT REMAINS ON THE LEMMY SPRINT" above:
+
+* **Chunk C items 2/3/5** -- SceneSequencer integration coverage at 22050/44100.
+  Every existing fixture starts AT the 48000 bus, so nothing proves the real
+  resample path. Item 1 is done.
+* **Chunks A2 -> A3 -> A4** -- v2 identity + replay bridge. Operator ruled
+  2026-08-11: **AUTO-PROMOTE on a clean replay** -- if A4 reproduces all six
+  frozen clip hashes, A2/A3 rewrite the receipt's identity fields with no second
+  sign-off.
+* **A forced-Lemmy live render** to settle chunk B. Chunk B (the shared
+  `resolve_voice_ref_path`) is written and tested but was deliberately NOT logged
+  as a PBUG, because it is grounded in the filesystem rather than in a captured
+  live failure. A forced-Lemmy render settles it either way and is the natural
+  next Lemmy step.
+* **Chunk E is OPERATOR ONLY** -- whether swapping Lemmy's voice counts as an
+  editorial recast for an audience that already heard the old one.
+* Branch B stays unbuilt; it existed for a G1 failure and G1 passed.
+
+**Operator directive 2026-08-12: the Lemmy fixes must be WELL DOCUMENTED.**
+
+### WINDOW B -- STORY WRITER + THE 21-LANE SWEEP (this window)
+
+Owns: `nodes/_otr_scifi_fable2.py`, `nodes/_otr_fable2_markup.py`,
+`nodes/_otr_outline.py`, `nodes/story_packs/**`, `nodes/_otr_ledger.py`,
+`scripts/otr_api.py`, `scripts/otr_w45_campaign.py`,
+`scripts/otr_writer_bank_gate.py`, and their tests.
+
+### THE SHARED HAZARD -- git, not files
+
+Both windows push to `v2.0-alpha`. This project has been burned twice by
+concurrent windows: a staged deletion swept into another window's commit, and an
+amendment lost in the gap between staging and committing.
+
+**So: stage, commit and push ATOMICALLY in one call. Never leave anything staged
+while the other window is live. Never `git add .` -- add by name.** Verify
+`HEAD == origin` after each push.
