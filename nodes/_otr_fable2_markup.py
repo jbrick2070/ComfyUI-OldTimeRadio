@@ -139,6 +139,25 @@ def _canonicalize_transport_line(line: str) -> "tuple[str, tuple[str, ...]]":
     genuinely unknown speaker still reaches UNKNOWN_SPEAKER after decoration is
     removed, and the closed-roster diagnostic keeps its meaning.
 
+    **DO NOT "FIX" A STRAY UNMATCHED LEADING MARKER HERE.** It is the obvious
+    next step -- ``*Ada: Hello`` misses the roster only because of one stray
+    ``*`` -- and it was proposed and REJECTED on 2026-08-12 (PBUG-20260812-03),
+    for two reasons:
+
+    * it breaks this function's contract. Balanced, transport-only, malformed
+      stays loud. Stripping unmatched decoration is the general Markdown
+      sanitizer the paragraphs above exist to refuse.
+    * **it would silently disarm the repair note that DOES fix this.** Strip the
+      marker from ``*SFX:`` and you get ``SFX:`` -- still not a roster name, so
+      still UNKNOWN_SPEAKER, but it no longer LOOKS like a stage direction. The
+      writer's ``_standalone_stage_direction_repair_note`` keys on exactly that
+      shape, so it would stop firing and the ladder would fall back to the
+      generic instruction that already burned four attempts on a live leg.
+
+    The stray-marker case is handled where it belongs: the writer's repair rung
+    checks the decorated label against the roster and tells the model to restore
+    the canonical label while keeping the dialogue.
+
     Returns ``(line, notes)``; every removal is reported, never hidden.
     """
     s = str(line).strip()

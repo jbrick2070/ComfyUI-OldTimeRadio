@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_content_safety as safety
+from nodes import _otr_fable2_markup as markup
 from nodes import _otr_openrouter_backend as openrouter
 from nodes import _otr_scifi_fable2 as fable2
 from nodes._otr_video_engines import render_driver as rd
@@ -131,10 +132,20 @@ def test_bounded_provider_capacity_fails_before_network(monkeypatch):
     assert calls == []
 
 
-def test_scifi_markup_repair_names_the_exact_standalone_row():
+def test_scifi_markup_repair_names_the_offending_standalone_row():
+    """The repair rung must quote the parser's own evidence back to the model.
+
+    Takes TYPED defects since PBUG-20260812-03: `str(defect)` appends
+    ` (line N)`, and re-parsing that string is what corrupted the token the note
+    looks up. The note now reads `code`, `detail` and `line_no` directly, so the
+    line number no longer has to be smuggled through the detail.
+    """
     note = fable2._standalone_stage_direction_repair_note(
-        ["BAD_LINE_SHAPE: (A sharp beep sounds.) (line 6)"]
+        (markup.ParseDefect(markup.Fable2ParseDefect.BAD_LINE_SHAPE,
+                            "(A sharp beep sounds.)", 6),),
+        cast_names=("Ada", "Bo"),
     )
     assert "(A sharp beep sounds.)" in note
+    assert "line 6" in note
     assert "must not appear as a standalone output row" in note
     assert "Return no explanation" in note

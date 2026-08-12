@@ -3715,51 +3715,89 @@ only visible because the cameo was FORCED and then did not appear.
   (`_otr_scifi_fable2.py:281`) shadows an attribute that exists on
   `BaseModel` -- Pydantic's `ModelMetaclass` inherits `ABCMeta`, so
   `BaseModel.register` is a bound metaclass method. Pydantic does NOT reject
-  this field name (the clash is on the metaclass, not the class body), and a
-  fully-validated instance is fine because the value lives in `__dict__`.
-  **But any instance whose `register` is absent from `__dict__` falls through
-  to the class attribute, and `model_dump()` then returns the bound method.**
-  Minimal reproduction on this box:
+  this field name: the clash is on the metaclass, not the class body.
+  **It instead adopts the inherited attribute as the field's DEFAULT.**
 
-      ok  = CastShape(name="Ada", role="lead", want="w", pressure="p",
-                      register="dry")
-      ok.model_dump()            # {'register': 'dry'}  -- fine
-      bad = CastShape.model_construct(name="Ada", role="lead", want="w",
-                                      pressure="p")
-      bad.model_dump()           # {'register': <bound method ...>}
-      json.dumps(bad.model_dump())
-      # TypeError: Object of type method is not JSON serializable
+  > **CORRECTED 2026-08-12, and the first version of this entry was wrong in a
+  > way that would have misdirected the fix.** It claimed the field was still
+  > required and that only `model_construct` could leak the method. Neither is
+  > true. Measured on this box against the real module:
+  >
+  >     CastShape.model_fields["register"].is_required()   # False
+  >     CastShape.model_fields["register"].default
+  >     # <bound method ModelMetaclass.register of <class '...CastShape'>>
+  >     CastShape.model_json_schema()["required"]
+  >     # ['name', 'role', 'want', 'pressure']      <-- no 'register'
+  >     CastShape(name="Ada", role="lead", want="w", pressure="p").register
+  >     # <bound method ...>                        <-- ORDINARY VALIDATION
+  >
+  > So three things happened silently, and the crash was the LUCKY one:
+  > 1. a field the author declared as required went OPTIONAL;
+  > 2. **the JSON schema handed to the writer stopped listing `register` in
+  >    `required`**, so the model was never obliged to produce a documented,
+  >    load-bearing contract field (doc s5: HOW a character speaks);
+  > 3. any shape that omitted it carried a bound method into
+  >    `_otr_scifi_fable2.py:1527`, which renders into the prompt as
+  >    `register: <bound method ModelMetaclass.register of ...>` -- a corrupted
+  >    writer prompt -- before dying on the next `json.dumps`.
 
-  Pydantic even warns on the dump --
-  `PydanticSerializationUnexpectedValue(Expected 'str' ... field_name='register',
-  input_value=<bound method ModelMetacl...>, input_type=method)` -- and that
-  warning goes to stderr where nothing reads it.
+  Pydantic warned twice and both warnings went where nothing reads them: a
+  `PydanticJsonSchemaWarning` at schema build (`Default value <bound method ...>
+  is not JSON serializable; excluding default from JSON schema`, visible in the
+  server logs) and a `PydanticSerializationUnexpectedValue` on the dump.
+  **A `warnings.filterwarnings` at `_otr_scifi_fable2.py:107` was silencing the
+  third one** -- pydantic's own `Field name "register"` shadowing warning --
+  with the comment "nothing in this module ever calls the shadowed attribute".
+  That reassurance was aimed at the wrong hazard: the danger was never a call.
 - **why it is INTERMITTENT, which is what makes it nasty:** the campaign rolls
   `--source-bank "roll (any eligible bank)"` per leg, so only legs that roll
   `scifi_fable2` can hit it, and only when a `CastShape` reaches the prompt
   builder without its `register` set. A re-run can pass and look like a flake.
-- fix: NONE YET -- deliberately. Two candidate directions, and the choice
-  belongs to the writer lane's owner because both touch the LLM contract:
-  (a) RENAME the field (`register` -> e.g. `vocal_register`), which removes the
-  shadow entirely but changes the structured-output schema the model is
-  prompted against and the `register:` label in the cast block at
-  `_otr_scifi_fable2.py:1527`; or (b) give it a DEFAULT (`register: str = ""`),
-  which makes the construct path fill it instead of leaking the method, at the
-  cost of weakening a currently-required field. **(a) is the root fix; (b) is a
-  containment.** Not attempted unattended: a wrong move here breaks story
-  generation on a shipping bank.
-- **the production TRIGGER is still unidentified.** There is no
-  `model_construct` or `CastShape(...)` call anywhere in `_otr_scifi_fable2.py`
-  -- the treatment is built by `structured_call(schema=Treatment, ...)`, which
-  validates -- so something in the structured-output/repair path is producing a
-  partially-populated model. That search is the next step and it is where the
-  fix has to be aimed.
-- verify idea: a test that asserts NO Pydantic model in the writer path has a
-  field name for which `hasattr(BaseModel, name)` is true. That is a one-line
-  structural check over `model_fields`, it catches the whole CLASS of this bug
-  rather than this one field, and it would have failed the day `register` was
-  added. (`Treatment` itself is clean; `CastShape.register` is the only hit in
-  the two models on this path.)
+- **the production TRIGGER, once the mechanism was right, needed no searching.**
+  The first version of this entry hunted for a `model_construct` call and found
+  none, and concluded the trigger was unidentified. There is nothing to find:
+  the treatment is built by `structured_call(schema=Treatment, ...)`, which
+  validates -- and validation ACCEPTED a missing `register`, because the schema
+  it generated never required one. The trigger is simply **the model omitting an
+  optional field**, which it was entitled to do. That also explains the
+  intermittency below without any flakiness: it depends on the model's output,
+  not on a rare code path.
+- **why it looked INTERMITTENT:** the campaign rolls
+  `--source-bank "roll (any eligible bank)"` per leg, so only legs that roll
+  `scifi_fable2` can hit it at all, and then only when the writer happened to
+  omit `register` for at least one cast shape. A re-run can pass and read as a
+  flake.
+- **fix: SHIPPED.** `register: str = Field(...)` at `_otr_scifi_fable2.py:281`.
+  The name is load-bearing prompt vocabulary and could not change, so the class
+  body shadows the inherited attribute with an explicit required marker --
+  restoring exactly what the bare `register: str` annotation was always meant to
+  say. Measured after: `is_required()` True, schema `required` now contains
+  `register`, omitting it raises `ValidationError` (honest and retryable through
+  the repair ladder) instead of poisoning a prompt, and `model_construct`
+  without it now raises `AttributeError` rather than handing back a method.
+  The neighbouring `warnings.filterwarnings` comment was rewritten to say what
+  actually makes the filter safe.
+  - Rejected: RENAMING the field. It changes the structured-output schema the
+    model is answering and the `register:` label in the cast block at
+    `_otr_scifi_fable2.py:1527` -- a contract change to fix a defaulting bug.
+  - Rejected: `register: str = ""`. It stops the crash but keeps the field
+    optional, so the writer still is not asked for it and a character silently
+    gets a blank speaking register. That is the containment, not the fix.
+- verify: `tests/test_writer_model_field_shadowing.py` -- 10 tests. The field is
+  required; the emitted JSON schema requires it; omission refuses; the contract
+  spelling is unchanged; `model_construct` cannot return a method. **Plus the
+  general rule, swept over every pydantic model reachable under `nodes/` (92 of
+  them): no field default may fail `json.dumps`.** That is the check that would
+  have caught this the day the field was added, it names the CLASS of defect
+  rather than this one field -- `copy`, `json`, `schema`, `dict`, `validate` and
+  `construct` are all waiting to do the same thing -- and it is guarded by a
+  companion test asserting the sweep actually found the models, so a broken
+  import cannot make it vacuously green. `register` was the only offender.
+- **the defect had no visible symptom in the source**, which is why the
+  executable check matters more than usual here: deleting the `Field(...)`
+  restores a perfectly ordinary-looking `register: str`.
+- status: FIXED. Proven by unit test and by measurement; a live `still_flat`
+  re-run is queued to close it on an artifact.
 - bible-worthy: **yes, strongly, as a class.** "A Pydantic field whose name
   collides with an attribute of BaseModel/its metaclass serializes as a bound
   method whenever the instance is built without it" is portable to every project
@@ -3797,28 +3835,98 @@ only visible because the cameo was FORCED and then did not appear.
   PARSER to normalize the decoration (balanced `**` shapes 1-4). This one is
   the other half of the same story -- when the parser CORRECTLY refuses, the
   repair rung has to be able to say why.
-- fix: SHIPPED, and it is PROMPT-ONLY -- it cannot make an invalid script
-  valid. The note now fires on `BAD_LINE_SHAPE`, `UNKNOWN_SPEAKER` and
-  `SKELETON_BREAK` when the offending TOKEN opens with `(`, `[` or `*`, and the
-  rule text names the speaker-label case explicitly ("a row like '*SFX: a door
-  slams' is a stage direction wearing a label, not a character, and there is no
-  sound-effect speaker"). No parser, acceptance rule or schema changed.
+- **fix: SHIPPED IN TWO PASSES, and the first pass was half wrong.** It is
+  PROMPT-ONLY throughout -- it cannot make an invalid script valid, and no
+  parser, acceptance rule or schema changed.
+
+  **Pass 1 (`3a5cf77f`), CORRECTED BELOW.** Widened the codes to
+  `BAD_LINE_SHAPE` / `UNKNOWN_SPEAKER` / `SKELETON_BREAK` and the prefixes to
+  `(`, `[`, `*`. The QA pass then holed it, and both findings were confirmed
+  against the producer:
+  - **the `SKELETON_BREAK` widening was DEAD CODE.** Every `skeleton()` detail
+    in `_otr_fable2_markup` is a descriptive English sentence that merely
+    CONTAINS the token -- the real row is `character line (*SFX) after the last
+    scene`, which opens with "character". It can never match a prefix test.
+    Nothing was lost by it being dead: the same line always raises
+    `UNKNOWN_SPEAKER` first. **Any earlier wording in this entry claiming the
+    shipped fix fires on `SKELETON_BREAK` is withdrawn.**
+  - **a test propped it up with a FICTIONAL row** (`SKELETON_BREAK: [SOUND]
+    after the last scene`), a shape no producer emits. It passed and proved
+    nothing -- the same lexical-fixture trap as lesson L26.
+  - and a real gap: a cast member wearing a stray unmatched marker
+    (`*Ada: Hello`) survives canonicalization, misses the roster, and raises
+    `UNKNOWN_SPEAKER: *Ada` -- shaped exactly like `*SFX`. Pass 1 would have
+    told the model to fold or drop a real character's line.
+
+  **Pass 2, after a kibitz consult** (`kibitz-runs/2026-08-12-writer-stage-
+  direction-note/r2/`, Codex `gpt-5.6-sol` + Antigravity; operator rule: one
+  failed fix on the writer, then the panel). Three findings would have shipped
+  past me:
+  - **`Fable2ParseDefect` is a plain `enum.Enum`, not a `str` enum.** Passing
+    typed defects while comparing `defect.code` against string constants would
+    be False forever -- the note silently never fires and every stage-direction
+    leg burns four attempts again, from code that reads correctly. Codes are now
+    compared as ENUM MEMBERS.
+  - **the two codes carry different data.** `UNKNOWN_SPEAKER.detail` is the bare
+    label; `BAD_LINE_SHAPE.detail` is a line fragment (`line[:80]`). One token
+    extractor over both is a category error, so the note branches by code and
+    does roster resolution only for `UNKNOWN_SPEAKER`.
+  - **the prompt was handing the model false evidence** -- it called `detail`
+    "the exact source row", which it is for neither code. It now says
+    "illegal speaker label" or "may be truncated", and carries `line_no` as its
+    own field.
+
+  Shipped shape: the note takes TYPED `ParseDefect` objects (`str(defect)`
+  appends ` (line N)`, and re-parsing that string is what corrupted the token),
+  `cast_names` is keyword-only and required, and there are **two rules rather
+  than one rule and a mute button** -- a decorated ROSTER name is told to
+  restore the canonical label and keep the dialogue, because going silent just
+  returns the generic instruction that already failed four attempts.
+  `defect_rows` stays a string tuple for `PassAttemptTrace`, which enforces
+  `tuple[str, ...]`.
+
+- **REJECTED: fixing this in the parser.** The obvious move is to have
+  `_canonicalize_transport_line` strip a stray unmatched leading marker so
+  `*Ada` resolves outright. Both panel lanes independently said no, and the
+  second reason is the non-obvious one: strip the marker from `*SFX:` and you
+  get `SFX:` -- still not a roster name, so still `UNKNOWN_SPEAKER`, but it no
+  longer LOOKS like a stage direction, so this note stops firing and the ladder
+  falls back to the generic instruction that caused the live failure. The parser
+  "fix" would silently disarm the real fix. Recorded as a comment in
+  `_canonicalize_transport_line` so it is not re-derived.
+- **REJECTED: deterministic Python folding of the offending row.** Deciding
+  where a sound event belongs, or whether it is dispensable, is authored story
+  work; `docs/PRODUCTION_SPRINT_LESSONS.md` requires returning ambiguous
+  placement to the model and failing closed.
 - **what was deliberately NOT widened:** an `UNKNOWN_SPEAKER` for a MISSPELLED
   CAST NAME still gets no stage-direction advice. Telling the model to fold a
   real character's line into a neighbour, or to drop it, is worse than the
   failure it replaces -- so the note requires the token to LOOK like a stage
   direction, not merely to be an unknown speaker.
-- verify: `tests/test_fable2_stage_direction_repair_note.py` -- 17 tests. The
-  exact two rows from the failed leg now produce the rule; six stage-direction
-  shapes fire; five real-name/other defects stay silent; the original
-  parenthetical case is asserted UNCHANGED; and a non-matching defect ahead of
-  a matching one must not suppress it, which is the order the live leg produced.
-- **NOT proven on a live leg yet.** The fix is verified by unit test and by the
-  mechanism; whether the model actually repairs when told needs a leg that rolls
-  `scifi_fable2` again. The campaign rolls its bank per leg, so that is a matter
-  of re-running rather than of new work.
+- verify: 33 tests across two files, and **every fixture is derived from the
+  REAL PARSER** rather than hand-written -- that is what the fictional-row trap
+  cost.
+  - `tests/test_fable2_stage_direction_repair_note.py` (27): the live rows
+    produce the rule; five real stage-direction shapes fire; a decorated roster
+    name gets the RESTORE rule and explicitly not the delete-a-character advice;
+    a decorated typo still gets the stage-direction rule; an undecorated unknown
+    name gets nothing; `*Ada (Engineer)` keeps its role parenthetical; and a
+    real `SKELETON_BREAK` detail is asserted UNABLE to open with a marker, which
+    is the assertion that would have caught the invented fixture.
+  - `tests/test_fable2_ladder_delivers_repair_rule.py` (6): **drives the real
+    `_run_markup_ladder` with a scripted writer and asserts on the SECOND
+    prompt.** Every other test checks what the note RETURNS; only this one
+    proves the string is put in front of the model, which is the property the
+    live failure actually turned on. It also pins that a model which never
+    repairs still fails closed, and that telemetry keeps immutable string
+    defects.
+- **NOT proven on a live leg yet.** Verified by unit test, by the end-to-end
+  ladder test, and by the mechanism; whether the model actually repairs when
+  told needs a leg that rolls `scifi_fable2` again. Queued behind the cross-bank
+  writer gate (operator directive 2026-08-12: a writer fix proven on one bank is
+  re-tested against every other bank before it is called closed).
 - bible-worthy: probably, as a class -- "a targeted repair/remediation rule
   scoped so narrowly that it cannot fire on the defect it was written for, so
   the retry loop burns its budget on identical failures". Deferred with
   PBUG-20260812-02 until both writer defects are settled.
-- status: FIXED (prompt-only), pending a live re-run.
+- status: FIXED (prompt-only), pending the cross-bank gate and a live re-run.

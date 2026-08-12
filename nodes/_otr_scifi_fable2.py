@@ -54,7 +54,9 @@ try:
     from ._otr_fable2_markup import (
         ANNOUNCER_NAME,
         Fable2ParseDefect,
+        ParseDefect,
         ParsedScript,
+        _strip_role_parenthetical,
         normalize_fable2_markup_text,
         parse_fable2_markup,
         render_defects,
@@ -79,7 +81,9 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_fable2_markup import (  # type: ignore
         ANNOUNCER_NAME,
         Fable2ParseDefect,
+        ParseDefect,
         ParsedScript,
+        _strip_role_parenthetical,
         normalize_fable2_markup_text,
         parse_fable2_markup,
         render_defects,
@@ -101,9 +105,17 @@ except (ImportError, ValueError):
 log = logging.getLogger("OTR")
 
 # The LLM contract field "register" (HOW a character speaks -- doc s5) is
-# load-bearing prompt vocabulary and cannot be renamed; pydantic warns that
-# it shadows a BaseModel attribute. Silence exactly that warning -- clean
-# logs, and nothing in this module ever calls the shadowed attribute.
+# load-bearing prompt vocabulary and cannot be renamed, so pydantic's
+# name-shadowing warning is expected and is silenced for clean logs.
+#
+# THE WARNING WAS TELLING THE TRUTH, AND THIS FILTER HELPED IT HIDE
+# (PBUG-20260812-02). "nothing in this module ever calls the shadowed
+# attribute" was the wrong reassurance: the danger was never a call, it was
+# that pydantic read the inherited attribute as the field's DEFAULT and quietly
+# made a required contract field optional. That is fixed at the field itself --
+# `CastShape.register` is declared `Field(...)` -- and `Field(...)` is what
+# makes this filter safe. The suite pins both halves; see
+# tests/test_writer_model_field_shadowing.py.
 warnings.filterwarnings(
     "ignore", message='Field name "register"', category=UserWarning)
 
@@ -278,7 +290,17 @@ class CastShape(BaseModel):
     role: str
     want: str
     pressure: str
-    register: str
+    #: `Field(...)` is not decoration -- it is the whole fix for
+    #: PBUG-20260812-02, and REMOVING it silently re-breaks the writer.
+    #: `register` also names a method reachable on BaseModel (pydantic's
+    #: ModelMetaclass inherits ABCMeta), so a bare `register: str` does NOT
+    #: declare a required field: pydantic reads the inherited attribute as the
+    #: field's DEFAULT. The field then goes OPTIONAL, the JSON schema handed to
+    #: the writer stops requiring it, and any cast shape that omits it carries a
+    #: bound method -- which reaches the prompt as "<bound method ...>" and kills
+    #: the node on the next json.dumps. `Field(...)` shadows the inherited
+    #: attribute and restores the declared intent: required, no default.
+    register: str = Field(...)
 
     @field_validator("name")
     @classmethod
@@ -1611,14 +1633,73 @@ def _strip_conversational_wrapper(raw: str) -> str:
 #: :func:`_standalone_stage_direction_repair_note`.
 _STAGE_DIRECTION_PREFIXES = ("(", "[", "*")
 
-#: The defect codes a stage-direction-shaped row can raise. It reaches
-#: ``BAD_LINE_SHAPE`` when it has no colon, and ``UNKNOWN_SPEAKER`` when it DOES
-#: -- ``*SFX: door slams`` parses as a speaker named ``*SFX`` -- which also
-#: trips ``SKELETON_BREAK`` if it lands outside a scene.
-_STAGE_DIRECTION_CODES = ("BAD_LINE_SHAPE", "UNKNOWN_SPEAKER", "SKELETON_BREAK")
+#: The two defect codes a stage-direction-shaped row can raise. Compared as ENUM
+#: MEMBERS, never as strings: ``Fable2ParseDefect`` is a plain ``enum.Enum``, not
+#: a ``str`` enum, so ``defect.code in ("UNKNOWN_SPEAKER", ...)`` is False
+#: FOREVER -- the note would silently never fire and every stage-direction leg
+#: would burn its four attempts again, from code that reads correctly.
+#:
+#: ``SKELETON_BREAK`` IS DELIBERATELY ABSENT and listing it would be dead code.
+#: Every ``skeleton()`` detail in ``_otr_fable2_markup`` is a descriptive English
+#: sentence that merely CONTAINS the token -- the row reads ``character line
+#: (*SFX) after the last scene`` -- so it can never open with a marker. It was
+#: briefly listed here on 2026-08-12 and matched nothing. Nothing is lost: a
+#: stage-direction row that trips a skeleton break always raises
+#: ``UNKNOWN_SPEAKER`` for the same line first.
+_STAGE_DIRECTION_CODES = (
+    Fable2ParseDefect.BAD_LINE_SHAPE,
+    Fable2ParseDefect.UNKNOWN_SPEAKER,
+)
 
 
-def _standalone_stage_direction_repair_note(defect_rows):
+def _speaker_identity_key(value: str) -> str:
+    """Case/spacing-insensitive speaker identity, matching the parser's own."""
+    return " ".join(str(value).split()).casefold()
+
+
+def _resolves_to_cast(label: str, roster: "set[str]") -> bool:
+    """Whether ``label`` names someone on the roster, the parser's way.
+
+    Mirrors the two-step lookup at `_otr_fable2_markup` `on_speaker`: exact
+    identity first, then the same trailing-role-parenthetical fallback, so
+    ``Ada (Engineer)`` resolves to Ada exactly as it does during parsing.
+    Imported rather than reimplemented -- the parser is the one authority on
+    what counts as the same speaker, and a second copy of that rule is a second
+    answer waiting to disagree.
+    """
+    if _speaker_identity_key(label) in roster:
+        return True
+    bare = _strip_role_parenthetical(label)
+    return bare != label and _speaker_identity_key(bare) in roster
+
+
+def _undecorated_label(label: str) -> str:
+    """A decorated speaker label with its decoration removed, else ``""``.
+
+    ``*Ada`` -> ``Ada``; ``(NARRATOR)`` -> ``NARRATOR``; ``Ada`` -> ``""``,
+    because an undecorated label is not this note's business.
+
+    Only ever called with an ``UNKNOWN_SPEAKER`` detail, which the parser sets
+    to the SUPPLIED LABEL alone. It must not be pointed at a ``BAD_LINE_SHAPE``
+    detail, which is a line fragment (``line[:80]``) rather than a label.
+
+    ONLY THE CLOSER THAT MATCHES THE OPENER comes off. Stripping any trailing
+    bracket instead turns ``*Ada (Engineer)`` into ``Ada (Engineer`` -- it eats
+    the role parenthetical's own closer, the roster lookup misses, and a real
+    character is handed the delete-me rule. The trailing role parenthetical is
+    the PARSER's to resolve (`_strip_role_parenthetical`), not this function's.
+    """
+    token = str(label).strip()
+    if not token.startswith(_STAGE_DIRECTION_PREFIXES):
+        return ""
+    closer = {"(": ")", "[": "]", "*": "*"}[token[0]]
+    token = token[1:].strip()
+    if token.endswith(closer):
+        token = token[:-1].strip()
+    return token
+
+
+def _standalone_stage_direction_repair_note(defects, *, cast_names):
     """Give the repair rung an explicit rule for illegal stage-direction rows.
 
     The parser reports the offending source row and line number. Keep that
@@ -1640,27 +1721,72 @@ def _standalone_stage_direction_repair_note(defect_rows):
     ``UNKNOWN_SPEAKER`` for a misspelled cast name must NOT be told to fold the
     row into a neighbouring line -- that would be wrong advice, and losing a
     real character's line is worse than the failure it replaces.
+
+    ``cast_names`` IS WHAT MAKES THAT PROMISE TRUE, and the shape check alone
+    did not. ``_canonicalize_transport_line`` strips only BALANCED decoration,
+    so a real cast member wearing a stray unmatched marker -- ``*Ada: Hello`` --
+    survives to the roster lookup, misses, and raises ``UNKNOWN_SPEAKER: *Ada``:
+    a real character's line that LOOKS exactly like a stage direction.
+
+    SO THERE ARE TWO RULES, NOT ONE RULE AND A MUTE BUTTON. Going silent on a
+    roster hit was the first design, and it was wrong for the same reason the
+    original defect was wrong: silence hands back the generic "repair the
+    defects below", which is exactly the instruction that failed four attempts
+    running. A decorated REAL name has an obvious, safe repair -- restore the
+    canonical label and keep the dialogue -- so say that instead.
+
+    Both branches take their token from ``UNKNOWN_SPEAKER`` details only.
+    ``BAD_LINE_SHAPE`` carries a LINE FRAGMENT rather than a label, so a roster
+    lookup against it is a category error and is not attempted.
     """
-    for defect in defect_rows:
-        row = str(defect)
-        if not row.startswith(_STAGE_DIRECTION_CODES):
+    roster = {_speaker_identity_key(name) for name in cast_names}
+    roster.add(_speaker_identity_key(ANNOUNCER_NAME))
+
+    for defect in defects:
+        if defect.code not in _STAGE_DIRECTION_CODES:
             continue
-        _, _, detail = row.partition(":")
-        if detail.lstrip().startswith(_STAGE_DIRECTION_PREFIXES):
-            return (
-                "\nFORMAT REPAIR RULE: a standalone parenthetical, bracketed "
-                "or asterisked row is an illegal stage direction. Do not return "
-                "it as its own line, and do not use it as a SPEAKER LABEL -- a "
-                "row like '*SFX: a door slams' is a stage direction wearing a "
-                "label, not a character, and there is no sound-effect speaker. "
-                "Preserve a necessary event only by folding it into the "
-                "nearest legal labelled spoken line as natural words, or omit "
-                "it when nonessential. Every nonblank row must begin with a "
-                "legal label; do not invent an unlabeled narration row."
-                "\nThe malformed source row reported by the parser is exactly "
-                f"{detail.strip()!r}. It must not appear as a standalone output "
-                "row. Return no explanation, markdown, or repair commentary."
-            )
+        detail = str(defect.detail).strip()
+        where = (" (reported at line %d)" % defect.line_no
+                 if defect.line_no is not None else "")
+
+        if defect.code is Fable2ParseDefect.UNKNOWN_SPEAKER:
+            label = _undecorated_label(detail)
+            if not label:
+                continue  # an undecorated unknown name -- not our business
+            if _resolves_to_cast(label, roster):
+                return (
+                    "\nFORMAT REPAIR RULE: a legal cast member was given a "
+                    "decorated speaker label. The parser reported the label "
+                    f"{detail!r}{where}, which is the character {label!r} "
+                    "wearing stray markup. Restore the plain canonical label "
+                    f"-- write the row as '{label}: ' followed by the dialogue "
+                    "-- and KEEP THE DIALOGUE EXACTLY AS WRITTEN. Do not delete "
+                    "this line, do not merge it into a neighbouring line, and "
+                    "do not rename the character. A speaker label carries no "
+                    "asterisks, parentheses or brackets."
+                    "\nReturn no explanation, markdown, or repair commentary."
+                )
+            evidence = (f"The parser reported the illegal speaker label "
+                        f"{detail!r}{where}.")
+        else:
+            if not detail.startswith(_STAGE_DIRECTION_PREFIXES):
+                continue
+            evidence = (f"The parser reported this malformed line, which may be "
+                        f"truncated: {detail!r}{where}.")
+
+        return (
+            "\nFORMAT REPAIR RULE: a standalone parenthetical, bracketed "
+            "or asterisked row is an illegal stage direction. Do not return "
+            "it as its own line, and do not use it as a SPEAKER LABEL -- a "
+            "row like '*SFX: a door slams' is a stage direction wearing a "
+            "label, not a character, and there is no sound-effect speaker. "
+            "Preserve a necessary event only by folding it into the "
+            "nearest legal labelled spoken line as natural words, or omit "
+            "it when nonessential. Every nonblank row must begin with a "
+            "legal label; do not invent an unlabeled narration row."
+            f"\n{evidence} It must not appear as a standalone output row. "
+            "Return no explanation, markdown, or repair commentary."
+        )
     return ""
 
 
@@ -1754,7 +1880,10 @@ def _run_markup_ladder(
             "complete episode from TITLE through END as plain text. Keep "
             "the same story, cast, events, and wording wherever the format "
             "is already valid. Do not repeat a rejected malformed row."
-            + _standalone_stage_direction_repair_note(defect_rows)
+            # The NOTE reads typed defects; `defect_rows` stays a string tuple
+            # because `PassAttemptTrace.parse_defects` enforces exactly that.
+            + _standalone_stage_direction_repair_note(
+                defects, cast_names=cast_names)
             + "\n" + rendered
         )
 

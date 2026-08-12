@@ -2,33 +2,27 @@
 
 NONE in `EXPECTED_FAILED_NODEIDS`. The suite is green.
 
-## One STRICT XFAIL, which is a different thing and is tracked here anyway
+## The strict xfail opened 2026-08-12 is CLOSED
 
 `tests/test_writer_model_field_shadowing.py::
-test_no_writer_model_field_shadows_a_BaseModel_attribute`
+test_no_writer_model_field_shadows_a_BaseModel_attribute` was marked
+`xfail(strict=True)` on 2026-08-12 for PBUG-20260812-02, and the marker was
+deleted the same day when the field was fixed.
 
-- **why it xfails:** PBUG-20260812-02. `CastShape.register`
-  (`nodes/_otr_scifi_fable2.py:281`) shadows `BaseModel.register`, which exists
-  because Pydantic's `ModelMetaclass` inherits `ABCMeta`. An instance built
-  without that field dumps a BOUND METHOD, and the writer dies on the next
-  `json.dumps` with `Object of type method is not JSON serializable`.
-- **found by:** a LIVE headless leg, 2026-08-12 -- the first leg of the 45-word
-  every-visual-path campaign, 78 s in, before any video work.
-- **why xfail and not EXPECTED_FAILED_NODEIDS:** `strict=True` means fixing the
-  field makes this test PASS, which fails the suite and forces the marker to be
-  deleted in the same change. That is the lane matrix's strict unexpected-pass
-  discipline applied to a single defect, and it keeps the suite green today
-  without letting the bug be forgotten.
-- **tracking:** `docs/PROD_BUG_LOG.md` PBUG-20260812-02 (status OPEN -- root
-  cause proven and reproduced, production trigger not yet located).
-- **exit condition:** the writer lane renames the field (root fix) or gives it a
-  default (containment). Delete the `xfail` marker in that same commit; the
-  three characterization tests beside it stay, and
-  `::test_the_rule_finds_exactly_the_known_offender_and_no_other` will need its
-  expected list updated to `[]`.
+**The mechanism worked exactly as designed, and is worth keeping as the pattern.**
+`strict=True` meant that fixing `CastShape.register` made the test PASS, which
+failed the suite and forced the marker out in the same change. The bug could not
+be quietly forgotten and the marker could not outlive its cause. That is the
+lane matrix's strict unexpected-pass discipline applied to a single defect.
 
-The suite's headline therefore reads **1 xfailed -> 2 xfailed** from
-2026-08-12. The other is long-standing.
+What replaced it is stronger than the original rule: the general check now
+sweeps EVERY pydantic model reachable under `nodes/` (92 of them) and asserts no
+field default can fail `json.dumps`, with a companion test proving the sweep
+actually found the models so a broken import cannot make it vacuously green.
+See `docs/PROD_BUG_LOG.md` PBUG-20260812-02 (status FIXED).
+
+The suite's headline is therefore back to **1 xfailed**, the long-standing one,
+after briefly reading 2 xfailed on 2026-08-12.
 
 `EXPECTED_FAILED_NODEIDS` in `tests/conftest.py` is the executable authority;
 this file is its human-readable ledger, and the conftest guard names both.
