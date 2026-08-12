@@ -19,7 +19,7 @@
     "humo_1.7B_169": "admission NOT enforced: inherits the 1.7B tier's missing cost row and has no landscape receipt of its own at any rung.",
     "humo_14B_169": "admission NOT enforced: the ruled hero cast has a measured 13.06 GiB warm landscape f97 receipt under the diet boot, but a receipt is not a qualified cost row and nothing refuses an over-budget plan on this lane today.",
     "ltx_audio_in": "admission NOT enforced: no cost row. **MARGINAL** (operator decision rule, row 7b, 2026-08-11): this lane clears the 14,500 MB ceiling by only 115 MB (0.11 GiB) on its ltx_av_diet boot, which is UNDER the 0.3 GiB threshold, so it is flagged marginal rather than passed. Both numbers, same recipe / canvas / frames / still, cold, VramPeakProbe maxima: default boot 14,465 MB absolute; ltx_av_diet boot 14,385 MB absolute / 11,872 MB net. The diet bought only 80 MB because the reserve half of the lever is INERT on this lane -- the adapter's own in-process 4.0 GB EXTRA_RESERVED_VRAM dominates any boot --reserve-vram for the whole render window -- so only --disable-pinned-memory was available. Output is BYTE-IDENTICAL between the two boots (sha256 36902e04...), so the diet costs nothing in quality. The affine FIT stays CUT for LTX (non-monotonic HQ ladder); this lane needs conservative ABSOLUTE envelopes.",
-    "ltx_video": "admission NOT enforced: no cost row, and its only datapoint is a FAILED chained diagnostic at 832x448 -- not the 832x480 it declares, and not a single-render number at all.",
+    "ltx_video": "admission NOT enforced: no cost row. The 'only datapoint is a FAILED chained diagnostic at 832x448' is CLOSED by lane 9 (2026-08-11): 15,916 MB absolute / 13,313 MB net, cold, at 1024x576x169 in 147.5 s, a VramPeakProbe MAXIMUM -- this adapter's first real peak, since both render paths were probe-less or lossy until the lane fixed them. That qualifies the `high` MARKER against its own sibling (ltx23_low_audio_in, 11,872 MB net, same stack and canvas); it is still not a cost row, and nothing refuses an over-budget plan on this lane today. TWO THINGS THE NUMBER DOES NOT SAY. It is not a fit promise: 15,916 MB absolute is OVER the 14.5 GiB working ceiling and reaches 97.6% of this 16 GB card, so the lane has no measured headroom at f169 and no diet boot has been tried on it. And the ladder below 169 is proven to DECODE, not proven to fit a budget -- the band sweep measured decode legality, and its peaks (13.1-13.9 GiB net) are close enough to the f169 figure that frame count is clearly not the dominant term on this lane, unlike the HuMo family.",
     "ltx_8gb": "admission NOT enforced: no cost row. The 'NO measurement of any kind on this box' that made its low/high marker provisional is CLOSED by lane 8 (2026-08-11): 9,106 MB absolute / 6,835 MB net, cold, at 512x288x161 in 22.1 s, a VramPeakProbe maximum. That qualifies the `low` MARKER; it is still not a cost row, and nothing refuses an over-budget plan on this lane today. Note what the number does NOT say: 6.8 GiB net is not a promise that the lane fits an 8 GB card, which is the exact claim the retired `8gb` token made without evidence.",
     "mesh_stage": "admission NOT enforced: no cost row; the lane's real preflight gap is the ungated hy3d graph, not a VRAM envelope."
   },
@@ -559,6 +559,64 @@
       "seeds_cost_row": true,
       "receipt": "docs/evidence/lane_receipts/lane07-ltx23_low_audio_in.md",
       "note": "ROW 7b, the operator-ordered diet leg. Paired with this lane's default-boot leg above: same recipe, canvas, frames and still, only the boot differs. --disable-pinned-memory PROVEN in the live process argv. Improvement 80 MB; margin 115 MB, MARGINAL under the 0.3 GiB rule. The rendered clip is BYTE-IDENTICAL to the default-boot one (same sha256), which is stronger parity evidence than HuMo's by-eye ruling and means the diet is free."
+    },
+    {
+      "lane": "ltx_video",
+      "public_id": "ltx23_high_video",
+      "canvas": "1024x576",
+      "model_frames": 169,
+      "delivered_frames": 169,
+      "boot_lane": "default",
+      "cache_state": "cold",
+      "surface": "absolute device total (VramPeakProbe max)",
+      "absolute_peak_mb": 15916,
+      "baseline_mb": 2603,
+      "net_mb": 13313,
+      "wall_time_s": 147.5,
+      "seeds_cost_row": true,
+      "receipt": "docs/evidence/lane_receipts/lane09-ltx23_high_video.md",
+      "note": "LANE 9's marker leg, and the FIRST vram_peak_mb this adapter has ever produced. Both of its render paths were probe-less until this lane: `render_clip` gained a VramPeakProbe earlier but `_render_clip_hq` -- the path the installed dev-family unet actually routes to -- had none, and `_clip_from_raw` dropped five of the seven receipt fields besides. render_driver substitutes `_mc.vram_used_mb()` when the peak is absent, so this leg would have reported 4,124 MB: a 3.9x UNDERSTATEMENT of the real peak, shaped exactly like a peak. That is the L10 PROVENANCE rule with a number attached. NOTE THE SURFACES (L7): 15,916 MB absolute is OVER the 14.5 GiB working ceiling and 13,313 MB net is under it. The cost-row surface is NET by the 2026-08-11 ruling; neither figure is quotable without naming which. This is the most expensive LTX 2.3 lane by net, which is what the `high` marker states."
+    },
+    {
+      "lane": "ltx_video",
+      "public_id": "ltx23_high_video",
+      "canvas": "1024x576",
+      "model_frames": "sweep: 9, 49, 97, 121, 137",
+      "delivered_frames": "9, 49, 97, 121, 137 -- every rung PROBED, exact",
+      "boot_lane": "default + OTR_LTX_VIDEO_PREQUALIFICATION=1",
+      "cache_state": "cold boot, warm within the sweep",
+      "surface": "absolute device total (VramPeakProbe max)",
+      "absolute_peak_mb": {
+        "f9": 14670,
+        "f49": 14823,
+        "f97": 14823,
+        "f121": 15139,
+        "f137": 15431
+      },
+      "baseline_mb": {
+        "f9": 1566,
+        "f49": 1590,
+        "f97": 1596,
+        "f121": 1528,
+        "f137": 1528
+      },
+      "net_mb": {
+        "f9": 13104,
+        "f49": 13233,
+        "f97": 13227,
+        "f121": 13611,
+        "f137": 13903
+      },
+      "wall_time_s": {
+        "f9": 60.5,
+        "f49": 75.4,
+        "f97": 95.7,
+        "f121": 110.5,
+        "f137": 120.5
+      },
+      "seeds_cost_row": false,
+      "receipt": "docs/evidence/lane_receipts/lane09-ltx23_high_video.md",
+      "note": "LANE 9 LEG 1 -- S8b-14 answered at its ROOT. Every clip stamps `+prequalification[min_decode_frames=9]`, so no row here can be mistaken for a production leg, and `seeds_cost_row` is FALSE for the same reason: these are DECODE-BAND measurements, not envelope rows. THE RESULT: the band is OPEN at the declared 1024x576. f121 and f137 -- the exact pair that raises the wrapper's tensor 256-vs-128 (dim 1) mismatch at 1472x832 -- both decode clean here, as does f9, the ladder's bottom rung. So the 169 decode floor is CANVAS-DEPENDENT: real at 1472x832, absent at 1024x576. The floor moved to 9 and the contract became the honest 8n+1 `min_frames=9, quantum=8`. CROSS-CHECK: the f49 sweep clip is BYTE-IDENTICAL (sha256 50e0bb305506faa3de77234ae8c794d5ff2c338e083dab86f184dc3395b5984c) to the post-change production smoke that asked for 50 frames on a boot with no consent act at all -- so the env-forced floor and the shipped default render the same bytes, and the sweep measured the real thing."
     }
   ]
 }

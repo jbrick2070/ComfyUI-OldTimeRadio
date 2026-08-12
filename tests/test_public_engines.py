@@ -22,11 +22,12 @@ from nodes._otr_workflow_apply import (
     _is_engine_director_admissible, apply_profile, build_offline_schemas)
 
 _TIER = {
-    "ltx23_16gb_video": "ltx_video",
     # The low/high convention (operator ruling 2026-08-09) lands ONE LANE AT A
     # TIME with the video transplant, not as a family sweep -- so this dict
-    # grows by one row per lane and the `<vramtier>gb` rows above retire as
-    # their own lanes close. Lane 1, 2026-08-11: wan_i2v.
+    # grew by one row per lane and the `<vramtier>gb` rows retired as their own
+    # lanes closed. Lane 9 (2026-08-11) retired the LAST of them
+    # (`ltx23_16gb_video`), so every row below is now a low/high id.
+    # Lane 1, 2026-08-11: wan_i2v.
     "wan22_high_i2v": "wan_i2v",
     # Lane 2, 2026-08-11: the ruled hero cast. The id states audio_in and the
     # aspect because a bare `humo14_high_face` hid which way its sibling
@@ -54,6 +55,13 @@ _TIER = {
     # lane 6's fastwan_8gb. `low` is measured here (6,835 MB net, cold, at
     # 512x288x161), not inherited from the `8gb` token it replaces.
     "ltx098_low_video": "ltx_8gb",
+    # Lane 9, 2026-08-11: the third MOVE, and the last `16gb` token retires with
+    # it. `high` is measured against its own SIBLING on the same stack and
+    # canvas -- 13,313 MB net here against ltx23_low_audio_in's 11,872 -- not
+    # against a card. The retired token was wrong in the opposite direction from
+    # `8gb`: "16GB" read as a comfortable fit for a 16 GB card while the render
+    # peaks at 97.6% of one.
+    "ltx23_high_video": "ltx_video",
 }
 
 

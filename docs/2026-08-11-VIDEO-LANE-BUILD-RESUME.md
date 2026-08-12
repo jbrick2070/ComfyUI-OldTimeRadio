@@ -5,10 +5,10 @@ Everything else you need is linked from those two.
 
 ## Where it stands
 
-**8 of 21 lane packets confirmed working and pushed, covering 8 distinct
-engines across 9 live legs. Lane 9 is OPEN with two measurement legs due.
-Nothing else is in flight; the working tree carries only other windows'
-files.**
+**9 of 21 lane packets confirmed working and pushed, covering 9 distinct
+engines across 16 live legs. Lane 10 (`mesh_stage`) is NEXT and is the most
+defective lane left -- 4 red gates. Nothing is in flight; the working tree
+carries only other windows' files.**
 
 | # | Lane | State |
 |---|---|---|
@@ -22,7 +22,8 @@ files.**
 | 7 | `ltx23_low_audio_in` (`ltx_audio_in`) | DONE `57665ee8` -- live 1024x576 f193 |
 | 7b | `ltx_audio_in` headroom | DONE `310437ae` -- MARGINAL, 115 MB, diet boot shipped |
 | 8 | `ltx098_low_video` (`ltx_8gb`) | DONE `c6a99764` -- live 512x288 f161 |
-| 9 | `ltx23_high_video` (`ltx_video`) | **OPEN -- two measurement legs due** |
+| 9 | `ltx23_high_video` (`ltx_video`) | DONE -- both legs run; floor 169 -> 9 |
+| 9b | `ltx_video` headroom | **OPEN** -- no diet boot ever tried, no headroom at f169 |
 | 10-21 | mesh, 4 viz, 4 still, H3 trio | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
 
@@ -67,7 +68,35 @@ NOT transfer and the lever is nearly exhausted here.
 "Confirmed working" = built, 7/7 preflight gates green, a live render smoked and
 PROBED (canvas, exact frame count, silence, no trim), full suite green, pushed.
 
-## Lane 9 is OPEN: `ltx23_high_video` (`ltx_video`) -- MEASUREMENT, not gates
+## LANE 9 CLOSED 2026-08-11 -- both legs run, and they moved the contract
+
+Full write-up: `docs/evidence/lane_receipts/lane09-ltx23_high_video.md`.
+
+* **The lane could not have reported an honest number.** `_render_clip_hq` --
+  the path this box's dev-family unet actually routes to -- had no
+  `VramPeakProbe` and never called `_clip_telemetry`, and `_clip_from_raw`
+  dropped five of seven receipt fields. `render_driver` substitutes an
+  instantaneous sample for a missing peak, so the marker leg would have
+  reported **4,124 MB** instead of **15,916 MB**. New lesson **L15**.
+* **The marker:** 15,916 MB absolute / **13,313 MB net**, cold, 1024x576x169,
+  147.5 s. State the surface: absolute is OVER the 14.5 GiB ceiling (97.6% of
+  the card), net is under. `high` is measured against its SIBLING
+  (`ltx23_low_audio_in`, 11,872 net), not against a card.
+* **S8b-14 resolved at its root.** The band at 1024x576 is OPEN --
+  f9/f49/f97/f121/f137 all decode clean, including the exact pair that FAILS at
+  1472x832. The floor was a canvas-dependent decode constraint, not a look
+  choice: 169 -> 9, contract now `min_frames=9, max_frames=169, quantum=8`.
+  New lesson **L16**. A 2 s beat renders 49 frames in 75.4 s instead of 169 in
+  147.5 s and discards nothing.
+* **Operator gated the look change on eyes:** the solo smoke is a SHORT-BEAT
+  A/B (`ab_BEFORE_vs_AFTER_f49.mp4` in the lane smoke dir). A short render is a
+  re-paced COMPLETE arc, not the truncation of a long one. One constant
+  reverses it.
+* Naming MOVE `ltx23_16gb_video` -> `_LEGACY_ENGINE_ALIASES`, retiring the
+  **last `16gb` token**; verified live on the server (28 menu rows, all four
+  spellings resolve, retired id absent from the menu).
+
+## The lane 9 material that used to live here -- MEASUREMENT, not gates
 
 Its preflight rows were already green before the lane started, so there is no
 gate to flip. What landed in `7afe40e5`, all of it prerequisite:
@@ -84,7 +113,8 @@ gate to flip. What landed in `7afe40e5`, all of it prerequisite:
 - the L4 receipt fields it never produced. Without them a measurement has
   nowhere to stamp departures and no peak to report.
 
-**STILL DUE -- two live legs:**
+**BOTH LEGS ARE NOW RUN -- the list below is kept as the record of what was
+asked for, and the section above records what each answered:**
 
 1. the **decode band at 1024x576** under the consent act, to answer S8b-14 at
    its ROOT. The 169 floor is canvas-dependent and was measured at 1472x832, so

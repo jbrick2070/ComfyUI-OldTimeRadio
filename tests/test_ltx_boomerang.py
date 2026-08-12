@@ -116,9 +116,23 @@ def test_NO_ENVIRONMENT_VALUE_can_restore_the_mirror(monkeypatch, value):
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", value)
     monkeypatch.setenv("OTR_LTX_LOOP_MIN_DECODE_FRAMES", "97")
     # The half-length the mirror used to render was 97. The surviving resolver
-    # must still answer the FULL declared length whatever these knobs say.
-    assert mod._ltx_frame_length(169, 25) == 169
-    assert mod._ltx_frame_length(9, 25) == 169
+    # must still answer the FULL asked length whatever these knobs say.
+    #
+    # ASSERTED AGAINST THE ASK, NOT AGAINST THE DECODE FLOOR (lane 9,
+    # 2026-08-11). This read `_ltx_frame_length(9, 25) == 169` and passed for a
+    # reason that had nothing to do with mirrors: EVERY ask returned 169,
+    # because the decode floor raised it. The floor moved to 9 when lane 9
+    # measured the band open at 1024x576, and this test went red -- correctly,
+    # and while proving nothing about mirrors either way.
+    #
+    # What actually distinguishes "no mirror" is that the resolver never returns
+    # HALF of what was asked for a mirror to double back. So ask for lengths and
+    # check the answer is the length, not the half -- an assertion that survives
+    # the floor moving again.
+    for ask in (169, 121, 97, 49, 9):
+        assert mod._ltx_frame_length(ask, 25) == ask, (
+            "ask %d came back as something else -- a halved return is the "
+            "mirror's signature" % ask)
     # And there is no gate left to consult them.
     assert not hasattr(LtxVideoEngine, "_loop_via_reverse")
     assert not hasattr(LtxVideoEngine, "_loop_fill_allowed")
@@ -165,11 +179,26 @@ def test_BOTH_render_paths_declare_none_UNCONDITIONALLY():
 def test_the_ADAPTER_still_renders_forward_only_lengths():
     """CONTROL -- the deletion must not have taken the length resolver with it.
 
-    ``_ltx_frame_length`` is the surviving authority and it only ever RAISES a
-    short ask to the decode floor; it never halves one for a mirror to double
-    back. A beat this adapter cannot cover in one render is split by coverage
-    planning into chained forward segments.
+    ``_ltx_frame_length`` is the surviving authority. It caps a long ask, raises
+    an ask below the decode floor, and snaps to 8n+1; it never halves one for a
+    mirror to double back. A beat this adapter cannot cover in one render is
+    split by coverage planning into chained forward segments.
+
+    THE FLOOR IS READ FROM THE MODULE, NOT WRITTEN AS 169 (lane 9, 2026-08-11).
+    The old body asserted `_ltx_frame_length(9, 25) == 169`, which stopped being
+    true when lane 9 measured the decode band open at the declared 1024x576 and
+    moved the floor to the bottom of the ladder. Derived here so the number can
+    move again -- the INVARIANT is "an ask below the floor comes back AT the
+    floor", and that outlives any particular floor.
     """
     assert hasattr(mod, "_ltx_frame_length")
-    assert mod._ltx_frame_length(9, 25) == 169     # raised to the decode floor
-    assert mod._ltx_frame_length(169, 25) == 169   # the one legal length
+    floor = mod._LTX_DECODE_FLOOR_DEFAULT
+    cap = mod._LTX_MAX_FRAMES_DEFAULT
+    # below the floor -> raised to it (identity when the floor is the ladder's
+    # own bottom, which is what an open decode band means)
+    assert mod._ltx_frame_length(mod._LTX_MIN_FRAMES, 25) == max(
+        floor, mod._LTX_MIN_FRAMES)
+    # at the cap -> the cap, unhalved
+    assert mod._ltx_frame_length(cap, 25) == cap
+    # above the cap -> capped, never mirrored up to it
+    assert mod._ltx_frame_length(cap + 200, 25) == cap

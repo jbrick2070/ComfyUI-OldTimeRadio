@@ -138,14 +138,32 @@ def _env_int(name, default, floor):
     return val
 
 
-#: The DECODE floor (round 5, ticking_lab + r5b live catches): at the
-#: 1472x832 landscape canvas the installed wrapper's VAEDecode survives ONLY
-#: in its tiled band -- 169f and 233f decode clean, 121f and 137f raise the
-#: tensor 256-vs-128 (dim 1) mismatch. Short asks are RAISED to the floor
-#: (safe: the composite TRUNCATES long sources to the beat window), long asks
-#: are CAPPED. With both defaults at 169, every landscape LTX clip renders
-#: the one proven length.
-_LTX_DECODE_FLOOR_DEFAULT = 169
+#: The DECODE floor -- AND IT IS CANVAS-DEPENDENT, which is the whole lesson
+#: here (S8b-14 resolved at its root, lane 9, 2026-08-11, operator ruled).
+#:
+#: THE HISTORY, because the number was never arbitrary. At the 1472x832
+#: landscape canvas the installed wrapper's VAEDecode survives ONLY in its
+#: tiled band -- 169f and 233f decode clean, 121f and 137f raise the tensor
+#: 256-vs-128 (dim 1) mismatch. So 169 was a real, measured DECODE CONSTRAINT
+#: at that canvas. It was never a look choice, and that distinction is what
+#: made it moveable once the canvas moved.
+#:
+#: THE MEASUREMENT that moved it. Lane 9 swept the ladder at the DECLARED
+#: 1024x576 under `OTR_LTX_VIDEO_PREQUALIFICATION`, and the band is OPEN:
+#: f9, f49, f97, f121 and f137 all decode clean and PROBE their exact frame
+#: count -- including f121 and f137, the precise pair that FAILED at 1472x832.
+#: Receipts in `docs/evidence/lane_receipts/lane09-ltx23_high_video.md`.
+#:
+#: THE RULE THIS LEAVES BEHIND, and it is the reason this comment is long:
+#: **THE FLOOR DOES NOT TRAVEL WITH THE CONSTANT -- IT TRAVELS WITH THE
+#: CANVAS.** 169 was true at 1472x832 and is false at 1024x576, measured both
+#: times. If this lane's `render_canvas` moves again, this number is UNKNOWN
+#: at the new canvas until it is swept again; it must NOT be assumed to carry
+#: over, in either direction. That is the same shared-mechanism lesson as the
+#: /64 stage-A defect (L13) one layer up: a canvas change can invalidate a
+#: constant that no one edited. `assert_env_matches_contract` already REFUSES
+#: an env canvas that disagrees with the declaration for exactly this reason.
+_LTX_DECODE_FLOOR_DEFAULT = 9
 
 
 #: THE CONSENT ACT (lane 9, 2026-08-11). ``eng_ltx_8gb``, ``wan_ti2v`` and
@@ -300,19 +318,25 @@ def _ltx_frame_length(target_frame_count, fallback):
     # have their own decode behavior) -- the floor never exceeds the cap.
     floor = min(floor, cap)
     if length < floor:
-        # THE TRIM RATIO, LOUD (S8b-14, lane 9, 2026-08-11). The floor is not
-        # moved in this commit by operator ruling -- whether 169 is right at the
-        # newly declared 1024x576 is UNMEASURED, and the 169 band was measured
-        # at 1472x832 -- so the COST is made visible instead of guessed away.
-        # A 50-frame beat renders 169 and the composite truncates 119 of them:
-        # ~3.4x the GPU work, and until this line it was untracked.
+        # THE TRIM RATIO, LOUD. At the declared 1024x576 this branch is now
+        # UNREACHABLE for any legal ask -- the floor is `_LTX_MIN_FRAMES`, the
+        # bottom of the ladder, because lane 9 swept the band and found it open
+        # (S8b-14 resolved). It is kept, not deleted, for the two cases that
+        # can still reach it: an operator raising the floor by env under the
+        # consent act, and a future canvas where the decode band closes again.
+        #
+        # Deleting it would have been the tempting tidy-up and the wrong one:
+        # the cost it makes visible -- a 50-frame beat rendering 169 and the
+        # composite discarding 119, ~3.4x the GPU work -- is exactly what went
+        # untracked for months, and the branch is the only place that can say so.
         _LOG.warning("[eng_ltx_video] frame ask %d below the decode floor %d "
                      "-- raising (the wrapper VAEDecode fails outside its "
-                     "tiled band at this canvas; the composite truncates to "
+                     "tiled band at SOME canvases; the composite truncates to "
                      "the beat window). TRIM RATIO %.2fx: %d of %d rendered "
-                     "frames are discarded. The floor is measured at 1472x832, "
-                     "NOT at the declared canvas -- re-deriving it is its own "
-                     "measurement leg.",
+                     "frames are discarded. THE FLOOR IS CANVAS-DEPENDENT: it "
+                     "is 169 at 1472x832 and 9 at the declared 1024x576, both "
+                     "measured. If this fires at a canvas nobody swept, sweep "
+                     "it rather than trusting the constant.",
                      length, floor, float(floor) / max(1, length),
                      floor - length, floor)
         length = floor
@@ -550,8 +574,31 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: the drift silently.
     #: ltx_8gb never had this defect: it has no decode floor, its declaration
     #: matches its runtime, and its leg passes.
+    #:
+    #: 169 -> 9 (S8b-14 RESOLVED AT ITS ROOT, lane 9, 2026-08-11, operator
+    #: ruled). ``min_frames=169`` was TRUE while ``_ltx_frame_length`` raised
+    #: every short ask to a 169 decode floor -- and the 2026-08-01 note above is
+    #: still exactly right about why the declaration had to say so. What changed
+    #: is the RUNTIME, not the doctrine: the floor was a decode constraint
+    #: measured at 1472x832, lane 9 swept the ladder at the declared 1024x576,
+    #: and f9/f49/f97/f121/f137 all decode clean. So the honest declaration for
+    #: an 8n+1 engine -- ``min_frames=9, quantum=8``, legal lengths 9+8k -- is
+    #: true again, and it is true because the runtime was fixed rather than
+    #: because the declaration was relaxed to fit.
+    #:
+    #: WHAT THIS BUYS, measured rather than argued: a 2 s beat asked for 50
+    #: frames and rendered 169, then the composite discarded 119 of them --
+    #: ~3.4x the GPU work and 147.5 s. It now renders 49 in ~75 s. And the
+    #: DELIVERED LOOK changes with it: a short beat used to show the truncated
+    #: opening of a 6.76 s motion arc and now shows a COMPLETE one, which is a
+    #: real visible change and is why the operator gated it on an A/B smoke
+    #: rather than on the arithmetic (receipt lane09).
+    #:
+    #: READ ``_LTX_DECODE_FLOOR_DEFAULT``'s comment before touching either
+    #: number: the floor is CANVAS-DEPENDENT and does not travel with the
+    #: constant.
     frame_contract = FrameContract(
-        min_frames=169,
+        min_frames=9,
         max_frames=169,
         quantum=8,
         native_fps=25,
@@ -571,17 +618,20 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: number. THE 169 FLOOR WAS MEASURED AT 1472x832, NOT HERE -- "at the
     #: 1472x832 landscape canvas the installed wrapper's VAEDecode survives ONLY
     #: in its tiled band; 169f and 233f decode clean, 121f and 137f raise the
-    #: tensor 256-vs-128 mismatch". At 832x480 the loop path's own note records
-    #: that 97f "decodes clean", so the floor is very likely NOT required at the
-    #: canvas production actually uses.
+    #: tensor 256-vs-128 mismatch".
     #:
-    #: The contract still declares 169 because ``_ltx_frame_length`` applies that
-    #: floor UNCONDITIONALLY, whatever the canvas -- so 169 is what this adapter
-    #: really renders today, and a declaration must describe the runtime rather
-    #: than the intent. Making the floor canvas-aware would let this engine take
-    #: shorter beats at 832x480 and cut a lot of trimmed work, but it needs its
-    #: own decode measurements at this canvas, which cost GPU time and are not a
-    #: thing to guess at while a campaign is running. Tracked, not assumed.
+    #: THE PARAGRAPH THAT USED TO SIT HERE IS GONE, and what it said is worth a
+    #: line. It read "the contract still declares 169 ... making the floor
+    #: canvas-aware would let this engine take shorter beats at 832x480 and cut
+    #: a lot of trimmed work, but it needs its own decode measurements at this
+    #: canvas ... Tracked, not assumed." That was correct and it was DISCHARGED:
+    #: lane 9 ran those measurements at the declared canvas and the floor is now
+    #: 9. It is deleted rather than kept because it described a canvas (832x480)
+    #: and a floor (169) that BOTH moved afterwards, so leaving it meant this
+    #: docblock contradicted itself twice over -- and a stale paragraph beside a
+    #: current one is worse than no paragraph, because a reader cannot tell
+    #: which half to trust.
+    #:
     #: 832x480 -> 1024x576 (OPERATOR RULING, lane 9, 2026-08-11). The HQ
     #: two-stage path renders stage A at exactly half the canvas and upsamples
     #: with a FIXED-x2 `LTXVLatentUpsampler` that takes no target size, so both
@@ -595,12 +645,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     #: default and silently became illegal when the lane moved to 832x480 --
     #: and nobody rechecked the two-stage geometry against the new canvas.
     #:
-    #: THE DECODE FLOOR IS DELIBERATELY NOT MOVED WITH IT. `frame_contract`
-    #: still declares 169 and the env refusal still stands. Whether 169 is the
-    #: right floor AT 1024x576 is UNMEASURED -- the 169 band was measured at
-    #: 1472x832 -- and bundling that guess into a canvas fix is exactly what
-    #: the operator forbade. It gets its own leg. Until then the trim ratio is
-    #: logged LOUD on every render so the cost is visible rather than silent.
+    #: THE DECODE FLOOR WAS DELIBERATELY NOT MOVED WITH IT -- and then it got
+    #: its own leg, which is the point of having said so. Lane 9 swept the
+    #: ladder AT this canvas under the consent act and the band is open, so the
+    #: floor is now 9 and `frame_contract` declares `min_frames=9, quantum=8`.
+    #: Separating the two was right: the canvas fix rested on arithmetic that
+    #: needed no GPU, and the floor rested on a measurement that could not be
+    #: guessed. Bundling them would have shipped one proof and one hope.
+    #:
+    #: THE COUPLING IS PERMANENT, THOUGH, AND IT RUNS THE OTHER WAY TOO: the
+    #: decode band is a property OF THE CANVAS. Moving `render_canvas` again
+    #: invalidates the floor measurement, so a canvas move owes a fresh sweep
+    #: before it can keep `min_frames=9`. See `_LTX_DECODE_FLOOR_DEFAULT`.
     render_canvas = (1024, 576)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
@@ -1584,9 +1640,26 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             width // 2, height // 2, width, height, length,
             os.path.basename(init_path))
         graph = self._build_graph_hq(plan, length, width, height, image_name)
-        results = _wb.run_graph(graph, classes, free_after_use=True,
-                                keep={"unet", "lora", "decode"})
-        images = results["decode"][0]
+        # THE PROBE BELONGS ON BOTH PATHS, and this one is the path that runs
+        # (lane 9, 2026-08-11). `render_clip` was given a VramPeakProbe and this
+        # sibling was not -- while the installed unet on this box is
+        # `ltx-2.3-22b-dev-Q3_K_M.gguf`, which `_detect_recipe` routes to
+        # hq_two_stage. So the probed lane does not render and the lane that
+        # renders was not probed.
+        #
+        # Worse than a missing number: `render_driver` reads
+        # `clip.get("vram_peak_mb") or _mc.vram_used_mb()`, so the absence was
+        # silently filled in by an INSTANTANEOUS post-render sample shaped
+        # exactly like a peak. Per L10 PROVENANCE a sample is a LOWER BOUND and
+        # may never seed a cost row -- a row built on one under-predicts, which
+        # admits renders that then OOM. A missing peak has to STAY missing.
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
+        try:
+            results = _wb.run_graph(graph, classes, free_after_use=True,
+                                    keep={"unet", "lora", "decode"})
+            images = results["decode"][0]
+        finally:
+            render_peak = probe.stop()
         bucket = prepared.setdefault("patchers", self._patchers) \
             if isinstance(prepared, dict) else self._patchers
         model = results.get("lora", (None,))[0]
@@ -1605,7 +1678,14 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         return {"out_path": path, "frame_count": n,
                 "ltx_recipe": RECIPE_HQ_TWO_STAGE,
                 "native_frame_count": n,
-                "extension_mode": "none"}
+                "extension_mode": "none",
+                "vram_peak_mb": render_peak,
+                # `_clip_telemetry` carries the prequalification suffix, so a
+                # MEASUREMENT clip off this path names its own departures. That
+                # is the consent act's whole safety property, and it was
+                # reachable only from the sibling -- i.e. only from the recipe
+                # this box does not run.
+                **self._clip_telemetry(width, height)}
 
     def canonicalize(self, raw, request, profile):
         """Normalize a rendered clip into the ALWAYS-SILENT bt709 / yuv420p
@@ -1657,6 +1737,24 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             # does this adapter.
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
+            # AND THE COMMENT ABOVE WAS RIGHT ABOUT A LIST IT DID NOT FINISH
+            # (lane 9, 2026-08-11). It names the exact failure -- "a field this
+            # method does not copy is a field render_beat_coverage never sees" --
+            # and then copied two of the seven, so `vram_peak_mb`, `recipe`,
+            # `quant`, `use_lora` and `render_canvas` died here even on the
+            # single-pass path that measured them properly. The receipt work
+            # landed in `render_clip` + `_clip_telemetry` and stopped one method
+            # short of the seam, which is `eng_ltx_8gb`'s bug happening a second
+            # time inside the file that quotes it.
+            #
+            # Same five keys, same order, as `wan_shared._clip_from_raw` -- that
+            # is the reference shape, and this adapter keeps its own copy of the
+            # seam rather than sharing it, which is what lets it drift at all.
+            "vram_peak_mb": raw.get("vram_peak_mb"),
+            "recipe": raw.get("recipe"),
+            "quant": raw.get("quant"),
+            "use_lora": raw.get("use_lora"),
+            "render_canvas": raw.get("render_canvas"),
         }
 
 

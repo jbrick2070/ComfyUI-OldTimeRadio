@@ -128,11 +128,12 @@ def test_label_suffix_is_aspect_derived():
     assert vd._label_for("humo_1.7B_169") == "humo17_high_audio_in_wide (16:9)"
     # video-tiers (2026-07-20): the four PUBLIC-aliased tier engines show their
     # public menu id (aspect suffix still derived from the internal engine).
-    assert vd._label_for("ltx_video") == "ltx23_16gb_video (16:9)"
-    # ltx_audio_in took its low/high name in lane 7 (2026-08-11); ltx_video
-    # still carries the retiring `16gb` token because its own packet (lane 9)
-    # has not run. Both spellings living here at once is the one-lane-at-a-time
-    # rollout being visible, not a drift.
+    assert vd._label_for("ltx_video") == "ltx23_high_video (16:9)"
+    # ltx_audio_in took its low/high name in lane 7 and ltx_video took its own
+    # in lane 9 (both 2026-08-11), which retired the last `<vramtier>gb` token
+    # in the public table. The mixed spellings this comment used to describe
+    # were the one-lane-at-a-time rollout being visible mid-flight; the rollout
+    # has now reached every renamed lane.
     assert vd._label_for("ltx_audio_in") == "ltx23_low_audio_in (16:9)"
     assert vd._label_for("wan_ti2v") == "wan22_high_video (16:9)"
     # ltx_8gb took its low/high name in lane 8 (2026-08-11). It was the last

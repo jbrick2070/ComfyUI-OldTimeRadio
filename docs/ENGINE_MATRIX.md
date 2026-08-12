@@ -62,7 +62,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
-| ltx_video | local | text_to_video | wide | canvas | 169-169 step 8 | 6.76-6.76 s | 25 | strict_first_frame | yes |
+| ltx_video | local | text_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_flat | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_motion | local | static_motion | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
@@ -210,7 +210,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 | humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
 | ltx_audio_in | single | 1: 449 | 449 | 442 | 0 |
-| ltx_video | chain | 3: 169, 169, 169 | 507 | 442 | 0 |
+| ltx_video | chain | 3: 169, 169, 113 | 451 | 442 | 0 |
 | mesh_stage | single | 1: 442 | 442 | 442 | 0 |
 | still_flat | single | 1: 442 | 442 | 442 | 0 |
 | still_motion | single | 1: 442 | 442 | 442 | 0 |
@@ -249,7 +249,7 @@ and it read exactly like a measured number until someone looked.
 | humo_14B_169 | 97 | safe_render_frames | docs/evidence |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
-| ltx_video | - | contract max | none cited |
+| ltx_video | - | contract max | docs/evidence |
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
 | still_flat | - | contract max | none cited |
 | still_motion | - | contract max | none cited |

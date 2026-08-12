@@ -173,12 +173,20 @@ def test_the_local_ladders_match_their_adapters_named_constants():
                                    _humo._HUMO_MAX_FRAMES)
     assert bounds("ltx_8gb") == (_l8._LTX8_MIN_FRAMES, 161)
     # ltx_video's minimum is its DECODE FLOOR, not the ladder's first rung
-    # (2026-08-01). _LTX_MIN_FRAMES is 9, but nothing in this adapter can
-    # render 9 frames: _ltx_frame_length raises every shorter ask to the decode
-    # floor, so 169 is the only length it produces. Declaring 9 killed a live
-    # leg -- the planner asked for an 89-frame segment and the engine returned
-    # 169, which render_beat_coverage refused as a surplus.
-    assert bounds("ltx_video") == (169, 169)
+    # (2026-08-01). The declaration is a LITERAL in the engine on purpose -- a
+    # FrameContract is static because stills are minted against it before the
+    # render phase -- so THIS assertion is the thing that keeps the literal and
+    # the runtime constant from drifting apart. Asserted against the constants
+    # rather than against numbers, which is this test's whole job.
+    #
+    # The pair was (169, 169) until lane 9 (2026-08-11): the decode floor was a
+    # constraint measured at 1472x832, the lane swept the ladder at the declared
+    # 1024x576, and f9/f49/f97/f121/f137 all decode clean -- so the floor moved
+    # to the bottom of the ladder and `min_frames=9, quantum=8` became the
+    # honest 8n+1 declaration again. Written as constants here so the next
+    # measurement moves one number in the engine, not two in two files.
+    assert bounds("ltx_video") == (_lv._LTX_DECODE_FLOOR_DEFAULT,
+                                   _lv._LTX_MAX_FRAMES_DEFAULT)
     assert bounds("ltx_audio_in") == (_lav._LTX_AV_MIN_FRAMES, 497)
 
 
@@ -479,7 +487,15 @@ def test_ltx_video_REFUSES_when_the_env_moves_what_the_contract_froze():
             _lv.assert_env_matches_contract(contract)
         os.environ.pop("OTR_LTX_MAX_FRAMES")
 
-        os.environ["OTR_LTX_MIN_DECODE_FRAMES"] = str(int(contract.min_frames) - 72)
+        # A disagreeing value that is also IN RANGE. This read
+        # `min_frames - 72`, which was 97 while the floor was 169 and became
+        # -63 when lane 9 moved the floor to 9 -- and `_env_int` clamps a
+        # below-range value back up to `_LTX_MIN_FRAMES`, so the "disagreement"
+        # agreed and the refusal correctly did not fire. Moving UP keeps the
+        # value inside the parser's range at any floor, so the test exercises
+        # the refusal instead of the clamp (lesson L12: a contract-bearing var
+        # must be judged on what it really resolves to).
+        os.environ["OTR_LTX_MIN_DECODE_FRAMES"] = str(int(contract.min_frames) + 40)
         with pytest.raises(fc.ContractEnvConflict):
             _lv.assert_env_matches_contract(contract)
     finally:

@@ -970,3 +970,141 @@ it between the adapter and the file.
 **Twin assertion:** the passthrough in `render_driver._clip_summary`, plus
 `seeds_cost_row` in `docs/evidence/video_evidence_manifest.json` so an
 unqualified number cannot be picked up by accident.
+
+---
+
+## L15 -- A fix lands on the path you TESTED, not the path that RUNS
+
+**Check:** when an adapter has more than one render path, ask which one THIS
+BOX actually takes, and check the fix is on that one. Selection is usually
+implicit -- a recipe detected from a weight's filename, a family probe, an env
+default -- so the running path is a property of the installed models, not of
+the code you are reading.
+
+**Symptom:** none from the CPU suite, which exercises both paths equally
+happily with fakes. The gap only appears on a live leg, and only if something
+downstream fails LOUD. If the missing thing has a fallback, nothing appears at
+all.
+
+**Root cause:** `eng_ltx_video` has two render paths. `render_clip` got a
+`VramPeakProbe` and a `_clip_telemetry` call; `_render_clip_hq` got neither.
+`_detect_recipe` routes a `ltx-2.3-22b-dev-*` unet to `hq_two_stage`, and that
+is the unet installed here -- so the probed path never runs and the running
+path was never probed. The commit that added the receipt fields said, in its
+own message, that it added them "because lane 9 cannot measure without them".
+
+**And the fallback is what made it invisible AND dangerous.** `render_driver`
+reads `clip.get("vram_peak_mb") or _mc.vram_used_mb()`, so a missing peak is
+replaced by an instantaneous post-render sample that is shaped exactly like a
+peak. Measured on the live leg: the substitute read **4,124 MB** where the true
+probe maximum was **15,916 MB** -- a 3.9x understatement that would have seeded
+a cost row, and a cost row built on a lower bound admits renders that then OOM.
+An `or` that reaches for a weaker source is how a lane reports a number it
+never measured.
+
+**Origin (lane 9, 2026-08-11):** found by reading this ledger before writing
+code, which is step 1 of the per-lane loop. No GPU time was spent discovering it.
+
+**Runnable check:** for each adapter, list its render paths, resolve which one
+the INSTALLED weights select, and assert the receipt fields on THAT one. Then
+assert that a raw return with no peak canonicalizes to `None` rather than to a
+substitute -- "I could not measure" must not be spellable as a number (L14, one
+layer down).
+
+**Twin assertion:** `tests/test_ltx_video_receipt_seam.py` -- the peak test pins
+a probe SPY's sentinel rather than `is not None`, because `is not None` passes
+on the GPU box against the very fallback it exists to forbid.
+
+---
+
+## L16 -- A constant measured at one canvas is not a fact about the engine
+
+**Check:** for every magic number an adapter enforces -- a decode floor, a tile
+size, a frame band -- ask WHAT IT WAS MEASURED AGAINST. If the answer is a
+canvas, a rung or a boot the lane no longer uses, the number is unknown at
+today's configuration and must be re-measured rather than inherited.
+
+**Symptom:** silent, expensive, and it looks like caution. `ltx_video` forced
+EVERY beat to 169 frames because 169 was the only length that decoded at
+1472x832. At the declared 1024x576 a 2 s beat rendered 169 frames and the
+composite discarded 119 of them -- ~3.4x the GPU work and 147.5 s instead of
+75.4 s -- to satisfy a constraint that did not exist at that canvas.
+
+**Root cause:** the number was correct when written and nothing re-derived it
+when the canvas moved. Constants do not carry their own provenance, so a
+measured constraint and an arbitrary constant are indistinguishable six months
+later -- and the conservative-looking one never gets challenged.
+
+**Origin (lane 9, 2026-08-11):** swept the ladder at 1024x576 under the consent
+act. f9, f49, f97, f121 and f137 all decode clean -- including f121 and f137,
+the exact pair that FAILS at 1472x832. The floor moved to the bottom of the
+ladder and the contract became the honest `min_frames=9, quantum=8`.
+
+**This is L13 one layer up.** L13 says a defect in a shared mechanism is a
+defect in every adapter sharing it. L16 says a MEASUREMENT is a fact about the
+configuration it was taken at, and a configuration change silently invalidates
+it. Both are "a change over there broke something over here that nobody
+edited"; the /64 stage-A defect and this floor are the same shape.
+
+**The corollary that keeps it honest:** a moved constant needs its own re-sweep
+trigger written down, or the next canvas move repeats this exactly. Both the
+constant and the `render_canvas` declaration now say so in their comments, and
+`assert_env_matches_contract` already REFUSES an env canvas that disagrees with
+the declaration for this reason.
+
+**Runnable check:** grep the adapter for enforced numeric constants; for each,
+the comment must name the canvas/rung/boot it was measured at. A constant with
+no stated provenance is a constant nobody can safely move OR keep.
+
+**Twin assertion:**
+`tests/test_engine_contract_roster.py::test_the_local_ladders_match_their_adapters_named_constants`
+now asserts the declaration against `_LTX_DECODE_FLOOR_DEFAULT` /
+`_LTX_MAX_FRAMES_DEFAULT` rather than against literals, so the next measurement
+moves ONE number in the engine instead of two numbers in two files.
+
+---
+
+## Lane 9 -- `ltx23_high_video` (`ltx_video`), closed 2026-08-11
+
+Preflight was 7/7 green before the lane opened, so this was never gate-flipping:
+two measurements the corpus forbade guessing at, and what they then obliged.
+Both new lessons above are this lane's. Three more things worth the next lane's
+attention.
+
+**What bit (1): six tests went red on the floor move and every one was
+correct.** `test_look_qa_round5.py`'s three `TestLtxFrameCap` cases, two roster
+tests and the ENGINE_MATRIX drift gate. They had all pinned 169 as a LITERAL,
+and two of them were asserting nothing at all once the default moved:
+`test_cap_below_floor_wins` needs a floor ABOVE the cap to mean anything and had
+been riding the old default, and a roster test set
+`OTR_LTX_MIN_DECODE_FRAMES = min_frames - 72`, which was a valid disagreeing 97
+at floor 169 and became **-63** at floor 9 -- clamped back up by `_env_int`, so
+the "disagreement" agreed and the refusal correctly did not fire.
+
+**Runnable check:** a test that derives a value by ARITHMETIC on a tunable
+(`min - 72`, `cap + 80`) must stay in range at every value that tunable can
+take. Prefer moving UP from a floor and DOWN from a ceiling; a derived value
+that falls outside the parser's range gets clamped and the test silently stops
+testing. This is L10 wearing a different hat: the literal was not the only thing
+that went stale, the ARITHMETIC AROUND it did.
+
+**What bit (2): the hand-kept env recipe drifted exactly as L10 predicted.**
+Regenerating the variants after the rename moved
+`otr_16gb_ltx_video.json`'s `master_hash`, and
+`workflows/variants/*.env.json` is NOT generated. The guard lane 5 wrote
+(`test_the_hand_kept_env_recipe_carries_the_LIVE_master_hash`) caught it. A
+guard written by an earlier lane catching a later lane's drift is the ledger
+working exactly as designed, and it is recorded here as evidence of that.
+
+**What did NOT bite:** the weight resolver, the canvas declaration, the Sage
+gate, the node gate, the V-1 self-probe and the admission honesty gate were all
+green before the packet started and stayed green. The only reason this lane had
+work at all is that its two numbers had never been measured on this box.
+
+**A harness trap that is NOT this lane's code, recorded so nobody re-hits it:**
+handing a smoke an init still that already lives in ComfyUI's `input/` directory
+makes `wrapper_bridge.stage_into_comfy_input` copy the file onto itself, which
+on Windows is `PermissionError: [WinError 32]` and kills the render at the
+staging seam before any GPU work, with an error that names nothing about init
+images. Keep a lane's still in the lane's own directory. Flagged for its own
+fix; every in-process adapter shares that helper.

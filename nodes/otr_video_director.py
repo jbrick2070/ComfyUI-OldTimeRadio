@@ -120,9 +120,14 @@ def _label_for(engine_id) -> str:
     or ``'viz_green (16:9) (audio-reactive, no scene image)'``).
 
     Video-tiers (2026-07-20): the visible token is the PUBLIC menu id when the engine
-    has one (``_INTERNAL_TO_PUBLIC``), else the bare internal id -- so the four
-    tier rows read ``wan_8gb`` / ``ltx_8gb`` / ``ltx23_16gb_audio_in`` /
-    ``ltx23_16gb_video`` while every other engine keeps its id. The suffixes are
+    has one (``_INTERNAL_TO_PUBLIC``), else the bare internal id. The four
+    original tier rows read ``wan_8gb`` / ``ltx_8gb`` / ``ltx23_16gb_audio_in``
+    / ``ltx23_16gb_video``; ALL FOUR of those ``<vramtier>gb`` spellings were
+    retired one lane at a time by the video transplant build (lanes 5-9,
+    2026-08-11) and now resolve through ``_LEGACY_ENGINE_ALIASES``, so the live
+    menu reads ``wan22_high_video`` / ``ltx098_low_video`` /
+    ``ltx23_low_audio_in`` / ``ltx23_high_video``. Every other engine keeps its
+    id. The suffixes are
     still DERIVED from the engine's own ``render_aspect`` / family (passed the
     INTERNAL id). Every suffix starts with ``' ('`` so
     :func:`_engine_id_from_pick`'s resolver strips them all and round-trips the label

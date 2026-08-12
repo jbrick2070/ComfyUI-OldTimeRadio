@@ -10,6 +10,11 @@ stay untouched (additive only -- no rename):
     ltx23_16gb_audio_in   -> ltx_audio_in
     ltx23_16gb_video      -> ltx_video
 
+All four of those `<vramtier>gb` spellings are RETIRED (lanes 5-9, 2026-08-11)
+and now live in `_LEGACY_ENGINE_ALIASES`; the live table below carries the
+`<model><version>_<low|high>_<capability>` convention instead. The block above
+is kept as the record of what the build started from.
+
 This module is the SINGLE place that maps a menu/saved/profile string back to the
 concrete internal engine id: it strips the display suffix (`wan_8gb (16:9)`), maps a
 public id to its internal id, THEN maps a renamed engine's legacy id to its current
@@ -28,7 +33,6 @@ from __future__ import annotations
 #: Public menu id -> internal engine id (the four video-tier rows). ltx_8gb maps to
 #: itself (its internal id IS its public id).
 _PUBLIC_ENGINES = {
-    "ltx23_16gb_video": "ltx_video",
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
     # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
     # is RETIRED by operator ruling 2026-08-09: it encoded "the card this lane
@@ -92,6 +96,23 @@ _PUBLIC_ENGINES = {
     # smoke ran, the marker was provisional in the evidence manifest's own
     # words ("NO measurement of any kind on this box").
     "ltx098_low_video": "ltx_8gb",
+    # Lane 9, 2026-08-11 -- the THIRD move, and the LTX 2.3 family closes with
+    # it. `ltx23_16gb_video` MOVED into _LEGACY_ENGINE_ALIASES in the same edit,
+    # same bijection reasoning as lanes 5 and 7.
+    #
+    # `high` is MEASURED, and it is measured against its own sibling rather than
+    # against a card. This lane and `ltx23_low_audio_in` are the same LTX 2.3
+    # 22B stack at the same 1024x576 canvas, so the comparison is like-for-like:
+    # 13,313 MB NET here (15,916 absolute, cold, VramPeakProbe max, at
+    # 1024x576x169) against the audio-in lane's 11,872 MB net. This is the more
+    # expensive of the two, so `high` states the measured cost -- which is the
+    # whole point of the token, and the discipline lane 8 set when it refused to
+    # let `low` mean "runs on an 8 GB card".
+    #
+    # NOTE the surface, per L7: 15,916 MB ABSOLUTE is over the 14.5 GiB working
+    # ceiling; 13,313 MB NET is not. The cost-row surface is NET by the
+    # 2026-08-11 ruling, and neither number is quotable without saying which.
+    "ltx23_high_video": "ltx_video",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -131,6 +152,14 @@ _LEGACY_ENGINE_ALIASES = {
     # the opposite of the truth. Every saved graph, profile and variant
     # carrying the old string still resolves through here.
     "ltx23_16gb_audio_in": "ltx_audio_in",
+    # MOVED out of _PUBLIC_ENGINES in lane 9 (2026-08-11), retiring the last
+    # `16gb` token in the table. Same reason as its audio-in sibling: the token
+    # named the card the lane was built for. It is wrong in the OTHER direction
+    # here -- this lane measures 15,916 MB absolute cold, so "16GB" read as a
+    # comfortable fit for a 16 GB card when the render actually peaks at 97.6%
+    # of one. Every saved graph, profile and variant carrying the old string
+    # still resolves through here.
+    "ltx23_16gb_video": "ltx_video",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -154,7 +183,13 @@ _PUBLIC_LABEL = {
     "wan22_high_fast": (
         "FastWan 2.2 TI2V 5B 3-step - high VRAM (the SAME motion at the "
         "SAME canvas for the SAME VRAM as wan22_high_video, ~2.7x sooner)"),
-    "ltx23_16gb_video": "LTX 2.3 - 16GB Video",
+    # "high" is the measured bucket against its own sibling on the same stack
+    # and canvas, not a quality claim and not a card claim. The rung is named
+    # because f169 is what was measured; the ladder now runs 9..169 step 8 and
+    # the rungs below it are proven to DECODE, not proven to fit a budget.
+    "ltx23_high_video": (
+        "LTX 2.3 22B silent video - high VRAM (13.3 GiB net at 1024x576x169; "
+        "the more expensive of the two LTX 2.3 lanes)"),
     # "low" is the measured bucket and the label says which rung it came from,
     # per the lane-1 convention. Audio-conditioned, so the id says `audio_in`.
     "ltx23_low_audio_in": (
