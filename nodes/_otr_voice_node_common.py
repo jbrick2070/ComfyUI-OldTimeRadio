@@ -45,31 +45,21 @@ def _engine_requires_voice_ref(adapter) -> bool:
 
 def _resolve_ref_to_disk(ref_path):
     """Resolve a voice-bank ref_path (usually relative to the ComfyUI root, e.g.
-    'models/TTS/refs/indextts2/ix_male_warm.wav') to an absolute path. Mirrors the
-    indextts2 adapter's own resolution so this existence check matches what the
-    worker will actually open."""
+    'models/TTS/refs/indextts2/ix_male_warm.wav') to an absolute path.
+
+    DELEGATES to the ONE shared resolver (Lemmy chunk B). It used to be a
+    SECOND, broader implementation of the same question -- this one knew about
+    the migrated ``C:\\ComfyUI-Models`` root and the adapters' private copies did
+    not, so this existence check could confirm a reference the worker then could
+    not open. The docstring even said it "mirrors the indextts2 adapter's own
+    resolution", which had stopped being true. One resolver, one answer.
+
+    Keeps ``None`` for an empty ref, because callers here distinguish "nothing
+    asked for" from "asked for and not found"."""
     if not ref_path:
         return None
-    if os.path.isabs(ref_path):
-        return ref_path
-    rp = ref_path.replace("\\", "/")
-    stripped = rp[len("models/"):] if rp.startswith("models/") else rp
-    candidates = []
-    try:
-        import folder_paths
-
-        md = folder_paths.models_dir
-        candidates.append(os.path.join(os.path.dirname(md), ref_path))  # <base>/models/...
-        candidates.append(os.path.join(md, stripped))                   # <models_dir>/TTS/...
-    except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
-        pass
-    # Known extra models root after the Comfy Desktop 1.0.4 model-path migration.
-    candidates.append(os.path.join("C:\\ComfyUI-Models", stripped))
-    candidates.append(os.path.abspath(ref_path))
-    for c in candidates:
-        if c and os.path.exists(c):
-            return c
-    return candidates[0] if candidates else None
+    from ._otr_audio_engines.base import resolve_voice_ref_path
+    return resolve_voice_ref_path(ref_path)
 
 
 def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
@@ -507,7 +497,26 @@ class OTRVoiceNodeBase:
             # fails closed regardless of what this method answers.
             routes = []
 
-        if not routes:
+        # CALL-TIME NUMERIC PARAMS (Lemmy chunk A1), and they are read BEFORE
+        # the no-routes shortcut because the defect has nothing to do with
+        # routes. `OTR_INDEXTTS2_EMO_ALPHA` changes what a local indextts2 leg
+        # renders, so answering "static" for that leg tells ComfyUI the render
+        # can never change when it just did.
+        #
+        # EMPTY IS THE COMMON CASE and it preserves everything: an engine with
+        # no such knob contributes nothing, so a no-routes ledger still returns
+        # the literal "static" and every shipping local render keeps its exact
+        # in-graph caching behaviour. Only an engine that actually resolves a
+        # knob at render time stops being "static" -- which is the truth about
+        # that engine, and the whole point.
+        render_params = {}
+        try:
+            from ._otr_audio_engines import get_engine as _get_engine
+            render_params = _get_engine(engine).render_time_params() or {}
+        except Exception:  # noqa: BLE001 -- unknown/duck-typed engine
+            render_params = {}
+
+        if not routes and not render_params:
             return "static"
 
         parts = [
@@ -516,6 +525,8 @@ class OTRVoiceNodeBase:
             str(engine or ""),
             str(stereo_policy or ""),
         ]
+        for name in sorted(render_params):
+            parts.append("%s=%s" % (name, render_params[name]))
         for route in sorted(routes, key=lambda r: str(r.get("route_id") or "")):
             runtime = route.get("runtime") or {}
             parts.extend([
@@ -813,6 +824,20 @@ class OTRVoiceNodeBase:
                 # stable_line_seed because params are not in the seed.
                 provider_model_id_stamp = ""
                 provider_voice_stamp = ""
+                # CALL-TIME NUMERIC PARAMS JOIN THE KEY (Lemmy chunk A1).
+                # `profile.default_params` is captured at request-BUILD time; an
+                # adapter that resolves a knob at GENERATE time (indextts2 reads
+                # OTR_INDEXTTS2_EMO_ALPHA from the env per render) therefore
+                # moved the render without moving the key, and the next identical
+                # line replayed audio made under the old value. Merged FIRST so
+                # the adapter's live value wins over a stale profile default of
+                # the same name rather than the other way round. Empty for every
+                # engine that has no such knob, which keeps them byte-identical.
+                line_params = dict(profile.default_params or {})
+                try:
+                    line_params.update(adapter.render_time_params() or {})
+                except Exception:  # noqa: BLE001 -- a duck-typed adapter
+                    pass           # without the hook keys exactly as before
                 if cache_enabled:
                     voice_ref, id_for_key = _resolve_voice_ref_early(
                         adapter, engine, cast, episode_seed, self.ROLE, voice_ref,
@@ -835,7 +860,7 @@ class OTRVoiceNodeBase:
                         cast_lock_revision=cast_lock_revision,
                         sample_rate=sr,
                         channels=1,
-                        params=dict(profile.default_params or {}),
+                        params=line_params,
                         commercial_clean=profile.commercial_clean,
                         provider_model_id=provider_model_id_stamp,
                         provider_voice_id=provider_voice_stamp,
@@ -857,7 +882,7 @@ class OTRVoiceNodeBase:
                         cast_lock_revision=cast_lock_revision,
                         sample_rate=sr,
                         channels=1,
-                        params=dict(profile.default_params or {}),
+                        params=line_params,
                         commercial_clean=profile.commercial_clean,
                         **route_fields,
                     )

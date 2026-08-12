@@ -192,21 +192,36 @@ class IndexTTS2Engine:
             return 1.0
         return min(1.0, max(0.0, a))
 
+    def render_time_params(self) -> dict:
+        """``emo_alpha`` MUST key -- it is resolved per render, from the env.
+
+        THE DEFECT THIS CLOSES (Lemmy chunk A1). ``current_emo_alpha`` is read
+        inside :meth:`generate_voice`, at GENERATE time, while the cache key
+        captured ``profile.default_params`` at REQUEST-BUILD time. So exporting
+        ``OTR_INDEXTTS2_EMO_ALPHA`` changed the RENDER and not the KEY: the next
+        identical line replayed audio made under the previous alpha, and the
+        receipt described a blend the clip does not have. ``IS_CHANGED`` carried
+        no alpha term either, so an in-graph rerun did not save it.
+
+        Resolved through :meth:`current_emo_alpha` -- the SAME function the
+        forward calls -- so the key and the render cannot disagree about the
+        value. Per-render env pickup is preserved exactly: a new request is
+        built per line per render, so a changed env still takes effect on the
+        next render. It now also takes effect on the KEY.
+        """
+        return {"emo_alpha": self.current_emo_alpha()}
+
     # ---- one dialogue line -> mono AUDIO {"waveform","sample_rate"} ----
     def _resolve_ref(self, ref):
         """Bank ref_paths are relative to the ComfyUI root (e.g.
         ``models/TTS/refs/...``). Resolve to an absolute path the isolated worker
-        can open regardless of its own cwd."""
-        if not ref or os.path.isabs(ref):
-            return ref
-        try:
-            import folder_paths
-            cand = os.path.join(os.path.dirname(folder_paths.models_dir), ref)
-            if os.path.exists(cand):
-                return cand
-        except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
-            pass
-        return os.path.abspath(ref)
+        can open regardless of its own cwd.
+
+        DELEGATES to the ONE shared resolver (Lemmy chunk B). This used to be a
+        private copy that tried a single candidate, so it could miss a reference
+        the voice node's own broader check had just confirmed exists."""
+        from .base import resolve_voice_ref_path
+        return resolve_voice_ref_path(ref)
 
     def generate_voice(self, text, ref_clip_path, delivery_vector, seed):
         self.load()

@@ -137,16 +137,10 @@ class DiaEngine:
         return clean_spoken_text(text)
 
     def _resolve_ref(self, ref):
-        if not ref or os.path.isabs(ref):
-            return ref
-        try:
-            import folder_paths
-            cand = os.path.join(os.path.dirname(folder_paths.models_dir), ref)
-            if os.path.exists(cand):
-                return cand
-        except Exception:  # noqa: BLE001
-            pass
-        return os.path.abspath(ref)
+        """DELEGATES to the ONE shared resolver (Lemmy chunk B) -- see
+        ``base.resolve_voice_ref_path``."""
+        from .base import resolve_voice_ref_path
+        return resolve_voice_ref_path(ref)
 
     def _resolve_transcript(self, ref_clip_path):
         """Optional clone transcript for this reference WAV, or "".

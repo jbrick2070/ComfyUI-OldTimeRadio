@@ -138,17 +138,13 @@ class ChatterboxEngine:
 
     def _resolve_ref(self, ref):
         """Resolve a bank ref_path (relative to the ComfyUI root) to an absolute
-        path the isolated worker can open regardless of its own cwd."""
-        if not ref or os.path.isabs(ref):
-            return ref
-        try:
-            import folder_paths
-            cand = os.path.join(os.path.dirname(folder_paths.models_dir), ref)
-            if os.path.exists(cand):
-                return cand
-        except Exception:  # noqa: BLE001 -- non-Comfy contexts (tests / CLI)
-            pass
-        return os.path.abspath(ref)
+        path the isolated worker can open regardless of its own cwd.
+
+        DELEGATES to the ONE shared resolver (Lemmy chunk B) -- see
+        ``base.resolve_voice_ref_path`` for why three private copies was a
+        disagreement waiting to happen."""
+        from .base import resolve_voice_ref_path
+        return resolve_voice_ref_path(ref)
 
     @staticmethod
     def _project(delivery_vector):

@@ -788,10 +788,18 @@ here, because this file is forward-only.
 **WHAT REMAINS ON THE LEMMY SPRINT.** Remediation plan `.gemini/antigravity/brain/c494e2df-.../implementation_plan.md`,
 triaged chunk-by-chunk 2026-08-11:
 
-* **Chunk A1 -- a LIVE cache defect.** `OTR_INDEXTTS2_EMO_ALPHA` is read at
-  generate time while the cache key captures `profile.default_params` at
-  request-build time, so an env override changes the RENDER without changing the
-  KEY. `IS_CHANGED` carries no emo_alpha term either. Independent of the rest.
+* **Chunk A1 -- DONE 2026-08-12.** `OTR_INDEXTTS2_EMO_ALPHA` was read at
+  generate time while the cache key captured `profile.default_params` at
+  request-build time, so an env override changed the RENDER without changing the
+  KEY, and `IS_CHANGED` carried no alpha term either. Closed with the NUMERIC
+  sibling of the mechanism that already existed for this exact class:
+  `identity_params` folds an env-selected MODEL into the key for Google TTS, and
+  the new `render_time_params` folds env-resolved numeric knobs into
+  `quantized_params`. The engine resolves the value through the SAME function
+  its forward calls, so key and render cannot disagree, and per-render env
+  pickup is preserved. Every engine without such a knob is byte-identical and
+  still answers `IS_CHANGED == "static"`; only `indextts2` now fingerprints.
+  Tests: `tests/test_lemmy_emo_alpha_cache_key.py`.
 * **Chunk C items 2/3/5.** SceneSequencer integration coverage at 22050/44100 --
   every existing fixture starts AT the 48000 bus, so nothing proves the real
   resample path -- plus the rate-assumption sweep. Item 1 is done.
@@ -800,8 +808,24 @@ triaged chunk-by-chunk 2026-08-11:
   clip hashes, A2/A3 rewrite the receipt's identity fields with no second
   sign-off. `tts_emo_alpha` follows the existing loose numeric convention; no new
   null-shape walker.
-* **Chunk B.** Shared voice-ref path resolution breadth -- three engines still
-  carry their own `_resolve_ref`. Fully independent, blocks nothing.
+* **Chunk B -- DONE 2026-08-12, and it was NOT the tidy-up it was filed as.**
+  The three cloning adapters' private `_resolve_ref` tried exactly ONE candidate
+  (`<comfy_base>/models/<ref>`) and otherwise returned a cwd-relative
+  `os.path.abspath`, while the voice node's own `_resolve_ref_to_disk` knew
+  about three more places -- including the `C:\ComfyUI-Models` root from the
+  Comfy Desktop 1.0.4 migration. **On this box BOTH Lemmy reference WAVs live
+  ONLY under that migrated root**: the qualified Branch-A reference
+  `lemmy_algenib_cockney_v1.wav` and the historic incumbent
+  `vz_donor_marshal_indian.wav` are both ABSENT from the historical location and
+  PRESENT under the migrated one. So the node's existence check confirmed the
+  file and the adapter that had to OPEN it resolved to a path that is not there.
+  Now one shared `resolve_voice_ref_path` in `_otr_audio_engines/base.py`, with
+  the historical candidate still tried FIRST so the fix can only turn a miss
+  into a hit. Tests: `tests/test_lemmy_voice_ref_resolver_breadth.py`.
+  **NOT logged as a PBUG:** it is grounded in the filesystem and a faithful
+  replay of the old resolver, not in a captured live failure, and the admission
+  rule wants the bug to have failed in a live run. A forced-Lemmy live render
+  would settle it either way and is the natural next Lemmy step.
 * **Chunk E.** Release/OBS audit: does swapping Lemmy's voice count as an
   EDITORIAL RECAST for an audience that already heard the old one? Operator only.
 * **Branch B stays unbuilt.** It existed only for a G1 failure, and G1 passed.

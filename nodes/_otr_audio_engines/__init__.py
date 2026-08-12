@@ -10,6 +10,7 @@ from .base import (
     AudioEngineAdapter,
     engine_supports_external_generator,
     pack_audio_batch,
+    resolve_voice_ref_path,
 )
 from .registry import (
     AudioEngine,
@@ -57,4 +58,5 @@ __all__ = [
     "is_registered",
     "pack_audio_batch",
     "register",
+    "resolve_voice_ref_path",
 ]

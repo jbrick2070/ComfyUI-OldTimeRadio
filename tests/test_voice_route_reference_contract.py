@@ -235,20 +235,44 @@ def _ledger_json(cast):
     return json.dumps({"meta": {"episode_seed": 1}, "cast": cast, "lines": []})
 
 
-def _is_changed(**kw):
+def _is_changed(engine="indextts2", **kw):
+    """``indextts2`` by default -- this file is about indextts2 ROUTES.
+
+    The engine is overridable since Lemmy chunk A1 so the two no-routes
+    "static" tests can ask an engine with no render-time knob; see their
+    docstrings for why that is the honest vehicle for that particular claim.
+    """
     from nodes.batch_character_voices import BatchCharacterVoices
-    return BatchCharacterVoices.IS_CHANGED(engine="indextts2", **kw)
+    return BatchCharacterVoices.IS_CHANGED(engine=engine, **kw)
 
 
 def test_a_ledger_with_no_routes_is_still_the_literal_string_static():
     """Byte-identical in-graph caching for every render shipping today. Not
-    'something stable' -- the same string as before."""
-    assert _is_changed() == "static"
-    assert _is_changed(ledger_json=_ledger_json([_row()])) == "static"
+    'something stable' -- the same string as before.
+
+    ASKED OF `kokoro` SINCE LEMMY CHUNK A1 (2026-08-12), and the swap is the
+    point rather than a convenience. This test's SUBJECT is routes: "a ledger
+    with no routes does not fingerprint". It used `indextts2` only because the
+    rest of this file is about indextts2 routes -- and `indextts2` is now the
+    one engine that legitimately fingerprints WITHOUT any route, because
+    `OTR_INDEXTTS2_EMO_ALPHA` can change what it renders and answering "static"
+    would tell ComfyUI otherwise. So the routes contract is asked of an engine
+    with no render-time knob, where it still holds exactly.
+
+    The indextts2 side is asserted in
+    `tests/test_lemmy_emo_alpha_cache_key.py::
+    test_is_changed_stops_saying_static_when_the_alpha_can_move_the_render`.
+    """
+    assert _is_changed(engine="kokoro") == "static"
+    assert _is_changed(engine="kokoro",
+                       ledger_json=_ledger_json([_row()])) == "static"
 
 
 def test_an_unparseable_ledger_stays_static_rather_than_disabling_caching():
-    assert _is_changed(ledger_json="{not json at all") == "static"
+    # `kokoro` for the reason written out above: the no-routes "static" contract
+    # belongs to an engine with no render-time knob.
+    assert _is_changed(engine="kokoro",
+                       ledger_json="{not json at all") == "static"
 
 
 def test_a_routed_ledger_fingerprints_instead(tmp_path):

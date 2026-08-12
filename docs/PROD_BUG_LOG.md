@@ -3639,3 +3639,62 @@ normal render. Re-run before treating the cause as understood.
 been shipping longest and most invisibly: nothing failed, nothing logged, and
 every scifi_news episode since the regression simply has no cast contract. It was
 only visible because the cameo was FORCED and then did not appear.
+
+## PBUG-20260812-01 -- a shared module reached its sibling by an absolute `nodes.` import, so the Sage probe could not read Sage on ANY server
+
+- surfaced: LIVE headless leg, 2026-08-12 (`_otr_single_engine_smoke.py --engine
+  minimax_h3_video --frames 129` against the sage-free `h3` boot on :8000, lane
+  19's solo smoke). The render refused before any weight loaded with:
+  `BootContractError: the running server does not satisfy boot contract 'h3' ...
+  needs SageAttention ABSENT, but the probe could not determine it
+  (ModuleNotFoundError) -- an unverifiable Sage state is not a pass on a lane
+  Sage silently corrupts`. The server WAS sage-free; nothing about Sage was
+  wrong.
+- symptom: a lane that requires a Sage-constrained boot contract is
+  UNRENDERABLE on every server, and the refusal names Sage rather than the
+  import that actually failed.
+- root cause: `nodes/_otr_shared/boot_contracts.py:running_server_boot_state`
+  reached its sibling package with
+  `from nodes._otr_video_engines.motion_common import sageattention_patched`.
+  **`nodes` resolves against `sys.path`.** Under pytest the repo root is on the
+  path, so `nodes` IS the OTR package and the probe worked in every test. Inside
+  a running ComfyUI server `nodes` is ComfyUI's OWN top-level node-registry
+  module and OTR lives under `custom_nodes/ComfyUI-OldTimeRadio`, so the import
+  raised `ModuleNotFoundError`, was caught, and left `sage_attention = None`.
+  `check_running_server` correctly treats UNKNOWN as not-satisfied, so the
+  contract could never be met.
+- **why it shipped dormant:** the probe's error is only CONSULTED when a
+  contract constrains Sage, and `h3` (2026-08-12) is the first one that does.
+  `default` and `humo_diet` both say "don't care" about Sage, so the broken
+  import sat behind them harmlessly since the S8 boot-contract mechanism landed.
+- **TWO MORE INSTANCES of the same class, swept in the same commit** -- neither
+  independently live-verified, both the identical import defect:
+  `_otr_shared/content_oracle.py:family_for_engine` failed SOFTLY into a bare
+  `except: pass` and answered from the `_FAMILY_FALLBACK` table on every call,
+  so the live registry was "the source of truth when present" only OFF the
+  runtime. That table stops at 2026-07-05, so `ltx_8gb`, `fastwan_8gb`,
+  `still_word`, every cloud lane and `minimax_h3_video` resolved to family `""`
+  in production -- which is not in `MOTION_FAMILIES` -- making
+  `motion_required_for_engine` answer False and those lanes silently
+  MOTION-EXEMPT. `_otr_shared/slot_matrix.py:eligible_engines_for_role` raised
+  outright.
+- fix: all three are relative imports (`from .._otr_video_engines import ...`),
+  which resolve through the package's own `__name__` and are correct under both
+  names. Committed `be4aadff` with lane 19.
+- verify: `tests/test_minimax_h3_video.py::
+  test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import`
+  AST-walks both shared packages and fails on any `nodes.`-prefixed
+  `Import`/`ImportFrom`. **AST, not a text grep** -- the first draft grepped the
+  source and failed on the comment that explains the fix, which necessarily
+  quotes the broken line. Plus `::test_the_family_oracle_answers_from_the_
+  REGISTRY_not_the_stale_table` for the soft-failure half, which asserts the
+  CONSEQUENCE (every registered engine's family matches the registry) rather
+  than the import.
+- bible-worthy: **yes, and strongly** -- "a module works in the test environment
+  and raises in production because an absolute import resolves against a
+  `sys.path` that differs between them" is portable to every plugin/extension
+  architecture where the host owns a top-level module name. The three-way split
+  in how it failed (caught-and-unknown, swallowed-into-stale-fallback, raised)
+  is the instructive part: only one of the three was visible at all.
+- status: FIXED, live-proved (the same smoke rendered PASS after the fix:
+  129 frames at 864x480, exactly 5.160 s, zero audio streams)
