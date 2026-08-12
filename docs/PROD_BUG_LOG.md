@@ -3698,3 +3698,72 @@ only visible because the cameo was FORCED and then did not appear.
   is the instructive part: only one of the three was visible at all.
 - status: FIXED, live-proved (the same smoke rendered PASS after the fix:
   129 frames at 864x480, exactly 5.160 s, zero audio streams)
+
+## PBUG-20260812-02 -- a Pydantic field named `register` silently becomes a BOUND METHOD, and the writer dies serializing it
+
+- surfaced: LIVE headless leg, 2026-08-12 06:08, the first leg of the 45-word
+  every-visual-path campaign (`otr_w45_campaign.py --only still_flat,...`,
+  profile `otr_w45_still_flat`, source bank rolled to `scifi_fable2`). The node
+  `OTR_LedgerScriptWriter` failed with
+  `TypeError: Object of type method is not JSON serializable`, 78 s in, before
+  any video work. Leg verdict: `FAIL (exit=1, 1.3 min) no new file in otr/obs`.
+- symptom: an episode dies in the WRITER, at
+  `_otr_scifi_fable2.py:1532` in `_script_user_prompt`, on
+  `json.dumps(treatment.model_dump())`. Nothing about the message names the
+  field or the model, so the failure reads as a generic serialization bug.
+- **root cause, REPRODUCED exactly.** `CastShape.register`
+  (`_otr_scifi_fable2.py:281`) shadows an attribute that exists on
+  `BaseModel` -- Pydantic's `ModelMetaclass` inherits `ABCMeta`, so
+  `BaseModel.register` is a bound metaclass method. Pydantic does NOT reject
+  this field name (the clash is on the metaclass, not the class body), and a
+  fully-validated instance is fine because the value lives in `__dict__`.
+  **But any instance whose `register` is absent from `__dict__` falls through
+  to the class attribute, and `model_dump()` then returns the bound method.**
+  Minimal reproduction on this box:
+
+      ok  = CastShape(name="Ada", role="lead", want="w", pressure="p",
+                      register="dry")
+      ok.model_dump()            # {'register': 'dry'}  -- fine
+      bad = CastShape.model_construct(name="Ada", role="lead", want="w",
+                                      pressure="p")
+      bad.model_dump()           # {'register': <bound method ...>}
+      json.dumps(bad.model_dump())
+      # TypeError: Object of type method is not JSON serializable
+
+  Pydantic even warns on the dump --
+  `PydanticSerializationUnexpectedValue(Expected 'str' ... field_name='register',
+  input_value=<bound method ModelMetacl...>, input_type=method)` -- and that
+  warning goes to stderr where nothing reads it.
+- **why it is INTERMITTENT, which is what makes it nasty:** the campaign rolls
+  `--source-bank "roll (any eligible bank)"` per leg, so only legs that roll
+  `scifi_fable2` can hit it, and only when a `CastShape` reaches the prompt
+  builder without its `register` set. A re-run can pass and look like a flake.
+- fix: NONE YET -- deliberately. Two candidate directions, and the choice
+  belongs to the writer lane's owner because both touch the LLM contract:
+  (a) RENAME the field (`register` -> e.g. `vocal_register`), which removes the
+  shadow entirely but changes the structured-output schema the model is
+  prompted against and the `register:` label in the cast block at
+  `_otr_scifi_fable2.py:1527`; or (b) give it a DEFAULT (`register: str = ""`),
+  which makes the construct path fill it instead of leaking the method, at the
+  cost of weakening a currently-required field. **(a) is the root fix; (b) is a
+  containment.** Not attempted unattended: a wrong move here breaks story
+  generation on a shipping bank.
+- **the production TRIGGER is still unidentified.** There is no
+  `model_construct` or `CastShape(...)` call anywhere in `_otr_scifi_fable2.py`
+  -- the treatment is built by `structured_call(schema=Treatment, ...)`, which
+  validates -- so something in the structured-output/repair path is producing a
+  partially-populated model. That search is the next step and it is where the
+  fix has to be aimed.
+- verify idea: a test that asserts NO Pydantic model in the writer path has a
+  field name for which `hasattr(BaseModel, name)` is true. That is a one-line
+  structural check over `model_fields`, it catches the whole CLASS of this bug
+  rather than this one field, and it would have failed the day `register` was
+  added. (`Treatment` itself is clean; `CastShape.register` is the only hit in
+  the two models on this path.)
+- bible-worthy: **yes, strongly, as a class.** "A Pydantic field whose name
+  collides with an attribute of BaseModel/its metaclass serializes as a bound
+  method whenever the instance is built without it" is portable to every project
+  using Pydantic v2, the failure is silent until a `json.dumps`, and the error
+  message names neither the model nor the field.
+- status: OPEN -- root cause PROVEN and reproduced, production trigger not yet
+  located, no fix attempted.
