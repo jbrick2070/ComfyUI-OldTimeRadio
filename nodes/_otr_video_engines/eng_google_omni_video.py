@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 from .registry import register
-from .frame_contract import FrameContract
+from .frame_contract import CONTINUITY_NONE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_google_api.client import (
     GoogleAPIError,
@@ -369,12 +369,21 @@ class GoogleOmniVideoEngine:
     #: which is exactly why allow_tail_trim is required rather than optional.
     #: CONTINUITY none -- this lane is text-only, with no image input a
     #: successor segment could begin from.
+    #:
+    #: DECLARED, not defaulted, since 2026-08-12 (row 22), and the gap this
+    #: closes is the whole point of L3. The sentence above has reasoned about
+    #: continuity since this lane was written, while the call below simply
+    #: inherited `CONTINUITY_NONE` -- so a lane that had thought about chaining
+    #: and a lane that never had were byte-identical at runtime. The value does
+    #: not change; what changes is that it is now a DECISION on the record.
+    #: This was the LAST `EXPECTED_RED` entry in the preflight matrix.
     frame_contract = FrameContract(
         min_frames=OUTPUT_DURATION_RANGE_S[0] * CANVAS_FPS,
         max_frames=OUTPUT_DURATION_RANGE_S[1] * CANVAS_FPS,
         quantum=1,
         native_fps=CANVAS_FPS,
         allow_tail_trim=True,
+        continuity=CONTINUITY_NONE,
     )
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()

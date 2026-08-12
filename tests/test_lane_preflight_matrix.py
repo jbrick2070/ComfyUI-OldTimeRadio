@@ -246,13 +246,24 @@ EXPECTED_RED: dict = {
     # counted. The directory contract now PROVES each frame from its magic
     # bytes, which is what makes "no audio stream" a fact about the bytes, and
     # G5 is taught that named function for directory-clip lanes only.
-    ("google_omni_video", "G3"): (
-        "L3 -- CONTINUITY_NONE is inherited rather than declared on this "
-        "text-to-video cloud lane. NONE is near-certainly the right answer "
-        "(no reference input exists to lock a first frame), but it is "
-        "currently a default and not a decision. OWNER: none tonight -- "
-        "cloud lanes are outside the 21-lane transplant scope; queued in "
-        "docs/GO_FORWARD_PLAN.md item 5 as a follow-up row."),
+    # ROW 22 CLOSED THE LAST ENTRY (2026-08-12). `google_omni_video`'s G3 row
+    # was the only defect left in this table after lane 21, and it was the one
+    # lane the 21-lane transplant deliberately did not own (cloud lanes were out
+    # of its scope). Row 22's own contract -- "every preflight row green, every
+    # expected-red removed" -- is what brought it in.
+    #
+    # The fix was one keyword. The lane's comment had reasoned "CONTINUITY none
+    # -- this lane is text-only, with no image input a successor segment could
+    # begin from" since it was written, while the call inherited the default, so
+    # a lane that had decided and a lane that never thought about it were
+    # byte-identical at runtime. That is L3 exactly, and it is why
+    # `declares_continuity_kwarg` is AST-based: the prose could not close it.
+    #
+    # THIS TABLE IS NOW EMPTY, and that is the whole point of a progressive
+    # ledger. It stayed honest while 21 lanes were repaired one at a time, and
+    # the strict unexpected-pass gate below is what forces the next entry to be
+    # deleted the moment its lane goes green rather than rotting into a rubber
+    # stamp.
 }
 
 # The four procedural visualizers and the four CPU still lanes carry the same

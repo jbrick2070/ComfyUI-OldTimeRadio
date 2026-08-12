@@ -1534,6 +1534,85 @@ and `::test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it`
 
 ---
 
+## L27 -- The API boundary has its own rules, and no CPU test crosses it
+
+**Check:** is this code talking to the ComfyUI SERVER rather than running inside
+it? If so, three things are different and a green unit suite proves none of them:
+where files live, how dynamic inputs serialize, and what `/history` calls the
+outputs.
+
+**Lane 21's runner failed live THREE times before it passed, all three the same
+class.** It is the first thing in this build that submits its own graph over
+HTTP rather than driving node classes in-process:
+
+* **Where files live.** `wrapper_bridge.stage_into_comfy_input` asks
+  `folder_paths` for the input directory -- correct inside the server, where
+  every registered adapter runs. From a separate process `folder_paths` does not
+  import, the helper falls back to a path derived from the REPO's location, and
+  the file lands in `Documents\ComfyUI\input` while the server reads
+  `ComfyUI-Installs\ComfyUI\ComfyUI\input`. Use the server's own
+  `POST /upload/image`: right by construction on any install layout.
+* **How dynamic inputs serialize, and it cuts BOTH ways.**
+  `SaveAudioAdvanced.format` is a `DynamicCombo`, so an API graph passes the
+  flat selector `"flac"` and the executor reassembles the dict `execute`
+  receives -- passing that dict directly fails with "missing 1 required
+  positional argument". That is lane 20's Autogrow lesson REVERSED: there, the
+  in-process call needed the dict the API serializes dotted. **Neither form is
+  "the" form. The form depends on which side of the executor you are on.**
+* **What the history calls things.** `SaveVideo` reports its mp4 under the
+  `images` key with `animated: [true]`, not `videos`. Keying on the name made
+  the runner report "no video output" for a render that had just succeeded.
+  Classify by FILE EXTENSION; the key names are a UI convention.
+
+**Runnable check:** before submitting a graph built from an in-process example
+(or vice versa), for every input that is not a plain scalar or a `[node, slot]`
+link, resolve what the EXECUTOR does with it. And never key on a `/history`
+output name -- read the filename.
+
+**Why no test caught these:** all three live in the difference between two
+environments, which is the same shape as L23's import bug. A CPU test builds the
+graph and asserts its shape; only a live submit finds out whether the other side
+agrees. **A lane whose runner talks HTTP owes a live run before it can claim
+anything.**
+
+**Twin assertion:** `tests/test_h3_mime_runner.py` pins the flat selector form
+and the extension-based classification, but the honest note is that the tests
+were WRITTEN from the live failures -- they are a regression net, not the thing
+that found the bugs.
+
+---
+
+## Lane 21 -- `h3_low_mime`, closed 2026-08-12 -- THE LAST PACKET, AND IT KEEPS ITS AUDIO
+
+Full receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. No matrix row
+and no gates to flip, because it registers nothing.
+
+**What bit (1): the whole lane is an EXEMPTION, so every inherited instinct is
+wrong once.** Lanes 19 and 20 spent two commits proving SILENCE on their emitted
+file; this one fails if the clip is silent. The reflex to reuse
+`canonicalize`, or to convert 24 -> 25 like its siblings, or to enforce the
+trained band, would each have been defensible and each would have been wrong
+here. **An exemption lane should be read as a different thing that shares a
+model, not as a variant of its neighbours.**
+
+**Runnable check:** for a lane the corpus calls an exemption, list what it is
+exempt FROM before writing code, and for each item say what it does instead.
+Three, here: it keeps audio (not V-1 silence), it delivers at 24 (not the canvas
+25), and it accepts below the trained band (not the published menu).
+
+**What bit (2): "not registered" is an invariant that needs asserting from BOTH
+sides.** r3 proved a registered engine cannot be kept out of the dropdowns, so
+"we just won't select it" is not a boundary. The test asserts the registry does
+not contain it AND that importing the runner does not change the registry or the
+public menu -- because a future `@register` added to the module the runner
+imports would be invisible to the first check alone.
+
+**What did NOT bite:** the grid math, the recipe and the loader tokens were
+IMPORTED from `eng_minimax_h3` rather than re-typed, so the runner cannot drift
+into a second H3 contract. That import is also what made the f90 snap free.
+
+---
+
 ## L26 -- A LEXICAL test does not just fail on comments; it PASSES on wrong code
 
 **Check:** does any test prove a behaviour by reading SOURCE TEXT --
