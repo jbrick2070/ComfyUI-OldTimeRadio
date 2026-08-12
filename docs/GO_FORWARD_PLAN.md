@@ -184,10 +184,96 @@ written), `TODO`.
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only | **DONE** -- 7/7 green, two live smoke legs (render + refusal). Took the `_require_still` call lane 15 left open, on its own evidence. Still HOLDS the "declares NOTHING" canvas control (it declared nothing). Receipt: `docs/evidence/lane_receipts/lane16-still_pan.md` |
 | 17 | `still_flat` | same checklist independently | **DONE** -- 7/7 green, two live smoke legs. Took the refusal too, so **ALL FOUR still families now refuse a missing still**. Premise re-checked on a THIRD builder (`ffmpeg_still_static_cmd`, fit+pad). The dark-floor branch is KEPT as a control with no occupant (lesson **L22** -- lane 16's "delete it" instruction was REVISED), with both halves asserted. Receipt: `docs/evidence/lane_receipts/lane17-still_flat.md` |
 | 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | **DONE** -- 7/7 green, two live smoke legs. Two of its three items were ALREADY closed (Sprint B's refusal; lane 15's inherited ffmpeg gate) and were verified rather than rebuilt -- the lane's deliverable is the acceptance check, since nothing had asserted the gate on this lane before. **THE WHOLE CHEAP SHELF IS NOW GREEN.** Receipt: `docs/evidence/lane_receipts/lane18-still_word.md` |
-| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | TODO |
+| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | **OPEN -- DIAGNOSED 2026-08-11 against the INSTALLED node, no code written.** Both 21 GB weights and all four node classes are present, so it is smokeable. **The spec's frame numbers are CONFIRMED against `align_frame_count` (17k+5), and lanes 11-18's "declare nothing" default INVERTS here.** See the LANE 19 DIAGNOSIS block; start coding |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
+
+### LANE 19 DIAGNOSIS -- `h3_low_video` / `minimax_h3_video` (done 2026-08-11, act on it)
+
+**Grounded against the INSTALLED node at
+`C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\comfy_extras\nodes_minimax_h3.py`
+and the real weights on disk, at `058b868d`.** Nothing is half-edited; the tree
+is clean. Pre-lane `build_variants.py --check` was **46 / 0**.
+
+**READ THIS FIRST: lanes 10-18's DEFAULT ANSWERS DO NOT TRANSFER HERE.** Those
+were repairs to CPU/procedural lanes. This is a new 21 GB diffusion adapter, and
+at least two of the shelf's conclusions INVERT.
+
+**IT IS INSTALLED AND SMOKEABLE.** Both weights are present (~20.97 GB each):
+`C:\ComfyUI-Models\diffusion_models\minimax_h3_fl2va_pruned_int8_convrot.safetensors`
+and `..._ref2va_...`. The four node classes exist in the running core:
+`EmptyMiniMaxH3LatentAV`, `MiniMaxH3ImageToVideo`, `MiniMaxH3ReferenceToVideo`,
+`MiniMaxH3SigmaShift`. Confirm them live in `/object_info` before submitting
+(lane 7's rule), and note the 21 GB weight against a 16 GB card -- the pruned
+int8 build plus offload is the whole reason this fits.
+
+**THE FRAME GRID, FROM THE NODE ITSELF -- and the spec's numbers CHECK OUT.**
+```python
+FPS = 24                       # the MODEL's rate. The canvas is 25.
+def align_frame_count(n):      # the real grid rule
+    while n % 17 != 5: n += 1  # i.e. 17k + 5: ... 124, 141, 158 ... 362 ...
+```
+`length` input: `default=124, min=5, max=3600, step=17`, tooltip "trained range
+is ~124-362, longer is untested". So the spec's
+`discrete_frames = (129,146,164,182,200,...,377)` is the 24->25 CONVERSION of
+that grid and is right -- **pin it against `align_frame_count`, never against a
+doc** (lesson L3's third half, which is exactly what this lane is).
+
+**THE EVIDENCE MANIFEST ALREADY HAS A FAILURE THAT PROVES THE GRID MATTERS:**
+`h3_i2v_canonical_832x480_f107_FAILED`, verdict `MEASURED_BELOW_RANGE_FAILURE`.
+f107 is BELOW the trained 124 floor. Do not treat the floor as advisory.
+
+**G2 -- AND THIS IS WHERE THE SHELF'S ANSWER INVERTS.** Lanes 11-18 all closed
+G2 by declaring the profile canvas channel INERT, because no cheap lane had a
+native canvas. **H3 does have canvas structure**, so DECLARE rather than
+document inert -- but declare the RIGHT thing, and check these first:
+* `width`/`height` are `step=32` on every H3 node, so the declaration must be
+  /32-legal (the same rule every declaring lane has).
+* The module encodes a trained shape: `BASE_SHORT_EDGE = 768`,
+  `MAX_PIXELS = 768*1344`, and `adapt_canvas()` rounds per-axis to 32 under an
+  area cap. **`adapt_canvas` is called ONLY at line 241, inside
+  `MiniMaxH3ReferenceToVideo`, to size REFERENCE media -- it does NOT rewrite
+  the generation canvas.** So the generation canvas is genuinely the caller's,
+  and the 768/area numbers are what the model was TRAINED at, not what the node
+  enforces. Say which of those you are declaring and why (L7: state the
+  surface).
+* Existing receipts sit at 832x480 (the FAILED f107 leg) and 864x480 (the
+  ref2va cold leg). Neither is a 768 short edge. If you declare 832x480,
+  say why the trained shape is not the declared one.
+
+**THE 24 -> 25 CONVERSION IS THE LANE'S REAL DELIVERABLE.** `FPS = 24` in the
+node; the canvas rate is 25. Without a conversion every H3 beat drifts ~4% and
+the mouth slides ~320 ms over 8 s (L3's origin story, and the local encoder can
+only LABEL a rate, never resample -- `wrapper_bridge` `-r` before `-i pipe:0`).
+Apply a nearest-source-frame integer index map to the uint8 batch immediately
+before `encode_frames_to_silent_mp4`. 200 canvas frames must be exactly 8.000 s.
+
+**H3 IS THE FIRST ENGINE THAT NATIVELY PRODUCES AUDIO**, which makes G5 real
+rather than ceremonial here. The latent is a NestedTensor PAIR --
+`video [B,24,T,H/16,W/16]` and `audio [B,32,2,T40]` (`AUDIO_LATENT_FPS = 40`).
+Every `has_audio: False` in this repo is a hand-written literal; on this lane it
+would be a receipt that LIES. Call `wan_shared.validate_silent_clip_contract` on
+its OWN emitted clip in `canonicalize`, and make sure the delivered mp4 really
+has no audio stream (the mux is the only thing that may add audio, V-1).
+
+**Scope discipline the corpus is explicit about:** register `minimax_h3_video`
+ONLY in this lane. `minimax_h3_audio_in` is lane 20, even though both adapters
+share one implementation module -- one internal engine cannot carry both modes,
+and two public ids must never map to one internal id (L5's import-time bijection
+assert, whose blast radius is most of OTR vanishing from the menu).
+
+**Also in this packet, per the spec:** `assert_sage_not_patched` (the
+`eng_ltx_video` pattern, NOT wan_i2v's sidecar escalation, which has no runner);
+an `h3` boot-contract profile (`sage_attention: false` +
+`--disable-pinned-memory`); seed 43 in the PROFILE's `seed_policy`, never in the
+adapter; and the `frame_contract.py:108` docstring fix (it teaches Veo's menu as
+`(96,144,192)`, the exact value a test asserts is wrong).
+
+**Do NOT extend the mouth policy in this lane.** `render_driver`'s
+`"ltx_audio_in"` equality test becomes a membership test in LANE 20, with the
+`minimax_h3_audio_in` registration it exists for. Doing it here would wire a
+policy to an engine that is not registered yet.
 
 ### LANE 15 DIAGNOSIS -- `still_motion` -- **ACTED ON AND CLOSED 2026-08-11**
 

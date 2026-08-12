@@ -39,7 +39,8 @@ now REFUSE a missing still instead of painting a black beat.
 | 16 | `still_pan` | DONE `fc7812dd` |
 | 17 | `still_flat` | DONE `b79af369` -- still shelf closed; the floor is now an unoccupied control (L22) |
 | 18 | `still_word` | DONE -- verification lane; **the whole cheap shelf is green** |
-| 19-21 | the H3 trio (two adapters + the standalone mime runner) | NOT STARTED |
+| 19 | `h3_low_video` (`minimax_h3_video`) | **NEXT -- DIAGNOSED, not started.** Both 21 GB weights + all four node classes installed, so it is smokeable. See the LANE 19 DIAGNOSIS block in GO_FORWARD |
+| 20-21 | `h3_low_audio_in`, the standalone mime runner | NOT STARTED |
 | 22 | 30-word end-to-end episode gate | NOT RUN |
 
 **Baselines at the lane-18 wrap:** full suite **9985 passed / 109 skipped /
