@@ -52,9 +52,10 @@ item, close its ROW in the same push.**
 ### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
 
 **WINDOW HANDOFF 2026-08-12: read `docs/2026-08-11-VIDEO-LANE-BUILD-RESUME.md`
-first -- its NEWEST section is at the top.** **19 of 21 packets** confirmed
-working and pushed. **Lane 20 (`h3_low_audio_in` / `minimax_h3_audio_in`) is
-NEXT, and it is the CHEAPEST lane left** -- lane 19 already wrote the module it
+first -- its NEWEST section is at the top.** **20 of 21 packets** confirmed
+working and pushed. **Lane 21 (the standalone `h3_low_mime` runner) is the LAST
+one, and it is UNLIKE every lane before it -- not registered, and it KEEPS its
+audio where 19 and 20 both prove silence.** Lane 20 was the cheapest lane left -- lane 19 already wrote the module it
 lives in, so it is a second registration rather than a new engine. The resume
 doc carries everything lane 20 needs (weights, the live node schema, the one
 unverified Autogrow socket, the mouth-policy site, the roster tests it will turn

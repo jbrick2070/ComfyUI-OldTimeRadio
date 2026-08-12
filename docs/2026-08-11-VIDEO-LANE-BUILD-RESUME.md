@@ -1,5 +1,52 @@
 # RESUME HERE -- video lane build
 
+## WINDOW HANDOFF 2026-08-12 (later) -- LANE 20 CLOSED
+
+**20 of 21 packets done. Lane 21 is the last one, and it is UNLIKE every lane
+before it: a standalone runner that is NOT registered.** Box CLEAN (no resident
+server, port 8000 clear, VRAM 1,283 MiB). HEAD == origin at `2362353b`.
+
+* `2362353b` -- **lane 20, `h3_low_audio_in` / `minimax_h3_audio_in`.** 7/7 green
+  on arrival, live smoke PASS on the FIRST attempt. Receipt:
+  `docs/evidence/lane_receipts/lane20-h3_low_audio_in.md`.
+
+**Baselines now:** suite **10114 passed / 110 skipped / 1 xfailed**, nothing
+deselected. Bug Bible **20/24/3 at 272**. `build_variants.py --check` **48
+variants, 0 failures**.
+
+### WHAT LANE 21 IS, AND WHY IT IS NOT LIKE 19 OR 20
+
+`h3_low_mime` -- a **standalone runner**, explicitly **NOT registered this
+build**. Its row: "G5.2 keeps-audio exemption, clip/stem receipts, durable
+output path, solo-runner QA."
+
+**The interesting part is `keeps-audio`.** Lanes 19 and 20 both prove SILENCE on
+their emitted file (V-1: only `OTR_MasterAudioMux` ever adds audio), and
+`canonicalize` ffprobes it. The mime runner is the EXEMPTION -- it keeps H3's
+natively generated audio, which is the whole reason it exists. So it must NOT
+reuse `_MiniMaxH3Base.canonicalize` unexamined, and G5's lexical gate does not
+apply to an unregistered runner. Read the G5.2 spec before assuming either way.
+
+**The lab has the ground truth**, and both legs PASSED cold with native audio:
+`vram-recipe-lab/recipes/h3_mime_i2v.json` (864x480, model f90 = 3.750 s, 7.28
+GiB, 178.9 s, audio at -27.5 LUFS) and `h3_mime_r2v.json` (7.23 GiB, -40.5
+LUFS). Note f90 is BELOW the 124 trained floor and on the 17k+5 grid -- so a
+mime clip is deliberately shorter than anything the registered lanes may render,
+which is one reason it is a separate runner rather than a third adapter.
+
+**Reuse, do not re-derive:** `eng_minimax_h3` already gives you the grid math
+(`align_frame_count`, `model_rungs`, `canvas_frames_for_model`,
+`canvas_index_map`), the weight resolution, the boot contract and the recipe.
+A runner can import them without registering anything.
+
+### THEN: the 45-word render of EVERY visual path
+
+The operator's acceptance gate, and it runs LAST -- after lane 21, because 21 is
+the final path. It supersedes row 22's single end-to-end episode. Every visual
+path gets a 45-word render; the `otr_w45_*` profiles are the shape.
+
+---
+
 ## WINDOW HANDOFF 2026-08-12 -- lane 19 CLOSED, two Lemmy fixers CLOSED
 
 **19 of 21 packets done. Lane 20 is next and it is the CHEAPEST lane left**,
