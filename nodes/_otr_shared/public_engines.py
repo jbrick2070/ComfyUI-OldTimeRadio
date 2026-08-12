@@ -113,6 +113,20 @@ _PUBLIC_ENGINES = {
     # ceiling; 13,313 MB NET is not. The cost-row surface is NET by the
     # 2026-08-11 ruling, and neither number is quotable without saying which.
     "ltx23_high_video": "ltx_video",
+    # Lane 19, 2026-08-12 -- the first NEW ENGINE in the campaign rather than a
+    # rename, so this is an ADD with no alias to move.
+    #
+    # `low` is MEASURED on this box under this lane's own boot contract, and it
+    # is what DECIDED the canvas rather than a label applied after the fact:
+    # 7.28 GiB absolute at 864x480 (the mime I2V leg) against 9.15 GiB at H3's
+    # trained 1344x768. Under ~8 GiB is what the token means, so the lane
+    # declares the canvas where the token is true.
+    #
+    # `video` and not `audio_in`: H3 natively produces audio, and this lane
+    # deliberately does not decode it -- there is no audio VAE in its graph. The
+    # audio-conditioned route is lane 20's `h3_low_audio_in`, a SEPARATE public
+    # id on a SEPARATE internal id.
+    "h3_low_video": "minimax_h3_video",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -215,6 +229,14 @@ _PUBLIC_LABEL = {
     "humo14_high_audio_in_portrait": (
         "HuMo 14B fp8 portrait - audio-driven face, high VRAM "
         "(13.22 GiB warm at 480x832x97 on the humo_diet boot)"),
+    # "low" is the measured bucket and the label names the leg it came from, per
+    # the lane-1 convention. It also states the two things a user has to know
+    # before picking this lane: it needs its own boot, and it is SLOW -- a 5 s
+    # beat is minutes, not seconds, because a 21 GB DiT streams through a 16 GB
+    # card. Neither is a quality claim in either direction.
+    "h3_low_video": (
+        "MiniMax H3 33B silent video - low VRAM (7.3 GiB at 864x480; needs the "
+        "sage-free h3 boot, and it is the slowest local lane by far)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

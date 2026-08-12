@@ -184,12 +184,58 @@ written), `TODO`.
 | 16 | `still_pan` | the now-proven still-lane rules, this lane only | **DONE** -- 7/7 green, two live smoke legs (render + refusal). Took the `_require_still` call lane 15 left open, on its own evidence. Still HOLDS the "declares NOTHING" canvas control (it declared nothing). Receipt: `docs/evidence/lane_receipts/lane16-still_pan.md` |
 | 17 | `still_flat` | same checklist independently | **DONE** -- 7/7 green, two live smoke legs. Took the refusal too, so **ALL FOUR still families now refuse a missing still**. Premise re-checked on a THIRD builder (`ffmpeg_still_static_cmd`, fit+pad). The dark-floor branch is KEPT as a control with no occupant (lesson **L22** -- lane 16's "delete it" instruction was REVISED), with both halves asserted. Receipt: `docs/evidence/lane_receipts/lane17-still_flat.md` |
 | 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | **DONE** -- 7/7 green, two live smoke legs. Two of its three items were ALREADY closed (Sprint B's refusal; lane 15's inherited ffmpeg gate) and were verified rather than rebuilt -- the lane's deliverable is the acceptance check, since nothing had asserted the gate on this lane before. **THE WHOLE CHEAP SHELF IS NOW GREEN.** Receipt: `docs/evidence/lane_receipts/lane18-still_word.md` |
-| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | **OPEN -- DIAGNOSED 2026-08-11 against the INSTALLED node, no code written.** Both 21 GB weights and all four node classes are present, so it is smokeable. **The spec's frame numbers are CONFIRMED against `align_frame_count` (17k+5), and lanes 11-18's "declare nothing" default INVERTS here.** See the LANE 19 DIAGNOSIS block; start coding |
+| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | **DONE** -- 7/7 green on arrival, live smoke PASS (129 canvas frames at the declared 864x480, exactly 5.160 s, ZERO audio streams, 6,315 MB absolute cold). G2 INVERTED as predicted and the canvas was DERIVED from the `low` token's own meaning. **The smoke found TWO shipped production bugs the suite could not see** -- the `h3` contract was missing the `--reserve-vram 12` that every passing H3 leg held (**L24**), and three shared modules reached siblings by an absolute `nodes.` import that works in tests and raises on a server, one of them silently making five lanes motion-EXEMPT (**L23**). Receipt: `docs/evidence/lane_receipts/lane19-h3_low_video.md` |
 | 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | TODO |
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | TODO |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | TODO |
 
-### LANE 19 DIAGNOSIS -- `h3_low_video` / `minimax_h3_video` (done 2026-08-11, act on it)
+### OPERATOR DIRECTIVES 2026-08-12 (pre-sleep) -- THE ORDER OF WHAT IS LEFT
+
+Three messages, in the order they were sent, and they reorder the tail of this
+queue:
+
+1. **"we need a 45 word render of every visual path so that's probably first"**
+   -- the acceptance gate is a 45-word episode render through EVERY visual path,
+   not row 22's single end-to-end episode. Row 22 is superseded by it.
+2. **"lemmy fixers first" / "i want the lemmy fixed before a big video test"**
+   -- Lemmy comes BEFORE that render sweep.
+3. **"try to get all 21 done"** -- lanes 20 and 21 still close.
+
+**The order the coder window took, and why:** finish lane 19 (already in flight;
+leaving it uncommitted is the one outcome nobody wants) -> **Lemmy fixers** ->
+lanes 20 + 21 -> **the 45-word sweep LAST**. Lanes 20 and 21 each ADD a visual
+path, so running the sweep before them would mean running it twice.
+
+**The Lemmy work list is already triaged** in "WHAT REMAINS ON THE LEMMY SPRINT"
+below. Coder-actionable, no operator input: **chunk A1** (a LIVE cache defect --
+`OTR_INDEXTTS2_EMO_ALPHA` changes the render without changing the cache key),
+**chunk B** (shared voice-ref path resolution), **chunk C 2/3/5** (SceneSequencer
+coverage at 22050/44100), **chunks A2-A4** (v2 identity + replay bridge, which
+the operator pre-ruled AUTO-PROMOTE on a clean replay). **Chunk E is operator
+only** and Branch B stays unbuilt -- it existed for a G1 failure, and G1 passed.
+
+### LANE 19 DIAGNOSIS -- `h3_low_video` / `minimax_h3_video` -- **ACTED ON AND CLOSED 2026-08-12**
+
+**Everything below was coded, smoked and pushed.** Kept as the record of what the
+packet contained; the outcome lives in
+`docs/evidence/lane_receipts/lane19-h3_low_video.md`. Three things the diagnosis
+got right and one it could not have known:
+
+* **G2 really does invert**, and the diagnosis was right to say so. What it left
+  open -- "say why the trained shape is not the declared one" -- resolved through
+  the PUBLIC ID: `low` means measured under ~8 GiB, so 864x480 (7.28 GiB) is the
+  only canvas at which the id the corpus assigned is true. 1344x768 measures
+  9.15 GiB and is 6.6x slower.
+* **The frame numbers checked out exactly.** `(129,146,...,377)` was reproduced
+  by deriving it from `align_frame_count` rather than transcribing it.
+* **The 832x480 FAILED leg is more informative than it looks**: it is the only
+  H3 leg booted WITHOUT `--reserve-vram 12`, which is how the boot-contract bug
+  (L24) was found.
+* **COULD NOT HAVE KNOWN:** the `h3` boot contract could not be satisfied on any
+  server at all, because the Sage probe's absolute `nodes.` import raised inside
+  ComfyUI (L23). No amount of static diagnosis reaches that one.
+
+The original diagnosis follows, unedited.
 
 **Grounded against the INSTALLED node at
 `C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\comfy_extras\nodes_minimax_h3.py`

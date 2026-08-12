@@ -110,6 +110,22 @@ except Exception:  # noqa: BLE001
     pass
 
 
+# minimax_h3_video (lane 19, 2026-08-12): the MiniMax H3 FL2VA first-frame ->
+# silent video lane. A NORMAL selectable row (requires_flag=None, empty
+# default_roles); it fails CLOSED until the DiT, the Qwen3-VL encoder and the
+# video VAE are on disk AND the server was booted on the named `h3` contract.
+# ONE registration out of eng_minimax_h3, deliberately: `minimax_h3_audio_in`
+# shares this implementation module but is lane 20's to register, and two public
+# ids on one internal id trips public_engines' bijection assert at import time.
+# Cold-import clean (V-12: torch / numpy / the ComfyUI node registry are lazy
+# inside load/render_clip). Guarded so a packaging quirk never breaks the
+# namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_minimax_h3 as _eng_minimax_h3  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # UNREGISTERED 2026-06-30 (still_parallax rip-out, item 2 -- "registry IS the
 # menu"): the 0-E easy on-ramp 2.5D depth-parallax engine (DepthAnythingV2-SMALL)
 # is no longer imported here and is NOT selectable. The SOURCE file stays on

@@ -5185,10 +5185,42 @@ def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None):
 
 
 def render_single(engine_name="humo", *, assets=None, frame_count=33,
-                  canvas=None):
+                  canvas=None, profile=None):
     """Render ONE shot via a SINGLE engine with NO fallback -- the focused
     in-process validation (surfaces the real exception so the in-process forward
-    can be debugged in isolation before the full soak). Returns a result dict."""
+    can be debugged in isolation before the full soak). Returns a result dict.
+
+    ``profile`` is the FOURTH thing this path has had to be taught to ask for,
+    and it is the same gap as lane 7's canvas one commit later: ``render_single``
+    builds its own inputs, so anything a production request carries and this
+    function does not invent is simply absent from every solo lane smoke.
+
+    Here that is the BOOT CONTRACT. ``_render_one`` passes ``profile or {}``
+    onward, and an empty profile SELECTS the ``default`` contract -- so a lane
+    that legitimately requires its own boot (lane 19's ``minimax_h3_video``, the
+    first such lane) could never be smoked on the boot it declares. When the
+    caller names no profile and the engine declares exactly ONE compatible
+    contract, that contract is selected here.
+
+    THIS IS NOT A BYPASS, and the distinction is the whole reason it is safe:
+    selecting a contract is a CLAIM, and the claim is still proved against
+    ``comfy.cli_args`` on the running server by ``assert_running_server``. A
+    smoke on a wrongly-booted server still refuses by name -- it just refuses
+    for the true reason ("this server has no reserve clamp") instead of the
+    false one ("you asked for the stock boot"). An engine declaring two or more
+    contracts is left alone: there the selection is a real choice and inventing
+    one would be guessing.
+    """
+    if profile is None:
+        try:
+            from .._otr_shared import boot_contracts as _bc
+            declared = tuple(
+                getattr(_vreg.get_engine(engine_name),
+                        "compatible_boot_contracts", ()) or ())
+            if len(declared) == 1 and declared[0] != _bc.DEFAULT:
+                profile = {"launch": {"boot_contract": declared[0]}}
+        except Exception:  # noqa: BLE001 -- unknown engine -> stock behaviour
+            pass
     shot = {"shot_id": "single_0000", "beat_id": "b0000",
             "engine_id": engine_name,
             "family": engine_family(engine_name, "audio_driven_face"),
@@ -5231,7 +5263,8 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     request = build_request(shot, assets, frame_count, canvas)
     t0 = time.time()
     try:
-        clip = _render_one(engine_name, request, force_oom=False)
+        clip = _render_one(engine_name, request, force_oom=False,
+                           profile=profile)
         return {"ok": True, "engine": engine_name,
                 "elapsed_s": round(time.time() - t0, 1),
                 "clip": _clip_summary(clip),

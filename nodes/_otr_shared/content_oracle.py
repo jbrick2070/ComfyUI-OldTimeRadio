@@ -58,6 +58,15 @@ _FAMILY_FALLBACK: dict = {
     "viz_mxc_cpu": "abstract",       # OTR rainbow visualizer -- motion-exempt (2026-06-30)
     "viz_mxc_mandala": "abstract",   # Cosmic Radio Mandala -- motion-exempt (2026-06-30)
     "viz_camera": "abstract",        # Golden Flicker camera visualizer -- motion-exempt (2026-07-05)
+    # The rows below were MISSING while the registry lookup above was silently
+    # unreachable on every live server (see family_for_engine). With the import
+    # fixed the registry answers for all of them, so these exist for the stated
+    # bare-script case only -- and they are filled in because a table whose
+    # gaps read as "motion-exempt" is the wrong shape of incomplete.
+    "ltx_8gb": "image_to_video",
+    "fastwan_8gb": "image_to_video",
+    "still_word": "static_image_gen",
+    "minimax_h3_video": "image_to_video",
 }
 
 #: Default mean-luma floor (0..255). A clip whose mean YAVG is at/below this reads
@@ -78,7 +87,21 @@ def family_for_engine(engine_id: str) -> str:
     """The engine's family: the live video registry first, then the fallback
     table, then '' (unknown). Pure attr read; never raises."""
     try:
-        from nodes._otr_video_engines import registry as _vreg  # lazy
+        # RELATIVE (lane 19, 2026-08-12), and this was the WORST of the three
+        # absolute sibling imports because it fails SOFTLY. `nodes` resolves
+        # against sys.path -- this package in the CPU suite, ComfyUI's own node
+        # registry on a live server -- so on the server the import raised, the
+        # bare `except` below swallowed it, and this function silently answered
+        # from `_FAMILY_FALLBACK` on EVERY call. The registry has been "the
+        # source of truth when present" only off the runtime.
+        #
+        # What that cost: the fallback table stops at 2026-07-05, so `ltx_8gb`,
+        # `fastwan_8gb`, `still_word`, every cloud lane and this one all
+        # resolved to family "" in production -- which is not in
+        # MOTION_FAMILIES, so `motion_required_for_engine` answered False and
+        # those lanes were silently MOTION-EXEMPT. A frozen clip from any of
+        # them would have passed the motion check by never being asked.
+        from .._otr_video_engines import registry as _vreg  # lazy
         if _vreg.is_registered(engine_id):
             return str(getattr(_vreg.get_engine(engine_id), "family", "") or "")
     except Exception:  # noqa: BLE001 -- registry not importable from a bare script

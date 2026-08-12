@@ -81,8 +81,18 @@ def profile_keys_for_all_roles() -> list:
 
 def eligible_engines_for_role(role: str) -> list:
     """Capability-eligible engine names for ``role`` (the C2 registry override).
-    Lazy registry import so this module stays cold-import clean."""
-    from nodes._otr_video_engines import registry as _vreg
+    Lazy registry import so this module stays cold-import clean.
+
+    RELATIVE, for the reason written out in ``boot_contracts``'s Sage probe
+    (lane 19, 2026-08-12): an ABSOLUTE ``nodes._otr_video_engines`` import
+    resolves ``nodes`` against sys.path, which is THIS package in the CPU suite
+    and ComfyUI's own node-registry module on a running server. This one raised
+    outright rather than degrading quietly, but it was the same defect and it
+    was the only other instance in either shared package, so it is swept here
+    rather than left to be found by whichever caller reaches it first on a
+    server (lesson L13).
+    """
+    from .._otr_video_engines import registry as _vreg
     return _vreg.engines_for_role(role)
 
 

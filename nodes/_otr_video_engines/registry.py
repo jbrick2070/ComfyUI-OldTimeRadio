@@ -483,6 +483,24 @@ CAPABILITIES = {
         "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
                                "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
                                "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
+    # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
+    # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
+    # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.
+    # needs_fp8_te is False and needs_fp4_te is TRUE: the DiT is an int8 repack
+    # rather than fp8, and the Qwen3-VL-32B encoder it conditions on is the
+    # NVFP4-AWQ artifact -- so the fp4 row is the one that describes this stack.
+    # Three model_requirements because all three are separate ~5-21 GB fetches
+    # and preflight fails CLOSED on any one of them; the audio VAE is NOT listed,
+    # because listing an asset this lane never loads would make the S5 wizard ask
+    # for 0.6 GB nobody needs (it belongs to lane 20).
+    "minimax_h3_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": True,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["minimax-h3-fl2va-int8",
+                               "qwen3vl-32b-minimax-h3-nvfp4",
+                               "minimax-h3-video-vae"]},
     # CLOUD partner video rows (S3 core, 2026-07-02, pass04 secs 5+7): the
     # render happens PROVIDER-SIDE (zero local VRAM); cpu_ok True (any box with
     # ffmpeg + credits can run them). NO enable flag (operator directive

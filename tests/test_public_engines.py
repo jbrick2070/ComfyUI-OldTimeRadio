@@ -62,6 +62,12 @@ _TIER = {
     # `8gb`: "16GB" read as a comfortable fit for a 16 GB card while the render
     # peaks at 97.6% of one.
     "ltx23_high_video": "ltx_video",
+    # Lane 19, 2026-08-12: the first ADD rather than a rename or a move -- a new
+    # engine, so there is no old public id to retire and no alias row. `low` is
+    # measured and it is what chose the canvas: 7.28 GiB at 864x480 against 9.15
+    # at H3's trained 1344x768, so the lane declares the canvas where the token
+    # is true rather than applying the token to whatever it renders.
+    "h3_low_video": "minimax_h3_video",
 }
 
 

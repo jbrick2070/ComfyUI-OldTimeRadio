@@ -105,11 +105,21 @@ class FrameContract:
         THE UNIT IS FRAMES, NOT SECONDS. ``coverage_plan`` compares these
         numbers against ``target_visible_frames`` directly, so a provider menu
         expressed in seconds MUST be multiplied by :attr:`native_fps` at the
-        declaration site. Veo's 4/6/8 s at 24 fps declares ``(96, 144, 192)``.
-        The field was named ``discrete_durations`` until 2026-07-26; it was
-        renamed because the old name invited exactly that seconds-for-frames
-        substitution, and a validator cannot catch it -- ``(4, 6, 8)`` is a
-        perfectly well-formed frame menu, just a wrong one.
+        declaration site -- and by the CANVAS rate, never the model's. Veo's
+        4/6/8 s menu declares ``(100, 150, 200)``: 25 fps, not Veo's own 24.
+        (This paragraph taught ``(96, 144, 192)`` until 2026-08-12, which is
+        the exact value the chunk-7a QA panel had already corrected in
+        ``eng_google_veo_video`` on 2026-07-26 and which
+        ``tests/test_engine_contract_roster.py`` asserts is wrong. Every 24 fps
+        lane is delivered at 25 -- Veo by the provider-side duration-preserving
+        resample in ``cloud_media_canonical``, MiniMax H3 by its own index map
+        before the encoder -- so a menu counted at 24 lists lengths nothing
+        downstream can ever produce, and a contract listing them refuses every
+        real beat. It is the first thing an adapter author reads, so it now
+        matches the code.) The field was named ``discrete_durations`` until
+        2026-07-26; it was renamed because the old name invited exactly that
+        seconds-for-frames substitution, and a validator cannot catch it --
+        ``(4, 6, 8)`` is a perfectly well-formed frame menu, just a wrong one.
     ``native_fps``
         The frame rate these frame numbers are expressed at, or ``0`` for an
         engine that renders at whatever the canvas asks for. Static and

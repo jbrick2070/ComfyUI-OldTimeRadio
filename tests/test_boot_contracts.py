@@ -86,9 +86,16 @@ def test_the_env_mapping_only_emits_knobs_a_launcher_actually_reads():
     """Lesson L6. `sage_attention` gets NO env row because no launcher passes
     an attention flag -- emitting one would be another configured knob that
     reaches nothing. Sage-sensitive lanes refuse at assert_usable instead,
-    which is enforcement that runs."""
+    which is enforcement that runs.
+
+    The reserve row joined this expectation in LANE 19 (2026-08-12), when the
+    H3 contract's `reserve_vram_gb` moved None -> 12.0 on the lab receipts. The
+    subject of this test is the knob that gets NO row, so both halves are
+    asserted: the two knobs a launcher reads DO emit, and Sage still does not.
+    """
     env = bc.launch_env_for(bc.H3)
-    assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1"}
+    assert env == {"OTR_HEADLESS_DISABLE_PINNED": "1",
+                   "OTR_HEADLESS_RESERVE_VRAM_GB": "12"}
     assert not any("SAGE" in k.upper() for k in env)
 
 
@@ -186,8 +193,16 @@ def test_a_failed_sage_probe_is_not_a_pass():
     """`running_server_boot_state` recorded `sage_probe_error` and NOTHING read
     it, so a probe that raised left `sage_attention = None` and the comparison
     skipped -- silently passing a Sage-constrained contract on the exact lanes
-    Sage silently corrupts. Recording an error nobody reads is swallowing it."""
-    state = {"available": True, "disable_pinned_memory": True,
+    Sage silently corrupts. Recording an error nobody reads is swallowing it.
+
+    The state SATISFIES every other H3 knob on purpose, so the only thing this
+    can fail on is its subject. It gained `reserve_vram_gb` in lane 19 when the
+    contract did; without that the reserve complaint sorts first and
+    `problems[0]` stops being about Sage at all -- the test would still pass or
+    fail for reasons unrelated to the probe.
+    """
+    state = {"available": True, "reserve_vram_gb": 12.0,
+             "disable_pinned_memory": True,
              "sage_attention": None, "sage_probe_error": "ImportError"}
     problems = bc.check_running_server(bc.H3, state=state)
     assert problems and "ImportError" in problems[0]
@@ -224,8 +239,12 @@ def test_sage_is_checked_only_when_the_contract_names_it():
     assert bc.check_running_server(bc.HUMO_DIET, state={
         "available": True, "reserve_vram_gb": 2.921,
         "disable_pinned_memory": True, "sage_attention": True}) == []
+    # Every OTHER H3 knob is satisfied here on purpose, so Sage is the only
+    # thing left to complain about. `reserve_vram_gb` was added in lane 19 with
+    # the contract itself: without it the reserve complaint sorts first and this
+    # assertion would be reading a message about the wrong knob.
     problems = bc.check_running_server(bc.H3, state={
-        "available": True, "reserve_vram_gb": None,
+        "available": True, "reserve_vram_gb": 12.0,
         "disable_pinned_memory": True, "sage_attention": True})
     assert problems and "SageAttention" in problems[0]
 

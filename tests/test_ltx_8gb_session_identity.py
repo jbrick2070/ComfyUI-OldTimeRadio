@@ -172,6 +172,15 @@ _ENGINES_WITH_A_SESSION = {
     # partitioner's side so the next capped adapter cannot be missed.
     "ltx_video",               # 2026-07-29, live campaign
     "ltx_audio_in",            # 2026-07-29, same fix (declared on _LtxAvBase)
+    # LANE 19, 2026-08-12. The first engine to join this set by ARRIVING rather
+    # than by being repaired -- and it did not get the choice. It splits (a
+    # discrete menu topping out at ~15 s cannot cover a 30 s beat in one call)
+    # and it holds local handles, so test_multiclip_session_identity_roster
+    # refused it the moment it registered. That is the roster invariant closing
+    # from the partitioner's side exactly as the note above predicted, one lane
+    # after it was written. Its identity is engine + frozen recipe + a re-stat
+    # of all three weights (never a hash of 21 GB).
+    "minimax_h3_video",        # 2026-08-12, lane 19
 }
 
 

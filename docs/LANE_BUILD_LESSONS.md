@@ -1458,6 +1458,139 @@ and `::test_the_synthesised_floor_STILL_WORKS_for_a_uses_still_False_family`.
 
 ---
 
+## L23 -- The environment a module is IMPORTED under is not the one it is TESTED under
+
+**Check:** does any module in `nodes/_otr_shared/` or `nodes/_otr_video_engines/`
+reach a SIBLING package by an absolute `from nodes.<pkg> import ...`? If so it
+works in the CPU suite and raises in production, and no test can see it.
+
+**Symptom, and it has three shapes -- this is what makes it worth an entry.**
+`nodes` resolves against `sys.path`. Under pytest the repo root is on the path,
+so `nodes` IS this package and every such import succeeds. Inside a running
+ComfyUI server it is NOT: ComfyUI has its own top-level `nodes` module (the node
+registry), OTR lives under `custom_nodes/ComfyUI-OldTimeRadio`, and the same line
+raises `ModuleNotFoundError` on every boot. All three live instances behaved
+differently:
+
+* **Raised and was CAUGHT, leaving a field UNKNOWN** -- the Sage probe in
+  `boot_contracts`. UNKNOWN is correctly not a pass, so the lane refused on every
+  server for a reason that was about an import. Dormant for as long as no
+  contract constrained Sage.
+* **Raised and was SWALLOWED into a stale fallback** -- the worst.
+  `content_oracle.family_for_engine` fell into `_FAMILY_FALLBACK` on every call,
+  so the registry was "the source of truth when present" only OFF the runtime.
+  That table stops at 2026-07-05, so five engines resolved to family `""` in
+  production -- not in `MOTION_FAMILIES` -- and were **silently motion-exempt**.
+* **Raised outright** -- `slot_matrix.eligible_engines_for_role`.
+
+**Root cause:** an absolute import used for what is structurally a relative one.
+The fix is one character class: `from .._otr_video_engines import ...`, which
+resolves through the package's own `__name__` and is correct under both names.
+
+**Why no test caught it:** every test runs under the name that makes it work.
+The bug is *in the difference between the two environments*, so the only
+instruments that can see it are a live run or a check on the import ITSELF.
+
+**Runnable check:** a live smoke is what found this. Cheaper, and now automated:
+AST-walk both shared packages for `Import`/`ImportFrom` nodes whose module
+starts with `nodes.`. Do NOT grep the source text -- the comment explaining the
+fix necessarily quotes the broken line (see L20).
+
+**Twin assertion:**
+`tests/test_minimax_h3_video.py::test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import`,
+plus `::test_the_family_oracle_answers_from_the_REGISTRY_not_the_stale_table`
+for the soft-failure half, which asserts the CONSEQUENCE rather than the import.
+
+---
+
+## L24 -- A contract drafted from prose clamps the knobs someone wrote down
+
+**Check:** before shipping a boot contract (or any "run it this way" record),
+find the measurement legs that actually PASSED and diff their real boot lane
+against the contract. Every knob in the passing lane and not in the contract is
+a knob the contract is silently relying on.
+
+**Symptom:** the contract names real knobs, passes its own verification, and the
+lane still blows the ceiling -- because the knob that decides the outcome was
+never in it.
+
+**Root cause:** `h3` was written from the spec's sentence ("sage_attention: false
+plus `--disable-pinned-memory`") before any H3 measurement was read back. The lab
+receipts said something else: **every** passing H3 leg on this box held
+`--reserve-vram 12`, including the trained 1344x768 canvas at 9.15 GiB, while the
+one I2V leg without it peaked **15.39 GiB and FAILED** on a canvas 2.6x SMALLER
+and a length SHORTER. A smaller, shorter render peaking 70% higher is not a
+canvas effect -- and the mechanism is plain, since reserving 12 GiB away from
+model loading is what forces a 21 GB DiT to stream rather than attempt residency.
+
+**The generalisation:** a contract assembled from what a document SAYS is a
+hypothesis. The passing runs are the evidence, and the difference between them
+and the failing run is the contract. Read the receipts, not the prose.
+
+**Twin assertion:**
+`tests/test_minimax_h3_video.py::test_the_h3_contract_carries_the_MEASURED_reserve_clamp`
+and `::test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it`
+(the second is L6's rule: a boot pin no launcher turns into argv clamps nothing).
+
+---
+
+## Lane 19 -- `h3_low_video` / `minimax_h3_video`, closed 2026-08-12 -- THE FIRST NEW ENGINE
+
+Full receipt: `docs/evidence/lane_receipts/lane19-h3_low_video.md`. Lanes 10-18
+repaired lanes that already existed; this one ADDS a 33.1B packed AV DiT, and the
+shelf's defaults inverted in two places.
+
+**What bit (1): the smoke found two production bugs and the test suite found
+neither.** Both are written up as L23 (the import) and L24 (the contract), and
+both had SHIPPED. The pattern connecting them is that each was invisible to
+every instrument except a live run: one lived in the difference between the test
+environment and the server, the other in the difference between a spec sentence
+and a measurement. **A lane's smoke is not a formality that confirms the tests.**
+
+**What bit (2): the lexical-gate lesson fired in the INVERSE direction, twice in
+one lane.** L20 records that prose containing a gate's token can SATISFY the
+gate. The same instrument can also BREAK it: a test greping the adapter source
+for `VAEDecodeAudio` failed on the `_build_graph` docstring that explains why the
+audio decoder is absent. Both times the fix was to ask the STRUCTURE -- the built
+graph, the AST -- instead of the text. **L20's check should be read in both
+directions**, and its runnable form is simply: never grep source text for a token
+that the correct code is likely to discuss.
+
+**What bit (3): a new engine makes every ROSTER notice, and that is the cost of
+admission.** Ten tests went red on registration -- boot-contract fixtures whose
+H3 state no longer satisfied the contract, the public-id table, the still-plan
+parity fixture, the layer-2 geometry equality check (my `scene_character` row
+dropped "16:9" and was caught), and the session-identity roster, which correctly
+refused a splittable lane holding local handles that declared no
+`session_identity`. Every one was fixed at the FIXTURE or by writing the missing
+declaration -- never by weakening the gate. Same shape as lane 8's six red tests.
+
+**Runnable check:** after `@register`, run the roster suites BEFORE the lane
+suite -- `test_public_engines`, `test_still_plan_parity`,
+`test_still_plan_layer2_parity`, `test_multiclip_session_identity_roster`,
+`test_boot_contracts`. They enumerate what a new engine owes.
+
+**What bit (4): `render_single` is missing whatever the newest lane needs.**
+Lane 7 taught it to read `declared_render_canvas`; lane 19 had to teach it to
+select a boot contract, because it invents its own request and passes
+`profile=None`, which means `default`. This is now a PATTERN, not an incident:
+every solo lane smoke runs through that one function, so anything production
+carries and it does not invent is absent from every smoke. **Before smoking a
+lane that declares something new, check whether `render_single` asks for it.**
+
+**What did NOT bite:** the frame contract, the still plan, the public surface and
+the ENGINE_MATRIX row were mechanical once the grid was derived rather than
+transcribed; deriving `H3_CANVAS_RUNGS` from the node's own `align_frame_count`
+at import meant the published menu could not disagree with what the node snaps
+to, and it reproduced the spec's tuple exactly without ever being compared to it.
+
+**An OPEN gap this lane deliberately did not close:** no NET VRAM figure. The
+leg reports 6,315 MB ABSOLUTE and no pre-queue baseline was sampled, so no net is
+claimed and **nothing in this receipt may seed a cost row** (L7: name the
+surface, and the cost-row surface is NET).
+
+---
+
 ## Lane 18 -- `still_word`, closed 2026-08-11 -- AND THE CHEAP SHELF IS FINISHED
 
 Two of this lane's three assigned items were already closed. The lane's value

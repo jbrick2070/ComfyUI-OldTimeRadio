@@ -58,6 +58,24 @@ HUMO_DIET = "humo_diet"
 #: Comfy-Org/ComfyUI#15263, and the per-model KJ probe FAILED on sm_120) plus
 #: pinned memory disabled. Declared here ahead of its adapters so the mechanism
 #: and its second consumer land without a schema change.
+#:
+#: **`reserve_vram_gb` MOVED None -> 12.0 in lane 19 (2026-08-12), on the lab
+#: receipts, and it is the difference between this lane fitting and not.** The
+#: contract was drafted from the spec's prose before any H3 measurement was read
+#: back. Every MiniMax H3 leg on this box that PASSED the 14.5 GiB gate was
+#: booted with `--reserve-vram 12`, including the trained 1344x768 canvas at
+#: model f124 (9.15 GiB absolute). The one I2V leg booted WITHOUT it --
+#: `h3_i2v_canonical_832x480_f107` -- peaked at **15.39 GiB and FAILED**, on a
+#: canvas 2.6x SMALLER and a length SHORTER than the leg that passed at 9.15.
+#: A smaller, shorter render peaking 70% higher is not a canvas effect; the boot
+#: is the only structural difference, and the mechanism is plain -- reserving 12
+#: GiB away from model loading is what forces the 21 GB DiT to stream instead of
+#: attempting residency on a 16 GB card.
+#:
+#: Left at None this contract would have named the sage and pinned-memory knobs,
+#: passed its own check, and still let the lane load its way over the ceiling --
+#: a contract that constrains the two knobs that were easy to write down and not
+#: the one that decides the outcome.
 H3 = "h3"
 
 #: The LTX-AV diet (row 7b, operator ruling 2026-08-11). `ltx_audio_in` cleared
@@ -99,7 +117,7 @@ BOOT_CONTRACTS = {
         "sage_attention": None,
     },
     H3: {
-        "reserve_vram_gb": None,
+        "reserve_vram_gb": 12.0,     # see the H3 note above: measured, not tidy
         "disable_pinned_memory": True,
         "sage_attention": False,
     },
@@ -184,7 +202,26 @@ def running_server_boot_state() -> dict:
     state["disable_pinned_memory"] = bool(
         getattr(args, "disable_pinned_memory", False))
     try:
-        from nodes._otr_video_engines.motion_common import sageattention_patched
+        # RELATIVE, and it has to be (lane 19, 2026-08-12 -- found by a live
+        # smoke, not by a test). This read `from nodes._otr_video_engines...`,
+        # an ABSOLUTE import that resolves `nodes` against sys.path. In the CPU
+        # suite the repo root is on sys.path, so `nodes` IS this package and the
+        # probe worked. Inside a running ComfyUI server it is NOT: ComfyUI has
+        # its own top-level `nodes` module (the node registry), OTR lives under
+        # custom_nodes/ComfyUI-OldTimeRadio, and the import raised
+        # ModuleNotFoundError on every boot.
+        #
+        # The failure was silent until this lane because the probe's error is
+        # only CONSULTED when a contract constrains Sage, and `h3` is the first
+        # one that does -- so the bug shipped dormant behind a `default` and a
+        # `humo_diet` that both say "don't care" about Sage. It then presented
+        # as an unrenderable lane: UNKNOWN is correctly not a pass, so the H3
+        # lane refused on every server, for a reason that was about the import
+        # and not about Sage.
+        #
+        # A relative import resolves through THIS package's own __name__, which
+        # is correct under both names.
+        from .._otr_video_engines.motion_common import sageattention_patched
         state["sage_attention"] = bool(sageattention_patched())
     except Exception as exc:  # noqa: BLE001
         state["sage_attention"] = None

@@ -21,8 +21,17 @@ provider serves a fixed set of lengths and nothing between them.
 engine renders at whatever rate the canvas asks for and the seconds column is
 meaningless rather than merely unknown -- it is marked `unbounded`.
 
-**Google runs at 24 fps against a 25 fps canvas.** Veo's published menu is 4/6/8
-SECONDS, which is 96/144/192 frames. The contract counts frames.
+**Two lanes run at 24 fps against a 25 fps canvas, and every contract in this
+page counts CANVAS frames.** Veo's published menu is 4/6/8 SECONDS, which is
+**100/150/200** frames at 25 -- not 96/144/192, which is the same menu counted
+at Veo's own 24 and is a length nothing downstream can produce. (This paragraph
+said 96/144/192 until 2026-08-12, contradicting the `google_veo_video` row in
+the table above it.) The two lanes reach 25 by different routes:
+`google_veo_video` by the provider-side duration-preserving resample in
+`cloud_media_canonical`, and `minimax_h3_video` by its own nearest-source-frame
+index map applied to the decoded batch before the encoder -- the local encoder
+can LABEL a frame rate but never resample one, so a 24 fps render shipped
+without that map would play ~4% short.
 
 ## What is NOT here, and why
 
@@ -64,6 +73,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
 | ltx_video | local | text_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
+| minimax_h3_video | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | strict_first_frame | yes |
 | still_flat | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_motion | local | static_motion | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_pan | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
@@ -96,6 +106,7 @@ SECONDS, which is 96/144/192 frames. The contract counts frames.
 | ltx_audio_in | text_prompt, audio_ref, init_image | text_prompt REQUIRED |
 | ltx_video | text_prompt | text_prompt REQUIRED |
 | mesh_stage | init_image | no text input |
+| minimax_h3_video | init_image | text_prompt OPTIONAL (sent when present) |
 | still_flat | text_prompt | text_prompt REQUIRED |
 | still_motion | text_prompt | text_prompt REQUIRED |
 | still_pan | text_prompt | text_prompt REQUIRED |
@@ -132,6 +143,7 @@ the engine's own `aspect` column above.
 | ltx_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never; portrait/wide/when_engine_talking; portrait/inherit_engine/when_engine_talking |
 | ltx_video | scene_open/wide/when_ltx_i2v_enabled; scene_beat/wide/when_ltx_i2v_enabled; scene_character/wide/when_ltx_i2v_enabled; portrait/inherit_engine/never |
 | mesh_stage | mesh_fodder/wide/always; scene_background_plate/wide/always; portrait/inherit_engine/never |
+| minimax_h3_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_flat | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_motion | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_pan | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -170,6 +182,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | ltx_audio_in | 1024x576 | declared |
 | ltx_video | 1024x576 | declared |
 | mesh_stage | 1472x832 | declared |
+| minimax_h3_video | 864x480 | declared |
 | still_flat | 1472x832 | shared landscape (by design for this family) |
 | still_motion | 1472x832 | shared landscape (by design for this family) |
 | still_pan | 1472x832 | shared landscape (by design for this family) |
@@ -212,6 +225,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 | ltx_audio_in | single | 1: 449 | 449 | 442 | 0 |
 | ltx_video | chain | 3: 169, 169, 113 | 451 | 442 | 0 |
 | mesh_stage | single | 1: 442 | 442 | 442 | 0 |
+| minimax_h3_video | chain | 2: 323, 129 | 452 | 442 | 0 |
 | still_flat | single | 1: 442 | 442 | 442 | 0 |
 | still_motion | single | 1: 442 | 442 | 442 | 0 |
 | still_pan | single | 1: 442 | 442 | 442 | 0 |
@@ -251,6 +265,7 @@ and it read exactly like a measured number until someone looked.
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | docs/evidence |
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
+| minimax_h3_video | - | contract max | docs/H3_LICENSE_ATTESTATION.md, docs/evidence |
 | still_flat | - | contract max | none cited |
 | still_motion | - | contract max | none cited |
 | still_pan | - | contract max | none cited |
@@ -265,7 +280,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **27**
+* registered engine names: **28**
 * provider-side: **8**
-* local: **19**
-* can chain (strict_first_frame): **5**
+* local: **20**
+* can chain (strict_first_frame): **6**
