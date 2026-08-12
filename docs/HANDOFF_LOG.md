@@ -3,6 +3,53 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-11 -- HEAD 80fba0ce (v2.0-alpha) -- CODER (Lemmy Branch A shipped + proven live; three PBUGs found by a bank sweep)
+
+Did: plan 5.2 (`e791344b`) CastLock re-pin ordering, 5.3 (`fdc016ef`) reference
+  resolution + per-line receipts + IS_CHANGED fingerprint, the G1 audition
+  harness (`7aca595e`), and **Branch A (`46608b93`) after the operator's blinded
+  audition PASSED**. He identified the historic incumbent as Indian WITHOUT
+  seeing its label -- the legitimate version of a claim an earlier draft had
+  wrongly inferred from the `_indian` filename, and which was correctly rejected
+  then. The candidate also beat the same-speaker control, so IndexTTS2 carried
+  the ACCENT through the clone, not merely the timbre.
+
+Proven in production: a six-bank 30-word sweep with the cameo FORCED on every
+  leg. `original` + `media_archive` cast Lemmy on the qualified route and
+  published to `otr/obs/`; `public_domain` + `shakespeare` REFUSED the same
+  forced setting and stamped `source_fidelity_exclusion`. That second half is
+  the one that needed proving -- at an ~11% roll, a broken exclusion looks
+  exactly like a working one unless the ledger records a decision.
+
+Going live found two defects nothing could have caught while
+  `approved_native_routes` was empty: bank-relative ref paths were joined onto
+  the REPO root instead of ComfyUI's MODELS root, and a qualified indextts2 route
+  made the unrelated `bark_legacy` preset bank RAISE. Both fixed at the root.
+
+Also: evergreen slug policy + both OpenRouter slots defaulted to
+  `openrouter/auto` (operator's vendor-resilience argument -- a `~latest` pointer
+  dies with its vendor, a router does not); slug provenance keyed on the id we
+  actually send (`4bc760c8`), whose verifier immediately found two dead Google
+  models; Chunk D (`baf338ee`) making `lemmy_cameo` a legal headless dial.
+
+Corrections I had to make to my OWN work, recorded because the pattern repeats:
+  * a rate test asserted a 24000 Hz bus when the real bus is 48000 -- every
+    assertion in the file agreed with every other, so it was uniformly wrong and
+    permanently green. Fixed by greping the real number out of the source.
+  * `BANK_CAMEO_POLICY` claimed `scifi_news: cameo_allowed`, written from the
+    bank list without measuring. The sweep disproved it.
+  * a `-1` price argument against routers was inconsistent with the evergreen
+    sweep I had just shipped; the operator caught it.
+
+Left OPEN (all three in GO_FORWARD's OPEN BUGS trio): PBUG-20260811-01/02/03.
+  -03 has an ESTABLISHED root cause -- `scifi_news` is a CONTENT-OWNED lane, so
+  the writer's cameo picker never runs; the obvious fix (route it back through
+  `lock_cast`) is exactly what detonates CastLock's replay. Operator row 15.
+
+Suite 9516 -> 9822. Bible 20/24/3 throughout. Canonical workflow untouched. The
+  concurrent video window's `eng_wan_i2v.py` + `otr_g4_wan_ti2v.json` were never
+  staged.
+
 ## 2026-08-11 -- HEAD 77fa4dad (v2.0-alpha) -- CODER (lane 9 closed on two live legs, the decode floor moved 169 -> 9, lane 10 diagnosed, Bible 268 -> 272)
 
 Did: closed lane 9 `ltx23_high_video` (`77fa4dad`). Preflight was 7/7 green

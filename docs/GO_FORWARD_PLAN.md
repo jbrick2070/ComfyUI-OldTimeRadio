@@ -315,10 +315,13 @@ announcer / LEMMY rows which have no ensemble slot"). `voice_cast_decision` is
 likewise built only for open characters and only under `hybrid_voice_fit_enabled()`.
 So he is hard-pinned to bark via `lemmy_row()` and cast on **gender alone** on the
 other six char-voice engines.
-**Mind the cost before coding it:** changing how he is cast MOVES the casting
-roll, which breaks replay parity and needs a DECLARED re-baseline. Consider
-making it OBSERVABLE first -- the pattern that made the upscale stage provable
-this week -- since the audition step (D-3) needs the operator's ears anyway.
+**D-2 IS OPEN ON SIX ENGINES ONLY (scoped 2026-08-11).** The `indextts2` half is
+closed by the Branch A qualified route, which pins him directly and never reads
+`cast_voice_slots`. On the OTHER SIX char-voice engines nothing changed: a
+pre-locked LEMMY row still has no ensemble slot and is still cast on GENDER
+ALONE. **A pin there still owes a DECLARED re-baseline** -- Branch A did not,
+measured (unclaimed rows are byte-identical against a no-policy baseline at both
+`allow_voice_reuse` settings), but that result does not transfer.
 
 ### WAITING ON THE OPERATOR -- the whole list, in one place (2026-08-09)
 
@@ -337,6 +340,7 @@ waiting on me?" without reading the whole file.
 | 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` Â§0A |
 
 | 14 | **LEMMY PHASE 2 CANNOT BE BUILT AS SPECIFIED -- a scope call, surfaced by the r2 panel 2026-08-10 and confirmed at the line.** The plan's central behaviour is *"if an engine cannot meet the Cockney floor, suppress the cameo on that engine rather than silently substitute"*. **That is not expressible in the current graph.** Lemmy is selected UPSTREAM in the writer (`OTR_LedgerScriptWriter.py:4412-4426`); the voice engine is chosen LATER by nodes 80/81, and `BatchCharacterVoices` exposes ONE engine for the entire character bus. So by the time anything knows the engine, the cameo is already written into the script | **PICK ONE:** (a) downgrade the requirement to a FAIL-CLOSED CastLock error (no new surface, but a bad combination stops the render instead of degrading); (b) add ONE upstream engine-policy authority feeding writer + CastLock + renderer so the writer can decline the cameo before authoring -- this needs a NEW NODE/WIDGET SURFACE and `otr_canonical.json` wiring, which r1 explicitly ruled out of scope, so it is a deliberate scope change only you can authorise; or (c) accept the cameo on any engine and drop the floor | `kibitz-runs/2026-08-10-lemmy-cockney/r2/` |
+| 15 | **Should LEMMY be able to appear in `scifi_news` again?** It was his FIRST lane and it worked under the legacy cast picker; the lane later became CONTENT-OWNED, so the writer's cameo picker never runs and the ledger records no decision at all. Not a careless break -- a capability lost to an architectural change (PBUG-20260811-03, root cause established) | A PRODUCT call, then a coder task. YES -> the lane runner offers the cameo when it builds its cast. NO -> it stamps an explicit declined-policy so the ledger says so. Either way the silence ends | `docs/PROD_BUG_LOG.md` PBUG-20260811-03; OPEN BUGS trio above |
 
 **Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
 a dropdown ruling (it became a sprint series), and queue item 1 is closed.
@@ -434,77 +438,31 @@ supported by the bank metadata and that overreach was correctly rejected.
   now reports WHICH line_ids failed and the raise compares that set against the
   route's own lines.
 
-**BRANCH A IS SHIPPED (`46608b93`, 2026-08-10). G1 PASSED.**
+**BRANCH A IS DONE -- shipped, G1 passed, proven in a live six-bank sweep.**
+Detail lives in `docs/HANDOFF_LOG.md` and
+`docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`; it is not repeated
+here, because this file is forward-only.
 
-**AND PROVEN IN PRODUCTION 2026-08-11 by a six-bank render sweep** (one 30-word
-`otr_w45_still_flat` episode per runnable bank, cameo FORCED on every leg).
-Full write-up: `docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`.
+**WHAT REMAINS ON THE LEMMY SPRINT.** Remediation plan `.gemini/antigravity/brain/c494e2df-.../implementation_plan.md`,
+triaged chunk-by-chunk 2026-08-11:
 
-| bank | Lemmy | `lemmy_policy` | |
-|---|---|---|---|
-| `original` | cast, qualified route | `operator_cameo` | PASS |
-| `media_archive` | cast, qualified route | `operator_cameo` | PASS |
-| `public_domain` | refused | `source_fidelity_exclusion` | PASS |
-| `shakespeare` | refused | `source_fidelity_exclusion` | PASS |
-| `scifi_news` | absent | **none recorded** | FINDING |
-| `scifi_news_pro` | -- | writer crashed | PBUG-20260811-01/02 |
-
-Both cameo lanes cast Lemmy on `idx_lemmy_algenib_cockney_v1` via route
-`lemmy-indextts2-algenib-cockney-v1` and PUBLISHED to `otr/obs/`. **The last
-unticked Branch A acceptance row is ticked.** Both fidelity lanes refused the
-same forced `always include` and recorded WHY -- which is the half that needed
-proving, because the cameo is an ~11% roll and a broken exclusion looks exactly
-like a working one unless the ledger states a decision.
-
-**THREE THINGS THE SWEEP FOUND, none of them in the voice route:**
-1. **`scifi_news` writes an EMPTY cast contract** -- the `scifi_news_circuit`
-   pipeline never calls `lock_cast()`, so it silently ignores `lemmy_cameo` AND
-   `num_characters` (asked 2, got 3) and records no `cast_seed`. May be correct
-   (a news lane may own its cast) but it is UNRECORDED, which is the defect.
-   **OPERATOR DECISION OWED.**
-2. **PBUG-20260811-01** -- forcing the cameo kills the `scifi_fable2` writer on
-   `scifi_news_pro`. Reproduced at 30 AND 90 words, so it is not a word squeeze;
-   with the cameo on its natural roll the writer passes cleanly.
-3. **PBUG-20260811-02** -- `scifi_news_pro` dies at node 92 with no materialized
-   still for beat `music_closing_001`, on the same profile where five other banks
-   produced one. Seen once.
-
-**A claim of mine was disproved and corrected in the same push:**
-`BANK_CAMEO_POLICY` had asserted `scifi_news: cameo_allowed`, written from the
-bank list without measuring. It now records observations, and marks
-`scifi_news_pro` `unmeasured` rather than inheriting from its sibling.
-
-**Chunk D shipped (`baf338ee`):** `lemmy_cameo` is a legal creative dial for
-headless drivers, so a qualification run forces the cameo deterministically
-instead of waiting on an 11% roll. It did not create PBUG-01, but it made it
-reachable from the sanctioned runner.
-
-The operator ran the blinded audition and returned a PASS: `arm1` "best cockney
-... preferred" was the candidate; `arm3` "not really cockney but an interesting
-indian" was the incumbent `vz_donor_marshal_indian`. **He identified the
-incumbent as Indian without seeing its label** -- which is the floor-evidence
-failure evidenced properly, after an earlier draft's attempt to infer it from the
-`_indian` in the filename was correctly rejected. The candidate also beat the
-same-speaker control, so IndexTTS2 carried the ACCENT through the clone and not
-merely the timbre.
-
-Shipped: the reference at `models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav`
-(byte-identical to the audited arm-A input), bank row
-`idx_lemmy_algenib_cockney_v1`, and the policy record with the verdict quoted in
-it. Runtime identity is DERIVED, never invented -- `engine_impl_version` is the
-sha256 of the adapter plus its worker, `weight_revision` the sha256 of a
-name+size manifest over the 65 checkpoint files.
-
-**THE LIVE ROUTE EXPOSED TWO REAL DEFECTS that no test could have caught while
-`approved_native_routes` was empty**, which is the whole argument for proving a
-thing live: (1) the validator joined bank-relative ref paths onto the REPO root
-when they are relative to ComfyUI's MODELS root, so the first real route failed
-against a path that never existed -- fixed with an injected `path_resolver` now
-shared by CastLock, the voice node and `IS_CHANGED`; (2) a qualified indextts2
-route made the unrelated `bark_legacy` preset bank RAISE, because no character
-engine resolves there -- it now logs and declines instead.
-
-**Branch B stays unbuilt.** It was only ever for a G1 failure, and G1 passed.
+* **Chunk A1 -- a LIVE cache defect.** `OTR_INDEXTTS2_EMO_ALPHA` is read at
+  generate time while the cache key captures `profile.default_params` at
+  request-build time, so an env override changes the RENDER without changing the
+  KEY. `IS_CHANGED` carries no emo_alpha term either. Independent of the rest.
+* **Chunk C items 2/3/5.** SceneSequencer integration coverage at 22050/44100 --
+  every existing fixture starts AT the 48000 bus, so nothing proves the real
+  resample path -- plus the rate-assumption sweep. Item 1 is done.
+* **Chunks A2 -> A3 -> A4.** v2 identity + replay bridge. **Operator ruled
+  2026-08-11: AUTO-PROMOTE on a clean replay** -- if A4 reproduces all six frozen
+  clip hashes, A2/A3 rewrite the receipt's identity fields with no second
+  sign-off. `tts_emo_alpha` follows the existing loose numeric convention; no new
+  null-shape walker.
+* **Chunk B.** Shared voice-ref path resolution breadth -- three engines still
+  carry their own `_resolve_ref`. Fully independent, blocks nothing.
+* **Chunk E.** Release/OBS audit: does swapping Lemmy's voice count as an
+  EDITORIAL RECAST for an audience that already heard the old one? Operator only.
+* **Branch B stays unbuilt.** It existed only for a G1 failure, and G1 passed.
 
 
 ### GOOGLE SLUGS -- TWO OPERATOR CALLS OWED (the build shipped `4bc760c8`)
@@ -1950,6 +1908,36 @@ real; their coordinates are not. **Re-pin a row's cite when you touch it.**
 Path note (verified 2026-08-04): engine adapters live under
 `nodes/_otr_video_engines/` (and `_otr_audio_engines/`, `_otr_image_engines/`)
 -- bare `eng_*.py` cites in these rows are shorthand for those paths.
+
+### The 2026-08-11 bank-sweep trio (LEMMY sprint, all three OPEN)
+
+Found by a six-bank live render sweep, not by tests. Full detail lives in
+`docs/PROD_BUG_LOG.md` and `docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`;
+these rows exist so a window working THIS list actually sees them.
+
+* **PBUG-20260811-03 -- `scifi_news` lost the LEMMY cameo it was built for.**
+  ROOT CAUSE ESTABLISHED: `scifi_news` is a CONTENT-OWNED lane
+  (`delivery_mode_for_meta(meta) == CONTENT_OWNED`, measured off the sweep's own
+  ledger; `original` is `legacy`). Content-owned runners build their own cast and
+  never run the writer's seeded picker, and `lock_cast()` is what applies the
+  cameo -- so it cannot fire there. The empty `cast_contract` is the same
+  deliberate decision: that block stamps `meta.episode_seed` and withholds
+  `cast_seed`, because claiming one on a lane-owned cast detonated CastLock's
+  replay before (`num_characters must be 1-6, got 0`).
+  **THE OBVIOUS FIX IS THE WRONG ONE** -- routing content-owned lanes back
+  through `lock_cast()` is precisely what that comment warns against. The repair
+  belongs in the lane runner. **Operator row 15.**
+  *Worst of the three by exposure:* nothing fails and nothing logs, so every
+  `scifi_news` episode since the redesign has shipped with no cast contract.
+* **PBUG-20260811-01 -- forcing the cameo kills the `scifi_fable2` writer on
+  `scifi_news_pro`.** `pass 'script' failed after 4 attempt(s): markup ladder
+  exhausted; BAD_LINE`. Reproduced at 30 AND 90 target words, so NOT a word
+  squeeze; with the cameo on its natural roll the writer passes cleanly. Root
+  cause not established.
+* **PBUG-20260811-02 -- `scifi_news_pro` dies at node 92 with no materialized
+  still for beat `music_closing_001`** (`still-spine handoff missing materialized
+  scene still ... engine still_flat`), on the same profile where five other banks
+  produced one. Seen ONCE. Re-run before treating the cause as understood.
 
 ### The P0 / source-span cluster (2026-07-30)
 
