@@ -3985,13 +3985,14 @@ only visible because the cameo was FORCED and then did not appear.
   RecursionError; a shared subtree is not mistaken for a cycle; a hostile
   `__repr__` cannot take down the handler; and end to end
   `save_ledger_safe` returns False, logs the path, and leaves NO partial ledger.
-- **not yet proven on a live leg.** The running gate booted before this fix, so
-  its `public_domain` leg must be re-run. That re-run is owed anyway: that leg
-  was also corrupted by an unrelated harness fault (see below).
+- **PROVEN ON A LIVE LEG, 2026-08-12 09:17.** Re-ran `public_domain` against a
+  server booted with the fix: **PASS, exit=0, 9.1 min**, against the 2.2-minute
+  death before it. The `--only`-style re-run also cleared the unrelated harness
+  fault that had corrupted the first attempt (see below).
 - **harness fault, same leg, NOT a product defect:** the leg log also shows
   `NameError: name 'describe_execution_error' is not defined` at
   `scripts/otr_api.py:749`. That was self-inflicted -- `otr_api.py` was edited
   between two edits while the gate was spawning subprocesses that import it, so
   that leg imported a half-applied file. **Never edit a module mid-campaign when
   legs import it per-subprocess.** The file is consistent now.
-- status: FIXED, pending a live re-run of the `public_domain` leg.
+- status: FIXED and CLOSED -- proven by a live passing leg.
