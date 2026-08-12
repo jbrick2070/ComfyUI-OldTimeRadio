@@ -1606,23 +1606,54 @@ def _strip_conversational_wrapper(raw: str) -> str:
     return trimmed
 
 
+#: A token that OPENS with one of these is a stage direction wearing a label,
+#: not a speaker. ``*`` joined ``(`` and ``[`` on 2026-08-12 -- see
+#: :func:`_standalone_stage_direction_repair_note`.
+_STAGE_DIRECTION_PREFIXES = ("(", "[", "*")
+
+#: The defect codes a stage-direction-shaped row can raise. It reaches
+#: ``BAD_LINE_SHAPE`` when it has no colon, and ``UNKNOWN_SPEAKER`` when it DOES
+#: -- ``*SFX: door slams`` parses as a speaker named ``*SFX`` -- which also
+#: trips ``SKELETON_BREAK`` if it lands outside a scene.
+_STAGE_DIRECTION_CODES = ("BAD_LINE_SHAPE", "UNKNOWN_SPEAKER", "SKELETON_BREAK")
+
+
 def _standalone_stage_direction_repair_note(defect_rows):
-    """Give the repair rung an explicit rule for illegal parenthetical rows.
+    """Give the repair rung an explicit rule for illegal stage-direction rows.
 
     The parser reports the offending source row and line number. Keep that
     evidence in the repair instruction so a retry repairs the named format
     defect instead of regenerating a similarly shaped whole-play artifact.
+
+    SCOPED TOO NARROWLY UNTIL 2026-08-12 (PBUG-20260812-03), and it cost a live
+    leg. It fired only on ``BAD_LINE_SHAPE`` whose detail opened with ``(`` or
+    ``[``. A model wrote ``*SFX: ...``, which HAS a colon and therefore parses
+    as a SPEAKER -- so the defects were ``UNKNOWN_SPEAKER: *SFX (line 25)`` and
+    ``SKELETON_BREAK``, this note returned "", and the repair rung got only the
+    generic "repair the defects below". The model re-emitted the same shape four
+    attempts running, the ladder exhausted, and the episode died in the writer
+    having never reached a video engine -- the third time this module's own
+    docstring records that exact ending.
+
+    STILL DELIBERATELY NARROW where it matters: the note only fires when the
+    offending TOKEN actually looks like a stage direction. An
+    ``UNKNOWN_SPEAKER`` for a misspelled cast name must NOT be told to fold the
+    row into a neighbouring line -- that would be wrong advice, and losing a
+    real character's line is worse than the failure it replaces.
     """
     for defect in defect_rows:
         row = str(defect)
-        if not row.startswith("BAD_LINE_SHAPE"):
+        if not row.startswith(_STAGE_DIRECTION_CODES):
             continue
         _, _, detail = row.partition(":")
-        if detail.lstrip().startswith(("(", "[")):
+        if detail.lstrip().startswith(_STAGE_DIRECTION_PREFIXES):
             return (
-                "\nFORMAT REPAIR RULE: a standalone parenthetical or bracketed "
-                "row is an illegal stage direction. Do not return it as its own "
-                "line. Preserve a necessary event only by folding it into the "
+                "\nFORMAT REPAIR RULE: a standalone parenthetical, bracketed "
+                "or asterisked row is an illegal stage direction. Do not return "
+                "it as its own line, and do not use it as a SPEAKER LABEL -- a "
+                "row like '*SFX: a door slams' is a stage direction wearing a "
+                "label, not a character, and there is no sound-effect speaker. "
+                "Preserve a necessary event only by folding it into the "
                 "nearest legal labelled spoken line as natural words, or omit "
                 "it when nonessential. Every nonblank row must begin with a "
                 "legal label; do not invent an unlabeled narration row."

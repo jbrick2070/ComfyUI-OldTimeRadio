@@ -3767,3 +3767,58 @@ only visible because the cameo was FORCED and then did not appear.
   message names neither the model nor the field.
 - status: OPEN -- root cause PROVEN and reproduced, production trigger not yet
   located, no fix attempted.
+
+## PBUG-20260812-03 -- the repair rule could not fire on the defect class it was written for, and a leg died four attempts running
+
+- surfaced: LIVE headless leg, 2026-08-12 06:52, the `viz_green` leg of the
+  45-word every-visual-path campaign (profile `otr_w45_viz_green`, source bank
+  rolled to `scifi_fable2`). `OTR_LedgerScriptWriter` failed after 3.0 min:
+  `[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
+  exhausted; last defects: - UNKNOWN_SPEAKER: *SFX (line 25) - SKELETON_BREAK:
+  character line (*SFX) after the last scene`. Leg verdict: `FAIL (exit=1)
+  no new file in otr/obs`. The episode never reached a video engine.
+- symptom: the markup ladder burns all four attempts on the SAME defect and
+  gives up. From the outside it reads as a model that cannot follow the format;
+  in fact the model was never told what the fix was.
+- **root cause.** `_standalone_stage_direction_repair_note`
+  (`_otr_scifi_fable2.py:1609`) exists to hand the repair rung an explicit rule
+  for an illegal stage-direction row. It fired only when the defect code was
+  `BAD_LINE_SHAPE` **and** the detail opened with `(` or `[`. A stage direction
+  written WITH A COLON -- `*SFX: a door slams` -- does not take that path at
+  all: it matches the speaker catch-all, so the code is `UNKNOWN_SPEAKER`
+  (plus `SKELETON_BREAK` when it lands outside a scene) and the detail opens
+  with `*`. Three independent ways to miss one rule. The note returned `""`,
+  the rung got only the generic "Repair only the malformed FORMAT defects
+  below", and the model re-emitted the same shape until the ladder exhausted.
+- **this is the THIRD time this ending is on the record**, and the previous two
+  are written into `_otr_fable2_markup`'s own module docstring: a decorated
+  label falling to the `_RE_SPEAKER` catch-all, `UNKNOWN_SPEAKER` four attempts
+  running, the leg dying in the writer. Those two were fixed by teaching the
+  PARSER to normalize the decoration (balanced `**` shapes 1-4). This one is
+  the other half of the same story -- when the parser CORRECTLY refuses, the
+  repair rung has to be able to say why.
+- fix: SHIPPED, and it is PROMPT-ONLY -- it cannot make an invalid script
+  valid. The note now fires on `BAD_LINE_SHAPE`, `UNKNOWN_SPEAKER` and
+  `SKELETON_BREAK` when the offending TOKEN opens with `(`, `[` or `*`, and the
+  rule text names the speaker-label case explicitly ("a row like '*SFX: a door
+  slams' is a stage direction wearing a label, not a character, and there is no
+  sound-effect speaker"). No parser, acceptance rule or schema changed.
+- **what was deliberately NOT widened:** an `UNKNOWN_SPEAKER` for a MISSPELLED
+  CAST NAME still gets no stage-direction advice. Telling the model to fold a
+  real character's line into a neighbour, or to drop it, is worse than the
+  failure it replaces -- so the note requires the token to LOOK like a stage
+  direction, not merely to be an unknown speaker.
+- verify: `tests/test_fable2_stage_direction_repair_note.py` -- 17 tests. The
+  exact two rows from the failed leg now produce the rule; six stage-direction
+  shapes fire; five real-name/other defects stay silent; the original
+  parenthetical case is asserted UNCHANGED; and a non-matching defect ahead of
+  a matching one must not suppress it, which is the order the live leg produced.
+- **NOT proven on a live leg yet.** The fix is verified by unit test and by the
+  mechanism; whether the model actually repairs when told needs a leg that rolls
+  `scifi_fable2` again. The campaign rolls its bank per leg, so that is a matter
+  of re-running rather than of new work.
+- bible-worthy: probably, as a class -- "a targeted repair/remediation rule
+  scoped so narrowly that it cannot fire on the defect it was written for, so
+  the retry loop burns its budget on identical failures". Deferred with
+  PBUG-20260812-02 until both writer defects are settled.
+- status: FIXED (prompt-only), pending a live re-run.
