@@ -101,6 +101,27 @@ LEG_ORDER = (
     "mesh_stage", "ltx_8gb", "fastwan_8gb", "ltx_video", "ltx_audio_in",
     "humo_1.7B", "humo_1.7B_169", "humo", "humo_14B_169",
     "wan_i2v", "wan_ti2v",
+    # THE TWO H3 LANES RUN LAST, AND THEY NEED A DIFFERENT BOOT (lanes 19/20,
+    # 2026-08-12). Last because they are by far the slowest -- ~240 s for a
+    # single 5 s beat, against ~22 s for ltx_8gb -- so on the
+    # cheapest-and-least-proven-first rule they are the tail.
+    #
+    # **THEY CANNOT SHARE THIS CAMPAIGN'S SERVER WITH THE HEAVY LANES.** Both
+    # REQUIRE the named `h3` boot contract, whose `--reserve-vram 12` is what
+    # forces a 21 GB DiT to stream on a 16 GB card -- and reserving 12 GiB away
+    # from model loading would starve `wan_i2v` (13.9 GiB warm) and the HuMo
+    # tiers on the same server. A contract is a BOOT fact and boot facts cannot
+    # be fixed at render time.
+    #
+    # So a complete "every visual path" sweep is TWO campaigns against two
+    # boots, not one: this file's default run for the nineteen incumbent lanes,
+    # then `--only minimax_h3_video,minimax_h3_audio_in` against a server booted
+    # with OTR_HEADLESS_RESERVE_VRAM_GB=12 + OTR_HEADLESS_DISABLE_PINNED=1. They
+    # stay in this roster rather than being excluded, because a lane silently
+    # missing from the list is the exact defect the registry-derived roster
+    # exists to prevent -- and because on the wrong boot they REFUSE by name at
+    # preflight rather than rendering something wrong.
+    "minimax_h3_video", "minimax_h3_audio_in",
 )
 
 
