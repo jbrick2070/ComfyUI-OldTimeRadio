@@ -397,8 +397,22 @@ class MeshStageEngine(_CheapFamilyBase):
     #:
     #: The lane's ONE profile (``config/profiles/otr_w45_mesh_stage.json``)
     #: carries the same numbers, so the config an operator reads agrees with
-    #: the render. That channel is a DRIFT GUARD, not an input: nothing reads
-    #: ``render.canvas_w/h`` on the way to a request.
+    #: the render.
+    #:
+    #: **That profile channel is NOT dead, and the corpus wording that calls it
+    #: "read by nothing" is wrong** (traced end to end 2026-08-11, lane 11's
+    #: opening check): ``_otr_workflow_apply`` flattens ``render.canvas_w/h``
+    #: into the node-87 ``OTR_VideoDirector`` widgets -- regenerating this
+    #: lane's variant moved them from ``25, 832, 480`` to ``25, 1472, 832`` --
+    #: and ``otr_video_director`` turns those widgets into ``request["canvas"]``.
+    #: What actually happens is that ``build_request_from_shot`` then OVERWRITES
+    #: the request canvas to the landscape default for every non-face family,
+    #: and this declaration overrules that in turn. So the profile number is
+    #: read, carried, and then twice overruled -- which has the same OUTCOME as
+    #: a dead channel and a completely different failure mode, because an
+    #: operator editing it sees the widget change and concludes it took effect.
+    #: It is a DRIFT GUARD here: it must agree with this declaration, and the
+    #: agreement is asserted rather than assumed.
     render_canvas = (DEFAULT_W, DEFAULT_H)
 
     _selftest_passed = False            # E-6: cube probe gates the first use

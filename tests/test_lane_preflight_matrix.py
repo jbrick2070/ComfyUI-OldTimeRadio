@@ -283,10 +283,10 @@ _G3_STILL_DEFAULTED_LANES = ("still_motion", "still_pan", "still_flat",
 for _lane, _owner in _CHEAP_LANE_OWNERS.items():
     EXPECTED_RED[(_lane, "G2")] = (
         "S8b-11 -- the lane declares no render_canvas while its profiles set "
-        "render.canvas_w/h, so that profile channel is read by nothing and "
-        "the lane renders at the 1472x832 driver default. Its packet decides "
-        "whether to declare the canvas or document the channel dead. "
-        "OWNER: %s." % _owner)
+        "render.canvas_w/h, so the configured number reaches the node-87 "
+        "director widgets and is then OVERWRITTEN by the 1472x832 landscape "
+        "default before the render. Its packet decides whether to declare the "
+        "canvas or document the channel inert. OWNER: %s." % _owner)
     if _lane not in _G3_STILL_DEFAULTED_LANES:
         EXPECTED_RED[(_lane, "G3")] = (
             "L3 -- the FrameContract never names continuity, so "
@@ -411,10 +411,25 @@ def _is_32_legal(canvas):
     return w > 0 and h > 0 and w % 32 == 0 and h % 32 == 0
 
 
-#: Lanes whose PROFILE canvas channel is knowingly, documentedly dead -- the
-#: engine reads its own declaration (or the driver default) and never the
-#: profile's `render.canvas_w/h`. An entry here is a claim the lane's row on
-#: the matrix page repeats in words; it is not a way to silence G2.3.
+#: Lanes whose PROFILE canvas channel is knowingly, documentedly INERT -- the
+#: number an operator sets in `render.canvas_w/h` cannot decide what this lane
+#: renders at. An entry here is a claim the lane's row on the matrix page
+#: repeats in words; it is not a way to silence G2.3.
+#:
+#: "INERT", NOT "DEAD", and the distinction was measured (lane 11's opening
+#: check, 2026-08-11). The corpus calls this channel "read by nothing"; it is
+#: nothing of the kind. `_otr_workflow_apply` flattens `render.canvas_w/h` into
+#: the node-87 `OTR_VideoDirector` widgets -- regenerating a variant after
+#: editing a profile visibly moves them -- and the director turns those widgets
+#: into `request["canvas"]`. The number is then OVERWRITTEN by
+#: `build_request_from_shot`'s landscape default for every non-face family, and
+#: a `render_canvas` declaration overrules that in turn.
+#:
+#: Why the distinction earns its keep: a channel nobody reads is a tidiness
+#: problem, while a channel that is read, carried into the request, and then
+#: silently overruled is a TRAP -- the operator edits the profile, watches the
+#: widget change, and concludes it took effect. Any lane documenting itself
+#: here must say the second thing.
 PROFILE_CANVAS_DOCUMENTED_DEAD: dict = {}
 
 
@@ -465,9 +480,9 @@ def gate_g2_canvas(name, eng):
             sizes = sorted({"%dx%d" % v for v in assigned.values()})
             bad.append(
                 "%d profile(s) set render.canvas_w/h (%s) on a lane that "
-                "declares no render_canvas, so that profile channel is read "
-                "by NOTHING and the lane renders at the driver default "
-                "instead (S8b item 11)"
+                "declares no render_canvas, so the number an operator "
+                "configures is OVERWRITTEN by the 1472x832 landscape default "
+                "and never reaches the render (S8b item 11)"
                 % (len(assigned), ", ".join(sizes)))
     return bad
 

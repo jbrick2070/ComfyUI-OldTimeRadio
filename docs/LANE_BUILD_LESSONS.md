@@ -1165,6 +1165,52 @@ catch -- here, a file with a frame extension whose bytes are not an image.
 
 ---
 
+## L18 -- "Read by nothing" and "read, then overruled" are different bugs
+
+**Check:** before writing off a configured knob as dead, TRACE IT FORWARD one
+step at a time and say where it stops. If it reaches a real consumer and is then
+overwritten downstream, it is not dead -- it is a TRAP, and the fix is different.
+
+**Symptom:** identical to a dead channel from the render's side (the configured
+number never decides anything), and the opposite from the OPERATOR's side. Edit
+the profile, regenerate the variant, and the widget visibly changes -- so the
+change looks applied. Nothing anywhere says it was discarded.
+
+**Root cause:** a chain audited by grepping for readers of the FIELD NAME.
+`render.canvas_w` has no driver that reads it, which is true and answers the
+wrong question. `_otr_workflow_apply` flattens it into the node-87
+`OTR_VideoDirector` widgets, and `otr_video_director` turns those widgets into
+`request["canvas"]` -- the field changes NAME at the seam, so a name-keyed grep
+stops one step early and reports a dead end that is a live wire.
+
+**Origin (lane 11's opening check, 2026-08-11, folded back into lane 10):** the
+video corpus and lane 10's own first draft both called the profile canvas
+channel "read by NO driver" and "read by nothing". Measured on lane 10's own
+regenerated variant, node 87 moved from `25, 832, 480` to `25, 1472, 832` when
+the profile changed. What actually discards it is `build_request_from_shot`,
+which overwrites the request canvas to the 1472x832 landscape default for every
+NON-FACE family -- and then a `render_canvas` declaration overrules that too.
+So the number is read, carried into the request, and twice overruled.
+
+**Why it matters and is not pedantry:** the two diagnoses prescribe opposite
+fixes. "Dead" says document the channel and move on. "Read, then overruled"
+says the config must be kept TRUTHFUL, because an operator will act on it --
+which is why lanes 11-18 declare or reconcile rather than annotate.
+
+**Runnable check:** for any field you are about to call dead, follow it through
+every rename. A profile field ends at a WIDGET at least as often as it ends at a
+driver, and `git grep <field>` cannot see past the assignment that renames it.
+Then confirm the terminus by MEASURING -- change the value, regenerate, and diff
+the artifact.
+
+**Twin assertion:**
+`tests/test_video_mesh_stage.py::test_the_profile_canvas_agrees_with_the_declaration`
+(the drift guard the accurate diagnosis obliges), and the corrected wording in
+`PROFILE_CANVAS_DOCUMENTED_DEAD` + G2.3's failure message, which is what every
+later lane reads when it decides how to close its own G2 row.
+
+---
+
 ## Lane 10 -- `mesh_stage`, closed 2026-08-11
 
 Four red gates, the most defective lane left. Both new lessons above are this

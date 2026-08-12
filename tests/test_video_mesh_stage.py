@@ -499,9 +499,16 @@ def test_the_lane_DECLARES_its_canvas_1472x832():
 
 
 def test_the_profile_canvas_agrees_with_the_declaration():
-    """G2.3. The profile channel is a DRIFT GUARD, not an input: nothing reads
-    render.canvas_w/h on the way to a request, so the only thing it can do is
-    tell an operator a number. It must be the number that renders.
+    """G2.3. The profile channel is a DRIFT GUARD. It is NOT dead, which is
+    worth stating because the corpus says it is: `_otr_workflow_apply` flattens
+    render.canvas_w/h into the node-87 OTR_VideoDirector widgets (regenerating
+    this lane's variant moved them from `25, 832, 480` to `25, 1472, 832`) and
+    the director turns those widgets into request["canvas"].
+    `build_request_from_shot` then overwrites that to the landscape default for
+    every non-face family, and the declaration overrules THAT. So the number is
+    read, carried, and twice overruled -- same outcome as a dead channel, worse
+    failure mode, because an operator editing it watches the widget change and
+    concludes it took effect. Hence: it must be the number that renders.
 
     Read from the declaration rather than repeated as a literal, so the next
     move of the canvas cannot make this test lie (lesson L10). Per lane 4's

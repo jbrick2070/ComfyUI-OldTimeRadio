@@ -79,10 +79,25 @@ pixels cannot disagree without a raise. /32-legal on both axes (46x32, 26x32).
 L13's /64 rule does not reach this lane -- no halved stage, no fixed-x2
 upsampler -- though 1472x832 satisfies it anyway.
 
-`config/profiles/otr_w45_mesh_stage.json` said **832x480** and that channel is
-dead: `canvas_w` is schema-validated in `_otr_shared/capability_profiles.py` and
-read by NO driver. It now carries 1472x832 as a DRIFT GUARD, and the variant was
-regenerated in the same change. Per lane 4's G2.3 every profile resolving to
+`config/profiles/otr_w45_mesh_stage.json` said **832x480**. It now carries
+1472x832 as a DRIFT GUARD, and the variant was regenerated in the same change.
+
+**CORRECTION, traced end to end at the start of lane 11 and folded back here:
+that profile channel is NOT dead, and the corpus wording -- "read by nothing" --
+is wrong.** `_otr_workflow_apply.py` flattens `render.canvas_w/h` into the
+node-87 `OTR_VideoDirector` widgets, and `otr_video_director.py` turns those
+widgets into `request["canvas"]`. Measured on this lane's own regenerated
+variant: node 87's widgets moved from `25, 832, 480` to `25, 1472, 832`. What
+really happens is that `build_request_from_shot` then OVERWRITES the request
+canvas to the landscape default for every non-face family, and the declaration
+overrules that in turn.
+
+Same OUTCOME as a dead channel -- the profile number never decides the render,
+so the fix and the reasoning for declaring were both right -- but a materially
+different failure mode, and the next lane needs the accurate one: an operator
+who edits that field watches the node-87 widget change and reasonably concludes
+it took effect. "Dead" would have told lanes 11-18 to document a channel they
+should instead keep truthful. Per lane 4's G2.3 every profile resolving to
 this engine was enumerated, not just the obvious one -- there is exactly one,
 and the test asserts the enumeration is non-empty so G2.3 cannot go vacuous.
 
