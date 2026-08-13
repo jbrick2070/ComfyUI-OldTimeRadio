@@ -75,6 +75,107 @@ operator's requested outline, already implemented, already in the right place.
   because the pipeline already uses a 55%-black caption box and the measured
   dark-background case is 8.96:1. It is a fallback, not the plan.
 
+## 3A. DE-RISK PASS (Opus, 2026-08-12 late) -- READ BEFORE BUILDING
+
+The driver flagged "suppressing the procgen draw without disturbing the
+`card_active` gating" as the risky half. **That framing was wrong**, and the
+real risk is elsewhere. Findings, each cited:
+
+**The gating is trivial.** `card_active` is assigned once (`video_engine.py:527`)
+and read once (`:655`) -- a single if/else, no other consumer repo-wide.
+
+**But `_draw_title_card` draws FIVE things, not one**, and two exist ONLY on
+card frames:
+
+| element | non-card frame | card frame |
+|---|---|---|
+| ident line at `_ident_xy` | solid `=== SIGNAL LOST ===` (`:665`) | the same line, DECODE-SCRAMBLED (`:764-768`) |
+| subtitle `"<title>"` | drawn (`:667`) | not drawn |
+| mm:ss timestamp | drawn (`:669-671`) | not drawn |
+| carrier meter | not drawn | drawn (`:769`) |
+| hero title block | -- | centred -> docked (`:771-828`) |
+
+So **an early return from `_draw_title_card` is WRONG** (it also kills the
+carrier decode and meter -- the carrier scramble IS part of the kept Matrix
+look), and **forcing `card_active` False is WRONG** (kills those two AND adds
+the subtitle + timestamp from frame 0).
+
+**THE MINIMAL DIFF: suppress AFTER the carrier block.** Insert between
+`video_engine.py:769` and `:771` -- after the carrier line and meter, before the
+hero block -- guarded by a helper defaulting to OFF with an
+`OTR_HERO_TITLE_IN_PROCGEN=1` escape hatch for the acceptance control render.
+Two lines of behaviour plus the helper; `card_active`, `_cards`,
+`_resolve_card_windows`, `_draw_ident` and `_draw_carrier_meter` all untouched.
+No widget, no `INPUT_TYPES` change, therefore NO canonical JSON change.
+
+**THE DOCK: keep it in ASS, option (a).** At the end of the dock the hero font
+shrinks to exactly `self._title_size` (`:386,:388`) and its position lerps to
+`ident_x, ident_y` (`:806,:812-813`) -- it lands ON the carrier line and is then
+hard-cut back to the ident at `end_f`. It is a ~0.4 s handoff, not a state.
+Express it as an ASS `\move` from centre to the `_ident_xy` anchor: `_ident_xy`
+is (40, 20) at 1920x1080 and `_ass_header` pins `PlayResX/Y` to 1920x1080
+(`_otr_captions.py:222-223`), so no new math.
+
+### THE ACTUAL DANGER -- fix this BEFORE deleting a single glyph
+
+**`OTRCaptionBurn` has FOUR no-error passthrough exits, and `burn_captions`
+DEFAULTS TO FALSE** (`otr_caption_burn.py:172-174`). It returns the input video
+untouched when: captions are off (`:220-221`), no timed ledger resolves
+(`:224-226`), or the burn raises `ValueError` (`:232-235`) -- which includes
+`build_ass_from_ledger` returning `None` (`:131`), itself returning
+`(None, ...)` when the ledger will not load (`_otr_captions.py:251-252`) **or
+when there are no speech lines** (`:335-336`).
+
+Today that is harmless because the title is baked into pixels. The moment the
+title lives only in ASS, every one of those paths ships an episode with **NO
+TITLE** and a cheerful log line. **Ruling: title events must NOT be gated behind
+`burn_captions`, and the title emission must be a REQUIRED save that refuses
+rather than passes through** -- the same discipline as `61ae356c`. The
+`if not events: return (None, ...)` at `_otr_captions.py:335` must also be
+reordered so title-only output is still valid ASS.
+
+### Two more, verified
+
+* **The card windows cannot be recomputed caption-side.** `self._cards` comes
+  from `_resolve_title_timing(led, volume, fps, total_frames)`
+  (`video_engine.py:2392`), which needs the per-frame VOLUME ENVELOPE for its
+  fallback (`:295-297`) and `total` for the synthesized close (`:323-334`).
+  `build_ass_from_ledger` takes a ledger path and works in seconds
+  (`_otr_captions.py:241`). So the emitter MUST live in `video_engine` and hand
+  CaptionBurn a sidecar. Step 1's "fed by `self._cards`" hid a real cross-node
+  dependency; reimplementing the window math caption-side will drift silently.
+* **Clamp the closing card to the MAIN video, not the encoded file.** The
+  synthesized close sets `music_close_end_f = total` (`:333`) but the encode
+  appends the HUD post-roll (`total_encode_frames = total_frames + _hud_frames`,
+  `:2395`). An ASS end time taken from the final mp4 hangs the closing title over
+  the post-roll and into the credits.
+
+### Struck from this spec
+
+The "time-gated scrim" fallback in section 3 is **unreachable and is withdrawn**.
+The blend is a single global `blend=all_mode=` over the whole frame
+(`otr_post_upscale_procgen_blend.py:390-400,:437-439`) with no per-region and no
+time gating, and `_BLEND_MODE_CHOICES` (`:135-142`) offers no mode where procgen
+darkens source while `screen`+`green_only` is in force. Any scrim means changing
+the blend node itself -- MORE work than the ASS route. **The ASS route is the
+only plan.** Recolouring the hero white also fails: over the measured lit
+monitor it screens to (255,255,255) against a ~200-luminance source, still under
+2:1.
+
+### The regression test that does not exist today
+
+**No test constructs `_CRTRenderer` or calls its `render()`.** Existing title
+coverage is `_title_reveal_progress` (`tests/test_video_render_path_cw4.py:645`,
+pure function), `_draw_crt_overstrike_text` on a standalone canvas (`:662`), and
+`_resolve_title_timing` window arithmetic (`test_video_ledger.py:495,522`).
+Nothing anywhere asserts the ident is on screen, so a silent ident loss ships
+green. Add two headless PIL tests (no ffmpeg, no GPU): one asserting the ident
+slot has phosphor ink DURING a card (carrier decode) and on the first frames
+AFTER it, and one asserting the centre has zero hero ink by default and non-zero
+under `OTR_HERO_TITLE_IN_PROCGEN=1`. Use `draw_scopes=False` so the centre
+assertion is not polluted by the ring/particles/waveform; the grid's green is
+capped at `15 + vol*25` (`:596`), far below a 90 threshold.
+
 ## 4. Build steps
 
 1. **Emit title events.** Add a title-card ASS emitter fed by `self._cards` and
