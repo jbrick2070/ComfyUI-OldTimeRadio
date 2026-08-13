@@ -3,6 +3,76 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-13 -- HEAD cbaf24cc (v2.0-alpha) -- CODER (title card shipped and PROVEN LIVE; the writer runaway finally caught in the act)
+
+Did: closed BOTH operator queue rows, then spent the night on the render gate
+and the defect it exposed.
+  ROW 1: Bible promotions **07.31** (scroll span vs canvas allocation) and
+  **07.32** (legibility through a lighten-only blend), index rows + README count,
+  survival-guide `80fc358`. The required-field list was READ off
+  `test_every_parsed_entry_has_the_documented_fields` -- id/phase/area/symptom/
+  cause/fix/verify/tags, all truthy; `legacy_id` is documented but NOT required,
+  which is likeliest what the backed-out attempt tripped on.
+  ROW 2: title card built in the spec's six-step order, suppression stayed step
+  4. `dc21e4df` + `d75a8866`. **Proven on a published episode**
+  (`signal_lost_wigners_whisper`): 628 TITLE events on ASS layer 1, BOTH cards
+  (0.00-10.00s and 123.16-131.12s), Matrix decode intact, block cursor rendering
+  from its `\p1` drawing, apostrophe surviving `_ass_escape`. Measured on the
+  FINAL artifact: core-vs-outline **13.66:1** / **12.60:1** vs a 4.5:1 gate,
+  where the pre-fix control measures **1.01:1** core-vs-scene. Operator then
+  eyeballed it -- "hard to see from a distance but much improved" -- and the
+  outline went 3 -> 6 with a shadow (+55% dark mass), verified by re-burning the
+  surviving intermediate rather than re-rendering.
+RENDER GATE, run 6: **3 PASS / 3 FAIL, 5 lanes still to run.** `still_pan`,
+  `ltx_8gb` (18.7 min) and **`ltx_video` (68.1 min -- a lane that had NEVER
+  completed a 45-word leg)** pass. `fastwan_8gb` and `wan_ti2v` fail on the
+  **disqualified `FRAME_COST_MODEL` row, NOT VRAM** -- it prices 125 frames at
+  30,125 MB on a 16 GB card, so it refuses on an EMPTY device, and the comment
+  block directly beneath it already said so. Promoted as Bible **12.98**.
+  `wan_i2v` fails on page-thrash (89.7-106.3 s/it vs a documented 29 s/it
+  pathology), killed at 108 min.
+THE WRITER RUNAWAY, characterised from THREE captured specimens after the
+  evidence log shipped: P3 an anaphoric peroration loop ("Let the echoes
+  inspire us / echo / resound", 13,828 tok), P5 escalating repetition ("Before
+  it's too late...", 14,521 tok -- within 1% of PARKED **PBUG-20260729-02**, same
+  pass, now with its text for the first time), and P2 a pure ELABORATION SPIRAL
+  with no repetition at all (15,355 tok, 83k chars). The third kills n-gram
+  detection as a primary signal: only an unclosed-string token counter catches
+  all three.
+Current step: row 3 part-run. `ltx_audio_in` IN FLIGHT at handoff; then HuMo x4
+  and the H3 pair. Read "WHAT IS ACTUALLY LEFT" at the top of GO_FORWARD -- it
+  lists the 5 lanes to run, the 3 that need a retry WITH what must change first,
+  and the 3 code items owed in value order.
+Next: let `ltx_audio_in` finish, then boot HuMo (`HUMO` token + reserve 2.921 +
+  disable pinned) and the H3 pair (no token + reserve 12 + disable pinned).
+  **The launcher token and the profile's `launch.env` are TWO different things
+  and you need both** -- I booted LTX with the right token and no env, which
+  would have refused `ltx_audio_in` inside the render phase an hour later.
+BOX AT HANDOFF: **NOT clean.** ComfyUI server RESIDENT on :8000 (LTX boot, with
+  `--disable-pinned-memory`), campaign process alive, `ltx_audio_in` mid-leg,
+  VRAM 8,460 MiB. Reset per CLAUDE.md section 4 before any new boot.
+Suite **10356 passed / 110 skipped / 1 xfailed**, nothing deselected (10309 at
+  session start; +47 across the title card, heartbeat and cycle-bound work).
+  Bug Bible **20 passed / 24 skipped / 3 xfailed** at survival-guide `0898981`,
+  **276 entries**. `build_variants --check` 50 variants / 0 failures.
+  `validate_canonical_workflow` OK, 23 nodes / 57 links.
+Models: Opus 5 drove and judged. **NO kibitz arc** -- the operator dropped it
+  mid-session ("we already kibitz it, just code, and Sonnet spawn after"), so
+  review was Sonnet 5 QA on the title-card diff (found 4 real defects including
+  a per-line RNG divergence invisible to all 7 of my tests), agy QA (found the
+  stray `.ass` written into the server CWD), an Opus design pass on the runaway
+  (corrected three of my claims against the leg log), and a Fable gate (predicted
+  the varied-drift pathology that the P2 specimen then confirmed). This is a
+  SCOPED review set, NOT a four-round arc, and must not be reported as one.
+**FIVE PREMISE CORRECTIONS this session, all mine, all from concluding on one
+  observation**: the runaway cause, the interrupt behaviour, the "missing" VRAM
+  release, the sibling-control claim, and the VRAM-vs-cost-model attribution.
+  Each was caught within the hour by a test, a reviewer, or the box producing a
+  second data point. The plan now carries "get more samples before choosing"
+  where I most wanted to skip it.
+Commits: 16 on v2.0-alpha (`a0e50fd9` .. `cbaf24cc`), plus survival-guide
+  `80fc358` and `0898981`.
+
 ## 2026-08-12 (night) -- HEAD 84c821d9 (v2.0-alpha) -- CODER (title-card plan hardened by four reviewers; TWO BIBLE PROMOTIONS OWED)
 
 Did: took the title-card legibility item from "operator says it looks bad" to a
