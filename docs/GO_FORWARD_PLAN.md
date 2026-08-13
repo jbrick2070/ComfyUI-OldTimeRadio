@@ -201,6 +201,51 @@ So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v`
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | **DONE** -- `scripts/otr_h3_mime_runner.py`, live run PASS: 864x480, model f90 = **3.750 s exactly at the model's own 24 fps**, and **`nb_streams=2` -- one video plus ONE audio stream**, the inversion this lane exists for. Lossless FLAC score stem from the same decode, plus a ducked voice-over review copy with the picture COPIED not re-encoded; both originals preserved. Registers nothing, and the test asserts that from both sides. **Three live API-boundary failures before the pass** (input dir, DynamicCombo serialization, the `/history` key that says `images` for an mp4) -- all three invisible to a CPU test, recorded as **L27**. Receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. **One operator ruling owed:** CLAUDE.md 0A says "no other runner" and should be amended to name this script |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | **THREE OF FOUR MET 2026-08-12.** The preflight matrix is **29 engines x 7 gates with ZERO non-green cells and ZERO `EXPECTED_RED` entries** -- the table is empty for the first time since it was written. All **21 lane receipts** are present in `docs/evidence/lane_receipts/`. The last expected-red (`google_omni_video` G3) was closed here rather than left: it was the one lane the 21-lane transplant deliberately did not own, and row 22's own contract is what brought it in. Its comment had reasoned "CONTINUITY none" since the lane was written while the call inherited the default -- L3 exactly, and one keyword to fix. **REMAINING: the render gate, and the operator SUPERSEDED it** -- "we need a 45 word render of every visual path" (2026-08-12) replaces "ONE end-to-end episode". That sweep is the last thing in the queue |
 
+### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13 morning)
+
+Rows 1 and 2 of the operator order are CLOSED. Row 3 (the render gate) is
+part-run. This is the live state.
+
+**LANES STILL TO RUN (5 of 21):**
+
+| lane | boot needed | note |
+|---|---|---|
+| `ltx_audio_in` | `LTX` token **+ `OTR_HEADLESS_DISABLE_PINNED=1`** | in flight |
+| `humo`, `humo_14b_169`, `humo_1_7b`, `humo_1_7b_169` | `HUMO` token + reserve 2.921 + disable pinned | never run in this gate |
+| `minimax_h3_video`, `minimax_h3_audio_in` | no token + reserve 12 + disable pinned, sage off | never run in this gate |
+
+**LANES THAT FAILED AND NEED A RETRY, with the reason and what must change:**
+
+| lane | failed on | retry needs |
+|---|---|---|
+| `fastwan_8gb` | `MotionBudgetError` -- the **disqualified `FRAME_COST_MODEL` row**, NOT VRAM (it refuses on an empty card) | delete/replace the row, then re-run. No code change = same failure |
+| `wan_ti2v` | same disqualified row | same |
+| `wan_i2v` | page-thrash, 89.7-106.3 s/it vs a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB | genuinely unknown whether this lane is viable on this box. Never completed a leg. Needs the VRAM question (row 5b) answered first, or a diet contract tried |
+
+**LANES THAT PASSED (6 of 21 this run + the cheap shelf):** `still_pan`,
+`ltx_8gb`, `ltx_video` this run; the four visualizers, four still families and
+`mesh_stage` from earlier sweeps.
+
+**THE THREE CODE ITEMS OWED, none built, in value order:**
+
+1. **Delete or replace the two `FRAME_COST_MODEL` rows.** Two red legs turn
+   green. The repo's own docs say empty is correct. The lab has measured
+   replacements (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
+   6.900/frame vs a shipped 185/frame in both) but the standing ruling says no
+   bench may substitute for the real lifecycle -- **operator has said he will
+   take this back to the lab when the GPU frees up.** Bible **12.98**.
+2. **The in-decode halt for the writer runaway.** Fires on an unclosed-string
+   token count (primary) and a repeating window (secondary), NEVER on
+   `target_words`. Must raise a REROLLABLE capacity phase or it silently
+   becomes the writer veto the directive forbids. Touches every pass P0-P5, so
+   it earns a review first. The runaway text is now captured -- see the
+   cadence-lock section.
+3. **`wan_ti2v` VRAM retention (row 5b).** 15 samples, post clustering ~8.1 GB
+   regardless of peak. NOT engine-specific (`wan_i2v` did both). No conclusion
+   drawn deliberately.
+
+**LEMMY** is untouched and deferred by the operator.
+
 ### OPERATOR ORDER FOR THE NEXT WINDOW (set 2026-08-12 late, supersedes below)
 
 Work these three in THIS order. The operator set it after watching a live leg.
