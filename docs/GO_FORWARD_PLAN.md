@@ -259,6 +259,19 @@ Confirmed grouping:
 | 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 |
 | 4 | (none) | `--reserve-vram 12 --disable-pinned-memory` | the two H3 lanes |
 
+**THE TOKEN AND THE ENV ARE TWO SEPARATE THINGS AND YOU NEED BOTH.** Walked into
+this 2026-08-13 despite quoting L24 an hour earlier. The launcher's SECOND
+ARGUMENT (`LTX` / `WAN` / `HUMO`) enables the ENGINES. The profile's own
+`launch.env` satisfies the CONTRACT. Booting the LTX lane with the right token
+and no env gets you a server where `ltx_video` runs happily and `ltx_audio_in`
+is heading for a render-phase refusal an hour later, because `ltx_av_diet`
+requires `OTR_HEADLESS_DISABLE_PINNED=1` and nothing had set it. Read the env
+out of the profile and export it BEFORE `Start-Process`; do not infer it from
+this table, which lists the clamp but cannot show you the token. Verify it
+landed by grepping the boot log for the flag on the command line -- the
+launcher's own `[launch]` echoes go to the detached console, NOT to the log,
+so their absence proves nothing either way.
+
 **AND THE PROFILE FILENAME IS NOT THE ENGINE ID.** `config/profiles/otr_w45_fastwan.json`
 registers the engine **`fastwan_8gb`**; `--only fastwan` is refused. The refusal
 is clean and loud ("names engines that are not registered local engines"), so it
@@ -283,6 +296,14 @@ with `delivered: ['mesh_stage']` and stills keyed `music_opening_001`. That is
 the live proof the beat-id deletion worked.
 
 **Remaining: 12** -- the 5 in boot A, the 5 in boot B, the 2 in boot C.
+
+**RUN 6 RESULTS SO FAR (2026-08-13): 3 PASS, 3 FAIL.** `still_pan` PASS (carries
+the title card), `ltx_8gb` PASS 18.7 min, **`ltx_video` PASS 68.1 min -- a lane
+that had NEVER completed a 45-word leg and was in the never-run list**, 10 beats
+with zero runaways and zero rerolls, the cleanest leg of the sweep.
+`fastwan_8gb` and `wan_ti2v` FAIL on the disqualified cost-model row (see the
+correction above -- NOT a VRAM fault). `wan_i2v` FAIL on page-thrash. Remaining:
+`ltx_audio_in` running, then HuMo x4 and the H3 pair.
 
 **RUN 6 (2026-08-13, boot 1 = WAN token, unclamped).** `ltx_8gb` **PASS**
 (18.7 min) -- one of this morning's three failures cleared, and it had died in
