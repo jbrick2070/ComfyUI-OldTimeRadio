@@ -199,9 +199,10 @@ Work these three in THIS order. The operator set it after watching a live leg.
 
 | # | Item | Where | State |
 |---:|---|---|---|
-| **1** | **TITLE-CARD LEGIBILITY -- start AND end cards** | `docs/2026-08-12-BUILD-SPEC-title-card-legibility.md` | **SPECIFIED, NOT BUILT -- cut this code FIRST** |
-| **2** | Resume the 45-word render gate | the section below | 9 of 21 legs passed; needs THREE contract-grouped boots |
-| **3** | LEMMY | the Lemmy sections further down | operator hands it over once 1 and 2 are done |
+| **1** | **BUG BIBLE -- TWO PROMOTIONS OWED. DO THIS FIRST.** | see the 2026-08-12 (night) HANDOFF_LOG entry for both write-ups | Attempted and BACKED OUT. `f70df546` credits canvas-vs-content scroll + `83eb759e` lighten-only text legibility. Both admissible (measured on a PUBLISHED episode), neither covered by `BUG_BIBLE.yaml` or `otr_coverage_index.yaml`. My entry shape failed `TestBibleIsActuallyParseable::test_every_parsed_entry_has_the_documented_fields` -- **read the required fields off that test, do not guess.** Promote both + append both index rows in the SAME change; the README entry count moves with it (Three-File Contract) |
+| **2** | **TITLE-CARD LEGIBILITY -- start AND end cards** | `docs/2026-08-12-BUILD-SPEC-title-card-legibility.md` -- read **3A, 3B, 3C** and follow the SIX-STEP order at the end of 3B | **SPECIFIED, FOUR-TIMES REVIEWED, NOT BUILT** |
+| **3** | Resume the 45-word render gate | the section below | 9 of 21 legs passed; needs THREE contract-grouped boots |
+| **4** | LEMMY | the Lemmy sections further down | operator hands it over once 1-3 are done |
 
 **Item 1 is the whole reason the sweep is stopped.** The hero title is phosphor
 green drawn into the procgen CRT frame and composited `screen` + `green_only`,

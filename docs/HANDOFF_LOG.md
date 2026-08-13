@@ -3,6 +3,71 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-12 (night) -- HEAD 84c821d9 (v2.0-alpha) -- CODER (title-card plan hardened by four reviewers; TWO BIBLE PROMOTIONS OWED)
+
+Did: took the title-card legibility item from "operator says it looks bad" to a
+build-ready, four-times-reviewed plan, and put it at the TOP of GO_FORWARD as
+the next window's item 1.
+  `76221f27` Opus de-risk pass -- and it found my framing was wrong. I had
+  called "suppressing the procgen draw without disturbing `card_active`" the
+  risky half. `card_active` is trivial (assigned `video_engine.py:527`, read
+  `:655`, no other consumer). The trap is that `_draw_title_card` draws FIVE
+  things and two exist ONLY on card frames -- the decode-scrambled carrier line
+  and the carrier meter -- so an early return kills part of the Matrix look and
+  forcing `card_active` False also adds the subtitle and timestamp from frame 0.
+  Correct cut: two lines AFTER `:769`, everything else byte-identical.
+  `d60fd180` Codex r2 -- caught that MY OWN SPEC's ASS syntax was invalid
+  (`\pos` + `\t()` does not animate position; `\move` does, and mixing them is
+  illegal). Replaced with one frame-bounded Dialogue event per line, which is
+  also the only way to reproduce the frame-SEEDED scramble deterministically.
+  Also: `_fit_hero`/`_wrap_words` are instance methods needing PIL font state,
+  so they are not a reusable interface; and the EMISSION half does need real
+  wiring (`title_card_plan_json` output + forced input + canonical links),
+  which reconciles with Opus's "no JSON change" -- that was about the
+  SUPPRESSION half, which is genuinely free.
+  `84c821d9` agy QA -- found a FIFTH silent passthrough
+  (`_otr_captions.py:253-255`, unknown style -> `(None, reason)` -> ValueError
+  -> caught -> clean-master passthrough, title dropped, no error) and confirmed
+  the six-step order closes the no-title window. Steps 2-3 briefly render a
+  DOUBLE title because suppression is step 4; that is correct and must not be
+  "tidied" earlier.
+**THE REAL DANGER, found by all three in the same place and NOT where I looked:**
+`OTR_CaptionBurn` has FIVE no-error passthrough exits and `burn_captions`
+DEFAULTS TO FALSE. Harmless today because the title is baked into pixels -- but
+the moment it lives only in ASS, any of them ships an episode with NO TITLE and
+a clean log. Hence suppression is step 4 of 6, never step 1.
+Current step: **BUILD IT.** `docs/2026-08-12-BUILD-SPEC-title-card-legibility.md`
+sections 3A/3B/3C carry the three reviews; the six-step order at the end of 3B
+is the contract. Then the remaining 12 render-gate legs on THREE
+contract-grouped boots, then Lemmy.
+**OWED -- TWO BIBLE PROMOTIONS, ATTEMPTED AND BACKED OUT.** Both qualify under
+the admission rule (measured on a PUBLISHED episode, not review):
+  * the credits roll scrolling between CANVAS edges instead of the content span
+    (OTR `f70df546`) -- blank at both ends, invisible on long content;
+  * text drawn into a LIGHTEN-ONLY composite being unfixable by an outline
+    (OTR `83eb759e`) -- `screen(A, 0) = A`, 1.13:1 over a lit monitor.
+  Neither is covered: grep of `BUG_BIBLE.yaml` for scroll/canvas-vs-content and
+  for lighten/screen legibility returns nothing on point, and
+  `otr_coverage_index.yaml` has no row for either. I appended both, and
+  `tests\bug_bible_regression.py` went RED on
+  `TestBibleIsActuallyParseable::test_every_parsed_entry_has_the_documented_fields`
+  -- my entry shape is missing a required field. I REVERTED both files
+  immediately (`git checkout --` on those two paths only; the repo had no other
+  tracked changes) and re-ran: back to **20 passed / 24 skipped / 3 xfailed**,
+  clean tree, survival-guide `69ee6b2`, 273 entries. **Next window: read the
+  required-field list off that test, then re-promote both with index rows in the
+  same change.** Do NOT guess the schema.
+Next: build step 1 of the title spec -- make the title burn independent of
+`burn_captions` and fail closed on all FIVE exits, and deliberately update
+`tests/test_caption_burn_cw4.py:53,76`, which currently PIN the passthrough.
+Models: Opus 5 drove and judged. De-risk pass on Opus (found the five-element
+draw and the real danger), `kibitz-plugin:kibitz` r2 on Codex (found the invalid
+ASS syntax in my own spec), agy QA by operator paste (found the fifth exit).
+**This was a scoped r2-only kibitz on the title item, NOT a four-round arc** --
+the full arc ran earlier today on the still-spine defect.
+Commits: 76221f27, d60fd180, 84c821d9 (+ this handoff). Bible: NO net change,
+two promotions owed.
+
 ## 2026-08-12 (late) -- HEAD 83eb759e (v2.0-alpha) -- CODER (the still-spine root cause, on the third swing, proved live)
 
 Did: **killed `_canonical_visual_beat_id`, and `mesh_stage` renders.** That leg
