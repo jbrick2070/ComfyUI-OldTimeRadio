@@ -223,6 +223,36 @@ move the hero; apply `_ass_escape` (`_otr_captions.py:136`) before injecting
 override tags, with tests for braces, backslashes, newlines, commas, Unicode,
 empty titles and long unbroken words.
 
+## 3C. AGY QA (third reviewer) -- a FIFTH passthrough exit
+
+Confirmed every claim in 3A/3B against the code, and found one more:
+
+**`_otr_captions.py:253-255` -- unknown style.** `build_ass_from_ledger` returns
+`(None, f"unknown style {style!r}; choices: ...")` when `STYLES.get(style)` is
+None. Driver-verified at the line. That `(None, reason)` becomes a `ValueError`
+in `burn_captions_on_video`, which `OTR_CaptionBurn` catches at `:232-235` and
+turns into a clean-master passthrough -- **dropping the title with no error.**
+So the inventory is **FIVE** exits, not four, and step 1 must fail closed on
+this one too.
+
+Also confirmed, and worth keeping:
+
+* **The build order does close the no-title window.** During steps 2-3 an
+  episode briefly renders a DOUBLE title (procgen + ASS) because suppression is
+  step 4. That is the correct trade: at no point can an episode publish with
+  ZERO titles. Do not "tidy" this by moving step 4 earlier.
+* **The suppression scope is exactly right.** An early return after `:769`
+  suppresses the hero overstrike text (`:819`) and the cursor rectangle
+  (`:827`) and nothing else -- carrier line, carrier meter, `card_active`,
+  `_draw_ident`, subtitle and timestamp all byte-identical.
+* **Per-frame events are necessary AND cheap.** Frame-seeded scramble RNG
+  (`:788`), a POP colour shift lasting 1-2 frames (`:776`) and framewise dock
+  font scaling (`:793`) cannot be expressed as tag interpolation. Density is
+  ~250 events for a 5 s card -- trivial for libass.
+* **`tests/test_caption_burn_cw4.py:53,76` PIN the passthrough behaviour**, so
+  step 1 must deliberately update them to assert raising. A green suite there
+  today means "passthrough works", which is the opposite of what we now want.
+
 **BUILD ORDER, final:** (1) make the title burn independent of `burn_captions`
 and fail closed; (2) the shared title planner + `title_card_plan_json` output
 and input, wired; (3) the ASS TITLE style and per-frame events; (4) ONLY THEN
