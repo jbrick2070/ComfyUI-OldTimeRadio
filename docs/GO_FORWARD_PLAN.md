@@ -261,7 +261,12 @@ part-run. This is the live state.
    it earns a review first. The runaway text is now captured -- see the
    cadence-lock section.
    **THE REVIEW IS DONE (2026-08-13) and the design is settled:
-   `docs/2026-08-13-codex-consults/indecode-halt-codex-review.md`.** It is
+   `docs/2026-08-13-codex-consult-indecode-halt.md`** (anchor + full review in
+   one file; the cost-row consult is its sibling
+   `docs/2026-08-13-codex-consult-costrow-refusal.md`). Note the FLAT dated
+   filename -- `docs/2026-*/` directories and `kibitz-runs/` are both
+   gitignored (`.gitignore:246`, `:251`), so a consult parked in either is not
+   in the repo at all. It is
    file-grounded and it changed four things about the shape I took in. Read it
    before writing a line; the summary is not a substitute.
    * **NOT in `invoke_structured_slot`** -- that function has no tokenizer, no
