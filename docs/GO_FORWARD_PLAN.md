@@ -200,7 +200,7 @@ Work these three in THIS order. The operator set it after watching a live leg.
 | # | Item | Where | State |
 |---:|---|---|---|
 | ~~**1**~~ | ~~**BUG BIBLE -- TWO PROMOTIONS OWED**~~ | survival-guide `80fc358` | **CLOSED 2026-08-12.** Landed as **07.31** (scroll span vs canvas allocation) and **07.32** (legibility through a lighten-only blend), both `verdict: promoted`, both index rows appended, README count moved at all three call sites. The required field set was READ off `test_every_parsed_entry_has_the_documented_fields` -- `id, phase, area, symptom, cause, fix, verify, tags`, every one truthy (`legacy_id` is documented but NOT required, which is what the backed-out attempt is likeliest to have tripped on). Filed **phase 7 / area video**, not the phase-12 slot the last five OTR promotions took: these are concrete compositing and scroll geometry. Bible regression reproduced the documented baseline EXACTLY, 20 passed / 24 skipped / 3 xfailed |
-| **2** | **TITLE-CARD LEGIBILITY -- start AND end cards** | `docs/2026-08-12-BUILD-SPEC-title-card-legibility.md` -- read **3A, 3B, 3C** and follow the SIX-STEP order at the end of 3B | **SPECIFIED, FOUR-TIMES REVIEWED, NOT BUILT** |
+| ~~**2**~~ | ~~**TITLE-CARD LEGIBILITY**~~ | `dc21e4df` + `d75a8866` | **CLOSED 2026-08-13, PROVEN ON A PUBLISHED EPISODE.** Built in the spec's six-step order, suppression stayed step 4. Live leg `signal_lost_wigners_whisper`: **628 TITLE events** on ASS layer 1, BOTH cards (open 0.00-10.00s, close 123.16-131.12s), Matrix decode intact, the block cursor rendering from its `\p1` drawing, and the apostrophe surviving `_ass_escape` on a real title. Measured on the FINAL artifact: core-vs-outline **13.66:1** opening / **12.60:1** closing against a gate of 4.5:1, where the pre-fix control measures **1.01:1** core-vs-scene. Then the operator eyeballed it -- "hard to see from a distance but much improved" -- and `d75a8866` took the outline 3 -> 6 with a shadow (+55% dark mass within 5px), verified by re-burning the surviving intermediate rather than re-rendering |
 | **3** | Resume the 45-word render gate | the section below | 9 of 21 legs passed; needs THREE contract-grouped boots |
 | **4** | LEMMY | the Lemmy sections further down | operator hands it over once 1-3 are done |
 
@@ -232,6 +232,30 @@ returns `None` for every profile):
 | A -- unclamped | none | `ltx_8gb`, `fastwan_8gb`, `ltx_video`, `wan_i2v`, `wan_ti2v` |
 | B -- `humo_diet` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 **+ `ltx_audio_in`** |
 | C -- `h3` | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
+
+**THE TABLE ABOVE IS INCOMPLETE, corrected 2026-08-13 while running it.** The
+`boot_contract` governs the VRAM CLAMPS. It does NOT enable the heavy engines --
+that is the launcher's SECOND ARGUMENT, and it defaults to enabling NOTHING:
+`LTX` sets `OTR_ENABLE_LTX_VIDEO` + `OTR_ENABLE_LTX_AV`, `WAN` sets both Wan
+engines, `HUMO` sets HuMo. So boot A above is not one boot: its five legs need
+at least two different tokens, and booting all five with no token leaves the
+heavy engines OFF and the lanes fall to the floor. **Group by
+`(boot_contract, launcher token)`, not by contract alone.** `ltx_8gb`,
+`fastwan_8gb` and the H3 pair carry NO enable flag and so ride any boot.
+Confirmed grouping:
+
+| boot | token | clamp | legs |
+|---|---|---|---|
+| 1 | `WAN` | none | `wan_i2v`, `wan_ti2v`, `fastwan_8gb`, `ltx_8gb` |
+| 2 | `LTX` | `--disable-pinned-memory` (ltx_av_diet) | `ltx_video`, `ltx_audio_in` |
+| 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 |
+| 4 | (none) | `--reserve-vram 12 --disable-pinned-memory` | the two H3 lanes |
+
+**AND THE PROFILE FILENAME IS NOT THE ENGINE ID.** `config/profiles/otr_w45_fastwan.json`
+registers the engine **`fastwan_8gb`**; `--only fastwan` is refused. The refusal
+is clean and loud ("names engines that are not registered local engines"), so it
+costs a relaunch rather than a leg -- but derive `--only` names from a prior
+results file's `engine` field, never from the profile filenames.
 
 B covers `ltx_audio_in` too: its `ltx_av_diet` contract sets
 `reserve_vram_gb: None`, which means "does not constrain that knob", so HuMo's
@@ -315,6 +339,45 @@ mid-frame -- that truncation cost the diagnosis of both writer failures. And a
 `scifi_news_pro` leg now persists its seed / frame card / stance BEFORE the
 passes that can die on them, so a dead leg is reproducible; three earlier deaths
 were not.
+
+### THE WRITER CAN LOOP FOREVER ON A CAPACITY RUNAWAY -- OPEN (found 2026-08-13)
+
+Found on a live leg while running the render gate, not by review. Two separate
+things, both real, neither patched -- the second is a five-minute fix and the
+first is a contract decision that deserves daylight.
+
+**1. `_otr_scifi_codex.py:2226` is a `while True:` with no cycle bound.** For a
+`PostValidationError` that is CORRECT and must not be "fixed": it is the
+fresh-candidate loop, and it is exactly how `scifi_news` recovers from its
+documented announcer-coverage weakness (`016ad146` took that bank from 0-for-4 to
+rerollable). But the same loop also catches a CAPACITY runaway, and that failure
+is not stochastic in the same way. On the 2026-08-12 night leg one news item -- a
+UCLA marmot/OnlyFans story -- drove P3 to consume its entire 14,191-token
+allowance without ever emitting a stop token, on all THREE ladder attempts
+(0.720 -> 0.320 -> 0.100, ~20 min each), after which cycle 2 opened and started
+the identical ladder again. The leg could not terminate on its own. The only
+backstop is the campaign's `LEG_TIMEOUT_S = 21600` -- SIX HOURS -- and per the
+campaign's own docstring a client-side timeout does NOT cancel the server job, so
+it leaves a ghost the next leg queues behind. That is the 2026-08-01 pile-up
+shape. A bound on CAPACITY cycles specifically (validation cycles stay unbounded)
+is the obvious answer, but it is a contract change and wants its own commit.
+
+**The variable was the NEWS ITEM, not the bank and not the code.** Diffed at the
+time: only two commits touched the writer path since the last green `still_pan`,
+and the relevant one (`98fb258f`, num_characters cap 6 -> 10) is arithmetically
+IDENTICAL at the `num_characters=2` these profiles request. `--source-bank` pins
+the BANK; the item still rolls. A re-roll on the same bank drew a ScienceDaily
+physics story and rendered clean. Do not read a single bad leg as a regression
+without checking which item it drew.
+
+**2. `OUTPUT_TRUNCATED` gives advice that is wrong exactly when it fires.** The
+guard says "Give this pass a slot whose window fits prompt+artifact". A
+`ProviderCapacityMessages` pass sets `_otr_reserve_remaining_output_capacity`, so
+`requested_tokens = context_cap` BY DESIGN and `effective < requested` is true the
+moment the prompt is non-empty. There is no bigger slot -- the pass already has
+every token there is. The message should distinguish the reserve-remaining case
+and say "the model did not stop", because as written it sends the reader hunting
+a config defect that does not exist. It cost this session about twenty minutes.
 
 ### THE STILL-SPINE REPAIR -- ROOT CAUSE FIXED AND PROVED LIVE (2026-08-12 late)
 
@@ -480,7 +543,7 @@ under "CLOSED LANE DIAGNOSES", alongside the per-lane receipts in
 |---|---|
 | Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-12 at the story-writer wrap, `ae76fb3f`) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **10309 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-12 LATE at `f70df546`, NOTHING deselected). Was 10281 at `ae76fb3f`; this session added 28 across the mesh-identity, post-audio-join and credits-scroll work. Prior note kept: **10281 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
+| Suite | **10340 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-13 at `d75a8866`, NOTHING deselected). Was 10309; the title-card build added 31 across three test files. **A caution learned building them:** all seven of the first tests passed while wrapped multi-line titles were silently wrong, because every fixture title fit one line -- including the "hostile" long-word case, which is one unbreakable word and never wraps. A green suite over a too-narrow fixture set is the failure mode here, not a flaky test. Prior note kept: **10309 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 LATE at `f70df546`, NOTHING deselected). Was 10281 at `ae76fb3f`; this session added 28 across the mesh-identity, post-audio-join and credits-scroll work. Prior note kept: **10281 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `80fc358` (**275** entries, index **388** rows). 2026-08-12 promoted **07.31** + **07.32**, the two the previous window owed. **Run the gate with NO `--pack-dir`** -- that is the invocation the 20/24/3 baseline describes, and the 24 skips ARE the pack-dependent tests. Passing `--pack-dir` at OTR turns 20 of them red on pack code untouched by any Bible edit, which reads like a regression and is not one. Also pre-existing: `tools/reload_bug_bible.py` exits 1 at HEAD on 29 stale legacy_id/xref complaints; it is not the gate. Earlier: **12.97**, a model field name that collides with its base class (from PBUG-20260812-02, admitted on a live leg). It checked the others against the index FIRST and promoted no duplicate -- **PBUG-20260811-02's class is already 12.57**, whose own rule (resolve the durable owner, prove same-run identity, REJECT mismatches) also condemns the warn-and-continue fallback OTR still has open. NEVER re-scrape indexed history |
 | Variants | `build_variants.py --check` **46 variants / 0 failures** on THIS box. **THAT COUNT IS WORKSTATION-DEPENDENT and 46 is not the repo's number** (lane 11, 2026-08-11): `git ls-files` counts **45** tracked variants, and the 46th on disk is another window's untracked `otr_upscale_ltx_probe.json`. The gate globs the DIRECTORY, so its headline silently counts files the repo has never seen -- the same defect class as the sbcov crash above. Compare `--check`'s 0 FAILURES, not its count. **RUN IT BEFORE STARTING A LANE** -- it had been RED since lane 5 and lane 7 had to separate inherited drift from its own; a red at the start of a lane belongs to whoever caused it |
 | Canonical workflow | **TOUCHED 2026-08-12** -- link 255 retargeted so `OTR_MetaBriefImagePromptGen` reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json` instead of the pre-audio freeze cascade (`[255,62,1,89,0] -> [255,90,0,89,0]`). Validated: 23 nodes / 56 links unchanged, acyclic, referential integrity clean, `validate_canonical_workflow` OK, 50 variants REGENERATED (`--check` 0 failures) and 4 hand-kept `.env.json` master_hash re-stamped. **The diff is ONE line** -- a first attempt round-tripped the JSON and reformatted all 3506 lines; that was reverted and redone as a surgical string edit |
