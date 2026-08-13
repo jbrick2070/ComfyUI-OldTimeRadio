@@ -177,7 +177,7 @@ written), `TODO`.
 | 0-9 | **CLOSED -- 9 packets, 9 engines, 16 live legs.** Detail lives in `docs/evidence/lane_receipts/lane0*.md` and `docs/HANDOFF_LOG.md`, never here | scaffolding, 3 WAN, 4 HuMo, 3 LTX | **DONE** through `77fa4dad` |
 | 2b | boot-contract enforcement TIMING | plumb `boot_contract` into the frozen director policy so the check fires at ShotLock preflight instead of inside the render phase; keep the render-time check as defence in depth | TODO |
 | 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
-| 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** | TODO |
+| 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** **THE TELEMETRY THIS ROW WAS WAITING FOR ARRIVED 2026-08-13, unprompted, on a live chained render-gate leg -- and it cost that leg.** Measured: `wan_ti2v VRAM render-phase peak 12870 MB / post 7942 MB`. Nearly 8 GB stayed resident AFTER the render phase closed. The `fastwan_8gb` leg then died on the next shot: `MotionBudgetError: static frame budget 69 (snapped 69) exceeds the cost-model's affordable 18 frames (free=9549 MB, margin=0.85)` -- the beat needed 69 frames, only 9.5 GB of 16 was free because of the retention above, and the engine REFUSED rather than silently resizing (correct fail-closed behaviour, not the defect). So this is not a `fastwan_8gb` fault and **not** the still-spine defect -- that repair held, there is no missing-still signature anywhere in the leg. It is cross-engine retention: engine A does not release before engine B's cost model prices its work. S7 says pick the release branch FROM the telemetry rather than inventing one; the telemetry now exists and has a consequence attached | TODO -- telemetry IN HAND |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
 | 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **DONE** -- 4/4 red gates green, live smoke PASS (50 frames at the declared 1472x832, magic-byte proved). Receipt: `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Its G3 fix also closed the FOUR still lanes' G3 rows (shared `_CheapFamilyBase`) |
 | 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | **DONE** -- 7/7 green, two live smoke legs. Its G2 closed by declaring the profile canvas channel INERT, **not** by declaring a canvas: a declaration would overrule `OTR_VIDEO_LANDSCAPE_CANVAS` on a lane with no native canvas (lesson L19, found by the Codex consult). Receipt: `docs/evidence/lane_receipts/lane11-viz_green.md` |
@@ -275,6 +275,24 @@ with `delivered: ['mesh_stage']` and stills keyed `music_opening_001`. That is
 the live proof the beat-id deletion worked.
 
 **Remaining: 12** -- the 5 in boot A, the 5 in boot B, the 2 in boot C.
+
+**RUN 6 (2026-08-13, boot 1 = WAN token, unclamped).** `ltx_8gb` **PASS**
+(18.7 min) -- one of this morning's three failures cleared, and it had died in
+the fable2 writer, so that is the post-fix data point the judging pass asked
+for. Its reuse audit is worth reading rather than skimming: 8 advisory findings
+including a `mirror/ping-pong -- 8-frame reflection about frame 104`, reported
+as ADVISORY while the leg still says PASS. `fastwan_8gb` **FAIL** (44.6 min) on
+the cross-engine retention above, NOT on the still-spine defect it failed on
+this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
+night and is the leg that carries the title card.
+
+**A WRITER RUNAWAY HIT THIS BATCH TOO**, on `fastwan_8gb`'s P1 (not P3) with a
+sober BBC eclipse story: 15,297 output tokens after a 1,087-token prompt, on a
+`DramaticQuestionV4` whose entire schema is THREE short strings. It self-healed
+on the next rung at temperature 0.320. So the runaway is neither P3-specific nor
+comic-premise-specific -- two occurrences in one night, different passes,
+different sources. See the runaway section below; the heartbeat and the evidence
+log both landed tonight so the next one is fully observable.
 
 **A `mesh_stage`-class PASS is weaker evidence than it looks.** That lane leaves
 NO per-shot clips, so `coverage` reads `not measured` and the frame-level
