@@ -167,6 +167,31 @@ Creative quality remains a taste decision, not a runtime validator.
   fail loudly rather than truncate.
 - [ ] **Hard:** Output reservations scale from the artifact's real size driver
   such as line count or evidence count, not only `target_words`.
+  **Reserving the whole remaining context window does not satisfy this.** A call
+  that requests `context_cap - prompt_tokens` has not scaled from a size driver;
+  it has declined to size at all, and it hands a degenerate decode the entire
+  budget. Name the size driver per pass, or justify the reservation explicitly.
+- [ ] **Hard:** EVERY generation call has an enforceable termination condition
+  that does not depend on the model choosing to stop. Exactly one of: a grammar
+  bound at token selection (lm-format-enforcer via the local schema binder), a
+  numeric `max_new_tokens` that is materially smaller than the remaining window,
+  or a stop criterion ACTUALLY PASSED to `generate()`. State which one applies to
+  each pass.
+  A call that reserves the full window AND binds no grammar AND passes no stop
+  has exactly two exits -- the model emitting EOS voluntarily, or the context
+  ceiling -- and a repetition loop takes the second one. Measured 2026-08-13: one
+  such decode spent 13,912 tokens over 22 minutes rewriting a single paragraph
+  about 36 times, and every token was discarded. A `stop` string the prompt asks
+  for (`END.`) is NOT a termination condition, because a locked loop never emits
+  it. Neither is an instruction in the prompt.
+- [ ] **Hard:** Every model-authored free-text string declares a maximum length,
+  and the pass states whether that maximum is ENFORCED DURING DECODING or only
+  post-validated. On a grammar-bound lane the maximum terminates the string and
+  is a real guard; on a post-validated lane it is hygiene only -- the runaway
+  still happens and the artifact is then discarded, which is strictly worse than
+  no ceiling unless the termination condition above is also present. Bounds that
+  can be reached must route to a REROLLABLE disposition, never to silently
+  accepted text that was cut off mid-word.
 - [ ] **Hard:** Models are never asked to calculate, report, or enforce exact
   word, line, item, or coverage counts. Python measures them
   deterministically and supplies measured defects to any creative repair.
