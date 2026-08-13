@@ -294,6 +294,32 @@ the cross-engine retention above, NOT on the still-spine defect it failed on
 this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
 night and is the leg that carries the title card.
 
+**`wan_i2v` PAGE-THRASHES ON THIS BOX -- new, and it had never been run before.**
+Killed at 108.6 min after ONE beat, measured at **89.7 - 106.3 s/it** on a 20-step
+segment. The plan's own documented thrash pathology is **29 s/it** (ltx 12.5 GB +
+humo 7 GB co-resident), so this is THREE TIMES worse than the case that was bad
+enough to write down. At ~33 min per segment and multiple 1-2 segment beats, the
+leg needed 5-11 hours; it was interrupted rather than allowed to run.
+
+The cause is visible in its own telemetry: an earlier `wan_i2v` render in the
+SAME leg peaked at **16,074 MB** -- over the 14.5 GiB working ceiling and at the
+16 GB card's limit -- and left **8,517 MB** resident. The engine is paging
+against its own residue. **So retention has TWO symptoms, not one:** it kills
+OTHER engines' cost models (that is what took `fastwan_8gb`) and it degrades the
+RETAINING engine into a state where it cannot finish. Same root, two failures.
+
+`wan_i2v` is listed as never-run in every prior sweep, so there is no baseline
+claiming it ever completed a 45-word leg on this hardware. Do not assume this is
+a regression.
+
+**AND `/interrupt` CUTS A SAMPLER BUT NOT AN LLM DECODE.** It was POSTed twice
+tonight: against the writer runaway it did nothing (the transformers
+`generate()` call never polls it, so `queue_running` stayed 1 until the server
+was restarted), and against this thrashing render it landed within ~2 minutes
+(ComfyUI's sampler checks between steps). That distinction matters for the
+`scripts/otr_api.py:820` interrupt fix -- it will cancel a stuck RENDER and will
+NOT cancel a stuck WRITER, which is the case that motivated it.
+
 **A WRITER RUNAWAY HIT THIS BATCH TOO**, on `fastwan_8gb`'s P1 (not P3) with a
 sober BBC eclipse story: 15,297 output tokens after a 1,087-token prompt, on a
 `DramaticQuestionV4` whose entire schema is THREE short strings. It self-healed
