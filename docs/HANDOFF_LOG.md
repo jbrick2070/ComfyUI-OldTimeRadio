@@ -3,6 +3,57 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-13 -- HEAD b37e095b (v2.0-alpha) -- RENDER (fastwan_8gb passed live; the runaway guard took three shapes before it was right)
+
+Did: ran boot 1 of the 45-word render gate (WAN token, unclamped, token+env both
+  verified out of the server's own process env, not off a table). **`fastwan_8gb`
+  PASSED -- 58.4 min, `obs_publish OK`, 75.8 MB at
+  otr/obs/signal_lost_glueball_gambit_20260813_145237_...final.mp4, 14 clips,
+  coverage COVERS** -- the live proof `9eea64a4` owed. Row 3 is now 13/21.
+  `wan_ti2v` FAILED at 14.7 min and NOT on the engine: P3 cycled on all three
+  rungs, ladder exhausted, no frame rendered.
+  Then shipped the writer runaway fix, which changed shape three times under
+  review and each change came from evidence I had not shown the reviewer.
+  `832eaf6b` structural ceilings on every model-authored P3/P5 string + a
+  rerollable `text_cap` -- it fired LIVE on `premise`, a field outside my
+  original four-field scope, so Codex's r1 must-fix is what stopped that leg
+  running away again. `9af0f7e2` replaced my length-based guard with verbatim
+  CYCLE detection after an r1 panel proved a length signal cannot tell a long
+  field from a loop, and raised the ceiling 6000->12000 after the operator
+  pointed out the corpus behind it was all SMALL episodes. `b37e095b` restored
+  the open-string counter ALONGSIDE the cycle detector after a Sonnet QA pass
+  found a THIRD captured specimen -- P2, a pure elaboration spiral, 15,355
+  tokens, no repetition at all -- that cycle detection is structurally blind to;
+  plus guard coverage on every local generate() (an audit found two live routes
+  bare), a post-hoc cloud check in all three remote backends, the P3 prompt
+  shape change, and the `raw head: <empty>` evidence fix.
+  Guard proven live: three TRUE-POSITIVE halts on the 15:39 leg at 960/864
+  tokens of a 13,778 allowance -- 14.7 min to fail instead of the 60-70 it cost
+  before. Measured seconds-per-line from 1,294 shipped ledgers: **10.35 s/line,
+  110.5 wpm, so 12 minutes needs ~70 lines against today's 24-line ceiling.**
+Current step: row 3 at 13/21, 8 legs left. Box CLEAN -- port 8000 clear, VRAM
+  3,035 MiB, no campaign lock.
+Next: **re-run `wan_ti2v` on a fresh seed** (boot 1, WAN token, unclamped). It is
+  cheap now -- 14 min to an answer instead of 70 -- and it settles whether the
+  15:39 failure was the bank/seed or the lane. Then `wan_i2v`, then boot 3 HuMo
+  x4, then boot 4 the H3 pair. NOT blocked on the operator.
+Models: RENDER window -- local production models for the legs; Claude to launch,
+  judge and wrap. Review routing read from GO_FORWARD:126 (operator 2026-08-11,
+  full-kibitz gate SUSPENDED): Codex CLI for quandaries, Sonnet 5 QA on the diff.
+  Panels actually run, none reported as a full arc: a SCOPED r1 on the guard
+  SHAPE (`kibitz-runs/2026-08-13-decode-guard-shape/r1/`, Codex + Antigravity,
+  the day's only genuine two-reviewer round, with judgment.md written); a Sonnet
+  QA that found the third specimen; an Antigravity QA that scanned 1,646 shipped
+  ledgers for false positives (17,033 lines, zero); a six-agent verification
+  sweep of an external report; and a BLIND frontier R1 ($0.12,
+  `docs/2026-08-13-blind-runaway-detection/`) which, with no source access,
+  independently derived the same mechanism and a 2,000-token bound against our
+  2,048. Suite 10410/110/1. Bug Bible 20/24/3 at 278 entries.
+Commits: 832eaf6b, 19d05774, 0d00bbf1, 420631ea, 9af0f7e2, b37e095b (OTR);
+  c796581, 9b56ddb (Bible repo -- entry 12.100 promoted, then CORRECTED because
+  as first written it prescribed cycle detection alone and taught two thirds of
+  its own defect class).
+
 ## 2026-08-13 -- HEAD aba67d76 (v2.0-alpha) -- CODER (the cost row had two call sites; GO_FORWARD cut back to forward-only)
 
 Did: queue row 3's first code item, two writer-transport honesty fixes, the

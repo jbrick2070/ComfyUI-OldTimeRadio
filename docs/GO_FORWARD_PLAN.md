@@ -75,8 +75,8 @@ before starting -- it is the largest surface in the campaign and the corpus
 explicitly put it LAST so it inherits every lesson. Nothing on this shelf's
 lessons transfers automatically: H3 has a real frame grid (124..362 step 17), a
 24->25 fps conversion, a Sage gate and a mouth-policy carve-out. Baselines to
-detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
-**272** entries (**still exact 2026-08-13**); full suite **10363 passed / 110
+detect drift against (REFRESHED 2026-08-13 late): Bug Bible **20 passed / 24
+skipped / 3 xfailed** at **278** entries; full suite **10410 passed / 110
 skipped / 1 xfailed, NOTHING DESELECTED**; `scripts/build_variants.py --check`
 **50 variants, 0 failures**. **THE OLD BASELINES ON THIS LINE WERE STALE and
 cost a re-grounding pass** -- they read 9963/109/1 and 46 variants, which was
@@ -199,40 +199,44 @@ written), `TODO`.
 So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v` is merely consistent about it while `wan_i2v` released once and held once. Do not build an engine-specific fix on the single clean sample; that is exactly the trap this row fell into for half an hour. Note also `wan_i2v` peaking **16074 MB**, over the 14.5 GiB working ceiling and at the 16 GB card's limit, which is its own open question. What the samples DO still rule out is "add a release between engines" is the WRONG SHAPE: an engine-boundary reclaim already exists (`render_driver.py:3893`, the CS-3 inter-beat reclaim) and it FIRES -- its steps are `unload_llm`, `_unload_bark`, `gc.collect`, `soft_empty_cache` and the cuda flushes, every one aimed at OTR's OUT-OF-BAND caches, which is what it was built for. `soft_empty_cache` frees cached blocks; it does not EVICT a resident ComfyUI-managed model, and no step in that reclaim does. So the question row 5b should answer is: **what decides whether a finished render gives its VRAM back**, given the SAME engine did both within one leg. The candidate branch is a targeted `free_memory(required, device)` before a DIFFERENT engine prices its work -- explicitly NOT `unload_all_models`, which V-4/V-5 forbid and which was measured freeing 0 MB. Nine samples exist now; **get more before choosing, and do not conclude from one** | TODO -- 9 samples, no conclusion yet |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
 
-### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13, after the cost-row fix)
+### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13 late, after the runaway guard)
 
-Operator rows 1 and 2 are CLOSED. Row 3, the 45-word render gate, is **12 of 21
+Operator rows 1 and 2 are CLOSED. Row 3, the 45-word render gate, is **13 of 21
 legs passed** and is the live work. This is the whole forward picture.
 
-**THE 9 LEGS LEFT, grouped by the boot they need.** The launcher's SECOND
+**THE 8 LEGS LEFT, grouped by the boot they need.** The launcher's SECOND
 ARGUMENT (the token) enables the ENGINES; the profile's own `launch.env`
 satisfies the CONTRACT. They are separate and you need both -- read the env out
 of the profile, never off this table.
 
 | boot | token | clamp | legs left |
 |---|---|---|---|
-| 1 | `WAN` | none | `fastwan_8gb`, `wan_ti2v`, `wan_i2v` |
+| 1 | `WAN` | none | `wan_ti2v`, `wan_i2v` |
 | 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo`, `humo_14B_169`, `humo_1.7B`, `humo_1.7B_169` |
 | 4 | (none) | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
 
 | lane | state |
 |---|---|
-| `fastwan_8gb`, `wan_ti2v` | **UNBLOCKED 2026-08-13 (`9eea64a4`) -- just re-run, no further code.** Both died on the disqualified `FRAME_COST_MODEL` row |
+| `wan_ti2v` | **RE-RUN IT ON A FRESH SEED -- and it is CHEAP NOW.** The 15:39 leg failed at 14.7 min, and NOT on the engine: P3 cycled on all three rungs and the ladder exhausted, so `wan_ti2v` never rendered a frame. The guard is what made that 14.7 min instead of the 60-70 it would have cost before. This is a bank/seed question, not a lane question, until a second seed says otherwise |
 | `wan_i2v` | **Still genuinely unknown.** Page-thrash at 89.7-106.3 s/it against a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB. Never completed a leg on this box, so do NOT read it as a regression. Wants row 5b answered, or a diet contract tried |
 | HuMo x4, the H3 pair | never run in this gate |
 
-**PASSED (12):** the four still families + four visualizers + `mesh_stage` from
+**PASSED (13):** the four still families + four visualizers + `mesh_stage` from
 earlier sweeps, then `ltx_8gb` (18.7 min), `ltx_video` (68.1 min -- a lane that
-had never completed a 45-word leg) and `ltx_audio_in` (83.2 min, 12 clips).
+had never completed a 45-word leg), `ltx_audio_in` (83.2 min, 12 clips), and
+**`fastwan_8gb` (58.4 min, 2026-08-13 15:35, 75.8 MB, 14 clips, coverage
+COVERS)** -- the live proof the cost-row fix `9eea64a4` worked, which is what
+that fix was owed.
 
 **THE NEXT WINDOW IS A RENDER WINDOW AND IT OWNS THESE LEGS (operator,
 2026-08-13).** It takes boot 1 first, because `fastwan_8gb` and `wan_ti2v` are
 the two the cost-row fix unblocked and they are the cheapest proof that it
-worked on live legs rather than only in the suite. The box was left CLEAN at
-handoff -- port 8000 clear, VRAM 1,207 MiB -- so reset per CLAUDE.md section 4
-is a verify, not a cleanup. **A coder window must not take the in-decode halt
-at the same time**: the halt touches every authoring pass, and the build law is
-one coder window in the code at a time.
+worked on live legs rather than only in the suite. THAT RUN HAPPENED
+2026-08-13: `fastwan_8gb` PASSED and `wan_ti2v` failed on a writer runaway that
+the new guard caught in 14.7 min. The box was left CLEAN at handoff -- port 8000
+clear, VRAM 3,035 MiB -- so reset per CLAUDE.md section 4 is a verify, not a
+cleanup. **The in-decode halt is now SHIPPED (item 2 below), so that caveat is
+retired.**
 
 **THE CODE ITEMS OWED, in value order:**
 
@@ -246,65 +250,37 @@ one coder window in the code at a time.
    6.900/frame) remain inadmissible until re-measured through the real
    `prepare()` + `render_clip()` lifecycle, and the operator said he would take
    that back to the lab when the GPU frees up.
-2. **The in-decode halt for the writer runaway.** Fires on an unclosed-string
-   token count (primary) and a repeating window (secondary), NEVER on
-   `target_words`. Must raise a REROLLABLE capacity phase or it silently
-   becomes the writer veto the directive forbids. Touches every pass P0-P5, so
-   it earns a review first. The runaway text is now captured -- see the
-   cadence-lock section.
-   **THE REVIEW IS DONE (2026-08-13) and the design is settled:
-   `docs/2026-08-13-codex-consult-indecode-halt.md`** (anchor + full review in
-   one file; the cost-row consult is its sibling
-   `docs/2026-08-13-codex-consult-costrow-refusal.md`). Note the FLAT dated
-   filename -- `docs/2026-*/` directories and `kibitz-runs/` are both
-   gitignored (`.gitignore:246`, `:251`), so a consult parked in either is not
-   in the repo at all. It is
-   file-grounded and it changed four things about the shape I took in. Read it
-   before writing a line; the summary is not a substitute.
-   * **NOT in `invoke_structured_slot`** -- that function has no tokenizer, no
-     model and no `generate()` call. It goes in `_build_truncating_generate_fn`,
-     installed unconditionally whenever `schema_model is not None`, which is the
-     one route P0/P1/P2/P3/P5 all traverse. (There is no P4 authoring pass.)
-   * **NOT through the existing `if stop:` path**, and construction failure must
-     be LOUD -- the `except Exception: stop-strings disabled` fallback there is
-     right for an optional quality stop and wrong for a liveness contract.
-   * **NOT an exception raised from inside the criterion.** `generate()` returns
-     NORMALLY on a criteria hit (verified against the installed transformers
-     5.10.4). Latch `hit`/`reason` on the criterion, let generate return, decode
-     once, then raise. Classify in this order: `guard.hit` -> capacity ceiling
-     -> `ended_with_eos` -> another stop. Never infer degeneracy from a short
-     generation; the optional substring stop also returns early.
-   * **NOT `phase="output_limit"`** -- that would make the diagnostics lie. New
-     `GenerationDegeneracyError`, phase `decode_degeneracy`, added to the shared
-     caught family with the rerollable predicate widened to accept both.
-     `_otr_scifi_codex.py:1879` summarises every rerollable capacity error as
-     "model output ended at the provider capacity limit", which would be false
-     for a guard halt.
-   * **Threshold: 2,048 open-string tokens** provisionally (~3 min instead of
-     21 at the observed ~11 tok/s), calibrated later as
-     `max(2048, 4 x maximum healthy per-string token count)` measured with the
-     production tokenizer over accepted artifacts. Honest caveat recorded in the
-     review: while the schema permits unbounded strings, NO finite bound can
-     promise it never cuts a legitimate one.
-   * **n-gram ships as TELEMETRY ONLY at first.** An independent hard halt would
-     reject intentional refrains, parallel rhetoric and repeated schema keys.
-   * **One claim in the review I have NOT verified and the next window must:**
-     it asserts "the outer candidate loop is not currently unbounded", which
-     contradicts this plan's premise that the loop is unbounded and correct.
-     Ground that before building on either statement.
-   * Its lexer note is worth heeding: scan the DECODED fragment character by
-     character with `clean_up_tokenization_spaces=False`, decoding only unseen
-     ids. Do not assume a quote gets its own token id.
-   * **TRANSPORT PARITY IS ONLY HALF DONE.** `6e9ed140` fixed the PRE-CALL leg:
-     `_otr_model_loader` now raises the phase-carrying
-     `PromptContextOverflowError` at both `GenerationContextOverflowError` sites
-     instead of a bare, phase-less `ModelLoaderError`, so an identical capacity
-     failure is rerollable on both transports. **The POST-GENERATION leg is
-     still divergent** and the guard must close it: that module tests
-     `len(generated_ids) >= effective_max_new_tokens` where the writer tests
-     `==`, it does not compute `ended_with_eos`, and it attaches no raw
-     evidence. So a runaway on that transport is still worse-diagnosed than the
-     same runaway on the writer's.
+2. ~~The in-decode halt for the writer runaway.~~ **DONE 2026-08-13
+   (`832eaf6b`, `9af0f7e2`, `b37e095b`), and it took three shapes before it was
+   right -- read WHY before touching it.**
+   * **It detects TWO things, and neither signal subsumes the other.** THREE
+     specimens were captured (`docs/HANDOFF_LOG.md`): P3 an anaphoric loop, P5
+     escalating repetition, and **P2 a pure ELABORATION SPIRAL, 15,355 tokens,
+     83k chars, NO repetition at all**. Cycle detection over token ids catches
+     the first two and is structurally blind to the third; an open-string
+     counter catches the third and is the only thing that can. Deleting either
+     re-opens a third of the defect class.
+   * **The open-string half is scoped to SCHEMA-BOUND passes only.** On free
+     prose a quotation mark is dialogue, not structure, and the lexer would open
+     on the first spoken line and count the rest of the scene. That mistake got
+     an earlier version deleted.
+   * **It is installed on EVERY local `model.generate()`**, not just the writer
+     wrapper -- an audit found the slot-drama contract and the loader factory
+     running bare. `tests/test_decode_guard_covers_every_local_route.py` goes
+     red if any install is removed.
+   * **Cloud lanes get a post-hoc word-level check** (`assert_no_verbatim_cycle`)
+     in all three remote backends. It cannot save the spend -- an HTTP call has
+     no token loop -- but a degenerate reply never reaches the ledger and it
+     raises the same rerollable phase.
+   * **What it may NOT claim:** it is COST-BOUNDING, not a correctness oracle.
+     Non-termination cannot be proven from a prefix. Target false-abort rate and
+     compute saved, never "catches everything". A blind frontier panel
+     (`docs/2026-08-13-blind-runaway-detection/`, $0.12) supplied that framing
+     and independently derived the same mechanism and bound with no source
+     access.
+   * Live proof: three TRUE-POSITIVE halts on the 15:39 `wan_ti2v` leg, caught
+     at 960 and 864 tokens of a 13,778 allowance.
+
 3. **`wan_ti2v` VRAM retention (row 5b).** 15 samples, post clustering ~8.1 GB
    regardless of peak. NOT engine-specific (`wan_i2v` did both). No conclusion
    drawn deliberately.
