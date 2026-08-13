@@ -1384,7 +1384,7 @@ class _TelemetryHUDRenderer:
         self._lhS = _fh(self.f_small)
 
         self._left  = self._build_left()
-        self._right, self._right_h = self._build_right()
+        self._right, self._right_h, self._right_top = self._build_right()
 
         # Scanline overlay (full canvas)
         self._scanlines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -1395,10 +1395,21 @@ class _TelemetryHUDRenderer:
     # -- Public API --------------------------------------------------------
 
     def hud_frames(self):
-        """Total frame count for the HUD post-roll (20-90 s)."""
-        scroll_px = max(0, self._right_h - self.h)
+        """Total frame count for the HUD post-roll (20-90 s).
+
+        Measured over the CONTENT SPAN, not the canvas. The panel is built on a
+        deliberately generous estimate (>= 3 screens) with a quarter-screen of
+        breathing room above the first line and trailing pad below the last, so
+        canvas height overstates how far there is to travel.
+        """
+        scroll_px = max(0, self._right_span() - self.h)
         secs = scroll_px / self._SCROLL_PPS + 8.0
         return int(max(20.0, min(90.0, secs)) * self.fps)
+
+    def _right_span(self):
+        """Height of the REAL transcript content, top of first line to bottom
+        of last."""
+        return max(0, self._right_h - self._right_top)
 
     def render(self, fi, total_hud_frames):
         """Return a PIL RGB Image for HUD frame *fi*."""
@@ -1421,7 +1432,21 @@ class _TelemetryHUDRenderer:
         else:
             frac = (fi - s_start) / max(1, s_end - s_start)
 
-        sy  = int(frac * max(0, self._right_h - self.h))
+        # SCROLL THE CONTENT, NOT THE CANVAS (2026-08-12, operator-caught on a
+        # 45-word leg). This was `frac * (self._right_h - self.h)` starting from
+        # 0, which meant the window opened on the quarter-screen of blank
+        # breathing room above the first line and closed BELOW the last one, in
+        # the trailing pad. Measured on the live artifact: ink in this column
+        # ran 0 until t=4s, full 6-14s, and 0 again from t=17s of a 20.8s roll
+        # -- the transcript was absent for ~38% of the credits and the tail
+        # faded out on an empty panel, which is what it looked like from the
+        # couch: "the script scroll is not appearing".
+        #
+        # Anchoring both ends to real ink makes the first line visible at
+        # frac=0 and rests the last line on the bottom edge at frac=1. When the
+        # content is SHORTER than the screen the span clamps to 0 and it simply
+        # holds, fully visible, instead of drifting through emptiness.
+        sy  = self._right_top + int(frac * max(0, self._right_span() - self.h))
         bot = min(sy + self.h, self._right.height)
         if bot > sy:
             crop = self._right.crop((0, sy, self.RIGHT_W, bot))
@@ -1548,7 +1573,14 @@ class _TelemetryHUDRenderer:
         return img
 
     def _build_right(self):
-        """Pre-render the full scrollable transcript. Returns (img, content_h)."""
+        """Pre-render the full scrollable transcript.
+
+        Returns ``(img, content_bottom, content_top)``. Both edges are reported
+        because the canvas is an over-estimate at BOTH ends -- a quarter screen
+        of breathing room above the first line, generous trailing pad below the
+        last -- and scrolling between canvas edges puts blank panel on screen at
+        the start and end of every roll.
+        """
         P, RW = self.P, self.RIGHT_W
         scenes = self.data.get("scenes", [])
         n_items = sum(len(s.get("items", [])) for s in scenes)
@@ -1565,6 +1597,9 @@ class _TelemetryHUDRenderer:
         img = Image.new("RGB", (RW, est_h), CRT_BG)
         d   = ImageDraw.Draw(img)
         y   = self.h // 4   # breathing room above first line
+        # Where real ink begins. The scroll opens here, not at canvas y=0, so
+        # the first line is on screen from the first frame.
+        content_top = y
 
         # BUG 3 (2026-06-20): PRODUCTION DOSSIER -- the forensic model/engine/system
         # detail scrolls on-screen ahead of the transcript (mirrors the
@@ -1638,7 +1673,7 @@ class _TelemetryHUDRenderer:
                fill=CRT_DARK, font=self.f_small)
         y += self._lhS + P * 6
 
-        return img, y
+        return img, y, content_top
 
 
 # -----------------------------------------------------------------------------
