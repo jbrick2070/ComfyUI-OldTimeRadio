@@ -48,9 +48,20 @@ Anti-drift on resume:
   Cowork session" section of GO_FORWARD first -- file tools hit the container,
   and `/mnt/user-data/uploads/` is a lagging snapshot that reports phantom
   corruption. Route everything through Desktop Commander on the Windows paths.
-- Any coding item carries the full `kibitz-plugin:kibitz` gate (r1-r4, Codex +
-  Antigravity, driver anchor first). Say so in the opening statement so the
-  window budgets for it.
+- **Review routing is whatever GO_FORWARD says TODAY -- read it, do not assume.**
+  This skill used to hard-code "any coding item carries the full
+  `kibitz-plugin:kibitz` gate (r1-r4)". That gate is SUSPENDED as of the
+  operator's 2026-08-11 directive, which routes a QUANDARY to **Codex CLI** and
+  the post-coding QA on the finished diff to **Sonnet 5**, with no r1-r4 arc
+  opened and no scoped tail ever reported as one. The 08-04 full-kibitz gate is
+  suspended, not dead, and returns if the operator withdraws 08-11 -- so state
+  the ROUTING YOU READ in the opening statement, with its date, rather than
+  repeating either from memory.
+- What 08-11 did NOT drop, and no routing change ever does: **Bug Bible
+  regression every turn**, the BOM check on every touched file, the full suite,
+  `build_variants.py --check`, AST parse on touched `.py`, and HEAD == origin
+  after the push. The two-strikes floor also still stands underneath: a bug that
+  survives two fixes gets a consult before the third swing.
 
 ## HAND OFF (wrap-up)
 
