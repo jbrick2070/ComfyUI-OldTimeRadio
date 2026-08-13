@@ -111,6 +111,14 @@ clear, VRAM 657 MiB).
   REASONING, not the shape -- if your lane does have a canvas-dependent
   property, declaring may be right for you.
 
+**A `mesh_stage`-CLASS PASS IS WEAKER EVIDENCE THAN IT LOOKS, and the runner
+does not say so.** That lane leaves NO per-shot clips, so `coverage` reads
+`not measured` and the frame-level no-reuse audit audits zero clips -- yet the
+runner still prints PASS. It fails closed when the registry is unreadable but
+stays quiet when there are simply no clips. **Queued coder fix: say it out loud
+in the verdict**, so a PASS that audited nothing cannot read as a PASS that
+audited everything.
+
 **RUN `scripts/build_variants.py --check` BEFORE STARTING A LANE.** Lane 7
 inherited five red variants from lane 5 and had to distinguish them from its
 own. A red at the start of a lane belongs to whoever caused it.
@@ -177,7 +185,7 @@ written), `TODO`.
 
 | # | Lane (public / internal) | Owns | Status |
 |---:|---|---|---|
-| 0-9 | **CLOSED -- 9 packets, 9 engines, 16 live legs.** Detail lives in `docs/evidence/lane_receipts/lane0*.md` and `docs/HANDOFF_LOG.md`, never here | scaffolding, 3 WAN, 4 HuMo, 3 LTX | **DONE** through `77fa4dad` |
+| 0-22 | **ALL 21 PACKETS CLOSED.** Per-lane detail lives in `docs/evidence/lane_receipts/lane*.md` and `docs/HANDOFF_LOG.md`, never here | 21 engines, built + receipted + pushed | **DONE** |
 | 2b | boot-contract enforcement TIMING | plumb `boot_contract` into the frozen director policy so the check fires at ShotLock preflight instead of inside the render phase; keep the render-time check as defence in depth | TODO |
 | 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
 | 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** **THE TELEMETRY THIS ROW WAS WAITING FOR ARRIVED 2026-08-13, unprompted, on a live chained render-gate leg -- and it cost that leg.** Measured: `wan_ti2v VRAM render-phase peak 12870 MB / post 7942 MB`. Nearly 8 GB stayed resident AFTER the render phase closed. The `fastwan_8gb` leg then died on the next shot: `MotionBudgetError: static frame budget 69 (snapped 69) exceeds the cost-model's affordable 18 frames (free=9549 MB, margin=0.85)` -- the beat needed 69 frames, only 9.5 GB of 16 was free because of the retention above, and the engine REFUSED rather than silently resizing (correct fail-closed behaviour, not the defect). So this is not a `fastwan_8gb` fault and **not** the still-spine defect -- that repair held, there is no missing-still signature anywhere in the leg. It is cross-engine retention: engine A does not release before engine B's cost model prices its work. S7 says pick the release branch FROM the telemetry rather than inventing one; the telemetry now exists and has a consequence attached. **A SECOND SAMPLE LOOKED LIKE A CONTROL AND WAS NOT -- corrected 30 minutes after it was written, and the correction is the finding.** `wan_i2v` was first measured `peak 14106 MB / post 2504 MB`, which reads as a clean sibling release, and this row briefly concluded the retention was `wan_ti2v`-specific. The SAME engine on its NEXT render in the SAME leg measured `peak 16074 MB / post 8517 MB`. Every sample tonight:
@@ -190,70 +198,45 @@ written), `TODO`.
 
 So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v` is merely consistent about it while `wan_i2v` released once and held once. Do not build an engine-specific fix on the single clean sample; that is exactly the trap this row fell into for half an hour. Note also `wan_i2v` peaking **16074 MB**, over the 14.5 GiB working ceiling and at the 16 GB card's limit, which is its own open question. What the samples DO still rule out is "add a release between engines" is the WRONG SHAPE: an engine-boundary reclaim already exists (`render_driver.py:3893`, the CS-3 inter-beat reclaim) and it FIRES -- its steps are `unload_llm`, `_unload_bark`, `gc.collect`, `soft_empty_cache` and the cuda flushes, every one aimed at OTR's OUT-OF-BAND caches, which is what it was built for. `soft_empty_cache` frees cached blocks; it does not EVICT a resident ComfyUI-managed model, and no step in that reclaim does. So the question row 5b should answer is: **what decides whether a finished render gives its VRAM back**, given the SAME engine did both within one leg. The candidate branch is a targeted `free_memory(required, device)` before a DIFFERENT engine prices its work -- explicitly NOT `unload_all_models`, which V-4/V-5 forbid and which was measured freeing 0 MB. Nine samples exist now; **get more before choosing, and do not conclude from one** | TODO -- 9 samples, no conclusion yet |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
-| 10 | `mesh_stage` | S8b-16 hy3d graph gate, dead profile-canvas channel, continuity declaration, V-1 self-probe | **DONE** -- 4/4 red gates green, live smoke PASS (50 frames at the declared 1472x832, magic-byte proved). Receipt: `docs/evidence/lane_receipts/lane10-mesh_stage.md`. Its G3 fix also closed the FOUR still lanes' G3 rows (shared `_CheapFamilyBase`) |
-| 11 | `viz_green` | profile/canvas contract, ffmpeg gates, continuity declaration | **DONE** -- 7/7 green, two live smoke legs. Its G2 closed by declaring the profile canvas channel INERT, **not** by declaring a canvas: a declaration would overrule `OTR_VIDEO_LANDSCAPE_CANVAS` on a lane with no native canvas (lesson L19, found by the Codex consult). Receipt: `docs/evidence/lane_receipts/lane11-viz_green.md` |
-| 12 | `viz_camera` | same visualizer checks, this lane only | **DONE** -- 7/7 green, live smoke. Same two answers as lane 11 (channel INERT + `continuity=`), with the L19 premise re-checked on this engine's own render path. Receipt: `docs/evidence/lane_receipts/lane12-viz_camera.md` |
-| 13 | `viz_mxc_cpu` | profile/canvas, dependencies, continuity | **DONE** -- 7/7 green, live smoke. Same two answers again, premise re-derived on its own painter. Still HOLDS the "declares NOTHING" canvas control (it declared nothing, so the control did not move). Receipt: `docs/evidence/lane_receipts/lane13-viz_mxc_cpu.md` |
-| 14 | `viz_mxc_mandala` | S8b-16 pycairo half, profile/canvas, continuity | **DONE** -- 7/7 green, live smoke. The pycairo NAMED refusal was ALREADY in place (verified, not rebuilt, and already covered by a forced-ImportError test). Same two answers as 11-13, premise re-checked hardest here. **ALL FOUR VISUALIZERS NOW CLOSED.** Receipt: `docs/evidence/lane_receipts/lane14-viz_mxc_mandala.md` |
-| 15 | `still_motion` | G7.4/S8b-15 `still_plan` authority, S8b-12 ffmpeg gate + missing-still refusal | **DONE** -- 7/7 green, two live smoke legs (a render AND the refusal firing). Closed the **black-beat defect** (`_require_still`, scoped to this lane) and put the ffmpeg gate at PREFLIGHT on the shared base, which **all four still lanes inherit**. Receipt: `docs/evidence/lane_receipts/lane15-still_motion.md` |
-| 16 | `still_pan` | the now-proven still-lane rules, this lane only | **DONE** -- 7/7 green, two live smoke legs (render + refusal). Took the `_require_still` call lane 15 left open, on its own evidence. Still HOLDS the "declares NOTHING" canvas control (it declared nothing). Receipt: `docs/evidence/lane_receipts/lane16-still_pan.md` |
-| 17 | `still_flat` | same checklist independently | **DONE** -- 7/7 green, two live smoke legs. Took the refusal too, so **ALL FOUR still families now refuse a missing still**. Premise re-checked on a THIRD builder (`ffmpeg_still_static_cmd`, fit+pad). The dark-floor branch is KEPT as a control with no occupant (lesson **L22** -- lane 16's "delete it" instruction was REVISED), with both halves asserted. Receipt: `docs/evidence/lane_receipts/lane17-still_flat.md` |
-| 18 | `still_word` | preserve its existing missing-still refusal, add the ffmpeg + single-authority contract | **DONE** -- 7/7 green, two live smoke legs. Two of its three items were ALREADY closed (Sprint B's refusal; lane 15's inherited ffmpeg gate) and were verified rather than rebuilt -- the lane's deliverable is the acceptance check, since nothing had asserted the gate on this lane before. **THE WHOLE CHEAP SHELF IS NOW GREEN.** Receipt: `docs/evidence/lane_receipts/lane18-still_word.md` |
-| 19 | `h3_low_video` / `minimax_h3_video` | the shared H3 implementation with this FIRST adapter only, 124..362 model / 129..377 canvas math, 24->25 delivery, continuity, Sage-free boot, V-1 self-probe | **DONE** -- 7/7 green on arrival, live smoke PASS (129 canvas frames at the declared 864x480, exactly 5.160 s, ZERO audio streams, 6,315 MB absolute cold). G2 INVERTED as predicted and the canvas was DERIVED from the `low` token's own meaning. **The smoke found TWO shipped production bugs the suite could not see** -- the `h3` contract was missing the `--reserve-vram 12` that every passing H3 leg held (**L24**), and three shared modules reached siblings by an absolute `nodes.` import that works in tests and raises on a server, one of them silently making five lanes motion-EXEMPT (**L23**). Receipt: `docs/evidence/lane_receipts/lane19-h3_low_video.md` |
-| 20 | `h3_low_audio_in` / `minimax_h3_audio_in` | the second adapter, mouth policy carve-out, soft-reference/JUMP, seed-43 workhorse profile | **DONE** -- 7/7 green on arrival, live smoke PASS on the FIRST attempt (129 canvas frames at 864x480, exactly 5.160 s, ZERO audio streams on the lane that LOADS an audio VAE, 6,678 MB absolute cold, 239.4 s). A SECOND registration out of lane 19's module, split into `_MiniMaxH3Base` + two subclasses with lane 19's behaviour held byte-for-byte. Continuity is `soft_reference` and is NOT inherited: the ref2va node has no `first_frame` input at all. The mouth-policy equality test became a membership test in the same commit -- without it every H3 character beat raises `MouthPolicyError` at PLAN time, which the test asserts as a consequence rather than a mapping. The handoff's one unverified item (the `COMFY_AUTOGROW_V3` sockets) is SETTLED: a V3 node's `FUNCTION` is `EXECUTE_NORMALIZED`, a plain passthrough, so in-process they take plain dicts. Receipt: `docs/evidence/lane_receipts/lane20-h3_low_audio_in.md` |
-| 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | **DONE** -- `scripts/otr_h3_mime_runner.py`, live run PASS: 864x480, model f90 = **3.750 s exactly at the model's own 24 fps**, and **`nb_streams=2` -- one video plus ONE audio stream**, the inversion this lane exists for. Lossless FLAC score stem from the same decode, plus a ducked voice-over review copy with the picture COPIED not re-encoded; both originals preserved. Registers nothing, and the test asserts that from both sides. **Three live API-boundary failures before the pass** (input dir, DynamicCombo serialization, the `/history` key that says `images` for an mp4) -- all three invisible to a CPU test, recorded as **L27**. Receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. **One operator ruling owed:** CLAUDE.md 0A says "no other runner" and should be amended to name this script |
-| 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | **THREE OF FOUR MET 2026-08-12.** The preflight matrix is **29 engines x 7 gates with ZERO non-green cells and ZERO `EXPECTED_RED` entries** -- the table is empty for the first time since it was written. All **21 lane receipts** are present in `docs/evidence/lane_receipts/`. The last expected-red (`google_omni_video` G3) was closed here rather than left: it was the one lane the 21-lane transplant deliberately did not own, and row 22's own contract is what brought it in. Its comment had reasoned "CONTINUITY none" since the lane was written while the call inherited the default -- L3 exactly, and one keyword to fix. **REMAINING: the render gate, and the operator SUPERSEDED it** -- "we need a 45 word render of every visual path" (2026-08-12) replaces "ONE end-to-end episode". That sweep is the last thing in the queue |
 
-### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13 morning)
+### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13, after the cost-row fix)
 
-Rows 1 and 2 of the operator order are CLOSED. Row 3 (the render gate) is
-part-run. This is the live state.
+Operator rows 1 and 2 are CLOSED. Row 3, the 45-word render gate, is **12 of 21
+legs passed** and is the live work. This is the whole forward picture.
 
-**LANES STILL TO RUN (5 of 21):**
+**THE 9 LEGS LEFT, grouped by the boot they need.** The launcher's SECOND
+ARGUMENT (the token) enables the ENGINES; the profile's own `launch.env`
+satisfies the CONTRACT. They are separate and you need both -- read the env out
+of the profile, never off this table.
 
-| lane | boot needed | note |
-|---|---|---|
-| `ltx_audio_in` | `LTX` token **+ `OTR_HEADLESS_DISABLE_PINNED=1`** | in flight |
-| `humo`, `humo_14b_169`, `humo_1_7b`, `humo_1_7b_169` | `HUMO` token + reserve 2.921 + disable pinned | never run in this gate |
-| `minimax_h3_video`, `minimax_h3_audio_in` | no token + reserve 12 + disable pinned, sage off | never run in this gate |
+| boot | token | clamp | legs left |
+|---|---|---|---|
+| 1 | `WAN` | none | `fastwan_8gb`, `wan_ti2v`, `wan_i2v` |
+| 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo`, `humo_14B_169`, `humo_1.7B`, `humo_1.7B_169` |
+| 4 | (none) | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
 
-**LANES THAT FAILED AND NEED A RETRY, with the reason and what must change:**
+| lane | state |
+|---|---|
+| `fastwan_8gb`, `wan_ti2v` | **UNBLOCKED 2026-08-13 (`9eea64a4`) -- just re-run, no further code.** Both died on the disqualified `FRAME_COST_MODEL` row |
+| `wan_i2v` | **Still genuinely unknown.** Page-thrash at 89.7-106.3 s/it against a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB. Never completed a leg on this box, so do NOT read it as a regression. Wants row 5b answered, or a diet contract tried |
+| HuMo x4, the H3 pair | never run in this gate |
 
-| lane | failed on | retry needs |
-|---|---|---|
-| `fastwan_8gb` | `MotionBudgetError` -- the **disqualified `FRAME_COST_MODEL` row** | **CODE FIX SHIPPED 2026-08-13 -- just re-run, no further change.** And the retry note that stood here was WRONG: "delete/replace the row" is a **proven no-op**, because `_cost_model_for` falls back to `_DEFAULT_FRAME_COST`, the byte-identical `(7000.0, 185.0)`. The real defect was that `compute_real_frame_budget` never asked `cost_row_may_refuse`; it does now. Both legs' exact failing calls return their full frame counts |
-| `wan_ti2v` | same disqualified row | same -- fixed by the same commit |
-| `wan_i2v` | page-thrash, 89.7-106.3 s/it vs a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB | genuinely unknown whether this lane is viable on this box. Never completed a leg. Needs the VRAM question (row 5b) answered first, or a diet contract tried |
+**PASSED (12):** the four still families + four visualizers + `mesh_stage` from
+earlier sweeps, then `ltx_8gb` (18.7 min), `ltx_video` (68.1 min -- a lane that
+had never completed a 45-word leg) and `ltx_audio_in` (83.2 min, 12 clips).
 
-**LANES THAT PASSED (6 of 21 this run + the cheap shelf):** `still_pan`,
-`ltx_8gb`, `ltx_video` this run; the four visualizers, four still families and
-`mesh_stage` from earlier sweeps.
+**THE CODE ITEMS OWED, in value order:**
 
-**THE THREE CODE ITEMS OWED, none built, in value order:**
-
-1. ~~**Delete or replace the two `FRAME_COST_MODEL` rows.**~~ **DONE
-   2026-08-13 -- and NOT by deleting them, because deletion is a PROVEN
-   NO-OP.** `_cost_model_for` falls back to `_DEFAULT_FRAME_COST`, the
-   byte-identical `(7000.0, 185.0)`; `eng_fastwan_8gb.py:293` says so about its
-   own row in as many words. Both legs refuse identically with the table empty,
-   so the prescribed fix would have shipped green and changed nothing. The real
-   defect: `compute_real_frame_budget` is the SECOND call site of that
-   disqualified row and the only one that never asked `cost_row_may_refuse` --
-   `render_driver._assert_beat_affordable` has asked since it was written, so
-   the row was inert on the reviewed path and live one call away, through
-   `eng_wan_ti2v._floor_length`. **Fix: both refusals now answer to that one
-   authority**, validation stays unconditional, and the predicate additionally
-   requires the row to EXIST so a typo cannot promote the shared fallback into
-   a guard. Both legs' exact failing calls now return their full frame counts.
-   The lab rows (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
-   6.900/frame) were NOT adopted -- the standing ruling still forbids a bench
-   substituting for the real lifecycle, and no row is qualified. Bible **12.98**
-   amended: its "DELETE the row" prescription is what this disproved.
-   **The overhead half was gated too, and that was a correction mid-build:** it
-   looks like the defensible term, but the binding NET-NOT-ABSOLUTE provenance
-   rule records that it came from an ABSOLUTE peak while the comparison runs
-   against FREE bytes, double-charging the desktop baseline. Caught by the
-   Codex consult, not by me.
+1. ~~The two `FRAME_COST_MODEL` rows.~~ **DONE `9eea64a4`** -- and NOT by
+   deleting them; deletion is a proven no-op (`_DEFAULT_FRAME_COST` is the
+   byte-identical tuple). Both refusals now answer to `cost_row_may_refuse`.
+   Detail in `docs/HANDOFF_LOG.md` and
+   `docs/2026-08-13-codex-consult-costrow-refusal.md`; the lab rows were NOT
+   adopted and no row is qualified. **The one thing to carry forward:** the lab
+   figures (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
+   6.900/frame) remain inadmissible until re-measured through the real
+   `prepare()` + `render_clip()` lifecycle, and the operator said he would take
+   that back to the lab when the GPU frees up.
 2. **The in-decode halt for the writer runaway.** Fires on an unclosed-string
    token count (primary) and a repeating window (secondary), NEVER on
    `target_words`. Must raise a REROLLABLE capacity phase or it silently
@@ -319,34 +302,20 @@ part-run. This is the live state.
 
 **LEMMY** is untouched and deferred by the operator.
 
-### OPERATOR ORDER FOR THE NEXT WINDOW (set 2026-08-12 late, supersedes below)
+### OPERATOR ORDER (set 2026-08-12 late, rows 1-2 CLOSED and removed)
 
-Work these three in THIS order. The operator set it after watching a live leg.
+What is left of the operator's order, in his order.
 
 | # | Item | Where | State |
 |---:|---|---|---|
-| ~~**1**~~ | ~~**BUG BIBLE -- TWO PROMOTIONS OWED**~~ | survival-guide `80fc358` | **CLOSED 2026-08-12.** Landed as **07.31** (scroll span vs canvas allocation) and **07.32** (legibility through a lighten-only blend), both `verdict: promoted`, both index rows appended, README count moved at all three call sites. The required field set was READ off `test_every_parsed_entry_has_the_documented_fields` -- `id, phase, area, symptom, cause, fix, verify, tags`, every one truthy (`legacy_id` is documented but NOT required, which is what the backed-out attempt is likeliest to have tripped on). Filed **phase 7 / area video**, not the phase-12 slot the last five OTR promotions took: these are concrete compositing and scroll geometry. Bible regression reproduced the documented baseline EXACTLY, 20 passed / 24 skipped / 3 xfailed |
-| ~~**2**~~ | ~~**TITLE-CARD LEGIBILITY**~~ | `dc21e4df` + `d75a8866` | **CLOSED 2026-08-13, PROVEN ON A PUBLISHED EPISODE.** Built in the spec's six-step order, suppression stayed step 4. Live leg `signal_lost_wigners_whisper`: **628 TITLE events** on ASS layer 1, BOTH cards (open 0.00-10.00s, close 123.16-131.12s), Matrix decode intact, the block cursor rendering from its `\p1` drawing, and the apostrophe surviving `_ass_escape` on a real title. Measured on the FINAL artifact: core-vs-outline **13.66:1** opening / **12.60:1** closing against a gate of 4.5:1, where the pre-fix control measures **1.01:1** core-vs-scene. Then the operator eyeballed it -- "hard to see from a distance but much improved" -- and `d75a8866` took the outline 3 -> 6 with a shadow (+55% dark mass within 5px), verified by re-burning the surviving intermediate rather than re-rendering |
-| **3** | Resume the 45-word render gate | the section below | 9 of 21 legs passed; needs THREE contract-grouped boots |
-| **4** | LEMMY | the Lemmy sections further down | operator hands it over once 1-3 are done |
-
-**Item 1 is the whole reason the sweep is stopped.** The hero title is phosphor
-green drawn into the procgen CRT frame and composited `screen` + `green_only`,
-which can ONLY lighten -- measured 1.13:1 over a lit monitor, and a black
-outline there is a mathematical no-op (`screen(A, 0) = A`). Direction is chosen
-and driver-verified: emit the title through `OTR_CaptionBurn`, which already
-runs AFTER the blend and whose ASS styles already carry `OutlineColour` /
-`BorderStyle` / `Outline` / `Shadow`. **The Matrix decode animation is KEPT.**
-Everything needed is in the spec -- rasterisation site, the card schedule
-(`_resolve_card_windows` already yields BOTH the open and close windows, so
-"start and end" needs no new timing work), the canonical chain, the risky half,
-and a measured acceptance test. Do not re-derive it.
+| **3** | Resume the 45-word render gate | the section below | **12 of 21 passed**; 9 legs left across THREE contract-grouped boots |
+| **4** | LEMMY | the Lemmy sections further down | parked and gated; operator hands it over once row 3 is done |
 
 **DO NOT CONFLATE THE TWO CREDIT SURFACES.** The end-credits SCROLL is a
 different thing and is already FIXED (`f70df546`). Conflating them cost the
 operator an evening believing the title was done.
 
-### THE 45-WORD RENDER GATE -- item 2 (live status 2026-08-12 late, sweep STOPPED)
+### THE 45-WORD RENDER GATE -- operator row 3, the live work
 
 **IT NEEDS THREE BOOTS, NOT ONE. This was wrong in the plan until now and would
 have burned ~5 GPU-hours.** Legs are grouped by the `launch.boot_contract` in
@@ -433,189 +402,6 @@ the cross-engine retention above, NOT on the still-spine defect it failed on
 this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
 night and is the leg that carries the title card.
 
-### THE TWO MotionBudgetError LEGS WERE NOT A VRAM PROBLEM (corrected 05:30)
-
-**PARTLY CORRECTED 2026-08-13 by running the arithmetic instead of reading it.**
-The empty-card claim below is TRUE for `wan_ti2v` (125 frames at 832x480 prices
-above any free level this card can reach) and **FALSE for `fastwan_8gb`**: its
-beat was **69** frames, not 125, which at `free=16000` prices 7000 + 69*185*
-(480/832 area scale) inside the budget and returns 69. So `fastwan_8gb` refused
-because free VRAM really was low -- the retention WAS a contributor on that leg,
-and only the `wan_ti2v` leg refuses on an empty card. The conclusion the section
-draws is unchanged (the row is disqualified and had to stop refusing); the
-supporting sentence was over-general, and both legs are green on the fix either
-way.
-
-**`wan_ti2v` and `fastwan_8gb` would have failed ON AN EMPTY CARD.** Both died
-with `MotionBudgetError`, both reported a low `free=` figure (9,389 and 9,549
-MB), and I attributed both to the `wan_ti2v` retention documented above. That
-was wrong, and the arithmetic settles it:
-
-```
-FRAME_COST_MODEL = {'wan_ti2v': (7000.0, 185.0), 'fastwan_8gb': (7000.0, 185.0)}
-
-  free  9389 MB -> affordable   5 frames   (needed 125)  REFUSES
-  free 14500 MB -> affordable  28 frames   (needed 125)  REFUSES
-  free 16000 MB -> affordable  35 frames   (needed 125)  REFUSES   <- empty card
-```
-
-A 125-frame beat prices at `7000 + 125*185 = 30,125 MB`, nearly TWICE this card.
-No free-VRAM level on this hardware satisfies it. The retention is real
-telemetry and it was never the cause of these two failures.
-
-**AND THE REPO ALREADY KNEW.** The doc block at `motion_common.py:341-360`,
-directly beneath the table, disqualifies that exact row in writing: it "refused
-a real production leg -- static frame budget 173 ... affordable 24 frames
-(free=13481 MB) -- on an engine that had already shipped", it is "wrong in BOTH
-directions", `_planned_length` "already stopped consulting it for exactly this
-reason", it "refuses EVERY segment length the coverage planner produces,
-including 93 frames at 14,500 MB free", and -- explicitly -- **"Empty is the
-correct value until a row is re-measured through the real prepare() +
-render_clip() lifecycle".**
-
-The table still holds exactly two engines. They are exactly the two that failed
-tonight. Nothing else is in it.
-
-**THE LAB ALREADY MEASURED THE RIGHT ROWS, and the shipped ones are off by an
-order of magnitude.** `vram-recipe-lab/docs/ENVELOPE_LADDERS.md`, "Job B --
-WAN/FastWan cost-row ladder", fitted from a real frame ladder (25/65/93/129/177):
-
-| engine | SHIPPED row | LAB-MEASURED row | per-frame error |
-|---|---|---|---|
-| `wan_ti2v` | 7000 + **185**/frame | 6,910.8 + **25.874**/frame | **7x too steep** |
-| `fastwan_8gb` | 7000 + **185**/frame | 7,317.9 + **6.900**/frame | **27x too steep** |
-
-The OVERHEAD is nearly right in both; the SLOPE is the defect.
-
-**AND THIS REFINES THE CORRECTION ABOVE RATHER THAN CONFIRMING IT.** "Retention
-was irrelevant" is true only against the BROKEN row. Recomputed with the lab row,
-a 125-frame `wan_ti2v` beat needs `6910.8 + 125*25.874 = 10,145 MB`:
-
-* at tonight's `free=9389` (x0.85 margin = 7,980 usable) it STILL refuses;
-* at `free=14500` (12,325 usable) it FITS.
-
-So with a correct cost row the ~8 GB retention becomes decisive after all. Both
-are real contributors and dismissing either is wrong.
-
-**A JUDGEMENT THE OPERATOR OWNS.** The standing ruling admits a row only when
-"re-measured through the real `prepare()` + `render_clip()` lifecycle -- which
-the standing ruling requires and no bench may substitute." The lab IS a bench.
-So adopting these numbers verbatim is exactly what that sentence forbids, even
-though they are self-evidently closer to truth than 185/frame. The choices are:
-delete the rows (restores the documented-correct empty table, no measurement
-needed), adopt the lab rows (needs the operator to rule the bench admissible),
-or re-measure through the real lifecycle.
-
-**So the fix is a DELETION, not a measurement campaign** -- and the standing
-ruling already names the bar for putting a row back: re-measured through the
-real lifecycle, which no bench may substitute. Until then an empty table means
-the geometry plan stands and no row may refuse. That is a small, high-value
-change and it is NOT built: it turns two red legs green and it deserves the
-review a refusal-path change earns.
-
-**WHAT THIS DOES NOT EXCUSE.** `wan_ti2v` really does retain ~8 GB (15 samples,
-post clustering at 8.1 GB regardless of a 7,985-13,065 MB peak, which looks like
-cached model weights rather than a leak) and `wan_i2v` really did thrash. Those
-stay open as row 5b. They are simply not what killed these two legs.
-
-**`wan_i2v` PAGE-THRASHES ON THIS BOX -- new, and it had never been run before.**
-Killed at 108.6 min after ONE beat, measured at **89.7 - 106.3 s/it** on a 20-step
-segment. The plan's own documented thrash pathology is **29 s/it** (ltx 12.5 GB +
-humo 7 GB co-resident), so this is THREE TIMES worse than the case that was bad
-enough to write down. At ~33 min per segment and multiple 1-2 segment beats, the
-leg needed 5-11 hours; it was interrupted rather than allowed to run.
-
-The cause is visible in its own telemetry: an earlier `wan_i2v` render in the
-SAME leg peaked at **16,074 MB** -- over the 14.5 GiB working ceiling and at the
-16 GB card's limit -- and left **8,517 MB** resident. The engine is paging
-against its own residue. **So retention has TWO symptoms, not one:** it kills
-OTHER engines' cost models (that is what took `fastwan_8gb`) and it degrades the
-RETAINING engine into a state where it cannot finish. Same root, two failures.
-
-`wan_i2v` is listed as never-run in every prior sweep, so there is no baseline
-claiming it ever completed a 45-word leg on this hardware. Do not assume this is
-a regression.
-
-**AND `/interrupt` CUTS A SAMPLER BUT NOT AN LLM DECODE.** It was POSTed twice
-tonight: against the writer runaway it did nothing (the transformers
-`generate()` call never polls it, so `queue_running` stayed 1 until the server
-was restarted), and against this thrashing render it landed within ~2 minutes
-(ComfyUI's sampler checks between steps). That distinction matters for the
-`scripts/otr_api.py:820` interrupt fix -- it will cancel a stuck RENDER and will
-NOT cancel a stuck WRITER, which is the case that motivated it.
-
-**A WRITER RUNAWAY HIT THIS BATCH TOO**, on `fastwan_8gb`'s P1 (not P3) with a
-sober BBC eclipse story: 15,297 output tokens after a 1,087-token prompt, on a
-`DramaticQuestionV4` whose entire schema is THREE short strings. It self-healed
-on the next rung at temperature 0.320. So the runaway is neither P3-specific nor
-comic-premise-specific -- two occurrences in one night, different passes,
-different sources. See the runaway section below; the heartbeat and the evidence
-log both landed tonight so the next one is fully observable.
-
-**A `mesh_stage`-class PASS is weaker evidence than it looks.** That lane leaves
-NO per-shot clips, so `coverage` reads `not measured` and the frame-level
-no-reuse audit audits zero clips -- yet the runner still prints PASS. It fails
-closed when the registry is unreadable but stays quiet when there are simply no
-clips. Queued fix: say so out loud in the verdict.
-
-**Bank pinned `scifi_news`** (`--source-bank`): the gate's question is "does this
-engine render", the bank is noise on top of it, and rolled banks already ate two
-legs. `scifi_news` specifically because its pack closes the cast-coverage
-asymmetry that killed `mesh_stage`, and it does not route to the fable2 writer
-that killed `ltx_8gb`.
-
-**Results files are overwritten per run** -- snapshot `tmp/_w45_results.json`
-before every launch. Runs 1-4 are preserved as
-`tmp/_w45_results_run{1,2,3,4}_20260812.json`.
-
-Operator acceptance gate: a 45-word render of EVERY visual path. Runner
-`scripts/otr_w45_campaign.py`, 21 legs -- 19 incumbent lanes on one boot, then
-`minimax_h3_video` + `minimax_h3_audio_in` on a SECOND boot with
-`--reserve-vram 12` (they would starve `wan_i2v` and the HuMo tiers on a shared
-server). Results in `tmp/_w45_results.json`; run 1 preserved at
-`tmp/_w45_results_run1_20260812.json`.
-
-**8 PASS, 3 FAIL, 10 NEVER RUN.** The sweep was STOPPED deliberately, mid-run,
-to fix a defect that would otherwise have consumed five of the remaining legs.
-
-| verdict | legs |
-|---------|------|
-| PASS | still_flat, still_pan, still_motion, still_word, viz_camera, viz_green, viz_mxc_cpu, viz_mxc_mandala |
-| FAIL | mesh_stage, ltx_8gb, fastwan_8gb |
-| never run | ltx_video, ltx_audio_in, humo x4, wan_i2v, wan_ti2v, + the H3 pair |
-
-**NOT ONE OF THE THREE FAILURES WAS A VIDEO DEFECT.** That is the headline of
-the whole sweep so far:
-
-- `mesh_stage` -- died in `OTR_CastLock`; the freeze cascade stamped
-  `needs_full_rerun` because a cast member (MARIA) owned no line. Rolled the
-  shakespeare bank. OPEN -- see the cast-coverage section below.
-- `ltx_8gb` -- died in the fable2 WRITER, markup ladder exhausted. That server
-  carried fix A but NOT fix B, so it is evidence that carrying the rejected
-  draft ALONE was not enough -- the post-fix data point the judging pass asked
-  for.
-- `fastwan_8gb` -- the only genuine render failure, and it is the still-spine
-  (PBUG-20260811-02, reproduced). Candidate repair under QA.
-
-**RESTART FROM `ltx_video`.** Reset + boot per CLAUDE.md sections 4 and 5, then
-run `--only` over the ten remaining incumbent legs, then reboot with
-`OTR_HEADLESS_RESERVE_VRAM_GB=12` and `OTR_HEADLESS_DISABLE_PINNED=1` for
-`--only minimax_h3_video,minimax_h3_audio_in`.
-
-**THE SWEEP CAN NOW PIN ITS BANK** (`--source-bank`, shipped `f9b51675`).
-Rolling stays the DEFAULT because it is how both writer defects were found. Pin
-when the question is "does this engine render"; roll when it is "does the
-pipeline hold across banks". Two legs were spent proving something about the
-writer before this existed.
-
-**Diagnosis is far cheaper than it was.** `scripts/otr_api.py`
-`describe_execution_error` names the failing NODE, the exception type and the
-tail of the traceback instead of truncating the history repr at 500 characters
-mid-frame -- that truncation cost the diagnosis of both writer failures. And a
-`scifi_news_pro` leg now persists its seed / frame card / stance BEFORE the
-passes that can die on them, so a dead leg is reproducible; three earlier deaths
-were not.
-
 ### THE WRITER CAN LOOP FOREVER ON A CAPACITY RUNAWAY -- OPEN (found 2026-08-13)
 
 Found on a live leg while running the render gate, not by review. Two separate
@@ -681,210 +467,6 @@ two runaway decodes took seconds:
   min here). Client-side, `scripts/otr_api.py:820` returns TIMEOUT and **never
   POSTs `/interrupt`** -- that is the documented ghost, and it is a five-minute fix.
 
-### THE RUNAWAY TEXT, CAPTURED AT LAST (2026-08-13 04:20) -- IT IS A CADENCE LOCK
-
-The evidence log shipped in `f912af64` fired on its first live runaway, and it
-answers the question every earlier analysis could only infer:
-
-```
-RUNAWAY EVIDENCE (55577 chars, 13828 tokens, ended_with_eos=False)
-HEAD: {"title": "Echoes of Error", "premise": "A brilliant engineer discovers a
-      flaw in her company's cutting-edge AI system, which could have
-      catastrophic consequences if exposed too early..."
-TAIL: Welcome, dear listener, to Echoes of Error. Let the echoes inspire us. Let
-      the truth unite us. Let the future be ours to shape, as one, echo by echo.
-      This is Echoes of Error. Let the echoes echo. Let the truth prevail. Let
-      the future be ours to forge, hand in hand, echo by echo. Welcome, dear
-      listener, to Echoes of Error. Let the echoes resound. Let the truth
-      triumph. Let the future be ours to build, side...
-```
-
-**It is an anaphoric peroration loop** -- the model entered an inspirational
-closing cadence and could not leave it. The structure is MIXED, which is the
-part that matters for the fix:
-* **verbatim anchors** -- "Welcome, dear listener, to Echoes of Error" and
-  "echo by echo" recur exactly;
-* **slot-substituted variation** -- inspire/echo/resound, unite/prevail/triumph,
-  shape/forge/build.
-
-`repetition_penalty=1.03` was ACTIVE and did not stop it, because the varying
-half is what the penalty is designed to encourage. `min_p=0.05` was active too.
-
-**THIS REFUTES THE REGISTER-COLLISION EXPLANATION for this instance.** The
-premise is earnest -- an engineer, an AI flaw, catastrophic consequences. There
-is no comic source, no OnlyFans, no tonal bind to hedge around. The Fable
-analysis that produced tonight's pack-prose fixes may still be right about the
-MARMOT leg; it is not what happened here. Treat the pack changes as a plausible
-contributing fix, NOT as the cure.
-
-**DESIGN CONSEQUENCE, and it confirms Fable's ordering for a better reason than
-Fable had:** lead the halt with the **open-string token counter**, keep n-gram
-detection as secondary. A window WOULD catch this one on its verbatim anchors,
-so n-gram is not useless -- but the anchors are separated by ~25 tokens of
-variation, so it fires late and only when the loop happens to contain repeats.
-The counter is indifferent to the loop's shape: 13,828 tokens inside ONE
-unclosed JSON string is pathological whatever the prose is doing, and it would
-have halted this at ~2,000 instead of 13,828.
-
-**Directive-safe signals** (none read `target_words`): non-closure of the
-currently-open JSON string; n-gram self-similarity; deviation from the pass's own
-healthy history (the very next leg ran P3 base calls in 60/75/65 s on the same box
--- the runaway was 20x that); tok/s and wall clock. Note `min_p=0.05` and
-`repetition_penalty=1.03` were ALREADY active and did not stop it.
-
-Recommended shape, three separate commits: an in-decode degeneracy + interrupt
-criterion; the client `/interrupt` fix; and the honesty fixes in D-below. A
-capacity-cycle bound ships as a backstop only, never as the headline.
-
-**The variable was the NEWS ITEM, not the bank and not the code.** Diffed at the
-time: only two commits touched the writer path since the last green `still_pan`,
-and the relevant one (`98fb258f`, num_characters cap 6 -> 10) is arithmetically
-IDENTICAL at the `num_characters=2` these profiles request. `--source-bank` pins
-the BANK; the item still rolls. A re-roll on the same bank drew a ScienceDaily
-physics story and rendered clean. Do not read a single bad leg as a regression
-without checking which item it drew.
-
-**2. `OUTPUT_TRUNCATED` gives advice that is wrong exactly when it fires.** The
-guard says "Give this pass a slot whose window fits prompt+artifact". A
-`ProviderCapacityMessages` pass sets `_otr_reserve_remaining_output_capacity`, so
-`requested_tokens = context_cap` BY DESIGN and `effective < requested` is true the
-moment the prompt is non-empty. There is no bigger slot -- the pass already has
-every token there is. The message should distinguish the reserve-remaining case
-and say "the model did not stop", because as written it sends the reader hunting
-a config defect that does not exist. It cost this session about twenty minutes.
-Branch on `reserve_remaining` at `OTR_LedgerScriptWriter.py:1052`.
-
-**3. The 14k-token evidence is captured and then thrown away.** The capacity
-raise attaches `raw_completion` at `OTR_LedgerScriptWriter.py:1089` and NOTHING
-reads it -- the leg log prints `raw head: <empty>`. So at the one moment the
-runaway text exists in memory, it is discarded, and the next reader has to
-reproduce a 21-minute decode to see what the model was actually saying. Log a
-head+tail of it.
-
-**4. The two local transports disagree.** `_otr_model_loader.py:1305` raises a
-bare `ModelLoaderError` with NO phase for the same condition the writer raises as
-a phase-carrying `PromptContextOverflowError`, so an identical runaway on that
-transport is not rerollable at all. It also tests `>=` where the writer tests
-`==`.
-
-### THE STILL-SPINE REPAIR -- ROOT CAUSE FIXED AND PROVED LIVE (2026-08-12 late)
-
-**CLOSED as a repair, still OPEN as a PBUG.** Three swings; the third one
-deleted the thing instead of adjusting it, and `mesh_stage` -- the leg that died
-on it -- now renders.
-
-`3446af3f` retargeted link 255 so the image producer reads the POST-AUDIO
-ledger, and that killed both branches which mint `b000_music_open`
-(`derive_opening_music_beat` returns None below the 2 s head gap; the fallback
-branch's condition literally means "this is a PRE-AUDIO ledger"). Meanwhile
-`render_driver._canonical_visual_beat_id` still rewrote the CONSUMER's lookup TO
-that id. The still was on disk, in `required_scene_targets`, with a hash --
-under the other name. The repair did not fail to fire; it fired and moved the
-mismatch from the closing beat to the opening one.
-
-Shipped, each its own green chunk:
-* `4e49ee4b` -- `_still_spine_row_for_mesh` chose a row by ABSENCE: `""` was in
-  the key set, so a music beat probing with an empty `char_id` matched any mesh
-  row. PREREQUISITE, not cleanup -- until it landed, a same-id mesh test could
-  not go red and the mesh half silently served a plausible wrong image.
-* `c9c8e5c0` -- **the root cause**: `_canonical_visual_beat_id` DELETED, both
-  call sites on the shot's own beat id. `_OPENING_MUSIC_SUFFIX` SURVIVES -- it
-  is a classifier with three callers (`:1407`, `:2821`, `:4509`), not a
-  translation. Do not reintroduce the function under any name.
-* `a2a85bcc` -- the post-audio join fails LOUD at ShotLock and stays fail-soft at
-  `SignalLostVideoRenderer`. `strict` is caller-scoped on purpose: the free
-  function has two live callers with opposite criticality, and a global contract
-  is wrong for one of them whichever way it is written.
-
-**STILL OPEN and unchanged:** PBUG-20260811-02 cannot CLOSE, because its
-acceptance leg (60-second opening AND closing cues) **is not configurable
-today** -- `CUE_DURATIONS` is 12/8/4, both fiction assemblers omit
-`target_duration_s`, `EpisodeAssembler` only TRUNCATES, and the canonical
-runner's `--set` is whitelisted. With `_MUSIC_MAX_CHUNK_DUR_S = 22.0`, a 12 s
-opening is ONE chunk, so `_002`/`_003` may be unreachable in production at all.
-Operator ruled 2026-08-12: ship the fix, leave the PBUG open, do not build the
-plumbing yet. **So the multi-chunk path remains UNPROVEN and no green sweep may
-be worded as proving it.**
-
-Also open, found by the panel, not yet built: `OTRShotLock.IS_CHANGED`
-fingerprints only routing env while `lock()` reads a mutable durable ledger
-(Bible 06.01) -- and `tests/test_route_freeze_wiring.py:278` deliberately pins
-ShotLock and VideoDirector to the SAME fingerprint, so "always re-execute" is a
-contract change needing its own justification, not a test edit in passing.
-
-### SUPERSEDED -- the pre-fix candidate write-up (kept for the record)
-
-`PBUG-20260811-02` moved from "root cause NOT ESTABLISHED" to established, on a
-live reproduction (`fastwan_8gb`), and a candidate repair is committed
-(`3446af3f`, `ae76fb3f`). **It is NOT proven and must not be called fixed.**
-
-- **The general fault:** the image producer planned stills from the PRE-AUDIO
-  ledger, so it planned against ids the finished episode does not use --
-  `EpisodeAssembler` mints one row PER CHUNK (`music_{cue}_{NNN}`). Fixed by
-  retargeting canonical link 255 to ShotLock's post-audio ledger. **This is the
-  fix that scales;** a reservation can only ever name `_001`.
-- **The local fault:** BOTH the opening and closing reservations suppressed
-  themselves on a ROLE test, so a pre-audio sentinel under an authored id killed
-  the reservation meant to cover it. Both are unconditional now, since `_add`
-  already dedupes by beat id. **Hardening -- NOT the multi-chunk solution.**
-- **STILL OPEN, flagged independently by two cross-checks:**
-  - `OTR_ShotLock.overlay_audio_timing` swallows every exception and returns the
-    PRE-AUDIO ledger, and a `_same_frozen_episode` mismatch does the same,
-    warning rather than raising. **So the fix's premise can silently fail** and a
-    multi-chunk `_002`/`_003` would die exactly as before. Bible **12.57**
-    already prescribes the answer: reject mismatches. Untestable today --
-    `overlay_audio_timing` short-circuits under `OTR_TEST_MODE=1`.
-  - `ShotLock.IS_CHANGED` covers routing environment state but NOT the ledger it
-    reads from disk, so image planning depends on a hidden disk read outside the
-    dependency signature (Bible 06.01).
-- **ACCEPTANCE TEST before this closes:** a canonical `fastwan_8gb` leg with
-  **60-second opening AND closing cues**. `_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a
-  60 s cue becomes THREE 20 s chunks; the original short cue never exercises the
-  chunked path, which is the half the reservations cannot reach.
-
-### THE FABLE2 WRITER -- TWO FIXES SHIPPED, THE THIRD SHELVED ON EVIDENCE
-
-**`scifi_news_pro` is the ONLY bank routed to this writer**
-(`banks.json: scifi_news_pro_multipass`; a grep for the whole-play grammar
-across `nodes/story_packs/` returns exactly one file). Every other bank's Python
-owns the speaker labels. **So the cross-bank writer gate CANNOT qualify this
-writer** -- five green banks proved the pipeline, not `_otr_scifi_fable2.py`.
-Coverage is repeated `scifi_news_pro` runs across distinct sources. Three axes
-vary per run: the news item, one of 14 frame cards, one of 6 stances
-(`OTR_FABLE2_SEED` pins the card/stance deal, not the news item and not the
-sampling).
-
-**SHIPPED** (r1 arc: Fable cold -> driver -> Codex -> Antigravity -> judged;
-artifacts in `kibitz-runs/2026-08-12-writer-genre-slippage/`):
-
-- `2572b493` -- **the repair turn now carries the rejected draft.** It never did:
-  the retry ordered the model to keep the same wording about a text it had never
-  been shown, so every attempt after the first was a COLD REGENERATION -- which
-  is why four attempts produced four DIFFERENT malformed shapes instead of
-  converging. Temperature decays only when the draft actually rode along.
-- `45d1d3f8` -- **the one-shot format example was DEAD CODE.** The parameter and
-  both use sites existed; nothing ever passed one, and the pack's `examples` was
-  empty. Now a gardening-programme example, deliberately a different domain
-  because it arrives as the model's own assistant turn, validated against the
-  real parser.
-- `8a7a4d62` -- fix B silently ate part of fix A's budget: the guard counted only
-  prompt plus draft, never the example B injects on every call.
-- `61ae356c` -- required ledger saves REFUSE instead of continuing silently.
-
-**SHELVED, deliberately -- the candidate-retirement ladder (lesson 35).** A
-judging pass found that the ALTERNATE PRODUCER SLOT every lane assumed -- Fable
-proposed it, the driver accepted it, Codex and Antigravity both wrote MUST-FIX
-items for it -- **does not exist**: `_ALLOWED_SLOTS = ("creative", "technical")`
-and `repair_slot_fn` is never passed in this module. Building it means a new
-widget plus canonical JSON wiring, which is its own project. All three dead legs
-also predate fixes A and B, so the failure mode may already be largely closed.
-**Gate the build on post-fix evidence that legs still exhaust.**
-
-**CUT, do not re-open:** upstream address-shaped roster names (both mechanical
-lanes rejected it independently -- `CastShape.name` is the ledger join key into
-casting, credits, portraits and voices); prefix or fuzzy matching of abbreviated
-speaker cues; loosening the parser.
-
 ### CAST COVERAGE -- OPEN, and it is a defect class rather than a lane
 
 A cast member with NO line hard-fails the freeze cascade for EVERY bank, but
@@ -916,14 +498,6 @@ every Stage-2 and Stage-3 call and then only RAISES.
    then preserve the original halt.
 6. Pack `examples` are POPULATED in three of the four packs and INERT by design
    (`_otr_story_pack.py:155-159`). Do not "fix" them.
-
-### CLOSED LANE DIAGNOSES -- MOVED OUT 2026-08-12
-
-The full lane 10 / 15 / 19 diagnosis write-ups (313 lines) lived here after
-they were acted on and closed. Per this file's own rule -- *if a thing is
-DONE, it does not belong here* -- they now live in `docs/HANDOFF_LOG.md`
-under "CLOSED LANE DIAGNOSES", alongside the per-lane receipts in
-`docs/evidence/lane_receipts/`. Nothing was deleted.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
@@ -1085,150 +659,6 @@ waiting on me?" without reading the whole file.
 **Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
 a dropdown ruling (it became a sprint series), and queue item 1 is closed.
 
-### LEMMY BRANCH A -- IN PROGRESS 2026-08-10, foundation landed
-
-**Authoritative plan:** `docs/2026-08-10-OPEN-PLAN-lemmy-cross-engine.md`
-(rewritten by a second window from my open plan; my rebuttal at
-`docs/2026-08-10-REBUTTAL-lemmy-identity-premise.md` was accepted and folded in).
-
-**G0 IS CLOSED -- the operator APPROVED on the record**
-(`docs/2026-08-10-G0-RIGHTS-DECISION-CARD-lemmy.md`, decided
-2026-08-10T20:37:17Z, against a same-day snapshot of the Gemini API Additional
-Terms and the Prohibited Use Policy, both quoted in the card). Scope: use of
-self-generated Google TTS output (voice Algenib) as a clone reference for LOCAL
-engines. Tier left UNDETERMINED and marked for the evidence packet -- it governs
-what Google may do with our data, not our rights to the output.
-
-**THE PREMISE CORRECTION THAT SURVIVED REVIEW, and must not be re-inherited:**
-Lemmy was never redrawn per episode. 1,633 ledgers, 186 LEMMY rows: 151 carry
-`voice_ref_id=None` (the bark-preset path, expected) and **33 of the remaining 35
-are the SAME reference**, `vz_donor_marshal_indian`. The second window explained
-the mechanism -- all 33 had `meta.episode_seed=None`, so CastLock derived an
-identical selector seed every time. **He was ACCIDENTALLY PINNED.** The fix is an
-explicit qualified re-pin, NOT a rewrite of the generic selector. A current
-40-seed sweep selects 14 refs, so an unpinned future route WOULD vary.
-The defect is a **floor-EVIDENCE failure** (the incumbent cannot prove the
-configured floor) -- NOT, as I originally wrote, proof from the `_indian` name
-or the `warm` timbre tag that it violates accent/vocal weight. Neither is
-supported by the bank metadata and that overreach was correctly rejected.
-
-**SHIPPED so far (both independent of which voice wins the audition):**
-* **Plan 5.1 -- `nodes/_otr_voice_route.py`.** `validate_qualified_voice_route`
-  makes a route PROVE itself: file exists, bytes hash to the receipt, the
-  ENGINE TRIPLE agrees (route == active scalar == bank entry), rights not
-  expired/revoked, closed status vocabularies, contract version supported.
-  Fail-closed on every unknown. Returns reasons, not a bare bool. The legacy
-  `is_qualified_route` REMAINS as a compatibility helper and may never authorize
-  a selected route -- a test pins that it says yes where the new one says no.
-  65 tests.
-* **Plan 5.3 (first half) -- route identity in the cache key.** `route_id`,
-  `route_contract_version`, `qualification_record_id`, `weight_revision` added to
-  `ResolvedVoiceRequest` AND to `IN_KEY_FIELDS`; partition invariant verified
-  intact. Legacy rows keep byte-identical keys via empty/zero defaults, so
-  nothing untouched gets re-baselined.
-  **`REQUEST_SCHEMA_VERSION` 2 -> 3**, deliberately: adding a key field changes
-  every request's cache_key, and the bump routes that invalidation through the
-  designed `needs_rerender` slim-migration path instead of silent key drift.
-  Measured at bump time: **ZERO cached entries on this box**, so the practical
-  cost was nil. `CACHE_SCHEMA_VERSION` unchanged -- the sidecar shape did not
-  change, only what the key is computed over.
-
-* **Plan 5.2 -- CastLock re-pin ordering. SHIPPED 2026-08-10 (`e791344b`).**
-  `lock()` now runs the plan's six ordered steps: the revision is stamped before
-  any route resolution; bank + engine metadata resolve ONCE for both cast
-  policies (preserve_ledger still passes `bank_entries=None`, so its
-  `char_voice_engine` stamp stays `auto` and does not start pinning a concrete
-  engine); rows match on normalized name OR char_id against a new
-  `LEMMY_VOICE_POLICY["character_key"]`, because Lemmy is positional `c02` and a
-  matcher keyed to a literal `lemmy` char_id would claim nobody; the route is
-  proved ahead of both the hybrid voice-fit and the generic selector; only the
-  claimed row changes; and a selected route that fails qualification raises
-  `VoiceRouteError` with NO fallback. New `_resolve_policy_claim` /
-  `_apply_policy_claim` on CastLock, and `select_policy_route` /
-  `resolve_policy_route_claim` / `cast_row_matches_policy` in
-  `nodes/_otr_voice_route.py`. 32 tests.
-  **IT SHIPPED INERT and that is the point:** `approved_native_routes` is still
-  `{}`, so nothing is selected, the voice bank is not even consulted on the
-  dormant path, and no current render changes. It activates the day G1 Test A
-  puts an operator receipt in that dict. Sonnet QA pass was clean on all nine
-  contract items; its one finding (the claim resolver not being handed the bank
-  `lock()` had already loaded) is fixed in the same commit.
-
-* **Plan 5.3 second half -- reference resolution, receipts, fingerprint.
-  SHIPPED 2026-08-10 (`fdc016ef`).** `resolve_and_verify_reference` (the 5.1 seam
-  that had never actually been built) now runs right after `cast_lookup`, and a
-  proved local route RENDERS ITS OWN BYTES -- without that override the route
-  proved one file while the generic resolver handed the adapter another.
-  `build_resolved_request` carries the four route fields into the cache key.
-  `IS_CHANGED` stopped returning the constant `"static"` for local legs, which
-  had asserted that a local voice render can never change: swap the reference WAV
-  under a pin and ComfyUI would serve the previous render while the ledger
-  claimed the new route. It is now a fingerprint over route identity, runtime and
-  the actual reference bytes -- with a ledger carrying NO routes still returning
-  the literal string `"static"`, never a network call, and NaN (fail-open) on an
-  unreadable expected local file. Per-line receipts now also land on the LOCAL
-  path for policy-route lines (`voice_route_id` + `sample_rate`), scoped to those
-  lines because stamping every local line would reload-and-resave the whole
-  ledger on every ordinary leg -- which `test_end_to_end_google_tts_cache_off_
-  byte_identity` forbids, correctly. 36 tests.
-  **Sonnet QA caught a real defect and it is fixed in the same commit:** the
-  "receipt must persist" rule first fired on a bare degraded COUNT plus "was any
-  route in this render a policy route", so an unrelated line's failed stamp would
-  have thrown away good, fully evidenced route audio. `_persist_ledger_stamps`
-  now reports WHICH line_ids failed and the raise compares that set against the
-  route's own lines.
-
-**BRANCH A IS DONE -- shipped, G1 passed, proven in a live six-bank sweep.**
-Detail lives in `docs/HANDOFF_LOG.md` and
-`docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`; it is not repeated
-here, because this file is forward-only.
-
-**WHAT REMAINS ON THE LEMMY SPRINT.** Remediation plan `.gemini/antigravity/brain/c494e2df-.../implementation_plan.md`,
-triaged chunk-by-chunk 2026-08-11:
-
-* **Chunk A1 -- DONE 2026-08-12.** `OTR_INDEXTTS2_EMO_ALPHA` was read at
-  generate time while the cache key captured `profile.default_params` at
-  request-build time, so an env override changed the RENDER without changing the
-  KEY, and `IS_CHANGED` carried no alpha term either. Closed with the NUMERIC
-  sibling of the mechanism that already existed for this exact class:
-  `identity_params` folds an env-selected MODEL into the key for Google TTS, and
-  the new `render_time_params` folds env-resolved numeric knobs into
-  `quantized_params`. The engine resolves the value through the SAME function
-  its forward calls, so key and render cannot disagree, and per-render env
-  pickup is preserved. Every engine without such a knob is byte-identical and
-  still answers `IS_CHANGED == "static"`; only `indextts2` now fingerprints.
-  Tests: `tests/test_lemmy_emo_alpha_cache_key.py`.
-* **Chunk C items 2/3/5.** SceneSequencer integration coverage at 22050/44100 --
-  every existing fixture starts AT the 48000 bus, so nothing proves the real
-  resample path -- plus the rate-assumption sweep. Item 1 is done.
-* **Chunks A2 -> A3 -> A4.** v2 identity + replay bridge. **Operator ruled
-  2026-08-11: AUTO-PROMOTE on a clean replay** -- if A4 reproduces all six frozen
-  clip hashes, A2/A3 rewrite the receipt's identity fields with no second
-  sign-off. `tts_emo_alpha` follows the existing loose numeric convention; no new
-  null-shape walker.
-* **Chunk B -- DONE 2026-08-12, and it was NOT the tidy-up it was filed as.**
-  The three cloning adapters' private `_resolve_ref` tried exactly ONE candidate
-  (`<comfy_base>/models/<ref>`) and otherwise returned a cwd-relative
-  `os.path.abspath`, while the voice node's own `_resolve_ref_to_disk` knew
-  about three more places -- including the `C:\ComfyUI-Models` root from the
-  Comfy Desktop 1.0.4 migration. **On this box BOTH Lemmy reference WAVs live
-  ONLY under that migrated root**: the qualified Branch-A reference
-  `lemmy_algenib_cockney_v1.wav` and the historic incumbent
-  `vz_donor_marshal_indian.wav` are both ABSENT from the historical location and
-  PRESENT under the migrated one. So the node's existence check confirmed the
-  file and the adapter that had to OPEN it resolved to a path that is not there.
-  Now one shared `resolve_voice_ref_path` in `_otr_audio_engines/base.py`, with
-  the historical candidate still tried FIRST so the fix can only turn a miss
-  into a hit. Tests: `tests/test_lemmy_voice_ref_resolver_breadth.py`.
-  **NOT logged as a PBUG:** it is grounded in the filesystem and a faithful
-  replay of the old resolver, not in a captured live failure, and the admission
-  rule wants the bug to have failed in a live run. A forced-Lemmy live render
-  would settle it either way and is the natural next Lemmy step.
-* **Chunk E.** Release/OBS audit: does swapping Lemmy's voice count as an
-  EDITORIAL RECAST for an audience that already heard the old one? Operator only.
-* **Branch B stays unbuilt.** It existed only for a G1 failure, and G1 passed.
-
-
 ### GOOGLE SLUGS -- TWO OPERATOR CALLS OWED (the build shipped `4bc760c8`)
 
 Verifier: `python scripts/verify_google_slugs.py` (exit 0/2/3/4/5; never
@@ -1369,22 +799,6 @@ own independent guard): *"there should be an LLM pass to clean this stuff up."*
   replay parity and needs a declared re-baseline. The LLM pass must be designed
   with that in mind rather than discovering it late.
 * Held while LEMMY is active -- it exercises casting.
-
-### CARRY-FORWARD -- how to run a bank-specific qualification (from the closed announcer-intro work)
-
-PBUG-20260807-01 is FIXED and LIVE-PROVEN (5/5 legs, four banks, three model
-families). Receipts in `docs/PROD_BUG_LOG.md`. Three things worth not
-re-learning:
-
-1. **Always override the bank per leg and ASSERT `meta.source_bank`.** The
-   canonical graph is pinned to `scifi_news`, which returns BEFORE the writer's
-   close/intro block -- so an un-overridden leg is green and proves nothing.
-2. **Assert on `meta.source_bank`, never `meta.source_meta.kind`.** `kind` is the
-   FETCH MECHANISM (`media_archive_rss`, `original_llm`), a different vocabulary.
-   A verifier that read `kind` false-flagged a passing leg.
-3. **Dry-run first.** Catalog model ids carry size suffixes (`... (12.0 GB)`);
-   the plain id is a hard `ValueError`. The `--dry-run` `applied:` line is the
-   only proof an override actually landed.
 
 ### STANDING POLICY -- provider model slugs (from the closed curation chunks)
 
@@ -1609,41 +1023,6 @@ the suite is green, but the commit message does not describe them.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
-### 0. VIDEO MATRIX PATTERN -- FOUR ROUNDS, FOUR NOs, DID NOT CONVERGE
-
-**Do not build from the current plan.** Arc r1-r4 complete (r4 single-lane --
-Antigravity out on provider quota). Judgments:
-`kibitz-runs/2026-08-06-2026-08-06-matrix-pattern/` (**LOCAL ONLY, gitignored**).
-Spec: `docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` (`11e893f6`), superseded
-in detail by the r3 `final.md` and the r4 judgment.
-
-**Why it did not converge, and it is not a design problem:** most of what remains
-is ABSENT HUMAN-OWNED DATA. Someone must WRITE a one-line `doc_purpose` for each
-of ~32 registered engines and DECIDE the total `family -> display_group`
-taxonomy. No further review round produces that content. The frozen
-`(engine_id, field)` grandfather set is likewise un-enumerated, so two builders
-could grandfather different holes and both pass.
-
-**What survived all four rounds (this part IS sound):** templated prose fragments
-whose numbers are placeholders resolved from the live registry; extending
-`AdapterDescriptor` rather than minting a second descriptor; a generator-side
-validator that keeps the registry pydantic-free; init order import -> audit ->
-rows; the two-unit cost split (VRAM MB vs provider USD); precedence stated as a
-HUMAN rule; and a mandatory `python tools/engine_matrix.py` regeneration step
-because `--check` never rewrites the doc.
-
-**Corrections banked:** `str.format_map` CANNOT resolve dotted flat keys
-(`KeyError: 'reference'`, proven) so the placeholder grammar must be explicit;
-`provider_side` migration is **behaviour-affecting, not STATIC** -- it changes
-dispatch at `render_driver.py:1653-1668` and there is a THIRD classifier at
-`scripts/otr_w45_campaign.py:82-108,120-132` where a provider id without a
-`cloud_`/`google_` prefix would enter the LOCAL campaign.
-
-**Next step is NOT another round.** Author the content, enumerate the grandfather
-set, plan the `provider_side` migration with parity tests, write the `CLAUDE.md`
-rule text -- then re-enter at **r3**, per the standing rule that a plan-level
-gap drops back rather than being patched from inside r4.
-
 ### 0-QUINQUE. MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
 
 **THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
@@ -1786,49 +1165,6 @@ CIM kill by CommandLine, never a blanket python kill (it severs the MCP tooling)
 Everything below was verified against the real files on 2026-08-04, is
 non-GPU, and is provable by the suite alone. Work them in order; each ends
 green and pushed on its own.
-
-### HARD GATE FOR THIS SPRINT -- NO CODE SHIPS WITHOUT A FULL KIBITZ (operator directive 2026-08-04)
-
-Operator: "for the next coding sprint be sure any coding work has a full
-`/kibitz-plugin:kibitz` review." **This is a gate, not a suggestion.** Now also
-written into `CLAUDE.md` above the two-strikes rule, because that older rule says
-a first-try root fix does not need a panel and would otherwise win the conflict.
-
-* **FULL = the default four-round arc.** r1 arc -> r2 coding -> r3 wiring -> r4
-  convergence; 8 external calls (two reviewers x four rounds). Not a scoped tail,
-  not one round, not a continuation receipt. If a round genuinely cannot run, say
-  which one and why -- a partial campaign is NEVER reported as a full arc.
-* **Invoke `kibitz-plugin:kibitz` by name.** `anthropic-skills:kibitz` is the
-  older duplicate; it is not what was asked for.
-* **Panel = Codex + Antigravity.** Claude drives from Cowork, so the driver's own
-  family is excluded -- do not launch a second `claude -p` lane against yourself.
-* **Use the ComfyUI profile.** `.kibitz/comfyui.local.md` is already in the repo
-  (written 2026-07-11). Regenerate via `kibitz/scripts/comfyui_profile.py` if the
-  tree has moved past it. Node contract, widget/`widgets_values` drift and
-  `IS_CHANGED` are exactly the defect classes this sprint can produce.
-* **Anchor first, judge last.** Write `driver_anchor.md` from the REAL Windows
-  files (Desktop Commander -- never the lagging Linux mount) BEFORE the fan-out,
-  then ground every panel claim and discard the misreads. A panel run on a false
-  premise is worse than no panel.
-* **When it binds:** the campaign runs on the item's plan BEFORE the code, and its
-  MUST-FIX list is answered BEFORE the commit. The panel does not replace the
-  suite and the suite does not replace the panel -- both, every item.
-* **Batching (amended by the r1 panel, 2026-08-04):** item 1 gets its OWN
-  campaign covering its 2-3 chunks -- it is the structural change and precisely
-  what a panel is for. Items 2 + 3 SHARE ONE campaign over their combined diff:
-  every item still passes through a full arc (the directive is satisfied), but a
-  fixture-isolation chunk does not buy 8 external calls of wall-clock on its own.
-  This batching is the gate-compliant reading, not an exemption.
-* **Artifacts:** `kibitz-runs/<date>-<topic>/r<N>/` with the per-round
-  `input.md`, `driver_anchor.md`, reviewer files, `judgment.md`, `final.md`.
-  UTF-8, no BOM. (r4 fixed a conflict here -- this matches the standing
-  re-ground gate's location and the tool's actual output; the earlier
-  `docs/<date>-<topic>/kibitz/` line is withdrawn.)
-
-Kibitz is CPU/API only and costs the operator nothing, so it never competes with
-work for the GPU -- but it does cost wall-clock. Four campaigns is real time on
-top of the ~2h40m of coding below. If the session runs short, finish FEWER items
-fully reviewed rather than more items unreviewed.
 
 ### 1. THE PUBLIC_DOMAIN LANE IS TOLD TO CARRY WORDS IT IS NEVER SHOWN (the session's main work -- r1 panel re-scoped 2026-08-04)
 
@@ -2102,7 +1438,9 @@ BOTH test-order permutations as regressions. The private-module-name
 alternative is CUT: it risks exercising fallback import paths instead of the
 production `nodes._otr_public_domain_sources` package identity.
 
-### 4. FINISH ITEM 7 -- the leak is closed and proven; testability is not (~2h)
+### 4. THE SPOKEN-CITATION CODA STILL OWES ITS TESTABILITY (~2h, OPEN)
+
+**The LEAK is closed and live-proven; the WORK below is not.** The old heading led with the closed half and a 2026-08-13 cleanup pass duly cut the whole section as done. Four coder items remain, and the two traps under them have each already cost real episodes.
 
 The spoken-citation defect SHIPPED and is live-proven (`3943dd38`, `0957e169`,
 `104c3f78`; receipt in `PROD_BUG_LOG.md` PBUG-20260805-04). Seven legs, six lanes,
@@ -3304,7 +2642,6 @@ here because each has been re-proposed at least once:
 - `workflows/otr_canonical.json` (the workflow source of truth)
 
 
-
 ---
 
 ## PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
@@ -3391,46 +2728,3 @@ section entirely.
 Until both are met, the Lemmy window stays parked and this window is the only
 one in the code. The work list below is kept ready so the handoff costs nothing
 when the gate opens.
-
-### WINDOW A -- LEMMY (the window that coded it)
-
-Owns: `nodes/scene_sequencer.py`, `nodes/_otr_audio_engines/**`,
-`nodes/_otr_voice_bank.py`, `config/voice_reference_bank.json`, and the Lemmy
-tests.
-
-Work list, already triaged in "WHAT REMAINS ON THE LEMMY SPRINT" above:
-
-* **Chunk C items 2/3/5** -- SceneSequencer integration coverage at 22050/44100.
-  Every existing fixture starts AT the 48000 bus, so nothing proves the real
-  resample path. Item 1 is done.
-* **Chunks A2 -> A3 -> A4** -- v2 identity + replay bridge. Operator ruled
-  2026-08-11: **AUTO-PROMOTE on a clean replay** -- if A4 reproduces all six
-  frozen clip hashes, A2/A3 rewrite the receipt's identity fields with no second
-  sign-off.
-* **A forced-Lemmy live render** to settle chunk B. Chunk B (the shared
-  `resolve_voice_ref_path`) is written and tested but was deliberately NOT logged
-  as a PBUG, because it is grounded in the filesystem rather than in a captured
-  live failure. A forced-Lemmy render settles it either way and is the natural
-  next Lemmy step.
-* **Chunk E is OPERATOR ONLY** -- whether swapping Lemmy's voice counts as an
-  editorial recast for an audience that already heard the old one.
-* Branch B stays unbuilt; it existed for a G1 failure and G1 passed.
-
-**Operator directive 2026-08-12: the Lemmy fixes must be WELL DOCUMENTED.**
-
-### WINDOW B -- STORY WRITER + THE 21-LANE SWEEP (this window)
-
-Owns: `nodes/_otr_scifi_fable2.py`, `nodes/_otr_fable2_markup.py`,
-`nodes/_otr_outline.py`, `nodes/story_packs/**`, `nodes/_otr_ledger.py`,
-`scripts/otr_api.py`, `scripts/otr_w45_campaign.py`,
-`scripts/otr_writer_bank_gate.py`, and their tests.
-
-### THE SHARED HAZARD -- git, not files
-
-Both windows push to `v2.0-alpha`. This project has been burned twice by
-concurrent windows: a staged deletion swept into another window's commit, and an
-amendment lost in the gap between staging and committing.
-
-**So: stage, commit and push ATOMICALLY in one call. Never leave anything staged
-while the other window is live. Never `git add .` -- add by name.** Verify
-`HEAD == origin` after each push.

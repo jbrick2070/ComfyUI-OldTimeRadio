@@ -3,6 +3,102 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-13 -- HEAD aba67d76 (v2.0-alpha) -- CODER (the cost row had two call sites; GO_FORWARD cut back to forward-only)
+
+Did: queue row 3's first code item, two writer-transport honesty fixes, the
+design review for the third, and then the operator asked for GO_FORWARD to be
+cut back to things that are actually ahead of us.
+
+**THE COST-ROW REFUSAL -- `9eea64a4`. The prescribed fix was a no-op and I
+proved it by running it.** The plan said "delete the two `FRAME_COST_MODEL`
+rows". `_cost_model_for` falls back to `_DEFAULT_FRAME_COST`, the
+byte-identical `(7000.0, 185.0)` -- `eng_fastwan_8gb.py` says exactly that
+about its own row -- so both legs refuse identically with the table EMPTY. A
+deletion would have shipped as a green diff that fixed nothing.
+  The real defect: `compute_real_frame_budget` is the SECOND consumer of the
+  disqualified row and the only one that never asked `cost_row_may_refuse`.
+  `render_driver._assert_beat_affordable` has asked since it was written, so
+  the row read as inert on the reviewed path while it was live one call away
+  through `eng_wan_ti2v._floor_length`. One row, two call sites, one gated.
+  Both refusals now answer to that one authority; validation stays
+  unconditional; and the predicate additionally requires the row to EXIST, so a
+  typo cannot promote the shared fallback into an enforcing guard.
+  **I was wrong about the overhead half and the Codex consult caught it.** I
+  wanted to keep the fixed-overhead floor armed, arguing only the SLOPE was
+  impeached. The binding NET-NOT-ABSOLUTE provenance rule (operator 2026-08-11,
+  `build_video_evidence_manifest.py`) records that the shipped overhead came
+  from an ABSOLUTE peak while the comparison runs against FREE bytes, so it
+  double-charges the desktop baseline -- and names that as how this row came to
+  refuse everything. Gated both. Consult:
+  `docs/2026-08-13-codex-consult-costrow-refusal.md`.
+  Corrected in passing: "both legs would have failed on an EMPTY CARD" is true
+  for `wan_ti2v` at 125 frames and FALSE for `fastwan_8gb`, whose beat was 69
+  frames and fits at `free=16000`. So retention WAS a contributor on that leg.
+
+**THE EVIDENCE-MANIFEST GENERATOR IS A LANDMINE -- fixed in the same commit.**
+`scripts/build_video_evidence_manifest.py` still produces `manifest_version` 1
+while the shipped JSON is at 5: lanes 7b, 8, 9 and the H3 pair appended their
+rows to the JSON directly and never came back to the script. A plain re-run
+DELETES 123 lines of real evidence. Found the only way it could be -- by
+running it, and reverting. It now refuses to overwrite a manifest whose version
+is higher than its own, and says what it would have thrown away.
+
+**WRITER-TRANSPORT HONESTY FIXES -- `6e9ed140`.** (1) `OUTPUT_TRUNCATED` gave
+advice that was wrong exactly when it fired: a `ProviderCapacityMessages` pass
+reserves the whole window BY DESIGN, so `effective < requested` is always true
+and "give this pass a slot whose window fits prompt+artifact" sent a live
+session hunting a config defect that does not exist. That branch now says the
+model did not stop. (2) The two local transports disagreed --
+`_otr_model_loader` raised a bare, phase-less `ModelLoaderError` where the
+writer raises a phase-carrying `PromptContextOverflowError`, so an identical
+capacity failure was rerollable on one transport and terminal on the other.
+Both now carry the phase. Checked that nothing catches `ModelLoaderError`
+around either site.
+
+**THE IN-DECODE HALT -- reviewed, NOT built** (`c665f991`, `aba67d76`). The
+Codex design review changed four things about the shape I took in, all
+file-grounded: it belongs in `_build_truncating_generate_fn` keyed on
+`schema_model` (not `invoke_structured_slot`, which has no tokenizer and no
+`generate()` call); not through the existing `if stop:` path; **never raise
+from inside the criterion** -- `generate()` returns NORMALLY on a criteria hit,
+verified against the installed transformers 5.10.4, so latch the hit, decode
+once, then raise; and NOT `phase="output_limit"`, which would make the
+diagnostics lie. Full text: `docs/2026-08-13-codex-consult-indecode-halt.md`.
+One claim in it is flagged UNVERIFIED in the plan -- it says the outer
+candidate loop is not currently unbounded, which contradicts the plan's premise.
+
+**RENDER GATE: `ltx_audio_in` PASSED** (83.2 min, 12 clips, COVERS) on the boot
+this window inherited. That puts the gate at **12 of 21**. Box then cleaned:
+selective kill by CommandLine, port 8000 clear, VRAM 1,207 MiB.
+
+**BIBLE 12.98 AMENDED** (survival-guide `3342889`). Its `fix` prescribed the
+deletion this session disproved; it now says to check the fallback first, and
+that if a value survives its own deletion the fix is to gate the enforcement
+through one explicit "may this row REFUSE?" predicate. `verify` gained: pin the
+no-op itself, assert from both sides, keep coefficient validation outside the
+gate, and require that qualification names a row that exists.
+
+**GO_FORWARD CUT BACK TO FORWARD-ONLY** (operator asked directly). The file had
+drifted to 3,436 lines, most of it closed narrative it forbids in its own
+header. Removed to here and to git history: the 21-lane VIDEO LANE QUEUE table
+(all packets closed, receipts in `docs/evidence/lane_receipts/`), the
+MotionBudgetError diagnosis (183 lines, closed by `9eea64a4` above), the
+still-spine repair and its superseded pre-fix write-up (closed, proved live),
+and the fable2 writer write-up (two fixes shipped, third shelved). The durable
+lessons from each are in this entry and in the receipts; the full prose is in
+this file's git history.
+
+Gates every turn: full suite **10364 passed / 110 skipped / 1 xfailed**, nothing
+deselected; Bug Bible **20 passed / 24 skipped / 3 xfailed** at 272 entries;
+`build_variants --check` **50 variants, 0 failures**; no BOM, ASCII-only in
+every line added, AST clean; HEAD == origin on both repos after every push.
+**The plan's stated baselines were STALE by ~400 tests** (9963/109/1 and 46
+variants, from the lane-10 era) -- proved by `git stash` + `--collect-only` that
+HEAD collects 10467 and this window's +7 is exactly its seven new tests.
+
+Next: the in-decode halt itself (CPU, design settled), then the render gate's
+remaining 9 legs in three contract-grouped boots, then row 5b retention.
+
 ## 2026-08-13 -- HEAD cbaf24cc (v2.0-alpha) -- CODER (title card shipped and PROVEN LIVE; the writer runaway finally caught in the act)
 
 Did: closed BOTH operator queue rows, then spent the night on the render gate
