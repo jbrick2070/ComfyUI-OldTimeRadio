@@ -38,6 +38,7 @@ from typing import Any, Callable, List, Optional, Type
 from pydantic import BaseModel
 
 from . import _otr_lmfe_compat  # compat shim; ensure_lmfe_transformers_compat() called inside factory below
+from . import _otr_writer_heartbeat as _OTRHB
 from ._otr_model_loader import (
     ModelLoaderError,
     _normalize_messages_for_cache_entry,
@@ -63,75 +64,12 @@ log = logging.getLogger("OTR")
 # identical with or without it. Every `every` tokens it logs token count,
 # tok/s, elapsed, and a short decoded tail so the operator can watch the
 # JSON forming live instead of staring at a frozen console.
-try:
-    from transformers.generation.streamers import BaseStreamer as _BaseStreamer
-except Exception:  # pragma: no cover - transformers missing in some test envs
-    class _BaseStreamer:  # type: ignore[no-redef]
-        def put(self, value: Any) -> None: ...
-        def end(self) -> None: ...
-
-
-class _HeartbeatStreamer(_BaseStreamer):
-    """Read-only generate() observer that logs a live tok/s heartbeat.
-
-    Attaching this to model.generate(streamer=...) cannot alter the
-    generated tokens; it only reads them. Safe on any pass.
-    """
-
-    def __init__(self, tokenizer: Any, label: str, every: int = 32) -> None:
-        self._tokenizer = tokenizer
-        self._label = label
-        self._every = max(1, int(every))
-        self._ids: List[int] = []
-        self._count = 0
-        self._last_emit = 0
-        self._t0: Optional[float] = None
-        self._prompt_seen = False
-
-    def put(self, value: Any) -> None:
-        # The first put() carries the prompt input_ids -- start the clock
-        # there and skip it for the new-token count.
-        if not self._prompt_seen:
-            self._prompt_seen = True
-            self._t0 = time.monotonic()
-            return
-        try:
-            raw = value.tolist() if hasattr(value, "tolist") else list(value)
-        except Exception:
-            return
-        flat: List[int] = []
-        for item in raw:
-            if isinstance(item, list):
-                flat.extend(item)
-            else:
-                flat.append(item)
-        if not flat:
-            return
-        self._ids.extend(flat)
-        self._count += len(flat)
-        if self._count - self._last_emit >= self._every:
-            self._last_emit = self._count
-            self._emit()
-
-    def _emit(self) -> None:
-        elapsed = (time.monotonic() - self._t0) if self._t0 else 0.0
-        tps = (self._count / elapsed) if elapsed > 0 else 0.0
-        tail = ""
-        try:
-            text = self._tokenizer.decode(self._ids, skip_special_tokens=True)
-            tail = text[-80:].replace("\n", " ").replace("\r", " ")
-        except Exception:
-            tail = ""
-        log.info(
-            "[%s] heartbeat: %d tok | %.1f tok/s | %.1fs | ...%s",
-            self._label, self._count, tps, elapsed, tail,
-        )
-
-    def end(self) -> None:
-        # Final pulse so the operator sees the closing token count even if
-        # the last chunk was shorter than the heartbeat interval.
-        if self._count > self._last_emit:
-            self._emit()
+# The implementation moved DOWN to the leaf module `_otr_writer_heartbeat` so
+# the other two generate transports could reach it -- this module imports FROM
+# `_otr_model_loader`, so a streamer living here was unreachable from there
+# without a cycle, and those transports ran blind as a result. The name is kept
+# as an alias because this module's own call site and its tests use it.
+_HeartbeatStreamer = _OTRHB.WriterHeartbeatStreamer
 
 
 # ---------------------------------------------------------------------------

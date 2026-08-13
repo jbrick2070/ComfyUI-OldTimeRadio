@@ -346,21 +346,74 @@ Found on a live leg while running the render gate, not by review. Two separate
 things, both real, neither patched -- the second is a five-minute fix and the
 first is a contract decision that deserves daylight.
 
-**1. `_otr_scifi_codex.py:2226` is a `while True:` with no cycle bound.** For a
-`PostValidationError` that is CORRECT and must not be "fixed": it is the
-fresh-candidate loop, and it is exactly how `scifi_news` recovers from its
-documented announcer-coverage weakness (`016ad146` took that bank from 0-for-4 to
-rerollable). But the same loop also catches a CAPACITY runaway, and that failure
-is not stochastic in the same way. On the 2026-08-12 night leg one news item -- a
-UCLA marmot/OnlyFans story -- drove P3 to consume its entire 14,191-token
-allowance without ever emitting a stop token, on all THREE ladder attempts
-(0.720 -> 0.320 -> 0.100, ~20 min each), after which cycle 2 opened and started
-the identical ladder again. The leg could not terminate on its own. The only
-backstop is the campaign's `LEG_TIMEOUT_S = 21600` -- SIX HOURS -- and per the
-campaign's own docstring a client-side timeout does NOT cancel the server job, so
-it leaves a ghost the next leg queues behind. That is the 2026-08-01 pile-up
-shape. A bound on CAPACITY cycles specifically (validation cycles stay unbounded)
-is the obvious answer, but it is a contract change and wants its own commit.
+**1. A decode can run 21 minutes with nothing watching it.** CORRECTED 2026-08-13
+against the actual leg log (`comfyui_8000.prev2.log:255-291`) after an Opus
+design pass; the first version of this entry, pushed in `2ddea5a2`, got three
+things wrong and recommended a fix that would not have fired. What really
+happened on the UCLA-marmot leg:
+
+```
+22:58:42  P3 attempt 1/3  base call        t=0.720
+23:19:50    OUTPUT_TRUNCATED  14191 tok after a 2193-tok prompt   <- 1268 s
+23:19:50  P3 attempt 2/3  structural retry t=0.320
+23:41:26    OUTPUT_TRUNCATED  14191 tok again                     <- 1296 s
+23:41:26  P3 attempt 3/3  typed repair     t=0.100
+23:42:34    failed: draft.cast_coverage, missing announcer        <- 68 s
+23:42:34  cycle 1 exhausted (PostValidationError) -> cycle 2
+```
+
+* **TWO rungs ran away, not three.** Rung 3 returned a COMPLETE parseable draft
+  in 68 seconds. The ladder self-healed out of the capacity failure; the runaway
+  cost 42 minutes but was never terminal by itself.
+* **Cycle 2 opened on `PostValidationError`, NOT on the capacity phase.** The
+  capacity error is consumed INSIDE the ladder (`_otr_structured_call.py:1075`)
+  and only reaches the cycle loop if it is the LAST rung's error. **So "bound
+  capacity cycles at `_otr_scifi_codex.py:2226`" -- what this entry previously
+  called the obvious answer -- provably would not have fired on this leg.** Keep
+  it as a cheap backstop; it is not the fix.
+* **P3 is the RADIO SCORE draft** (`RadioScoreDraftV4`, `_otr_scifi_codex.py:426`),
+  not prose -- prose is P5 (`ScriptTextDraftV4`, `:612`). This matters: P3's
+  ARRAYS are bounded by schema (scenes <=3, shots <=2, beats <=4, cues <=3) while
+  its STRING fields have no max, so under constrained decode a 14,191-token run is
+  provably stuck inside ONE JSON string. That is a structural fact and it is the
+  seam a directive-safe guard can use.
+* The leg did not run to the six-hour wall -- the operator killed it at 23:44.
+  "Cannot terminate on its own" remains true as a property; it was not observed.
+
+**The loop is still unbounded and is still CORRECT for validation errors** --
+that is how `scifi_news` recovers from its announcer-coverage weakness
+(`016ad146`, 0-for-4 to reliable), and no fix may weaken it.
+
+**PRIOR ART: this is PBUG-20260729-02 again** (`docs/PROD_BUG_LOG.md:2816`),
+same signature (14,697 tokens, ~24 min) on P5 instead of P3, already PARKED with
+an operator ruling on the books: *"the writer should never veto, the writers
+should keep on passing in a loop to agents to clean up the ledger."* That ruling
+also explicitly forbids capping the output budget to the word target.
+
+**THE REAL FAULTS, and where the time goes.** Everything on that leg except the
+two runaway decodes took seconds:
+
+* **D1 -- no in-decode guard.** `OTR_LedgerScriptWriter.py:996` calls
+  `model.generate()` with no `streamer` and no `stopping_criteria` (the criteria
+  block at `:977` is behind `if stop:`, and `invoke_structured_slot` never passes
+  `stop`). Nothing observed the decode for 21 minutes. **The streamer half of
+  this is now fixed** -- see the heartbeat work -- so a runaway is at least
+  VISIBLE; the halting half is not.
+* **D2 -- the outer loop cannot be bounded by phase**, per the correction above.
+* **D3 -- no cancellation reaches an in-flight decode.** `_otr_structured_call.py`
+  has ZERO interrupt polls, so cancellation granularity is one whole ladder (43
+  min here). Client-side, `scripts/otr_api.py:820` returns TIMEOUT and **never
+  POSTs `/interrupt`** -- that is the documented ghost, and it is a five-minute fix.
+
+**Directive-safe signals** (none read `target_words`): non-closure of the
+currently-open JSON string; n-gram self-similarity; deviation from the pass's own
+healthy history (the very next leg ran P3 base calls in 60/75/65 s on the same box
+-- the runaway was 20x that); tok/s and wall clock. Note `min_p=0.05` and
+`repetition_penalty=1.03` were ALREADY active and did not stop it.
+
+Recommended shape, three separate commits: an in-decode degeneracy + interrupt
+criterion; the client `/interrupt` fix; and the honesty fixes in D-below. A
+capacity-cycle bound ships as a backstop only, never as the headline.
 
 **The variable was the NEWS ITEM, not the bank and not the code.** Diffed at the
 time: only two commits touched the writer path since the last green `still_pan`,
@@ -378,6 +431,20 @@ moment the prompt is non-empty. There is no bigger slot -- the pass already has
 every token there is. The message should distinguish the reserve-remaining case
 and say "the model did not stop", because as written it sends the reader hunting
 a config defect that does not exist. It cost this session about twenty minutes.
+Branch on `reserve_remaining` at `OTR_LedgerScriptWriter.py:1052`.
+
+**3. The 14k-token evidence is captured and then thrown away.** The capacity
+raise attaches `raw_completion` at `OTR_LedgerScriptWriter.py:1089` and NOTHING
+reads it -- the leg log prints `raw head: <empty>`. So at the one moment the
+runaway text exists in memory, it is discarded, and the next reader has to
+reproduce a 21-minute decode to see what the model was actually saying. Log a
+head+tail of it.
+
+**4. The two local transports disagree.** `_otr_model_loader.py:1305` raises a
+bare `ModelLoaderError` with NO phase for the same condition the writer raises as
+a phase-carrying `PromptContextOverflowError`, so an identical runaway on that
+transport is not rerollable at all. It also tests `>=` where the writer tests
+`==`.
 
 ### THE STILL-SPINE REPAIR -- ROOT CAUSE FIXED AND PROVED LIVE (2026-08-12 late)
 

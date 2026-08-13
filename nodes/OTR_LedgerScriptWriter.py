@@ -134,6 +134,7 @@ from ._otr_generation_budget import (
     fit_output_tokens,
 )
 from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
+from . import _otr_writer_heartbeat as _OTRHB
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
 
@@ -992,6 +993,16 @@ def _build_truncating_generate_fn(
                     "[OTR_LedgerScriptWriter] stop-strings disabled: %s",
                     exc,
                 )
+
+        # LIVE HEARTBEAT (2026-08-13). This transport had NO streamer, and it is
+        # the one that ran away: a P3 prose pass burned its whole 14,191-token
+        # allowance without a stop token, three times, ~20 minutes each, and
+        # nothing was visible while it happened. Read-only -- generate() hands
+        # the streamer sampled token ids and this never feeds any back, so the
+        # output is byte-identical with it attached.
+        _hb = _OTRHB.make_streamer(tokenizer, "OTR_LedgerScriptWriter")
+        if _hb is not None:
+            gen_kwargs = dict(gen_kwargs, streamer=_hb)
 
         with torch.no_grad():
             try:

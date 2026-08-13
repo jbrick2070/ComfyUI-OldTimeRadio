@@ -44,6 +44,21 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Live token heartbeat. A LEAF module on purpose: _otr_constrained_generate
+# imports FROM this file, so the streamer cannot live there without a cycle --
+# which is exactly why this transport had no live view for so long.
+#
+# RELATIVE WITH A BARE FALLBACK, and this file specifically NEEDS both halves:
+# it is imported as `nodes._otr_model_loader` on a server AND as a bare
+# top-level `_otr_model_loader` by tests that put nodes/ on sys.path (see
+# tests/test_writer_llm_unload.py:23). A plain relative import raises
+# "no known parent package" under the second form -- which is how the first
+# version of this line took three tests red.
+try:
+    from . import _otr_writer_heartbeat as _OTRHB  # type: ignore
+except ImportError:  # loaded with nodes/ on sys.path
+    import _otr_writer_heartbeat as _OTRHB  # type: ignore
+
 try:
     from ._otr_generation_budget import (
         GenerationContextOverflowError,
@@ -1298,6 +1313,13 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 top_p=0.92,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
+                # Read-only live heartbeat (2026-08-13). A reserve-remaining
+                # pass can legitimately be handed >14k output tokens, and with
+                # no streamer that is a silent twenty-minute wait whose only
+                # signal arrives at the ceiling. None when disabled.
+                streamer=_OTRHB.make_streamer(
+                    tokenizer,
+                    f"llm:{cache_entry.get('model_id', '<unknown>')}"),
             )
         # Strip prompt prefix from decoded output.
         prompt_len = inputs["input_ids"].shape[1]
@@ -1422,6 +1444,9 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 top_p=_POLISH_TOP_P,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
+                streamer=_OTRHB.make_streamer(
+                    tokenizer,
+                    f"polish:{cache_entry.get('model_id', '<unknown>')}"),
             )
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
