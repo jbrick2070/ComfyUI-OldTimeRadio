@@ -193,7 +193,79 @@ written), `TODO`.
 | 21 | standalone `h3_low_mime` runner | G5.2 keeps-audio exemption, clip/stem receipts, durable output path, solo-runner QA. NOT registered this build | **DONE** -- `scripts/otr_h3_mime_runner.py`, live run PASS: 864x480, model f90 = **3.750 s exactly at the model's own 24 fps**, and **`nb_streams=2` -- one video plus ONE audio stream**, the inversion this lane exists for. Lossless FLAC score stem from the same decode, plus a ducked voice-over review copy with the picture COPIED not re-encoded; both originals preserved. Registers nothing, and the test asserts that from both sides. **Three live API-boundary failures before the pass** (input dir, DynamicCombo serialization, the `/history` key that says `images` for an mp4) -- all three invisible to a CPU test, recorded as **L27**. Receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. **One operator ruling owed:** CLAUDE.md 0A says "no other runner" and should be amended to name this script |
 | 22 | all-row + episode gate | every preflight row green, every expected-red removed, every solo-smoke receipt present, then ONE end-to-end episode | **THREE OF FOUR MET 2026-08-12.** The preflight matrix is **29 engines x 7 gates with ZERO non-green cells and ZERO `EXPECTED_RED` entries** -- the table is empty for the first time since it was written. All **21 lane receipts** are present in `docs/evidence/lane_receipts/`. The last expected-red (`google_omni_video` G3) was closed here rather than left: it was the one lane the 21-lane transplant deliberately did not own, and row 22's own contract is what brought it in. Its comment had reasoned "CONTINUITY none" since the lane was written while the call inherited the default -- L3 exactly, and one keyword to fix. **REMAINING: the render gate, and the operator SUPERSEDED it** -- "we need a 45 word render of every visual path" (2026-08-12) replaces "ONE end-to-end episode". That sweep is the last thing in the queue |
 
-### THE 45-WORD RENDER GATE -- THE OPEN ITEM (live status 2026-08-12, sweep STOPPED)
+### OPERATOR ORDER FOR THE NEXT WINDOW (set 2026-08-12 late, supersedes below)
+
+Work these three in THIS order. The operator set it after watching a live leg.
+
+| # | Item | Where | State |
+|---:|---|---|---|
+| **1** | **TITLE-CARD LEGIBILITY -- start AND end cards** | `docs/2026-08-12-BUILD-SPEC-title-card-legibility.md` | **SPECIFIED, NOT BUILT -- cut this code FIRST** |
+| **2** | Resume the 45-word render gate | the section below | 9 of 21 legs passed; needs THREE contract-grouped boots |
+| **3** | LEMMY | the Lemmy sections further down | operator hands it over once 1 and 2 are done |
+
+**Item 1 is the whole reason the sweep is stopped.** The hero title is phosphor
+green drawn into the procgen CRT frame and composited `screen` + `green_only`,
+which can ONLY lighten -- measured 1.13:1 over a lit monitor, and a black
+outline there is a mathematical no-op (`screen(A, 0) = A`). Direction is chosen
+and driver-verified: emit the title through `OTR_CaptionBurn`, which already
+runs AFTER the blend and whose ASS styles already carry `OutlineColour` /
+`BorderStyle` / `Outline` / `Shadow`. **The Matrix decode animation is KEPT.**
+Everything needed is in the spec -- rasterisation site, the card schedule
+(`_resolve_card_windows` already yields BOTH the open and close windows, so
+"start and end" needs no new timing work), the canonical chain, the risky half,
+and a measured acceptance test. Do not re-derive it.
+
+**DO NOT CONFLATE THE TWO CREDIT SURFACES.** The end-credits SCROLL is a
+different thing and is already FIXED (`f70df546`). Conflating them cost the
+operator an evening believing the title was done.
+
+### THE 45-WORD RENDER GATE -- item 2 (live status 2026-08-12 late, sweep STOPPED)
+
+**IT NEEDS THREE BOOTS, NOT ONE. This was wrong in the plan until now and would
+have burned ~5 GPU-hours.** Legs are grouped by the `launch.boot_contract` in
+their own profile (nested under `launch`, NOT top-level -- a top-level read
+returns `None` for every profile):
+
+| boot | flags | legs |
+|---|---|---|
+| A -- unclamped | none | `ltx_8gb`, `fastwan_8gb`, `ltx_video`, `wan_i2v`, `wan_ti2v` |
+| B -- `humo_diet` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 **+ `ltx_audio_in`** |
+| C -- `h3` | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
+
+B covers `ltx_audio_in` too: its `ltx_av_diet` contract sets
+`reserve_vram_gb: None`, which means "does not constrain that knob", so HuMo's
+2.921 satisfies both while the shared `disable_pinned_memory` is what that lane
+actually needs. **Take each boot's env from the profile's own `launch.env`
+block** rather than typing it -- that is what stops a contract being written
+down but not applied (lesson L24).
+
+**The HuMo contract check fires INSIDE THE RENDER PHASE, not at preflight**
+(lane 2b, still TODO). So a HuMo leg on the wrong boot spends ~80 min on writer
++ audio and only then refuses. That is the ~5 hours grouping avoids.
+
+**9 of 21 legs now PASS.** 4 still lanes + 4 visualizers + **`mesh_stage`**,
+which is the one that matters: it died twice (2.6 min in CastLock on a rolled
+bank, then 18.5 min on the still-spine beat-id split) and now PASSES at 21.6 min
+with `delivered: ['mesh_stage']` and stills keyed `music_opening_001`. That is
+the live proof the beat-id deletion worked.
+
+**Remaining: 12** -- the 5 in boot A, the 5 in boot B, the 2 in boot C.
+
+**A `mesh_stage`-class PASS is weaker evidence than it looks.** That lane leaves
+NO per-shot clips, so `coverage` reads `not measured` and the frame-level
+no-reuse audit audits zero clips -- yet the runner still prints PASS. It fails
+closed when the registry is unreadable but stays quiet when there are simply no
+clips. Queued fix: say so out loud in the verdict.
+
+**Bank pinned `scifi_news`** (`--source-bank`): the gate's question is "does this
+engine render", the bank is noise on top of it, and rolled banks already ate two
+legs. `scifi_news` specifically because its pack closes the cast-coverage
+asymmetry that killed `mesh_stage`, and it does not route to the fable2 writer
+that killed `ltx_8gb`.
+
+**Results files are overwritten per run** -- snapshot `tmp/_w45_results.json`
+before every launch. Runs 1-4 are preserved as
+`tmp/_w45_results_run{1,2,3,4}_20260812.json`.
 
 Operator acceptance gate: a 45-word render of EVERY visual path. Runner
 `scripts/otr_w45_campaign.py`, 21 legs -- 19 incumbent lanes on one boot, then
@@ -243,7 +315,52 @@ mid-frame -- that truncation cost the diagnosis of both writer failures. And a
 passes that can die on them, so a dead leg is reproducible; three earlier deaths
 were not.
 
-### THE STILL-SPINE REPAIR -- CANDIDATE UNDER QA, NOT SHIPPED (2026-08-12)
+### THE STILL-SPINE REPAIR -- ROOT CAUSE FIXED AND PROVED LIVE (2026-08-12 late)
+
+**CLOSED as a repair, still OPEN as a PBUG.** Three swings; the third one
+deleted the thing instead of adjusting it, and `mesh_stage` -- the leg that died
+on it -- now renders.
+
+`3446af3f` retargeted link 255 so the image producer reads the POST-AUDIO
+ledger, and that killed both branches which mint `b000_music_open`
+(`derive_opening_music_beat` returns None below the 2 s head gap; the fallback
+branch's condition literally means "this is a PRE-AUDIO ledger"). Meanwhile
+`render_driver._canonical_visual_beat_id` still rewrote the CONSUMER's lookup TO
+that id. The still was on disk, in `required_scene_targets`, with a hash --
+under the other name. The repair did not fail to fire; it fired and moved the
+mismatch from the closing beat to the opening one.
+
+Shipped, each its own green chunk:
+* `4e49ee4b` -- `_still_spine_row_for_mesh` chose a row by ABSENCE: `""` was in
+  the key set, so a music beat probing with an empty `char_id` matched any mesh
+  row. PREREQUISITE, not cleanup -- until it landed, a same-id mesh test could
+  not go red and the mesh half silently served a plausible wrong image.
+* `c9c8e5c0` -- **the root cause**: `_canonical_visual_beat_id` DELETED, both
+  call sites on the shot's own beat id. `_OPENING_MUSIC_SUFFIX` SURVIVES -- it
+  is a classifier with three callers (`:1407`, `:2821`, `:4509`), not a
+  translation. Do not reintroduce the function under any name.
+* `a2a85bcc` -- the post-audio join fails LOUD at ShotLock and stays fail-soft at
+  `SignalLostVideoRenderer`. `strict` is caller-scoped on purpose: the free
+  function has two live callers with opposite criticality, and a global contract
+  is wrong for one of them whichever way it is written.
+
+**STILL OPEN and unchanged:** PBUG-20260811-02 cannot CLOSE, because its
+acceptance leg (60-second opening AND closing cues) **is not configurable
+today** -- `CUE_DURATIONS` is 12/8/4, both fiction assemblers omit
+`target_duration_s`, `EpisodeAssembler` only TRUNCATES, and the canonical
+runner's `--set` is whitelisted. With `_MUSIC_MAX_CHUNK_DUR_S = 22.0`, a 12 s
+opening is ONE chunk, so `_002`/`_003` may be unreachable in production at all.
+Operator ruled 2026-08-12: ship the fix, leave the PBUG open, do not build the
+plumbing yet. **So the multi-chunk path remains UNPROVEN and no green sweep may
+be worded as proving it.**
+
+Also open, found by the panel, not yet built: `OTRShotLock.IS_CHANGED`
+fingerprints only routing env while `lock()` reads a mutable durable ledger
+(Bible 06.01) -- and `tests/test_route_freeze_wiring.py:278` deliberately pins
+ShotLock and VideoDirector to the SAME fingerprint, so "always re-execute" is a
+contract change needing its own justification, not a test edit in passing.
+
+### SUPERSEDED -- the pre-fix candidate write-up (kept for the record)
 
 `PBUG-20260811-02` moved from "root cause NOT ESTABLISHED" to established, on a
 live reproduction (`fastwan_8gb`), and a candidate repair is committed
@@ -362,7 +479,7 @@ under "CLOSED LANE DIAGNOSES", alongside the per-lane receipts in
 |---|---|
 | Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-12 at the story-writer wrap, `ae76fb3f`) |
 | **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **10281 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
+| Suite | **10309 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-12 LATE at `f70df546`, NOTHING deselected). Was 10281 at `ae76fb3f`; this session added 28 across the mesh-identity, post-audio-join and credits-scroll work. Prior note kept: **10281 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
 | Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `69ee6b2` (**273** entries, index **386** rows). This session PROMOTED ONE: **12.97**, a model field name that collides with its base class (from PBUG-20260812-02, admitted on a live leg). It checked the others against the index FIRST and promoted no duplicate -- **PBUG-20260811-02's class is already 12.57**, whose own rule (resolve the durable owner, prove same-run identity, REJECT mismatches) also condemns the warn-and-continue fallback OTR still has open. NEVER re-scrape indexed history |
 | Variants | `build_variants.py --check` **46 variants / 0 failures** on THIS box. **THAT COUNT IS WORKSTATION-DEPENDENT and 46 is not the repo's number** (lane 11, 2026-08-11): `git ls-files` counts **45** tracked variants, and the 46th on disk is another window's untracked `otr_upscale_ltx_probe.json`. The gate globs the DIRECTORY, so its headline silently counts files the repo has never seen -- the same defect class as the sbcov crash above. Compare `--check`'s 0 FAILURES, not its count. **RUN IT BEFORE STARTING A LANE** -- it had been RED since lane 5 and lane 7 had to separate inherited drift from its own; a red at the start of a lane belongs to whoever caused it |
 | Canonical workflow | **TOUCHED 2026-08-12** -- link 255 retargeted so `OTR_MetaBriefImagePromptGen` reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json` instead of the pre-audio freeze cascade (`[255,62,1,89,0] -> [255,90,0,89,0]`). Validated: 23 nodes / 56 links unchanged, acyclic, referential integrity clean, `validate_canonical_workflow` OK, 50 variants REGENERATED (`--check` 0 failures) and 4 hand-kept `.env.json` master_hash re-stamped. **The diff is ONE line** -- a first attempt round-tripped the JSON and reformatted all 3506 lines; that was reverted and redone as a surgical string edit |

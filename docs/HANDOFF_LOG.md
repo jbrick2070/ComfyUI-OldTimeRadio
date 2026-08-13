@@ -3,6 +3,56 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-12 (late) -- HEAD 83eb759e (v2.0-alpha) -- CODER (the still-spine root cause, on the third swing, proved live)
+
+Did: **killed `_canonical_visual_beat_id`, and `mesh_stage` renders.** That leg
+had died twice -- 2.6 min in CastLock on a rolled bank, then 18.5 min on the
+beat-id split -- and now PASSES at 21.6 min with `delivered: ['mesh_stage']`,
+publishing to `otr/obs`, consuming stills keyed `music_opening_001`. Root cause:
+`3446af3f` retargeted link 255 to the POST-AUDIO ledger, which killed both
+branches that mint `b000_music_open`, while the CONSUMER still rewrote its
+lookup TO that id. The plate was on disk and in `required_scene_targets` with a
+hash, under the other name. The earlier repairs did not fail to fire -- they
+fired and moved the mismatch from the closing beat to the opening one.
+  `4e49ee4b` the mesh empty-key match (a row chosen by ABSENCE -- prerequisite,
+  because until it landed the mesh half had no red state to prove anything
+  with); `c9c8e5c0` the deletion itself, keeping `_OPENING_MUSIC_SUFFIX` since
+  three callers classify with it; `a2a85bcc` the post-audio join fails LOUD at
+  ShotLock, fail-soft at `SignalLostVideoRenderer` -- caller-scoped `strict`,
+  because the free function has two live callers with opposite criticality.
+  `f70df546` **credits scroll the CONTENT, not the canvas** -- operator caught
+  it watching a leg; measured ink showed the transcript column blank for the
+  first ~4s and last ~4s of a 20.8s roll. `83eb759e` the title-card build spec.
+Current step: **the operator reordered the queue.** Title-card legibility is
+NEXT and is SPECIFIED, NOT BUILT (`docs/2026-08-12-BUILD-SPEC-title-card-
+legibility.md`); then the remaining 12 render-gate legs; then Lemmy.
+Next: cut the title-card code. The hero title is drawn into the procgen frame
+and composited `screen` + `green_only`, which can only LIGHTEN -- 1.13:1 over a
+lit monitor, and a black outline there is a no-op (`screen(A, 0) = A`). Emit it
+through `OTR_CaptionBurn` instead; its ASS styles already carry the outline and
+it already runs after the blend. **The Matrix decode stays.** Then the sweep --
+and it needs THREE contract-grouped boots, not one; a HuMo leg on the wrong boot
+burns ~80 min before refusing, which is ~5 GPU-hours the grouping avoids.
+  Suite **10309 passed / 110 skipped / 1 xfailed**, nothing deselected (10281 +
+  28). Bug Bible **20/24/3** at survival-guide `69ee6b2`, 273 entries -- checked,
+  nothing new promoted: every defect this session was a code fault in OTR, not a
+  new portable rule, and the admission rule bars promoting from review alone.
+  `build_variants --check` 50 variants, 0 failures. Box left CLEAN -- no server,
+  port 8000 clear, VRAM 2,794 MiB.
+Models: Opus 5 drove and judged. **A full four-round `kibitz-plugin:kibitz` arc
+ran on the still-spine defect -- 9 external reviews, NOT the stock 8-call
+two-lane shape**: r1 two lanes, r2 and r3 one lane each (Antigravity CLI
+quota-held, `RESOURCE_EXHAUSTED` 429, delivered later by operator paste), r4
+three lanes. Sonnet 5 ran post-coding QA and found two real defects in my own
+work (a classifier that sniffed prose instead of reading the ledgers, and a
+docstring asserting a sequencing guarantee the code does not enforce). A live
+cloud `/roundtable` (GPT + Gemini + DeepSeek, **$0.27, of which $0.16 was WASTED**
+on a first pass truncated at the skill's default `--max-tokens`) settled the
+title-card architecture. Three reviewers each overturned something I asserted:
+the empty-key defect, the second `overlay_audio_timing` caller, and every line
+number in my own plan being 25 stale after my own edit.
+Commits: 4e49ee4b, c9c8e5c0, a2a85bcc, f70df546, 83eb759e.
+
 ## 2026-08-12 -- HEAD ae76fb3f (v2.0-alpha) -- CODER (the 45-word sweep found four defects, none of them video)
 
 Did: ran the operator's 45-word every-visual-path sweep and spent the day on
