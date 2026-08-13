@@ -294,6 +294,50 @@ the cross-engine retention above, NOT on the still-spine defect it failed on
 this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
 night and is the leg that carries the title card.
 
+### THE TWO MotionBudgetError LEGS WERE NOT A VRAM PROBLEM (corrected 05:30)
+
+**`wan_ti2v` and `fastwan_8gb` would have failed ON AN EMPTY CARD.** Both died
+with `MotionBudgetError`, both reported a low `free=` figure (9,389 and 9,549
+MB), and I attributed both to the `wan_ti2v` retention documented above. That
+was wrong, and the arithmetic settles it:
+
+```
+FRAME_COST_MODEL = {'wan_ti2v': (7000.0, 185.0), 'fastwan_8gb': (7000.0, 185.0)}
+
+  free  9389 MB -> affordable   5 frames   (needed 125)  REFUSES
+  free 14500 MB -> affordable  28 frames   (needed 125)  REFUSES
+  free 16000 MB -> affordable  35 frames   (needed 125)  REFUSES   <- empty card
+```
+
+A 125-frame beat prices at `7000 + 125*185 = 30,125 MB`, nearly TWICE this card.
+No free-VRAM level on this hardware satisfies it. The retention is real
+telemetry and it was never the cause of these two failures.
+
+**AND THE REPO ALREADY KNEW.** The doc block at `motion_common.py:341-360`,
+directly beneath the table, disqualifies that exact row in writing: it "refused
+a real production leg -- static frame budget 173 ... affordable 24 frames
+(free=13481 MB) -- on an engine that had already shipped", it is "wrong in BOTH
+directions", `_planned_length` "already stopped consulting it for exactly this
+reason", it "refuses EVERY segment length the coverage planner produces,
+including 93 frames at 14,500 MB free", and -- explicitly -- **"Empty is the
+correct value until a row is re-measured through the real prepare() +
+render_clip() lifecycle".**
+
+The table still holds exactly two engines. They are exactly the two that failed
+tonight. Nothing else is in it.
+
+**So the fix is a DELETION, not a measurement campaign** -- and the standing
+ruling already names the bar for putting a row back: re-measured through the
+real lifecycle, which no bench may substitute. Until then an empty table means
+the geometry plan stands and no row may refuse. That is a small, high-value
+change and it is NOT built: it turns two red legs green and it deserves the
+review a refusal-path change earns.
+
+**WHAT THIS DOES NOT EXCUSE.** `wan_ti2v` really does retain ~8 GB (15 samples,
+post clustering at 8.1 GB regardless of a 7,985-13,065 MB peak, which looks like
+cached model weights rather than a leak) and `wan_i2v` really did thrash. Those
+stay open as row 5b. They are simply not what killed these two legs.
+
 **`wan_i2v` PAGE-THRASHES ON THIS BOX -- new, and it had never been run before.**
 Killed at 108.6 min after ONE beat, measured at **89.7 - 106.3 s/it** on a 20-step
 segment. The plan's own documented thrash pathology is **29 s/it** (ltx 12.5 GB +
