@@ -219,25 +219,42 @@ def test_a_fragment_forced_shut_BELOW_the_ceiling_is_still_caught():
     assert lane._AUTHORED_TEXT_DEGENERACY_GUARD_BAND > 76
 
 
-def test_long_but_legitimate_authorship_still_compiles():
-    """The guard must bound a runaway WITHOUT rejecting long writing.
+def test_a_LARGE_EPISODE_is_never_refused_by_the_ceiling():
+    """THE LAW: an audit may improve a story, never fail one for length.
 
-    5,000 characters is far longer than anything this project has ever shipped
-    (widest observed: a 4,549-char premise) and must still compile, or the guard
-    has become the length gate THE LAW forbids.
+    Operator directive 2026-08-13: "we can't just arbitrarily cap, we need to
+    allow for large episodes." This is that directive as an assertion.
+
+    The arithmetic the ceiling has to clear: the beat topology tops out near
+    1,520 spoken words, so even a pathological line carrying HALF a maximum
+    episode in one unbroken breath is about 4,500 characters. The widest string
+    of any kind this project has ever shipped is a 4,549-char premise. The
+    rejection threshold must sit well clear of both, or the guard becomes the
+    length gate THE LAW forbids.
+
+    The trade is asymmetric on purpose: too high costs a little GPU on a rare
+    degenerate decode, because the string still terminates; too low refuses a
+    legitimate episode. When in doubt the ceiling goes UP.
     """
     draft = _draft(["announcer", "c01"])
+    half_a_maximum_episode = "y" * 4500
     long_but_legal = draft.model_copy(update={
         "scenes": [draft.scenes[0].model_copy(update={
-            "description": "y" * 5000,
+            "description": half_a_maximum_episode,
         })],
     })
 
     score = lane.compile_radio_score_draft(
         long_but_legal, _advisory(2), _cast(), _facts(),
     )
-    assert score.scenes[0].description.startswith("yyy")
-    assert len(score.scenes[0].description) == 5000
+    assert len(score.scenes[0].description) == 4500
+
+    # And the threshold must clear the real-world extremes by a real margin,
+    # not by a rounding error.
+    assert lane._AUTHORED_TEXT_REJECT_AT > 4549 * 2, (
+        "the reject threshold must sit at least 2x above the widest authored "
+        "string this project has ever shipped, or a long episode could trip it"
+    )
 
 
 def test_the_error_is_classified_recoverable_by_the_candidate_loop():

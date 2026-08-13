@@ -60,6 +60,7 @@ try:
     from ._otr_script_prep import clean_spoken_text
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
     from ._otr_generation_budget import (
+        CAPACITY_PHASE_DECODE_DEGENERACY,
         ProviderCapacityMessages,
         is_rerollable_capacity_error,
     )
@@ -103,6 +104,7 @@ except ImportError:  # pragma: no cover
         set_line_text_metrics,
     )
     from _otr_generation_budget import (  # type: ignore
+        CAPACITY_PHASE_DECODE_DEGENERACY,
         ProviderCapacityMessages,
         is_rerollable_capacity_error,
     )
@@ -371,7 +373,39 @@ _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT = 2
 # truncation that parses and validates cleanly, which is a worse defect than
 # the one being fixed.
 # ---------------------------------------------------------------------------
-_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS = 6000
+#
+# RAISED 6000 -> 12000 on 2026-08-13, operator directive: "we can't just
+# arbitrarily cap, we need to allow for large episodes ... I've been testing
+# small episodes ... but can't cap the big just because we tested small."
+#
+# THE MEASURED CORPUS IS NOT THE JUSTIFICATION, AND SAYING IT WAS WAS A
+# REASONING DEFECT. The 8,119 authored strings behind the earlier sizing came
+# from SMALL episodes -- the 45-word render gate and its siblings. Sizing a
+# ceiling from that population and then applying it to large episodes is an
+# inference from the wrong sample, and the operator caught it.
+#
+# THE REAL ARGUMENT IS STRUCTURAL, and it does not depend on the corpus at all:
+# an episode gets LONGER BY GAINING FIELDS, NOT BY LENGTHENING ONE. More words
+# means more beats, more lines, more scenes -- the beat topology and
+# `_SCRIPT_TEXT_DRAFT_MAX_LINES` grow the COUNT of authored strings, while any
+# single `description`, `visual_prompt` or spoken line stays the size of one
+# thought. A ceiling on ONE field is therefore close to independent of episode
+# length, which is exactly the property that makes it safe to have at all.
+#
+# Sanity check at the extreme: to reach 12,000 characters a SINGLE spoken line
+# would need roughly 2,000 words -- more than the entire longest episode this
+# topology can currently produce (~1,520 spoken words), delivered in one
+# unbroken breath by one character. Even at several times today's maximum
+# episode size, per-line content lands in the hundreds of characters.
+#
+# The trade is ASYMMETRIC, which settles the direction of any future doubt: a
+# ceiling that is too HIGH costs a little more GPU on a rare degenerate decode,
+# because the string still terminates. A ceiling that is too LOW refuses a
+# legitimate episode, which THE LAW forbids outright. **When in doubt, raise
+# it.** What this raise costs: a degenerate field burns ~3,000 tokens instead of
+# ~1,500 before being forced shut -- still finite, still far under the
+# 13,912-token window, still rerolled.
+_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS = 12000
 _SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS = _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS
 
 # THE GUARD BAND -- why the detector does NOT test `len == ceiling`.
@@ -2061,6 +2095,17 @@ def _candidate_rejection_summary(error: BaseException) -> str:
             :_WRITER_RETRY_REJECTION_MAX_CHARS
         ]
     if is_rerollable_capacity_error(error):
+        # TWO rerollable phases now, and they are not the same event. Reporting
+        # a guard halt as "ended at the provider capacity limit" would be false
+        # -- the decode was stopped deliberately with most of its allowance
+        # unspent. This string is read by a human debugging a failed render and
+        # by the retry prompt, so it has to say which one happened.
+        if getattr(error, "phase", None) == CAPACITY_PHASE_DECODE_DEGENERACY:
+            return (
+                "the decode was halted by the liveness guard: one string "
+                "stayed open past the bound, so the model had stopped "
+                "steering rather than run out of room"
+            )
         return "model output ended at the provider capacity limit"
     return type(error).__name__
 

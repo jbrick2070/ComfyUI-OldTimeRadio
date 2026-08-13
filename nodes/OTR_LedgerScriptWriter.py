@@ -130,6 +130,7 @@ from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
 from ._otr_generation_budget import (
     CAPACITY_PHASE_OUTPUT_LIMIT,
     GenerationContextOverflowError,
+    GenerationDegeneracyError,
     PromptContextOverflowError,
     fit_output_tokens,
 )
@@ -969,6 +970,40 @@ def _build_truncating_generate_fn(
             gen_kwargs["prefix_allowed_tokens_fn"] = prefix_allowed_tokens_fn
             gen_kwargs["num_beams"] = 1
 
+        # THE LIVENESS GUARD (2026-08-13). Installed UNCONDITIONALLY, and NOT
+        # behind `if stop:` -- the structured passes never pass `stop`, which is
+        # exactly why nothing watched the decode that ran away for 22 minutes.
+        #
+        # It is also NOT gated on `schema_model is not None`, though the settled
+        # design proposed that. A schema gate installs the guard on the lane
+        # that now ALSO has structural string ceilings, and skips the lane with
+        # full remaining capacity, no schema and no stop. A liveness contract
+        # belongs on every local generate() call; the guard costs nothing on a
+        # decode that never opens a long string.
+        #
+        # CONSTRUCTION FAILURE IS LOUD. The stop-string block below swallows its
+        # exception because a missing quality stop is a nice-to-have; a missing
+        # liveness guard is a silent removal of protection the log then claims
+        # to have. So this one raises.
+        from transformers import StoppingCriteriaList  # noqa: I001
+        try:
+            from ._otr_decode_guard import make_degeneracy_criterion
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                make_degeneracy_criterion,
+            )
+        # NO try/except AROUND THE CONSTRUCTION. An r1 panel caught the first
+        # version claiming "construction failure must be loud" in a comment
+        # while the code quietly set the guard to None and ran without it --
+        # a comment describing a fix is not a fix. If the guard cannot be
+        # built, that is a broken install and the render must say so.
+        _degeneracy_guard = make_degeneracy_criterion(
+            inputs["input_ids"].shape[1],
+        )
+        gen_kwargs["stopping_criteria"] = StoppingCriteriaList(
+            [_degeneracy_guard]
+        )
+
         # Stop-string support (Phase 4 v4). Tier 2 fix #16
         # (2026-05-11): the StoppingCriteria subclass is now defined
         # once at module scope by `_get_substring_stop_class()` and
@@ -983,11 +1018,17 @@ def _build_truncating_generate_fn(
                 prompt_len_now = inputs["input_ids"].shape[1]
                 stop_strings = tuple(s for s in stop if s)
                 _SubstringStop = _get_substring_stop_class()
-                gen_kwargs["stopping_criteria"] = StoppingCriteriaList([
-                    _SubstringStop(
-                        tokenizer, stop_strings, prompt_len_now,
-                    ),
-                ])
+                # APPEND, never assign. This block used to own
+                # `stopping_criteria` outright; with the liveness guard
+                # installed above, assigning here would silently REMOVE the
+                # guard on exactly the calls that also asked for stop strings.
+                # StoppingCriteriaList ORs its members, so both signals stay
+                # live and the guard's `hit` flag remains the discriminator.
+                _criteria = list(gen_kwargs.get("stopping_criteria") or [])
+                _criteria.append(
+                    _SubstringStop(tokenizer, stop_strings, prompt_len_now)
+                )
+                gen_kwargs["stopping_criteria"] = StoppingCriteriaList(_criteria)
             except Exception as exc:  # noqa: BLE001
                 log.debug(
                     "[OTR_LedgerScriptWriter] stop-strings disabled: %s",
@@ -1052,6 +1093,62 @@ def _build_truncating_generate_fn(
         decoded = tokenizer.decode(
             generated_ids, skip_special_tokens=True,
         )
+
+        # CLASSIFY THE HALT FIRST (2026-08-13). Order matters and this is the
+        # authoritative sequence from the settled design:
+        #   1. guard.hit          -> degeneracy, REGARDLESS of generated length
+        #   2. at the ceiling, no EOS -> capacity
+        #   3. ended_with_eos     -> clean termination
+        #   4. otherwise          -> some other criterion, e.g. a stop substring
+        # Degeneracy must be tested BEFORE capacity because a halted decode
+        # stops with room to spare -- reading it as anything else would report
+        # "ended at the provider capacity limit" about a decode that was
+        # deliberately stopped with ~11,000 tokens unspent.
+        if _degeneracy_guard is not None and getattr(
+            _degeneracy_guard, "hit", False
+        ):
+            telemetry = _degeneracy_guard.telemetry()
+            log.error(
+                "[OTR_LedgerScriptWriter] DECODE HALTED (%s): the output "
+                "repeated a %s-token run verbatim %s times in a row, after %s "
+                "generated tokens of a %d-token allowance. The model did not "
+                "run out of room and this is not a long artifact -- it was "
+                "CYCLING, and the transport stopped it. REROLLABLE: the "
+                "ladder's next rung runs at a lower temperature. Telemetry: %s",
+                _degeneracy_guard.reason,
+                telemetry.get("cycle_tokens"),
+                telemetry.get("required_repeats"),
+                generated_tokens, effective_max_new_tokens,
+                telemetry,
+            )
+            # Same evidence discipline as the capacity raise below: the head
+            # says what the model was writing, the tail says what it was doing
+            # when the guard stopped it. For a degeneracy halt the tail is the
+            # whole point -- it is where the loop is visible.
+            _halt_raw = decoded or ""
+            log.error(
+                "[OTR_LedgerScriptWriter] RUNAWAY EVIDENCE (%d chars, %s "
+                "tokens, halted)\n  HEAD: %s\n  TAIL: %s",
+                len(_halt_raw), generated_tokens,
+                _halt_raw[:400].replace("\n", " "),
+                _halt_raw[-400:].replace("\n", " "),
+            )
+            raise GenerationDegeneracyError(
+                "generation was halted by the in-decode liveness guard: the "
+                "output repeated a run of tokens verbatim, which is a decode "
+                "that is cycling rather than a long artifact",
+                halt_reason=_degeneracy_guard.reason,
+                open_string_tokens=None,
+                repetition=telemetry,
+                raw_completion=decoded,
+                prompt_tokens=prompt_len,
+                generated_tokens=generated_tokens,
+                requested_output_tokens=requested_max_new_tokens,
+                effective_output_tokens=effective_max_new_tokens,
+                context_cap=context_cap,
+                ended_with_eos=ended_with_eos,
+            )
+
         if generated_tokens == effective_max_new_tokens:
             # The model stopped because it ran OUT OF ROOM, not because it was
             # finished. When the room it was given is also LESS than the room

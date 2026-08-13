@@ -40,9 +40,34 @@ class ProviderCapacityMessages(list):
 #                     produce both a pass and a fail on byte-identical code),
 #                     so a re-roll at a lower temperature is a real second
 #                     chance, not a wasted call.
+#   decode_degeneracy -- the transport HALTED the call itself, because one
+#                     string stayed open past the liveness bound. The model had
+#                     not run out of room and had not stopped; it had stopped
+#                     steering. Rerollable for the same reason output_limit is:
+#                     sampling is stochastic and a lower-temperature rung is a
+#                     real second chance.
+#
+# decode_degeneracy is DELIBERATELY NOT output_limit (2026-08-13). Reusing that
+# phase would make every diagnostic lie: "ended at the provider capacity limit"
+# is false for a decode that was halted at 2,048 open-string tokens with ~11,000
+# tokens of room still unspent. The phases differ in what actually happened, so
+# they differ here.
 CAPACITY_PHASE_PROMPT_NO_ROOM = "prompt_no_room"
 CAPACITY_PHASE_OUTPUT_LIMIT = "output_limit"
-CAPACITY_PHASES = (CAPACITY_PHASE_PROMPT_NO_ROOM, CAPACITY_PHASE_OUTPUT_LIMIT)
+CAPACITY_PHASE_DECODE_DEGENERACY = "decode_degeneracy"
+CAPACITY_PHASES = (
+    CAPACITY_PHASE_PROMPT_NO_ROOM,
+    CAPACITY_PHASE_OUTPUT_LIMIT,
+    CAPACITY_PHASE_DECODE_DEGENERACY,
+)
+
+#: The phases a re-roll could actually fix. `prompt_no_room` is absent forever:
+#: the arithmetic that refused it is deterministic and re-derives the identical
+#: refusal.
+REROLLABLE_PHASES = (
+    CAPACITY_PHASE_OUTPUT_LIMIT,
+    CAPACITY_PHASE_DECODE_DEGENERACY,
+)
 
 
 class _CapacityError(RuntimeError):
@@ -113,20 +138,58 @@ class PromptContextOverflowError(_CapacityError):
         self.ended_with_eos = ended_with_eos
 
 
+class GenerationDegeneracyError(PromptContextOverflowError):
+    """The transport HALTED a decode that had stopped steering.
+
+    A subtype rather than a reused phase string, so a caller can tell "the model
+    filled its allowance" from "we stopped the model" without string-matching.
+    It inherits the evidence fields (`raw_completion`, the token arithmetic) and
+    adds the halt's own: which signal fired, and how long the string had been
+    open when it did.
+
+    NOT a quality judgement and NOT terminal -- see `_otr_decode_guard`.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        halt_reason: str | None = None,
+        open_string_tokens: int | None = None,
+        repetition: dict | None = None,
+        **kwargs: Any,
+    ) -> None:
+        kwargs.setdefault("phase", CAPACITY_PHASE_DECODE_DEGENERACY)
+        super().__init__(message, **kwargs)
+        self.halt_reason = halt_reason
+        self.open_string_tokens = open_string_tokens
+        self.repetition = repetition or {}
+
+
 CAPACITY_ERRORS = (GenerationContextOverflowError, PromptContextOverflowError)
 
 
-def is_rerollable_capacity_error(error: Any) -> bool:
-    """Return True only for a capacity failure a re-roll could actually fix.
+def is_rerollable_generation_error(error: Any) -> bool:
+    """Return True only for a generation failure a re-roll could actually fix.
 
     ONE predicate, one owner: the transports raise the phase and the ladder
     asks this. A `prompt_no_room` failure answers False forever -- the
-    arithmetic that refused it is deterministic.
+    arithmetic that refused it is deterministic. Both `output_limit` (the model
+    filled its allowance) and `decode_degeneracy` (we halted it) are honest
+    second chances, because sampling is stochastic and the ladder's next rung
+    runs at a lower temperature.
     """
     return (
         isinstance(error, CAPACITY_ERRORS)
-        and getattr(error, "phase", None) == CAPACITY_PHASE_OUTPUT_LIMIT
+        and getattr(error, "phase", None) in REROLLABLE_PHASES
     )
+
+
+#: Historical name. Kept because the ladder, the lower-temperature rung and the
+#: candidate loop all call it, and renaming across three call sites in the same
+#: change as a new failure mode is how a rename becomes a regression. The name
+#: now understates what it covers, which is why the new name exists beside it.
+is_rerollable_capacity_error = is_rerollable_generation_error
 
 
 def estimate_prompt_tokens(messages: Any) -> int:
