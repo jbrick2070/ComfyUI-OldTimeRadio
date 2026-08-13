@@ -30,6 +30,7 @@ for tests). UTF-8, no BOM, ASCII source.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -198,7 +199,15 @@ def _same_frozen_episode(wire: dict, disk: dict) -> tuple[bool, str]:
     )
 
 
-def overlay_audio_timing(ledger: dict) -> dict:
+class PostAudioJoinFailed(RuntimeError):
+    """A ``strict`` post-audio overlay could not prove its join.
+
+    Named, with a stable message prefix, so tests assert on a type rather than
+    on incidental ``JSONDecodeError`` / ``OSError`` wording.
+    """
+
+
+def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
     """Rehydrate the pre-audio wire ledger from the active post-audio ledger.
 
     ShotLock is the canonical graph join gated by ``audio_done``. The freeze
@@ -206,8 +215,42 @@ def overlay_audio_timing(ledger: dict) -> dict:
     AudioEnhance, and EpisodeAssembler persist their producer-owned truth to the
     in-flight disk ledger. Once episode identity is proven, disk owns the full
     ``audio`` section and the other post-audio top-level sections; metadata and
-    row-local timing/WAV fields merge only into empty wire slots. No disk ledger
-    or an identity mismatch leaves the wire unchanged and logs the latter LOUD.
+    row-local timing/WAV fields merge only into empty wire slots.
+
+    ``strict`` IS CALLER-SCOPED ON PURPOSE, AND THAT IS THE WHOLE DESIGN.
+    This free function has TWO live callers with opposite criticality, and a
+    global contract is wrong for one of them whichever way it is written:
+
+    * :meth:`OTRShotLock.lock` gates on the ``audio_done`` forceInput, and
+      ``EpisodeAssembler`` ATTEMPTS the durable save in the same function body
+      immediately before minting that string. So once ``audio_done`` is
+      genuinely non-empty, a missing or unprovable join here is a real anomaly
+      and must fail LOUD -- silently returning the PRE-AUDIO ledger restores the
+      old beat-id space and makes the PBUG-20260811-02 repair inert for that
+      run. Bug Bible 12.57: resolve the durable owner, prove same-run identity,
+      REJECT mismatches. That caller passes ``strict=True``.
+
+      ATTEMPTS, not guarantees, and the distinction is load-bearing: that save
+      sits inside a blanket ``except Exception`` in ``scene_sequencer`` and
+      ``save_ledger_safe`` RETURNS ``False`` rather than raising, with the
+      result unchecked at the call site -- so ``audio_done`` can fire non-empty
+      after a save that silently failed. That is precisely why raising here is
+      an improvement rather than a formality: this gate is currently the only
+      thing between a failed durable save and a render that quietly uses
+      pre-audio ids. Making the save itself gate the signal is the real repair
+      and is a separate item.
+    * ``SignalLostVideoRenderer.render_video`` (``video_engine.py``) calls this
+      with no ``audio_done`` input at all -- only an ``AUDIO`` data dependency
+      -- and uses the overlay for title-card timing, not for an identity-
+      critical join. It is a registered, sanctioned policy-floor node and the
+      call has no try/except around it, so raising there would convert a
+      slightly-worse title card into a hard crash of the floor renderer. It
+      keeps the fail-soft default.
+
+    Under ``strict`` the whole join is validated BEFORE anything is written, and
+    the merge happens on a deep copy: a rejected join must leave the caller's
+    ledger untouched rather than half-overlaid. Without ``strict`` the behaviour
+    is exactly what it has always been -- warn and return the wire unchanged.
     """
     import os
     if os.environ.get("OTR_TEST_MODE") == "1":
@@ -218,18 +261,68 @@ def overlay_audio_timing(ledger: dict) -> dict:
         from . import _otr_ledger as _OL
         p = _OL.in_flight_ledger_path()
         if not p:
+            if strict:
+                raise PostAudioJoinFailed(
+                    "post-audio join failed: no durable ledger path resolved, "
+                    "but audio_done has fired -- EpisodeAssembler saves the "
+                    "durable ledger before minting that signal, so its absence "
+                    "here is an anomaly, not a pre-audio run")
             return ledger
         p = Path(p)
+        if strict and not p.exists():
+            raise PostAudioJoinFailed(
+                "post-audio join failed: durable ledger %s does not exist" % p)
         disk = json.loads(p.read_text(encoding="utf-8"))
         if not isinstance(disk, dict):
             raise ValueError(f"post-audio ledger is {type(disk).__name__}, expected object")
         same_episode, identity = _same_frozen_episode(ledger, disk)
         if not same_episode:
+            if strict:
+                # Two different failures wear this one flag, and conflating them
+                # sends the next reader hunting a collision that never happened.
+                # _same_frozen_episode returns False both when a STALE SIBLING
+                # really did try to donate audio truth, and when NEITHER side
+                # carries any identity receipt at all.
+                #
+                # DECIDED FROM THE LEDGERS, NOT FROM THE PROSE. Sniffing
+                # _same_frozen_episode's message for "no matching immutable
+                # identity receipt" got this wrong for one real case: a legacy
+                # pair with no freeze_timestamp on either side but two DIFFERENT
+                # non-empty episode_ids falls through to that same wording, and
+                # that is a genuine stale-sibling collision being labelled as an
+                # absence. Only a total absence of receipts is "no identity".
+                def _receipts(led):
+                    meta = led.get("meta") if isinstance(led.get("meta"), dict) else {}
+                    return (str(meta.get("freeze_timestamp") or "").strip(),
+                            str(led.get("episode_id") or "").strip())
+
+                no_identity = not any(_receipts(ledger) + _receipts(disk))
+                raise PostAudioJoinFailed(
+                    "post-audio join failed: %s from %s -- %s"
+                    % ("no identity available on either side" if no_identity
+                       else "identity mismatch (stale sibling rejected)",
+                       p.name, identity))
             log.warning(
                 "[OTR_ShotLock] post-audio ledger overlay REJECTED from %s: %s",
                 p.name, identity,
             )
             return ledger
+
+        # VALIDATED -- only now may anything be written, and never to the
+        # caller's own object. Everything below mutates `ledger` in place
+        # (episode_id, audio, meta, lines, music), so under strict we work on a
+        # deep copy and hand it back only if the whole merge completes. A
+        # half-overlaid ledger in the caller's hands is worse than no overlay:
+        # it looks joined.
+        if strict:
+            ledger = copy.deepcopy(ledger)
+            # REBIND, or the copy is a lie. ``lines`` was bound from the
+            # caller's ledger before this try block, so every row merge below
+            # would still write through to the ORIGINAL list while the returned
+            # copy came back empty of timing -- caller mutated, result useless,
+            # both at once. Caught by the round-trip assertion in
+            # tests/test_post_audio_join_strict.py.
+            lines = ledger.get("lines") or []
 
         # The durable ledger owns the legitimate pending-id -> final-title
         # transition.  ``freeze_timestamp`` proves this is the same authored
@@ -430,7 +523,19 @@ def overlay_audio_timing(ledger: dict) -> dict:
             p.name, identity, rows_overlaid, music_rows_overlaid,
             mirrors_overlaid, master_hash[:12] or "missing",
         )
-    except Exception as exc:                 # noqa: BLE001 - never block the lock
+    except PostAudioJoinFailed:
+        # Already the considered verdict -- never demote it to a warning.
+        raise
+    except Exception as exc:                 # noqa: BLE001
+        if strict:
+            # Under strict every remaining failure here is a real one: an
+            # unreadable or malformed durable ledger, a disk error, a bad row
+            # shape. Swallowing it returns the PRE-AUDIO ledger, which silently
+            # restores the old beat-id space -- exactly the class of quiet
+            # fallback PBUG-20260811-02 was.
+            raise PostAudioJoinFailed(
+                "post-audio join failed: %s: %s" % (type(exc).__name__, exc)
+            ) from exc
         log.warning("[OTR_ShotLock] post-audio ledger overlay skipped: %s", exc)
     return ledger
 
@@ -1679,7 +1784,15 @@ class OTRShotLock:
         from . import _otr_ledger_consumers as _OTRLC
 
         led = _OTRLC.load_ledger(script_json)
-        led = overlay_audio_timing(led)     # fill per-line timing from the post-audio disk ledger
+        # STRICT HERE, AND ONLY HERE. This is the canonical graph join: it is
+        # gated on the audio_done forceInput, and EpisodeAssembler saves the
+        # durable ledger immediately before minting that string. So a join that
+        # cannot be proved at THIS call site is an anomaly, and quietly
+        # returning the pre-audio ledger would restore the old beat-id space
+        # and make the PBUG-20260811-02 repair inert for the run. The other
+        # caller (SignalLostVideoRenderer, title-card timing only) keeps the
+        # fail-soft default -- see overlay_audio_timing's docstring.
+        led = overlay_audio_timing(led, strict=bool(str(audio_done or "").strip()))
         meta = led.get("meta")
         if not isinstance(meta, dict):
             meta = {}
