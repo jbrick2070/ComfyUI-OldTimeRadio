@@ -1061,16 +1061,41 @@ def _build_truncating_generate_fn(
             # cause once, LOUDLY, with the whole arithmetic -- a reader of the
             # leg log must never have to reconstruct it.
             if effective_max_new_tokens < requested_max_new_tokens:
-                log.error(
-                    "[OTR_LedgerScriptWriter] OUTPUT_TRUNCATED: generation "
-                    "stopped at the ceiling after a CLAMP. The caller asked for "
-                    "%d output tokens; the %d-token context window left only %d "
-                    "after a %d-token prompt. Any JSON parse failure below is "
-                    "this budget, not the model. Give this pass a slot whose "
-                    "window fits prompt+artifact.",
-                    requested_max_new_tokens, context_cap,
-                    effective_max_new_tokens, prompt_len,
-                )
+                if reserve_remaining:
+                    # THE ADVICE WAS WRONG EXACTLY WHEN IT FIRED (2026-08-13).
+                    #
+                    # A ProviderCapacityMessages pass sets
+                    # _otr_reserve_remaining_output_capacity, so requested ==
+                    # the whole context window BY DESIGN, and
+                    # effective < requested is true the moment the prompt is
+                    # non-empty. The old text told the reader to "give this
+                    # pass a slot whose window fits prompt+artifact" -- but
+                    # this pass already HAS every token there is, so there is
+                    # no bigger slot to give it and no config defect to find.
+                    # It sent a live session hunting one for twenty minutes.
+                    # When the pass reserved everything and still hit the
+                    # ceiling without an EOS, the model did not stop.
+                    log.error(
+                        "[OTR_LedgerScriptWriter] OUTPUT_TRUNCATED: this pass "
+                        "reserved ALL remaining output capacity (%d of the "
+                        "%d-token window, after a %d-token prompt) and still "
+                        "ran to the ceiling. THE MODEL DID NOT STOP -- there "
+                        "is no larger slot to move it to, so do not go looking "
+                        "for one. Any JSON parse failure below is a runaway "
+                        "decode, not a budget defect.",
+                        effective_max_new_tokens, context_cap, prompt_len,
+                    )
+                else:
+                    log.error(
+                        "[OTR_LedgerScriptWriter] OUTPUT_TRUNCATED: generation "
+                        "stopped at the ceiling after a CLAMP. The caller asked "
+                        "for %d output tokens; the %d-token context window left "
+                        "only %d after a %d-token prompt. Any JSON parse failure "
+                        "below is this budget, not the model. Give this pass a "
+                        "slot whose window fits prompt+artifact.",
+                        requested_max_new_tokens, context_cap,
+                        effective_max_new_tokens, prompt_len,
+                    )
             else:
                 log.warning(
                     "[OTR_LedgerScriptWriter] OUTPUT_CAP: generation stopped at "

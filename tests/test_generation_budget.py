@@ -223,10 +223,17 @@ def test_model_loader_captures_complete_patch_marker_before_normalization(
         "model_id": "local-test",
         "context_cap": 8192,
     })
+    # The TYPE changed on 2026-08-13 and the change is the point. This used to
+    # expect a bare ModelLoaderError, which carries NO phase -- so the retry
+    # ladder, which reads the phase to decide whether a failure is rerollable,
+    # treated an identical capacity failure as terminal on this transport and
+    # rerollable on OTR_LedgerScriptWriter's. Same condition, same marker, two
+    # answers, decided by which transport the pass happened to take. The marker
+    # match below is this test's actual subject and is unchanged.
     with pytest.raises(
-        model_loader.ModelLoaderError,
+        model_loader.PromptContextOverflowError,
         match="complete requested output",
-    ):
+    ) as excinfo:
         generate(
             _RequireFullMessages([
                 {"role": "user", "content": "compact patch"},
@@ -234,6 +241,9 @@ def test_model_loader_captures_complete_patch_marker_before_normalization(
             temperature=.2,
             max_new_tokens=2000,
         )
+    assert excinfo.value.phase, (
+        "the whole reason this raise changed type is that it must carry a "
+        "phase for the ladder to route on")
 
 
 def test_local_structured_transport_adds_prefix_without_losing_sampling(

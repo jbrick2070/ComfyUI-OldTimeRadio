@@ -200,6 +200,51 @@ def test_the_dying_leg_logs_its_own_truncation_arithmetic(monkeypatch, caplog):
     assert str(FITTED_OUTPUT) in logged
 
 
+class _ReserveRemainingMessages(list):
+    """A ProviderCapacityMessages-shaped pass: it reserves the whole window."""
+    _otr_fail_on_output_limit = True
+    _otr_reserve_remaining_output_capacity = True
+
+
+def test_a_reserve_remaining_pass_is_NOT_told_to_find_a_bigger_slot(
+        monkeypatch, caplog):
+    """The advice used to be wrong exactly when it fired.
+
+    A pass that sets ``_otr_reserve_remaining_output_capacity`` gets
+    ``requested = context_cap`` BY DESIGN, so ``effective < requested`` is true
+    the moment the prompt is non-empty -- and the old text answered that with
+    "give this pass a slot whose window fits prompt+artifact". There is no
+    bigger slot: the pass already holds every token there is. It cost a live
+    session about twenty minutes hunting a config defect that did not exist.
+    What actually happened is that the model did not stop, and the log must say
+    so.
+    """
+    generate, _tokenizer = _generate_fn(monkeypatch)
+
+    with caplog.at_level(logging.ERROR, logger=writer.log.name):
+        with pytest.raises(writer.PromptContextOverflowError):
+            generate(
+                _ReserveRemainingMessages(
+                    [{"role": "user", "content": "45 words"}]),
+                temperature=.2,
+                # None, not a number: a reserve-remaining pass names no
+                # ceiling of its own. Passing one sets `bounded_capacity`,
+                # which makes fit_output_tokens require the FULL window and
+                # refuse before the decode -- a different failure entirely,
+                # and not the one this test is about.
+                max_new_tokens=None,
+            )
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "OUTPUT_TRUNCATED" in logged
+    assert "THE MODEL DID NOT STOP" in logged
+    # The sentence that sent the reader hunting must NOT appear on this path.
+    assert "slot whose window fits" not in logged
+    # The arithmetic a reader still needs is all present.
+    assert str(PROMPT_TOKENS) in logged
+    assert str(FITTED_OUTPUT) in logged
+
+
 def test_a_leg_that_ends_with_eos_at_the_cap_still_returns_its_text(monkeypatch):
     """CONTROL: the raise condition is unchanged -- EOS at the cap is a finish."""
     generate, tokenizer = _generate_fn(monkeypatch, last_token=_Tokenizer.eos_token_id)

@@ -62,11 +62,13 @@ except ImportError:  # loaded with nodes/ on sys.path
 try:
     from ._otr_generation_budget import (
         GenerationContextOverflowError,
+        PromptContextOverflowError,
         fit_output_tokens,
     )
 except ImportError:  # pragma: no cover - flat-module compatibility tests
     from _otr_generation_budget import (  # type: ignore
         GenerationContextOverflowError,
+        PromptContextOverflowError,
         fit_output_tokens,
     )
 
@@ -1304,7 +1306,18 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
-            raise ModelLoaderError(str(exc)) from exc
+            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). This used to
+            # raise a bare ModelLoaderError with NO phase for the exact
+            # condition OTR_LedgerScriptWriter raises as a phase-carrying
+            # PromptContextOverflowError. The ladder reads the PHASE to decide
+            # whether a failure is rerollable, so an identical runaway was
+            # rerollable on one transport and terminal on the other, purely
+            # from which one the pass happened to take. The phase is read off
+            # the error rather than assumed here, so a pre-call refusal that IS
+            # retryable cannot be mislabelled by this line.
+            raise PromptContextOverflowError(
+                str(exc), phase=exc.phase,
+            ) from exc
         with torch.no_grad():
             out = model.generate(
                 **inputs,
@@ -1435,7 +1448,18 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 require_full=require_full_output or bounded_capacity,
             )
         except GenerationContextOverflowError as exc:
-            raise ModelLoaderError(str(exc)) from exc
+            # THE TWO LOCAL TRANSPORTS MUST AGREE (2026-08-13). This used to
+            # raise a bare ModelLoaderError with NO phase for the exact
+            # condition OTR_LedgerScriptWriter raises as a phase-carrying
+            # PromptContextOverflowError. The ladder reads the PHASE to decide
+            # whether a failure is rerollable, so an identical runaway was
+            # rerollable on one transport and terminal on the other, purely
+            # from which one the pass happened to take. The phase is read off
+            # the error rather than assumed here, so a pre-call refusal that IS
+            # retryable cannot be mislabelled by this line.
+            raise PromptContextOverflowError(
+                str(exc), phase=exc.phase,
+            ) from exc
         with torch.no_grad():
             out = model.generate(
                 **inputs,
