@@ -740,16 +740,41 @@ def _still_spine_row_for_portrait(rows, char_id):
 
 
 def _still_spine_row_for_mesh(rows, beat_id, char_id):
+    """The mesh row a beat owns, chosen by IDENTITY and never by ABSENCE.
+
+    Four keys are legitimate because the recurring radio mesh deliberately
+    shares ONE subject across beats -- that breadth is the contract, and it is
+    why this lookup is looser than the beat-exact scene lookup above.
+
+    What was NOT the contract: ``keys`` was built from four possibly-empty row
+    fields and probed with ``str(char_id or "") in keys``. A music beat probes
+    with ``char_id == ""`` and a mesh row stores ``char_id: ""``, so ``"" in
+    keys`` was True for EVERY mesh row and the loop returned the first one it
+    reached -- an answer to a question nobody asked. Measured on the failing
+    2026-08-12 leg's own rows: asking for ``b000_music_open`` returned
+    ``meshfodder_music_opening_001``.
+
+    That is why the still spine's SCENE half failed loud on the beat-id split
+    while the MESH half stayed quiet and served a plausible wrong image. Both
+    sides are guarded here -- emptiness is dropped from ``keys`` AND an empty
+    probe is refused -- because either one alone still lets absence match
+    absence.
+    """
+    cid = str(char_id or "").strip()
+    bid = str(beat_id or "").strip()
+    if not cid and not bid:
+        return None                     # no identity asked for, none answered
     for row in reversed(rows):
         if str(row.get("kind") or "") != "mesh_fodder":
             continue
         keys = {
-            str(row.get("mesh_subject_id") or ""),
-            str(row.get("object_id") or ""),
-            str(row.get("char_id") or ""),
-            str(row.get("beat_id") or ""),
+            str(row.get("mesh_subject_id") or "").strip(),
+            str(row.get("object_id") or "").strip(),
+            str(row.get("char_id") or "").strip(),
+            str(row.get("beat_id") or "").strip(),
         }
-        if str(char_id or "") in keys or str(beat_id or "") in keys:
+        keys.discard("")
+        if (cid and cid in keys) or (bid and bid in keys):
             return row
     return None
 
