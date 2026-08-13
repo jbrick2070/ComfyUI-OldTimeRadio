@@ -235,10 +235,26 @@ def color_for(char_id: str, role: str, style: dict, order_map: dict) -> str:
 # and every event carries an explicit \pos, so libass collision handling can
 # never shift the hero off its planned mark.
 TITLE_STYLE_NAME = "TITLE"
-TITLE_OUTLINE_W = 3
+# 3 -> 6, and a real shadow, after the FIRST live leg (2026-08-13). Operator, on
+# the published artifact: "a bit hard to see from a distance but much improved".
+# The measurement said the same thing and says why. On that episode the glyph
+# EDGE cleared 13.66:1 against its outline -- the gate passed -- while the glyph
+# FILL was only 1.21:1 against the lit gold radio panel behind it, barely up
+# from the 1.01:1 the pre-fix control measured. So the outline was carrying the
+# whole result: legible close up, and at a distance the 3px border falls below
+# what the eye resolves and the phosphor fill sinks back into a bright scene.
+#
+# Widening the border and adding a dropped shadow buys weight that survives
+# downscaling, WITHOUT going to BorderStyle=3 -- an opaque box would be the
+# strongest answer and is what the SDH captions use, but it would replace the
+# CRT phosphor look with a caption slab, and the Matrix decode is explicitly
+# kept. Re-measure `core vs scene` on the next leg: that is the number that has
+# to move, not `core vs outline`, which was already passing.
+TITLE_OUTLINE_W = 6
+TITLE_SHADOW = 2
 _TITLE_STYLE_LINE = (
     f"Style: {TITLE_STYLE_NAME},Consolas,48,&H0041FF00,&H000000FF,&H00000000,"
-    f"&H00000000,1,0,0,0,100,100,0,0,1,{TITLE_OUTLINE_W},0,7,0,0,0,1"
+    f"&H00000000,1,0,0,0,100,100,0,0,1,{TITLE_OUTLINE_W},{TITLE_SHADOW},7,0,0,0,1"
 )
 
 
