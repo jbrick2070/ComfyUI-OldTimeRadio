@@ -332,6 +332,73 @@ _RADIO_SCORE_MAX_LINES_PER_BEAT = 2
 _RADIO_SCORE_MAX_MUSIC_CUES = 3
 _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT = 2
 
+# ---------------------------------------------------------------------------
+# AUTHORED-STRING CEILINGS -- why these exist and why they are this generous.
+#
+# The draft's ARRAYS were bounded from the start; its STRINGS were not. Under
+# constrained decoding that asymmetry is what lets a decode run to the context
+# ceiling: lm-format-enforcer masks EOS until the JSON document is complete, so
+# the only exit from an unbounded string is the closing quote -- and a decode
+# that has fallen into a verbatim paragraph loop never samples it. Measured on
+# a live leg 2026-08-13: 13,912 output tokens after a 2,472-token prompt,
+# provably stuck inside ONE string. `jsonschemaparser` returns exactly '"' once
+# `max_length` is reached, so a cap here is enforced DURING decoding rather
+# than after it -- the string is structurally forced to close.
+#
+# THIS IS A STRUCTURAL CEILING, NEVER A LENGTH OR QUALITY GATE. THE LAW: an
+# audit may improve a story, never fail one for length.
+#
+# ONE shared value, deliberately. A first draft of this block gave each field
+# its own ceiling sized 3-6x the longest string of its kind ever observed
+# (title 240, arc_phase 400, intent 800 ...). The suite refused it, and it was
+# right to: `test_p3_score_draft_preserves_arbitrarily_long_authored_fields`
+# asserts that authored fields survive at ARBITRARY length, and the tight
+# per-field values broke four of them. Differentiated ceilings buy nothing
+# here -- the job is to make a string FINITE, not to make it short -- while
+# every extra ceiling is one more chance for a bound to bind real authorship.
+# So there is a single ceiling, far above anything any field has ever carried
+# (the widest string across 8,119 authored strings in 4,608 shipped ledgers
+# was a 4,549-char premise; means run 8-177 chars, p95s 12-281).
+#
+# It still does the whole job: it bounds ONE string to roughly 1,500 tokens
+# instead of the 13,912 measured on a live leg, and -- the part that actually
+# matters -- it makes the string TERMINATE, so the document completes and the
+# ladder proceeds instead of dying on OUTPUT_TRUNCATED.
+#
+# A string that lands ON the ceiling is treated as degeneracy evidence and
+# rerolled rather than accepted -- see `_assert_authored_text_within_bounds`.
+# Without that, a cap converts a loud runaway into a SILENT mid-sentence
+# truncation that parses and validates cleanly, which is a worse defect than
+# the one being fixed.
+# ---------------------------------------------------------------------------
+_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS = 6000
+_SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS = _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS
+
+# THE GUARD BAND -- why the detector does NOT test `len == ceiling`.
+#
+# A review pass caught this and it is the difference between a working guard and
+# a decorative one. lm-format-enforcer does not simply allow the quote AT the
+# ceiling; `tokenenforcer.py` computes
+#     max_allowed_len = min(cache.max_token_len, max_len - cur_len)
+# so as the string approaches its ceiling only progressively SHORTER tokens stay
+# legal, and the closing quote can be forced anywhere inside the final
+# max_token_len characters. A constraint-forced fragment therefore often stops
+# a few characters SHORT of the ceiling -- and a detector looking for an exact
+# hit would wave it straight through, shipping the very mid-word truncation the
+# ceiling exists to prevent.
+#
+# The band is measured, not guessed: the longest single token any local writer
+# can emit is 76 characters (Mistral-Nemo and Captain-Eris both carry a 76-char
+# run of dashes; the gemma family tops out at 31). 128 clears that with room to
+# spare, and still sits far above the 4,549-char widest string this project has
+# ever shipped -- so it cannot bind real authorship.
+_AUTHORED_TEXT_DEGENERACY_GUARD_BAND = 128
+
+#: At or above this length, a string is degeneracy evidence rather than writing.
+_AUTHORED_TEXT_REJECT_AT = (
+    _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS - _AUTHORED_TEXT_DEGENERACY_GUARD_BAND
+)
+
 
 class AdvisoryBeatV4(_Strict):
     beat_id: str = Field(pattern=r"^b\d{3}$")
@@ -416,8 +483,10 @@ class RadioScoreDraftBeatV4(_Strict):
     shot_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_SHOTS_PER_SCENE - 1)
     char_id: Literal["announcer", "c01", "c02", "c03"]
     line_count: int = Field(ge=1, le=_RADIO_SCORE_MAX_LINES_PER_BEAT)
-    intent: str = Field(min_length=1)
-    arc_phase: str = Field(min_length=1)
+    intent: str = Field(min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS)
+    arc_phase: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
     fact_ids: list[Annotated[str, Field(pattern=r"^F0[1-6]$")]] = Field(
         default_factory=list,
         max_length=_RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
@@ -425,13 +494,19 @@ class RadioScoreDraftBeatV4(_Strict):
 
 
 class RadioScoreDraftShotV4(_Strict):
-    description: str = Field(min_length=1)
-    visual_prompt: str = Field(min_length=1)
+    description: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
+    visual_prompt: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
 
 
 class RadioScoreDraftSceneV4(_Strict):
-    env: str = Field(min_length=1)
-    description: str = Field(min_length=1)
+    env: str = Field(min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS)
+    description: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
     shots: list[RadioScoreDraftShotV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_SHOTS_PER_SCENE,
     )
@@ -442,8 +517,12 @@ class RadioScoreDraftSceneV4(_Strict):
 
 class RadioScoreDraftMusicCueV4(_Strict):
     cue_id: Literal["music_open", "music_inter", "music_close"]
-    description: str = Field(min_length=1)
-    generation_prompt: str = Field(min_length=1)
+    description: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
+    generation_prompt: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
     anchor_beat_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_BEATS - 1)
     anchor_line_index: int = Field(ge=0, le=_RADIO_SCORE_MAX_LINES_PER_BEAT - 1)
 
@@ -451,9 +530,13 @@ class RadioScoreDraftMusicCueV4(_Strict):
 class RadioScoreDraftV4(_Strict):
     """Compact P3 transport. Python derives the final score mechanics."""
 
-    title: str = Field(min_length=1)
-    premise: str = Field(min_length=1)
-    setting: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS)
+    premise: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
+    setting: str = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+    )
     scenes: list[RadioScoreDraftSceneV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_SCENES,
     )
@@ -477,6 +560,13 @@ _DRAFT_ERROR_CODES = frozenset({
     "cue_id",
     "score_schema",
     "graph",
+    # An authored string that landed EXACTLY on its structural ceiling. The
+    # ceiling is 3-6x the longest such string this project has ever produced,
+    # so hitting it to the character is degeneracy evidence, not authorship --
+    # and the artifact it produces is a clean-parsing sentence cut off
+    # mid-word. Rerollable ON PURPOSE: a reroll costs one ladder rung, while
+    # accepting it ships a truncated line to TTS.
+    "text_cap",
 })
 
 
@@ -510,7 +600,19 @@ def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool | None]:
         "max_line_count_per_beat": _RADIO_SCORE_MAX_LINES_PER_BEAT,
         "max_music_cues": _RADIO_SCORE_MAX_MUSIC_CUES,
         "max_fact_ids_per_beat": _RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
-        "authored_text_bounds": "provider_capacity_only",
+        # WAS "provider_capacity_only" until 2026-08-13, and that value was the
+        # defect written down: every authored string was bounded only by the
+        # context window, so one looping string could spend it all. The strings
+        # now carry structural ceilings and an exact-hit reroll.
+        "authored_text_bounds": "structural_ceilings",
+        "max_authored_text_chars": _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+        # The REJECT threshold, not just the ceiling: lmfe can force a string
+        # shut up to one max-token-length early, so the ceiling alone does not
+        # describe what the transport actually enforces.
+        "degeneracy_reject_at_chars": _AUTHORED_TEXT_REJECT_AT,
+        # P5 shares both values. Named here because this is the only receipt a
+        # reader gets, and a receipt that covers half the enforcement misleads.
+        "p5_line_bounds": "shared_with_p3",
     }
 
 
@@ -645,7 +747,18 @@ class ScriptTextDraftLineV4(_Strict):
     """The only P5 fields the model actually authors."""
 
     line_id: str = Field(pattern=r"^l\d{3}$")
-    text: str = Field(min_length=1)
+    # P5 carries the SAME unbounded-string exposure P3 did, and it is not
+    # theoretical: the 2026-08-13 leg ran away HERE too, 8,128 tokens over 12
+    # minutes, immediately after P3's own runaway was survived.
+    #
+    # PBUG-20260729-02 is the same FAMILY on this pass -- an unbounded
+    # constrained decode that ate the window (14,697 tokens, ~24 min) -- but be
+    # precise about what it proved: its root cause (a) is that the model never
+    # stopped adding LINES, an array ceiling the decoder was never told, not a
+    # single line's text growing without end. Different surface, same pathology.
+    text: str = Field(
+        min_length=1, max_length=_SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS,
+    )
 
 
 class ScriptTextDraftV4(_Strict):
@@ -817,6 +930,73 @@ _DRAFT_CUE_PLACEMENTS = {
 }
 
 
+def _assert_authored_text_within_bounds(draft: RadioScoreDraftV4) -> None:
+    """Reject a draft whose authored text landed exactly on a ceiling.
+
+    The ceilings in this module are enforced DURING decoding: lm-format-enforcer
+    returns only the closing quote once ``max_length`` is reached, so a runaway
+    string is forced shut instead of consuming the context window. That is the
+    cure -- and on its own it would introduce a quieter disease, because the
+    forced-shut string is still valid JSON and still passes pydantic. The
+    episode would simply carry a description that stops mid-word, and nothing
+    downstream would ever know a ceiling fired.
+
+    So an exact-ceiling hit is treated as evidence of the degeneracy that
+    caused it and routed into the existing candidate ladder as a REROLL. The
+    ceilings are 3-6x the longest string of their kind ever observed across
+    8,119 authored strings, so a legitimate landing on one is not a scenario
+    this project has produced.
+
+    This never judges prose. It fires on ONE arithmetic condition -- length
+    equals the structural ceiling exactly -- and never on style, quality, or a
+    word target.
+    """
+    def check(value: str, ceiling: int, path: str) -> None:
+        # Tested against the REJECT threshold, not the ceiling: lmfe can force
+        # the closing quote up to one max-token-length BELOW max_length, so an
+        # exact-hit test would miss most real constraint-forced fragments. See
+        # the guard-band note above.
+        if len(value) >= _AUTHORED_TEXT_REJECT_AT:
+            raise RadioScoreDraftCompileError(
+                code="text_cap", path=path,
+                detail=(
+                    f"authored text reached {len(value)} chars, at or past the "
+                    f"{_AUTHORED_TEXT_REJECT_AT}-char degeneracy threshold "
+                    f"({ceiling}-char ceiling less a "
+                    f"{_AUTHORED_TEXT_DEGENERACY_GUARD_BAND}-char guard band); "
+                    f"this is a decode that was cut short rather than written "
+                    f"to an end, so it is rerolled instead of accepted"
+                ),
+            )
+
+    check(draft.title, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS, "title")
+    check(draft.premise, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS, "premise")
+    check(draft.setting, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS, "setting")
+    for scene_index, scene in enumerate(draft.scenes):
+        base = f"scenes[{scene_index}]"
+        check(scene.env, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS, f"{base}.env")
+        check(scene.description, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+              f"{base}.description")
+        for shot_index, shot in enumerate(scene.shots):
+            shot_path = f"{base}.shots[{shot_index}]"
+            check(shot.description, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+                  f"{shot_path}.description")
+            check(shot.visual_prompt, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+                  f"{shot_path}.visual_prompt")
+        for beat_index, beat in enumerate(scene.beats):
+            beat_path = f"{base}.beats[{beat_index}]"
+            check(beat.intent, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+                  f"{beat_path}.intent")
+            check(beat.arc_phase, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+                  f"{beat_path}.arc_phase")
+    for cue_index, cue in enumerate(draft.music_cues):
+        cue_path = f"music_cues[{cue_index}]"
+        check(cue.description, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+              f"{cue_path}.description")
+        check(cue.generation_prompt, _RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+              f"{cue_path}.generation_prompt")
+
+
 def compile_radio_score_draft(
     draft: RadioScoreDraftV4,
     advisory: AdvisoryWordPlanV4,
@@ -831,6 +1011,10 @@ def compile_radio_score_draft(
     canonical IDs, parents, order, speaker metadata, word centers, cue
     placement, and canonical cue anchors.
     """
+    # Before any structural compile: a string forced shut by its ceiling is a
+    # runaway that got caught, not a draft that is ready to ship.
+    _assert_authored_text_within_bounds(draft)
+
     advisory_rows = list(advisory.per_beat)
     advisory_ids = [row.beat_id for row in advisory_rows]
     if not advisory_rows or len(set(advisory_ids)) != len(advisory_ids):
@@ -2739,6 +2923,30 @@ def _validate_p5_structure(
         label_pattern = _spoken_label_pattern(cast)
         findings: list[str] = []
         for line in script.lines:
+            # THE P5 HALF OF THE RUNAWAY GUARD, and it belongs HERE rather than
+            # in compile_script_text_draft, because a finding returned from
+            # this function becomes a rerollable PostValidationError while a
+            # raise from the compiler does not.
+            #
+            # Without it, capping ScriptTextDraftLineV4.text would be strictly
+            # worse than leaving it unbounded: lmfe forces the string shut at
+            # the ceiling, pydantic accepts it (<=), nothing else measures it,
+            # and a spoken line cut off mid-word is frozen into the ledger and
+            # sent to TTS. A silent truncation in the audio is a far worse
+            # outcome than a slow decode. PBUG-20260729-02 is the same family of
+            # unbounded decode on this pass (its own root cause was an unenforced
+            # ARRAY ceiling, not a long string -- do not conflate them).
+            if len(str(line.text or "")) >= _AUTHORED_TEXT_REJECT_AT:
+                findings.append(
+                    f"{line.line_id}: spoken text reached "
+                    f"{len(str(line.text or ''))} chars, at or past the "
+                    f"{_AUTHORED_TEXT_REJECT_AT}-char degeneracy threshold "
+                    f"({_SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS}-char ceiling less a "
+                    f"{_AUTHORED_TEXT_DEGENERACY_GUARD_BAND}-char guard band); "
+                    f"it was cut short rather than written to an end, so it is "
+                    f"rerolled instead of spoken"
+                )
+                continue
             if line.skip or line.speaker_role not in (
                 "character", "announcer"
             ):
@@ -2786,6 +2994,20 @@ def _p5_raw_spoken_findings(
     findings: list[str] = []
     for row in draft.lines:
         line_id = str(row.line_id)
+        # The ceiling finding is raised BEFORE the role filter and on the RAW
+        # draft, for the same reason this whole function exists: a draft that
+        # fails compilation on line-ID coverage would otherwise hide a
+        # cut-short line behind the ID complaint, the repair would fix the IDs
+        # and re-emit the same truncated text, and the one typed repair would
+        # be spent. Both defects have to reach it together.
+        if len(str(row.text or "")) >= _AUTHORED_TEXT_REJECT_AT:
+            findings.append(
+                f"{line_id}: spoken text reached {len(str(row.text or ''))} "
+                f"chars, at or past the {_AUTHORED_TEXT_REJECT_AT}-char "
+                f"degeneracy threshold; it was cut short rather than written "
+                f"to an end, so it is rerolled instead of spoken"
+            )
+            continue
         role = role_by_line_id.get(line_id)
         if role not in ("character", "announcer"):
             continue

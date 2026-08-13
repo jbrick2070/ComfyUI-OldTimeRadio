@@ -220,6 +220,68 @@ def test_validate_p5_structure_reports_every_offending_line(monkeypatch):
     assert "l002" not in error
 
 
+def test_validate_p5_structure_rerolls_a_line_that_hit_the_ceiling(monkeypatch):
+    """A spoken line forced shut by its ceiling must reroll, never be spoken.
+
+    The P5 half of the 2026-08-13 runaway fix. `ScriptTextDraftLineV4.text`
+    carries a structural ceiling so a looping decode cannot spend the whole
+    context window inside one string -- but lm-format-enforcer closes that
+    string by returning only the quote at the ceiling, and pydantic accepts it
+    because len == max_length is valid. Nothing downstream measures the line.
+
+    So without this finding the cap would be WORSE than the unbounded field it
+    replaced: a line cut off mid-word would be frozen into the ledger and
+    spoken by TTS. The check lives here, in the validator, because a finding
+    returned from this function becomes a rerollable PostValidationError --
+    a raise from the compiler would not.
+
+    Not hypothetical: the 2026-08-13 leg ran away in P5 as well as P3, 8,128
+    tokens over 12 minutes. (PBUG-20260729-02 is the same family on this pass,
+    but its root cause was an unenforced ARRAY ceiling rather than a long
+    string -- related pathology, different surface.)
+    """
+    _patch_graph_checks(monkeypatch)
+    # 40 chars SHORT of the ceiling: lmfe can force the quote up to one
+    # max-token-length (76 chars on this project's widest local tokenizer)
+    # early, so this is what a real forced closure looks like and it must be
+    # caught by the guard band rather than by an exact-hit test.
+    forced = lane._SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS - 40
+    script = _script_stub([
+        ("l001", "character", "A clean spoken line that breaks nothing."),
+        ("l002", "character", "x" * forced),
+    ])
+
+    error = lane._validate_p5_structure(script, _cast_stub(), _score_stub({}))
+
+    assert error is not None
+    assert "l002" in error
+    assert "degeneracy threshold" in error
+    assert "rerolled" in error
+    # The clean line is not implicated.
+    assert "l001" not in error
+
+
+def test_validate_p5_ceiling_check_covers_skipped_and_music_lines(monkeypatch):
+    """The ceiling check runs BEFORE the spoken-role filter, on purpose.
+
+    The other findings in this validator only apply to spoken character and
+    announcer rows, because they judge spoken markup. A truncated string is not
+    a markup opinion -- it is a broken artifact wherever it lands, and a music
+    or skipped row carrying one still means the decode ran away.
+    """
+    _patch_graph_checks(monkeypatch)
+    ceiling = lane._SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS
+    script = _script_stub([
+        ("l001", "music_open", "x" * ceiling),
+    ])
+
+    error = lane._validate_p5_structure(script, _cast_stub(), _score_stub({}))
+
+    assert error is not None
+    assert "l001" in error
+    assert "degeneracy threshold" in error
+
+
 def test_validate_p5_structure_single_defect_message_is_unchanged(monkeypatch):
     """One bad line still yields the bare, historical message -- no joining
     artifacts -- so existing pins on the exact string keep holding."""

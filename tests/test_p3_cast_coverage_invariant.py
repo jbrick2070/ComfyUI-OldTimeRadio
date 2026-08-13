@@ -159,6 +159,87 @@ def test_an_uncovered_character_is_caught_too():
     assert "c01" in excinfo.value.detail
 
 
+def test_the_text_ceiling_guard_is_WIRED_INTO_the_real_compile_entry_point():
+    """Prove the runaway guard fires through the PRODUCTION path, not just alone.
+
+    There is a separate unit test that calls
+    `_assert_authored_text_within_bounds` directly, and on its own that test is
+    not enough: it would keep passing if the call at the top of
+    `compile_radio_score_draft` were deleted, leaving the guard perfectly tested
+    and completely unwired. That is this project's oldest failure shape -- code
+    that ships, tests green, and never runs in production -- so the wiring gets
+    its own assertion through the real entry point.
+    """
+    draft = _draft(["announcer", "c01"])
+    runaway = draft.model_copy(update={
+        "scenes": [draft.scenes[0].model_copy(update={
+            "description": "y" * lane._RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+        })],
+    })
+
+    with pytest.raises(lane.RadioScoreDraftCompileError) as excinfo:
+        lane.compile_radio_score_draft(
+            runaway, _advisory(2), _cast(), _facts(),
+        )
+
+    assert excinfo.value.code == "text_cap"
+    assert "scenes[0].description" in excinfo.value.path
+
+
+def test_a_fragment_forced_shut_BELOW_the_ceiling_is_still_caught():
+    """The guard band -- the difference between a real guard and a decorative one.
+
+    lm-format-enforcer does not only permit the closing quote AT max_length. Its
+    token enforcer computes `max_allowed_len = min(cache.max_token_len,
+    max_len - cur_len)`, so near the ceiling it admits only progressively
+    shorter tokens and can force the quote up to one max-token-length EARLY. The
+    longest token any local writer can emit is 76 characters, so a real
+    constraint-forced fragment routinely stops short of the ceiling.
+
+    A detector that tested `len == ceiling` would therefore pass most genuine
+    runaways straight through. This asserts the band, not the ceiling.
+    """
+    draft = _draft(["announcer", "c01"])
+    # 40 chars short of the ceiling: inside the band, unreachable by an
+    # exact-hit test, and exactly what a forced closure looks like.
+    forced_shut = draft.model_copy(update={
+        "scenes": [draft.scenes[0].model_copy(update={
+            "description": "y" * (lane._RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS - 40),
+        })],
+    })
+
+    with pytest.raises(lane.RadioScoreDraftCompileError) as excinfo:
+        lane.compile_radio_score_draft(
+            forced_shut, _advisory(2), _cast(), _facts(),
+        )
+    assert excinfo.value.code == "text_cap"
+
+    # And the band must be wider than the longest token any local writer emits,
+    # or a forced closure can still slip underneath it.
+    assert lane._AUTHORED_TEXT_DEGENERACY_GUARD_BAND > 76
+
+
+def test_long_but_legitimate_authorship_still_compiles():
+    """The guard must bound a runaway WITHOUT rejecting long writing.
+
+    5,000 characters is far longer than anything this project has ever shipped
+    (widest observed: a 4,549-char premise) and must still compile, or the guard
+    has become the length gate THE LAW forbids.
+    """
+    draft = _draft(["announcer", "c01"])
+    long_but_legal = draft.model_copy(update={
+        "scenes": [draft.scenes[0].model_copy(update={
+            "description": "y" * 5000,
+        })],
+    })
+
+    score = lane.compile_radio_score_draft(
+        long_but_legal, _advisory(2), _cast(), _facts(),
+    )
+    assert score.scenes[0].description.startswith("yyy")
+    assert len(score.scenes[0].description) == 5000
+
+
 def test_the_error_is_classified_recoverable_by_the_candidate_loop():
     """Proves the loop will REDRAFT rather than fail the episode.
 

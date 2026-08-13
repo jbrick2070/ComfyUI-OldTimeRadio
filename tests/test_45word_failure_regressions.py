@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from nodes import _otr_scifi_codex as codex
 from nodes import _otr_scifi_fable2 as fable2
 from nodes._otr_video_engines import eng_mesh_stage  # noqa: F401
@@ -196,24 +198,90 @@ def test_markup_repair_explicitly_handles_standalone_stage_direction():
     assert "folding" in repair_user
 
 
-def test_p3_transport_keeps_prose_open_and_uses_provider_capacity():
+def test_p3_transport_bounds_prose_structurally_and_never_clips_silently():
+    """The P3 strings carry ceilings, and an exact hit rerolls rather than ships.
+
+    THIS REVERSES A DELIBERATE EARLIER DECISION and the reason is a live
+    defect, so the reasoning is recorded rather than just the assertions. The
+    previous contract left every authored string bounded only by provider
+    capacity, on the principle that creative text must never be clipped by the
+    typed boundary. That principle is right and is PRESERVED here -- but the
+    unbounded half of it was also the runaway's mechanism: under constrained
+    decoding the closing quote is the only exit from a string, and a decode
+    that falls into a verbatim loop never samples it. Measured 2026-08-13:
+    13,912 output tokens inside ONE string, and with MAX_CANDIDATE_CYCLES=3 a
+    long enough runaway now KILLS a leg rather than merely delaying it.
+
+    So the strings are finite, the ceilings sit 3-6x above the longest string
+    of their kind ever observed, and "never silently clipped" is enforced by
+    the reroll below rather than by leaving the string unbounded.
+    """
+    ceiling = codex._RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS
     schema = codex.RadioScoreDraftV4.model_json_schema()
-    # Authored prose is deliberately not a Pydantic length gate. The
-    # transport is still finite through structural graph bounds and provider
-    # capacity; overlong creative text remains representable and cannot be
-    # silently clipped by the typed boundary.
-    assert "maxLength" not in schema["properties"]["premise"]
+    assert schema["properties"]["premise"]["maxLength"] == ceiling
     scene = schema["$defs"]["RadioScoreDraftSceneV4"]
-    assert "maxLength" not in scene["properties"]["description"]
+    assert scene["properties"]["description"]["maxLength"] == ceiling
     assert schema["properties"]["scenes"]["maxItems"] == 3
     assert scene["properties"]["shots"]["maxItems"] == 2
     assert scene["properties"]["beats"]["maxItems"] == 4
+
     receipt = codex._radio_score_draft_surface_receipt()
     assert receipt["output_budget_mode"] == "provider_capacity"
     assert receipt["requested_max_new_tokens"] is None
-    assert receipt["authored_text_bounds"] == "provider_capacity_only"
+    assert receipt["authored_text_bounds"] == "structural_ceilings"
+    assert receipt["max_authored_text_chars"] == ceiling
     assert "context_cap_tokens" not in receipt
     assert "input_token_reservation" not in receipt
+
+    # ONE ceiling, and it must never bind real authorship. The corpus
+    # measurement behind the value (widest authored string ever shipped: a
+    # 4,549-char premise) is recorded in
+    # docs/2026-08-13-writer-runaway-root-cause.md -- this line documents the
+    # intent and does NOT re-measure it, so do not cite it as validation of the
+    # corpus claim.
+    assert ceiling > 4549
+    assert codex._SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS == ceiling
+
+
+
+
+
+def test_p3_exact_ceiling_hit_rerolls_instead_of_shipping_truncated_text():
+    """A string forced shut by its ceiling is degeneracy, not authorship.
+
+    lm-format-enforcer returns only the closing quote once maxLength is
+    reached, so a runaway string comes back as valid JSON that passes pydantic
+    and stops mid-word. Without this check the cure would be quieter than the
+    disease: the episode would simply carry a clipped description and nothing
+    downstream would know. The error code is in the rerollable set on purpose.
+    """
+    draft = codex.RadioScoreDraftV4.model_validate({
+        "title": "Signal",
+        "premise": "A quiet signal forces a choice.",
+        "setting": "An observatory at night.",
+        "scenes": [{
+            "env": "Observatory",
+            # Exactly the ceiling -- what a forced-shut runaway produces.
+            "description": "x" * codex._RADIO_SCORE_MAX_AUTHORED_TEXT_CHARS,
+            "shots": [{"description": "A dish turns.",
+                       "visual_prompt": "A dish turns against the stars."}],
+            "beats": [{"shot_index": 0, "char_id": "announcer",
+                       "line_count": 1, "intent": "open",
+                       "arc_phase": "Setup", "fact_ids": []}],
+        }],
+        "music_cues": [{"cue_id": "music_open", "description": "A low drone.",
+                        "generation_prompt": "Low analog drone, sparse.",
+                        "anchor_beat_index": 0, "anchor_line_index": 0}],
+    })
+
+    with pytest.raises(codex.RadioScoreDraftCompileError) as excinfo:
+        codex._assert_authored_text_within_bounds(draft)
+
+    assert excinfo.value.code == "text_cap"
+    assert "scenes[0].description" in excinfo.value.path
+    # Rerollable, not fatal: the ladder retries rather than killing the leg.
+    assert "text_cap" in codex._DRAFT_ERROR_CODES
+
 
 def test_p3_call_uses_provider_capacity_prompt_transport(monkeypatch):
     observed = {}
