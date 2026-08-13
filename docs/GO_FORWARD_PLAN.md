@@ -326,6 +326,36 @@ render_clip() lifecycle".**
 The table still holds exactly two engines. They are exactly the two that failed
 tonight. Nothing else is in it.
 
+**THE LAB ALREADY MEASURED THE RIGHT ROWS, and the shipped ones are off by an
+order of magnitude.** `vram-recipe-lab/docs/ENVELOPE_LADDERS.md`, "Job B --
+WAN/FastWan cost-row ladder", fitted from a real frame ladder (25/65/93/129/177):
+
+| engine | SHIPPED row | LAB-MEASURED row | per-frame error |
+|---|---|---|---|
+| `wan_ti2v` | 7000 + **185**/frame | 6,910.8 + **25.874**/frame | **7x too steep** |
+| `fastwan_8gb` | 7000 + **185**/frame | 7,317.9 + **6.900**/frame | **27x too steep** |
+
+The OVERHEAD is nearly right in both; the SLOPE is the defect.
+
+**AND THIS REFINES THE CORRECTION ABOVE RATHER THAN CONFIRMING IT.** "Retention
+was irrelevant" is true only against the BROKEN row. Recomputed with the lab row,
+a 125-frame `wan_ti2v` beat needs `6910.8 + 125*25.874 = 10,145 MB`:
+
+* at tonight's `free=9389` (x0.85 margin = 7,980 usable) it STILL refuses;
+* at `free=14500` (12,325 usable) it FITS.
+
+So with a correct cost row the ~8 GB retention becomes decisive after all. Both
+are real contributors and dismissing either is wrong.
+
+**A JUDGEMENT THE OPERATOR OWNS.** The standing ruling admits a row only when
+"re-measured through the real `prepare()` + `render_clip()` lifecycle -- which
+the standing ruling requires and no bench may substitute." The lab IS a bench.
+So adopting these numbers verbatim is exactly what that sentence forbids, even
+though they are self-evidently closer to truth than 185/frame. The choices are:
+delete the rows (restores the documented-correct empty table, no measurement
+needed), adopt the lab rows (needs the operator to rule the bench admissible),
+or re-measure through the real lifecycle.
+
 **So the fix is a DELETION, not a measurement campaign** -- and the standing
 ruling already names the bar for putting a row back: re-measured through the
 real lifecycle, which no bench may substitute. Until then an empty table means
