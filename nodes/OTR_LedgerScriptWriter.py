@@ -1081,6 +1081,31 @@ def _build_truncating_generate_fn(
                 )
         if (generated_tokens == effective_max_new_tokens
                 and fail_on_output_limit and not ended_with_eos):
+            # LOG THE EVIDENCE BEFORE DISCARDING IT (2026-08-13).
+            #
+            # `raw_completion=decoded` below has been attached to this exception
+            # since A-1 and NOTHING has ever read it -- the leg log prints
+            # "raw head: <empty>". So at the one moment thousands of tokens of
+            # runaway text exist in memory, they are thrown away, and the next
+            # reader has to reproduce a 20-minute decode to learn what the model
+            # was actually saying. Two runaways in one night were diagnosed by
+            # inference for exactly this reason.
+            #
+            # Head AND tail, because they answer different questions: the head
+            # says what the model was writing, the tail says what it was doing
+            # when it ran out of room. A verbatim loop or digit run in the tail
+            # means degeneracy; varied run-on prose means it was hedging and
+            # could not find a way to end the sentence. That distinction decides
+            # whether the cure is a decode guard or the pack's own wording, and
+            # it is one log line away.
+            _raw = decoded or ""
+            _head = _raw[:400].replace("\n", " ")
+            _tail = _raw[-400:].replace("\n", " ")
+            log.error(
+                "[OTR_LedgerScriptWriter] RUNAWAY EVIDENCE (%d chars, %d "
+                "tokens, ended_with_eos=%s)\n  HEAD: %s\n  TAIL: %s",
+                len(_raw), generated_tokens, ended_with_eos, _head, _tail,
+            )
             raise PromptContextOverflowError(
                 "prose generation exhausted the full remaining provider/context "
                 f"capacity ({effective_max_new_tokens} output tokens after a "

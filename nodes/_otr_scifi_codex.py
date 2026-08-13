@@ -25,6 +25,31 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 log = logging.getLogger("OTR")
 
+#: How many candidate ladders a single pass may run before the leg is KILLED.
+#:
+#: OPERATOR RULING 2026-08-13, after a live leg spent 42 minutes on two decodes
+#: that never reached a stop token: "after three rerolls, we should kill the
+#: workflow ... that means we need to actually fix the workflow."
+#:
+#: Each cycle runs a full ladder (`_otr_structured_call._DEFAULT_MAX_ATTEMPTS`
+#: rungs), so this ceiling is 3 x 3 = NINE attempts at the artifact before the
+#: pass gives up. That is not a hair trigger; it is the point at which more
+#: rolls stop being evidence.
+#:
+#: The ruling was made with the trade-off stated: it also caps the unbounded
+#: reroll that `016ad146` introduced for cast-coverage failures, which is how
+#: the `scifi_news` bank recovered from an announcer-coverage weakness. The
+#: operator chose the hard bound for ALL cycles over a narrower
+#: capacity-runaways-only rule, because a workflow that cannot produce a valid
+#: ledger in three ladders is broken and should say so.
+MAX_CANDIDATE_CYCLES: int = 3
+
+#: NOTE: there is deliberately NO mirrored rung-count constant here. A first
+#: draft kept one so the refusal could say "attempted N times", and it was
+#: wrong on the first run: a ladder may end early (a deterministic repair can
+#: close it at two rungs), so cycles x rungs overstated the attempts by half.
+#: The refusal counts the journal instead.
+
 GenerateFn = Callable[..., str]
 
 try:
@@ -2219,7 +2244,28 @@ def invoke_codex_structured(
     ] | None = None,
     retry_until_valid: bool = False,
 ) -> BaseModel:
-    """Run finite candidate ladders until one is valid or cancellation wins."""
+    """Run a BOUNDED number of candidate ladders until one is valid.
+
+    OPERATOR RULING 2026-08-13: "after three rerolls, we should kill the
+    workflow. If it's running away three times and it can't get a good ledger,
+    then that's probably the best thing to do -- because that means we need to
+    actually fix the workflow."
+
+    This loop was `while True:`. It was written unbounded on purpose -- a
+    rejected candidate is genuinely rerollable, and `016ad146` made
+    cast-coverage failures recoverable this way, taking the `scifi_news` bank
+    from 0-for-4 to reliable. The cost of that generosity showed up on a live
+    leg: a pass that cannot terminate grinds until something external kills it,
+    and the only external bound is a SIX-HOUR client timeout that does not even
+    cancel the server job.
+
+    The operator was offered a narrower rule -- bound only the capacity
+    runaways, leave validation rerolls unbounded -- and chose the hard bound for
+    ALL cycles, knowing it caps the announcer-coverage recovery above. The
+    reasoning is the one in the ruling: a workflow that cannot produce a valid
+    ledger in three tries is broken, and grinding hides that instead of
+    surfacing it. A loud failure is the point, not a regrettable side effect.
+    """
     cycle = 1
     candidate_nonce: str | None = None
     writer_retry: Mapping[str, Any] | None = None
@@ -2260,6 +2306,37 @@ def invoke_codex_structured(
                 raise CodexPassError(f"{pass_id} failed: {exc}") from exc
             if terminal is None:  # defensive; classifier above excludes this
                 raise CodexPassError(f"{pass_id} failed: {exc}") from exc
+            if cycle >= MAX_CANDIDATE_CYCLES:
+                # KILL THE WORKFLOW, LOUDLY. Three ladders could not produce a
+                # valid artifact, so the fault is upstream of sampling and a
+                # fourth roll is a slower way to learn nothing.
+                #
+                # STATE ONLY WHAT THIS CODE KNOWS: the cycle count.
+                #
+                # Two earlier drafts of this line put an ATTEMPT count in it and
+                # both were wrong. The first multiplied cycles by a mirrored
+                # rung constant and said "9" on a run that made 6, because a
+                # ladder can close early on a deterministic repair. The second
+                # read len(call_journal["calls"]) and said "3", because the
+                # journal records one entry PER CYCLE, not per attempt. The
+                # attempts live inside the ladder and never surface here.
+                #
+                # A refusal that overstates its evidence is worse than one that
+                # is merely brief -- this one justifies killing an operator's
+                # render, so every number in it has to be one we can defend.
+                log.error(
+                    "[scifi_codex] %s ABANDONED after %d candidate cycle(s), "
+                    "the operator ceiling. Each cycle ran a full retry ladder "
+                    "and the last failure was %s. This is a WORKFLOW defect, "
+                    "not an unlucky roll -- read the last raw draft and fix "
+                    "the pass rather than re-running the leg.",
+                    pass_id, cycle, type(terminal).__name__,
+                )
+                raise CodexPassError(
+                    f"{pass_id} abandoned after {cycle} candidate cycles "
+                    f"(ceiling {MAX_CANDIDATE_CYCLES}); last error "
+                    f"{type(terminal).__name__}: {terminal}"
+                ) from exc
             cycle += 1
             candidate_nonce = uuid.uuid4().hex
             writer_retry = _writer_retry_mapping(
@@ -2269,9 +2346,9 @@ def invoke_codex_structured(
             )
             log.warning(
                 "[scifi_codex] %s candidate cycle %d exhausted (%s); "
-                "abandoning it and starting cycle %d nonce=%s",
+                "abandoning it and starting cycle %d of %d nonce=%s",
                 pass_id, cycle - 1, type(terminal).__name__,
-                cycle, candidate_nonce,
+                cycle, MAX_CANDIDATE_CYCLES, candidate_nonce,
             )
             _poll_processing_interrupt()
             continue
