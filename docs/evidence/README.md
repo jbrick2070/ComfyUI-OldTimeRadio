@@ -63,8 +63,12 @@ or its receipts say "admission NOT enforced" IN WORDS, on disk, reachable in
 the manifest. That table is where those words live, and
 `tests/test_lane_preflight_matrix.py` reads it.
 
-`QUALIFIED_COST_ROWS` is empty today (`motion_common.py:367`), so NO local lane
-is guarded. A silently unguarded lane that looks guarded is the failure this
+`QUALIFIED_COST_ROWS` is empty today (`motion_common.py:386`), so NO local lane
+is guarded -- and since 2026-08-13 that is true on BOTH refusal paths. The
+STATIC path (`compute_real_frame_budget`, reached from
+`eng_wan_ti2v._floor_length`) used to refuse anyway, because it never asked
+`cost_row_may_refuse`; it took two live 45-word render-gate legs before anyone
+noticed the authority was wired to only one of its two call sites. A silently unguarded lane that looks guarded is the failure this
 mechanism exists to prevent; a lane leaves the table in the same commit that
 qualifies its cost row through OTR's real `prepare()` + `render_clip()`
 lifecycle -- never from lab numbers alone.

@@ -41,7 +41,20 @@ def test_budget_none_free_trusts_target(monkeypatch):
     assert mc.compute_real_frame_budget(0, 33, 1472, 832, "wan_ti2v") == 33
 
 
-def test_budget_raises_under_pressure(monkeypatch):
+@pytest.fixture
+def qualified_row(monkeypatch):
+    """Qualify `wan_ti2v`'s row so the SLOPE refusal can be exercised at all.
+
+    No row is qualified in production (``QUALIFIED_COST_ROWS`` is empty and
+    ``test_no_row_is_qualified_today_and_that_is_deliberate`` guards that), so
+    since 2026-08-13 the per-frame refusal cannot fire for any shipped engine.
+    These tests are about whether the pricing arithmetic refuses CORRECTLY when
+    a row is trusted -- a separate question from whether any row is trusted.
+    """
+    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
+
+
+def test_budget_raises_under_pressure(monkeypatch, qualified_row):
     """S4 platform-portability rewrite (2026-07-10): the frame budget is now a
     STATIC 4n+1-snapped target (geometry only) -- it NEVER shrinks to fit live
     VRAM anymore. When the cost model predicts the snapped target will not
@@ -51,24 +64,69 @@ def test_budget_raises_under_pressure(monkeypatch):
     # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
     # free 14775 -> 12558.75 budget -> (12558.75-7000)/185 = 30 affordable, which
     # cannot fit the snapped target 277 (4n+1 <= 280) -> raises.
+    Needs ``qualified_row``: this is the SLOPE refusal, and an unqualified row
+    may no longer price frames.
     """
     _clear_cost_env(monkeypatch)
     with pytest.raises(mc.MotionBudgetError):
         mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
 
 
-def test_budget_raises_when_starved(monkeypatch):
-    """S4 rewrite: the old expectation was floor-wins-shrink (the 17-frame
-    motion floor). NEW: static budget, raise-never-resize -- starved VRAM
-    that cannot even cover the per-engine overhead makes the affordable frame
-    count negative, which is always below the snapped target -> raises,
-    never silently shrinks to the motion floor.
-    # 8 GB free cannot fit a frame past the 7000 MB overhead -> affordable < 0
-    # < snapped(277) -> MotionBudgetError.
+def test_budget_raises_when_starved(monkeypatch, qualified_row):
+    """Starved VRAM that cannot cover the engine's fixed overhead refuses --
+    when the row is QUALIFIED to say so.
+    # 8000 free -> budget 6800 < the 7000 MB overhead -> raises before any
+    # frame is priced, whatever the target length is.
+
+    Needs ``qualified_row`` since 2026-08-13, and the reason is worth keeping:
+    the overhead floor looks like the half a disqualified row could still be
+    trusted for, because it is not slope and only bites a card too starved to
+    hold the weights. The binding NET-NOT-ABSOLUTE provenance rule says
+    otherwise -- the shipped 7000 came from an ABSOLUTE peak while the
+    comparison is against FREE bytes, so it double-charges the desktop baseline
+    on every prediction. Both halves of an unqualified row are impeached.
     """
     _clear_cost_env(monkeypatch)
     with pytest.raises(mc.MotionBudgetError):
         mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v")
+
+
+def test_an_unqualified_row_may_not_refuse_on_OVERHEAD_either(monkeypatch):
+    """The half that is easy to leave armed by accident. No fixture: this is
+    production, where nothing is qualified."""
+    _clear_cost_env(monkeypatch)
+    assert not mc.cost_row_may_refuse("wan_ti2v")
+    # budget 6800 is well under the 7000 overhead, and it still may not refuse.
+    assert mc.compute_real_frame_budget(
+        8000.0, 33, 1472, 832, "wan_ti2v") == 33
+
+
+def test_a_malformed_cost_model_is_fatal_even_unqualified(monkeypatch):
+    """Validation is NOT enforcement, and the qualification gate must not
+    swallow it. A non-finite or negative coefficient is a configuration error
+    -- somebody's env override is broken -- and it stays loud for every engine
+    whether or not its row may refuse a render."""
+    _clear_cost_env(monkeypatch)
+    assert not mc.cost_row_may_refuse("wan_ti2v")
+    for bad in ("-1", "nan", "inf"):
+        monkeypatch.setenv("OTR_VIDEO_COST_PER_FRAME_MB", bad)
+        with pytest.raises(mc.MotionBudgetError):
+            mc.compute_real_frame_budget(14500.0, 33, 832, 480, "wan_ti2v")
+
+
+def test_qualifying_a_name_with_no_row_does_not_arm_the_fallback(monkeypatch):
+    """A name may not be qualified into enforcing `_DEFAULT_FRAME_COST`.
+
+    Qualification and table presence are separate concepts by design, and the
+    gap between them pointed the wrong way: a typo'd or aspirational name in
+    QUALIFIED_COST_ROWS would have promoted the borrowed fallback row to an
+    enforcing guard -- the exact "looks guarded, guards nothing" failure the
+    registry exists to prevent."""
+    _clear_cost_env(monkeypatch)
+    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"humo"}))
+    assert "humo" not in mc.FRAME_COST_MODEL
+    assert not mc.cost_row_may_refuse("humo")
+    assert mc.compute_real_frame_budget(8000.0, 33, 1472, 832, "humo") == 33
 
 
 def test_budget_never_exceeds_target(monkeypatch):
@@ -78,7 +136,7 @@ def test_budget_never_exceeds_target(monkeypatch):
     assert out <= 49 and (out - 1) % 4 == 0
 
 
-def test_budget_scales_cost_with_pixel_area(monkeypatch):
+def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row):
     """S4 rewrite: old expectation was bigger-canvas -> fewer predicted frames
     (a shrink). NEW: the snapped target (277 for target=280 on wan_ti2v) is
     canvas-independent -- per-frame VRAM cost still scales with pixel area, so
@@ -94,6 +152,59 @@ def test_budget_scales_cost_with_pixel_area(monkeypatch):
     assert small == 277
     with pytest.raises(mc.MotionBudgetError):
         mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "wan_ti2v")
+
+
+@pytest.mark.parametrize("engine, free_mb, frames", [
+    # The two 45-word render-gate legs that died on 2026-08-13, with the exact
+    # numbers off their own MotionBudgetError messages.
+    ("fastwan_8gb", 9549.0, 69),
+    ("wan_ti2v", 9389.0, 125),
+    # And the refusal this repo has cited as the disqualifying evidence since
+    # 2026-08-02: a length an engine that had already shipped an episode was
+    # told it could not afford.
+    ("wan_ti2v", 13481.0, 173),
+])
+def test_an_unqualified_row_may_not_price_frames(monkeypatch, engine,
+                                                 free_mb, frames):
+    """THE REGRESSION. An unqualified row PREDICTS; it may not REFUSE.
+
+    ``compute_real_frame_budget`` was the second call site of the disqualified
+    ``(7000.0, 185.0)`` row and the only one that never asked
+    ``cost_row_may_refuse``. ``render_driver._assert_beat_affordable`` has asked
+    since it was written and reports "admission NOT enforced"; this path,
+    reached from ``eng_wan_ti2v._floor_length``, priced frames and raised
+    anyway -- which is what took both legs.
+
+    Note what this is NOT: the plan's first prescription was to delete the two
+    ``FRAME_COST_MODEL`` rows, and that is a proven no-op --
+    ``_DEFAULT_FRAME_COST`` is the byte-identical tuple, so every call above
+    refuses exactly the same way with the table empty. Hence
+    ``test_deleting_a_row_changes_nothing_which_is_why_the_gate_is_the_fix``.
+
+    All three cases sit ABOVE the overhead floor, so they isolate the per-frame
+    price; the overhead half has its own test above.
+    """
+    _clear_cost_env(monkeypatch)
+    assert not mc.cost_row_may_refuse(engine), "fixture assumes no qualified row"
+    assert mc.compute_real_frame_budget(
+        free_mb, frames, 832, 480, engine) == frames
+
+
+def test_deleting_a_row_changes_nothing_which_is_why_the_gate_is_the_fix(
+        monkeypatch):
+    """The seed rows are byte-identical to the fallback, so removing one is
+    invisible at runtime. Pinning this stops the "just delete the row" fix from
+    being proposed a third time."""
+    _clear_cost_env(monkeypatch)
+    assert mc._DEFAULT_FRAME_COST == (7000.0, 185.0)
+    for engine in ("wan_ti2v", "fastwan_8gb"):
+        assert mc.FRAME_COST_MODEL[engine] == mc._DEFAULT_FRAME_COST, (
+            "%s's seed row is no longer byte-identical to the fallback -- the "
+            "no-op argument in compute_real_frame_budget step 3a needs "
+            "re-deriving before it is trusted again" % engine)
+        with_row = mc._cost_model_for(engine)
+        monkeypatch.delitem(mc.FRAME_COST_MODEL, engine)
+        assert mc._cost_model_for(engine) == with_row
 
 
 def test_budget_env_overrides_cost_model(monkeypatch):

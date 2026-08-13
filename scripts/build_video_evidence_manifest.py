@@ -259,6 +259,14 @@ for lane, key, receipts, narrative, verdict, note in ROWS:
 
 manifest = {
     "schema": "otr.video_evidence_manifest/1",
+    # STALE, AND THE GUARD AT THE BOTTOM OF THIS FILE IS WHY (2026-08-13).
+    # This generator still produces version 1. The SHIPPED manifest is at 5:
+    # lanes 7b, 8, 9 and the H3 pair appended their rows to the JSON directly
+    # and never came back to this script, so running it verbatim DELETES 123
+    # lines of real evidence. Found the only way it could be -- by running it.
+    # Do not bump this number to silence the guard; that just re-arms the trap.
+    # Reconciling the two is its own piece of work: every row the JSON has and
+    # this file does not must be re-derived from its receipt, not copied.
     "manifest_version": 1,
     "built": "2026-08-11",
     "lab_repo": "vram-recipe-lab",
@@ -280,15 +288,20 @@ manifest = {
     # prepare() + render_clip() lifecycle -- never from lab numbers alone.
     "admission_unenforced": {
         "wan_ti2v": (
-            "admission NOT enforced as qualified: the STATIC path "
-            "(compute_real_frame_budget -> MotionBudgetError) does fire on "
-            "this lane, but it uses a row its own comment disqualifies, and "
-            "the coverage-plan path is inert because QUALIFIED_COST_ROWS is "
-            "empty. Recalibration + qualification ship together in lane 5."),
+            "admission NOT enforced: BOTH paths are inert because "
+            "QUALIFIED_COST_ROWS is empty. Corrected 2026-08-13 -- the STATIC "
+            "path (compute_real_frame_budget -> MotionBudgetError) used to "
+            "fire on this lane while the coverage-plan path did not, because "
+            "it never asked cost_row_may_refuse. It refused two live 45-word "
+            "render-gate legs on the row this repo disqualifies before the "
+            "gate was moved to cover it. Recalibration + qualification ship "
+            "together in lane 5."),
         "fastwan_8gb": (
-            "admission NOT enforced as qualified: this lane mirrors the same "
-            "disqualified cost row from its own module and would go silently "
-            "stale if recalibrated apart from wan_ti2v. Owned by lane 6."),
+            "admission NOT enforced: this lane mirrors the same disqualified "
+            "cost row from its own module -- byte-identical to the fallback, "
+            "so deleting it would change nothing -- and would go silently "
+            "stale if recalibrated apart from wan_ti2v. It was the second leg "
+            "the ungated STATIC path refused on 2026-08-13. Owned by lane 6."),
         "wan_i2v": (
             "admission NOT enforced: single-clip renders on this lane get no "
             "check before or after. Only f33 at 832x480 has warm evidence, "
@@ -331,6 +344,29 @@ manifest = {
     "entries": entries,
     "otr_side_legs": OTR_SIDE_LEGS,
 }
+
+# ---- NEVER CLOBBER A NEWER MANIFEST (2026-08-13). The append-only doctrine
+# above assumes every appending lane appends HERE. Several did not: they edited
+# the JSON directly, so this generator's ROWS are a strict subset of what ships
+# and a plain re-run is a silent 123-line deletion of evidence. A generator that
+# destroys the artifact it is named for is worse than no generator, so it fails
+# closed and says exactly what it would have thrown away.
+_existing_version = 0
+if os.path.exists(OUT):
+    try:
+        with open(OUT, encoding="utf-8") as fh:
+            _existing_version = int(json.load(fh).get("manifest_version") or 0)
+    except (OSError, ValueError, TypeError):
+        _existing_version = 0
+if _existing_version > manifest["manifest_version"]:
+    raise SystemExit(
+        "REFUSING to overwrite %s: it is at manifest_version %d and this "
+        "generator only produces %d. Rows that lanes appended to the JSON "
+        "directly are NOT in this script, so writing would delete them. "
+        "Reconcile the missing rows into ROWS / admission_unenforced -- "
+        "re-derived from their receipts, never copied out of the JSON -- "
+        "before running this again."
+        % (OUT, _existing_version, manifest["manifest_version"]))
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8", newline="\n") as fh:

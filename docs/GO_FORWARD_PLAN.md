@@ -76,12 +76,15 @@ explicitly put it LAST so it inherits every lesson. Nothing on this shelf's
 lessons transfers automatically: H3 has a real frame grid (124..362 step 17), a
 24->25 fps conversion, a Sage gate and a mouth-policy carve-out. Baselines to
 detect drift against: Bug Bible **20 passed / 24 skipped / 3 xfailed** at
-**272** entries; full suite **9963 passed / 109 skipped / 1 xfailed, NOTHING
-DESELECTED** (**9950 before this lane -> 9963**: lane 10 adds 14 new `def
-test_` functions and REPLACES one -- `test_default_canvas_is_explicit_1472x832`
-became `test_the_lane_DECLARES_its_canvas_1472x832` -- so the net is +13, which
-is the number to check drift against); `scripts/build_variants.py --check`
-**46 variants, 0 failures**. Box was left CLEAN (no resident server, port 8000
+**272** entries (**still exact 2026-08-13**); full suite **10363 passed / 110
+skipped / 1 xfailed, NOTHING DESELECTED**; `scripts/build_variants.py --check`
+**50 variants, 0 failures**. **THE OLD BASELINES ON THIS LINE WERE STALE and
+cost a re-grounding pass** -- they read 9963/109/1 and 46 variants, which was
+lane 10's era, while lanes 11-22 and the title-card work had moved the suite
+~400 tests since. If your run does not match, check the DELTA against
+`git stash` + `pytest --collect-only` before assuming a regression: that is how
+the 2026-08-13 window proved its +7 was its own seven new tests and the rest was
+drift already on `origin`. Box was left CLEAN (no resident server, port 8000
 clear, VRAM 657 MiB).
 
 **What is already done FOR you, and what is not:**
@@ -218,8 +221,8 @@ part-run. This is the live state.
 
 | lane | failed on | retry needs |
 |---|---|---|
-| `fastwan_8gb` | `MotionBudgetError` -- the **disqualified `FRAME_COST_MODEL` row**, NOT VRAM (it refuses on an empty card) | delete/replace the row, then re-run. No code change = same failure |
-| `wan_ti2v` | same disqualified row | same |
+| `fastwan_8gb` | `MotionBudgetError` -- the **disqualified `FRAME_COST_MODEL` row** | **CODE FIX SHIPPED 2026-08-13 -- just re-run, no further change.** And the retry note that stood here was WRONG: "delete/replace the row" is a **proven no-op**, because `_cost_model_for` falls back to `_DEFAULT_FRAME_COST`, the byte-identical `(7000.0, 185.0)`. The real defect was that `compute_real_frame_budget` never asked `cost_row_may_refuse`; it does now. Both legs' exact failing calls return their full frame counts |
+| `wan_ti2v` | same disqualified row | same -- fixed by the same commit |
 | `wan_i2v` | page-thrash, 89.7-106.3 s/it vs a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB | genuinely unknown whether this lane is viable on this box. Never completed a leg. Needs the VRAM question (row 5b) answered first, or a diet contract tried |
 
 **LANES THAT PASSED (6 of 21 this run + the cheap shelf):** `still_pan`,
@@ -228,12 +231,29 @@ part-run. This is the live state.
 
 **THE THREE CODE ITEMS OWED, none built, in value order:**
 
-1. **Delete or replace the two `FRAME_COST_MODEL` rows.** Two red legs turn
-   green. The repo's own docs say empty is correct. The lab has measured
-   replacements (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
-   6.900/frame vs a shipped 185/frame in both) but the standing ruling says no
-   bench may substitute for the real lifecycle -- **operator has said he will
-   take this back to the lab when the GPU frees up.** Bible **12.98**.
+1. ~~**Delete or replace the two `FRAME_COST_MODEL` rows.**~~ **DONE
+   2026-08-13 -- and NOT by deleting them, because deletion is a PROVEN
+   NO-OP.** `_cost_model_for` falls back to `_DEFAULT_FRAME_COST`, the
+   byte-identical `(7000.0, 185.0)`; `eng_fastwan_8gb.py:293` says so about its
+   own row in as many words. Both legs refuse identically with the table empty,
+   so the prescribed fix would have shipped green and changed nothing. The real
+   defect: `compute_real_frame_budget` is the SECOND call site of that
+   disqualified row and the only one that never asked `cost_row_may_refuse` --
+   `render_driver._assert_beat_affordable` has asked since it was written, so
+   the row was inert on the reviewed path and live one call away, through
+   `eng_wan_ti2v._floor_length`. **Fix: both refusals now answer to that one
+   authority**, validation stays unconditional, and the predicate additionally
+   requires the row to EXIST so a typo cannot promote the shared fallback into
+   a guard. Both legs' exact failing calls now return their full frame counts.
+   The lab rows (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
+   6.900/frame) were NOT adopted -- the standing ruling still forbids a bench
+   substituting for the real lifecycle, and no row is qualified. Bible **12.98**
+   amended: its "DELETE the row" prescription is what this disproved.
+   **The overhead half was gated too, and that was a correction mid-build:** it
+   looks like the defensible term, but the binding NET-NOT-ABSOLUTE provenance
+   rule records that it came from an ABSOLUTE peak while the comparison runs
+   against FREE bytes, double-charging the desktop baseline. Caught by the
+   Codex consult, not by me.
 2. **The in-decode halt for the writer runaway.** Fires on an unclosed-string
    token count (primary) and a repeating window (secondary), NEVER on
    `target_words`. Must raise a REROLLABLE capacity phase or it silently
@@ -361,6 +381,17 @@ this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
 night and is the leg that carries the title card.
 
 ### THE TWO MotionBudgetError LEGS WERE NOT A VRAM PROBLEM (corrected 05:30)
+
+**PARTLY CORRECTED 2026-08-13 by running the arithmetic instead of reading it.**
+The empty-card claim below is TRUE for `wan_ti2v` (125 frames at 832x480 prices
+above any free level this card can reach) and **FALSE for `fastwan_8gb`**: its
+beat was **69** frames, not 125, which at `free=16000` prices 7000 + 69*185*
+(480/832 area scale) inside the budget and returns 69. So `fastwan_8gb` refused
+because free VRAM really was low -- the retention WAS a contributor on that leg,
+and only the `wan_ti2v` leg refuses on an empty card. The conclusion the section
+draws is unchanged (the row is disqualified and had to stop refusing); the
+supporting sentence was over-general, and both legs are green on the fix either
+way.
 
 **`wan_ti2v` and `fastwan_8gb` would have failed ON AN EMPTY CARD.** Both died
 with `MotionBudgetError`, both reported a low `free=` figure (9,389 and 9,549

@@ -2735,6 +2735,18 @@ out until they independently meet the same production-only admission rule.
   must raise `MotionBudgetError` UNPINNED and return 17 with the tier ceiling
   on the ledger; and an unpinned tier must still return 177 (no lane capped by
   the fix). Covered by `tests/test_remaining_video_contracts.py`
+- UPDATE 2026-08-13: the UNPINNED half of that verify idea no longer holds, and
+  the change is deliberate. `compute_real_frame_budget` now refuses only for a
+  row in `QUALIFIED_COST_ROWS`, which is empty, so the unpinned 177-frame beat
+  RETURNS 177 instead of raising. The cost row that produced the original
+  refusal is the one this repo disqualified in writing, and it had been
+  refusing through this path alone because `_floor_length` never consulted the
+  qualification authority that `render_driver._assert_beat_affordable` always
+  did -- it killed two live 45-word render-gate legs (`fastwan_8gb` at 69
+  frames, `wan_ti2v` at 125) before that was spotted. The tier-ceiling claim --
+  the actual subject of this PBUG -- is untouched and still verified: the test
+  in `tests/test_remaining_video_contracts.py` now QUALIFIES the row so the
+  ceiling still has a refusal to be measured against
 - UPDATE 2026-07-27 (B3): the "then ping-pong-extended to the beat's full audio
   length" clause above is still exactly right for WAN and is now only HALF the
   meaning of `video.max_render_frames`. For `ltx_8gb` -- the sole member of

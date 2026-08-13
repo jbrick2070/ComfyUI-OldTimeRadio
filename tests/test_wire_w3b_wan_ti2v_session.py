@@ -474,8 +474,15 @@ def test_the_HOIST_COST_is_added_back_or_the_predictor_refuses_real_renders(
     ``_floor_length`` reads it, so the same weights are charged twice and the
     predictor raises ``MotionBudgetError`` on renders that fit. Adding the
     MEASURED hoist cost back restores exactly the memory state the pre-hoist
-    code measured."""
+    code measured.
+
+    The row is QUALIFIED here (2026-08-13). The double-charge this test exists
+    to catch is only VISIBLE as a refusal, so the refusal has to be reachable;
+    in production no row is qualified and the uncorrected call returns instead.
+    The arithmetic error would still be there -- which is the point of keeping
+    this test able to see it."""
     from nodes._otr_video_engines import eng_wan_ti2v as mod
+    monkeypatch.setattr(mod._MC, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
     monkeypatch.setattr(mod._MC, "free_vram_mb", lambda: 4000.0)
     eng = WanTi2vEngine()
     with pytest.raises(mod._MC.MotionBudgetError):

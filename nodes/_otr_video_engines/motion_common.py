@@ -363,7 +363,26 @@ class MotionBudgetError(RuntimeError):
 #: This is deliberately a separate, explicit registry rather than deleting the
 #: row: the seed values still document the model's SHAPE for non-enforcing
 #: readers, and a disqualification that is written down teaches more than a
-#: deletion that leaves no trace.
+#: deletion that leaves no trace. DELETING THEM IS ALSO A PROVEN NO-OP --
+#: :data:`_DEFAULT_FRAME_COST` is the byte-identical tuple, so an engine whose
+#: row is removed is priced exactly the same way one second later.
+#:
+#: WHAT THIS GATES, PRECISELY (widened 2026-08-13). BOTH refusals, at BOTH
+#: call sites:
+#:   * ``render_driver._assert_beat_affordable`` -- the coverage-planned beat
+#:     boundary, which has asked since it was written;
+#:   * ``compute_real_frame_budget`` -- the STATIC path reached from
+#:     ``eng_wan_ti2v._floor_length``, which did NOT ask until the 45-word
+#:     render gate caught it refusing two live legs on this very row.
+#: Both the per-frame price and the fixed-overhead floor are enforcement, and
+#: neither is exempt. The overhead half LOOKS defensible -- it is not slope, and
+#: it only bites a card too starved to hold the weights -- but the binding
+#: NET-NOT-ABSOLUTE provenance rule (operator 2026-08-11) records that the
+#: shipped overhead came from an ABSOLUTE peak while the comparison is against
+#: FREE bytes, so it double-charges the desktop baseline on every prediction.
+#: That is named there as exactly how this row came to refuse everything. One
+#: authority, one question: a qualified-slope / qualified-overhead split would
+#: be a second authority with no evidence under it.
 QUALIFIED_COST_ROWS = frozenset()
 
 
@@ -379,8 +398,29 @@ def cost_row_may_refuse(engine_name) -> bool:
     Callers that want a real guard ask this and say plainly when the answer is
     no, rather than enforcing a number nothing stands behind. See
     :data:`QUALIFIED_COST_ROWS`.
+
+    Answers for EVERY refusal a cost row can issue -- the per-frame price and
+    the fixed-overhead floor alike. Both are enforcement, and one row does not
+    get to be trusted for half of itself.
+
+    QUALIFICATION REQUIRES AN EXPLICIT ROW (2026-08-13, Codex consult). A name
+    in :data:`QUALIFIED_COST_ROWS` but absent from :data:`FRAME_COST_MODEL`
+    would otherwise qualify :data:`_DEFAULT_FRAME_COST` -- silently promoting
+    the borrowed fallback to an enforcing guard, which is the precise failure
+    this whole registry exists to prevent. Qualifying a row you have not
+    written down is a typo, not a measurement.
+
+    THE ONE HAZARD IN THAT SECOND CONDITION (Sonnet QA, same day), latent while
+    :data:`QUALIFIED_COST_ROWS` is empty and worth knowing before it is not:
+    ``fastwan_8gb``'s row is injected by ``eng_fastwan_8gb`` at IMPORT time, so
+    a caller that imports this module WITHOUT that adapter sees no row and gets
+    False. That direction is fail-OPEN -- no refusal -- which is the current
+    posture anyway, so it cannot surprise a render today. But whoever qualifies
+    ``fastwan_8gb`` must make its row unconditional here, or it will be
+    qualified-but-silent in exactly the isolated runs that would prove it.
     """
-    return str(engine_name or "") in QUALIFIED_COST_ROWS
+    name = str(engine_name or "")
+    return name in QUALIFIED_COST_ROWS and name in FRAME_COST_MODEL
 
 
 def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
@@ -458,7 +498,48 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
                 "and non-negative. Check FRAME_COST_MODEL and the "
                 "OTR_VIDEO_COST_* / OTR_VIDEO_BUDGET_MARGIN overrides."
                 % (engine_name, label, value))
-    # 2. the FIXED overhead must fit, whatever the slope. Unconditional.
+    # 2. ---- ONLY A QUALIFIED ROW MAY REFUSE (2026-08-13, the render gate's two
+    # red legs). Everything below this line is ENFORCEMENT; everything above it
+    # is validation and arithmetic, and stays unconditional.
+    #
+    # WHAT WENT WRONG. This function is the SECOND call site of the row
+    # :data:`QUALIFIED_COST_ROWS` disqualifies in writing, and it was the one
+    # nobody wired to the authority. ``render_driver._assert_beat_affordable``
+    # asks ``cost_row_may_refuse`` and reports "admission NOT enforced"; this
+    # path -- reached from ``eng_wan_ti2v._floor_length`` -- priced frames and
+    # raised anyway. It refused two live 45-word render-gate legs on 2026-08-13,
+    # ``fastwan_8gb`` at 69 frames and ``wan_ti2v`` at 125.
+    #
+    # WHY NOT SIMPLY DELETE THE TWO SEED ROWS, which is what was asked for
+    # first: deleting them is a PROVEN no-op. ``_cost_model_for`` falls back to
+    # :data:`_DEFAULT_FRAME_COST`, the byte-identical ``(7000.0, 185.0)`` --
+    # ``eng_fastwan_8gb`` says exactly that about its own row. Both legs refuse
+    # identically with the table empty, so the deletion looks like a fix and
+    # changes nothing.
+    #
+    # WHY BOTH REFUSALS GO, NOT JUST THE PER-FRAME ONE. The overhead term looks
+    # like the defensible half -- it is not slope, and it only bites a card too
+    # starved to hold the weights. But the binding NET-NOT-ABSOLUTE provenance
+    # rule (operator 2026-08-11, ``build_video_evidence_manifest.py``) records
+    # that ``free_vram_mb()`` reports FREE bytes, which already exclude the
+    # resident desktop baseline, while the shipped overhead was derived from an
+    # ABSOLUTE peak -- so it double-charges that baseline on every prediction,
+    # and that is named there as exactly how this row came to refuse every
+    # segment length the coverage planner produces. The overhead is impeached
+    # too. And :data:`QUALIFIED_COST_ROWS` is ONE authority over one question;
+    # splitting it into a qualified-slope and a qualified-overhead half would
+    # invent a second authority with no evidence under it.
+    #
+    # So an unqualified row PREDICTS and never REFUSES. ``docs/evidence/
+    # README.md`` already states the resulting posture plainly -- "NO local lane
+    # is guarded" -- and this makes the code agree with it on both paths rather
+    # than on one. The OOM exposure is real and is stated rather than papered
+    # over with a number nobody stands behind: a row earns refusal back through
+    # OTR's real ``prepare()`` + ``render_clip()`` lifecycle, which no bench and
+    # no lab fit may substitute for.
+    if not cost_row_may_refuse(engine_name):
+        return snapped
+    # 3. the FIXED overhead must fit, whatever the slope.
     if budget_mb < overhead:
         raise MotionBudgetError(
             "engine %s: the model's fixed overhead alone (%.0f MB) exceeds the "
@@ -466,9 +547,9 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
             "is affordable -- free VRAM or pick a lighter engine."
             % (engine_name, overhead, budget_mb,
                float(free_vram_mb_value), margin))
-    # 3. zero slope is legal ONLY now that the overhead has been proven to fit:
+    # 4. zero slope is legal ONLY now that the overhead has been proven to fit:
     #    frames are free, so any length is affordable.
-    # 4. a positive slope prices the frames.
+    # 5. a positive slope prices the frames.
     if per_frame_at_res > 0:
         affordable = int((budget_mb - overhead) / per_frame_at_res)
         if affordable < snapped:

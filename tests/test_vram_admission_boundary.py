@@ -66,10 +66,18 @@ def test_a_PRESENT_but_disqualified_row_may_not_refuse(monkeypatch):
         "would be refused by it")
     assert "disqualified" in record["reason"]
 
-    # And the row really would have refused, which is why this matters.
+    # And the STATIC path no longer refuses them either (2026-08-13).
+    #
+    # This assertion used to run the other way: it proved the row "really would
+    # have refused", because until the render gate caught it,
+    # `compute_real_frame_budget` priced frames without asking
+    # `cost_row_may_refuse` at all. So the disqualified row was inert at THIS
+    # boundary and live one call away, through `eng_wan_ti2v._floor_length` --
+    # and that is the path that killed the `fastwan_8gb` and `wan_ti2v` legs.
+    # One row, one authority, both call sites.
     for frames in (93, 177):
-        with pytest.raises(mc.MotionBudgetError):
-            mc.assert_frame_affordable(14500.0, frames, 832, 480, "wan_ti2v")
+        assert mc.assert_frame_affordable(
+            14500.0, frames, 832, 480, "wan_ti2v") == frames
 
 
 def test_no_row_is_qualified_today_and_that_is_deliberate():

@@ -1,6 +1,6 @@
 {
   "schema": "otr.video_evidence_manifest/1",
-  "manifest_version": 4,
+  "manifest_version": 5,
   "built": "2026-08-11",
   "lab_repo": "vram-recipe-lab",
   "lab_evidence_commit": "4d87cfa3278c39cbdde6f3cb8b16f241aeb58c02",
@@ -11,8 +11,8 @@
     "APPEND-ONLY. Every receipt-producing commit bumps manifest_version and appends its rows; rows are never rewritten in place."
   ],
   "admission_unenforced": {
-    "wan_ti2v": "admission NOT enforced as qualified: the STATIC path (compute_real_frame_budget -> MotionBudgetError) does fire on this lane, but it uses a row its own comment disqualifies, and the coverage-plan path is inert because QUALIFIED_COST_ROWS is empty. Recalibration + qualification ship together in lane 5.",
-    "fastwan_8gb": "admission NOT enforced as qualified: this lane mirrors the same disqualified cost row from its own module and would go silently stale if recalibrated apart from wan_ti2v. Owned by lane 6.",
+    "wan_ti2v": "admission NOT enforced: BOTH paths are inert because QUALIFIED_COST_ROWS is empty. CORRECTED 2026-08-13 -- this entry used to say the STATIC path (compute_real_frame_budget -> MotionBudgetError) 'does fire on this lane', and it did, because that path never asked cost_row_may_refuse while the coverage-plan path always had. One row, two call sites, one of them ungated. It refused two live 45-word render-gate legs -- wan_ti2v at 125 frames and fastwan_8gb at 69 -- on the row this repo disqualifies in writing, before the gate was moved to cover both. Recalibration + qualification still ship together in lane 5.",
+    "fastwan_8gb": "admission NOT enforced: this lane mirrors the same disqualified cost row from its own module, and that row is byte-identical to _DEFAULT_FRAME_COST -- so DELETING it changes nothing at runtime, which is why the fix was the qualification gate and not the deletion the plan first called for. It was the second leg the ungated STATIC path refused on 2026-08-13. Would still go silently stale if recalibrated apart from wan_ti2v. Owned by lane 6.",
     "wan_i2v": "admission NOT enforced: single-clip renders on this lane get no check before or after. Only f33 at 832x480 has warm evidence, so no envelope covers the f177 ceiling it declares.",
     "humo": "admission NOT enforced: no cost row and no envelope key. Evidence is portrait 480x832x97 only, on two boot lanes with a 2.16 GiB gap between them (14.98 default, 13.22 diet).",
     "humo_1.7B": "admission NOT enforced: no cost row, and safe_render_frames is None so the exact-fit guard is skipped entirely -- an over-ladder beat emits 177 frames stamped as if honest. Owned by lane 3.",

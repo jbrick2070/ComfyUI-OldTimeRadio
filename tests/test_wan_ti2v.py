@@ -232,29 +232,35 @@ def test_floor_length_honors_target_without_vram_read(monkeypatch):
 
 
 def test_floor_length_predicts_from_live_vram(monkeypatch):
-    """S4 platform-portability rewrite (2026-07-10): motion_common's frame
-    budget never shrinks a beat's target anymore -- it RAISES MotionBudgetError
-    when the live-VRAM cost model cannot afford the (hard-cap-clamped) snapped
-    target. _floor_length first clamps target=280 down to the engine's native
-    hard cap (177, a valid 4n+1) before budgeting; at BOTH VRAM levels below
-    (a clean-box free=14775 and a tight free=8000) the cost model cannot
-    afford 177 frames at 1472x832, so both calls now raise instead of
-    returning a shrunken prediction.
-    # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
-    # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
-    # free 14775 -> budget 12558.75 -> affordable (12558.75-7000)/185=30 < 177 -> raises.
-    # free 8000  -> budget 6800.00  -> affordable (6800.00-7000)/185=-1 < 177 -> raises.
+    """The static budget never SHRINKS a beat's target -- it either returns the
+    hard-cap-clamped snapped target or raises. _floor_length clamps target=280
+    down to the engine's native hard cap (177, a valid 4n+1) before budgeting.
+
+    REWRITTEN 2026-08-13. This is the exact production path that refused two
+    live 45-word render-gate legs, and it no longer refuses on an UNQUALIFIED
+    row -- at either VRAM level, and for either half of the cost model:
+
+    # overhead 7000 + 185/frame @1472x832; budget = free*0.85.
+    # free 14775 -> budget 12558.75; the SLOPE would price 177 frames at
+    #   (12558.75-7000)/185 = 30 affordable and refuse.
+    # free 8000  -> budget 6800.00, under the 7000 OVERHEAD, so the fixed-cost
+    #   floor would refuse before pricing a single frame.
+    # Neither may, because `wan_ti2v` is not in QUALIFIED_COST_ROWS: the slope
+    # is 7x a measured ladder and the overhead is an ABSOLUTE-peak figure being
+    # compared against FREE bytes. Both return the hard-cap-clamped 177.
+
+    A qualified row still refuses at both levels -- that arithmetic is covered
+    in test_clip_fill.py, which qualifies the row to reach it.
     """
     _clear_floor_env(monkeypatch)
     from nodes._otr_video_engines import motion_common as mc
+    assert not mc.cost_row_may_refuse("wan_ti2v")
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 14775.0)
-    with pytest.raises(mc.MotionBudgetError):
-        WanTi2vEngine()._floor_length(280, 1472, 832)
-    # Tight VRAM (8 GB free) cannot fit even one frame past overhead either --
-    # still a raise (never a silent floor-wins shrink to 17).
+    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 177
+    # Tight VRAM (8 GB free) is under the overhead floor and still not a refusal
+    # -- and still never a silent floor-wins shrink to 17.
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 8000.0)
-    with pytest.raises(mc.MotionBudgetError):
-        WanTi2vEngine()._floor_length(280, 1472, 832)
+    assert WanTi2vEngine()._floor_length(280, 1472, 832) == 177
 
 
 def test_floor_max_override_is_an_absolute_hard_cap(monkeypatch):

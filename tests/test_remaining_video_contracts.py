@@ -194,11 +194,20 @@ def test_wan_ti2v_renders_the_8gb_contract_instead_of_failing_closed(monkeypatch
     """The live 2026-07-23 leg, reproduced: a 177-frame beat at 832x480 with
     only ~30 frames affordable. UNPINNED it raises (correct -- no silent
     resize); with the tier ceiling on the ledger it renders 17 real frames,
-    which the render then ping-pong-extends to the beat's full length."""
+    which the render then ping-pong-extends to the beat's full length.
+
+    The row is QUALIFIED here (2026-08-13). This test's subject is the TIER
+    CEILING, and the ceiling is only interesting against a budget that would
+    otherwise refuse -- so the refusal has to be reachable for the contrast to
+    mean anything. In production no row is qualified and the unpinned call
+    returns 177 instead of raising; that is pinned in test_wan_ti2v.py, not
+    here, because it is a different claim.
+    """
     from nodes._otr_video_engines import motion_common as mc
     from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
 
     monkeypatch.delenv("OTR_WAN_TI2V_MAX_FRAMES", raising=False)
+    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 10365.0)   # affords ~30
     engine = WanTi2vEngine()
 
