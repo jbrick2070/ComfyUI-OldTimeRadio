@@ -260,6 +260,54 @@ part-run. This is the live state.
    becomes the writer veto the directive forbids. Touches every pass P0-P5, so
    it earns a review first. The runaway text is now captured -- see the
    cadence-lock section.
+   **THE REVIEW IS DONE (2026-08-13) and the design is settled:
+   `docs/2026-08-13-codex-consults/indecode-halt-codex-review.md`.** It is
+   file-grounded and it changed four things about the shape I took in. Read it
+   before writing a line; the summary is not a substitute.
+   * **NOT in `invoke_structured_slot`** -- that function has no tokenizer, no
+     model and no `generate()` call. It goes in `_build_truncating_generate_fn`,
+     installed unconditionally whenever `schema_model is not None`, which is the
+     one route P0/P1/P2/P3/P5 all traverse. (There is no P4 authoring pass.)
+   * **NOT through the existing `if stop:` path**, and construction failure must
+     be LOUD -- the `except Exception: stop-strings disabled` fallback there is
+     right for an optional quality stop and wrong for a liveness contract.
+   * **NOT an exception raised from inside the criterion.** `generate()` returns
+     NORMALLY on a criteria hit (verified against the installed transformers
+     5.10.4). Latch `hit`/`reason` on the criterion, let generate return, decode
+     once, then raise. Classify in this order: `guard.hit` -> capacity ceiling
+     -> `ended_with_eos` -> another stop. Never infer degeneracy from a short
+     generation; the optional substring stop also returns early.
+   * **NOT `phase="output_limit"`** -- that would make the diagnostics lie. New
+     `GenerationDegeneracyError`, phase `decode_degeneracy`, added to the shared
+     caught family with the rerollable predicate widened to accept both.
+     `_otr_scifi_codex.py:1879` summarises every rerollable capacity error as
+     "model output ended at the provider capacity limit", which would be false
+     for a guard halt.
+   * **Threshold: 2,048 open-string tokens** provisionally (~3 min instead of
+     21 at the observed ~11 tok/s), calibrated later as
+     `max(2048, 4 x maximum healthy per-string token count)` measured with the
+     production tokenizer over accepted artifacts. Honest caveat recorded in the
+     review: while the schema permits unbounded strings, NO finite bound can
+     promise it never cuts a legitimate one.
+   * **n-gram ships as TELEMETRY ONLY at first.** An independent hard halt would
+     reject intentional refrains, parallel rhetoric and repeated schema keys.
+   * **One claim in the review I have NOT verified and the next window must:**
+     it asserts "the outer candidate loop is not currently unbounded", which
+     contradicts this plan's premise that the loop is unbounded and correct.
+     Ground that before building on either statement.
+   * Its lexer note is worth heeding: scan the DECODED fragment character by
+     character with `clean_up_tokenization_spaces=False`, decoding only unseen
+     ids. Do not assume a quote gets its own token id.
+   * **TRANSPORT PARITY IS ONLY HALF DONE.** `6e9ed140` fixed the PRE-CALL leg:
+     `_otr_model_loader` now raises the phase-carrying
+     `PromptContextOverflowError` at both `GenerationContextOverflowError` sites
+     instead of a bare, phase-less `ModelLoaderError`, so an identical capacity
+     failure is rerollable on both transports. **The POST-GENERATION leg is
+     still divergent** and the guard must close it: that module tests
+     `len(generated_ids) >= effective_max_new_tokens` where the writer tests
+     `==`, it does not compute `ended_with_eos`, and it attaches no raw
+     evidence. So a runaway on that transport is still worse-diagnosed than the
+     same runaway on the writer's.
 3. **`wan_ti2v` VRAM retention (row 5b).** 15 samples, post clustering ~8.1 GB
    regardless of peak. NOT engine-specific (`wan_i2v` did both). No conclusion
    drawn deliberately.
