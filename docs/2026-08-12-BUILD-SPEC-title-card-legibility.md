@@ -176,6 +176,59 @@ under `OTR_HERO_TITLE_IN_PROCGEN=1`. Use `draw_scopes=False` so the centre
 assertion is not polluted by the ring/particles/waveform; the grid's green is
 capped at `15 + vol*25` (`:596`), far below a 90 threshold.
 
+## 3B. CODEX r2 -- three corrections Opus did not catch (driver: ADOPTED)
+
+Both reviewers independently reached the CaptionBurn passthrough danger and the
+"suppress the draw is ambiguous -- split card chrome from hero glyphs" ruling.
+Codex adds three that change the build:
+
+1. **THE ASS SYNTAX IN THIS SPEC IS INVALID.** `\pos` plus `\t()` does not
+   animate position; movement is `\move`, and combining `\pos` with `\move` is
+   invalid. **Ruling: one frame-bounded `Dialogue` event per visible title line,
+   with fixed `\pos`, `\fs`, colour and text for `[fi/fps, (fi+1)/fps)`.** That
+   is not a workaround -- it is the only thing that reproduces the per-frame
+   SEEDED scramble, the two-frame POP and the framewise dock resize
+   deterministically. **Define "decode step" as a FRAME.**
+
+2. **`_fit_hero` / `_wrap_words` are not a reusable interface.** They are
+   `_CRTRenderer` instance methods needing PIL draw/font state
+   (`video_engine.py:684,700`) while the ASS builder is a standalone ledger
+   function (`_otr_captions.py:241`). Extract deterministic title PLANNING into
+   a shared helper with explicit inputs and serializable outputs. **Do NOT
+   import `video_engine` into `_otr_captions.py`.** Capture the already-resolved
+   title from `render_video` (`:2194-2248`) so the ASS cannot disagree with the
+   widget/timestamp fallback chain.
+
+3. **The emission half DOES need wiring** -- this reconciles with 3A, which said
+   "no canonical JSON change". 3A was about the SUPPRESSION diff, which is
+   genuinely free. The EMISSION needs a `title_card_plan_json` output on
+   `OTR_SignalLostVideo`, a forced input on `OTR_CaptionBurn`, canonical links
+   and regenerated variants. Versioned shape: resolved title, fps, play
+   resolution, MAIN frame count, resolved reveal fraction, and ordered cards
+   `{kind, start_f, music_end_f, dock_frames, end_f}`. Both halves land in the
+   same commit per the build law.
+
+**Acceptance is also not executable as written** (Codex §6): there is no named
+35-word fixture -- the repo has `workflows/variants/otr_w45_viz_green.json`. And
+"report three surfaces" is not a predicate. **Ruling: select the brightest
+underlying-source frame from the TITLE-FREE control ROI, then require final
+encoded core glyph vs immediately adjacent outline/matte >= 4.5:1, for opening
+AND closing, on scramble AND solid frames. Generate control and candidate from
+the SAME node-93 video** so a stochastic scene difference cannot be mistaken for
+a contrast change.
+
+Also adopted: keep `TITLE` as a SECOND style line without changing the existing
+`Style: SDH` bytes; use explicit positioning so libass collision handling cannot
+move the hero; apply `_ass_escape` (`_otr_captions.py:136`) before injecting
+override tags, with tests for braces, backslashes, newlines, commas, Unicode,
+empty titles and long unbroken words.
+
+**BUILD ORDER, final:** (1) make the title burn independent of `burn_captions`
+and fail closed; (2) the shared title planner + `title_card_plan_json` output
+and input, wired; (3) the ASS TITLE style and per-frame events; (4) ONLY THEN
+the two-line procgen suppression; (5) the two `_CRTRenderer` regression tests;
+(6) the measured acceptance leg.
+
 ## 4. Build steps
 
 1. **Emit title events.** Add a title-card ASS emitter fed by `self._cards` and
