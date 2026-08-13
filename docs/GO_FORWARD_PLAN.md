@@ -457,6 +457,51 @@ two runaway decodes took seconds:
   min here). Client-side, `scripts/otr_api.py:820` returns TIMEOUT and **never
   POSTs `/interrupt`** -- that is the documented ghost, and it is a five-minute fix.
 
+### THE RUNAWAY TEXT, CAPTURED AT LAST (2026-08-13 04:20) -- IT IS A CADENCE LOCK
+
+The evidence log shipped in `f912af64` fired on its first live runaway, and it
+answers the question every earlier analysis could only infer:
+
+```
+RUNAWAY EVIDENCE (55577 chars, 13828 tokens, ended_with_eos=False)
+HEAD: {"title": "Echoes of Error", "premise": "A brilliant engineer discovers a
+      flaw in her company's cutting-edge AI system, which could have
+      catastrophic consequences if exposed too early..."
+TAIL: Welcome, dear listener, to Echoes of Error. Let the echoes inspire us. Let
+      the truth unite us. Let the future be ours to shape, as one, echo by echo.
+      This is Echoes of Error. Let the echoes echo. Let the truth prevail. Let
+      the future be ours to forge, hand in hand, echo by echo. Welcome, dear
+      listener, to Echoes of Error. Let the echoes resound. Let the truth
+      triumph. Let the future be ours to build, side...
+```
+
+**It is an anaphoric peroration loop** -- the model entered an inspirational
+closing cadence and could not leave it. The structure is MIXED, which is the
+part that matters for the fix:
+* **verbatim anchors** -- "Welcome, dear listener, to Echoes of Error" and
+  "echo by echo" recur exactly;
+* **slot-substituted variation** -- inspire/echo/resound, unite/prevail/triumph,
+  shape/forge/build.
+
+`repetition_penalty=1.03` was ACTIVE and did not stop it, because the varying
+half is what the penalty is designed to encourage. `min_p=0.05` was active too.
+
+**THIS REFUTES THE REGISTER-COLLISION EXPLANATION for this instance.** The
+premise is earnest -- an engineer, an AI flaw, catastrophic consequences. There
+is no comic source, no OnlyFans, no tonal bind to hedge around. The Fable
+analysis that produced tonight's pack-prose fixes may still be right about the
+MARMOT leg; it is not what happened here. Treat the pack changes as a plausible
+contributing fix, NOT as the cure.
+
+**DESIGN CONSEQUENCE, and it confirms Fable's ordering for a better reason than
+Fable had:** lead the halt with the **open-string token counter**, keep n-gram
+detection as secondary. A window WOULD catch this one on its verbatim anchors,
+so n-gram is not useless -- but the anchors are separated by ~25 tokens of
+variation, so it fires late and only when the loop happens to contain repeats.
+The counter is indifferent to the loop's shape: 13,828 tokens inside ONE
+unclosed JSON string is pathological whatever the prose is doing, and it would
+have halted this at ~2,000 instead of 13,828.
+
 **Directive-safe signals** (none read `target_words`): non-closure of the
 currently-open JSON string; n-gram self-similarity; deviation from the pass's own
 healthy history (the very next leg ran P3 base calls in 60/75/65 s on the same box
