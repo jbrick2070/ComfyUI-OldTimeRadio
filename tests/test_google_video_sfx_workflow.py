@@ -95,7 +95,19 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # 83 -> nodes 3/7). PBUG-20260721-14 adds link 284, the post-rename
     # SignalLostVideo completion gate into ShotLock; the 85/92 SFX-manifest
     # link IDs below are untouched.
-    assert wf["last_link_id"] == 284
+    #
+    # Title-card legibility (2026-08-12) adds link 285: SignalLostVideo's new
+    # title_card_plan_json output into OTR_CaptionBurn, so the hero title can be
+    # drawn AFTER the procgen blend where an outline is not a no-op. Again a
+    # NEW link id appended; nothing on the 85/92 side moves.
+    #
+    # NOTE for whoever bumps this next -- this is the FIFTH time this one line
+    # has been amended for a link that has nothing to do with this test's
+    # subject. It pins the GLOBAL counter as a did-the-graph-change canary while
+    # every other assertion here is scoped to nodes 85 and 92. Retiring it in
+    # favour of the scoped assertions would be a deliberate contract change and
+    # belongs in its own commit, not in passing.
+    assert wf["last_link_id"] == 285
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",

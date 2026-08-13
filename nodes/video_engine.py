@@ -35,6 +35,16 @@ import time as _time
 import numpy as np
 import torch
 
+# Shared hero-title-card arithmetic. RELATIVE with a bare-name fallback, never
+# `from nodes...`: an absolute package import resolves in the test suite (where
+# the repo root is on sys.path) and RAISES on a live server, which is lesson L23
+# -- three shared modules shipped that way and one of them silently made five
+# lanes motion-exempt in production while every test stayed green.
+try:
+    from . import _otr_title_card as _OTRTC  # type: ignore
+except ImportError:  # loaded with nodes/ on sys.path
+    import _otr_title_card as _OTRTC  # type: ignore
+
 log = logging.getLogger("OTR")
 
 # -----------------------------------------------------------------------------
@@ -338,6 +348,29 @@ def _resolve_title_timing(led, volume, fps, total_frames):
     return {}
 
 
+def _hero_title_in_procgen():
+    """Should the hero title be drawn INTO the procgen frame? Default: NO.
+
+    The procgen layer is composited `screen` + `green_only`, which can only
+    LIGHTEN, so a black outline there is the blend's identity and the title
+    measured 1.13:1 over a lit monitor. The legible copy is emitted as ASS by
+    OTR_CaptionBurn, downstream of that blend.
+
+    ``OTR_HERO_TITLE_IN_PROCGEN=1`` selects the LEGACY arm as a whole -- the
+    hero is drawn here again AND ``title_card_plan()`` returns None, so no ASS
+    title is emitted either. Both halves matter: a flag that only restored the
+    draw would render the title twice and the "before" picture it exists to
+    produce would contain the "after" as well.
+
+    The TITLE-FREE control the acceptance measurement needs is a different and
+    cheaper thing -- with the suppression in place, node 93's own output is
+    already title-free, so the brightest-underlying-source ROI is read from
+    there rather than from a third render.
+    """
+    return str(os.environ.get("OTR_HERO_TITLE_IN_PROCGEN", "")).strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
 def _title_reveal_progress(fi, w0, me, in_dock, reveal_frac=0.4):
     """BUG-LOCAL-409: decode/reveal progress for the hero title card.
 
@@ -345,16 +378,13 @@ def _title_reveal_progress(fi, w0, me, in_dock, reveal_frac=0.4):
     and then HOLDS solid (p == 1.0) until the POP/dock -- previously it stretched
     across the WHOLE window, so the title only resolved on the final frame (the
     operator saw scramble for the entire duration). Returns p in [0.0, 1.0].
+
+    The implementation moved to ``_otr_title_card`` when the title gained a
+    SECOND consumer (the ASS emitter downstream of the procgen blend). This name
+    stays because it is the public one the tests and the renderer already use;
+    there is exactly one implementation behind it, which is the point.
     """
-    if in_dock:
-        return 1.0
-    try:
-        rf = float(reveal_frac)
-    except (TypeError, ValueError):
-        rf = 0.4
-    rf = min(1.0, max(0.05, rf))
-    span = max(1, int((int(me) - int(w0)) * rf))
-    return min(1.0, max(0.0, (int(fi) - int(w0)) / span))
+    return _OTRTC.title_reveal_progress(fi, w0, me, in_dock, reveal_frac)
 
 
 # -----------------------------------------------------------------------------
@@ -442,12 +472,12 @@ class _CRTRenderer:
     # -- Deterministic per-frame RNG ------------------------------------
     def _rng(self, fi, salt):
         """A stable-hash-seeded Generator (fixes the v1 unseeded section-8
-        noise). seed = blake2s(title|fi|salt); same inputs -> same frame."""
-        seed = int.from_bytes(
-            hashlib.blake2s(f"{self.title}|{int(fi)}|{salt}".encode()).digest()[:8],
-            "big",
-        )
-        return np.random.default_rng(seed)
+        noise). seed = blake2s(title|fi|salt); same inputs -> same frame.
+
+        Shared with the title planner: the ASS emitter must be able to reproduce
+        the hero scramble of a frame it never rendered.
+        """
+        return _OTRTC.decode_rng(self.title, fi, salt)
 
     # -- Title card window resolution -----------------------------------
     def _resolve_card_windows(self, timing):
@@ -671,7 +701,10 @@ class _CRTRenderer:
                   f"{mm:02d}:{ss:02d}", fill=CRT_DIM, font=self.f_sub)
 
     # -- Hero title card (#1: decode -> reveal -> POP -> dock) ----------
-    _DECODE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%*+=-"
+    # The scramble alphabet moved to _otr_title_card with the decode itself, so
+    # this name is an ALIAS, not a second copy -- two alphabets would silently
+    # desynchronise the drawn frame from the planned one.
+    _DECODE_GLYPHS = _OTRTC.DECODE_GLYPHS
 
     def _tw(self, draw, s, font):
         b = draw.textbbox((0, 0), s, font=font)
@@ -717,15 +750,81 @@ class _CRTRenderer:
 
     def _decode_line(self, text, reveal_n, rng):
         """Left-to-right decode: the first reveal_n chars are solid; the rest
-        are seeded scramble (spaces stay spaces)."""
-        out = []
-        for i, ch in enumerate(text):
-            if ch == " " or i < reveal_n:
-                out.append(ch)
-            else:
-                out.append(self._DECODE_GLYPHS[
-                    int(rng.integers(0, len(self._DECODE_GLYPHS)))])
-        return "".join(out)
+        are seeded scramble (spaces stay spaces).
+
+        Delegates to the shared planner so the frame this renderer draws and the
+        frame the ASS emitter plans scramble IDENTICALLY -- two implementations
+        of the same seeded shuffle would drift the moment either was touched.
+        """
+        return _OTRTC.decode_line(text, reveal_n, rng)
+
+    # -- Title-card plan (the ASS emitter's input) -----------------------
+
+    def _hero_measure(self, draw):
+        """Return (measure_text, fit_hero) closures over THIS renderer's PIL
+        state, in the shape the shared planner asks for.
+
+        Measurement is the only part of title planning that needs fonts, so it
+        is the only part that stays here. ``fit_hero(title, size=N)`` re-wraps at
+        an exact size, which is what the dock needs as it shrinks the hero onto
+        the ident.
+        """
+        def measure_text(text, size):
+            font = _load_font(max(8, int(size)))
+            return (self._tw(draw, text, font), self._th(draw, text or "M", font))
+
+        def fit_hero(title, size=None):
+            if size is None:
+                font, lines, resolved = self._fit_hero(draw, title)
+                return (lines, resolved)
+            font = _load_font(max(8, int(size)))
+            return (self._wrap_words(draw, title, font, int(self.w * 0.8)),
+                    int(size))
+
+        return measure_text, fit_hero
+
+    def title_card_plan(self, main_frames=None):
+        """Build the serializable per-frame hero-title plan for this episode.
+
+        Handed downstream to ``OTR_CaptionBurn``, which renders it as ASS AFTER
+        the procgen blend -- the only place an outline is not a no-op. Returns
+        ``None`` when this episode has no card at all, which is a legitimate
+        state (no resolved music window) and NOT a failure.
+
+        Also ``None`` under ``OTR_HERO_TITLE_IN_PROCGEN=1``. That flag selects
+        the LEGACY arm whole: the title goes back into the procgen layer and no
+        ASS title is emitted. Without this the flag drew the hero TWICE -- baked
+        in AND burned on top -- so the "control" render it exists to produce was
+        never a clean before-picture and the contrast comparison it feeds would
+        have measured the new title against itself.
+        """
+        if not self._cards or _hero_title_in_procgen():
+            return None
+        img = Image.new("RGB", (self.w, self.h), CRT_BG)
+        draw = ImageDraw.Draw(img)
+        measure_text, fit_hero = self._hero_measure(draw)
+        try:
+            reveal_frac = float(os.environ.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
+        except (TypeError, ValueError):
+            reveal_frac = 0.4
+        return _OTRTC.build_title_plan(
+            title=(self.title or "SIGNAL").upper(),
+            # The draw seeds its scramble from the RAW title while drawing the
+            # uppercased one. Reproducing the frames means reproducing that.
+            rng_title=self.title,
+            cards=self._cards,
+            fps=self.fps,
+            frame_size=(self.w, self.h),
+            ident_xy=self._ident_xy,
+            title_size=self._title_size,
+            # MAIN frames, never the encoded total: the encode appends the HUD
+            # post-roll, and a closing card clamped to the encoded length would
+            # hang the title over the post-roll and into the credits.
+            main_frames=int(self.total if main_frames is None else main_frames),
+            measure_text=measure_text,
+            fit_hero=fit_hero,
+            reveal_frac=reveal_frac,
+        )
 
     def _draw_carrier_meter(self, draw, level):
         """A broken-phosphor carrier-strength meter under the ident: blocks
@@ -767,6 +866,22 @@ class _CRTRenderer:
         carrier = self._decode_line(carrier_src, reveal_n, self._rng(fi, "carrier"))
         draw.text(self._ident_xy, carrier, fill=CRT_GREEN, font=self.f_title)
         self._draw_carrier_meter(draw, signal if not in_dock else 1.0)
+
+        # -- THE HERO STOPS HERE (2026-08-12) ------------------------------
+        # Everything above this line still draws: the decode-SCRAMBLED carrier
+        # and the carrier meter exist ONLY on card frames and ARE the Matrix
+        # look, which is kept. Only the hero glyphs below are suppressed.
+        #
+        # The cut is HERE and not at the top of this method on purpose. An early
+        # return would take the carrier decode and the meter with it, and forcing
+        # `card_active` False would ALSO add the section-1 subtitle and timestamp
+        # from frame 0 -- both change the picture rather than move the title.
+        # Below this point the method draws exactly two things, the hero
+        # overstrike text and the reveal cursor, and those are what now live in
+        # the ASS layer downstream of the procgen blend, where an outline is not
+        # a no-op (Bible 07.32).
+        if not _hero_title_in_procgen():
+            return
 
         # -- HERO title (big + bold, centre-anchored, EXEMPT from gutter) -
         title = (self.title or "SIGNAL").upper()
@@ -2076,8 +2191,10 @@ class SignalLostVideoRenderer:
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "render_video"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("video_path",)
+    # title_card_plan_json APPENDED, never inserted: output order is positional
+    # in the saved graph exactly as widget order is, so a new socket goes last.
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("video_path", "title_card_plan_json")
     OUTPUT_NODE = True
 
     @classmethod
@@ -2394,6 +2511,36 @@ class SignalLostVideoRenderer:
                                 timing=_title_timing)
         total_encode_frames = total_frames + _hud_frames
 
+        # -- Hero title-card plan for the DOWNSTREAM burn ------------------
+        # The title is drawn here into a layer that is composited `screen` +
+        # `green_only` -- lighten-only, where a black outline is a no-op and the
+        # hero measured 1.13:1 over a lit monitor (Bible 07.32). So the legible
+        # copy is emitted as ASS by OTR_CaptionBurn, which runs AFTER that
+        # blend. This plan is what it draws from.
+        #
+        # total_frames, NOT total_encode_frames: the encode appends the HUD
+        # post-roll, and a closing card clamped to the encoded length would hang
+        # the title over the post-roll and into the credits.
+        _title_plan_json = ""
+        try:
+            _title_plan = renderer.title_card_plan(main_frames=total_frames)
+            if _title_plan is not None:
+                _title_plan_json = json.dumps(_title_plan, separators=(",", ":"))
+                _runtime_log(
+                    f"Video: title-card plan -- {len(_title_plan['frames'])} frames "
+                    f"across {len(_title_plan['cards'])} card(s)")
+        except Exception as _e:  # noqa: BLE001
+            # An episode with no resolvable card is a legitimate state and sends
+            # an EMPTY plan. A plan that FAILED to build is not: it would reach
+            # the burn as "no title wanted" and publish a title-less master, so
+            # it stops the render here where the cause is still on screen.
+            raise RuntimeError(
+                f"OTR_SignalLostVideo: hero title-card planning failed "
+                f"({type(_e).__name__}: {_e}). The downstream burn cannot tell "
+                f"a failed plan from an episode with no card, so this refuses "
+                f"rather than shipping an untitled episode."
+            ) from _e
+
         def _render_crt(fi):
             return renderer.render(fi, draw_scopes=draw_scopes)
 
@@ -2546,5 +2693,5 @@ class SignalLostVideoRenderer:
             "ui": {"gifs": [{"filename": os.path.basename(out_path),
                              "subfolder": _subfolder,
                              "type": "output"}]},
-            "result": (out_path,),
+            "result": (out_path, _title_plan_json),
         }
