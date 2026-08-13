@@ -225,6 +225,15 @@ of the profile, never off this table.
 earlier sweeps, then `ltx_8gb` (18.7 min), `ltx_video` (68.1 min -- a lane that
 had never completed a 45-word leg) and `ltx_audio_in` (83.2 min, 12 clips).
 
+**THE NEXT WINDOW IS A RENDER WINDOW AND IT OWNS THESE LEGS (operator,
+2026-08-13).** It takes boot 1 first, because `fastwan_8gb` and `wan_ti2v` are
+the two the cost-row fix unblocked and they are the cheapest proof that it
+worked on live legs rather than only in the suite. The box was left CLEAN at
+handoff -- port 8000 clear, VRAM 1,207 MiB -- so reset per CLAUDE.md section 4
+is a verify, not a cleanup. **A coder window must not take the in-decode halt
+at the same time**: the halt touches every authoring pass, and the build law is
+one coder window in the code at a time.
+
 **THE CODE ITEMS OWED, in value order:**
 
 1. ~~The two `FRAME_COST_MODEL` rows.~~ **DONE `9eea64a4`** -- and NOT by

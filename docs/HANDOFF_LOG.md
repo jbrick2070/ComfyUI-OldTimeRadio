@@ -96,8 +96,28 @@ every line added, AST clean; HEAD == origin on both repos after every push.
 variants, from the lane-10 era) -- proved by `git stash` + `--collect-only` that
 HEAD collects 10467 and this window's +7 is exactly its seven new tests.
 
-Next: the in-decode halt itself (CPU, design settled), then the render gate's
-remaining 9 legs in three contract-grouped boots, then row 5b retention.
+**BIBLE 12.99 PROMOTED** (survival-guide `a282037`, Three-File Contract, count
+276 -> 277) for the generator defect above -- "a generator gone stale destroys
+the artifact it is named for". Checked against `otr_coverage_index.yaml` and
+the Bible first; nothing covered a stale generator versus its own output, and
+indexed history was NOT re-scraped. The cost-row defect was NOT promoted as a
+new entry: its class is already **12.98**, which this session AMENDED instead,
+because its prescribed fix was the deletion this session disproved.
+
+Current step: operator row 3, the 45-word render gate, **12 of 21 passed**.
+Next: **a RENDER window takes the legs** (operator, 2026-08-13). Boot 1 first
+-- `WAN` token, unclamped -- and re-run `fastwan_8gb` + `wan_ti2v`, the two the
+cost-row fix unblocked; they are the cheapest live proof it worked. Then HuMo
+x4 on boot 3, the H3 pair on boot 4. Hold `wan_i2v` until row 5b is answered.
+The in-decode halt stays with a CODER window and must NOT run concurrently --
+it touches every authoring pass, and one coder window in the code at a time.
+Models: Opus 5 drove; Codex CLI took both quandaries (cost-row fork, halt
+design) as the 2026-08-11 routing's consult of record; Sonnet 5 ran the
+post-coding QA on the cost-row diff and found four real items, all fixed or
+recorded. **No kibitz arc was run and none is claimed** -- the 08-11 routing
+suspends that gate.
+Commits: OTR `9eea64a4`, `6e9ed140`, `c665f991`, `aba67d76`, `97444efc`;
+survival-guide `3342889`, `a282037`.
 
 ## 2026-08-13 -- HEAD cbaf24cc (v2.0-alpha) -- CODER (title card shipped and PROVEN LIVE; the writer runaway finally caught in the act)
 
