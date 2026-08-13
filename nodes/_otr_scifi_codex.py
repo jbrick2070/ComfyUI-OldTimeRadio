@@ -517,8 +517,22 @@ def _radio_score_draft_surface_receipt() -> dict[str, int | str | bool | None]:
 _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     "\nRadioScoreDraftV4 compact contract: return one JSON object only, "
     "rooted at exactly title, premise, setting, scenes, music_cues. Every "
+    # WORDING CHANGED 2026-08-13 -- this clause was runaway fuel.
+    #
+    # It used to end "use the available provider capacity", which is the
+    # no-length-vetoes law faithfully transcribed and is still the law. But to
+    # a model that is mid-sentence and unsure whether it is finished, "use the
+    # available capacity" reads as an instruction to KEEP GOING. Three
+    # runaways in one night each consumed the entire remaining window inside a
+    # single unterminated JSON string.
+    #
+    # The replacement keeps the anti-clipping half verbatim -- nothing may be
+    # truncated or rejected for length -- and deletes the maximalist reading by
+    # saying what "no limit" actually means here: room is not a target.
     "prose field must be a non-empty JSON string. Do not truncate, clip, or "
-    "reject authored wording for length; use the available provider capacity. "
+    "reject authored wording for length. There is ample room, so write each "
+    "field at its natural length and end it when its sentence is done; the "
+    "available capacity is a ceiling, never a target. "
     "scenes has 1..3 items. Each scene has exactly env, "
     "description, shots, beats; shots has 1..2 items with exactly description "
     "and visual_prompt; beats has 1..4 items with exactly shot_index, char_id, "
