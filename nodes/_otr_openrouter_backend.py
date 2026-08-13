@@ -1675,7 +1675,7 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
         # A: a per-call GBNF grammar (the style-picker inventor passing its
         # exactly-N grammar) overrides the bound one; both None = free-form.
         g = grammar if grammar is not None else bound_grammar
-        return backend.generate(
+        _reply = backend.generate(
             cache_entry,
             messages,
             temperature=temperature,
@@ -1684,6 +1684,19 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
             response_format=rf,
             grammar=g,
         )
+        # CLOUD RUNAWAY GUARD (2026-08-13). A remote call has no token loop to
+        # attach a StoppingCriteria to, so this cannot save the spend -- but it
+        # stops a degenerate reply reaching the ledger and raises the same
+        # rerollable phase the local guard raises. Without it, local lanes were
+        # protected and cloud lanes silently were not.
+        try:
+            from ._otr_decode_guard import assert_no_verbatim_cycle
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                assert_no_verbatim_cycle,
+            )
+        assert_no_verbatim_cycle(_reply, label="openrouter")
+        return _reply
 
     # Markers so structured_call can detect a remote fn and whether it
     # already carries a schema-bound response_format (don't override that).

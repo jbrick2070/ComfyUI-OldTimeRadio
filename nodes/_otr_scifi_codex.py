@@ -665,10 +665,46 @@ _RADIO_SCORE_DRAFT_SURFACE_INSTRUCTION = (
     # The replacement keeps the anti-clipping half verbatim -- nothing may be
     # truncated or rejected for length -- and deletes the maximalist reading by
     # saying what "no limit" actually means here: room is not a target.
+    # SHAPE, NOT ROOM (2026-08-13, second revision -- see the note above for
+    # the first). The previous wording still said "there is ample room" and
+    # "write each field at its natural length". Both are on the wrong side of
+    # what we measured today:
+    #
+    #  * "ample room" is the maximalist framing that the FIRST revision was
+    #    supposed to delete, surviving under a different phrase.
+    #  * "natural length" gives the model no shape at all, so a field with no
+    #    natural end -- a description, a visual prompt -- has nowhere to
+    #    arrive. Our measured runaway went 13,912 tokens inside ONE such field.
+    #
+    # TWO LIVE FAILURE MODES ARE ADDRESSED HERE BY NAME, because both were
+    # observed on real legs today and neither was forbidden by this contract:
+    #
+    #  1. ENUMERATION. The 10:44 runaway cycled an open list -- "the lab's
+    #     visual prompts include: a screen ..., a row of servers ..., and a
+    #     whiteboard ...". A list has no terminal state; every item invites
+    #     another. Forced/open-ended enumeration is the one prompt condition
+    #     with published evidence of raising repetition.
+    #  2. META-COMMENTARY. The 15:39 runaways cycled the model talking ABOUT
+    #     the draft -- "the draft is designed to be compatible with the
+    #     provided schema contract, ensuring that it meets all required
+    #     criteria" and "the draft does not use the final factual note to ...".
+    #     Nothing here told it to write the STORY rather than a report on its
+    #     own compliance, and that is what it spent the window doing.
+    #
+    # THIS IS GUIDANCE, NOT A GATE, and it must stay that way: nothing below
+    # rejects, trims or rerolls an episode for length. The anti-clipping law is
+    # kept verbatim and first. Sentence shape is the best-evidenced request
+    # unit for a local model -- it is visible in the text as it writes, which a
+    # word count is not -- and small counts are where compliance lives.
     "prose field must be a non-empty JSON string. Do not truncate, clip, or "
-    "reject authored wording for length. There is ample room, so write each "
-    "field at its natural length and end it when its sentence is done; the "
-    "available capacity is a ceiling, never a target. "
+    "reject authored wording for length. Give each prose field the shape its "
+    "job needs: env, description and visual_prompt are one or two complete "
+    "sentences, each doing one thing -- where we are, what is happening, what "
+    "the listener would see. intent and arc_phase are short phrases. Write "
+    "continuous prose and finish the thought; do NOT write a list, an "
+    "inventory, or a run of items joined by commas inside a prose field, and "
+    "do NOT describe the draft, the schema, the contract, or how well the "
+    "output satisfies them -- write the story itself, never a report about it. "
     "scenes has 1..3 items. Each scene has exactly env, "
     "description, shots, beats; shots has 1..2 items with exactly description "
     "and visual_prompt; beats has 1..4 items with exactly shot_index, char_id, "

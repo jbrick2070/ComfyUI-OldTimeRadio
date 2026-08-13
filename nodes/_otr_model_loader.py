@@ -62,12 +62,14 @@ except ImportError:  # loaded with nodes/ on sys.path
 try:
     from ._otr_generation_budget import (
         GenerationContextOverflowError,
+        GenerationDegeneracyError,
         PromptContextOverflowError,
         fit_output_tokens,
     )
 except ImportError:  # pragma: no cover - flat-module compatibility tests
     from _otr_generation_budget import (  # type: ignore
         GenerationContextOverflowError,
+        GenerationDegeneracyError,
         PromptContextOverflowError,
         fit_output_tokens,
     )
@@ -1318,6 +1320,26 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             raise PromptContextOverflowError(
                 str(exc), phase=exc.phase,
             ) from exc
+        # THE LIVENESS GUARD (2026-08-13). This transport was unprotected when
+        # the guard shipped, because the guard was installed per-WRAPPER in
+        # OTR_LedgerScriptWriter instead of at every local generate().
+        #
+        # Today's live callers all pass small numeric caps (8-300 tokens), so
+        # this is prophylaxis, not an emergency. It is worth doing anyway
+        # because THIS transport honours reserve-remaining -- the comment
+        # below concedes it "can legitimately be handed >14k output tokens" --
+        # so the first caller that reserves the window here would reopen the
+        # 22-minute runaway with nothing watching it. A guard installed only
+        # where the runaway happened to occur is a guard waiting to be missed.
+        from transformers import StoppingCriteriaList  # noqa: I001
+        try:
+            from ._otr_decode_guard import make_degeneracy_criterion
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                make_degeneracy_criterion,
+            )
+        _guard = make_degeneracy_criterion(inputs["input_ids"].shape[1])
+
         with torch.no_grad():
             out = model.generate(
                 **inputs,
@@ -1326,6 +1348,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 top_p=0.92,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
+                stopping_criteria=StoppingCriteriaList([_guard]),
                 # Read-only live heartbeat (2026-08-13). A reserve-remaining
                 # pass can legitimately be handed >14k output tokens, and with
                 # no streamer that is a silent twenty-minute wait whose only
@@ -1337,6 +1360,33 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         # Strip prompt prefix from decoded output.
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
+        if getattr(_guard, "hit", False):
+            # Classified BEFORE the output-limit check below, for the same
+            # reason the writer classifies degeneracy first: a halted decode
+            # stops with its allowance unspent, so reporting it as capacity
+            # exhaustion would send the next reader hunting a budget defect
+            # that does not exist.
+            telemetry = _guard.telemetry()
+            log.error(
+                "[OTR.llm] DECODE HALTED (%s): repeated a %s-token run "
+                "verbatim %s times after %s generated tokens of a %s-token "
+                "allowance. Telemetry: %s",
+                _guard.reason, telemetry.get("cycle_tokens"),
+                telemetry.get("required_repeats"), len(generated_ids),
+                effective_max_new_tokens, telemetry,
+            )
+            raise GenerationDegeneracyError(
+                "generation was halted by the liveness guard: the output "
+                "repeated a run of tokens verbatim rather than progressing",
+                halt_reason=_guard.reason,
+                repetition=telemetry,
+                raw_completion=tokenizer.decode(
+                    generated_ids, skip_special_tokens=True,
+                ),
+                prompt_tokens=prompt_len,
+                generated_tokens=len(generated_ids),
+                effective_output_tokens=effective_max_new_tokens,
+            )
         if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
             raise ModelLoaderError(
                 "prose generation exhausted the full remaining provider/context "
@@ -1460,6 +1510,15 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
             raise PromptContextOverflowError(
                 str(exc), phase=exc.phase,
             ) from exc
+        from transformers import StoppingCriteriaList  # noqa: I001
+        try:
+            from ._otr_decode_guard import make_degeneracy_criterion
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                make_degeneracy_criterion,
+            )
+        _guard = make_degeneracy_criterion(inputs["input_ids"].shape[1])
+
         with torch.no_grad():
             out = model.generate(
                 **inputs,
@@ -1468,12 +1527,35 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 top_p=_POLISH_TOP_P,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
+                stopping_criteria=StoppingCriteriaList([_guard]),
                 streamer=_OTRHB.make_streamer(
                     tokenizer,
                     f"polish:{cache_entry.get('model_id', '<unknown>')}"),
             )
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
+        if getattr(_guard, "hit", False):
+            telemetry = _guard.telemetry()
+            log.error(
+                "[OTR.llm] POLISH DECODE HALTED (%s): repeated a %s-token run "
+                "verbatim %s times after %s generated tokens of a %s-token "
+                "allowance. Telemetry: %s",
+                _guard.reason, telemetry.get("cycle_tokens"),
+                telemetry.get("required_repeats"), len(generated_ids),
+                effective_max_new_tokens, telemetry,
+            )
+            raise GenerationDegeneracyError(
+                "polish generation was halted by the liveness guard: the output "
+                "repeated a run of tokens verbatim rather than progressing",
+                halt_reason=_guard.reason,
+                repetition=telemetry,
+                raw_completion=tokenizer.decode(
+                    generated_ids, skip_special_tokens=True,
+                ),
+                prompt_tokens=prompt_len,
+                generated_tokens=len(generated_ids),
+                effective_output_tokens=effective_max_new_tokens,
+            )
         if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
             raise ModelLoaderError(
                 "prose generation exhausted the full remaining provider/context "

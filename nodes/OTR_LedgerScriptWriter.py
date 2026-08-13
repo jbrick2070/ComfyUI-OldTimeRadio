@@ -997,8 +997,15 @@ def _build_truncating_generate_fn(
         # while the code quietly set the guard to None and ran without it --
         # a comment describing a fix is not a fix. If the guard cannot be
         # built, that is a broken install and the render must say so.
+        # The tokenizer is passed ONLY when a schema is bound, which turns on
+        # the second signal: the open-string counter that catches an
+        # ELABORATION SPIRAL (a runaway that never repeats -- specimen P2,
+        # 15,355 tokens, which the cycle detector is structurally blind to).
+        # It reads quotes as STRUCTURE, so it must never run on a free-prose
+        # or markup pass where a quotation mark is dialogue.
         _degeneracy_guard = make_degeneracy_criterion(
             inputs["input_ids"].shape[1],
+            tokenizer=tokenizer if schema_model is not None else None,
         )
         gen_kwargs["stopping_criteria"] = StoppingCriteriaList(
             [_degeneracy_guard]

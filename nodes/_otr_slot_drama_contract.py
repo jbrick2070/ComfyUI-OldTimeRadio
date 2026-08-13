@@ -54,6 +54,11 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+try:
+    from ._otr_generation_budget import GenerationDegeneracyError
+except ImportError:  # pragma: no cover - flat import fallback
+    from _otr_generation_budget import GenerationDegeneracyError  # type: ignore[no-redef]
+
 
 log = logging.getLogger("OTR")
 
@@ -526,10 +531,16 @@ def build_slot_drama_contract(
                 hidden_pressure=jobs.hidden_pressure,
                 **skeleton,
             )
-        except (ValidationError, ValueError, json.JSONDecodeError) as exc:
+        except (
+            ValidationError,
+            ValueError,
+            json.JSONDecodeError,
+            GenerationDegeneracyError,
+        ) as exc:
             log.info(
-                "[SlotDramaContract] LLM job-field pass failed for %s: %s",
+                "[SlotDramaContract] LLM job-field pass failed for %s (%s): %s",
                 skeleton.get("dialogue_slot_id"),
+                type(exc).__name__,
                 exc,
             )
             return None

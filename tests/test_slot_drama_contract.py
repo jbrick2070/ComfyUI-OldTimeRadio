@@ -356,6 +356,60 @@ def _always_bad(messages, *, temperature, max_new_tokens):
     return "never valid json"
 
 
+def test_degeneracy_error_recovers_on_second_attempt():
+    from nodes._otr_generation_budget import GenerationDegeneracyError
+
+    calls = 0
+
+    def _degenerate_once(messages, *, temperature, max_new_tokens):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise GenerationDegeneracyError("mock degeneracy halt")
+        return json.dumps(
+            {"line_job": "name the cost", "hidden_pressure": "the brother's freedom"}
+        )
+
+    contract, source = sdc.build_slot_drama_contract(
+        _degenerate_once,
+        slot_row=SLOT_ROWS[3],
+        slot_index=3,
+        dramatic_state=DRAMATIC_STATE,
+        beat_intent="face the choice",
+        active_props=ACTIVE_PROPS,
+        key_terms=KEY_TERMS,
+    )
+    assert calls == 2
+    assert source == "llm_regenerate"
+    ok, _ = sdc.validate_contract(contract, ACTIVE_PROPS, KEY_TERMS)
+    assert ok
+
+
+def test_degeneracy_error_falls_back_to_minimal_after_two_failures():
+    from nodes._otr_generation_budget import GenerationDegeneracyError
+
+    calls = 0
+
+    def _always_degenerate(messages, *, temperature, max_new_tokens):
+        nonlocal calls
+        calls += 1
+        raise GenerationDegeneracyError("mock degeneracy halt")
+
+    contract, source = sdc.build_slot_drama_contract(
+        _always_degenerate,
+        slot_row=SLOT_ROWS[3],
+        slot_index=3,
+        dramatic_state=DRAMATIC_STATE,
+        beat_intent="face the choice",
+        active_props=ACTIVE_PROPS,
+        key_terms=KEY_TERMS,
+    )
+    assert calls == 2
+    assert source == "minimal"
+    ok, reasons = sdc.validate_contract(contract, ACTIVE_PROPS, KEY_TERMS)
+    assert ok, reasons
+
+
 def test_falls_back_to_minimal_after_two_failures():
     contract, source = sdc.build_slot_drama_contract(
         _always_bad,

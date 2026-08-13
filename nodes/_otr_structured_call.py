@@ -800,12 +800,24 @@ def parse_validate_tolerant(
     )
 
 
-def _raw_head(raw: "str | None", cap: int = 400) -> str:
+def _raw_head(
+    raw: "str | None", cap: int = 400, error: "BaseException | None" = None,
+) -> str:
     """Sanitized head of a failed model output for the ladder WARNING
     logs (live-smoke hardening 2026-07-10: three production stage
     failures in one night were undiagnosable because the raw output
     was never logged). Whitespace runs collapse to single spaces so
-    the log line stays one line and greppable."""
+    the log line stays one line and greppable.
+
+    FALLS BACK TO THE ERROR'S OWN COMPLETION (2026-08-13). A transport that
+    raises from INSIDE the generate call -- the in-decode liveness guard does
+    exactly this -- never assigns the caller's `last_raw`, so the ladder logged
+    `raw head: <empty>` while the halted text sat on the exception all along.
+    That was observed live on a `wan_ti2v` leg: the writer printed the runaway
+    evidence and the ladder line beside it said empty.
+    """
+    if not raw and error is not None:
+        raw = getattr(error, "raw_completion", None)
     if not raw:
         return "<empty>"
     head = " ".join(str(raw).split())
@@ -1048,7 +1060,7 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
                 "head: %s", helper_name, attempts_run, exc,
-                _raw_head(last_raw),
+                _raw_head(last_raw, error=exc),
             )
         except Exception as exc:
             notify_attempt(exc)
@@ -1106,7 +1118,7 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d failed: %s | raw "
                 "head: %s", helper_name, attempts_run, exc,
-                _raw_head(last_raw),
+                _raw_head(last_raw, error=exc),
             )
         except Exception as exc:
             notify_attempt(exc)
@@ -1191,7 +1203,7 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d (repair) failed: "
                 "%s | raw head: %s",
-                helper_name, attempts_run, exc, _raw_head(last_raw),
+                helper_name, attempts_run, exc, _raw_head(last_raw, error=exc),
             )
         except Exception as exc:
             notify_attempt(exc)
@@ -1250,7 +1262,7 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' attempt %d (repair syntax retry) "
                 "failed: %s | raw head: %s",
-                helper_name, attempts_run, exc, _raw_head(last_raw),
+                helper_name, attempts_run, exc, _raw_head(last_raw, error=exc),
             )
         except Exception as exc:
             notify_attempt(exc)
@@ -1321,7 +1333,7 @@ def structured_call(
             log.warning(
                 "[OTR_StructuredCall] '%s' alternate repair failed: %s | "
                 "raw head: %s",
-                helper_name, exc, _raw_head(last_raw),
+                helper_name, exc, _raw_head(last_raw, error=exc),
             )
         except Exception as exc:
             notify_attempt(exc)

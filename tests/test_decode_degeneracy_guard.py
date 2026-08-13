@@ -15,6 +15,8 @@ content repeats.
 """
 from __future__ import annotations
 
+import pytest
+
 from nodes import _otr_decode_guard as guard
 from nodes._otr_generation_budget import (
     CAPACITY_PHASE_DECODE_DEGENERACY,
@@ -234,3 +236,191 @@ def test_the_guard_never_reads_target_words():
     assert not offenders, (
         f"the liveness guard must never read a word target; found {offenders}"
     )
+
+
+# --------------------------------------------------------------------------
+# The CLOUD guard. A remote call has no token loop, so the check is post-hoc
+# and word-based -- but it must reroll on the same phase as the local one.
+# --------------------------------------------------------------------------
+
+def test_a_remote_reply_that_cycles_verbatim_is_rejected():
+    paragraph = " ".join(f"w{i}" for i in range(40))
+    reply = " ".join([paragraph] * 4)
+    with pytest.raises(GenerationDegeneracyError) as excinfo:
+        guard.assert_no_verbatim_cycle(reply, label="openrouter")
+    assert excinfo.value.phase == CAPACITY_PHASE_DECODE_DEGENERACY
+    assert excinfo.value.halt_reason == "verbatim_cycle_remote"
+    assert is_rerollable_generation_error(excinfo.value) is True
+
+
+def test_a_LONG_VARIED_remote_reply_is_left_alone():
+    """The false-positive case. A cloud lane writing a long episode is normal."""
+    reply = " ".join(f"word{i}" for i in range(6000))
+    guard.assert_no_verbatim_cycle(reply, label="openrouter")  # must not raise
+
+
+def test_a_remote_reply_with_a_REFRAIN_is_left_alone():
+    """Deliberate repetition is craft, not degeneracy.
+
+    A radio drama can repeat a line for effect -- a station ident, a callback,
+    a chorus. Those are short and separated by different material, so they must
+    not trip a guard whose floor is a 32-word run repeated back to back.
+    """
+    refrain = "this is signal lost broadcasting on the edge of the dial"
+    body = [refrain]
+    for block in range(6):
+        body.append(" ".join(f"scene{block}word{i}" for i in range(40)))
+        body.append(refrain)
+    guard.assert_no_verbatim_cycle(" ".join(body), label="openrouter")
+
+
+def test_an_empty_or_short_remote_reply_is_safe():
+    guard.assert_no_verbatim_cycle("", label="x")
+    guard.assert_no_verbatim_cycle("a short answer", label="x")
+    guard.assert_no_verbatim_cycle(None, label="x")  # type: ignore[arg-type]
+
+
+def test_every_cloud_backend_installs_the_remote_guard():
+    """The route-coverage lesson, applied to the transports a criterion cannot reach.
+
+    Local routes are covered by tests/test_decode_guard_covers_every_local_route.py.
+    These three are HTTP transports, exempt from that file for the right reason
+    (no token loop) -- which is exactly how they came to have no runaway
+    protection at all. This is their equivalent.
+    """
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1] / "nodes"
+    for rel in ("_otr_openrouter_backend.py",
+                "_otr_comfy_backend.py",
+                "_otr_google_api/llm.py"):
+        source = (root / rel).read_text(encoding="utf-8")
+        assert "assert_no_verbatim_cycle" in source, (
+            f"{rel} returns a remote reply without the cloud runaway guard, so "
+            f"a cycling cloud generation would ship into the ledger unnoticed"
+        )
+
+
+def test_the_ladder_can_still_see_a_halted_completion():
+    """The evidence must survive the transport that raised from inside generate().
+
+    Observed live on a wan_ti2v leg: the writer printed 5,201 characters of
+    runaway evidence and the ladder line beside it read `raw head: <empty>`.
+    The ladder logs the caller's `last_raw`, which a transport raising from
+    INSIDE the generate call never assigns -- while the completion sat on the
+    exception the whole time. Losing the text at the one moment it exists is
+    the exact defect the runaway-evidence logging was added to prevent.
+    """
+    from nodes import _otr_structured_call as sc
+
+    halted = GenerationDegeneracyError(
+        "halted", halt_reason="verbatim_cycle",
+        raw_completion="the draft is designed to be compatible with the "
+                       "provided schema contract, ensuring that it meets",
+    )
+    assert sc._raw_head(None, error=halted) != "<empty>"
+    assert "schema contract" in sc._raw_head(None, error=halted)
+    # An error with no completion still degrades honestly.
+    assert sc._raw_head(None, error=ValueError("x")) == "<empty>"
+    # And a real raw string is never overridden by the error.
+    assert sc._raw_head("actual raw", error=halted) == "actual raw"
+
+
+# --------------------------------------------------------------------------
+# SIGNAL 2: the ELABORATION SPIRAL. A runaway that never repeats.
+#
+# Three specimens were captured on 2026-08-13 (docs/HANDOFF_LOG.md:150-157):
+# P3 an anaphoric loop, P5 escalating repetition, and P2 a pure elaboration
+# spiral -- 15,355 tokens, 83k chars, NO repetition anywhere. The cycle
+# detector catches the first two and is structurally blind to the third.
+# These tests exist because a guard that catches 2 of 3 known runaways, and
+# says nothing about the third, is the worst kind: it reads as solved.
+# --------------------------------------------------------------------------
+
+class _WordTokenizer:
+    """Decodes token ids to text so the open-string lexer can see quotes."""
+
+    def __init__(self, mapping):
+        self._map = mapping
+
+    def decode(self, ids, clean_up_tokenization_spaces=True):
+        return "".join(self._map.get(int(i), "x") for i in ids)
+
+
+QUOTE, WORD = 1, 2
+_TOK = _WordTokenizer({QUOTE: '"', WORD: "word "})
+
+
+def test_an_ELABORATION_SPIRAL_with_no_repetition_is_caught():
+    """The P2 specimen shape: one string, growing forever, never repeating."""
+    ids = [QUOTE] + [WORD] * 300
+    criterion = guard.make_degeneracy_criterion(
+        0, tokenizer=_TOK, max_open_string_tokens=200,
+    )
+    verdict = criterion(_FakeIds(ids), None)
+    assert verdict is True
+    assert criterion.hit is True
+    assert criterion.reason == "open_string"
+    assert criterion.telemetry()["open_string_tokens"] >= 200
+
+
+def test_a_string_that_CLOSES_never_trips_the_spiral_signal():
+    """Many complete fields is a long episode, not a spiral.
+
+    Content VARIES per field, deliberately. A first draft of this fixture
+    repeated one token id, which is a perfectly periodic stream -- so the
+    CYCLE detector fired and the test failed for the wrong reason. A fixture
+    that is itself degenerate cannot prove a no-halt case.
+    """
+    ids = []
+    for field in range(40):
+        body = [1000 + field * 200 + i for i in range(100)]
+        ids += [QUOTE] + body + [QUOTE]
+    criterion = guard.make_degeneracy_criterion(
+        0, tokenizer=_TOK, max_open_string_tokens=200,
+    )
+    assert criterion(_FakeIds(ids), None) is False
+    assert criterion.hit is False
+
+
+def test_the_spiral_signal_is_OFF_when_no_tokenizer_is_supplied():
+    """Unconstrained routes get cycle detection ONLY.
+
+    On a free-prose or markup pass a quotation mark is dialogue, not
+    structure -- running the lexer there would count the rest of the scene.
+    That mistake is what got the first version of this module deleted.
+
+    The body varies so this isolates the SPIRAL signal: a repeating body would
+    trip the cycle detector and tell us nothing about the tokenizer gate.
+    """
+    ids = [QUOTE] + [(i * 7919) % 30000 for i in range(5000)]
+    criterion = guard.make_degeneracy_criterion(0)      # no tokenizer
+    assert criterion(_FakeIds(ids), None) is False
+    assert criterion.telemetry()["open_string_bound"] is None
+
+
+def test_an_escaped_quote_does_not_close_the_string():
+    """The classic lexer trap: an escaped quote is content, not a terminator."""
+    tracker = guard.OpenStringTracker()
+    for chunk in ('{"a": "', 'say ' + chr(92), '" more', ' and more'):
+        tracker.feed(chunk)
+    assert tracker.in_string is True
+
+
+def test_an_escaped_backslash_lets_the_next_quote_close():
+    """A doubled backslash is literal, so the following quote DOES close.
+
+    The case that only appears when the run is split across token
+    boundaries, which is why the lexer carries escape state between feeds.
+    """
+    tracker = guard.OpenStringTracker()
+    for chunk in ('{"a": "', 'path' + chr(92) * 2, '"'):
+        tracker.feed(chunk)
+    assert tracker.in_string is False
+
+
+def test_BOTH_signals_are_live_on_a_schema_bound_route():
+    """Neither subsumes the other -- that is the whole point of having two."""
+    cycle = list(range(500, 500 + 60))
+    criterion = guard.make_degeneracy_criterion(0, tokenizer=_TOK)
+    assert criterion(_FakeIds(cycle * 4), None) is True
+    assert criterion.reason == "verbatim_cycle"      # signal 1 still fires

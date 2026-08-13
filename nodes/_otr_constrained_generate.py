@@ -39,6 +39,7 @@ from pydantic import BaseModel
 
 from . import _otr_lmfe_compat  # compat shim; ensure_lmfe_transformers_compat() called inside factory below
 from . import _otr_writer_heartbeat as _OTRHB
+from ._otr_generation_budget import GenerationDegeneracyError
 from ._otr_model_loader import (
     ModelLoaderError,
     _normalize_messages_for_cache_entry,
@@ -264,6 +265,31 @@ def make_constrained_generate_fn(
             else None
         )
 
+        # THE LIVENESS GUARD (2026-08-13). This route is LIVE -- the writer
+        # builds it for the slot-drama contract and calls it once per voiced
+        # beat -- and it was missed when the guard shipped, because the guard
+        # was installed per-WRAPPER in OTR_LedgerScriptWriter rather than at
+        # every local generate(). A six-agent audit of every `model.generate`
+        # in nodes/ found this and `_otr_model_loader.make_generate_fn`
+        # unprotected. A unit test can pass while a production route runs bare.
+        #
+        # Cost here is bounded today (192 output tokens, two attempts per slot),
+        # so this is prophylaxis rather than an emergency -- but "bounded by
+        # whatever the caller happened to pass" is not a liveness contract.
+        from transformers import StoppingCriteriaList  # noqa: I001
+        try:
+            from ._otr_decode_guard import make_degeneracy_criterion
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                make_degeneracy_criterion,
+            )
+        # Tokenizer supplied: this route is ALWAYS schema-bound (it exists to
+        # run lm-format-enforcer), so the open-string spiral signal applies and
+        # a quote here is structure, never dialogue.
+        _guard = make_degeneracy_criterion(
+            inputs["input_ids"].shape[1], tokenizer=tokenizer,
+        )
+
         with torch.no_grad():
             out = model.generate(
                 **inputs,
@@ -272,6 +298,7 @@ def make_constrained_generate_fn(
                 top_p=0.92,
                 max_new_tokens=max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
+                stopping_criteria=StoppingCriteriaList([_guard]),
                 # The schema-binding argument. transformers passes
                 # this hook into the logits-processing path; lm-
                 # format-enforcer reuses it to keep the sampler in
@@ -289,10 +316,34 @@ def make_constrained_generate_fn(
             )
 
         prompt_len = inputs["input_ids"].shape[1]
-        return tokenizer.decode(
+        decoded = tokenizer.decode(
             out[0][prompt_len:],
             skip_special_tokens=True,
         )
+        if getattr(_guard, "hit", False):
+            # A halted decode is NOT a short answer. Returning the truncated
+            # text would hand the caller a fragment that parses as a real
+            # reply -- the silent-truncation trap. Raise the same rerollable
+            # phase the writer transport raises, so a caller that has a retry
+            # path uses it and one that does not fails loudly instead of
+            # quietly accepting half a JSON object.
+            telemetry = _guard.telemetry()
+            log.error(
+                "[%s] DECODE HALTED (%s): repeated a %s-token run verbatim %s "
+                "times. Rerollable. Telemetry: %s",
+                heartbeat_label or "constrained-generate",
+                _guard.reason, telemetry.get("cycle_tokens"),
+                telemetry.get("required_repeats"), telemetry,
+            )
+            raise GenerationDegeneracyError(
+                "constrained generation was halted by the liveness guard: the "
+                "output repeated a run of tokens verbatim",
+                halt_reason=_guard.reason,
+                repetition=telemetry,
+                raw_completion=decoded,
+                prompt_tokens=prompt_len,
+            )
+        return decoded
 
     # Expose the parser + prefix-fn on the closure for tests that want
     # to assert the binding without invoking generate().

@@ -716,7 +716,7 @@ def make_comfy_credits_generate_fn(cache_entry: dict, *, response_format: dict |
     def generate_fn(messages, *, temperature=None, max_new_tokens=None,
                     stop=None, response_format=None):
         rf = response_format if response_format is not None else bound_rf
-        return backend.generate(
+        _reply = backend.generate(
             cache_entry,
             messages,
             temperature=temperature,
@@ -724,6 +724,18 @@ def make_comfy_credits_generate_fn(cache_entry: dict, *, response_format: dict |
             stop=stop,
             response_format=rf,
         )
+        # CLOUD RUNAWAY GUARD (2026-08-13) -- see _otr_decode_guard.
+        # Post-hoc, because an HTTP call has no token loop to watch. It cannot
+        # save the spend; it stops a degenerate reply reaching the ledger and
+        # raises the same rerollable phase the local guard raises.
+        try:
+            from ._otr_decode_guard import assert_no_verbatim_cycle
+        except ImportError:  # pragma: no cover - flat/standalone import path
+            from _otr_decode_guard import (  # type: ignore
+                assert_no_verbatim_cycle,
+            )
+        assert_no_verbatim_cycle(_reply, label="comfy_credits")
+        return _reply
 
     generate_fn._otr_comfy_credits = True  # type: ignore[attr-defined]
     generate_fn._otr_response_format = bound_rf  # type: ignore[attr-defined]
