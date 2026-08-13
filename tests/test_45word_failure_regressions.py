@@ -10,10 +10,37 @@ from nodes._otr_video_engines import eng_mesh_stage  # noqa: F401
 from nodes._otr_video_engines import render_driver as rd
 
 
-def _opening_ledger(tmp_path: Path) -> dict:
-    still = tmp_path / "open_scene.png"
-    fodder = tmp_path / "open_fodder.png"
+# THE OPENING-MUSIC BEAT EXISTS IN TWO SHAPES AND THEY ARE NOT ALIASES.
+#
+# These two fixtures used to be ONE, and it encoded the defect. The old
+# `_opening_ledger` gave a shot carrying `source_line_ids: ["music_opening_001"]`
+# image rows keyed ONLY `b000_music_open`, and asserted the join SUCCEEDED --
+# which was satisfiable only through `render_driver._canonical_visual_beat_id`,
+# a hardcoded rewrite of one id to the other.
+#
+# That was CORRECT WHEN WRITTEN: the image producer then read the PRE-AUDIO
+# ledger and really did mint `b000_music_open`. Commit 3446af3f retargeted
+# canonical link 255 to ShotLock's POST-AUDIO ledger, where EpisodeAssembler has
+# already mirrored the cue into an ordinary beat named `music_opening_001`, and
+# the producer now mints THAT. The test kept asserting the old world, so it
+# would have gone on passing while production died -- and it did die, on the
+# 2026-08-12 `mesh_stage` leg (PBUG-20260811-02).
+#
+# The two shapes are genuinely different episodes, not two names for one thing:
+#   POSITIONED  -- a mirrored opening cue starting at 0.0. ShotLock inserts no
+#                  synthetic beat (`derive_opening_music_beat` requires a >= 2 s
+#                  head gap), the shot carries the mirror's own line id, and the
+#                  producer keyed its still under that same id.
+#   SYNTHETIC   -- a real head gap with no mirrored cue. ShotLock DOES insert
+#                  `b000_music_open`, the shot has EMPTY source_line_ids, and
+#                  `derive_opening_music_beat` returns non-None so the producer
+#                  mints that id. `_beat_id_for_shot` recovers it by stripping
+#                  the `shot_` prefix.
+# Each resolves through its OWN id. Neither needs a translation layer.
 
+
+def _positioned_ledger() -> dict:
+    """Mirrored opening cue at 0.0 -- post-audio assembler ids throughout."""
     return {
         "video": {"video_revision": 1, "shots": []},
         "lines": [{
@@ -26,23 +53,52 @@ def _opening_ledger(tmp_path: Path) -> dict:
         }],
         "images": {"images": [
             {
+                "object_id": "still_music_opening_001",
+                "kind": "scene_open",
+                "beat_id": "music_opening_001",
+                "path": "C:/tmp/open_scene.png",
+            },
+            {
+                "object_id": "meshfodder_music_opening_001",
+                "kind": "mesh_fodder",
+                "beat_id": "music_opening_001",
+                "mesh_subject_id": "radio_host",
+                "path": "C:/tmp/open_fodder.png",
+            },
+        ]},
+    }
+
+
+def _synthetic_open_ledger() -> dict:
+    """Genuine head gap -- ShotLock's synthetic beat, keyed b000_music_open."""
+    return {
+        "video": {"video_revision": 1, "shots": []},
+        "lines": [{
+            "line_id": "b001",
+            "speaker_role": "announcer",
+            "char_id": "",
+            "start_s": 9.5,
+            "dur_s": 8.0,
+        }],
+        "images": {"images": [
+            {
                 "object_id": "still_b000_music_open",
                 "kind": "scene_open",
                 "beat_id": "b000_music_open",
-                "path": str(still),
+                "path": "C:/tmp/synth_scene.png",
             },
             {
                 "object_id": "meshfodder_b000_music_open",
                 "kind": "mesh_fodder",
                 "beat_id": "b000_music_open",
                 "mesh_subject_id": "radio_host",
-                "path": str(fodder),
+                "path": "C:/tmp/synth_fodder.png",
             },
         ]},
     }
 
 
-def _opening_shot(engine_id: str, family: str) -> dict:
+def _positioned_shot(engine_id: str, family: str) -> dict:
     return {
         "shot_id": "shot_music_opening_001",
         "source_line_ids": ["music_opening_001"],
@@ -54,23 +110,48 @@ def _opening_shot(engine_id: str, family: str) -> dict:
     }
 
 
-def test_mirrored_music_line_joins_canonical_scene_still():
+def _synthetic_open_shot(engine_id: str, family: str) -> dict:
+    """No source lines -- the beat id is recovered from the shot_id."""
+    return {
+        "shot_id": "shot_b000_music_open",
+        "source_line_ids": [],
+        "char_id": "",
+        "engine_id": engine_id,
+        "family": family,
+        "target_frame_count": 25,
+        "creative": {},
+    }
+
+
+def test_positioned_music_mirror_joins_the_still_under_its_OWN_id():
     req = rd.build_request_from_shot(
-        _opening_shot("still_word", "static_image_gen"),
-        _opening_ledger(Path("C:/tmp")),
+        _positioned_shot("still_word", "static_image_gen"),
+        _positioned_ledger(),
     )
     assert req["asset_refs"]["init_image"].endswith("open_scene.png")
     assert req["observability"]["init_source"] == "scene_still"
 
 
-def test_mirrored_music_line_joins_canonical_mesh_fodder_and_subject():
+def test_positioned_music_mirror_joins_the_mesh_fodder_under_its_OWN_id():
     req = rd.build_request_from_shot(
-        _opening_shot("mesh_stage", "image_to_video"),
-        _opening_ledger(Path("C:/tmp")),
+        _positioned_shot("mesh_stage", "image_to_video"),
+        _positioned_ledger(),
     )
     assert req["asset_refs"]["init_image"].endswith("open_fodder.png")
     assert req["observability"]["init_source"] == "mesh_fodder"
     assert req["mesh_subject_id"] == "radio_host"
+
+
+def test_the_GENUINE_synthetic_opener_still_joins_b000_music_open():
+    """The synthetic head-gap beat is not going away and must keep resolving --
+    this is the case that justifies keeping `_OPENING_MUSIC_SUFFIX` after the
+    translation function is deleted. Green before AND after the deletion."""
+    req = rd.build_request_from_shot(
+        _synthetic_open_shot("still_word", "static_image_gen"),
+        _synthetic_open_ledger(),
+    )
+    assert req["asset_refs"]["init_image"].endswith("synth_scene.png")
+    assert req["observability"]["init_source"] == "scene_still"
 
 
 def _valid_script() -> str:

@@ -823,10 +823,12 @@ def _jump_still_requests_for_shot(shot):
     """Every jump-segment still this shot owes, READ off the durable stamp.
 
     Never re-derived (2026-07-25, chunk 4). ShotLock minted these ids from the
-    beat_id it was building, and the beat id a shot renders passes through
-    :func:`_canonical_visual_beat_id` on the way here -- so recomputing an id
-    at this end would be a second derivation of one string, which is the mirror
-    class chunk 1a collapsed. A stamp that exists but is shaped wrong is
+    beat_id it was building, and this end READS them off the durable row -- so
+    recomputing an id here would be a second derivation of one string, which is
+    the mirror class chunk 1a collapsed. (This once said the id "passes through
+    ``_canonical_visual_beat_id`` on the way here". That translation was deleted
+    with PBUG-20260811-02: there is now exactly ONE id, the shot's own, which is
+    what makes the never-re-derive rule cheap to keep.) A stamp that exists but is shaped wrong is
     TERMINAL: this pass is the last gate before a GPU render, and a request it
     cannot read is a still it cannot prove.
     """
@@ -1076,7 +1078,8 @@ def validate_and_repair_still_spine(ledger):
     for shot in shots:
         raw_bid = _beat_id_for_shot(shot)
         line = lines.get(raw_bid, {})
-        beat_id = _canonical_visual_beat_id(raw_bid, line)
+        # The shot's own beat id IS the producer's key -- no translation.
+        beat_id = raw_bid
         engine_id = str(shot.get("engine_id") or "")
         family = engine_family(engine_id, str(shot.get("family") or ""))
         char_id = str(shot.get("char_id") or line.get("char_id") or "")
@@ -1246,19 +1249,45 @@ def _beat_id_for_shot(shot):
 #: Mirrors ``otr_shot_lock.OPENING_MUSIC_BEAT_ID`` -- duplicated as a local
 #: constant (round 5): importing the ShotLock node module from the driver would
 #: drag node-registration side effects into the engine package.
+#:
+#: STILL LIVE, and it is a CLASSIFIER, not a translation. Three callers ask
+#: "is this shot ShotLock's synthetic head-gap opener?" by structure -- the
+#: motion-register pick, the round-5-F2 synthetic-open subject detection, and
+#: the LTX open-clip health check. That beat is real: ShotLock inserts it
+#: whenever there is a genuine >= 2 s head gap, and the image producer mints a
+#: target under that same id when it does.
 _OPENING_MUSIC_SUFFIX = "b000_music_open"
 
 
-def _canonical_visual_beat_id(beat_id, line=None):
-    """Map the positioned music opener to its synthetic visual beat."""
-    bid = str(beat_id or "")
-    if bid == "music_opening_001":
-        return _OPENING_MUSIC_SUFFIX
-    if (isinstance(line, dict)
-            and str(line.get("speaker_role") or "") == "music_open"
-            and str(line.get("mirrored_from") or "") == "music"):
-        return _OPENING_MUSIC_SUFFIX
-    return bid
+# _canonical_visual_beat_id WAS HERE, AND ITS REMOVAL IS THE FIX FOR
+# PBUG-20260811-02. Do not reintroduce it, under any name.
+#
+# It rewrote a shot's beat id to ``b000_music_open`` whenever the id was
+# ``music_opening_001`` or the line looked like a mirrored music opener, so that
+# visual-asset lookups would find rows the image producer had keyed under the
+# SYNTHETIC id while the shot carried the POSITIONED one. That was a real fix
+# for a real split -- while the producer read the PRE-AUDIO ledger.
+#
+# Commit 3446af3f retargeted canonical link 255 so the producer reads ShotLock's
+# POST-AUDIO ledger, where EpisodeAssembler has already mirrored the cue into an
+# ordinary beat named ``music_opening_001``. From that moment the producer keyed
+# its rows under the positioned id and this rewrite pointed the consumer at an
+# id nothing minted any more -- so it did not fail to fire, it fired and moved
+# the mismatch from the closing beat to the opening one. The 2026-08-12
+# ``mesh_stage`` leg died on exactly that, with the plate it wanted sitting on
+# disk under the other name.
+#
+# THE AUTHORITATIVE ID IS THE EXACT BEAT ID IN SHOTLOCK'S FINAL EXECUTION PLAN,
+# and both halves already agree on it once nothing translates between them: a
+# positioned mirror carries its own ``music_<cue>_<NNN>`` line id, and a genuine
+# synthetic opener carries ``b000_music_open`` with empty ``source_line_ids``,
+# which ``_beat_id_for_shot`` recovers from the shot_id. Each resolves through
+# its own id.
+#
+# This is also the only shape that survives a chunked cue.
+# ``_MUSIC_MAX_CHUNK_DUR_S = 22.0`` means a long cue becomes ``_001``, ``_002``,
+# ``_003`` against ONE synthetic beat, and no 1:1 rewrite can express
+# one-to-many. Removing the translation is what scales; a smarter mapping is not.
 
 
 #: 6/5 motion-centric LTX prompts (BUG-LOCAL-112, restored 2026-06-12 from the
@@ -1965,8 +1994,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _vstyle = get_visual_style((ledger or {}).get("meta") or {})
     _line_beat_id = _beat_id_for_shot(shot)
     line = _line_index(ledger).get(_line_beat_id, {})
-    # Audio keeps the positioned line id; visual assets use the producer key.
-    _visual_beat_id = _canonical_visual_beat_id(_line_beat_id, line)
+    # Audio and visual assets share ONE key: the shot's own beat id. They used
+    # to diverge here, and closing that split is PBUG-20260811-02's fix.
+    _visual_beat_id = _line_beat_id
     # Round 5 F5: the SHOT row carries the ShotLock-normalized char_id (the
     # announcer 'announcer'->cast-row-id join); prefer it, fall back to the
     # raw line value for pre-round-5 planned ledgers.

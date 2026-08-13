@@ -524,11 +524,14 @@ def validate_coverage_plan(plan: CoveragePlan, contract):
 # ONE AUTHORITY, THREE CONSUMERS, NO RE-DERIVATION. OTR_ShotLock mints these
 # rows and stamps them durably on the shot; the image dispatcher and the still
 # spine READ them off the ledger rather than recomputing an id from a beat id.
-# That is deliberate. The beat id a SHOT renders and the beat id an image
-# OBJECT was keyed under pass through a canonicalizing remap (the positioned
-# music opener, ``render_driver._canonical_visual_beat_id``), so two
-# independent derivations are two chances to disagree about one string -- the
-# mirror class chunk 1a collapsed for routing.
+# That is deliberate, and the conclusion outlived its own premise. The premise
+# used to be that the beat id a SHOT renders and the beat id an image OBJECT was
+# keyed under passed through a canonicalizing remap, so two independent
+# derivations were two chances to disagree about one string -- the mirror class
+# chunk 1a collapsed for routing. THAT REMAP IS GONE (PBUG-20260811-02): the
+# shot's own beat id is the producer's key, full stop. Reading the durable row
+# is now the only way to disagree with nobody, so the rule stands harder than
+# when a translation still stood between the two ends.
 
 @dataclass(frozen=True)
 class SegmentAudioWindow:

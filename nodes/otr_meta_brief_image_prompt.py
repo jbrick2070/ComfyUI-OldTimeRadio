@@ -1215,8 +1215,8 @@ def derive_scene_still_targets(lines, fps: int = 25,
         # The producer was therefore the sole owner of a still for a beat id
         # that no shot in the finished episode ever carries.
         #
-        # Render-side consumers papered the split over with a hardcoded alias
-        # (render_driver._canonical_visual_beat_id), but the alias is applied
+        # Render-side consumers USED TO paper the split over with a hardcoded
+        # alias (render_driver._canonical_visual_beat_id). It was applied
         # INCONSISTENTLY, which is what made the split reachable two ways:
         #   - merge_jump_still_requests does not canonicalize, so a JUMP
         #     coverage plan on the opening beat asked for a jump-segment still
@@ -1226,6 +1226,14 @@ def derive_scene_still_targets(lines, fps: int = 25,
         #     plate_b000_music_open, never joined to music_opening_001, and the
         #     textured hero composited over the floor fallback instead.
         # One state, two id spaces, and only some readers held the map.
+        #
+        # THE ALIAS IS NOW DELETED (PBUG-20260811-02, third and final swing).
+        # Every reader uses the shot's own beat id, so there is one id space and
+        # no map to hold. The reservation below is unchanged and still correct:
+        # it gives the positioned mirror a producer-owned target under the name
+        # it will actually have, which is exactly what the consumer now asks
+        # for. What changed is that a MISSED reservation is now a plain missing
+        # still rather than a silent join failure under a second name.
         #
         # Reserving the assembler's deterministic id gives that beat a
         # producer-owned target under the name it will actually have. The b000
