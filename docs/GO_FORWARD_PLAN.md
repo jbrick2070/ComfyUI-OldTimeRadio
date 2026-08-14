@@ -127,12 +127,26 @@ parentheticals, no `assert`. **This is the documentation that ruling asked for.*
 | Repair fails again | **Bounded retries, then flag loudly.** Each retry is told what was still wrong with the last attempt. On final failure the ledger records the line as unclean and the log says so; the render continues. **Never a silent pass, never a hard stop** |
 | Where stripped action goes | **Nowhere. Deleted.** Operator: *"i dont want any non-spoken lines in ledger."* The ledger holds spoken lines and music cues, full stop |
 
-**ONE THING TO VERIFY BEFORE THE DELETE HALF SHIPS.** The ledger-completeness
-rule in `CLAUDE.md` says a removed field needs its consumers enumerated first.
-Confirm during the bank audit whether ANY downstream consumer -- video/shot
-direction, captions, per-beat slicing -- reads a non-spoken row today. If nothing
-reads it, deleting is clean and this note closes. **If something does read it,
-stop and raise it** rather than quietly opening a hole in the ledger.
+**THAT VERIFICATION IS DONE -- 2026-08-14, and the answer is reassuring.** The
+question was whether any downstream consumer reads a non-spoken row, because
+deleting one would otherwise open a hole in the ledger.
+
+**There is no stage-direction / action / narration ROW TYPE in this codebase at
+all.** The only non-spoken rows are `music_open` / `music_close` / `music_inter`,
+whose `text` is empty by design (the `sfx` role was retired 2026-07-01 and is now
+a hard error, `scene_sequencer.py:905-908`). Music cues are exactly what the
+operator's rule already permits in the ledger, so nothing needs deleting.
+
+**Those music rows ARE load-bearing and must stay:** per-beat audio slicing
+dispatches on `speaker_role` with an explicit music passthrough
+(`scene_sequencer.py:909-956`); still generation keys off `music_opening_001` /
+`music_closing_001` (`otr_meta_brief_image_prompt.py:1246-1273`); and the video
+tail-loop window is derived from `music_close` rows
+(`otr_silent_composite.py:419-422`, `render_driver.py:4764`).
+
+**So F1 is purely a CONTENT defect, not a schema one.** The action text is inside
+spoken rows' `text`; there is no separate field it should have gone to and none
+to remove. The repair pass rewrites the row's text and nothing else moves.
 
 **THE BAR, in the operator's words 2026-08-14:** *"as long as the ledger is legal
 -- no action in the ledger, good character consistency -- we are good."* That is
@@ -227,11 +241,35 @@ consistency is explicitly carved out as one that is. So the bank audit REPORTS
 story shape as an observation and GRADES only on F1 and F2. A lane whose prose
 is merely unexciting is not broken.
 
-**F2 already has a traced seam.** `e679b754` (2026-07-11) repairs P5 metadata
-deterministically from the accepted score graph and states it "never touches
-dialogue, premise, beats, character intent" -- so if speaker identity is not
-among the fields it carries authoritatively, the speaker can drift off the line.
-Verify whether the repair carries speaker; that is F2's likely home.
+**F2's ROOT CAUSE IS FOUND AND VERIFIED -- 2026-08-14, and it is NOT where this
+file previously said.** The earlier note sent the reader to
+`repair_script_artifact_metadata` (from `e679b754`). **THAT FUNCTION DOES NOT
+EXIST -- repo-wide grep, zero hits.** It was removed sometime after July 11. Do
+not go looking for it.
+
+**The real cause is one line-schema omission, and it is SHARED BY EVERY BANK:**
+
+| Site | Carries `speaker`? |
+|---|---|
+| `production_ledger.py:1118` -- `Ledger.set_beats()` | **YES** -- `"speaker": _safe_str(r.get("speaker")) or None` |
+| `production_ledger.py:1281-1300` -- `Ledger.set_lines()` | **NO. The key is absent from the normalized row schema entirely** |
+
+So a caller may pass `speaker` on a line row and `set_lines()` **silently drops
+it**. Both news lanes also fail to supply it upstream --
+`_otr_scifi_codex.py:3211` and `_otr_scifi_fable2.py:2749-2786` build line rows
+with `char_id`/`speaker_role` but no `speaker`, because `ScriptLineV4`
+(`_otr_scifi_codex.py:760-784`) has no speaker field at all.
+
+**THE FIX MUST LAND IN BOTH HALVES AT ONCE:** add `speaker` to the `set_lines()`
+normalized schema (mirroring `set_beats()`), AND carry the owning beat's speaker
+name onto the line row at each assembly site. **Fixing only the lane leaves
+`set_lines()` dropping it; fixing only `set_lines()` leaves the lanes not
+supplying it.** And because the root is the SHARED ledger method, a lane-only fix
+leaves every other bank broken.
+
+**Why it shipped unnoticed:** `production_ledger.py:1806-1822` has a
+`cast[].char_id -> name` fallback that masks the omission for ONE consumer. The
+raw ledger JSON on disk still says `speaker: None` on every line row.
 
 ### RERolls ARE THE RUNAWAY -- operator 2026-08-14
 
@@ -708,7 +746,76 @@ a Python list every 32 tokens. **If short-period token spam is ever OBSERVED, th
 correct addition is narrow -- periods 1..8 at a HIGH repeat count, on the list, at
 the existing cadence -- and it needs the artifact first, per the admission rule.**
 
-### MISS 2 -- the leading hypothesis, NOT yet confirmed
+### BANK AUDIT RESULTS -- all six, 2026-08-14 (step 1 of the operator brief)
+
+Three parallel read-only audits, every claim traced to a model call rather than
+read off a declaration. **All 12 news-lane seams and all 9 legacy-lane seams are
+LIVE** -- no bank is shipping dead prompt text. Two real findings:
+
+**1. `pipelines.json` DOES NOT drive the four legacy banks, confirmed.**
+`legacy_many_pass` / `legacy_many_pass_adapt` are `executable: false` and the
+file says so itself (`pipelines.json:87-89`, "DESCRIPTIVE ONLY"). The real router
+is `_otr_lane_specs.py:119-123` (`INLINE_PIPELINES`) plus
+`_otr_creative_prompt_router.py:158-219`. **One nuance that is NOT purely
+descriptive:** `declared_seams` for `original_multi_pass` IS consumed, at
+`_otr_story_routing.py:408`, to extend the seam allowlist -- a validation
+contract, not an execution driver.
+
+**2. THE ONE CONDITIONALLY-DEAD SEAM: `exchange_system`.** It is a REQUIRED seam
+for `shakespeare` and `public_domain` (`banks.json:119,157`), but its pass only
+runs when the `use_exchange` widget is true -- **and the widget default is FALSE**
+(`OTR_LedgerScriptWriter.py:3164-3165`, gate at `:5618`). So a required seam is
+off by default. The lane still works (per-beat `line_composer_system` covers
+dialogue), which is why this never surfaced. The canonical workflow appears to
+ship it TRUE, but that reading rests on positional `widgets_values` in a file
+currently mid-edit -- **re-confirm after the workflow is regenerated.**
+
+| Bank | Verdict | Owning weakness |
+|---|---|---|
+| `shakespeare` | working | `exchange_system` conditionally dead by default |
+| `public_domain` | working | same |
+| `media_archive` | working | selection is `index 0` of the live feed, not a random draw |
+| `original` | working | -- |
+| `scifi_news` | **weak** | coda/announcer are prompt text only, nothing reserves position, nothing verifies after; plus the shared speaker drop |
+| `scifi_news_pro` | weak | shares the speaker drop, but its coda IS structurally enforced |
+
+**Source breadth is genuinely good on the adaptation lanes** -- `shakespeare`
+draws uniformly across all 14 scenes (`_otr_shakespeare_sources.py:276-285`) and
+`public_domain` across all 65 units (`_otr_public_domain_sources.py:308-335`,
+fixed 2026-08-04; it previously always drew the same pinned unit).
+**`media_archive` is the exception:** `payloads[_configured_index() % len]` with
+the index defaulting to 0 (`_otr_media_archive_sources.py:191-221`) -- always
+entry 0 of whatever the feed returns. Not random, unlike its siblings.
+
+**Dramatize-vs-recap: all four legacy banks PASS**, and the pack text is better
+than feared -- shakespeare's `exchange_system` says *"Where the scene gives these
+characters words, CARRY THEM"* and *"Do NOT summarize the play"*; public_domain
+converts narration into speech explicitly.
+
+### MISS 2 -- MECHANISM CONFIRMED, and the pro lane already solved it
+
+**`scifi_news`: the coda is prompt text and nothing else.**
+`codex_coda_contract_system` is never its own pass -- it is string-concatenated
+onto the P3 score prompt (`_otr_scifi_codex.py:3557`) and the P5 script prompt
+(`:2756`). Those are the ONLY two occurrences of "coda" in a 3,639-line file.
+There is no coda output type, no beat kind for it, nothing reserving a final
+announcer row, and **nothing verifying afterwards that a coda exists or names the
+source**. The only structural rule is cast coverage -- every cast row needs at
+least one beat SOMEWHERE (`:1238-1269`), position unchecked. **A model that gives
+the announcer one beat, mid-episode, passes every gate** -- which is exactly the
+published artifact.
+
+**`scifi_news_pro` already does it right, and is the model to copy.** Its markup
+parser is a state machine that REFUSES a draft without a coda or an announcer
+outro (`_otr_fable2_markup.py:432-444`), rejects a second coda (`:419-430`),
+rejects closing music before the coda (`:385-391`), and requires the opening
+music + intro before the first scene (`:398-402`). On top of that,
+`fable2_news_read_system` is a DEDICATED pass whose validated output is
+**unconditionally Python-appended as its own row** (`_otr_scifi_fable2.py:2897-2908`).
+
+**So the fix for MISS 2 is not invention -- it is bringing the non-pro lane up to
+the pro lane's structure.** Note this is a STRUCTURE port between two production
+lanes, not a lab port.
 
 The six banks run two different machines. Four (`shakespeare`, `public_domain`,
 `media_archive`, `original`) declare 8-9 shared seams on a `legacy_many_pass`
