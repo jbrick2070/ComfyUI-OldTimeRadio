@@ -317,6 +317,68 @@ retired at `314dd481`. **These are DETECTORS. They pair with a model repair pass
 they never rewrite prose themselves.** That is why they are portable under the
 operator's law where the old reroll machinery was not.
 
+**PORT APPROVED 2026-08-14 -- both files.** The operator approved the coda
+verifier in terms that also set its behaviour: *"we need to see our codas are
+working, and if not the LLM cleans up the coda -- not fails it, not rerolls
+it."* A firing verifier triggers a CLEAN. Never a refusal, never a reroll.
+
+### THE REPAIR MUST THINK, NOT STRIP -- operator 2026-08-14
+
+*"If it detects non-dialogue it should ask it to THINK and update the ledger
+beat with updated text. Make its best choice -- mix of removing the stage
+directions and updating the dialogue. It should think of the best edit."*
+
+**So the F1 repair is NOT a strip.** Deleting the parenthetical and leaving the
+rest is the wrong answer: it can leave a line that no longer makes sense, or
+lose something the moment needed. The model gets the line, the speaker, and the
+acts and beats so far, and is asked to produce **the best edit** -- which is
+usually removing the stage business AND adjusting the dialogue so the moment
+still plays as pure speech. Sometimes the action becomes implied in what the
+character says. That judgement is the model's, which is exactly why this may
+never be Python.
+
+### RERolls: THE LINE IS *UPSTREAM VS THE WRITTEN STORY* -- operator 2026-08-14
+
+*"Some cast rerolls are OK -- it's upstream, it won't reroll the whole darn
+story."* And: *"we can remove the rerolls."*
+
+**The rule that falls out of that, and it is the right one:**
+
+| Reroll position | Verdict |
+|---|---|
+| **UPSTREAM of the writing** -- casting, cast coverage, source selection | **KEEP.** Cheap, bounded, and it does not throw away written prose. `016ad146`'s cast-coverage reroll stays; it is what took `scifi_news` from 0-for-4 to reliable |
+| **ON THE WRITTEN STORY** -- reject a drafted candidate and redraw it cold | **REMOVE.** This is the runaway: nine cold asks get nine similar answers, and it discards work instead of fixing it. Replaced by the clean stage |
+
+### THE CLEAN STAGE -- driver's recommendation, requested by the operator 2026-08-14
+
+The operator asked for a best-practice approach given the spread between small
+local models and frontier ones, and floated tuning `scifi_news_pro` for frontier
+and `scifi_news` for local. **That would collide with the standing law "one
+prompt per job for every model tier, no per-model variants."** The resolution:
+
+**VARY THE JOB SIZE, NOT THE PROMPT TEXT.** A 2B local model can reliably answer
+*"does this one line contain action, and if so rewrite it as pure speech"*. It
+cannot reliably answer *"clean this ledger"*. So every pass gets ONE JOB and a
+SMALL WINDOW -- which a local model can do and a frontier model simply does
+better with the identical prompt. **Where the tiers legitimately differ is which
+MODEL the lane selects**, which is already a dropdown; `scifi_news_pro` naturally
+points at the stronger one. **The lane picks the model; the prompt stays single.**
+No fork, law intact, and the operator's capability instinct is still served.
+
+| # | Pass | Window it sees | Fires when |
+|---|---|---|---|
+| 1 | Action out of dialogue (**F1**) | one flagged line + speaker + acts/beats so far | `spoken_text_policy` returns a finding |
+| 2 | Speaker/line consistency (**F2**) | one flagged line + the cast | attribution is wrong |
+| 3 | Coda names the source | episode structure only | `verify_announcer_news_coda` fires |
+| 4 | Announcer open sets story/place/time/premise | episode structure only | `verify_announcer_open` fires |
+
+Then **code re-runs the detectors -- free** -- and if anything is still dirty,
+ONE bounded repair round, then flag loudly and continue. Never a hard stop.
+
+**EVERY PASS IS DETECTOR-GATED, which is the property that makes this affordable
+on local models: a clean episode costs ZERO cleaning calls.** You pay only for
+what is actually broken, instead of nine cold redraws on every pass regardless.
+
 ### MISS 2 -- the leading hypothesis, NOT yet confirmed
 
 The six banks run two different machines. Four (`shakespeare`, `public_domain`,
