@@ -43,69 +43,25 @@ should credit the play. The episode ends without telling the listener what it
 was drawn from. **The defect is that the coda does not NAME THE SOURCE -- not
 that the coda's surface or structure is wrong.** Do not redesign the ending.
 
-Both get CONFIRMED WITH EVIDENCE before either is fixed (step 2 below). A fix
-landed on a misdiagnosis will look like it broke something else.
+**BOTH ARE NOW CONFIRMED ON THE PUBLISHED 2026-08-13 LEDGER, and logged as
+`PBUG-20260814-01/02/03`. NEITHER IS FIXED.** The evidence gate is passed, so the
+next window fixes rather than re-diagnoses. Root causes, all traced:
+* **F1** -- the dialogue job writes a WHOLE ACT in one model call, so the model
+  returns a summary of the act in narrated prose. Fix is per-beat dialogue plus
+  an act-review pass.
+* **F2** -- `Ledger.set_lines()` omits `speaker` from its normalized row schema
+  while its sibling `set_beats()` carries it. **Shared by every bank**, so a
+  lane-only fix leaves the rest broken.
+* **MISS 2** -- the coda is prompt text glued onto two other passes, with nothing
+  reserving the row and nothing verifying it afterwards. `scifi_news_pro` already
+  enforces it structurally and is the model to copy.
 
-### Acts, not words -- the one thing worth keeping from the lab
+### Acts, not words -- DONE 2026-08-14 (`c0cec79b`)
 
-Production derives story length from WORD BUDGETS. That is the mouldy part and
-it goes. The lab replaced the whole apparatus with a single visible knob -- a
-dropdown for the NUMBER OF ACTS, 1 through 8, and nothing else -- making words an
-OBSERVATION rather than an INSTRUCTION. The operator is open to other ideas here;
-what is not open is keeping the word-count chasing.
-
-Verified in the production tree 2026-08-14, so the port is smaller than it
-sounds -- **the act knob already exists**, it is just subordinate to words:
-
-| Seam | State today (verified 2026-08-14) |
-|---|---|
-| `act_count` widget | ALREADY A COMBO on the writer (`OTR_LedgerScriptWriter.py:82`), default `'auto'` |
-| `'auto'` resolution | derives the act count FROM `target_words` (`OTR_LedgerScriptWriter.py:1834-1862`) -- the derivation to cut |
-| `_DEFAULT_ACT_BREAKPOINTS` | `_otr_episode_budget.py:70-74` -- the word-total -> act-count table |
-| `max_act_count` | `_otr_episode_budget.py:98-104` -- caps the operator's act choice at `target_words // 50` |
-| `ACT_COUNT_CONFIG` | `_otr_episode_budget.py:111` -- per-act outline shape; **tops out at 7 acts, operator wants 1..8** |
-| everything downstream | per-phase word targets, per-phase beat counts and `music_inter` count are all derived from the `(target_words, act_count)` PAIR |
-
-So the work is: make `act_count` the authority (explicit 1..8), extend the config
-table from 7 to 8, cut the word-derived default and cap, and **DELETE
-`target_words` outright** -- operator 2026-08-14, in caps, after being shown the
-cost below: *"REMOVE TARGET WORDS ETC WORD completely."* Not demoted to a
-read-only observation. Gone.
-
-**WHAT DELETING IT COSTS, measured 2026-08-14 -- do this atomically or not at
-all.** `target_words` is the **SECOND widget** on `OTR_LedgerScriptWriter`, right
-after `episode_title`, on a node with a very long widget list. `widgets_values`
-is POSITIONAL (BUG-LOCAL-097), so removing slot 2 shifts EVERY value after it:
-
-| Blast radius | Measured |
-|---|---|
-| `workflows/otr_canonical.json` | writer node carries `target_words` as widget slot 2 |
-| `workflows/variants/*.json` | **50 of 54** carry `target_words` |
-| Any graph saved OUTSIDE the repo | reloads with every post-slot-2 value shifted by one |
-
-The repo-internal half is tractable and must land in ONE change: regenerate the
-canonical workflow and all 50 variants alongside the code, then re-validate
-(`OTR_WorkflowValidator` + JSON round-trip + widget-count vs live `INPUT_TYPES`
-+ link integrity) and run `scripts/build_variants.py --check`. **Now is the right
-time to pay it** -- pre-release, before anyone but the operator has saved graphs.
-Any workflow the operator saved outside the repo needs re-saving after this lands.
-
-**NO WORD COUNTS IN THE PROMPTS EITHER -- driver's call 2026-08-14, taken on the
-operator's explicit delegation.** The operator offered: *"unless you want to say
-an act usually is of xx words, xx paragraphs ... if you think it helps."* **It
-does not help, and it is the word chasing coming back through the prompt.** A
-word number in a prompt is a word-count instruction reaching a model, which is
-the exact thing this work removes. An act is described by its DRAMATIC JOB
-instead -- someone wants something, it costs them something, something turns --
-which is also the operator's own test for whether a lane produces a story at all.
-If the bank audit turns up a lane where the model genuinely cannot judge scale,
-a non-word shape cue (exchanges, or beats per act) may be proposed THEN, with the
-evidence attached. Not added speculatively.
-
-**NO NEW WORD-COUNT AUTHORITY IN ANY FORM**, including a token ceiling derived
-from a word target. Removing the existing authority is the goal. Runaway guards
-(decode-loop, repetition) are CODE-SIDE, they STAY, they are not length limits,
-and they never appear as a prompt rule.
+`act_count` is an explicit 1..8 combo, default "3", and the operator's pick is
+always honoured. `target_words` is deleted everywhere -- widget, schemas,
+prompts, lane gates and all three parallel word tables. Receipt in
+`docs/HANDOFF_LOG.md`; the open consequences are in OPERATOR DECISIONS OWED below.
 
 ### The dialogue-cleanup pass -- decided 2026-08-14
 
@@ -684,93 +640,50 @@ called 250 a word-count authority. The test to apply: **can the number move when
 `target_words` moves?** If yes it is illegal; if it is a property of the job, it
 is capacity.
 
-### THE WORD RIP -- WHAT ACTUALLY SHIPPED (2026-08-14)
+### THE WORD RIP IS DONE -- receipt in `docs/HANDOFF_LOG.md` (2026-08-14, `c0cec79b`)
 
-**THERE WERE THREE PARALLEL WORD SYSTEMS, not one.** That is the finding worth
-carrying forward: removing the widget was the small part.
+`act_count` 1-8 is the only knob that shapes an episode; length is an
+observation. Three parallel word systems were collapsed onto one act topology,
+four word counts stopped reaching a model, and the positional widget removal was
+paid across `otr_canonical.json`, `otr_story_only.json`, all 50 variants and four
+env recipes in the same change. Shipped green: **10355 passed / 0 failures**,
+Bug Bible 20/24/3, variants 0 failures. **The full receipt, including the ten
+review-found defects and the self-test rot, is in `docs/HANDOFF_LOG.md` -- it
+does not belong in this forward file.**
 
-| Where | What was removed |
-|---|---|
-| `_otr_episode_budget.py` | word->act breakpoint table, `default_act_count` / `max_act_count` (**a veto that could REFUSE an act choice**), `auto_act_count`, per-phase word split, per-beat range widening, word-feasibility guard |
-| `_otr_outline.py` | `Beat.target_words`, `OutlineRequest.target_words`, `_allocate_phase_target_words`, the `beat_allocations` chain, **two prompt injections** |
-| `_otr_scifi_codex.py` | `WordSteerV4`(30..900) -> `ActSteerV4`(1..8); beat count `ceil(words/15)` -> act topology; advisory plan split -- **word centers out, beat identity kept** |
-| `_otr_scifi_fable2.py` | its OWN `_SCENE_COUNT_TABLE` (word total -> scene count), per-scene word targets, **a fourth prompt injection** |
-| `_otr_lane_specs.py` / `_otr_rolls.py` | `RollRequest`, `assert_supported`, `is_roll_compatible` -- a gate that could refuse a whole BANK on a word count |
-| `_otr_word_delivery.py` | records observed words only; no target is stamped |
-| `OTR_LedgerScriptWriter.py` | the widget, the auto-derive, and a `target_words * 4` token ceiling |
+**What that leaves OPEN, and it is the whole point of the exercise:** the story
+itself is still wrong. See the two misses above; all three are logged as
+artifact-verified PBUGs (`PBUG-20260814-01/02/03`) and NONE is fixed.
 
-**`act_count` is now an explicit 1..8 combo, default "3", always honoured.**
-`BEAT_WORD_HARD_MAX` deliberately SURVIVES -- it is the Beat schema's structural
-cap and the passage selector needs it to split a long source speech across beats;
-without it the Shakespeare lane silently drops Banquo's 91-word speech.
+**A GRAPH SAVED OUTSIDE THE REPO MUST BE RE-SAVED.** Widget slot 1 was removed,
+so every later `widgets_values` slot shifted down one.
 
-**FOUR word counts were physically reaching a model** and all four are cut. The
-pack JSONs were already clean -- the authority was entirely Python-side.
+### OPERATOR DECISIONS OWED FROM THE WORD RIP (three, all small)
 
-**THE POSITIONAL WIDGET COST, paid in one change (BUG-LOCAL-097).**
-`target_words` was slot 1, so every later slot shifted down one. Regenerated
-together: `otr_canonical.json`, **`otr_story_only.json`** (missed on the first
-pass -- there are TWO top-level graphs, not one), all 50 variants, and the four
-`*.env.json` recipes whose master hashes moved. The single link into the writer
-node followed slot 34 -> 33. **Any graph the operator saved outside the repo must
-be re-saved.**
+1. **7 acts yields FEWER voiced beats than 6** -- measured 1->3, 2->6, 3->14,
+   4->14, 5->17, 6->**20**, 7->**19**, 8->22. INHERITED, not introduced: the
+   7-act row predates the rip and was probably tuned to fit a word budget rather
+   than to describe a dramatic shape. It contradicts "more acts means more
+   turns". **Pinned in `tests/test_voiced_beat_count.py` with the reasoning
+   rather than silently changed** -- altering it changes every episode rendered
+   at 7 acts. Nothing breaks mechanically. **Fix the row, or accept it?**
+2. **`exchange_system` is a REQUIRED seam whose widget defaults FALSE**
+   (`use_exchange`, `OTR_LedgerScriptWriter.py:3164-3165`). The canonical graph
+   ships it TRUE, so production is fine -- but a fresh graph would run
+   `shakespeare` and `public_domain` without it. **Flip the default, or leave it?**
+3. **`media_archive` always takes feed entry 0** (`_otr_media_archive_sources.py:191-221`)
+   while `shakespeare` draws across all 14 scenes and `public_domain` across all
+   65 units. **Randomize it, or is entry-0 deliberate?**
 
-### THE REVIEW CAUGHT WHAT THE TESTS COULD NOT -- keep doing this
+### SMALL FORWARD ITEM -- the `__main__` self-test blocks are not tests
 
-Two Sonnet agents fixed the mechanical fallout; an **Antigravity pass then found
-defects no test would ever have failed on.** Both classes are worth remembering:
+Nothing executes them, so they rot. Three false assertions were found and fixed
+in passing 2026-08-14 (a `seed` widget that does not exist and was raising
+`KeyError`, killing the block so nothing after it ran; a cast max pinned at 6
+against a real 10; a Beat validator asserted to uppercase when it only strips).
+`OTR_LedgerScriptWriter.py`'s block still stops on an unrelated
+`creative_writing_model` default drift. **Wire them into pytest or delete them.**
 
-1. **A FIELD STOPPED BEING WRITTEN, BUT A READER STILL GUARDED ON IT.** The
-   credits roll printed its `Words:` row only `if gp.get("target_words")`. With
-   the target gone that guard is permanently False, so **the observed word counts
-   silently stopped appearing in published credits.** Same defect in
-   `video_engine.py` twice, where it rendered `Target words: (not recorded)` into
-   every HUD dossier and `_treatment.txt` sidecar. **No test failed. Nothing
-   crashed. The output just quietly went missing** -- exactly the ledger hole the
-   completeness rule exists to prevent. All three now report observed counts.
-2. **ORPHANED CALLERS OUTSIDE `nodes/`.** Five scripts still passed `--words` or
-   patched the deleted widget (`otr_api.py`'s whitelist mirror,
-   `otr_canonical_api_run.py`, `otr_queue_smoke.py`, `otr_w45_campaign.py`,
-   `otr_writer_bank_gate.py`, `otr_w45_overnight.py`). A repo-wide sweep for
-   ORPHANS has to include `scripts/`, `workflows/` and `tests/conftest.py`, not
-   just the node package.
-
-**Also fixed:** `stamp_actual` wrote `schema_version: 4` over `stamp_contract`'s
-`5`, silently demoting every published ledger's receipt.
-
-### KNOWN AND DELIBERATELY NOT FIXED
-
-**Seven acts yields FEWER voiced beats than six** -- 20 -> 19. Measured across the
-table: 1->3, 2->6, 3->14, 4->14, 5->17, 6->20, **7->19**, 8->22. This is
-INHERITED; the 7-act row predates the rip and was almost certainly tuned to fit a
-word budget rather than to describe a dramatic shape. It contradicts the
-operator's model that more acts means more turns. **Pinned in
-`tests/test_voiced_beat_count.py` with the reasoning written out, NOT silently
-changed** -- altering the topology changes every episode rendered at 7 acts, and
-that is the operator's call. Nothing breaks mechanically: the cast-capacity guard
-still passes at 19 beats.
-
-**17 bare `assert`s under `nodes/` all PREDATE this change** (verified). Not
-introduced here, not fixed here.
-
-**THE `__main__` SELF-TEST BLOCKS HAVE ROTTED, and nothing was watching.** Found
-while repairing them for the word rip: pytest never executes these blocks, so
-their assertions have drifted out of agreement with the code for a long time.
-Corrected in passing, each labelled PRE-EXISTING ROT in the source:
-
-| Block | Rotted assertion | Reality |
-|---|---|---|
-| `OTR_LedgerScriptWriter.py` | reads `spec["optional"]["seed"]` | **there is no `seed` widget** -- it raised `KeyError` and killed the self-test at that line, so NOTHING after it had run for however long |
-| `OTR_LedgerScriptWriter.py` | `nc_meta["max"] == 6` | the real ceiling is `_FABLE2_MAX_CAST` (10). Now reads the constant |
-| `_otr_outline.py` | `Beat(...).speaker == "AEGEUS"` | the validator only STRIPS; it has never uppercased. Uppercasing lives in `_normalize_speaker`, applied by callers |
-
-**`_otr_outline.py`'s block now passes end to end.** `OTR_LedgerScriptWriter.py`'s
-gets much further and stops on ANOTHER pre-existing drift --
-`creative_writing_model` default is `openrouter:slot-a`, not the Mistral id the
-assertion still names. **Deliberately NOT fixed here:** it is unrelated to this
-change and fully repairing that block is its own task. **The real lesson: a
-self-test nothing runs is not a test.** Either wire these into pytest or delete
-them; leaving them is how three false assertions survived.
 
 ### QUEUED -- RENAME THE LANES OFF "codex" AND "fable2" (operator 2026-08-14)
 

@@ -3,6 +3,89 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-14 -- base HEAD 707b39e9 -> c0cec79b (v2.0-alpha) -- THE WORD RIP (acts replace words; both story misses proven on the published ledger)
+
+Did: removed the word-count authority from the story writer and made `act_count`
+1-8 the only knob that shapes an episode. Proved both operator-reported story
+defects on the real published artifact before changing anything. Audited all six
+source banks. Shipped green: **10355 passed / 110 skipped / 1 xfailed, 0
+failures**; Bug Bible 20/24/3 at baseline; `build_variants --check` 50 variants
+0 failures.
+
+**THERE WERE THREE PARALLEL WORD SYSTEMS, not one.** `_otr_episode_budget` (the
+word->act table, a derived floor/ceiling that could REFUSE an act choice,
+per-phase word split, per-beat range widening), `_otr_scifi_codex`
+(`WordSteerV4` 30..900, beat count `ceil(words/15)`, per-beat advisory word
+centers) and `_otr_scifi_fable2` (its own word-total-to-scene-count table and
+per-scene word targets). All three now read one act topology. Removing the
+widget was the small part.
+
+**Four word counts were physically reaching a model. All cut.** The pack JSONs
+were already clean -- the authority was entirely Python-side, so no per-lane
+prompt rewrite was needed.
+
+**`BEAT_WORD_HARD_MAX` deliberately survived.** It is the Beat schema's
+structural cap and the passage selector needs it to split a long source speech
+across beats; removing it would silently drop Banquo's 91-word speech, Lear's
+love test and the balcony scene from the Shakespeare lane. Enumerating consumers
+before deleting is what caught it.
+
+**The positional-widget cost was paid in one change (BUG-LOCAL-097).**
+`target_words` was slot 1, so every later slot shifted down one. Regenerated
+together: `otr_canonical.json`, **`otr_story_only.json`** (missed first pass --
+there are TWO top-level graphs), all 50 variants, and four `*.env.json` recipes
+whose master hashes moved. The single link into the writer node followed slot
+34 -> 33. **Any graph saved outside the repo must be re-saved.**
+
+**Both story misses PROVEN on the published 2026-08-13 episode, then logged:**
+PBUG-20260814-01 (every spoken line ships `speaker: None` -- `Ledger.set_lines()`
+omits the field its sibling `set_beats()` carries), PBUG-20260814-02
+(`scifi_news` publishes with NO announcer coda and never names its news story;
+the pro lane already enforces this structurally and is the model to copy), and
+PBUG-20260814-03 (the ledger is narrated prose, so TTS reads stage directions on
+air). **All three are OPEN -- diagnosed and artifact-verified, not fixed.**
+Correction of record: this file previously pointed at
+`repair_script_artifact_metadata` as the speaker bug's home. **That function does
+not exist** -- zero hits repo-wide.
+
+**BANK AUDIT: all 21 declared seams across all six banks are LIVE.** No bank
+ships dead prompt text. `exchange_system` looked conditionally dead (its
+`use_exchange` widget defaults False) but the canonical graph ships it TRUE.
+`media_archive` takes feed entry 0 every time while its siblings draw at random.
+
+**FOUR INDEPENDENT REVIEWS FOUND TEN DEFECTS NO TEST WOULD HAVE FAILED ON.**
+Two Sonnet agents (mechanical fallout, 23 obsolete tests tombstoned) and two
+Antigravity passes. The class worth remembering: **a field stopped being
+written, but readers still guarded on it, so the guard was permanently false and
+the output silently vanished.** The credits roll, the HUD dossier and the
+`_treatment.txt` sidecar had all quietly stopped printing episode word counts.
+No crash, no red test. Also caught: `stamp_actual` writing `schema_version: 4`
+over `stamp_contract`'s `5`, and five SCRIPTS still passing `--words` to a
+deleted widget. **A repo-wide orphan sweep must include `scripts/`, `workflows/`
+and `tests/conftest.py`, not just the node package.**
+
+**THE `__main__` SELF-TEST BLOCKS HAVE ROTTED.** `OTR_LedgerScriptWriter.py` read
+a `seed` widget that does not exist, raised `KeyError` and killed its self-test
+at that line -- so nothing after it had run in a long time. Also a cast max
+pinned at 6 against a real ceiling of 10, and `_otr_outline.py` asserting the
+Beat validator uppercases when it only strips. Three corrected in passing and
+labelled PRE-EXISTING ROT; the writer's block still stops on an unrelated model-
+default drift, deliberately left. **A self-test nothing runs is not a test** --
+wire them into pytest or delete them.
+
+Deliberately NOT done: the codex/fable2 -> scifi-news rename (queued, sequenced
+behind this so a red gate stays attributable), the F1/F2/coda fixes themselves,
+and the 7-acts-yields-fewer-beats-than-6 inversion (20 -> 19, inherited; pinned
+in a test with the reasoning rather than silently changing episode topology).
+
+Suite delta: 10410 -> 10355 passed. The 55 fewer are obsolete word-budget tests
+DELETED rather than contorted, each with a tombstone naming what it used to
+assert. Nothing was silently dropped.
+
+Next: no episode has been generated yet. The suite proves nothing broke; only a
+story proves the acts knob produces one. Generate on `scifi_news` at two act
+counts and read the ledger -- that is also where the three OPEN PBUGs live.
+
 ## 2026-08-13 -- base HEAD 8c3ed304 (v2.0-alpha) -- RENDER/HANDOFF (`wan_ti2v` passed; published content failed; original Story Lab recovered)
 
 Did: completed the fresh-seed `wan_ti2v` retry, audited the published episode

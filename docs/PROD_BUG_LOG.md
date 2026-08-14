@@ -4119,3 +4119,98 @@ only visible because the cameo was FORCED and then did not appear.
   that leg imported a half-applied file. **Never edit a module mid-campaign when
   legs import it per-subprocess.** The file is consistent now.
 - status: FIXED and CLOSED -- proven by a live passing leg.
+
+## PBUG-20260814-01 -- every spoken line ships `speaker: None` because the shared line normalizer drops the field its sibling carries
+
+- artifact: `output/otr/episodes/signal_lost_the_light_of_possibility_20260813_172801/audio/..._ledger.json`
+  -- the accepted, PUBLISHED 2026-08-13 `wan_ti2v` episode. `meta.source_bank = scifi_news`.
+- symptom: all 11 spoken rows (`l001`..`l011`) carry `speaker: None`. The two
+  music rows carry `speaker: "RADIO"` correctly, and the BEAT rows carry the real
+  names -- `b000` Dr. Ada, `b003` Dr. Leo, `b005` MIT Ethics Board. So speaker
+  identity EXISTS at beat level and is lost on the way to the line.
+- consequence: nothing on a line asserts who says it; only an opaque `char_id`
+  survives. This is the mechanism behind the operator's "John speaking Mary's
+  lines" complaint. Visible in the same artifact: `b005` belongs to the MIT
+  Ethics Board, but its second row is narration about **Ada** leaving the room.
+- root cause: `nodes/production_ledger.py:1252-1309`, `Ledger.set_lines()`. Its
+  normalized row schema (`:1281-1300`) enumerates the keys it keeps, and
+  `"speaker"` is NOT among them -- a caller that passes one has it silently
+  discarded. Its SIBLING `Ledger.set_beats()` (`:1118`) does carry it:
+  `"speaker": _safe_str(r.get("speaker")) or None`. **The bug is the asymmetry
+  between two normalizers for parallel row types.** Both news lanes also fail to
+  supply it upstream (`_otr_scifi_codex.py:3211`, `_otr_scifi_fable2.py:2749-2786`);
+  `ScriptLineV4` (`_otr_scifi_codex.py:760-784`) has no speaker field at all.
+- why it shipped unnoticed: `production_ledger.py:1806-1822` has a
+  `cast[].char_id -> name` fallback that masks the omission for ONE consumer.
+  The raw ledger JSON on disk still says `speaker: None` on every line row.
+- the fix must land in BOTH halves at once: add `speaker` to the `set_lines()`
+  normalized schema mirroring `set_beats()`, AND carry the owning beat's speaker
+  onto the line row at each assembly site. Fixing only the lane leaves
+  `set_lines()` dropping it; fixing only `set_lines()` leaves the lanes not
+  supplying it. Because the root is the SHARED ledger method, a lane-only fix
+  leaves every other bank broken.
+- checked against `otr_coverage_index.yaml` and `BUG_BIBLE.yaml` 2026-08-14:
+  **genuinely uncovered.** No entry covers "sibling normalizers disagree on a
+  shared field, so one silently drops it".
+- status: OPEN -- diagnosed and artifact-verified, NOT yet fixed. **Bible
+  promotion is OWED once the fix lands with executable coverage**, per the
+  three-file contract; the rule is portable (a key-enumerating normalizer drops
+  everything it does not name, and an asymmetry against its sibling is the tell).
+
+## PBUG-20260814-02 -- `scifi_news` publishes with NO announcer coda, and never names the news story it was drawn from
+
+- artifact: same published 2026-08-13 episode as PBUG-20260814-01.
+- symptom: the episode contains exactly ONE announcer row, `l003`, and it sits in
+  the MIDDLE. There is no announcer opening and no announcer close. The real news
+  behind it (light-activated cell movement, starfish cells, MIT) is never named
+  anywhere in the ledger. Structure shipped:
+  `music_opening -> l001..l002 -> l003 ANNOUNCER -> l004..l011 -> music_closing`.
+- expected per the bank's own `coda_mode: real_news_report` and the canonical
+  topology: opening music -> ANNOUNCER introduction -> drama -> ANNOUNCER
+  source-backed news summary -> closing music.
+- root cause: the coda is PROMPT TEXT ONLY. `codex_coda_contract_system` is never
+  its own pass -- it is string-concatenated onto the P3 score prompt
+  (`_otr_scifi_codex.py:3557`) and the P5 script prompt (`:2756`). Those are the
+  only two occurrences of "coda" in the 3,639-line lane. There is no coda output
+  type, no beat kind for it, nothing reserving a final announcer row, and
+  **nothing verifying afterwards** that a coda exists or names the source. The
+  only structural rule is cast coverage (`:1238-1269`): every cast row needs at
+  least one beat SOMEWHERE, position unchecked. A model that gives the announcer
+  one beat mid-episode passes every gate -- which is exactly what shipped.
+- the sibling lane already solves it: `scifi_news_pro`'s markup parser REFUSES a
+  draft with no coda or no announcer outro (`_otr_fable2_markup.py:432-444`),
+  rejects a second coda (`:419-430`), rejects closing music before the coda
+  (`:385-391`), and requires opening music + intro before the first scene
+  (`:398-402`). Its `fable2_news_read_system` is a DEDICATED pass whose validated
+  output is unconditionally Python-appended as its own row (`_otr_scifi_fable2.py:2897-2908`).
+  **So the fix is levelling the non-pro lane up to the pro lane's structure, not
+  inventing one.**
+- status: OPEN -- diagnosed and artifact-verified, not yet fixed.
+
+## PBUG-20260814-03 -- the sealed ledger is narrated third-person prose, so TTS reads stage directions on air
+
+- artifact: same published 2026-08-13 episode.
+- symptom: this is not leakage at the edges, it is the DOMINANT mode. Verbatim
+  rows that were read aloud: `l002` is 100% narration with no dialogue at all
+  ("Ada's fingers drum on the desk, lost in thought..."); `l007` is
+  "**Leo sighs, running a hand through his hair.** '...' The room falls silent";
+  `l001` carries an attribution verb ("**Ada murmurs, her eyes reflecting the
+  glow**"); `l011` is pure narration. **The quotation marks are INSIDE the text**,
+  so dialogue is delivered as quoted speech embedded in narration.
+- consequence: the episode is an audiobook being read aloud rather than a radio
+  play being performed. This also explains the operator's "dubbed old film" note
+  better than any timing theory -- the performance is narration, so nothing
+  sounds like it is happening now.
+- diagnosis (operator's own, `docs/2026-08-14-per-beat-dialogue-design.md` in the
+  lab repo, written BEFORE this artifact was read): the dialogue job writes an
+  ENTIRE ACT in one model call -- roughly 28 JSON rows in a single reply on a
+  three-act story. *"A model asked for one beat writes that beat. A model asked
+  for a whole act writes a summary of one."* Two measured lab failures from the
+  same shape: `gemma-4-12b-it` truncated mid-object at the decode guard, and
+  `gemma-4-E4B-it` wrote twelve beats of two researchers agreeing.
+- contract violated: the sealed ledger holds announcer speech, character dialogue
+  and music cues -- never a stage direction, action row, narration or delivery
+  note. Every sealed line becomes TTS audio.
+- status: OPEN -- artifact-verified, not yet fixed. Fix direction is per-beat
+  dialogue plus an act-review pass; the repair must be a MODEL pass (code may
+  detect and explain, never rewrite prose).
