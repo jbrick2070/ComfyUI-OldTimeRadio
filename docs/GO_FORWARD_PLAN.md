@@ -646,6 +646,41 @@ called 250 a word-count authority. The test to apply: **can the number move when
 `target_words` moves?** If yes it is illegal; if it is a property of the job, it
 is capacity.
 
+### QUEUED -- RENAME THE LANES OFF "codex" AND "fable2" (operator 2026-08-14)
+
+*"Ideally I'd like to not call them codex or fable lanes -- they are scifi /
+science news pro / non-pro."* Correct, and it is the standing naming rule: a name
+that does not tell the reader what the thing does gets renamed. The BANK ids are
+already right (`scifi_news`, `scifi_news_pro`); the internals lag.
+
+| Now | After |
+|---|---|
+| `_otr_scifi_codex.py` | `_otr_scifi_news.py` |
+| `_otr_scifi_fable2.py` | `_otr_scifi_news_pro.py` |
+| `_otr_fable2_markup.py` | `_otr_scifi_news_pro_markup.py` |
+| `codex_*_system` (6 seams) | `scifi_news_*_system` |
+| `fable2_*_system` (6 seams) | `scifi_news_pro_*_system` |
+| `CodexGraphError` / `CodexTargetRangeError` | `ScifiNewsGraphError` / ... |
+
+Surface measured 2026-08-14: 3 modules, ~55 files mentioning `codex`, ~52
+mentioning `fable2` (docs and kibitz runs included), and **12 seam ids**.
+
+**THE SEAM IDS ARE THE ONLY RISKY PART, and they are risky for a specific
+reason:** they are PROMPT ROUTING KEYS in the pack JSONs and `pipelines.json`.
+Rename one inconsistently and that seam goes DEAD -- and dead pack text looks
+exactly like live pack text, which is the trap the bank audit exists to catch.
+Pack JSON + `pipelines.json` + the Python that reads them must move atomically.
+
+**SEQUENCING: after the word rip lands green, as its own change.** It touches the
+same three files the rip is mid-way through, and two large diffs on one file
+makes a red gate unattributable.
+
+**Build the seam-resolution check FIRST and keep it.** A test that every
+`required_seams` / `declared_seams` entry resolves to a real prompt turns this
+rename from risky into verifiable -- run it before, run it after, compare. That
+check is owed to the bank audit anyway (step 1 asks which declared seams are
+routed by nothing), so it is not rename-only scaffolding.
+
 ### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
 
 Straight from `2026-08-13-blind-runaway-detection-problem.md`. Every one of these
