@@ -379,6 +379,147 @@ ONE bounded repair round, then flag loudly and continue. Never a hard stop.
 on local models: a clean episode costs ZERO cleaning calls.** You pay only for
 what is actually broken, instead of nine cold redraws on every pass regardless.
 
+### BOTH MISSES CONFIRMED ON A REAL SEALED LEDGER -- 2026-08-14, evidence gate PASSED
+
+Artifact: `output/otr/episodes/signal_lost_the_light_of_possibility_20260813_172801/audio/..._ledger.json`
+-- the accepted 2026-08-13 `wan_ti2v` episode. `meta.source_bank = scifi_news`.
+13 line rows, 6 beats, 4 cast. **This is the published artifact, not a fixture.**
+
+**F1 CONFIRMED -- and it is not "leakage", it is the DOMINANT MODE.** The ledger
+is narrated third-person prose, not dialogue. Verbatim rows that TTS reads aloud:
+
+* `l001` -- "Under the microscope, the starfish cell dances... **Ada murmurs, her
+  eyes reflecting the glow.**" -- narration + an attribution verb, spoken.
+* `l002` -- **100% narration, zero dialogue.** "Ada's fingers drum on the desk,
+  lost in thought. Her lab, bathed in the hum of equipment, is her sanctuary."
+* `l004` -- "**Ada turns to Leo, her eyes alight.** '...' **Her voice trembles
+  with excitement and fear.**" -- action + quote + delivery note in one row.
+* `l007` -- "**Leo sighs, running a hand through his hair.** '...' The room falls
+  silent, the weight of his words hanging heavy."
+* `l011` -- **100% narration.** "Ada leaves the room, her steps echoing..."
+
+**The quotation marks are INSIDE the text**, so the dialogue is delivered as
+quoted speech embedded in narration. **The episode is an audiobook being read
+aloud, not a radio play being performed.** That single observation explains the
+operator's "dubbed old film" note better than any timing theory.
+
+**F2's ROOT CAUSE FOUND, and it is precise.** Every spoken line carries
+**`speaker = None`**:
+
+| Row | `speaker` | `char_id` | |
+|---|---|---|---|
+| `music_opening_001` | `'RADIO'` | -- | music rows DO carry a speaker |
+| `l001` .. `l011` | **`None`** | `c01`/`c02`/`c03`/`announcer` | **every spoken line** |
+
+But the BEATS carry it correctly -- `b000` = `Dr. Ada`, `b003` = `Dr. Leo`,
+`b005` = `MIT Ethics Board`. **So speaker identity EXISTS at beat level and is
+LOST at line level.** Only the opaque `char_id` survives onto the line. That is
+exactly the `e679b754` trace in this file ("projected P5's accepted line graph
+without authoritative speaker names/cast identity") -- **now confirmed on a real
+artifact rather than inferred.** Nothing on a line asserts who says it, which is
+precisely how a line drifts to the wrong mouth.
+
+**And F2 is VISIBLE in the same artifact.** `b005` is the `MIT Ethics Board`
+beat, holding `l010` + `l011`. `l011` is narration about **Ada** leaving the
+room. A collective character's row is carrying another character's material --
+F2, in the published episode.
+
+**MISS 2 CONFIRMED, and worse than reported.** The coda is not merely failing to
+name the news -- **there is no announcer close at all.** The whole episode
+contains ONE announcer row, `l003`, and it sits in the MIDDLE. There is no
+announcer opening establishing story/place/time/premise, and no announcer
+closing. The real news story behind this episode (light-activated cell movement,
+starfish cells, MIT) **is never named anywhere in the ledger.** Structure:
+
+```
+music_opening -> l001..l002 (Ada) -> l003 ANNOUNCER (middle) -> l004..l011 -> music_closing
+                                     ^ the only announcer row in the episode
+```
+
+Against the canonical `scifi_news` topology this file already records -- opening
+music, ANNOUNCER introduction, drama, ANNOUNCER source-backed news summary,
+closing music -- **both bookends are missing and the one announcer row is in the
+wrong place.**
+
+### THE SOLUTION WAS ALREADY DESIGNED -- lab `docs/2026-08-14-per-beat-dialogue-design.md`
+
+**The operator wrote this yesterday and it supersedes the four-pass clean stage
+proposed above.** It is a better design, and it diagnoses the F1 evidence
+measured today before that evidence existed. Its central sentence:
+
+> "A model asked for one beat writes that beat. A model asked for a whole act
+> writes a summary of one."
+
+**That IS the artifact.** Every row in the published ledger is a summary of the
+act in narrated third-person prose. The cause is not a weak prompt clause -- it
+is that **the dialogue job writes an ENTIRE ACT in one model call** (~28 JSON
+rows in a single reply on a three-act story). Two measured lab failures from that
+same shape: `gemma-4-12b-it` truncated mid-object at the decode guard, and
+`gemma-4-E4B-it` wrote twelve beats of two researchers agreeing with each other.
+**Bulk generation averages; a model writing two exchanges with the previous beat
+in view commits.**
+
+**The shape, per act:**
+
+```
+   today:  spine -> beats -> dialogue(whole act) -> cleanup
+   after:  spine -> beats -> [dialogue beat 1 .. beat N] -> review -> cleanup
+```
+
+Job count `4 * act_count + total_beats + 7`. **`act_count` stays the only knob**;
+the beat count is the MODEL's own answer to the beats job, so the schedule is a
+function of `act_count` plus what the model planned -- **never of a length
+target.**
+
+**The seven global jobs include `announcer_open` and `announcer_news_coda` as
+DEDICATED MODEL JOBS.** That is MISS 2's fix, and it confirms the production
+hypothesis below: production folds the coda into the script pass as a contract,
+the lab gives it its own job.
+
+**Review and cleanup are deliberately SEPARATE, and must stay separate:**
+
+| Job | Question it answers |
+|---|---|
+| `act_review` | **Is this act any good?** Receives the act's spine, its beats and every accepted row in order; returns the rows unchanged, or rewritten against the spine |
+| `act_cleanup` | **Can this be sealed?** The legality pass -- turns a stage direction into speech or a music cue, strips a speaker label |
+
+*"Collapsing them would make one prompt answer two unrelated questions."*
+
+**THIS IS THE OPERATOR'S BEAT-LEVEL REWRITE INSTRUCTION, restated 2026-08-14:**
+*"No Python stripper or shims. The LLM passes are asked to READ and THINK and
+give us a complete rewrite of the ledger beat, so it doesn't include action and
+the dialogue is appropriate for a character 'X' in light of the act and story
+arc."* `act_review` is that job. The unit of rewrite is the BEAT/ACT, not a line.
+
+### RUNAWAY PREVENTION -- operator 2026-08-14: *"that has to be in there"*
+
+The lab design already carries the key mechanism, and it is the right one:
+**per-job-kind decode budgets.** *"A beat needs a small fraction of an act, so
+the runaway guard stops binding on honest work."* The old truncation was a
+whole-act reply hitting a guard sized for something smaller; per-beat replies are
+small, so the guard only fires on a genuine runaway instead of on legitimate
+output. **Right-size the budget to the job -- do not raise the guard.**
+
+The full set, and none of it is a length limit on the story:
+
+| Mechanism | What it stops |
+|---|---|
+| **Per-job-kind decode budgets** | the guard binding on honest work, and a whole-act reply truncating |
+| **Existing two-signal decode guard** (`_otr_decode_guard.py`) | a decode that never reaches a stop token. **Live-proven, do not reopen or remove either signal** |
+| **Feed the failure back on retry** | the cold-redraw repetition loop -- a retry that is told what was wrong is not the same roll again |
+| **Progress requirement** | a repair that does not reduce the finding count does not get retried identically |
+| **Bounded attempts, then flag loudly** | grinding. Never a hard stop; the ledger records the row as unclean and the log says so |
+| **Detector-gating** (driver addition) | paying for clean work -- `act_cleanup` need only do real work where a finding exists |
+
+**PORTING NOTE -- this is a SHAPE port, not a file copy.** The lab design is
+written against the lab's job system (`story_authoring.py`,
+`authoring_executor.py`, `AUTHORING_JOB_SEAMS`). Production's writer is a
+different structure (`_otr_outline.py` three-stage cascade, and the
+`_otr_scifi_codex.py` P0-P5 circuit). The per-beat split, the review job, the
+separate cleanup job and the dedicated announcer jobs all have to be re-expressed
+in production's own seams. **Do not copy the lab's executor into production** --
+`CLAUDE.md` forbids shipping the lab's duplicate workflow/mirror/bridge into OTR.
+
 ### MISS 2 -- the leading hypothesis, NOT yet confirmed
 
 The six banks run two different machines. Four (`shakespeare`, `public_domain`,
