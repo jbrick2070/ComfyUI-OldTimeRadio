@@ -577,6 +577,75 @@ Everything else the research lists for the four legacy lanes is **finite-surface
 hygiene, and the research says so explicitly** -- on a post-validated lane an
 uncapped authored string is untidy, not a runaway cure. Not urgent.
 
+### CORRECTION 2026-08-14 -- THE RUNAWAY IS A REQUISITION DEFECT, NOT A DETECTION ONE
+
+**The operator pushed back on "mostly shipped" with live evidence -- *"we keep
+hitting runaways"* and *"the code yesterday was inviting runaways"* -- and he was
+right. Detection is shipped and verified. The runaways continue anyway, because
+THE CODE ASKS FOR THEM.**
+
+`_otr_generation_budget.ProviderCapacityMessages` sets
+`_otr_reserve_remaining_output_capacity = True`, and
+`OTR_LedgerScriptWriter.py:905`:
+
+```python
+requested_max_new_tokens = context_cap if reserve_remaining else max(1, int(max_new_tokens))
+```
+
+On the story lanes the request is **the entire remaining window** --
+`16,384 cap - 2,472 prompt = 13,912 tokens, no stop string, no schema ceiling`
+(`WRITER_INPUT_MATRIX.md` section 3). A model handed 13,912 tokens of room uses
+them. **The guard is the ambulance at the bottom of the cliff. This is the cliff.**
+
+**AND THE SPLIT IS EXACT -- the lanes that behave are the ones with a number:**
+
+| Lane | Ceiling |
+|---|---|
+| outline macro / phase / beat | 250 / 200 / 150 |
+| cast description / `compose_exchange` / `SlotJobFields` | 250 / 320 / 192 |
+| media / shakespeare / public-domain briefs | 520 |
+| **codex P3 / P5** (`scifi_news`) | **whole remaining window** |
+| **fable2 pitch / treatment / news read / casting** (`scifi_news_pro`) | **whole remaining window** |
+| **fable2 P3 raw markup** | **whole window, no stops, NO SCHEMA** |
+
+`WRITER_INPUT_MATRIX.md:120` states it plainly: *"The inline lanes are safe from
+a full-window runaway because every call carries a NUMERIC ceiling."* **The only
+two lanes that request everything are the two story lanes in daily use.** That is
+why it looked sudden.
+
+**THE ROOT CONFUSION, and it is a category error, not a coding slip.** The
+`ProviderCapacityMessages` docstring says it is for *"prose whose size must never
+be pre-judged"* -- the no-word-count law, applied to the DECODE BUDGET. Two
+different things were collapsed:
+
+| | |
+|---|---|
+| **The STORY** | must never be length-gated. **Correct, and it stays.** |
+| **One model CALL** | still needs a sane request size. That is machine capacity, not a story instruction |
+
+**Do not chase the archaeology (operator 2026-08-14: *"I'm suspect but don't want
+to waste tokens chasing it"*).** The docstring already gives the why; who wrote it
+and when does not change the fix.
+
+**THE FIX IS PER-JOB DECODE BUDGETS, AND IT IS NOT A SMALL ITEM -- it is the main
+event.** An earlier line in this file called it one of "two small things"; that
+was wrong and is withdrawn.
+
+**AND IT ONLY BECOMES SAFE ONCE DIALOGUE IS PER-BEAT.** With a whole-act request,
+ANY ceiling is dangerous because an honest reply really is enormous -- which is
+exactly why "raise the ceiling" kept treating the symptom and why
+`gemma-4-12b-it` truncated. A BEAT's reply genuinely fits a small budget, so the
+ceiling only ever cuts a runaway and never honest work. **Per-beat dialogue and
+per-job budgets are ONE change, not two.**
+
+**IS A PER-JOB BUDGET LEGAL UNDER THE NO-WORD-COUNT LAW? YES, and the line is
+sharp.** The law forbids a token ceiling **derived from a word target**. A budget
+derived from the **job shape** -- a beat is two exchanges -- is not that. The
+inline lanes have carried numeric ceilings from the beginning and nobody has ever
+called 250 a word-count authority. The test to apply: **can the number move when
+`target_words` moves?** If yes it is illegal; if it is a property of the job, it
+is capacity.
+
 ### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
 
 Straight from `2026-08-13-blind-runaway-detection-problem.md`. Every one of these
