@@ -520,6 +520,90 @@ separate cleanup job and the dedicated announcer jobs all have to be re-expresse
 in production's own seams. **Do not copy the lab's executor into production** --
 `CLAUDE.md` forbids shipping the lab's duplicate workflow/mirror/bridge into OTR.
 
+### RUNAWAYS -- THE WHOLE PLAN, and most of it already shipped
+
+Yesterday's research is six documents: `2026-08-13-writer-runaway-root-cause.md`,
+`-blind-runaway-detection-problem.md`, `-cross-bank-runaway-exposure.md`,
+`-decode-guard-alternatives.md`, `-codex-consult-indecode-halt.md`,
+`-process-audit-runaway-fix.md`, plus the `WRITER_INPUT_MATRIX.md` gate.
+**It reduces to one sentence:**
+
+> **Three failure shapes. Two signals. One install rule.**
+
+**THREE SHAPES** -- captured specimens, not theory (2026-08-13):
+
+| | Specimen | Size | Repeats? |
+|---|---|---|---|
+| A | P3 anaphoric peroration loop | 13,828 tok | yes |
+| B | P5 escalating repetition | 14,521 tok | yes |
+| C | P2 pure **elaboration spiral** | 15,355 tok | **never** |
+
+**TWO SIGNALS** -- and neither is redundant, because C has no cycle to find:
+
+| Signal | Catches | Where |
+|---|---|---|
+| `find_repeating_cycle` -- 48..1024 tok, 3 verbatim repeats | A, B | `_otr_decode_guard.py:99` |
+| `OpenStringTracker` -- one string open > 2,048 tokens | **C** | `_otr_decode_guard.py:225` |
+
+The second is **not a length gate**: it does not measure output, it measures how
+long ONE string has gone without closing. A 20,000-token draft of complete
+fields never approaches it.
+
+**ONE INSTALL RULE** -- *a degeneracy guard is a LIVENESS CONTRACT, so it belongs
+on every local `generate()` call, whether or not a grammar is bound.* The
+research's #1 priority was that the halt installed on `schema_model is not None`
+and therefore missed `scifi_news_pro`'s fable2 markup call, which passes
+`schema_model=None` -- the worst path in the repo.
+
+**THAT IS SHIPPED.** `b37e095b` un-gated the install and added
+`tests/test_decode_guard_covers_every_local_route.py`. **Verified 2026-08-14, not
+taken on trust: 38 passed** across that file and
+`tests/test_decode_degeneracy_guard.py`. `OTR_LedgerScriptWriter.py:977` says it
+outright -- the guard is NOT gated on schema. Also shipped: structural ceilings
+on every model-authored string with a reroll on an exact-ceiling hit, so a
+forced-shut string can never ship as clean-parsing text cut off mid-word.
+
+**SO WHAT IS ACTUALLY LEFT IS TWO SMALL THINGS AND NEITHER IS A NEW GUARD:**
+
+1. **Per-job-kind decode budgets** (from the per-beat design). A beat needs a
+   small fraction of an act, so a right-sized budget stops the guard binding on
+   honest work. This is the fix for the `gemma-4-12b-it` truncation. **Right-size
+   the job; never raise the guard.**
+2. **Feed the failure back on retry.** A retry told what was wrong is not the
+   same roll again. This is what ends the cold-redraw repetition loop, and it is
+   the same mechanism the clean stage needs anyway.
+
+Everything else the research lists for the four legacy lanes is **finite-surface
+hygiene, and the research says so explicitly** -- on a post-validated lane an
+uncapped authored string is untidy, not a runaway cure. Not urgent.
+
+### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
+
+Straight from `2026-08-13-blind-runaway-detection-problem.md`. Every one of these
+was tried or measured:
+
+| Rejected | Why |
+|---|---|
+| `repetition_penalty` | **inert here**, up to its maximum -- HF's penalty is not frequency-aware |
+| `no_repeat_ngram_size` | unusable with the grammar -- the ban and the mask both write `-inf`, the intersection can be EMPTY and sampling crashes |
+| lower temperature | helped one run, failed another. Not reliable |
+| a stop string / "end with END." | a locked decode never emits it |
+| prompt wording alone | "capacity is a ceiling, never a target" shipped, and a runaway recurred hours later with it live |
+| **a hard token ceiling** | forbidden -- a legitimately long field and a runaway field are indistinguishable by length |
+
+**ADDED 2026-08-14 -- a `RobustRepetitionStoppingCriteria` drop-in (periods
+1..48, `torch.equal` per token) was offered and DECLINED.** Grounded against the
+real files, it is a regression in three ways: (1) its 48-token ceiling sits BELOW
+the measured ~384-token runaway, so production's floor is its ceiling; (2) as a
+*drop-in replacement* it deletes `OpenStringTracker`, the only signal that sees
+specimen C; (3) periods 1..48 are excluded here **on purpose** -- JSON structural
+keys recur in every array element and dialogue has refrains, so it would fire on
+healthy output. Its "negligible cost" claim also assumes CPU: `torch.equal` on
+CUDA tensors forces a device sync, up to ~96 per token, where production compares
+a Python list every 32 tokens. **If short-period token spam is ever OBSERVED, the
+correct addition is narrow -- periods 1..8 at a HIGH repeat count, on the list, at
+the existing cadence -- and it needs the artifact first, per the admission rule.**
+
 ### MISS 2 -- the leading hypothesis, NOT yet confirmed
 
 The six banks run two different machines. Four (`shakespeare`, `public_domain`,
