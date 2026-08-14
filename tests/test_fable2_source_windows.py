@@ -438,7 +438,7 @@ def _run_until_treatment(
             payload=payload,
             pack=_pack(),
             resolved={
-                "target_words": 120,
+                "act_count": 3,
                 "num_characters": 1,
                 "creative_writing_model": "test/creative",
                 "technical_model": "test/technical",
@@ -511,7 +511,7 @@ def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
             payload=payload,
             pack=_pack(),
             resolved={
-                "target_words": 120,
+                "act_count": 3,
                 "num_characters": 1,
                 "creative_writing_model": "test/creative",
                 "technical_model": "test/technical",
@@ -714,7 +714,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         payload=payload,
         pack=_pack(),
         resolved={
-            "target_words": 120,
+            "act_count": 3,
             "num_characters": 1,
             "creative_writing_model": "test/creative",
             "technical_model": "test/technical",

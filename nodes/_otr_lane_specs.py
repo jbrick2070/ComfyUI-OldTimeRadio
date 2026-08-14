@@ -10,17 +10,13 @@ checker -- had to import the writer (and therefore ComfyUI) to ask a
 question about lanes. It lives here now. There is exactly ONE table; no
 view, no shadow copy.
 
-Two entry points, one policy (kibitz r3 headline: a single function cannot
-BOTH re-raise a runner's native error and raise one catchable type):
+The two request-compatibility entry points (`assert_supported` and
+`is_roll_compatible`) were REMOVED 2026-08-14 along with `RollRequest` and the
+word authority. Both existed to ask a lane whether it would accept a
+`target_words`; only `scifi_news_circuit` ever declared a band (30..900).
 
-* `assert_supported` -- the writer's entry gate. Re-raises the lane's OWN
-  exception, unwrapped and unreworded, so a direct pick fails exactly as it
-  always did.
-* `is_roll_compatible` -- the randomizer's filter. Resolves only the lane's
-  DECLARED compat errors and returns False for those. An ImportError,
-  AttributeError or genuine runner defect PROPAGATES: a bare `except` would
-  silently turn a bug into "ineligible", which is the silent-degrade class
-  this repo bans.
+A lane that genuinely cannot build a requested SHAPE still fails loudly when
+it tries -- only the timing of that failure moved.
 
 LaneSpec stores NAMES, never callables and never exception CLASSES.
 Building the table out of imported objects would drag every runner module
@@ -53,21 +49,10 @@ class UnknownLanePipelineError(_ROUTING.StoryRoutingError):
     """
 
 
-@dataclass(frozen=True)
-class RollRequest:
-    """The request fields a lane may legitimately refuse.
-
-    Lives here rather than in `_otr_bank_roll` so the import edge between
-    the two stays one-way: the roll imports lane specs, never the reverse.
-
-    Only `target_words` today. It is deliberately NOT a general "everything
-    the operator typed" bag -- a lane may decline a REQUEST SHAPE it cannot
-    execute, and nothing else. Word count is never a quality gate here
-    (docs: "we never chase word count"); this is purely "would this lane
-    raise before it wrote a word".
-    """
-
-    target_words: int
+# `RollRequest` was REMOVED 2026-08-14 with the word authority. It carried
+# exactly one field, `target_words`, and existed so a lane could decline a
+# target outside its band. With no target there is nothing to decline, and a
+# gate whose only input is gone is worse than no gate: it still reads as live.
 
 
 @dataclass(frozen=True)
@@ -80,17 +65,9 @@ class LaneSpec:
     runner_attr: str
     """The lane entry point inside `module`."""
 
-    compat_attr: str
-    """Target-only preflight predicate inside `module`; "" = unconstrained.
-
-    Empty is a DECLARATION, not an absence: every dispatched lane states its
-    policy explicitly, because "no hook found" silently meaning "compatible"
-    is how an incompatible lane wins a roll it should never have entered.
-    """
-
-    compat_error_attrs: "tuple[str, ...]" = ()
-    """Exception attribute names in `module` that mean "this lane declines
-    this request". ONLY these are caught by `is_roll_compatible`."""
+    # `compat_attr` / `compat_error_attrs` were removed 2026-08-14. They named
+    # the target-band preflight and the exceptions it raised; both policed
+    # `target_words` and nothing else.
 
 
 # The dispatched lanes. The key IS the pipeline id from pipelines.json.
@@ -99,19 +76,12 @@ LANE_SPECS: "dict[str, LaneSpec]" = {
     "scifi_news_pro_multipass": LaneSpec(
         module="_otr_scifi_fable2",
         runner_attr="run_scifi_fable2_episode",
-        # Unconstrained BY DECLARATION: the lane accepts any target the
-        # shared episode budget already accepted (it only refuses < 1, and
-        # the budget floor of 30 is strictly tighter).
-        compat_attr="",
-        compat_error_attrs=(),
     ),
     # 2026-07-19: base scifi_codex (v1) was retired and the v4 lane became
     # the direct scifi_news runner.
     "scifi_news_circuit": LaneSpec(
         module="_otr_scifi_codex",
         runner_attr="run_scifi_codex_episode",
-        compat_attr="assert_supported_target_words",
-        compat_error_attrs=("CodexTargetRangeError",),
     ),
 }
 
@@ -161,71 +131,17 @@ def runner_for(pipeline_id: str) -> "Callable[..., Any] | None":
     raise _unknown(pipeline_id)
 
 
-def _compat_hook(spec: LaneSpec):
-    """The lane's declared preflight predicate, or None if unconstrained."""
-    if not spec.compat_attr:
-        return None
-    return getattr(_load(spec.module), spec.compat_attr)
-
-
-def assert_supported(bank: Any, req: RollRequest) -> None:
-    """Writer entry gate: raise the LANE'S OWN error, unwrapped.
-
-    A direct pick that a lane cannot execute must fail with exactly the
-    exception type and message it has always produced -- the gate moves
-    WHEN the failure happens (before any source work), never WHAT it is.
-    An inline lane is a no-op; an unregistered pipeline raises.
-    """
-    pipeline_id = str(getattr(bank, "default_story_pipeline", "") or "")
-    spec = LANE_SPECS.get(pipeline_id)
-    if spec is None:
-        if pipeline_id in INLINE_PIPELINES:
-            return
-        raise _unknown(pipeline_id)
-    hook = _compat_hook(spec)
-    if hook is not None:
-        hook(req.target_words)
-
-
-def is_roll_compatible(bank: Any, req: RollRequest) -> bool:
-    """Randomizer filter: would this lane refuse this request outright?
-
-    Catches ONLY the lane's DECLARED compat errors. Anything else -- an
-    ImportError, an AttributeError, a defect inside the preflight --
-    propagates, because a randomizer that silently drops a bank whenever its
-    module is broken hides the breakage behind a smaller pool.
-    """
-    pipeline_id = str(getattr(bank, "default_story_pipeline", "") or "")
-    spec = LANE_SPECS.get(pipeline_id)
-    if spec is None:
-        # An inline lane is compatible; an unregistered pipeline is NOT
-        # eligible-by-default -- it is a wiring bug, and the roll says so.
-        if pipeline_id in INLINE_PIPELINES:
-            return True
-        return False
-    hook = _compat_hook(spec)
-    if hook is None:
-        return True
-    module = _load(spec.module)
-    declared = tuple(getattr(module, name) for name in spec.compat_error_attrs)
-    if not declared:
-        hook(req.target_words)
-        return True
-    try:
-        hook(req.target_words)
-    except declared:
-        return False
-    return True
+# `_compat_hook`, `assert_supported` and `is_roll_compatible` were REMOVED
+# 2026-08-14 with `RollRequest`. All three existed only to ask a lane
+# whether it would accept a `target_words`. The bank roll now filters on
+# `bank.runnable` alone -- see `_otr_rolls.eligible_bank_ids`.
 
 
 __all__ = [
     "INLINE_PIPELINES",
     "LANE_SPECS",
     "LaneSpec",
-    "RollRequest",
     "UnknownLanePipelineError",
-    "assert_supported",
     "is_dispatched",
-    "is_roll_compatible",
     "runner_for",
 ]

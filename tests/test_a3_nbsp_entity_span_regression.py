@@ -71,7 +71,7 @@ OPEN_MODELS_QUOTE = (
     "for their task, such as generating product renderings in a certain "
     "artistic style. But these models can be tampered with."
 )
-RESOLVED = {"seed_source": "rss_fetch", "target_words": 45}
+RESOLVED = {"seed_source": "rss_fetch", "act_count": 3}
 
 
 def _payload(full_text: str) -> dict:

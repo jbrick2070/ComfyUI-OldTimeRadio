@@ -238,7 +238,7 @@ def test_resolve_inputs_replays_snapshot_and_bypasses_rss(tmp_path, monkeypatch)
 
     monkeypatch.setattr(SP, "resolve_fetcher", _boom)
 
-    out = LSW._resolve_inputs(source_bank="scifi_news_pro", target_words=120)
+    out = LSW._resolve_inputs(source_bank="scifi_news_pro")
     assert out["seed_source"] == "science_rss_frozen"
     assert out["news_article"] == _payload()
     assert out["news_seed"] == "the frozen source seed text"
@@ -251,7 +251,7 @@ def test_resolve_inputs_propagates_base_mismatch_loud(tmp_path, monkeypatch):
         tmp_path, {"scifi_news_pro": _envelope(base="media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     with pytest.raises(SS.SourceSnapshotError):
-        LSW._resolve_inputs(source_bank="scifi_news_pro", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_news_pro")
 
 
 def test_resolve_inputs_without_snapshot_is_unaffected(tmp_path, monkeypatch):
@@ -260,7 +260,6 @@ def test_resolve_inputs_without_snapshot_is_unaffected(tmp_path, monkeypatch):
     out = LSW._resolve_inputs(
         source_bank="scifi_news_pro",
         custom_premise="a custom seed premise",
-        target_words=120,
     )
     assert out["seed_source"] == "custom_premise"
     assert out["news_seed"] == "a custom seed premise"
@@ -278,7 +277,7 @@ def test_resolve_inputs_replay_warns_without_c7_seeds(tmp_path, monkeypatch, cap
     monkeypatch.delenv("OTR_STYLE_SEED", raising=False)
     monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
     with caplog.at_level(logging.WARNING):
-        LSW._resolve_inputs(source_bank="scifi_news_pro", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_news_pro")
     assert any("without C7 seed pinning" in r.getMessage() for r in caplog.records)
 
 
@@ -290,5 +289,5 @@ def test_resolve_inputs_replay_quiet_with_c7_seeds(tmp_path, monkeypatch, caplog
     monkeypatch.setenv("OTR_STYLE_SEED", "42")
     monkeypatch.setattr(SP, "resolve_fetcher", _no_fetch)
     with caplog.at_level(logging.WARNING):
-        LSW._resolve_inputs(source_bank="scifi_news_pro", target_words=120)
+        LSW._resolve_inputs(source_bank="scifi_news_pro")
     assert not any("without C7 seed pinning" in r.getMessage() for r in caplog.records)

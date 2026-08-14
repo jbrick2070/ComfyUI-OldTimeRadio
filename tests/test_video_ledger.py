@@ -337,7 +337,11 @@ def test_video_treatment_forensic_sections(tmp_path):
     # WRITER / LLM CONFIG
     assert "WRITER / LLM CONFIG" in content
     assert "claude-opus-latest" in content
-    assert "863" in content and "845" in content
+    # 2026-08-14: was `"863" in content and "845" in content` -- requested
+    # vs actual. The requested half is gone; the treatment sidecar carries
+    # the observed counts alone.
+    assert "845" in content
+    assert "Target words" not in content
     assert "A<->B transition" in content
     # STORY SPINE
     assert "STORY SPINE" in content

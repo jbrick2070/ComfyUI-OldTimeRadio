@@ -679,7 +679,7 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
 # Headless creative whitelist (S2 spec section 8; enforced, stateless)
 # ---------------------------------------------------------------------------
 CREATIVE_WHITELIST = frozenset({
-    "target_words", "num_characters", "act_count", "request_seed",
+    "num_characters", "act_count", "request_seed",
     "seed_mode",
     "episode_title", "custom_premise", "style_custom",
     "openrouter_slot_a_model", "openrouter_slot_b_model",

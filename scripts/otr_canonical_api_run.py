@@ -91,8 +91,8 @@ def _apply_set(workflow: dict, schemas: dict, patch: str) -> str:
 def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
     writer_id = _node_id_for(workflow, "OTR_LedgerScriptWriter")
     shortcuts: list[tuple[str, Any]] = []
-    if args.words is not None:
-        shortcuts.append(("target_words", int(args.words)))
+    # `--words` was removed 2026-08-14 with the target_words widget. Episode
+    # shape is set with --act-count below; length is an observation.
     if args.title is not None:
         shortcuts.append(("episode_title", args.title))
     if args.premise is not None:
@@ -171,7 +171,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--profile", default="none",
                         help="explicit capability profile id, e.g. none or otr_cloud_lanes")
-    parser.add_argument("--words", type=int, default=None)
     parser.add_argument("--title", default=None)
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)

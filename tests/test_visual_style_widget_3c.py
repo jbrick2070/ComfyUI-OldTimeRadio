@@ -1,11 +1,11 @@
 """tests/test_visual_style_widget_3c.py
 
 Multi-modal story schema STAGE 3 CHUNK 3C -- the `visual_style` selector
-widget on OTR_LedgerScriptWriter (workflow slot 26; the 2C playbook applied
+widget on OTR_LedgerScriptWriter (workflow slot 23; the 2C playbook applied
 per STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
 
 Pins:
-  1. Widget surface: visual_style stays pinned at slot 24; choices ==
+  1. Widget surface: visual_style stays pinned at slot 23; choices ==
      list_style_ids() exactly (registry order, all styles live); default
      sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
@@ -15,9 +15,10 @@ Pins:
      (non-runnable custom bank wins even when both are bad).
   4. _resolve_inputs carries visual_style as the authoritative value.
   5. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
-     slot 24 (shifted -2 by the 2026-07-05 style-engine consolidation,
-     which deleted the style / style_custom widgets). Later widgets append
-     after it.
+     slot 23 (shifted -1 by the 2026-08-14 removal of the `target_words`
+     widget, on top of the -2 shift from the 2026-07-05 style-engine
+     consolidation, which deleted the style / style_custom widgets).
+     Later widgets append after it.
 """
 from __future__ import annotations
 
@@ -53,10 +54,10 @@ class TestWidgetSurface:
     def test_visual_style_positional_pin(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[24] == "visual_style"
-        assert order[25] == "google_api_slot_a_model"
-        assert order[26] == "google_api_slot_b_model"
-        assert order[27] == "source_ref"
+        assert order[23] == "visual_style"
+        assert order[24] == "google_api_slot_a_model"
+        assert order[25] == "google_api_slot_b_model"
+        assert order[26] == "source_ref"
 
     def test_choices_are_the_roll_sentinel_then_the_registry(self):
         """2026-07-31: this dropdown owns the SECOND randomizer's command,
@@ -146,7 +147,7 @@ class TestHeadlessSurface:
         assert "visual_style" in pkg_wl
         assert "visual_style" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_24(self):
+    def test_patch_widget_by_name_lands_slot_23(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -161,13 +162,16 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34
-        # (llm_device..gguf_quant appended at 28-33; visual_style stays 24).
-        # schemas comes from the LIVE INPUT_TYPES() above, so this already
-        # reflects the new vector -- only the pin needed updating.
-        assert len(node1["widgets_values"]) == 34
-        assert node1["widgets_values"][24] == "anime"
-        assert node1["widgets_values"][23] == "scifi_news"
+        # S5 platform-portability (2026-07-10): OLD pin 28 -> pin 34
+        # (llm_device..gguf_quant appended at 28-33; visual_style at 24).
+        # 2026-08-14: target_words removal shifted everything from
+        # num_characters onward down by 1 -- visual_style now sits at 23
+        # and the vector tops out at 33. schemas comes from the LIVE
+        # INPUT_TYPES() above, so this already reflects the new vector --
+        # only the pin needed updating.
+        assert len(node1["widgets_values"]) == 33
+        assert node1["widgets_values"][23] == "anime"
+        assert node1["widgets_values"][22] == "scifi_news"
+        assert node1["widgets_values"][24] == "(select Google API model)"
         assert node1["widgets_values"][25] == "(select Google API model)"
-        assert node1["widgets_values"][26] == "(select Google API model)"
-        assert node1["widgets_values"][27] == ""
+        assert node1["widgets_values"][26] == ""

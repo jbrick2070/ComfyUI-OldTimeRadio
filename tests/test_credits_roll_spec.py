@@ -256,7 +256,11 @@ def test_writer_config_block():
     body = _flat(lay["col2"]["writer_grid"])
     assert "Mistral-Nemo-Instruct-2407" in body
     assert "0.85" in body and "0.95" in body
-    assert "target 120" in body and "actual 83" in body
+    # 2026-08-14: was `"target 120" and "actual 83"`. There is no requested
+    # length any more, so the row carries the OBSERVED counts alone. The row
+    # must keep RENDERING -- it briefly stopped entirely, because it was
+    # gated on a target_words that is never written now.
+    assert "83 (char 37 / ann 46)" in body
 
 
 # --------------------------------------------------------------------------- #

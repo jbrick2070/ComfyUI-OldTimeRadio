@@ -48,7 +48,12 @@ def test_dossier_has_writer_llm_block():
         l for s in dossier if s["header"] == "WRITER / LLM CONFIG" for l in s["lines"])
     assert "claude-opus-latest" in body          # creative slot model on-screen
     assert "Mistral-Nemo" in body                # technical slot model on-screen
-    assert "320" in body and "305" in body       # target vs actual words
+    # 2026-08-14: was `"320" in body and "305" in body` -- requested vs
+    # actual. There is no requested length now, so the dossier reports the
+    # OBSERVED counts alone. The row must still RENDER: it briefly printed
+    # "Target words: (not recorded)" instead.
+    assert "305 (char 210 / ann 95)" in body
+    assert "320" not in body, "a requested word count must not reappear"
 
 
 def test_dossier_has_story_spine_block():

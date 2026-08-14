@@ -2,10 +2,11 @@
 
 Pins the 2026-06-01 contract (indices shifted -2 by the 2026-07-05
 style-engine consolidation, which deleted the style/style_custom
-widgets that used to sit earlier in the optional block):
-  * comfy_slot_a_model / comfy_slot_b_model are APPENDED at indices 19/20
+widgets that used to sit earlier in the optional block, then a further
+-1 by the 2026-08-14 removal of the `target_words` widget):
+  * comfy_slot_a_model / comfy_slot_b_model are APPENDED at indices 18/19
     of the writer's combined required+optional order (the OpenRouter
-    pair stays at 17/18).
+    pair stays at 16/17).
   * The lane is opt-in / default-off via OTR_ENABLE_COMFY_CREDITS=1 -- when
     disabled the virtual rows + slug catalog never reach the dropdowns, so
     the offline baseline is untouched (mirrors the OpenRouter gate).
@@ -256,8 +257,8 @@ def test_request_slot_routes_comfy_handle_to_backend(comfy_on):
 def test_writer_appends_comfy_slots_after_openrouter():
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[19] == "comfy_slot_a_model"
-    assert order[20] == "comfy_slot_b_model"
+    assert order[18] == "comfy_slot_a_model"
+    assert order[19] == "comfy_slot_b_model"
     # Hidden auth inputs are declared but are NOT widgets (absent from order).
     assert "auth_token_comfy_org" in spec.get("hidden", {})
     assert "api_key_comfy_org" in spec.get("hidden", {})
@@ -273,7 +274,6 @@ def test_comfy_slot_defaults_selectable_when_enabled(comfy_on):
 
 def test_resolve_inputs_threads_comfy_slots():
     out = _resolve_inputs(
-        target_words=350,
         num_characters=2,
         creative_writing_model=cat.DEFAULT_LLM,
         technical_model=cat.DEFAULT_LLM,
@@ -287,7 +287,6 @@ def test_resolve_inputs_threads_comfy_slots():
 
 def test_resolve_inputs_old_workflow_defaults_comfy_slots_empty():
     out = _resolve_inputs(
-        target_words=350,
         num_characters=2,
         creative_writing_model=cat.DEFAULT_LLM,
         technical_model=cat.DEFAULT_LLM,

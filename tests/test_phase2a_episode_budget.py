@@ -25,12 +25,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes._otr_episode_budget import (  # noqa: E402
     ACT_COUNT_CONFIG,
     ARC_PHASE_GUIDANCE,
+    MAX_ACT_COUNT,
+    MIN_ACT_COUNT,
     EpisodeBudget,
     InvalidEpisodeBudgetError,
-    auto_act_count,
     compute_episode_budget,
-    default_act_count,
-    max_act_count,
 )
 from nodes._otr_outline import (  # noqa: E402
     Beat,
@@ -42,207 +41,111 @@ from nodes._otr_outline import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# default_act_count / max_act_count
-# ---------------------------------------------------------------------------
-
-
-class TestDefaultActCount:
-
-    @pytest.mark.parametrize("words,expected", [
-        (30, 1),
-        (100, 1),
-        (149, 1),
-        (150, 2),
-        (200, 2),
-        (299, 2),
-        (300, 3),
-        (350, 3),
-        (1000, 3),
-        (5000, 3),
-    ])
-    def test_threshold_table(self, words, expected):
-        assert default_act_count(words) == expected
-
-    def test_below_minimum_raises(self):
-        with pytest.raises(InvalidEpisodeBudgetError) as exc:
-            default_act_count(29)
-        assert "below minimum of 30" in str(exc.value)
-
-
-class TestMaxActCount:
-
-    @pytest.mark.parametrize("words,expected", [
-        (30, 1),
-        (100, 2),
-        (200, 4),
-        (300, 6),
-        (350, 7),
-        (1000, 7),
-        (5000, 7),
-    ])
-    def test_threshold_table(self, words, expected):
-        assert max_act_count(words) == expected
-
-
-class TestAutoActCount:
-    """auto_act_count scales the act count up with length (option A,
-    2026-06-06): fewest acts whose widened-beat budget fits target_words,
-    at or above the narrative default floor."""
-
-    def test_default_length_stays_three_acts(self):
-        # 350 fits 3 acts, so auto must not over-subdivide it.
-        assert auto_act_count(350) == 3
-
-    def test_780_stays_three_acts_fewer_acts_preference(self):
-        # The whole point of "fewer acts, longer beats": 780 fits 3 acts
-        # (widened beats), so auto keeps 3 rather than adding acts.
-        assert auto_act_count(780) == 3
-
-    def test_never_below_narrative_default(self):
-        for tw in (30, 149, 150, 299, 300, 800, 1364):
-            assert auto_act_count(tw) >= default_act_count(tw)
-
-    def test_climbs_when_three_acts_cannot_fit(self):
-        # ~1600 words exceed the 3- and 4-act ceilings; auto climbs to the
-        # smallest act count that actually fits, and that budget is valid.
-        ac = auto_act_count(1600)
-        assert ac >= 5
-        compute_episode_budget(1600, ac, True, 2)  # must not raise
-
-    def test_chosen_act_count_always_valid_across_envelope(self):
-        # Across the whole supported envelope, the auto pick must build a
-        # budget without tripping the feasibility guard.
-        for tw in range(240, 1821, 20):
-            ac = auto_act_count(tw)
-            compute_episode_budget(tw, ac, True, 2)  # must not raise
-
-    def test_beyond_ceiling_picks_max_capacity_and_guard_still_fires(self):
-        # Past the engine's structural max, no act count fits; auto returns
-        # a real act count but compute_episode_budget still fail-fasts.
-        ac = auto_act_count(2500)
-        assert ac in range(1, 8)
-        with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(2500, ac, True, 2)
-
-    def test_below_minimum_raises(self):
-        with pytest.raises(InvalidEpisodeBudgetError):
-            auto_act_count(29)
-
-
-# ---------------------------------------------------------------------------
-# compute_episode_budget
+# compute_episode_budget -- act topology only
+#
+# REWRITTEN 2026-08-14. Three whole classes were deleted rather than repaired:
+# TestDefaultActCount, TestMaxActCount and TestAutoActCount each pinned a
+# word-derived act count, and all three helpers were removed with the word
+# authority. Repairing them would have meant inventing a new meaning for
+# tests whose entire premise was "how many acts does this WORD TOTAL buy".
 # ---------------------------------------------------------------------------
 
 
 class TestComputeEpisodeBudget:
 
-    def test_screenshot_case_350_3_acts(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+    def test_three_act_shape(self):
+        eb = compute_episode_budget(3, True, 2)
         assert eb.act_count == 3
         assert eb.arc_phases == ("setup", "complication", "resolution")
-        assert eb.per_phase_words == (98, 154, 98)
         assert eb.per_phase_beats == (4, 6, 4)
-        assert eb.words_per_beat_range == (20, 35)
         assert eb.music_inter_count == 2
         assert eb.announcer_beats == 2
         assert eb.cast_size == 2
-        assert eb.target_words == 350
 
     def test_include_act_breaks_false_zeros_music_inter(self):
-        eb = compute_episode_budget(350, 3, False, 2)
-        assert eb.music_inter_count == 0
+        assert compute_episode_budget(3, False, 2).music_inter_count == 0
 
     def test_1_act_no_music_inter_even_with_breaks(self):
-        eb = compute_episode_budget(30, 1, True, 1)
-        # 1 act -> music_inter_count = act_count - 1 = 0
-        assert eb.music_inter_count == 0
-
-    def test_target_words_below_minimum_rejected(self):
-        with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(29, 1, True, 1)
+        # music_inter_count = act_count - 1 = 0
+        assert compute_episode_budget(1, True, 1).music_inter_count == 0
 
     def test_act_count_out_of_range_rejected(self):
         with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(350, 0, True, 2)
+            compute_episode_budget(MIN_ACT_COUNT - 1, True, 2)
         with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(350, 8, True, 2)
+            compute_episode_budget(MAX_ACT_COUNT + 1, True, 2)
 
-    def test_act_count_below_default_rejected(self):
-        # tw=350 -> default 3; act_count=2 is below the floor
-        with pytest.raises(InvalidEpisodeBudgetError) as exc:
-            compute_episode_budget(350, 2, True, 2)
-        assert "below default" in str(exc.value)
-
-    def test_act_count_above_max_rejected(self):
-        # tw=100 -> max 2; act_count=5 exceeds the cap
-        with pytest.raises(InvalidEpisodeBudgetError) as exc:
-            compute_episode_budget(100, 5, True, 2)
-        assert "exceeds max" in str(exc.value)
+    def test_eight_acts_is_now_in_range(self):
+        # The ceiling moved 7 -> 8 on 2026-08-14; 8 used to be the first
+        # REJECTED value and this test previously asserted that.
+        eb = compute_episode_budget(8, True, 2)
+        assert eb.act_count == 8
+        assert len(eb.arc_phases) == 8
+        assert "crisis" in eb.arc_phases
 
     def test_num_characters_below_one_rejected(self):
         with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(350, 3, True, 0)
+            compute_episode_budget(3, True, 0)
 
     def test_returns_frozen_dataclass(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         with pytest.raises(Exception):
             eb.act_count = 4  # type: ignore[misc]
 
-    # --- per-beat ceiling widening + fail-fast guard (BUG 2026-06-06) ---
+    # --- the word authority is gone and must stay gone -------------------
 
-    def test_short_episode_beat_cap_unchanged_by_widening(self):
-        # ceil(P/N) <= base_hi for every phase, so widening is a no-op
-        # and a 350w/3-act episode is byte-identical to before the fix.
-        eb = compute_episode_budget(350, 3, True, 2)
-        assert eb.words_per_beat_range == (20, 35)
+    def test_every_operator_act_choice_is_honoured(self):
+        """No derived floor, no derived ceiling, no refusal.
 
-    def test_long_episode_widens_beat_cap_to_fit_3_acts(self):
-        # target_words=780 at 3 acts: complication needs ceil(343/6)=58,
-        # which drives the per-beat ceiling up so the fixed 14-beat
-        # structure can actually hold the requested length.
-        eb = compute_episode_budget(780, 3, True, 2)
-        assert eb.words_per_beat_range[0] == 20
-        assert eb.words_per_beat_range[1] == 58
-        capacity = sum(
-            eb.words_per_beat_range[1] * nb for nb in eb.per_phase_beats
-        )
-        assert capacity >= 780
+        The removed `default_act_count` / `max_act_count` pair could REFUSE
+        an act count because of a word total -- a word-count veto in a
+        project whose law says word targets are advisory.
+        """
+        for acts in range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1):
+            eb = compute_episode_budget(acts, True, 2)
+            assert eb.act_count == acts
 
-    def test_beat_cap_never_exceeds_schema_hard_max(self):
-        from nodes._otr_episode_budget import BEAT_WORD_HARD_MAX
-        # A length demanding >80 words/beat is clamped to the schema cap.
-        eb = compute_episode_budget(1100, 3, True, 2)
-        assert eb.words_per_beat_range[1] == BEAT_WORD_HARD_MAX
+    def test_no_word_field_survives_on_the_budget(self):
+        eb = compute_episode_budget(3, True, 2)
+        for banned in (
+            "target_words", "per_phase_words", "words_per_beat_range",
+        ):
+            assert not hasattr(eb, banned), banned
 
-    def test_unfittable_length_raises_fast_with_guidance(self):
-        # Beyond what even 80-word beats can hold at this act count the
-        # guard raises immediately (no LLM calls), with an actionable hint.
-        with pytest.raises(InvalidEpisodeBudgetError) as exc:
-            compute_episode_budget(1400, 3, True, 2)
-        msg = str(exc.value)
-        assert "cannot fit" in msg
-        assert "raise act_count" in msg
+    def test_the_retired_word_helpers_are_really_gone(self):
+        import nodes._otr_episode_budget as budget
+
+        for retired in (
+            "auto_act_count", "default_act_count", "max_act_count",
+            "_DEFAULT_ACT_BREAKPOINTS", "_max_target_words_for_act_count",
+        ):
+            assert not hasattr(budget, retired), retired
 
 
 class TestActCountConfigSanity:
 
-    @pytest.mark.parametrize("ac", list(range(1, 8)))
-    def test_fractions_sum_to_one(self, ac):
-        s = sum(ACT_COUNT_CONFIG[ac]["act_word_fractions"])
-        assert abs(s - 1.0) < 1e-6
-
-    @pytest.mark.parametrize("ac", list(range(1, 8)))
+    @pytest.mark.parametrize("ac", list(range(1, 9)))
     def test_lengths_match_act_count(self, ac):
         cfg = ACT_COUNT_CONFIG[ac]
         assert len(cfg["arc_phases"]) == ac
         assert len(cfg["voiced_beats_per_act"]) == ac
-        assert len(cfg["act_word_fractions"]) == ac
 
-    @pytest.mark.parametrize("ac", list(range(1, 8)))
+    @pytest.mark.parametrize("ac", list(range(1, 9)))
     def test_arc_phase_guidance_covers_all_phases(self, ac):
         for phase in ACT_COUNT_CONFIG[ac]["arc_phases"]:
-            assert phase in ARC_PHASE_GUIDANCE, \
-                f"ARC_PHASE_GUIDANCE missing {phase!r}"
+            assert phase in ARC_PHASE_GUIDANCE,                 f"ARC_PHASE_GUIDANCE missing {phase!r}"
+
+    @pytest.mark.parametrize("ac", list(range(1, 9)))
+    def test_no_word_keys_left_in_the_topology(self, ac):
+        cfg = ACT_COUNT_CONFIG[ac]
+        assert "act_word_fractions" not in cfg
+        assert "words_per_beat_range" not in cfg
+
+    def test_the_table_covers_exactly_the_offered_range(self):
+        assert sorted(ACT_COUNT_CONFIG) == list(
+            range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)
+        )
+
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +169,6 @@ def _ok_beat(beat_id: str, speaker: str = "ALICE",
         "speaker": speaker,
         "speaker_role": role,
         "intent": "speak about the signal",
-        "target_words": words,
         "mood": "tense",
     }
     if phase is not None:
@@ -328,18 +230,20 @@ class TestEpisodeBudgetPromptBlock:
     # replaces it.
 
     def test_block_renders_as_nonbinding_plan(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         prompt = _build_user_prompt(req)
         assert "EPISODE PLAN:" in prompt
-        assert "Requested spoken length: about 350 words" in prompt
-        assert "Use this only as broad guidance" in prompt
-        assert "never pad or compress" in prompt
+        # THE WORD LINE IS GONE (2026-08-14). This assertion used to require
+        # "Requested spoken length: about 350 words" -- the word count
+        # physically reaching the model. Its absence is now the contract.
+        assert "Requested spoken length" not in prompt
+        assert "Target total dialogue length" not in prompt
+        assert "350" not in prompt
         assert "Announcer beats: 2" in prompt
 
 
@@ -404,35 +308,30 @@ class TestValidateOutlineAgainstBudget:
     # TestEpisodeBudgetPromptBlock covers the reject case.
 
     def test_clean_outline_passes(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
         assert validate_outline_against_budget(outline, req) is None
 
     def test_per_phase_word_drift_is_metadata_only(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        outline.beats[11].target_words = 5
-        outline.beats[12].target_words = 5
         assert validate_outline_against_budget(outline, req) is None
 
     def test_arc_phase_ordering_is_metadata_only(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
@@ -440,11 +339,10 @@ class TestValidateOutlineAgainstBudget:
         assert validate_outline_against_budget(outline, req) is None
 
     def test_music_inter_count_violation_rejected(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
@@ -455,11 +353,10 @@ class TestValidateOutlineAgainstBudget:
         assert "music_inter" in violation
 
     def test_announcer_count_violation_rejected(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
@@ -470,23 +367,20 @@ class TestValidateOutlineAgainstBudget:
         assert "announcer" in violation
 
     def test_per_beat_word_range_is_metadata_only(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()
-        outline.beats[2].target_words = 10
         assert validate_outline_against_budget(outline, req) is None
 
     def test_unknown_arc_phase_is_metadata_only(self):
-        eb = compute_episode_budget(350, 3, True, 2)
+        eb = compute_episode_budget(3, True, 2)
         req = OutlineRequest(
             news_seed="seed", style="noir",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=eb,
         )
         outline = _outline_for_350_3_acts()

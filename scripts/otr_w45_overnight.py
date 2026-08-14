@@ -153,7 +153,7 @@ def run_campaign(engines: list) -> list:
     say("running legs: %s" % ", ".join(engines))
     env = dict(os.environ, PYTHONUTF8="1")
     subprocess.run(
-        [PY, str(CAMPAIGN), "--words", "45", "--only", ",".join(engines)],
+        [PY, str(CAMPAIGN), "--acts", "1", "--only", ",".join(engines)],
         cwd=str(REPO), env=env)
     if not RESULTS.exists():
         return []

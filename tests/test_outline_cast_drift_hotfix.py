@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes._otr_episode_budget import (  # noqa: E402
     compute_episode_budget,
-    default_act_count,
 )
 from nodes._otr_outline import (  # noqa: E402
     Outline,
@@ -59,7 +58,6 @@ _MACRO_JSON = json.dumps({
 })
 _BEAT_JSON = json.dumps({
     "intent": "advance the scene toward the next turn",
-    "target_words": 18,
     "mood": "tense",
 })
 
@@ -111,11 +109,14 @@ def _make_gen(phase_speaker_fn, *, record=None):
 # production; a mismatched pair (e.g. 150 words forced into 3 acts)
 # yields an internally unsatisfiable per-phase word / beat budget.
 _TARGET_WORDS = 350
+# 2026-08-14: the act count replaced `_TARGET_WORDS` as the thing that
+# shapes an episode. Three acts is the default shape.
+_ACT_COUNT = 3
 
 
 def _budget(num_characters):
     return compute_episode_budget(
-        _TARGET_WORDS, default_act_count(_TARGET_WORDS), True,
+        _ACT_COUNT, True,
         num_characters,
     )
 
@@ -124,7 +125,6 @@ def _request(cast):
     return OutlineRequest(
         news_seed="a real science seed", style="noir",
         character_cast=cast,
-        target_words=_TARGET_WORDS,
         budget=_budget(len(cast)),
     )
 

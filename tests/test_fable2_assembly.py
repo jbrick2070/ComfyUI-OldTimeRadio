@@ -141,7 +141,7 @@ _PAYLOAD = {
 }
 
 
-def _sealed_draft(markup: str, *, target_words: int = 50,
+def _sealed_draft(markup: str, *, act_count: int = 3,
                   treatment: "F2.Treatment | None" = None):
     treatment = treatment or _treatment()
     parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
@@ -160,7 +160,7 @@ def _sealed_draft(markup: str, *, target_words: int = 50,
         treatment,
         p3_attempts=(trace,),
     )
-    return parsed, draft, F2._build_envelope(target_words)
+    return parsed, draft, F2._build_envelope(act_count)
 
 
 def _assembled(tmp_path: Path):

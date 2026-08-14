@@ -73,10 +73,10 @@ def test_rss_projection_retains_complete_body_before_derived_seed_alias():
     payload = _payload(body, seed_text=f"headline {body} summary")
 
     rss, _ = lane.validate_payload_envelope(
-        payload, {"seed_source": "rss_fetch", "target_words": 45},
+        payload, {"seed_source": "rss_fetch", "act_count": 3},
     )
     pinned, _ = lane.validate_payload_envelope(
-        payload, {"seed_source": "custom_premise", "target_words": 45},
+        payload, {"seed_source": "custom_premise", "act_count": 3},
     )
 
     rss_projection, _ = lane._p0_evidence_projection(rss)
@@ -90,14 +90,14 @@ def test_rss_projection_retains_complete_body_before_derived_seed_alias():
 def test_rss_admission_keeps_body_above_old_48k_but_pinned_remains_bounded():
     body = "x" * 60_000
     envelope, _ = lane.validate_payload_envelope(
-        _payload(body), {"seed_source": "rss_fetch", "target_words": 45},
+        _payload(body), {"seed_source": "rss_fetch", "act_count": 3},
     )
     assert envelope.payload.full_text == body
 
     with pytest.raises(lane.CodexPayloadOversizeError, match="48,000"):
         lane.validate_payload_envelope(
             _payload(body),
-            {"seed_source": "custom_premise", "target_words": 45},
+            {"seed_source": "custom_premise", "act_count": 3},
         )
 
 
@@ -105,7 +105,7 @@ def test_rss_body_above_secure_character_bound_refuses_instead_of_slicing():
     body = "x" * ((2 * 1024 * 1024) + 1)
     with pytest.raises(lane.CodexPayloadOversizeError, match="2 MiB"):
         lane.validate_payload_envelope(
-            _payload(body), {"seed_source": "rss_fetch", "target_words": 45},
+            _payload(body), {"seed_source": "rss_fetch", "act_count": 3},
         )
 
 
@@ -311,7 +311,7 @@ def test_production_runner_windows_rebases_and_hands_merged_tail_to_p1(
             pack=SimpleNamespace(),
             resolved={
                 "seed_source": "rss_fetch",
-                "target_words": 45,
+                "act_count": 3,
                 "technical_model": "technical",
                 "creative_writing_model": "creative",
             },
@@ -333,7 +333,7 @@ def test_production_runner_windows_rebases_and_hands_merged_tail_to_p1(
     merged = lane.FactIndexV4.model_validate(p1_inputs["fact_index"])
     assert merged.payload_sha256 == lane._digest(
         lane.validate_payload_envelope(
-            payload, {"seed_source": "rss_fetch", "target_words": 45},
+            payload, {"seed_source": "rss_fetch", "act_count": 3},
         )[0].payload.model_dump(mode="json")
     )
     assert any(

@@ -829,7 +829,7 @@ def poll_history(
 #: tests/test_workflow_apply.py). Engine/feature widgets are NEVER patched
 #: directly by scripts; they go through apply_profile_to_workflow.
 CREATIVE_WHITELIST = frozenset({
-    "target_words", "num_characters", "act_count", "request_seed",
+    "num_characters", "act_count", "request_seed",
     "seed_mode",
     "episode_title", "custom_premise", "style_custom",
     "openrouter_slot_a_model", "openrouter_slot_b_model",

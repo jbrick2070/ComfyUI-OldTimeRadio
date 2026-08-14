@@ -2,9 +2,11 @@
 
 Pins the 2026-06-01 go-forward plan S2 contract (indices shifted -2 by
 the 2026-07-05 style-engine consolidation, which deleted the style /
-style_custom widgets that used to sit at [8, 9]):
+style_custom widgets that used to sit at [8, 9], then shifted a further
+-1 by the 2026-08-14 removal of the `target_words` widget, formerly
+slot 1):
   * openrouter_slot_a_model / openrouter_slot_b_model are pinned at
-    indices 17/18; the existing [0..16] widget
+    indices 16/17; the existing [0..15] widget
     order is byte-for-byte unchanged (saved workflows bind by index --
     the BUG-LOCAL-258/253 index-drift trap).
   * creative_writing_model's default is CONDITIONAL: openrouter:slot-a when
@@ -21,10 +23,12 @@ from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 
 
-# The frozen widget order for indices [0..16] -- must never shift.
-# style / style_custom retired 2026-07-05 (style-engine consolidation).
-_EXPECTED_0_18 = [
-    "episode_title", "target_words", "num_characters",
+# The frozen widget order for indices [0..15] -- must never shift.
+# style / style_custom retired 2026-07-05 (style-engine consolidation);
+# target_words retired 2026-08-14 (episode length is an observation now,
+# never a word-count instruction).
+_EXPECTED_0_15 = [
+    "episode_title", "num_characters",
     "creative_writing_model", "technical_model", "custom_premise",
     "include_act_breaks", "act_count",
     "creativity", "perfect_run_spacesaver", "min_p",
@@ -52,38 +56,39 @@ def remote_on(monkeypatch):
 
 
 def test_widget_order_appends_slots_at_end():
-    """The widget KEYS are env-independent: [0..16] frozen, OpenRouter slots
-    at 17/18, Comfy Credits slots at 19/20 (2026-06-01), and the Google
-    API slots appended at 25/26 (2026-07-08), then source_ref at 27
+    """The widget KEYS are env-independent: [0..15] frozen, OpenRouter slots
+    at 16/17, Comfy Credits slots at 18/19 (2026-06-01), and the Google
+    API slots appended at 24/25 (2026-07-08), then source_ref at 26
     (Source Banks v2, 2026-07-08). Indices shifted -2 by the 2026-07-05
-    style-engine consolidation (style / style_custom widgets deleted)."""
+    style-engine consolidation (style / style_custom widgets deleted),
+    then a further -1 by the 2026-08-14 target_words removal."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[:17] == _EXPECTED_0_18, f"index drift in [0..16]: {order[:17]}"
-    assert order[17] == "openrouter_slot_a_model"
-    assert order[18] == "openrouter_slot_b_model"
-    assert order[19] == "comfy_slot_a_model"
-    assert order[20] == "comfy_slot_b_model"
-    assert order[21] == "refine_target_grade"   # refine loop v1 (2026-06-23)
-    assert order[22] == "story_scaffold"          # scaffold toggle (2026-06-24)
-    assert order[23] == "source_bank"             # Stage 2C (2026-07-05)
-    assert order[24] == "visual_style"            # Stage 3C (2026-07-06)
-    assert order[25] == "google_api_slot_a_model" # Google API (2026-07-08)
-    assert order[26] == "google_api_slot_b_model" # Google API (2026-07-08)
-    assert order[27] == "source_ref"              # Source Banks v2 (2026-07-08)
+    assert order[:16] == _EXPECTED_0_15, f"index drift in [0..15]: {order[:16]}"
+    assert order[16] == "openrouter_slot_a_model"
+    assert order[17] == "openrouter_slot_b_model"
+    assert order[18] == "comfy_slot_a_model"
+    assert order[19] == "comfy_slot_b_model"
+    assert order[20] == "refine_target_grade"   # refine loop v1 (2026-06-23)
+    assert order[21] == "story_scaffold"          # scaffold toggle (2026-06-24)
+    assert order[22] == "source_bank"             # Stage 2C (2026-07-05)
+    assert order[23] == "visual_style"            # Stage 3C (2026-07-06)
+    assert order[24] == "google_api_slot_a_model" # Google API (2026-07-08)
+    assert order[25] == "google_api_slot_b_model" # Google API (2026-07-08)
+    assert order[26] == "source_ref"              # Source Banks v2 (2026-07-08)
     # S5 platform-portability (2026-07-10): the six explicit LLM
-    # runtime-policy widgets, appended at 28-33 (append-only).
-    assert order[28] == "llm_device"
-    assert order[29] == "llm_attn_impl"
-    assert order[30] == "llm_quant_policy"
-    assert order[31] == "llm_vram_ceiling_gb"
-    assert order[32] == "gguf_n_ctx"
-    assert order[33] == "gguf_quant"
+    # runtime-policy widgets, appended at 27-32 (append-only).
+    assert order[27] == "llm_device"
+    assert order[28] == "llm_attn_impl"
+    assert order[29] == "llm_quant_policy"
+    assert order[30] == "llm_vram_ceiling_gb"
+    assert order[31] == "gguf_n_ctx"
+    assert order[32] == "gguf_quant"
     # gate_in (S5 validation-order fix) is a forceInput SOCKET -- present
     # in the INPUT_TYPES key order but consumes NO widgets_values slot
-    # (the serialized widget vector stays 34).
-    assert order[34] == "gate_in"
-    assert len(order) == 35
+    # (the serialized widget vector stays 33).
+    assert order[33] == "gate_in"
+    assert len(order) == 34
 
 
 # --- conditional creative default; technical never flips --------------------
@@ -129,7 +134,6 @@ def test_resolve_inputs_old_workflow_supplies_slot_defaults():
     """Old workflow shape: _resolve_inputs called with NO slot kwargs ->
     both slots default to "" (unset); creative/technical unchanged."""
     out = _resolve_inputs(
-        target_words=350,
         num_characters=2,
         episode_title="",
         creative_writing_model=cat.DEFAULT_LLM,
@@ -145,7 +149,6 @@ def test_resolve_inputs_old_workflow_supplies_slot_defaults():
 
 def test_resolve_inputs_threads_slot_values():
     out = _resolve_inputs(
-        target_words=350,
         num_characters=2,
         creative_writing_model=cat.DEFAULT_LLM,
         technical_model=cat.DEFAULT_LLM,

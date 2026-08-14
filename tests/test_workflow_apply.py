@@ -313,10 +313,16 @@ def test_coverage_every_request_seed_widget_is_managed(schemas, master_copy, map
 # patch_creative whitelist
 # ---------------------------------------------------------------------------
 def test_patch_creative_allows_whitelisted(schemas, master_copy):
+    # num_characters replaces target_words as the probe widget here:
+    # target_words was DELETED from OTR_LedgerScriptWriter 2026-08-14
+    # (operator directive -- episode length is an observation, not an
+    # instruction), so it is no longer a whitelisted name to prove the
+    # mechanism with. Any other CREATIVE_WHITELIST-listed widget proves
+    # the same patch_creative pass-through.
     writer = [n for n in master_copy["nodes"] if n["type"] == "OTR_LedgerScriptWriter"][0]
-    wa.patch_creative(master_copy, writer["id"], "target_words", 30, schemas=schemas)
+    wa.patch_creative(master_copy, writer["id"], "num_characters", 4, schemas=schemas)
     slots = wa.serialized_slot_names("OTR_LedgerScriptWriter", schemas)
-    assert writer["widgets_values"][slots.index("target_words")] == 30
+    assert writer["widgets_values"][slots.index("num_characters")] == 4
 
 
 def test_patch_creative_can_force_the_lemmy_cameo(schemas, master_copy):

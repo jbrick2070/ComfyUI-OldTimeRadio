@@ -102,10 +102,13 @@ class Beat(BaseModel):
         min_length=1,
         description="What this beat accomplishes narratively",
     )
-    target_words: int = Field(
-        ...,
-        description="Optional generation guidance; never an acceptance gate",
-    )
+    # `target_words` was removed from this schema 2026-08-14. It was
+    # Python-allocated from the episode word total and stamped onto every
+    # beat, so it moved whenever the length request moved -- a per-beat
+    # length instruction, which is exactly the authority being removed.
+    # The Beat schema's 80-word structural cap survives as
+    # `_otr_episode_budget.BEAT_WORD_HARD_MAX`, which the passage selector
+    # needs to split a long source speech across beats.
     mood: str = Field(
         ...,
         min_length=1,
@@ -295,9 +298,10 @@ class OutlineRequest:
                              # Field renamed from style_hint 2026-05-10 — Jeffrey:
                              # "no 'hint', it's just style". User-visible widget name
                              # is 'style', so the dataclass field matches.
-    target_words: int        # Canonical length unit (validated below). Words are
-                             # the single source of truth for story planning;
-                             # there is no seconds field — see Jeffrey 2026-05-10.
+                             # `target_words` was removed 2026-08-14. It was the
+                             # "canonical length unit" and the single source of
+                             # truth for story planning; ACT COUNT is now that
+                             # source of truth, and length is an observation.
     character_cast: tuple[str, ...]
                              # Exact character names from the locked cast.
                              # Excludes ANNOUNCER (the writer hardcodes
@@ -447,10 +451,6 @@ class OutlineRequest:
                 f"character_cast must have 1-6 names, got {n}: "
                 f"{self.character_cast!r}"
             )
-        if self.target_words < 5:
-            raise ValueError(
-                f"target_words must be >= 5, got {self.target_words}"
-            )
         for name in self.character_cast:
             if not isinstance(name, str) or not name.strip():
                 raise ValueError(
@@ -505,7 +505,7 @@ class OutlineRequest:
                 "OutlineRequest.budget is required (v2.0 contract) "
                 "and must be an EpisodeBudget. Build via "
                 "_otr_episode_budget.compute_episode_budget with "
-                "(target_words, act_count, include_act_breaks, "
+                "(act_count, include_act_breaks, "
                 "num_characters) and pass it on construction; got "
                 f"{type(self.budget).__name__}={self.budget!r}."
             )
@@ -535,7 +535,6 @@ Schema:
                    "speaker":      exact name from Cast, or "NARRATOR" for music beats,
                    "speaker_role": one of: character, announcer, music_open, music_close, music_inter,
                    "intent":       non-empty narrative purpose string, not dialogue,
-                   "target_words": integer advisory value,
                    "mood":         non-empty tone string
                  }
 }
@@ -596,20 +595,20 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     # EPISODE BUDGET block below (when `budget` is non-None); the
     # include_act_breaks toggle drives music_inter_count inside the
     # budget rather than appearing in its own prose line.
-    # Phase 2A (2026-05-11): EPISODE BUDGET block. Lands BEFORE the
-    # target_words summary so the LLM sees concrete numbers for every
-    # phase + beat-range before being told the rough total.
+    # Phase 2A (2026-05-11): EPISODE BUDGET block — the act topology.
     # S28 cleanbreak: the `if budget_block:` guard was extinct — the
     # producer (OTR_LedgerScriptWriter) always supplies a budget so
     # _format_episode_budget_block always returns a non-empty string.
     parts.append(_format_episode_budget_block(req))
     parts.append("")
 
-    parts.extend([
-        f"Target total dialogue length: ~{req.target_words} words "
-        f"(sum of per-beat target_words should land near this number).",
-        "",
-    ])
+    # THE "Target total dialogue length: ~N words" LINE WAS REMOVED HERE
+    # 2026-08-14, with its twin inside _format_episode_budget_block.
+    # Those two lines were the word count physically reaching the model.
+    # Do not reinstate either, in any wording: a length request in a
+    # prompt is a word-count authority however politely it is phrased,
+    # and the previous version hedged it ("guidance only") while still
+    # handing over the number.
     # Best-of-N selector (2026-06-23): an optional structural-variation
     # overlay. The selector sets req.diversity_hint per candidate (i>=1) to
     # push each outline toward a different dramatic approach; candidate 0 and
@@ -790,14 +789,13 @@ def _get_budget(req: "OutlineRequest"):
     b = getattr(req, "budget", None)
     if b is None:
         return None
-    if (hasattr(b, "arc_phases") and hasattr(b, "per_phase_words")
-            and hasattr(b, "per_phase_beats")):
+    if hasattr(b, "arc_phases") and hasattr(b, "per_phase_beats"):
         return b
     return None
 
 
 def _format_episode_budget_block(req: "OutlineRequest") -> str:
-    """Render structural planning context; requested length is guidance only."""
+    """Render the act topology. Carries NO length instruction of any kind."""
     b = _get_budget(req)
     if b is None:
         return ""
@@ -805,11 +803,6 @@ def _format_episode_budget_block(req: "OutlineRequest") -> str:
     per_phase_beats = list(b.per_phase_beats)
     lines = [
         "EPISODE PLAN:",
-        (
-            f"- Requested spoken length: about {b.target_words} words. "
-            "Use this only as broad guidance; never pad or compress a story "
-            "to meet the number."
-        ),
         (
             f"- Structure: {b.act_count} act"
             f"{'s' if b.act_count != 1 else ''} -> {', '.join(arc_phases)}"
@@ -864,7 +857,7 @@ def validate_outline_against_budget(
 # family is model-agnostic (Mistral over-produces, Gemma under-then-
 # over-corrects). Root cause: the legacy single mega-call asked the
 # LLM to satisfy N independent sub-problems (logline + per-phase
-# allocation + N beats + N moods + N target_words + N intents) in
+# allocation + N beats + N moods + N intents) in
 # one 1500-token structured pass under pydantic strict validation.
 #
 # Path C breaks the single call into a tree of small calls following
@@ -879,10 +872,7 @@ def validate_outline_against_budget(
 #                                  list of {speaker} entries.
 #   Stage 3 (num_voiced_beats):    per-beat fleshout -- intent + mood
 #                                  for one beat. Under 150 tokens
-#                                  output, 2 fields. target_words is
-#                                  Python-owned (Sprint 3B): it left
-#                                  the LLM schema; the combiner stamps
-#                                  the per-phase allocation.
+#                                  output, 2 fields.
 #   Python combiner:               Stamp beat_id (b001..), arc_phase
 #                                  from budget, speaker_role
 #                                  (character / announcer /
@@ -893,7 +883,7 @@ def validate_outline_against_budget(
 #                                  budget validators.
 #
 # Total LLM calls per outline: 1 + act_count + num_voiced_beats.
-# Smoke (target_words=300, act_count=3, include_act_breaks=False):
+# Smoke (act_count=3, include_act_breaks=False):
 # 1 + 3 + 14 = 18 calls, each <= 250 tokens output.
 #
 # Each call has its own 3-attempt retry. Failures localize to one
@@ -937,21 +927,14 @@ class _PhaseSkeleton(BaseModel):
 
 # Stage 3 schema -- per-beat fleshout. intent + mood only.
 #
-# Sprint 3B (2026-05-25): `target_words` was dropped from this schema.
-# Python is the sole authority for per-beat word counts -- the Stage 3
-# inline block in generate_outline rebuilds every _BeatFleshout with
-# `_allocate_phase_target_words`' allocation and discards whatever the
-# LLM emitted. The field was therefore pure dead weight on the
-# structured-output token budget: the model spent tokens deciding a
-# number that was always overwritten before assembly. Removing it is a
-# behaviour-neutral cleanup (the LLM-audit reclassified it from "fix"
-# to "token-budget cleanup"). The Beat schema still carries
-# target_words; the combiner stamps Python's allocation onto it.
+# Sprint 3B (2026-05-25) dropped `target_words` from this schema, and
+# 2026-08-14 removed the concept entirely: there is no per-beat word
+# count anywhere any more, on this model or on Beat. A beat is as long
+# as the beat needs to be.
 #
 # Extra-field tolerance: this model uses pydantic's default
-# `extra="ignore"`, so a transitional model that still emits a
-# `target_words` key parses cleanly -- the stray key is dropped, not
-# rejected.
+# `extra="ignore"`, so a model that still emits a `target_words` key
+# parses cleanly -- the stray key is dropped, not rejected.
 class _BeatFleshout(BaseModel):
     intent: str = Field(..., min_length=1)
     mood: str = Field(..., min_length=1)
@@ -1155,10 +1138,8 @@ def _build_beat_user_prompt(
     Each adjacency line is emitted ONLY when its value is present;
     a missing neighbour produces no line at all (never an empty or
     "None" placeholder). Adjacency window is 1 -- immediate
-    neighbours only. target_words is intentionally NOT requested:
-    Python owns the per-beat word allocation (see
-    `_allocate_phase_target_words` and the Stage 3 block in
-    generate_outline). Cross-beat coherence beyond the 1-beat window
+    neighbours only. No per-beat length is requested or supplied --
+    that authority was removed 2026-08-14. Cross-beat coherence beyond the 1-beat window
     is still handled by the combiner + budget validators downstream.
     """
     beat_idx, beat_total = beat_position
@@ -1219,42 +1200,10 @@ def _build_beat_user_prompt(
     return "\n".join(parts)
 
 
-def _allocate_phase_target_words(
-    phase_total_words: int,
-    n_beats: int,
-    words_per_beat_range: tuple[int, int],
-) -> list[int]:
-    """Default per-beat target_words allocation for a single phase.
-
-    Used as the seed for Stage 3 prompts (each beat is told a
-    `[lo, hi]` window centered on its allocation) AND as the
-    fallback when Stage 3 produces a value out-of-range. The Stage 3
-    pydantic schema enforces the absolute Beat bounds (3..80); this
-    function enforces the budget's local window.
-
-    Greedy fill so the sum lands on phase_total_words and every entry
-    stays in [words_per_beat_range].
-    """
-    lo, hi = words_per_beat_range
-    if n_beats <= 0:
-        return []
-    base = phase_total_words // n_beats
-    base = max(lo, min(hi, base))
-    arr = [base] * n_beats
-    delta = phase_total_words - sum(arr)
-    idx = 0
-    safety = n_beats * 6  # bounded; can't loop forever
-    while delta != 0 and safety > 0:
-        i = idx % n_beats
-        if delta > 0 and arr[i] < hi:
-            arr[i] += 1
-            delta -= 1
-        elif delta < 0 and arr[i] > lo:
-            arr[i] -= 1
-            delta += 1
-        idx += 1
-        safety -= 1
-    return arr
+# `_allocate_phase_target_words` was deleted 2026-08-14. It split a phase
+# word total across that phase's beats and seeded every Stage-3 beat prompt
+# with a [lo, hi] word window. With `Beat.target_words` gone there is
+# nothing to allocate: a beat is as long as the beat needs to be.
 
 
 # ---------------------------------------------------------------------------
@@ -1419,24 +1368,20 @@ def _assemble_outline(
     macro: _MacroShape,
     phase_skeletons: list[_PhaseSkeleton],
     beat_details: list[list[_BeatFleshout]],
-    beat_allocations: list[list[int]],
     req: OutlineRequest,
     budget,
 ) -> Outline:
     """Combine stage outputs into the final Outline pydantic object.
 
     Python is authoritative for: beat_id sequence, speaker_role
-    assignment, arc_phase tagging, announcer + music_inter beat
-    insertion, AND per-voiced-beat target_words. The LLM contributes:
-    macro shape (Stage 1), speaker selection per voiced beat (Stage 2),
-    intent + mood per voiced beat (Stage 3).
+    assignment, arc_phase tagging, and announcer + music_inter beat
+    insertion. The LLM contributes: macro shape (Stage 1), speaker
+    selection per voiced beat (Stage 2), intent + mood per voiced beat
+    (Stage 3).
 
-    Sprint 3B (2026-05-25): target_words no longer rides on the
-    _BeatFleshout LLM schema. `beat_allocations` carries Python's
-    per-phase per-beat word allocation (from
-    `_allocate_phase_target_words`) and aligns 1:1 with `beat_details`
-    -- one inner list per phase, one int per voiced beat. The combiner
-    stamps each allocation onto the corresponding Beat.target_words.
+    2026-08-14: `beat_allocations` was removed with `Beat.target_words`.
+    Python no longer owns a per-beat length, because there no longer is
+    one. The combiner
     """
     arc_phases = tuple(budget.arc_phases)
     per_phase_beats_target = tuple(budget.per_phase_beats)
@@ -1460,24 +1405,20 @@ def _assemble_outline(
         speaker="ANNOUNCER",
         speaker_role="announcer",
         intent="Open the episode and orient the listener.",
-        target_words=15,
         mood="welcoming",
         arc_phase=arc_phases[0],
     ))
 
     # Per-phase voiced beats.
-    for phase_idx, (phase_name, skeleton, fleshouts, allocations) in enumerate(
-        zip(arc_phases, phase_skeletons, beat_details, beat_allocations)
+    for phase_idx, (phase_name, skeleton, fleshouts) in enumerate(
+        zip(arc_phases, phase_skeletons, beat_details)
     ):
-        for beat_seed, detail, allocation in zip(
-            skeleton.beats, fleshouts, allocations
-        ):
+        for beat_seed, detail in zip(skeleton.beats, fleshouts):
             beats.append(Beat(
                 beat_id=_next_bid(),
                 speaker=beat_seed.speaker,
                 speaker_role="character",
                 intent=detail.intent,
-                target_words=allocation,
                 mood=detail.mood,
                 arc_phase=phase_name,
             ))
@@ -1500,7 +1441,6 @@ def _assemble_outline(
                 # init_lines_from_outline). The old "Musical interlude
                 # bridging <phase>..." string leaked into the transcript.
                 intent="Bridge to the next phase with music only.",
-                target_words=5,
                 mood="transitional",
                 arc_phase=phase_name,
             ))
@@ -1511,7 +1451,7 @@ def _assemble_outline(
     # sameness has the announcer narrate who won / what blew up, stealing the
     # climax from the characters' final beat). The close is NEVER removed -- it
     # stays an announcer beat (budget validator #7 counts announcer beats) and
-    # keeps target_words/mood/arc_phase intact; only the intent prose changes.
+    # keeps mood/arc_phase intact; only the intent prose changes.
     # Use the shared config reader so the announcer-close gate honors the SAME
     # default as the writer's style-grammar block (DEFAULT ON as of 2026-06-24;
     # OTR_ENABLE_STYLE_GRAMMAR=0 is the kill-switch => the exact pre-grammar
@@ -1539,7 +1479,6 @@ def _assemble_outline(
         speaker="ANNOUNCER",
         speaker_role="announcer",
         intent=_close_intent,
-        target_words=15,
         mood="reflective",
         arc_phase=arc_phases[-1],
     ))
@@ -1625,10 +1564,8 @@ def generate_outline(
                                      setting, time_of_day).
       Stage 2 (act_count calls):     per-phase speaker assignments.
       Stage 3 (num_voiced_beats):    per-beat intent + mood (Sprint 3B:
-                                     target_words is Python-owned, not
                                      in the LLM schema).
       Python combiner:               beat_id, arc_phase, speaker_role,
-                                     target_words stamping; announcer +
                                      music_inter beat insertion.
 
     Total LLM calls per outline: 1 + act_count + num_voiced_beats.
@@ -1661,9 +1598,7 @@ def generate_outline(
     # AttributeError on the next line. Mirrors the same S28 cleanup in
     # validate_outline_against_budget.
     arc_phases = tuple(budget.arc_phases)
-    per_phase_words = tuple(budget.per_phase_words)
     per_phase_beats = tuple(budget.per_phase_beats)
-    words_per_beat_range = tuple(budget.words_per_beat_range)
     locked_cast_set = set(req.character_cast)
     locked_cast_by_normalized = {
         _normalize_speaker(name): name for name in req.character_cast
@@ -1863,29 +1798,19 @@ def generate_outline(
 
     # ----------------------------- Stage 3 ---------------------------------
     # Per-beat fleshout. The LLM contributes intent + mood per voiced
-    # beat. Python owns target_words entirely: _allocate_phase_target_
-    # words computes a per-phase allocation that satisfies the per-beat
-    # range AND the per-phase sum AND the per-episode total by
-    # construction -- a constraint LLMs (Mistral and Gemma alike,
-    # retests #8-#11) cannot satisfy at once.
+    # beat. No length is planned, allocated or requested: the per-beat
+    # word allocation and its per-phase/per-episode arithmetic were
+    # removed 2026-08-14 along with `target_words` itself.
     #
-    # Sprint 3B (2026-05-25): target_words left the _BeatFleshout LLM
-    # schema (the model was spending structured-output tokens on a
-    # number that was always discarded). The per-phase `allocations`
-    # list now flows straight to the combiner via `beat_allocations`;
     # _BeatFleshout carries only the LLM's intent + mood. Sprint 3B
     # also gives each beat call a 1-beat adjacency window: the previous
     # beat's already-generated intent, the next beat's speaker, and a
     # one-line phase summary.
     beat_details: list[list[_BeatFleshout]] = []
-    beat_allocations: list[list[int]] = []
-    for phase_idx, (phase_name, phase_skel, phase_total_words) in enumerate(
-        zip(arc_phases, phase_skeletons, per_phase_words)
+    for phase_idx, (phase_name, phase_skel) in enumerate(
+        zip(arc_phases, phase_skeletons)
     ):
         n_beats = len(phase_skel.beats)
-        allocations = _allocate_phase_target_words(
-            phase_total_words, n_beats, words_per_beat_range,
-        )
         phase_summary = _phase_summary(phase_name)
         phase_details: list[_BeatFleshout] = []
         for beat_idx, beat_seed in enumerate(phase_skel.beats):
@@ -1948,11 +1873,10 @@ def generate_outline(
 
             phase_details.append(detail)
         beat_details.append(phase_details)
-        beat_allocations.append(allocations)
 
     # ----------------------------- Combine ---------------------------------
     outline = _assemble_outline(
-        macro, phase_skeletons, beat_details, beat_allocations,
+        macro, phase_skeletons, beat_details,
         req, budget,
     )
 
@@ -2016,37 +1940,45 @@ if __name__ == "__main__":
         from ._otr_episode_budget import compute_episode_budget as _ceb
     except ImportError:
         from _otr_episode_budget import compute_episode_budget as _ceb  # type: ignore[no-redef]
-    _HARNESS_BUDGET_200 = _ceb(200, 3, True, 2)
-    _HARNESS_BUDGET_150 = _ceb(150, 3, True, 2)
-    _HARNESS_BUDGET_200_1CHAR = _ceb(200, 3, True, 1)
+    _HARNESS_BUDGET_200 = _ceb(3, True, 2)
+    _HARNESS_BUDGET_150 = _ceb(3, True, 2)
+    _HARNESS_BUDGET_200_1CHAR = _ceb(3, True, 1)
     # 350 words at the matching default act count (3) is the proven-
     # satisfiable budget shape -- a complete outline validates against
     # it. Test 10 runs generate_outline to completion, so it needs a
     # consistent budget (unlike _HARNESS_BUDGET_150, where 150 words
     # forced into 3 acts is internally unsatisfiable -- fine for the
     # Tests 9/11/12 that never assemble a full outline).
-    _HARNESS_BUDGET_350 = _ceb(350, 3, True, 2)
+    _HARNESS_BUDGET_350 = _ceb(3, True, 2)
 
     # Test 1: Beat schema rejects bad inputs.
     print("\n[Test 1] Beat schema validation")
     try:
         Beat(beat_id="bad", speaker="X", speaker_role="character",
-             intent="test test", target_words=10, mood="ok")
+             intent="test test", mood="ok")
         print("  FAIL: bad beat_id was accepted")
     except ValidationError:
         print("  PASS: bad beat_id rejected")
     try:
+        # `target_words=0` used to be what made this Beat invalid; the
+        # field is gone, so this probes a constraint that still exists:
+        # intent carries min_length=1.
         Beat(beat_id="b001", speaker="X", speaker_role="character",
-             intent="test test", target_words=0, mood="ok")
-        print("  FAIL: target_words=0 was accepted")
+             intent="", mood="ok")
+        print("  FAIL: a blank intent was accepted")
     except ValidationError:
-        print("  PASS: target_words=0 rejected")
+        print("  PASS: blank intent rejected")
 
-    # Test 2: speaker uppercased.
-    b = Beat(beat_id="b001", speaker="aegeus", speaker_role="character",
-             intent="introduce stakes", target_words=12, mood="tense")
-    assert b.speaker == "AEGEUS", f"expected AEGEUS, got {b.speaker}"
-    print("\n[Test 2] speaker uppercase canonicalization: PASS")
+    # Test 2: speaker whitespace is stripped.
+    # PRE-EXISTING ROT, corrected 2026-08-14 while here: this asserted
+    # `== "AEGEUS"`, but `_speaker_must_not_be_blank` only STRIPS -- it has
+    # never uppercased. Uppercasing lives in `_normalize_speaker`, which
+    # callers apply. Nothing caught the drift because this block is not run
+    # by pytest. Unrelated to the word rip.
+    b = Beat(beat_id="b001", speaker="  aegeus  ", speaker_role="character",
+             intent="introduce stakes", mood="tense")
+    assert b.speaker == "aegeus", f"expected stripped 'aegeus', got {b.speaker!r}"
+    print("\n[Test 2] speaker whitespace strip: PASS")
 
     # Test 3: Outline schema accepts any beats now (cast-membership
     # check moved out to generate_outline). The schema still rejects
@@ -2060,13 +1992,13 @@ if __name__ == "__main__":
         "time_of_day": "midnight",
         "beats": [
             {"beat_id": "b001", "speaker": "STRANGER", "speaker_role": "character",
-             "intent": "speak out of turn", "target_words": 12, "mood": "tense"},
+             "intent": "speak out of turn", "mood": "tense"},
             {"beat_id": "b001", "speaker": "STRANGER", "speaker_role": "character",
-             "intent": "speak again with the same id", "target_words": 12, "mood": "tense"},
+             "intent": "speak again with the same id", "mood": "tense"},
             {"beat_id": "b003", "speaker": "STRANGER", "speaker_role": "character",
-             "intent": "third beat", "target_words": 12, "mood": "tense"},
+             "intent": "third beat", "mood": "tense"},
             {"beat_id": "b004", "speaker": "STRANGER", "speaker_role": "character",
-             "intent": "fourth beat", "target_words": 12, "mood": "tense"},
+             "intent": "fourth beat", "mood": "tense"},
         ],
     }
     try:
@@ -2086,13 +2018,13 @@ if __name__ == "__main__":
         "time_of_day": "midnight",
         "beats": [
             {"beat_id": "b001", "speaker": "INTRO", "speaker_role": "music_open",
-             "intent": "open the show", "target_words": 5, "mood": "bold"},
+             "intent": "open the show", "mood": "bold"},
             {"beat_id": "b002", "speaker": "AEGEUS", "speaker_role": "character",
-             "intent": "set the scene", "target_words": 15, "mood": "wry"},
+             "intent": "set the scene", "mood": "wry"},
             {"beat_id": "b003", "speaker": "AEGEUS", "speaker_role": "character",
-             "intent": "complication arrives", "target_words": 20, "mood": "tense"},
+             "intent": "complication arrives", "mood": "tense"},
             {"beat_id": "b004", "speaker": "OUTRO", "speaker_role": "music_close",
-             "intent": "close the show", "target_words": 5, "mood": "resolute"},
+             "intent": "close the show", "mood": "resolute"},
         ],
     }
     o = Outline.model_validate(ok_data)
@@ -2134,7 +2066,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=tuple(f"NAME{i}" for i in range(10)),
-            target_words=150,
         )
         print("  FAIL: character_cast=10 accepted")
     except ValueError:
@@ -2143,7 +2074,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=("alice",),  # not uppercase
-            target_words=150,
         )
         print("  FAIL: lowercase character_cast accepted")
     except ValueError:
@@ -2156,7 +2086,6 @@ if __name__ == "__main__":
         request=OutlineRequest(
             news_seed="x", style="y",
             character_cast=("ALICE", "BOB"),
-            target_words=150,
             budget=_HARNESS_BUDGET_150,
         ),
     )
@@ -2183,7 +2112,6 @@ if __name__ == "__main__":
     })
     _T10_BEAT_JSON = json.dumps({
         "intent": "advance the scene toward the next turn",
-        "target_words": 18,
         "mood": "tense",
     })
 
@@ -2207,7 +2135,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=("ALICE", "BOB"),
-            target_words=350,
             budget=_HARNESS_BUDGET_350,
         ),
         max_attempts=2,
@@ -2238,7 +2165,6 @@ if __name__ == "__main__":
     rich_req = OutlineRequest(
         news_seed="science seed", style="noir",
         character_cast=("ALICE", "BOB"),
-        target_words=200,
         budget=_HARNESS_BUDGET_200,
         cast_descriptions=(
             ("ALICE", "female", "weary forensic engineer in her 40s"),
@@ -2259,7 +2185,6 @@ if __name__ == "__main__":
     no_gender_req = OutlineRequest(
         news_seed="science seed", style="noir",
         character_cast=("ALICE",),
-        target_words=200,
         budget=_HARNESS_BUDGET_200_1CHAR,
         cast_descriptions=(("ALICE", "", "lone caretaker"),),
     )
@@ -2273,7 +2198,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=("ALICE", "BOB"),
-            target_words=200,
             cast_descriptions=(("ALICE", "female", "desc"),),  # length 1 vs cast length 2
         )
         print("  FAIL 11d: length-mismatch cast_descriptions accepted")
@@ -2287,7 +2211,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=("ALICE", "BOB"),
-            target_words=200,
             cast_descriptions=(
                 ("BOB",   "male",   "desc"),     # swapped -- name mismatch at idx 0
                 ("ALICE", "female", "desc"),
@@ -2304,7 +2227,6 @@ if __name__ == "__main__":
         OutlineRequest(
             news_seed="x", style="y",
             character_cast=("ALICE",),
-            target_words=200,
             cast_descriptions=(("ALICE", "female"),),  # 2-tuple instead of 3-tuple
         )
         print("  FAIL 11f: bad-shape cast_descriptions accepted")
@@ -2321,14 +2243,15 @@ if __name__ == "__main__":
     no_struct_req = OutlineRequest(
         news_seed="seed", style="noir",
         character_cast=("ALICE",),
-        target_words=200,
         budget=_HARNESS_BUDGET_200_1CHAR,
     )
     no_struct_prompt = _build_user_prompt(no_struct_req)
     assert "Target episode shape:" not in no_struct_prompt, \
         "12a: legacy 'Target episode shape:' line must not appear"
-    assert "Target total dialogue length: ~200 words" in no_struct_prompt, \
-        "12a: target_words line must still render"
+    assert "Target total dialogue length" not in no_struct_prompt, \
+        "12a: the word-length line was deleted 2026-08-14 and must stay gone"
+    assert "Requested spoken length" not in no_struct_prompt, \
+        "12a: its twin in the EPISODE PLAN block must stay gone too"
     assert no_struct_req.include_act_breaks is True, \
         "12b: include_act_breaks default must be True"
     print("  PASS 12: target_length structure line gone; "
@@ -2346,7 +2269,6 @@ if __name__ == "__main__":
         speaker="ALICE",
         speaker_role="character",
         intent="speak about the signal",
-        target_words=20,
         mood="curious",
         # arc_phase deliberately omitted -- mimics 12B-LLM behavior
     )
@@ -2362,7 +2284,6 @@ if __name__ == "__main__":
         speaker="BOB",
         speaker_role="character",
         intent="speak",
-        target_words=20,
         mood="tense",
         arc_phase="climax",
     )

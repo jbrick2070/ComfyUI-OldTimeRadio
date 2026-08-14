@@ -126,15 +126,6 @@
           "link": null
         },
         {
-          "localized_name": "target_words",
-          "name": "target_words",
-          "type": "INT",
-          "widget": {
-            "name": "target_words"
-          },
-          "link": null
-        },
-        {
           "localized_name": "num_characters",
           "name": "num_characters",
           "type": "INT",
@@ -514,13 +505,12 @@
       },
       "widgets_values": [
         "",
-        30,
         2,
         "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
         "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
         "",
         true,
-        "auto",
+        "3",
         "balanced",
         false,
         0.05,
@@ -774,7 +764,7 @@
       63,
       0,
       1,
-      34,
+      33,
       "STRING"
     ]
   ],

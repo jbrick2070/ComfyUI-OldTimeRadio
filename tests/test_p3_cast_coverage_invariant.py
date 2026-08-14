@@ -53,9 +53,8 @@ def _cast() -> lane.CastPlanV4:
 
 def _advisory(beats: int) -> lane.AdvisoryWordPlanV4:
     return lane.AdvisoryWordPlanV4(
-        advisory_total_center=6 * beats,
         per_beat=[
-            {"beat_id": f"b{index + 1:03d}", "advisory_word_center": 6}
+            {"beat_id": f"b{index + 1:03d}"}
             for index in range(beats)
         ],
     )

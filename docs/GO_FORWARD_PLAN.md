@@ -684,6 +684,94 @@ called 250 a word-count authority. The test to apply: **can the number move when
 `target_words` moves?** If yes it is illegal; if it is a property of the job, it
 is capacity.
 
+### THE WORD RIP -- WHAT ACTUALLY SHIPPED (2026-08-14)
+
+**THERE WERE THREE PARALLEL WORD SYSTEMS, not one.** That is the finding worth
+carrying forward: removing the widget was the small part.
+
+| Where | What was removed |
+|---|---|
+| `_otr_episode_budget.py` | word->act breakpoint table, `default_act_count` / `max_act_count` (**a veto that could REFUSE an act choice**), `auto_act_count`, per-phase word split, per-beat range widening, word-feasibility guard |
+| `_otr_outline.py` | `Beat.target_words`, `OutlineRequest.target_words`, `_allocate_phase_target_words`, the `beat_allocations` chain, **two prompt injections** |
+| `_otr_scifi_codex.py` | `WordSteerV4`(30..900) -> `ActSteerV4`(1..8); beat count `ceil(words/15)` -> act topology; advisory plan split -- **word centers out, beat identity kept** |
+| `_otr_scifi_fable2.py` | its OWN `_SCENE_COUNT_TABLE` (word total -> scene count), per-scene word targets, **a fourth prompt injection** |
+| `_otr_lane_specs.py` / `_otr_rolls.py` | `RollRequest`, `assert_supported`, `is_roll_compatible` -- a gate that could refuse a whole BANK on a word count |
+| `_otr_word_delivery.py` | records observed words only; no target is stamped |
+| `OTR_LedgerScriptWriter.py` | the widget, the auto-derive, and a `target_words * 4` token ceiling |
+
+**`act_count` is now an explicit 1..8 combo, default "3", always honoured.**
+`BEAT_WORD_HARD_MAX` deliberately SURVIVES -- it is the Beat schema's structural
+cap and the passage selector needs it to split a long source speech across beats;
+without it the Shakespeare lane silently drops Banquo's 91-word speech.
+
+**FOUR word counts were physically reaching a model** and all four are cut. The
+pack JSONs were already clean -- the authority was entirely Python-side.
+
+**THE POSITIONAL WIDGET COST, paid in one change (BUG-LOCAL-097).**
+`target_words` was slot 1, so every later slot shifted down one. Regenerated
+together: `otr_canonical.json`, **`otr_story_only.json`** (missed on the first
+pass -- there are TWO top-level graphs, not one), all 50 variants, and the four
+`*.env.json` recipes whose master hashes moved. The single link into the writer
+node followed slot 34 -> 33. **Any graph the operator saved outside the repo must
+be re-saved.**
+
+### THE REVIEW CAUGHT WHAT THE TESTS COULD NOT -- keep doing this
+
+Two Sonnet agents fixed the mechanical fallout; an **Antigravity pass then found
+defects no test would ever have failed on.** Both classes are worth remembering:
+
+1. **A FIELD STOPPED BEING WRITTEN, BUT A READER STILL GUARDED ON IT.** The
+   credits roll printed its `Words:` row only `if gp.get("target_words")`. With
+   the target gone that guard is permanently False, so **the observed word counts
+   silently stopped appearing in published credits.** Same defect in
+   `video_engine.py` twice, where it rendered `Target words: (not recorded)` into
+   every HUD dossier and `_treatment.txt` sidecar. **No test failed. Nothing
+   crashed. The output just quietly went missing** -- exactly the ledger hole the
+   completeness rule exists to prevent. All three now report observed counts.
+2. **ORPHANED CALLERS OUTSIDE `nodes/`.** Five scripts still passed `--words` or
+   patched the deleted widget (`otr_api.py`'s whitelist mirror,
+   `otr_canonical_api_run.py`, `otr_queue_smoke.py`, `otr_w45_campaign.py`,
+   `otr_writer_bank_gate.py`, `otr_w45_overnight.py`). A repo-wide sweep for
+   ORPHANS has to include `scripts/`, `workflows/` and `tests/conftest.py`, not
+   just the node package.
+
+**Also fixed:** `stamp_actual` wrote `schema_version: 4` over `stamp_contract`'s
+`5`, silently demoting every published ledger's receipt.
+
+### KNOWN AND DELIBERATELY NOT FIXED
+
+**Seven acts yields FEWER voiced beats than six** -- 20 -> 19. Measured across the
+table: 1->3, 2->6, 3->14, 4->14, 5->17, 6->20, **7->19**, 8->22. This is
+INHERITED; the 7-act row predates the rip and was almost certainly tuned to fit a
+word budget rather than to describe a dramatic shape. It contradicts the
+operator's model that more acts means more turns. **Pinned in
+`tests/test_voiced_beat_count.py` with the reasoning written out, NOT silently
+changed** -- altering the topology changes every episode rendered at 7 acts, and
+that is the operator's call. Nothing breaks mechanically: the cast-capacity guard
+still passes at 19 beats.
+
+**17 bare `assert`s under `nodes/` all PREDATE this change** (verified). Not
+introduced here, not fixed here.
+
+**THE `__main__` SELF-TEST BLOCKS HAVE ROTTED, and nothing was watching.** Found
+while repairing them for the word rip: pytest never executes these blocks, so
+their assertions have drifted out of agreement with the code for a long time.
+Corrected in passing, each labelled PRE-EXISTING ROT in the source:
+
+| Block | Rotted assertion | Reality |
+|---|---|---|
+| `OTR_LedgerScriptWriter.py` | reads `spec["optional"]["seed"]` | **there is no `seed` widget** -- it raised `KeyError` and killed the self-test at that line, so NOTHING after it had run for however long |
+| `OTR_LedgerScriptWriter.py` | `nc_meta["max"] == 6` | the real ceiling is `_FABLE2_MAX_CAST` (10). Now reads the constant |
+| `_otr_outline.py` | `Beat(...).speaker == "AEGEUS"` | the validator only STRIPS; it has never uppercased. Uppercasing lives in `_normalize_speaker`, applied by callers |
+
+**`_otr_outline.py`'s block now passes end to end.** `OTR_LedgerScriptWriter.py`'s
+gets much further and stops on ANOTHER pre-existing drift --
+`creative_writing_model` default is `openrouter:slot-a`, not the Mistral id the
+assertion still names. **Deliberately NOT fixed here:** it is unrelated to this
+change and fully repairing that block is its own task. **The real lesson: a
+self-test nothing runs is not a test.** Either wire these into pytest or delete
+them; leaving them is how three false assertions survived.
+
 ### QUEUED -- RENAME THE LANES OFF "codex" AND "fable2" (operator 2026-08-14)
 
 *"Ideally I'd like to not call them codex or fable lanes -- they are scifi /

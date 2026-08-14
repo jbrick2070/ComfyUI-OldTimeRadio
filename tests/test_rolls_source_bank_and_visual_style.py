@@ -18,18 +18,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import OTR_LedgerScriptWriter as WRITER
-from nodes import _otr_lane_specs as LANES
 from nodes import _otr_rolls as ROLLS
 from nodes import _otr_story_routing as ROUTING
 from nodes import _otr_visual_styles as STYLES
 
 
-def _req(target_words: int = 320) -> "LANES.RollRequest":
-    return LANES.RollRequest(target_words=target_words)
-
-
-def _factory(target_words: int = 320):
-    return lambda: _req(target_words)
+# `_req` / `_factory` were REMOVED 2026-08-14. They built a
+# `_otr_lane_specs.RollRequest` and handed it to `resolve_bank_selection` as
+# `request_factory=`. `resolve_bank_selection` no longer takes a
+# `request_factory` kwarg at all -- the bank roll filters on `bank.runnable`
+# alone now (see `nodes/_otr_rolls.py::eligible_bank_ids`), so there is
+# nothing left to build a request FOR.
 
 
 @pytest.fixture(autouse=True)
@@ -61,8 +60,7 @@ def test_the_two_surfaces_use_separate_seed_envs():
 
 
 def test_rolling_the_bank_does_not_roll_the_style():
-    bank, bank_receipt = ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(), env={})
+    bank, bank_receipt = ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, env={})
     style, style_receipt = ROLLS.resolve_style_selection(
         "sci_fi_radio", env={})
     assert bank_receipt is not None and bank in ROUTING.list_bank_ids()
@@ -70,8 +68,7 @@ def test_rolling_the_bank_does_not_roll_the_style():
 
 
 def test_rolling_the_style_does_not_roll_the_bank():
-    bank, bank_receipt = ROLLS.resolve_bank_selection(
-        "scifi_news", request_factory=_factory(), env={})
+    bank, bank_receipt = ROLLS.resolve_bank_selection("scifi_news", env={})
     style, style_receipt = ROLLS.resolve_style_selection(
         ROLLS.STYLE_SENTINEL, env={})
     assert bank == "scifi_news" and bank_receipt is None
@@ -80,8 +77,7 @@ def test_rolling_the_style_does_not_roll_the_bank():
 
 def test_both_surfaces_can_roll_in_the_same_run_with_separate_seeds():
     env = {ROLLS.BANK_SEED_ENV: "11", ROLLS.STYLE_SEED_ENV: "22"}
-    _bank, bank_receipt = ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(), env=env)
+    _bank, bank_receipt = ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, env=env)
     _style, style_receipt = ROLLS.resolve_style_selection(
         ROLLS.STYLE_SENTINEL, env=env)
     assert bank_receipt.seed == 11 and style_receipt.seed == 22
@@ -95,8 +91,7 @@ def test_both_surfaces_can_roll_in_the_same_run_with_separate_seeds():
 
 @pytest.mark.parametrize("picked", ["scifi_news", "shakespeare", "anything"])
 def test_a_manual_bank_pick_returns_unchanged_with_no_receipt(picked):
-    assert ROLLS.resolve_bank_selection(
-        picked, request_factory=_factory(), env={}) == (picked, None)
+    assert ROLLS.resolve_bank_selection(picked, env={}) == (picked, None)
 
 
 @pytest.mark.parametrize("picked", ["sci_fi_radio", "anime", "anything"])
@@ -104,54 +99,45 @@ def test_a_manual_style_pick_returns_unchanged_with_no_receipt(picked):
     assert ROLLS.resolve_style_selection(picked, env={}) == (picked, None)
 
 
-def test_a_manual_pick_never_builds_the_request():
-    """Gate-first ordering: a malformed target must not raise BEFORE the
-    unknown/non-runnable bank gate gets to speak."""
-    def _explode():
-        raise AssertionError("the request was built on the manual path")
-
-    assert ROLLS.resolve_bank_selection(
-        "scifi_news", request_factory=_explode, env={}) == ("scifi_news", None)
+# `test_a_manual_pick_never_builds_the_request` was DELETED 2026-08-14. It
+# pinned gate-first ordering: a manual (non-sentinel) bank pick returned
+# BEFORE `request_factory()` was ever invoked, proving the sentinel check ran
+# before the (now-removed) request was built. `request_factory` and the
+# `RollRequest` it built are gone with the word-count authority -- there is
+# no request left to build early, late, or at all, so the ordering claim
+# this test pinned no longer applies to anything.
 
 
 # ---------------------------------------------------------------------------
 # eligibility
 # ---------------------------------------------------------------------------
 
-def test_bank_pool_is_runnable_and_lane_compatible_and_sorted():
-    order = ROLLS.eligible_bank_ids(_req(320))
+def test_bank_pool_is_runnable_and_sorted():
+    order = ROLLS.eligible_bank_ids()
     banks = ROUTING._ensure_loaded().banks
     assert list(order) == sorted(order), "pool must not depend on row order"
-    assert order, "at least one bank must be rollable at a normal target"
+    assert order, "at least one bank must be rollable"
     for bank_id in order:
         assert banks[bank_id].runnable is True
     # custom_source_bank is the shipped non-runnable row -- never rollable.
     assert "custom_source_bank" not in order
 
 
-def test_bank_pool_drops_a_lane_that_cannot_build_the_request():
-    """A bank whose lane would reject the target must not win the roll and
-    then fail -- filtering BEFORE the draw is the whole point."""
-    wide = set(ROLLS.eligible_bank_ids(_req(320)))
-    narrow = set(ROLLS.eligible_bank_ids(_req(5000)))
-    assert narrow < wide, "the 30..900 lane should drop out at 5000 words"
-    dropped = wide - narrow
-    assert dropped, "expected at least one lane-constrained bank"
-    for bank_id in dropped:
-        bank = ROUTING.get_bank(bank_id)
-        assert not LANES.is_roll_compatible(bank, _req(5000))
+# `test_bank_pool_drops_a_lane_that_cannot_build_the_request` was DELETED
+# 2026-08-14. It pinned a SECOND pool filter -- "the lane's declared request
+# compatibility" via `_otr_lane_specs.is_roll_compatible` -- that dropped
+# scifi_news_circuit (a 30..900 word band) out of the pool once the request
+# target left that band. `eligible_bank_ids` now takes no request at all and
+# filters on `bank.runnable` alone (see `nodes/_otr_rolls.py`); there is no
+# second filter left to drop anything.
 
 
 def test_bank_pool_is_derived_from_the_live_registry_not_a_literal():
     """A client bank admitted at runtime must be an ordinary peer."""
-    order = ROLLS.eligible_bank_ids(_req(320))
+    order = ROLLS.eligible_bank_ids()
     runnable = {b.source_bank_id for b in ROUTING._ensure_loaded().banks.values()
                 if b.runnable}
-    assert set(order) <= runnable
-    assert set(order) == {
-        b for b in runnable
-        if LANES.is_roll_compatible(ROUTING.get_bank(b), _req(320))
-    }
+    assert set(order) == runnable
 
 
 def test_style_pool_is_registry_plus_dynamic_sorted():
@@ -162,15 +148,12 @@ def test_style_pool_is_registry_plus_dynamic_sorted():
     assert len(order) == len(STYLES.list_style_ids()) + 1 == 10
 
 
-def test_an_empty_bank_pool_fails_loud_and_names_both_filters(monkeypatch):
-    monkeypatch.setattr(LANES, "is_roll_compatible",
-                        lambda _bank, _req: False, raising=True)
+def test_an_empty_bank_pool_fails_loud_and_names_the_runnable_filter(monkeypatch):
+    monkeypatch.setattr(ROLLS, "eligible_bank_ids", lambda: (), raising=True)
     with pytest.raises(ROLLS.RollError) as caught:
-        ROLLS.resolve_bank_selection(
-            ROLLS.BANK_SENTINEL, request_factory=_factory(), env={})
+        ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, env={})
     message = str(caught.value)
     assert "runnable=false" in message
-    assert "lane incompatibility" in message
     assert "no eligible bank" in message
 
 
@@ -225,8 +208,7 @@ def test_a_malformed_or_out_of_range_seed_raises_rather_than_degrading(bad):
 
 def test_a_seeded_bank_roll_replays_from_its_own_receipt():
     env = {ROLLS.BANK_SEED_ENV: "987654"}
-    selected, receipt = ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(), env=env)
+    selected, receipt = ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, env=env)
     assert ROLLS.draw(receipt.eligible_order, receipt.seed) == selected
     assert receipt.selected == selected
 
@@ -245,8 +227,7 @@ def test_an_unseeded_style_roll_replays_from_its_own_receipt():
 
 def test_receipt_meta_shape_is_json_ready_and_names_its_surface():
     _selected, receipt = ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(),
-        env={ROLLS.BANK_SEED_ENV: "5"})
+        ROLLS.BANK_SENTINEL, env={ROLLS.BANK_SEED_ENV: "5"})
     row = receipt.to_meta()
     assert row["receipt_version"] == ROLLS.RECEIPT_VERSION
     assert row["surface"] == "source_bank"
@@ -274,22 +255,19 @@ def test_style_receipt_names_its_own_surface_and_seed_source():
 def test_the_bank_roll_refuses_a_pinned_source_ref():
     with pytest.raises(ROLLS.RollError, match="pins a specific source"):
         ROLLS.resolve_bank_selection(
-            ROLLS.BANK_SENTINEL, request_factory=_factory(),
-            source_ref="folger:mac.2.2", env={})
+            ROLLS.BANK_SENTINEL, source_ref="folger:mac.2.2", env={})
 
 
 def test_a_blank_source_ref_does_not_block_the_roll():
     for blank in ("", "   ", None):
         selected, receipt = ROLLS.resolve_bank_selection(
-            ROLLS.BANK_SENTINEL, request_factory=_factory(),
-            source_ref=blank, env={})
+            ROLLS.BANK_SENTINEL, source_ref=blank, env={})
         assert receipt is not None and selected
 
 
 def test_a_pinned_source_ref_is_fine_on_a_manual_pick():
     assert ROLLS.resolve_bank_selection(
-        "shakespeare", request_factory=_factory(),
-        source_ref="folger:mac.2.2", env={}) == ("shakespeare", None)
+        "shakespeare", source_ref="folger:mac.2.2", env={}) == ("shakespeare", None)
 
 
 # ---------------------------------------------------------------------------
@@ -361,8 +339,7 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
 
 def test_the_roll_never_mutates_process_env():
     before = dict(__import__("os").environ)
-    ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(), env={})
+    ROLLS.resolve_bank_selection(ROLLS.BANK_SENTINEL, env={})
     ROLLS.resolve_style_selection(ROLLS.STYLE_SENTINEL, env={})
     assert dict(__import__("os").environ) == before
 
@@ -376,6 +353,5 @@ def test_the_rng_factory_is_a_real_seam():
         return random.Random(seed)
 
     ROLLS.resolve_bank_selection(
-        ROLLS.BANK_SENTINEL, request_factory=_factory(),
-        env={ROLLS.BANK_SEED_ENV: "3"}, rng_factory=_fake)
+        ROLLS.BANK_SENTINEL, env={ROLLS.BANK_SEED_ENV: "3"}, rng_factory=_fake)
     assert calls == [3]

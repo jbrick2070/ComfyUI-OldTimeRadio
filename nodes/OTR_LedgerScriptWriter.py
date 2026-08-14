@@ -10,7 +10,7 @@ Pipeline (unchanged from v2.0 LPL):
          _otr_style_catalog.build_story_contract(), made once cast_seed
          and script_brief both exist (style-engine consolidation,
          2026-07-05). No widget, no LLM picker.
-       - target_words from widget, optionally overridden by smoke
+       - act_count from widget (1-8); episode length is an observation
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
          only computed post-hoc for the est_minutes output socket.
@@ -63,9 +63,6 @@ Widget surface (current as of 2026-05-23):
     required:
         episode_title     STRING  (optional override; empty -> LLM regen
                                    from final dialogue post-composition)
-        target_words      INT     (canonical length unit; radio ~140 wpm
-                                   conversion is only for the est_minutes
-                                   output, never for story planning)
         num_characters    INT     (REQUESTED speaking characters, 1 = monologue;
                                    a request, not a cap -- the story may use more)
     optional:
@@ -79,8 +76,8 @@ Widget surface (current as of 2026-05-23):
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
         include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
                                     beats between acts; False -> continuous)
-        act_count         combo   ('auto' derives the act count from
-                                   target_words; '1'-'7' set it explicitly)
+        act_count         combo   ('1'-'8' -- THE one length-shaped knob;
+                                   always honoured, never derived)
         creativity        combo   (maps to temperature + top_p preset)
         perfect_run_spacesaver BOOLEAN (DEPRECATED 2026-08-08 -- no-op
                                         sentinel; kept to preserve widget
@@ -1539,14 +1536,22 @@ def _resolve_creativity(creativity: str) -> tuple[float, float]:
     return (float(temp), float(top_p))
 
 
-def _resolve_target_words(target_words) -> int:
-    """Clamp target_words to the schema minimum.
+try:                                            # package import
+    from . import _otr_episode_budget as _OTRB
+except ImportError:                              # flat/script import
+    import _otr_episode_budget as _OTRB          # type: ignore
 
-    Smoke-preset target_length override path removed 2026-05-11
-    (post-Phase-3 cleanup) along with the target_length widget. For
-    a smoke run type target_words=30 directly.
-    """
-    return max(5, int(target_words))
+#: Act count used when the widget value is missing or out of range. Three
+#: acts is the classic radio-drama shape (setup / complication / resolution)
+#: and was the previous auto-derived default for a normal-length episode.
+#: It is NOT derived from anything -- deriving it is what was removed.
+_DEFAULT_ACT_COUNT: int = 3
+
+#: Operator-facing act choices. Explicit 1..8; there is deliberately no
+#: 'auto' option, because 'auto' meant "derive from target_words".
+_ACT_COUNT_CHOICES: list[str] = [
+    str(n) for n in range(_OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT + 1)
+]
 
 
 def _resolve_cast_rng_seed() -> tuple[int, str]:
@@ -1727,7 +1732,6 @@ def _stamp_news_seed_receipt(
 
 def _resolve_inputs(
     episode_title: str = "",
-    target_words: int = 350,
     num_characters: int = 2,
     *,
     # S30 B2a: split single model_id input into the two writer-surface
@@ -1825,41 +1829,31 @@ def _resolve_inputs(
         str(technical_model or _otr_model_catalog.DEFAULT_LLM)
     )
 
-    target_words = _resolve_target_words(target_words)
     # A REQUEST, not a cap (operator directive 2026-08-12, all banks). The
     # only real ceiling is the voice stock, enforced in the writer against
     # `MAX_SPEAKING_CAST`, because two characters never share a voice.
     num_characters = max(1, min(_FABLE2_MAX_CAST, int(num_characters)))
 
-    # Phase 2A: act_count resolution. The widget is a combo --
-    # "auto" (the default) means auto-derive via
-    # _otr_episode_budget.auto_act_count, which scales the act count up
-    # with target_words (fewest acts whose widened-beat budget fits the
-    # length); "1".."7" set it explicitly. An explicit pick is validated
-    # against the [default..max] band by compute_episode_budget in run().
-    _act_count_raw = str(act_count).strip().lower()
-    if _act_count_raw in ("", "auto"):
-        act_count_int = 0
-    else:
-        try:
-            act_count_int = max(1, min(7, int(_act_count_raw)))
-        except (TypeError, ValueError):
-            act_count_int = 0
-    if act_count_int == 0:
-        try:
-            from . import _otr_episode_budget as _OTRB  # type: ignore
-            act_count_int = _OTRB.auto_act_count(target_words)
-        except Exception as exc:  # noqa: BLE001
-            # If target_words is below 30, auto_act_count raises (via
-            # default_act_count); fall through to act_count=1 and let
-            # compute_episode_budget surface the structured
-            # InvalidEpisodeBudgetError in run().
-            log.warning(
-                "[OTR_LedgerScriptWriter] act_count auto-derive failed "
-                "(target_words=%d): %s -- defaulting to 1",
-                target_words, exc,
-            )
-            act_count_int = 1
+    # ACT COUNT IS THE ONLY LENGTH-SHAPED KNOB (operator directive
+    # 2026-08-14). The widget is an explicit 1..8 combo. There is no
+    # 'auto' any more: 'auto' meant "derive the act count from
+    # target_words", and target_words no longer exists. Nor is the pick
+    # validated against a derived [default..max] band -- that band came
+    # from the word total too, which meant a word count could REFUSE an
+    # operator's act choice. An out-of-range value falls back to the
+    # default rather than failing the render.
+    try:
+        act_count_int = int(str(act_count).strip())
+    except (TypeError, ValueError):
+        act_count_int = _DEFAULT_ACT_COUNT
+    if not (_OTRB.MIN_ACT_COUNT <= act_count_int <= _OTRB.MAX_ACT_COUNT):
+        log.warning(
+            "[OTR_LedgerScriptWriter] act_count=%r out of range [%d, %d] "
+            "-- using %d",
+            act_count, _OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT,
+            _DEFAULT_ACT_COUNT,
+        )
+        act_count_int = _DEFAULT_ACT_COUNT
     temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
 
@@ -2047,7 +2041,6 @@ def _resolve_inputs(
         "news_seed":            news_seed,
         "news_article":         news_article,
         "seed_source":          seed_source,
-        "target_words":         target_words,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
         # S30 B2b: per-slot keys ONLY. The legacy `model_id` key is
@@ -2922,18 +2915,15 @@ class OTR_LedgerScriptWriter:
                         "supply a title."
                     ),
                 }),
-                "target_words": ("INT", {
-                    "default": 350, "min": 30, "max": 10000, "step": 10,
-                    "tooltip": (
-                        "Target spoken dialogue word count at ~140 wpm. "
-                        "30 = ultra-smoke pipeline check (~13s, ~3 lines), "
-                        "100 = smoke (~45s, ~6 HuMo clips), 200 = quick, "
-                        "350 = ~2.5min (default), 700 = 5min, "
-                        "1400 = 10min, 2100 = 15min, 3500 = 25min. "
-                        "target_length presets for '30 words (smoke)' / "
-                        "'tiny (smoke)' override this widget."
-                    ),
-                }),
+                # `target_words` WAS WIDGET SLOT 2 AND WAS REMOVED
+                # 2026-08-14 (operator directive). Episode length is an
+                # OBSERVATION now, not an instruction: pick the number of
+                # acts and the story is as long as it turns out to be.
+                # `widgets_values` is POSITIONAL (BUG-LOCAL-097), so this
+                # removal shifted every saved value after slot 2 --
+                # `workflows/otr_canonical.json` and all variants were
+                # regenerated in the SAME change. A graph saved before that
+                # change must be re-saved.
                 "num_characters": ("INT", {
                     "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
                     "tooltip": (
@@ -3028,28 +3018,29 @@ class OTR_LedgerScriptWriter:
                         "shape` line 2026-05-10."
                     ),
                 }),
-                # act_count sits where target_length used to be in the
-                # widget order. Replaced the legacy target_length combo
-                # (post-Phase-3 cleanup 2026-05-11) with this act_count
-                # combo: "auto" derives the act count from target_words,
-                # "1".."7" set it explicitly. compute_episode_budget is
-                # the authoritative validator.
+                # THE ONE LENGTH-SHAPED KNOB (operator directive
+                # 2026-08-14). 'auto' was removed with target_words --
+                # it meant "derive the act count from the word total" --
+                # and the range grew from 1-7 to 1-8. Whatever is picked
+                # here is honoured: there is no derived floor or ceiling
+                # that can refuse it.
                 "act_count": (
-                    ["auto", "1", "2", "3", "4", "5", "6", "7"],
+                    _ACT_COUNT_CHOICES,
                     {
-                        "default": "auto",
+                        "default": str(_DEFAULT_ACT_COUNT),
                         "tooltip": (
-                            "Number of acts. 'auto' (the default) sizes "
-                            "the act count from target_words via "
-                            "_otr_episode_budget.default_act_count; pick "
-                            "1-7 to set it explicitly.\n\n"
-                            "Auto thresholds (target_words floor):\n"
-                            "  30   -> 1 act\n"
-                            "  150  -> 2 acts\n"
-                            "  300  -> 3 acts (and all higher word counts)\n\n"
-                            "compute_episode_budget is authoritative and "
-                            "rejects an out-of-band explicit pick at run "
-                            "time (cap = target_words // 50, ceiling 7)."
+                            "Number of acts, 1-8. This is the only knob "
+                            "that shapes episode length, and your pick "
+                            "is always honoured.\n\n"
+                            "More acts means a story with more turns in "
+                            "it -- each act gets its own beat skeleton "
+                            "and its own pass. The episode ends up as "
+                            "long as the story needs; length is reported "
+                            "afterwards, never requested up front.\n\n"
+                            "  1 -> a single scene\n"
+                            "  2 -> setup, resolution\n"
+                            "  3 -> setup, complication, resolution\n"
+                            "  8 -> the full arc, through crisis and climax"
                         ),
                     },
                 ),
@@ -3123,10 +3114,11 @@ class OTR_LedgerScriptWriter:
                         "Per-line max_new_tokens ceiling on the "
                         "composer hot-path.\n\n"
                         "Default 200 preserves current behavior. The "
-                        "composer scales attempt-1 max_new_tokens with "
-                        "min(cap, target_words * 4) so short lines do "
-                        "not get a profligate budget that invites "
-                        "drift; attempt-2 retry uses the full cap."
+                        "Attempt-1 uses this cap directly; attempt-2 "
+                        "retry uses the full cap. It is a per-CALL decode "
+                        "budget, not a length target -- it was scaled from "
+                        "target_words until 2026-08-14, which made it a "
+                        "token ceiling derived from a word request."
                     ),
                 }),
                 # BUG-LOCAL-260: operator control for the LEMMY cameo.
@@ -3613,7 +3605,6 @@ class OTR_LedgerScriptWriter:
     def run(
         self,
         episode_title="",
-        target_words=350,
         num_characters=2,
         # S30 B2a: single model_id widget split into two surface widgets.
         # Both default to _otr_model_catalog.DEFAULT_LLM so the audio C7 baseline is
@@ -3733,8 +3724,6 @@ class OTR_LedgerScriptWriter:
         # that bug in the r2 draft, independently.
         source_bank, _bank_roll = _ROLLS.resolve_bank_selection(
             source_bank,
-            request_factory=lambda: _LANES.RollRequest(
-                target_words=_resolve_target_words(target_words)),
             source_ref=source_ref,
         )
         visual_style, _style_roll = _ROLLS.resolve_style_selection(
@@ -3746,30 +3735,12 @@ class OTR_LedgerScriptWriter:
         # Every REGISTERED style (and the dynamic visual_storybased style) is valid.
         if visual_style != _ROLLS.DYNAMIC_STYLE_ID:
             _otr_visual_styles.resolve_visual_style(visual_style)
-        # Lane request gate (2026-07-31) -- beside the other two, same
-        # zero-side-effect contract. A dispatched lane that STRUCTURALLY
-        # cannot build the requested shape (today: scifi_news_circuit's
-        # 30..900 band, which its RadioScore graph cannot express outside)
-        # raises its OWN native error HERE, before the RSS fetch, instead
-        # of after the source work. The gate moves WHEN the failure lands,
-        # never WHAT it is -- a direct pick still gets the identical
-        # exception type and message. An inline lane is a no-op.
-        #
-        # This is NOT a word-count quality gate, and nothing here may grow
-        # into one: episode length is a recorded property, never pass/fail.
-        # The clamped value is used because that is exactly what the runner
-        # will read out of `resolved`, so the gate can never disagree with
-        # the lane it speaks for.
-        _LANES.assert_supported(
-            _source_bank_row,
-            _LANES.RollRequest(
-                target_words=_resolve_target_words(target_words)),
-        )
-        # target_words and refine_target_grade remain compatibility/guidance
-        # inputs. Neither authors a competing story, and neither judges one:
-        # the ONLY thing target_words can do is decline a lane whose
-        # structure cannot be built at that shape (the gate directly above),
-        # which is a capability statement, not a length verdict.
+        # The lane REQUEST GATE (2026-07-31) was removed 2026-08-14 with the
+        # word authority. It sat here to let a dispatched lane refuse a
+        # `target_words` outside its band -- `scifi_news_circuit`'s 30..900
+        # was the only band any lane ever declared. There is no target to
+        # refuse, so there is nothing to gate: the act count is always
+        # honoured, and every bank's topology accepts every act count.
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the
         # process env FIRST, before generate_outline + every style-grammar read,
         # so this single control governs the whole bundled scaffold: the style
@@ -3864,7 +3835,6 @@ class OTR_LedgerScriptWriter:
 
         # --- A. Resolve all widget inputs (RSS fetch happens here) -----
         resolved = _resolve_inputs(
-            target_words=target_words,
             num_characters=num_characters,
             episode_title=episode_title,
             creative_writing_model=creative_writing_model,
@@ -3914,12 +3884,12 @@ class OTR_LedgerScriptWriter:
 
         log.info(
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
-            "technical_model=%r, target_words=%d, num_characters=%d, "
+            "technical_model=%r, act_count=%d, num_characters=%d, "
             "creativity=%r (temp=%.2f top_p=%.2f), seed_source=%s, "
             "episode_title=%r, perfect_run_spacesaver=%s",
             resolved["creative_writing_model"],
             resolved["technical_model"],
-            resolved["target_words"],
+            resolved["act_count"],
             resolved["num_characters"],
             resolved["creativity"],
             resolved["temperature"], resolved["top_p"],
@@ -4743,27 +4713,19 @@ class OTR_LedgerScriptWriter:
             for row in cast_rows
             if row["name"] != "ANNOUNCER"
         )
-        # Phase 2A (2026-05-11): build EpisodeBudget from
-        # (target_words, act_count, include_act_breaks, num_characters).
-        # On invalid combos compute_episode_budget raises
-        # InvalidEpisodeBudgetError (ValueError subclass); we let it
-        # propagate -- the widget delta is the right place to fail
-        # loud, not silently coerce.
-        from . import _otr_episode_budget as _OTRB  # type: ignore
+        # Build the act topology from (act_count, include_act_breaks,
+        # num_characters). `target_words` left this call 2026-08-14 along
+        # with every word-derived field it used to produce.
         episode_budget = _OTRB.compute_episode_budget(
-            target_words=resolved["target_words"],
             act_count=resolved["act_count"],
             include_act_breaks=resolved["include_act_breaks"],
             num_characters=resolved["num_characters"],
         )
         log.info(
-            "[OTR_LedgerScriptWriter] phase 2A budget: act_count=%d, "
-            "arc_phases=%s, per_phase_words=%s, per_phase_beats=%s, "
-            "words_per_beat_range=%s, music_inter=%d",
+            "[OTR_LedgerScriptWriter] act topology: act_count=%d, "
+            "arc_phases=%s, per_phase_beats=%s, music_inter=%d",
             episode_budget.act_count, list(episode_budget.arc_phases),
-            list(episode_budget.per_phase_words),
             list(episode_budget.per_phase_beats),
-            list(episode_budget.words_per_beat_range),
             episode_budget.music_inter_count,
         )
         # The StoryContract (`contract`) was already built earlier in this
@@ -4774,7 +4736,6 @@ class OTR_LedgerScriptWriter:
             news_seed=resolved["news_seed"],
             style=(contract.label if contract else ""),
             character_cast=character_cast,
-            target_words=resolved["target_words"],
             script_brief=script_brief,
             key_terms=key_terms_tuple,
             cast_descriptions=cast_descriptions,
@@ -4785,8 +4746,7 @@ class OTR_LedgerScriptWriter:
             style_grammar=(contract.grammar if contract else ""),
             story_engine=(contract.story_engine if contract else ""),
         )
-        # The first structurally valid outline is authoritative. Requested word
-        # count remains prompt guidance; no grade-selected outline can replace it.
+        # The first structurally valid outline is authoritative.
         with slot_scheduler.helper_context("generate_outline"):
             outline = _OTRO.generate_outline(
                 creative_generate_fn,
@@ -4795,17 +4755,11 @@ class OTR_LedgerScriptWriter:
                 source_bank_id=resolved["source_bank"],
             )
 
-        # Requested length guides planning only. Record the planned allocation
-        # without comparing, rejecting, or re-authoring the accepted outline.
-        voiced_beats = [
-            beat for beat in outline.beats
-            if getattr(beat, "speaker_role", "") == "character"
-        ]
-        beat_word_sum = sum(beat.target_words for beat in voiced_beats)
+        # Length is an OBSERVATION (2026-08-14). Nothing was requested, so
+        # nothing is stamped as a target and there is no planned per-beat
+        # allocation to record -- `Beat.target_words` no longer exists.
         _OTRWD.stamp_contract(
             meta,
-            target_words=int(resolved["target_words"]),
-            planned_voiced_words=beat_word_sum,
             owner=f"inline:{resolved['source_bank']}",
         )
 
@@ -6310,7 +6264,7 @@ class OTR_LedgerScriptWriter:
         # (forward-compat title chain slot) and perfect_run_spacesaver.
         meta = led.data.setdefault("meta", {})
         meta["gen_params_initial"] = {
-            "target_words":         resolved["target_words"],
+            "act_count":            resolved["act_count"],
             "num_characters":       resolved["num_characters"],
             # S30 B2b: the legacy `model_id` key is DELETED outright.
             # Every consumer that previously read meta.gen_params_initial.
@@ -6901,9 +6855,12 @@ if __name__ == "__main__":
         spec = cls.INPUT_TYPES()
         assert "required" in spec, "missing required block"
         assert "optional" in spec, "missing optional block"
-        # Required block: episode_title, target_words, num_characters.
+        # Required block: episode_title, num_characters. `target_words` left
+        # it 2026-08-14 with the rest of the word authority.
         req_keys = list(spec["required"].keys())
-        assert req_keys == ["episode_title", "target_words", "num_characters"], \
+        assert "target_words" not in spec["optional"], \
+            "target_words must not come back as an optional widget either"
+        assert req_keys == ["episode_title", "num_characters"], \
             f"required widget order drift: {req_keys}"
         # Optional block: the clean set after Phase 0-3 cleanup + B2a
         # two-widget split.
@@ -6918,28 +6875,25 @@ if __name__ == "__main__":
                        "model_id"):
             assert legacy not in spec["optional"], \
                 f"legacy widget {legacy!r} resurrected"
-        # seed widget: INT, 0..2^32-1, default 42 (post-cleanup
-        # cosmetic flip; shuffle-on randomizes regardless).
-        seed_type, seed_meta = spec["optional"]["seed"]
-        assert seed_type == "INT", f"seed type drift: {seed_type!r}"
-        assert seed_meta["min"] == 0
-        assert seed_meta["max"] == 2**32 - 1
-        assert seed_meta["default"] == 42, \
-            f"seed default drift: {seed_meta['default']!r}"
+        # PRE-EXISTING ROT, corrected 2026-08-14 while here: this block read
+        # `spec["optional"]["seed"]` and raised KeyError -- there is no `seed`
+        # widget on this node and there has not been for some time. It killed
+        # the self-test at that line, so nothing after it ever ran. Nothing
+        # caught it because this block is not executed by pytest. Unrelated
+        # to the word rip.
+        assert "seed" not in spec["optional"], \
+            "a `seed` widget reappeared; the self-test below assumes none"
         # episode_title is a STRING (default empty).
         et_type, et_meta = spec["required"]["episode_title"]
         assert et_type == "STRING"
         assert et_meta.get("default") == ""
-        # target_words INT clamps + default 350.
-        tw_type, tw_meta = spec["required"]["target_words"]
-        assert tw_type == "INT"
-        assert tw_meta["min"] == 30 and tw_meta["max"] == 10000
-        assert tw_meta["default"] == 350, \
-            f"target_words default drift: {tw_meta['default']!r}"
         # num_characters INT clamps
         nc_type, nc_meta = spec["required"]["num_characters"]
         assert nc_type == "INT"
-        assert nc_meta["min"] == 1 and nc_meta["max"] == 6
+        # PRE-EXISTING ROT, corrected 2026-08-14: pinned max 6 while the
+        # real ceiling is `_FABLE2_MAX_CAST`. Read the constant so it cannot
+        # drift again. Unrelated to the word rip.
+        assert nc_meta["min"] == 1 and nc_meta["max"] == _FABLE2_MAX_CAST
         # custom_premise is multiline STRING with empty default
         cp_type, cp_meta = spec["optional"]["custom_premise"]
         assert cp_type == "STRING"
@@ -6949,11 +6903,12 @@ if __name__ == "__main__":
         cr_choices, _ = spec["optional"]["creativity"]
         assert cr_choices == _CREATIVITY_CHOICES, \
             f"creativity dropdown drift: {cr_choices}"
-        # act_count combo: "auto" sentinel + explicit "1".."7".
+        # act_count: THE one length-shaped knob. Explicit "1".."8" and no
+        # 'auto' -- 'auto' meant "derive from target_words" (2026-08-14).
         ac_choices, ac_meta = spec["optional"]["act_count"]
-        assert ac_choices == ["auto", "1", "2", "3", "4", "5", "6", "7"], \
+        assert list(ac_choices) == [str(n) for n in range(1, 9)], \
             f"act_count combo drift: {ac_choices!r}"
-        assert ac_meta["default"] == "auto", \
+        assert ac_meta["default"] == "3", \
             f"act_count default drift: {ac_meta['default']!r}"
         # Style-engine consolidation (2026-07-05): the `style` combo and
         # `style_custom` free-text widgets are DELETED -- style comes
@@ -7009,7 +6964,7 @@ if __name__ == "__main__":
         failures.append(("4/9 generate_fn build", traceback.format_exc()))
         print("[4/9] FAIL: truncating generate_fn build")
 
-    # 5. _resolve_creativity / 3-way style resolution / _resolve_target_words.
+    # 5. _resolve_creativity (the word clamp is gone).
     try:
         # 5a. creativity presets land on the right (temp, top_p) tuple.
         for name, (et, ep) in zip(
@@ -7023,15 +6978,13 @@ if __name__ == "__main__":
         t, p = _resolve_creativity("???")
         assert (t, p) == (0.85, 0.95)
 
-        # 5c. _resolve_target_words clamps to schema minimum.
-        # (Smoke-preset force logic was retired with the
-        # target_length widget 2026-05-11; type target_words=30
-        # directly for smoke runs.)
-        assert _resolve_target_words(350) == 350
-        assert _resolve_target_words(1400) == 1400
-        assert _resolve_target_words(0) == 5, "min-clamp guard"
+        # 5c. `_resolve_target_words` was DELETED 2026-08-14 with the word
+        # authority. It clamped a requested word count to a schema minimum,
+        # and there is no requested word count left to clamp.
+        assert "_resolve_target_words" not in globals(), \
+            "the word clamp must stay deleted"
 
-        print("[5/9] PASS: resolver helpers (creativity + target_words clamp)")
+        print("[5/9] PASS: resolver helpers (creativity)")
     except Exception:
         failures.append(("5/9 resolver helpers", traceback.format_exc()))
         print("[5/9] FAIL: resolver helpers")
@@ -7042,14 +6995,14 @@ if __name__ == "__main__":
     #    along with the resolver branch it pinned.
     try:
         out = _resolve_inputs(
-            target_words=350, num_characters=2,
+            num_characters=2,
             custom_premise="A real seed for testing.",
             creativity="balanced",
         )
         assert out["news_seed"] == "A real seed for testing."
         assert out["seed_source"] == "custom_premise"
         assert "style" not in out, "style must not appear in resolved dict"
-        assert out["target_words"] == 350
+        assert "target_words" not in out,             "target_words must not reappear in the resolved dict"
         assert "target_seconds" not in out, \
             f"target_seconds must not appear in resolved dict (words-only contract per Jeffrey 2026-05-10)"
         assert out["temperature"] == 0.85 and out["top_p"] == 0.95

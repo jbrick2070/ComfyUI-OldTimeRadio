@@ -728,7 +728,7 @@ def run_leg(engine: str, profile: str, words: int,
 
     cmd = [PY, str(REPO / "scripts" / "otr_canonical_api_run.py"),
            "--profile", profile,
-           "--words", str(words),
+           "--act-count", str(words),
            "--source-bank", source_bank,
            "--visual-style", "roll (any style)",
            "--timeout", str(LEG_TIMEOUT_S)]
@@ -809,7 +809,10 @@ def run_leg(engine: str, profile: str, words: int,
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--words", type=int, default=45)
+    # 2026-08-14: was `--words 45`. The child runner's --words flag went
+    # with the target_words widget; episode shape is act count now.
+    ap.add_argument("--acts", type=int, default=1,
+                    help="act count 1-8; the only episode-shape knob")
     # PIN THE BANK SO A WRITER DEFECT CANNOT MASK A VIDEO LANE.
     #
     # Every leg rolled its bank, and that is wrong for what this campaign
@@ -881,13 +884,13 @@ def main(argv=None) -> int:
     try:
         for engine, profile in legs:
             reset_between_legs()
-            results.append(run_leg(engine, profile, args.words, args.source_bank))
+            results.append(run_leg(engine, profile, args.acts, args.source_bank))
             (REPO / "tmp" / "_w45_results.json").write_text(
                 json.dumps(results, indent=2), encoding="utf-8")
     finally:
         LOCK.unlink(missing_ok=True)
 
-    print("\n=========== %d-WORD CAMPAIGN ===========" % args.words)
+    print("\n=========== %d-ACT CAMPAIGN ===========" % args.acts)
     for r in results:
         print("%-16s %-5s exit=%-4s %6s min  %s" % (
             r["engine"], "PASS" if r["ok"] else "FAIL", r["exit"],

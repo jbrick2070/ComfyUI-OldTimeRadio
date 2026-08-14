@@ -574,45 +574,48 @@ class TestWriterB2aSurface:
         the `style` / `style_custom` widgets outright (slots 8/9) -- style
         is no longer a widget at all, it comes from the single
         deterministic build_story_contract() engine call -- shifting
-        every slot from `creativity` onward down by 2.
+        every slot from `creativity` onward down by 2. The 2026-08-14
+        removal of `target_words` (operator directive -- episode length is
+        an observation now, driven by act_count alone, never a word-count
+        instruction) then shifted every slot from `num_characters` onward
+        down by 1 more.
         """
         writer = self._writer()
         wv = writer.get("widgets_values", [])
         # Current writer widgets_values layout:
         #   0  episode_title              ""
-        #   1  target_words               350
-        #   2  num_characters             2
-        #   3  creative_writing_model     catalog default repo_id
-        #   4  technical_model            catalog default repo_id
-        #   5  custom_premise             ""
-        #   6  include_act_breaks         True
-        #   7  act_count                  "auto"
-        #   8  creativity                 "balanced"
-        #   9  perfect_run_spacesaver     False
-        #  10  min_p                      0.05
-        #  11  repetition_penalty         1.03
-        #  12  max_new_tokens_cap         200
-        #  13  lemmy_cameo                "roll (~11% chance)"
-        #  14  use_exchange                       True      (Build 4)
-        #  15  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
-        #  16  news_briefs_required               True      (Sprint 2.2)
-        #  17  openrouter_slot_a_model
-        #  18  openrouter_slot_b_model
-        #  19  comfy_slot_a_model
-        #  20  comfy_slot_b_model
-        #  21  refine_target_grade
-        #  22  story_scaffold
-        #  23  source_bank
-        #  24  visual_style
-        #  25  google_api_slot_a_model
-        #  26  google_api_slot_b_model
-        #  27  source_ref
-        #  28  llm_device                  "cuda"
-        #  29  llm_attn_impl               "sdpa"
-        #  30  llm_quant_policy            "bnb_nf4"
-        #  31  llm_vram_ceiling_gb         14.5
-        #  32  gguf_n_ctx                  4096
-        #  33  gguf_quant                  "Q8_0"
+        #   1  num_characters             2
+        #   2  creative_writing_model     catalog default repo_id
+        #   3  technical_model            catalog default repo_id
+        #   4  custom_premise             ""
+        #   5  include_act_breaks         True
+        #   6  act_count                  "3"
+        #   7  creativity                 "balanced"
+        #   8  perfect_run_spacesaver     False
+        #   9  min_p                      0.05
+        #  10  repetition_penalty         1.03
+        #  11  max_new_tokens_cap         200
+        #  12  lemmy_cameo                "roll (~11% chance)"
+        #  13  use_exchange                       True      (Build 4)
+        #  14  enable_production_stage3_validators True     (Sprint 10B Wave 1 Agent B)
+        #  15  news_briefs_required               True      (Sprint 2.2)
+        #  16  openrouter_slot_a_model
+        #  17  openrouter_slot_b_model
+        #  18  comfy_slot_a_model
+        #  19  comfy_slot_b_model
+        #  20  refine_target_grade
+        #  21  story_scaffold
+        #  22  source_bank
+        #  23  visual_style
+        #  24  google_api_slot_a_model
+        #  25  google_api_slot_b_model
+        #  26  source_ref
+        #  27  llm_device                  "cuda"
+        #  28  llm_attn_impl               "sdpa"
+        #  29  llm_quant_policy            "bnb_nf4"
+        #  30  llm_vram_ceiling_gb         14.5
+        #  31  gguf_n_ctx                  4096
+        #  32  gguf_quant                  "Q8_0"
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -627,153 +630,160 @@ class TestWriterB2aSurface:
         # vector back to 27; Source Banks v2 then appended source_ref as
         # slot 27 without moving any prior slot.
         #
-        # S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34.
-        # The six explicit LLM runtime-policy widgets (llm_device ..
-        # gguf_quant) were appended after source_ref at slots 28-33
-        # (append-only, BUG-LOCAL-097). Defaults equal the nv50 16 GB
-        # baseline the writer already resolved to, so an old 28-slot
-        # workflow still resolves byte-identically. A gate_in forceInput
-        # socket was also added (OTR_WorkflowValidator.validation_report,
-        # link 279) but it is socket-only and consumes NO widgets_values
-        # slot, so the vector ceiling is 34, not 35.
-        assert len(wv) == 34, (
-            f"writer widgets_values length drift: {len(wv)} (expected 34 "
-            f"after appending the six S5 LLM runtime-policy widgets)"
+        # S5 platform-portability (2026-07-10): pin 28 -> pin 34. The six
+        # explicit LLM runtime-policy widgets (llm_device .. gguf_quant)
+        # were appended after source_ref at slots 28-33 (append-only,
+        # BUG-LOCAL-097). Defaults equal the nv50 16 GB baseline the writer
+        # already resolved to, so an old 28-slot workflow still resolves
+        # byte-identically. A gate_in forceInput socket was also added
+        # (OTR_WorkflowValidator.validation_report, link 279) but it is
+        # socket-only and consumes NO widgets_values slot.
+        #
+        # 2026-08-14 (operator directive): `target_words` (formerly slot 1)
+        # was DELETED -- episode length is an observation now, never a
+        # word-count instruction -- shifting every slot from
+        # `num_characters` onward down by 1 (34 -> 33). `act_count`'s
+        # choices changed from ["auto","1".."7"] default "auto" to
+        # ["1".."8"] default "3": 'auto' meant "derive the act count from
+        # target_words", which no longer exists, so there is no derive
+        # path left to default to.
+        assert len(wv) == 33, (
+            f"writer widgets_values length drift: {len(wv)} (expected 33 "
+            f"after the 2026-08-14 target_words removal)"
         )
-        # Slot 7: act_count must ship as "auto" so production derives the
-        # act structure from target_words instead of freezing a brittle count.
-        assert wv[7] == "auto", (
-            f"act_count (slot 7) must ship 'auto' so it follows target_words; "
-            f"got {wv[7]!r}"
+        # Slot 6: act_count must ship as "3" (the classic setup/complication/
+        # resolution shape) -- there is no 'auto' choice left to fall back to.
+        assert wv[6] == "3", (
+            f"act_count (slot 6) must ship '3'; got {wv[6]!r}"
         )
-        # Slot 14: use_exchange -- the live grouped-exchange dialogue path
+        # Slot 13: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
-        assert wv[14] is True, (
-            f"use_exchange (slot 14) must be ON in the shipped bake; "
-            f"got {wv[14]!r}"
+        assert wv[13] is True, (
+            f"use_exchange (slot 13) must be ON in the shipped bake; "
+            f"got {wv[13]!r}"
         )
-        # Slot 15: enable_production_stage3_validators (ON in the shipped
+        # Slot 14: enable_production_stage3_validators (ON in the shipped
         # bake).
+        assert wv[14] is True, (
+            f"enable_production_stage3_validators (slot 14); got {wv[14]!r}"
+        )
+        # Slot 15: news_briefs_required (ON in the shipped bake).
         assert wv[15] is True, (
-            f"enable_production_stage3_validators (slot 15); got {wv[15]!r}"
+            f"news_briefs_required (slot 15); got {wv[15]!r}"
         )
-        # Slot 16: news_briefs_required (ON in the shipped bake).
-        assert wv[16] is True, (
-            f"news_briefs_required (slot 16); got {wv[16]!r}"
-        )
-        # Slots 17/18: the S2 OpenRouter slot-slug pickers, appended at the
+        # Slots 16/17: the S2 OpenRouter slot-slug pickers, appended at the
         # END. PRODUCTION RESTORE 2026-06-10: the shipped bake previously
         # pinned the recommended slugs, but ComfyUI's /prompt validator
         # REJECTS an out-of-catalog value whenever the remote lane is OFF
         # (value_not_in_list) -- the saved file would not queue AS-IS. The
         # bake now ships the DISABLED SENTINELS; an operator who enables a
         # lane picks a slug in the UI and the preservation rule keeps it.
-        assert wv[17] == "(enable OpenRouter)", (
-            f"openrouter_slot_a_model (slot 17) must ship the disabled "
+        assert wv[16] == "(enable OpenRouter)", (
+            f"openrouter_slot_a_model (slot 16) must ship the disabled "
             f"sentinel (the saved file must queue with lanes off); got "
-            f"{wv[17]!r}"
+            f"{wv[16]!r}"
         )
-        assert wv[18] == "(enable OpenRouter)", (
-            f"openrouter_slot_b_model (slot 18) must ship the disabled "
-            f"sentinel; got {wv[18]!r}"
+        assert wv[17] == "(enable OpenRouter)", (
+            f"openrouter_slot_b_model (slot 17) must ship the disabled "
+            f"sentinel; got {wv[17]!r}"
         )
-        # Slots 19/20: the Comfy Credits slot-slug pickers -- same sentinel
-        # rule as 17/18.
+        # Slots 18/19: the Comfy Credits slot-slug pickers -- same sentinel
+        # rule as 16/17.
+        assert wv[18] == "(enable Comfy Credits)", (
+            f"comfy_slot_a_model (slot 18) must ship the disabled sentinel; "
+            f"got {wv[18]!r}"
+        )
         assert wv[19] == "(enable Comfy Credits)", (
-            f"comfy_slot_a_model (slot 19) must ship the disabled sentinel; "
+            f"comfy_slot_b_model (slot 19) must ship the disabled sentinel; "
             f"got {wv[19]!r}"
         )
-        assert wv[20] == "(enable Comfy Credits)", (
-            f"comfy_slot_b_model (slot 20) must ship the disabled sentinel; "
-            f"got {wv[20]!r}"
-        )
-        # Slot 21: refine_target_grade (refine loop v1, 2026-06-23) -- APPENDED
+        # Slot 20: refine_target_grade (refine loop v1, 2026-06-23) -- APPENDED
         # at the END; ships "Off" (the loop is default-OFF / byte-identical).
-        assert wv[21] == "Off", (
-            f"refine_target_grade (slot 21) must ship 'Off' (the refine loop is "
-            f"default-OFF in the shipped bake); got {wv[21]!r}"
+        assert wv[20] == "Off", (
+            f"refine_target_grade (slot 20) must ship 'Off' (the refine loop is "
+            f"default-OFF in the shipped bake); got {wv[20]!r}"
         )
-        # Slot 22: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
+        # Slot 21: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
         # (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
-        assert wv[22] == "auto", (
-            f"story_scaffold (slot 22) must ship 'auto' (follow the env/default "
-            f"scaffold setting in the shipped bake); got {wv[22]!r}"
+        assert wv[21] == "auto", (
+            f"story_scaffold (slot 21) must ship 'auto' (follow the env/default "
+            f"scaffold setting in the shipped bake); got {wv[21]!r}"
         )
-        # Slot 23: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
+        # Slot 22: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
         # -- APPENDED at the END; ships the production story-bank surface AND
         # must be a REGISTERED bank id (cross-checked against the live routing
         # registry so a re-order / typo cannot ship silently). The roster trim
         # (2026-07-17) retired the science_news family; the default lane is now
         # scifi_news (the local-default sci-fi bank).
-        assert wv[23] == "scifi_news", (
-            f"source_bank (slot 23) must ship 'scifi_news' (the local default "
-            f"story lane); got {wv[23]!r}"
+        assert wv[22] == "scifi_news", (
+            f"source_bank (slot 22) must ship 'scifi_news' (the local default "
+            f"story lane); got {wv[22]!r}"
         )
         from nodes import _otr_story_routing as _routing
-        assert wv[23] in _routing.list_bank_ids(), (
-            f"source_bank (slot 23) value {wv[23]!r} is not a registered "
+        assert wv[22] in _routing.list_bank_ids(), (
+            f"source_bank (slot 22) value {wv[22]!r} is not a registered "
             f"bank id: {_routing.list_bank_ids()!r}"
         )
-        # Slot 24: visual_style (Stage 3C multi-modal story schema,
+        # Slot 23: visual_style (Stage 3C multi-modal story schema,
         # 2026-07-06) -- APPENDED at the END; ships the production look AND
         # must be a REGISTERED style id (live registry cross-check).
-        assert wv[24] == "sci_fi_radio", (
-            f"visual_style (slot 24) must ship 'sci_fi_radio' (the "
-            f"production look); got {wv[24]!r}"
+        assert wv[23] == "sci_fi_radio", (
+            f"visual_style (slot 23) must ship 'sci_fi_radio' (the "
+            f"production look); got {wv[23]!r}"
         )
         from nodes import _otr_rolls as _rolls
-        assert wv[24] in _rolls.eligible_style_ids(), (
-            f"visual_style (slot 24) value {wv[24]!r} is not an eligible "
+        assert wv[23] in _rolls.eligible_style_ids(), (
+            f"visual_style (slot 23) value {wv[23]!r} is not an eligible "
             f"style id: {_rolls.eligible_style_ids()!r}"
         )
+        assert wv[24] == "(select Google API model)", (
+            f"google_api_slot_a_model (slot 24) must ship the unselected "
+            f"sentinel; got {wv[24]!r}"
+        )
         assert wv[25] == "(select Google API model)", (
-            f"google_api_slot_a_model (slot 25) must ship the unselected "
+            f"google_api_slot_b_model (slot 25) must ship the unselected "
             f"sentinel; got {wv[25]!r}"
         )
-        assert wv[26] == "(select Google API model)", (
-            f"google_api_slot_b_model (slot 26) must ship the unselected "
-            f"sentinel; got {wv[26]!r}"
+        assert wv[26] == "", (
+            f"source_ref (slot 26) must ship blank/inert; got {wv[26]!r}"
         )
-        assert wv[27] == "", (
-            f"source_ref (slot 27) must ship blank/inert; got {wv[27]!r}"
-        )
-        # Slots 28-33: S5 platform-portability (2026-07-10) LLM
+        # Slots 27-32: S5 platform-portability (2026-07-10) LLM
         # runtime-policy tail, APPENDED after source_ref. Defaults equal
         # the nv50 16 GB baseline so an old 28-slot workflow resolves
         # byte-identically.
-        assert wv[28] == "cuda", (
-            f"llm_device (slot 28) must ship 'cuda' (nv50 baseline); "
-            f"got {wv[28]!r}"
+        assert wv[27] == "cuda", (
+            f"llm_device (slot 27) must ship 'cuda' (nv50 baseline); "
+            f"got {wv[27]!r}"
         )
-        assert wv[29] == "sdpa", (
-            f"llm_attn_impl (slot 29) must ship 'sdpa'; got {wv[29]!r}"
+        assert wv[28] == "sdpa", (
+            f"llm_attn_impl (slot 28) must ship 'sdpa'; got {wv[28]!r}"
         )
-        assert wv[30] == "bnb_nf4", (
-            f"llm_quant_policy (slot 30) must ship 'bnb_nf4'; got {wv[30]!r}"
+        assert wv[29] == "bnb_nf4", (
+            f"llm_quant_policy (slot 29) must ship 'bnb_nf4'; got {wv[29]!r}"
         )
-        assert wv[31] == 14.5, (
-            f"llm_vram_ceiling_gb (slot 31) must ship 14.5; got {wv[31]!r}"
+        assert wv[30] == 14.5, (
+            f"llm_vram_ceiling_gb (slot 30) must ship 14.5; got {wv[30]!r}"
         )
-        assert wv[32] == 4096, (
-            f"gguf_n_ctx (slot 32) must ship 4096; got {wv[32]!r}"
+        assert wv[31] == 4096, (
+            f"gguf_n_ctx (slot 31) must ship 4096; got {wv[31]!r}"
         )
-        assert wv[33] == "Q8_0", (
-            f"gguf_quant (slot 33) must ship 'Q8_0'; got {wv[33]!r}"
+        assert wv[32] == "Q8_0", (
+            f"gguf_quant (slot 32) must ship 'Q8_0'; got {wv[32]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
-        assert isinstance(wv[3], str) and wv[3], (
+        assert isinstance(wv[2], str) and wv[2], (
             f"creative_writing_model widget value not a non-empty "
-            f"string: {wv[3]!r}"
+            f"string: {wv[2]!r}"
         )
-        assert isinstance(wv[4], str) and wv[4], (
+        assert isinstance(wv[3], str) and wv[3], (
             f"technical_model widget value not a non-empty string: "
-            f"{wv[4]!r}"
+            f"{wv[3]!r}"
         )
-        assert wv[8] == "balanced", (
-            f"creativity widget drifted: {wv[8]!r}"
+        assert wv[7] == "balanced", (
+            f"creativity widget drifted: {wv[7]!r}"
         )
-        assert wv[9] is False, (
-            f"perfect_run_spacesaver widget drifted from slot 9: {wv[9]!r}"
+        assert wv[8] is False, (
+            f"perfect_run_spacesaver widget drifted from slot 8: {wv[8]!r}"
         )
 
     def test_writer_broadcasts_normalized_model_ids(self):

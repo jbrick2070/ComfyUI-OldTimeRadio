@@ -136,29 +136,44 @@ def test_pack_and_pipeline_expose_the_exact_fixed_topology():
     ] == ["script"]
 
 
-def test_one_pitch_is_dealt_for_every_requested_length():
+def test_one_pitch_is_dealt_for_every_act_count():
+    """2026-08-14: was `..._for_every_requested_length`.
+
+    The word half of the envelope is gone -- `total_words` and
+    `scene_word_targets` no longer exist -- so the two assertions about them
+    were deleted rather than reinterpreted. The surviving point is that
+    exactly one pitch is dealt whatever the episode's shape.
+    """
     deck = F2._load_frame_deck()
-    for requested_words in (1, 30, 320, 10_000):
-        cards, stance = F2._deal(random.Random(requested_words), deck)
-        envelope = F2._build_envelope(requested_words)
+    for act_count in (1, 3, 5, 8):
+        cards, stance = F2._deal(random.Random(act_count), deck)
+        envelope = F2._build_envelope(act_count)
         assert len(cards) == 1
         assert stance["name"].strip()
-        assert envelope.total_words == requested_words
-        assert sum(envelope.scene_word_targets) == requested_words
+        assert envelope.scene_count == act_count
 
 
 @pytest.mark.parametrize(
-    ("requested_words", "dialogue"),
+    ("act_count", "dialogue"),
     [
-        (320, "Go."),
-        (30, ("Signal " * 700) + "holds."),
+        (8, "Go."),
+        (1, ("Signal " * 700) + "holds."),
     ],
-    ids=("far-below-guidance", "far-above-guidance"),
+    ids=("tiny-script-many-acts", "huge-script-one-act"),
 )
 def test_first_structurally_clean_script_is_the_single_story_authority(
-    requested_words,
+    act_count,
     dialogue,
 ):
+    """A wildly off-shape script is STILL the single story authority.
+
+    2026-08-14: the ids were "far-below-guidance" / "far-above-guidance",
+    because the parameter was a word request the script missed by miles.
+    There is no length guidance to miss any more, so the cases now pair an
+    extreme script with an extreme act count. The assertion is unchanged and
+    the point is stronger: the first structurally clean draft is accepted,
+    whatever its size.
+    """
     calls: list[dict[str, object]] = []
     raw = _script(dialogue)
 
@@ -171,7 +186,7 @@ def test_first_structurally_clean_script_is_the_single_story_authority(
         _pack(),
         _treatment(),
         "A source digest that supplies fiction fuel.",
-        F2._build_envelope(requested_words),
+        F2._build_envelope(act_count),
         ["SELA"],
     )
 
@@ -219,7 +234,7 @@ def test_only_structural_transport_failure_opens_another_script_call(
         pass_id="script",
         system="Return one complete radio play in the required markup.",
         base_user="Write the complete episode now.",
-        envelope=F2._build_envelope(320),
+        envelope=F2._build_envelope(3),
         cast_names=["SELA"],
         initial_temperature=0.75,
     )

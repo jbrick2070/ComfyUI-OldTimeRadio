@@ -1,10 +1,11 @@
 """Shared actual-word telemetry for every OTR story producer.
 
-Requested length may guide the first authoring prompt, but this module never
-classifies the accepted story as near, far, under, over, passing, or failing.
-It records the requested target as context, then stamps only canonical actual
-counts and text hashes. There is no retry, candidate, mutation, range, ratio,
-drift, or rejection API.
+WORDS ARE AN OBSERVATION HERE, AND ONLY AN OBSERVATION. This module never
+classifies the accepted story as near, far, under, over, passing or failing,
+and since 2026-08-14 it does not record a requested target either -- there is
+no longer one to record. It stamps canonical actual counts and text hashes,
+attributed to the lane that produced them. There is no retry, candidate,
+mutation, range, ratio, drift or rejection API.
 """
 from __future__ import annotations
 
@@ -44,27 +45,30 @@ def _positive_int(value: Any) -> int | None:
 def stamp_contract(
     meta: MutableMapping[str, Any],
     *,
-    target_words: int,
     owner: str,
-    planned_voiced_words: int | None = None,
 ) -> dict[str, Any]:
-    """Persist requested-length context without any acceptance judgment."""
+    """Record WHO owns this episode's word accounting. No target.
+
+    2026-08-14: `target_words` and `planned_voiced_words` were removed with
+    the word authority. Nothing is requested up front any more, so there is
+    no target to persist and no planned per-beat allocation to record --
+    `Beat.target_words` no longer exists either.
+
+    The receipt survives because `owner` is genuinely read (the freeze
+    cascade attributes the actual counts to a lane) and because
+    `stamp_actual` fills the same dict with what the episode TURNED OUT to
+    be. Requested length left; observed length stayed.
+    """
     if not isinstance(meta, MutableMapping):
         raise WordDeliveryError("ledger meta must be mutable")
-    target = _positive_int(target_words)
-    if target is None:
-        raise WordDeliveryError("target_words must be a positive integer")
-    planned = target if planned_voiced_words is None else int(planned_voiced_words)
     receipt = meta.get("word_budget")
     if not isinstance(receipt, MutableMapping):
         receipt = {}
         meta["word_budget"] = receipt
     receipt.update({
-        "schema_version": 4,
-        "target_words": target,
-        "planned_voiced_words": planned,
+        "schema_version": 5,
         "owner": str(owner or "").strip(),
-        "policy": "requested_context_actual_count_only",
+        "policy": "actual_count_only",
     })
     return dict(receipt)
 
@@ -177,25 +181,24 @@ def stamp_actual(
         budget = {}
         meta["word_budget"] = budget
 
-    target = _positive_int(budget.get("target_words"))
+    # 2026-08-14: there is no target to compare against. `target_status`
+    # survives as a schema field so existing readers keep parsing, and it
+    # reports the only honest value: nothing was requested. A malformed
+    # receipt is still called out rather than silently normalised.
     if malformed_budget:
         target_status = "invalid"
         target_error = "meta.word_budget is invalid"
-    elif target is not None:
-        target_status = "valid"
-        target_error = ""
-    elif budget:
-        target_status = "invalid"
-        target_error = "meta.word_budget.target_words is invalid"
     else:
-        target_status = "missing"
+        target_status = "not_requested"
         target_error = ""
 
     result: dict[str, Any] = {
-        "schema_version": 4,
+        # 5, not 4: `stamp_contract` writes 5 and this dict is merged OVER
+        # the same receipt, so a stale 4 here silently demoted every
+        # published ledger's word_budget schema back a version.
+        "schema_version": 5,
         "stage": str(stage or "final"),
         "target_status": target_status,
-        "target_words": target,
         "actual_character_words": character_words,
         "actual_announcer_words": announcer_words,
         "actual_total_voiced_words": total_words,

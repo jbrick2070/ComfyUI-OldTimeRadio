@@ -97,12 +97,13 @@ def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
     assert wv[4] == wa.semantic_master_hash(variant, mapping=mapping,
                                             schemas=schemas)
     # Profile-managed values landed: castlock voice_device (slot 5) = cpu,
-    # writer llm_device (slot 28) = cpu, gguf_quant (slot 33) = Q4_K_M.
+    # writer llm_device (slot 27) = cpu, gguf_quant (slot 32) = Q4_K_M.
+    # (2026-08-14: target_words removal shifted these from 28/33 to 27/32.)
     n80 = next(n for n in variant["nodes"] if n["id"] == 80)
     assert n80["widgets_values"][5] == "cpu"
     n1 = next(n for n in variant["nodes"] if n["id"] == 1)
-    assert n1["widgets_values"][28] == "cpu"
-    assert n1["widgets_values"][33] == "Q4_K_M"
+    assert n1["widgets_values"][27] == "cpu"
+    assert n1["widgets_values"][32] == "Q4_K_M"
     # Recipe carries args + env pointers + key names, never key values.
     assert "--cpu" in recipe
     assert "OTR_COMFYUI_MODELS_ROOT" in recipe

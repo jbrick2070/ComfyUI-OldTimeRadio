@@ -20,12 +20,15 @@ from pathlib import Path
 
 import pytest
 
+# 2026-08-14: the act count replaced `_TARGET_WORDS` as the thing that
+# shapes an episode. Three acts is the default shape.
+_ACT_COUNT = 3
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_style_catalog as STYLE  # noqa: E402
 from nodes._otr_episode_budget import (  # noqa: E402
     compute_episode_budget,
-    default_act_count,
 )
 from nodes._otr_outline import OutlineRequest, generate_outline  # noqa: E402
 
@@ -130,9 +133,9 @@ def _req(**kw):
     target = 350
     base = dict(
         news_seed="a real science seed", style="noir",
-        character_cast=("ALICE", "BOB"), target_words=target,
+        character_cast=("ALICE", "BOB"),
         budget=compute_episode_budget(
-            target, default_act_count(target), True, 2,
+            _ACT_COUNT, True, 2,
         ),
     )
     base.update(kw)

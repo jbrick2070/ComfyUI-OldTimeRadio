@@ -50,23 +50,34 @@ class TestWriterCanonicalModelSlots:
     pin here.
     """
 
-    def test_writer_ships_fast_30_word_model_slots(self):
-        """Canonical workflow is the quick 30-word smoke canvas."""
+    def test_writer_ships_measured_hf_12b_model_slots(self):
+        """Canonical workflow ships the measured HF 12B writer on both
+        model slots.
+
+        Renamed from test_writer_ships_fast_30_word_model_slots
+        (2026-08-14): the `target_words` widget this test used to pin at
+        slot 1 (value 30, "the quick 30-word smoke canvas") was DELETED
+        (operator directive -- episode length is an observation driven by
+        act_count alone, never a word-count instruction). That assertion
+        is gone with the widget, not replaced with anything -- there is no
+        word-count concept left to pin. The model-slot pins below are a
+        separate concern (which LLM ships in the canonical graph) and
+        still hold.
+        """
         n = _node_by_id(_load_canonical_workflow(), 1)
         assert n.get("type") == "OTR_LedgerScriptWriter"
         widgets = n.get("widgets_values", [])
-        assert len(widgets) >= 5, (
+        assert len(widgets) >= 4, (
             "writer widgets_values shorter than expected; widget vector "
             "may have drifted"
         )
         # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES, post the
-        # BUG-LOCAL-269/270 seed-widget removal:
+        # 2026-08-14 target_words removal (BUG-LOCAL-269/270 seed-widget
+        # removal predates it and still holds -- no seed widget either):
         #   [0] episode_title
-        #   [1] target_words
-        #   [2] num_characters
-        #   [3] creative_writing_model
-        #   [4] technical_model
-        assert widgets[1] == 30
+        #   [1] num_characters
+        #   [2] creative_writing_model
+        #   [3] technical_model
         # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane, not the independent GGUF Q8 row whose
@@ -79,13 +90,13 @@ class TestWriterCanonicalModelSlots:
         # could have run Mistral. Pinned in full so the suffix cannot be lost.
         expected_creative = "google/gemma-4-12b-it (11.9 GB)"
         expected_technical = "google/gemma-4-12b-it (11.9 GB)"
-        assert widgets[3] == expected_creative, (
+        assert widgets[2] == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "
-            f"got {widgets[3]!r}."
+            f"got {widgets[2]!r}."
         )
-        assert widgets[4] == expected_technical, (
+        assert widgets[3] == expected_technical, (
             f"writer technical_model must be {expected_technical!r}; "
-            f"got {widgets[4]!r}."
+            f"got {widgets[3]!r}."
         )
 
 

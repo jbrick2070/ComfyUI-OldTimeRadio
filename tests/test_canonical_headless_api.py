@@ -99,7 +99,6 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
         "--offline-schemas",
         "--dry-run",
         "--profile", "otr_cloud_lanes",
-        "--words", "30",
         "--source-bank", "scifi_news_pro",
         "--dump-prompt", str(dump),
     ])
@@ -110,29 +109,24 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
-    assert writer["inputs"]["target_words"] == 30
     assert writer["inputs"]["source_bank"] == "scifi_news_pro"
     assert str(director["inputs"]["announcer_video_model"]).startswith("cloud_")
     assert str(director["inputs"]["announcer_image_model"]).startswith("cloud_")
 
 
-def test_canonical_words_override_preserves_auto_act_count(tmp_path):
-    dump = tmp_path / "prompt.json"
-    rc, out = _run_main([
-        "--offline-schemas",
-        "--dry-run",
-        "--profile", "none",
-        "--words", "320",
-        "--source-bank", "media_archive",
-        "--dump-prompt", str(dump),
-    ])
-    assert rc == 0
-    assert "OTR_LedgerScriptWriter.target_words=320" in out
-    assert "OTR_LedgerScriptWriter.act_count" not in out
-    prompt = json.loads(dump.read_text(encoding="utf-8"))
-    writer = _node(prompt, "OTR_LedgerScriptWriter")
-    assert writer["inputs"]["target_words"] == 320
-    assert writer["inputs"]["act_count"] == "auto"
+## TOMBSTONE (2026-08-14): test_canonical_words_override_preserves_auto_act_count
+## used to assert that --words 320 patched OTR_LedgerScriptWriter.target_words
+## to 320 while leaving act_count untouched at its "auto" default -- proving
+## the CLI's --words shortcut did not also force an explicit act structure, so
+## production could still derive the act count from the word total. Both
+## halves of that claim are gone: `target_words` was DELETED from the writer
+## (operator directive -- episode length is an observation now, driven by
+## act_count alone, never a word-count instruction), and `act_count` no
+## longer HAS an "auto" choice to preserve (its choices are now explicit
+## "1".."8", default "3"; 'auto' meant "derive from target_words", which no
+## longer exists). There is no word-count-vs-act-count interaction left to
+## pin, so the test is deleted rather than contorted into asserting something
+## it was never written to say.
 
 
 def test_visual_style_override_does_not_patch_story_fields(tmp_path):
@@ -141,7 +135,6 @@ def test_visual_style_override_does_not_patch_story_fields(tmp_path):
         "--offline-schemas",
         "--dry-run",
         "--profile", "none",
-        "--words", "320",
         "--visual-style", "video_art",
         "--dump-prompt", str(dump),
     ])
@@ -162,7 +155,6 @@ def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
         "--offline-schemas",
         "--dry-run",
         "--profile", "google_veo_media",
-        "--words", "30",
         "--source-bank", "media_archive",
         "--dump-prompt", str(dump),
     ])
@@ -184,7 +176,6 @@ def test_google_omni_media_profile_dry_run_builds_prompt(tmp_path):
         "--offline-schemas",
         "--dry-run",
         "--profile", "google_omni_media",
-        "--words", "30",
         "--source-bank", "media_archive",
         "--dump-prompt", str(dump),
     ])
@@ -215,7 +206,6 @@ def test_google_all_profile_dry_run_builds_prompt(
         "--offline-schemas",
         "--dry-run",
         "--profile", profile_id,
-        "--words", "120",
         "--source-bank", "media_archive",
         "--creative-model", "google_api:slot-a",
         "--technical-model", "google_api:slot-b",
@@ -233,7 +223,6 @@ def test_google_all_profile_dry_run_builds_prompt(
     music = _node(prompt, "OTR_StableAudioTheme")
     director = _node(prompt, "OTR_VideoDirector")
     render = _node(prompt, "OTR_VideoRenderBatch")
-    assert writer["inputs"]["target_words"] == 120
     assert writer["inputs"]["creative_writing_model"] == "google_api:slot-a"
     assert writer["inputs"]["technical_model"] == "google_api:slot-b"
     assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
@@ -265,8 +254,9 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
-    assert writer["inputs"]["target_words"] == 30
-    # 2026-07-20: the canonical writer uses official Gemma4Unified on the
+    # target_words was DELETED 2026-08-14 (operator directive) -- it no
+    # longer appears in the prompt at all, so there is nothing to assert
+    # here. 2026-07-20: the canonical writer uses official Gemma4Unified on the
     # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
     # lane binds LMFE schema constraints; this is not the Q8 GGUF path.
     #
@@ -285,15 +275,20 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
 
 def test_set_allows_only_creative_widgets(tmp_path):
     dump = tmp_path / "prompt.json"
+    # num_characters replaces target_words as the probe widget here:
+    # target_words was DELETED from OTR_LedgerScriptWriter 2026-08-14
+    # (operator directive -- episode length is an observation, not an
+    # instruction), so it is no longer a valid --set target. Any other
+    # CREATIVE_WHITELIST-listed widget proves the same --set mechanism.
     rc, _out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--set", "OTR_LedgerScriptWriter.target_words=31",
+        "--set", "OTR_LedgerScriptWriter.num_characters=4",
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
     prompt = json.loads(dump.read_text(encoding="utf-8"))
-    assert _node(prompt, "OTR_LedgerScriptWriter")["inputs"]["target_words"] == 31
+    assert _node(prompt, "OTR_LedgerScriptWriter")["inputs"]["num_characters"] == 4
 
 
 def test_google_api_llm_slots_are_headless_bindable(tmp_path, monkeypatch):

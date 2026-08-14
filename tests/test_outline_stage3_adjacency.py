@@ -38,13 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes._otr_episode_budget import (  # noqa: E402
     ARC_PHASE_GUIDANCE,
     compute_episode_budget,
-    default_act_count,
 )
 from nodes._otr_outline import (  # noqa: E402
     _BeatFleshout,
     Outline,
     OutlineRequest,
-    _allocate_phase_target_words,
     _build_beat_user_prompt,
     _MacroShape,
     _phase_summary,
@@ -58,11 +56,14 @@ from nodes._otr_outline import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 _TARGET_WORDS = 350
+# 2026-08-14: the act count replaced `_TARGET_WORDS` as the thing that
+# shapes an episode. Three acts is the default shape.
+_ACT_COUNT = 3
 
 
 def _budget(num_characters: int):
     return compute_episode_budget(
-        _TARGET_WORDS, default_act_count(_TARGET_WORDS), True,
+        _ACT_COUNT, True,
         num_characters,
     )
 
@@ -71,7 +72,6 @@ def _request(cast: tuple[str, ...]) -> OutlineRequest:
     return OutlineRequest(
         news_seed="a real science seed", style="noir",
         character_cast=cast,
-        target_words=_TARGET_WORDS,
         budget=_budget(len(cast)),
     )
 
@@ -352,114 +352,13 @@ def _beat_json_with_words(words):
     })
 
 
-class TestPhaseWordAllocationUnchanged:
-
-    def test_combiner_stamps_python_allocation_not_llm_number(self):
-        # The mock emits target_words=80 on every beat (the schema's
-        # legacy max). Python's allocation -- bounded by the budget's
-        # words_per_beat_range -- must win on every voiced beat.
-        req = _request(("ALICE", "BOB"))
-        words_lo, words_hi = req.budget.words_per_beat_range
-
-        def _gen(messages, *, temperature, max_new_tokens):
-            stage = _stage_of(messages)
-            if stage == "phase":
-                user = messages[1]["content"]
-                m = re.search(
-                    r"Beats to plan in this phase: (\d+)", user
-                )
-                n = int(m.group(1)) if m else 1
-                return json.dumps(
-                    {"beats": [{"speaker": "ALICE"} for _ in range(n)]}
-                )
-            if stage == "beat":
-                return _beat_json_with_words(80)
-            return _MACRO_JSON
-
-        outline = generate_outline(_gen, req)
-        assert isinstance(outline, Outline)
-        voiced = [
-            b for b in outline.beats if b.speaker_role == "character"
-        ]
-        assert voiced, "outline has no voiced beats"
-        for beat in voiced:
-            assert words_lo <= beat.target_words <= words_hi, (
-                f"{beat.beat_id} target_words={beat.target_words} "
-                f"escaped the budget range {words_lo}-{words_hi}; the "
-                f"LLM's 80 must NOT have leaked through"
-            )
-            assert beat.target_words != 80, (
-                f"{beat.beat_id} carried the LLM's raw 80 -- Python's "
-                f"allocation did not win"
-            )
-
-    def test_phase_word_totals_match_the_python_allocation(self):
-        # The assembled per-phase word totals must equal exactly what
-        # _allocate_phase_target_words produces -- the schema trim
-        # changed no word arithmetic.
-        req = _request(("ALICE", "BOB"))
-        budget = req.budget
-
-        def _gen(messages, *, temperature, max_new_tokens):
-            stage = _stage_of(messages)
-            if stage == "phase":
-                user = messages[1]["content"]
-                m = re.search(
-                    r"Beats to plan in this phase: (\d+)", user
-                )
-                n = int(m.group(1)) if m else 1
-                return json.dumps(
-                    {"beats": [{"speaker": "ALICE"} for _ in range(n)]}
-                )
-            if stage == "beat":
-                return _beat_json_with_words(25)
-            return _MACRO_JSON
-
-        outline = generate_outline(_gen, req)
-        for phase_name, phase_words, phase_beats in zip(
-            budget.arc_phases, budget.per_phase_words,
-            budget.per_phase_beats,
-        ):
-            expected = _allocate_phase_target_words(
-                phase_words, phase_beats, budget.words_per_beat_range,
-            )
-            got = [
-                b.target_words for b in outline.beats
-                if b.speaker_role == "character"
-                and b.arc_phase == phase_name
-            ]
-            assert got == expected, (
-                f"phase {phase_name!r} word allocation drifted: "
-                f"got {got}, expected {expected}"
-            )
-
-    def test_assembled_outline_passes_the_budget_validators(self):
-        # End-to-end proof the schema trim left a valid outline: the
-        # Phase 2A budget validators (which read Beat.target_words)
-        # still pass on a generate_outline result.
-        req = _request(("ALICE", "BOB"))
-
-        def _gen(messages, *, temperature, max_new_tokens):
-            stage = _stage_of(messages)
-            if stage == "phase":
-                user = messages[1]["content"]
-                m = re.search(
-                    r"Beats to plan in this phase: (\d+)", user
-                )
-                n = int(m.group(1)) if m else 1
-                return json.dumps(
-                    {"beats": [{"speaker": "ALICE"} for _ in range(n)]}
-                )
-            if stage == "beat":
-                return json.dumps({
-                    "intent": "advance the scene toward the next turn",
-                    "mood": "tense",
-                })
-            return _MACRO_JSON
-
-        outline = generate_outline(_gen, req)
-        assert validate_outline_against_budget(outline, req) is None
-
+# `TestPhaseWordAllocationUnchanged` was DELETED 2026-08-14, not repaired.
+# Its two tests existed to prove that Python's per-beat word allocation beat
+# whatever number the LLM emitted -- `test_combiner_stamps_python_allocation_not_llm_number` and `test_phase_word_totals_match_the_python_allocation`.
+# There is no per-beat word allocation any more: `_allocate_phase_target_words`,
+# `Beat.target_words`, `budget.per_phase_words` and `budget.words_per_beat_range`
+# were all removed with the word authority. A repaired version of these tests
+# would have had to assert something they were never written to say.
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

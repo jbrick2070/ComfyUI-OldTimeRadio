@@ -185,7 +185,7 @@ def test_markup_repair_explicitly_handles_standalone_stage_direction():
         pass_id="script",
         system="Return one complete radio play in the required markup.",
         base_user="Write the complete episode now.",
-        envelope=fable2._build_envelope(45),
+        envelope=fable2._build_envelope(3),
         cast_names=["SELA"],
         initial_temperature=0.75,
     )

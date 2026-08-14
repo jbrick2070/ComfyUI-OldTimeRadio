@@ -170,11 +170,15 @@ def test_complete_patch_capacity_refuses_before_google_request(monkeypatch):
 def test_writer_appends_google_slots_after_visual_style():
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[23] == "source_bank"
-    assert order[24] == "visual_style"
-    assert order[25] == "google_api_slot_a_model"
-    assert order[26] == "google_api_slot_b_model"
-    assert order[27] == "source_ref"
+    # 2026-08-14: every index dropped by one when the `target_words` widget
+    # was removed from slot 1. Derived from the live order, not retyped.
+    base = order.index("source_bank")
+    assert order[base] == "source_bank"
+    assert order[base + 1] == "visual_style"
+    assert order[base + 2] == "google_api_slot_a_model"
+    assert order[base + 3] == "google_api_slot_b_model"
+    assert order[base + 4] == "source_ref"
+    assert "target_words" not in order
 
 
 def test_resolve_inputs_threads_google_slots():

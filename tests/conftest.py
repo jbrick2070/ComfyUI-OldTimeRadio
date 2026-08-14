@@ -85,18 +85,16 @@ if "folder_paths" not in sys.modules:
 def standard_budget():
     """v2.0 production-shape EpisodeBudget for outline + composer tests.
 
-    Mirrors OTR_LedgerScriptWriter defaults (target_words=350,
-    num_characters=2, include_act_breaks=True, act_count auto-derived)
+    Mirrors OTR_LedgerScriptWriter defaults (act_count=3,
+    num_characters=2, include_act_breaks=True)
     so prompt-shape tests exercise the production code path. S28
     cleanbreak removed the `budget=None` back-compat — every
     OutlineRequest now needs a real budget; this fixture is the
     canonical one for tests that don't pin a specific shape.
     """
-    from nodes._otr_episode_budget import compute_episode_budget, default_act_count
-    target_words = 350
+    from nodes._otr_episode_budget import compute_episode_budget
     return compute_episode_budget(
-        target_words=target_words,
-        act_count=default_act_count(target_words),
+        act_count=3,
         include_act_breaks=True,
         num_characters=2,
     )

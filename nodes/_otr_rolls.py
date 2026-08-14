@@ -170,59 +170,46 @@ def draw(
 # source_bank
 # ---------------------------------------------------------------------------
 
-def eligible_bank_ids(req: "_LANES.RollRequest") -> "tuple[str, ...]":
+def eligible_bank_ids() -> "tuple[str, ...]":
     """Bank ids the roll may select, sorted.
 
-    TWO filters, and only two (operator ruling 2026-07-12: the roll does NOT
-    filter on rights, and no `rights_class` field exists -- understanding the
-    terms under which AI output is used is the end user's call, not a gate
-    inside the writer):
+    ONE filter (operator ruling 2026-07-12: the roll does NOT filter on
+    rights, and no `rights_class` field exists -- understanding the terms
+    under which AI output is used is the end user's call, not a gate inside
+    the writer): `bank.runnable`, the ONE curation surface.
 
-    1. `bank.runnable` -- the ONE curation surface.
-    2. the lane's declared request compatibility -- a bank whose lane cannot
-       structurally build this request must not win a roll it would then
-       fail. Filtering BEFORE the draw is legal; a bank that fails AFTER the
-       draw fails LOUD, never a silent re-roll.
+    The second filter -- "the lane's declared request compatibility" -- was
+    removed 2026-08-14 with the word authority. It existed solely so a lane
+    could refuse a `target_words` outside its band, and there is no longer a
+    target to refuse. See `_otr_lane_specs`.
     """
     banks = _ROUTING._ensure_loaded().banks
     return tuple(sorted(
-        bank_id for bank_id, bank in banks.items()
-        if bank.runnable and _LANES.is_roll_compatible(bank, req)
+        bank_id for bank_id, bank in banks.items() if bank.runnable
     ))
 
 
-def _bank_pool_diagnosis(req: "_LANES.RollRequest") -> str:
+def _bank_pool_diagnosis() -> str:
     """Name every filter that emptied the pool, and how many each removed."""
     banks = _ROUTING._ensure_loaded().banks
     not_runnable = [b for b in banks.values() if not b.runnable]
-    incompatible = [
-        b for b in banks.values()
-        if b.runnable and not _LANES.is_roll_compatible(b, req)
-    ]
     return (
         f"{len(banks)} registered bank(s): "
         f"{len(not_runnable)} removed by runnable=false "
-        f"({sorted(b.source_bank_id for b in not_runnable)}), "
-        f"{len(incompatible)} removed by lane incompatibility with "
-        f"target_words={req.target_words} "
-        f"({sorted(b.source_bank_id for b in incompatible)})"
+        f"({sorted(b.source_bank_id for b in not_runnable)})"
     )
 
 
 def resolve_bank_selection(
     requested: str,
     *,
-    request_factory: "Callable[[], _LANES.RollRequest]",
     source_ref: str = "",
     env: "Mapping[str, str] | None" = None,
     rng_factory: "Callable[[int], Any]" = random.Random,
 ) -> "tuple[str, RollReceipt | None]":
     """(concrete bank id, receipt-or-None). The ONE writer of `bank_roll`.
 
-    A non-sentinel value returns byte-identically with NO receipt and
-    WITHOUT building the request -- otherwise a malformed `target_words`
-    would raise before the unknown/non-runnable bank gate and break the
-    gate-first ordering the widget tests pin.
+    A non-sentinel value returns byte-identically with NO receipt.
 
     A nonblank `source_ref` alongside the sentinel is REFUSED, loudly. A
     pinned source belongs to one specific bank (a Folger scene ref means
@@ -239,12 +226,11 @@ def resolve_bank_selection(
             f"pins a specific source. A pinned reference belongs to ONE "
             f"bank: pick that bank directly, or clear source_ref to roll."
         )
-    req = request_factory()
-    order = eligible_bank_ids(req)
+    order = eligible_bank_ids()
     if not order:
         raise RollError(
             f"the source_bank roll has no eligible bank. "
-            f"{_bank_pool_diagnosis(req)}. Pick a bank directly, or change "
+            f"{_bank_pool_diagnosis()}. Pick a bank directly, or change "
             f"the request so a lane can run it."
         )
     seed, seed_source = resolve_seed(BANK_SEED_ENV, env)

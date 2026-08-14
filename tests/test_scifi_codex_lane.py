@@ -284,7 +284,7 @@ def _run_lane(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
     *,
-    target_words: int = 120,
+    act_count: int = 3,
     line_text: LineText = _default_line_text,
     transform_script: ScriptTransform | None = None,
     technical_generator: Callable[..., str] | None = None,
@@ -389,7 +389,7 @@ def _run_lane(
     monkeypatch.setattr(lane, "_assemble_ledger", tracked_assemble)
 
     led = PL.new_ledger(
-        episode_id=f"codex_{target_words}",
+        episode_id=f"codex_{act_count}",
         out_dir=str(tmp_path / "ledger"),
     )
     meta = led.data.setdefault("meta", {})
@@ -400,7 +400,7 @@ def _run_lane(
     parts = lane.run_scifi_codex_episode(
         payload=_payload(),
         pack=SimpleNamespace(),
-        resolved={"seed_source": "rss_fetch", "target_words": target_words},
+        resolved={"seed_source": "rss_fetch", "act_count": act_count},
         led=led,
         meta=meta,
         creative_fn=creative_fn,
@@ -408,7 +408,7 @@ def _run_lane(
         slot_scheduler=object(),
         source_bank_row=SimpleNamespace(source_bank_id="scifi_news"),
         episode_root=tmp_path,
-        episode_id=f"codex_{target_words}",
+        episode_id=f"codex_{act_count}",
     )
     state["parts"] = parts
     return state
@@ -669,28 +669,34 @@ def test_frozen_raw_text_grandfather_without_marker_validates_unchanged():
 
 
 @pytest.mark.parametrize(
-    ("target_words", "words_per_line"),
-    [(120, 1), (320, 80)],
+    ("act_count", "words_per_line"),
+    [(1, 1), (3, 80)],
 )
 def test_arbitrary_spoken_prose_length_publishes_with_telemetry_only(
-    monkeypatch, tmp_path, target_words, words_per_line,
+    monkeypatch, tmp_path, act_count, words_per_line,
 ):
+    """Any spoken length publishes; the receipt only ever OBSERVES it.
+
+    2026-08-14: reparameterized from `target_words` onto `act_count`. The
+    intent is stronger now, not weaker -- there is no requested length at
+    all, so `target_status` is "not_requested" and the actual count is
+    whatever the story turned out to be.
+    """
     def prose(_line_id: str, _index: int) -> str:
         return " ".join(["signal"] * words_per_line)
 
     state = _run_lane(
         monkeypatch,
         tmp_path,
-        target_words=target_words,
+        act_count=act_count,
         line_text=prose,
     )
 
-    expected_lines = lane._codex_target_beat_count(target_words, 2)
+    expected_lines = lane._codex_target_beat_count(act_count, 2)
     expected_actual = expected_lines * words_per_line
     receipt = state["meta"]["scifi_codex"]["word_receipt"]
-    assert receipt["target_status"] == "valid"
+    assert receipt["target_status"] == "not_requested"
     assert receipt["actual_total_voiced_words"] == expected_actual
-    assert receipt["actual_total_voiced_words"] != target_words
     assert len(state["ledger"].data["lines"]) == expected_lines
     assert state["assemble_calls"] == 1
     coverage = state["ledger"].data["meta"]["content_authorship"]["coverage"]

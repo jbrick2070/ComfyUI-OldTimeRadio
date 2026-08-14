@@ -8,7 +8,7 @@ section 4/5 happen OUTSIDE this script.
 
 Usage:
     python scripts/otr_queue_smoke.py                       # canonical, 30w
-    python scripts/otr_queue_smoke.py --words 30 --source-bank original
+    python scripts/otr_queue_smoke.py --acts 1 --source-bank original
     python scripts/otr_queue_smoke.py --workflow workflows/variants/otr_cpu_floor.json
 
 Exit 0 only on history SUCCESS. The obs/episode asset check (Test-Path)
@@ -32,7 +32,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workflow",
                     default=str(REPO / "workflows" / "otr_canonical.json"))
-    ap.add_argument("--words", type=int, default=30)
+    ap.add_argument("--acts", type=int, default=1,
+                    help="act count 1-8; the only episode-shape knob")
     ap.add_argument("--source-bank", default="",
                     help="optional source_bank override (blank = saved value)")
     ap.add_argument("--timeout", type=int, default=1800)
@@ -41,13 +42,13 @@ def main() -> int:
     wf = otr_api.load_workflow(args.workflow)
     schemas = otr_api.fetch_schemas()
     wf = otr_api.normalize_stamp_widgets_for_live_schema(wf, schemas)
-    otr_api.patch_creative(wf, 1, "target_words", args.words, schemas)
+    otr_api.patch_creative(wf, 1, "act_count", str(args.acts), schemas)
     if args.source_bank:
         otr_api.patch_creative(wf, 1, "source_bank", args.source_bank,
                                schemas)
     prompt = otr_api.workflow_to_api_prompt(wf, schemas)
     pid = otr_api.submit_prompt(prompt)
-    print(f"[smoke] submitted {pid} ({args.words}w, "
+    print(f"[smoke] submitted {pid} ({args.acts} act(s), "
           f"{Path(args.workflow).name})", flush=True)
 
     t0 = time.time()

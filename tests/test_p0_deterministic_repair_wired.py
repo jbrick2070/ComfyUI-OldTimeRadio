@@ -391,7 +391,7 @@ def test_allowlist_aware_repair_keeps_correct_sibling_prunes():
             "date": "2026-07-30",
             "link": "https://example.invalid/apollo",
         },
-        {"seed_source": "rss_fetch", "target_words": 45},
+        {"seed_source": "rss_fetch", "act_count": 3},
     )
     projected, allowed = _p0_evidence_projection(envelope)
     assert projected == {
@@ -453,7 +453,7 @@ def test_production_p0_closure_fires_with_the_projection_allowlist(
     }
     resolved = {
         "seed_source": "rss_fetch",
-        "target_words": 45,
+        "act_count": 3,
         "technical_model": "technical",
         "creative_writing_model": "creative",
     }

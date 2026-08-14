@@ -165,7 +165,7 @@ def run_bank(bank: str, profile: str, words: int) -> dict:
 
     cmd = [PY, str(REPO / "scripts" / "otr_canonical_api_run.py"),
            "--profile", profile,
-           "--words", str(words),
+           "--act-count", str(words),
            "--source-bank", bank,
            "--visual-style", "roll (any style)",
            "--timeout", str(LEG_TIMEOUT_S)]
@@ -196,7 +196,10 @@ def run_bank(bank: str, profile: str, words: int) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--words", type=int, default=45)
+    # 2026-08-14: was `--words 45`. The child runner's --words flag went
+    # with the target_words widget; episode shape is act count now.
+    ap.add_argument("--acts", type=int, default=1,
+                    help="act count 1-8; the only episode-shape knob")
     ap.add_argument("--profile", default=DEFAULT_PROFILE)
     ap.add_argument("--banks", default=None,
                     help="comma-separated bank ids instead of every bank")
@@ -222,12 +225,12 @@ def main(argv=None) -> int:
     results = []
     try:
         for bank in banks:
-            results.append(run_bank(bank, args.profile, args.words))
+            results.append(run_bank(bank, args.profile, args.acts))
             RESULTS.write_text(json.dumps(results, indent=2), encoding="utf-8")
     finally:
         LOCK.unlink(missing_ok=True)
 
-    print("\n=========== WRITER BANK GATE (%d words) ===========" % args.words)
+    print("\n=========== WRITER BANK GATE (%d acts) ===========" % args.acts)
     for r in results:
         print("%-18s %-4s exit=%-4s %6s min  %s %s" % (
             r["bank"], "PASS" if r["ok"] else "FAIL", r["exit"], r["minutes"],

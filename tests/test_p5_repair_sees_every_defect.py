@@ -97,10 +97,8 @@ def _a6_score() -> lane.RadioScoreV4:
         premise="A signal asks for an answer.",
         setting="Meridian observatory.",
         advisory_word_plan=lane.AdvisoryWordPlanV4(
-            advisory_total_center=6,
             per_beat=[{
                 "beat_id": "b001",
-                "advisory_word_center": 6,
             }],
         ),
         scenes=[{
@@ -125,7 +123,6 @@ def _a6_score() -> lane.RadioScoreV4:
                 "intent": "Answer the signal.",
                 "arc_phase": "arrival",
                 "fact_ids": [],
-                "advisory_voiced_word_center": 6,
             }],
         }],
         music_cues=[{

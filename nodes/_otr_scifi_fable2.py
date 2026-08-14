@@ -40,6 +40,7 @@ from pydantic import (
 )
 
 try:
+    from . import _otr_episode_budget as _OTRB
     from ._otr_structured_call import (
         StructuredCallFailedError,
         structured_call,
@@ -64,6 +65,7 @@ try:
     from . import _otr_canon as _OTRC
     from . import _otr_word_delivery as _OTRWD
 except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_episode_budget as _OTRB  # type: ignore
     from _otr_structured_call import (  # type: ignore
         StructuredCallFailedError,
         structured_call,
@@ -204,8 +206,9 @@ _DIGEST_DATE_CHAR_CAP = 64
 _DIGEST_SUMMARY_CHAR_CAP = 720
 _DIGEST_FRAME_TRIM_MARK = " [...TRIMMED]"
 
-# Advisory scene-count guidance. It never participates in acceptance.
-_SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
+# RETIRED 2026-08-14: this mapped a WORD TOTAL to a scene count. The scene
+# count follows the act topology now. Kept only as a tombstone reference.
+_RETIRED_SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
     (164, 1),
     (274, 2),
     (384, 3),
@@ -574,60 +577,32 @@ def _deal(rng: random.Random, deck: dict):
 
 @dataclass(frozen=True)
 class SceneEnvelope:
-    """Advisory scene plan derived before generation; never a delivery gate."""
+    """Advisory scene plan derived before generation; never a delivery gate.
+
+    2026-08-14: `scene_word_targets` and `total_words` were removed with the
+    word authority. This lane carried its OWN copy of the word machinery --
+    a word-total-to-scene-count table plus a per-scene word split -- on top
+    of the one in `_otr_episode_budget` and the one in the codex circuit.
+    The scene count follows the ACT TOPOLOGY now, like every other lane.
+    """
 
     scene_count: int
-    scene_word_targets: "tuple[int, ...]"
-    total_words: int
 
     def __post_init__(self) -> None:
         if type(self.scene_count) is not int or self.scene_count < 1:
             raise TypeError("scene_count must be a positive strict int")
-        if type(self.total_words) is not int or self.total_words < 1:
-            raise TypeError("total_words must be a positive strict int")
-        if (
-            not isinstance(self.scene_word_targets, tuple)
-            or len(self.scene_word_targets) != self.scene_count
-            or any(type(value) is not int or value < 1
-                   for value in self.scene_word_targets)
-        ):
-            raise TypeError(
-                "scene_word_targets must contain one positive strict int "
-                "per scene"
-            )
-        if sum(self.scene_word_targets) != self.total_words:
-            raise ValueError("scene_word_targets must sum to total_words")
-
-    @property
-    def per_scene_words(self) -> int:
-        return max(1, round(self.total_words / self.scene_count))
 
 
-def _scene_count_for_words(target_words: int) -> int:
-    tw = max(1, int(target_words))
-    for upper_bound, scene_count in _SCENE_COUNT_TABLE:
-        if tw <= upper_bound:
-            return scene_count
-    return _SCENE_COUNT_TABLE[-1][1]
-
-
-def _build_envelope(target_words: int) -> SceneEnvelope:
-    """Build advisory scene-count and quotient/remainder guidance."""
-    tw = int(target_words)
-    if tw < 1:
+def _build_envelope(act_count: int) -> SceneEnvelope:
+    """Advisory scene count for this act count. Never a delivery gate."""
+    acts = int(act_count)
+    if not (_OTRB.MIN_ACT_COUNT <= acts <= _OTRB.MAX_ACT_COUNT):
         raise Fable2ScriptError(
-            "script", f"target_words must be positive, got {tw}"
+            "script",
+            f"act_count must be {_OTRB.MIN_ACT_COUNT}..{_OTRB.MAX_ACT_COUNT}, "
+            f"got {acts}",
         )
-    scenes = _scene_count_for_words(tw)
-    quotient, remainder = divmod(tw, scenes)
-    return SceneEnvelope(
-        scene_count=scenes,
-        scene_word_targets=tuple(
-            quotient + (1 if index < remainder else 0)
-            for index in range(scenes)
-        ),
-        total_words=tw,
-    )
+    return SceneEnvelope(scene_count=acts)
 
 
 def _validate_scene_envelope(envelope: Any) -> None:
@@ -636,7 +611,7 @@ def _validate_scene_envelope(envelope: Any) -> None:
             "final_draft",
             "envelope must be an exact SceneEnvelope artifact",
         )
-    if envelope != _build_envelope(envelope.total_words):
+    if envelope != _build_envelope(envelope.scene_count):
         raise Fable2ScriptError(
             "final_draft",
             "envelope does not match its advisory scene plan",
@@ -1595,10 +1570,10 @@ def _script_user_prompt(
         + f"canonical roster labels):\n{cast_block}\n\n"
         + "BOUNDED SOURCE PREVIEW (fiction fuel; the treatment's dossier "
         + f"owns complete-source coverage):\n{digest}\n\n"
-        + "DURATION GUIDANCE: the request is approximately "
-        + f"{envelope.total_words} character-spoken words. Treat that only as "
-        + "creative pacing guidance; never count, pad, compress, or mention a "
-        + "word quota. Use a natural number of scenes for this story.\n\n"
+        + f"SHAPE: this episode runs {envelope.scene_count} scene"
+        + ("s" if envelope.scene_count != 1 else "")
+        + ". Let each scene run as long as it needs; never count, pad, "
+        + "compress, or mention a word quota.\n\n"
         + "FORMAT REMINDER: every nonblank row uses one structural label: "
         + "TITLE, MUSIC, SCENE, ANNOUNCER, a cast roster label, CODA, or END. "
         + "Spoken text may use ordinary punctuation, including quotation marks, "
@@ -3095,19 +3070,16 @@ def run_scifi_fable2_episode(
 ) -> Fable2TailParts:
     """Produce one proof-backed story with target-independent topology."""
     del episode_root, episode_id
-    target = int(resolved["target_words"])
-    if target < 1:
-        raise Fable2ScriptError("script", f"invalid target_words {target}")
+    # `target = int(resolved["target_words"])` and its `< 1` guard were removed
+    # 2026-08-14 with the word authority. The act count is validated where it
+    # is used, by `_build_envelope`, against the real topology range.
     n_max = max(1, int(resolved["num_characters"]))
     creative_model = str(resolved["creative_writing_model"])
     technical_model = str(resolved["technical_model"])
     seed = _resolve_seed()
     rng = random.Random(seed)
     meta["episode_seed"] = seed
-    _OTRWD.stamp_contract(
-        meta, target_words=target, planned_voiced_words=target,
-        owner="scifi_news_pro",
-    )
+    _OTRWD.stamp_contract(meta, owner="scifi_news_pro")
     receipts: "list[dict[str, Any]]" = []
 
     def receipt(pass_id, model_id, attempts, temp, tokens, *, trace=()):
@@ -3234,11 +3206,10 @@ def run_scifi_fable2_episode(
     treatment = treatment.model_copy(
         update={"news_close_read": read.news_close_read}
     )
-    envelope = _build_envelope(target)
-    f2["duration_guidance"] = {
-        "requested_words": target,
+    envelope = _build_envelope(int(resolved["act_count"]))
+    f2["episode_shape"] = {
+        "act_count": int(resolved["act_count"]),
         "suggested_scenes": envelope.scene_count,
-        "suggested_scene_words": list(envelope.scene_word_targets),
         "gating": False,
     }
     fn, box = _counting(creative_fn)

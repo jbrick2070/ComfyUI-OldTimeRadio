@@ -5,7 +5,7 @@ widget on OTR_LedgerScriptWriter (kibitz-converged plan,
 kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 
 Pins:
-  1. Widget surface: source_bank stays pinned at slot 23; choices come
+  1. Widget surface: source_bank stays pinned at slot 22; choices come
      LIVE from the routing registry (exact list, registry order, including
      non-runnable custom banks -- the honest-error contract); default scifi_news.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
@@ -19,9 +19,10 @@ Pins:
      every recursive compose_line self-call forwards it (AST pin).
   5. _resolve_inputs carries source_bank as the one authoritative value.
   6. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
-     patch_widget_by_name lands it at slot 23 of the canonical workflow
-     (shifted -2 by the 2026-07-05 style-engine consolidation, which
-     deleted the style / style_custom widgets).
+     patch_widget_by_name lands it at slot 22 of the canonical workflow
+     (shifted -1 by the 2026-08-14 removal of the `target_words` widget,
+     on top of the -2 shift from the 2026-07-05 style-engine consolidation,
+     which deleted the style / style_custom widgets).
 """
 from __future__ import annotations
 
@@ -59,14 +60,16 @@ class TestWidgetSurface:
     def test_source_bank_positional_pin(self):
         # Stage 3C (2026-07-06) appended visual_style after source_bank;
         # Google API (2026-07-08) appended its slot pair after visual_style;
-        # Source Banks v2 appended source_ref after those.
+        # Source Banks v2 appended source_ref after those. 2026-08-14: the
+        # `target_words` widget (formerly slot 1) was deleted, shifting
+        # every slot from num_characters onward down by 1.
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[23] == "source_bank"
-        assert order[24] == "visual_style"
-        assert order[25] == "google_api_slot_a_model"
-        assert order[26] == "google_api_slot_b_model"
-        assert order[27] == "source_ref"
+        assert order[22] == "source_bank"
+        assert order[23] == "visual_style"
+        assert order[24] == "google_api_slot_a_model"
+        assert order[25] == "google_api_slot_b_model"
+        assert order[26] == "source_ref"
 
     def test_choices_are_the_roll_sentinel_then_the_registry_in_order(self):
         """2026-07-31: the randomizer command is PREPENDED as choice 0.
@@ -250,7 +253,7 @@ class TestHeadlessSurface:
         assert "source_bank" in pkg_wl
         assert "source_bank" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_23(self):
+    def test_patch_widget_by_name_lands_slot_22(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -266,16 +269,17 @@ class TestHeadlessSurface:
             workflow, 1, "source_bank", "scifi_news", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         # The Google API selectors and source_ref were appended after
-        # visual_style; source_bank stays at slot 23 (was 25 before the
-        # style-engine consolidation). S5 platform-portability appended
-        # the six llm runtime-policy widgets at 28-33 (vector = 34).
-        assert len(node1["widgets_values"]) == 34
-        assert node1["widgets_values"][23] == "scifi_news"
+        # visual_style; source_bank stays at slot 22 (was 25 before the
+        # style-engine consolidation, then 23 before the 2026-08-14
+        # target_words removal). S5 platform-portability appended the six
+        # llm runtime-policy widgets at 27-32 (vector = 33).
+        assert len(node1["widgets_values"]) == 33
+        assert node1["widgets_values"][22] == "scifi_news"
+        assert node1["widgets_values"][24] == "(select Google API model)"
         assert node1["widgets_values"][25] == "(select Google API model)"
-        assert node1["widgets_values"][26] == "(select Google API model)"
-        assert node1["widgets_values"][27] == ""
-        assert node1["widgets_values"][28] == "cuda"
-        assert node1["widgets_values"][33] == "Q8_0"
+        assert node1["widgets_values"][26] == ""
+        assert node1["widgets_values"][27] == "cuda"
+        assert node1["widgets_values"][32] == "Q8_0"
 
 
 # ---------------------------------------------------------------------------
@@ -384,12 +388,12 @@ class TestClientBankReachesTheWidget:
         workflow = json.loads(
             _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 34
-        assert node1["widgets_values"][23] == "scifi_news"
+        assert len(node1["widgets_values"]) == 33
+        assert node1["widgets_values"][22] == "scifi_news"
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[23] == "source_bank"
-        assert order[24] == "visual_style"
+        assert order[22] == "source_bank"
+        assert order[23] == "visual_style"
 
 
 # ---------------------------------------------------------------------------

@@ -1243,8 +1243,11 @@ def _build_hud_dossier(led):
         wl.append("Slot routing:  %s A<->B transition(s)" % _tr)
     wl.append("Creativity:    %s" % g(gp, "creativity"))
     wl.append("Temp / top_p:  %s / %s" % (g(gp, "temperature"), g(gp, "top_p")))
-    wl.append("Words:         target %s / actual %s (char %s / ann %s)" % (
-        g(gp, "target_words"), g(meta, "total_word_count"),
+    # 2026-08-14: was "target %s / actual %s". target_words is no longer
+    # written, so the target half printed "(not recorded)" into every
+    # published HUD dossier. Length is an observation now -- report it.
+    wl.append("Words:         %s (char %s / ann %s)" % (
+        g(meta, "total_word_count"),
         g(meta, "character_word_count"), g(meta, "announcer_word_count")))
     sections.append({"header": "WRITER / LLM CONFIG", "lines": wl})
 
@@ -1940,8 +1943,10 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f"  Temperature        :  {_g(gp, 'temperature')}    top_p: {_g(gp, 'top_p')}")
         W_(f"  Optimization       :  {_g(gp, 'optimization_profile')}")
         W_(f"  Seed source        :  {_g(gp, 'seed_source')}")
-        W_(f"  Target words       :  {_g(gp, 'target_words')}    "
-           f"Actual: {_g(meta, 'total_word_count')} "
+        # 2026-08-14: the "Target words" half is gone with the word
+        # authority; it was rendering "(not recorded)" into every
+        # _treatment.txt sidecar.
+        W_(f"  Words              :  {_g(meta, 'total_word_count')} "
            f"(char {_g(meta, 'character_word_count')} / "
            f"announcer {_g(meta, 'announcer_word_count')})")
         W_(f"  Characters         :  {_g(gp, 'num_characters')}")

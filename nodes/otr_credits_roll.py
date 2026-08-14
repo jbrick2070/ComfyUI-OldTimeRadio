@@ -398,10 +398,16 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if gp.get("num_characters") is not None:
         # A first-order dropdown (recipe card): how many characters were asked.
         writer_grid.append(("Characters:", str(gp.get("num_characters"))))
-    if gp.get("target_words") is not None:
-        writer_grid.append(("Words:", "target %s / actual %s (char %s / ann %s)" % (
-            gp.get("target_words"), meta.get("total_word_count"),
-            meta.get("character_word_count"), meta.get("announcer_word_count"))))
+    # 2026-08-14: this row used to be gated on `gp["target_words"]` and read
+    # "target N / actual M". target_words is gone, so the gate was always
+    # False and the OBSERVED counts stopped printing entirely -- a hole in
+    # the credits opened by removing the target. Length is an observation
+    # now, so the row reports what the episode actually was, unconditionally.
+    if meta.get("total_word_count") is not None:
+        writer_grid.append(("Words:", "%s (char %s / ann %s)" % (
+            meta.get("total_word_count"),
+            meta.get("character_word_count"),
+            meta.get("announcer_word_count"))))
     col2 = {"cast_rows": cast_rows, "writer_grid": writer_grid}
 
     # --- COL 3 (scrolls) ---------------------------------------------------

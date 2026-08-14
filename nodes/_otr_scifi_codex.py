@@ -53,6 +53,7 @@ MAX_CANDIDATE_CYCLES: int = 3
 GenerateFn = Callable[..., str]
 
 try:
+    from . import _otr_episode_budget as _OTRB
     from ._otr_canon import EpisodeCanon
     from ._otr_json import parse_first_json_object
     from ._otr_source_payload import validate_source_payload
@@ -94,6 +95,7 @@ try:
     from . import _otr_word_delivery as _OTRWD
     from .production_ledger import stamp_word_counts
 except ImportError:  # pragma: no cover
+    import _otr_episode_budget as _OTRB  # type: ignore
     from _otr_canon import EpisodeCanon  # type: ignore
     from _otr_json import parse_first_json_object  # type: ignore
     from _otr_source_payload import validate_source_payload  # type: ignore
@@ -146,7 +148,7 @@ class ScifiCodexError(RuntimeError):
 class CodexPayloadShapeError(ScifiCodexError): pass
 class CodexPayloadRouteError(ScifiCodexError): pass
 class CodexPayloadOversizeError(ScifiCodexError): pass
-class CodexTargetRangeError(ScifiCodexError): pass
+class CodexActRangeError(ScifiCodexError): pass
 class CodexPackContractError(ScifiCodexError): pass
 class CodexPassError(ScifiCodexError): pass
 class CodexSpokenTextError(ScifiCodexError): pass
@@ -211,30 +213,24 @@ class PayloadEnvelopeV4(_Strict):
     source_digest: str
 
 
-class WordSteerV4(_Strict):
-    requested_words: int = Field(ge=30, le=900)
+class ActSteerV4(_Strict):
+    """The operator's act count, carried through the circuit.
 
-
-def assert_supported_target_words(target_words) -> None:
-    """Target-only preflight for this lane, hoisted out of the runner.
-
-    `_otr_lane_specs` calls this so the writer's entry gate and the bank
-    randomizer can both ask "would this lane refuse this target?" WITHOUT
-    importing the runner's whole execution path or duplicating the band.
-    `WordSteerV4` stays the single source of truth for the numbers -- this
-    is a reachable spelling of it, not a second copy -- and the runner keeps
-    its own defensive construction of the same model.
-
-    This is NOT a word-count quality gate: the lane's structural contract
-    simply cannot be built outside 30..900, so a request outside it fails
-    here rather than after the source work.
+    Replaced `WordSteerV4(requested_words: int, ge=30, le=900)` on
+    2026-08-14. The old model was a one-field word band that could refuse an
+    episode outright; the act count is the only length-shaped knob now, and
+    it is always honoured inside the topology range.
     """
-    try:
-        WordSteerV4(requested_words=target_words)
-    except Exception as exc:
-        raise CodexTargetRangeError(
-            "target_words must be an integer from 30 through 900"
-        ) from exc
+
+    act_count: int = Field(
+        ge=_OTRB.MIN_ACT_COUNT, le=_OTRB.MAX_ACT_COUNT,
+    )
+
+
+# `assert_supported_target_words` was REMOVED 2026-08-14 with the word
+# authority. It was this lane's 30..900 preflight, reached from
+# `_otr_lane_specs` so the writer's entry gate and the bank randomizer could
+# ask "would this lane refuse this target?". There is no target to refuse.
 
 
 class FactV4(_Strict):
@@ -435,12 +431,25 @@ _AUTHORED_TEXT_REJECT_AT = (
 
 
 class AdvisoryBeatV4(_Strict):
+    """One planned beat SLOT. Identity and order only.
+
+    `advisory_word_center` was removed 2026-08-14 with the word authority.
+    It was stamped onto `BeatPlanV4.advisory_voiced_word_center` and never
+    read again anywhere -- a per-beat word target that only ever travelled
+    into the P3 prompt. What this row is actually FOR is beat identity and
+    ordering, which every real consumer uses and which is untouched.
+    """
+
     beat_id: str = Field(pattern=r"^b\d{3}$")
-    advisory_word_center: int = Field(ge=0, le=900)
 
 
 class AdvisoryWordPlanV4(_Strict):
-    advisory_total_center: int = Field(ge=1, le=900)
+    """The locked beat plan: which beats exist, in what order.
+
+    `advisory_total_center` was removed 2026-08-14 -- it was the episode
+    word request in another costume.
+    """
+
     per_beat: list[AdvisoryBeatV4] = Field(
         min_length=1, max_length=_RADIO_SCORE_MAX_BEATS,
     )
@@ -467,7 +476,6 @@ class BeatPlanV4(_Strict):
     fact_ids: list[Annotated[str, Field(pattern=r"^F0[1-6]$")]] = Field(
         default_factory=list, max_length=_RADIO_SCORE_MAX_FACT_IDS_PER_BEAT,
     )
-    advisory_voiced_word_center: int = Field(ge=0, le=900)
 
 
 class ShotPlanV4(_Strict):
@@ -1101,19 +1109,17 @@ def compile_radio_score_draft(
         )
     if flat_draft_beat_count != len(advisory_rows):
         # Gate 3 (SOURCE_BANK_PREFLIGHT): "No model-produced or unused count
-        # field can gate production"; `target_words` is advisory, never a fatal
-        # quota gate. A beat-count mismatch must NOT fail the episode. Reconcile
-        # the advisory word plan onto the draft's ACTUAL beat count so word
-        # centers redistribute deterministically; the positional compile below
-        # stays valid for any count. (advisory_total_center == requested_words,
-        # already range-validated 30..900 by make_advisory_word_blueprint.)
+        # field can gate production". A beat-count mismatch must NOT fail the
+        # episode -- the model may plan more or fewer beats than the act
+        # topology suggested, and that is its call. Re-lock the plan onto the
+        # draft's ACTUAL beat count so the positional compile below stays
+        # valid for any count.
         log.info(
             "[scifi_codex] P3 beat-count reconciled: draft=%d advisory=%d "
             "(Gate 3: counts are advisory, never a fatal quota gate)",
             flat_draft_beat_count, len(advisory_rows),
         )
-        advisory = make_advisory_word_blueprint(
-            advisory.advisory_total_center,
+        advisory = make_advisory_beat_plan(
             [f"b{i:03d}" for i in range(flat_draft_beat_count)],
         )
         advisory_rows = list(advisory.per_beat)
@@ -1214,7 +1220,6 @@ def compile_radio_score_draft(
                 intent=draft_beat.intent,
                 arc_phase=draft_beat.arc_phase,
                 fact_ids=list(draft_beat.fact_ids),
-                advisory_voiced_word_center=advisory_row.advisory_word_center,
             ))
             used_shot_indices.add(draft_beat.shot_index)
             used_cast_ids.add(draft_beat.char_id)
@@ -1442,7 +1447,7 @@ def _normalize_span_source_text(text: str) -> str:
 
 def validate_payload_envelope(
     payload: Mapping[str, Any], resolved: Mapping[str, Any]
-) -> tuple[PayloadEnvelopeV4, WordSteerV4]:
+) -> tuple[PayloadEnvelopeV4, ActSteerV4]:
     try:
         clean = validate_source_payload(dict(payload), "scifi_codex")
     except Exception as exc:
@@ -1482,9 +1487,12 @@ def validate_payload_envelope(
                 "RSS source payload exceeds the serialized A0 cap"
             )
     try:
-        steer = WordSteerV4(requested_words=resolved.get("target_words"))
+        steer = ActSteerV4(act_count=resolved.get("act_count"))
     except Exception as exc:
-        raise CodexTargetRangeError("target_words must be an integer from 30 through 900") from exc
+        raise CodexActRangeError(
+            f"act_count must be an integer from {_OTRB.MIN_ACT_COUNT} "
+            f"through {_OTRB.MAX_ACT_COUNT}"
+        ) from exc
     env = PayloadEnvelopeV4(
         schema_version="scifi_codex.payload_envelope.v4",
         payload=SourcePayload7.model_validate(clean),
@@ -1919,42 +1927,39 @@ def _validate_script_roster_contract(
         )
 
 
-def _codex_target_beat_count(requested_words: int, cast_count: int) -> int:
-    """Size P3 topology from delivery demand, bounded by the score schema."""
-    if (
-        not isinstance(requested_words, int)
-        or isinstance(requested_words, bool)
-        or not 30 <= requested_words <= 900
-    ):
-        raise CodexTargetRangeError("requested_words must be 30..900")
+def _codex_target_beat_count(act_count: int, cast_count: int) -> int:
+    """Size P3 topology from the ACT TOPOLOGY, bounded by the score schema.
+
+    2026-08-14: this used to be `max(3, ceil(requested_words / 15))` -- the
+    lane's own private word-to-beat table, a duplicate of the one removed
+    from `_otr_episode_budget`. It now reads the same act topology every
+    other bank uses, so the operator's act count is the single thing that
+    shapes an episode on every lane.
+
+    The cast floor stays: every locked character needs a beat to speak in.
+    """
     if (
         not isinstance(cast_count, int)
         or isinstance(cast_count, bool)
         or cast_count < 1
     ):
         raise CodexGraphError("cast_count must be a positive integer")
-    word_driven = max(3, int(math.ceil(requested_words / 15)))
-    return max(cast_count, 3, min(_RADIO_SCORE_MAX_BEATS, word_driven))
+    act_driven = _OTRB.voiced_beat_count(act_count)
+    return max(cast_count, 3, min(_RADIO_SCORE_MAX_BEATS, act_driven))
 
 
-def make_advisory_word_blueprint(requested_words: int, locked_beats: Sequence[str]) -> AdvisoryWordPlanV4:
-    if not isinstance(requested_words, int) or isinstance(requested_words, bool) or not 30 <= requested_words <= 900:
-        raise CodexTargetRangeError("requested_words must be 30..900")
+def make_advisory_beat_plan(locked_beats: Sequence[str]) -> AdvisoryWordPlanV4:
+    """Lock the beat slots and their order.
+
+    Was `make_advisory_word_blueprint` until 2026-08-14, when it also spread
+    a word total across the beats. The word half is gone; the beat identity
+    it produces is what every downstream consumer actually reads.
+    """
     ids = list(locked_beats)
     if not ids:
         raise CodexGraphError("cannot allocate an empty beat plan")
-    weights = [1 + (i % 3) for i in range(len(ids))]
-    total = sum(weights)
-    raw = [requested_words * w / total for w in weights]
-    centers = [int(x) for x in raw]
-    for i in sorted(range(len(ids)), key=lambda i: raw[i] - centers[i], reverse=True)[:requested_words - sum(centers)]:
-        centers[i] += 1
     return AdvisoryWordPlanV4(
-        advisory_total_center=requested_words,
-        per_beat=[
-            AdvisoryBeatV4(beat_id=beat_id, advisory_word_center=n)
-            for beat_id, n in zip(ids, centers)
-        ],
+        per_beat=[AdvisoryBeatV4(beat_id=beat_id) for beat_id in ids],
     )
 
 
@@ -2002,7 +2007,7 @@ def _script_artifact_context(score: RadioScoreV4) -> dict[str, Any]:
 
 
 def _script_artifact_inputs(
-    score: RadioScoreV4, fact_index: FactIndexV4, word_steer: WordSteerV4,
+    score: RadioScoreV4, fact_index: FactIndexV4, word_steer: ActSteerV4,
 ) -> dict[str, Any]:
     """Add P5-only fact and word-steer inputs to the shared script context."""
     return {
@@ -3449,10 +3454,11 @@ def run_scifi_codex_episode(
         "call_journal": {},
     }
     meta["scifi_codex"] = lane_meta
+    # Length is an OBSERVATION now (2026-08-14): nothing is requested up
+    # front, so nothing is stamped as a target here. The word-delivery
+    # contract is filled from what the episode actually turned out to be.
     _OTRWD.stamp_contract(
         meta,
-        target_words=steer.requested_words,
-        planned_voiced_words=steer.requested_words,
         owner="scifi_codex",
     )
     journal = lane_meta["call_journal"]
@@ -3538,16 +3544,13 @@ def run_scifi_codex_episode(
         retry_until_valid=True,
     )
 
-    beat_count = _codex_target_beat_count(
-        steer.requested_words, len(p2.cast)
-    )
-    advisory = make_advisory_word_blueprint(
-        steer.requested_words,
+    beat_count = _codex_target_beat_count(steer.act_count, len(p2.cast))
+    advisory = make_advisory_beat_plan(
         [f"b{index:03d}" for index in range(beat_count)],
     )
     journal["radio_score_draft_surface"] = {
         **_radio_score_draft_surface_receipt(),
-        "requested_words": steer.requested_words,
+        "act_count": steer.act_count,
         "beat_count": beat_count,
     }
     score = _call_radio_score_draft(
@@ -3575,7 +3578,7 @@ def run_scifi_codex_episode(
         raise CodexGraphError("accepted score has no executable line graph")
     journal["script_transport"] = {
         "transport_schema": "ScriptTextDraftV4",
-        "requested_words": steer.requested_words,
+        "act_count": steer.act_count,
         "accepted_line_count": line_count,
         "output_budget_mode": "provider_capacity",
         "requested_max_new_tokens": None,

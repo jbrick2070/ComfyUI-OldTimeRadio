@@ -181,7 +181,7 @@ def _writer_schemas_s5() -> dict:
     which pair ``_writer_schemas()`` with the independent, frozen-in-time
     28-slot ``_writer_node_fixture()`` synthetic double -- keep exercising
     that fixed shape unmodified. Only ``test_round_trip_canonical_node1_
-    inputs_correct`` reads the REAL canonical workflow (now 34 widgets
+    inputs_correct`` reads the REAL canonical workflow (now 33 widgets
     wide), so only that test needs the extended schema.
 
     Adds the six explicit LLM runtime-policy widgets appended after
@@ -191,6 +191,11 @@ def _writer_schemas_s5() -> dict:
     """
     schemas = _writer_schemas()
     required = schemas["OTR_LedgerScriptWriter"]["input"]["required"]
+    # 2026-08-14: the `target_words` widget was deleted from the live node.
+    # Only THIS helper drops it -- the frozen 28-slot `_writer_schemas()` and
+    # its paired synthetic double stay exactly as they were, because they
+    # test the by-name patch mechanism against a fixed shape, not the live one.
+    required.pop("target_words", None)
     required["llm_device"] = (
         ["cuda", "cpu", "mps"], {"default": "cuda"},
     )
@@ -508,22 +513,24 @@ def test_round_trip_canonical_node1_inputs_correct():
     from 27 to 25 before the 2026-07-08 Google pair and source_ref brought
     it to 28.
 
-    S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34. The six
+    S5 platform-portability (2026-07-10): OLD pin 28 -> NEW pin 34, then
+    2026-08-14 dropped `target_words` and the pin became 33. The six
     explicit LLM runtime-policy widgets (llm_device, llm_attn_impl,
     llm_quant_policy, llm_vram_ceiling_gb, gguf_n_ctx, gguf_quant) were
     appended after source_ref at slots 28-33, and a gate_in forceInput
     socket (OTR_WorkflowValidator.validation_report, link 279) was added
     at inputs[34] -- a pure socket, so it consumes NO widgets_values slot
-    and the vector ceiling is 34, not 35. Uses _writer_schemas_s5() (the
-    28-slot _writer_schemas() plus the six new widgets + gate_in) so the
-    round-trip conversion sees a schema matching the live 34-wide vector.
+    and the vector ceiling is 33. Uses _writer_schemas_s5() so the
+    round-trip conversion sees a schema matching the live vector.
     """
     dump = _dump_canonical_node1()
-    # 34: 28 (pre-S5) plus the six LLM runtime-policy widgets (28-33);
-    # gate_in is a forceInput socket and does not occupy a slot.
-    assert len(dump) == 34, f"node 1 widgets_values length drift: {len(dump)}"
-    expected_creative = dump[3]
-    expected_technical = dump[4]
+    # 33: 28 (pre-S5) plus the six LLM runtime-policy widgets, MINUS the
+    # `target_words` widget removed 2026-08-14. gate_in is a forceInput
+    # socket and does not occupy a slot.
+    assert len(dump) == 33, f"node 1 widgets_values length drift: {len(dump)}"
+    # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
+    expected_creative = dump[2]
+    expected_technical = dump[3]
 
     schemas = _writer_schemas_s5()
     workflow = load_workflow(str(_CANONICAL_WORKFLOW))
