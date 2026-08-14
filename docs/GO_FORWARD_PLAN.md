@@ -210,6 +210,113 @@ someone summarizing what happened (recap)? A faithful scene that ends unresolved
 is a PASS. The want / cost / reversal test still governs `original`, `scifi_news`
 and `scifi_news_pro`, which author their own stories.
 
+### THE ACCEPTANCE TEST -- operator 2026-08-14, and it is only two things
+
+*"The only thing that's failure is if the ledger includes action, or the
+characters and the dialogue get mismatched -- there has to be consistency, so
+John is not speaking Mary's lines and vice versa."*
+
+| # | Failure | |
+|---|---|---|
+| **F1** | **Action in the ledger** | a spoken row carrying stage business, delivery notes or narration |
+| **F2** | **Speaker/line mismatch** | a character's row carrying another character's words |
+
+**NOTHING ELSE IS A FAILURE.** This is the 2026-08-04 "story quality is done"
+law applied, not a new rule: prose quality is not a defect, and character
+consistency is explicitly carved out as one that is. So the bank audit REPORTS
+story shape as an observation and GRADES only on F1 and F2. A lane whose prose
+is merely unexciting is not broken.
+
+**F2 already has a traced seam.** `e679b754` (2026-07-11) repairs P5 metadata
+deterministically from the accepted score graph and states it "never touches
+dialogue, premise, beats, character intent" -- so if speaker identity is not
+among the fields it carries authoritatively, the speaker can drift off the line.
+Verify whether the repair carries speaker; that is F2's likely home.
+
+### RERolls ARE THE RUNAWAY -- operator 2026-08-14
+
+*"You can look at the story reroll and story killer and maybe kill some of them,
+they were causing runaways -- LLMs repeating itself multiple times and failed
+episodes."* And: **"I don't need 20 rerolls, I just need a correct ledger."**
+
+**What is actually there, measured 2026-08-14:**
+
+| Thing | Value |
+|---|---|
+| `_otr_scifi_codex.py` reroll references | **20** -- the most in the tree, and it is the `scifi_news` lane that owns BOTH misses |
+| `MAX_CANDIDATE_CYCLES` | 3 (operator ruling 2026-08-13) |
+| `_otr_structured_call._DEFAULT_MAX_ATTEMPTS` | 3 rungs per cycle |
+| **Attempts per pass** | **3 x 3 = 9** |
+| Passes in the circuit | P0, P1, P2, P3, P5 -- so the worst case across an episode is many times nine |
+
+**THE MECHANISM, and it explains the repetition.** A reroll is a
+REJECT-AND-REDRAW: it throws the candidate away and asks the model again **cold**
+-- same prompt, same model, no word about what was wrong. That is the
+cold-regeneration defect class already logged in this file. **A cold redraw is
+why the model repeats itself: nine identical asks get nine similar answers.**
+More rolls are not more evidence; they are the same roll nine times.
+
+**THE DIRECTION, and it is what the operator already chose for the dialogue
+repair: REPAIR, NOT REROLL.** One informed pass that says *"this line has action
+in it, here are the acts and the beats so far, rewrite it as pure speech"* beats
+nine cold redraws, costs a fraction, and cannot run away. Note the existing code
+already knows the difference -- `repair_max_attempts` is **1** where a repair
+function exists.
+
+**What must NOT be touched:** the runaway GUARDS (decode-loop, repetition,
+`_otr_decode_guard.py`) are code-side and STAY. They are not reroll loops and
+not length limits. Killing rerolls does not mean killing the guard that stops a
+decode which never reaches a stop token.
+
+**Do not kill a reroll site without naming it first.** Bring the operator the
+specific list with what each one recovers from -- `016ad146`'s cast-coverage
+reroll is the one that took `scifi_news` from 0-for-4 to reliable, so it is a
+real capability and not merely waste.
+
+### THE TARGET ARCHITECTURE -- operator 2026-08-14, stated in three messages
+
+*"I need 3-5 LLM passes to clean the ledger."*
+*"The lab may have a post-story ledger clean phase, I'm open to that, before it
+hits the TTS."*
+*"I really don't want rerolls as much. I just want a story, and LLMs cleaning up
+the story."*
+
+**So: WRITE THE STORY ONCE, THEN CLEAN IT.**
+
+```
+   story passes (write it once, no reroll storm)
+        |
+   POST-STORY LEDGER CLEAN -- 3-5 bounded LLM passes
+        |  detect with code, repair with a model
+        |  F1: no action in any spoken row
+        |  F2: no character speaking another's lines
+        v
+   sealed ledger  ->  TTS
+```
+
+This REPLACES reject-and-redraw with detect-and-repair. It is cheaper (a bounded
+handful of informed passes instead of nine cold redraws per pass), it cannot run
+away, and it is the only shape that can actually FIX a defect rather than hope
+the next cold roll avoids it. The clean stage runs AFTER the story exists and
+BEFORE anything reaches TTS.
+
+### WHAT THE LAB HAS FOR THIS -- inventoried 2026-08-14, READ-ONLY, nothing ported yet
+
+The lab already built the detection half, and it is built in exactly the shape
+the operator's law requires: **verifiers that return FINDINGS, not rewrites.**
+
+| Lab asset | Lines | What it is | Serves |
+|---|---|---|---|
+| `src/upstream_story_lab/spoken_text_policy.py` | 695 | `SPOKEN_TEXT_POLICY_ID = "otr.spoken-text-only.v1"`. Detects production cues, delimited stage directions, physical-action verbs, attribution verbs ("he said"), pronoun narration, scene narration, third-person reference, bare stage lines. Returns `SpokenTextFinding` objects | **F1** |
+| `src/upstream_story_lab/ledger_verifiers.py` | 429 | `verify_ledger_integrity`, `verify_news_capture`, `verify_announcer_open`, **`verify_announcer_news_coda`**, `verify_music_bookends` | **MISS 2** + structure |
+| `contracts/ledger_bible_v2.json` | -- | the lab's ledger contract | both |
+
+**`verify_announcer_news_coda` is a detector for MISS 2 that production does not
+have**, and `spoken_text_policy` is a detector for MISS 1 that production
+retired at `314dd481`. **These are DETECTORS. They pair with a model repair pass;
+they never rewrite prose themselves.** That is why they are portable under the
+operator's law where the old reroll machinery was not.
+
 ### MISS 2 -- the leading hypothesis, NOT yet confirmed
 
 The six banks run two different machines. Four (`shakespeare`, `public_domain`,
