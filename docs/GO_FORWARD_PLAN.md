@@ -4,7 +4,312 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## PRIORITY 1 -- STORY CLEANUP IN PRODUCTION (operator 2026-08-14). DO THIS FIRST.
+
+**This block outranks the CURRENT RUNWAY table below, including its row 1.** The
+Story Lab is PARKED and is being RETIRED, not resumed: row 1's "resume the
+upstream lab and A/B against it" order is SUPERSEDED. The lab at
+`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OTR-UpstreamStoryLab`
+(branch `main`) is READ-ONLY reference for this work. We read it, we port
+individually approved features out of it, we do not develop in it. Its problem
+statement of record is `docs/PROD_PROBLEM_STATEMENT.md` **in the lab repo**
+(there is no such file in production).
+
+**The history in one paragraph.** The stories were working about a week ago
+(early August 2026). A round of prose updates to the writing prompts broke them,
+and they have not been right since. The lab was built to work the storywriting
+out in isolation rather than debug it in a live system; it grew more complicated
+than the problem it was meant to solve and is now parked. It was not wasted --
+it produced one real improvement (acts, below) and it sharpened the diagnosis
+down to the two defects below.
+
+**The goal:** a story ledger we trust, so production can be tested and frozen.
+
+### The two big misses -- production still has both
+
+**MISS 1 -- CHARACTER ACTION IS BLEEDING INTO THE DIALOGUE.** Rows that should
+contain nothing but spoken words are carrying stage business: what a character
+does, how a line is delivered, what is heard. Every sealed line becomes TTS
+audio, so a stage direction inside a line **gets read aloud on air**. The sealed
+ledger holds exactly three things -- announcer speech, character dialogue, music
+cues -- and never a stage direction, action row, narration or delivery note.
+Observed on the accepted 2026-08-13 `wan_ti2v` episode and standing as a live
+content receipt.
+
+**MISS 2 -- THE CODA IS NOT ANNOUNCING THE SOURCE.** On the `scifi_news` lane
+the closing announcer read does not name the real news story the episode was
+drawn from. The same defect shape applies on `shakespeare`, where the close
+should credit the play. The episode ends without telling the listener what it
+was drawn from. **The defect is that the coda does not NAME THE SOURCE -- not
+that the coda's surface or structure is wrong.** Do not redesign the ending.
+
+Both get CONFIRMED WITH EVIDENCE before either is fixed (step 2 below). A fix
+landed on a misdiagnosis will look like it broke something else.
+
+### Acts, not words -- the one thing worth keeping from the lab
+
+Production derives story length from WORD BUDGETS. That is the mouldy part and
+it goes. The lab replaced the whole apparatus with a single visible knob -- a
+dropdown for the NUMBER OF ACTS, 1 through 8, and nothing else -- making words an
+OBSERVATION rather than an INSTRUCTION. The operator is open to other ideas here;
+what is not open is keeping the word-count chasing.
+
+Verified in the production tree 2026-08-14, so the port is smaller than it
+sounds -- **the act knob already exists**, it is just subordinate to words:
+
+| Seam | State today (verified 2026-08-14) |
+|---|---|
+| `act_count` widget | ALREADY A COMBO on the writer (`OTR_LedgerScriptWriter.py:82`), default `'auto'` |
+| `'auto'` resolution | derives the act count FROM `target_words` (`OTR_LedgerScriptWriter.py:1834-1862`) -- the derivation to cut |
+| `_DEFAULT_ACT_BREAKPOINTS` | `_otr_episode_budget.py:70-74` -- the word-total -> act-count table |
+| `max_act_count` | `_otr_episode_budget.py:98-104` -- caps the operator's act choice at `target_words // 50` |
+| `ACT_COUNT_CONFIG` | `_otr_episode_budget.py:111` -- per-act outline shape; **tops out at 7 acts, operator wants 1..8** |
+| everything downstream | per-phase word targets, per-phase beat counts and `music_inter` count are all derived from the `(target_words, act_count)` PAIR |
+
+So the work is: make `act_count` the authority (explicit 1..8), extend the config
+table from 7 to 8, cut the word-derived default and cap, and **DELETE
+`target_words` outright** -- operator 2026-08-14, in caps, after being shown the
+cost below: *"REMOVE TARGET WORDS ETC WORD completely."* Not demoted to a
+read-only observation. Gone.
+
+**WHAT DELETING IT COSTS, measured 2026-08-14 -- do this atomically or not at
+all.** `target_words` is the **SECOND widget** on `OTR_LedgerScriptWriter`, right
+after `episode_title`, on a node with a very long widget list. `widgets_values`
+is POSITIONAL (BUG-LOCAL-097), so removing slot 2 shifts EVERY value after it:
+
+| Blast radius | Measured |
+|---|---|
+| `workflows/otr_canonical.json` | writer node carries `target_words` as widget slot 2 |
+| `workflows/variants/*.json` | **50 of 54** carry `target_words` |
+| Any graph saved OUTSIDE the repo | reloads with every post-slot-2 value shifted by one |
+
+The repo-internal half is tractable and must land in ONE change: regenerate the
+canonical workflow and all 50 variants alongside the code, then re-validate
+(`OTR_WorkflowValidator` + JSON round-trip + widget-count vs live `INPUT_TYPES`
++ link integrity) and run `scripts/build_variants.py --check`. **Now is the right
+time to pay it** -- pre-release, before anyone but the operator has saved graphs.
+Any workflow the operator saved outside the repo needs re-saving after this lands.
+
+**NO WORD COUNTS IN THE PROMPTS EITHER -- driver's call 2026-08-14, taken on the
+operator's explicit delegation.** The operator offered: *"unless you want to say
+an act usually is of xx words, xx paragraphs ... if you think it helps."* **It
+does not help, and it is the word chasing coming back through the prompt.** A
+word number in a prompt is a word-count instruction reaching a model, which is
+the exact thing this work removes. An act is described by its DRAMATIC JOB
+instead -- someone wants something, it costs them something, something turns --
+which is also the operator's own test for whether a lane produces a story at all.
+If the bank audit turns up a lane where the model genuinely cannot judge scale,
+a non-word shape cue (exchanges, or beats per act) may be proposed THEN, with the
+evidence attached. Not added speculatively.
+
+**NO NEW WORD-COUNT AUTHORITY IN ANY FORM**, including a token ceiling derived
+from a word target. Removing the existing authority is the goal. Runaway guards
+(decode-loop, repetition) are CODE-SIDE, they STAY, they are not length limits,
+and they never appear as a prompt rule.
+
+### The dialogue-cleanup pass -- decided 2026-08-14
+
+**A test pass that only says PASS is waste.** Operator: *"i dont want to waste too
+many on test passes that dont do anything ... test passes should say 'look for
+non-dialogue, if you see it, look at the acts and beats so far and rewrite the
+ledger so there's no action in the dialogue'."* So the pass DETECTS and then
+REPAIRS, with the acts and the beats so far as its context.
+
+**And the repair is a MODEL CALL, never Python.** Operator: *"i hate shims and
+assertions of py to fix things, i like llm calls to ask it to fix things, that
+should be documented."* Code may detect the defect and describe it precisely; the
+rewrite is always a model pass. No regex surgery on a line, no Python stripping
+parentheticals, no `assert`. **This is the documentation that ruling asked for.**
+
+| Decision | Ruling (operator 2026-08-14) |
+|---|---|
+| Which model repairs | **`creative_writing_model`** -- it is rewriting dialogue, so the tier that wrote the line rewrites it, and the repaired line still sounds like its neighbours |
+| Repair fails again | **Bounded retries, then flag loudly.** Each retry is told what was still wrong with the last attempt. On final failure the ledger records the line as unclean and the log says so; the render continues. **Never a silent pass, never a hard stop** |
+| Where stripped action goes | **Nowhere. Deleted.** Operator: *"i dont want any non-spoken lines in ledger."* The ledger holds spoken lines and music cues, full stop |
+
+**ONE THING TO VERIFY BEFORE THE DELETE HALF SHIPS.** The ledger-completeness
+rule in `CLAUDE.md` says a removed field needs its consumers enumerated first.
+Confirm during the bank audit whether ANY downstream consumer -- video/shot
+direction, captions, per-beat slicing -- reads a non-spoken row today. If nothing
+reads it, deleting is clean and this note closes. **If something does read it,
+stop and raise it** rather than quietly opening a hole in the ledger.
+
+**THE BAR, in the operator's words 2026-08-14:** *"as long as the ledger is legal
+-- no action in the ledger, good character consistency -- we are good."* That is
+the acceptance test for this whole tranche. Not a word number, not a green suite.
+
+### THE ARC MACHINERY ALREADY EXISTS -- keep it, just cut the words out
+
+**Measured 2026-08-14. This is the single most important finding so far and it
+shrinks the acts work to a removal.** The operator described the shape he wants:
+*"here is a story and you've already cast the cast, we need you to build an X
+number act story arc for this -- that gives me the whole story arc summarized
+composing of X acts, and then prompts after that flesh out the acts and create
+the dialogue."* **Production already does exactly that.** `_otr_outline.py:876-895`:
+
+| Stage | Calls | Job |
+|---|---|---|
+| 1 macro | 1 | the whole arc, summarized |
+| 2 phase | **`act_count`** | per-act beat skeleton -- one call per act |
+| 3 beat | `num_voiced_beats` | flesh out each beat, compose the lines |
+
+Total LLM calls = `1 + act_count + num_voiced_beats`. **The act count already
+drives the pass topology.** Operator confirmation: *"hopefully a lot of the act /
+spine / beat writing prompt architecture can stay basically the same."* **It can.
+It stays.**
+
+**And the beat topology is ALREADY act-driven, not word-driven.**
+`_otr_episode_budget.py:275` -- `per_phase_beats = tuple(cfg["voiced_beats_per_act"])`
+comes from `ACT_COUNT_CONFIG` alone. Words never touch it.
+
+**So here is the entire word surface, and it is smaller than feared:**
+
+| Where | What it does | Verdict |
+|---|---|---|
+| `_otr_outline.py:809-811` | injects `"Requested spoken length: about {target_words} words"` **into the macro prompt** -- the word count literally reaching the model | **DELETE** (3 lines) |
+| `_otr_episode_budget.py:273` | `per_phase_words = round(target_words * f)` | DELETE |
+| `:276-292` | `words_per_beat_range` / `BEAT_WORD_HARD_MAX` per-beat word ceilings | DELETE |
+| `:216-227` | `_max_target_words_for_act_count` | DELETE |
+| `:293+` | fail-fast word-feasibility guard | DELETE |
+| `:70-104` | `_DEFAULT_ACT_BREAKPOINTS`, `default_act_count`, `max_act_count` | DELETE |
+| `_otr_outline.py:814-826` | acts, arc phases, beats per phase, music inter, announcer beats | **KEEP -- this is the spine** |
+
+**AND THERE IS A LIVE WORD-COUNT VETO IN PRODUCTION RIGHT NOW, which contradicts
+the operator's own standing law.** `compute_episode_budget` RAISES
+`InvalidEpisodeBudgetError` when `act_count < default_act_count(target_words)`
+or `act_count > max_act_count(target_words)` -- so the word total can currently
+REFUSE the operator's act choice outright. The law says `target_words` is
+advisory: *"no refusals, no hard caps, no shunts."* This is one. It goes with the
+rest.
+
+**THE PACK PROMPTS ARE ALREADY CLEAN OF WORDS.** Grepped all six banks
+2026-08-14: the only word-count strings anywhere are in `custom_source_bank`
+(`runnable: false`) and one description line in `pipelines.json`. **The word
+authority is entirely Python-side.** So this removal does NOT require rewriting
+prompts on six lanes, which keeps it inside the one-lane-at-a-time rule.
+
+**THE OLD VIOLENCE CLAUSE IS ALREADY GONE.** Grepped for "blood / guns / knives /
+graphic violence" across all six packs: no hits. The only match is a
+`spark_deck` prop ("bloodstains of beet dye"). The fidelity defect named in
+`CLAUDE.md` was fixed before this window. Do not re-fix it.
+
+### Story rulings -- operator 2026-08-14
+
+| Lane question | Ruling |
+|---|---|
+| **Shakespeare: the 14 Folger scenes are famous MIDDLE scenes with no ending** | **Dramatize the scene faithfully and let it end where it ends.** Fidelity beats arc. The pack already says this -- `tone_guardrails`: *"Put a MICROPHONE on the scene; do not re-plot it"*, *"Compression is allowed; replacement is not"*, and the macro seam says *"Land the scene's OWN turn, not a turn you supply"* |
+| **Science news: how far may the drama depart from the real story?** | **Springboard -- invent freely from a real premise.** The news is the seed, not a cage. **This makes MISS 2 load-bearing**: because the fiction departs freely, the coda is the ONLY thing telling the listener where fact stopped and fiction started |
+| **`original`: no source to credit, `coda_mode` is empty** | **A reflective close on the story's theme.** The announcer lands what the story was about, crediting nothing. Originals get the same weight of ending the adaptations get |
+
+**THIS CHANGES THE AUDIT CRITERION FOR THE ADAPTATION LANES, so grade them
+correctly.** "Produces a story" was going to be tested as want / cost / reversal.
+On `shakespeare` and `public_domain` that is the WRONG test -- the operator has
+ruled fidelity above arc. The right test on those lanes is **dramatize versus
+narrate**: are the characters speaking and acting in the moment (drama), or is
+someone summarizing what happened (recap)? A faithful scene that ends unresolved
+is a PASS. The want / cost / reversal test still governs `original`, `scifi_news`
+and `scifi_news_pro`, which author their own stories.
+
+### MISS 2 -- the leading hypothesis, NOT yet confirmed
+
+The six banks run two different machines. Four (`shakespeare`, `public_domain`,
+`media_archive`, `original`) declare 8-9 shared seams on a `legacy_many_pass`
+pipeline that has **`announcer_coda` as its OWN dedicated pass**. The two news
+banks declare **zero** shared seams and run their own pipelines.
+
+`scifi_news_circuit` DOES carry a coda seam -- `codex_coda_contract_system` --
+but it is **not a pass**. It is folded in as a CONTRACT on `P3_radio_score` and
+`P5_first_play`. So on the legacy banks the coda is GENERATED BY ITS OWN PASS;
+on the news lane it is A RULE ATTACHED TO THE PASS THAT WRITES THE SCRIPT. If the
+model does not honour it, nothing reserves the slot. That matches the older note
+in this file that the coda *"remained a prompt wish."*
+
+**Confirm before fixing:** that the seam text actually reaches a model, and
+whether P5 physically reserves a coda row. Also note `legacy_many_pass` is
+`executable: false`, so for those four banks `pipelines.json` may be DESCRIBING
+the writer rather than driving it -- real routing would be in Python. That is the
+dead-text-looks-like-live-text trap; verify per bank, do not read the JSON as
+truth.
+
+### Standing rules for this work -- learned the hard way
+
+* The sealed ledger holds announcer speech, character dialogue and music cues.
+  Nothing else, ever. Every sealed line becomes TTS audio -- that is MISS 1.
+* **Code may DETECT a defect and explain it. Only a MODEL PASS may rewrite
+  prose.** No Python that edits an author's or a model's words.
+* No content guardrails. Generated episode content is not filtered; a source's
+  own violence is carried as the author wrote it. The packs once forbade "blood,
+  guns, knives" while adapting Macbeth and King Lear -- a fidelity defect, not a
+  safety win.
+* ONE PROMPT PER JOB for every model tier. No per-model variants.
+* No bare `assert` in shipped code -- `python -O` strips it.
+* Licence and non-commercial notices ride the PRINTED CREDITS, never the audio.
+  Folger is CC BY-NC 3.0 and must not be read aloud; Shakespeare gets the spoken
+  credit.
+* Regenerate sealed fixtures with their generators; never hand-edit a digest.
+* The untracked operator files under `config/profiles/`,
+  `config/source_banks/_corpus/` and `docs/H3_LICENSE_ATTESTATION*.md` are NOT
+  OURS -- do not touch, move or commit them.
+
+### Out of scope unless the operator says otherwise
+
+Casting (production's is intact and stays); the ending coda STRUCTURE (only its
+failure to name the source is in scope); source selection and corpus breadth
+(production selects across a whole bank -- that is a STRENGTH, do not replace it).
+
+### Order of work -- one feature at a time, gates green between
+
+1. **Audit all six working source banks** -- `shakespeare`, `public_domain`,
+   `media_archive`, `original`, `scifi_news`, `scifi_news_pro`. Per bank: which
+   prompt seams actually REACH A MODEL and which are declared but routed by
+   nothing (**dead text in a pack looks exactly like live text -- verify, do not
+   assume; this has bitten before**); whether source selection can draw from the
+   whole bank (14 Folger scenes, 65 public-domain works) rather than re-adapting
+   one pinned source, and if it can, how to take better advantage of it; and
+   whether the lane actually PRODUCES A STORY -- does a person want something,
+   does it cost them something, does anything reverse. **A lane that recaps its
+   source instead of dramatizing it has FAILED even if every gate is green.**
+   Report per lane working / weak / broken, with evidence and the seam that owns
+   each weakness.
+2. **Confirm the two misses, with evidence. Do not fix them yet.** Show where the
+   action text enters the dialogue, and why the coda is not naming the source on
+   the science-news lane.
+3. **Diff the lab, then ASK.** Read its two planning documents
+   (`docs/2026-08-14-lab-to-prod-porting-plan.md` and
+   `docs/2026-08-14-prod-to-lab-transplant-plan.md` in the lab repo), diff the
+   two trees, and return a RANKED candidate feature list. The operator decides
+   FEATURE BY FEATURE, not by batch. Two findings that save time: the media banks
+   are ALREADY IDENTICAL on both sides (Shakespeare byte-for-byte, the same 65
+   public-domain works), and production selects across a whole bank while the lab
+   could not -- source selection and corpus breadth are a production strength.
+4. **Patch production one feature at a time, without breaking it.** Each accepted
+   feature lands on its own, with the gates green before the next starts.
+   Production works today apart from the named defects, and a careful patch that
+   preserves that is worth more than a fast one that does not.
+
+**ASK THE OPERATOR BEFORE:** porting any lab feature; changing a prompt on more
+than one lane at once; deleting a seam; touching anything downstream of the
+ledger.
+
+**"The tests pass" is not success. READ THE STORY.**
+
+**How to run one.** ComfyUI's interpreter is
+`C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (Python 3.12.11,
+torch 2.10.0+cu130, CUDA live on the 5080). The system Python 3.10 has a CPU-only
+torch and cannot load a model. The two LLM dropdowns are `creative_writing_model`
+and `technical_model`; `DEFAULT_LLM` is `mistralai/Mistral-Nemo-Instruct-2407`;
+`HF_HOME` is `C:\ComfyUI-Models\huggingface`. Downloaded and ready:
+`gemma-2-2b-it`, `gemma-4-E2B-it`, `gemma-4-E4B-it`, `gemma-4-12b-it`,
+`Mistral-Nemo-Instruct-2407`. The unsloth GGUFs and `Qwen2.5-14B` are NOT
+downloaded. Use a small gemma for a cheap first pass, Mistral-Nemo for a real
+judgement.
+
 ## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
+
+**ROW 1 BELOW IS SUPERSEDED by PRIORITY 1 above (operator 2026-08-14).** Its
+order was "resume the upstream Story Lab and A/B against it"; the lab is now
+parked, read-only and being retired, and the story work happens in production.
+Rows 2-5 are unchanged and still run in their listed order, behind PRIORITY 1.
 
 This block is authoritative. It supersedes every older order, count, Lemmy gate,
 and review-routing sentence lower in this file. Re-ground the active row against
