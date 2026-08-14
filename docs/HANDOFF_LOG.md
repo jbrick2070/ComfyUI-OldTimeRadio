@@ -3,6 +3,140 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-13 -- base HEAD 8c3ed304 (v2.0-alpha) -- RENDER/HANDOFF (`wan_ti2v` passed; published content failed; original Story Lab recovered)
+
+Did: completed the fresh-seed `wan_ti2v` retry, audited the published episode
+all the way back through its accepted P3/P5 artifacts, recovered the original
+upstream Story Lab from GitHub, and rewrote the forward baton around the
+operator's new order. No production code, tests, profiles or workflow JSON were
+edited. The GPU was not used again after the successful leg.
+
+**RENDER RECEIPT -- PASS.** Exact engine/profile `wan_ti2v` /
+`otr_w45_wan_ti2v`, exit 0, 179.8 min, 13 clips, `audio 168.06s video
+169.12s clips 13 COVERS`; server `Prompt executed in 02:59:40` and
+`obs_publish OK`; watchdog DONE; registry readable; delivered engine exact. The
+OBS H.264/AAC asset exists and ffprobes at 1920x1080, 25 fps, 193.040 s:
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\signal_lost_the_light_of_possibility_20260813_172801_silent_procgen_blended_captioned_with_credits_final.mp4`.
+This fresh seed proves lane viability. The prior 14.7-minute first-seed P3 cycle
+never rendered a frame and is not a lane failure. Gate is now **14/21**.
+
+**EPISODE-CONTENT RECEIPT -- FAIL.** The credit was truthful, not wrong:
+the durable ledger records `source_bank=scifi_news`, `owner_bank=scifi_news`,
+the science source packet and `wan_ti2v`. P3 accepted six beats whose first and
+last owners are characters; its sole ANNOUNCER beat is second, fact-free, and
+described as introducing Ada's personal struggle. P5 then froze third-person
+action/narration and cross-speaker quotations as clean voiced text. Exact live
+examples include `l002` (pure Ada action), `l005` (Leo's speech voiced by Ada),
+`l006` (Ada's speech voiced by Leo), and `l011` (Ada leaving, voiced by the
+board). The 45-word request delivered 357 spoken words, but that count is
+evidence for a separate semantic-duration design -- **not** permission to add a
+word clamp.
+
+**THE AUGUST 13 RUNAWAY GUARD IS EXONERATED.** It never fired on the accepted
+run; P3 and P5 transports were 4,224 and 2,389 characters, far below the guard
+threshold, and P5 was accepted on its first call. Do not revert `b37e095b`,
+`9af0f7e2` or `832eaf6b`. The exact history is:
+
+- `e679b754` (2026-07-11) created P5's compact artifact projection without the
+  authoritative speaker name/cast map, while the prompt still told P5 to obey
+  the graph's speaker;
+- `499386aa` (2026-07-17) retired the old `science_news` family, whose outline
+  physically reserved announcer open and close; `f03128fa` (2026-07-19) renamed
+  the independent compact circuit to `scifi_news`;
+- `2129ce84` (2026-07-23) narrowed current-lane spoken acceptance from the
+  spoken-surface hygiene route to explicit markup/control checks;
+- `314dd481` (2026-07-24) deleted the shared narration/stage-direction detector
+  stack and its tests and weakened the P3/P5 pack language.
+
+There was no executable current-lane first-announcer/final-factual-coda
+invariant to mutate: it was a prompt wish. Some seeds obeyed it -- a July 30
+published `scifi_news` control has both bookends -- and `scifi_codex_v4` won the
+blind script showdown at 24/25 before its rename. Therefore the current circuit
+is not discarded. Story Lab must compare it with the old control and port proven
+authorities rather than restore either stack wholesale.
+
+Operator's first Story Lab contract, stated 2026-08-13: reserve two typed
+ANNOUNCER bookends independently of requested word count. The opening introduces
+the drama, establishes place and time, and connects it to the real-news premise.
+The ending clearly summarizes the source-backed real news and distinguishes the
+factual takeaway from the fictional drama. A draft missing either bookend is a
+recoverable candidate failure, not a prompt-style preference and not an episode-
+fatal taste veto.
+
+The complete operator-ruled sequence is: **opening music -> ANNOUNCER
+introduction -> character drama, with music only where the accepted script asks
+for it -> ANNOUNCER real-news summary -> closing music**. Opening/closing music
+and the two announcer bookends are structural reservations; intermediate music
+is script-owned rather than mechanically inserted.
+
+**THE OLD-MOVIE SYNC FEEL IS NOT TIMELINE DRIFT.** All 13 native clips are CFR
+25 fps; maximum positioned beat error is 19.521 ms, under half a frame, and the
+story video matches the 168.061-second master. The causal visual-performance
+defect is that silent I2V `wan_ti2v` receives no audio but every character M4
+prompt starts `face visible, speaking to camera`; TTS is muxed later, so invented
+mouth motion cannot synchronize. A separate durable-receipt bug records all 13
+`audio_motion_profiles` rows with zero timing and roughly one segment's duration
+instead of the positioned multi-segment beat. Those are distinct from story
+authorship and from mux drift.
+
+**UPSCALER/LOOK RECEIPT.** No learned upscaler ran. Node 84 used
+`upscale_engine=off`; native 832x480 clips were enlarged to 1920x1080 with
+FFmpeg Lanczos + unsharp. The episode also rolled `shakespeare_stage_realism`,
+used full-strength procgen blending and contains 17 internal chain seams. The
+operator's “eerie and interesting, but not very good” judgment is preserved,
+but WAN recipe judgment waits for a clean script, capability-aware performance
+prompts, pinned neutral `sci_fi_radio`, and matched raw-clip/final controls.
+
+**ORIGINAL STORY LAB RECOVERED -- DO NOT START BLANK.** Operator supplied
+`https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab`. Its current main
+is `7df7c80`: a transplant workspace containing the July 2 SFX-free production
+mirror, old `science_news` writer modules, 12 story-pack fixtures, runner/bridge,
+drift checks and transplant plans. Clean LF checkout re-verification today:
+**50 passed**, `validate_lab.py` OK, `verify_tree.py` 52 Python / 30 JSON / 0
+errors. The mirror hashes are byte-sensitive, so use `core.autocrlf=false`; CRLF
+checkout creates a false manifest-hash failure. Standalone v1 remains at
+`41c6512` and also passes its 5 tests + validator. OTR additionally archived the
+sibling at `2e83755c` before pruning bulky copies at `22795799`.
+
+Operator ruling: the new Story Lab is a fresh experimental window around this
+recovered work, **not** a fresh story design. Use old `science_news` as the
+control and current `scifi_news` as the challenger. Keep the current fact graph,
+typed schemas and liveness work where they win; recover old hard bookends,
+speaker ownership and spoken-hygiene/repair mechanisms where the A/B proves
+them. The opening must introduce story/place/time plus the real-news premise;
+the ending must summarize the source-backed news. Separately design the semantic
+parameter that owns episode duration. The
+external lab may experiment independently, but its duplicate production mirror,
+bridge and workflow do not ship; the final transplant is one serialized OTR
+commit, with canonical workflow wiring atomic if any surface changes.
+
+**NEXT ORDER, operator 2026-08-13:** (1) Story Lab A/B and root fixes; (2) give
+Lemmy Phases 2-4 and PBUG-20260811-01/-02/-03 a fighting chance; (3) recreate
+the render runner from then-current source and run the seven remaining proofs;
+(4) narrow Spandrel resolver hardening; (5) release roadmap. The seven are
+`wan_i2v`; `humo`, `humo_14B_169`, `humo_1.7B`, `humo_1.7B_169`;
+`minimax_h3_video`, `minimax_h3_audio_in`. Their purpose is to qualify the code
+that will ship, so all pre-change results and the deleted helper are stale by
+design.
+
+Current box: selectively clean -- port 8000 clear, no owned server/campaign/
+watchdog, no campaign lock, GPU 1,353 MiB. Temporary row-3 helpers deleted.
+
+Gates: documentation-only diff passes `git diff --check`; touched docs have no
+BOM. Bug Bible synced at `9b56ddb` and remains **20 passed / 24 skipped / 3
+xfailed** at 278 entries. Full OTR suite and variants were not rerun because no
+production/code/workflow/test file changed; last green baselines remain **10410
+passed / 110 skipped / 1 xfailed**, nothing deselected, and **50 variants / 0
+failures**. The Story Lab checks above were run independently. Formal PBUG
+entries and Bible promotion remain with the owning Story Lab/transplant chunks;
+the published artifact satisfies admission, but no fix is claimed here.
+
+Models/credits: RENDER rung -- local production models for the leg, Codex app
+for monitoring/audit/handoff, $0 external model spend. Review routing actually
+read: GO_FORWARD operator directive dated **2026-08-11**, full-kibitz suspended;
+Codex consult only for a genuine quandary/third swing and Sonnet 5 for post-code
+QA. No full-kibitz arc was assumed or claimed.
+
 ## 2026-08-13 -- HEAD b37e095b (v2.0-alpha) -- RENDER (fastwan_8gb passed live; the runaway guard took three shapes before it was right)
 
 Did: ran boot 1 of the 45-word render gate (WAN token, unclamped, token+env both
@@ -8942,4 +9076,3 @@ the NEXT spec after this transplant, not a line item in it. And
 `google_omni_video` inherits `CONTINUITY_NONE` rather than declaring it -- a
 one-token fix on a cloud lane outside the 21-lane order, tracked by an
 `EXPECTED_RED` row in the preflight suite.
-

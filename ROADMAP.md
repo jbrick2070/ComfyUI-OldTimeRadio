@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Updated:** 2026-08-07
+**Updated:** 2026-08-13
 
 **Branch:** `v2.0-alpha`
 
@@ -31,13 +31,14 @@ operator listening are separate elapsed time.
 | 5 | Install path | Clean install/bootstrap/profile smoke/log collection on representative machines | 4-6 days |
 | 6 | Product docs and v2 release | First-render guide, troubleshooting, accurate README, all release gates green; operator controls tag/promotion | 2-5 days |
 
-**FULL RUNWAY ORDER, operator 2026-08-07.** GO_FORWARD and this file are ONE
-ordered runway: GO_FORWARD 1-8 (qualification -> `visual_storybased` ->
-reference A/B -> WAN 8-GB -> MiniMax H3 -> video matrix -> the 23 shipped
-episodes -> upscaler), then rows 3-6 here (lean-mean -> RunPod/AMD/Mac ->
-install -> docs and release). Row 4 was split out of the old combined
-"RunPod and install path" because the operator ordered the platform tests as
-their own step.
+**FULL RUNWAY ORDER, operator 2026-08-13.** `docs/GO_FORWARD_PLAN.md` is the
+authoritative near-term queue: resume the original upstream Story Lab and recover
+the old `science_news` control -> transplant the proven root fixes -> Lemmy ->
+seven freshly rebuilt post-change render proofs -> only the narrow Spandrel
+resolver hardening. Then rows 3-6 here run lean-mean -> RunPod/AMD/Mac -> install
+-> docs and release.
+The multi-GPU learned-upscale stage is already shipped and live-proven; it is not
+a future campaign.
 
 **SFX (row 1) IS RETIRED, 2026-08-06 (operator: "I do really want to rip out
 SFX 100%").** It was parked by operator doubt on 2026-08-04; two days later the
@@ -60,10 +61,10 @@ later block lands on freshly-rewired code. It sits ahead of rows 4 and 5 on
 purpose: validating an install path and tagging a release against a tree still
 full of dead code would have to be redone after the rip.
 
-**Everything in `docs/GO_FORWARD_PLAN.md` precedes row 2 here (row 1 is
-retired).** That file carries the ON DECK continuity-correctness queue, then
-WAN 8-GB, Randomizer A and `dynamic_story`; when its queue is exhausted, a
-window comes here.
+**Everything in `docs/GO_FORWARD_PLAN.md` precedes row 3 here (rows 1-2 are
+retired/empty).** Its live top queue is Story Lab recovery/root fixes, Lemmy,
+seven post-change render proofs, then narrow upscaler hardening. When that queue
+is exhausted, a window comes here.
 
 **Release-runway planning range after GO_FORWARD:** roughly **28-46 coder-days** (figure predates the SFX retirement; the effective range is lower with row 1 gone)
 before optional product-expansion campaigns, or about **6-9 one-coder weeks**
@@ -190,10 +191,12 @@ Choose these as separate campaigns after the core surface is stable:
   shippable to a stranger with no accounts. The cloud slots that already exist
   stay as opt-in bake-off arms; this was about building MORE of them, and it is
   not happening;
-- ~~a new system-agnostic multi-GPU upscale stage~~ **PROMOTED 2026-08-07** to
-  `docs/GO_FORWARD_PLAN.md` queue item 8, after the 23-episode disposition. The
-  constraint travels with it: built against the profile and registry contracts,
-  NEVER a resurrection of the retired NVIDIA-only node;
+- ~~a new system-agnostic multi-GPU upscale stage~~ **CLOSED 2026-08-09.** It
+  shipped against the profile and registry contracts and passed live with
+  `spandrel_esrgan` / Real-ESRGAN on `cuda:0` (7 MODEL PATH, 0 FAST PATH,
+  `obs_publish OK`). Only the narrow `_resolve_model` robustness pair remains in
+  GO_FORWARD; that does not reopen this campaign or resurrect the retired
+  NVIDIA-only node;
 - a one-shot continuous multi-speaker segment role (podcast/trailer banter
   between two announcers, rendered as a single unbroken take). VibeVoice is the
   candidate model and has maintained ComfyUI nodes, but it is NOT a `char_voice`

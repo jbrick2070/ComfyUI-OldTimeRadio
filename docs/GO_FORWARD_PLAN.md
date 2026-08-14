@@ -4,52 +4,89 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
-## THE QUEUE -- OPERATOR-ORDERED 2026-08-07. WORK IT TOP TO BOTTOM.
+## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
 
-This order is the operator's, set after the shield-scoping ship. It OVERRIDES
-the section numbering below (which is historical) and the older "work by
-priority, not by number" line. A window takes the topmost item that is not
-blocked on the operator, finishes it green and pushed, then re-reads this list.
+This block is authoritative. It supersedes every older order, count, Lemmy gate,
+and review-routing sentence lower in this file. Re-ground the active row against
+the Windows tree before editing; when a row is coded, fully tested, committed and
+pushed, move its receipt to `docs/HANDOFF_LOG.md` and remove it from this forward
+queue in the same push.
 
-**ORDER SET BY THE OPERATOR 2026-08-07** and it now runs straight through
-`ROADMAP.md` as ONE runway -- rows 1-9 live here, rows 10-13 are the roadmap's
-later runway, reordered to match. A window works the topmost UNBLOCKED item.
+| # | Active work | Exit condition |
+|---:|---|---|
+| 1 | **Resume the original Story Lab for the published `scifi_news` regression, then root-fix the proven bug cluster** | Start from the recovered upstream lab and its old `science_news` production mirror -- **not** from a blank design. Use the old lane as the control and current `scifi_news` as the challenger. The requested and executed bank was `scifi_news`, yet the published script lost the announcer opening that introduces the drama, its place/time and real-news premise; lost the announcer closing that summarizes the real news; and contains stage direction/cross-speaker prose in spoken rows. Recover proven old mechanisms selectively, preserve useful new contracts, and fix the real authority. Do **not** treat target-vs-actual word count as the fix: `target_words` is advisory, and what should govern episode duration is a separate Story Lab design question. After the story contract is clean, capability-gate silent I2V performance prompts and repair the false per-beat motion receipt. Then continue with timeout `/interrupt`, boot-contract refusal timing, mesh zero-clip verdict transparency, and cast-coverage/cold-regeneration. Every production fix needs executable regression, full suite + Bug Bible + variants green, Sonnet post-code QA clean, and push. Do not mint a PBUG/Bible rule from static review alone. Row 5b VRAM retention remains measurement-first until the mechanism is proven. |
+| 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
+| 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
+| 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
+| 5 | **Release runway** | `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. |
 
-| # | Item | Where | Kind | Blocked on |
-|---:|---|---|---|---|
-**CLOSED, do not re-open:** row 1 (model-slug curation chunk B, `262dfa8f` + `22012263`),
-row 8 (multi-GPU upscale stage), row 9-C3 (Macbeth safety probe -- all four live cells
-passed, `macbeth_probe` removed from both profiles). Detail lives in `docs/HANDOFF_LOG.md`.
+### STORY LAB RECOVERY BASE -- OPERATOR DECISION 2026-08-13
 
-| # | Item | Where | Kind | Blocked on |
-|---:|---|---|---|---|
+**A new lab window does not mean a new story system from zero.** Resume
+[`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab).
+Its current `main` is commit `7df7c80`, the transplant workspace built around a
+July 2 SFX-free production mirror. It retains the old production writer modules,
+12 story-pack fixtures including `science_news`, an executable runner/bridge,
+drift checks and the transplant plans. A clean LF checkout was re-verified on
+2026-08-13: **50 passed**, `validate_lab.py` OK, `verify_tree.py` 52 Python / 30
+JSON / 0 errors. The byte-hash mirror gate requires LF checkout
+(`core.autocrlf=false`); a normal Windows CRLF conversion creates a false mirror
+hash failure.
 
-Then, in `ROADMAP.md`: **10** lean-mean/dead-code -> **11** RunPod + AMD/Mac
-platform tests -> **12** install path -> **13** product docs + v2 release.
+The original standalone v1 lab is deliberately preserved at `41c6512`: its 12
+fixtures, preview/validator nodes, 5 contract tests and validator all pass today.
+Use it as provenance and recover pieces with `git show 41c6512:<path>`; do not
+reset the whole workspace to v1. The stronger starting point is current `main`,
+because it keeps the old production mirror and adds the executable comparison
+surface.
 
-**Items 3, 4, 6 and 7 are blocked on the operator.** (Item 5 left this list on
-2026-08-09: H3 is no longer a pending ruling, it is a sprint series whose first
-sprint the operator will name -- see 0-QUINQUE.) A coder window that
-reaches one without an answer skips to the next unblocked item rather than
-guessing.
+**Control arm:** the old `science_news` many-pass recipe and the old lab/story-
+showdown evidence -- hard announcer open and close, an opening that locates the
+drama in place/time and introduces its real-news premise, a source-backed ending
+news summary, spoken-line ownership/hygiene and its repair tests, plus the old
+duration recipe.
+**Challenger arm:** current independent `scifi_news` P0-P5 circuit, fact graph,
+typed schemas, liveness guard and current ledger contract. Reproduce the accepted
+2026-08-13 P3/P5 artifacts as fixtures, then compare both arms before choosing
+what returns. Port proven mechanisms; do not resurrect the old stack wholesale
+and do not discard the current architecture wholesale.
 
-**READ THIS BEFORE HUNTING FOR WORK (state as of 2026-08-09 late).** With item 1
-closed, **THE QUEUE HAS NO UNBLOCKED CODING ROW LEFT** -- every remaining row is
-waiting on the operator, and item 9's remainder is held behind Lemmy besides. A
-coder window that reaches this line has not run out of work; it has run out of
-QUEUE. The unblocked work lives in **STILL OPEN, SMALL, UNSCHEDULED** below and
-in the 6-STATUS follow-ups. Take the topmost item there instead of forcing a
-blocked row, and do not read the queue's silence as "nothing to do".
+**Canonical `scifi_news` episode topology, operator 2026-08-13:** opening music
+-> ANNOUNCER introduction -> character drama, with interstitial music only where
+the accepted script requests it -> ANNOUNCER source-backed real-news summary ->
+closing music. Opening/closing music and both ANNOUNCER bookends are structural
+reservations independent of `target_words`; body music remains script-owned. The
+opening must establish story, place and time and connect the premise to the news.
+The ending must summarize the real news and distinguish fact from fiction.
 
-**GREP OR MEASURE BEFORE REPEATING A BLOCKER OUT OF THIS FILE.** This file
-once asserted for a day that item 1 was blocked on a missing
-`OPENROUTER_API_KEY`; the key was in the User env all along and a window
-repeated the claim to the operator as fact. It has cost two windows. The
-same defect points the other way too: a row describing finished work as
-pending costs the next window a re-grounding pass. **When you close an
-item, close its ROW in the same push.**
+**Ownership lock:** the new Story Lab window owns all story/writer experimentation
+and code until it hands back a converged transplant. OTR windows remain read-only
+on story code meanwhile. Production transplant is a later serialized OTR coder
+chunk, including `workflows/otr_canonical.json` in the same change if wiring moves.
+That prevents two coder windows from editing the writer or canonical graph at once.
+The separate repository is an experiment/control surface, not a second production
+package: do not ship its duplicate workflow, production mirror or bridge into OTR.
 
-### VIDEO LANE QUEUE (queue item 5) -- ONE LANE OPEN AT A TIME
+**Why row 3 waits until after rows 1-2:** the remaining legs are not seven boxes
+to consume. They are the end-to-end acceptance and regression proof for the code
+that will exist after the bug and Lemmy work. Running them first would qualify a
+tree we are about to change and would make the expensive evidence stale.
+
+**REBUILD THE SEVEN-LEG RUNNER AFTER LEMMY.** Today's temporary row-3 helpers
+were deleted. Never revive or reuse them, a cached prompt, a generated workflow,
+an old results table, or old profile-derived environment. Build a fresh
+one-engine-at-a-time runner from the then-current `workflows/otr_canonical.json`,
+the then-current profiles' own `launch.env`, registered engine IDs, and current
+success contract. Snapshot `tmp/_w45_results.json` immediately before every
+launch. The token enables engines; profile env satisfies the boot contract; prove
+both from the server process's own environment.
+
+**Closed work does not belong in this queue.** All 21 engine packets/preflight
+rows, the cost-row refusal fix, the two-signal decode liveness guard, the model
+slug work, multi-GPU learned upscaling, and the Macbeth probe are receipted in
+`docs/HANDOFF_LOG.md`.
+
+### VIDEO LANE BUILD -- CLOSED; RENDER ACCEPTANCE IS RUNWAY ROW 3
 
 **ALL 21 PACKETS ARE CLOSED (2026-08-12).** Lanes 0-21 are built, receipted
 and pushed; the preflight matrix is 29 engines x 7 gates with ZERO non-green
@@ -57,8 +94,9 @@ cells and ZERO `EXPECTED_RED` entries. Per-lane detail lives in
 `docs/evidence/lane_receipts/` and the closed diagnoses in `docs/HANDOFF_LOG.md`
 -- **not here**.
 
-**WHAT IS ACTUALLY LEFT IS THE RENDER GATE**, and it is the only forward item in
-this section: the operator's 45-word render of EVERY visual path. Status below.
+The only forward video-lane work is the seven-leg render acceptance in runway
+row 3, parked behind Story Lab/bugs and Lemmy. The packet/preflight build itself
+is closed.
 
 **THE WHOLE CHEAP SHELF IS GREEN** -- four visualizers, four still families,
 8/8 with INERT G2 rows and declared continuity. All four still families refuse
@@ -84,32 +122,8 @@ lane 10's era, while lanes 11-22 and the title-card work had moved the suite
 ~400 tests since. If your run does not match, check the DELTA against
 `git stash` + `pytest --collect-only` before assuming a regression: that is how
 the 2026-08-13 window proved its +7 was its own seven new tests and the rest was
-drift already on `origin`. Box was left CLEAN (no resident server, port 8000
-clear, VRAM 657 MiB).
-
-**What is already done FOR you, and what is not:**
-* **Lanes 16-18 (the remaining still lanes): your G3 rows are GREEN** (lane 10
-  put `continuity=` on the shared `_CheapFamilyBase`) **and your ffmpeg
-  PREFLIGHT gate is already inherited** (lane 15 put it on the same base). Your
-  G2 rows are still yours, and so is the `_require_still` call -- lane 15 took
-  the refusal for `still_motion` ALONE and left the base default False.
-* **Lanes 16-18 (the remaining still lanes), on G2: READ LESSON L19 FIRST.**
-  Lane 15 already took the INERT answer for `still_motion` and its receipt
-  records the one wrinkle these lanes share: the still builders pass dims
-  through `even_dim()`, a yuv420p mod-2 CODEC snap, which is not a native
-  canvas and is a no-op at every canvas in play. All four
-  visualizers closed G2 by declaring the profile canvas channel INERT, never by
-  declaring a canvas -- four for four. Your lanes render through ffmpeg from a
-  supplied still, so check whether YOUR path has a size of its own before
-  copying either answer; the reasoning transfers only if the premise does.
-  Historical note on why that default exists -- lane 11
-  drafted `render_canvas = (1472, 832)` on a measured-looking argument and it
-  was WRONG: that number is the default of `OTR_VIDEO_LANDSCAPE_CANVAS`, an
-  operator lever, and a declaration is applied LAST and would silently disable
-  it for one lane. The right close for a procedural lane with no native canvas
-  is `PROFILE_CANVAS_DOCUMENTED_DEAD` with the mechanism written out. Copy the
-  REASONING, not the shape -- if your lane does have a canvas-dependent
-  property, declaring may be right for you.
+drift already on `origin`. Box is CLEAN after the 2026-08-13 WAN pass (no
+resident server, port 8000 clear, no campaign lock, VRAM 1,353 MiB).
 
 **A `mesh_stage`-CLASS PASS IS WEAKER EVIDENCE THAN IT LOOKS, and the runner
 does not say so.** That lane leaves NO per-shot clips, so `coverage` reads
@@ -151,7 +165,7 @@ Every turn, unchanged:
 * **Bug Bible regression EVERY TURN**, not just at wrap-up -- `cd` to
   `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide` and run
   the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
-  path fails to collect). Baseline **20 passed / 24 skipped / 3 xfailed at 272
+  path fails to collect). Baseline **20 passed / 24 skipped / 3 xfailed at 278
   entries**. Sync to the Bible repo's origin/main first; never pin a stale copy.
 * **BOM check on every touched file, always** -- UTF-8, NO BOM. First three
   bytes must not be `EF BB BF`. Never write Python source with `Set-Content` /
@@ -194,113 +208,137 @@ written), `TODO`.
 |---|---|---|
 | `wan_i2v` | 14106 | **2504** |
 | `wan_i2v` | 16074 | **8517** |
-| `wan_ti2v` | 7985 .. 13041 (7 samples) | 6737 .. 8113 |
+| `wan_ti2v` | 7985 .. 13041 (first 7 samples shown) | 6737 .. 8113 |
 
-So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v` is merely consistent about it while `wan_i2v` released once and held once. Do not build an engine-specific fix on the single clean sample; that is exactly the trap this row fell into for half an hour. Note also `wan_i2v` peaking **16074 MB**, over the 14.5 GiB working ceiling and at the 16 GB card's limit, which is its own open question. What the samples DO still rule out is "add a release between engines" is the WRONG SHAPE: an engine-boundary reclaim already exists (`render_driver.py:3893`, the CS-3 inter-beat reclaim) and it FIRES -- its steps are `unload_llm`, `_unload_bark`, `gc.collect`, `soft_empty_cache` and the cuda flushes, every one aimed at OTR's OUT-OF-BAND caches, which is what it was built for. `soft_empty_cache` frees cached blocks; it does not EVICT a resident ComfyUI-managed model, and no step in that reclaim does. So the question row 5b should answer is: **what decides whether a finished render gives its VRAM back**, given the SAME engine did both within one leg. The candidate branch is a targeted `free_memory(required, device)` before a DIFFERENT engine prices its work -- explicitly NOT `unload_all_models`, which V-4/V-5 forbid and which was measured freeing 0 MB. Nine samples exist now; **get more before choosing, and do not conclude from one** | TODO -- 9 samples, no conclusion yet |
+So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v` is merely consistent about it while `wan_i2v` released once and held once. Do not build an engine-specific fix on the single clean sample; that is exactly the trap this row fell into for half an hour. Note also `wan_i2v` peaking **16074 MB**, over the 14.5 GiB working ceiling and at the 16 GB card's limit, which is its own open question. What the samples DO still rule out is "add a release between engines" is the WRONG SHAPE: an engine-boundary reclaim already exists (`render_driver.py:3893`, the CS-3 inter-beat reclaim) and it FIRES -- its steps are `unload_llm`, `_unload_bark`, `gc.collect`, `soft_empty_cache` and the cuda flushes, every one aimed at OTR's OUT-OF-BAND caches, which is what it was built for. `soft_empty_cache` frees cached blocks; it does not EVICT a resident ComfyUI-managed model, and no step in that reclaim does. So the question row 5b should answer is: **what decides whether a finished render gives its VRAM back**, given the SAME engine did both within one leg. The candidate branch is a targeted `free_memory(required, device)` before a DIFFERENT engine prices its work -- explicitly NOT `unload_all_models`, which V-4/V-5 forbid and which was measured freeing 0 MB. **Fifteen samples exist now; no conclusion was drawn deliberately.** Get more only if the mechanism still cannot be named; do not conclude from one. | TODO -- 15 samples, no conclusion yet |
 | 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
 
-### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13 late, after the runaway guard)
+### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13, after the fresh-seed WAN pass)
 
-Operator rows 1 and 2 are CLOSED. Row 3, the 45-word render gate, is **13 of 21
-legs passed** and is the live work. This is the whole forward picture.
+The 45-word render gate is **14 of 21 passed**. It is deliberately PARKED behind
+the root-bug tranche and Lemmy, leaving **seven post-change acceptance legs**.
 
-**THE 8 LEGS LEFT, grouped by the boot they need.** The launcher's SECOND
-ARGUMENT (the token) enables the ENGINES; the profile's own `launch.env`
-satisfies the CONTRACT. They are separate and you need both -- read the env out
-of the profile, never off this table.
+**`wan_ti2v` PASSED on the fresh seed.** The campaign completed in 179.8 minutes;
+the server logged `Prompt executed in 02:59:40` and `obs_publish OK`; the result
+is exact engine/profile `wan_ti2v` / `otr_w45_wan_ti2v`, exit 0, 13 clips,
+`audio 168.06s video 169.12s clips 13 COVERS`. The OBS deliverable exists at
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\signal_lost_the_light_of_possibility_20260813_172801_silent_procgen_blended_captioned_with_credits_final.mp4`.
+This proves the current w45 lane can finish; the earlier fresh-attempt miss was
+a writer/seed miss before any engine frame, not a lane failure. It is not the
+first historical full `wan_ti2v` publication: canonical published episodes are
+proven as far back as 2026-07-23, and published history reaches June.
 
-| boot | token | clamp | legs left |
+**Mechanical PASS is not content acceptance.** Operator eyeball on this exact
+episode found substantial stage direction/description leaking into spoken
+dialogue, a dubbed-old-film synchronization feel, and a video recipe that is
+eerie and interesting but not yet good. More seriously,
+the `scifi_news` episode neither introduced its news story nor summarized it at
+the end, violating the bank's expected story shape despite the green render
+receipt. Treat these as a live production-quality receipt at the FRONT of row 1:
+preserve the subjective observation, trace the source-bank -> writer -> ledger
+contract and exact timing mechanism, and root-fix rather than tuning blind.
+
+The ledger confirms this was not just a wrong credit: `source_bank`,
+`owner_bank`, and title provenance all say `scifi_news`. The treatment contains
+only one announcer row and repeatedly places narration or another character's
+quoted speech in a character's spoken row. Its 357 actual words against the
+45-word test request are evidence only, **not a clamp target**: word count is
+advisory by law. Story Lab must separately redesign which semantic control sets
+episode duration. First compare bank form and dialogue ownership against the old
+Story Lab/`science_news` control; only then judge clip timing and the WAN visual
+recipe, because a malformed script contaminates both downstream judgments.
+
+**Do not roll back the runaway guard for this.** It never fired on the accepted
+run; accepted P3/P5 artifacts were far below its thresholds. The engine/render
+gate is PASS while the episode-content contract is FAIL. The exact regression
+chain now has three seams: `e679b754` (2026-07-11) projected P5's accepted line
+graph without authoritative speaker names/cast identity even though the prompt
+tells P5 to use the graph's speaker; `2129ce84` (2026-07-23) narrowed current-lane
+spoken-surface acceptance to explicit markup/control checks; `314dd481`
+(2026-07-24) retired the shared narration/stage-direction detectors and tests and
+weakened the `scifi_news` P3/P5 prompt contract. The old `science_news` family,
+with its physically reserved announcer open/close, was retired separately at
+`499386aa` on July 17; current `scifi_news` was renamed at `f03128fa` on July 19.
+There was no executable first-announcer/final-factual-coda invariant in the
+current lane to mutate -- it remained a prompt wish. The August 13 guard commits
+did not cause this artifact, and `b37e095b` must not be reverted.
+
+The Story Lab first seam is therefore an evidence A/B, not a rollback: restore
+score-owned speaker identity to P5 input; test a recoverable bank-specific
+ANNOUNCER opening that establishes story/place/time and the real-news premise,
+plus a terminal ANNOUNCER source-backed news summary; port the old utterance-only narration/cross-speaker
+detector class into the current repair seam; and separate render-engine PASS from
+episode-content PASS. Keep duration telemetry honest while the lab chooses a
+semantic duration authority. Do not reinstate a global subjective-quality gate
+or a word-count veto.
+
+**The perceived lip-sync problem is not mux drift.** All 13 delivered beat clips
+are CFR 25 fps and positioned within 19.521 ms of the master audio -- under half a
+frame. The causal defect is that `wan_ti2v` is a mute image-to-video engine, yet
+every character M4 prompt begins `face visible, speaking to camera`; TTS is muxed
+later, so the invented mouth motion cannot track speech. Make the performance
+prompt capability-aware: silent I2V gets action/reaction/cutaway direction, while
+audio-conditioned engines may receive speaking/lip-performance direction. Do not
+hide this with timestamp offsets. The episode also exposes a separate false
+receipt: all 13 `audio_motion_profiles` rows record zero start/duration timing and
+roughly one segment's length, not the positioned multi-segment beat. Repair that
+durable producer boundary before using the receipt for sync decisions.
+
+**Visual judgment remains deliberately open.** No learned upscaler ran: native
+832x480 WAN was resized to 1920x1080 by FFmpeg Lanczos + unsharp. The episode
+rolled `shakespeare_stage_realism`, full-strength procgen blending and 17 internal
+chain seams. After story and performance-prompt fixes, compare raw clip versus
+final with a pinned neutral `sci_fi_radio` style and matched script/stills/seeds;
+do not diagnose the WAN recipe from this confounded artifact alone.
+
+**THE SEVEN LEGS LEFT, in their required order and boot groups.** The launcher's
+second argument enables engines; the profile's own `launch.env` satisfies the
+contract. They are separate. Re-read the env from each current profile and prove
+it in the server process's own environment.
+
+| boot | token | profile contract | legs left, in order |
 |---|---|---|---|
-| 1 | `WAN` | none | `wan_ti2v`, `wan_i2v` |
+| 1 | `WAN` | no clamp | `wan_i2v` |
 | 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo`, `humo_14B_169`, `humo_1.7B`, `humo_1.7B_169` |
-| 4 | (none) | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
+| 4 | none | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
 
-| lane | state |
-|---|---|
-| `wan_ti2v` | **RE-RUN IT ON A FRESH SEED -- and it is CHEAP NOW.** The 15:39 leg failed at 14.7 min, and NOT on the engine: P3 cycled on all three rungs and the ladder exhausted, so `wan_ti2v` never rendered a frame. The guard is what made that 14.7 min instead of the 60-70 it would have cost before. This is a bank/seed question, not a lane question, until a second seed says otherwise |
-| `wan_i2v` | **Still genuinely unknown.** Page-thrash at 89.7-106.3 s/it against a documented 29 s/it pathology; peaked 16,074 MB and retained 8,517 MB. Never completed a leg on this box, so do NOT read it as a regression. Wants row 5b answered, or a diet contract tried |
-| HuMo x4, the H3 pair | never run in this gate |
+`wan_i2v` remains genuinely unknown on this box: the prior run page-thrashed at
+89.7-106.3 s/iteration, peaked at 16,074 MB and retained 8,517 MB. The HuMo four
+and H3 pair have not run in this gate.
 
-**PASSED (13):** the four still families + four visualizers + `mesh_stage` from
-earlier sweeps, then `ltx_8gb` (18.7 min), `ltx_video` (68.1 min -- a lane that
-had never completed a 45-word leg), `ltx_audio_in` (83.2 min, 12 clips), and
-**`fastwan_8gb` (58.4 min, 2026-08-13 15:35, 75.8 MB, 14 clips, coverage
-COVERS)** -- the live proof the cost-row fix `9eea64a4` worked, which is what
-that fix was owed.
+**Purpose of the seven:** prove the final post-bugfix/post-Lemmy code through the
+real canonical graph on every still-unqualified heavy path. Each proof must show
+the exact registered public engine, no fallback, correct token plus boot env,
+canonical result success, `COVERS`, server completion/publish receipts, and the
+OBS asset on disk. A pass against pre-change code does not satisfy this purpose.
 
-**THE NEXT WINDOW IS A RENDER WINDOW AND IT OWNS THESE LEGS (operator,
-2026-08-13).** It takes boot 1 first, because `fastwan_8gb` and `wan_ti2v` are
-the two the cost-row fix unblocked and they are the cheapest proof that it
-worked on live legs rather than only in the suite. THAT RUN HAPPENED
-2026-08-13: `fastwan_8gb` PASSED and `wan_ti2v` failed on a writer runaway that
-the new guard caught in 14.7 min. The box was left CLEAN at handoff -- port 8000
-clear, VRAM 3,035 MiB -- so reset per CLAUDE.md section 4 is a verify, not a
-cleanup. **The in-decode halt is now SHIPPED (item 2 below), so that caveat is
-retired.**
+**Runner recreation gate:** after Lemmy lands and before boot 1, create a fresh
+serial runner from current source. Load only `workflows/otr_canonical.json`;
+derive `--only` values from current registry/result engine IDs; derive boot env
+from current profile JSON; snapshot `tmp/_w45_results.json` before every launch;
+and verify queue empty, lock absent, exact server ownership and baseline VRAM
+between legs. Never run the deleted 2026-08-13 helper or any stale copy.
 
-**THE CODE ITEMS OWED, in value order:**
+**Current machine handoff:** port 8000 clear, no owned server/campaign/watchdog,
+no campaign lock, GPU at 1,353 MiB after selective teardown. The GPU is free for
+the coding and Lemmy work.
 
-1. ~~The two `FRAME_COST_MODEL` rows.~~ **DONE `9eea64a4`** -- and NOT by
-   deleting them; deletion is a proven no-op (`_DEFAULT_FRAME_COST` is the
-   byte-identical tuple). Both refusals now answer to `cost_row_may_refuse`.
-   Detail in `docs/HANDOFF_LOG.md` and
-   `docs/2026-08-13-codex-consult-costrow-refusal.md`; the lab rows were NOT
-   adopted and no row is qualified. **The one thing to carry forward:** the lab
-   figures (`wan_ti2v` 6,910.8 + 25.874/frame; `fastwan_8gb` 7,317.9 +
-   6.900/frame) remain inadmissible until re-measured through the real
-   `prepare()` + `render_clip()` lifecycle, and the operator said he would take
-   that back to the lab when the GPU frees up.
-2. ~~The in-decode halt for the writer runaway.~~ **DONE 2026-08-13
-   (`832eaf6b`, `9af0f7e2`, `b37e095b`), and it took three shapes before it was
-   right -- read WHY before touching it.**
-   * **It detects TWO things, and neither signal subsumes the other.** THREE
-     specimens were captured (`docs/HANDOFF_LOG.md`): P3 an anaphoric loop, P5
-     escalating repetition, and **P2 a pure ELABORATION SPIRAL, 15,355 tokens,
-     83k chars, NO repetition at all**. Cycle detection over token ids catches
-     the first two and is structurally blind to the third; an open-string
-     counter catches the third and is the only thing that can. Deleting either
-     re-opens a third of the defect class.
-   * **The open-string half is scoped to SCHEMA-BOUND passes only.** On free
-     prose a quotation mark is dialogue, not structure, and the lexer would open
-     on the first spoken line and count the rest of the scene. That mistake got
-     an earlier version deleted.
-   * **It is installed on EVERY local `model.generate()`**, not just the writer
-     wrapper -- an audit found the slot-drama contract and the loader factory
-     running bare. `tests/test_decode_guard_covers_every_local_route.py` goes
-     red if any install is removed.
-   * **Cloud lanes get a post-hoc word-level check** (`assert_no_verbatim_cycle`)
-     in all three remote backends. It cannot save the spend -- an HTTP call has
-     no token loop -- but a degenerate reply never reaches the ledger and it
-     raises the same rerollable phase.
-   * **What it may NOT claim:** it is COST-BOUNDING, not a correctness oracle.
-     Non-termination cannot be proven from a prefix. Target false-abort rate and
-     compute saved, never "catches everything". A blind frontier panel
-     (`docs/2026-08-13-blind-runaway-detection/`, $0.12) supplied that framing
-     and independently derived the same mechanism and bound with no source
-     access.
-   * Live proof: three TRUE-POSITIVE halts on the 15:39 `wan_ti2v` leg, caught
-     at 960 and 864 tokens of a 13,778 allowance.
+### OPERATOR ORDER (set 2026-08-13 after the WAN pass)
 
-3. **`wan_ti2v` VRAM retention (row 5b).** 15 samples, post clustering ~8.1 GB
-   regardless of peak. NOT engine-specific (`wan_i2v` did both). No conclusion
-   drawn deliberately.
+1. Resume the original upstream Story Lab from `7df7c80`, recover the old
+   `science_news` control from its production mirror/`41c6512`, and A/B it against
+   current `scifi_news`. Root-fix the published structural failure: an ANNOUNCER
+   opening must introduce the drama, place/time and real-news premise, and an
+   ANNOUNCER ending must summarize the source-backed real news. Then fix spoken
+   narration/cross-speaker leakage, capability-gate the mute I2V performance
+   prompt, and repair the false motion-timing receipt. Separately settle the semantic episode-
+   duration authority; do not turn the 45-word request into a clamp.
+2. Complete Lemmy Phases 2-4 and the live Lemmy PBUGs.
+3. Recreate the runner and execute the seven post-change render proofs above.
+4. Take only the narrow learned-upscale resolver hardening later; the learned
+   multi-GPU stage is already closed.
 
-**LEMMY** is untouched and deferred by the operator.
-
-### OPERATOR ORDER (set 2026-08-12 late, rows 1-2 CLOSED and removed)
-
-What is left of the operator's order, in his order.
-
-| # | Item | Where | State |
-|---:|---|---|---|
-| **3** | Resume the 45-word render gate | the section below | **12 of 21 passed**; 9 legs left across THREE contract-grouped boots |
-| **4** | LEMMY | the Lemmy sections further down | parked and gated; operator hands it over once row 3 is done |
-
-**DO NOT CONFLATE THE TWO CREDIT SURFACES.** The end-credits SCROLL is a
-different thing and is already FIXED (`f70df546`). Conflating them cost the
-operator an evening believing the title was done.
-
-### THE 45-WORD RENDER GATE -- operator row 3, the live work
+### THE 45-WORD RENDER GATE -- parked runbook; current count and order are above
 
 **IT NEEDS THREE BOOTS, NOT ONE. This was wrong in the plan until now and would
 have burned ~5 GPU-hours.** Legs are grouped by the `launch.boot_contract` in
@@ -322,7 +360,8 @@ at least two different tokens, and booting all five with no token leaves the
 heavy engines OFF and the lanes fall to the floor. **Group by
 `(boot_contract, launcher token)`, not by contract alone.** `ltx_8gb`,
 `fastwan_8gb` and the H3 pair carry NO enable flag and so ride any boot.
-Confirmed grouping:
+Historical full grouping (completed legs remain only to explain the contracts;
+the exact seven-leg queue above governs):
 
 | boot | token | clamp | legs |
 |---|---|---|---|
@@ -340,9 +379,9 @@ is heading for a render-phase refusal an hour later, because `ltx_av_diet`
 requires `OTR_HEADLESS_DISABLE_PINNED=1` and nothing had set it. Read the env
 out of the profile and export it BEFORE `Start-Process`; do not infer it from
 this table, which lists the clamp but cannot show you the token. Verify it
-landed by grepping the boot log for the flag on the command line -- the
-launcher's own `[launch]` echoes go to the detached console, NOT to the log,
-so their absence proves nothing either way.
+landed by reading the launched server process's OWN environment. The launcher's
+`[launch]` echoes go to the detached console, not the server log, so their
+absence from the log proves nothing either way.
 
 **AND THE PROFILE FILENAME IS NOT THE ENGINE ID.** `config/profiles/otr_w45_fastwan.json`
 registers the engine **`fastwan_8gb`**; `--only fastwan` is refused. The refusal
@@ -361,96 +400,20 @@ down but not applied (lesson L24).
 (lane 2b, still TODO). So a HuMo leg on the wrong boot spends ~80 min on writer
 + audio and only then refuses. That is the ~5 hours grouping avoids.
 
-**9 of 21 legs now PASS.** 4 still lanes + 4 visualizers + **`mesh_stage`**,
-which is the one that matters: it died twice (2.6 min in CastLock on a rolled
-bank, then 18.5 min on the still-spine beat-id split) and now PASSES at 21.6 min
-with `delivered: ['mesh_stage']` and stills keyed `music_opening_001`. That is
-the live proof the beat-id deletion worked.
+The detailed pass/fail chronology belongs in `docs/HANDOFF_LOG.md`. The only
+live count is **14/21, seven parked** in the authoritative block above.
 
-**Remaining: 12** -- the 5 in boot A, the 5 in boot B, the 2 in boot C.
+### TIMEOUT CANCELLATION DOES NOT REACH THE SERVER -- OPEN
 
-**RUN 6 RESULTS SO FAR (2026-08-13): 3 PASS, 3 FAIL.** `still_pan` PASS (carries
-the title card), `ltx_8gb` PASS 18.7 min, **`ltx_video` PASS 68.1 min -- a lane
-that had NEVER completed a 45-word leg and was in the never-run list**, 10 beats
-with zero runaways and zero rerolls, the cleanest leg of the sweep.
-`fastwan_8gb` and `wan_ti2v` FAIL on the disqualified cost-model row (see the
-correction above -- NOT a VRAM fault). `wan_i2v` FAIL on page-thrash. Remaining:
-`ltx_audio_in` running, then HuMo x4 and the H3 pair.
+The two-signal in-decode liveness guard is shipped and live-proven; do not reopen
+it or remove either signal. Its detailed diagnosis and proof belong in
+`docs/HANDOFF_LOG.md`.
 
-**RUN 6 (2026-08-13, boot 1 = WAN token, unclamped).** `ltx_8gb` **PASS**
-(18.7 min) -- one of this morning's three failures cleared, and it had died in
-the fable2 writer, so that is the post-fix data point the judging pass asked
-for. Its reuse audit is worth reading rather than skimming: 8 advisory findings
-including a `mirror/ping-pong -- 8-frame reflection about frame 104`, reported
-as ADVISORY while the leg still says PASS. `fastwan_8gb` **FAIL** (44.6 min) on
-the cross-engine retention above, NOT on the still-spine defect it failed on
-this morning -- that repair held. `still_pan` also re-proved PASS earlier in the
-night and is the leg that carries the title card.
-
-### THE WRITER CAN LOOP FOREVER ON A CAPACITY RUNAWAY -- OPEN (found 2026-08-13)
-
-Found on a live leg while running the render gate, not by review. Two separate
-things, both real, neither patched -- the second is a five-minute fix and the
-first is a contract decision that deserves daylight.
-
-**1. A decode can run 21 minutes with nothing watching it.** CORRECTED 2026-08-13
-against the actual leg log (`comfyui_8000.prev2.log:255-291`) after an Opus
-design pass; the first version of this entry, pushed in `2ddea5a2`, got three
-things wrong and recommended a fix that would not have fired. What really
-happened on the UCLA-marmot leg:
-
-```
-22:58:42  P3 attempt 1/3  base call        t=0.720
-23:19:50    OUTPUT_TRUNCATED  14191 tok after a 2193-tok prompt   <- 1268 s
-23:19:50  P3 attempt 2/3  structural retry t=0.320
-23:41:26    OUTPUT_TRUNCATED  14191 tok again                     <- 1296 s
-23:41:26  P3 attempt 3/3  typed repair     t=0.100
-23:42:34    failed: draft.cast_coverage, missing announcer        <- 68 s
-23:42:34  cycle 1 exhausted (PostValidationError) -> cycle 2
-```
-
-* **TWO rungs ran away, not three.** Rung 3 returned a COMPLETE parseable draft
-  in 68 seconds. The ladder self-healed out of the capacity failure; the runaway
-  cost 42 minutes but was never terminal by itself.
-* **Cycle 2 opened on `PostValidationError`, NOT on the capacity phase.** The
-  capacity error is consumed INSIDE the ladder (`_otr_structured_call.py:1075`)
-  and only reaches the cycle loop if it is the LAST rung's error. **So "bound
-  capacity cycles at `_otr_scifi_codex.py:2226`" -- what this entry previously
-  called the obvious answer -- provably would not have fired on this leg.** Keep
-  it as a cheap backstop; it is not the fix.
-* **P3 is the RADIO SCORE draft** (`RadioScoreDraftV4`, `_otr_scifi_codex.py:426`),
-  not prose -- prose is P5 (`ScriptTextDraftV4`, `:612`). This matters: P3's
-  ARRAYS are bounded by schema (scenes <=3, shots <=2, beats <=4, cues <=3) while
-  its STRING fields have no max, so under constrained decode a 14,191-token run is
-  provably stuck inside ONE JSON string. That is a structural fact and it is the
-  seam a directive-safe guard can use.
-* The leg did not run to the six-hour wall -- the operator killed it at 23:44.
-  "Cannot terminate on its own" remains true as a property; it was not observed.
-
-**The loop is still unbounded and is still CORRECT for validation errors** --
-that is how `scifi_news` recovers from its announcer-coverage weakness
-(`016ad146`, 0-for-4 to reliable), and no fix may weaken it.
-
-**PRIOR ART: this is PBUG-20260729-02 again** (`docs/PROD_BUG_LOG.md:2816`),
-same signature (14,697 tokens, ~24 min) on P5 instead of P3, already PARKED with
-an operator ruling on the books: *"the writer should never veto, the writers
-should keep on passing in a loop to agents to clean up the ledger."* That ruling
-also explicitly forbids capping the output budget to the word target.
-
-**THE REAL FAULTS, and where the time goes.** Everything on that leg except the
-two runaway decodes took seconds:
-
-* **D1 -- no in-decode guard.** `OTR_LedgerScriptWriter.py:996` calls
-  `model.generate()` with no `streamer` and no `stopping_criteria` (the criteria
-  block at `:977` is behind `if stop:`, and `invoke_structured_slot` never passes
-  `stop`). Nothing observed the decode for 21 minutes. **The streamer half of
-  this is now fixed** -- see the heartbeat work -- so a runaway is at least
-  VISIBLE; the halting half is not.
-* **D2 -- the outer loop cannot be bounded by phase**, per the correction above.
-* **D3 -- no cancellation reaches an in-flight decode.** `_otr_structured_call.py`
-  has ZERO interrupt polls, so cancellation granularity is one whole ladder (43
-  min here). Client-side, `scripts/otr_api.py:820` returns TIMEOUT and **never
-  POSTs `/interrupt`** -- that is the documented ghost, and it is a five-minute fix.
+The separate remaining defect is client cancellation. When `scripts/otr_api.py`
+reaches its timeout it returns TIMEOUT without POSTing ComfyUI's `/interrupt`, so
+an in-flight server prompt can continue after the client has abandoned it.
+Re-ground the endpoint and prompt-ownership semantics, add interruption on the
+timeout path, and cover both the POST and safe failure handling.
 
 ### CAST COVERAGE -- OPEN, and it is a defect class rather than a lane
 
@@ -486,18 +449,17 @@ every Stage-2 and Stage-3 call and then only RAISES.
 
 ### CURRENT BASELINE -- carry forward, detect drift
 
-| Thing | Value as of 2026-08-12 (story-writer + still-spine wrap) |
+| Thing | Current verified value |
 |---|---|
-| Branch / HEAD | `v2.0-alpha`, == `origin/v2.0-alpha` (measured 2026-08-12 at the story-writer wrap, `ae76fb3f`) |
-| **GROUNDING RULE (learned 2026-08-09)** | **`kibitz-runs/` IS GITIGNORED (`.gitignore:251`).** Two days of audit work lived in `kibitz-runs/2026-08-07-slugfest/` -- 71 slugs across 11 lists -- and was invisible to every doc search AND every `git log --all` search. The operator had to remember it existed. **Before grounding any item that smells previously-investigated, list `kibitz-runs/` by hand.** |
-| Suite | **10340 passed / 110 skipped / 1 xfailed, exit 0** (measured 2026-08-13 at `d75a8866`, NOTHING deselected). Was 10309; the title-card build added 31 across three test files. **A caution learned building them:** all seven of the first tests passed while wrapped multi-line titles were silently wrong, because every fixture title fit one line -- including the "hostile" long-word case, which is one unbreakable word and never wraps. A green suite over a too-narrow fixture set is the failure mode here, not a flaky test. Prior note kept: **10309 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 LATE at `f70df546`, NOTHING deselected). Was 10281 at `ae76fb3f`; this session added 28 across the mesh-identity, post-audio-join and credits-scroll work. Prior note kept: **10281 passed / 110 skipped / 1 xfailed** (measured 2026-08-12 at `ae76fb3f`, NOTHING deselected). Was 9963 at the lane-10 wrap; this session added ~318 tests across the writer, ledger, still-spine and campaign work. **The xfail count went 1 -> 2 -> 1**: PBUG-20260812-02 opened a STRICT xfail that did its job and forced its own deletion the same day when the field was fixed. Deselecting to get a green number hides real failures |
-| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at survival-guide `80fc358` (**275** entries, index **388** rows). 2026-08-12 promoted **07.31** + **07.32**, the two the previous window owed. **Run the gate with NO `--pack-dir`** -- that is the invocation the 20/24/3 baseline describes, and the 24 skips ARE the pack-dependent tests. Passing `--pack-dir` at OTR turns 20 of them red on pack code untouched by any Bible edit, which reads like a regression and is not one. Also pre-existing: `tools/reload_bug_bible.py` exits 1 at HEAD on 29 stale legacy_id/xref complaints; it is not the gate. Earlier: **12.97**, a model field name that collides with its base class (from PBUG-20260812-02, admitted on a live leg). It checked the others against the index FIRST and promoted no duplicate -- **PBUG-20260811-02's class is already 12.57**, whose own rule (resolve the durable owner, prove same-run identity, REJECT mismatches) also condemns the warn-and-continue fallback OTR still has open. NEVER re-scrape indexed history |
-| Variants | `build_variants.py --check` **46 variants / 0 failures** on THIS box. **THAT COUNT IS WORKSTATION-DEPENDENT and 46 is not the repo's number** (lane 11, 2026-08-11): `git ls-files` counts **45** tracked variants, and the 46th on disk is another window's untracked `otr_upscale_ltx_probe.json`. The gate globs the DIRECTORY, so its headline silently counts files the repo has never seen -- the same defect class as the sbcov crash above. Compare `--check`'s 0 FAILURES, not its count. **RUN IT BEFORE STARTING A LANE** -- it had been RED since lane 5 and lane 7 had to separate inherited drift from its own; a red at the start of a lane belongs to whoever caused it |
-| Canonical workflow | **TOUCHED 2026-08-12** -- link 255 retargeted so `OTR_MetaBriefImagePromptGen` reads `OTR_ShotLock`'s POST-AUDIO `patched_ledger_json` instead of the pre-audio freeze cascade (`[255,62,1,89,0] -> [255,90,0,89,0]`). Validated: 23 nodes / 56 links unchanged, acyclic, referential integrity clean, `validate_canonical_workflow` OK, 50 variants REGENERATED (`--check` 0 failures) and 4 hand-kept `.env.json` master_hash re-stamped. **The diff is ONE line** -- a first attempt round-tripped the JSON and reformatted all 3506 lines; that was reverted and redone as a surgical string edit |
-| Cloud profiles | `macbeth_probe` gate REMOVED from both; `openrouter_model_pins` + `audio_cache` remain |
+| Branch / HEAD before this docs update | `v2.0-alpha`, `8c3ed304`, equal to `origin/v2.0-alpha` |
+| Full suite | **10410 passed / 110 skipped / 1 xfailed**, nothing deselected |
+| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at **278 entries**; run without `--pack-dir` |
+| Variants | `scripts/build_variants.py --check`: **50 variants / 0 failures** |
+| Canonical workflow | `workflows/otr_canonical.json`; every API/headless/render run loads this real file |
 
-A window that reads a different suite number has inherited drift -- find out
-why before building on it.
+If a window reads a different number, explain the delta before building on it.
+`kibitz-runs/` is gitignored, so inspect it directly when grounding work that may
+have prior review evidence.
 
 ### WHEN THE SUITE IS RED, CHECK `git status` FIRST
 
@@ -728,10 +690,12 @@ bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
    exactly one dying-line P-OBS carrying `cache=miss`.
    Receipts: `kibitz-runs/2026-08-09-audio-cache-chips/r1/judgment.md`
    (GITIGNORED; **r1 ONLY -- a scoped receipt, never to be called an arc**).
-4. **`SpandrelEsrgan._resolve_model` robustness pair.** An unreadable NON-winning
-   candidate aborts the whole search instead of skipping; the winning file is
-   stat'ed twice with a TOCTOU window. **THIRD touch of this logic, so the
-   two-strikes rule makes a full kibitz panel MANDATORY before any code.**
+4. **`SpandrelEsrgan._resolve_model` robustness pair -- LATER.** An unreadable
+   NON-winning candidate aborts the whole search instead of skipping; the
+   winning file is stat'ed twice with a TOCTOU window. This is a third touch of
+   the logic: use Codex CLI only if the implementation remains a genuine
+   quandary/third swing, then Sonnet 5 post-code QA. The 2026-08-11 directive
+   suspended the full-kibitz gate.
 5. ~~Upscale-model SHA pin~~ **DONE** -- `_model_sha256` is pinned.
 6. ~~`visual_style_receipt["attempts"]` always reports 1~~ **DONE** (`e16e9a63`),
    and the shared `on_attempt_complete` contract three callers depend on is now
@@ -882,7 +846,8 @@ the suite is green, but the commit message does not describe them.
      winning file is stat'ed twice with a TOCTOU window that can turn
      ordinary absence into a bare NaN. **This is the same absence-vs-fault
      logic already reworked twice, so per the two-strikes rule the third
-     attempt MUST get a full kibitz panel BEFORE any code.**
+     attempt follows the live 2026-08-11 review route: Codex CLI for a genuine
+     quandary/third swing, then Sonnet 5 post-code QA; no full arc.**
    **Banked so it is never re-derived:** `Path.is_file()` on Python 3.12.11
    does NOT swallow every `OSError` -- pathlib filters through
    `_ignore_error()`, which whitelists only ENOENT/ENOTDIR/EBADF/ELOOP and
@@ -1581,12 +1546,11 @@ multi-session structural change gated on the ownership table
 (`docs/2026-08-03-fidelity-pass-ownership.md`) with four overwrite paths to close
 first, and starting it half-way is worse than not starting it.
 
-## NEXT CODING QUEUE -- confirmed against the tree 2026-08-04 (non-GPU, suite-provable)
+## HISTORICAL CODING BACKLOG -- subordinate to the current runway at the top
 
-Verified by grep/read this session, after the operator parked SFX and asked what
-other coding work is real. Same rules as ON DECK: in order, one green pushed
-chunk at a time, full `kibitz-plugin:kibitz` per item while the sprint gate
-stands.
+This 2026-08-04 inventory may still contain real work, but it is not the active
+order. Re-ground any item against HEAD only after the current top runway reaches
+it. The 2026-08-11 review routing at the top governs; no full arc is implied.
 
 1. **Style/identity campaign, items 1-4 (one campaign, ~1 day).** Highest
    leverage: fixes the credits style line for all six banks uniformly.
@@ -1923,7 +1887,7 @@ and the interpreter sees only the first 5,000, so a 3,445-word scene reaches the
 brief as ~880 words, silently. Belongs with the artifact work, where each beat is
 fed its own segment rather than a blind prefix.
 
-## STYLE / IDENTITY DECISION WORK (one campaign, next CODER window)
+## STYLE / IDENTITY DECISION WORK (backlog; not the next coder window)
 
 Grounded by the 2026-08-03 four-agent forensics; every line has a file:line in the
 session traces.
@@ -2401,9 +2365,9 @@ Z-Image's `CLIPLoader(type="qwen_image")` encoder, unrelated). Cloud writers sta
 opt-in bake-off arms, never the default.
 
 Per-window mapping: RENDER windows = local production models + the Codex-app monitor,
-Claude only to launch and wrap. CODER windows = Claude codes, rung-1 Qwen triages every
-failure first, and the full kibitz panel is now mandatory per item (see the ON DECK
-gate). PLANNER = Claude + the local panel.
+Claude/Codex only to launch, judge and wrap. CODER windows use the cheapest competent
+local triage first; Codex CLI is reserved for a genuine quandary/third swing and
+Sonnet 5 performs post-code QA. The 2026-08-11 directive suspended full kibitz.
 
 ## THE LAW (operator, 2026-07-22 -- supersedes anything that disagrees)
 
@@ -2440,29 +2404,36 @@ rip are inventoried and queued for removal as ON DECK item 5.
 * **One coder window in the code at a time**, serialized through this file. Two windows
   editing the same file -- especially the workflow JSON -- is how it gets corrupted.
 * The remaining hard rules (root-cause fixes, no content guardrails on generated
-  episodes, no word-count chasing, the full-kibitz gate, the ledger-completeness rule
-  for any ripped LLM pass, git policy) live in `CLAUDE.md` and are not duplicated here.
+  episodes, no word-count chasing, the ledger-completeness rule for any ripped LLM
+  pass, git policy) live in `CLAUDE.md` and are not duplicated here. Review routing is
+  the dated 2026-08-11 block above; the older full-kibitz gate is suspended.
 
 ## Window packing (credit discipline -- one line starts any window)
 
 Starting any window costs the same boot context, so BATCH chunks per window and never
 open one for a single small item. Every window starts by pasting its one-line kickoff --
 the `otr-handoff` skill reads this file + git and states the current step. No manual
-context handoff, ever. This planner window keeps GO_FORWARD + HANDOFF_LOG current;
-coder windows never write plans.
+context handoff, ever. The active coder keeps GO_FORWARD + HANDOFF_LOG current in
+the same green push that closes a row.
 
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
-| **CODER (open slot)** | The ON DECK queue at the top of this file, in order, one green pushed chunk at a time, each with its full kibitz | Claude codes + judges; kibitz = codex + agy | none -- work it now | ~2h40m + panels |
-| RENDER | RESUMED 2026-08-05 (the 08-04 "no runs" line was that session only). Queue: D2 first, then the WAN/8-GB proof obligations. Reset per CLAUDE.md section 4 before every leg | local production + Codex-app monitor | operator asks for a live leg | GPU days |
+| **STORY LAB (next)** | Resume external lab `7df7c80` with LF checkout; old `science_news` control versus current `scifi_news` challenger. OTR story code stays read-only until the lab hands back a converged transplant | local story models + Claude/Codex to code/judge; Sonnet 5 post-code QA | none -- operator opened it | evidence-driven |
+| **OTR CODER** | After the lab converges, transplant its proven root fixes atomically into OTR; then Lemmy row 2; one green pushed chunk at a time | Claude/Codex codes and judges; Sonnet 5 post-code QA | Story Lab handoff | evidence-driven |
+| RENDER | PARKED until rows 1-2 land. Then recreate the runner and execute the exact seven post-change proofs in current order. Reset per CLAUDE.md section 4 before every leg | local production + Codex-app monitor | bugs + Lemmy green | GPU days |
 | PLANNER | Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with any coder window | docs |
 
-**NEVER boot a window by letter.** Boot by the ON DECK section, always:
+**NEVER boot a window by letter.** Boot by the current runway at the top, always:
 
-> resume the OTR build -- you are a CODER window. Read GO_FORWARD "ON DECK" and execute
-> THAT queue only, in its stated order, one green pushed chunk at a time, each with its
-> full `kibitz-plugin:kibitz` review per the HARD GATE. State your MODEL & CREDIT BUDGET
-> rung first.
+> resume the OTR Story Lab from `jbrick2070/ComfyUI-OTR-UpstreamStoryLab`
+> current main `7df7c80` with LF checkout. Read OTR GO_FORWARD "STORY LAB
+> RECOVERY BASE" and the top of HANDOFF_LOG. Use old `science_news` as the
+> control and current `scifi_news` as the challenger; do not start blank or edit
+> OTR story code concurrently. First make the typed ANNOUNCER opening introduce
+> story/place/time plus the real-news premise, and make the typed ANNOUNCER ending
+> summarize the source-backed news. Enforce opening music -> ANNOUNCER -> character
+> drama/optional script-requested music -> ANNOUNCER -> closing music. State your MODEL & CREDIT BUDGET rung first,
+> then the dated REVIEW ROUTING you actually read.
 
 ### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
 
@@ -2694,22 +2665,17 @@ Related and already shipped: `num_characters` is now a REQUEST rather than a cap
 
 ---
 
-## LEMMY IS PARKED AND GATED, 2026-08-12 (operator ruling -- CORRECTED)
+## LEMMY RUNS BEFORE THE SEVEN RENDER PROOFS (operator ruling 2026-08-13)
 
-The operator has a second window that originally coded Lemmy. When Lemmy is
-taken up, it goes THERE -- it holds the design context for chunks A2-A4, and the
-operator wants the Lemmy fixes well documented.
+This supersedes the 2026-08-12 "all sweeps first" gate. The operator wants the
+proven story/source-bank bugs fixed first, then Lemmy given a full fighting
+chance, then the seven remaining render legs run as post-change acceptance.
 
-**But it is NOT handed off yet.** Operator, 2026-08-12: *"I'm not handing Lemmy
-until your story fixes are done, all sweeps."* So this is a QUEUE, not a
-parallel split -- which is also the stricter reading of CLAUDE.md's one-coder-
-window rule, and avoids the concurrent-git hazard described at the end of this
-section entirely.
+The one-coder-window law still serializes every code edit. Lemmy is runway row 2,
+not a parallel window. Re-ground Phases 2-4 and PBUG-20260811-01/-02/-03 against
+the then-current tree, preserve the qualification-receipt contract, wire any new
+authority into `workflows/otr_canonical.json` atomically, and document each green
+chunk in `docs/HANDOFF_LOG.md` while removing it from this forward plan.
 
-**THE GATE, both parts:**
-1. the story-writer fixes are done (see "THE FABLE2 WRITER" above), and
-2. **all sweeps are done** -- the 21-lane 45-word render gate, both boots.
-
-Until both are met, the Lemmy window stays parked and this window is the only
-one in the code. The work list below is kept ready so the handoff costs nothing
-when the gate opens.
+The render runner must be recreated only after Lemmy is green. Its seven legs
+prove the code that will ship; no stale pre-Lemmy runner or prompt is admissible.
