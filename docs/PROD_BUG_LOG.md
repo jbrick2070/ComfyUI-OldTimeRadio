@@ -4357,3 +4357,250 @@ only visible because the cameo was FORCED and then did not appear.
 - status: FIXED and PROVEN 2026-08-14 -- the lab reports `act on 6 row(s),
   intent on 6, brief on 6, before 5, after 5` on every bank, and a
   production-shaped ledger returns `sight 11111 ok true`.
+
+## PBUG-20260815-01 -- the clean stage DELETES the source attribution it was never meant to touch
+
+- artifact: `signal_lost_reel_of_mystery_20260815_041350` (media_archive),
+  `signal_lost_midnights_ticktock_20260815_045020` (public_domain),
+  `signal_lost_ghost_of_elsinore_20260815_050626` (shakespeare). Overnight
+  six-bank gate, 2026-08-15.
+- symptom: operator on the archive episode -- *"What news story???"*. The
+  closing announcer said only *"Clarisse's gaze meets the reel's enigmatic
+  label"*.
+- what actually happened: `meta.ledger_clean.rows[b016].before` holds the
+  COMPOSED row -- an authored bridge, `": "`, then the factual close *"In other
+  news, the Library of Congress announces its film loans for the month,
+  including 'None But the Lonely Heart', 'Symphony of Swing', and 'The Man With
+  the Golden Arm'."* `.after`, and the row that shipped, is the drama alone.
+  **The entire source note was deleted by the clean stage.**
+- root cause: `nodes/_otr_ledger_clean.py` (shipped 2026-08-14) judges every
+  voiced row for "anything that is not speech" and has a MODEL rewrite what it
+  names. The closing announcer row carries a deterministic, PYTHON-OWNED fact
+  (`_otr_provenance.spoken_coda_line` output, or the interpreter's
+  `news_close_brief`), appended verbatim after an LLM bridge by
+  `_otr_line_composer._assemble_news_coda_surface:1441-1446`. The pass has no
+  concept of a protected component, so a model rewrote a fact Python owns.
+- consequence: the interpreter was NOT at fault -- `meta.news.news_close_brief`
+  is factual and correct in the artifact. On `midnights_ticktock` the ledger
+  still advertises `spoken_coda_source: "provenance"` and
+  `provenance_coda_line` still holds the original sentence, so the RECEIPT AND
+  THE SPOKEN ROW DISAGREE. Rewrite rate 9 of 14 voiced rows on all three.
+- why it shipped unnoticed: the clean stage was proven on
+  `scripts/otr_clean_stage_lab.py`, a planted-ledger measurement rig that never
+  runs the writer tail and therefore never composes a coda.
+- verify idea: for any ledger whose `meta` carries a Python-owned coda fact,
+  assert that fact appears byte-identically exactly once in the final announcer
+  row. Anchor on the durable meta value with `endswith`, NOT on a `": "` search
+  -- `_assemble_news_coda_surface` omits the separator entirely when the bridge
+  is empty (flag `news_coda_fact_only`).
+- bible-worthy: yes -- "a model-owned rewrite pass was given authority over a
+  field another owner writes deterministically". Generalizes well beyond OTR.
+- status: OPEN -- diagnosed, fix specified in
+  `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`, not yet landed.
+
+## PBUG-20260815-02 -- `scifi_news` dies at the pre-tail audit on the first row the clean stage repairs
+
+- artifact: overnight six-bank gate 2026-08-15,
+  `tmp/_bankgate_scifi_news.log:142` -- `CodexPreTailAuditError: line receipt
+  mismatch for l004`. Died at 13.6 min, AFTER writing.
+- root cause: `_otr_scifi_codex.py:4424` freezes `expected = {line_id: text}`
+  and `:4455` hands it to `_CodexTailFinalizer`. AFTER that,
+  `OTR_LedgerScriptWriter.py:6750` `run_ledger_clean` has a MODEL rewrite
+  `lines[].text` and `:6758` `run_ledger_cleanup` blanks unsayable rows
+  (`_otr_ledger_cleanup.py:256-263`). Only then, at `:6831`, does
+  `before_save` compare live text to the frozen snapshot
+  (`_otr_scifi_codex.py:3306-3308`). The receipt predates the clean stage and
+  was never taught it exists. Deterministic: the leg dies at whichever row the
+  clean stage repairs first.
+- proof it is the clean stage, not the act topology: server log `:25934` --
+  `l004 repaired -- judge named 2 segment(s)`; `l001`/`l002` shipped STILL
+  UNCLEAN (text untouched) and passed the audit. `l004` is the first row
+  actually rewritten and the first to fail. The plan's prime suspect was the
+  2026-08-15 act change from 8 to 12 beats, but `:25998` records **8 voiced
+  rows, not 12**, and the failure is at row 4, not past row 12.
+  **The act-topology hypothesis is falsified; the named revert experiment was
+  deliberately skipped rather than spending a live roll.**
+- the fix is wider than the error: review found the reseal spans FOUR surfaces
+  -- `_CodexTailFinalizer.expected` (`_proof` is expected-driven on both prongs
+  and `after_save` re-proofs at `:3364`), `meta.scifi_codex.accepted_lines`
+  (the full pre-clean TEXT dict), `meta.content_authorship` (stamped by BOTH
+  content-owned lanes, enforced fatally at `_otr_freeze_cascade.py:803` ->
+  `needs_full_rerun`), and the voiced-row coverage set.
+- SECOND DEFECT INSIDE THIS ONE: raising here kills a render after 13.6 minutes
+  of completed work, which violates the standing "a render must not die" rule.
+  The audit must reject the transaction, roll back, stamp a degradation receipt
+  and let the episode ship -- not raise.
+- verify idea: mutate a row WITH an owning receipt (must pass) and WITHOUT one
+  (must still fail); assert no render-path exception in either case.
+- bible-worthy: yes -- "an integrity snapshot taken upstream of a later
+  sanctioned mutator", plus "a post-generation audit whose only failure mode
+  destroys finished work".
+- status: OPEN -- diagnosed, fix specified, not yet landed.
+
+## PBUG-20260815-03 -- `scifi_news_pro` markup ladder exhausts because the terminal delimiter regex demands a period
+
+- artifact: overnight six-bank gate 2026-08-15. `Fable2ScriptError: pass
+  'script' failed after 4 attempt(s): markup ladder exhausted; last defects:
+  BAD_LINE_SHAPE: END (line 23) | MISSING_END`. Died at 3.3 min.
+- root cause: `nodes/_otr_fable2_markup.py:41` --
+  `_RE_END = re.compile(r"^END\.\s*$", re.IGNORECASE)` requires a LITERAL
+  PERIOD. The model wrote bare `END`, which falls past `_RE_END` (`:545`), past
+  `_RE_SPEAKER` (`:548`, which needs a colon), and lands on `BAD_LINE_SHAPE`
+  (`:552`) with detail `line[:80]` == `"END"`. Because `p.on_end` never fires,
+  `p.saw_end` stays False and `:566` adds `MISSING_END`. **Both reported
+  defects, one cause.**
+- reproduced deterministically offline against the real module: `END`, `end`,
+  `END ` (trailing space), `**END**` and `[END]` all fail; only `END.` passes.
+  A fixture whose terminal line is bare `END` produces exactly the live defect
+  pair; the same fixture with `END.` produces neither. Not length-dependent and
+  unrelated to the act-topology change.
+- the deeper defect: the ladder DOES repair
+  (`_otr_scifi_fable2.py:2180-2192` carries the rejected draft plus rendered
+  defects into the next turn) and still failed four times, because the message
+  the model receives says its END is malformed AND missing without ever stating
+  the required shape. A model cannot infer "add a period", so it re-emitted
+  `END` on every rung. **Any defect that reports WHAT IS WRONG without WHAT IS
+  REQUIRED is unrepairable by construction.**
+- verify idea: every accepted END form parses to one delimiter; every transport
+  defect detail contains the required shape; unpaired brackets and
+  content-bearing variants still fail LOUD.
+- bible-worthy: yes -- "a repair loop whose diagnostic names the offence but
+  never the required shape, so the model cannot converge".
+- status: OPEN -- diagnosed, fix specified, not yet landed. Ordering note: this
+  must NOT land before PBUG-20260815-02's reseal, or the lane clears the ladder
+  and then dies at the freeze cascade instead.
+
+## PBUG-20260815-04 -- the public_domain cast is gender-INVERTED because the unit has no provenance sidecar
+
+- artifact: `signal_lost_midnights_ticktock_20260815_045020` (public_domain).
+  Operator heard GERTRUDE DEMONGMORENCI MCFIGGIN speak with a male voice.
+- measured, not inferred: each character's own line windows were sliced from
+  the delivered master (`start_s`/`dur_s`, windows verified contiguous and
+  non-overlapping) and median F0 taken per line. GERTRUDE, a woman, renders
+  MALE on all six of her lines (111.9 / 112.4 / 105.0 / 111.1 / 110.1 / 107.5
+  Hz). **LORD RONALD, a man, renders FEMALE on all six of his** (279.1 / 233.0
+  / 186.0 / 241.3 / 281.5 / 269.7 Hz) -- a second instance the operator did not
+  report. The pair is RECIPROCALLY INVERTED, which is the signature of a blind
+  roll rather than a bad pin. Audible in the script itself: the male-voiced
+  character is addressed *"Miss McFiggins"* and the female-voiced one
+  *"Lord Ronald"*.
+- root cause: `cast_source_contract.gender_by_name` is `{}` while
+  `character_names` lists all five source characters, because
+  `config/source_banks/public_domain_story/sources/gertrude_governess.provenance.json`
+  DOES NOT EXIST. Exactly one `.provenance.json` sidecar exists for 65 `.txt`
+  units. With no roster the pin map is empty and the 40/40/20 largest-remainder
+  roll stands.
+- why nothing downstream caught it: both slots are `source_owned`, and
+  `_repair_ensemble_names` EXEMPTS source-owned slots by design
+  (`_otr_casting.py:682-684`) -- correctly, since renaming Sir Toby to satisfy a
+  coherence rule loses the character. And `gender_of_first_name("GERTRUDE ...")`
+  returns `unknown` anyway; the first-name pools carry 98 male names against 24
+  female.
+- everything BELOW the gender decision is correct, and this was verified rather
+  than assumed: the voice picker honoured the tags faithfully
+  (`vz_bill_boerst`, bank label male, measured 126 Hz, to the male slot;
+  `vz_donor_glenn`, bank label female, measured 313.9 Hz, to the female slot),
+  and the whole voice reference bank audits clean -- 41 references measured,
+  ZERO label disagreements, males 89-146 Hz against females 155-314 Hz.
+  **No voice-bank relabelling is needed.**
+- verify idea: for any adaptation-lane episode, assert
+  `cast_source_contract.gender_by_name` is non-empty and that every
+  source-named character resolves; separately, a corpus gate that every manifest
+  unit has a sidecar carrying a total `characters[]` roster.
+- bible-worthy: yes -- "an armed consumer with no producer": the render path
+  knew how to read a roster fact that vendor time never wrote for 64 of 65
+  units.
+- status: OPEN -- diagnosed. Fix is the vendor-time stamper already specified in
+  `docs/2026-08-05-character-gender-ladder-SPEC.md`, never built.
+
+## PBUG-20260815-05 -- the episode title names a DIFFERENT play from the one it adapted
+
+- artifact: `signal_lost_tempests_midnight_revelations_20260815_034337`
+  (shakespeare). Operator: *"Is this Tempest or Macbeth? mixup??"*
+- finding: the episode is Macbeth end to end -- cast `MACBETH` / `BANQUO`,
+  `meta.source_ref "folger-macbeth:act1-scene3-witches"`,
+  `meta.source_meta.play_title "Macbeth"`, music cue "Scottish moor, midnight
+  sky". **Scene selection is CORRECT and is not the defect.**
+- root cause: `meta.title_source == "llm_post_composition"`.
+  `_generate_title_from_script` (`OTR_LedgerScriptWriter.py:1349-1526`, called
+  `:6293-6305`) builds its prompt from dialogue excerpts, `outline.premise`, an
+  empty `arc_verdict` and a generic bank label. **`source_meta`, `play_title`,
+  `play_code` and `source_ref` are never passed in.** The model free-associated
+  "Tempest" from the scene's genuine storm sound-world -- and "The Tempest" is a
+  DIFFERENT play living in the same curated-scene manifest
+  (`config/source_banks/shakespeare/curated_scenes.sample.json:27-49`).
+- consequence: a FIDELITY defect on the lane where fidelity outranks arc.
+- verify idea: the rendered title must not contain another configured work
+  title. Regression fixture: a Macbeth scene must not title as Tempest. The
+  check is CODE-side -- the craft rule forbids naming the feared failure in a
+  prompt, so no forbidden example may enter the model's context.
+- bible-worthy: yes -- "a naming pass blind to the identity it is naming, in a
+  catalog where a sibling's name is a plausible free association".
+- status: OPEN -- diagnosed, fix specified, not yet landed.
+
+## PBUG-20260815-06 -- `media_archive` retells the newest feed post forever
+
+- artifact: live RSS lane, verified in code and confirmed by the overnight gate
+  artifacts.
+- root cause: `nodes/_otr_media_archive_sources.py:221` --
+  `return payloads[_configured_index() % len(payloads)]`, where
+  `_configured_index()` (`:191-196`) reads `OTR_MEDIA_ARCHIVE_ITEM_INDEX` and
+  defaults to `"0"`. Feed entries arrive newest-first, so absent an
+  operator-set env var the lane always adapts the newest post. No dedup, no
+  ranking, no history, no recording anywhere in the module.
+- **that selection path has no test at all** -- verified by grep across
+  `tests/`.
+- prerequisite nobody had stated: the post's own headline is never stamped
+  durably. `_otr_source_payload.py:585-621` builds `source_meta` as feed
+  label / url / date only, and `news_seed_receipt` is never passed for this lane
+  (`:698-701`), so `_stamp_news_seed_receipt` early-returns
+  (`OTR_LedgerScriptWriter.py:1683-1685`). So "name the post it adapted" cannot
+  be built from today's meta; the headline must be stamped at SELECTION time.
+- verify idea: two consecutive runs with a stable feed must not select the same
+  post; the selected headline must be present in durable meta.
+- bible-worthy: probably -- "a live feed consumed by a constant index", a cheap
+  and very portable check.
+- status: OPEN -- diagnosed, fix specified, not yet landed.
+
+## PBUG-20260815-07 -- the `original`-lane voice-gender report, INVESTIGATED AND NOT REPRODUCED
+
+- artifact: `signal_lost_kindling_the_past_20260815_043118` (bank `original`).
+  Reported alongside PBUG-20260815-04 as a second voice-gender instance:
+  JULIANA SIMPSON speaking with a male voice.
+- measured: JULIANA renders FEMALE on all six of her lines (229.7 / 220.7 /
+  300.0 / 222.2 / 248.1 / 212.9 Hz), and every recorded field agrees -- ledger
+  `gender` and `presentation_gender` both `female`, Bark preset
+  `v2/en_speaker_4` classified female in `config/cast_pools.py:263`, and the
+  indextts2 reference `vz_donor_glenn` measured at 313.9 Hz.
+- a routing hypothesis was raised in review -- that pooled F0 could hide a
+  speaker-to-slice routing fault, so the wrong audio might have been measured.
+  Investigated PER LINE: windows are contiguous and non-overlapping and every
+  one of Juliana's six lines measures 212-300 Hz. **Refuted.**
+- recorded so nobody re-chases it: the invented lanes roll gender freely and
+  that is correct design; `_repair_ensemble_names` already repairs name/gender
+  incoherence there (probe: `JULIANA SIMPSON` rolled male repairs to
+  `DANIEL SIMPSON`).
+- status: REJECTED -- not a defect on this artifact. See PBUG-20260815-08 for
+  the real defect found in the same episode.
+
+## PBUG-20260815-08 -- a character record carries a DIFFERENT character's name in its description and speech signature
+
+- artifact: `signal_lost_kindling_the_past_20260815_043118` (bank `original`),
+  cast row `c02`.
+- symptom: `name` is `"TARIQ SCOTT"`, but `character_description` reads
+  *"40s, HENRY BARTEL, Seasoned Craftsman..."* and `speech_signature` reads
+  *"Henry's sentences often begin with a pause..."*. A stale, different name is
+  baked into the record that the description LLM, the portrait prompt and the
+  dialogue cast block all read.
+- found while investigating PBUG-20260815-07; the sibling row `c03` shows no
+  such artifact, so this is a per-row desync rather than a lane-wide fault.
+- consequence: identity drift across surfaces. `slot.gender` and the character
+  name feed the description LLM, the outline prompt, the dialogue cast block
+  (`_otr_line_composer.py:447,469`) and the image prompt's gender anchor
+  (`otr_meta_brief_image_prompt.py:78-90`), so a record naming two different
+  people can move both script and portrait.
+- verify idea: a character-record invariant -- canonical name, description
+  subject, speech signature, caption identity and voice mapping must all agree
+  before rendering.
+- bible-worthy: yes -- "a renamed entity whose derived text kept the old name".
+- status: OPEN -- diagnosed, not yet scoped into a chunk.
