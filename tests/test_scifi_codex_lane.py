@@ -304,6 +304,7 @@ def _run_lane(
     state = state if state is not None else {}
     state.update(
         trace=[], retry_flags=[], p3_calls=0, p5_calls=0, assemble_calls=0,
+        line_cursor=0,
     )
 
     def creative_fn(*_args, **_kwargs) -> str:
@@ -343,18 +344,32 @@ def _run_lane(
                 kwargs["artifact_inputs"]["advisory_word_plan"]
             )
             result = _score_draft(advisory)
-        elif pass_id == "P5":
-            result = lane.ScriptTextDraftV4(
-                lines=[
-                    lane.ScriptTextDraftLineV4(
-                        line_id=row["line_id"],
-                        text=line_text(row["line_id"], index),
-                    )
-                    for index, row in enumerate(
-                        kwargs["artifact_inputs"]["accepted_line_graph"]
-                    )
-                ]
-            )
+        elif pass_id == "P5B":
+            # PBUG-20260814-03: the dialogue job is ONE BEAT now. The index
+            # handed to `line_text` stays global so a caller that varies text
+            # per line still sees a stable sequence across the episode.
+            beat_line_ids = kwargs["artifact_inputs"]["this_beat"]["line_ids"]
+            rows = []
+            for line_id in beat_line_ids:
+                rows.append(lane.ScriptTextDraftLineV4(
+                    line_id=line_id,
+                    text=line_text(line_id, state["line_cursor"]),
+                ))
+                state["line_cursor"] += 1
+            result = lane.BeatTextDraftV4(lines=rows)
+        elif pass_id == "P5R":
+            # The reviewer that finds nothing to fix: it returns the scene's
+            # rows exactly as it received them.
+            text_by_id = {
+                row["line_id"]: row["text"]
+                for row in kwargs["artifact_inputs"]["scene_rows"]
+            }
+            result = lane.SceneReviewDraftV4(lines=[
+                lane.ScriptTextDraftLineV4(
+                    line_id=line_id, text=text_by_id[line_id],
+                )
+                for line_id in kwargs["artifact_inputs"]["scene_line_ids"]
+            ])
         elif pass_id == "P6":
             # The closing announcer read is its own pass (PBUG-20260814-02).
             # The fake index carries no entities or figures, so the
@@ -440,6 +455,23 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
     state = _run_lane(monkeypatch, tmp_path)
 
     observed = [row[:4] for row in state["trace"]]
+    score = state["p3_score"]
+    # PBUG-20260814-03: the script schedule is DERIVED, not a constant. One
+    # dialogue job per accepted beat, one review job per scene -- so it is a
+    # function of what the score planned and of nothing else. Building the
+    # expectation from the score is the point: a hard-coded list would still
+    # pass if the schedule silently stopped following the graph.
+    script_passes = []
+    for scene in score.scenes:
+        for _beat in scene.beats:
+            script_passes.append((
+                "P5B", "creative", ("codex_play_system",),
+                lane.BeatTextDraftV4,
+            ))
+        script_passes.append((
+            "P5R", "creative", ("codex_play_system",),
+            lane.SceneReviewDraftV4,
+        ))
     assert observed == [
         (
             "P0",
@@ -465,12 +497,7 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
             ("codex_radio_score_system", "codex_coda_contract_system"),
             lane.RadioScoreDraftV4,
         ),
-        (
-            "P5",
-            "creative",
-            ("codex_play_system", "codex_coda_contract_system"),
-            lane.ScriptTextDraftV4,
-        ),
+        *script_passes,
         # PBUG-20260814-02: the coda seam stopped being decoration glued onto
         # two other prompts and became a pass that owns one job.
         (
@@ -483,12 +510,26 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
     assert state["trace"][0][4] is state["technical_fn"]
     assert all(row[4] is state["creative_fn"] for row in state["trace"][1:])
     assert state["retry_flags"] == [
-        ("P0", True), ("P1", True), ("P2", True), ("P3", True), ("P5", True),
+        ("P0", True), ("P1", True), ("P2", True), ("P3", True),
+        # A dialogue or review draft that misses its closed row set or speaks
+        # markup IS malformed, so those stay rerollable exactly as the
+        # whole-play pass was.
+        *[(row[0], True) for row in script_passes],
         # P6 does NOT reroll. A coda that does not name its source is a good
         # draft missing one thing, so the verifier triggers a CLEAN told what
         # was wrong -- never a cold redraw (operator ruling 2026-08-14).
         ("P6", False),
     ]
+    schedule = state["meta"]["scifi_codex"]["call_journal"]["script_schedule"]
+    assert schedule["shape"] == "per_beat_dialogue_then_scene_review"
+    assert schedule["beat_dialogue_jobs"] == sum(
+        len(scene.beats) for scene in score.scenes
+    )
+    assert schedule["scene_review_jobs"] == len(score.scenes)
+    assert schedule["beat_dialogue_max_new_tokens"] == \
+        lane._BEAT_TEXT_MAX_OUTPUT_TOKENS
+    assert schedule["scene_review_max_new_tokens"] == \
+        lane._SCENE_REVIEW_MAX_OUTPUT_TOKENS
     assert state["p3_calls"] == state["p5_calls"] == 1
     assert state["p3_max_new_tokens"] is None
     assert state["p3_score"] is state["p5_score"] is state["assembled_score"]

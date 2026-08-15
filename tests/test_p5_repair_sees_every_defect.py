@@ -384,12 +384,18 @@ def test_raw_scan_is_clean_when_every_owned_row_is_clean():
 # --------------------------------------------------------------------------
 
 class _LadderProbe(Exception):
-    """Aborts the P5 ladder once the post_validator has been exercised."""
+    """Aborts the script schedule once a post_validator has been exercised."""
 
 
 def _capture_validator(monkeypatch, candidate):
-    """Run the P5 ladder far enough to call its post_validator on
-    `candidate`, and return what the validator said."""
+    """Run the script schedule far enough to call the FIRST post_validator on
+    `candidate`, and return what the validator said.
+
+    Since PBUG-20260814-03 the first job is the per-beat dialogue pass rather
+    than one whole-play call, so this exercises `validate_beat`. The property
+    under test did not move: whatever is wrong with the rows, the one typed
+    repair shot has to be told all of it at once.
+    """
     said: dict[str, object] = {}
 
     def fake_invoke(**kwargs):
@@ -402,63 +408,100 @@ def _capture_validator(monkeypatch, candidate):
             slot_fn=lambda *a, **k: "",
             pack=SimpleNamespace(),
             artifact_inputs={},
-            score=_score_stub({"l001": "character", "l002": "character"}),
+            score=_a6_score(),
             cast=_cast_stub(),
-            max_new_tokens=None,
             call_journal={},
         )
     return said["error"]
 
 
-def test_compile_refusal_carries_the_markup_findings_with_it(monkeypatch):
-    """THE live bug. The draft both misses the graph and speaks markup; the
-    repair must be told both, because it only gets one turn."""
-    def refuse(_draft, _score):
-        raise lane.CodexGraphError(
-            "P5 compact draft line IDs do not exactly cover the accepted "
-            "graph (missing=[], unknown=['l011'])"
-        )
+def test_a_row_set_that_misses_the_beat_and_speaks_markup_reports_both():
+    """THE live bug, at the beat.
 
-    monkeypatch.setattr(lane, "compile_script_text_draft", refuse)
-    candidate = lane.ScriptTextDraftV4(lines=[
-        {
-            "line_id": "l001",
-            "text": "(SFX: gun beside the keyboard)",
-        },
-        {"line_id": "l002", "text": "A clean spoken line."},
-        {"line_id": "l011", "text": "An invented row."},
-    ])
-    error = _capture_validator(monkeypatch, candidate)
-    assert error is not None
-    assert "do not exactly cover the accepted graph" in error
-    assert "l001: spoken text is production markup" in error
-    # The word inside the markup is no longer a second finding (content
-    # findings retired 2026-08-05); the MARKUP finding is what must ride along.
-    assert "weapon" not in error
+    It used to be a compile refusal hiding a markup defect behind it: the
+    repair obeyed the only complaint it was given, re-emitted the markup, and
+    the ladder was spent. The per-beat validator reports the closed-set miss
+    and every offending row together, so the one repair shot can fix all of
+    it.
+    """
+    rows = lane.BeatTextDraftV4(lines=[
+        {"line_id": "l001", "text": "(SFX: static over the receiver)"},
+        {"line_id": "l002", "text": "An invented row."},
+    ]).lines
+    findings = lane._closed_rows_findings(
+        rows, ["l001"], lane._spoken_label_pattern(_cast_stub()),
+        label="b001",
+    )
+    joined = "; ".join(findings)
+    assert "do not exactly cover the closed set" in joined
+    assert "unknown=['l002']" in joined
+    assert "l001: spoken text is production markup" in joined
 
 
-def test_compile_refusal_alone_stays_bare_when_the_rows_are_clean(monkeypatch):
-    def refuse(_draft, _score):
-        raise lane.CodexGraphError("P5 compact draft has duplicate line IDs")
+def test_a_clean_row_set_that_misses_the_beat_reports_only_the_miss():
+    rows = lane.BeatTextDraftV4(lines=[
+        {"line_id": "l002", "text": "A quiet signal crosses the observatory."},
+    ]).lines
+    findings = lane._closed_rows_findings(
+        rows, ["l001"], lane._spoken_label_pattern(_cast_stub()),
+        label="b001",
+    )
+    assert len(findings) == 1
+    assert "missing=['l001'], unknown=['l002']" in findings[0]
 
-    monkeypatch.setattr(lane, "compile_script_text_draft", refuse)
-    candidate = lane.ScriptTextDraftV4(lines=[
-        {"line_id": "l001", "text": "A quiet signal crosses the observatory."},
-    ])
-    error = _capture_validator(monkeypatch, candidate)
-    assert error == "P5 compact draft has duplicate line IDs"
+
+def test_a_duplicated_row_id_is_its_own_finding():
+    rows = lane.BeatTextDraftV4(lines=[
+        {"line_id": "l001", "text": "The receiver is stable."},
+        {"line_id": "l001", "text": "The receiver is stable."},
+    ]).lines
+    findings = lane._closed_rows_findings(
+        rows, ["l001"], lane._spoken_label_pattern(_cast_stub()),
+        label="b001",
+    )
+    assert any("duplicate line IDs ['l001']" in row for row in findings)
+
+
+def test_a_row_defective_only_after_cleaning_is_still_rerollable():
+    """The canonical surface is judged where a finding can still reroll.
+
+    The whole-play pass validated raw AND canonical text. Per beat,
+    canonicalization happens once every beat is in -- far too late to reroll
+    -- so the canonical check moved into the per-beat validator rather than
+    being dropped.
+    """
+    rows = lane.BeatTextDraftV4(lines=[
+        {"line_id": "l001", "text": "[breath catches] (a long pause)"},
+    ]).lines
+    findings = lane._closed_rows_findings(
+        rows, ["l001"], lane._spoken_label_pattern(_cast_stub()),
+        label="b001",
+    )
+    assert findings == [
+        "l001: spoken text cleans to an empty spoken surface",
+    ]
+
+
+def _rows_json(*pairs) -> str:
+    """The wire shape shared by every row-drafting job on this lane.
+
+    BeatTextDraftV4, SceneReviewDraftV4 and ScriptTextDraftV4 all serialize to
+    {"lines":[{"line_id":...,"text":...}]}, so one helper feeds whichever job
+    the schedule is on.
+    """
+    return lane.ScriptTextDraftV4(
+        lines=[{"line_id": lid, "text": text} for lid, text in pairs],
+    ).model_dump_json()
 
 
 def test_cleanup_empty_surface_runs_real_p5_reauthor_rung():
     bad_text = "[breath catches] (a long pause)"
     good_text = "The signal is still there."
     responses = [
-        lane.ScriptTextDraftV4(
-            lines=[{"line_id": "l001", "text": bad_text}],
-        ).model_dump_json(),
-        lane.ScriptTextDraftV4(
-            lines=[{"line_id": "l001", "text": good_text}],
-        ).model_dump_json(),
+        _rows_json(("l001", bad_text)),
+        _rows_json(("l001", good_text)),
+        # The scene review that follows the beat and finds nothing to fix.
+        _rows_json(("l001", good_text)),
     ]
     calls = []
 
@@ -476,12 +519,11 @@ def test_cleanup_empty_surface_runs_real_p5_reauthor_rung():
         artifact_inputs={},
         score=_a6_score(),
         cast=_a6_cast(),
-        max_new_tokens=None,
         call_journal=journal,
     )
 
     assert [call[0] for call in calls] == pytest.approx([
-        .72, structured_call._REPAIR_TEMPERATURE,
+        .72, structured_call._REPAIR_TEMPERATURE, .52,
     ])
     assert structured_call._REPAIR_TEMPERATURE != pytest.approx(.32)
     assert script.lines[0].text == good_text
@@ -514,10 +556,8 @@ def test_defective_p5_candidate_is_abandoned_for_fresh_divergent_fiction(
     accepted_text = (
         "Far from the receiver, a gardener teaches moonflowers to sing."
     )
-    accepted = lane.ScriptTextDraftV4(
-        lines=[{"line_id": "l001", "text": accepted_text}],
-    ).model_dump_json()
-    responses = [rejected, rejected, accepted]
+    accepted = _rows_json(("l001", accepted_text))
+    responses = [rejected, rejected, accepted, accepted]
     prompts = []
 
     def slot(messages, **_kwargs):
@@ -534,14 +574,14 @@ def test_defective_p5_candidate_is_abandoned_for_fresh_divergent_fiction(
         artifact_inputs={},
         score=_a6_score(),
         cast=_a6_cast(),
-        max_new_tokens=None,
         call_journal=journal,
     )
 
     assert script.lines[0].text == accepted_text
-    assert len(prompts) == 3
+    # Two beat cycles (the rejected one is abandoned) plus the scene review.
+    assert len(prompts) == 4
     assert [entry["status"] for entry in journal["calls"]] == [
-        "failed", "accepted",
+        "failed", "accepted", "accepted",
     ]
     assert "writer_retry" in prompts[2][1]["content"]
     assert "REJECTED_PROSE" not in prompts[2][1]["content"]
@@ -553,13 +593,9 @@ def test_canonicalization_defect_retires_candidate_before_acceptance(
     monkeypatch.setattr(lane, "_poll_processing_interrupt", lambda: None)
     rejected_text = "OTHER: Ada Sterling: The signal is clear."
     accepted_text = "The signal is clear, and the receiver is stable."
-    rejected = lane.ScriptTextDraftV4(
-        lines=[{"line_id": "l001", "text": rejected_text}],
-    ).model_dump_json()
-    accepted = lane.ScriptTextDraftV4(
-        lines=[{"line_id": "l001", "text": accepted_text}],
-    ).model_dump_json()
-    responses = [rejected, rejected, accepted]
+    rejected = _rows_json(("l001", rejected_text))
+    accepted = _rows_json(("l001", accepted_text))
+    responses = [rejected, rejected, accepted, accepted]
     prompts = []
 
     def slot(messages, **_kwargs):
@@ -576,14 +612,13 @@ def test_canonicalization_defect_retires_candidate_before_acceptance(
         artifact_inputs={},
         score=_a6_score(),
         cast=_a6_cast(),
-        max_new_tokens=None,
         call_journal=journal,
     )
 
     assert script.lines[0].text == accepted_text
-    assert len(prompts) == 3
+    assert len(prompts) == 4
     assert [entry["status"] for entry in journal["calls"]] == [
-        "failed", "accepted",
+        "failed", "accepted", "accepted",
     ]
     assert "starts with a role label" in str(prompts[1])
 
@@ -595,11 +630,12 @@ def test_without_empty_surface_finding_cleanup_would_skip_the_line(monkeypatch):
 
     def slot(_messages, **_kwargs):
         calls.append(True)
-        if len(calls) > 1:
+        # Two calls is the clean schedule: the beat, then its scene review. A
+        # THIRD would mean the empty-surface finding fired and forced a
+        # re-author, which is exactly what this counterfactual removes.
+        if len(calls) > 2:
             pytest.fail("counterfactual P5 unexpectedly tried to re-author")
-        return lane.ScriptTextDraftV4(
-            lines=[{"line_id": "l001", "text": bad_text}],
-        ).model_dump_json()
+        return _rows_json(("l001", bad_text))
 
     accepted = lane._call_script_text_draft(
         slot_fn=slot,
@@ -610,10 +646,9 @@ def test_without_empty_surface_finding_cleanup_would_skip_the_line(monkeypatch):
         artifact_inputs={},
         score=_a6_score(),
         cast=_a6_cast(),
-        max_new_tokens=None,
         call_journal={},
     )
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert accepted.lines[0].text == bad_text
 
     row = accepted.lines[0].model_dump(mode="json")
@@ -635,7 +670,7 @@ def test_without_empty_surface_finding_cleanup_would_skip_the_line(monkeypatch):
 
 def test_validator_still_refuses_a_non_draft_result(monkeypatch):
     error = _capture_validator(monkeypatch, SimpleNamespace())
-    assert error == "P5 compact result is not a ScriptTextDraftV4"
+    assert error == "beat dialogue result is not a BeatTextDraftV4"
 
 
 if __name__ == "__main__":

@@ -4266,6 +4266,48 @@ only visible because the cameo was FORCED and then did not appear.
 - contract violated: the sealed ledger holds announcer speech, character dialogue
   and music cues -- never a stage direction, action row, narration or delivery
   note. Every sealed line becomes TTS audio.
-- status: OPEN -- artifact-verified, not yet fixed. Fix direction is per-beat
-  dialogue plus an act-review pass; the repair must be a MODEL pass (code may
-  detect and explain, never rewrite prose).
+- fix (2026-08-14): the dialogue job is ONE BEAT now, and each scene is read
+  back before anything downstream. `_call_script_text_draft` kept its name and
+  its place in the lane but stopped being a single call; it is the schedule.
+  * **Per scene: one `P5B` dialogue job per accepted beat, then one `P5R`
+    review job.** The score's SCENE is this lane's act-sized unit. `act_count`
+    still shapes the beat topology upstream and nothing here acquired a length
+    target of any kind -- the beat count is the model's own answer to the score
+    job, never a quota.
+  * **The WINDOW is the fix, not the loop.** A beat job is handed this beat's
+    intent/speaker/arc/facts, the spine of the scene it sits in, and
+    `rows_so_far` -- what the listener has already heard -- so the writer
+    answers the line before this one. It is NOT handed the accepted line
+    graph; handing the model every row is what produced a summary.
+  * **The review may rewrite, and may not add, drop or renumber.** It reads
+    the scene's spine, beats and accepted rows and returns them unchanged or
+    rewritten against the spine. Code detects and explains; a model rewrites.
+    Review asks whether the scene plays; the per-beat validator already asks
+    whether it can be sealed -- one prompt answering both answers neither.
+  * **The next scene is written against what the review LEFT**, not against
+    the draft it replaced.
+  * **Per-job decode budgets ship in the same change**, because they are the
+    same change: a beat needs a fraction of an act, so a right-sized budget
+    stops the guard binding on honest work. `_BEAT_TEXT_MAX_OUTPUT_TOKENS`
+    (2 lines) and `_SCENE_REVIEW_MAX_OUTPUT_TOKENS` (a scene) replace the
+    whole-provider-window reservation. Right-size the job; never raise the
+    guard -- no guard was touched.
+  * **The beat's ARRAY ceiling is the beat's own**, not the script's. An
+    unenforced array ceiling is the root cause of PBUG-20260729-02; a job that
+    can legally emit two rows cannot run away into twenty-four.
+  * **Everything downstream is unchanged on purpose.** The accepted rows are
+    assembled into the same `ScriptTextDraftV4` the whole-play pass used to
+    return, then compiled, canonicalized and validated by exactly the same
+    code. The canonical-surface hygiene check moved INTO the per-beat
+    validator, where a finding can still reroll -- per beat, canonicalization
+    happens once every beat is in, which is far too late.
+  * One prompt per job for every model tier: both jobs use the lane's existing
+    `codex_play_system` seam. The JOB SIZE changed; the prompt text did not.
+  * Coverage: `tests/test_codex_per_beat_dialogue.py` (12 tests) plus the
+    DERIVED schedule assertion in `tests/test_scifi_codex_lane.py` -- built
+    from the accepted score rather than hard-coded, so a schedule that stopped
+    following the graph goes red. `nodes/story_packs/pipelines.json` declares
+    both passes.
+- status: FIXED 2026-08-14 in code. **The published-artifact proof is a
+  separate act:** only a generated episode shows whether the ledger is
+  dialogue rather than narration, and that read is recorded in the handoff.

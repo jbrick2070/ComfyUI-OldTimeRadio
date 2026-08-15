@@ -27,6 +27,19 @@ down to the two defects below.
 
 ### The two big misses -- production still has both
 
+**MISS 1's ROOT CAUSE IS FIXED ON `scifi_news` -- 2026-08-14,
+`PBUG-20260814-03` closed in code.** The dialogue job is ONE BEAT now, and each
+scene is read back by a review pass before anything downstream. Per scene: one
+`P5B` job per accepted beat, then one `P5R` review. The window is the fix --
+a beat job sees its own intent, its scene's spine, and `rows_so_far`, never the
+whole line graph, so the writer answers the line before this one instead of
+averaging an act into a summary. The review may rewrite against the spine and
+may not add, drop or renumber. Per-job decode budgets shipped in the same
+change, because they are the same change: right-size the job, never raise the
+guard. **What is NOT yet proven:** only a generated episode shows whether the
+ledger reads as dialogue. The code change is the hypothesis; the story is the
+evidence.
+
 **MISS 1 -- CHARACTER ACTION IS BLEEDING INTO THE DIALOGUE.** Rows that should
 contain nothing but spoken words are carrying stage business: what a character
 does, how a line is delivered, what is heard. Every sealed line becomes TTS

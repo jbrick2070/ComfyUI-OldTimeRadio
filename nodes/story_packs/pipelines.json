@@ -402,13 +402,20 @@
           "description": "Builds scenes, shots, beats, music cues, fact placements, and advisory beat-length centers."
         },
         {
-          "pass_id": "P5_first_play",
+          "pass_id": "P5B_beat_dialogue",
           "slot": "creative",
           "seam_refs": [
-            "codex_play_system",
-            "codex_coda_contract_system"
+            "codex_play_system"
           ],
-          "description": "Writes the sole compact closed {line_id,text} spoken artifact. The creative structured ladder repairs only malformed schema or closed graph/roster IDs."
+          "description": "One job per accepted beat. Writes that beat's closed {line_id,text} rows against the scene spine, the beat's own intent, and the rows already accepted, so the writer answers the line before it. Replaced the single whole-play call, which returned a summary of a play rather than a play. Carries its own decode budget; the beat's array ceiling is the beat's, not the script's."
+        },
+        {
+          "pass_id": "P5R_scene_review",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_play_system"
+          ],
+          "description": "One job per scene, between the last beat's dialogue and anything downstream. Reads the scene's spine, beats and accepted rows and returns them unchanged or rewritten against the spine. Review asks whether the scene plays; the per-beat validator already asks whether it can be sealed. Code never edits prose."
         },
         {
           "pass_id": "P6_news_coda",

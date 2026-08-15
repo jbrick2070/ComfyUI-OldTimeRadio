@@ -848,6 +848,102 @@ class ScriptTextDraftV4(_Strict):
     )
 
 
+class BeatTextDraftV4(_Strict):
+    """ONE beat's spoken rows -- the unit the dialogue job now writes.
+
+    PBUG-20260814-03. This lane used to ask for the whole play in a single
+    call: up to twenty-four rows in one reply. What came back was a SUMMARY of
+    a play rather than a play -- the published 2026-08-13 ledger is narrated
+    third-person prose with the dialogue quoted inside it, so TTS read stage
+    directions on air. The operator's diagnosis, written before that artifact
+    was read: "A model asked for one beat writes that beat. A model asked for a
+    whole act writes a summary of one."
+
+    The array ceiling is the beat's own, not the script's. That is not
+    cosmetic: an unenforced array ceiling is the exact root cause of
+    PBUG-20260729-02, where the model never stopped adding lines. A job that
+    can legally emit two rows cannot run away into twenty-four.
+    """
+
+    lines: list[ScriptTextDraftLineV4] = Field(
+        min_length=1, max_length=_RADIO_SCORE_MAX_LINES_PER_BEAT,
+    )
+
+
+class SceneReviewDraftV4(_Strict):
+    """One scene's rows, returned unchanged or rewritten against its spine.
+
+    The review job. It reads the scene's spine, its beats and every row just
+    accepted, and answers one question -- does this play? Code never edits
+    prose; a model does, which is what makes this legal under the standing
+    rule and what makes it able to fix a scene rather than reroll it.
+
+    Deliberately NOT merged with the spoken-text hygiene the per-beat
+    validator already applies: review is about whether the scene is any good,
+    hygiene is about whether it can be sealed. One prompt answering two
+    unrelated questions answers neither well.
+    """
+
+    lines: list[ScriptTextDraftLineV4] = Field(
+        min_length=1,
+        max_length=(
+            _RADIO_SCORE_MAX_BEATS_PER_SCENE * _RADIO_SCORE_MAX_LINES_PER_BEAT
+        ),
+    )
+
+
+#: RIGHT-SIZE THE JOB, NEVER RAISE THE GUARD (operator direction 2026-08-14).
+#: The runaway guards stay exactly where they are; what changes is that an
+#: honest job no longer has to reach anywhere near them. A spoken line is the
+#: size of one thought -- the measured corpus behind the authored-string
+#: ceiling runs 8-177 characters with p95s of 12-281 -- so 512 tokens is
+#: roughly 2,000 characters for ONE line, seven times the widest p95 and far
+#: beyond anything this topology can perform. It bounds the cost of a
+#: degenerate call; it is not a length authority over the writing.
+_BEAT_TEXT_TOKENS_PER_LINE = 512
+
+#: The JSON scaffolding around the rows: root key, per-row keys, quoting and
+#: punctuation. Generous, because underrunning this would truncate a legitimate
+#: reply and that failure mode is far worse than a few spare tokens.
+_ROW_DRAFT_ENVELOPE_TOKENS = 128
+
+_BEAT_TEXT_MAX_OUTPUT_TOKENS = (
+    _RADIO_SCORE_MAX_LINES_PER_BEAT * _BEAT_TEXT_TOKENS_PER_LINE
+    + _ROW_DRAFT_ENVELOPE_TOKENS
+)
+
+_SCENE_REVIEW_MAX_OUTPUT_TOKENS = (
+    _RADIO_SCORE_MAX_BEATS_PER_SCENE
+    * _RADIO_SCORE_MAX_LINES_PER_BEAT
+    * _BEAT_TEXT_TOKENS_PER_LINE
+    + _ROW_DRAFT_ENVELOPE_TOKENS
+)
+
+_BEAT_TEXT_DRAFT_ROOT_INSTRUCTION = (
+    "\nBEAT DIALOGUE CONTRACT: You are writing ONE BEAT, not the play. Return "
+    "one JSON object with exactly one root key, lines. Each lines item has "
+    "exactly line_id and text. Emit every and only the line_id listed in "
+    "this_beat.line_ids, once each, in the listed order. The text is what the "
+    "speaker SAYS OUT LOUD and nothing else -- no action, no stage direction, "
+    "no delivery note, no narration, no speaker label, no quotation marks "
+    "around the whole line. Write into the moment: rows_so_far is what the "
+    "listener has already heard, so answer the line before this one. Python "
+    "owns every other field."
+)
+
+_SCENE_REVIEW_ROOT_INSTRUCTION = (
+    "\nSCENE REVIEW CONTRACT: You are reading one scene that has just been "
+    "written, beat by beat, and deciding whether it plays. Return one JSON "
+    "object with exactly one root key, lines, carrying every and only the "
+    "line_id listed in scene_line_ids, once each, in the listed order. Return "
+    "a row UNCHANGED when it is already right. Rewrite a row against the "
+    "scene spine when the scene sags, repeats itself, or two speakers merely "
+    "agree. Every text is still pure speech: no action, no stage direction, "
+    "no delivery note, no narration, no speaker label. Do not add or remove "
+    "rows, and do not renumber them."
+)
+
+
 class NewsCodaV4(_Strict):
     """The closing announcer read, authored by its OWN pass (P6).
 
@@ -2004,55 +2100,39 @@ def make_advisory_beat_plan(locked_beats: Sequence[str]) -> AdvisoryWordPlanV4:
     )
 
 
-def _script_artifact_context(score: RadioScoreV4) -> dict[str, Any]:
-    """Project the accepted score into a compact ScriptArtifactV4 context.
+def _script_artifact_inputs(
+    score: RadioScoreV4, fact_index: FactIndexV4,
+) -> dict[str, Any]:
+    """The STORY-WIDE context every dialogue and review job carries.
 
-    Passing the full nested score next to an unconstrained ``scenes`` output
-    field led the local writer to echo score scenes (including shots and
-    beats) instead of emitting the root ``lines`` array. The projection
-    preserves every script constraint while giving whole-script passes a flat,
-    authoritative line graph.
+    It used to be the whole flat line graph plus a word steer, because one
+    call authored the whole play. Since the schedule writes ONE BEAT at a time
+    (PBUG-20260814-03) each job derives its own window from the score, and the
+    graph, the line-id manifest, the count and the music cues had no reader
+    left. They are gone rather than computed and discarded: a field nobody
+    reads is a field that rots quietly, which is a defect class this project
+    has already paid for twice.
+
+    What SURVIVES is the arc a beat writer genuinely needs -- the story
+    surface and the flat scene list, so a beat knows where the episode is
+    going, plus the fact index. Deliberately still a PROJECTION, never the
+    nested score: handing a writer the full score once made it echo scenes,
+    shots and beats back instead of writing.
     """
-    scenes: list[dict[str, str]] = []
-    line_graph: list[dict[str, Any]] = []
-    for scene in score.scenes:
-        scenes.append({
-            "scene_id": scene.scene_id,
-            "env": scene.env,
-            "description": scene.description,
-        })
-        for beat in scene.beats:
-            for line_id in beat.line_ids:
-                line_graph.append({
-                    "line_id": line_id,
-                    "beat_id": beat.beat_id,
-                    "shot_id": beat.shot_id,
-                    "char_id": beat.char_id,
-                    "speaker_role": beat.speaker_role,
-                    "arc_phase": beat.arc_phase,
-                    "beat_intent": beat.intent,
-                    "fact_ids": list(beat.fact_ids),
-                })
     return {
         "story_context": {
             "title": score.title,
             "premise": score.premise,
             "setting": score.setting,
-            "scenes": scenes,
+            "scenes": [
+                {
+                    "scene_id": scene.scene_id,
+                    "env": scene.env,
+                    "description": scene.description,
+                }
+                for scene in score.scenes
+            ],
         },
-        "accepted_line_graph": line_graph,
-        "accepted_line_ids": [row["line_id"] for row in line_graph],
-        "accepted_line_count": len(line_graph),
-        "music_cues": [cue.model_dump(mode="json") for cue in score.music_cues],
-    }
-
-
-def _script_artifact_inputs(
-    score: RadioScoreV4, fact_index: FactIndexV4, word_steer: ActSteerV4,
-) -> dict[str, Any]:
-    """Add P5-only fact and word-steer inputs to the shared script context."""
-    return {
-        **_script_artifact_context(score),
         "fact_index": {
             "facts": [
                 {"fact_id": fact.fact_id, "claim": fact.claim}
@@ -2060,7 +2140,6 @@ def _script_artifact_inputs(
             ],
             "tone": fact_index.tone,
         },
-        "initial_draft_word_steer": word_steer.model_dump(mode="json"),
     }
 
 
@@ -2276,6 +2355,12 @@ def _invoke_codex_structured_once(
     script_text_pass = (
         pass_id == "P5" and result_type is ScriptTextDraftV4
     )
+    beat_text_pass = (
+        pass_id == "P5B" and result_type is BeatTextDraftV4
+    )
+    scene_review_pass = (
+        pass_id == "P5R" and result_type is SceneReviewDraftV4
+    )
     body: dict[str, Any] = {
         "pass_id": pass_id,
         "artifact_inputs": artifact_inputs,
@@ -2295,6 +2380,10 @@ def _invoke_codex_structured_once(
         )
     if script_text_pass:
         instruction += _SCRIPT_TEXT_DRAFT_ROOT_INSTRUCTION
+    if beat_text_pass:
+        instruction += _BEAT_TEXT_DRAFT_ROOT_INSTRUCTION
+    if scene_review_pass:
+        instruction += _SCENE_REVIEW_ROOT_INSTRUCTION
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": "\n".join(seams) + instruction},
@@ -2756,6 +2845,209 @@ def _call_radio_score_draft(
     return compiled
 
 
+def _closed_rows_findings(
+    rows: Sequence[Any],
+    wanted_line_ids: Sequence[str],
+    label_pattern: "re.Pattern[str]",
+    *,
+    label: str,
+) -> list[str]:
+    """Every defect in a CLOSED set of authored rows, reported at once.
+
+    Shared by the per-beat dialogue job and the scene review job. Reporting
+    all findings together is not tidiness -- the structured ladder grants a
+    typed repair exactly ONE shot and never retries a repair that was
+    schema-valid but content-invalid, so a validator that surfaces one defect
+    at a time spends that shot on row 1 and dies on row 2. That is a measured
+    live failure, not a hypothetical (see `_validate_p5_structure`).
+    """
+    wanted = list(wanted_line_ids)
+    observed = [str(row.line_id) for row in rows]
+    findings: list[str] = []
+    if len(observed) != len(set(observed)):
+        duplicated = sorted(
+            {lid for lid in observed if observed.count(lid) > 1}
+        )
+        findings.append(f"{label}: duplicate line IDs {duplicated}")
+    missing = [lid for lid in wanted if lid not in set(observed)]
+    unknown = [lid for lid in observed if lid not in set(wanted)]
+    if missing or unknown:
+        findings.append(
+            f"{label}: rows do not exactly cover the closed set "
+            f"(missing={missing}, unknown={unknown})"
+        )
+    for row in rows:
+        line_id = str(row.line_id)
+        text = str(row.text or "")
+        # Same degeneracy rule the whole-script validator carries: a string
+        # that reached its ceiling was cut short rather than written to an
+        # end, so it is rerolled instead of spoken.
+        if len(text) >= _AUTHORED_TEXT_REJECT_AT:
+            findings.append(
+                f"{line_id}: spoken text reached {len(text)} chars, at or "
+                f"past the {_AUTHORED_TEXT_REJECT_AT}-char degeneracy "
+                f"threshold; it was cut short rather than written to an end, "
+                f"so it is rerolled instead of spoken"
+            )
+            continue
+        finding = _spoken_text_finding(line_id, text, label_pattern)
+        if finding is None:
+            # JUDGE THE SURFACE THAT WILL ACTUALLY BE SPOKEN TOO. The
+            # whole-play pass validated raw AND canonical, so a row that was
+            # clean as written but defective once cleaned was REROLLED. Per
+            # beat, canonicalization happens after every beat is in, which is
+            # far too late to reroll -- so the canonical check moves here,
+            # where a finding is still a rerollable complaint.
+            finding = _spoken_text_finding(
+                line_id, clean_spoken_text(text), label_pattern,
+            )
+        if finding is not None:
+            findings.append(finding)
+    return findings
+
+
+def _beat_dialogue_inputs(
+    *,
+    story_context: Any,
+    fact_index: Any,
+    scene: ScenePlanV4,
+    beat: BeatPlanV4,
+    rows_so_far: Sequence[Mapping[str, str]],
+) -> dict[str, Any]:
+    """The SMALL window one beat is written into.
+
+    Deliberately NOT the whole accepted line graph. The window is the point of
+    the change: this beat's own job, the spine it sits in, and what the
+    listener has already heard -- so the writer can answer the line before it
+    instead of averaging a whole act into a summary.
+    """
+    return {
+        "story_context": story_context,
+        "fact_index": fact_index,
+        "this_scene": {
+            "scene_id": scene.scene_id,
+            "env": scene.env,
+            "description": scene.description,
+            "beats": [
+                {
+                    "beat_id": row.beat_id,
+                    "speaker": row.speaker,
+                    "speaker_role": row.speaker_role,
+                    "intent": row.intent,
+                    "arc_phase": row.arc_phase,
+                }
+                for row in scene.beats
+            ],
+        },
+        "this_beat": {
+            "beat_id": beat.beat_id,
+            "speaker": beat.speaker,
+            "speaker_role": beat.speaker_role,
+            "intent": beat.intent,
+            "arc_phase": beat.arc_phase,
+            "fact_ids": list(beat.fact_ids),
+            "line_ids": list(beat.line_ids),
+        },
+        "rows_so_far": [dict(row) for row in rows_so_far],
+    }
+
+
+def _call_beat_dialogue(
+    *,
+    slot_fn: GenerateFn,
+    pack: Any,
+    artifact_inputs: Mapping[str, Any],
+    beat: BeatPlanV4,
+    label_pattern: "re.Pattern[str]",
+    call_journal: MutableMapping[str, Any],
+) -> list[ScriptTextDraftLineV4]:
+    """Write ONE beat. The whole reason PBUG-20260814-03 has a fix."""
+    wanted = [str(line_id) for line_id in beat.line_ids]
+
+    def validate_beat(candidate: BaseModel) -> str | None:
+        if not isinstance(candidate, BeatTextDraftV4):
+            return "beat dialogue result is not a BeatTextDraftV4"
+        findings = _closed_rows_findings(
+            candidate.lines, wanted, label_pattern, label=beat.beat_id,
+        )
+        return "; ".join(findings) if findings else None
+
+    result = invoke_codex_structured(
+        pass_id="P5B",
+        slot="creative",
+        slot_fn=slot_fn,
+        pack=pack,
+        seam_refs=("codex_play_system",),
+        artifact_inputs=artifact_inputs,
+        result_type=BeatTextDraftV4,
+        post_validator=validate_beat,
+        base_temperature=.72,
+        structural_retry_temperature=.32,
+        max_new_tokens=_BEAT_TEXT_MAX_OUTPUT_TOKENS,
+        call_journal=call_journal,
+        prompt_must_fit=True,
+        include_result_json_schema=False,
+        retry_until_valid=True,
+    )
+    if not isinstance(result, BeatTextDraftV4):
+        raise CodexPassError(
+            f"beat {beat.beat_id} returned a non-draft structured result"
+        )
+    by_id = {str(row.line_id): row for row in result.lines}
+    return [by_id[line_id] for line_id in wanted]
+
+
+def _call_scene_review(
+    *,
+    slot_fn: GenerateFn,
+    pack: Any,
+    artifact_inputs: Mapping[str, Any],
+    scene_line_ids: Sequence[str],
+    label_pattern: "re.Pattern[str]",
+    call_journal: MutableMapping[str, Any],
+) -> list[ScriptTextDraftLineV4]:
+    """Read the scene back and fix it against its own spine.
+
+    Between the last beat's dialogue and anything downstream, exactly as the
+    design calls for: "have the model look at the dialogue and say does this
+    look good, and if not read the act spine and fix it". Legal because the
+    rewriting is done by a MODEL pass and never by code.
+    """
+    wanted = [str(line_id) for line_id in scene_line_ids]
+
+    def validate_review(candidate: BaseModel) -> str | None:
+        if not isinstance(candidate, SceneReviewDraftV4):
+            return "scene review result is not a SceneReviewDraftV4"
+        findings = _closed_rows_findings(
+            candidate.lines, wanted, label_pattern, label="scene review",
+        )
+        return "; ".join(findings) if findings else None
+
+    result = invoke_codex_structured(
+        pass_id="P5R",
+        slot="creative",
+        slot_fn=slot_fn,
+        pack=pack,
+        seam_refs=("codex_play_system",),
+        artifact_inputs=artifact_inputs,
+        result_type=SceneReviewDraftV4,
+        post_validator=validate_review,
+        base_temperature=.52,
+        structural_retry_temperature=.32,
+        max_new_tokens=_SCENE_REVIEW_MAX_OUTPUT_TOKENS,
+        call_journal=call_journal,
+        prompt_must_fit=True,
+        include_result_json_schema=False,
+        retry_until_valid=True,
+    )
+    if not isinstance(result, SceneReviewDraftV4):
+        raise CodexPassError(
+            "scene review returned a non-draft structured result"
+        )
+    by_id = {str(row.line_id): row for row in result.lines}
+    return [by_id[line_id] for line_id in wanted]
+
+
 def _call_script_text_draft(
     *,
     slot_fn: GenerateFn,
@@ -2763,85 +3055,153 @@ def _call_script_text_draft(
     artifact_inputs: Mapping[str, Any],
     score: RadioScoreV4,
     cast: CastPlanV4,
-    max_new_tokens: int | None,
     call_journal: MutableMapping[str, Any],
 ) -> ScriptArtifactV4:
-    """Run one creative P5 ladder; only schema/graph defects may retry."""
-    compiled_by_identity: dict[int, ScriptArtifactV4] = {}
+    """Write the play ONE BEAT AT A TIME, then review each scene.
 
-    def validate_draft(candidate: BaseModel) -> str | None:
-        if not isinstance(candidate, ScriptTextDraftV4):
-            return "P5 compact result is not a ScriptTextDraftV4"
-        try:
-            raw_compiled = compile_script_text_draft(candidate, score)
-            error = _validate_p5_structure(raw_compiled, cast, score)
-            if error is not None:
-                return error
-            compiled = _canonicalize_script_spoken_text(raw_compiled)
-            error = _validate_p5_structure(compiled, cast, score)
-            if error is not None:
-                return error
-        except ScifiCodexError as exc:
-            # The compile refusal alone is not the whole complaint. The typed
-            # repair gets ONE shot, so a draft that both misses the graph AND
-            # speaks production markup must be told both at once -- otherwise
-            # the repair fixes the IDs, re-emits the markup, and the ladder is
-            # spent with nothing left to spend.
-            findings = _p5_raw_spoken_findings(candidate, score, cast)
-            if findings:
-                return f"{exc}; also: " + "; ".join(findings)
-            return str(exc)
-        compiled_by_identity[id(candidate)] = compiled
-        return None
+    PBUG-20260814-03. This used to be a single call that authored the whole
+    play -- up to twenty-four rows in one reply -- and what came back was a
+    summary of a play: narrated third-person prose with the dialogue quoted
+    inside it, which TTS then read aloud, stage directions and all.
 
-    result = invoke_codex_structured(
-        pass_id="P5",
-        slot="creative",
-        slot_fn=slot_fn,
-        pack=pack,
-        seam_refs=("codex_play_system", "codex_coda_contract_system"),
-        artifact_inputs=artifact_inputs,
-        result_type=ScriptTextDraftV4,
-        post_validator=validate_draft,
-        base_temperature=.72,
-        structural_retry_temperature=.32,
-        max_new_tokens=max_new_tokens,
-        call_journal=call_journal,
-        prompt_must_fit=True,
-        include_result_json_schema=False,
-        retry_until_valid=True,
-    )
-    if not isinstance(result, ScriptTextDraftV4):
-        raise CodexPassError("P5 returned a non-draft structured result")
-    compiled = compiled_by_identity.get(id(result))
-    if compiled is None:
-        compiled = _canonicalize_script_spoken_text(
-            compile_script_text_draft(result, score)
+    The schedule now is, per scene: one dialogue job per beat, then one review
+    job for the scene. The score's SCENE is this lane's act-sized unit --
+    `act_count` still shapes the beat topology upstream, and nothing here
+    acquires a length target of any kind. The beat count is the model's own
+    answer to the score job, never a quota.
+
+    Each sub-job carries its OWN decode budget instead of running on provider
+    capacity. Right-size the job; never raise the guard.
+
+    Everything downstream is unchanged on purpose: the accepted rows are
+    assembled into the same `ScriptTextDraftV4` the whole-script pass used to
+    return, and then compiled, canonicalized and validated by exactly the same
+    code. A smaller job is the only thing that changed.
+    """
+    label_pattern = _spoken_label_pattern(cast)
+    story_context = artifact_inputs.get("story_context")
+    fact_index = artifact_inputs.get("fact_index")
+
+    accepted: dict[str, str] = {}
+    ordered_ids: list[str] = []
+    rows_so_far: list[dict[str, str]] = []
+    beat_jobs = 0
+    review_jobs = 0
+
+    for scene in score.scenes:
+        scene_line_ids: list[str] = []
+        for beat in scene.beats:
+            rows = _call_beat_dialogue(
+                slot_fn=slot_fn,
+                pack=pack,
+                artifact_inputs=_beat_dialogue_inputs(
+                    story_context=story_context,
+                    fact_index=fact_index,
+                    scene=scene,
+                    beat=beat,
+                    rows_so_far=rows_so_far,
+                ),
+                beat=beat,
+                label_pattern=label_pattern,
+                call_journal=call_journal,
+            )
+            beat_jobs += 1
+            for row in rows:
+                line_id = str(row.line_id)
+                accepted[line_id] = row.text
+                ordered_ids.append(line_id)
+                scene_line_ids.append(line_id)
+                rows_so_far.append({
+                    "line_id": line_id,
+                    "speaker": beat.speaker,
+                    "text": row.text,
+                })
+
+        reviewed = _call_scene_review(
+            slot_fn=slot_fn,
+            pack=pack,
+            artifact_inputs={
+                "story_context": story_context,
+                "this_scene": {
+                    "scene_id": scene.scene_id,
+                    "env": scene.env,
+                    "description": scene.description,
+                    "beats": [
+                        {
+                            "beat_id": row.beat_id,
+                            "speaker": row.speaker,
+                            "intent": row.intent,
+                            "arc_phase": row.arc_phase,
+                            "line_ids": list(row.line_ids),
+                        }
+                        for row in scene.beats
+                    ],
+                },
+                "scene_line_ids": list(scene_line_ids),
+                "scene_rows": [
+                    dict(row) for row in rows_so_far
+                    if row["line_id"] in set(scene_line_ids)
+                ],
+            },
+            scene_line_ids=scene_line_ids,
+            label_pattern=label_pattern,
+            call_journal=call_journal,
         )
-        error = _validate_p5_structure(compiled, cast, score)
-        if error is not None:
-            raise CodexPassError(
-                "P5 accepted compact draft failed structural validation: "
-                + error
-            )
+        review_jobs += 1
+        for row in reviewed:
+            accepted[str(row.line_id)] = row.text
+        # The next scene is written against what the review LEFT, not against
+        # the draft it replaced.
+        #
+        # REBUILT, never mutated in place. `rows_so_far` is a PROMPT WINDOW,
+        # not a ledger row -- but `text` is a name the canonical text-metric
+        # owner guards deliberately and conservatively across the whole node
+        # package (a ledger row's text may only move through
+        # `set_line_text_metrics`, which recomputes its counts in lockstep).
+        # Rebuilding respects that boundary without teaching the guard an
+        # exception, and it is the clearer code besides.
+        rows_so_far = [
+            {**row, "text": accepted[row["line_id"]]}
+            if row["line_id"] in accepted else dict(row)
+            for row in rows_so_far
+        ]
 
-    calls = call_journal.get("calls")
-    if isinstance(calls, list) and calls and isinstance(calls[-1], dict):
-        entry = calls[-1]
-        if entry.get("pass_id") == "P5":
-            wire = entry.get("accepted")
-            serialized = json.dumps(
-                wire, sort_keys=True, separators=(",", ":"),
-                ensure_ascii=False,
-            )
-            entry["accepted_transport"] = {
-                "schema": "ScriptTextDraftV4",
-                "chars": len(serialized),
-                "sha256": hashlib.sha256(
-                    serialized.encode("utf-8")
-                ).hexdigest(),
-            }
-            entry["accepted"] = compiled.model_dump(mode="json")
+    draft = ScriptTextDraftV4(lines=[
+        ScriptTextDraftLineV4(line_id=line_id, text=accepted[line_id])
+        for line_id in ordered_ids
+    ])
+    compiled = _canonicalize_script_spoken_text(
+        compile_script_text_draft(draft, score)
+    )
+    # A POST-CONDITION, not a gate on a model. Every row was validated when it
+    # was accepted and the ids are assembled from the score's own graph, so a
+    # failure here means this schedule is wrong rather than the writing.
+    error = _validate_p5_structure(compiled, cast, score)
+    if error is not None:
+        raise CodexPassError(
+            "the per-beat script failed structural validation after review: "
+            + error
+        )
+
+    serialized = json.dumps(
+        draft.model_dump(mode="json"), sort_keys=True,
+        separators=(",", ":"), ensure_ascii=False,
+    )
+    call_journal["script_schedule"] = {
+        "shape": "per_beat_dialogue_then_scene_review",
+        "beat_dialogue_jobs": beat_jobs,
+        "scene_review_jobs": review_jobs,
+        "accepted_line_count": len(ordered_ids),
+        "beat_dialogue_max_new_tokens": _BEAT_TEXT_MAX_OUTPUT_TOKENS,
+        "scene_review_max_new_tokens": _SCENE_REVIEW_MAX_OUTPUT_TOKENS,
+        "accepted_transport": {
+            "schema": "ScriptTextDraftV4",
+            "chars": len(serialized),
+            "sha256": hashlib.sha256(
+                serialized.encode("utf-8")
+            ).hexdigest(),
+        },
+    }
     return compiled
 
 
@@ -3943,16 +4303,19 @@ def run_scifi_codex_episode(
         "transport_schema": "ScriptTextDraftV4",
         "act_count": steer.act_count,
         "accepted_line_count": line_count,
-        "output_budget_mode": "provider_capacity",
+        # PBUG-20260814-03: the script is no longer authored in one call, so
+        # it no longer reserves a whole provider window. Each dialogue and
+        # review job carries its own right-sized budget; the per-job figures
+        # are receipted in `journal["script_schedule"]`.
+        "output_budget_mode": "per_job_budget",
         "requested_max_new_tokens": None,
     }
     script = _call_script_text_draft(
         slot_fn=creative_fn,
         pack=pack,
-        artifact_inputs=_script_artifact_inputs(score, p0, steer),
+        artifact_inputs=_script_artifact_inputs(score, p0),
         score=score,
         cast=p2,
-        max_new_tokens=None,
         call_journal=journal,
     )
     script, safety_receipt = _apply_script_safety_cleanup(
