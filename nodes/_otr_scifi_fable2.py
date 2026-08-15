@@ -2724,7 +2724,7 @@ def _assemble(
     def _spoken_row(line_id: str, shot_id: str, char_id: str, role: str,
                     text: str, boundary: "str | None",
                     constituents, artifact_name: str,
-                    artifact_norm: str) -> dict:
+                    artifact_norm: str, *, speaker: str) -> dict:
         del artifact_norm  # pure proof construction already consumed it
         entry = proof_by_id.get(line_id)
         if entry is None or line_id in consumed_proof_ids:
@@ -2756,14 +2756,18 @@ def _assemble(
         proof_map.append(_proof_entry_payload(entry))
         return {
             "line_id": line_id, "beat_id": line_id, "shot_id": shot_id,
+            # PBUG-20260814-01: the spoken row names its own speaker. The
+            # beat below reads it back off this row rather than being
+            # handed it a second time, so the two can never disagree.
+            "speaker": speaker,
             "char_id": char_id, "speaker_role": role, "boundary": boundary,
             "text": _norm_ws(text),
         }
 
-    def _beat(line_row: dict, scene_id: "str | None", speaker: str) -> None:
+    def _beat(line_row: dict, scene_id: "str | None") -> None:
         beat_rows.append({
             "beat_id": line_row["beat_id"], "shot_id": line_row["shot_id"],
-            "scene_id": scene_id, "speaker": speaker,
+            "scene_id": scene_id, "speaker": line_row["speaker"],
             "char_id": line_row["char_id"],
             "line_ids": [line_row["line_id"]],
         })
@@ -2785,9 +2789,9 @@ def _assemble(
         row = _spoken_row(
             f"shot_000_b{k + 1}", "shot_000", "announcer", "announcer",
             text, "shot_start" if k == 0 else "beat_start",
-            [text], "winning_draft", draft_norm)
+            [text], "winning_draft", draft_norm, speaker=ANNOUNCER_NAME)
         line_rows.append(row)
-        _beat(row, None, ANNOUNCER_NAME)
+        _beat(row, None)
     led.set_lines(line_rows)
     led.save()
 
@@ -2821,9 +2825,9 @@ def _assemble(
                 f"{shot_id}_b{k + 1}", shot_id, char_id_by_name[speaker],
                 "character", merged,
                 "shot_start" if k == 0 else "beat_start",
-                texts, "winning_draft", draft_norm)
+                texts, "winning_draft", draft_norm, speaker=speaker)
             line_rows.append(row)
-            _beat(row, scene_id, speaker)
+            _beat(row, scene_id)
         for k, cue in enumerate(inter_by_scene.get(scene.n, [])):
             inter_seq += 1
             inter_sentinel = _music_sentinel(
@@ -2858,17 +2862,17 @@ def _assemble(
         row = _spoken_row(
             f"{post_shot}_b{k}", post_shot, "announcer", "announcer", text,
             "shot_start" if k == 1 else "beat_start",
-            [text], "winning_draft", draft_norm)
+            [text], "winning_draft", draft_norm, speaker=ANNOUNCER_NAME)
         line_rows.append(row)
-        _beat(row, None, ANNOUNCER_NAME)
+        _beat(row, None)
     # CODA bridge row (announcer-spoken pivot, from the draft).
     k += 1
     row = _spoken_row(
         f"{post_shot}_b{k}", post_shot, "announcer", "announcer",
         parsed.coda, "beat_start", [parsed.coda], "winning_draft",
-        draft_norm)
+        draft_norm, speaker=ANNOUNCER_NAME)
     line_rows.append(row)
-    _beat(row, None, ANNOUNCER_NAME)
+    _beat(row, None)
     # News-read row: LLM-authored (treatment.news_close_read),
     # python-APPENDED (r1/C1). The legacy coda append lives in legacy
     # composition (writer I.5), which this lane never runs -- no double
@@ -2878,9 +2882,9 @@ def _assemble(
         f"{post_shot}_b{k}", post_shot, "announcer", "announcer",
         treatment.news_close_read, "beat_start",
         [treatment.news_close_read], "treatment.news_close_read",
-        news_read_norm)
+        news_read_norm, speaker=ANNOUNCER_NAME)
     line_rows.append(row)
-    _beat(row, None, ANNOUNCER_NAME)
+    _beat(row, None)
     closing_sentinel = _music_sentinel(post_shot, "music_close")
     line_rows.append(closing_sentinel)
     music_rows.append({

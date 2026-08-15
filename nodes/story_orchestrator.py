@@ -2461,6 +2461,9 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             for i, (name, text) in enumerate(self._streamed_lines):
                 line_rows.append({
                     "line_id":  f"l{i+1:03d}",
+                    # The streamed name IS the speaker; carry it so even a
+                    # partial snapshot names who is talking (PBUG-20260814-01).
+                    "speaker":  name,
                     "char_id":  self._streamed_chars.get(name),
                     "text":     text,
                 })

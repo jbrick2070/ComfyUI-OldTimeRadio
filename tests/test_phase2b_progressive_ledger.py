@@ -162,6 +162,23 @@ class TestInitLinesFromOutline:
         # music beats have no arc_phase in this fixture.
         assert rows["b001"]["arc_phase"] is None
 
+    def test_line_row_carries_the_owning_beats_speaker(
+            self, fresh_ledger, fake_outline_3acts):
+        """PBUG-20260814-01: the line row names its speaker, and it is the
+        same name the beat row carries. Before the fix a line knew only its
+        opaque char_id, so nothing in the sealed ledger asserted who spoke
+        it -- the mechanism behind 'John is speaking Mary's lines'."""
+        fresh_ledger.init_lines_from_outline(
+            fake_outline_3acts,
+            char_id_by_name={"ALICE": "c01", "BOB": "c02"},
+        )
+        lines = {r["beat_id"]: r for r in fresh_ledger.data["lines"]}
+        beats = {r["beat_id"]: r for r in fresh_ledger.data["beats"]}
+        assert lines["b003"]["speaker"] == beats["b003"]["speaker"]
+        assert lines["b003"]["speaker"]
+        for beat_id, line_row in lines.items():
+            assert line_row["speaker"] == beats[beat_id]["speaker"]
+
     def test_char_id_lookup_from_name_map(self, fresh_ledger,
                                           fake_outline_3acts):
         fresh_ledger.init_lines_from_outline(

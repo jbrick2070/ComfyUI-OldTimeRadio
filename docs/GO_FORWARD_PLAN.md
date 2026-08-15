@@ -197,7 +197,15 @@ consistency is explicitly carved out as one that is. So the bank audit REPORTS
 story shape as an observation and GRADES only on F1 and F2. A lane whose prose
 is merely unexciting is not broken.
 
-**F2's ROOT CAUSE IS FOUND AND VERIFIED -- 2026-08-14, and it is NOT where this
+**F2's LEDGER HALF IS FIXED -- 2026-08-14, `PBUG-20260814-01` is CLOSED and
+promoted to the Bible as `BUG-12.101`.** `set_lines()` now names `speaker`,
+every assembly site supplies it from the row that already owns it, and the
+symmetry between the two normalizers is pinned by a test in both repos. What
+remains open under F2 is the CONTENT half -- a character speaking another
+character's words -- which the clean stage below owns. The diagnosis that
+follows is kept because it is the reason the fix looks the way it does.
+
+**F2's ROOT CAUSE WAS FOUND AND VERIFIED -- 2026-08-14, and it is NOT where this
 file previously said.** The earlier note sent the reader to
 `repair_script_artifact_metadata` (from `e679b754`). **THAT FUNCTION DOES NOT
 EXIST -- repo-wide grep, zero hits.** It was removed sometime after July 11. Do

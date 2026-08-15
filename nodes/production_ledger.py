@@ -1195,6 +1195,9 @@ class Ledger:
                 "line_id":          beat_id,
                 "shot_id":          None,
                 "beat_id":          beat_id,
+                # The owning beat's speaker, carried onto the line row so
+                # the sealed ledger names who says each line (PBUG-20260814-01).
+                "speaker":          speaker or None,
                 "char_id":          char_id,
                 "text":             text,
                 "traits":           mood or None,
@@ -1282,6 +1285,15 @@ class Ledger:
                 "line_id":          _safe_str(raw.get("line_id")),
                 "shot_id":          _safe_str(raw.get("shot_id")) or None,
                 "beat_id":          _safe_str(raw.get("beat_id")) or None,
+                # PBUG-20260814-01: `speaker` was absent from this
+                # enumerated schema while the sibling normalizer
+                # `set_beats()` carried it, so every caller that supplied a
+                # speaker name on a line row had it silently discarded and
+                # every published ledger shipped `speaker: None` on every
+                # spoken row. A key-enumerating normalizer drops everything
+                # it does not name; the asymmetry against its sibling was
+                # the tell. Keep these two schemas in step.
+                "speaker":          _safe_str(raw.get("speaker")) or None,
                 "char_id":          _safe_str(raw.get("char_id")) or None,
                 "text":             text,
                 "traits":           _safe_str(raw.get("traits")) or None,

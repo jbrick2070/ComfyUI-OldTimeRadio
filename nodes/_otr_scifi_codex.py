@@ -3213,7 +3213,11 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
                 src = script_by_line.get(lid)
                 if src is None:
                     raise CodexGraphError(f"missing script line {lid}")
-                row = {"line_id": lid, "beat_id": b.beat_id, "shot_id": b.shot_id, "char_id": src.char_id, "speaker_role": src.speaker_role, "text": src.text, "skip": src.skip, "tts_skip_reason": src.tts_skip_reason, "traits": src.traits, "boundary": src.boundary, "arc_phase": src.arc_phase, "compose_flags": list(src.compose_flags), "beat_intent": src.beat_intent, "dialogue_slot_id": src.dialogue_slot_id}
+                # `speaker` comes off the OWNING BEAT, never off the model's
+                # line -- the score already named who holds the beat, so the
+                # line inherits it rather than asking the writer twice
+                # (PBUG-20260814-01).
+                row = {"line_id": lid, "beat_id": b.beat_id, "shot_id": b.shot_id, "speaker": b.speaker, "char_id": src.char_id, "speaker_role": src.speaker_role, "text": src.text, "skip": src.skip, "tts_skip_reason": src.tts_skip_reason, "traits": src.traits, "boundary": src.boundary, "arc_phase": src.arc_phase, "compose_flags": list(src.compose_flags), "beat_intent": src.beat_intent, "dialogue_slot_id": src.dialogue_slot_id}
                 lines.append(row)
                 if src.char_id.startswith("music_"):
                     music_ids.append(lid)

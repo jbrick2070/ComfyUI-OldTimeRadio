@@ -4152,10 +4152,28 @@ only visible because the cameo was FORCED and then did not appear.
 - checked against `otr_coverage_index.yaml` and `BUG_BIBLE.yaml` 2026-08-14:
   **genuinely uncovered.** No entry covers "sibling normalizers disagree on a
   shared field, so one silently drops it".
-- status: OPEN -- diagnosed and artifact-verified, NOT yet fixed. **Bible
-  promotion is OWED once the fix lands with executable coverage**, per the
-  three-file contract; the rule is portable (a key-enumerating normalizer drops
-  everything it does not name, and an asymmetry against its sibling is the tell).
+- fix (2026-08-14): both halves in one change. `set_lines()` now names
+  `"speaker"` in its normalized schema, mirroring `set_beats()` exactly
+  (`_safe_str(...) or None`, key always present). Every assembly site supplies
+  it from the row that already owns it: `init_lines_from_outline()` stamps the
+  outline beat's speaker on the line row it pre-stamps; `_otr_scifi_codex
+  ._assemble_ledger` takes `b.speaker` off the OWNING BEAT rather than asking
+  P5 for it (`ScriptLineV4` is unchanged -- the score already named who holds
+  the beat); `_otr_scifi_fable2._spoken_row` gains a required `speaker` and
+  `_beat()` now READS it back off the line row instead of being handed it a
+  second time, so the two cannot disagree by construction; the story
+  orchestrator's streamed partial ledger carries the streamed name.
+  `tests/fixtures/fable2/golden_s1b_assembly.json` regenerated deliberately
+  (assembly contract changed by design; the three music sentinel rows own no
+  beat and carry null).
+- promotion: BUG-12.101 (survival-guide `a6035b2`, the three-file contract in
+  one commit: YAML entry, README count 278 -> 279, executable coverage
+  `TestThreeFileContract::test_otr_sibling_row_normalizers_name_the_same_speaker`
+  which diffs the key sets both normalizers build out of the AST, and the
+  `otr_coverage_index.yaml` row).
+- status: FIXED 2026-08-14. Suite 10359 passed / 110 skipped / 1 xfailed
+  (baseline 10355 + the four new guards), Bug Bible 20/25/3,
+  `build_variants --check` 50 variants 0 failures.
 
 ## PBUG-20260814-02 -- `scifi_news` publishes with NO announcer coda, and never names the news story it was drawn from
 

@@ -198,6 +198,54 @@ class TestLedgerBeats:
         assert rows[0]["speaker_role"] == "announcer"
         assert rows[1]["speaker_role"] == "music_open"
 
+    def test_set_lines_carries_speaker(self, tmp_out):
+        """PBUG-20260814-01: a supplied speaker name rides through
+        set_lines. It used to be dropped -- the normalized row schema
+        enumerates the keys it keeps and `speaker` was not among them, so
+        every published ledger shipped `speaker: None` on every spoken row
+        and nothing on a line said who was talking."""
+        led = Ledger("test_line_speaker", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "beat_id": "shot_001_b1", "char_id": "c01",
+             "speaker": "ALICE", "text": "Hello"},
+            {"line_id": "l002", "beat_id": "shot_001_b2", "char_id": "c02",
+             "speaker": "BOB", "text": "Hi"},
+        ])
+        rows = led.data["lines"]
+        assert rows[0]["speaker"] == "ALICE"
+        assert rows[1]["speaker"] == "BOB"
+
+    def test_set_lines_speaker_absent_is_none_not_missing(self, tmp_out):
+        """A caller that supplies no speaker gets an explicit None -- the
+        key is always present, so a consumer reads a value rather than
+        guessing whether the field exists."""
+        led = Ledger("test_line_speaker_none", str(tmp_out))
+        led.set_lines([{"line_id": "l001", "char_id": "c01", "text": "Hi"}])
+        row = led.data["lines"][0]
+        assert "speaker" in row
+        assert row["speaker"] is None
+
+    def test_line_and_beat_normalizers_agree_on_speaker(self, tmp_out):
+        """The regression guard for the ASYMMETRY that caused
+        PBUG-20260814-01. set_beats() and set_lines() are sibling
+        normalizers for parallel row types; when one names a shared
+        identity field and the other does not, the silent one drops it.
+        Feed both the same speaker and require the same answer."""
+        led = Ledger("test_normalizer_symmetry", str(tmp_out))
+        led.set_beats([
+            {"beat_id": "shot_001_b1", "shot_id": "shot_001",
+             "speaker": "ALICE", "char_id": "c01",
+             "line_ids": ["shot_001_b1"]},
+        ])
+        led.set_lines([
+            {"line_id": "shot_001_b1", "beat_id": "shot_001_b1",
+             "shot_id": "shot_001", "speaker": "ALICE", "char_id": "c01",
+             "text": "Hello"},
+        ])
+        beat = led.data["beats"][0]
+        line = led.data["lines"][0]
+        assert beat["speaker"] == line["speaker"] == "ALICE"
+
     def test_path_follows_episode_id(self, tmp_out):
         led = Ledger("signal_lost_BLACK SPHERE_20260424", str(tmp_out))
         assert led.path.endswith("signal_lost_black_sphere_20260424_ledger.json")
