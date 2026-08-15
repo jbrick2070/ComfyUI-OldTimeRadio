@@ -1,0 +1,39 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "beckoning_fair_one",
+  "unit": "main",
+  "work_title": "Widdershins",
+  "author": "Oliver Onions",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/14168/pg14168.txt",
+  "body_sha256": "fcffc868e5ce6888abde2a8e394ad97d9cf64d5a084e19bc296e8cd8abfce3e8",
+  "body_bytes": 140334,
+  "body_words": 25200,
+  "text_path": "config/source_banks/public_domain_story/sources/beckoning_fair_one.txt",
+  "characters": [
+    {
+      "name": "Paul Oleron",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 651 vs she/her/hers 120 across 211 mention window(s) for 'paul oleron', 'oleron'",
+      "aliases": [
+        "oleron"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Elsie Bengough",
+      "the landlady"
+    ]
+  }
+}

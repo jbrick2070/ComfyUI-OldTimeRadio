@@ -1,0 +1,48 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "idle_days_on_the_yann",
+  "unit": "main",
+  "work_title": "A Dreamer's Tales",
+  "author": "Lord Dunsany",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/8129/pg8129.txt",
+  "body_sha256": "b4890343f8399745c58dfcf941e7564a28e094c2b8162a86dc25331be6168b58",
+  "body_bytes": 35308,
+  "body_words": 6600,
+  "text_path": "config/source_banks/public_domain_story/sources/idle_days_on_the_yann.txt",
+  "characters": [
+    {
+      "name": "the Captain",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 159 vs she/her/hers 0 across 68 mention window(s) for 'the captain', 'captain'",
+      "aliases": [
+        "captain"
+      ]
+    },
+    {
+      "name": "the helmsman",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 54 vs she/her/hers 2 across 32 mention window(s) for 'the helmsman', 'helmsman'",
+      "aliases": [
+        "helmsman"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the Dreamer"
+    ]
+  }
+}

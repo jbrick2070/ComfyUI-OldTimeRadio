@@ -1,0 +1,28 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "frankenstein",
+  "unit": "main",
+  "work_title": "Frankenstein",
+  "author": "Mary Shelley",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/84/pg84.txt",
+  "body_sha256": "ab7d8661032b4efd413cef711a92fe595d41e46a8f487b4a4e13c91902f02cf5",
+  "body_bytes": 13060,
+  "body_words": 2359,
+  "text_path": "config/source_banks/public_domain_story/sources/frankenstein.txt",
+  "characters": [],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 0,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [
+      "Victor Frankenstein",
+      "the Creature"
+    ]
+  }
+}

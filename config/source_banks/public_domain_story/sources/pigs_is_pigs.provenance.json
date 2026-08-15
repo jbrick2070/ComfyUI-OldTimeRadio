@@ -1,0 +1,54 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "pigs_is_pigs",
+  "unit": "main",
+  "work_title": "Pigs Is Pigs",
+  "author": "Ellis Parker Butler",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/2004/pg2004.txt",
+  "body_sha256": "945d1d760a03def9769d492687bf1c08b15442da91d102d2780461f94983e1e1",
+  "body_bytes": 19632,
+  "body_words": 3389,
+  "text_path": "config/source_banks/public_domain_story/sources/pigs_is_pigs.txt",
+  "characters": [
+    {
+      "name": "Flannery",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 86 vs she/her/hers 0 across 46 mention window(s) for 'flannery'"
+    },
+    {
+      "name": "Mr. Morehouse",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Morehouse' contains a gendered title or relation word",
+      "aliases": [
+        "morehouse"
+      ]
+    },
+    {
+      "name": "the head-office clerk",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 4 vs she/her/hers 0 across 1 mention window(s) for 'the head-office clerk', 'head-office clerk', 'clerk'",
+      "aliases": [
+        "head-office clerk",
+        "clerk"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

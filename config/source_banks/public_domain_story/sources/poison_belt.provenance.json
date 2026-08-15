@@ -1,0 +1,62 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "poison_belt",
+  "unit": "main",
+  "work_title": "The Poison Belt",
+  "author": "Arthur Conan Doyle",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/126/pg126.txt",
+  "body_sha256": "c545f004cb845cd1705447242cd837a5a854986f65961a63077851aa9b4b36ff",
+  "body_bytes": 31290,
+  "body_words": 5612,
+  "text_path": "config/source_banks/public_domain_story/sources/poison_belt.txt",
+  "characters": [
+    {
+      "name": "Mrs. Challenger",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Challenger' contains a gendered title or relation word",
+      "aliases": [
+        "challenger"
+      ]
+    },
+    {
+      "name": "Summerlee",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 14 vs she/her/hers 2 across 15 mention window(s) for 'summerlee'"
+    },
+    {
+      "name": "Lord John Roxton",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Lord John Roxton' contains a gendered title or relation word",
+      "aliases": [
+        "roxton"
+      ]
+    },
+    {
+      "name": "Malone",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 13 vs she/her/hers 0 across 3 mention window(s) for 'malone'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 4,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 5,
+    "declined": [
+      "Professor Challenger"
+    ]
+  }
+}

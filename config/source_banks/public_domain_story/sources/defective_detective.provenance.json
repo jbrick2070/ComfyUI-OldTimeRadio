@@ -1,0 +1,50 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "defective_detective",
+  "unit": "main",
+  "work_title": "Nonsense Novels",
+  "author": "Stephen Leacock",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/4682/pg4682.txt",
+  "body_sha256": "b73b488a8f708772edfb4117d9bfcfe7abde582bd36aece98aa81ab998802837",
+  "body_bytes": 10570,
+  "body_words": 1782,
+  "text_path": "config/source_banks/public_domain_story/sources/defective_detective.txt",
+  "characters": [
+    {
+      "name": "the Great Detective",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 171 vs she/her/hers 15 across 69 mention window(s) for 'the great detective', 'great detective', 'detective'",
+      "aliases": [
+        "great detective",
+        "detective"
+      ]
+    },
+    {
+      "name": "the Prime Minister",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 51 vs she/her/hers 0 across 15 mention window(s) for 'the prime minister', 'prime minister', 'minister'",
+      "aliases": [
+        "prime minister",
+        "minister"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the narrator"
+    ]
+  }
+}

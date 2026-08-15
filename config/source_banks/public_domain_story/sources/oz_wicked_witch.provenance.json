@@ -1,0 +1,48 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "oz_wicked_witch",
+  "unit": "main",
+  "work_title": "The Wonderful Wizard of Oz",
+  "author": "L. Frank Baum",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/55/pg55.txt",
+  "body_sha256": "d12464d404446f8c743e8e41258df941deae74ccb49240409013e687bf59eb60",
+  "body_bytes": 19260,
+  "body_words": 3674,
+  "text_path": "config/source_banks/public_domain_story/sources/oz_wicked_witch.txt",
+  "characters": [
+    {
+      "name": "Dorothy",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 20 vs she/her/hers 111 across 38 mention window(s) for 'dorothy'"
+    },
+    {
+      "name": "the Wicked Witch of the West",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'the Wicked Witch of the West' contains a gendered title or relation word",
+      "aliases": [
+        "wicked witch of the west",
+        "west"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 5,
+    "declined": [
+      "the Lion",
+      "the Scarecrow",
+      "the Tin Woodman"
+    ]
+  }
+}

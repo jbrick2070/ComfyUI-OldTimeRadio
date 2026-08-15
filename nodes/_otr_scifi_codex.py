@@ -937,12 +937,36 @@ _BEAT_TEXT_MAX_OUTPUT_TOKENS = (
     + _ROW_DRAFT_ENVELOPE_TOKENS
 )
 
-_SCENE_REVIEW_MAX_OUTPUT_TOKENS = (
-    _RADIO_SCORE_MAX_BEATS_PER_SCENE
-    * _RADIO_SCORE_MAX_LINES_PER_BEAT
-    * _BEAT_TEXT_TOKENS_PER_LINE
-    + _ROW_DRAFT_ENVELOPE_TOKENS
-)
+def scene_review_output_tokens(line_count: int) -> int:
+    """Tokens to ask for when reviewing a scene of exactly `line_count` lines.
+
+    RIGHT-SIZE THE JOB, NEVER RAISE THE GUARD -- the same rule as the constants
+    above, applied to the request instead of the schema. This used to be a
+    CONSTANT derived from the SCHEMA maximum:
+
+        _RADIO_SCORE_MAX_BEATS_PER_SCENE (8) * _RADIO_SCORE_MAX_LINES_PER_BEAT
+        (2) * _BEAT_TEXT_TOKENS_PER_LINE (512) + envelope (128) = 8320
+
+    and 8320 is larger than the ENTIRE 8192-token context window of the shipped
+    writer, so P5R could never succeed on it no matter how short the prompt was.
+    It killed a live `scifi_news` leg at 10:18 with
+    `prompt requires 1203 input tokens, requested_output=8320, context_cap=8192`
+    (PBUG-20260815-10). The schema ceiling carries a deliberate `_SCHEMA_HEADROOM`
+    of 2 so the SCHEMA can accept more than a legal episode ever contains --
+    correct for a guard, wrong for a request, because it asks for exactly twice
+    the output any real scene needs.
+
+    A real scene is `BEATS_PER_ACT` (4) beats x 2 lines = 8 rows -> 4224 tokens,
+    which leaves ~4,000 for the prompt. The schema's own `max_length` is
+    untouched: the guard stays exactly where it was.
+
+    No clamp against the context on purpose. If even the right-sized job does
+    not fit, `prompt_must_fit=True` refuses deterministically and says so, which
+    is information; silently truncating the request would hand back a review
+    missing rows and fail the closed-row validator with a misleading message.
+    """
+    rows = max(1, int(line_count))
+    return rows * _BEAT_TEXT_TOKENS_PER_LINE + _ROW_DRAFT_ENVELOPE_TOKENS
 
 #: THE BEAT WINDOW IS CAPPED, AND IT KEEPS THE END.
 #: `rows_so_far` exists so a beat can answer the line before it, and recency is
@@ -3093,7 +3117,7 @@ def _call_scene_review(
         post_validator=validate_review,
         base_temperature=.52,
         structural_retry_temperature=.32,
-        max_new_tokens=_SCENE_REVIEW_MAX_OUTPUT_TOKENS,
+        max_new_tokens=scene_review_output_tokens(len(wanted)),
         call_journal=call_journal,
         prompt_must_fit=True,
         include_result_json_schema=False,
@@ -3146,6 +3170,11 @@ def _call_script_text_draft(
     rows_so_far: list[dict[str, str]] = []
     beat_jobs = 0
     review_jobs = 0
+    # The review budget is per-scene now, so the receipt records the LARGEST
+    # request this run actually made rather than a constant. A single number
+    # that no call used is worse than no number: it is the shape of receipt
+    # that let an impossible 8320 sit in every journal unnoticed.
+    review_budget_max = 0
 
     for scene in score.scenes:
         scene_line_ids: list[str] = []
@@ -3207,6 +3236,9 @@ def _call_script_text_draft(
             call_journal=call_journal,
         )
         review_jobs += 1
+        review_budget_max = max(
+            review_budget_max, scene_review_output_tokens(len(scene_line_ids)),
+        )
         for row in reviewed:
             accepted[str(row.line_id)] = row.text
         # The next scene is written against what the review LEFT, not against
@@ -3252,7 +3284,7 @@ def _call_script_text_draft(
         "scene_review_jobs": review_jobs,
         "accepted_line_count": len(ordered_ids),
         "beat_dialogue_max_new_tokens": _BEAT_TEXT_MAX_OUTPUT_TOKENS,
-        "scene_review_max_new_tokens": _SCENE_REVIEW_MAX_OUTPUT_TOKENS,
+        "scene_review_max_new_tokens": review_budget_max,
         "accepted_transport": {
             "schema": "ScriptTextDraftV4",
             "chars": len(serialized),

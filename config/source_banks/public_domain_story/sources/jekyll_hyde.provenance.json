@@ -1,0 +1,54 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "jekyll_hyde",
+  "unit": "main",
+  "work_title": "The Strange Case of Dr. Jekyll and Mr. Hyde",
+  "author": "Robert Louis Stevenson",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/43/pg43.txt",
+  "body_sha256": "5ec08d8e042b2a43689c3e020859e40ca225c8b599c1ddbe844d44b881b49794",
+  "body_bytes": 24300,
+  "body_words": 4357,
+  "text_path": "config/source_banks/public_domain_story/sources/jekyll_hyde.txt",
+  "characters": [
+    {
+      "name": "Mr. Utterson",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Utterson' contains a gendered title or relation word",
+      "aliases": [
+        "utterson"
+      ]
+    },
+    {
+      "name": "Poole",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 79 vs she/her/hers 4 across 43 mention window(s) for 'poole'"
+    },
+    {
+      "name": "the voice behind the door",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 18 vs she/her/hers 0 across 17 mention window(s) for 'the voice behind the door', 'voice behind the door', 'door'",
+      "aliases": [
+        "voice behind the door",
+        "door"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

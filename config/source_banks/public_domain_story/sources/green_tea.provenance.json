@@ -1,0 +1,46 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "green_tea",
+  "unit": "main",
+  "work_title": "Green Tea; Mr. Justice Harbottle",
+  "author": "J. Sheridan Le Fanu",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/11635/pg11635.txt",
+  "body_sha256": "828c98c5514b2df6c2f1b54e8372f245c488eebc8cd7fcde8b926a154bfb1ad4",
+  "body_bytes": 70660,
+  "body_words": 12848,
+  "text_path": "config/source_banks/public_domain_story/sources/green_tea.txt",
+  "characters": [
+    {
+      "name": "Dr. Hesselius",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 42 vs she/her/hers 0 across 26 mention window(s) for 'dr. hesselius', 'hesselius'",
+      "aliases": [
+        "hesselius"
+      ]
+    },
+    {
+      "name": "Reverend Jennings",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 177 vs she/her/hers 1 across 35 mention window(s) for 'reverend jennings', 'jennings'",
+      "aliases": [
+        "jennings"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": []
+  }
+}

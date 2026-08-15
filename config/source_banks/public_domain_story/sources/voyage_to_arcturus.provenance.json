@@ -1,0 +1,54 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "voyage_to_arcturus",
+  "unit": "main",
+  "work_title": "A Voyage to Arcturus",
+  "author": "David Lindsay",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1329/pg1329.txt",
+  "body_sha256": "ea69c641dac4e2bebfdc96ad51b99c8a365f2a1599863e7d30e1e625e9f4e1e9",
+  "body_bytes": 25036,
+  "body_words": 4177,
+  "text_path": "config/source_banks/public_domain_story/sources/voyage_to_arcturus.txt",
+  "characters": [
+    {
+      "name": "Maskull",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 23 vs she/her/hers 2 across 11 mention window(s) for 'maskull'"
+    },
+    {
+      "name": "Krag",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 12 vs she/her/hers 0 across 3 mention window(s) for 'krag'"
+    },
+    {
+      "name": "Nightspore",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 30 vs she/her/hers 0 across 13 mention window(s) for 'nightspore'"
+    },
+    {
+      "name": "Backhouse",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 44 vs she/her/hers 6 across 27 mention window(s) for 'backhouse'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 4,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": []
+  }
+}

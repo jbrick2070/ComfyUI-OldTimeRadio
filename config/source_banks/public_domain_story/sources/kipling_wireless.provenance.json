@@ -1,0 +1,48 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "kipling_wireless",
+  "unit": "main",
+  "work_title": "Traffics and Discoveries",
+  "author": "Rudyard Kipling",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/9790/pg9790.txt",
+  "body_sha256": "716cbe5d4c0a72088386382db2a56f42a89b83718c2522d68ca9a09ace210132",
+  "body_bytes": 37896,
+  "body_words": 6312,
+  "text_path": "config/source_banks/public_domain_story/sources/kipling_wireless.txt",
+  "characters": [
+    {
+      "name": "Mr. Shaynor",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Shaynor' contains a gendered title or relation word",
+      "aliases": [
+        "shaynor"
+      ]
+    },
+    {
+      "name": "Mr. Cashell",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Cashell' contains a gendered title or relation word",
+      "aliases": [
+        "cashell"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the narrator"
+    ]
+  }
+}

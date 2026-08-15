@@ -1,0 +1,52 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "great_sermon_handicap",
+  "unit": "main",
+  "work_title": "The Inimitable Jeeves",
+  "author": "P. G. Wodehouse",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/59254/pg59254.txt",
+  "body_sha256": "2c271b300ea7d9fee9642eca16286253dcd2fdce253f281f89dd7f41345377ce",
+  "body_bytes": 35131,
+  "body_words": 5964,
+  "text_path": "config/source_banks/public_domain_story/sources/great_sermon_handicap.txt",
+  "characters": [
+    {
+      "name": "Jeeves",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 39 vs she/her/hers 0 across 27 mention window(s) for 'jeeves'"
+    },
+    {
+      "name": "Bingo Little",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 27 vs she/her/hers 0 across 16 mention window(s) for 'bingo little', 'little'",
+      "aliases": [
+        "little"
+      ]
+    },
+    {
+      "name": "Steggles",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 17 vs she/her/hers 0 across 10 mention window(s) for 'steggles'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Bertie Wooster"
+    ]
+  }
+}

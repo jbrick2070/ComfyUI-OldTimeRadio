@@ -4728,3 +4728,52 @@ only visible because the cameo was FORCED and then did not appear.
   The proof is only a proof because that episode RENAMED -- it entered the
   freeze as `pending_<ts>` and published under its final slug, which is the
   exact condition that produced the block. CLOSED; do not re-prove.
+
+## PBUG-20260815-10 -- the scene-review pass asks for more tokens than the whole context window
+
+- artifact: live `scifi_news` leg through `workflows/otr_canonical.json`,
+  2026-08-15, `tmp/d2_server.log`. Died at `Prompt executed in 00:10:18` with
+  `CodexPassError: P5R failed: prompt cannot fit the complete requested output:
+  prompt requires 1203 input tokens, requested_output=8320, context_cap=8192
+  leaves only 6989 output tokens`. Writer was `gemma-4-12b-it` (the saved
+  runtime-qualified default, `context_window=8192`).
+- root cause: `nodes/_otr_scifi_codex.py` `_SCENE_REVIEW_MAX_OUTPUT_TOKENS` was
+  a CONSTANT derived from the SCHEMA maximum --
+  `_RADIO_SCORE_MAX_BEATS_PER_SCENE` (8) x `_RADIO_SCORE_MAX_LINES_PER_BEAT` (2)
+  x `_BEAT_TEXT_TOKENS_PER_LINE` (512) + envelope (128) = **8320** -- and 8320
+  is larger than the ENTIRE 8192-token context window. The request is therefore
+  unsatisfiable for ANY prompt, including an empty one; the 1203-token prompt in
+  the log is incidental. `_RADIO_SCORE_MAX_BEATS_PER_SCENE` carries a deliberate
+  `_SCHEMA_HEADROOM` of 2 so the SCHEMA can accept more than a legal episode
+  contains -- correct for a guard, wrong for a request, because it asks for
+  exactly twice the output any real scene needs.
+- why it was invisible: two tests asserted the constant --
+  `tests/test_codex_per_beat_dialogue.py:335` and
+  `tests/test_scifi_codex_lane.py:531` -- so the suite AGREED with the bug. A
+  test that pins the number a caller passes, rather than the property that
+  number must satisfy, cannot fail when the number is impossible.
+- scope, measured not assumed: every `max_new_tokens` budget in both story
+  lanes was computed against the 8192 cap. `_SCENE_REVIEW_MAX_OUTPUT_TOKENS`
+  8320 was the ONLY impossible one; `_BEAT_TEXT_MAX_OUTPUT_TOKENS` 1152,
+  `fable2._MAX_NEW_TOKENS['dossier']` 700 and `_NEWS_CODA_MAX_OUTPUT_TOKENS` 384
+  all leave >= 7,000 tokens for the prompt. One instance, not a class outbreak.
+- fix: replaced the constant with `scene_review_output_tokens(line_count)` --
+  the request is sized to the scene ACTUALLY in hand
+  (`len(scene_line_ids) * 512 + 128`; a real 4-beat scene is 8 rows -> 4224,
+  leaving ~4,000 for the prompt). The schema's `max_length` guard is untouched:
+  right-size the job, never raise the guard. No clamp against the context on
+  purpose -- if even the right-sized job does not fit, `prompt_must_fit=True`
+  refuses deterministically and says why, whereas a silent truncation would
+  return a review missing rows and fail the closed-row validator with a
+  misleading message. Telemetry `scene_review_max_new_tokens` now records the
+  LARGEST request the run actually made, because a receipt naming a number no
+  call used is what let 8320 sit in every journal unread.
+- coverage: both tests above now assert the property (`== scene_review_output_
+  tokens(len(scene_line_ids))` AND `< the smallest shipped context window`)
+  instead of the number.
+- bible-worthy: yes -- "a generation request derived from a SCHEMA ceiling
+  rather than the job in hand can exceed the model's entire context, and a test
+  that pins the constant agrees with it".
+- status: FIXED, suite green. NOT yet live-proven -- it blocked the D2
+  qualifying leg, so the re-run proves both.
+

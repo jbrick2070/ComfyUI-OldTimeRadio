@@ -1,0 +1,36 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "machine_stops",
+  "unit": "main",
+  "work_title": "The Eternal Moment and Other Stories",
+  "author": "E. M. Forster",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/72890/pg72890.txt",
+  "body_sha256": "60fb0be81b1164c8fb6a926ab7c10e9c6fb4e14c8c4b0285c1c7c2035287c709",
+  "body_bytes": 68478,
+  "body_words": 12162,
+  "text_path": "config/source_banks/public_domain_story/sources/machine_stops.txt",
+  "characters": [
+    {
+      "name": "Vashti",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 6 vs she/her/hers 74 across 32 mention window(s) for 'vashti'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Kuno",
+      "the voice of the Machine"
+    ]
+  }
+}

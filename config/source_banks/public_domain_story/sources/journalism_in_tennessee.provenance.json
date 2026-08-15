@@ -1,0 +1,40 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "journalism_in_tennessee",
+  "unit": "main",
+  "work_title": "Sketches New and Old",
+  "author": "Mark Twain",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/3189/pg3189.txt",
+  "body_sha256": "dddd89e39db6c5a9285188adaae42328d209ece3c032172bd00672caa641cd2d",
+  "body_bytes": 13311,
+  "body_words": 2280,
+  "text_path": "config/source_banks/public_domain_story/sources/journalism_in_tennessee.txt",
+  "characters": [
+    {
+      "name": "the chief editor",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 24 vs she/her/hers 0 across 10 mention window(s) for 'the chief editor', 'chief editor'; ignored shared form(s) ['editor']",
+      "aliases": [
+        "chief editor",
+        "editor"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the new associate editor",
+      "armed callers"
+    ]
+  }
+}

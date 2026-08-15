@@ -1,0 +1,48 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "open_window",
+  "unit": "main",
+  "work_title": "Beasts and Super-Beasts",
+  "author": "Saki",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/269/pg269.txt",
+  "body_sha256": "a49f3ee057f61782605b5ab54c75d60313c713dabd1370e00f3832a7b2a6c374",
+  "body_bytes": 7047,
+  "body_words": 1211,
+  "text_path": "config/source_banks/public_domain_story/sources/open_window.txt",
+  "characters": [
+    {
+      "name": "Framton Nuttel",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 11 vs she/her/hers 0 across 4 mention window(s) for 'framton nuttel', 'nuttel'",
+      "aliases": [
+        "nuttel"
+      ]
+    },
+    {
+      "name": "Mrs. Sappleton",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Sappleton' contains a gendered title or relation word",
+      "aliases": [
+        "sappleton"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Vera"
+    ]
+  }
+}

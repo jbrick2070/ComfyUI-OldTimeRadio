@@ -1,0 +1,40 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "anne_green_gables_apology",
+  "unit": "main",
+  "work_title": "Anne of Green Gables",
+  "author": "L. M. Montgomery",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/45/pg45.txt",
+  "body_sha256": "8078dbd03d7317789797320ec7957cc59411bb837b5886c2083584d2644987fc",
+  "body_bytes": 27883,
+  "body_words": 4840,
+  "text_path": "config/source_banks/public_domain_story/sources/anne_green_gables_apology.txt",
+  "characters": [
+    {
+      "name": "Mrs. Rachel Lynde",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Rachel Lynde' contains a gendered title or relation word",
+      "aliases": [
+        "lynde"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Anne Shirley",
+      "Marilla Cuthbert",
+      "Matthew Cuthbert"
+    ]
+  }
+}

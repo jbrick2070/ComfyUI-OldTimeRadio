@@ -1,0 +1,35 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "cask_amontillado",
+  "unit": "main",
+  "work_title": "The Cask of Amontillado",
+  "author": "Edgar Allan Poe",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1063/pg1063.txt",
+  "body_sha256": "ce6314c91489c8442ff5b2e97e0abe27d9c7b2e5083b05a0b29f4972794b2445",
+  "body_bytes": 13072,
+  "body_words": 2317,
+  "text_path": "config/source_banks/public_domain_story/sources/cask_amontillado.txt",
+  "characters": [
+    {
+      "name": "Fortunato",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 38 vs she/her/hers 3 across 14 mention window(s) for 'fortunato'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [
+      "Montresor"
+    ]
+  }
+}

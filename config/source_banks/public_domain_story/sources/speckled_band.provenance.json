@@ -1,0 +1,49 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "speckled_band",
+  "unit": "main",
+  "work_title": "The Adventures of Sherlock Holmes",
+  "author": "Arthur Conan Doyle",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1661/pg1661.txt",
+  "body_sha256": "93c6334e3c52347bb431f226ad3a82095df07af385adbd6a423003469952ead9",
+  "body_bytes": 54096,
+  "body_words": 9812,
+  "text_path": "config/source_banks/public_domain_story/sources/speckled_band.txt",
+  "characters": [
+    {
+      "name": "Sherlock Holmes",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 114 vs she/her/hers 26 across 63 mention window(s) for 'sherlock holmes', 'holmes'",
+      "aliases": [
+        "holmes"
+      ]
+    },
+    {
+      "name": "Dr. Watson",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 8 vs she/her/hers 2 across 13 mention window(s) for 'dr. watson', 'watson'",
+      "aliases": [
+        "watson"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Helen Stoner",
+      "Dr. Grimesby Roylott"
+    ]
+  }
+}

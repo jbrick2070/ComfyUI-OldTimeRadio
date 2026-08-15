@@ -1,0 +1,36 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "wuthering_heights_window",
+  "unit": "main",
+  "work_title": "Wuthering Heights",
+  "author": "Emily Bronte",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/768/pg768.txt",
+  "body_sha256": "00729823f93f0a21bde767670c298fd448fd84d5056103a72baf51f286cfc0e8",
+  "body_bytes": 27754,
+  "body_words": 4806,
+  "text_path": "config/source_banks/public_domain_story/sources/wuthering_heights_window.txt",
+  "characters": [
+    {
+      "name": "Lockwood",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 12 vs she/her/hers 0 across 2 mention window(s) for 'lockwood'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Heathcliff",
+      "the voice at the glass"
+    ]
+  }
+}

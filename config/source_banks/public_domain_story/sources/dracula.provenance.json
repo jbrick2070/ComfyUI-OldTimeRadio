@@ -1,0 +1,57 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "dracula",
+  "unit": "main",
+  "work_title": "Dracula",
+  "author": "Bram Stoker",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/345/pg345.txt",
+  "body_sha256": "43b8762c7d2c62c51270b7f7897980299fefd784814745a3cc752e6c8866f9b5",
+  "body_bytes": 59116,
+  "body_words": 11215,
+  "text_path": "config/source_banks/public_domain_story/sources/dracula.txt",
+  "characters": [
+    {
+      "name": "Jonathan Harker",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 10 vs she/her/hers 0 across 8 mention window(s) for 'jonathan harker', 'harker'",
+      "aliases": [
+        "harker"
+      ]
+    },
+    {
+      "name": "Count Dracula",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Count Dracula' contains a gendered title or relation word",
+      "aliases": [
+        "dracula"
+      ]
+    },
+    {
+      "name": "the coach driver",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 11 vs she/her/hers 0 across 4 mention window(s) for 'the coach driver', 'coach driver', 'driver'",
+      "aliases": [
+        "coach driver",
+        "driver"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "three_men_boat_pineapple",
+  "unit": "main",
+  "work_title": "Three Men in a Boat",
+  "author": "Jerome K. Jerome",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/308/pg308.txt",
+  "body_sha256": "0b3a084ad6efc0144eb78b3fa7f601ac0662b26769335881dacd16f41322074f",
+  "body_bytes": 24331,
+  "body_words": 4512,
+  "text_path": "config/source_banks/public_domain_story/sources/three_men_boat_pineapple.txt",
+  "characters": [
+    {
+      "name": "George",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 22 vs she/her/hers 0 across 20 mention window(s) for 'george'"
+    },
+    {
+      "name": "Harris",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 42 vs she/her/hers 1 across 30 mention window(s) for 'harris'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "J."
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "miss_mix",
+  "unit": "main",
+  "work_title": "Condensed Novels",
+  "author": "Bret Harte",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/2277/pg2277.txt",
+  "body_sha256": "7de8ac44a80258ef43fb1aef9ec1cdb9a2eb4d85ca1f41250ccac20e175cb91a",
+  "body_bytes": 16071,
+  "body_words": 2789,
+  "text_path": "config/source_banks/public_domain_story/sources/miss_mix.txt",
+  "characters": [
+    {
+      "name": "Miss Mix",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Miss Mix' contains a gendered title or relation word",
+      "aliases": [
+        "mix"
+      ]
+    },
+    {
+      "name": "Mr. Rawjester",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Rawjester' contains a gendered title or relation word",
+      "aliases": [
+        "rawjester"
+      ]
+    },
+    {
+      "name": "the housekeeper",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 6 vs she/her/hers 2 across 13 mention window(s) for 'the housekeeper', 'housekeeper'",
+      "aliases": [
+        "housekeeper"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

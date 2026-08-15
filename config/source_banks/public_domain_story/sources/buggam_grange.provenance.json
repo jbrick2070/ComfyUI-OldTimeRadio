@@ -1,0 +1,39 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "buggam_grange",
+  "unit": "main",
+  "work_title": "Winsome Winnie and Other New Nonsense Novels",
+  "author": "Stephen Leacock",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/20633/pg20633.txt",
+  "body_sha256": "b951e89155b3dd458b7542763f1325c1b342487e2186b3617b86faa9405ce167",
+  "body_bytes": 16747,
+  "body_words": 3091,
+  "text_path": "config/source_banks/public_domain_story/sources/buggam_grange.txt",
+  "characters": [
+    {
+      "name": "Horrod the butler",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Horrod the butler' contains a gendered title or relation word",
+      "aliases": [
+        "butler"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the narrator",
+      "the phantasm"
+    ]
+  }
+}

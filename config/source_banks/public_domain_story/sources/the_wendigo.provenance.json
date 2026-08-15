@@ -1,0 +1,52 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "the_wendigo",
+  "unit": "main",
+  "work_title": "The Wendigo",
+  "author": "Algernon Blackwood",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/10897/pg10897.txt",
+  "body_sha256": "ab10add79dfb604d1e7dbe862c31cc1a19fe092f506b03f3a0f39f53335138d9",
+  "body_bytes": 106588,
+  "body_words": 18423,
+  "text_path": "config/source_banks/public_domain_story/sources/the_wendigo.txt",
+  "characters": [
+    {
+      "name": "Simpson",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 165 vs she/her/hers 1 across 68 mention window(s) for 'simpson'"
+    },
+    {
+      "name": "Dr. Cathcart",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 176 vs she/her/hers 0 across 62 mention window(s) for 'dr. cathcart', 'cathcart'",
+      "aliases": [
+        "cathcart"
+      ]
+    },
+    {
+      "name": "Hank",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 153 vs she/her/hers 0 across 59 mention window(s) for 'hank'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Defago"
+    ]
+  }
+}

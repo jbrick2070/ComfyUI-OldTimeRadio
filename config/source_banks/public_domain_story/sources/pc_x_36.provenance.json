@@ -1,0 +1,39 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "pc_x_36",
+  "unit": "main",
+  "work_title": "A Christmas Garland",
+  "author": "Max Beerbohm",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/14667/pg14667.txt",
+  "body_sha256": "3b30028a1a03d210e823c068554a078856503451ff0bad11c508188ecb931899",
+  "body_bytes": 7800,
+  "body_words": 1392,
+  "text_path": "config/source_banks/public_domain_story/sources/pc_x_36.txt",
+  "characters": [
+    {
+      "name": "Constable X 36",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Constable X 36' contains a gendered title or relation word",
+      "aliases": [
+        "36"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Santa Claus",
+      "the narrator"
+    ]
+  }
+}

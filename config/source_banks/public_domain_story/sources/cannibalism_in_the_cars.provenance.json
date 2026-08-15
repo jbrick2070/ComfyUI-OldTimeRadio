@@ -1,0 +1,49 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "cannibalism_in_the_cars",
+  "unit": "main",
+  "work_title": "Sketches New and Old",
+  "author": "Mark Twain",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/3189/pg3189.txt",
+  "body_sha256": "5db2256d7f3a4e6a193f2edcfe36a9a45bad7e2ad3d8941ffdcfb0db5ebe6d24",
+  "body_bytes": 18884,
+  "body_words": 3239,
+  "text_path": "config/source_banks/public_domain_story/sources/cannibalism_in_the_cars.txt",
+  "characters": [
+    {
+      "name": "Mr. Bascom",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Bascom' contains a gendered title or relation word",
+      "aliases": [
+        "bascom"
+      ]
+    },
+    {
+      "name": "Mr. Gaston",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Gaston' contains a gendered title or relation word",
+      "aliases": [
+        "gaston"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "the narrator",
+      "the courtly stranger"
+    ]
+  }
+}

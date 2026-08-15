@@ -1,0 +1,38 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "munchausen",
+  "unit": "main",
+  "work_title": "The Surprising Adventures of Baron Munchausen",
+  "author": "Rudolf Erich Raspe",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/3154/pg3154.txt",
+  "body_sha256": "6b2f68e5a9062951d1d7ae36c491512fa89ca0f41be25576e261bae908c22611",
+  "body_bytes": 27833,
+  "body_words": 5125,
+  "text_path": "config/source_banks/public_domain_story/sources/munchausen.txt",
+  "characters": [
+    {
+      "name": "Baron Munchausen",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Baron Munchausen' contains a gendered title or relation word",
+      "aliases": [
+        "munchausen"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [
+      "a credulous listener"
+    ]
+  }
+}

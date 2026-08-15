@@ -1,0 +1,58 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "queer_feet",
+  "unit": "main",
+  "work_title": "The Innocence of Father Brown",
+  "author": "G. K. Chesterton",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/204/pg204.txt",
+  "body_sha256": "aa5176dae52fe065885c345bbff4730e6f799fab921b8e981ebf36e3a60ef924",
+  "body_bytes": 42732,
+  "body_words": 7620,
+  "text_path": "config/source_banks/public_domain_story/sources/queer_feet.txt",
+  "characters": [
+    {
+      "name": "Father Brown",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Father Brown' contains a gendered title or relation word",
+      "aliases": [
+        "brown"
+      ]
+    },
+    {
+      "name": "Mr. Lever",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Lever' contains a gendered title or relation word",
+      "aliases": [
+        "lever"
+      ]
+    },
+    {
+      "name": "a colonel",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 50 vs she/her/hers 0 across 21 mention window(s) for 'a colonel', 'colonel'",
+      "aliases": [
+        "colonel"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Flambeau"
+    ]
+  }
+}

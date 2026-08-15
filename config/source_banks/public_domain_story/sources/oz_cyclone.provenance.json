@@ -1,0 +1,56 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "oz_cyclone",
+  "unit": "main",
+  "work_title": "The Wonderful Wizard of Oz",
+  "author": "L. Frank Baum",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/55/pg55.txt",
+  "body_sha256": "1589e5a2d94aa2bf0f0c3871cbf0bf2c18cbbe9bee5de810aef7a863367b0d6a",
+  "body_bytes": 16895,
+  "body_words": 3149,
+  "text_path": "config/source_banks/public_domain_story/sources/oz_cyclone.txt",
+  "characters": [
+    {
+      "name": "Dorothy",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 21 vs she/her/hers 77 across 48 mention window(s) for 'dorothy'"
+    },
+    {
+      "name": "Aunt Em",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Aunt Em' contains a gendered title or relation word",
+      "aliases": [
+        "em"
+      ]
+    },
+    {
+      "name": "the Good Witch of the North",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'the Good Witch of the North' contains a gendered title or relation word",
+      "aliases": [
+        "good witch of the north",
+        "north"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "a Munchkin"
+    ]
+  }
+}

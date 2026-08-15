@@ -1,0 +1,40 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "buck_rogers",
+  "unit": "main",
+  "work_title": "Armageddon 2419 A.D.",
+  "author": "Philip Francis Nowlan",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/32530/pg32530.txt",
+  "body_sha256": "c073514a95b87e92baca9d3cf5f252bb1e99d86e4984d1fc94e2ebc500e36ba8",
+  "body_bytes": 21735,
+  "body_words": 3785,
+  "text_path": "config/source_banks/public_domain_story/sources/buck_rogers.txt",
+  "characters": [
+    {
+      "name": "a Han patrol",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 0 vs she/her/hers 4 across 2 mention window(s) for 'a han patrol', 'han patrol', 'patrol'",
+      "aliases": [
+        "han patrol",
+        "patrol"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Anthony Rogers",
+      "Wilma Deering"
+    ]
+  }
+}

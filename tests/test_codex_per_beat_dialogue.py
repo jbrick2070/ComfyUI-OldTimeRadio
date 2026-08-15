@@ -116,6 +116,14 @@ def _score() -> lane.RadioScoreV4:
     )
 
 
+#: The smallest context window any shipped writer offers -- the `context_window`
+#: default in `_otr_model_catalog`, which `gemma-4-12b-it` (the saved
+#: runtime-qualified default) carries. A generation request at or above this can
+#: never be served, however short the prompt is, so it is a hard ceiling on any
+#: `max_new_tokens` the lane asks for rather than a tuning target.
+_SMALLEST_SHIPPED_CONTEXT_WINDOW = 8192
+
+
 class _Schedule:
     """Records every job and answers each with `text_for(line_id)`."""
 
@@ -332,13 +340,24 @@ def test_every_job_carries_its_own_right_sized_decode_budget(monkeypatch):
         assert job["max_new_tokens"] == lane._BEAT_TEXT_MAX_OUTPUT_TOKENS
         assert job["prompt_must_fit"] is True
     for job in schedule.of("P5R"):
-        assert job["max_new_tokens"] == lane._SCENE_REVIEW_MAX_OUTPUT_TOKENS
+        # SIZED TO THE SCENE IN HAND, not to the schema ceiling. This assertion
+        # used to read `== lane._SCENE_REVIEW_MAX_OUTPUT_TOKENS`, and that
+        # constant was 8320 against an 8192-token context window -- so the test
+        # passed by agreeing with a request that could never be served, and a
+        # live scifi_news leg died on it at 10:18 (PBUG-20260815-10). Pin the
+        # PROPERTY that matters instead of the number that was wrong.
+        assert job["max_new_tokens"] == lane.scene_review_output_tokens(
+            len(job["artifact_inputs"]["scene_line_ids"]))
         assert job["prompt_must_fit"] is True
+        assert job["max_new_tokens"] < _SMALLEST_SHIPPED_CONTEXT_WINDOW, (
+            "a request larger than the whole context can never be served, "
+            "however short the prompt is"
+        )
     # The beat budget is a fraction of the scene's, which is a fraction of a
     # whole script -- the property that makes it a right-sized job rather
     # than a relabelled ceiling.
     assert lane._BEAT_TEXT_MAX_OUTPUT_TOKENS < \
-        lane._SCENE_REVIEW_MAX_OUTPUT_TOKENS
+        lane.scene_review_output_tokens(lane._RADIO_SCORE_MAX_BEATS_PER_SCENE)
 
 
 def test_the_beat_array_ceiling_is_the_beats_own(monkeypatch):

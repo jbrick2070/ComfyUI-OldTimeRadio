@@ -1,0 +1,63 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "tobermory",
+  "unit": "main",
+  "work_title": "The Chronicles of Clovis",
+  "author": "Saki",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/3688/pg3688.txt",
+  "body_sha256": "2dc70be6ebae4194c67ceb5bc7fdd5648d19834e45b92da1be24a92ca050c1bb",
+  "body_bytes": 16293,
+  "body_words": 2718,
+  "text_path": "config/source_banks/public_domain_story/sources/tobermory.txt",
+  "characters": [
+    {
+      "name": "Tobermory",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 30 vs she/her/hers 3 across 28 mention window(s) for 'tobermory'"
+    },
+    {
+      "name": "Mr. Appin",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. Appin' contains a gendered title or relation word",
+      "aliases": [
+        "appin"
+      ]
+    },
+    {
+      "name": "Lady Blemley",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Lady Blemley' contains a gendered title or relation word",
+      "aliases": [
+        "blemley"
+      ]
+    },
+    {
+      "name": "Mrs. Cornett",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Cornett' contains a gendered title or relation word",
+      "aliases": [
+        "cornett"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 4,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": []
+  }
+}

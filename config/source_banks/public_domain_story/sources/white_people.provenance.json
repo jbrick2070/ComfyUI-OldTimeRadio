@@ -1,0 +1,50 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "white_people",
+  "unit": "main",
+  "work_title": "The House of Souls",
+  "author": "Arthur Machen",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/25016/pg25016.txt",
+  "body_sha256": "f52413e8784b07a26dd6f65c90b41d8d3f0425e7e8f2617849078405100baf12",
+  "body_bytes": 89175,
+  "body_words": 17512,
+  "text_path": "config/source_banks/public_domain_story/sources/white_people.txt",
+  "characters": [
+    {
+      "name": "the girl",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'the girl' contains a gendered title or relation word",
+      "aliases": [
+        "girl"
+      ]
+    },
+    {
+      "name": "Ambrose",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 15 vs she/her/hers 4 across 14 mention window(s) for 'ambrose'"
+    },
+    {
+      "name": "Cotgrave",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 17 vs she/her/hers 1 across 16 mention window(s) for 'cotgrave'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

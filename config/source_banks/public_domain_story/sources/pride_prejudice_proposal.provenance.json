@@ -1,0 +1,28 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "pride_prejudice_proposal",
+  "unit": "main",
+  "work_title": "Pride and Prejudice",
+  "author": "Jane Austen",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1342/pg1342.txt",
+  "body_sha256": "9a17138743452378a041098ed887cc4380e75ce1bb5b682ce98e30929c0c9c8d",
+  "body_bytes": 12209,
+  "body_words": 2105,
+  "text_path": "config/source_banks/public_domain_story/sources/pride_prejudice_proposal.txt",
+  "characters": [],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 0,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [
+      "Elizabeth Bennet",
+      "Fitzwilliam Darcy"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "the_mezzotint",
+  "unit": "main",
+  "work_title": "Ghost Stories of an Antiquary",
+  "author": "M. R. James",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/8486/pg8486.txt",
+  "body_sha256": "932e4afe11a237792e6616939161aae8ec30d406f278b502d250a10fad2ad82c",
+  "body_bytes": 25416,
+  "body_words": 4540,
+  "text_path": "config/source_banks/public_domain_story/sources/the_mezzotint.txt",
+  "characters": [
+    {
+      "name": "Williams",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 90 vs she/her/hers 0 across 40 mention window(s) for 'williams'"
+    },
+    {
+      "name": "Nisbet",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 19 vs she/her/hers 0 across 14 mention window(s) for 'nisbet'"
+    },
+    {
+      "name": "Filcher",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 5 vs she/her/hers 0 across 1 mention window(s) for 'filcher'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "a colleague"
+    ]
+  }
+}

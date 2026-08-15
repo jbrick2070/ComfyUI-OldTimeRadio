@@ -1,0 +1,40 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "water_ghost",
+  "unit": "main",
+  "work_title": "The Water Ghost and Others",
+  "author": "John Kendrick Bangs",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/8377/pg8377.txt",
+  "body_sha256": "d145d0afcf9871d0228ad6c229db5af9c27c3785a8884da52aedcf3f878fada4",
+  "body_bytes": 18661,
+  "body_words": 3373,
+  "text_path": "config/source_banks/public_domain_story/sources/water_ghost.txt",
+  "characters": [
+    {
+      "name": "the heir of Harrowby",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 67 vs she/her/hers 6 across 34 mention window(s) for 'the heir of harrowby', 'heir of harrowby', 'harrowby'",
+      "aliases": [
+        "heir of harrowby",
+        "harrowby"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the water ghost",
+      "the narrator"
+    ]
+  }
+}

@@ -528,8 +528,17 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
     assert schedule["scene_review_jobs"] == len(score.scenes)
     assert schedule["beat_dialogue_max_new_tokens"] == \
         lane._BEAT_TEXT_MAX_OUTPUT_TOKENS
-    assert schedule["scene_review_max_new_tokens"] == \
-        lane._SCENE_REVIEW_MAX_OUTPUT_TOKENS
+    # The LARGEST review request this run actually made. It used to be a
+    # constant (8320) that exceeded the 8192-token context window, so every
+    # journal recorded a budget no call could ever have been served
+    # (PBUG-20260815-10); a receipt naming a number nothing used is how that
+    # went unnoticed.
+    assert schedule["scene_review_max_new_tokens"] == max(
+        lane.scene_review_output_tokens(
+            sum(len(beat.line_ids) for beat in scene.beats))
+        for scene in score.scenes
+    )
+    assert schedule["scene_review_max_new_tokens"] < 8192
     assert state["p3_calls"] == state["p5_calls"] == 1
     assert state["p3_max_new_tokens"] is None
     assert state["p3_score"] is state["p5_score"] is state["assembled_score"]

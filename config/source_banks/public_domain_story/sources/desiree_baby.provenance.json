@@ -1,0 +1,29 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "desiree_baby",
+  "unit": "main",
+  "work_title": "The Awakening and Selected Short Stories",
+  "author": "Kate Chopin",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/160/pg160.txt",
+  "body_sha256": "7ec9447366f1cb4a2502fe995d976fb37065a269fe0e3c3bdba1172f9423bc05",
+  "body_bytes": 12102,
+  "body_words": 2145,
+  "text_path": "config/source_banks/public_domain_story/sources/desiree_baby.txt",
+  "characters": [],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 0,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "Desiree",
+      "Armand Aubigny",
+      "Madame Valmonde"
+    ]
+  }
+}

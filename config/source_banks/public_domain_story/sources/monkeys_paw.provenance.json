@@ -1,0 +1,66 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "monkeys_paw",
+  "unit": "main",
+  "work_title": "The Monkey's Paw",
+  "author": "W. W. Jacobs",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/12122/pg12122.txt",
+  "body_sha256": "ddc6b66b7ee8f0074d1315c96e3efc780bfdb10172f5078ae8d494304793fa94",
+  "body_bytes": 22824,
+  "body_words": 3954,
+  "text_path": "config/source_banks/public_domain_story/sources/monkeys_paw.txt",
+  "characters": [
+    {
+      "name": "Mr. White",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mr. White' contains a gendered title or relation word",
+      "aliases": [
+        "white"
+      ]
+    },
+    {
+      "name": "Mrs. White",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. White' contains a gendered title or relation word",
+      "aliases": [
+        "white"
+      ]
+    },
+    {
+      "name": "Herbert White",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 4 vs she/her/hers 0 across 2 mention window(s) for 'herbert white'; ignored shared form(s) ['white']",
+      "aliases": [
+        "white"
+      ]
+    },
+    {
+      "name": "Sergeant-Major Morris",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 16 vs she/her/hers 0 across 6 mention window(s) for 'sergeant-major morris', 'morris'",
+      "aliases": [
+        "morris"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 4,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "man_size_in_marble",
+  "unit": "main",
+  "work_title": "Grim Tales",
+  "author": "E. Nesbit",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/40321/pg40321.txt",
+  "body_sha256": "d28cb0061f6c755c188db0da114ee4b7543d105a29ee6fc1841ff3a5005712d2",
+  "body_bytes": 23069,
+  "body_words": 4262,
+  "text_path": "config/source_banks/public_domain_story/sources/man_size_in_marble.txt",
+  "characters": [
+    {
+      "name": "Mrs. Dorman",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Dorman' contains a gendered title or relation word",
+      "aliases": [
+        "dorman"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Jack",
+      "Laura",
+      "Dr. Kelly"
+    ]
+  }
+}

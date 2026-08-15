@@ -1,0 +1,55 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "enoch_soames",
+  "unit": "main",
+  "work_title": "Seven Men",
+  "author": "Max Beerbohm",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1306/pg1306.txt",
+  "body_sha256": "5e09387c707a0396f29cf7577e2e2c5e6b0e9e9b1e90234a0bf4a9383a09a2aa",
+  "body_bytes": 63014,
+  "body_words": 11048,
+  "text_path": "config/source_banks/public_domain_story/sources/enoch_soames.txt",
+  "characters": [
+    {
+      "name": "Enoch Soames",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 290 vs she/her/hers 4 across 130 mention window(s) for 'enoch soames', 'soames'",
+      "aliases": [
+        "soames"
+      ]
+    },
+    {
+      "name": "the Devil",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 128 vs she/her/hers 2 across 52 mention window(s) for 'the devil', 'devil'",
+      "aliases": [
+        "devil"
+      ]
+    },
+    {
+      "name": "Rothenstein",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 52 vs she/her/hers 0 across 25 mention window(s) for 'rothenstein'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Max"
+    ]
+  }
+}

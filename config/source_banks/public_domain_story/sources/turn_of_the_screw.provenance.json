@@ -1,0 +1,53 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "turn_of_the_screw",
+  "unit": "main",
+  "work_title": "The Turn of the Screw",
+  "author": "Henry James",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/209/pg209.txt",
+  "body_sha256": "c77216ed4f9eb858aada2593fac937abc7dcb465b23ad18cb3bd380ede598877",
+  "body_bytes": 18294,
+  "body_words": 3316,
+  "text_path": "config/source_banks/public_domain_story/sources/turn_of_the_screw.txt",
+  "characters": [
+    {
+      "name": "the Governess",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'the Governess' contains a gendered title or relation word",
+      "aliases": [
+        "governess"
+      ]
+    },
+    {
+      "name": "Miles",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 30 vs she/her/hers 1 across 7 mention window(s) for 'miles'"
+    },
+    {
+      "name": "Mrs. Grose",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "the source's own name for this character states the gender: 'Mrs. Grose' contains a gendered title or relation word",
+      "aliases": [
+        "grose"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": []
+  }
+}

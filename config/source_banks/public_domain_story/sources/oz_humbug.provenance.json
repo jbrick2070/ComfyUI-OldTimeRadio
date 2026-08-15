@@ -1,0 +1,57 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "oz_humbug",
+  "unit": "main",
+  "work_title": "The Wonderful Wizard of Oz",
+  "author": "L. Frank Baum",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/55/pg55.txt",
+  "body_sha256": "53156d5494795cac732ab413d26685027163a83aa498e801739933792efb55e1",
+  "body_bytes": 14943,
+  "body_words": 2761,
+  "text_path": "config/source_banks/public_domain_story/sources/oz_humbug.txt",
+  "characters": [
+    {
+      "name": "the Tin Woodman",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 18 vs she/her/hers 6 across 24 mention window(s) for 'the tin woodman', 'tin woodman', 'woodman'",
+      "aliases": [
+        "tin woodman",
+        "woodman"
+      ]
+    },
+    {
+      "name": "the Lion",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 20 vs she/her/hers 4 across 13 mention window(s) for 'the lion', 'lion'",
+      "aliases": [
+        "lion"
+      ]
+    },
+    {
+      "name": "Oz",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 22 vs she/her/hers 7 across 28 mention window(s) for 'oz'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 3,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 5,
+    "declined": [
+      "Dorothy",
+      "the Scarecrow"
+    ]
+  }
+}

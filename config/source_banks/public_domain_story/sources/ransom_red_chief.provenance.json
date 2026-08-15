@@ -1,0 +1,37 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "ransom_red_chief",
+  "unit": "main",
+  "work_title": "Whirligigs",
+  "author": "O. Henry",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/1595/pg1595.txt",
+  "body_sha256": "938ce03d1f11a6d711ea1b6a11ae8cd7d2dc43447afbe29df92ba043e65447f4",
+  "body_bytes": 14176,
+  "body_words": 2578,
+  "text_path": "config/source_banks/public_domain_story/sources/ransom_red_chief.txt",
+  "characters": [
+    {
+      "name": "Sam",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 9 vs she/her/hers 0 across 8 mention window(s) for 'sam'"
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 1,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Bill Driscoll",
+      "Johnny",
+      "Ebenezer Dorset"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "alice_tea_party",
+  "unit": "main",
+  "work_title": "Alice's Adventures in Wonderland",
+  "author": "Lewis Carroll",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/11/pg11.txt",
+  "body_sha256": "da67ff08a7e1ae834a920a3b6cbb002b013e90a4c70ca81564d54b8597a8668b",
+  "body_bytes": 13516,
+  "body_words": 2287,
+  "text_path": "config/source_banks/public_domain_story/sources/alice_tea_party.txt",
+  "characters": [],
+  "gender_ladder": {
+    "version": "gender_ladder_v1",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 0,
+      "llm_web": 0,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "Alice",
+      "the Hatter",
+      "the March Hare",
+      "the Dormouse"
+    ]
+  }
+}
