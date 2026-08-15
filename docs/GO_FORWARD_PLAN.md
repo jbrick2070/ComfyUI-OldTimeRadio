@@ -34,20 +34,35 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10711 / 110 / 1**, Bible **20 / 26 / 3**
-(the Bible now holds **283** entries -- `12.103` landed with chunk 2, `12.105`
-with chunk 3.5, `12.104` with D2's transaction), variants 50 emitted
-(3 refused -- the standing unratified cloud profiles). (10532 -> 10561
-specification session; -> 10608 chunk 0.5; -> 10610, 10613, 10624 the three agy
-QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5 / D3; -> 10683 D2's
-transition schema + the rename fix; -> 10711 D2's emitter + transaction.
-No regressions at any step.)
+**BASELINES to detect drift:** suite **10729 / 110 / 1**, Bible **20 / 26 / 3**
+(the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
+with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
+budget), variants 50 emitted (3 refused -- the standing unratified cloud
+profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610,
+10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5
+/ D3; -> 10683 D2's transition schema + the rename fix; -> 10711 D2's emitter +
+transaction; -> 10729 D4's sidecars + the P5R budget fix. No regressions at any
+step.)
 
 **A Bible entry now costs a README bump.** The survival-guide repo enforces a
 Three-File Contract -- `BUG_BIBLE.yaml`'s entry count must equal the count cited
 in `README.md`, in three places -- so adding an entry and not touching the
 README turns `tests/bug_bible_regression.py` red (20/26/3 became 19+1F/26/3 on
 `12.104` until the README said 283). Bump both in the same commit.
+
+**NEVER EDIT A TRACKED FILE WHILE THE SUITE IS RUNNING.** Cost this window: two
+phantom regressions (`test_p0_deterministic_repair_wired`,
+`test_scifi_candidate_liveness`) that both pass clean on a settled tree. Several
+tests AST-parse `nodes/*.py` off disk, so a mid-run edit produces a torn read
+that looks exactly like a real break and costs a full re-run to disprove. Start
+the suite, then keep your hands off the tree until it reports.
+
+**THE MODEL & CREDIT BUDGET LADDER IS EMPTY.** The table at the "MODEL & CREDIT
+BUDGET" heading below has a header row and a separator and **no rows under
+them**, so the rungs every window is asked to cite do not exist in this
+document. Windows are currently answering from the per-window mapping paragraph
+beneath it. Either restore the rungs or retire the instruction; asking each
+window to state a rung from an empty table is a question with no answer.
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
@@ -109,27 +124,54 @@ a proof it could not reconcile. New module `nodes/_otr_clean_transaction.py`,
 the 1-in-3 exposure on `roll (any eligible bank)` is only *believed* closed
 until those two legs pass. Do not record the lane as fixed on the suite alone.
 
-**2. Then chunk 0.75 (D4 vendor gate) -- PROMOTED IN URGENCY.** Check
-`.claude/worktrees/awesome-brahmagupta-a509b4/` first -- it already holds a full
-set of provenance sidecars, which is exactly what 0.75 builds, so another window
-may be on it. **A THIRD live gender instance landed 2026-08-15 and its root
-cause is now confirmed on the artifact, not inferred:** the operator heard
-**AHAB** -- unambiguously male in Moby-Dick -- speaking with a female voice in
-`signal_lost_the_price_of_a_soul_20260815_132024`. That episode's
-`meta.cast_source_contract.gender_by_name` is `{}`, and `moby_dick_quarterdeck`
-has **no provenance sidecar**. Only 16 sidecars exist tree-wide (15
-`shakespeare` + `time_machine__arrival`), so **64 of 65 public_domain units
-carry no gender facts at all**.
+**2. D4's DATA GAP IS CLOSED (2026-08-15) -- the sidecars are written.** All
+**65** public_domain units now carry a provenance sidecar with a `characters`
+roster; before this there were 16 tree-wide and 64 of 65 units held no gender
+fact at all. Stamper: `scripts/otr_stamp_character_genders.py`; the scan:
+`nodes/_otr_gender_pronoun_scan.py`. Re-running writes 0 files, so it is
+genuinely idempotent -- the staleness identity is the CONTENT, never `ran_utc`.
 
-**The operator proposed an A/B/C local-LLM gender bakeoff plus possible web
-search. Both are the wrong instrument and the evidence says so.** Neither
-answers "how do we know Ahab is male" -- that question is not failing, because
-Melville's own text says "he" throughout. What fails is that the FIELD built to
-carry the fact is empty for 64 of 65 units. A better prompt cannot fill a
-sidecar that was never written, and a web search would add a cloud dependency
-against the standing 100%-local rule to fetch a fact the source already states.
-Build the sidecars; the gap is plumbing, not knowledge. (This restates the
-existing section B ruling, now with a third instance behind it.)
+**THE PLUMBING WAS ALREADY COMPLETE, AND THAT IS THE LESSON.**
+`source_meta_from_unit` (`_otr_public_domain_sources.py:565-567`) already loaded
+the sidecar's `characters` into `source_meta`, and
+`OTR_LedgerScriptWriter.py:4335` already joined the cast names against it. Every
+link existed; only the DATA was missing. A correct pipeline over absent data
+looks exactly like a correct pipeline, which is why a green suite never noticed
+and only a listener could. **No render-path code changed for D4.**
+
+Proven through the real join, with the cast names spelled the way the failing
+artifacts spelled them: **AHAB -> male** (61-0, joining "Captain Ahab" via the
+`short_form` tier), **GERTRUDE -> female** (31-101), **LORD RONALD -> male**.
+`gender_by_name` goes from `{}` to populated. 18 tests in
+`tests/test_character_gender_sidecars.py`, anchored on the REAL sidecars rather
+than invented fixtures.
+
+**COVERAGE IS 133 OF 219 CANDIDATES, AND THE 86 DECLINES ARE DELIBERATE.** A
+name the ladder cannot decide is OMITTED from the sidecar, so downstream it is a
+join miss and keeps today's roll -- a no-change, never an `unknown` row anyone
+has to branch on. **Do not loosen the margin to raise that number:** measured,
+DOROTHY of Oz scores male 8 / female 3 under a first-pronoun-only estimator
+because her scene is crowded with the Scarecrow and the Lion. A looser threshold
+buys a confident lie in the same shape as the bug, not coverage.
+
+**WEB SEARCH IS NOW ALLOWED (operator, 2026-08-15, stated twice).** The earlier
+"web search breaks the 100%-local rule" ruling is WITHDRAWN -- the operator's
+reasoning is that the pipeline already fetches RSS as standard, so a remote
+lookup at VENDOR time is not a new class of dependency. That reopens the SPEC's
+tier 3 (LLM + web, character-in-work) and tier 4 (name frequency) for the 86
+stragglers. The A/B/C local-LLM *bakeoff* remains rejected on separate grounds:
+comparing models does not fill a field that was never written.
+
+**THE STRAGGLER LIST IS A MEASURED ARTIFACT, not a guess** -- run
+`scripts/otr_stamp_character_genders.py` (no `--write`) and it prints every
+declined name with its source. Aim tier 3 at that list; do not re-vendor all 65.
+
+**NOT part of this window's work:** `config/source_banks/_corpus/` (a fetched
+Gutenberg corpus, `_vendor_report.json` = 63 ok / 3 failed) and
+`docs/H3_LICENSE_ATTESTATION*.md` remain UNTRACKED and were never staged. That
+sidecar generation feeds **D5** identity fields (`work_title` / `author` /
+`license_label`), not D4's gender fields -- same file, same generator, two
+consumers. Worth knowing before anyone assumes it covers this.
 
 The chunk order is in the contract; it is not the defect order and two of its
 edges are load-bearing:

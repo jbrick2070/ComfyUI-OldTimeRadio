@@ -3,6 +3,72 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD e8da2920 (v2.0-alpha) -- CODER (D4's sidecars land, and the leg meant to prove D2 found a pass that could never have run)
+
+Did: **Closed D4's data gap.** All **65** public_domain units now carry a
+provenance sidecar with a `characters` roster; there were 16 tree-wide before,
+so 64 of 65 units held no gender fact at all and
+`cast_source_contract.gender_by_name` shipped `{}` on every episode.
+
+**The finding that matters more than the fix: the plumbing was already
+complete.** `source_meta_from_unit` (`_otr_public_domain_sources.py:565-567`)
+already loaded the sidecar's `characters` into `source_meta`, and
+`OTR_LedgerScriptWriter.py:4335` already joined the cast against it. Every link
+existed and only the DATA was missing -- so **no render-path code changed for
+D4**. A correct pipeline over absent data looks exactly like a correct pipeline,
+which is why the suite never noticed and only a listener could.
+
+Proven through the real join with the artifacts' own spellings: **AHAB -> male**
+(61-0, reaching the row "Captain Ahab" through the `short_form` tier),
+**GERTRUDE -> female** (31-101), **LORD RONALD -> male**.
+
+**LORD RONALD forced a real design change.** He scored male 78 / female 36 --
+clearing the floor, failing the 3x margin -- so the first scan DECLINED a man
+whose name is the word "Lord". `gertrude_governess` is a romance: the leads
+share nearly every mention window, so each one's pronouns pollute the other's
+count. A name that states its own gender now decides BEFORE any counting, which
+is what the SPEC meant by "lets the author's own naming of a role decide it
+deterministically". Coverage went 54.3% -> 60.7% on that change alone.
+
+**AND THE MARGIN STAYS STRICT, because I measured the alternative.** A
+first-pronoun-only estimator scores worse overall (127 vs 133 decided) and, far
+worse, scores **DOROTHY of Oz male 8 / female 3** -- her scene is crowded with
+the Scarecrow and the Lion. Loosening the threshold does not buy coverage, it
+buys a confident lie in the same shape as the bug. The 86 declines are omitted
+from the sidecars entirely, so downstream they are a join miss and keep today's
+roll: a no-change, and no `unknown` row anyone must branch on.
+
+**Web search is now ALLOWED (operator, stated twice this session)** -- the RSS
+precedent, since the pipeline already fetches remotely as standard. That
+reopens the SPEC's tier 3 and tier 4 for the 86 stragglers, and the straggler
+list is a measured artifact: run the stamper without `--write` and it prints
+every declined name. Aim a network tier at that list; do not re-vendor all 65.
+
+**The leg meant to prove D2 died before reaching D2 -- on a different bug.**
+PBUG-20260815-10: pass P5R requested **8320** output tokens against an **8192**
+context window, which is unsatisfiable for ANY prompt including an empty one.
+The budget came from the SCHEMA ceiling, which deliberately carries a 2x
+headroom -- right for a guard, wrong for a request. Two tests asserted that
+constant, so **the suite agreed with the bug** and only a live render could find
+it. Replaced with `scene_review_output_tokens(line_count)`, sized to the scene
+in hand; the schema guard is untouched. I swept every generation budget in both
+story lanes arithmetically rather than by eye: that was the only impossible one
+of four. Bible `12.106`.
+
+**A process error worth not repeating:** I edited `nodes/_otr_scifi_codex.py`
+while a full suite was running and produced two phantom regressions
+(`test_p0_deterministic_repair_wired`, `test_scifi_candidate_liveness`). Several
+tests AST-parse the node sources off disk, so a mid-run edit is a torn read that
+looks exactly like a real break. Both pass clean on a settled tree; the cost was
+a full re-run. Recorded in `GO_FORWARD_PLAN.md`.
+
+Numbers: suite **10729 / 110 / 1** (from 10711; +18, no regressions). Bible
+**20 / 26 / 3** at **284** entries.
+
+**STILL OWED: the live legs.** `scifi_news` (D2 + P5R) is running as this is
+written; `scifi_news_pro` (D2/D3) has not been run. Nothing here is
+live-proven yet.
+
 ## 2026-08-15 -- HEAD 6475f9c4 (v2.0-alpha) -- CODER (D2 finishes: the clean window becomes a transaction, and an unprovable reseal now costs a repair instead of a render)
 
 Did: **Finished D2 -- both owed halves, chunk 1 and chunk 3.** The acceptance
