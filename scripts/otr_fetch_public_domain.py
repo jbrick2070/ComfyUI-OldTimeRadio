@@ -54,6 +54,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "nodes"))
 
 from _otr_character_roster import parse_character_roster  # noqa: E402
+from _otr_roster_gender import STAMPER_OWNED_SIDECAR_KEYS  # noqa: E402
 CORPUS_ROOT = REPO_ROOT / "config" / "source_banks" / "_corpus"
 
 GUTENBERG_TEXT_URL = "https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.txt"
@@ -271,6 +272,44 @@ def write_source(
     }
     if extra:
         provenance.update(extra)
+
+    # CARRY FORWARD WHAT THIS TOOL DOES NOT OWN -- but only while it is still
+    # TRUE. The sidecar is shared property: the character roster and its ladder
+    # stamp belong to `otr_stamp_character_genders.py`. This function rebuilds
+    # its dict from scratch and overwrites the file, so before this block a
+    # routine re-fetch silently deleted the gender roster and dropped that unit
+    # back to the blind 40/40/20 roll -- PBUG-20260815-04 reintroduced by the
+    # tool least likely to be suspected of it.
+    #
+    # The roster's validity is bound to the TEXT it was read from, so it may
+    # only survive a re-fetch that produced identical bytes. If the body moved,
+    # the roster describes a source that no longer exists: it is dropped and the
+    # operator is told to re-run the stamper. Carrying it onto changed text
+    # would be worse than deleting it, because it would still look authoritative.
+    if sidecar_path.is_file():
+        try:
+            previous = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            previous = {}
+        if isinstance(previous, dict):
+            carried = [k for k in STAMPER_OWNED_SIDECAR_KEYS if k in previous]
+            if carried and previous.get("body_sha256") == digest:
+                # `setdefault`, never assignment: `characters` has TWO owners
+                # split by lane. The SHAKESPEARE path authors it right here
+                # (`extra`, :403) off the play's own cast block, and that value
+                # must win; only public_domain, where this tool writes no
+                # roster, falls through to the stamper's.
+                for key in carried:
+                    provenance.setdefault(key, previous[key])
+            elif carried:
+                print(
+                    f"[fetch] {stem}: body changed, so the stamper-owned "
+                    f"{carried} did NOT survive -- re-run "
+                    f"scripts/otr_stamp_character_genders.py --write or this "
+                    f"unit casts from a blind gender roll",
+                    file=sys.stderr,
+                )
+
     sidecar_path.write_bytes(
         (json.dumps(provenance, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     )

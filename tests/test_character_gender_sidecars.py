@@ -36,6 +36,10 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# The vendor tools are scripts, not a package -- the repo directory name has a
+# hyphen so it cannot be imported as one. Same path trick the scripts use on
+# themselves (`otr_fetch_public_domain.py:54`).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from nodes import _otr_roster_gender as RG  # noqa: E402
 from nodes._otr_gender_pronoun_scan import (  # noqa: E402
@@ -208,6 +212,117 @@ class TestTheThreeThatShippedWrong:
             ["AHAB", "STARBUCK", "STUBB"], characters)
         assert pinned != {}
         assert len(pinned) == 3
+
+    @staticmethod
+    def _fetcher(monkeypatch, tmp_path):
+        """The vendor tool, rooted at tmp_path.
+
+        `write_source` records `text_path` relative to the repo root, so a
+        destination outside it raises -- rooting the module at tmp_path is what
+        lets this exercise the REAL function instead of a copy of its logic.
+        """
+        import importlib
+
+        fetch = importlib.import_module("otr_fetch_public_domain")
+        monkeypatch.setattr(fetch, "REPO_ROOT", tmp_path)
+        return fetch
+
+    _ROSTER = [{"name": "AHAB", "gender": "male",
+                "gender_source": "pronouns", "evidence": "e"}]
+
+    def test_a_REFETCH_does_not_silently_erase_the_gender_roster(
+            self, monkeypatch, tmp_path):
+        """The landmine: `otr_fetch_public_domain.write_source` rebuilds the
+        sidecar dict from scratch and overwrites the file, so before the
+        carry-forward a routine re-fetch deleted `characters` and dropped that
+        unit back to the blind roll -- PBUG-20260815-04 reintroduced by the tool
+        least likely to be suspected of it."""
+        fetch = self._fetcher(monkeypatch, tmp_path)
+        body = "Ahab paced. He said nothing.\n"
+        args = dict(
+            slug="probe", unit=None, work_title="W", author="A",
+            license_label="L", source_url="u", word_count=5,
+            dest_dir=tmp_path,
+        )
+        _text, sidecar = fetch.write_source(body=body, **args)
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        data["characters"] = list(self._ROSTER)
+        data["gender_ladder"] = {"version": "gender_ladder_v1"}
+        sidecar.write_text(json.dumps(data), encoding="utf-8")
+
+        fetch.write_source(body=body, **args)  # identical bytes -> survives
+
+        after = json.loads(sidecar.read_text(encoding="utf-8"))
+        assert after["characters"][0]["name"] == "AHAB"
+        assert after["gender_ladder"]["version"] == "gender_ladder_v1"
+
+    def test_a_CHANGED_body_drops_the_roster_instead_of_lying(
+            self, monkeypatch, tmp_path):
+        """Carrying a roster onto text it was not read from would be WORSE than
+        deleting it -- it would still look authoritative while describing a
+        source that no longer exists."""
+        fetch = self._fetcher(monkeypatch, tmp_path)
+        args = dict(
+            slug="probe2", unit=None, work_title="W", author="A",
+            license_label="L", source_url="u", word_count=5,
+            dest_dir=tmp_path,
+        )
+        _text, sidecar = fetch.write_source(body="Ahab paced.\n", **args)
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        data["characters"] = list(self._ROSTER)
+        sidecar.write_text(json.dumps(data), encoding="utf-8")
+
+        fetch.write_source(body="A completely different source.\n", **args)
+
+        after = json.loads(sidecar.read_text(encoding="utf-8"))
+        assert "characters" not in after
+
+    def test_the_owned_key_list_has_exactly_ONE_definition(self, monkeypatch,
+                                                           tmp_path):
+        """Two hand-spelled key lists is the producer/consumer mismatch of
+        Bible 12.86, which is how the roster would go missing again.
+
+        Value equality, not object identity: the scripts import the roster
+        module FLAT (`_otr_roster_gender`) while the render path imports it as
+        `nodes._otr_roster_gender`, so there are legitimately two module objects
+        and an `is` check would fail on correct code. What must not differ is
+        the value, plus the fact that the script IMPORTS the name rather than
+        spelling the keys itself.
+        """
+        fetch = self._fetcher(monkeypatch, tmp_path)
+        assert (tuple(fetch.STAMPER_OWNED_SIDECAR_KEYS)
+                == tuple(RG.STAMPER_OWNED_SIDECAR_KEYS))
+        source = (_REPO / "scripts" / "otr_fetch_public_domain.py").read_text(
+            encoding="utf-8")
+        assert "import STAMPER_OWNED_SIDECAR_KEYS" in source
+        # Deliberately NOT asserting the fetcher never spells "characters": it
+        # legitimately AUTHORS that key for the shakespeare lane (`:403`), where
+        # the play's own cast block is the source of truth. Two owners, split by
+        # lane -- which is exactly why the carry-forward uses `setdefault`, so a
+        # fetcher-authored roster always wins over a preserved one.
+        assert '"characters": characters' in source
+
+    def test_a_fetcher_AUTHORED_roster_still_wins_over_a_preserved_one(
+            self, monkeypatch, tmp_path):
+        """Shakespeare's roster comes from the fetcher, not the stamper. The
+        carry-forward must never shadow a lane that owns the key itself."""
+        fetch = self._fetcher(monkeypatch, tmp_path)
+        body = "Ahab paced. He said nothing.\n"
+        args = dict(
+            slug="probe3", unit=None, work_title="W", author="A",
+            license_label="L", source_url="u", word_count=5,
+            dest_dir=tmp_path,
+        )
+        _text, sidecar = fetch.write_source(body=body, **args)
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        data["characters"] = list(self._ROSTER)
+        sidecar.write_text(json.dumps(data), encoding="utf-8")
+
+        fetch.write_source(
+            body=body, extra={"characters": [{"name": "MACBETH"}]}, **args)
+
+        after = json.loads(sidecar.read_text(encoding="utf-8"))
+        assert after["characters"] == [{"name": "MACBETH"}]
 
     def test_an_undecided_name_leaves_the_roll_ALONE(self):
         """The second 'undetermined' state, and it must stay distinct: a name

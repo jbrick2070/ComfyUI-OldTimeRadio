@@ -219,6 +219,21 @@ class RosterGenderVerdict:
         return self.gender in _BINARY
 
 
+#: Sidecar keys the FETCHER does not own and must never destroy.
+#:
+#: A provenance sidecar is shared property: `otr_fetch_public_domain.py` owns
+#: the base identity fields, and `otr_stamp_character_genders.py` owns these
+#: two. The fetcher rebuilds its dict from scratch on every re-fetch and
+#: overwrites the file, so without an explicit carry-forward a routine re-fetch
+#: silently deletes the gender roster and drops that unit back to the blind
+#: 40/40/20 roll -- PBUG-20260815-04, the defect the roster exists to fix,
+#: reintroduced by the tool least likely to be suspected.
+#:
+#: Named ONCE here, imported by both scripts, because two hand-spelled key lists
+#: is the producer/consumer mismatch of `BUG_BIBLE.yaml` 12.86.
+STAMPER_OWNED_SIDECAR_KEYS = ("characters", "gender_ladder")
+
+
 def sidecar_path_for_text(text_path) -> Path:
     """The provenance sidecar beside a vendored source text.
 
