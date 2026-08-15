@@ -307,6 +307,19 @@ def test_the_window_survives_a_log_that_is_not_there(tmp_path):
     assert state.tails == []
 
 
+def test_the_window_can_be_a_page_that_refreshes_itself():
+    """A terminal window means opening a terminal. This one you leave open."""
+    page = view.render_live_html("pass scifi_codex:P3\n  tokens 960", 3.0)
+    assert "http-equiv='refresh' content='3'" in page
+    assert "pass scifi_codex:P3" in page
+    assert "class=alarm" not in page
+
+
+def test_the_page_goes_red_when_the_model_is_repeating():
+    page = view.render_live_html("  !!  REPEATING  --  a phrase came back", 4.0)
+    assert "class=alarm" in page
+
+
 # ---------------------------------------------------------------------------
 # 5. Finding a ledger, and the shapes it emits
 # ---------------------------------------------------------------------------

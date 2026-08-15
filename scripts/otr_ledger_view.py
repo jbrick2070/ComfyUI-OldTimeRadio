@@ -636,8 +636,12 @@ def read_live(server_log: Path) -> LiveState:
         state.tokens = int(last.group(1))
         state.rate = float(last.group(2))
         state.elapsed = float(last.group(3))
+        # Keep a long run of samples: the window stitches them back into one
+        # stream, and more samples means more of the sentence the model is
+        # actually typing. Turn the pulse rate up with
+        # OTR_WRITER_HEARTBEAT_EVERY (default 64 tokens) for a finer stream.
         state.tails = [
-            " ".join(b.group(4).split())[-70:] for b in beats[-6:]
+            " ".join(b.group(4).split()) for b in beats[-24:]
         ]
     state.repeating = _repetition_note(state.tails)
     return state
@@ -651,7 +655,11 @@ def _repetition_note(tails: list[str]) -> str:
     cycling. This is the SAME evidence the code-side guard acts on, surfaced
     for a human watching; it never stops anything itself.
     """
-    recent = [t for t in tails[-4:] if t]
+    # LOOK AT WHAT THE HUMAN IS LOOKING AT. An earlier cut examined the last
+    # four samples while the window rendered twenty-four, so a loop plainly
+    # readable on screen went unflagged. A detector with a narrower view than
+    # the display is worse than none: it reads as an all-clear.
+    recent = [t for t in tails[-14:] if t]
     if len(recent) < 2:
         return ""
     if len(set(recent)) == 1:
@@ -743,9 +751,16 @@ def render_live(report: LedgerReport | None, state: LiveState,
         add("")
         add("  !!  REPEATING  --  " + state.repeating)
     add("")
-    add("stream tail, oldest first:")
-    for tail in state.tails or ["  (nothing streaming)"]:
-        add(f"   | {tail}")
+    add("writing now:")
+    if state.tails:
+        # The samples stitched back into the sentence the model is typing.
+        # Reading disjoint slices is what made a runaway hard to see; reading
+        # the prose is what makes it obvious.
+        stream = _merge_tails(state.tails)[-900:]
+        for chunk in _wrap(stream, 72):
+            add(f"   {chunk}")
+    else:
+        add("   (nothing streaming)")
     add("")
     if report is None:
         add("ledger: none on disk yet")
@@ -764,7 +779,33 @@ def render_live(report: LedgerReport | None, state: LiveState,
     return "\n".join(out)
 
 
-def watch(interval: float, server_log: Path, root: Path | None) -> int:
+def render_live_html(frame: str, interval: float) -> str:
+    """The same frame as a page that refreshes itself.
+
+    A terminal window means opening a terminal. This is the same information
+    as a thing you can leave open on a second monitor and glance at.
+    """
+    alarm = "REPEATING" in frame
+    return (
+        f"<!doctype html><html><head><meta charset='utf-8'>"
+        f"<meta http-equiv='refresh' content='{max(int(interval), 1)}'>"
+        f"<title>OTR live</title>{_LIVE_STYLE}</head><body"
+        f"{' class=alarm' if alarm else ''}>"
+        f"<pre>{html.escape(frame)}</pre></body></html>"
+    )
+
+
+_LIVE_STYLE = """<style>
+:root{color-scheme:dark;}
+body{background:#101014;color:#d8d4cc;margin:0;padding:1.2rem 1.4rem;
+font:14px/1.45 ui-monospace,Consolas,Menlo,monospace;}
+body.alarm{background:#2a1116;color:#ffd9df;}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;}
+</style>"""
+
+
+def watch(interval: float, server_log: Path, root: Path | None,
+          html_out: Path | None = None) -> int:
     import time
     try:
         while True:
@@ -773,8 +814,15 @@ def watch(interval: float, server_log: Path, root: Path | None) -> int:
             except (SystemExit, OSError, ValueError, json.JSONDecodeError):
                 report = None
             frame = render_live(report, read_live(server_log), read_gpu())
-            sys.stdout.write("\x1b[2J\x1b[H" + frame + "\n")
-            sys.stdout.flush()
+            if html_out is not None:
+                html_out.parent.mkdir(parents=True, exist_ok=True)
+                tmp = html_out.with_suffix(html_out.suffix + ".tmp")
+                tmp.write_text(
+                    render_live_html(frame, interval), encoding="utf-8")
+                os.replace(tmp, html_out)
+            else:
+                sys.stdout.write("\x1b[2J\x1b[H" + frame + "\n")
+                sys.stdout.flush()
             time.sleep(interval)
     except KeyboardInterrupt:
         return 0
@@ -824,7 +872,10 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.episodes_root) if args.episodes_root else None
 
     if args.watch is not None:
-        return watch(max(args.watch, 0.5), Path(args.server_log), root)
+        return watch(
+            max(args.watch, 0.5), Path(args.server_log), root,
+            Path(args.html) if args.html else None,
+        )
 
     if args.list is not None:
         found = episode_ledgers(root)[: args.list]
