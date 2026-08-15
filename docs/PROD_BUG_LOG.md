@@ -4604,3 +4604,41 @@ only visible because the cameo was FORCED and then did not appear.
   before rendering.
 - bible-worthy: yes -- "a renamed entity whose derived text kept the old name".
 - status: OPEN -- diagnosed, not yet scoped into a chunk.
+
+## PBUG-20260815-09 -- a publication receipt stamped before the episode rename blocked EVERY episode from obs
+
+- artifacts: `signal_lost_the_price_of_the_floorboards_20260815_120514`
+  (public_domain), `signal_lost_a_tomb_of_secrets_20260815_122546`
+  (shakespeare), `signal_lost_the_weight_of_the_brass_key_20260815_125005`
+  (media_archive). All three RESULT SUCCESS, all three archival finals on disk,
+  **`otr\obs\` empty**.
+- symptom, from the server log:
+  `obs_publish BLOCKED (eligibility_receipt_episode_mismatch: receipt is
+  stamped for 'pending_20260815_115325'; this episode is
+  'signal_lost_the_price_of_the_floorboards_20260815_120514')`
+- cause: the freeze (Phase 10) stamps `meta.publication_eligibility` with the
+  episode id while the episode is still `pending_<ts>`; `Ledger.rename_episode`
+  then gives it its real slug. `OTRMasterAudioMux` compared the receipt's
+  stamped id against the LIVE ledger's id, found them different, and read that
+  as the stale-in-flight-singleton case it fails closed on. Every episode is
+  renamed, so this withheld every episode -- a self-inflicted regression from
+  chunk 0.5, shipped the same day.
+- why the suite was green over it: every unit test pins a fixed episode id.
+  Nothing but a live leg renames, so no fixture could reproduce it.
+- fix (`92981bc4`): `rename_episode` already rebases every episode-local
+  durable pointer onto the new identity; the receipt was simply not on its
+  list. `_rebase_publication_eligibility` moves the name only -- the verdict
+  and its reasons are untouched, so rights stay owned by the one producer at
+  the freeze. Three regression tests.
+- consequence if unfixed: no episode ever reaches the operator's watch folder,
+  while every log line says RESULT SUCCESS and the archival final exists. The
+  failure is invisible to `RESULT SUCCESS` and visible only by looking in
+  `otr\obs\` -- which is exactly the operator's standing law about confirming
+  the asset on disk.
+- bible: shape is COVERED by `12.66` (rename-stale episode identity captured
+  before `rename_episode` and used afterwards). This instance extends it from
+  path RESOLUTION to an authorization GATE: the data was correct, only the name
+  was stale, and the consequence was a withheld deliverable rather than a
+  mis-resolved path. Index row appended pointing at `12.66`.
+- status: FIXED, suite-proven, **NOT yet live-proven**. Needs one leg that
+  reaches `obs_publish OK`.

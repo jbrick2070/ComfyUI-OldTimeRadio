@@ -69,10 +69,27 @@ validator were never built -- only the identity adapter shipped. Nothing in
 D2 machinery, so it belongs with chunks 1 and 3; the point is that chunk 0 is
 NOT closed.
 
-**NEXT: chunk 0.75 (the D4 vendor gate) or chunks 1+3 (D2).** D1 is in, so the
-qualifying live leg is now unblocked. Before starting 0.75, check
-`.claude/worktrees/awesome-brahmagupta-a509b4/` -- it already holds a full set
-of provenance sidecars, which is exactly what 0.75 builds, so another window
+### NEXT WINDOW -- START HERE, IN THIS ORDER
+
+**1. PROVE THE OBS FIX ON ONE LIVE LEG. Nothing else first.**
+`PBUG-20260815-09`: three successful renders on 2026-08-15 left `otr\obs\`
+EMPTY. The freeze stamped the publication receipt under `pending_<ts>`, the
+cascade renamed the episode, and the mux read the mismatch as a stale singleton
+and withheld every OBS copy. Fixed at `rename_episode` (`92981bc4`) and
+suite-proven, **but no leg has yet reached `obs_publish OK` with the fix in.**
+Until one does, assume publication is broken. One `public_domain` leg answers
+it; look for `obs_publish OK` in the server log and a file in `otr\obs\`.
+
+**2. FINISH D2 -- it is HALF BUILT.** `nodes/_otr_content_transition.py` and the
+composite validator are landed and green; the EMITTER and chunk 1's
+transaction/restore are NOT wired. Capture one window around BOTH
+`run_ledger_clean` and `run_ledger_cleanup` (`OTR_LedgerScriptWriter.py`
+~6784-6798), stamp ONCE after cleanup, before `stamp_text_for_tts_delivery`.
+`scifi_news` and `scifi_news_pro` stay broken until this lands.
+
+**3. Then chunk 0.75 (D4 vendor gate).** Check
+`.claude/worktrees/awesome-brahmagupta-a509b4/` first -- it already holds a full
+set of provenance sidecars, which is exactly what 0.75 builds, so another window
 may be on it.
 
 The chunk order is in the contract; it is not the defect order and two of its
