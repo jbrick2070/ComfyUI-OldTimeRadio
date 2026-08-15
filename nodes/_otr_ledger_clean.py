@@ -91,6 +91,7 @@ log = logging.getLogger("OTR.ledger_clean")
 __all__ = [
     "LEDGER_CLEAN_VERSION",
     "UNCLEAN_COMPOSE_FLAG",
+    "MISATTRIBUTED_COMPOSE_FLAG",
     "run_ledger_clean",
 ]
 
@@ -99,6 +100,10 @@ LEDGER_CLEAN_VERSION = "ledger_clean_v2"
 #: Stamped on a row that survived the whole repair budget still dirty, so the
 #: defect is visible in the artifact and not only in the log.
 UNCLEAN_COMPOSE_FLAG = "unclean_spoken_text"
+
+#: Stamped on a row that still reads as another character's speech after the
+#: bounded fix. Visible in the artifact, never a reason to kill a render.
+MISATTRIBUTED_COMPOSE_FLAG = "misattributed_spoken_text"
 
 #: Repair attempts per dirty row. Two, not nine: the second is INFORMED (the
 #: judge has already read the first and said what survived), and a third
@@ -153,6 +158,11 @@ REPAIR_READS_BRIEF_ONLY = False
 #: It costs about two small calls per line instead of one larger one. Whether
 #: that trade wins is a measurement, not an opinion -- run the lab.
 JUDGE_PER_SENTENCE = False
+#: F2's CONTENT half -- "is this the wrong character's speech?" -- as its own
+#: per-row model call. OFF until the lab says it earns its wall-clock, which
+#: is the operator's own rule for this one: *"Fable had a good idea, but we
+#: need a real laboratory test on Fable's design to see what works."*
+JUDGE_ATTRIBUTION = False
 
 #: How much of the episode a model is shown BEFORE the line. The window is the
 #: point: a model that sees its own scene answers the line in front of it, and
@@ -222,6 +232,15 @@ def _flag_unclean(row: MutableMapping[str, Any]) -> None:
         row["compose_flags"] = flags
     if UNCLEAN_COMPOSE_FLAG not in flags:
         flags.append(UNCLEAN_COMPOSE_FLAG)
+
+
+def _flag_misattributed(row: MutableMapping[str, Any]) -> None:
+    flags = row.get("compose_flags")
+    if not isinstance(flags, list):
+        flags = []
+        row["compose_flags"] = flags
+    if MISATTRIBUTED_COMPOSE_FLAG not in flags:
+        flags.append(MISATTRIBUTED_COMPOSE_FLAG)
 
 
 def _lines_around(
@@ -786,6 +805,234 @@ def _judge_by_sentence(
             found.append({"quote": piece, "why": entry.get("why", "")})
             break
     return found, reachable
+
+
+def _f2_judge(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    roster: "Sequence[str]",
+    lines_around: "Sequence[str]",
+    where: str = "",
+) -> "tuple[bool, str, str]":
+    """Does this line belong to the character it is assigned to?
+
+    F2's CONTENT half, and it is the last failure class in the operator's
+    acceptance test with no detector anywhere in the pipeline: *"I'm more
+    concerned about not finding and fixing non-dialogue, or the WRONG
+    CHARACTER'S SPEECH."*
+
+    ITS OWN CALL, never bolted onto the F1 judge. A small model handed two
+    questions degrades on both -- the same job-size law that took F1's recall
+    from 13/15 to 15/15 by asking about one sentence instead of four things
+    at once.
+
+    The defect is NOT in the words. The identical sentence can be correct in
+    one mouth and wrong in another, which is why the fixtures plant the same
+    line twice and why no pattern could ever find this. Returns
+    ``(belongs, likely_speaker, why)``.
+    """
+    parts = _structured()
+    if parts is None:
+        return True, "", ""
+    BaseModel, Field, structured_call = parts
+
+    class _Attribution(BaseModel):
+        belongs_to_speaker: bool
+        likely_speaker: str = Field(default="", max_length=80)
+        why: str = Field(default="", max_length=200)
+
+    prompt = [
+        {
+            "role": "system",
+            "content": (
+                "You check whether a line of radio dialogue belongs to the "
+                "character who is speaking it. You return JSON only."
+            ),
+        },
+        {
+            "role": "user",
+            "content": "\n".join([
+                "In this script the line below is assigned to "
+                f"{speaker or 'the announcer'}. Check whether it reads as "
+                "that character's line. Most lines are fine -- when the line "
+                "sits naturally in this character's mouth, say so and stop.",
+                "",
+                f"THE SPEAKER: {speaker or 'the announcer'}",
+                f"THE LINE: {text}",
+                "",
+                "WHO IS IN THIS EPISODE: " + ", ".join(roster),
+                "",
+                f"WHERE THE STORY IS: {where}" if where else "",
+                "THE LINES AROUND IT, in story order, this one marked >>>:",
+                "\n".join(lines_around),
+                "",
+                "IT DOES NOT BELONG when:",
+                f"- it addresses {speaker or 'the speaker'} BY NAME, or "
+                "orders them about. Nobody addresses themselves;",
+                "- it claims a role, job or authority that belongs to "
+                "someone else in the cast;",
+                "- it claims not to know something this character must know, "
+                "or knows something only another character could.",
+                "",
+                "IT DOES BELONG -- say nothing -- when the character is:",
+                "- naming or ordering SOMEONE ELSE. That is ordinary "
+                "dialogue and is the most common thing in a script;",
+                "- quoting or reporting what another person said;",
+                "- agreeing, echoing, or finishing another's thought;",
+                "- simply stating their own role correctly.",
+                "",
+                'Answer JSON: {"belongs_to_speaker": true} when it is fine. '
+                'If it is not: {"belongs_to_speaker": false, '
+                '"likely_speaker": "<who in the cast it really sounds like, '
+                'or empty>", "why": "<a few words>"}',
+            ]),
+        },
+    ]
+    try:
+        # LLM slot: creative -- reading a line against a roster is a
+        # reader's judgement about character, not a mechanical check.
+        result = structured_call(
+            prompt=prompt,
+            schema=_Attribution,
+            slot_fn=slot_fn,
+            base_temperature=JUDGE_TEMPERATURE,
+            structural_retry_temperature=min(0.1, JUDGE_TEMPERATURE),
+            max_new_tokens=_JUDGE_MAX_NEW_TOKENS,
+            max_attempts=2,
+            helper_name="ledger_clean_f2_judge",
+        )
+    except Exception as exc:  # noqa: BLE001 -- never fatal
+        log.warning(
+            "[ledger_clean] the attribution judge could not read a line "
+            "(%s: %s); F2 is unchecked for it",
+            type(exc).__name__, str(exc)[:160],
+        )
+        return True, "", ""
+    if result.belongs_to_speaker:
+        return True, "", ""
+    return (
+        False,
+        " ".join(str(result.likely_speaker or "").split())[:80],
+        " ".join(str(result.why or "").split())[:200],
+    )
+
+
+def _f2_fix(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    likely_speaker: str,
+    why: str,
+    lines_around: "Sequence[str]",
+    where: str = "",
+    previous_attempt: str = "",
+) -> str:
+    """Rewrite the line so it belongs to the STATED speaker.
+
+    ONE behaviour, not a fork. The operator overruled a report-only design --
+    *"we can judge, but someone needs to rewrite ... at some point it needs to
+    be CORRECTED, not fail the whole thing"* -- and the correction is to move
+    the WORDS, never the attribution: the beat's speaker is the contract every
+    downstream consumer is already keyed to (voice casting, TTS voice,
+    captions, credits), and `text` is the only field a model pass may own.
+    Handing back "this is really Olivia's line" would be report-only wearing a
+    hat; someone would still have to write it.
+    """
+    parts = _structured()
+    if parts is None:
+        return ""
+    BaseModel, Field, structured_call = parts
+
+    class _Fixed(BaseModel):
+        text: str = Field(min_length=1, max_length=2000)
+
+    body = [
+        f"In this radio script the line below is assigned to {speaker}. A "
+        f"reader checked it and found it does not read as {speaker}'s line "
+        "-- it reads as someone else's words in their mouth. A voice actor "
+        f"playing {speaker} will read it exactly as written, so it must "
+        f"become a line {speaker} would truly say.",
+        "",
+        f"THE SPEAKER: {speaker}",
+        f"THE LINE: {text}",
+        "",
+        "WHAT THE READER FOUND:",
+        f"  {('It reads as ' + likely_speaker + chr(39) + 's line. ') if likely_speaker else ''}{why}",
+        "",
+    ]
+    if where:
+        body += [f"WHERE THE STORY IS: {where}", ""]
+    if lines_around:
+        body += [
+            "THE LINES AROUND IT, in story order, yours marked >>>:",
+            "\n".join(lines_around),
+            "",
+        ]
+    if previous_attempt:
+        body += [
+            "YOUR PREVIOUS ATTEMPT still reads as someone else's line. Do "
+            "not hand back a variation of it -- change what was named:",
+            previous_attempt,
+            "",
+        ]
+    body += [
+        "HOW TO FIX IT:",
+        f"- Give the words to {speaker}. Say only what {speaker} knows, "
+        f"wants, and would say, in {speaker}'s way of talking.",
+        "- The line must still do what the moment needs done. Do not lose "
+        "the information or the turn it carries -- put it in this "
+        "character's mouth.",
+        f"- If the line calls {speaker} by name, that is the giveaway: a "
+        "person does not address themselves. Aim the words at whoever "
+        f"{speaker} is actually talking to.",
+        "- Keep as many of the original words as the fix allows, and keep "
+        "the line roughly its original length.",
+        "",
+        "Example of the move, shape only -- your line is the one above:",
+        "  speaker: MALVOLIO",
+        "  found: reads as OLIVIA's line -- it addresses Malvolio by name",
+        "  before: Then step back, Malvolio, and let me see the letter.",
+        "  after:  I will step back, my lady -- and the letter is yours to "
+        "see.",
+        "",
+        f"Before you answer, read your line once as the actor playing "
+        f"{speaker} will: every word must be something {speaker} says, to "
+        "someone else, in this moment.",
+        "",
+        'Answer JSON: {"text": "the fixed line"}. The spoken line only -- no '
+        "speaker name in front, no brackets, no quotation marks around the "
+        "whole line.",
+    ]
+    try:
+        # LLM slot: creative -- it is rewriting dialogue into a voice.
+        result = structured_call(
+            prompt=[
+                {"role": "system", "content": (
+                    "You rewrite one line of radio dialogue so that it "
+                    "belongs to the character who speaks it. You return JSON "
+                    "only."
+                )},
+                {"role": "user", "content": "\n".join(body)},
+            ],
+            schema=_Fixed,
+            slot_fn=slot_fn,
+            base_temperature=0.55,
+            structural_retry_temperature=0.25,
+            max_new_tokens=_MAX_NEW_TOKENS,
+            max_attempts=2,
+            helper_name="ledger_clean_f2_fix",
+        )
+    except Exception as exc:  # noqa: BLE001 -- the row ships flagged
+        log.warning(
+            "[ledger_clean] the attribution fix failed (%s: %s); the row "
+            "keeps its text and is flagged",
+            type(exc).__name__, str(exc)[:160],
+        )
+        return ""
+    return " ".join(str(result.text or "").split())
 
 
 def _judge_votes(**kwargs) -> "tuple[list[dict[str, str]], bool]":
@@ -1415,6 +1662,10 @@ def run_ledger_clean(
         "judge_only": 0,
         "f1_rows": 0,
         "f2_rows": 0,
+        "f2_content_rows": 0,
+        "f2_reattributed": 0,
+        "f2_reattributed_unverified": 0,
+        "f2_unfixed": 0,
         "repaired": 0,
         "improved": 0,
         "unclean": 0,
@@ -1459,6 +1710,30 @@ def run_ledger_clean(
                 "line_id": line_id,
                 "findings": [{"kind": f.kind, "detail": f.detail} for f in f2],
             })
+
+        # F2's CONTENT half, its own call, before F1 touches the text. It
+        # runs first deliberately: if the line belongs to the wrong mouth,
+        # fixing its stage business first would just polish the wrong
+        # character's words.
+        if JUDGE_ATTRIBUTION and slot_fn is not None:
+            receipt["model_calls"] += 1
+            belongs, likely, why = _f2_judge(
+                slot_fn=slot_fn,
+                speaker=speaker,
+                text=_text_of(row),
+                roster=[n for n in cast.values() if n],
+                lines_around=_lines_around(rows, index, beats),
+                where=_where_the_story_is(row, beats, episode, act_briefs),
+            )
+            if not belongs:
+                receipt["f2_content_rows"] += 1
+                receipt["f2"].append(_fix_attribution(
+                    row=row, rows=rows, index=index, beats=beats,
+                    episode=episode, act_briefs=act_briefs,
+                    likely=likely, why=why,
+                    roster=[n for n in cast.values() if n],
+                    slot_fn=slot_fn, receipt=receipt,
+                ))
 
         # The free detector runs first so the judge can be shown its evidence.
         # On the fidelity lanes the language kinds are inadmissible as a
@@ -1731,6 +2006,106 @@ def _repair_row(
         "complaint": list(complaint),
         "text": original,
         "attempts": attempts,
+    }
+
+
+def _fix_attribution(
+    *,
+    row: MutableMapping[str, Any],
+    rows: "Sequence[Mapping[str, Any]]",
+    index: int,
+    beats: "Mapping[str, Mapping]",
+    episode: str,
+    act_briefs: "Mapping[str, str]",
+    likely: str,
+    why: str,
+    roster: "Sequence[str]",
+    slot_fn: "Callable[..., str]",
+    receipt: MutableMapping[str, Any],
+) -> "dict[str, Any]":
+    """Rewrite one misattributed line into its stated speaker's voice.
+
+    Bounded and fail-soft like everything else here: if the fix cannot be
+    made, the row SHIPS with a flag and the render continues. A misattributed
+    line on air is bad; a dead episode is worse.
+    """
+    line_id = str(row.get("line_id") or "")
+    speaker = str(row.get("speaker") or "").strip()
+    original = _text_of(row)
+    lines_around = _lines_around(rows, index, beats)
+    where = _where_the_story_is(row, beats, episode, act_briefs)
+
+    previous = ""
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        receipt["model_calls"] += 1
+        candidate = _f2_fix(
+            slot_fn=slot_fn, speaker=speaker, text=original,
+            likely_speaker=likely, why=why,
+            lines_around=lines_around, where=where,
+            previous_attempt=previous,
+        )
+        if not candidate:
+            break
+        receipt["model_calls"] += 1
+        belongs, _likely2, why2 = _f2_judge(
+            slot_fn=slot_fn, speaker=speaker, text=candidate,
+            roster=roster,
+            lines_around=lines_around, where=where,
+        )
+        if belongs:
+            set_line_text_metrics(row, candidate)
+            receipt["f2_reattributed"] += 1
+            log.info(
+                "[ledger_clean] %s reattributed into %s's voice (%s) -- "
+                "%r -> %r",
+                line_id, speaker or "the speaker", why,
+                original[:60], candidate[:60],
+            )
+            return {
+                "line_id": line_id, "outcome": "reattributed",
+                "why": why, "likely_speaker": likely,
+                "before": original, "after": candidate,
+            }
+        previous, why = candidate, why2 or why
+
+    # THE ORIGINAL IS KNOWN WRONG -- the judge said so, which is why we are
+    # here. So a rewrite the judge merely failed to BLESS is not a coin flip
+    # against a good line; it is a coin flip against a line already condemned,
+    # aimed at the right mouth. Operator, 2026-08-14: *"at some point it needs
+    # to be CORRECTED, not fail the whole thing."* It ships, and it ships
+    # FLAGGED, so nothing is quietly declared fixed.
+    #
+    # Measured in the lab before this existed: the fix produced candidates on
+    # every caught row and the judge blessed NONE of them, so F2 was
+    # report-only in practice -- the exact behaviour the operator rejected.
+    if previous:
+        set_line_text_metrics(row, previous)
+        _flag_misattributed(row)
+        receipt["f2_reattributed_unverified"] += 1
+        log.warning(
+            "[ledger_clean] %s was rewritten for %s but the judge would not "
+            "confirm it (%s). The REWRITE ships, flagged -- the original was "
+            "already condemned: %r -> %r",
+            line_id, speaker or "the speaker", why,
+            original[:60], previous[:60],
+        )
+        return {
+            "line_id": line_id, "outcome": "reattributed_unverified",
+            "why": why, "likely_speaker": likely,
+            "before": original, "after": previous,
+        }
+
+    _flag_misattributed(row)
+    receipt["f2_unfixed"] += 1
+    log.error(
+        "[ledger_clean] %s STILL reads as the wrong character's speech after "
+        "%d bounded pass(es): %s. The row SHIPS flagged and the render "
+        "continues -- a render is never killed for this.",
+        line_id, _MAX_ATTEMPTS, why,
+    )
+    return {
+        "line_id": line_id, "outcome": "misattributed_unfixed",
+        "why": why, "likely_speaker": likely, "text": original,
     }
 
 

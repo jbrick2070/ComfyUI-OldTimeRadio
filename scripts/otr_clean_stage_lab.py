@@ -373,6 +373,129 @@ def fixtures() -> "dict[str, dict]":
 
 
 # ---------------------------------------------------------------------------
+# F2 -- the wrong character's speech
+# ---------------------------------------------------------------------------
+# The operator's OTHER failure class, and the one with no detector anywhere in
+# the pipeline: *"I'm more concerned about not finding and fixing non-dialogue,
+# or the WRONG CHARACTER'S SPEECH."*
+#
+# It is harder to plant honestly than F1, because the defect is not IN the
+# words -- it is in the relationship between the words and the roster. So each
+# planted row is wrong for a REASON a reader could name, and each trap is a
+# thing that LOOKS like the defect and is not.
+#
+# The traps matter more here than they did for F1. Characters name each other
+# constantly, quote each other, and finish each other's thoughts; a judge that
+# treats any of that as misattribution would rewrite half an episode.
+
+
+def f2_fixtures() -> "dict[str, dict]":
+    banks: "dict[str, dict]" = {}
+
+    banks["original"] = _ledger(
+        "original",
+        [("ANNOUNCER", "announcer"), ("Nan Reyes", "c01"), ("Web Doyle", "c02")],
+        [
+            {"speaker": "ANNOUNCER",
+             "text": "Tonight, the keeper and the inspector.",
+             "trap": "announcer open", "why": "plain address"},
+            {"speaker": "Nan Reyes",
+             "text": "Then step back, Nan, and let me look at the log myself.",
+             "planted": "self_address",
+             "why": "she orders HERSELF by name -- nobody addresses themselves",
+             "intent": "order the other one away from the log"},
+            {"speaker": "Web Doyle",
+             "text": "Step back yourself, Nan. I have read that log twice.",
+             "trap": "names the other",
+             "why": "naming ANOTHER character is ordinary dialogue"},
+            {"speaker": "Nan Reyes",
+             "text": "As the inspector, I am required to file this by Friday.",
+             "planted": "role_claim",
+             "why": "Nan is the KEEPER; Web is the inspector",
+             "intent": "assert authority over the log"},
+            {"speaker": "Web Doyle",
+             "text": "She said she would file it by Friday, and she has not.",
+             "trap": "quoting",
+             "why": "reporting another's words is ordinary dialogue"},
+            {"speaker": "Nan Reyes",
+             "text": "I keep this light. You only visit it.",
+             "trap": "role stated correctly",
+             "why": "the keeper saying she keeps the light"},
+            {"speaker": "ANNOUNCER",
+             "text": "The lamp stayed dark until morning.",
+             "trap": "announcer close", "why": "plain narration"},
+        ],
+    )
+
+    banks["shakespeare"] = _ledger(
+        "shakespeare",
+        [("ANNOUNCER", "announcer"), ("MALVOLIO", "c01"), ("OLIVIA", "c02")],
+        [
+            {"speaker": "ANNOUNCER",
+             "text": "Tonight, a scene from Twelfth Night.",
+             "trap": "announcer open", "why": "plain address"},
+            {"speaker": "MALVOLIO",
+             "text": "Go to, Malvolio, thou art made if thou desir'st to be so.",
+             "planted": "self_address",
+             "why": "the letter's line to Malvolio, put in HIS mouth",
+             "intent": "read the letter's promise"},
+            {"speaker": "OLIVIA",
+             "text": "Go to, Malvolio, thou art made if thou desir'st to be so.",
+             "trap": "same words, right mouth",
+             "why": "IDENTICAL text -- correct when SHE says it. The defect "
+                    "is never in the words alone"},
+            {"speaker": "MALVOLIO",
+             "text": "Some are born great, some achieve greatness.",
+             "trap": "source language", "why": "FIDELITY: the author's line"},
+            {"speaker": "OLIVIA",
+             "text": "My lady bade me wear these cross-garters.",
+             "planted": "role_claim",
+             "why": "OLIVIA IS the lady; she has no lady to obey",
+             "intent": "explain the garters"},
+            {"speaker": "ANNOUNCER",
+             "text": "So ends the scene, as Shakespeare set it down.",
+             "trap": "announcer close", "why": "plain narration"},
+        ],
+    )
+
+    banks["scifi_news_pro"] = _ledger(
+        "scifi_news_pro",
+        [("ANNOUNCER", "announcer"), ("Dr. Ruiz", "c01"), ("Halloway", "c02")],
+        [
+            {"speaker": "ANNOUNCER",
+             "text": "Tonight, from a hospital that keeps no night shift.",
+             "trap": "announcer open", "why": "plain address"},
+            {"speaker": "Dr. Ruiz",
+             "text": "You are the physician here, Ruiz -- you tell me what "
+                     "the count means.",
+             "planted": "self_address",
+             "why": "Ruiz defers to Ruiz",
+             "intent": "demand an explanation of the figures"},
+            {"speaker": "Halloway",
+             "text": "You are the physician here, Doctor. You tell me what "
+                     "the count means.",
+             "trap": "same demand, right mouth",
+             "why": "correct when the LAYMAN says it"},
+            {"speaker": "Dr. Ruiz",
+             "text": "I have never read a chart in my life.",
+             "planted": "knowledge_mismatch",
+             "why": "the physician cannot claim never to have read a chart",
+             "intent": "admit being out of depth"},
+            {"speaker": "Halloway",
+             "text": "I have never read a chart in my life. That is why you "
+                     "are here.",
+             "trap": "same claim, right mouth",
+             "why": "true and ordinary from the layman"},
+            {"speaker": "ANNOUNCER",
+             "text": "Drawn from reporting on the UCLA Health network.",
+             "trap": "clean coda", "why": "names the source"},
+        ],
+    )
+
+    return banks
+
+
+# ---------------------------------------------------------------------------
 # the real corpus -- REAL bad ledgers, with the act artifacts derived
 # ---------------------------------------------------------------------------
 # Operator, 2026-08-14: *"we have lots of bad ledgers to pull, but not sure
@@ -492,6 +615,14 @@ def score(ledger: dict, receipt: dict) -> dict:
         for r in ledger.get("lines", [])
     }
     flagged = {str(r.get("line_id")) for r in receipt.get("rows", [])}
+    # An F2 run scores on the ATTRIBUTION verdict, not on F1 findings.
+    if receipt.get("f2_content_rows") is not None and receipt.get("f2"):
+        f2_hits = {
+            str(e.get("line_id")) for e in receipt.get("f2", [])
+            if e.get("outcome") in ("reattributed", "misattributed_unfixed")
+        }
+        if f2_hits or receipt.get("f2_content_rows"):
+            flagged = f2_hits
     outcome = {
         str(r.get("line_id")): str(r.get("outcome") or "")
         for r in receipt.get("rows", [])
@@ -503,7 +634,14 @@ def score(ledger: dict, receipt: dict) -> dict:
     caught = planted & flagged
     missed = planted - flagged
     false_alarms = traps & flagged
-    repaired = {lid for lid in caught if outcome.get(lid) == "repaired"}
+    for entry in receipt.get("f2", []):
+        if entry.get("outcome"):
+            outcome[str(entry.get("line_id"))] = str(entry["outcome"])
+    repaired = {
+        lid for lid in caught
+        if outcome.get(lid) in ("repaired", "reattributed",
+                               "reattributed_unverified")
+    }
     improved = {lid for lid in caught if outcome.get(lid) == "improved"}
 
     return {
@@ -577,6 +715,8 @@ def main(argv: "list[str] | None" = None) -> int:
                     help="judge reads per row; 2 keeps only what both name")
     ap.add_argument("--judge-temp", type=float, default=None,
                     help="judge temperature")
+    ap.add_argument("--f2", action="store_true",
+                    help="run the F2 fixtures: the WRONG CHARACTER'S speech")
     ap.add_argument("--per-sentence", action="store_true",
                     help="shrink the job: one judge call per SENTENCE")
     ap.add_argument("--brief-only", action="store_true",
@@ -593,7 +733,13 @@ def main(argv: "list[str] | None" = None) -> int:
     if args.per_sentence:
         CLEAN.JUDGE_PER_SENTENCE = True
 
-    banks = fixtures()
+    # F2 is its own fixture bank and its own judge -- the defect is not in
+    # the words, so the F1 fixtures cannot test it.
+    if args.f2:
+        CLEAN.JUDGE_ATTRIBUTION = True
+        banks = f2_fixtures()
+    else:
+        banks = fixtures()
     if args.bank:
         if args.bank not in banks:
             print(f"unknown bank {args.bank!r}; have: {', '.join(banks)}")

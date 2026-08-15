@@ -588,9 +588,12 @@ def test_python_owns_no_opinion_about_prose():
     assert "assert " not in code
     assert "re.sub" not in code and ".sub(" not in code
     assert '["text"] =' not in code, "text is set through the canonical owner"
-    # Two writes now -- the spotless repair and the best-effort improvement
-    # -- and BOTH write a string the model returned.
-    assert code.count("set_line_text_metrics(row,") == 2
+    # FOUR writes now -- the spotless F1 repair, the best-effort F1
+    # improvement, the confirmed F2 reattribution, and the unconfirmed one --
+    # and EVERY ONE writes a string the model returned. That is the whole
+    # law: Python chooses which of the model's answers to keep, and never
+    # writes a word of its own.
+    assert code.count("set_line_text_metrics(row,") == 4
 
 
 # ---------------------------------------------------------------------------

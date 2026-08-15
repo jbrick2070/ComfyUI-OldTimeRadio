@@ -200,6 +200,70 @@ monitoring the shielding of a device at 60% capacity."* That is a real read of
 the material -- the model can see the act. ~5 calls an episode, one per arc
 phase, never fatal.
 
+### F2 WAS LAB-TESTED BEFORE SHIPPING, AND IT DID NOT PASS. IT IS OFF.
+
+**Operator, 2026-08-14: *"Fable had a good idea, but we need a real laboratory
+test on Fable's design to see what works."* Done, and the lab earned its keep
+by stopping a plausible design from shipping.**
+
+Built exactly as designed and as the operator amended it: a per-row model
+judge asking "does this line belong to the character speaking it", its OWN
+call (never bolted onto the F1 judge), and a REWRITE rather than a report --
+he overruled report-only outright: *"we can judge, but someone needs to
+rewrite ... at some point it needs to be CORRECTED, not fail the whole
+thing."*
+
+**The fixtures.** F2 cannot be tested with the F1 bank, because the defect is
+not in the words. So each bank plants the SAME LINE TWICE -- once in the wrong
+mouth and once in the right one -- plus three defect shapes and five trap
+shapes:
+
+| planted | what it is |
+|---|---|
+| `self_address` | the character orders THEMSELVES by name |
+| `role_claim` | claims a role that belongs to another cast member |
+| `knowledge_mismatch` | claims not to know what this character must know |
+
+| trap | why it must survive |
+|---|---|
+| names the other | naming ANOTHER character is ordinary dialogue |
+| quoting | reporting another's words is ordinary dialogue |
+| **same words, right mouth** | the identical sentence, correctly assigned |
+| role stated correctly | the keeper saying she keeps the light |
+| source language | FIDELITY: the author's own line |
+
+**MEASURED ON `gemma-4-12b-it`, the shipping model, twice:**
+
+| run | recall | traps kept | repaired |
+|---|---|---|---|
+| baseline, no model | 0/6 (0%) | 12/13 | 0 |
+| run 1 | 3/6 (50%) | 11/13 (85%) | 0 |
+| run 2 | **1/6 (17%)** | 12/13 (92%) | 1 |
+
+**THE JUDGE IS UNSTABLE, AND THAT IS THE VERDICT.** Runs 1 and 2 used a
+BYTE-IDENTICAL judge -- the only change between them was what happens after it
+fires -- and recall swung 50% to 17% on the same fixtures at temperature 0.2.
+A detector that finds half the defects one run and a sixth the next cannot be
+trusted with a rewrite.
+
+**What it does and does not see:** it caught `self_address` (the vocative)
+when it caught anything, and missed `role_claim` and `knowledge_mismatch`
+EVERY time in both runs. And the "same words, right mouth" trap fooled it in
+both runs -- the hardest and most important trap, because it is the one that
+proves the judge is reading the ROSTER rather than the words.
+
+**SHIPPED OFF: `JUDGE_ATTRIBUTION = False`.** The code is in and tested so the
+next window does not rebuild it, but it does not run.
+
+**THE NEXT THING TO TRY, and it is the architecture that already worked
+twice:** give the F2 judge a free Python HINT the way F1 gets its pattern
+findings -- does this line contain its own speaker's name as a vocative? --
+handed over as EVIDENCE, labelled unreliable, union never veto. That is
+legitimate (it is detection, not prose editing), it costs nothing, and it
+targets exactly the one class the model already half-sees. The subtle classes
+may simply need the roster stated more sharply, or a smaller job per the
+job-size law that took F1 to 15/15.
+
 ### THE NO-SHIMS RULE IS BEING BROKEN IN FOUR PLACES WE DID NOT WRITE
 
 **Operator, 2026-08-14: *"fan out all source banks for similar functions / LLM
