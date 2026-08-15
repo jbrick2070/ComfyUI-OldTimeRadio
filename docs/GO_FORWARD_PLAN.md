@@ -27,6 +27,125 @@ down to the two defects below.
 
 ### The two big misses -- production still has both
 
+### NEXT CHUNK -- A GRADUATED EXTRACTION CONTRACT (operator 2026-08-14)
+
+*"If it fails once on extraction, we relax the extraction requirements on the
+second pass. It just has to get the gist of the story and populate the coda at
+the end."*
+
+**This is the right answer to the model floor below, and it is better than
+refusing the model.** Attempt 1 keeps the strict contract. On failure the
+retry drops to a RELAXED contract instead of re-asking for the same thing at a
+lower temperature -- which is the cold-redraw defect this file already names.
+
+**What the strict contract demands that a small model cannot deliver:** the
+`source_spans` -- field, character offsets, and a VERBATIM quote that must
+match the payload. That is the measured failure (`quote_not_literal`), and it
+is a transcription task, not a comprehension one.
+
+**What the coda actually needs is much less.** `_news_coda_source_anchors`
+reads entity NAMES and number VERBATIMS. It never reads a span. So the relaxed
+pass is well defined:
+
+| | strict (attempt 1) | relaxed (attempt 2) |
+|---|---|---|
+| fact claims | yes | yes |
+| entity names, numbers | yes | yes |
+| `source_spans` with literal quotes | required | **dropped** |
+
+That is enough to ground the drama and to name the source in the coda, which
+is the whole job.
+
+**THE ONE THING THE RULING DOES NOT SAY, AND IT IS LOAD-BEARING: STAMP IT.**
+A relaxed extraction is no longer span-proven, so nothing downstream may claim
+verified provenance for it. `meta` must record which contract produced the
+index, and every consumer that reads a span needs a defined answer when there
+is none -- that is the standing "a ripped pass may not leave a ledger field
+unowned" rule applied to a field that is now conditionally absent. Enumerate
+the span readers (`_span_ok`, `_span_mismatch`, the citation audit,
+`_otr_scifi_source_repair`) and give each an explicit behaviour before writing
+the relaxed pass, not after.
+
+**Applies to both news lanes:** `scifi_news` P0 and `scifi_news_pro`'s dossier
+fail the same way for the same reason.
+
+**Not started 2026-08-14** -- specified here at the end of the session so the
+design is not lost. The measurement that motivates it is below.
+
+### THE MODEL FLOOR IS REAL, UNWRITTEN, AND IT GRINDS INSTEAD OF REFUSING
+
+**Measured 2026-08-14.** `gemma-2-2b-it` drove `original` at act 3 to a
+complete, F2-clean ledger in **5.1 minutes** -- the fastest good result of the
+session. The same model could not get `scifi_news` past **P0**: it burned all
+three attempts on the first source window, moved to the second, and was killed
+at 34 minutes having produced nothing.
+
+**IT WAS NOT A RUNAWAY, and the distinction matters.** The evidence: 10 P0
+attempts distributed 1/3 x2, 2/3 x2, 3/3 x1 -- the ladder working across two
+windows -- one halt caught and rerolled by the guard, and a longest single
+decode of **1,581 tokens** against the 8,128 and 13,912 of the real runaways.
+It was bounded, honest, futile work. P0 runs PER SOURCE WINDOW and each window
+gets up to nine attempts, so a long article times that cost by the window
+count.
+
+**THE OPERATOR'S MEMORY IS CORRECT AND THE CORPUS CONFIRMS IT.**
+`gemma-2-2b-it` produced **25 complete episodes in early June**, all
+`(unstamped)` -- before `source_bank` was a field -- at 16 spoken rows each.
+So the news bank DID run on a 2B model once. What changed is not the model and
+not a regression: the LANE was replaced. `scifi_news` today is the codex v4
+machine (adopted 2026-07-19, `_otr_lane_specs.py`) with an evidence contract
+the June pipeline never had -- literal source quotes, character-offset spans,
+a capped fact index, cast-coverage gates. **The bank kept its name; the machine
+underneath it changed, and the model floor rose with it.**
+
+Across the recorded journals (2026-07-11 onward) the models that have actually
+driven `scifi_news` P0 are `Mistral-Nemo` (67 episodes), `openrouter:slot-a`
+(17), `gemma-4-12b-it` (10), its GGUF (4) and `gemma-4-E4B-it` (3). **`gemma-2-2b`
+appears zero times.**
+
+| | |
+|---|---|
+| `scifi_news`, `scifi_news_pro` | need a real model. Proven: `gemma-4-12b-it`, `Mistral-Nemo` |
+| `original`, `shakespeare`, `public_domain`, `media_archive` | `gemma-2-2b-it` is fine, and fast |
+
+**THE DEFECT IS NOT THE FLOOR, IT IS THE SILENCE.** A model that cannot
+satisfy a lane's contract should be refused at the top of the run with the
+reason, not discovered after 34 minutes of bounded retries. Do NOT delete
+`gemma-2-2b-it` to fix this -- it is the fastest writer-lane model on the box,
+and deleting it would trade a working capability for a missing message.
+
+### ONE CLEAN EPISODE IN THE WHOLE CORPUS, AND IT IS TODAY'S
+
+Graded ~1,400 episodes on disk with `scripts/otr_ledger_view.py`. **Exactly one
+passes F1+F2: the 2026-08-14 `scifi_news` run.** Every earlier episode fails,
+because every earlier episode shipped `speaker: None` on every spoken row.
+That is the true blast radius of `PBUG-20260814-01` and the sharpest available
+measure of what the fix bought.
+
+### A SCHEMA CAP MUST NEVER SIT AT THE NUMBER A TRIM ALREADY ENFORCES
+
+**Found live 2026-08-14, then swept.** `scifi_news_pro` died twice on a UCLA
+Health story that names 11 places and 14 institutions. The model extracted them
+correctly; the pydantic cap on `NamedEntities` refused the reply three times
+and killed the episode. The cap was **redundant** -- `_merge_dossiers` already
+trims every bucket via `_balanced_window_values(limit=...)` -- so the refusal
+fired in front of the trim written to handle exactly that case.
+
+Sweeping every bounded list field in the story lanes found **three more** in
+the same model (`facts_to_keep`, `allowed_numbers`, `dramatizable_vectors`).
+One killed episodes; the others were the same failure waiting for a richer
+source. All four ceilings are now backstops against a degenerate decode; the
+limits stay at the merge. Fixed and proven live (`8884b4d2`).
+
+**STILL SUSPECT, DELIBERATELY NOT FIXED:** the codex lane carries the same
+shape on `MAX_FACT_ROWS` (6) and `MAX_ENTITY_ROWS` (4) -- caps equal to the
+`_balanced_p0_records(limit=...)` trim. That lane decodes under a grammar, so
+the ceiling TRUNCATES during generation rather than refusing: a different
+symptom (silent evidence thinning, not a crash) and unproven on an artifact.
+Six facts and four entities is tight for a real news story, and it is a better
+explanation for thin evidence than quote-literalness alone. **Prove it on an
+artifact before touching it.**
+
 ### F1 IS ON EVERY BANK, AND PER-BEAT IS NOT THE FIX FOR FIVE OF THEM
 
 **Measured 2026-08-14 with `scripts/otr_ledger_view.py` over 250 episodes on
@@ -123,13 +242,6 @@ next window fixes rather than re-diagnoses. Root causes, all traced:
 * **MISS 2** -- the coda is prompt text glued onto two other passes, with nothing
   reserving the row and nothing verifying it afterwards. `scifi_news_pro` already
   enforces it structurally and is the model to copy.
-
-### Acts, not words -- DONE 2026-08-14 (`c0cec79b`)
-
-`act_count` is an explicit 1..8 combo, default "3", and the operator's pick is
-always honoured. `target_words` is deleted everywhere -- widget, schemas,
-prompts, lane gates and all three parallel word tables. Receipt in
-`docs/HANDOFF_LOG.md`; the open consequences are in OPERATOR DECISIONS OWED below.
 
 ### The dialogue-cleanup pass -- decided 2026-08-14
 
@@ -449,118 +561,6 @@ ONE bounded repair round, then flag loudly and continue. Never a hard stop.
 on local models: a clean episode costs ZERO cleaning calls.** You pay only for
 what is actually broken, instead of nine cold redraws on every pass regardless.
 
-### BOTH MISSES CONFIRMED ON A REAL SEALED LEDGER -- 2026-08-14, evidence gate PASSED
-
-Artifact: `output/otr/episodes/signal_lost_the_light_of_possibility_20260813_172801/audio/..._ledger.json`
--- the accepted 2026-08-13 `wan_ti2v` episode. `meta.source_bank = scifi_news`.
-13 line rows, 6 beats, 4 cast. **This is the published artifact, not a fixture.**
-
-**F1 CONFIRMED -- and it is not "leakage", it is the DOMINANT MODE.** The ledger
-is narrated third-person prose, not dialogue. Verbatim rows that TTS reads aloud:
-
-* `l001` -- "Under the microscope, the starfish cell dances... **Ada murmurs, her
-  eyes reflecting the glow.**" -- narration + an attribution verb, spoken.
-* `l002` -- **100% narration, zero dialogue.** "Ada's fingers drum on the desk,
-  lost in thought. Her lab, bathed in the hum of equipment, is her sanctuary."
-* `l004` -- "**Ada turns to Leo, her eyes alight.** '...' **Her voice trembles
-  with excitement and fear.**" -- action + quote + delivery note in one row.
-* `l007` -- "**Leo sighs, running a hand through his hair.** '...' The room falls
-  silent, the weight of his words hanging heavy."
-* `l011` -- **100% narration.** "Ada leaves the room, her steps echoing..."
-
-**The quotation marks are INSIDE the text**, so the dialogue is delivered as
-quoted speech embedded in narration. **The episode is an audiobook being read
-aloud, not a radio play being performed.** That single observation explains the
-operator's "dubbed old film" note better than any timing theory.
-
-**F2's ROOT CAUSE FOUND, and it is precise.** Every spoken line carries
-**`speaker = None`**:
-
-| Row | `speaker` | `char_id` | |
-|---|---|---|---|
-| `music_opening_001` | `'RADIO'` | -- | music rows DO carry a speaker |
-| `l001` .. `l011` | **`None`** | `c01`/`c02`/`c03`/`announcer` | **every spoken line** |
-
-But the BEATS carry it correctly -- `b000` = `Dr. Ada`, `b003` = `Dr. Leo`,
-`b005` = `MIT Ethics Board`. **So speaker identity EXISTS at beat level and is
-LOST at line level.** Only the opaque `char_id` survives onto the line. That is
-exactly the `e679b754` trace in this file ("projected P5's accepted line graph
-without authoritative speaker names/cast identity") -- **now confirmed on a real
-artifact rather than inferred.** Nothing on a line asserts who says it, which is
-precisely how a line drifts to the wrong mouth.
-
-**And F2 is VISIBLE in the same artifact.** `b005` is the `MIT Ethics Board`
-beat, holding `l010` + `l011`. `l011` is narration about **Ada** leaving the
-room. A collective character's row is carrying another character's material --
-F2, in the published episode.
-
-**MISS 2 CONFIRMED, and worse than reported.** The coda is not merely failing to
-name the news -- **there is no announcer close at all.** The whole episode
-contains ONE announcer row, `l003`, and it sits in the MIDDLE. There is no
-announcer opening establishing story/place/time/premise, and no announcer
-closing. The real news story behind this episode (light-activated cell movement,
-starfish cells, MIT) **is never named anywhere in the ledger.** Structure:
-
-```
-music_opening -> l001..l002 (Ada) -> l003 ANNOUNCER (middle) -> l004..l011 -> music_closing
-                                     ^ the only announcer row in the episode
-```
-
-Against the canonical `scifi_news` topology this file already records -- opening
-music, ANNOUNCER introduction, drama, ANNOUNCER source-backed news summary,
-closing music -- **both bookends are missing and the one announcer row is in the
-wrong place.**
-
-### THE SOLUTION WAS ALREADY DESIGNED -- lab `docs/2026-08-14-per-beat-dialogue-design.md`
-
-**The operator wrote this yesterday and it supersedes the four-pass clean stage
-proposed above.** It is a better design, and it diagnoses the F1 evidence
-measured today before that evidence existed. Its central sentence:
-
-> "A model asked for one beat writes that beat. A model asked for a whole act
-> writes a summary of one."
-
-**That IS the artifact.** Every row in the published ledger is a summary of the
-act in narrated third-person prose. The cause is not a weak prompt clause -- it
-is that **the dialogue job writes an ENTIRE ACT in one model call** (~28 JSON
-rows in a single reply on a three-act story). Two measured lab failures from that
-same shape: `gemma-4-12b-it` truncated mid-object at the decode guard, and
-`gemma-4-E4B-it` wrote twelve beats of two researchers agreeing with each other.
-**Bulk generation averages; a model writing two exchanges with the previous beat
-in view commits.**
-
-**The shape, per act:**
-
-```
-   today:  spine -> beats -> dialogue(whole act) -> cleanup
-   after:  spine -> beats -> [dialogue beat 1 .. beat N] -> review -> cleanup
-```
-
-Job count `4 * act_count + total_beats + 7`. **`act_count` stays the only knob**;
-the beat count is the MODEL's own answer to the beats job, so the schedule is a
-function of `act_count` plus what the model planned -- **never of a length
-target.**
-
-**The seven global jobs include `announcer_open` and `announcer_news_coda` as
-DEDICATED MODEL JOBS.** That is MISS 2's fix, and it confirms the production
-hypothesis below: production folds the coda into the script pass as a contract,
-the lab gives it its own job.
-
-**Review and cleanup are deliberately SEPARATE, and must stay separate:**
-
-| Job | Question it answers |
-|---|---|
-| `act_review` | **Is this act any good?** Receives the act's spine, its beats and every accepted row in order; returns the rows unchanged, or rewritten against the spine |
-| `act_cleanup` | **Can this be sealed?** The legality pass -- turns a stage direction into speech or a music cue, strips a speaker label |
-
-*"Collapsing them would make one prompt answer two unrelated questions."*
-
-**THIS IS THE OPERATOR'S BEAT-LEVEL REWRITE INSTRUCTION, restated 2026-08-14:**
-*"No Python stripper or shims. The LLM passes are asked to READ and THINK and
-give us a complete rewrite of the ledger beat, so it doesn't include action and
-the dialogue is appropriate for a character 'X' in light of the act and story
-arc."* `act_review` is that job. The unit of rewrite is the BEAT/ACT, not a line.
-
 ### RUNAWAY PREVENTION -- operator 2026-08-14: *"that has to be in there"*
 
 The lab design already carries the key mechanism, and it is the right one:
@@ -715,24 +715,6 @@ inline lanes have carried numeric ceilings from the beginning and nobody has eve
 called 250 a word-count authority. The test to apply: **can the number move when
 `target_words` moves?** If yes it is illegal; if it is a property of the job, it
 is capacity.
-
-### THE WORD RIP IS DONE -- receipt in `docs/HANDOFF_LOG.md` (2026-08-14, `c0cec79b`)
-
-`act_count` 1-8 is the only knob that shapes an episode; length is an
-observation. Three parallel word systems were collapsed onto one act topology,
-four word counts stopped reaching a model, and the positional widget removal was
-paid across `otr_canonical.json`, `otr_story_only.json`, all 50 variants and four
-env recipes in the same change. Shipped green: **10355 passed / 0 failures**,
-Bug Bible 20/24/3, variants 0 failures. **The full receipt, including the ten
-review-found defects and the self-test rot, is in `docs/HANDOFF_LOG.md` -- it
-does not belong in this forward file.**
-
-**What that leaves OPEN, and it is the whole point of the exercise:** the story
-itself is still wrong. See the two misses above; all three are logged as
-artifact-verified PBUGs (`PBUG-20260814-01/02/03`) and NONE is fixed.
-
-**A GRAPH SAVED OUTSIDE THE REPO MUST BE RE-SAVED.** Widget slot 1 was removed,
-so every later `widgets_values` slot shifted down one.
 
 ### OPERATOR DECISIONS OWED FROM THE WORD RIP (three, all small)
 
