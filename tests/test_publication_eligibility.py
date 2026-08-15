@@ -689,3 +689,60 @@ class TestMuxStampAndCacheKey:
         assert path == episode["final"]
         assert published == [episode["final"]]
         assert "obs_publish OK" in report
+
+
+class TestTheReceiptSurvivesTheEpisodeRename:
+    """The live regression, 2026-08-15, and the most expensive kind: my own
+    guard withholding correct episodes.
+
+    The freeze stamps the publication verdict while the episode is still
+    `pending_<ts>`; the cascade then renames it to its real slug. The mux
+    compared the receipt's episode id against the live ledger's, saw
+    `pending_...` vs `signal_lost_...`, read it as a STALE SINGLETON and
+    withheld the OBS copy. On EVERY episode, because every episode is renamed.
+    Two finished, correct episodes stayed unpublished with their archival
+    finals on disk.
+
+    `rename_episode` already owns rebasing every episode-local durable pointer;
+    the receipt was simply not on the list. It re-decides nothing -- the verdict
+    and reasons are untouched, only the name it files itself under moves.
+    """
+
+    def _ledger_obj(self, tmp_path, ep_id):
+        from nodes import production_ledger as PL
+        audio = tmp_path / "output" / "otr" / "episodes" / ep_id / "audio"
+        audio.mkdir(parents=True)
+        led = PL.Ledger(episode_id=ep_id, out_dir=str(audio))
+        led.data.setdefault("meta", {})["source_bank"] = "public_domain"
+        led.data["meta"]["source_meta"] = dict(_NAMED)
+        led.data["meta"]["provenance"] = dict(_CLEARED)
+        PE.stamp_publication_eligibility(led.data)
+        return led
+
+    def test_the_receipt_follows_the_episode_to_its_new_name(self, tmp_path):
+        led = self._ledger_obj(tmp_path, "pending_20260815_115325")
+        receipt = led.data["meta"][PE.PUBLICATION_ELIGIBILITY_META_KEY]
+        assert receipt["episode_id"] == "pending_20260815_115325"
+        led._rebase_publication_eligibility("signal_lost_the_real_slug")
+        assert receipt["episode_id"] == "signal_lost_the_real_slug"
+        # and the VERDICT is untouched -- the rename moves a name, not a right
+        assert receipt["eligible"] is True
+        assert receipt["reasons"] == [
+            PE.REASON_RIGHTS_CLEARED, PE.REASON_IDENTITY_COMPLETE]
+
+    def test_a_renamed_episode_is_PUBLISHABLE_again(self, tmp_path):
+        led = self._ledger_obj(tmp_path, "pending_20260815_115325")
+        led.data["episode_id"] = "signal_lost_the_real_slug"
+        before = PE.decide_from_meta(
+            led.data["meta"], expected_episode_id="signal_lost_the_real_slug")
+        assert before.publishable is False   # the shipped regression
+        assert before.reason == PE.DECISION_EPISODE_MISMATCH
+        led._rebase_publication_eligibility("signal_lost_the_real_slug")
+        after = PE.decide_from_meta(
+            led.data["meta"], expected_episode_id="signal_lost_the_real_slug")
+        assert after.publishable is True
+
+    def test_a_ledger_with_no_receipt_rebases_harmlessly(self, tmp_path):
+        led = self._ledger_obj(tmp_path, "pending_1")
+        led.data["meta"].pop(PE.PUBLICATION_ELIGIBILITY_META_KEY)
+        led._rebase_publication_eligibility("whatever")   # must not raise

@@ -34,12 +34,13 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10657 / 110 / 1**, Bible **20 / 26 / 3**
+**BASELINES to detect drift:** suite **10683 / 110 / 1**, Bible **20 / 26 / 3**
 (the Bible now holds **282** entries -- `12.103` landed with chunk 2, `12.105`
 with chunk 3.5), variants 50 emitted (3 refused -- the standing unratified
 cloud profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5;
 -> 10610, 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1;
--> 10657 chunk 3.5 / D3. No regressions at any step.)
+-> 10657 chunk 3.5 / D3; -> 10683 D2's transition schema + the rename fix.
+No regressions at any step.)
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 

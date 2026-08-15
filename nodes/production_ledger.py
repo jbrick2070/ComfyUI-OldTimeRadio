@@ -732,6 +732,45 @@ class Ledger:
 
     # -- identity ------------------------------------------------------
 
+
+    def _rebase_publication_eligibility(self, new_id: str) -> None:
+        """Carry the publication receipt's episode id across a rename.
+
+        THE RECEIPT IS AN EPISODE-LOCAL DURABLE POINTER, and this method
+        already owns rebasing every one of those onto the new identity -- it
+        just predates this particular field.
+
+        WHY IT MATTERS (live, 2026-08-15). The freeze stamps the publication
+        verdict while the episode is still `pending_<ts>`; this rename then
+        gives it its real slug. The terminal mux compares the receipt's episode
+        id against the live ledger's, found `pending_...` versus
+        `signal_lost_...`, read that as a STALE SINGLETON and withheld the OBS
+        copy -- on every episode, because every episode is renamed. Two
+        finished, correct episodes stayed unpublished.
+
+        This does NOT re-decide anything. The verdict and its reasons are
+        untouched; only the name the receipt files itself under moves, exactly
+        as the durable paths above it do. Rights stay owned by the one producer
+        at the freeze.
+        """
+        meta = self.data.get("meta")
+        if not isinstance(meta, dict):
+            return
+        try:
+            from ._otr_publication_eligibility import (
+                PUBLICATION_ELIGIBILITY_META_KEY,
+            )
+        except ImportError:  # pragma: no cover -- flat/standalone load
+            try:
+                from _otr_publication_eligibility import (  # type: ignore
+                    PUBLICATION_ELIGIBILITY_META_KEY,
+                )
+            except ImportError:  # pragma: no cover
+                return
+        receipt = meta.get(PUBLICATION_ELIGIBILITY_META_KEY)
+        if isinstance(receipt, dict) and receipt.get("episode_id") != new_id:
+            receipt["episode_id"] = new_id
+
     def rename_episode(self, new_id: str) -> None:
         """Rename the episode id and atomically move BOTH the parent
         per-episode dir AND the ledger + treatment files inside.
@@ -790,6 +829,7 @@ class Ledger:
                      old, new_id)
             self.episode_id = new_id
             self.data["episode_id"] = new_id
+            self._rebase_publication_eligibility(new_id)
             return
 
         old_exists = os.path.isdir(old_ep_dir)
@@ -941,6 +981,7 @@ class Ledger:
         self.data = rebased_data
         self.episode_id = new_id
         self.data["episode_id"] = new_id
+        self._rebase_publication_eligibility(new_id)
         self.out_dir = new_audio_dir
 
         # Step 5: rename treatment + any other owned txt sidecars from

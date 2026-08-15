@@ -3,6 +3,78 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- CODER (D2's transition schema, and a LIVE leg catching a regression no unit test could)
+
+**Did.** Chunk 0's owed transition-receipt schema + D2's composite validator,
+plus a regression the live run found in chunk 0.5. Green and pushed.
+**The emitter and chunk 1's transaction are NOT wired yet** -- the contract is
+built and proven, the call sites are the next commit.
+
+### The live run paid for itself in one leg
+
+Three legs ran through `workflows/otr_canonical.json`: public_domain,
+shakespeare, media_archive. Two finished RESULT SUCCESS.
+
+**D1 is PROVEN ON ARTIFACTS, all three lanes.** Every leg protected its coda row
+(`b016`), and none overlapped the rows the clean stage touched:
+public_domain protected b016 / cleaned b012; shakespeare protected b016 /
+cleaned nothing; media_archive protected b016 / cleaned b001. The fact is
+byte-present in each. So the guard fires AND the clean stage still works --
+the failure mode I was most worried about (a guard that becomes a general
+exemption) did not happen.
+
+**D5 and chunk 0.5 are proven with it.** The codas now name the work --
+*"adapted from Condensed Novels, by Bret Harte"*, *"drawn from William
+Shakespeare's Much Ado About Nothing"* -- where they used to say "a work in the
+public domain". Note public_domain named the WORK, not the unit label: the unit
+was *Gertrude the Governess*, a story inside Harte's collection. That is the
+display rule the contract settled against all four reviewers' anthology
+recommendation, working correctly on a real episode.
+
+### THE REGRESSION, and it was mine
+
+**`otr\obs\` was EMPTY. Both finished episodes went unpublished.** From the
+server log:
+
+> `obs_publish BLOCKED (eligibility_receipt_episode_mismatch: receipt is
+> stamped for 'pending_20260815_115325'; this episode is
+> 'signal_lost_the_price_of_the_floorboards_20260815_120514')`
+
+The freeze stamps the publication verdict while the episode is still
+`pending_<ts>`; the cascade then renames it to its real slug. My identity check
+compared a snapshot against a value that legitimately moves, so it would have
+blocked **every episode, forever**. No unit test could have caught it -- they
+all use a fixed episode id. Only a live leg renames.
+
+**Fixed at the right owner.** `rename_episode` already rebases every
+episode-local durable pointer onto the new identity; the receipt was simply not
+on its list. It re-decides nothing -- verdict and reasons untouched, only the
+name it files under moves -- so rights stay owned by the one producer at the
+freeze. Three regression tests.
+
+Worth recording: the diagnosis took two minutes because the log line carried the
+`TO FIX:` remedy naming the stale-singleton hypothesis. That remedy text exists
+because the agy round-3 review argued for it. The QA round paid for itself here.
+
+### The transition schema (chunk 0's owed half)
+
+`nodes/_otr_content_transition.py`: ONE authorized rewrite window between
+acceptance and audit, proving before AND after. `validate_receipt` is now
+composite -- no transition means the v1 contract is byte-for-byte unchanged, so
+every historical ledger still validates. An UNATTRIBUTED mutation still fails
+loud, which is the line between teaching the audit about a mutator and widening
+its tolerance (Bible 12.104 says explicitly: do not widen).
+
+**The D2 QA round caught a design defect before it was wired**, and it was the
+one that mattered: `run_ledger_clean` and `run_ledger_cleanup` BOTH run between
+acceptance and the audit, so one transition per stage is impossible -- the
+second's `pre` would be the first's OUTPUT and could never equal the parent
+receipt. `authorized_stages` is a LIST covering one window. Also accepted:
+`parent_authorship_digest` is now VERIFIED (line ids repeat across episodes, so
+hash equality alone let a transition be lifted between episodes or lanes), and
+the declared-change set must match what moved EXACTLY, in both directions.
+Rejected nothing; all four findings were real.
+
 ## 2026-08-15 -- CODER (chunk 3.5 / D3: the terminal delimiter, and the diagnostic that never named it)
 
 **Did.** D3's code and tests, plus Bible `12.105`. Green and pushed.

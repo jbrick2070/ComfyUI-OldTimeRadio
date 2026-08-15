@@ -185,24 +185,76 @@ def validate_receipt(ledger_data: Mapping[str, Any]) -> dict[str, Any]:
         proof_by_id[line_id] = proof
     live = _voiced_rows(ledger_data)
     live_by_id = {str(row.get("line_id") or ""): row for row in live}
-    if set(proof_by_id) != set(live_by_id):
-        missing = sorted(set(live_by_id) - set(proof_by_id))
-        extra = sorted(set(proof_by_id) - set(live_by_id))
+
+    # THE ACCEPTED STATE, which is what the v1 proofs describe. Before the
+    # pipeline grew sanctioned post-acceptance passes this WAS the live state,
+    # and the two were compared directly. They are now two different instants,
+    # and conflating them is the whole defect (12.104).
+    accepted_hashes = {
+        line_id: str(proof.get("text_sha256") or "")
+        for line_id, proof in proof_by_id.items()
+    }
+
+    # ONE authorized transition may sit between acceptance and this audit.
+    # Absent -> the v1 contract is unchanged, so every historical ledger and
+    # every episode nothing rewrote keeps validating exactly as before.
+    transition = None
+    try:
+        try:
+            from ._otr_content_transition import (
+                ContentTransitionError, transition_of, validate_transition,
+            )
+        except ImportError:  # pragma: no cover -- flat test/standalone load
+            from _otr_content_transition import (  # type: ignore
+                ContentTransitionError, transition_of, validate_transition,
+            )
+        transition = transition_of(meta)
+    except ImportError:  # pragma: no cover -- transition support absent
+        transition = None
+
+    if transition is None:
+        expected_hashes = accepted_hashes
+        expected_count = len(live_by_id)
+    else:
+        # A transition must PROVE its rewrite. It is detective, not permissive:
+        # it says which rows moved and to what, and anything else still fails.
+        try:
+            expected_hashes, expected_count = validate_transition(
+                ledger_data, transition, parent_line_hashes=accepted_hashes,
+            )
+        except ContentTransitionError as exc:
+            raise ContentAuthorshipError(
+                f"content_authorship transition is not provable: {exc}"
+            ) from exc
+
+    if set(expected_hashes) != set(live_by_id):
+        missing = sorted(set(live_by_id) - set(expected_hashes))
+        extra = sorted(set(expected_hashes) - set(live_by_id))
         raise ContentAuthorshipError(
             f"line proof coverage mismatch: missing={missing} extra={extra}"
         )
     for line_id, row in live_by_id.items():
         digest = _sha256_bytes(str(row.get("text") or "").encode("utf-8"))
-        if proof_by_id[line_id].get("text_sha256") != digest:
+        if expected_hashes[line_id] != digest:
             raise ContentAuthorshipError(f"canonical text hash mismatch for {line_id!r}")
+
+    # The coverage SUMMARY still describes the acceptance, not the live set --
+    # it is part of the v1 receipt and states what the lane proved when it
+    # accepted. A transition that drops a row reports the new count through its
+    # own post state, which `expected_count` above already carries.
     coverage = receipt.get("coverage")
-    expected_count = len(live_by_id)
+    accepted_count = len(proof_by_id)
     if not isinstance(coverage, Mapping) or coverage != {
-        "voiced_line_count": expected_count,
-        "proved_line_count": expected_count,
+        "voiced_line_count": accepted_count,
+        "proved_line_count": accepted_count,
         "complete": True,
     }:
         raise ContentAuthorshipError("content_authorship coverage summary is false")
+    if expected_count != len(live_by_id):
+        raise ContentAuthorshipError(
+            "transition post coverage %d disagrees with the live ledger (%d)"
+            % (expected_count, len(live_by_id))
+        )
     return dict(receipt)
 
 
