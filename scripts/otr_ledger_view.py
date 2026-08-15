@@ -44,6 +44,14 @@ The F1 detectors are deliberately noisy in one direction. A false positive
 costs a human five seconds of reading; a false negative ships a stage
 direction to the microphone. Every finding names the exact phrase it tripped
 on so the reader can overrule it at a glance.
+
+ONE DEFINITION OF "ACTION", AND IT IS NOT HERE
+-----------------------------------------------
+The patterns live in ``nodes/_otr_spoken_text_policy.py`` because production's
+CLEAN STAGE (``nodes/_otr_ledger_clean.py``) gates its repair calls on the
+same rules this grader judges by. If the two disagreed, a run could repair a
+line this tool still fails, or ship one it would have caught. So this file
+imports the policy and never restates it.
 """
 from __future__ import annotations
 
@@ -58,6 +66,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from nodes._otr_spoken_text_policy import (  # noqa: E402
+    F1_PATTERNS,
+    VOICED_ROLES,
+    f1_findings,
+    f2_findings,
+)
 
 #: Where rendered episodes live. Overridable so a bench tree or a copied
 #: episode can be inspected without moving files around.
@@ -65,80 +82,6 @@ EPISODES_ROOT = Path(
     os.environ.get("OTR_OUTPUT_DIR")
     or r"C:\Users\jeffr\Documents\ComfyUI\output"
 ) / "otr" / "episodes"
-
-VOICED_ROLES = ("character", "announcer")
-
-
-# ---------------------------------------------------------------------------
-# F1 -- action inside a row that is supposed to be pure speech
-# ---------------------------------------------------------------------------
-# Each pattern is one WAY narration leaks in, kept separate so a finding can
-# say which one fired instead of "looks like prose".
-
-_F1_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    (
-        "stage direction in brackets",
-        re.compile(r"\([^)]{2,}\)|\[[^\]]{2,}\]|\*[^*]{2,}\*"),
-    ),
-    (
-        "attribution verb",
-        re.compile(
-            r"\b(?:said|says|saying|murmurs?|murmured|whispers?|whispered"
-            r"|shouts?|shouted|replies|replied|asks|asked|answers?|answered"
-            r"|adds?|added|continues?|continued|mutters?|muttered|snaps?"
-            r"|snapped|breathes?|breathed|calls? out|called out)\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        # A BARE VERB IS NOT EVIDENCE. The first cut matched the verb alone
-        # and fired six times out of six on a ledger that was clean: "We
-        # stand at the precipice" (first person), "humanity to finally stand"
-        # (an infinitive), "Then step back, Kaelen" (an imperative spoken to
-        # another character), "it stands as our shield" (a metaphor). None of
-        # those is stage business. What makes an action a STAGE DIRECTION is
-        # a third-person subject DOING it, so the subject is now part of the
-        # pattern -- and `to` in front rules out the infinitive.
-        "third-person action",
-        re.compile(
-            r"(?<!to )\b(?:He|She|They|"
-            # A capitalised word is only a SUBJECT if it is not the ordinary
-            # way an English sentence opens. "Then step back" and "The vest
-            # stands" are a command and a metaphor, not stage business.
-            r"(?!(?:Then|But|And|When|If|Now|So|Let|Well|The|This|That|These"
-            r"|Those|Here|There|Why|How|What|Who|Since|While|After|Before"
-            r"|Today|Tonight|We|You|I|My|Your|Our|It|Its|Not|Just|Only|Even"
-            r"|Maybe|Perhaps|Yes|No|Every|Each|Some|All)\b)"
-            r"[A-Z][a-z]{2,})\s+"
-            r"(?:turns?|turned|leans?|leaned|reaches?|reached|walks?|walked"
-            r"|steps?|stepped|nods?|nodded|smiles?|smiled|frowns?|frowned"
-            r"|glances?|glanced|stares?|stared|drums?|drummed|paces?|paced"
-            r"|grabs?|grabbed|enters?|entered|leaves?|exits?|exited|stands?"
-            r"|stood|sits?|sat|rises?|rose|sighs?|sighed|shrugs?|shrugged"
-            r"|laughs?|laughed|pauses?|paused)\b",
-        ),
-    ),
-    (
-        "delivery note",
-        re.compile(
-            r"\b(?:her|his|their) (?:voice|eyes|hands?|face|gaze|tone"
-            r"|breath|shoulders?|fingers?)\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        # STRAIGHT AND CURLY DOUBLE QUOTES ONLY. The first cut included the
-        # curly SINGLE quotes, which in ordinary English are apostrophes --
-        # so "It's designed to block the solar storms" read as quoted speech
-        # embedded in prose. Two of the six false alarms were this.
-        "quoted speech inside prose",
-        re.compile("[\"\u201c\u201d].{8,}[\"\u201c\u201d]"),
-    ),
-    (
-        "speaker label",
-        re.compile(r"^\s*[A-Z][A-Z .'\u2019-]{1,30}:", re.MULTILINE),
-    ),
-)
 
 
 @dataclass
@@ -176,12 +119,6 @@ class LedgerReport:
         return not self.f1 and not self.f2 and bool(self.voiced)
 
 
-def _first_match(text: str, pattern: re.Pattern[str]) -> str:
-    found = pattern.search(text)
-    if not found:
-        return ""
-    snippet = " ".join(found.group(0).split())
-    return snippet[:60]
 
 
 def source_anchors(data: dict) -> list[str]:
@@ -264,28 +201,16 @@ def grade(path: Path) -> LedgerReport:
         line_id = str(row.get("line_id") or "")
         text = str(row.get("text") or "")
 
-        for kind, pattern in _F1_PATTERNS:
-            hit = _first_match(text, pattern)
-            if hit:
-                report.f1.append(RowFinding(line_id, kind, hit))
-
-        speaker = str(row.get("speaker") or "").strip()
-        beat = beats.get(str(row.get("beat_id") or "")) or {}
-        owner = str(beat.get("speaker") or "").strip()
-        if not speaker:
-            report.f2.append(RowFinding(
-                line_id, "no speaker",
-                "the row does not say who is talking"))
-        elif owner and speaker != owner:
-            report.f2.append(RowFinding(
-                line_id, "row disagrees with its beat",
-                f"row says {speaker!r}, beat says {owner!r}"))
-        elif row.get("speaker_role") == "character":
-            name = cast.get(str(row.get("char_id") or ""))
-            if name and speaker != name:
-                report.f2.append(RowFinding(
-                    line_id, "row disagrees with the cast",
-                    f"row says {speaker!r}, cast says {name!r}"))
+        for finding in f1_findings(text):
+            report.f1.append(
+                RowFinding(line_id, finding.kind, finding.detail))
+        for finding in f2_findings(
+            row,
+            beats.get(str(row.get("beat_id") or "")),
+            cast.get(str(row.get("char_id") or ""), ""),
+        ):
+            report.f2.append(
+                RowFinding(line_id, finding.kind, finding.detail))
 
     anchors = source_anchors(data)
     voiced = report.voiced
@@ -469,7 +394,7 @@ def _wrap(text: str, width: int) -> list[str]:
 def _mark_html(text: str) -> str:
     """Escape, then highlight every phrase an F1 detector would trip on."""
     escaped = html.escape(text)
-    for _kind, pattern in _F1_PATTERNS:
+    for _kind, pattern in F1_PATTERNS:
         escaped = pattern.sub(
             lambda m: f"<mark>{m.group(0)}</mark>", escaped)
     return escaped

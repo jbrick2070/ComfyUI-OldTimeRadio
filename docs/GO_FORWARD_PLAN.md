@@ -6,6 +6,314 @@ revision of this file is in git. If a thing is DONE, it does not belong here.
 
 ## PRIORITY 1 -- STORY CLEANUP IN PRODUCTION (operator 2026-08-14). DO THIS FIRST.
 
+### THE CLEAN STAGE IS BUILT AND WIRED -- 2026-08-14, and the JUDGE IS A MODEL
+
+`nodes/_otr_ledger_clean.py`, called once from
+`OTR_LedgerScriptWriter._run_writer_tail` immediately before
+`run_ledger_cleanup` -- the ONE producer boundary every source bank reaches
+(the legacy writer path, and both news lanes via the pipeline-runner
+dispatch). So all six banks are covered by one call site.
+
+**THE FIRST CUT GATED THE REPAIR ON A REGEX LIST AND THE OPERATOR KILLED IT,
+correctly.** *"Your shim can clean a contained story but it won't fix the
+next one ... I'd rather a more intelligent LLM say 'do you see things acting,
+like a door closing? that's not dialogue -- well, you need to make a rewrite
+pass'."* The proof is one line long: the pattern list has `sighs` and `turns`
+in it and does not have `closes`, so
+
+> "The door closes behind him."
+
+walks past every pattern and gets read aloud. The lab's own 695-line
+`spoken_text_policy.py` is the same class of thing and says so in its header
+(*"a future fuzzy or model-assisted policy requires a new policy"*), so
+PORTING IT WOULD NOT HAVE HELPED. Enumerating stage business is not a finite
+job, so it may not be a Python job.
+
+**The shape now:**
+
+| | |
+|---|---|
+| **Judge** | a MODEL reads EVERY voiced row: *"is every word of this something the character says out loud?"* and quotes what is not |
+| **Patterns** | `_otr_spoken_text_policy` still runs -- free, instant, and the same detector the offline grader scores with. Handed to the judge as evidence, LABELLED AS OFTEN WRONG |
+| **Trigger** | a UNION, never a veto: dirty if the judge says so OR the patterns do. Neither may overrule the other |
+| **Repair** | a MODEL, told the judge's own words, plus speaker + beat intent + the story so far. Best EDIT, never a strip |
+| **Confirm** | the JUDGE re-reads the repair. A repair graded more weakly than the judgement can pass by moving the defect where the weaker check cannot see |
+| **Budget** | 2 repair attempts per row, each informed. Then the row SHIPS with `compose_flags += ["unclean_spoken_text"]` and a loud log. Never a hard stop |
+
+**PYTHON'S ENTIRE JOB:** choose which rows to ask about, carry the model's
+answer into the row, count, and stop. There is exactly ONE line that writes a
+row's text and it writes the MODEL's returned string, through the canonical
+`set_line_text_metrics` owner so `word_count`/`char_count` move with it. Zero
+`assert`, zero `re.sub`, zero stripping. Pinned by
+`test_python_owns_no_opinion_about_prose`.
+
+**WHAT THE LIVE LEGS SHOWED, and the middle one is why the design changed:**
+
+| leg | cut | result on `media_archive`, act 3, `gemma-2-2b-it` |
+|---|---|---|
+| 1 | regex gate, model may answer "already_speech" | 16 rows, F1 on 6, **0 repaired, 5 overruled**. The 2B took the escape door five times out of five -- once quoting the prompt's own first sentence back as its reason. **The pass was a no-op on the bank that needed it most** |
+| 2 | same, but Python refused the overrule on markup | 16 rows, F1 on 5, **3 repaired**, 1 overruled, 1 unclean. It worked -- and it is the shim the operator then rejected, because it only ever knows the verbs already in the list |
+| 3 | **model judge** | see the handoff |
+
+**STILL OPEN under the clean stage:** F2's CONTENT half (a character speaking
+another's words) is REPORTED, never repaired -- it is a reading of the whole
+episode rather than of one line, and there is no detector for it. F2's
+metadata half is reported too and was ZERO on every live leg, which is the
+`PBUG-20260814-01` fix holding on a bank it was never proven on.
+
+### THE CLEANUP LAB, AND THE FIRST HONEST RECIPE MEASUREMENT
+
+`scripts/otr_clean_stage_lab.py` -- operator's design, 2026-08-14: *"create a
+bad ledger realistic scenario for each source bank and simulate having the
+local LLM clean it up ... keep experimenting until you get the right cleanup
+recipe."*
+
+A planted bad ledger per bank, REAL production code and a REAL local model on
+the `_otr_model_loader` seam. The defects are labelled, so the run scores
+itself on the thing a rendered episode CANNOT measure: **precision**. A live
+leg shows six flagged lines and no way to tell which were wrong; the lab says
+so exactly. Each fixture is shaped like ITS OWN LANE (`LANE_SHAPE`) -- writer
+banks put the act fields on the LINE row, codex banks on both -- because a lab
+whose fixtures share one convenient shape cannot catch a per-lane wiring
+fault, which is precisely the bug that got through.
+
+**MEASURED 2026-08-14, `gemma-2-2b-it`, all six banks:**
+
+| recipe | recall | traps kept | model calls |
+|---|---|---|---|
+| pattern floor only (`--dry`) | 12/15 (80%) | **26/28 (93%)** | 0 |
+| + the model judge | **13/15 (87%)** | 15/28 (**54%**) | 131 |
+
+**READ THAT HONESTLY: on a 2B the judge is NOT yet a win.** It buys one extra
+defect -- and every miss the patterns have is a `scene_report`, the
+unpunctuated class only a model can catch, so the ceiling is real -- but it
+costs ELEVEN false alarms on clean dialogue. A recipe is better only when
+recall rises and traps kept does NOT fall. This one is not there.
+
+**Next experiments, cheapest first** (the lab makes each one minutes, not a
+ten-minute render): ask the judge twice and act only on agreement; try the
+judge on `gemma-4-12b-it` while the repair stays local; tighten the
+calibration examples toward the trap shapes that actually fire.
+
+### THE PASS WAS BLIND TO THE ACT ON EVERY LIVE EPISODE -- FIXED 2026-08-14
+
+**Operator: *"the key is we need to make sure in the ComfyUI workflow it is
+actually seeing all the artifacts and pointed to them -- act / act spine,
+characters, before and after dialogue -- and not blind due to a coding
+error."* He was right, and it was already happening.**
+
+Measured on the live `media_archive` ledger: `beat_intent` present on **0/16**
+rows, `arc_phase` on **0/16**. The cause is one wrong lookup --
+`arc_phase` and `beat_intent` are stamped on the **LINE** row by the writer
+lane, and the pass read the **BEAT** row, whose writer-lane shape is pure
+transport (`beat_id`, `char_id`, `line_ids`, `scene_id`, `shot_id`,
+`start_s`, `dur_s`). So "WHERE THE STORY IS" shipped EMPTY on every prompt of
+every writer-lane episode, and the judge and the repair both worked blind.
+**The unit suite was green throughout**, because its fixtures put the fields
+on the beat -- a shape no writer-lane ledger has.
+
+Fixed by reading the UNION, line first (`_story_field`), since the codex lane
+does populate beats. Three things now make it un-repeatable:
+* **`meta.ledger_clean.context_seen`** counts, per episode, how many rows
+  resolved an arc phase, a beat intent, a cast name, lines before and lines
+  after. A zero in that block IS the blindness, visible in the artifact.
+* **A test on the real production shape** (`test_the_act_is_read_from_the_line_row_where_production_puts_it`)
+  plus one on the codex shape, so neither lane can regress alone.
+* **The lab prints the same counts per bank** and marks a blind run
+  `*** BLIND ***`.
+
+**AND THE STRONGER PROOF THE OPERATOR ASKED FOR:** *"asking the LLM if it can
+see it is the better truth over some codified variable check."* Correct -- a
+counter proves a STRING WAS BUILT, not that the model received or could use
+it. So `summarize_acts` has the model READ each act and write its own ~10-word
+brief, which is then pasted into every judge and repair prompt for that act.
+The brief is both the context ("rising" is a label; a sentence is usable) and
+the evidence of sight. Live from the lab, on `scifi_news`: *"Dr. Osei is
+monitoring the shielding of a device at 60% capacity."* That is a real read of
+the material -- the model can see the act. ~5 calls an episode, one per arc
+phase, never fatal.
+
+### THE NO-SHIMS RULE IS BEING BROKEN IN FOUR PLACES WE DID NOT WRITE
+
+**Operator, 2026-08-14: *"fan out all source banks for similar functions / LLM
+calls to fix, and see they have the same rigour -- not just this one call."***
+Three read-only audits swept every fix / repair / review / clean model call in
+the tree against a seven-point bar (detect-and-repair vs cold reroll; informed
+retry; does it see the act/beat and the lines before AND after; bounded +
+fail-soft; numeric decode budget; canonical text ownership; any Python editing
+prose). **Every finding below was re-verified against the real Windows files
+before being written down.**
+
+**THE HEADLINE, AND IT DEFEATS THE PASS WE JUST BUILT.**
+`clean_spoken_text` (`_otr_script_prep.py:21-30`) is three regexes:
+
+```python
+_SPEAKER_PREFIX = re.compile(r"^[A-Z][A-Z .'\-]{1,30}:\s*")
+_PAREN          = re.compile(r"\([^)]{1,80}\)")
+_BRACKET        = re.compile(r"\[[^\]]{1,40}\]")
+```
+
+It deletes the parenthetical and staples the halves together -- **the exact
+move `_otr_ledger_clean`'s own repair prompt forbids the model from making**
+("Never just delete and staple. A stripped line often stops making sense or
+goes flat"). And it runs in two places that matter:
+* **at TTS time**, producing the string the voice actor speaks
+  (`eng_chatterbox.py:137`, `eng_dia.py:137`, `eng_indextts2.py:175`,
+  `_otr_voice_node_common.py:796/800`) -- so it runs **AFTER** the clean
+  stage and silently edits the rows the clean stage flagged and shipped;
+* **in the codex lane at compile time**
+  (`_otr_scifi_codex.py:3259` `_canonicalize_script_spoken_text`, and
+  `:3728` on the coda before its verifier ever reads it).
+
+**This resolves a measurement mystery.** `scifi_news` graded 0% F1 not because
+the lane is clean but because Python had already deleted the evidence. The
+`re.fullmatch` blind spot in `_spoken_text_finding` (`:3400`) is therefore
+NOT the leak -- the silent prose edit is. **A latent bug rides along:**
+`_PAREN` caps at 80 chars and `_BRACKET` at 40, so a longer stage direction
+survives every strip and IS read aloud.
+
+**PYTHON AUTHORS BROADCAST PROSE.** `validate_announcer_line`
+(`_otr_line_composer.py:1140`) rejects a model's announcer line for containing
+any of `[]{}` -- then `:1320-1323` ships `fallback_announcer_intro`, a
+hardcoded Python sentence: *"Good evening. This is SIGNAL LOST. Tonight: ..."*
+No reroll, no repair, no model. This is the furthest any site sits from the
+operator's law.
+
+**THE BUSIEST CALL IN THE PIPELINE IS A COLD REROLL.**
+`compose_line_draft` (`_otr_line_composer.py:1016-1046`) -- the per-beat
+dialogue path for EVERY writer-lane bank -- re-sends the identical `messages`
+object with the temperature RAISED `+0.1` per attempt and tells the model
+nothing about what was wrong. Then `raise LineCompositionFailedError` (:1046),
+for which **no `except` exists anywhere in `nodes\`** and whose call site
+(`OTR_LedgerScriptWriter.py:5679`) is unwrapped -- an empty beat kills the
+episode. (Two independent audits reached this conclusion separately.)
+
+**THE PASS WHOSE JOB IS "READ IT BACK AND FIX IT" NEVER REPAIRS.** Codex
+`P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`): a content failure
+gets ONE generic repair turn that sees 400 characters of its own draft
+(`_otr_repair_prompts.py:47`), then three cold rerolls carrying
+`_WRITER_RETRY_INSTRUCTION` (*"The prior candidate is abandoned"*), then
+`CodexPassError` kills the render.
+
+**THE PRO LANE NEVER CHECKS ITS SOURCE ATTRIBUTION.** `_pass_news_read`
+(`_otr_scifi_fable2.py:1547`) passes **no `post_validator` at all**, so the one
+row telling the listener where fact stopped and fiction started is accepted as
+written -- while its codex twin (P6) verifies and cleans it.
+
+**A WIDGET ADVERTISES A REPAIR THAT DOES NOT EXIST.**
+`enable_production_stage3_validators` (`OTR_LedgerScriptWriter.py:3181-3208`)
+promises *"ONE repair regenerate attempt with the finding messages threaded in
+as the reroll hint."* That code is not in the tree; findings are telemetry
+only (`_otr_line_composer.py:1076-1090`). **Measured 2026-08-14: the widget is
+`True` in `workflows/otr_canonical.json`,** so production runs with a promise
+it does not keep.
+
+**ALSO PYTHON REWRITING SEALED PROSE:** `_otr_ledger_scrub.scrub_ledger`
+(`:219-221`) regex-rewrites the FINAL accepted ledger downstream of the clean
+stage; `_otr_ledger_cleanup._complete_deterministic` (`:251-263`) blanks a
+spoken row to a skip when a regex says it has no surface;
+`_otr_line_composer.strip_action_marker` / `_MD_BOLD_ITALIC_RE` (`:66-89`)
+delete `ACTION:` runs and every `*` `_` backtick globally rather than as
+wrappers.
+
+**DORMANT BUT LOADED:** `_otr_content_safety.py` still carries hardcoded
+`PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS` lists
+(`:25-82`) driving model rewrites -- directly contrary to the 2026-08-03
+no-guardrails directive -- plus two bare `RuntimeError`s (`:328`, `:334`) that
+would kill a render. Nothing calls it today. Delete it or rebuild it before
+anything wires it back.
+
+**GOOD NEWS, MEASURED:** the whole-remaining-window runaway shape
+(`ProviderCapacityMessages`) is constructed **only** in the two news lanes;
+every writer-lane call already carries a numeric ceiling. And
+`set_line_text_metrics` really is the sole writer of `row["text"]` -- a
+repo-wide grep returns only that line.
+
+**RESOLVED WHILE AUDITING:** `use_exchange` is **`True`** in
+`workflows/otr_canonical.json` (widget idx 13; count 33 == 33, no drift), so
+`compose_exchange` -- the one genuine informed detect-and-repair in the writer
+lane (`_otr_compose_exchange.py:585`, which feeds its Tier-A verdict reasons
+back into the rewrite) -- IS live in production. That answers open question 2
+in the word-rip list by measurement instead of assumption.
+
+**RANKED, worst first, for whoever takes this next:**
+1. `clean_spoken_text` at TTS time -- it silently undoes the clean stage.
+2. The announcer fallback -- Python-authored prose on air.
+3. `compose_line_draft` -- cold reroll + uncaught raise on every bank.
+4. Codex `P5R` -- a review pass that cannot repair and can kill the render.
+5. `_pass_news_read` -- unverified source attribution on the pro lane.
+6. The stage-3 widget's phantom repair -- `True` in the canonical graph.
+
+### DO WE NEED MORE LLM PASSES? -- Fable read the real flow, 2026-08-14
+
+Operator asked, and asked for the ACTUAL pass flow to be read rather than the
+docs. Fable read `_otr_ledger_clean.py`, the codex lane's `P5B`/`P5R`/`P6` and
+their validators, `_otr_outline.py`'s three-stage cascade, and the shared
+tail. The answer, ranked:
+
+1. **NOTHING NEW FOR F1.** The layering is already correct and
+   non-duplicative: upstream `P5B`/`P5R` catch WHOLE-LINE markup with
+   `re.fullmatch` at authoring time, where a finding is still a cheap
+   rerollable complaint inside the structured ladder; the tail judge catches
+   what upstream structurally cannot -- EMBEDDED and UNPUNCTUATED stage
+   business. The segment-list schema closes the "finds one, misses the
+   second" gap INSIDE that pass rather than needing a sibling. Another F1
+   pass would re-read text a judge already reads.
+2. **THE ONE REAL GAP: F2's CONTENT HALF HAS NO DETECTOR ANYWHERE.**
+   `f2_findings` checks bookkeeping only. Nothing in the flow ever asks *"do
+   these WORDS belong to this speaker?"* -- the gender/voice-contradiction
+   class the operator keeps explicitly open as a CORRECTNESS defect. **This
+   is the next pass, and it is the only one that earns its wall-clock.**
+   Shape, and it is deliberately narrow:
+   * **one job** -- "does this line read as spoken BY this speaker?" Do NOT
+     bolt it onto the F1 judge; a 2B model given two questions degrades on
+     both.
+   * **window** -- the line, the beat's speaker + intent, the cast list, and
+     the same `_CONTEXT_ROWS` prior-row window the F1 judge already builds.
+   * **DETECTOR-GATED on free Python signals**, which is where the
+     wall-clock is won (~0-3 calls an episode instead of +16): the speaker's
+     own name used as a vocative inside their own line; two consecutive rows
+     by the same speaker where the second answers the first; a first-person
+     self-description contradicting the cast row. Optionally UNGATED on the
+     two adaptation lanes, where the bug has actually been observed.
+   * **returns** `{"belongs_to_speaker": bool, "likely_speaker": str,
+     "why": str}` and **REPAIRS NOTHING** -- the beat owns the speaker, so
+     rewriting prose to fit a wrong attribution asks a writer to fix a
+     bookkeeping fault. It appends to the receipt, flags, logs, continues.
+     Report-only also means a 2B misfire costs a flag, never a mangled line.
+3. **REMOVE NOTHING.** `P5R` is the safe cut if wall-clock ever must shrink
+   -- it owns NO exclusive ledger fields, rewriting row `text` only through
+   the same accepted-rows path `P5B` feeds -- but its job is scene coherence
+   against the spine, which the clean stage does not and should not do.
+   Arcs are the stated point of the pipeline. Keep it.
+
+**EXPLICITLY REJECTED: a whole-episode "final table read" pass.** It is the
+`PBUG-20260814-03` failure shape in reverse -- a 2B model handed a whole
+episode averages it into a summary -- and it violates the one-job /
+small-window rule that fixed that bug.
+
+### THE SCIENCE-NEWS REVIEW PASSES DO NOT CATCH AN EMBEDDED STAGE DIRECTION
+
+**Found 2026-08-14 answering the operator's question -- *"I thought we had an
+LLM pass that looks AND fixes for things like this."* He is right that the
+passes exist, and they still miss this.** `scifi_news` runs `P5R`
+`_call_scene_review` (*"read the scene back and fix it against its own
+spine"*, `_otr_scifi_codex.py:3034`) and `P6`'s coda clean. Both validate
+through `_spoken_text_finding`, whose markup rule is
+
+```python
+re.fullmatch(r"\s*(?:\[[^\]]+\]|\([^)]*\))\s*", text)
+```
+
+**`fullmatch`.** It only fires when the WHOLE line is a stage direction. A
+parenthetical embedded in real dialogue -- which is the actual measured
+defect shape -- passes both passes clean. That is the best available
+explanation for `scifi_news_pro` at 32% and `scifi_news` at 18% F1 despite
+having a review pass. The clean stage covers it because both lanes reach the
+shared tail; the narrow `fullmatch` is left alone deliberately, since
+widening it would be another verb-list shim.
+
+
 **This block outranks the CURRENT RUNWAY table below, including its row 1.** The
 Story Lab is PARKED and is being RETIRED, not resumed: row 1's "resume the
 upstream lab and A/B against it" order is SUPERSEDED. The lab at

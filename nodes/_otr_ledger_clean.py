@@ -1,0 +1,1383 @@
+"""THE CLEAN STAGE -- a model reads every line, and a model repairs it.
+
+Operator, 2026-08-14: *"I need 3-5 LLM passes to clean the ledger."* and
+*"I hate shims and assertions of py to fix things, I like LLM calls to ask it
+to fix things."* So the shape is fixed and this module obeys it exactly:
+
+    write the story once  ->  a model JUDGES each line
+                          ->  a model REPAIRS what it named
+                          ->  sealed ledger  ->  TTS
+
+WHY THE JUDGE IS A MODEL AND NOT A PATTERN LIST
+------------------------------------------------
+The first cut of this pass gated the repair on a regex list, and the operator
+killed it on exactly the right grounds: *"your shim can clean a contained
+story but it won't fix the next one."* He is correct, and it is easy to show.
+The list had `sighs` and `turns` in it; it did not have `closes`. So
+
+    "The door closes behind him."
+
+sails straight through a pattern list and gets read aloud. The lab's own
+695-line `spoken_text_policy.py` is the same class of thing and says so in its
+header -- *"a future fuzzy or model-assisted policy requires a new policy."*
+Enumerating stage business is not a finite job, so it may not be a Python
+job. What the operator asked for instead is the right primitive: *"I'd rather
+a more intelligent LLM say 'do you see things acting, like a door closing?
+that's not dialogue -- well, you need to make a rewrite pass'."*
+
+So a MODEL answers the question "is every word of this line something the
+character says out loud?" That question generalizes; a verb list does not.
+
+THE PATTERN LIST SURVIVES AS A HINT, NEVER AS A GATE
+-----------------------------------------------------
+``_otr_spoken_text_policy`` still runs -- it is free, it is the same detector
+the offline grader scores with, and it catches the blatant cases instantly.
+Its findings are handed to the judge as EVIDENCE, labelled as often wrong.
+A line is dirty if the judge says so OR the patterns do: a union, never a
+veto. Nothing in Python decides whether the model's reading is admissible,
+and nothing in Python decides whether the patterns' reading is. That is the
+difference between two detectors and a shim.
+
+THE REPAIR THINKS, IT DOES NOT STRIP
+------------------------------------
+Operator: *"make its best choice -- mix of removing the stage directions and
+updating the dialogue. It should think of the best edit."* Deleting the
+parenthetical and keeping the rest is the WRONG answer: it can leave a line
+that no longer makes sense, or lose the beat the action carried. So the
+repair model gets the line, who says it, the acts and beats SO FAR, and the
+judge's own words about what is wrong -- and returns the best edit. Sometimes
+the action becomes implied in what the character says. That judgement is the
+model's, which is exactly why it may never be Python.
+
+PYTHON'S ENTIRE JOB IN THIS MODULE
+-----------------------------------
+Choose which rows to ask about, carry the model's answer into the row, count
+what happened, and stop after a bounded number of tries. It never writes,
+edits, strips, or overrules a word of prose. The single line of code that
+touches a row's text writes the MODEL'S returned string.
+
+BOUNDED, INFORMED, AND IT NEVER STOPS THE RENDER
+-------------------------------------------------
+Each repair is TOLD what the judge found, and the judge re-reads the result
+-- a retry that knows what was wrong is not the same cold roll again. After
+the budget, the row SHIPS, the ledger records it as unclean, and the log says
+so loudly. Never a silent pass; never a hard stop. An imperfect line beats a
+dead episode.
+
+WHERE IT RUNS
+-------------
+Once, at the one shared producer boundary --
+``OTR_LedgerScriptWriter._run_writer_tail`` -- immediately before
+``_otr_ledger_cleanup.run_ledger_cleanup``. Every source bank reaches that
+boundary: the legacy writer path, and both news lanes via the pipeline-runner
+dispatch. Running BEFORE the cleanup pass is deliberate, because that pass
+re-stamps text metrics, so a row this module rewrites is measured after the
+rewrite rather than before it.
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Callable, Mapping, MutableMapping, Sequence
+
+try:
+    from . import _otr_spoken_text_policy as _POLICY
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_spoken_text_policy as _POLICY  # type: ignore
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
+
+log = logging.getLogger("OTR.ledger_clean")
+
+__all__ = [
+    "LEDGER_CLEAN_VERSION",
+    "UNCLEAN_COMPOSE_FLAG",
+    "run_ledger_clean",
+]
+
+LEDGER_CLEAN_VERSION = "ledger_clean_v2"
+
+#: Stamped on a row that survived the whole repair budget still dirty, so the
+#: defect is visible in the artifact and not only in the log.
+UNCLEAN_COMPOSE_FLAG = "unclean_spoken_text"
+
+#: Repair attempts per dirty row. Two, not nine: the second is INFORMED (the
+#: judge has already read the first and said what survived), and a third
+#: informed pass has never been the difference between a fixable line and a
+#: hopeless one -- it is where grinding starts.
+_MAX_ATTEMPTS = 2
+
+#: One repaired line. A beat's worth of speech, never an act's.
+_MAX_NEW_TOKENS = 320
+
+#: The judge answers a yes/no and quotes the offending words. It never needs
+#: room to write prose, and a tight budget is what keeps a per-row pass cheap.
+_JUDGE_MAX_NEW_TOKENS = 160
+
+#: How much of the episode a model is shown BEFORE the line. The window is the
+#: point: a model that sees its own scene answers the line in front of it, and
+#: one handed the whole line graph averages the episode instead.
+_CONTEXT_ROWS = 12
+
+#: And AFTER it. Operator, 2026-08-14: *"when correcting it needs to look at
+#: the act and the lines before AND after."* He is right, and the writer's own
+#: rule does not apply here: a BEAT job cannot see the future because the
+#: future is not written yet, but this pass runs on a FINISHED episode where
+#: the next line already exists. Rewriting a line without it is how you get an
+#: edit the following line no longer answers.
+_AFTER_ROWS = 4
+
+
+def _rows(ledger_data: Mapping[str, Any], key: str) -> "list":
+    value = ledger_data.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _text_of(row: Mapping[str, Any]) -> str:
+    value = row.get("text")
+    return value if isinstance(value, str) else ""
+
+
+def _beats_by_id(ledger_data: Mapping[str, Any]) -> "dict[str, Mapping]":
+    return {
+        str(row.get("beat_id")): row
+        for row in _rows(ledger_data, "beats")
+        if isinstance(row, Mapping)
+    }
+
+
+def _cast_names(ledger_data: Mapping[str, Any]) -> "dict[str, str]":
+    return {
+        str(row.get("char_id")): str(row.get("name") or "")
+        for row in _rows(ledger_data, "cast")
+        if isinstance(row, Mapping)
+    }
+
+
+def _is_voiced(row: Mapping[str, Any]) -> bool:
+    return (
+        row.get("speaker_role") in _POLICY.VOICED_ROLES
+        and not bool(row.get("skip"))
+        and bool(_text_of(row).strip())
+    )
+
+
+def _flag_unclean(row: MutableMapping[str, Any]) -> None:
+    flags = row.get("compose_flags")
+    if not isinstance(flags, list):
+        flags = []
+        row["compose_flags"] = flags
+    if UNCLEAN_COMPOSE_FLAG not in flags:
+        flags.append(UNCLEAN_COMPOSE_FLAG)
+
+
+def _lines_around(
+    rows: "Sequence[Mapping[str, Any]]",
+    index: int,
+    beats: "Mapping[str, Mapping]",
+) -> "list[str]":
+    """The scene around this line: the rows before it, THIS LINE, then after.
+
+    Both sides, because this pass runs on a FINISHED episode. A rewrite that
+    cannot see the reply it has to set up produces a line the next one no
+    longer answers -- and the next line is already written, so withholding it
+    buys nothing. The beat's own intent rides along where the ledger carries
+    one, because an edit has to know what the moment was FOR before it can
+    decide which half of a line to keep.
+
+    THE LINE ITSELF IS MARKED IN PLACE. A model handed a flat list of rows
+    has to guess which one it is working on; the marker removes the guess.
+    """
+    window: "list[str]" = []
+    for prior in rows[max(0, index - _CONTEXT_ROWS):index]:
+        if not _is_voiced(prior):
+            continue
+        speaker = str(prior.get("speaker") or "").strip() or "UNKNOWN"
+        window.append(f"{speaker}: {_text_of(prior).strip()}")
+
+    here = rows[index]
+    speaker = str(here.get("speaker") or "").strip() or "UNKNOWN"
+    window.append(f">>> {speaker}: {_text_of(here).strip()}")
+
+    for later in rows[index + 1:index + 1 + _AFTER_ROWS]:
+        if not _is_voiced(later):
+            continue
+        speaker = str(later.get("speaker") or "").strip() or "UNKNOWN"
+        window.append(f"{speaker}: {_text_of(later).strip()}")
+    return window
+
+
+def _story_field(
+    row: Mapping[str, Any], beats: "Mapping[str, Mapping]", key: str,
+) -> str:
+    """Read a story field from wherever the producing lane actually put it.
+
+    THE LINE ROW FIRST, and that ordering is the whole bug fix. Measured on a
+    live `media_archive` episode 2026-08-14: `arc_phase` and `beat_intent`
+    are present on **every** LINE row and on **no** beat row -- the writer
+    lane's beats carry only transport (`beat_id`, `char_id`, `line_ids`,
+    `scene_id`, `shot_id`, `start_s`, `dur_s`). The first cut of this
+    function read the BEAT, so "WHERE THE STORY IS" came out empty on all 16
+    rows and the judge and the repair both ran BLIND to the act. The unit
+    tests missed it because their fixtures put the fields on the beat.
+
+    The beat is kept as a fallback because the codex lane does populate beats
+    -- so this reads the union rather than betting on either lane's shape.
+    """
+    value = str(row.get(key) or "").strip()
+    if value:
+        return value
+    beat = beats.get(str(row.get("beat_id") or "")) or {}
+    return str(beat.get(key) or "").strip()
+
+
+def _where_the_story_is(
+    row: Mapping[str, Any],
+    beats: "Mapping[str, Mapping]",
+    episode: str = "",
+    act_briefs: "Mapping[str, str] | None" = None,
+) -> str:
+    """The act/beat the line lives in, as one short line of prompt.
+
+    Kept OUT of the surrounding-rows block on purpose: one block in pure
+    story order with an inline marker is the format a small model misreads
+    least, and mixing commentary rows into it costs that clarity.
+    """
+    bits: "list[str]" = []
+    if episode:
+        bits.append(episode)
+    arc = _story_field(row, beats, "arc_phase")
+    if arc:
+        bits.append(f"this is the {arc} of the story")
+        # THE PASS'S OWN BRIEF. "rising" is a label; a sentence written from
+        # the episode's own lines is what a small model can actually use to
+        # judge whether a line belongs in this moment.
+        brief = str((act_briefs or {}).get(arc) or "").strip()
+        if brief:
+            bits.append(f"what is going on here: {brief}")
+    intent = _story_field(row, beats, "beat_intent")
+    if intent:
+        bits.append(f"this moment is meant to: {intent}")
+    return " -- ".join(bits)
+
+
+def _episode_context(ledger_data: Mapping[str, Any]) -> str:
+    """One clause naming the whole episode, from what the ledger already has.
+
+    The writer stamps a story contract and an arc shape on `meta`; using them
+    costs nothing and no model call. Only what is actually recorded is used
+    -- nothing here invents a premise the episode never had.
+    """
+    meta = ledger_data.get("meta")
+    if not isinstance(meta, Mapping):
+        return ""
+    bits: "list[str]" = []
+    contract = meta.get("story_contract")
+    if isinstance(contract, Mapping):
+        label = str(contract.get("label") or "").strip()
+        if label:
+            bits.append(f"the episode is a {label}")
+    shape = str(meta.get("arc_shape") or "").strip()
+    if shape:
+        bits.append(f"its arc is {shape}")
+    return ", ".join(bits)
+
+
+def _numbered(findings: "Sequence[Mapping[str, str]]") -> str:
+    """The judge's findings as the repair's must-all-be-gone checklist."""
+    lines = []
+    for n, finding in enumerate(findings, start=1):
+        quote = str(finding.get("quote") or "").strip()
+        why = str(finding.get("why") or "").strip()
+        lines.append(f"  {n}. {quote!r}" + (f" -- {why}" if why else ""))
+    return "\n".join(lines)
+
+
+def _as_findings(findings: "Sequence[_POLICY.Finding]") -> "list[dict[str, str]]":
+    """Pattern findings in the judge's own shape, so one path feeds the repair."""
+    return [{"quote": f.detail, "why": f.kind} for f in findings]
+
+
+def _structured():
+    """pydantic + the shared retry ladder, or None when unavailable."""
+    try:
+        from pydantic import BaseModel, Field
+
+        try:
+            from ._otr_structured_call import structured_call
+        except ImportError:  # pragma: no cover -- flat load
+            from _otr_structured_call import structured_call  # type: ignore
+    except Exception:  # noqa: BLE001 -- no pydantic, no pass, no crash
+        return None
+    return BaseModel, Field, structured_call
+
+
+# ---------------------------------------------------------------------------
+# THE JUDGE -- a model reads the line and says what is not speech
+# ---------------------------------------------------------------------------
+
+
+def summarize_acts(
+    ledger_data: Mapping[str, Any],
+    *,
+    slot_fn: "Callable[..., str]",
+) -> "dict[str, str]":
+    """One short read of what is going on in each ACT of the finished episode.
+
+    Operator, 2026-08-14: *"one LLM pass could read them and summarize the
+    act again ... and if it says what act"*, then: *"maybe you say quickly
+    summarize what's going on around this part of the dialogue based on the
+    story act."*
+
+    This is that pass, and it does two jobs at once:
+
+      1. IT MAKES THE CONTEXT REAL. `arc_phase` is a one-word label --
+         "rising" tells a 2B model almost nothing about what is happening.
+         A sentence written from the episode's own lines does, and it is the
+         difference between a repair that fits the moment and one that
+         guesses at it.
+      2. IT PROVES THE MODEL CAN SEE. A summary written FROM the lines is
+         evidence the lines arrived; an empty or generic one is evidence they
+         did not. That is the operator's own point -- asking the model what it
+         can see beats counting Python variables, because a counter only ever
+         proves a string was built.
+
+    GROUPED BY ACT, which is what makes it affordable: one call per arc phase
+    (about five an episode) instead of one per row (sixteen and up). Each row
+    then carries the summary for the act it actually sits in, so the context
+    is LOCAL without being per-row expensive.
+
+    Never fatal. A phase that cannot be summarized simply carries no summary,
+    and the pass runs on the labels alone exactly as before.
+    """
+    parts = _structured()
+    if parts is None:
+        return {}
+    BaseModel, Field, structured_call = parts
+
+    class _ActSummary(BaseModel):
+        going_on: str = Field(min_length=1, max_length=160)
+
+    rows = [
+        r for r in _rows(ledger_data, "lines")
+        if isinstance(r, Mapping) and _is_voiced(r)
+    ]
+    beats = _beats_by_id(ledger_data)
+    grouped: "dict[str, list[str]]" = {}
+    for row in rows:
+        phase = _story_field(row, beats, "arc_phase") or "the episode"
+        speaker = str(row.get("speaker") or "").strip() or "UNKNOWN"
+        grouped.setdefault(phase, []).append(
+            f"{speaker}: {_text_of(row).strip()}")
+
+    summaries: "dict[str, str]" = {}
+    for phase, lines in grouped.items():
+        prompt = [
+            {
+                "role": "system",
+                "content": (
+                    "You read part of a radio script and say what is going "
+                    "on in it. You return JSON only."
+                ),
+            },
+            {
+                "role": "user",
+                "content": "\n".join([
+                    f"These are the lines from the {phase} of a radio "
+                    "drama, in order:",
+                    "",
+                    "\n".join(lines[:40]),
+                    "",
+                    # SHORT ON PURPOSE. This brief is pasted into every judge
+                    # and repair prompt for its act, so a rambling summary
+                    # would cost tokens on every call and bury the line the
+                    # model is actually meant to be looking at.
+                    "In about TEN WORDS, say what is going on here: who "
+                    "wants what from whom. Write only what these lines "
+                    "actually show -- do not invent events.",
+                    "",
+                    'Answer JSON: {"going_on": "..."}',
+                ]),
+            },
+        ]
+        try:
+            # LLM slot: creative -- reading drama for what it is about.
+            result = structured_call(
+                prompt=prompt,
+                schema=_ActSummary,
+                slot_fn=slot_fn,
+                base_temperature=0.3,
+                structural_retry_temperature=0.1,
+                max_new_tokens=200,
+                max_attempts=2,
+                helper_name="ledger_clean_act_summary",
+            )
+        except Exception as exc:  # noqa: BLE001 -- context is a bonus
+            log.warning(
+                "[ledger_clean] could not summarize the %s (%s: %s); the "
+                "pass runs on the arc labels alone for those rows",
+                phase, type(exc).__name__, str(exc)[:160],
+            )
+            continue
+        summaries[phase] = " ".join(str(result.going_on or "").split())[:160]
+        log.info(
+            "[ledger_clean] the %s: %s", phase, summaries[phase][:160],
+        )
+    return summaries
+
+
+def probe_context_visibility(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    lines_around: "Sequence[str]",
+    where: str,
+) -> "dict[str, Any]":
+    """ASK THE MODEL what it can see, instead of counting Python variables.
+
+    Operator, 2026-08-14: *"asking the LLM if it can see [it] is the better
+    truth over some codified variable check."* He is right, and the reason is
+    sharp. A field counter proves a STRING WAS BUILT. It cannot prove the
+    string reached the model, landed somewhere readable, or survived the
+    prompt's own length -- and every one of those is a real way to be blind.
+    A model that can quote the act back has demonstrably received it.
+
+    ONE call per episode, not per row: this is a liveness check on the wiring,
+    and the wiring does not change between rows.
+
+    It never gates anything. A blind answer does not stop the render; it makes
+    the blindness LOUD in the log and permanent in the ledger, which is the
+    thing that was missing when the pass shipped blind on all 16 rows of a
+    live episode.
+    """
+    parts = _structured()
+    if parts is None:
+        return {"asked": False, "reason": "no structured-call machinery"}
+    BaseModel, Field, structured_call = parts
+
+    class _ContextReport(BaseModel):
+        act: str = Field(default="", max_length=120)
+        this_moment: str = Field(default="", max_length=200)
+        line_before: str = Field(default="", max_length=300)
+        line_after: str = Field(default="", max_length=300)
+
+    prompt = [
+        {
+            "role": "system",
+            "content": (
+                "You report what you can see in the material you are given. "
+                "You return JSON only."
+            ),
+        },
+        {
+            "role": "user",
+            "content": "\n".join([
+                "Here is one line from a radio script and its surroundings. "
+                "Do not judge it or rewrite it. Just tell me what you can "
+                "see.",
+                "",
+                f"THE SPEAKER: {speaker or 'the announcer'}",
+                f"THE LINE: {text}",
+                "",
+                f"WHERE THE STORY IS: {where}" if where else
+                "WHERE THE STORY IS: (nothing was given to you)",
+                "",
+                "THE LINES AROUND IT, in story order, the one in question "
+                "marked >>>:",
+                "\n".join(lines_around) or "(nothing was given to you)",
+                "",
+                "Answer JSON. Leave a field EMPTY if you were not actually "
+                "told it -- do not guess or invent:",
+                '{"act": "<what WHERE THE STORY IS says, or empty>", '
+                '"this_moment": "<what this moment is meant to do, or '
+                'empty>", "line_before": "<the line immediately before the '
+                'marked one, or empty>", "line_after": "<the line '
+                'immediately after the marked one, or empty>"}',
+            ]),
+        },
+    ]
+    try:
+        # LLM slot: creative -- same slot the pass itself runs on, so the
+        # probe proves the wiring THAT pass actually uses.
+        result = structured_call(
+            prompt=prompt,
+            schema=_ContextReport,
+            slot_fn=slot_fn,
+            base_temperature=0.1,
+            structural_retry_temperature=0.05,
+            max_new_tokens=200,
+            max_attempts=2,
+            helper_name="ledger_clean_context_probe",
+        )
+    except Exception as exc:  # noqa: BLE001 -- diagnostic only, never fatal
+        return {"asked": True, "ok": False, "error": str(exc)[:200]}
+    return {
+        "asked": True,
+        "ok": True,
+        "act": " ".join(str(result.act or "").split()),
+        "this_moment": " ".join(str(result.this_moment or "").split()),
+        "line_before": " ".join(str(result.line_before or "").split()),
+        "line_after": " ".join(str(result.line_after or "").split()),
+    }
+
+
+def _grade_probe(
+    report: Mapping[str, Any],
+    *,
+    where: str,
+    lines_around: "Sequence[str]",
+) -> "dict[str, Any]":
+    """Did the model actually SEE it -- graded against what we handed it."""
+    if not report.get("ok"):
+        return dict(report, verdict="unknown")
+
+    marked = next(
+        (i for i, s in enumerate(lines_around) if s.startswith(">>> ")), -1)
+    before = lines_around[marked - 1] if marked > 0 else ""
+    after = (
+        lines_around[marked + 1]
+        if 0 <= marked < len(lines_around) - 1 else ""
+    )
+
+    def _echoes(said: str, truth: str) -> bool:
+        """A loose containment check -- the model paraphrases, and should."""
+        said, truth = said.strip().casefold(), truth.strip().casefold()
+        if not truth:
+            return not said          # nothing to see, nothing claimed: right
+        if not said:
+            return False
+        words = [w for w in truth.split() if len(w) > 3]
+        if not words:
+            return bool(said)
+        hits = sum(1 for w in words if w in said)
+        return hits >= max(1, len(words) // 3)
+
+    saw_act = _echoes(str(report.get("act") or ""), where)
+    saw_before = _echoes(str(report.get("line_before") or ""), before)
+    saw_after = _echoes(str(report.get("line_after") or ""), after)
+    return dict(
+        report,
+        saw_act=saw_act,
+        saw_line_before=saw_before,
+        saw_line_after=saw_after,
+        verdict="sighted" if (saw_act and saw_before and saw_after)
+        else "partial" if (saw_act or saw_before or saw_after)
+        else "BLIND",
+    )
+
+
+def _judge_prompt(
+    *,
+    speaker: str,
+    text: str,
+    hints: "Sequence[_POLICY.Finding]",
+    lines_around: "Sequence[str]",
+    where: str = "",
+) -> "list[dict[str, str]]":
+    """One job, one small window -- the same prompt for every model tier.
+
+    Standing law: vary the JOB SIZE, not the prompt text. A small local model
+    can answer "is every piece of THIS ONE LINE talk"; it cannot answer
+    "clean this ledger". A frontier model does the identical job better with
+    the identical words. The lane picks the model; the prompt stays single.
+
+    RECALIBRATED AFTER A LIVE LEG, 2026-08-14. The first cut opened by
+    warning that lines "often smuggle stage business" and then listed five
+    ways to be guilty. On a 2B that is a HUNT FRAME, and a hunt obliges: it
+    condemned two lines of ordinary dialogue -- a man asking another to
+    confirm a reference number, and a man arguing with someone he names --
+    quoting the ENTIRE line as the offending segment both times. Three things
+    fix it, and all three are framing rather than rules:
+      * the clean answer is stated as the NORMAL outcome, up front;
+      * TALK is defined BEFORE stage business, because on a small model the
+        category it reads first becomes the default bucket, and the default
+        must be innocence;
+      * the three measured lines go in verbatim as calibration. A 2B imitates
+        a worked example far more reliably than it applies a rule.
+    """
+    speaker_label = speaker or "the announcer"
+    parts = [
+        "Below is one line from a radio script, with the lines around it. A "
+        "voice actor will read every word of THE LINE aloud. Most lines are "
+        "just people talking -- when that is true, your answer is an empty "
+        "list and you are done. Now and then a line carries a piece of stage "
+        "business -- an action, a sound, a bit of scene description -- and "
+        "that piece must be reported, because the actor would wrongly speak "
+        "it.",
+        "",
+        f"THE SPEAKER: {speaker_label}",
+        f"THE LINE: {text}",
+        "",
+    ]
+    if where:
+        parts += [f"WHERE THE STORY IS: {where}", ""]
+    if lines_around:
+        parts += [
+            "THE LINES AROUND IT, in story order. The line you are judging "
+            "is marked >>>:",
+            "\n".join(lines_around),
+            "",
+        ]
+    if hints:
+        parts += [
+            "A crude pattern-matcher also flagged the following. It is often "
+            "WRONG. Check its claims like any other piece; never copy them "
+            "as your answer:",
+            "\n".join(f"  - {h.kind}: {h.detail}" for h in hints),
+            "",
+        ]
+    parts += [
+        "DO THIS, IN ORDER:",
+        "1. Split THE LINE into pieces: every sentence, and every bracketed "
+        "or parenthesized chunk, is a piece.",
+        "2. Check each piece, first to last, all the way to the end: is it "
+        "talk, or is it stage business?",
+        "3. Report only the stage-business pieces, quoted exactly. If there "
+        "are none -- and usually there are none -- return the empty list.",
+        "",
+        # TALK FIRST. On a small model the first category read becomes the
+        # default, and the default has to be innocence. The talks-to-someone
+        # test is the POSITIVE discriminator: it clears a question and an
+        # argument in one clause each, while leaving pure scene description
+        # nothing to grab. One-directional on purpose -- presence proves
+        # talk, absence proves nothing, so the unpunctuated door line still
+        # falls through to the reporter test below.
+        "A piece is TALK -- normal, clean, report nothing -- when someone is "
+        "talking to someone: asking, answering, arguing, ordering, "
+        "explaining. If it says I, you, or we, asks a question, or names the "
+        "person being spoken to, it is talk. Talk about objects, numbers, "
+        "places, or the past is talk. Quoting another person is talk. Old, "
+        "formal, or literary style is still talk -- style is never a fault.",
+        "",
+        # THE ANNOUNCER, and the lab is why this clause exists. Handed "The
+        # reel returned to its can, and the vault closed", a 2B called it
+        # stage business -- reasonably, by the rules as written, since it is
+        # third person and nobody is addressed. But that is an ANNOUNCER
+        # narrating to the listener, which is the announcer's entire job and
+        # the oldest thing in radio. Without this, the pass rewrites every
+        # open and every close on every bank.
+        "THE ANNOUNCER IS A SPECIAL CASE, and it matters because every "
+        "episode opens and closes with one. An announcer speaks TO THE "
+        "LISTENER, and narrating in the third person is exactly their job: "
+        "\"Tonight, from the lighthouse\" and \"And so the light went dark\" "
+        "are an announcer doing radio, not stage business. If THE SPEAKER "
+        "is the announcer or a narrator, third-person narration aimed at "
+        "the audience is TALK. Report only script apparatus in their lines "
+        "-- a bracketed direction, a NAME: label, a sound cue.",
+        "",
+        "A piece is STAGE BUSINESS when nobody is being spoken to and the "
+        "script is describing the scene instead: someone performing an "
+        "action (sighs, turns, throws), a sound or event in the room (a door "
+        "closes, footsteps), a note on delivery (softly, pausing), people "
+        "described from outside in the third person as it happens, or "
+        "apparatus like a NAME: label. This kind can wear no brackets at "
+        "all.",
+        "",
+        # THE WHOLE-LINE RULE, stated WITH its one exception. It cannot be
+        # "never the whole line": the live catch that proved this pass was a
+        # correct whole-line finding. The exception is precisely that shape
+        # and nothing else's.
+        "A finding is a PIECE of the line, almost never the whole line. If "
+        "you are about to quote the entire line, stop and look again: a "
+        "question, an argument, or a line that names the person being "
+        "addressed is talk, and the right answer is the empty list. Quote "
+        "the whole line only when it is scene description from its first "
+        "word to its last and talks to no one.",
+        "",
+        "CALIBRATION -- three real lines, judged right:",
+        '- "The air in the studio crackles as Dale Bernard stares at Stone '
+        'Tanaka." -- NOT speech, the whole line. Third person, describes the '
+        "room, talks to no one.",
+        '- "This shipment was listed as A.P.O. 86-574, reel two, right?" -- '
+        "talk. A question to another person. Empty list.",
+        "- \"It's more than just a reel number, Tanaka. We have to see "
+        "what's inside.\" -- talk. He argues and names the man he is "
+        "arguing with. Empty list.",
+        "",
+        "Answer JSON, exactly this shape. Quotes must come from THE LINE "
+        "above, never from the calibration lines:",
+        '{"segments_read": <how many pieces you split THE LINE into>, '
+        '"not_speech": [{"quote": "<the exact words>", "why": "<a few words: '
+        'action / sound / delivery note / scene report / apparatus>"}]}',
+        "",
+        'All talk: {"segments_read": 2, "not_speech": []}',
+        'One bad piece in a two-piece line: {"segments_read": 2, '
+        '"not_speech": [{"quote": "(He sighs)", "why": "action"}]}',
+    ]
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You check one line of a radio script. You say when it is "
+                "all spoken words, and you report any piece of it that is "
+                "not. You return JSON only."
+            ),
+        },
+        {"role": "user", "content": "\n".join(parts)},
+    ]
+
+
+def _judge_row(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    hints: "Sequence[_POLICY.Finding]",
+    lines_around: "Sequence[str]",
+    where: str = "",
+) -> "tuple[list[dict[str, str]], bool]":
+    """Ask a model to walk the line and name EVERY piece that is not speech.
+
+    Returns ``(not_speech, call_ok)``. ``not_speech`` is a list of
+    ``{"quote": ..., "why": ...}`` -- empty means the model read it clean.
+    ``call_ok`` is False when the model could not be reached at all, so the
+    caller falls back to the pattern hints rather than declaring a line clean
+    it never actually read.
+
+    A LIST, NOT ONE FINDING, and that is the operator's requirement: *"it
+    reads the WHOLE line and looks for even SEGMENTS that are not
+    dialogue."* A line routinely carries stage business at BOTH ends with
+    real dialogue between -- "(Montgomery sighs) I've already given you the
+    reel ... (Montgomery sighs again)" -- and a judge that reports the first
+    one leaves the second to be read aloud.
+    """
+    parts = _structured()
+    if parts is None:
+        return [], False
+    BaseModel, Field, structured_call = parts
+
+    class _NotSpeech(BaseModel):
+        quote: str = Field(min_length=1, max_length=300)
+        why: str = Field(default="", max_length=120)
+
+    class _SpokenLineJudgement(BaseModel):
+        # A model cannot report how many pieces it read without actually
+        # splitting the line, so this integer is a three-token forcing
+        # function for the walk -- and it makes a skim visible, because a
+        # four-sentence line answered with segments_read=1 was not read.
+        segments_read: int = Field(default=1, ge=1, le=64)
+        not_speech: "list[_NotSpeech]" = Field(default_factory=list)
+
+    haystack = " ".join(text.split()).casefold()
+
+    def _validate(_result: "_SpokenLineJudgement") -> "str | None":
+        # DELIBERATELY PERMISSIVE, and this is a correction of a real defect.
+        # The first cut REJECTED a reply whose quote was not in the line, and
+        # rejected a whole-line quote as a self-contradicted skim. Both are
+        # true faults -- but rejecting cost the ladder, and when the ladder
+        # exhausted the row lost its judge ENTIRELY and fell back to the
+        # pattern floor. Measured in the lab: a 2B tripped one of the two on
+        # most rows, so the strict version was quietly turning the model
+        # judge OFF on the very episodes it was built for.
+        #
+        # A bad ENTRY is now dropped after the call instead of failing the
+        # whole reply, which keeps every good finding in the same answer and
+        # never costs the judge. Nothing here judges prose: it only decides
+        # whether an answer is about the line we asked about.
+        return None
+
+    try:
+        # LLM slot: creative -- it is reading DIALOGUE for what a listener
+        # would hear performed, which is a reader's judgement about prose.
+        result = structured_call(
+            prompt=_judge_prompt(
+                speaker=speaker,
+                text=text,
+                hints=hints,
+                lines_around=lines_around,
+                where=where,
+            ),
+            schema=_SpokenLineJudgement,
+            slot_fn=slot_fn,
+            base_temperature=0.2,
+            structural_retry_temperature=0.1,
+            post_validator=_validate,
+            max_new_tokens=_JUDGE_MAX_NEW_TOKENS,
+            max_attempts=2,
+            helper_name="ledger_clean_line_judge",
+        )
+    except Exception as exc:  # noqa: BLE001 -- fall back to the hints
+        log.warning(
+            "[ledger_clean] the judge could not read a line (%s: %s); the "
+            "pattern findings stand alone for it",
+            type(exc).__name__, str(exc)[:200],
+        )
+        return [], False
+    found: "list[dict[str, str]]" = []
+    dropped: "list[str]" = []
+    for entry in result.not_speech:
+        quote = " ".join(str(entry.quote or "").split())
+        if not quote:
+            continue
+        if quote.casefold() not in haystack:
+            # NOT ABOUT THIS LINE. Measured in the lab: shown the lines
+            # around the target, a 2B routinely quotes a NEIGHBOUR back --
+            # it is reading the block as the subject. Acting on it would
+            # send the repair after words this speaker never said, so the
+            # entry goes; the rest of the answer stands.
+            dropped.append(f"{quote!r} (not in this line)")
+            continue
+        if (
+            result.segments_read >= 2
+            and len(result.not_speech) == 1
+            and len(quote.casefold()) >= len(haystack) - 2
+        ):
+            # SELF-CONTRADICTED: it says it split the line into pieces and
+            # then condemns the whole line as one piece. That shape was the
+            # exact signature of the measured false positives on clean
+            # dialogue, so the entry goes and the line reads clean.
+            dropped.append(f"{quote!r} (whole line, but claims a split)")
+            continue
+        found.append({
+            "quote": quote,
+            "why": " ".join(str(entry.why or "").split())[:120],
+        })
+    if dropped:
+        log.info(
+            "[ledger_clean] dropped %d judge finding(s) that were not usable "
+            "for this line: %s",
+            len(dropped), "; ".join(dropped)[:240],
+        )
+    return found, True
+
+
+# ---------------------------------------------------------------------------
+# THE REPAIR -- a model rewrites what the judge named
+# ---------------------------------------------------------------------------
+
+
+def _repair_prompt(
+    *,
+    speaker: str,
+    text: str,
+    complaint: str,
+    lines_around: "Sequence[str]",
+    previous_attempt: str = "",
+    where: str = "",
+) -> "list[dict[str, str]]":
+    speaker_label = speaker or "the announcer"
+    parts = [
+        "A voice actor is about to read this line into a microphone, every "
+        "word exactly as written. A reader has been through it and marked "
+        "the pieces that are not speech -- there may be several. Hand back "
+        "the line with ALL of them gone and the moment intact.",
+        "",
+        f"THE SPEAKER: {speaker_label}",
+        f"THE LINE: {text}",
+        "",
+        # A NUMBERED CHECKLIST, not a prose complaint. The repair is graded
+        # against an enumerated list, so a model that fixes item 1 and
+        # forgets item 2 has failed a list it was literally handed.
+        "NOT SPEECH -- every one of these must be gone from your rewrite:",
+        complaint,
+        "",
+    ]
+    if where:
+        parts += [f"WHERE THE STORY IS: {where}", ""]
+    if lines_around:
+        parts += [
+            "THE LINES AROUND IT, in story order. The line you are "
+            "rewriting is marked >>>. Your rewrite must sit in that slot:",
+            "\n".join(lines_around),
+            "",
+        ]
+    if previous_attempt:
+        parts += [
+            "YOUR PREVIOUS ATTEMPT was read again and still has a problem. "
+            "Do not hand back a variation of it -- change what was named:",
+            previous_attempt,
+            "",
+        ]
+    parts += [
+        "HOW TO EDIT -- take the marked pieces one at a time:",
+        f"- Decide what each piece was doing for the moment. If it carried "
+        f"something the scene needs -- a feeling, a beat, an event the "
+        f"listener must know happened -- fold it into what {speaker_label} "
+        f"SAYS, in {speaker_label}'s own voice. A sigh can become a weary "
+        f"word. A door closing can become the speaker remarking that someone "
+        f"is gone. A thrown object can become the speaker reacting to "
+        f"catching it.",
+        "- If it carried nothing the scene needs, remove it and smooth the "
+        "join, so the sentence still reads as one thought.",
+        "- Never just delete and staple. A stripped line often stops making "
+        "sense or goes flat. You are making the best EDIT, not the shortest "
+        "one.",
+        # Without this clause a small model treats "remove the stage
+        # direction" and "keep the length" as a contradiction, and resolves
+        # it by keeping the stage direction rephrased as narration.
+        "- Keep every part that already was speech. Keep the speaker's "
+        "voice, and keep the line roughly its original length -- what you "
+        "fold in makes up for what you take out.",
+        "- Your rewrite has to fit its slot: it follows the line before it "
+        "and is answered by the line after it. Do not contradict either "
+        "one.",
+        "",
+        "Example of the move, shape only -- your line is the one above:",
+        '  marked: "The door closes behind him." -- scene report',
+        "  before: The door closes behind him. I told you he would not stay.",
+        "  after:  There he goes -- door and all. I told you he would not "
+        "stay.",
+        "",
+        # The judge's own standard, inside the repair. This is what cuts the
+        # ping-pong between the two informed attempts.
+        f"Before you answer, read your rewrite once, first word to last, the "
+        f"way the voice actor will. If any word of it is not something "
+        f"{speaker_label} says out loud, fix it. If any marked piece "
+        f"survives in any form that is not spoken words, fix it.",
+        "",
+        'Answer JSON: {"text": "the rewritten line"}. The spoken line only '
+        "-- no speaker label, no brackets or parentheses, no quotation marks "
+        "wrapped around the whole line, no description of anyone doing "
+        "anything.",
+    ]
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You rewrite one line of radio dialogue so that every word "
+                "of it is something the speaker says out loud. You return "
+                "JSON only."
+            ),
+        },
+        {"role": "user", "content": "\n".join(parts)},
+    ]
+
+
+def _call_repair(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    complaint: str,
+    lines_around: "Sequence[str]",
+    previous_attempt: str,
+    where: str = "",
+) -> str:
+    """One bounded model call. Returns the rewritten line, or "" on failure --
+    a repair that cannot run is never fatal to the render."""
+    parts = _structured()
+    if parts is None:
+        return ""
+    BaseModel, Field, structured_call = parts
+
+    class _RepairedLine(BaseModel):
+        text: str = Field(min_length=1, max_length=2000)
+
+    def _validate(result: "_RepairedLine") -> "str | None":
+        if not " ".join(str(result.text or "").split()):
+            return "text is empty after whitespace normalization"
+        return None
+
+    try:
+        # LLM slot: creative -- it is rewriting DIALOGUE, so the tier that
+        # wrote the line rewrites it and the repaired line still sounds like
+        # its neighbours (operator ruling 2026-08-14).
+        result = structured_call(
+            prompt=_repair_prompt(
+                speaker=speaker,
+                text=text,
+                complaint=complaint,
+                lines_around=lines_around,
+                previous_attempt=previous_attempt,
+                where=where,
+            ),
+            schema=_RepairedLine,
+            slot_fn=slot_fn,
+            base_temperature=0.55,
+            structural_retry_temperature=0.25,
+            post_validator=_validate,
+            max_new_tokens=_MAX_NEW_TOKENS,
+            max_attempts=2,
+            helper_name="ledger_clean_line_repair",
+        )
+    except Exception as exc:  # noqa: BLE001 -- the row ships flagged instead
+        log.warning(
+            "[ledger_clean] repair call failed (%s: %s); the row keeps its "
+            "current text and is flagged rather than dropped",
+            type(exc).__name__, str(exc)[:200],
+        )
+        return ""
+    return " ".join(str(result.text or "").split())
+
+
+# ---------------------------------------------------------------------------
+# the pass
+# ---------------------------------------------------------------------------
+
+
+def run_ledger_clean(
+    ledger_data: MutableMapping[str, Any],
+    *,
+    slot_fn: "Callable[..., str] | None" = None,
+    bank_id: str = "",
+) -> "dict[str, Any]":
+    """A model reads every spoken row; a model repairs what it names.
+
+    Returns the receipt it also stamps on ``meta.ledger_clean``. The receipt
+    is the point on a dirty episode: it names every row that was touched,
+    what the judge said about it in its own words, and what the repair did.
+
+    F2 IS DETECTED AND REPORTED, NOT REPAIRED, and that is deliberate. Its
+    metadata half -- a row that names no speaker, or disagrees with its beat
+    or the cast -- is not fixed by rewriting prose; the beat already owns the
+    answer, so a model call there would be asking a writer to repair a
+    bookkeeping fault. Its CONTENT half -- one character speaking another's
+    words -- is a reading of the whole episode rather than of one line, and
+    is not this pass's job. Both are reported so a regression shows up in the
+    artifact.
+    """
+    rows = _rows(ledger_data, "lines")
+    beats = _beats_by_id(ledger_data)
+    cast = _cast_names(ledger_data)
+    admissible = _POLICY.repairable_kinds(bank_id)
+    episode = _episode_context(ledger_data)
+    # ONE read of the finished episode, act by act, BEFORE any judging. The
+    # pass writes its own brief to rewrite against -- and the brief doubles
+    # as the proof it could see the act, which is stronger evidence than any
+    # Python field count (operator, 2026-08-14).
+    act_briefs = summarize_acts(ledger_data, slot_fn=slot_fn) if slot_fn else {}
+
+    receipt: "dict[str, Any]" = {
+        "version": LEDGER_CLEAN_VERSION,
+        "policy": _POLICY.SPOKEN_TEXT_POLICY_ID,
+        "source_bank": str(bank_id or ""),
+        "judge": "model",
+        "episode_context": episode,
+        "act_briefs": dict(act_briefs),
+        "admissible_pattern_kinds": sorted(admissible),
+        # THE BLINDNESS TELEMETRY, and it exists because the pass WAS blind.
+        # Operator, 2026-08-14: *"the key is we need to make sure in the
+        # ComfyUI workflow it is actually seeing all the artifacts and
+        # pointed to them -- act / act spine, characters, before and after
+        # dialogue -- and not blind due to a coding error."* He was right:
+        # `arc_phase` and `beat_intent` live on the LINE row, this pass read
+        # the BEAT row, and every prompt shipped with an empty act. A green
+        # unit suite cannot see that -- only a count taken from the real
+        # artifact can. If any of these reads 0 on a live episode, the model
+        # was working blind and the receipt says so in the ledger.
+        "context_seen": {
+            "rows_with_arc_phase": 0,
+            "rows_with_beat_intent": 0,
+            "rows_with_cast_name": 0,
+            "rows_with_lines_before": 0,
+            "rows_with_lines_after": 0,
+            "rows_with_act_brief": 0,
+            "acts_summarized": 0,
+            "episode_context": "",
+        },
+        "voiced_rows": 0,
+        "judged_dirty": 0,
+        "segments_named": 0,
+        "pattern_only": 0,
+        "judge_only": 0,
+        "f1_rows": 0,
+        "f2_rows": 0,
+        "repaired": 0,
+        "improved": 0,
+        "unclean": 0,
+        "model_calls": 0,
+        "rows": [],
+        "f2": [],
+    }
+
+    for index, row in enumerate(rows):
+        if not isinstance(row, MutableMapping) or not _is_voiced(row):
+            continue
+        receipt["voiced_rows"] += 1
+        line_id = str(row.get("line_id") or "")
+        speaker = str(row.get("speaker") or "").strip()
+
+        seen = receipt["context_seen"]
+        seen["episode_context"] = episode
+        if _story_field(row, beats, "arc_phase"):
+            seen["rows_with_arc_phase"] += 1
+        if _story_field(row, beats, "beat_intent"):
+            seen["rows_with_beat_intent"] += 1
+        if act_briefs.get(_story_field(row, beats, "arc_phase") or ""):
+            seen["rows_with_act_brief"] += 1
+        if cast.get(str(row.get("char_id") or "")):
+            seen["rows_with_cast_name"] += 1
+        if any(_is_voiced(r) for r in rows[max(0, index - _CONTEXT_ROWS):index]):
+            seen["rows_with_lines_before"] += 1
+        if any(_is_voiced(r) for r in rows[index + 1:index + 1 + _AFTER_ROWS]):
+            seen["rows_with_lines_after"] += 1
+
+        f2 = _POLICY.f2_findings(
+            row,
+            beats.get(str(row.get("beat_id") or "")),
+            cast.get(str(row.get("char_id") or ""), ""),
+        )
+        if f2:
+            receipt["f2_rows"] += 1
+            receipt["f2"].append({
+                "line_id": line_id,
+                "findings": [{"kind": f.kind, "detail": f.detail} for f in f2],
+            })
+
+        # The free detector runs first so the judge can be shown its evidence.
+        # On the fidelity lanes the language kinds are inadmissible as a
+        # TRIGGER -- the author's own third person is not a defect -- but the
+        # judge still reads the line and its verdict counts everywhere.
+        patterns = _POLICY.f1_findings(_text_of(row))
+        hints = [f for f in patterns if f.kind in admissible]
+
+        if slot_fn is None:
+            if hints:
+                receipt["f1_rows"] += 1
+                receipt["pattern_only"] += 1
+                receipt["unclean"] += 1
+                _flag_unclean(row)
+                receipt["rows"].append({
+                    "line_id": line_id,
+                    "outcome": "no_model",
+                    "complaint": _as_findings(hints),
+                })
+            continue
+
+        receipt["model_calls"] += 1
+        judged, call_ok = _judge_row(
+            slot_fn=slot_fn,
+            speaker=speaker,
+            text=_text_of(row),
+            hints=hints,
+            lines_around=_lines_around(rows, index, beats),
+            where=_where_the_story_is(row, beats, episode, act_briefs),
+        )
+
+        # A UNION, NOT A VETO. Whichever reader saw something, we act on it:
+        # the model generalizes to the door nobody enumerated, the patterns
+        # catch the blatant case instantly, and neither is allowed to
+        # overrule the other.
+        if judged and hints:
+            source = "both"
+        elif judged:
+            source = "judge"
+            receipt["judge_only"] += 1
+        elif hints:
+            source = "patterns"
+            receipt["pattern_only"] += 1
+        else:
+            continue
+
+        if judged:
+            receipt["judged_dirty"] += 1
+            receipt["segments_named"] += len(judged)
+        receipt["f1_rows"] += 1
+        complaint = judged or _as_findings(hints)
+
+        receipt["rows"].append(_repair_row(
+            row=row,
+            rows=rows,
+            index=index,
+            beats=beats,
+            complaint=complaint,
+            source=source,
+            episode=episode,
+            act_briefs=act_briefs,
+            judge_reachable=call_ok,
+            admissible=admissible,
+            slot_fn=slot_fn,
+            receipt=receipt,
+        ))
+
+    receipt["context_seen"]["acts_summarized"] = len(act_briefs)
+    _log_verdict(receipt)
+    meta = ledger_data.setdefault("meta", {})
+    if isinstance(meta, MutableMapping):
+        meta["ledger_clean"] = receipt
+    return receipt
+
+
+def _repair_row(
+    *,
+    row: MutableMapping[str, Any],
+    rows: "Sequence[Mapping[str, Any]]",
+    index: int,
+    beats: "Mapping[str, Mapping]",
+    complaint: "Sequence[Mapping[str, str]]",
+    source: str,
+    episode: str,
+    act_briefs: "Mapping[str, str]",
+    judge_reachable: bool,
+    admissible: "frozenset[str]",
+    slot_fn: "Callable[..., str]",
+    receipt: MutableMapping[str, Any],
+) -> "dict[str, Any]":
+    """Repair ONE row, bounded, the judge re-reading each attempt.
+
+    Every segment the judge named goes into the SAME repair call, as a
+    numbered checklist. One call fixes the whole line -- a per-segment loop
+    would edit a line three times against three partial views of it and let
+    each edit undo the last.
+    """
+    line_id = str(row.get("line_id") or "")
+    speaker = str(row.get("speaker") or "").strip()
+    original = _text_of(row)
+    lines_around = _lines_around(rows, index, beats)
+    where = _where_the_story_is(row, beats, episode, act_briefs)
+
+    current = list(complaint)
+    previous = ""
+    attempts: "list[dict[str, Any]]" = []
+    # PROGRESS, NOT PERFECTION. Measured in the lab on a 2B: the judge is
+    # eager enough that it finds SOMETHING on almost every rewrite, so an
+    # accept-only-when-spotless loop never converges -- every row burns its
+    # whole budget and then ships the ORIGINAL, discarding rewrites that had
+    # genuinely removed the stage direction. Keeping the best candidate turns
+    # a grind into monotone improvement, and it is still the model's prose:
+    # Python only picks which of the model's own answers to keep, exactly as
+    # it already does when it accepts one.
+    best_text = ""
+    best_count = len(current)
+    started_with = len(current)
+
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        receipt["model_calls"] += 1
+        candidate = _call_repair(
+            slot_fn=slot_fn,
+            speaker=speaker,
+            text=original,
+            complaint=_numbered(current),
+            lines_around=lines_around,
+            previous_attempt=previous,
+            where=where,
+        )
+        if not candidate:
+            attempts.append({"attempt": attempt, "outcome": "call_failed"})
+            break
+
+        # READ IT BACK THE SAME WAY IT WAS READ THE FIRST TIME. A repair
+        # graded by a weaker check than the one that condemned it is a repair
+        # that can pass by moving the defect somewhere the check cannot see.
+        still_patterns = [
+            f for f in _POLICY.f1_findings(candidate) if f.kind in admissible
+        ]
+        still_judged: "list[dict[str, str]]" = []
+        if judge_reachable:
+            receipt["model_calls"] += 1
+            still_judged, _ok = _judge_row(
+                slot_fn=slot_fn,
+                speaker=speaker,
+                text=candidate,
+                hints=still_patterns,
+                lines_around=lines_around,
+                where=where,
+            )
+        remaining = still_judged or _as_findings(still_patterns)
+        attempts.append({
+            "attempt": attempt,
+            "outcome": (
+                "clean" if not (still_judged or still_patterns)
+                else "still_dirty"
+            ),
+            "remaining": remaining,
+        })
+        if not still_judged and not still_patterns:
+            # THE CANONICAL OWNER sets the text, so `word_count` and
+            # `char_count` move with it in one step. A bare `row["text"] = `
+            # would leave the metrics describing the line this pass just
+            # replaced, and every downstream consumer that budgets from them
+            # would be reading a line nobody says.
+            set_line_text_metrics(row, candidate)
+            receipt["repaired"] += 1
+            log.info(
+                "[ledger_clean] %s repaired -- %s named %d segment(s) -- "
+                "%r -> %r",
+                line_id, source, len(complaint),
+                original[:70], candidate[:70],
+            )
+            return {
+                "line_id": line_id,
+                "outcome": "repaired",
+                "found_by": source,
+                "complaint": list(complaint),
+                "before": original,
+                "after": candidate,
+                "attempts": attempts,
+            }
+        if len(remaining) < best_count:
+            best_text, best_count = candidate, len(remaining)
+        previous = candidate
+        current = remaining
+
+    # BOUNDED, THEN TAKE THE BEST ANSWER AND FLAG IT. If some attempt left
+    # the line strictly cleaner than it started, that rewrite SHIPS -- a line
+    # with one problem left is better on air than a line with three, and
+    # throwing it away to preserve the original was losing real repairs. The
+    # flag stays either way, so nothing is quietly declared fixed.
+    if best_text and best_count < started_with:
+        set_line_text_metrics(row, best_text)
+        receipt["improved"] += 1
+        log.warning(
+            "[ledger_clean] %s could not be made spotless in %d pass(es), but "
+            "the best rewrite cut its problems from %d to %d -- SHIPPING that "
+            "one, flagged: %r -> %r",
+            line_id, len(attempts), started_with, best_count,
+            original[:60], best_text[:60],
+        )
+        _flag_unclean(row)
+        return {
+            "line_id": line_id,
+            "outcome": "improved",
+            "found_by": source,
+            "complaint": list(complaint),
+            "before": original,
+            "after": best_text,
+            "remaining_count": best_count,
+            "attempts": attempts,
+        }
+
+    _flag_unclean(row)
+    receipt["unclean"] += 1
+    log.error(
+        "[ledger_clean] %s is STILL unclean after %d bounded repair pass(es): "
+        "%s. The row SHIPS with compose_flag %r and the render continues -- "
+        "a render is never killed for this.",
+        line_id, len(attempts),
+        "; ".join(str(f.get("quote") or "") for f in current) or "(nothing "
+        "named)",
+        UNCLEAN_COMPOSE_FLAG,
+    )
+    return {
+        "line_id": line_id,
+        "outcome": "unclean",
+        "found_by": source,
+        "complaint": list(complaint),
+        "text": original,
+        "attempts": attempts,
+    }
+
+
+def _log_verdict(receipt: Mapping[str, Any]) -> None:
+    """One line the operator can read without opening the ledger."""
+    if not receipt["f1_rows"] and not receipt["f2_rows"]:
+        log.info(
+            "[ledger_clean] %d voiced row(s) read by the judge, nothing to "
+            "clean (%s)",
+            receipt["voiced_rows"], receipt["policy"],
+        )
+        return
+    log.info(
+        "[ledger_clean] %d voiced row(s): %d carried something that is not "
+        "speech (%d segment(s) named), F2 on %d. %d repaired, %d still "
+        "unclean, in %d model call(s). Found by: judge only %d, patterns "
+        "only %d.",
+        receipt["voiced_rows"], receipt["f1_rows"],
+        receipt["segments_named"], receipt["f2_rows"],
+        receipt["repaired"], receipt["unclean"], receipt["model_calls"],
+        receipt["judge_only"], receipt["pattern_only"],
+    )
+    if receipt["judge_only"]:
+        log.info(
+            "[ledger_clean] %d row(s) were caught ONLY by the judge -- no "
+            "pattern would have found them. That is the reason the judge is "
+            "a model.",
+            receipt["judge_only"],
+        )
+    if receipt["f2_rows"]:
+        log.error(
+            "[ledger_clean] %d row(s) disagree about who is speaking -- this "
+            "is F2 and it is a bookkeeping fault upstream, not something a "
+            "rewrite can fix. See meta.ledger_clean.f2 for every one.",
+            receipt["f2_rows"],
+        )

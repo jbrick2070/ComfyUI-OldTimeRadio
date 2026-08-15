@@ -6652,6 +6652,37 @@ class OTR_LedgerScriptWriter:
         # and a freshly minted seed is not derivable from the inputs, so a
         # pass that minted one for every lane would make this tail
         # irreproducible (tests/test_fable2_tail_context.py pins that).
+        # THE CLEAN STAGE, and it runs FIRST at this boundary. A MODEL reads
+        # every spoken row and names anything in it that is not speech; a
+        # MODEL then rewrites it. Every sealed line becomes TTS audio, so a
+        # stage direction left inside one gets read aloud on air -- measured
+        # at 11-40% of spoken rows on every bank (2026-08-14).
+        #
+        # COST, STATED HONESTLY: it is NOT detector-gated. One judge call per
+        # voiced row, so a clean 16-row episode still spends 16 small calls
+        # here. That is deliberate and it is the whole reason the pass works
+        # -- gating on a pattern list is what let "The door closes behind
+        # him" through, since no verb list contains every verb. A dirty row
+        # then costs up to two repair calls, each re-read by the judge.
+        # Bounded: after that budget the row SHIPS carrying a compose flag
+        # and the log says so. It never stops a render.
+        #
+        # It uses the CREATIVE slot, not the technical one: it is rewriting
+        # dialogue, so the tier that wrote the line rewrites it and the
+        # repaired line still sounds like its neighbours (operator ruling
+        # 2026-08-14).
+        #
+        # BEFORE run_ledger_cleanup, deliberately -- that pass re-stamps text
+        # metrics, so a row rewritten here is measured after the rewrite
+        # rather than before it.
+        from . import _otr_ledger_clean as _OTRLCLN
+        with slot_scheduler.helper_context("ledger_clean"):
+            _OTRLCLN.run_ledger_clean(
+                led.data,
+                slot_fn=creative_generate_fn,
+                bank_id=str(meta.get("source_bank") or ""),
+            )
+
         from . import _otr_ledger_cleanup as _OTRLCLEAN
         with slot_scheduler.helper_context("ledger_cleanup"):
             _OTRLCLEAN.run_ledger_cleanup(
