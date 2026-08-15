@@ -3,6 +3,110 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 11920cbc (v2.0-alpha) -- CODER (the clean stage proven live on the codex lane; the headless entrypoint had been dead for a day; four operator rulings reshaped the act topology; an all-night six-bank gate found two deterministic writer failures)
+
+**Did.** Five green pushed chunks plus two evidence docs.
+
+* `3463dd0a` -- **the ONE sanctioned headless entrypoint had been dead since
+  2026-08-14.** `otr_headless_canonical.ps1` forwarded `--words`, deleted from
+  the runner with the `target_words` widget, so every invocation exited 2 in
+  argparse before reaching the API. The 08-14 log had even recorded "five
+  scripts still passing --words"; two were fixed, the wrapper and README were
+  missed. `-Words` removed rather than repaired (length is an observation);
+  `-Acts` forwards `--act-count`. A regression seizes the runner's LIVE parser
+  and asserts every flag the wrapper sends is one the runner accepts.
+* `3661bc42` -- the ranked no-shims work. `compose_line_draft` re-sent
+  byte-identical messages with the temperature raised 0.1 and told the model
+  nothing; the retry now carries its own rejected reply plus the complaint and
+  runs COOLER. `LineCompositionFailedError` had no handler anywhere in
+  `nodes/`; both writer call sites now leave the row EMPTY for
+  `_otr_ledger_cleanup` to mark an explicit skip -- the freeze contract's own
+  answer, so Python authors no prose. `_pass_news_read` got the source-
+  attribution validator it shipped without. The stage-3 tooltip stopped
+  advertising a repair that does not exist (the TOOLTIP was the defect: THE LAW
+  forbids rerolling for length or language).
+* `9c2d721d` -- **four operator rulings on episode shape.** `BEATS_PER_ACT = 4`
+  with `voiced_beats_per_act` DERIVED from the arc phases. The old table broke
+  the operator's own model twice (7 acts asked for 19 while 6 asked for 20; 3
+  and 4 tied at 14). The codex schema caps were a hard 12-beat cap on a WHOLE
+  episode at any act count, and since a scene is that lane's act-sized unit a
+  7-act pick could not make a 7-act spine -- under a grammar it TRUNCATED
+  rather than refused. Caps are derived from the topology now: 7 acts asked 28
+  and resolved 12 before, resolves 28 now. The outline no longer rerolls a
+  phase over a beat-count mismatch.
+* `f5fee5b9` -- 1,089 lines of `__main__` self-tests nothing ever ran, deleted
+  from 8 modules, with an AST tripwire.
+* `11920cbc` -- GO_FORWARD scoped to the bug-fix sprint.
+
+**THE LIVE PROOF THIS WINDOW OPENED ON.** `scifi_news` on `gemma-4-12b-it`,
+`RESULT SUCCESS` in 19 min: **`clean sight 11111 [line speaker act around
+complaint] sha c104e9cc ok=true, repaired=0 unclean=0`, freeze `frozen_clean`**
+on a CODEX-lane ledger. Only the writer lane had been proven live before, and
+the codex lane is the one whose row shape hid the 08-14 blindness bug. Six act
+briefs populated -- independent evidence of sight.
+
+**ALL-NIGHT SIX-BANK GATE, 3 PASSES, 18 LEGS** (`otr_writer_bank_gate.py --acts
+3 --profile otr_w45_still_flat`, stills on z_image_turbo). **4/6 banks pass in
+every pass; the SAME two fail in every pass** -- deterministic, not sampling.
+`scifi_news`: `CodexPreTailAuditError: line receipt mismatch`, dies AFTER
+writing. `scifi_news_pro`: `Fable2ScriptError: markup ladder exhausted,
+BAD_LINE_SHAPE: END`. Prime suspect for BOTH is the act change, not the writer
+fixes -- these are the first legs to assemble a 12-beat script. The named
+experiment is in the findings doc: reproduce with the act change reverted
+LOCALLY, do not commit the revert. If implicated, fix the CONSUMER, never the
+topology -- the topology is an operator ruling.
+
+**OPERATOR EYEBALL, six findings, all grounded against real ledgers**
+(`docs/2026-08-15-operator-eyeball-findings.md`). Three banks fail to name what
+they adapted: `shakespeare` names NOBODY (`spoken_coda_source: none`),
+`public_domain` says the literal words "public domain work" without the title,
+`media_archive` closes with a `news_close_brief` it never earned. Two live
+voice-gender contradictions (GERTRUDE, JULIANA -- both male voices). One
+undiagnosed possible Tempest/Macbeth title mixup. **The operator's guess that
+the original-bank episode closing with no source is FINE was correct** -- bank
+`original`, coda correctly `none`.
+
+**Corrections I made to the plan's own premises, grounded:** the graduated
+extraction contract is CODEX-ONLY, not both news lanes -- the pro lane's
+dossier validator returns None unconditionally and drops unverifiable rows
+delete-only, so it already ships the graduated behaviour. And ranked no-shims
+item 2 largely dissolved: `_writer_retry_mapping` threads the rejection into
+every candidate cycle, so P5R's "three cold rerolls" is not accurate, and the
+kill after the ceiling is the operator's own 08-13 ruling. What survives is the
+400-char repair echo.
+
+**Current step.** PRIORITY 0 is the bug-fix sprint, seven live-artifact
+defects, evidence already grounded so the next window scopes rather than
+re-derives.
+
+**Next.** Scope the PRIORITY 0 sprint. Gender/voice is GREEN-LIT by the
+operator. The `shakespeare` coda wording needs an operator ruling BEFORE it is
+coded -- it looks like an over-application of the 08-05 licensed-source ruling.
+
+**Models.** No kibitz arc opened -- the 2026-08-11 routing was in force for the
+coding, and **the operator restored kibitz + Sonnet/Fable fan-out at the END of
+the session for the NEXT window only**; that mandate is at the top of
+GO_FORWARD. No subagents were spawned this session. No paid spend.
+
+**Gates.** Suite **10532 passed / 110 skipped / 1 xfailed**, 0 failures (start
+of session 10488; the +44 are this session's new tests). Bug Bible **20 passed
+/ 26 skipped / 3 xfailed**. `build_variants.py --check` **50 / 0**. AST + BOM
+clean on every touched file. HEAD == origin after every push.
+
+**Bible delta-scrape: NOT DONE, and it is OWED.** Seven live-artifact defects
+landed tonight and none was checked against `otr_coverage_index.yaml`. I ran
+out of usable context and chose not to do it badly. It is recorded as an
+explicit owed item in GO_FORWARD PRIORITY 0. `PROD_BUG_LOG.md` entries for the
+two gate failures and the two voice-gender instances are owed with it.
+
+**Box. NOT CLEAN -- the next window MUST reset per CLAUDE.md section 4 before
+any leg.** The ComfyUI server is RESIDENT on :8000 holding ~10.6 GB (the
+expected no-teardown behaviour, not a crash -- all three gate passes finished,
+pass 3 at 05:24:40). No pytest or gate processes remain.
+
+**Commits.** 7 on `v2.0-alpha`: `3463dd0a` `3661bc42` `9c2d721d` `f5fee5b9`
+`2fcb4c3c` `7d0a0745` `11920cbc`, plus this handoff.
+
 ## 2026-08-14 -- HEAD 10ccbfe9 (v2.0-alpha) -- CODER (the clean stage shipped on all six banks; a lab that scores recall AND false alarms; four defects only running it could find; character drift measured, priced and accepted)
 
 **Did.** Built and shipped the POST-STORY CLEAN STAGE
