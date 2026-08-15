@@ -46,6 +46,7 @@ log = logging.getLogger("OTR")
 __all__ = [
     "InvalidEpisodeBudgetError",
     "ACT_COUNT_CONFIG",
+    "BEATS_PER_ACT",
     "BEAT_WORD_HARD_MAX",
     "ARC_PHASE_GUIDANCE",
     "MIN_ACT_COUNT",
@@ -95,47 +96,66 @@ MAX_ACT_COUNT: int = 8
 # topology, which is why the beat count moves in steps rather than sliding
 # with a length request.
 
+#: Beats in one act. OPERATOR RULING 2026-08-15: *"ideally we say each act is
+#: 4 beats and we have a separate LLM pass per beat"*, and an act count is a
+#: number of ACT PATHS -- *"if I say 7 acts it goes through 7 different act
+#: paths, that should ensure there are more with 7"*.
+#:
+#: What that replaced: a hand-tuned table where every row had a different
+#: shape and two rows broke the operator's own model. Three acts and four
+#: acts both bought 14 beats, and SEVEN acts bought 19 while six bought 20 --
+#: asking for a longer story made a shorter one. The 7-act row `(2,3,3,3,3,3,2)`
+#: predates the word rip and was almost certainly a word-fitting artifact:
+#: act counts above 3 were only reachable when `target_words // 50` allowed
+#: them, so the rows were tuned to fit a word budget rather than to describe
+#: a dramatic shape. The budget is gone; the shapes it left behind are too.
+#:
+#: A uniform act is also the honest one. Every act runs the same arc machinery
+#: and gets the same per-beat authoring passes, so there is no mechanism that
+#: would make a "setup" act intrinsically thinner than a "climax" act -- the
+#: old varying rows encoded a length guess, not a dramatic fact.
+BEATS_PER_ACT: int = 4
+
 ACT_COUNT_CONFIG: dict[int, dict] = {
     1: {
         "arc_phases":            ("scene",),
-        "voiced_beats_per_act":  (3,),
     },
     2: {
         "arc_phases":            ("setup", "resolution"),
-        "voiced_beats_per_act":  (3, 3),
     },
     3: {
         "arc_phases":            ("setup", "complication", "resolution"),
-        "voiced_beats_per_act":  (4, 6, 4),
     },
     4: {
         "arc_phases":            ("setup", "rising_action", "complication",
                                   "resolution"),
-        "voiced_beats_per_act":  (3, 4, 4, 3),
     },
     5: {
         "arc_phases":            ("exposition", "rising_action",
                                   "complication", "climax", "resolution"),
-        "voiced_beats_per_act":  (3, 4, 4, 3, 3),
     },
     6: {
         "arc_phases":            ("setup", "catalyst", "rising_action",
                                   "complication", "climax", "resolution"),
-        "voiced_beats_per_act":  (3, 3, 4, 4, 3, 3),
     },
     7: {
         "arc_phases":            ("setup", "catalyst", "rising_action",
                                   "midpoint", "complication", "climax",
                                   "resolution"),
-        "voiced_beats_per_act":  (2, 3, 3, 3, 3, 3, 2),
     },
     8: {
         "arc_phases":            ("setup", "catalyst", "rising_action",
                                   "midpoint", "complication", "crisis",
                                   "climax", "resolution"),
-        "voiced_beats_per_act":  (2, 3, 3, 3, 3, 3, 3, 2),
     },
 }
+
+# `voiced_beats_per_act` is DERIVED, not authored: one entry per arc phase,
+# every entry BEATS_PER_ACT. Derived rather than typed out so the two can
+# never drift apart, and so "how many beats is an act" has exactly one owner.
+for _cfg in ACT_COUNT_CONFIG.values():
+    _cfg["voiced_beats_per_act"] = (BEATS_PER_ACT,) * len(_cfg["arc_phases"])
+del _cfg
 
 
 # The Stage-3 Beat pydantic schema hard-caps one voiced beat at 80 words.

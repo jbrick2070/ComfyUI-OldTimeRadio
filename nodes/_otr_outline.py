@@ -1722,12 +1722,24 @@ def generate_outline(
         )
 
         def _phase_check(parsed: _PhaseSkeleton) -> str | None:
-            # Cast membership AND beat count match.
+            # Cast membership only. THE BEAT COUNT IS A REQUEST, NOT A GATE
+            # (operator ruling 2026-08-15: "we ask for x beats, we do our
+            # best, we don't fail if it doesn't have exactly as many beats").
+            #
+            # This used to reject the phase and reroll on
+            # `len(parsed.beats) != phase_beat_count` -- a story that came
+            # back with three beats where four were asked for was thrown away
+            # and re-rolled, exactly the way a word total used to be able to
+            # refuse an episode. The prompt still ASKS for the count and the
+            # topology still sizes the request; what is gone is the refusal.
+            # An emitted beat count is now an observation, and the gap is
+            # receipted below rather than punished.
             if len(parsed.beats) != phase_beat_count:
-                return (
-                    f"phase {phase_name!r} beat count mismatch: "
-                    f"got {len(parsed.beats)}, expected "
-                    f"{phase_beat_count}"
+                log.info(
+                    "[OTR_Outline] phase %r returned %d beat(s) for a "
+                    "request of %d; accepted as written (the count is a "
+                    "request, never a gate).",
+                    phase_name, len(parsed.beats), phase_beat_count,
                 )
             # Step 5: normalize each emitted speaker before the
             # cast-membership check -- uppercase, strip whitespace,

@@ -57,7 +57,11 @@ class TestComputeEpisodeBudget:
         eb = compute_episode_budget(3, True, 2)
         assert eb.act_count == 3
         assert eb.arc_phases == ("setup", "complication", "resolution")
-        assert eb.per_phase_beats == (4, 6, 4)
+        # ONE ENTRY PER ACT PATH. The SIZE is deliberately not asserted --
+        # "no chasing beats" (operator 2026-08-15), so a beat count is a
+        # request and no test pins it. The old hand-tuned (4, 6, 4) went with
+        # the word budget it had been fitted to.
+        assert len(eb.per_phase_beats) == 3
         assert eb.music_inter_count == 2
         assert eb.announcer_beats == 2
         assert eb.cast_size == 2

@@ -17,6 +17,7 @@ import pytest
 
 from nodes._otr_episode_budget import (
     ACT_COUNT_CONFIG,
+    BEATS_PER_ACT,
     MAX_ACT_COUNT,
     MIN_ACT_COUNT,
     InvalidEpisodeBudgetError,
@@ -37,40 +38,57 @@ class TestVoicedBeatCount:
         for acts in range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1):
             assert voiced_beat_count(acts) >= 3
 
-    def test_the_seven_act_inversion_is_pinned_not_endorsed(self):
-        """7 acts yields FEWER beats than 6. Pinned so it cannot drift silently.
+    def test_asking_for_more_acts_never_asks_for_less(self):
+        """The operator's model. NOT a beat-count pin -- a direction check.
 
-        Measured 2026-08-14: 1->3, 2->6, 3->14, 4->14, 5->17, 6->20,
-        **7->19**, 8->22. Six acts buys 20 voiced beats and seven buys 19.
+        OPERATOR DIRECTIVE 2026-08-15: *"it's like chasing words again -- no
+        chasing beats."* So nothing in this file asserts that an act count
+        buys a PARTICULAR number of beats, and nothing asserts what an episode
+        came back with. A beat count is a request, exactly like a word total,
+        and a test that pins the number turns the request back into a gate
+        with pytest holding the gate instead of the writer.
 
-        This is INHERITED, not introduced by the word rip -- the 7-act row
-        `(2,3,3,3,3,3,2)` predates it. It was probably a word-fitting artifact:
-        act counts above 3 were only reachable when `target_words // 50`
-        allowed them, so the rows were tuned to fit a word budget rather than
-        to describe a dramatic shape.
-
-        It contradicts the operator's stated model that more acts means a
-        story with more turns in it, so it is RAISED rather than fixed here --
-        changing the topology changes every episode rendered at 7 acts. When
-        the operator rules, this test changes with the table.
+        What survives is the only thing that was ever a defect: the REQUEST
+        used to go DOWN when the operator asked for more. Seven acts asked for
+        19 beats while six asked for 20, and three and four asked for the same
+        14 -- a hand-tuned table left over from a word budget that no longer
+        exists. This checks the direction and says nothing about the size.
         """
-        assert voiced_beat_count(6) == 20
-        assert voiced_beat_count(7) == 19
-        assert voiced_beat_count(7) < voiced_beat_count(6)
+        counts = [
+            voiced_beat_count(acts)
+            for acts in range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)
+        ]
+        for acts, (fewer, more) in enumerate(zip(counts, counts[1:]), start=1):
+            assert more > fewer, (
+                f"asking for {acts + 1} acts requests fewer beats than asking "
+                f"for {acts}; asking for a longer story must never ask for a "
+                f"shorter one"
+            )
+
+    def test_every_act_gets_its_own_path(self):
+        """An act count is a number of act paths. Nothing here sizes them.
+
+        *"If I say 7 acts it goes through 7 different act paths"* -- so seven
+        acts means seven arc phases and seven per-act entries. The SIZE of an
+        entry is deliberately not asserted.
+        """
+        for acts, cfg in ACT_COUNT_CONFIG.items():
+            assert len(cfg["arc_phases"]) == acts
+            assert len(cfg["voiced_beats_per_act"]) == acts
 
     def test_every_act_count_has_at_least_one_beat_per_act(self):
         for acts in range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1):
             assert voiced_beat_count(acts) >= acts
 
-    def test_a_single_act_cannot_hold_a_four_person_cast(self):
-        # Not a risk -- a pigeonhole certainty. Every locked character needs a
-        # beat to speak in, and this is the cast-capacity guard's predicate.
-        assert voiced_beat_count(1) < 4
+    def test_one_act_holds_exactly_one_act_of_beats(self):
+        # The cast-capacity guard's predicate: every locked character needs a
+        # beat to speak in, so the smallest episode still has to seat a cast.
+        assert voiced_beat_count(1) == BEATS_PER_ACT
 
     def test_a_three_act_episode_holds_a_real_exchange(self):
         # Three acts is the default shape; it must have room for a scene with
         # actual back-and-forth in it, not two lines and a close.
-        assert voiced_beat_count(3) >= 14
+        assert voiced_beat_count(3) == 3 * BEATS_PER_ACT
 
     def test_unconfigured_act_count_raises(self):
         with pytest.raises(

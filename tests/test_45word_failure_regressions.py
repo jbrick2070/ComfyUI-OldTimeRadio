@@ -221,9 +221,25 @@ def test_p3_transport_bounds_prose_structurally_and_never_clips_silently():
     assert schema["properties"]["premise"]["maxLength"] == ceiling
     scene = schema["$defs"]["RadioScoreDraftSceneV4"]
     assert scene["properties"]["description"]["maxLength"] == ceiling
-    assert schema["properties"]["scenes"]["maxItems"] == 3
-    assert scene["properties"]["shots"]["maxItems"] == 2
-    assert scene["properties"]["beats"]["maxItems"] == 4
+    # The ITEM counts are incidental to this test -- its subject is the
+    # STRING ceilings above, which are what the runaway escaped through.
+    # They were literals (3 scenes, 4 beats) until 2026-08-15, when the
+    # operator ruled that no hard schema ceiling may shape a spine: "if I ask
+    # for 7 acts it needs to generate a spine of 7 acts". They are derived
+    # from the act topology now, and asserting the derivation rather than the
+    # numbers is what keeps this test about strings.
+    assert (
+        schema["properties"]["scenes"]["maxItems"]
+        == codex._RADIO_SCORE_MAX_SCENES
+    )
+    assert (
+        scene["properties"]["shots"]["maxItems"]
+        == codex._RADIO_SCORE_MAX_SHOTS_PER_SCENE
+    )
+    assert (
+        scene["properties"]["beats"]["maxItems"]
+        == codex._RADIO_SCORE_MAX_BEATS_PER_SCENE
+    )
 
     receipt = codex._radio_score_draft_surface_receipt()
     assert receipt["output_budget_mode"] == "provider_capacity"

@@ -4,6 +4,51 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## OPERATOR RULINGS 2026-08-15 (hard -- these settle three OWED decisions)
+
+**THE EPISODE SHAPE IS A REQUEST, TOP TO BOTTOM. NOT THE BEATS, NOT THE ACTS.**
+*"It's like chasing words again -- no chasing beats."* *"We ask for x beats, we
+do our best, we don't fail if it doesn't have exactly as many beats."* *"If it
+writes 1 act [when] I request 7, fine."* This is the word-count law extended to
+every structural number: nothing may refuse, reroll, retire or clip an episode
+for the count it came back with, and **no test may pin one either** -- a test
+that asserts "an act is exactly N beats" is the same gate with pytest holding
+it. Direction is checkable (asking for more must never ask for less); size is
+not. In practice the act count is guaranteed by CONSTRUCTION anyway -- the
+outline runs one authoring pass per arc phase -- so only the beats inside a
+path are the model's answer.
+
+**NO HARD SCHEMA CEILING MAY SHAPE A SPINE.** *"If I ask for 7 acts it needs to
+generate a spine of 7 acts."* `_RADIO_SCORE_MAX_SCENES = 3` x
+`_RADIO_SCORE_MAX_BEATS_PER_SCENE = 4` was a hard 12-beat cap on a WHOLE
+episode at ANY act count, and the score's scene is that lane's act-sized unit
+-- so a 7-act pick could not produce a 7-act spine, and because the lane
+decodes under a grammar built from the schema it TRUNCATED mid-generation
+rather than refusing. Caps are DERIVED from the topology now
+(`MAX_ACT_COUNT * _SCHEMA_HEADROOM`, `BEATS_PER_ACT * _SCHEMA_HEADROOM`), so
+raising the topology carries the schema with it. They stay finite: runaway
+guards remain code-side.
+
+**AN ACT IS 4 BEATS, AND EVERY ACT IS AN ACT PATH.** *"Ideally we say each act
+is 4 beats and we have a separate LLM pass per beat."* `BEATS_PER_ACT = 4`,
+with `voiced_beats_per_act` DERIVED from the arc phases so the two cannot
+drift. This fixed two inversions in the old hand-tuned table: 7 acts asked for
+19 beats while 6 asked for 20, and 3 and 4 both asked for 14. Per-beat
+authoring passes were already shipped (`per_beat_dialogue_then_scene_review`).
+**Cost, measured:** ~1.7 min/beat story-only on `gemma-4-12b-it`, so 3 acts
+runs ~12 beats and 8 acts ~32.
+
+**`media_archive` IS ALREADY LIVE RSS** (Library of Congress + National Film
+Preservation feeds, fetched every run) -- the defect was that it always took
+pooled entry 0, so it retold the newest post forever. Ruling: pick it *"similar
+to [the] science news picker"*, which means the three mechanisms that lane
+already ships -- dedup against `news_history.json` so a story is never told
+twice, a MODEL ranking candidates by narrative fit, and recording the choice --
+not the seeded shuffle first proposed. **OPEN.**
+
+**THE `__main__` SELF-TEST BLOCKS: DELETE THEM.** *"If they aren't doing
+anything delete em."* **OPEN.**
+
 ## PRIORITY 1 -- STORY CLEANUP. The clean stage SHIPPED 2026-08-14.
 
 **Forward-only.** What this section used to carry -- the build narrative, the

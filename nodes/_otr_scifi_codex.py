@@ -320,9 +320,34 @@ def repair_cast_plan_metadata(failed_output: str) -> CastPlanV4 | None:
 
 
 
-_RADIO_SCORE_MAX_SCENES = 3
+# BACKSTOPS, DERIVED FROM THE TOPOLOGY -- NEVER A SHAPE.
+#
+# OPERATOR RULING 2026-08-15: *"we need to remove hard schema ceilings for
+# anything -- if I ask for 7 acts it needs to generate a spine of 7 acts."*
+#
+# These were hardcoded at 3 scenes x 4 beats = 12 beats for a WHOLE episode,
+# at ANY act count. The score's scene is this lane's act-sized unit, so an
+# operator asking for 7 or 8 acts could never get a spine with 7 or 8 acts in
+# it -- and because the lane decodes under a GRAMMAR built from this schema,
+# the cap did not refuse the longer story loudly, it TRUNCATED one during
+# generation. A number typed here was silently outranking the operator's pick.
+#
+# So they are no longer typed here. They are COMPUTED from the same topology
+# that sizes the request -- the most acts that can be asked for, and the beats
+# an act contains -- times a headroom factor. A cap can therefore never sit at
+# the number a request produces (Bible 12.102: ceilings are backstops, limits
+# live at the trim), and raising MAX_ACT_COUNT or BEATS_PER_ACT carries the
+# schema with it instead of leaving a truncation behind.
+#
+# They remain non-infinite on purpose: the standing rule is that runaway
+# guards stay code-side. A backstop at several times the largest legal request
+# cannot shape an episode, and still stops a decode that has stopped making
+# sense.
+_SCHEMA_HEADROOM = 2
+
+_RADIO_SCORE_MAX_SCENES = _OTRB.MAX_ACT_COUNT * _SCHEMA_HEADROOM
 _RADIO_SCORE_MAX_SHOTS_PER_SCENE = 2
-_RADIO_SCORE_MAX_BEATS_PER_SCENE = 4
+_RADIO_SCORE_MAX_BEATS_PER_SCENE = _OTRB.BEATS_PER_ACT * _SCHEMA_HEADROOM
 _RADIO_SCORE_MAX_BEATS = (
     _RADIO_SCORE_MAX_SCENES * _RADIO_SCORE_MAX_BEATS_PER_SCENE
 )
