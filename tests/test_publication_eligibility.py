@@ -62,6 +62,23 @@ def _ledger(provenance=None, source_meta=None, *, episode_id="the_test_episode",
     }
 
 
+def _record_mux_destination(monkeypatch):
+    """Stub the ffmpeg mux and capture the path it was told to write.
+
+    The destination is the thing under test in the ``output_path`` cases -- not
+    what the report says afterwards -- because a file written into obs is
+    already there by the time any report is assembled.
+    """
+    seen = {}
+
+    def _fake_mux(silent_video_path, master_audio_path, out_path, **kwargs):
+        seen["out"] = out_path
+        return out_path, ["mux gate OK"]
+
+    monkeypatch.setattr(MUX, "mux_master_audio", _fake_mux)
+    return seen
+
+
 _CLEARED = {"status": "public_domain_us", "blocks_publish": False}
 _RESEARCH = {"status": "research_only", "blocks_publish": True,
              "source_label": "Restricted Collection"}
@@ -493,6 +510,49 @@ class TestMuxStampAndCacheKey:
         assert saved["final_video_path"] == episode["final"]
         assert "obs_final_path" not in saved["meta"]
         assert "obs_final" not in saved["meta"]["paths"]
+
+    def test_output_path_is_NOT_a_back_door_into_obs_for_a_blocked_episode(
+            self, episode, monkeypatch, tmp_path):
+        """Withholding the published COPY while the archival write lands in the
+        watch folder anyway would satisfy the code and defeat the rule.
+
+        `output_path` is an operator widget, so it can name any destination --
+        including obs. On a blocked episode that destination is refused and the
+        archival final goes to the episode dir instead. Found by the agy QA
+        pass; this is the narrow version of it, so `output_path` keeps its
+        meaning everywhere else.
+        """
+        self._write(episode, _RESEARCH)
+        obs_dir = tmp_path / "output" / "otr" / "obs"
+        monkeypatch.setattr(MUX, "_obs_dir", lambda: obs_dir)
+        seen = _record_mux_destination(monkeypatch)
+        monkeypatch.setattr(
+            MUX.OTRMasterAudioMux, "_publish_to_obs",
+            lambda self, final: pytest.fail("a blocked episode published"),
+        )
+        smuggled = str(obs_dir / "sneaky_final.mp4")
+        path, report = MUX.OTRMasterAudioMux().mux(
+            episode["video"], episode["audio"], output_path=smuggled)
+        assert not MUX._is_inside_obs_dir(seen["out"]), seen["out"]
+        assert not MUX._is_inside_obs_dir(path), path
+        assert "obs_publish BLOCKED" in report
+
+    def test_output_path_is_HONOURED_when_the_episode_may_publish(
+            self, episode, monkeypatch, tmp_path):
+        """The other half: the refusal above is scoped to obs on a BLOCKED
+        episode, and must not quietly start ignoring the operator's path."""
+        self._write(episode, _CLEARED)
+        monkeypatch.setattr(MUX, "_obs_dir", lambda: tmp_path / "obs")
+        seen = _record_mux_destination(monkeypatch)
+        monkeypatch.setattr(
+            MUX.OTRMasterAudioMux, "_publish_to_obs",
+            lambda self, final: "obs/copy.mp4",
+        )
+        chosen = str(tmp_path / "elsewhere" / "operator_choice.mp4")
+        path, _ = MUX.OTRMasterAudioMux().mux(
+            episode["video"], episode["audio"], output_path=chosen)
+        assert seen["out"] == chosen
+        assert path == chosen
 
     def test_an_ELIGIBLE_episode_publishes(self, episode, monkeypatch):
         """The other half. Without this, "nothing published" would pass for

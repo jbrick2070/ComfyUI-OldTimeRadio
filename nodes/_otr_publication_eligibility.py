@@ -196,8 +196,6 @@ def _rights_reasons(meta: Mapping[str, Any]) -> List[str]:
         # A malformed rights record is NOT read as a block. The gap audit
         # already reports shape faults, and inventing a rights denial out of a
         # type error would withhold an episode for a reason nobody stated.
-        if isinstance(prov, str) and prov.strip().lower() == "research_only":
-            return [REASON_RIGHTS_RESEARCH_ONLY, REASON_RIGHTS_MALFORMED]
         return [REASON_RIGHTS_MALFORMED]
     if prov.get("blocks_publish"):
         return [REASON_RIGHTS_RESEARCH_ONLY]

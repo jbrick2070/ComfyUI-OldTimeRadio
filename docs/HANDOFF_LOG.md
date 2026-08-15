@@ -77,6 +77,37 @@ promotion draft maps `12.103`-`12.109` to PBUG-20260815-01..08; D5a has no PBUG
 because it is a gap found by design review, not a production failure with an
 artifact -- and the admission rule forbids inventing one.
 
+### The agy QA pass, and what it cost -- read this before the next one
+
+An Antigravity QA round ran against the finished diff
+(`kibitz-runs/2026-08-15-chunk05-qa/r3/antigravity.md`, verdict
+`yes-with-fixes`, four must-fix + two should-fix). **It then APPLIED its own
+findings directly to the working tree while this window was mid-commit**, so
+three files were edited underneath the driver and the edits landed inside
+`84313d67` unreviewed. That is the "one coder window in the code at a time"
+rule breaking in the most expensive way: a push that claimed a green suite it
+had not been measured against. Corrected in the next commit. **A reviewer
+proposes; it must never write to the repo.** Say so explicitly in the next QA
+brief.
+
+Disposition, one line each, all six grounded against the real files:
+
+| Finding | Verdict |
+|---|---|
+| M1 `_strip_obs_aliases...` should call `decide_from_meta` | **REJECTED.** That strips on ANY unreadable receipt, including every pre-eligibility ledger and every save before Phase 10 stamps -- it would delete `meta.paths.obs_final` from essentially every ledger in normal operation. "We cannot tell" is not "we know it is blocked"; the consumer is the strict one, by design. |
+| M2 `output_path` bypasses the gate | **ACCEPTED, narrowed.** Real hole: the archival write happened before the decision, so an `output_path` inside obs put a blocked episode in the watch folder. Its fix silently ignored `output_path` and changed what the node returns. Mine decides BEFORE writing and refuses only that one destination, loudly, on a blocked episode. Two tests, both directions. |
+| M3 a string `"research_only"` should block | **REJECTED.** `normalize_provenance` always returns a dict, so the shape is unreachable; and the patch left my comment explaining why a type error must not become a rights denial sitting directly above code doing exactly that. |
+| M4 add a `ledger_frozen` input to order the graph | **REJECTED, and it was the dangerous one.** A new `INPUT_TYPES` entry breaks contract Law 10 outright, was not wired into `workflows/otr_canonical.json` in the same change (rule 0), and the name collides with the existing `led["audio"]["ledger_frozen"]` ledger field. |
+| S1 scan `episodes_root` when no singleton | **REJECTED as written** -- an untested disk scan that weakens the stale-singleton guard. The underlying question (can a legitimate episode fail to publish?) is real and stays open below. |
+| S2 drop the disk read from `IS_CHANGED` | **REJECTED.** It deleted the contract's explicit "episode identity + eligibility digest" and broke the D5a acceptance assertion. The disk read fails in the safe direction and now says so in the docstring: a missing receipt costs a remux, never a leaked publish. |
+
+**Open, from S1 and worth a real answer later:** the consumer fails closed, so
+an episode whose ledger carries no receipt will not publish. In production the
+freeze always stamps first, and `in_flight_ledger_path` falls back to the mtime
+walker outside test mode -- but a partial graph run that skips
+`OTR_LedgerFreezeCascade` would withhold a legitimate episode. Not a defect
+today; worth a deliberate decision before the qualifying live leg.
+
 **Next.** Chunk 0.75 (the D4 vendor gate: all 65 sidecars generated,
 schema-validated, freshness-verified).
 

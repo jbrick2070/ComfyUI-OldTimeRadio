@@ -366,12 +366,8 @@ def _strip_obs_aliases_when_publication_blocked(meta: dict) -> bool:
             from _otr_publication_eligibility import (  # type: ignore
                 PUBLICATION_ELIGIBILITY_META_KEY,
             )
-        try:
-            from ._otr_publication_eligibility import decide_from_meta
-        except ImportError:  # pragma: no cover -- flat test/standalone load
-            from _otr_publication_eligibility import decide_from_meta  # type: ignore
-        decision = decide_from_meta(meta)
-        if decision.publishable is not False:
+        receipt = meta.get(PUBLICATION_ELIGIBILITY_META_KEY)
+        if not isinstance(receipt, dict) or receipt.get("eligible") is not False:
             return False
         removed = meta.pop("obs_final_path", None) is not None
         paths = meta.get("paths")

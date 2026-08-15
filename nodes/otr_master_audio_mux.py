@@ -373,6 +373,43 @@ def _episode_stem(silent_video_path: str) -> str:
     return os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
 
 
+def _obs_dir() -> Path:
+    """The operator-facing OBS folder. ONE owner for where "published" means.
+
+    ``OTR_OBS_DIR`` pins it explicitly -- on this box the headless server
+    renders into the ComfyUI-Installs tree while the operator watches
+    ``Documents\\ComfyUI\\output\\otr\\obs`` (two-tree split, 2026-06-09), so
+    the launch recipe sets it. Pure: resolves a path and creates nothing, so a
+    caller may ASK where obs is without bringing it into existence.
+    """
+    pinned = os.environ.get("OTR_OBS_DIR", "").strip()
+    if pinned:
+        return Path(pinned)
+    try:
+        import folder_paths  # type: ignore
+        root = folder_paths.get_output_directory()
+    except Exception:  # noqa: BLE001
+        root = "."
+    return Path(root) / "otr" / "obs"
+
+
+def _is_inside_obs_dir(path: str) -> bool:
+    """Would writing ``path`` put a file in the operator's watch folder?
+
+    Used to refuse an unpublishable episode a back door into obs via the
+    operator's own ``output_path``. Compares RESOLVED paths so ``..`` segments,
+    case differences and short/long Windows forms cannot walk around it. Never
+    raises -- an unresolvable path is not inside obs by any reading, and a
+    crash here would take a finished episode down over a string comparison.
+    """
+    try:
+        target = Path(path).resolve()
+        obs = _obs_dir().resolve()
+        return obs == target or obs in target.parents
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
     """The in-flight ledger and episode dir, but ONLY if they are THIS episode.
 
@@ -401,13 +438,6 @@ def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
             import _otr_ledger as _OTRL  # type: ignore
         ledger_path = _OTRL.in_flight_ledger_path()
         if ledger_path is None:
-            ep_root = _episodes_root().resolve()
-            if ep_root.exists():
-                for candidate in ep_root.iterdir():
-                    if candidate.is_dir() and not candidate.name.startswith("_") and stem.startswith(candidate.name):
-                        cand_ledger = candidate / "audio" / f"{candidate.name}_ledger.json"
-                        if cand_ledger.is_file():
-                            return cand_ledger, candidate
             return None, None
         candidate = Path(ledger_path).resolve().parent.parent
         expected_root = _episodes_root().resolve()
@@ -504,10 +534,6 @@ class OTRMasterAudioMux:
                     "default": "", "forceInput": True,
                     "tooltip": "Audio-done gate (EpisodeAssembler out3). Orders the mux AFTER the audio freezes. Opaque.",
                 }),
-                "ledger_frozen": ("STRING", {
-                    "default": "", "forceInput": True,
-                    "tooltip": "Ledger freeze gate. Orders the mux AFTER the freeze cascade.",
-                }),
                 "declared_credits_tail_s": ("FLOAT", {
                     "default": 0.0, "forceInput": True,
                     "tooltip": "OTR_CreditsRoll's declared silent-credits tail "
@@ -565,14 +591,7 @@ class OTRMasterAudioMux:
         box the headless server renders into the ComfyUI-Installs tree while
         the operator watches ``Documents\\ComfyUI\\output\\otr\\obs``, so the
         launch recipe sets it (two-tree split, 2026-06-09 operator report)."""
-        obs_dir = os.environ.get("OTR_OBS_DIR", "").strip()
-        if not obs_dir:
-            try:
-                import folder_paths  # type: ignore
-                root = folder_paths.get_output_directory()
-            except Exception:  # noqa: BLE001
-                root = "."
-            obs_dir = os.path.join(root, "otr", "obs")
+        obs_dir = str(_obs_dir())
         os.makedirs(obs_dir, exist_ok=True)
         dst = os.path.join(obs_dir, os.path.basename(final))
         # PLAYABILITY (operator screenshot 2026-06-09): -c:a copy from the WAV
@@ -662,26 +681,70 @@ class OTRMasterAudioMux:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        """Cache key: the manifest, the EPISODE, and its inputs.
+        """Cache key: the manifest, the EPISODE, and its publication verdict.
 
-        Cache invalidation when rights change is handled naturally by
-        ComfyUI's graph invalidation, thanks to the ledger_frozen input wire.
+        THE OLD KEY COULD REUSE A PUBLISHED RESULT FOR A BLOCKED EPISODE. It
+        hashed ``clip_manifest_json`` alone -- a RETIRED connector that feeds
+        nothing -- so two runs with the same manifest looked identical to
+        ComfyUI's cache even when they were different episodes with different
+        rights. A cached node does not execute, and a mux that does not execute
+        cannot withhold anything: the receipt would say blocked and the earlier
+        run's published output would stand in for it.
+
+        Episode identity closes the cross-episode half; the eligibility digest
+        closes the same-episode half, so re-freezing an episode after its rights
+        record changes re-runs the mux rather than serving the old verdict.
+
+        THE DIGEST IS READ FROM DISK, AND THAT IS SAFE IN THE ONE DIRECTION
+        THAT MATTERS. If the ledger is not yet written when ComfyUI computes
+        the key, the digest is empty and the key simply differs from the next
+        run's -- which re-executes the node. The failure direction is "run
+        again", never "serve a cached publish", so a missing receipt can cost a
+        remux and can never leak an unpublishable episode.
+
+        Returns a SHA-256 hex string, not ``hash()``. Python salts string
+        hashing per interpreter, so the previous key silently changed at every
+        server boot -- harmless while nothing depended on it, wrong the moment
+        it gates a deliverable.
         """
         manifest = str(kwargs.get("clip_manifest_json") or "")
         stem = _episode_stem(str(kwargs.get("silent_video_path") or ""))
-        parts = (manifest, stem, str(kwargs.get("master_audio_path") or ""),
-                 str(kwargs.get("declared_credits_tail_s") or ""))
+        _, episode_dir = _inflight_episode_for_stem(stem)
+        episode_id = episode_dir.name if episode_dir is not None else ""
+        decision = _publication_decision(str(kwargs.get("silent_video_path") or ""))
+        # The REASON rides in the key as well as the digest: a blocked decision
+        # has no digest (there is no receipt to hash), and two different
+        # blocking reasons must not collide into one cache entry.
+        parts = (manifest, stem, episode_id, decision.reason,
+                 "1" if decision.publishable else "0", decision.digest)
         return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
     def mux(self, silent_video_path, master_audio_path, audio_done="",
-            ledger_frozen="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
             ffmpeg="ffmpeg", output_path=""):
         # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
         # still wired on the canonical graph and hashed by IS_CHANGED, but it
         # feeds nothing -- the SFX bed compiler it once armed is deleted.
         master_audio_path = _reresolve_master_audio(master_audio_path)
-        out = self._default_out(silent_video_path)
+        # DECIDE BEFORE WRITING. The verdict is a pure read, and knowing it
+        # first is what lets the archival write choose a lawful destination --
+        # deciding after the file exists would leave the one case below already
+        # on disk in the folder the rule forbids.
+        decision = _publication_decision(silent_video_path)
+        out = output_path.strip() or self._default_out(silent_video_path)
+        if not decision.publishable and _is_inside_obs_dir(out):
+            # A BLOCKED EPISODE MAY NOT REACH obs BY ANY ROUTE, INCLUDING THE
+            # OPERATOR'S OWN output_path. Withholding the published COPY while
+            # the archival write lands in the watch folder anyway would satisfy
+            # the code and defeat the rule. `output_path` keeps its meaning
+            # everywhere else; only this destination is refused, and loudly.
+            out = self._default_out(silent_video_path)
+            log.warning(
+                "[OTR_MasterAudioMux] output_path %r points into the OBS "
+                "folder and this episode may not be published (%s); the "
+                "archival final goes to %s instead",
+                output_path.strip(), decision.summary(), out,
+            )
         try:
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
@@ -693,14 +756,9 @@ class OTRMasterAudioMux:
             # and a research-only source is cleared for exactly the first and
             # not the second. Withholding is not a failure: this node returns
             # success either way and says which happened, out loud.
-            decision = _publication_decision(silent_video_path)
             if decision.publishable:
                 obs_copy = self._publish_to_obs(final)
                 report.append("obs_publish OK -> " + obs_copy)
-                if output_path.strip() and output_path.strip() != final:
-                    import shutil
-                    os.makedirs(os.path.dirname(output_path.strip()), exist_ok=True)
-                    shutil.copy2(final, output_path.strip())
             else:
                 obs_copy = None
                 report.append("obs_publish BLOCKED -- " + decision.summary())
