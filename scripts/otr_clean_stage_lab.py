@@ -571,7 +571,23 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--show", action="store_true",
                     help="print every flagged line and what happened to it")
     ap.add_argument("--json", default=None, help="write the scores here")
+    # A/B THE RECIPE. Operator, 2026-08-14: *"the repair needs to be model
+    # agnostic -- do a bunch of A/Bs until you get something that works."*
+    ap.add_argument("--votes", type=int, default=None,
+                    help="judge reads per row; 2 keeps only what both name")
+    ap.add_argument("--judge-temp", type=float, default=None,
+                    help="judge temperature")
+    ap.add_argument("--brief-only", action="store_true",
+                    help="split the load: the repair reads the act brief and "
+                         "its two neighbours instead of the whole window")
     args = ap.parse_args(argv)
+
+    if args.votes is not None:
+        CLEAN.JUDGE_VOTES = args.votes
+    if args.judge_temp is not None:
+        CLEAN.JUDGE_TEMPERATURE = args.judge_temp
+    if args.brief_only:
+        CLEAN.REPAIR_READS_BRIEF_ONLY = True
 
     banks = fixtures()
     if args.bank:
@@ -586,6 +602,11 @@ def main(argv: "list[str] | None" = None) -> int:
     print(f"POLICY {POLICY.SPOKEN_TEXT_POLICY_ID}   "
           f"STAGE {CLEAN.LEDGER_CLEAN_VERSION}   "
           f"MODEL {'(none -- patterns only)' if args.dry else args.model}")
+    print(f"RECIPE votes={CLEAN.JUDGE_VOTES} "
+          f"judge_temp={CLEAN.JUDGE_TEMPERATURE} "
+          f"attempts={CLEAN._MAX_ATTEMPTS} "
+          f"brief_only={CLEAN.REPAIR_READS_BRIEF_ONLY} "
+          f"before={CLEAN._CONTEXT_ROWS} after={CLEAN._AFTER_ROWS}")
     print("=" * 78)
 
     all_scores: "list[dict[str, Any]]" = []

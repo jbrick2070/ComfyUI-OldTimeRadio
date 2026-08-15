@@ -703,6 +703,73 @@ def test_the_beat_row_still_works_for_the_lane_that_populates_it():
 
 
 # ---------------------------------------------------------------------------
+# it may never kill a render, and it must state its cost honestly
+# ---------------------------------------------------------------------------
+
+
+def test_a_junk_row_in_the_lines_array_cannot_kill_the_render():
+    """`run_ledger_clean` is called UNWRAPPED from the writer tail.
+
+    The row being judged was guarded, but its NEIGHBOURS were sliced raw out
+    of `lines[]` and handed to `_is_voiced`, which does `.get()`. One stray
+    string or null in that array -- an older or hand-edited ledger -- would
+    have raised AttributeError straight out of the pass and killed the
+    episode. `otr_ledger_view.grade()` filters the same array the same way,
+    so the shape is not hypothetical.
+    """
+    ledger = _ledger(DIRTY, "And then we left.")
+    ledger["lines"].insert(1, "a stray string where a row should be")
+    ledger["lines"].insert(3, None)
+    ledger["beats"].append("junk beat")
+
+    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert receipt["voiced_rows"] == 3
+    assert ledger["lines"][2]["text"] == FIXED
+
+
+def test_the_receipt_counts_the_briefing_calls_it_actually_spent():
+    """The writer tail promises this pass states its cost honestly.
+
+    The per-act briefing runs BEFORE the receipt used to exist, so its calls
+    were real spend that never appeared in `model_calls`.
+    """
+    ledger = _ledger("I have not slept.")
+    slot = _Slot()
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+
+    assert slot.summary_calls > 0
+    assert receipt["briefing_calls"] == slot.summary_calls
+    assert receipt["model_calls"] >= slot.summary_calls
+
+
+def test_a_row_no_model_ever_saw_is_not_counted_as_a_failed_repair():
+    ledger = _ledger(DIRTY)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=None, bank_id="original")
+    assert receipt["no_model"] == 1
+    assert receipt["unclean"] == 0, (
+        "'unclean' means a model tried and could not fix it")
+
+
+def test_the_prompt_markers_the_test_double_routes_on_are_pinned():
+    """A canary for the fixture itself.
+
+    `_Slot` routes judge / repair / briefing on two literal substrings. If a
+    prompt is reworded and these drift, the suite fails in confusing ways
+    somewhere else -- this test names the real cause in one line.
+    """
+    ledger = _ledger(DIRTY)
+    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+
+    assert slot.summary_calls and slot.judge_calls and slot.repair_calls, (
+        "all three job kinds must have been routed")
+    assert all("In about TEN WORDS" in p for p in slot.summary_prompts)
+    assert all("DO THIS, IN ORDER:" in p for p in slot.judge_prompts)
+    assert not any("DO THIS, IN ORDER:" in p for p in slot.repair_prompts)
+
+
+# ---------------------------------------------------------------------------
 # wiring -- code that is not wired in is dead code
 # ---------------------------------------------------------------------------
 

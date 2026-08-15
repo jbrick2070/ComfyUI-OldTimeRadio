@@ -107,11 +107,47 @@ This is the same shape as the news lanes' documented floor, now proven for
 the clean stage with ground truth: **`gemma-2-2b-it` writes a fine `original`
 episode but cannot JUDGE one.** Route the clean stage's slot accordingly.
 
-**Still open on the recipe** (the lab makes each experiment minutes, not a
-ten-minute render): the two surviving misses are both `scene_report`, and
-`scifi_news_pro`'s `quoting` trap fires on both models -- worth one more
-calibration example. Asking the judge twice and acting only on agreement is
-the next cheap lever if precision needs more.
+**THE A/B/C/D SWEEP, all on `gemma-2-2b-it`, same planted ledgers
+(operator: *"the repair needs to be model agnostic -- do a bunch of A/Bs"*):**
+
+| variant | recall | traps kept | repaired | calls |
+|---|---|---|---|---|
+| A baseline (votes=1, full repair window) | 13/15 | 17/28 (61%) | 6 | 123 |
+| B agreement voting (`--votes 2`) | 13/15 | 16/28 (57%) | 4 | 168 |
+| C load split (`--brief-only`) | 13/15 | 17/28 (61%) | 5 | 122 |
+| **12B, no tricks at all** | 13/15 | **24/28 (86%)** | **13** | **79** |
+
+**THE KNOBS DO NOTHING AND THE MODEL DOES EVERYTHING.** Recall sits at 13/15
+in EVERY variant and on BOTH models -- the two survivors are always
+`scene_report`, a scene sentence followed by real dialogue in the same row.
+Agreement voting is a straight loss (-4% precision for +45 calls) and is
+rejected. The load split -- the operator's idea, and good engineering -- is
+neutral on quality and marginally cheaper; it stays available
+(`REPAIR_READS_BRIEF_ONLY`) but is not the fix. **Only the 12B moves
+precision, and it does so with FEWER calls.**
+
+Do not re-run these three. They are measured. The next real lever is a
+calibration example for the MIXED row (scene sentence + dialogue in one line),
+which is the entire remaining miss class.
+
+**PRIORITY, operator 2026-08-14:** *"I'm more concerned about not finding and
+fixing non-dialogue, or the wrong character's speech."* So recall and F2 are
+the objective; a false positive on `original` or the news banks is cheap --
+*"even if it cleans up a good line, as long as it still fits the act, story
+and surrounding dialogue"* -- **EXCEPT on `shakespeare` and `public_domain`,
+where rewriting the author IS the defect.** That lane scored traps kept 2/5
+on the 2B with false alarms on `literary` and `imperative`; protecting it is
+the one place precision is non-negotiable.
+
+**POST-CODING QA (Sonnet 5, on the finished diff) FOUND A RENDER-KILLER, now
+fixed.** `_is_voiced` was handed NEIGHBOUR rows sliced raw out of `lines[]`
+with no `isinstance` guard, so one stray non-mapping entry -- an older or
+hand-edited ledger -- would raise `AttributeError` out of the pass, and
+`run_ledger_clean` is called UNWRAPPED from the writer tail, so it would kill
+the episode. It also caught `model_calls` silently omitting the per-act
+briefing spend while the writer-tail comment claimed the cost was stated
+honestly, and `unclean` conflating "a model tried and failed" with "no model
+ran". All three fixed and pinned by tests.
 
 ### THE PASS WAS BLIND TO THE ACT ON EVERY LIVE EPISODE -- FIXED 2026-08-14
 

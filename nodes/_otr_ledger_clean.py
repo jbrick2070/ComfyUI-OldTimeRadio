@@ -113,6 +113,32 @@ _MAX_NEW_TOKENS = 320
 #: room to write prose, and a tight budget is what keeps a per-row pass cheap.
 _JUDGE_MAX_NEW_TOKENS = 160
 
+#: THE RECIPE KNOBS. Module-level so `scripts/otr_clean_stage_lab.py` can
+#: A/B them against a planted ledger and MEASURE the answer instead of
+#: arguing about it. Operator, 2026-08-14: *"the repair needs to be model
+#: agnostic -- do a bunch of A/Bs until you get something that works."* The
+#: shipped defaults are whatever won the last A/B; they are not guesses.
+#:
+#: The prompt TEXT is deliberately not a knob -- one prompt per job for every
+#: model tier is a standing law. What varies is how the job is run.
+JUDGE_TEMPERATURE = 0.2
+#: How many independent reads before a finding is acted on. 1 = trust the
+#: first read. 2 = ask twice and keep only what BOTH reads name, which is the
+#: classic cure for a noisy judge and costs one extra small call per row.
+JUDGE_VOTES = 1
+#: SPLIT THE LOAD BETWEEN CALLS. Operator, 2026-08-14: *"one pass creating
+#: the briefing of the act and dialogue, so the repair pass can read that
+#: brief and all it has to do is generate the repaired line -- splitting the
+#: load between calls."*
+#:
+#: The reasoning is exactly right for a small model. The full repair prompt
+#: carries the act, the brief, the surrounding lines, a numbered checklist
+#: AND a how-to-edit passage -- and a 2B handed that much drops most of it.
+#: With this on, the briefing pass has already done the reading, so the
+#: repair call carries the brief, the line and the complaint, and its whole
+#: job is to write one sentence.
+REPAIR_READS_BRIEF_ONLY = False
+
 #: How much of the episode a model is shown BEFORE the line. The window is the
 #: point: a model that sees its own scene answers the line in front of it, and
 #: one handed the whole line graph averages the episode instead.
@@ -153,9 +179,22 @@ def _cast_names(ledger_data: Mapping[str, Any]) -> "dict[str, str]":
     }
 
 
-def _is_voiced(row: Mapping[str, Any]) -> bool:
+def _is_voiced(row: Any) -> bool:
+    """Is this row spoken aloud -- and is it even a row?
+
+    THE isinstance GUARD IS LOAD-BEARING, not defensive habit. The CURRENT
+    row was already guarded, but the NEIGHBOUR rows fed to `_lines_around`
+    and to the context counters were sliced straight out of `lines[]` and
+    handed here unchecked. One non-mapping entry in that array -- a stray
+    string or null from an older or hand-edited ledger -- would raise
+    AttributeError out of this pass, and `run_ledger_clean` is called
+    UNWRAPPED from the writer tail, so it would kill the render. This pass
+    may never do that. (`scripts/otr_ledger_view.grade()` already filters the
+    same array the same way, so the shape is not hypothetical here.)
+    """
     return (
-        row.get("speaker_role") in _POLICY.VOICED_ROLES
+        isinstance(row, Mapping)
+        and row.get("speaker_role") in _POLICY.VOICED_ROLES
         and not bool(row.get("skip"))
         and bool(_text_of(row).strip())
     )
@@ -320,6 +359,7 @@ def summarize_acts(
     ledger_data: Mapping[str, Any],
     *,
     slot_fn: "Callable[..., str]",
+    cost: "MutableMapping[str, int] | None" = None,
 ) -> "dict[str, str]":
     """One short read of what is going on in each ACT of the finished episode.
 
@@ -371,6 +411,11 @@ def summarize_acts(
 
     summaries: "dict[str, str]" = {}
     for phase, lines in grouped.items():
+        # COUNTED, because the writer tail's comment promises this pass
+        # states its cost honestly -- and these briefing calls are real
+        # spend that used to be invisible in the receipt.
+        if cost is not None:
+            cost["calls"] = cost.get("calls", 0) + 1
         prompt = [
             {
                 "role": "system",
@@ -566,6 +611,49 @@ def _grade_probe(
     )
 
 
+def _judge_votes(**kwargs) -> "tuple[list[dict[str, str]], bool]":
+    """Read the line ``JUDGE_VOTES`` times and keep only what every read names.
+
+    A noisy judge is the measured failure mode on a small model: it condemned
+    clean dialogue on roughly half the trap lines in the lab. Random noise
+    does not survive being asked twice, while a real stage direction does --
+    so agreement is the classic, model-agnostic cure, and it costs one extra
+    SMALL call per row rather than a bigger model.
+
+    One vote is a straight pass-through, so the default recipe pays nothing.
+    """
+    if JUDGE_VOTES <= 1:
+        return _judge_row(**kwargs)
+
+    rounds: "list[list[dict[str, str]]]" = []
+    reachable = False
+    for _ in range(JUDGE_VOTES):
+        found, ok = _judge_row(**kwargs)
+        reachable = reachable or ok
+        if ok:
+            rounds.append(found)
+    if not rounds:
+        return [], reachable
+
+    # A finding survives only if EVERY read named the same words.
+    agreed: "list[dict[str, str]]" = []
+    for entry in rounds[0]:
+        quote = entry["quote"].casefold()
+        if all(
+            any(other["quote"].casefold() == quote for other in later)
+            for later in rounds[1:]
+        ):
+            agreed.append(entry)
+    dropped = len(rounds[0]) - len(agreed)
+    if dropped:
+        log.info(
+            "[ledger_clean] %d finding(s) were named by one read but not the "
+            "other, so they were not acted on",
+            dropped,
+        )
+    return agreed, reachable
+
+
 def _judge_prompt(
     *,
     speaker: str,
@@ -684,7 +772,11 @@ def _judge_prompt(
         "the whole line only when it is scene description from its first "
         "word to its last and talks to no one.",
         "",
-        "CALIBRATION -- three real lines, judged right:",
+        # CALIBRATION IS THE STRONGEST LEVER ON A SMALL MODEL -- it imitates
+        # a worked example far more reliably than it applies a rule. All four
+        # of these are lines this pass actually got wrong in the lab or on
+        # air, so each one buys a measured failure back.
+        "CALIBRATION -- four real lines, judged right:",
         '- "The air in the studio crackles as Dale Bernard stares at Stone '
         'Tanaka." -- NOT speech, the whole line. Third person, describes the '
         "room, talks to no one.",
@@ -693,6 +785,14 @@ def _judge_prompt(
         "- \"It's more than just a reel number, Tanaka. We have to see "
         "what's inside.\" -- talk. He argues and names the man he is "
         "arguing with. Empty list.",
+        # THE ONE THAT FAILS ON EVERY MODEL SIZE. Both the 2B and the 12B
+        # condemned "She said the ward was closed before midnight" in the
+        # lab -- a person REPORTING what someone else said reads as
+        # narration unless the prompt says otherwise. Model-agnostic
+        # failure, so it earns a calibration line rather than a tier tweak.
+        "- \"She said the ward was closed before midnight.\" -- talk. He is "
+        "telling someone what a third person told him. Reporting speech is "
+        "speech, even in the past tense about someone absent. Empty list.",
         "",
         "Answer JSON, exactly this shape. Quotes must come from THE LINE "
         "above, never from the calibration lines:",
@@ -789,8 +889,8 @@ def _judge_row(
             ),
             schema=_SpokenLineJudgement,
             slot_fn=slot_fn,
-            base_temperature=0.2,
-            structural_retry_temperature=0.1,
+            base_temperature=JUDGE_TEMPERATURE,
+            structural_retry_temperature=min(0.1, JUDGE_TEMPERATURE),
             post_validator=_validate,
             max_new_tokens=_JUDGE_MAX_NEW_TOKENS,
             max_attempts=2,
@@ -874,7 +974,23 @@ def _repair_prompt(
     ]
     if where:
         parts += [f"WHERE THE STORY IS: {where}", ""]
-    if lines_around:
+    if lines_around and REPAIR_READS_BRIEF_ONLY:
+        # LOAD SPLIT: the briefing pass has already read the act, so this
+        # call carries only the two lines the rewrite must sit between --
+        # which is the constraint it cannot get from a summary -- and its
+        # whole job becomes writing one sentence.
+        marked = next(
+            (i for i, s in enumerate(lines_around) if s.startswith(">>> ")), -1)
+        neighbours = [
+            s for s in lines_around[max(0, marked - 1):marked + 2] if s
+        ]
+        parts += [
+            "IT SITS BETWEEN THESE, and must still fit between them "
+            "(yours is marked >>>):",
+            "\n".join(neighbours),
+            "",
+        ]
+    elif lines_around:
         parts += [
             "THE LINES AROUND IT, in story order. The line you are "
             "rewriting is marked >>>. Your rewrite must sit in that slot:",
@@ -1035,7 +1151,11 @@ def run_ledger_clean(
     # pass writes its own brief to rewrite against -- and the brief doubles
     # as the proof it could see the act, which is stronger evidence than any
     # Python field count (operator, 2026-08-14).
-    act_briefs = summarize_acts(ledger_data, slot_fn=slot_fn) if slot_fn else {}
+    brief_cost: "dict[str, int]" = {}
+    act_briefs = (
+        summarize_acts(ledger_data, slot_fn=slot_fn, cost=brief_cost)
+        if slot_fn else {}
+    )
 
     receipt: "dict[str, Any]" = {
         "version": LEDGER_CLEAN_VERSION,
@@ -1075,7 +1195,10 @@ def run_ledger_clean(
         "repaired": 0,
         "improved": 0,
         "unclean": 0,
-        "model_calls": 0,
+        "no_model": 0,
+        "found_by_both": 0,
+        "model_calls": brief_cost.get("calls", 0),
+        "briefing_calls": brief_cost.get("calls", 0),
         "rows": [],
         "f2": [],
     }
@@ -1125,7 +1248,11 @@ def run_ledger_clean(
             if hints:
                 receipt["f1_rows"] += 1
                 receipt["pattern_only"] += 1
-                receipt["unclean"] += 1
+                # NOT "unclean": that number means "a model tried and could
+                # not fix it". No model ran here at all, and conflating the
+                # two made the receipt claim a failed repair that never
+                # happened.
+                receipt["no_model"] += 1
                 _flag_unclean(row)
                 receipt["rows"].append({
                     "line_id": line_id,
@@ -1134,8 +1261,8 @@ def run_ledger_clean(
                 })
             continue
 
-        receipt["model_calls"] += 1
-        judged, call_ok = _judge_row(
+        receipt["model_calls"] += JUDGE_VOTES
+        judged, call_ok = _judge_votes(
             slot_fn=slot_fn,
             speaker=speaker,
             text=_text_of(row),
@@ -1150,6 +1277,7 @@ def run_ledger_clean(
         # overrule the other.
         if judged and hints:
             source = "both"
+            receipt["found_by_both"] += 1
         elif judged:
             source = "judge"
             receipt["judge_only"] += 1
@@ -1359,13 +1487,16 @@ def _log_verdict(receipt: Mapping[str, Any]) -> None:
         return
     log.info(
         "[ledger_clean] %d voiced row(s): %d carried something that is not "
-        "speech (%d segment(s) named), F2 on %d. %d repaired, %d still "
-        "unclean, in %d model call(s). Found by: judge only %d, patterns "
-        "only %d.",
+        "speech (%d segment(s) named), F2 on %d. %d repaired, %d improved, "
+        "%d still unclean, %d with no model, in %d model call(s) (%d of them "
+        "briefing). Found by: judge only %d, patterns only %d, both %d.",
         receipt["voiced_rows"], receipt["f1_rows"],
         receipt["segments_named"], receipt["f2_rows"],
-        receipt["repaired"], receipt["unclean"], receipt["model_calls"],
+        receipt["repaired"], receipt["improved"], receipt["unclean"],
+        receipt["no_model"], receipt["model_calls"],
+        receipt["briefing_calls"],
         receipt["judge_only"], receipt["pattern_only"],
+        receipt["found_by_both"],
     )
     if receipt["judge_only"]:
         log.info(
