@@ -336,6 +336,62 @@ def _as_findings(findings: "Sequence[_POLICY.Finding]") -> "list[dict[str, str]]
     return [{"quote": f.detail, "why": f.kind} for f in findings]
 
 
+def context_digest(*parts: str) -> str:
+    """A short SHA-256 over the context we built, house style.
+
+    Same idea the ledger already uses on a spoken row's
+    ``text_for_tts_source_sha256``: a short digest is a cheap, exact name for
+    "the bytes we meant", and it makes two runs comparable at a glance.
+    """
+    import hashlib
+
+    joined = "\n".join(p for p in parts if p)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
+
+
+def verify_context_landed(
+    prompt: "Sequence[Mapping[str, str]]",
+    required: "Mapping[str, str]",
+) -> "dict[str, Any]":
+    """Did the context we BUILT actually reach the prompt we SENT?
+
+    THIS IS THE CHECK THAT WOULD HAVE CAUGHT TODAY'S TWO BUGS, and they were
+    different bugs with the same shape:
+
+      1. `arc_phase` / `beat_intent` were read off the wrong row, so the act
+         block was built EMPTY and every prompt shipped without it.
+      2. `where` was threaded into `_repair_prompt`'s signature and then
+         never rendered into the message body -- built, handed over, silently
+         dropped on the floor.
+
+    A field-count check catches the first and MISSES THE SECOND, because the
+    string existed; it just never made it into the bytes. Hashing what we
+    meant and then looking for it in what we sent catches both, costs no
+    model call, and cannot drift out of date the way a hand-written assertion
+    does.
+
+    Returns a receipt, never raises. A pass that is blind should say so in
+    the ledger and keep rendering -- discovering blindness is not a reason to
+    kill an episode.
+    """
+    sent = "\n".join(str(m.get("content") or "") for m in prompt)
+    missing = [
+        name for name, value in required.items()
+        if str(value or "").strip() and str(value).strip() not in sent
+    ]
+    supplied = {
+        name: value for name, value in required.items()
+        if str(value or "").strip()
+    }
+    return {
+        "sha": context_digest(*(supplied[k] for k in sorted(supplied))),
+        "supplied": sorted(supplied),
+        "empty": sorted(k for k in required if k not in supplied),
+        "did_not_land": missing,
+        "ok": not missing and bool(supplied),
+    }
+
+
 def _structured():
     """pydantic + the shared retry ladder, or None when unavailable."""
     try:
@@ -825,6 +881,7 @@ def _judge_row(
     hints: "Sequence[_POLICY.Finding]",
     lines_around: "Sequence[str]",
     where: str = "",
+    sightings: "list[dict[str, Any]] | None" = None,
 ) -> "tuple[list[dict[str, str]], bool]":
     """Ask a model to walk the line and name EVERY piece that is not speech.
 
@@ -876,17 +933,36 @@ def _judge_row(
         # whether an answer is about the line we asked about.
         return None
 
+    built = _judge_prompt(
+        speaker=speaker,
+        text=text,
+        hints=hints,
+        lines_around=lines_around,
+        where=where,
+    )
+    # SHA VERIFY: the context we meant to show, looked for in the bytes we
+    # are about to send. Cheap, exact, and it catches a field that was
+    # threaded through the call and then never rendered.
+    landed = verify_context_landed(built, {
+        "line": text,
+        "speaker": speaker,
+        "where": where,
+        "lines_around": "\n".join(lines_around),
+    })
+    if sightings is not None:
+        sightings.append(dict(landed, job="judge"))
+    if landed["did_not_land"]:
+        log.error(
+            "[ledger_clean] THE JUDGE IS PARTLY BLIND on this line: %s was "
+            "built but is not in the prompt that was sent (context sha %s). "
+            "That is a wiring fault in this pass, not a model problem.",
+            ", ".join(landed["did_not_land"]), landed["sha"],
+        )
     try:
         # LLM slot: creative -- it is reading DIALOGUE for what a listener
         # would hear performed, which is a reader's judgement about prose.
         result = structured_call(
-            prompt=_judge_prompt(
-                speaker=speaker,
-                text=text,
-                hints=hints,
-                lines_around=lines_around,
-                where=where,
-            ),
+            prompt=built,
             schema=_SpokenLineJudgement,
             slot_fn=slot_fn,
             base_temperature=JUDGE_TEMPERATURE,
@@ -1068,6 +1144,7 @@ def _call_repair(
     lines_around: "Sequence[str]",
     previous_attempt: str,
     where: str = "",
+    sightings: "list[dict[str, Any]] | None" = None,
 ) -> str:
     """One bounded model call. Returns the rewritten line, or "" on failure --
     a repair that cannot run is never fatal to the render."""
@@ -1084,19 +1161,39 @@ def _call_repair(
             return "text is empty after whitespace normalization"
         return None
 
+    built = _repair_prompt(
+        speaker=speaker,
+        text=text,
+        complaint=complaint,
+        lines_around=lines_around,
+        previous_attempt=previous_attempt,
+        where=where,
+    )
+    # SHA VERIFY, and this is the exact path where it earned itself: `where`
+    # was threaded into this builder's signature and never rendered into the
+    # body, so the act was carried all the way here and dropped.
+    landed = verify_context_landed(built, {
+        "line": text,
+        "speaker": speaker,
+        "where": where,
+        "complaint": complaint,
+        "lines_around": "\n".join(lines_around),
+    })
+    if sightings is not None:
+        sightings.append(dict(landed, job="repair"))
+    if landed["did_not_land"]:
+        log.error(
+            "[ledger_clean] THE REPAIR IS PARTLY BLIND: %s was built but is "
+            "not in the prompt that was sent (context sha %s). Wiring fault "
+            "in this pass, not the model.",
+            ", ".join(landed["did_not_land"]), landed["sha"],
+        )
     try:
         # LLM slot: creative -- it is rewriting DIALOGUE, so the tier that
         # wrote the line rewrites it and the repaired line still sounds like
         # its neighbours (operator ruling 2026-08-14).
         result = structured_call(
-            prompt=_repair_prompt(
-                speaker=speaker,
-                text=text,
-                complaint=complaint,
-                lines_around=lines_around,
-                previous_attempt=previous_attempt,
-                where=where,
-            ),
+            prompt=built,
             schema=_RepairedLine,
             slot_fn=slot_fn,
             base_temperature=0.55,
@@ -1146,6 +1243,10 @@ def run_ledger_clean(
     beats = _beats_by_id(ledger_data)
     cast = _cast_names(ledger_data)
     admissible = _POLICY.repairable_kinds(bank_id)
+    # Every prompt this run sends reports whether the context it was built
+    # with actually landed in its bytes. Collected here so the ledger carries
+    # one verdict for the episode instead of a log line nobody reads.
+    sightings: "list[dict[str, Any]]" = []
     episode = _episode_context(ledger_data)
     # ONE read of the finished episode, act by act, BEFORE any judging. The
     # pass writes its own brief to rewrite against -- and the brief doubles
@@ -1269,6 +1370,7 @@ def run_ledger_clean(
             hints=hints,
             lines_around=_lines_around(rows, index, beats),
             where=_where_the_story_is(row, beats, episode, act_briefs),
+            sightings=sightings,
         )
 
         # A UNION, NOT A VETO. Whichever reader saw something, we act on it:
@@ -1306,9 +1408,34 @@ def run_ledger_clean(
             admissible=admissible,
             slot_fn=slot_fn,
             receipt=receipt,
+            sightings=sightings,
         ))
 
     receipt["context_seen"]["acts_summarized"] = len(act_briefs)
+    # THE SHA VERDICT for the episode: did what we built reach what we sent?
+    blind = [s for s in sightings if s["did_not_land"]]
+    receipt["context_verified"] = {
+        "prompts_checked": len(sightings),
+        "prompts_complete": sum(1 for s in sightings if s["ok"]),
+        "prompts_missing_context": len(blind),
+        "fields_that_did_not_land": sorted({
+            name for s in blind for name in s["did_not_land"]
+        }),
+        "context_shas": sorted({s["sha"] for s in sightings})[:12],
+    }
+    if blind:
+        log.error(
+            "[ledger_clean] %d of %d prompt(s) went out MISSING context that "
+            "was built for them (%s). That is a wiring fault in this pass.",
+            len(blind), len(sightings),
+            ", ".join(receipt["context_verified"]["fields_that_did_not_land"]),
+        )
+    elif sightings:
+        log.info(
+            "[ledger_clean] context verified: %d/%d prompt(s) carried every "
+            "field they were built with.",
+            receipt["context_verified"]["prompts_complete"], len(sightings),
+        )
     _log_verdict(receipt)
     meta = ledger_data.setdefault("meta", {})
     if isinstance(meta, MutableMapping):
@@ -1330,6 +1457,7 @@ def _repair_row(
     admissible: "frozenset[str]",
     slot_fn: "Callable[..., str]",
     receipt: MutableMapping[str, Any],
+    sightings: "list[dict[str, Any]] | None" = None,
 ) -> "dict[str, Any]":
     """Repair ONE row, bounded, the judge re-reading each attempt.
 
@@ -1369,6 +1497,7 @@ def _repair_row(
             lines_around=lines_around,
             previous_attempt=previous,
             where=where,
+            sightings=sightings,
         )
         if not candidate:
             attempts.append({"attempt": attempt, "outcome": "call_failed"})
@@ -1390,6 +1519,7 @@ def _repair_row(
                 hints=still_patterns,
                 lines_around=lines_around,
                 where=where,
+                sightings=sightings,
             )
         remaining = still_judged or _as_findings(still_patterns)
         attempts.append({

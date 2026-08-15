@@ -751,6 +751,56 @@ def test_a_row_no_model_ever_saw_is_not_counted_as_a_failed_repair():
         "'unclean' means a model tried and could not fix it")
 
 
+def test_the_sha_check_proves_the_context_reached_the_prompt():
+    """The check that catches "built it, then dropped it on the floor".
+
+    A field COUNT cannot see this class: the string existed, it was passed
+    into the builder, and the builder never rendered it. Hashing what we
+    meant and looking for it in what we sent does see it.
+    """
+    ledger = _production_shaped_ledger()
+    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    receipt = lcl.run_ledger_clean(
+        ledger, slot_fn=slot, bank_id="media_archive")
+
+    verified = receipt["context_verified"]
+    assert verified["prompts_checked"] > 0
+    assert verified["prompts_missing_context"] == 0
+    assert verified["fields_that_did_not_land"] == []
+    assert verified["prompts_complete"] == verified["prompts_checked"]
+    assert verified["context_shas"], "every prompt gets a context digest"
+
+
+def test_a_field_built_but_never_rendered_is_caught_and_named():
+    """The literal bug this exists for, reproduced against the real checker."""
+    built = [
+        {"role": "system", "content": "you judge a line"},
+        {"role": "user", "content": "THE LINE: I told you he would not stay."},
+    ]
+    landed = lcl.verify_context_landed(built, {
+        "line": "I told you he would not stay.",
+        # threaded into the builder, never rendered into the body
+        "where": "this is the rising of the story",
+    })
+    assert landed["ok"] is False
+    assert landed["did_not_land"] == ["where"]
+    assert "line" in landed["supplied"]
+
+
+def test_the_digest_is_stable_and_ignores_empty_fields():
+    a = lcl.verify_context_landed(
+        [{"role": "user", "content": "alpha beta"}],
+        {"one": "alpha", "two": "beta", "three": ""},
+    )
+    b = lcl.verify_context_landed(
+        [{"role": "user", "content": "alpha beta"}],
+        {"one": "alpha", "two": "beta"},
+    )
+    assert a["sha"] == b["sha"], "an empty field must not change the digest"
+    assert a["empty"] == ["three"]
+    assert a["ok"] and b["ok"]
+
+
 def test_the_prompt_markers_the_test_double_routes_on_are_pinned():
     """A canary for the fixture itself.
 
