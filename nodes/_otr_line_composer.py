@@ -60,6 +60,20 @@ _BASE_TEMPERATURE = 0.8
 _STRUCTURAL_RETRY_TEMPERATURE = 0.35
 _MAX_NEW_TOKENS_PER_LINE = 200
 
+#: What to tell the dialogue composer when its reply cleaned away to nothing.
+#: It states only what `strip_line_formatting` actually removes -- a wrapping
+#: quote, a `[VOICE: ...]` tag, a locked speaker-name prefix, markdown emphasis
+#: -- so the complaint is TRUE about the reply that was rejected. Naming a
+#: feared failure invents it, so this names the CATEGORY (transport) and asks
+#: for the category we want (spoken words), never an example of either.
+_EMPTY_LINE_COMPLAINT = (
+    "Your last reply left no spoken line: after the label and markup were "
+    "removed there were no words remaining. The row already records who is "
+    "speaking, so a speaker name, a voice tag, emphasis marks or quotation "
+    "marks on their own carry nothing an actor can say. Write the line again "
+    "as the plain words this character speaks aloud."
+)
+
 # Exact response-transport marker; this is syntax, not prose classification.
 _ACTION_MARKER_RE = re.compile(
     r"(?im)(?:^|(?<=[.!?\"'\)\]\s]))ACTION:\s*[^\n]*"
@@ -1016,13 +1030,22 @@ def compose_line_draft(
         {"role": "user", "content": _build_user_prompt(req)},
     ]
     attempts: list[tuple[str, str]] = []
+    # The ask starts as the plain request and becomes a CORRECTION the moment
+    # the model returns something that cleans away to nothing -- see
+    # _EMPTY_LINE_COMPLAINT. A transport failure leaves it alone: there is no
+    # model turn to correct and nothing true to say about it.
+    ask = messages
+    cooled = False
     for attempt_idx in range(max_attempts):
-        temperature = base_temperature + (0.1 * attempt_idx)
+        temperature = (
+            _STRUCTURAL_RETRY_TEMPERATURE if cooled
+            else base_temperature + (0.1 * attempt_idx)
+        )
         try:
             try:
                 # LLM slot: creative -- one authored character line.
                 raw = creative_fn(
-                    messages,
+                    ask,
                     temperature=temperature,
                     max_new_tokens=int(max_new_tokens_cap),
                     stop=list(stop_strings) if stop_strings else None,
@@ -1030,7 +1053,7 @@ def compose_line_draft(
             except TypeError:
                 # LLM slot: creative -- compatibility retry for the same line.
                 raw = creative_fn(
-                    messages,
+                    ask,
                     temperature=temperature,
                     max_new_tokens=int(max_new_tokens_cap),
                 )
@@ -1046,6 +1069,16 @@ def compose_line_draft(
         if cleaned:
             return cleaned
         attempts.append((raw or "", "empty after transport cleanup"))
+        # TELL THE MODEL. Every later attempt carries its own rejected reply
+        # and the complaint, so it is correcting a known mistake instead of
+        # rolling the same dice warmer. Built from `messages`, never appended
+        # to `ask`, so a third attempt shows ONE rejected reply rather than a
+        # growing pile the model has to sort through.
+        ask = list(messages) + [
+            {"role": "assistant", "content": str(raw or "")},
+            {"role": "user", "content": _EMPTY_LINE_COMPLAINT},
+        ]
+        cooled = True
     raise LineCompositionFailedError(attempts=attempts, request=req)
 
 

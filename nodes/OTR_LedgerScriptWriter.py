@@ -3175,35 +3175,40 @@ class OTR_LedgerScriptWriter:
                 }),
                 # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
                 # Stage 3 validators on the legacy dialogue composer.
-                # Catches speaker leaks, banned phrases, length drift,
-                # pronoun mismatches, on-beat misses on the rendered
-                # text BEFORE the ledger is frozen. Lines with error-
-                # severity findings get ONE repair regenerate attempt
-                # with the finding messages threaded in as the reroll
-                # hint. Warn-severity findings are stamped without
-                # regenerating. The final findings (post-repair if it
-                # ran) land on meta.lines[].validation_findings for
-                # soak audit. Default OFF so the legacy PD1 byte-
-                # identity contract holds out-of-the-box; flip ON for
-                # production smokes + the Section 6.2 A/B.
+                # Observes speaker leaks, banned phrases, length drift,
+                # pronoun mismatches and on-beat misses on the rendered
+                # text BEFORE the ledger is frozen, and stamps what it
+                # finds on meta.lines[].validation_findings for audit.
+                #
+                # IT NEVER REGENERATES A LINE, and the widget said it did
+                # until 2026-08-15. The promise was written in an era that
+                # ended twice over: THE LAW (2026-07-22) forbids failing or
+                # rerolling a story for length, language or style, which is
+                # most of what these validators report; and the one finding
+                # class that IS a real defect -- a character speaking
+                # another's lines -- was built as an attribution repair,
+                # lab-measured on 2026-08-14 at 3/6 then 1/6 recall on
+                # identical fixtures, and shipped disabled for being too
+                # unstable to hand a rewrite. Telemetry is the correct
+                # behaviour here; the tooltip was the defect.
+                #
+                # Default OFF so the legacy PD1 byte-identity contract holds
+                # out-of-the-box; flip ON for production smokes.
                 "enable_production_stage3_validators": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "Sprint 10B Wave 1 Agent B. OFF (default) "
-                        "preserves PD1 byte-identity on the legacy "
-                        "path -- no validators run. ON wires Stage 3 "
-                        "validators (speaker-leak, banned-phrase, "
-                        "length, pronoun, on-beat) into the production "
-                        "compose_line for every character dialogue "
-                        "beat. Errors trigger ONE repair regenerate "
-                        "(hint = the validator findings); warns stamp "
-                        "without regenerating. Findings stamped on "
-                        "meta.lines[].validation_findings. Adds at "
-                        "most one extra creative-slot LLM call per "
-                        "flagged beat (~1-3s on Mistral-Nemo); a "
-                        "clean line costs zero extra. Flip ON for "
-                        "production smokes; OFF for the byte-identity "
-                        "regression run."
+                        "OFF (default) preserves PD1 byte-identity on the "
+                        "legacy path -- no validators run. ON wires Stage 3 "
+                        "validators (speaker-leak, banned-phrase, length, "
+                        "pronoun, on-beat) into the production compose_line "
+                        "for every character dialogue beat. TELEMETRY ONLY: "
+                        "findings are stamped on "
+                        "meta.lines[].validation_findings and NOTHING is "
+                        "regenerated, rerolled or rejected -- an audit may "
+                        "never fail a story for length, language, style or "
+                        "quality. Costs no extra LLM call at any severity. "
+                        "Flip ON for production smokes; OFF for the "
+                        "byte-identity regression run."
                     ),
                 }),
                 # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27
@@ -5675,15 +5680,43 @@ class OTR_LedgerScriptWriter:
                         }
                         if _w1b_stage3_enabled else {}
                     )
-                    with slot_scheduler.helper_context("compose_line"):
-                        line_res = _OTRLC.compose_line(
-                            creative_fn=creative_generate_fn,
-                            req=line_req,
-                            base_temperature=base_temp,
-                            max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                            creative_repo_id=resolved["creative_writing_model"],
-                            source_bank_id=resolved["source_bank"],  # 2C
-                            **_w1b_s3_kwargs,
+                    # LineCompositionFailedError had NO handler anywhere in
+                    # nodes/, so a beat the composer could not fill read as a
+                    # dead render with a bare traceback. It is not: the ledger
+                    # already owns this exact case. A voiced row with nothing
+                    # sayable is marked an EXPLICIT skip, with its reason, by
+                    # `_otr_ledger_cleanup` at the writer tail -- which is why
+                    # this leaves the row EMPTY rather than writing a line.
+                    # Python authors no prose here and the freeze contract
+                    # ("text non-empty OR skip=True with a reason") is met by
+                    # its existing owner, not by a second one invented here.
+                    try:
+                        with slot_scheduler.helper_context("compose_line"):
+                            line_res = _OTRLC.compose_line(
+                                creative_fn=creative_generate_fn,
+                                req=line_req,
+                                base_temperature=base_temp,
+                                max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                                creative_repo_id=resolved["creative_writing_model"],
+                                source_bank_id=resolved["source_bank"],  # 2C
+                                **_w1b_s3_kwargs,
+                            )
+                    except _OTRLC.LineCompositionFailedError as _line_exc:
+                        log.error(
+                            "[OTR_LedgerScriptWriter] beat %s (%s) produced no "
+                            "spoken line after every attempt; the row stays "
+                            "empty and the ledger cleanup marks it an explicit "
+                            "skip. The episode continues one beat shorter "
+                            "(LOUD). Attempts: %s",
+                            beat.beat_id, beat.speaker,
+                            "; ".join(
+                                f"{reason}" for _raw, reason
+                                in getattr(_line_exc, "attempts", ()) or ()
+                            ) or "(none recorded)",
+                        )
+                        line_res = _OTRLC.LineResult(
+                            text="",
+                            compose_flags=("line_composition_failed",),
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
@@ -5700,11 +5733,20 @@ class OTR_LedgerScriptWriter:
                         )
 
                 cid = char_id_by_name[beat.speaker]
-                token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
+                # An unfillable beat emits NO transcript token and enters NO
+                # context window: `[VOICE: MARA, wry] ` is a nonempty string
+                # that would reach the transcript carrying no speech, and an
+                # empty "previous line" is worse than no previous line for
+                # every beat composed after it.
+                token = (
+                    f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
+                    if cleaned else ""
+                )
 
-                last_lines.append((beat.speaker, cleaned))
-                if len(last_lines) > LAST_LINES_WINDOW:
-                    last_lines.pop(0)
+                if cleaned:
+                    last_lines.append((beat.speaker, cleaned))
+                    if len(last_lines) > LAST_LINES_WINDOW:
+                        last_lines.pop(0)
 
             elif beat.speaker_role == "announcer":
                 # Announcer dedicated passes (2026-05-22, BUG-LOCAL-255).
@@ -5799,26 +5841,54 @@ class OTR_LedgerScriptWriter:
                     # beat is a narrative write; keep the shared
                     # composer path. S32 B6: helper_context
                     # attribution; constant-time overhead.
-                    with slot_scheduler.helper_context("compose_line"):
-                        line_res = _OTRLC.compose_line(
-                            creative_fn=creative_generate_fn,
-                            req=line_req,
-                            base_temperature=base_temp,
-                            max_new_tokens_cap=resolved[
-                                "max_new_tokens_cap"
-                            ],
-                            creative_repo_id=resolved[
-                                "creative_writing_model"
-                            ],
-                            source_bank_id=resolved["source_bank"],  # 2C
+                    # Same disposition as the character branch above: the row
+                    # stays empty, the ledger cleanup marks the explicit skip
+                    # with its reason, and no Python sentence goes on air.
+                    # This is a MID-EPISODE announcer beat -- the opening and
+                    # closing bookends are authored by their own passes and
+                    # keep their own structural floors.
+                    try:
+                        with slot_scheduler.helper_context("compose_line"):
+                            line_res = _OTRLC.compose_line(
+                                creative_fn=creative_generate_fn,
+                                req=line_req,
+                                base_temperature=base_temp,
+                                max_new_tokens_cap=resolved[
+                                    "max_new_tokens_cap"
+                                ],
+                                creative_repo_id=resolved[
+                                    "creative_writing_model"
+                                ],
+                                source_bank_id=resolved["source_bank"],  # 2C
+                            )
+                    except _OTRLC.LineCompositionFailedError as _line_exc:
+                        log.error(
+                            "[OTR_LedgerScriptWriter] mid-episode announcer "
+                            "beat %s produced no spoken line after every "
+                            "attempt; the row stays empty and the ledger "
+                            "cleanup marks it an explicit skip. The episode "
+                            "continues one beat shorter (LOUD). Attempts: %s",
+                            beat.beat_id,
+                            "; ".join(
+                                f"{reason}" for _raw, reason
+                                in getattr(_line_exc, "attempts", ()) or ()
+                            ) or "(none recorded)",
+                        )
+                        line_res = _OTRLC.LineResult(
+                            text="",
+                            compose_flags=("line_composition_failed",),
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
-                token = f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
+                token = (
+                    f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
+                    if cleaned else ""
+                )
 
-                last_lines.append(("ANNOUNCER", cleaned))
-                if len(last_lines) > LAST_LINES_WINDOW:
-                    last_lines.pop(0)
+                if cleaned:
+                    last_lines.append(("ANNOUNCER", cleaned))
+                    if len(last_lines) > LAST_LINES_WINDOW:
+                        last_lines.pop(0)
 
             elif beat.speaker_role in NON_VOICED_ROLES:
                 # Phase 4 v4 (2026-05-11): scene-local LAST SPOKEN

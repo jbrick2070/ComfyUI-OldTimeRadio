@@ -1544,6 +1544,79 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
             "treatment", str(exc.last_error), exc.attempts) from exc
 
 
+def _news_read_source_anchors(dossier: DossierLLM) -> "tuple[str, ...]":
+    """Verbatim strings that would PROVE the factual close named its source.
+
+    The twin of `_otr_scifi_codex._news_coda_source_anchors`, reading this
+    lane's dossier instead of that lane's fact index. Names shorter than three
+    characters are dropped for the same reason: a one- or two-letter "entity"
+    matches inside ordinary words and would let a close that names nothing
+    pass by accident.
+    """
+    anchors: "list[str]" = []
+    entities = dossier.named_entities
+    for bucket in (entities.people, entities.places, entities.things):
+        for raw in bucket:
+            name = str(raw or "").strip()
+            if len(name) >= 3:
+                anchors.append(name)
+    for raw in dossier.allowed_numbers:
+        token = str(raw or "").strip()
+        if token:
+            anchors.append(token)
+    seen: "set[str]" = set()
+    ordered: "list[str]" = []
+    for anchor in anchors:
+        key = anchor.casefold()
+        if key not in seen:
+            seen.add(key)
+            ordered.append(anchor)
+    return tuple(ordered)
+
+
+def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
+    """The source-attribution gate this pass shipped without.
+
+    P6's codex twin has verified and cleaned its coda since it was built;
+    this lane passed NO post_validator at all, so the pro lane's closing read
+    -- the one that tells a listener where the fact stopped and the fiction
+    started -- was never checked for naming its source or for leaking a
+    fictional character into a factual report.
+
+    Both findings are PROVENANCE, not prose: whether a real source is named,
+    and whether the fact/fiction boundary held. Length, register, sentence
+    count and craft are not inspected and never will be here -- THE LAW.
+    """
+    anchors = _news_read_source_anchors(dossier)
+    fiction = tuple(
+        name for name in (str(n or "").strip() for n in cast_names)
+        if len(name) >= 3
+    )
+
+    def _check(read: NewsCloseRead) -> "str | None":
+        text = _norm_ws(read.news_close_read)
+        findings: "list[str]" = []
+        # An empty dossier cannot prove anything, so it does not accuse:
+        # a close is only asked to name a source when a source was indexed.
+        if anchors and not any(_word_re(a).search(text) for a in anchors):
+            findings.append(
+                "the closing read never names the real source -- none of the "
+                "dossier's entities or numbers appears in it, so the listener "
+                "is never told where the fact stopped and the fiction "
+                "started. Name at least one of them verbatim"
+            )
+        spoken_fiction = [n for n in fiction if _word_re(n).search(text)]
+        if spoken_fiction:
+            findings.append(
+                "the closing read is a FACTUAL report and it names invented "
+                f"characters ({', '.join(sorted(spoken_fiction))}). Report "
+                "only what the source says, using the source's own names"
+            )
+        return "; ".join(findings) if findings else None
+
+    return _check
+
+
 def _pass_news_read(
     technical_fn,
     pack,
@@ -1580,6 +1653,7 @@ def _pass_news_read(
             base_temperature=0.20,
             structural_retry_temperature=0.10,
             repair_prompt_factory=make_dispatching_repair_factory(),
+            post_validator=_make_news_read_validator(dossier, cast_names),
             max_new_tokens=None,
             helper_name="fable2_news_read",
         )

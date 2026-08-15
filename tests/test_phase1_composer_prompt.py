@@ -131,3 +131,73 @@ def test_outline_helpers_preserve_authored_beat_text():
 
     assert "Begin." in spine and "Answer." in spine
     assert "b002" in current and "Answer." in current
+
+
+def _recording_creative(*texts):
+    """A creative_fn that records the exact messages of every call."""
+    state = {"index": 0, "calls": [], "temperatures": []}
+
+    def generate(messages, *, temperature, max_new_tokens, stop=None):
+        state["calls"].append([dict(m) for m in messages])
+        state["temperatures"].append(temperature)
+        index = min(state["index"], len(texts) - 1)
+        state["index"] += 1
+        return texts[index]
+
+    generate.state = state
+    return generate
+
+
+def test_the_retry_after_an_empty_line_is_told_what_was_wrong():
+    """The second ask is a CORRECTION, not the same dice thrown warmer.
+
+    This call site used to re-send the byte-identical `messages` with the
+    temperature raised 0.1, and the model was never told that its reply had
+    cleaned away to nothing. A model that is not told cannot correct.
+    """
+    creative = _recording_creative("ALICE VALE:", "The signal is steady.")
+    result = compose_line(creative_fn=creative, req=_req(), max_attempts=2)
+
+    assert result.text == "The signal is steady."
+    first, second = creative.state["calls"]
+
+    # The first ask is the plain request; the second carries the model's own
+    # rejected reply plus the complaint.
+    assert len(second) == len(first) + 2
+    assert second[:len(first)] == first
+    assert second[-2]["role"] == "assistant"
+    assert second[-2]["content"] == "ALICE VALE:"
+    assert second[-1]["role"] == "user"
+    assert "no words remaining" in second[-1]["content"]
+
+    # Cooler on the correction, not hotter. Raising the temperature on a
+    # reply that produced no words is asking the same question louder.
+    assert creative.state["temperatures"][1] < creative.state["temperatures"][0]
+
+
+def test_a_third_ask_shows_one_rejected_reply_not_a_growing_pile():
+    creative = _recording_creative("", "  ", "The signal is steady.")
+    result = compose_line(creative_fn=creative, req=_req(), max_attempts=3)
+
+    assert result.text == "The signal is steady."
+    first, _second, third = creative.state["calls"]
+    assert len(third) == len(first) + 2
+    assert third[-2]["content"] == "  "
+
+
+def test_a_transport_failure_gets_a_reroll_and_no_invented_complaint():
+    """There is no model turn to correct when the call itself raised."""
+    state = {"calls": [], "raised": False}
+
+    def generate(messages, *, temperature, max_new_tokens, stop=None):
+        state["calls"].append([dict(m) for m in messages])
+        if not state["raised"]:
+            state["raised"] = True
+            raise RuntimeError("provider exploded")
+        return "The signal is steady."
+
+    result = compose_line(creative_fn=generate, req=_req(), max_attempts=2)
+
+    assert result.text == "The signal is steady."
+    first, second = state["calls"]
+    assert second == first, "a transport failure must not fabricate a complaint"
