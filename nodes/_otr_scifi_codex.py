@@ -919,6 +919,19 @@ _SCENE_REVIEW_MAX_OUTPUT_TOKENS = (
     + _ROW_DRAFT_ENVELOPE_TOKENS
 )
 
+#: THE BEAT WINDOW IS CAPPED, AND IT KEEPS THE END.
+#: `rows_so_far` exists so a beat can answer the line before it, and recency is
+#: what serves that -- the opening line matters far less to beat twelve than
+#: beat eleven does. Uncapped it is also a cliff: 12 beats x 2 lines, each
+#: legally up to `_AUTHORED_TEXT_REJECT_AT` (11,872) chars, is a ~285,000-char
+#: window. Real episodes are nowhere near that (the corpus p95 for one line is
+#: 281 chars, so a full 24-row window is ~7 KB) and `prompt_must_fit` would
+#: refuse deterministically rather than truncate -- but the refusal would land
+#: on the LAST beat of the LONGEST episode, which is the worst place to find a
+#: limit. Capping makes it impossible instead of unlikely.
+_BEAT_WINDOW_MAX_ROWS = 12
+_BEAT_WINDOW_MAX_CHARS = 6000
+
 _BEAT_TEXT_DRAFT_ROOT_INSTRUCTION = (
     "\nBEAT DIALOGUE CONTRACT: You are writing ONE BEAT, not the play. Return "
     "one JSON object with exactly one root key, lines. Each lines item has "
@@ -2948,8 +2961,29 @@ def _beat_dialogue_inputs(
             "fact_ids": list(beat.fact_ids),
             "line_ids": list(beat.line_ids),
         },
-        "rows_so_far": [dict(row) for row in rows_so_far],
+        "rows_so_far": _recent_window(rows_so_far),
     }
+
+
+def _recent_window(
+    rows: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """The tail of what the listener has heard, bounded on BOTH axes.
+
+    Row count and characters, because either alone leaves the cliff open: a
+    dozen ordinary lines are small, one runaway-length line is not. Kept in
+    story order; only the oldest rows are dropped.
+    """
+    kept: list[dict[str, str]] = []
+    budget = _BEAT_WINDOW_MAX_CHARS
+    for row in reversed(list(rows)[-_BEAT_WINDOW_MAX_ROWS:]):
+        text = str(row.get("text") or "")
+        if kept and len(text) > budget:
+            break
+        budget -= len(text)
+        kept.append(dict(row))
+    kept.reverse()
+    return kept
 
 
 def _call_beat_dialogue(

@@ -86,17 +86,39 @@ def _write(tmp_path: Path, data: dict, episode="probe_ep") -> Path:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("text,kind", [
-    ("Ada turns to Leo. 'We have to try.'", "third-person action"),
-    ("'We have to try,' Ada murmured.", "attribution verb"),
+    ("Ada turns to Leo. We have to try.", "third-person action"),
+    ("She stared at the console. We have to try.", "third-person action"),
+    ("“We have to try,” Ada murmured.", "attribution verb"),
     ("(softly) We have to try.", "stage direction in brackets"),
     ("Her voice trembles. We have to try.", "delivery note"),
     ("ADA: We have to try.", "speaker label"),
+    ("He said “we have to try” and the room went cold.",
+     "quoted speech inside prose"),
 ])
 def test_narration_inside_a_spoken_row_is_found(tmp_path, text, kind):
     path = _write(tmp_path, _ledger([_row("l001", text)]))
     report = view.grade(path)
     assert {f.kind for f in report.f1} >= {kind}
     assert report.clean is False
+
+
+@pytest.mark.parametrize("text", [
+    # Every one of these is real dialogue from the first episode the per-beat
+    # schedule produced, and the first cut of the detector flagged all of
+    # them. Six false alarms out of six findings is not a noisy detector, it
+    # is a broken one: an operator who has to overrule it every time stops
+    # reading it.
+    "We stand at the precipice of the red frontier.",
+    "If my cells pay the price for humanity to finally stand on red soil.",
+    "Then step back, Kaelen. Let the fear stay in the airlock with you.",
+    "The vest stands as our greatest shield against the sun's fury.",
+    "It’s designed to block the solar storms we can predict.",
+    "It’s not just a number on a readout, Commander.",
+])
+def test_ordinary_dialogue_is_not_mistaken_for_stage_business(tmp_path, text):
+    path = _write(tmp_path, _ledger([_row("l001", text)]))
+    report = view.grade(path)
+    assert report.f1 == [], f"false positive on: {text}"
 
 
 def test_a_finding_names_the_phrase_it_tripped_on(tmp_path):
@@ -106,7 +128,7 @@ def test_a_finding_names_the_phrase_it_tripped_on(tmp_path):
     ]))
     report = view.grade(path)
     action = next(f for f in report.f1 if f.kind == "third-person action")
-    assert action.detail == "turns"
+    assert action.detail == "Ada turns"
     assert action.line_id == "l001"
 
 
@@ -345,7 +367,7 @@ def test_html_shows_the_text_and_highlights_the_defect(tmp_path):
     page = view.render_html([report])
     assert "<title>" in page
     assert "We have to try." in page
-    assert "<mark>turns</mark>" in page
+    assert "<mark>Ada turns</mark>" in page
     assert "dirty" in page
 
 
@@ -367,6 +389,37 @@ def test_exit_code_is_the_verdict(tmp_path, capsys):
     dirty = tmp_path / "dirty"
     _write(dirty, _ledger([_row("l001", "Ada turns away. Fine.")]))
     assert view.main(["--episodes-root", str(dirty), "--json"]) == 1
+
+
+@pytest.mark.parametrize("meta", [
+    [],                                   # a list where an object belongs
+    {"scifi_codex": []},                  # lane block is a list
+    {"scifi_codex": {"call_journal": []}},
+    {"scifi_codex": {"fact_index": "nope"}},
+    {"scifi_codex": {"news_coda": 7}},
+    "a string",
+])
+def test_a_malformed_meta_block_does_not_take_the_viewer_down(tmp_path, meta):
+    """`--watch` reads a ledger a run is actively rewriting, and `--ladder`
+    sweeps hundreds of files written by older code. A `.get()` on a value that
+    turned out to be a list would kill the window on the very artifact it
+    exists to watch."""
+    data = _ledger([_row("l001", "We have to try.")])
+    data["meta"] = meta
+    path = _write(tmp_path, data)
+    report = view.grade(path)
+    assert len(report.voiced) == 1
+    assert view.render_text(report)
+    assert view.ladder_rows(path) == []
+
+
+def test_a_ledger_whose_root_is_not_an_object_is_refused_clearly(tmp_path):
+    path = tmp_path / "ep" / "audio" / "ep_ledger.json"
+    path.parent.mkdir(parents=True)
+    path.write_text("[1, 2, 3]", encoding="utf-8")
+    with pytest.raises(ValueError, match="root is not an object"):
+        view.grade(path)
+    assert view.ladder_rows(path) == []
 
 
 def test_the_viewer_never_writes_to_the_ledger(tmp_path):

@@ -27,6 +27,47 @@ down to the two defects below.
 
 ### The two big misses -- production still has both
 
+### F1 IS ON EVERY BANK, AND PER-BEAT IS NOT THE FIX FOR FIVE OF THEM
+
+**Measured 2026-08-14 with `scripts/otr_ledger_view.py` over 250 episodes on
+disk, grouped by bank.** Operator: *"we need to fix these similar [problems] on
+all source banks if they are present."* They are present.
+
+| bank | ends on announcer | spoken rows carrying action |
+|---|---|---|
+| `media_archive` | 100% | **40%** |
+| `scifi_news_pro` | 100% | **32%** |
+| `original` | 100% | **30%** |
+| `scifi_news` | 43% -> fixed | 18% -> **0%** on the 2026-08-14 leg |
+| `public_domain` | 100% | 13% |
+| `shakespeare` | 100% | 11% |
+
+**Two things this settles.**
+
+1. **The CODA defect was `scifi_news`-only.** Every other bank already ends on
+   an announcer row. (An earlier cut of this audit reported "no coda anywhere"
+   -- it was counting the `news_coda` compose flag, which only the codex lane
+   sets. Measurement error, corrected here.) What is NOT yet measured on the
+   other banks is whether that closing announcer NAMES its source; only the
+   codex lane stores a fact index to check against.
+2. **PER-BEAT DIALOGUE IS NOT THE FIX FOR THE WRITER-LANE BANKS.** `original`,
+   `shakespeare`, `public_domain` and `media_archive` ALREADY compose one
+   model call per beat (`_otr_outline` stage 3) and are still dirtier than
+   `scifi_news` was. Their job size was never the problem, so shrinking it
+   cannot be the answer. What they need is the CLEAN STAGE this file already
+   specifies -- code detects, a model repairs -- which is **built as a
+   detector and NOT yet wired as a repair pass.**
+
+**The detector now exists and is shared.** `otr_ledger_view.grade()` is the
+same F1/F2 grader for every bank; the repair pass can reuse it rather than
+growing a second opinion about what "action" means.
+
+**Grade the fidelity lanes with care.** On `shakespeare` and `public_domain`
+the author's own language is carried as written, so a third-person construction
+that came from the source is not a defect. The detector cannot tell those apart
+and will over-report there; its findings on those two banks are a reading list,
+not a verdict.
+
 **MISS 1's ROOT CAUSE IS FIXED ON `scifi_news` -- 2026-08-14,
 `PBUG-20260814-03` closed in code.** The dialogue job is ONE BEAT now, and each
 scene is read back by a review pass before anything downstream. Per scene: one

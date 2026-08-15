@@ -91,28 +91,48 @@ _F1_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        # A BARE VERB IS NOT EVIDENCE. The first cut matched the verb alone
+        # and fired six times out of six on a ledger that was clean: "We
+        # stand at the precipice" (first person), "humanity to finally stand"
+        # (an infinitive), "Then step back, Kaelen" (an imperative spoken to
+        # another character), "it stands as our shield" (a metaphor). None of
+        # those is stage business. What makes an action a STAGE DIRECTION is
+        # a third-person subject DOING it, so the subject is now part of the
+        # pattern -- and `to` in front rules out the infinitive.
         "third-person action",
         re.compile(
-            r"\b(?:turns?|turned|leans?|leaned|reaches?|reached|walks?|walked"
+            r"(?<!to )\b(?:He|She|They|"
+            # A capitalised word is only a SUBJECT if it is not the ordinary
+            # way an English sentence opens. "Then step back" and "The vest
+            # stands" are a command and a metaphor, not stage business.
+            r"(?!(?:Then|But|And|When|If|Now|So|Let|Well|The|This|That|These"
+            r"|Those|Here|There|Why|How|What|Who|Since|While|After|Before"
+            r"|Today|Tonight|We|You|I|My|Your|Our|It|Its|Not|Just|Only|Even"
+            r"|Maybe|Perhaps|Yes|No|Every|Each|Some|All)\b)"
+            r"[A-Z][a-z]{2,})\s+"
+            r"(?:turns?|turned|leans?|leaned|reaches?|reached|walks?|walked"
             r"|steps?|stepped|nods?|nodded|smiles?|smiled|frowns?|frowned"
             r"|glances?|glanced|stares?|stared|drums?|drummed|paces?|paced"
             r"|grabs?|grabbed|enters?|entered|leaves?|exits?|exited|stands?"
             r"|stood|sits?|sat|rises?|rose|sighs?|sighed|shrugs?|shrugged"
             r"|laughs?|laughed|pauses?|paused)\b",
-            re.IGNORECASE,
         ),
     ),
     (
         "delivery note",
         re.compile(
-            r"\b(?:her|his|their|its) (?:voice|eyes|hands?|face|gaze|tone"
+            r"\b(?:her|his|their) (?:voice|eyes|hands?|face|gaze|tone"
             r"|breath|shoulders?|fingers?)\b",
             re.IGNORECASE,
         ),
     ),
     (
+        # STRAIGHT AND CURLY DOUBLE QUOTES ONLY. The first cut included the
+        # curly SINGLE quotes, which in ordinary English are apostrophes --
+        # so "It's designed to block the solar storms" read as quoted speech
+        # embedded in prose. Two of the six false alarms were this.
         "quoted speech inside prose",
-        re.compile(r"[\"\u201c\u2018\u2019\u201d].{8,}[\"\u201c\u2018\u2019\u201d]"),
+        re.compile("[\"\u201c\u201d].{8,}[\"\u201c\u201d]"),
     ),
     (
         "speaker label",
@@ -171,8 +191,8 @@ def source_anchors(data: dict) -> list[str]:
     or more (a two-letter name matches inside ordinary words and proves
     nothing) plus source-spanned figures.
     """
-    lane = (data.get("meta") or {}).get("scifi_codex") or {}
-    index = lane.get("fact_index") or {}
+    lane = _as_dict(_as_dict(data.get("meta")).get("scifi_codex"))
+    index = _as_dict(lane.get("fact_index"))
     anchors: list[str] = []
     for entity in index.get("entities") or []:
         name = str((entity or {}).get("name") or "").strip()
@@ -202,10 +222,23 @@ def names_anchor(text: str, anchors: Iterable[str]) -> str:
     return ""
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """A mapping, or an empty one -- never an AttributeError.
+
+    `--watch` reads a ledger WHILE a run is rewriting it, and `--ladder`
+    sweeps hundreds of files written by older code. A `.get()` on a value
+    that turned out to be a list takes the whole window down, and a viewer
+    that dies on the artifact it exists to watch is worse than no viewer.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def grade(path: Path) -> LedgerReport:
     data = json.loads(path.read_text(encoding="utf-8"))
-    meta = data.get("meta") or {}
-    lane = meta.get("scifi_codex") or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: ledger root is not an object")
+    meta = _as_dict(data.get("meta"))
+    lane = _as_dict(meta.get("scifi_codex"))
     rows = [r for r in (data.get("lines") or []) if isinstance(r, dict)]
     cast = {
         str(r.get("char_id")): str(r.get("name") or "")
@@ -269,13 +302,14 @@ def grade(path: Path) -> LedgerReport:
         "text": str(flagged[-1].get("text") or "") if flagged else "",
         "names": names_anchor(
             str(flagged[-1].get("text") or "") if flagged else "", anchors),
-        "lane_status": ((lane.get("news_coda") or {}).get("status") or ""),
+        "lane_status": (_as_dict(lane.get("news_coda")).get("status") or ""),
     }
 
-    schedule = (lane.get("call_journal") or {}).get("script_schedule") or {}
+    schedule = _as_dict(_as_dict(lane.get("call_journal")).get("script_schedule"))
     report.receipts = {
-        "act_count": (lane.get("call_journal") or {})
-        .get("script_transport", {}).get("act_count"),
+        "act_count": _as_dict(
+            _as_dict(lane.get("call_journal")).get("script_transport"),
+        ).get("act_count"),
         "schedule": schedule.get("shape") or "",
         "beat_jobs": schedule.get("beat_dialogue_jobs"),
         "review_jobs": schedule.get("scene_review_jobs"),
@@ -811,7 +845,12 @@ def watch(interval: float, server_log: Path, root: Path | None,
         while True:
             try:
                 report = grade(resolve(None, root))
-            except (SystemExit, OSError, ValueError, json.JSONDecodeError):
+            except Exception:
+                # A WINDOW THAT DIES ON THE FILE IT WATCHES IS NO WINDOW.
+                # This reads a ledger a run is actively rewriting, so it will
+                # meet half-written JSON and shapes older code never emitted.
+                # Every one of those is a reason to draw the next frame, not
+                # to exit -- the loop owns nothing and can always retry.
                 report = None
             frame = render_live(report, read_live(server_log), read_gpu())
             if html_out is not None:
@@ -826,6 +865,130 @@ def watch(interval: float, server_log: Path, root: Path | None,
             time.sleep(interval)
     except KeyboardInterrupt:
         return 0
+
+
+# ---------------------------------------------------------------------------
+# The ladder census -- is a pass failing by luck, or every single time?
+# ---------------------------------------------------------------------------
+# A retry ladder is a good answer to a STOCHASTIC failure and a terrible answer
+# to a SYSTEMATIC one: if a pass never survives its first attempt, the prompt
+# or the schema is wrong and the rerolls are paying nine calls to hide it. The
+# two look identical from inside one run, and the call journal already records
+# every rung of every episode -- so the question is answerable from the corpus
+# rather than from an impression.
+
+def ladder_rows(path: Path) -> list[dict[str, Any]]:
+    """Every ladder this episode ran, flattened."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    lane = _as_dict(_as_dict(data.get("meta")).get("scifi_codex"))
+    calls = _as_dict(lane.get("call_journal")).get("calls") or []
+    if not isinstance(calls, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for call in calls:
+        if not isinstance(call, dict):
+            continue
+        attempts = [a for a in (call.get("attempts") or [])
+                    if isinstance(a, dict)]
+        disposition = str(call.get("terminal_disposition") or "")
+        receipt = _as_dict(call.get("deterministic_repair_receipt"))
+        rows.append({
+            "episode": path.parent.parent.name,
+            "pass_id": str(call.get("pass_id") or "?"),
+            "cycle": call.get("candidate_cycle"),
+            "status": str(call.get("status") or ""),
+            "attempts": attempts,
+            "first_ok": bool(attempts and attempts[0].get("status")
+                             == "accepted"),
+            # A DETERMINISTIC repair is not a reroll: Python fixed the
+            # artifact and no second model call was spent. Counting it as a
+            # retry would overstate what the ladder costs -- and hide what it
+            # actually costs, which is EVIDENCE, not calls.
+            "deterministic": disposition == "accepted_after_deterministic_repair",
+            "drops": len(receipt.get("drops") or []),
+            "terminal_error": str(call.get("terminal_error") or ""),
+        })
+    return rows
+
+
+def ladder_census(paths: Iterable[Path]) -> dict[str, dict[str, Any]]:
+    census: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        for row in ladder_rows(path):
+            slot = census.setdefault(row["pass_id"], {
+                "ladders": 0, "first_ok": 0, "rungs": [], "temps": {},
+                "errors": {}, "abandoned": 0, "deterministic": 0, "drops": 0,
+            })
+            slot["ladders"] += 1
+            slot["first_ok"] += 1 if row["first_ok"] else 0
+            slot["deterministic"] += 1 if row["deterministic"] else 0
+            slot["drops"] += int(row["drops"])
+            slot["rungs"].append(len(row["attempts"]))
+            if row["status"] == "failed":
+                slot["abandoned"] += 1
+            for index, attempt in enumerate(row["attempts"]):
+                temp = attempt.get("temperature")
+                if temp is not None:
+                    slot["temps"].setdefault(index, set()).add(round(temp, 3))
+                error = str(attempt.get("error_type") or "")
+                if error:
+                    slot["errors"][error] = slot["errors"].get(error, 0) + 1
+            if row["terminal_error"]:
+                head = row["terminal_error"].split(":")[0][:48]
+                slot["errors"][f"terminal {head}"] = (
+                    slot["errors"].get(f"terminal {head}", 0) + 1)
+    return census
+
+
+def render_census(census: dict[str, dict[str, Any]], episodes: int) -> str:
+    out = [
+        f"LADDER CENSUS over {episodes} episode(s)",
+        "",
+        "A pass whose FIRST attempt almost never survives is not unlucky --",
+        "its prompt or its schema is wrong, and the ladder is hiding it.",
+        "",
+        f"{'pass':<7}{'ladders':>8}{'1st ok':>10}{'py-fix':>8}"
+        f"{'avg rungs':>10}{'abandoned':>10}  temperature by rung",
+        "-" * 78,
+    ]
+    for pass_id in sorted(census):
+        slot = census[pass_id]
+        ladders = slot["ladders"]
+        pct = (100.0 * slot["first_ok"] / ladders) if ladders else 0.0
+        avg = (sum(slot["rungs"]) / len(slot["rungs"])) if slot["rungs"] else 0
+        temps = "  ".join(
+            f"{i + 1}:{'/'.join(str(t) for t in sorted(v))}"
+            for i, v in sorted(slot["temps"].items())
+        )
+        out.append(
+            f"{pass_id:<7}{ladders:>8}{slot['first_ok']:>5} ({pct:>3.0f}%)"
+            f"{slot['deterministic']:>8}{avg:>10.1f}{slot['abandoned']:>10}"
+            f"  {temps}")
+    out.append("")
+    out.append("py-fix = accepted after a DETERMINISTIC repair: Python fixed "
+               "it, no second")
+    out.append("         model call. Cheap in calls -- but read the drops "
+               "line below, because")
+    out.append("         what it spends instead is evidence.")
+    dropped = {p: s["drops"] for p, s in census.items() if s["drops"]}
+    if dropped:
+        out.append("  rows dropped by deterministic repair: " + ", ".join(
+            f"{p} {n}" for p, n in sorted(dropped.items())))
+    out.append("")
+    out.append("why the rungs were spent:")
+    for pass_id in sorted(census):
+        errors = census[pass_id]["errors"]
+        if not errors:
+            continue
+        ranked = sorted(errors.items(), key=lambda kv: -kv[1])[:3]
+        out.append(f"  {pass_id:<6} " + ", ".join(
+            f"{name} x{count}" for name, count in ranked))
+    return "\n".join(out)
 
 
 def report_json(report: LedgerReport) -> dict[str, Any]:
@@ -867,9 +1030,23 @@ def main(argv: list[str] | None = None) -> int:
              "writes. Ctrl-C to stop. Read-only.")
     parser.add_argument("--server-log", default=str(DEFAULT_SERVER_LOG),
                         help="server log the live window reads")
+    parser.add_argument(
+        "--ladder", type=int, nargs="?", const=40, default=None, metavar="N",
+        help="census the retry ladders across the N newest episodes: how "
+             "often each pass survived its FIRST attempt, at what "
+             "temperatures, and what spent the rungs")
     args = parser.parse_args(argv)
 
     root = Path(args.episodes_root) if args.episodes_root else None
+
+    if args.ladder is not None:
+        paths = episode_ledgers(root)[: args.ladder]
+        census = ladder_census(paths)
+        if not census:
+            print("no episode on disk carries a codex call journal")
+            return 1
+        print(render_census(census, len(paths)))
+        return 0
 
     if args.watch is not None:
         return watch(

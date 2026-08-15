@@ -353,6 +353,42 @@ def test_the_beat_array_ceiling_is_the_beats_own(monkeypatch):
         ])
 
 
+def test_the_beat_window_is_capped_on_both_axes():
+    """Uncapped, the window is a cliff that falls on the LAST beat.
+
+    Twelve beats of two lines, each legally up to the degeneracy threshold, is
+    a ~285,000-character prompt. Real episodes are nowhere near it, and
+    prompt_must_fit would refuse rather than truncate -- but the refusal would
+    land on the longest episode's final beat, which is the worst place to
+    discover a limit.
+    """
+    many = [{"line_id": f"l{i:03d}", "speaker": "Ada", "text": "word"}
+            for i in range(40)]
+    kept = lane._recent_window(many)
+    assert len(kept) == lane._BEAT_WINDOW_MAX_ROWS
+    # The TAIL is what a beat needs: it answers the line before it.
+    assert kept[-1]["line_id"] == "l039"
+
+    huge = [
+        {"line_id": "l001", "speaker": "Ada", "text": "x" * 20_000},
+        {"line_id": "l002", "speaker": "Leo", "text": "the last word"},
+    ]
+    kept = lane._recent_window(huge)
+    assert [row["line_id"] for row in kept] == ["l002"]
+
+    # A single oversized row still survives when it is all there is, so the
+    # beat is never handed an empty window by the cap alone.
+    assert lane._recent_window(huge[:1])[0]["line_id"] == "l001"
+
+
+def test_a_short_episode_window_is_untouched(monkeypatch):
+    schedule = _Schedule()
+    _run(monkeypatch, schedule)
+    windows = [j["artifact_inputs"]["rows_so_far"]
+               for j in schedule.of("P5B")]
+    assert [len(w) for w in windows] == [0, 1, 3]
+
+
 def test_the_schedule_is_receipted(monkeypatch):
     journal: dict[str, Any] = {}
     schedule = _Schedule()
