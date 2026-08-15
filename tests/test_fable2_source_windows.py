@@ -324,6 +324,74 @@ def test_merge_is_bounded_balanced_deduplicated_and_keeps_tail():
     assert "vector-24" in merged.dramatizable_vectors
 
 
+def test_a_source_richer_than_the_bucket_limit_still_parses():
+    """A cap that refuses a legitimate source is a defect, not a safeguard.
+
+    Measured 2026-08-14: a UCLA Health story names 11 places and 14
+    institutions. The model extracted them correctly and the pydantic cap --
+    set to the same number the MERGE already trims to -- rejected the reply
+    three times and killed the episode with `Fable2DossierError`. The refusal
+    fired in front of the trim that exists to handle exactly this.
+
+    The schema ceiling is now a backstop against a degenerate decode; the
+    per-bucket limit is enforced where it always was, at the merge.
+    """
+    entities = F2.NamedEntities(
+        people=[f"person {i}" for i in range(11)],
+        places=[f"place {i}" for i in range(11)],
+        things=[f"thing {i}" for i in range(14)],
+    )
+    assert len(entities.places) == 11
+    assert len(entities.things) == 14
+
+    values, _count = F2._balanced_window_values(
+        [entities.things], limit=F2._DOSSIER_ENTITIES_PER_BUCKET_MAX,
+    )
+    assert len(values) == F2._DOSSIER_ENTITIES_PER_BUCKET_MAX
+
+    # The backstop is still a backstop.
+    with pytest.raises(Exception):
+        F2.NamedEntities(
+            things=[f"t{i}"
+                    for i in range(F2._DOSSIER_ENTITIES_PER_BUCKET_CEILING + 1)],
+        )
+
+
+@pytest.mark.parametrize("field,keep_limit", [
+    ("facts_to_keep", "_DOSSIER_FACTS_MAX"),
+    ("allowed_numbers", "_DOSSIER_NUMBERS_MAX"),
+    ("dramatizable_vectors", "_DOSSIER_VECTORS_MAX"),
+])
+def test_no_dossier_list_refuses_what_the_merge_would_have_trimmed(
+    field, keep_limit,
+):
+    """THE DEFECT CLASS, swept across the whole model.
+
+    Each of these carried a pydantic cap equal to the number the merge
+    already trims them to, so a source richer than the keep limit was
+    REFUSED before the trim could run. One of them killed two live episodes;
+    the other three were the same failure waiting for a richer source. A
+    schema ceiling may exist to bound a degenerate decode, but it must never
+    sit at the same number as a downstream trim.
+    """
+    keep = getattr(F2, keep_limit)
+    payload = {
+        "facts_to_keep": ["a fact"],
+        "allowed_numbers": [],
+        "named_entities": {},
+        "dramatizable_vectors": ["dramatize it"],
+    }
+    payload[field] = [f"{field} {i}" for i in range(keep + 1)]
+
+    parsed = F2.DossierLLM.model_validate(payload)
+    assert len(getattr(parsed, field)) == keep + 1
+
+    values, _count = F2._balanced_window_values(
+        [getattr(parsed, field)], limit=keep,
+    )
+    assert len(values) == keep
+
+
 def test_blank_dossier_fact_opens_structural_repair_before_merge():
     responses = iter([
         json.dumps({

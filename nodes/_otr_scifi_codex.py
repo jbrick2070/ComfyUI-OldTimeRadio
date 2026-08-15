@@ -3728,21 +3728,31 @@ def _call_news_coda(
         candidate = clean_spoken_text(
             str(getattr(result, "text", "") or "")
         ).strip()
-        findings = _news_coda_findings(candidate, anchors, label_pattern)
-        if candidate:
-            text = candidate
+        candidate_findings = _news_coda_findings(
+            candidate, anchors, label_pattern,
+        )
         receipt["attempts"].append({
             "attempt": attempt,
-            "outcome": "clean" if not findings else "unclean",
-            "findings": list(findings),
+            "outcome": "clean" if not candidate_findings else "unclean",
+            "findings": list(candidate_findings),
         })
-        if not findings:
-            break
+        # THE VERDICT BELONGS TO THE TEXT THAT SHIPS. `text` only advances on a
+        # non-empty candidate, so the verdict must only advance with it --
+        # otherwise a later EMPTY attempt overwrites the complaint while the
+        # earlier text is still the one going to air, and the receipt explains
+        # a draft nobody hears. Measured shape: attempt 1 writes a coda that
+        # names no source, attempt 2 returns nothing, and the ledger blames
+        # "spoken text is empty" for a row that is not empty.
+        if candidate:
+            text = candidate
+            findings = candidate_findings
+            if not findings:
+                break
         log.warning(
             "[scifi_codex] P6 news coda attempt %d is unclean (%s); handing "
             "the complaint back for ONE bounded clean rather than rerolling "
             "it cold.",
-            attempt, "; ".join(findings),
+            attempt, "; ".join(candidate_findings) or "empty result",
         )
 
     if text and not findings:

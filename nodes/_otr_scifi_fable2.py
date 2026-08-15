@@ -199,6 +199,42 @@ _DOSSIER_WINDOW_OVERLAP_CHARS = MAX_QUOTE_CHARS - 1
 _DOSSIER_FACTS_MAX = 20
 _DOSSIER_NUMBERS_MAX = 20
 _DOSSIER_ENTITIES_PER_BUCKET_MAX = 10
+
+#: THE SCHEMA CEILING IS A BACKSTOP, NOT THE LIMIT.
+#:
+#: `_DOSSIER_ENTITIES_PER_BUCKET_MAX` is how many entities the merged dossier
+#: KEEPS, and `_merge_window_dossiers` already enforces it deterministically
+#: (`_balanced_window_values(limit=...)`). Putting the same number on the
+#: pydantic field made it a REFUSAL that fired first: a source naming more
+#: than ten places could never be extracted at all, so the trim that exists to
+#: handle exactly that case never got to run.
+#:
+#: Measured 2026-08-14: a UCLA Health story names 11 places and 14
+#: institutions. The model extracted them correctly, the schema rejected the
+#: reply three times, and the episode died with
+#: `Fable2DossierError: 2 validation errors for DossierLLM`. The model was
+#: right and the cap was wrong -- and news stories with more than ten proper
+#: nouns are ordinary, not exotic.
+#:
+#: This is the same doctrine the score compiler already applies to a stale cue
+#: anchor ("a stale index must never be a fatal count gate") and the same
+#: reason the word budget's upper bound was removed: a cap that refuses a
+#: legitimate source is a defect, not a safeguard. The ceiling below stays
+#: only to keep a degenerate decode finite.
+_DOSSIER_ENTITIES_PER_BUCKET_CEILING = 60
+
+#: THE SAME CONTRADICTION, THREE MORE TIMES. `facts_to_keep`,
+#: `allowed_numbers` and `dramatizable_vectors` each carried a pydantic cap
+#: equal to the number `_merge_dossiers` already trims them to
+#: (`_balanced_window_values(limit=...)`), so a source richer than the keep
+#: limit was refused before the trim could run -- exactly the defect that
+#: killed two `scifi_news_pro` episodes on a UCLA Health story. Found by
+#: sweeping every bounded list field in the story lanes after the first one
+#: was fixed, which is the only reason these were not three more live
+#: failures waiting for a richer source.
+_DOSSIER_FACTS_CEILING = 60
+_DOSSIER_NUMBERS_CEILING = 60
+_DOSSIER_VECTORS_CEILING = 40
 _DOSSIER_VECTORS_MAX = 10
 _DIGEST_HEADLINE_CHAR_CAP = 240
 _DIGEST_SOURCE_CHAR_CAP = 120
@@ -236,17 +272,20 @@ _DECK_PATH = (
 # ---------------------------------------------------------------------------
 
 class NamedEntities(BaseModel):
+    """Extraction metadata. The per-bucket LIMIT is applied by the merge, not
+    by this schema -- see `_DOSSIER_ENTITIES_PER_BUCKET_CEILING`."""
+
     people: list[str] = Field(
         default_factory=list,
-        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_CEILING,
     )
     places: list[str] = Field(
         default_factory=list,
-        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_CEILING,
     )
     things: list[str] = Field(
         default_factory=list,
-        max_length=_DOSSIER_ENTITIES_PER_BUCKET_MAX,
+        max_length=_DOSSIER_ENTITIES_PER_BUCKET_CEILING,
     )
 
 
@@ -255,16 +294,16 @@ class DossierLLM(BaseModel):
 
     facts_to_keep: list[str] = Field(
         min_length=1,
-        max_length=_DOSSIER_FACTS_MAX,
+        max_length=_DOSSIER_FACTS_CEILING,
     )
     allowed_numbers: list[str] = Field(
         default_factory=list,
-        max_length=_DOSSIER_NUMBERS_MAX,
+        max_length=_DOSSIER_NUMBERS_CEILING,
     )
     named_entities: NamedEntities
     dramatizable_vectors: list[str] = Field(
         default_factory=list,
-        max_length=_DOSSIER_VECTORS_MAX,
+        max_length=_DOSSIER_VECTORS_CEILING,
     )
 
     @field_validator("facts_to_keep")

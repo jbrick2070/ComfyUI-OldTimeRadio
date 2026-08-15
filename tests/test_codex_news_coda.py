@@ -299,6 +299,43 @@ def test_a_coda_that_never_names_its_source_still_ships_flagged(monkeypatch):
     assert all(row["outcome"] == "unclean" for row in receipt["attempts"])
 
 
+def test_the_receipt_explains_the_text_that_actually_ships(monkeypatch):
+    """A receipt that blames the wrong draft is worse than no receipt.
+
+    `text` only advances on a non-empty candidate. The VERDICT has to advance
+    with it: attempt 1 writes a coda naming no source, attempt 2 returns
+    nothing, and the row going to air is still attempt 1's. If the findings
+    kept walking, the ledger would say "spoken text is empty" about a row that
+    is not empty, and whoever debugs it later starts from a lie.
+    """
+    fake = _FakeCoda("And that was tonight's story.", "   ")
+    text, receipt = _run(monkeypatch, fake)
+
+    assert text == "And that was tonight's story."
+    assert receipt["status"] == "unclean"
+    # The complaint that survives is the one about the shipped text.
+    joined = " ".join(receipt["attempts"][0]["findings"])
+    assert "never names the real source" in joined
+
+
+def test_an_empty_first_attempt_does_not_poison_a_good_second(monkeypatch):
+    # The schema forbids a truly empty string, so the only way a pass
+    # yields nothing is whitespace that strips away.
+    fake = _FakeCoda("   ", "A real MIT report started this.")
+    text, receipt = _run(monkeypatch, fake)
+
+    assert text == "A real MIT report started this."
+    assert receipt["status"] == "clean"
+
+
+def test_two_empty_attempts_are_absent_not_unclean(monkeypatch):
+    fake = _FakeCoda(" ", "   ")
+    text, receipt = _run(monkeypatch, fake)
+
+    assert text is None
+    assert receipt["status"] == "absent"
+
+
 def test_a_pass_that_cannot_author_returns_absent_and_invents_nothing(
     monkeypatch,
 ):
