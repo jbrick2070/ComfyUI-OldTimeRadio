@@ -138,6 +138,21 @@ JUDGE_VOTES = 1
 #: repair call carries the brief, the line and the complaint, and its whole
 #: job is to write one sentence.
 REPAIR_READS_BRIEF_ONLY = False
+#: ONE SENTENCE PER CALL instead of one line per call. This is the LAST
+#: untested lever, and it is the one that has actually worked in this codebase
+#: before: per-beat dialogue fixed the writer by making the JOB smaller, not
+#: the prompt cleverer.
+#:
+#: Today the judge must do four things in one reply -- split the line,
+#: classify every piece, quote each offender verbatim, and count the pieces.
+#: A 2B drops most of a four-part instruction. With this on, PYTHON does the
+#: splitting (mechanical -- sentence boundaries are not a judgement about
+#: prose, and nothing is edited), and the model is left with one question it
+#: can actually answer: is THIS sentence talk, or is it stage business?
+#:
+#: It costs about two small calls per line instead of one larger one. Whether
+#: that trade wins is a measurement, not an opinion -- run the lab.
+JUDGE_PER_SENTENCE = False
 
 #: How much of the episode a model is shown BEFORE the line. The window is the
 #: point: a model that sees its own scene answers the line in front of it, and
@@ -706,6 +721,73 @@ def _grade_probe(
     )
 
 
+def _sentences(text: str) -> "list[str]":
+    """Split a line into sentences, for ASKING -- never for editing.
+
+    Python decides where the sentence boundaries are, which is mechanical:
+    it makes no judgement about whether any of them is speech, it changes
+    nothing, and the pieces are reassembled by the model, not by us. The
+    whole point is to hand the model ONE small question at a time.
+    """
+    import re as _re
+
+    parts = [
+        p.strip() for p in
+        _re.split(r"(?<=[.!?])\s+|(?<=\))\s+(?=[A-Z])", text or "")
+        if p and p.strip()
+    ]
+    return parts or ([text.strip()] if text.strip() else [])
+
+
+def _judge_by_sentence(
+    *,
+    slot_fn: "Callable[..., str]",
+    speaker: str,
+    text: str,
+    hints: "Sequence[_POLICY.Finding]",
+    lines_around: "Sequence[str]",
+    where: str = "",
+    sightings: "list[dict[str, Any]] | None" = None,
+) -> "tuple[list[dict[str, str]], bool]":
+    """Ask about ONE SENTENCE at a time -- the smallest honest job.
+
+    The model no longer splits, counts, or transcribes: Python already knows
+    which sentence is being asked about, so the quote is exact by
+    construction and the only thing left is the judgement itself. That is the
+    same move that fixed the writer -- shrink the job, keep the prompt.
+    """
+    pieces = _sentences(text)
+    if len(pieces) <= 1:
+        # Nothing to split. The whole-line judge is already the small job.
+        return _judge_row(
+            slot_fn=slot_fn, speaker=speaker, text=text, hints=hints,
+            lines_around=lines_around, where=where, sightings=sightings,
+        )
+
+    found: "list[dict[str, str]]" = []
+    reachable = False
+    for piece in pieces:
+        verdict, ok = _judge_row(
+            slot_fn=slot_fn,
+            speaker=speaker,
+            text=piece,
+            # The hints belong to the WHOLE line; only pass the ones whose
+            # phrase actually falls inside this sentence, or the model is
+            # being told about words it cannot see.
+            hints=[h for h in hints if h.detail and h.detail in piece],
+            lines_around=lines_around,
+            where=where,
+            sightings=sightings,
+        )
+        reachable = reachable or ok
+        for entry in verdict:
+            # The quote is the SENTENCE, exact by construction -- no verbatim
+            # transcription for the model to get wrong.
+            found.append({"quote": piece, "why": entry.get("why", "")})
+            break
+    return found, reachable
+
+
 def _judge_votes(**kwargs) -> "tuple[list[dict[str, str]], bool]":
     """Read the line ``JUDGE_VOTES`` times and keep only what every read names.
 
@@ -717,13 +799,14 @@ def _judge_votes(**kwargs) -> "tuple[list[dict[str, str]], bool]":
 
     One vote is a straight pass-through, so the default recipe pays nothing.
     """
+    reader = _judge_by_sentence if JUDGE_PER_SENTENCE else _judge_row
     if JUDGE_VOTES <= 1:
-        return _judge_row(**kwargs)
+        return reader(**kwargs)
 
     rounds: "list[list[dict[str, str]]]" = []
     reachable = False
     for _ in range(JUDGE_VOTES):
-        found, ok = _judge_row(**kwargs)
+        found, ok = reader(**kwargs)
         reachable = reachable or ok
         if ok:
             rounds.append(found)

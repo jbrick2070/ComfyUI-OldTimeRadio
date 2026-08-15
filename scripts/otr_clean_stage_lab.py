@@ -577,6 +577,8 @@ def main(argv: "list[str] | None" = None) -> int:
                     help="judge reads per row; 2 keeps only what both name")
     ap.add_argument("--judge-temp", type=float, default=None,
                     help="judge temperature")
+    ap.add_argument("--per-sentence", action="store_true",
+                    help="shrink the job: one judge call per SENTENCE")
     ap.add_argument("--brief-only", action="store_true",
                     help="split the load: the repair reads the act brief and "
                          "its two neighbours instead of the whole window")
@@ -588,6 +590,8 @@ def main(argv: "list[str] | None" = None) -> int:
         CLEAN.JUDGE_TEMPERATURE = args.judge_temp
     if args.brief_only:
         CLEAN.REPAIR_READS_BRIEF_ONLY = True
+    if args.per_sentence:
+        CLEAN.JUDGE_PER_SENTENCE = True
 
     banks = fixtures()
     if args.bank:
@@ -606,6 +610,7 @@ def main(argv: "list[str] | None" = None) -> int:
           f"judge_temp={CLEAN.JUDGE_TEMPERATURE} "
           f"attempts={CLEAN._MAX_ATTEMPTS} "
           f"brief_only={CLEAN.REPAIR_READS_BRIEF_ONLY} "
+          f"per_sentence={CLEAN.JUDGE_PER_SENTENCE} "
           f"before={CLEAN._CONTEXT_ROWS} after={CLEAN._AFTER_ROWS}")
     print("=" * 78)
 

@@ -107,28 +107,41 @@ This is the same shape as the news lanes' documented floor, now proven for
 the clean stage with ground truth: **`gemma-2-2b-it` writes a fine `original`
 episode but cannot JUDGE one.** Route the clean stage's slot accordingly.
 
-**THE A/B/C/D SWEEP, all on `gemma-2-2b-it`, same planted ledgers
-(operator: *"the repair needs to be model agnostic -- do a bunch of A/Bs"*):**
+**THE FULL SWEEP -- six recipes, one set of planted ledgers, done chasing.**
 
-| variant | recall | traps kept | repaired | calls |
-|---|---|---|---|---|
-| A baseline (votes=1, full repair window) | 13/15 | 17/28 (61%) | 6 | 123 |
-| B agreement voting (`--votes 2`) | 13/15 | 16/28 (57%) | 4 | 168 |
-| C load split (`--brief-only`) | 13/15 | 17/28 (61%) | 5 | 122 |
-| **12B, no tricks at all** | 13/15 | **24/28 (86%)** | **13** | **79** |
+| variant | model | recall | traps kept | repaired | calls |
+|---|---|---|---|---|---|
+| whole-line (baseline) | 2B | 13/15 | 17/28 (61%) | 6 | 123 |
+| agreement voting | 2B | 13/15 | 16/28 (57%) | 4 | 168 |
+| load split (brief only) | 2B | 13/15 | 17/28 (61%) | 5 | 122 |
+| **per-sentence** | 2B | **15/15 (100%)** | 12/28 (43%) | 6 | 172 |
+| **whole-line** | **12B** | 13/15 | **24/28 (86%)** | **13** | **79** |
+| per-sentence | 12B | 12/15 | 24/28 (86%) | 12 | 109 |
 
-**THE KNOBS DO NOTHING AND THE MODEL DOES EVERYTHING.** Recall sits at 13/15
-in EVERY variant and on BOTH models -- the two survivors are always
-`scene_report`, a scene sentence followed by real dialogue in the same row.
-Agreement voting is a straight loss (-4% precision for +45 calls) and is
-rejected. The load split -- the operator's idea, and good engineering -- is
-neutral on quality and marginally cheaper; it stays available
-(`REPAIR_READS_BRIEF_ONLY`) but is not the fix. **Only the 12B moves
-precision, and it does so with FEWER calls.**
+**THE TWO LEVERS ARE SEPARABLE, AND ONLY ONE OF THEM STACKS.**
+* **JOB SIZE buys RECALL.** Per-sentence judging broke the 13/15 ceiling that
+  had held across every other variant AND both model sizes -- 15/15, the only
+  thing all session that moved it. That is the per-beat principle again:
+  shrink the JOB, not the prompt. Python splits the sentences (mechanical, it
+  edits nothing) and the model answers one question instead of four.
+* **MODEL SIZE buys PRECISION.** 61% -> 86%, with more repairs and FEWER
+  calls, because a 12B converges instead of grinding two attempts into a flag.
+* **They do not combine.** Per-sentence on the 12B is strictly worse than
+  whole-line on it. Tested, not assumed.
 
-Do not re-run these three. They are measured. The next real lever is a
-calibration example for the MIXED row (scene sentence + dialogue in one line),
-which is the entire remaining miss class.
+**SHIP: whole-line on `gemma-4-12b-it`.** Best repairs (13), best precision,
+fewest calls (79), and the fidelity lanes stay protected. `JUDGE_PER_SENTENCE`
+stays as a documented knob for the case where the 2B is forced and recall
+matters more than politeness -- but note it costs `shakespeare` (2/5 traps)
+and `public_domain` (2/4), which is exactly where the operator ruled that a
+false positive IS a real defect.
+
+**REJECTED, measured, do not re-propose without new evidence:** agreement
+voting (-4% precision for +45 calls); the load split (neutral on quality,
+marginally cheaper -- kept available, not a fix); per-sentence on a 12B.
+
+**The last three misses are all `scene_report`** -- a scene sentence and real
+dialogue sharing one row. That is the only remaining recall class on the 12B.
 
 **PRIORITY, operator 2026-08-14:** *"I'm more concerned about not finding and
 fixing non-dialogue, or the wrong character's speech."* So recall and F2 are
