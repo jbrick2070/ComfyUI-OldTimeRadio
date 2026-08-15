@@ -389,7 +389,10 @@ class TestClientBankReachesTheWidget:
             _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         assert len(node1["widgets_values"]) == 33
-        assert node1["widgets_values"][22] == "scifi_news"
+        # 2026-08-15 (operator): canonical ships the roll sentinel here. The
+        # point of this assertion is that admitting a client bank does not
+        # disturb slot 22, whatever legal value it holds.
+        assert node1["widgets_values"][22] == "roll (any eligible bank)"
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert order[22] == "source_bank"

@@ -171,7 +171,10 @@ class TestHeadlessSurface:
         # only the pin needed updating.
         assert len(node1["widgets_values"]) == 33
         assert node1["widgets_values"][23] == "anime"
-        assert node1["widgets_values"][22] == "scifi_news"
+        # 2026-08-15 (operator): canonical ships the bank roll sentinel. This is
+        # the NEIGHBOUR check proving the visual_style patch landed at 23 and
+        # left 22 alone, so it tracks canonical's saved value.
+        assert node1["widgets_values"][22] == "roll (any eligible bank)"
         assert node1["widgets_values"][24] == "(select Google API model)"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == ""

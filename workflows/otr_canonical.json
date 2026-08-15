@@ -527,8 +527,8 @@
         "(enable Comfy Credits)",
         "Off",
         "auto",
-        "scifi_news",
-        "sci_fi_radio",
+        "roll (any eligible bank)",
+        "roll (any style)",
         "(select Google API model)",
         "(select Google API model)",
         "",
@@ -2171,9 +2171,9 @@
         "Node name for S&R": "OTR_VideoDirector"
       },
       "widgets_values": [
-        "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
-        "viz_mxc_mandala (16:9) (audio-reactive, no scene image)",
-        "viz_camera (16:9) (audio-reactive, no scene image)",
+        "still_flat (16:9)",
+        "still_flat (16:9)",
+        "still_flat (16:9)",
         "z_image_turbo",
         "z_image_turbo",
         "z_image_turbo",

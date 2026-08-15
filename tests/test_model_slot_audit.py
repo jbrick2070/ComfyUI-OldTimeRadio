@@ -77,10 +77,18 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
         "music_visual": "music_video_model",
         "character_video": "character_video_model",
     }
+    # 2026-08-15 (operator): all three beat classes moved off the audio-reactive
+    # visualizers onto the flat still. The visualizers declare "no scene image"
+    # and never requested one, so a live leg logged
+    # `cast=0/3 with portrait, voiced=0/14 with visual` -- no portrait was ever
+    # minted and the operator could not see stills at all. still_flat is still a
+    # LEAN default (cheap_families), not a heavy video engine, so the
+    # lean-canonical intent below is unchanged. The assert_usable / invocable
+    # checks that follow are what prove the new picks are genuinely runnable.
     expected_video = {
-        "announcer_visual": "viz_mxc_cpu",
-        "music_visual": "viz_mxc_mandala",
-        "character_video": "viz_camera",
+        "announcer_visual": "still_flat",
+        "music_visual": "still_flat",
+        "character_video": "still_flat",
     }
     for role, widget in video_slots.items():
         engine = video_director._engine_id_from_pick(director[widget])

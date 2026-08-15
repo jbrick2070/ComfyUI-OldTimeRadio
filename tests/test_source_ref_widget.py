@@ -124,8 +124,12 @@ def test_patch_widget_by_name_lands_source_ref_slot_26():
     # above, so this already reflects the new vector -- only the pin
     # needed updating.
     assert len(node1["widgets_values"]) == 33
-    assert node1["widgets_values"][22] == "scifi_news"
-    assert node1["widgets_values"][23] == "sci_fi_radio"
+    # 2026-08-15 (operator): canonical ships the roll sentinels on both slots so
+    # an unattended run varies bank and style. These two lines are NEIGHBOUR
+    # checks -- they exist to prove the source_ref patch landed at 26 without
+    # disturbing anything around it, so they track canonical's saved values.
+    assert node1["widgets_values"][22] == "roll (any eligible bank)"
+    assert node1["widgets_values"][23] == "roll (any style)"
     assert node1["widgets_values"][24] == "(select Google API model)"
     assert node1["widgets_values"][25] == "(select Google API model)"
     assert node1["widgets_values"][26] == "https://example.invalid/source.txt"

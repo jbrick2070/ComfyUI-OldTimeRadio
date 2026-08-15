@@ -715,26 +715,29 @@ class TestWriterB2aSurface:
         # registry so a re-order / typo cannot ship silently). The roster trim
         # (2026-07-17) retired the science_news family; the default lane is now
         # scifi_news (the local-default sci-fi bank).
-        assert wv[22] == "scifi_news", (
-            f"source_bank (slot 22) must ship 'scifi_news' (the local default "
-            f"story lane); got {wv[22]!r}"
-        )
+        # 2026-08-15 (operator): canonical now ships the ROLL sentinel so an
+        # unattended run varies its bank. The sentinel is deliberately NOT a
+        # registered bank id -- `eligible_bank_ids()` excludes it (and excludes
+        # custom_source_bank) so a roll can never select the escape hatch or
+        # itself. So the guardrail below accepts the sentinel OR a registered
+        # id, which still catches the thing it was written for: a re-order or a
+        # typo shipping a value that resolves to nothing.
         from nodes import _otr_story_routing as _routing
-        assert wv[22] in _routing.list_bank_ids(), (
-            f"source_bank (slot 22) value {wv[22]!r} is not a registered "
-            f"bank id: {_routing.list_bank_ids()!r}"
+        from nodes import _otr_rolls as _rolls
+        assert wv[22] == _rolls.BANK_SENTINEL or wv[22] in _routing.list_bank_ids(), (
+            f"source_bank (slot 22) must ship the roll sentinel "
+            f"{_rolls.BANK_SENTINEL!r} or a registered bank id "
+            f"{_routing.list_bank_ids()!r}; got {wv[22]!r}"
         )
         # Slot 23: visual_style (Stage 3C multi-modal story schema,
         # 2026-07-06) -- APPENDED at the END; ships the production look AND
         # must be a REGISTERED style id (live registry cross-check).
-        assert wv[23] == "sci_fi_radio", (
-            f"visual_style (slot 23) must ship 'sci_fi_radio' (the "
-            f"production look); got {wv[23]!r}"
-        )
-        from nodes import _otr_rolls as _rolls
-        assert wv[23] in _rolls.eligible_style_ids(), (
-            f"visual_style (slot 23) value {wv[23]!r} is not an eligible "
-            f"style id: {_rolls.eligible_style_ids()!r}"
+        # 2026-08-15 (operator): the roll sentinel ships here too -- same
+        # reasoning as slot 22 above. Sentinel OR an eligible style id.
+        assert wv[23] == _rolls.STYLE_SENTINEL or wv[23] in _rolls.eligible_style_ids(), (
+            f"visual_style (slot 23) must ship the roll sentinel "
+            f"{_rolls.STYLE_SENTINEL!r} or an eligible style id "
+            f"{_rolls.eligible_style_ids()!r}; got {wv[23]!r}"
         )
         assert wv[24] == "(select Google API model)", (
             f"google_api_slot_a_model (slot 24) must ship the unselected "

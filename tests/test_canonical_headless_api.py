@@ -271,7 +271,10 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
         "google/gemma-4-12b-it (11.9 GB)"
     assert writer["inputs"]["technical_model"] == \
         "google/gemma-4-12b-it (11.9 GB)"
-    assert str(director["inputs"]["announcer_video_model"]).startswith("viz_")
+    # 2026-08-15 (operator): the lean default moved from the audio-reactive
+    # visualizers to the flat still, so the beat classes actually show the
+    # z_image_turbo image they mint. Still a cheap family, not heavy video.
+    assert str(director["inputs"]["announcer_video_model"]).startswith("still_flat")
 
 
 def test_set_allows_only_creative_widgets(tmp_path):

@@ -58,8 +58,13 @@ def test_production_workflow_visual_structure_pinned():
          (2026-07-04 widget-audit Batch 3 -- single caption owner); node 93
          OTR_PostUpscaleProcgenBlend no longer carries the burn_captions /
          caption_style widgets;
-      2. the LTX radio open: node 87 OTR_VideoDirector routes
-         announcer_video_model AND music_video_model to ltx_video;
+      2. the lean visual defaults: node 87 OTR_VideoDirector routes all three
+         beat classes to still_flat over z_image_turbo stills. (This bullet
+         used to claim ltx_video and had been WRONG since 2026-07-07, when the
+         lean visualizer defaults landed and only the assertions were updated;
+         corrected 2026-08-15 with the still_flat change so the docstring and
+         the asserts stop disagreeing.) Heavy/video engines remain explicit
+         profile overrides, never saved-workflow defaults;
       3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds BOTH
          the composite base (node 84) and the blend texture (node 93), and the
          chain runs 84 -> 93 -> 86 -> 95 -> 85: captions (node 86) burn BEFORE
@@ -99,10 +104,17 @@ def test_production_workflow_visual_structure_pinned():
     # 2026-07-07: the repo canonical is the operator-saved 30-word test canvas,
     # with CPU visualizers and z_image_turbo stills. Heavy/video profiles are
     # explicit profile overrides, not saved-workflow defaults.
-    assert wv87[0].startswith("viz_mxc_cpu"), (
-        "announcer_video_model regressed off the lean visualizer default: %r" % wv87[0])
-    assert wv87[1].startswith("viz_mxc_mandala"), (
-        "music_video_model regressed off the lean mandala default: %r" % wv87[1])
+    # 2026-08-15 (operator): the lean default is now the FLAT STILL on all three
+    # beat classes. The audio-reactive visualizers declare "no scene image" and
+    # never requested one, so the minted z_image_turbo stills were never shown --
+    # a live leg logged `cast=0/3 with portrait, voiced=0/14 with visual`, which
+    # also made the visual half of a voice/portrait gender check impossible.
+    # still_flat is a cheap_families engine, so the LEAN intent of this pin is
+    # intact: heavy video stays a profile override, never a saved default.
+    assert wv87[0].startswith("still_flat"), (
+        "announcer_video_model regressed off the lean still default: %r" % wv87[0])
+    assert wv87[1].startswith("still_flat"), (
+        "music_video_model regressed off the lean still default: %r" % wv87[1])
     # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15; clean-UI removals
     # (2026-07-03) dropped allow_auto_fallback (15->14), episode_duration_target
     # (14->13), then consolidated the legacy catch-all video slot -> character promoted to video
@@ -115,8 +127,8 @@ def test_production_workflow_visual_structure_pinned():
     # canonical keeps today's behaviour and only a tier profile pins a ceiling).
     assert len(wv87) == 15, wv87
     assert wv87[14] == 0, "canonical must ship the render ceiling UNPINNED"
-    assert wv87[2].startswith("viz_camera"), (
-        "character_video_model must stay on the lean camera visualizer lane: %r"
+    assert wv87[2].startswith("still_flat"), (
+        "character_video_model must stay on the lean still lane: %r"
         % wv87[2])
     assert wv87[3:6] == ["z_image_turbo", "z_image_turbo", "z_image_turbo"]
 
