@@ -937,6 +937,25 @@ _BEAT_TEXT_MAX_OUTPUT_TOKENS = (
     + _ROW_DRAFT_ENVELOPE_TOKENS
 )
 
+#: The most rows one scene-review call may be asked to return.
+#:
+#: DERIVED FROM THE TOPOLOGY, NOT THE SCHEMA. `BEATS_PER_ACT` (4) x 2 lines = 8
+#: rows is what a REAL scene contains, so a real scene is one call and this
+#: chunking is invisible in production. The schema's own ceiling is twice that
+#: (`_SCHEMA_HEADROOM`), and using the doubled number here would reintroduce
+#: exactly the request that could not fit -- the whole lesson of
+#: PBUG-20260815-10 is that a schema ceiling is a guard and never a job size.
+#:
+#: The arithmetic that makes it safe, against the smallest shipped context
+#: window (8192, `_otr_model_catalog.py`): 8 x 512 + 128 = 4224, leaving 3,968
+#: tokens for a prompt measured at ~1,203. `tests/test_codex_per_beat_dialogue`
+#: pins that headroom so a future rise in the per-line budget cannot quietly
+#: eat it.
+_SCENE_REVIEW_MAX_ROWS_PER_CALL = (
+    _OTRB.BEATS_PER_ACT * _RADIO_SCORE_MAX_LINES_PER_BEAT
+)
+
+
 def scene_review_output_tokens(line_count: int) -> int:
     """Tokens to ask for when reviewing a scene of exactly `line_count` lines.
 
@@ -3097,38 +3116,83 @@ def _call_scene_review(
     rewriting is done by a MODEL pass and never by code.
     """
     wanted = [str(line_id) for line_id in scene_line_ids]
+    reviewed: dict[str, ScriptTextDraftLineV4] = {}
 
-    def validate_review(candidate: BaseModel) -> str | None:
-        if not isinstance(candidate, SceneReviewDraftV4):
-            return "scene review result is not a SceneReviewDraftV4"
-        findings = _closed_rows_findings(
-            candidate.lines, wanted, label_pattern, label="scene review",
+    # ONE CALL PER CHUNK, AND A REAL SCENE IS EXACTLY ONE CHUNK.
+    #
+    # Scene size is MODEL-CONTROLLED, which is what the first fix for
+    # PBUG-20260815-10 missed. Replacing the impossible 8320 constant with a
+    # request sized to the scene cured the constant and left the death
+    # reachable: the schema accepts up to `_RADIO_SCORE_MAX_BEATS_PER_SCENE`
+    # (8) beats per scene and the P3 prompt at `:786` explicitly INVITES "at
+    # most 8 beats per scene", so a legal draft can carry 16 rows -> 8320
+    # tokens, the exact number that killed a live leg. It bites earlier than
+    # that too: at 7 beats the request is 7296 and the measured P5R prompt is
+    # ~1203, so 8499 > 8192 and the render dies deterministically
+    # (`prompt_must_fit=True` refuses; a re-roll cannot change it).
+    #
+    # Chunking is the only fix that holds for EVERY schema-legal input, and it
+    # costs the writing nothing: the model still reads the WHOLE scene, because
+    # `scene_rows` and the beat spine stay intact in every call -- only the rows
+    # it is asked to RETURN are split. A 4-beat scene is 8 rows, so it takes one
+    # call and is byte-identical to before.
+    #
+    # Not fixed by narrowing the prompt's advertised ceiling instead: the schema
+    # headroom exists precisely because models overshoot what they are told, so
+    # an advertised limit is guidance and this has to be a guarantee.
+    chunks = [
+        wanted[i:i + _SCENE_REVIEW_MAX_ROWS_PER_CALL]
+        for i in range(0, len(wanted), _SCENE_REVIEW_MAX_ROWS_PER_CALL)
+    ] or [[]]
+    if len(chunks) > 1:
+        log.info(
+            "[scifi_codex] scene review split into %d calls: %d rows exceeds "
+            "the %d-row budget one request can carry inside the context "
+            "window (the model drew a scene larger than the topology's own)",
+            len(chunks), len(wanted), _SCENE_REVIEW_MAX_ROWS_PER_CALL,
         )
-        return "; ".join(findings) if findings else None
 
-    result = invoke_codex_structured(
-        pass_id="P5R",
-        slot="creative",
-        slot_fn=slot_fn,
-        pack=pack,
-        seam_refs=("codex_play_system",),
-        artifact_inputs=artifact_inputs,
-        result_type=SceneReviewDraftV4,
-        post_validator=validate_review,
-        base_temperature=.52,
-        structural_retry_temperature=.32,
-        max_new_tokens=scene_review_output_tokens(len(wanted)),
-        call_journal=call_journal,
-        prompt_must_fit=True,
-        include_result_json_schema=False,
-        retry_until_valid=True,
-    )
-    if not isinstance(result, SceneReviewDraftV4):
-        raise CodexPassError(
-            "scene review returned a non-draft structured result"
+    for chunk in chunks:
+        if not chunk:
+            continue
+
+        def validate_review(
+            candidate: BaseModel, _chunk: list = chunk,
+        ) -> str | None:
+            if not isinstance(candidate, SceneReviewDraftV4):
+                return "scene review result is not a SceneReviewDraftV4"
+            findings = _closed_rows_findings(
+                candidate.lines, _chunk, label_pattern, label="scene review",
+            )
+            return "; ".join(findings) if findings else None
+
+        result = invoke_codex_structured(
+            pass_id="P5R",
+            slot="creative",
+            slot_fn=slot_fn,
+            pack=pack,
+            seam_refs=("codex_play_system",),
+            # The whole scene stays visible; only the return set narrows.
+            artifact_inputs={**dict(artifact_inputs),
+                             "scene_line_ids": list(chunk)},
+            result_type=SceneReviewDraftV4,
+            post_validator=validate_review,
+            base_temperature=.52,
+            structural_retry_temperature=.32,
+            max_new_tokens=scene_review_output_tokens(len(chunk)),
+            call_journal=call_journal,
+            prompt_must_fit=True,
+            include_result_json_schema=False,
+            retry_until_valid=True,
         )
-    by_id = {str(row.line_id): row for row in result.lines}
-    return [by_id[line_id] for line_id in wanted]
+        if not isinstance(result, SceneReviewDraftV4):
+            raise CodexPassError(
+                "scene review returned a non-draft structured result"
+            )
+        for row in result.lines:
+            reviewed[str(row.line_id)] = row
+
+    return [reviewed[line_id] for line_id in wanted]
 
 
 def _call_script_text_draft(

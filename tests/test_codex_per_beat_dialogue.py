@@ -23,6 +23,7 @@ Pure-Python. No GPU. No LLM.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -358,6 +359,105 @@ def test_every_job_carries_its_own_right_sized_decode_budget(monkeypatch):
     # than a relabelled ceiling.
     assert lane._BEAT_TEXT_MAX_OUTPUT_TOKENS < \
         lane.scene_review_output_tokens(lane._RADIO_SCORE_MAX_BEATS_PER_SCENE)
+
+
+#: The P5R prompt measured on a real leg (PBUG-20260815-10's own log line:
+#: "prompt requires 1203 input tokens"). Used as the prompt allowance a request
+#: must leave room for -- an assertion about output alone would pass on a budget
+#: that still cannot run.
+_MEASURED_P5R_PROMPT_TOKENS = 1203
+
+
+def test_NO_schema_legal_scene_can_outgrow_the_context_window():
+    """The hole the first fix for PBUG-20260815-10 left open.
+
+    Replacing the impossible 8320 CONSTANT with a request sized to the scene
+    cured the constant and left the death reachable, because SCENE SIZE IS
+    MODEL-CONTROLLED: the schema accepts up to `_RADIO_SCORE_MAX_BEATS_PER_SCENE`
+    (8) beats x 2 lines = 16 rows, and the P3 prompt explicitly invites "at most
+    8 beats per scene". Sixteen rows is 8320 tokens -- the exact number that
+    killed a live leg -- and it bites from 7 beats up, since 7296 + a
+    ~1203-token prompt already exceeds 8192.
+
+    So the guarantee has to hold for EVERY size the schema permits, not for the
+    size the topology intends. Walk all of them.
+    """
+    max_rows = (
+        lane._RADIO_SCORE_MAX_BEATS_PER_SCENE
+        * lane._RADIO_SCORE_MAX_LINES_PER_BEAT
+    )
+    for rows in range(1, max_rows + 1):
+        per_call = min(rows, lane._SCENE_REVIEW_MAX_ROWS_PER_CALL)
+        request = lane.scene_review_output_tokens(per_call)
+        assert request + _MEASURED_P5R_PROMPT_TOKENS < \
+            _SMALLEST_SHIPPED_CONTEXT_WINDOW, (
+                f"a {rows}-row scene requests {request} tokens, which cannot "
+                f"be served with a {_MEASURED_P5R_PROMPT_TOKENS}-token prompt"
+            )
+
+
+def test_an_OVERSIZED_scene_is_reviewed_in_CHUNKS_and_loses_no_row(monkeypatch):
+    """The worst scene the schema allows still gets reviewed, in pieces.
+
+    Chunking costs the writing nothing: every call still carries the whole
+    scene's rows and spine, so the model reads the entire scene back exactly as
+    the design intends -- only the rows it must RETURN are split.
+    """
+    ids = [f"l{i:03d}" for i in range(
+        lane._RADIO_SCORE_MAX_BEATS_PER_SCENE
+        * lane._RADIO_SCORE_MAX_LINES_PER_BEAT)]
+    jobs: list[dict[str, Any]] = []
+
+    def fake_invoke(**kwargs):
+        jobs.append(kwargs)
+        wanted = kwargs["artifact_inputs"]["scene_line_ids"]
+        return lane.SceneReviewDraftV4(lines=[
+            {"line_id": lid, "text": f"Reviewed row {lid} in the moment."}
+            for lid in wanted
+        ])
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", fake_invoke)
+    out = lane._call_scene_review(
+        slot_fn=lambda **k: "",
+        pack=None,
+        artifact_inputs={
+            "scene_line_ids": list(ids),
+            "scene_rows": [{"line_id": i, "text": "x"} for i in ids],
+        },
+        scene_line_ids=ids,
+        label_pattern=re.compile(r"."),
+        call_journal={},
+    )
+
+    assert [str(row.line_id) for row in out] == ids, "a row was lost"
+    assert len(jobs) == 2, "16 rows must split into two 8-row calls"
+    for job in jobs:
+        assert job["max_new_tokens"] + _MEASURED_P5R_PROMPT_TOKENS < \
+            _SMALLEST_SHIPPED_CONTEXT_WINDOW
+        # The whole scene stays visible in every call -- only the return set
+        # narrows. Losing that would make chunking a quality regression.
+        assert len(job["artifact_inputs"]["scene_rows"]) == len(ids)
+
+
+def test_a_REAL_scene_still_takes_exactly_one_review_call(monkeypatch):
+    """Chunking must be invisible in production. A 4-beat scene is 8 rows."""
+    ids = [f"l{i:03d}" for i in range(lane._SCENE_REVIEW_MAX_ROWS_PER_CALL)]
+    jobs: list[dict[str, Any]] = []
+
+    def fake_invoke(**kwargs):
+        jobs.append(kwargs)
+        return lane.SceneReviewDraftV4(lines=[
+            {"line_id": lid, "text": f"Reviewed row {lid} in the moment."}
+            for lid in kwargs["artifact_inputs"]["scene_line_ids"]
+        ])
+
+    monkeypatch.setattr(lane, "invoke_codex_structured", fake_invoke)
+    lane._call_scene_review(
+        slot_fn=lambda **k: "", pack=None,
+        artifact_inputs={"scene_line_ids": list(ids), "scene_rows": []},
+        scene_line_ids=ids, label_pattern=re.compile(r"."), call_journal={},
+    )
+    assert len(jobs) == 1
 
 
 def test_the_beat_array_ceiling_is_the_beats_own(monkeypatch):
