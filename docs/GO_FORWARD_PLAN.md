@@ -198,7 +198,63 @@ fail-soft; numeric decode budget; canonical text ownership; any Python editing
 prose). **Every finding below was re-verified against the real Windows files
 before being written down.**
 
-**THE HEADLINE, AND IT DEFEATS THE PASS WE JUST BUILT.**
+### CORRECTION -- `clean_spoken_text` IS NOT A VIOLATION. THE OPERATOR RULED ON IT.
+
+**Written first because the entry below originally ranked it the WORST
+offender, and that was wrong.** Fable found the ruling; it is verified in the
+real files, twice over:
+
+`_otr_captions.py:19-40`, **operator ruling 2026-08-05**: *"PERFORMANCE
+DIRECTION IS SHOWN ON PURPOSE. A caption burns the RAW ledger line, so a
+parenthetical like `(forcefully winding the clock)` appears on screen even
+though the voice never speaks it -- TTS independently strips it via
+`clean_spoken_text`. Caption and audio therefore diverge BY DESIGN; measured
+at 255 cues across 95 of 915 shipped episodes."* The operator's own words:
+*"it's a nice easter egg as long as it's built and we know and it's
+documented."* `tests/test_otr_captions.py` pins it **so the divergence cannot
+be "corrected" by accident later** -- which is exactly what the entry below
+was about to send someone off to do.
+
+**And the raw text is LOAD-BEARING on the visual side, verified:**
+`_otr_motion_clause._line_text_index` (`:135-143`) reads raw `lines[].text`
+and hands it to the i2v motion clause under the standing directive *"the line
+drives the motion"* (`:47`); it also feeds the still-image prompt and the HUD.
+Stripping direction out of `lines[].text` would quietly degrade stills AND
+motion.
+
+**So this is a deliberate TWO-SURFACE design, not a shim.** `lines[].text` is
+the canonical, direction-bearing record; the microphone gets a deterministic
+projection of it. The no-shims law is about AUTHORSHIP -- who may write the
+record -- and `clean_spoken_text` at TTS time writes nothing back. **Leave it
+alone: do not remove it, do not gate it on the unclean flag, do not add
+logging.** The 80/40 character caps are deliberate bounds on deletion power,
+not a latent bug: the regex only deletes fragments short enough to be
+unambiguously stage business, and anything longer is left for the model.
+
+**WHAT WOULD REOPEN IT:** a live episode where the regex deleted words a model
+had BLESSED as genuine speech. That population is greppable -- rows where
+`clean_spoken_text(text) != text` with no `unclean_spoken_text` flag and no
+policy finding. If it contains eaten dialogue, narrow the net; do not remove
+it.
+
+**STILL A DIFFERENT QUESTION, and NOT settled by the above:**
+`_otr_scifi_codex._canonicalize_script_spoken_text` (`:3249`) runs the same
+function but writes the stripped text back INTO the script artifact, which
+becomes the ledger. That is not a projection at the mic -- it edits the
+RECORD, and the record is what stills and motion read. Lower priority than it
+looked, but not covered by the captions ruling.
+
+**A NEW TENSION THE CLEAN STAGE CREATES, and it is ours:** the clean stage
+REWRITES `lines[].text`, so a repaired row no longer carries the direction the
+2026-08-05 ruling calls load-bearing for stills and i2v motion. It degrades
+gently -- the repair FOLDS the action into the speech rather than deleting it,
+and `compute_source_hash` includes the dialogue so a changed line correctly
+regenerates its motion clause -- but the two rulings pull on the same field
+from opposite ends. Worth one conscious look before the clean stage is trusted
+on a video leg; it does not block the audio path.
+
+### THE REST OF THE SWEEP STANDS
+
 `clean_spoken_text` (`_otr_script_prep.py:21-30`) is three regexes:
 
 ```python
@@ -207,10 +263,9 @@ _PAREN          = re.compile(r"\([^)]{1,80}\)")
 _BRACKET        = re.compile(r"\[[^\]]{1,40}\]")
 ```
 
-It deletes the parenthetical and staples the halves together -- **the exact
-move `_otr_ledger_clean`'s own repair prompt forbids the model from making**
-("Never just delete and staple. A stripped line often stops making sense or
-goes flat"). And it runs in two places that matter:
+It deletes the parenthetical and staples the halves together. **Read the
+CORRECTION above before acting on any of this** -- at TTS time that is
+sanctioned and must stay. Recorded here for the map of where it runs:
 * **at TTS time**, producing the string the voice actor speaks
   (`eng_chatterbox.py:137`, `eng_dia.py:137`, `eng_indextts2.py:175`,
   `_otr_voice_node_common.py:796/800`) -- so it runs **AFTER** the clean
@@ -219,12 +274,13 @@ goes flat"). And it runs in two places that matter:
   (`_otr_scifi_codex.py:3259` `_canonicalize_script_spoken_text`, and
   `:3728` on the coda before its verifier ever reads it).
 
-**This resolves a measurement mystery.** `scifi_news` graded 0% F1 not because
-the lane is clean but because Python had already deleted the evidence. The
-`re.fullmatch` blind spot in `_spoken_text_finding` (`:3400`) is therefore
-NOT the leak -- the silent prose edit is. **A latent bug rides along:**
-`_PAREN` caps at 80 chars and `_BRACKET` at 40, so a longer stage direction
-survives every strip and IS read aloud.
+**This still resolves a measurement mystery.** `scifi_news` graded 0% F1 not
+because the lane is clean but because the codex lane's compile-time
+canonicalization had already removed the evidence from the record. The
+`re.fullmatch` blind spot in `_spoken_text_finding` (`:3400`) is therefore not
+the leak. **The 80/40 caps are NOT a latent bug** -- they are deliberate
+bounds on deletion power, so only fragments short enough to be unambiguously
+stage business are removed and anything longer is left for the model.
 
 **PYTHON AUTHORS BROADCAST PROSE.** `validate_announcer_line`
 (`_otr_line_composer.py:1140`) rejects a model's announcer line for containing
@@ -291,12 +347,20 @@ back into the rewrite) -- IS live in production. That answers open question 2
 in the word-rip list by measurement instead of assumption.
 
 **RANKED, worst first, for whoever takes this next:**
-1. `clean_spoken_text` at TTS time -- it silently undoes the clean stage.
-2. The announcer fallback -- Python-authored prose on air.
-3. `compose_line_draft` -- cold reroll + uncaught raise on every bank.
-4. Codex `P5R` -- a review pass that cannot repair and can kill the render.
-5. `_pass_news_read` -- unverified source attribution on the pro lane.
-6. The stage-3 widget's phantom repair -- `True` in the canonical graph.
+1. The announcer fallback -- Python-authored prose on air, no reroll, no
+   repair. The clearest violation left.
+2. `compose_line_draft` -- cold reroll + an apparently uncaught raise, on the
+   busiest call in the pipeline, on every bank.
+3. Codex `P5R` -- a review pass that cannot repair and can kill the render.
+4. `_pass_news_read` -- unverified source attribution on the pro lane.
+5. The stage-3 widget's phantom repair -- `True` in the canonical graph.
+6. `_canonicalize_script_spoken_text` -- the codex lane writing the stripped
+   text back into the RECORD, which is a different act from projecting it at
+   the microphone.
+
+**`clean_spoken_text` at TTS time is NOT on this list.** It was ranked first
+here until the 2026-08-05 captions ruling was found; see the correction at the
+top of this section.
 
 ### DO WE NEED MORE LLM PASSES? -- Fable read the real flow, 2026-08-14
 
