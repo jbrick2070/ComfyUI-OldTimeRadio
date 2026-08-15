@@ -3,6 +3,134 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-14 -- HEAD 10ccbfe9 (v2.0-alpha) -- CODER (the clean stage shipped on all six banks; a lab that scores recall AND false alarms; four defects only running it could find; character drift measured, priced and accepted)
+
+**Did.** Built and shipped the POST-STORY CLEAN STAGE
+(`nodes/_otr_ledger_clean.py`), called once from
+`OTR_LedgerScriptWriter._run_writer_tail` -- the one producer boundary all six
+banks reach. A MODEL judges every spoken row for anything that is not speech; a
+MODEL rewrites what it names, told the judge's own words plus the act, the
+speaker, and the lines BEFORE AND AFTER. Bounded at two attempts, then the best
+rewrite ships flagged. Python never writes a word: all four calls that set row
+text write a string the model returned, through `set_line_text_metrics`. Proven
+live on `media_archive` at act 3 -- RESULT SUCCESS, 16 voiced rows, 9 carrying
+non-speech, **6 of them found by the model alone that no pattern list would
+have caught**.
+
+**The judge is a MODEL, not a pattern list, and the operator is why.** The first
+cut gated repairs on regex; he killed it -- *"your shim can clean a contained
+story but it won't fix the next one."* Demonstrably right: the list had `sighs`
+and `turns` and not `closes`, so "The door closes behind him." walked past it.
+The lab's own 695-line `spoken_text_policy.py` is the same class and says so in
+its header, so porting it would not have helped either. Patterns survive as
+EVIDENCE handed to the judge, labelled unreliable -- a union, never a veto.
+
+**FOUR DEFECTS THAT ONLY RUNNING IT COULD FIND, all fixed:**
+
+* **The pass ran BLIND to the act on every writer-lane row** -- `beat_intent`
+  0/16 and `arc_phase` 0/16 on a live episode, because it read them off the
+  BEAT row and the writer lane stamps both on the LINE row. The suite was green
+  throughout. Logged `PBUG-20260814-04`; **already covered by Bible 12.86**,
+  index row appended, not promoted.
+* **The judge condemned clean dialogue** -- a man asking about a reel number, a
+  man arguing and naming who he argues with. Recalibrated by Fable.
+* **A stray non-mapping row in `lines[]` would have killed the render**
+  (`run_ledger_clean` is called unwrapped). Found by the Sonnet QA pass.
+* **The sight string itself could lie** -- call sites keyed `where` /
+  `lines_around` while positions were named `act` / `around`, so a miss landed
+  in no position and read `11111` while `ok` was false.
+
+**Instrumentation, per the operator's design.**
+`meta.ledger_clean.context_seen` counts what each run actually resolved;
+`context_verified` SHA-verifies that the context we BUILT reached the prompt
+bytes we SENT, as a fixed-position sight string (`11111` = all five landed,
+`11011` = the act did not; 8-hex digest). `summarize_acts` has the model write
+its own ~10-word brief per act -- both usable context and evidence of sight,
+since a brief written FROM the lines can only exist if it read them. All of it
+surfaces in `otr_ledger_view.py`, the tool that actually gets run.
+
+**THE LAB (`scripts/otr_clean_stage_lab.py`) -- operator's design, and it paid
+for itself four times.** A planted bad ledger per bank, shaped per LANE (writer
+banks put the act on the line row, codex banks on both -- the shape that would
+have caught the blindness bug), scored on recall AND the false alarms a live
+render cannot measure. Six recipes:
+
+| variant | model | recall | traps kept | repaired | calls |
+|---|---|---|---|---|---|
+| patterns only | -- | 12/15 | 26/28 | 0 | 0 |
+| whole-line | 2B | 13/15 | 17/28 (61%) | 6 | 123 |
+| agreement voting | 2B | 13/15 | 16/28 (57%) | 4 | 168 |
+| load split | 2B | 13/15 | 17/28 (61%) | 5 | 122 |
+| per-sentence | 2B | **15/15** | 12/28 (43%) | 6 | 172 |
+| **whole-line** | **12B** | 13/15 | **24/28 (86%)** | **13** | **79** |
+| per-sentence | 12B | 12/15 | 24/28 (86%) | 12 | 109 |
+
+**Two levers, separable, only one stacks:** job size buys RECALL (per-sentence
+broke a 13/15 ceiling that had held across every variant and both models);
+model size buys PRECISION. They do not combine. **SHIPPING: whole-line on
+`gemma-4-12b-it`.**
+
+**F2 built, lab-tested, and SHIPPED OFF because it failed.** The operator asked
+for the lab first -- *"Fable had a good idea, but we need a real laboratory test
+to see what works"* -- and it stopped a plausible design. Recall **3/6 then 1/6
+on identical fixtures with a byte-identical judge**; never caught `role_claim`
+or `knowledge_mismatch`; the "same words, right mouth" trap fooled it both runs.
+`JUDGE_ATTRIBUTION = False`.
+
+**CHARACTER DRIFT ACCEPTED (operator ruling).** Documented honestly in
+`README.md` -- what a listener will hear, that it ships disabled, why, that the
+constraint is the 16 GB card and not the design, and how to enable and MEASURE
+it with a frontier model. Closed as a work item; reopening needs a measured run
+showing a model both accurate and stable across repeats.
+
+**THE WORST NO-SHIMS VIOLATION FIXED.** The announcer opening, closing and coda
+bridge were reject-and-substitute -- one call, and a single bracket meant Python
+shipped its own hardcoded sentence on air. Now the model is shown its rejected
+line, told brackets are apparatus a voice actor reads aloud, and asked once more
+cooler; the Python line is the last resort AFTER the model was asked, and the
+compose flag says which happened. Also removed a duplicate `_announcer_generate`
+that burned an extra call per episode.
+
+**A THREE-WAY READ-ONLY AUDIT of every fix/repair/review call in the tree**
+against a seven-point bar. Ranked survivors are in PRIORITY 1. **One correction
+of my own:** I ranked `clean_spoken_text` the worst violation; it is NOT one --
+`_otr_captions.py:19-40` is an operator ruling of 2026-08-05 (caption and audio
+diverge BY DESIGN, 255 cues across 95 of 915 episodes, pinned by a test) and the
+raw line is load-bearing for stills, i2v motion and the HUD. Corrected in the
+doc; a Fable consult found it and it was verified against the real files before
+being folded in.
+
+**Current step.** PRIORITY 1 rewritten forward-only (4,183 -> ~2,020 lines). The
+clean stage is DONE. Open items in order: the graduated extraction contract (not
+started), `compose_line_draft`'s cold reroll + apparently uncaught raise, codex
+`P5R`, `_pass_news_read`'s missing validator, the stage-3 phantom repair.
+
+**Next.** Run a live `scifi_news` leg on `gemma-4-12b-it` and confirm the sight
+string reads `11111` on a CODEX-lane ledger -- only the writer lane was proven
+live. Then the graduated extraction contract, enumerating every span reader
+BEFORE writing the relaxed pass.
+
+**Models.** Fable x3 (prompt craft; the pass-flow question; the
+`clean_spoken_text` fork), every claim verified against the real Windows files
+before folding in. Sonnet 5 post-coding QA on the finished diff, which found the
+render-killer. Three general-purpose agents for the read-only audit. Local
+`gemma-2-2b-it` and `gemma-4-12b-it` for every lab measurement. **No kibitz
+r1-r4 arc opened**, per the 2026-08-11 routing; no scoped tail reported as one.
+
+**Gates.** Suite **10488 passed / 110 skipped / 1 xfailed**, 0 failures (the
+baseline at session start was 10448; the +40 are this session's new tests). Bug
+Bible **20 passed / 26 skipped / 3 xfailed**. `build_variants.py --check` **50
+variants, 0 failures**. AST + BOM clean on every touched file. HEAD == origin
+after every push.
+
+**Box.** CLEAN at wrap-up: no resident server, port 8000 clear, no lab or pytest
+processes, VRAM 3.6 GB (desktop apps only -- no model resident).
+
+**Commits.** 11 on `v2.0-alpha`: `15e75e7e` `909ce06f` `5d774e4f` `b84f6e4e`
+`ac9b4881` `b28b9876` `901e09d3` `33c38e09` `1480249a` `2bd38a19` `10ccbfe9`,
+plus this handoff. One row appended to `otr_coverage_index.yaml` in the
+survival-guide repo (verdict `already-covered`, no Bible entry authored).
+
 ## 2026-08-14 -- base HEAD 4216b937 -> 9217995d (v2.0-alpha) -- CODER (all three story bugs fixed and PROVEN on live episodes; a ledger inspector and live window; four schema caps that were refusing legitimate sources)
 
 ### THE ONE-SCREEN VERSION

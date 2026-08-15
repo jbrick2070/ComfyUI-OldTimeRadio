@@ -4,580 +4,151 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
-## PRIORITY 1 -- STORY CLEANUP IN PRODUCTION (operator 2026-08-14). DO THIS FIRST.
+## PRIORITY 1 -- STORY CLEANUP. The clean stage SHIPPED 2026-08-14.
 
-### THE CLEAN STAGE IS BUILT AND WIRED -- 2026-08-14, and the JUDGE IS A MODEL
+**Forward-only.** What this section used to carry -- the build narrative, the
+diagnosis, the measurement tables -- is DONE and lives in the
+2026-08-14 CODER entry of `docs/HANDOFF_LOG.md`. What is left below is what is
+still open, still ruled, or still dangerous.
 
-`nodes/_otr_ledger_clean.py`, called once from
-`OTR_LedgerScriptWriter._run_writer_tail` immediately before
-`run_ledger_cleanup` -- the ONE producer boundary every source bank reaches
-(the legacy writer path, and both news lanes via the pipeline-runner
-dispatch). So all six banks are covered by one call site.
+### WHAT SHIPPED, in one paragraph, so nobody rebuilds it
 
-**THE FIRST CUT GATED THE REPAIR ON A REGEX LIST AND THE OPERATOR KILLED IT,
-correctly.** *"Your shim can clean a contained story but it won't fix the
-next one ... I'd rather a more intelligent LLM say 'do you see things acting,
-like a door closing? that's not dialogue -- well, you need to make a rewrite
-pass'."* The proof is one line long: the pattern list has `sighs` and `turns`
-in it and does not have `closes`, so
+`nodes/_otr_ledger_clean.py` runs once from
+`OTR_LedgerScriptWriter._run_writer_tail`, just before
+`_otr_ledger_cleanup.run_ledger_cleanup` -- the ONE producer boundary all six
+banks reach. A MODEL judges every spoken row for anything that is not speech;
+a MODEL rewrites what it names, told the judge's own words plus the act, the
+speaker and the lines BEFORE AND AFTER. Bounded at two attempts, then the best
+rewrite ships flagged. Python never writes a word: the four calls that set row
+text all write a string the model returned, through `set_line_text_metrics`.
+`scripts/otr_clean_stage_lab.py` is the measurement rig -- a planted bad ledger
+per bank, shaped per lane, scored on recall AND false alarms.
 
-> "The door closes behind him."
+### THE SHIPPING RECIPE, measured -- do not re-derive it
 
-walks past every pattern and gets read aloud. The lab's own 695-line
-`spoken_text_policy.py` is the same class of thing and says so in its header
-(*"a future fuzzy or model-assisted policy requires a new policy"*), so
-PORTING IT WOULD NOT HAVE HELPED. Enumerating stage business is not a finite
-job, so it may not be a Python job.
+**Whole-line judging on `gemma-4-12b-it`.** 13/15 recall, 24/28 traps kept,
+13 rows repaired, 79 calls. The clean stage has a MODEL FLOOR exactly like the
+news lanes do: on `gemma-2-2b-it` precision collapses to 61% and it repairs
+less than half as much while spending MORE calls.
 
-**The shape now:**
+**Rejected by measurement -- do not re-propose without new evidence:**
+agreement voting (-4% precision for +45 calls); the load split as a quality fix
+(neutral, marginally cheaper, kept available as `REPAIR_READS_BRIEF_ONLY`);
+per-sentence judging on a large model (strictly worse than whole-line there).
 
-| | |
-|---|---|
-| **Judge** | a MODEL reads EVERY voiced row: *"is every word of this something the character says out loud?"* and quotes what is not |
-| **Patterns** | `_otr_spoken_text_policy` still runs -- free, instant, and the same detector the offline grader scores with. Handed to the judge as evidence, LABELLED AS OFTEN WRONG |
-| **Trigger** | a UNION, never a veto: dirty if the judge says so OR the patterns do. Neither may overrule the other |
-| **Repair** | a MODEL, told the judge's own words, plus speaker + beat intent + the story so far. Best EDIT, never a strip |
-| **Confirm** | the JUDGE re-reads the repair. A repair graded more weakly than the judgement can pass by moving the defect where the weaker check cannot see |
-| **Budget** | 2 repair attempts per row, each informed. Then the row SHIPS with `compose_flags += ["unclean_spoken_text"]` and a loud log. Never a hard stop |
+**`JUDGE_PER_SENTENCE` is a real lever and it is OFF.** It is the only thing
+that ever broke the 13/15 recall ceiling -- 15/15 on the 2B, by shrinking the
+JOB rather than improving the prompt. It costs precision, and specifically it
+costs `shakespeare` (2/5 traps) and `public_domain` (2/4), which is where the
+operator ruled a false positive IS a real defect. Turn it on only for a forced
+2B run where recall beats politeness.
 
-**PYTHON'S ENTIRE JOB:** choose which rows to ask about, carry the model's
-answer into the row, count, and stop. There is exactly ONE line that writes a
-row's text and it writes the MODEL's returned string, through the canonical
-`set_line_text_metrics` owner so `word_count`/`char_count` move with it. Zero
-`assert`, zero `re.sub`, zero stripping. Pinned by
-`test_python_owns_no_opinion_about_prose`.
+### CHARACTER DRIFT IS ACCEPTED. DO NOT CHASE IT. (operator 2026-08-14 -- HARD)
 
-**WHAT THE LIVE LEGS SHOWED, and the middle one is why the design changed:**
+*"We just accept character drift, don't chase. Be honest in the README -- note
+that if they want to chase it, they need a frontier model above what my 16 GB
+card can do."*
 
-| leg | cut | result on `media_archive`, act 3, `gemma-2-2b-it` |
-|---|---|---|
-| 1 | regex gate, model may answer "already_speech" | 16 rows, F1 on 6, **0 repaired, 5 overruled**. The 2B took the escape door five times out of five -- once quoting the prompt's own first sentence back as its reason. **The pass was a no-op on the bank that needed it most** |
-| 2 | same, but Python refused the overrule on markup | 16 rows, F1 on 5, **3 repaired**, 1 overruled, 1 unclean. It worked -- and it is the shim the operator then rejected, because it only ever knows the verbs already in the list |
-| 3 | **model judge** | see the handoff |
+**F2's CONTENT half is CLOSED as a work item** -- not parked, not a TODO. It
+was built, lab-tested on the shipping model, failed, and ships disabled
+(`JUDGE_ATTRIBUTION = False`). Recall swung **3/6 then 1/6 on identical
+fixtures with a byte-identical judge**; it never once caught `role_claim` or
+`knowledge_mismatch`, and the "same words, right mouth" trap fooled it both
+runs. A detector that unstable cannot be trusted with a rewrite.
 
-**STILL OPEN under the clean stage:** F2's CONTENT half (a character speaking
-another's words) is REPORTED, never repaired -- it is a reading of the whole
-episode rather than of one line, and there is no detector for it. F2's
-metadata half is reported too and was ZERO on every live leg, which is the
-`PBUG-20260814-01` fix holding on a bank it was never proven on.
+Documented honestly in `README.md` under "Known limitation: character drift",
+including how to enable it and how to MEASURE it
+(`scripts/otr_clean_stage_lab.py --f2 --model <...>`).
 
-### THE CLEANUP LAB, AND THE FIRST HONEST RECIPE MEASUREMENT
+**Reopening it requires NEW EVIDENCE, and that means one thing only:** a
+measured run on the F2 fixtures showing a model both accurate AND stable across
+repeats. This does not reopen the 2026-08-04 story-quality law -- character
+consistency is still carved out of it as a correctness defect. We measured what
+fixing it costs on this hardware and the operator priced it.
 
-`scripts/otr_clean_stage_lab.py` -- operator's design, 2026-08-14: *"create a
-bad ledger realistic scenario for each source bank and simulate having the
-local LLM clean it up ... keep experimenting until you get the right cleanup
-recipe."*
+**F1 -- action in a spoken row -- remains ON and is the shipped capability.**
 
-A planted bad ledger per bank, REAL production code and a REAL local model on
-the `_otr_model_loader` seam. The defects are labelled, so the run scores
-itself on the thing a rendered episode CANNOT measure: **precision**. A live
-leg shows six flagged lines and no way to tell which were wrong; the lab says
-so exactly. Each fixture is shaped like ITS OWN LANE (`LANE_SHAPE`) -- writer
-banks put the act fields on the LINE row, codex banks on both -- because a lab
-whose fixtures share one convenient shape cannot catch a per-lane wiring
-fault, which is precisely the bug that got through.
+### DO NOT "FIX" `clean_spoken_text`. THE OPERATOR RULED ON IT 2026-08-05.
 
-**MEASURED 2026-08-14, `gemma-2-2b-it`, all six banks:**
+An earlier cut of this file ranked it the worst no-shims violation in the tree.
+**That was wrong**, and acting on it would have broken a working design.
 
-| recipe | recall | traps kept | model calls |
-|---|---|---|---|
-| pattern floor only (`--dry`) | 12/15 (80%) | **26/28 (93%)** | 0 |
-| + the model judge | **13/15 (87%)** | 15/28 (**54%**) | 131 |
+`_otr_captions.py:19-40`: performance direction is shown on purpose. A caption
+burns the RAW ledger line while TTS independently strips it via
+`clean_spoken_text`, so caption and audio diverge BY DESIGN -- 255 cues across
+95 of 915 shipped episodes, *"a nice easter egg as long as it's built and we
+know and it's documented"*, pinned by `tests/test_otr_captions.py`. And the raw
+text is load-bearing on the visual side: `_otr_motion_clause._line_text_index`
+reads raw `lines[].text` for the i2v motion clause under *"the line drives the
+motion"*, plus the still prompt and the HUD.
 
-**READ THAT HONESTLY: on a 2B the judge is NOT a win.** It buys one extra
-defect and costs ELEVEN false alarms on clean dialogue.
+It is a two-surface design: `lines[].text` is the canonical direction-bearing
+record, the microphone gets a projection of it. The no-shims law is about who
+may WRITE the record; the TTS strip writes nothing back. The 80/40 character
+caps are deliberate bounds on deletion power, not a latent bug.
 
-**THEN THE SAME LAB ANSWERED THE RECIPE QUESTION IN ONE RUN:**
-
-| recipe | recall | traps kept | repaired | calls |
-|---|---|---|---|---|
-| pattern floor only | 12/15 (80%) | 26/28 (93%) | 0 | 0 |
-| judge on `gemma-2-2b-it` | 13/15 (87%) | 15/28 (**54%**) | 4 | 131 |
-| **judge on `gemma-4-12b-it`** | 13/15 (87%) | **24/28 (86%)** | **13** | **79** |
-
-**THE CLEAN STAGE HAS A MODEL FLOOR, and it is now measured rather than
-guessed.** The 12B holds the 2B's recall, recovers precision from 54% to 86%
--- within a hair of the pattern floor -- repairs THIRTEEN rows where the 2B
-repaired four, and does it in FEWER calls (79 vs 131), because it converges
-instead of grinding two attempts into a flag. Its act briefs are visibly
-better reads too: *"Kaelen asks for a baseline regarding a sixty percent
-figure."*
-
-This is the same shape as the news lanes' documented floor, now proven for
-the clean stage with ground truth: **`gemma-2-2b-it` writes a fine `original`
-episode but cannot JUDGE one.** Route the clean stage's slot accordingly.
-
-**THE FULL SWEEP -- six recipes, one set of planted ledgers, done chasing.**
-
-| variant | model | recall | traps kept | repaired | calls |
-|---|---|---|---|---|---|
-| whole-line (baseline) | 2B | 13/15 | 17/28 (61%) | 6 | 123 |
-| agreement voting | 2B | 13/15 | 16/28 (57%) | 4 | 168 |
-| load split (brief only) | 2B | 13/15 | 17/28 (61%) | 5 | 122 |
-| **per-sentence** | 2B | **15/15 (100%)** | 12/28 (43%) | 6 | 172 |
-| **whole-line** | **12B** | 13/15 | **24/28 (86%)** | **13** | **79** |
-| per-sentence | 12B | 12/15 | 24/28 (86%) | 12 | 109 |
-
-**THE TWO LEVERS ARE SEPARABLE, AND ONLY ONE OF THEM STACKS.**
-* **JOB SIZE buys RECALL.** Per-sentence judging broke the 13/15 ceiling that
-  had held across every other variant AND both model sizes -- 15/15, the only
-  thing all session that moved it. That is the per-beat principle again:
-  shrink the JOB, not the prompt. Python splits the sentences (mechanical, it
-  edits nothing) and the model answers one question instead of four.
-* **MODEL SIZE buys PRECISION.** 61% -> 86%, with more repairs and FEWER
-  calls, because a 12B converges instead of grinding two attempts into a flag.
-* **They do not combine.** Per-sentence on the 12B is strictly worse than
-  whole-line on it. Tested, not assumed.
-
-**SHIP: whole-line on `gemma-4-12b-it`.** Best repairs (13), best precision,
-fewest calls (79), and the fidelity lanes stay protected. `JUDGE_PER_SENTENCE`
-stays as a documented knob for the case where the 2B is forced and recall
-matters more than politeness -- but note it costs `shakespeare` (2/5 traps)
-and `public_domain` (2/4), which is exactly where the operator ruled that a
-false positive IS a real defect.
-
-**REJECTED, measured, do not re-propose without new evidence:** agreement
-voting (-4% precision for +45 calls); the load split (neutral on quality,
-marginally cheaper -- kept available, not a fix); per-sentence on a 12B.
-
-**The last three misses are all `scene_report`** -- a scene sentence and real
-dialogue sharing one row. That is the only remaining recall class on the 12B.
-
-**PRIORITY, operator 2026-08-14:** *"I'm more concerned about not finding and
-fixing non-dialogue, or the wrong character's speech."* So recall and F2 are
-the objective; a false positive on `original` or the news banks is cheap --
-*"even if it cleans up a good line, as long as it still fits the act, story
-and surrounding dialogue"* -- **EXCEPT on `shakespeare` and `public_domain`,
-where rewriting the author IS the defect.** That lane scored traps kept 2/5
-on the 2B with false alarms on `literary` and `imperative`; protecting it is
-the one place precision is non-negotiable.
-
-**POST-CODING QA (Sonnet 5, on the finished diff) FOUND A RENDER-KILLER, now
-fixed.** `_is_voiced` was handed NEIGHBOUR rows sliced raw out of `lines[]`
-with no `isinstance` guard, so one stray non-mapping entry -- an older or
-hand-edited ledger -- would raise `AttributeError` out of the pass, and
-`run_ledger_clean` is called UNWRAPPED from the writer tail, so it would kill
-the episode. It also caught `model_calls` silently omitting the per-act
-briefing spend while the writer-tail comment claimed the cost was stated
-honestly, and `unclean` conflating "a model tried and failed" with "no model
-ran". All three fixed and pinned by tests.
-
-### THE PASS WAS BLIND TO THE ACT ON EVERY LIVE EPISODE -- FIXED 2026-08-14
-
-**Operator: *"the key is we need to make sure in the ComfyUI workflow it is
-actually seeing all the artifacts and pointed to them -- act / act spine,
-characters, before and after dialogue -- and not blind due to a coding
-error."* He was right, and it was already happening.**
-
-Measured on the live `media_archive` ledger: `beat_intent` present on **0/16**
-rows, `arc_phase` on **0/16**. The cause is one wrong lookup --
-`arc_phase` and `beat_intent` are stamped on the **LINE** row by the writer
-lane, and the pass read the **BEAT** row, whose writer-lane shape is pure
-transport (`beat_id`, `char_id`, `line_ids`, `scene_id`, `shot_id`,
-`start_s`, `dur_s`). So "WHERE THE STORY IS" shipped EMPTY on every prompt of
-every writer-lane episode, and the judge and the repair both worked blind.
-**The unit suite was green throughout**, because its fixtures put the fields
-on the beat -- a shape no writer-lane ledger has.
-
-Fixed by reading the UNION, line first (`_story_field`), since the codex lane
-does populate beats. Three things now make it un-repeatable:
-* **`meta.ledger_clean.context_seen`** counts, per episode, how many rows
-  resolved an arc phase, a beat intent, a cast name, lines before and lines
-  after. A zero in that block IS the blindness, visible in the artifact.
-* **A test on the real production shape** (`test_the_act_is_read_from_the_line_row_where_production_puts_it`)
-  plus one on the codex shape, so neither lane can regress alone.
-* **The lab prints the same counts per bank** and marks a blind run
-  `*** BLIND ***`.
-
-**AND THE STRONGER PROOF THE OPERATOR ASKED FOR:** *"asking the LLM if it can
-see it is the better truth over some codified variable check."* Correct -- a
-counter proves a STRING WAS BUILT, not that the model received or could use
-it. So `summarize_acts` has the model READ each act and write its own ~10-word
-brief, which is then pasted into every judge and repair prompt for that act.
-The brief is both the context ("rising" is a label; a sentence is usable) and
-the evidence of sight. Live from the lab, on `scifi_news`: *"Dr. Osei is
-monitoring the shielding of a device at 60% capacity."* That is a real read of
-the material -- the model can see the act. ~5 calls an episode, one per arc
-phase, never fatal.
-
-### CHARACTER DRIFT IS ACCEPTED. DO NOT CHASE IT. (operator ruling 2026-08-14 -- HARD)
-
-*"Sure, we just accept character drift, don't chase. Be honest in the README --
-note that if they want to chase it, they need a frontier model above what my
-16 GB card can do."*
-
-**F2's CONTENT half is CLOSED as a work item.** It was built, lab-tested,
-failed its own test, and is shipped disabled. It is not a bug to fix, an
-oversight to revisit, or a TODO. A future window that reopens it without NEW
-EVIDENCE is chasing something the operator has explicitly stopped.
-
-What "new evidence" would mean: a measured run on the F2 fixtures showing a
-model that is both accurate AND stable across repeats. Nothing else.
-
-* **Documented in the README** under "Known limitation: character drift",
-  honestly -- what it is, that it ships disabled, why (the 3/6-then-1/6
-  instability), that the constraint is the 16 GB card rather than the design,
-  and exactly how to turn it on and measure it with a bigger model.
-* **The code stays** (`JUDGE_ATTRIBUTION = False`), tested, so nobody rebuilds
-  it and anyone with a frontier model can flip one flag.
-* **F1 -- action in a spoken row -- remains ON and is the shipped capability.**
-  That half of the acceptance test works and is measured.
-
-**This does NOT reopen the 2026-08-04 story-quality law, and it does not
-contradict it.** Character consistency was carved out of that law as a
-CORRECTNESS defect, and it still is -- we simply measured the cost of fixing
-it on this hardware and the operator has priced it. Accepting a known,
-documented, disabled-by-default limitation is a decision, not a regression.
-
-### F2 WAS LAB-TESTED BEFORE SHIPPING, AND IT DID NOT PASS. IT IS OFF.
-
-**Operator, 2026-08-14: *"Fable had a good idea, but we need a real laboratory
-test on Fable's design to see what works."* Done, and the lab earned its keep
-by stopping a plausible design from shipping.**
-
-Built exactly as designed and as the operator amended it: a per-row model
-judge asking "does this line belong to the character speaking it", its OWN
-call (never bolted onto the F1 judge), and a REWRITE rather than a report --
-he overruled report-only outright: *"we can judge, but someone needs to
-rewrite ... at some point it needs to be CORRECTED, not fail the whole
-thing."*
-
-**The fixtures.** F2 cannot be tested with the F1 bank, because the defect is
-not in the words. So each bank plants the SAME LINE TWICE -- once in the wrong
-mouth and once in the right one -- plus three defect shapes and five trap
-shapes:
-
-| planted | what it is |
-|---|---|
-| `self_address` | the character orders THEMSELVES by name |
-| `role_claim` | claims a role that belongs to another cast member |
-| `knowledge_mismatch` | claims not to know what this character must know |
-
-| trap | why it must survive |
-|---|---|
-| names the other | naming ANOTHER character is ordinary dialogue |
-| quoting | reporting another's words is ordinary dialogue |
-| **same words, right mouth** | the identical sentence, correctly assigned |
-| role stated correctly | the keeper saying she keeps the light |
-| source language | FIDELITY: the author's own line |
-
-**MEASURED ON `gemma-4-12b-it`, the shipping model, twice:**
-
-| run | recall | traps kept | repaired |
-|---|---|---|---|
-| baseline, no model | 0/6 (0%) | 12/13 | 0 |
-| run 1 | 3/6 (50%) | 11/13 (85%) | 0 |
-| run 2 | **1/6 (17%)** | 12/13 (92%) | 1 |
-
-**THE JUDGE IS UNSTABLE, AND THAT IS THE VERDICT.** Runs 1 and 2 used a
-BYTE-IDENTICAL judge -- the only change between them was what happens after it
-fires -- and recall swung 50% to 17% on the same fixtures at temperature 0.2.
-A detector that finds half the defects one run and a sixth the next cannot be
-trusted with a rewrite.
-
-**What it does and does not see:** it caught `self_address` (the vocative)
-when it caught anything, and missed `role_claim` and `knowledge_mismatch`
-EVERY time in both runs. And the "same words, right mouth" trap fooled it in
-both runs -- the hardest and most important trap, because it is the one that
-proves the judge is reading the ROSTER rather than the words.
-
-**SHIPPED OFF: `JUDGE_ATTRIBUTION = False`.** The code is in and tested so the
-next window does not rebuild it, but it does not run.
-
-**THE NEXT THING TO TRY, and it is the architecture that already worked
-twice:** give the F2 judge a free Python HINT the way F1 gets its pattern
-findings -- does this line contain its own speaker's name as a vocative? --
-handed over as EVIDENCE, labelled unreliable, union never veto. That is
-legitimate (it is detection, not prose editing), it costs nothing, and it
-targets exactly the one class the model already half-sees. The subtle classes
-may simply need the roster stated more sharply, or a smaller job per the
-job-size law that took F1 to 15/15.
-
-### THE NO-SHIMS RULE IS BEING BROKEN IN FOUR PLACES WE DID NOT WRITE
-
-**Operator, 2026-08-14: *"fan out all source banks for similar functions / LLM
-calls to fix, and see they have the same rigour -- not just this one call."***
-Three read-only audits swept every fix / repair / review / clean model call in
-the tree against a seven-point bar (detect-and-repair vs cold reroll; informed
-retry; does it see the act/beat and the lines before AND after; bounded +
-fail-soft; numeric decode budget; canonical text ownership; any Python editing
-prose). **Every finding below was re-verified against the real Windows files
-before being written down.**
-
-### CORRECTION -- `clean_spoken_text` IS NOT A VIOLATION. THE OPERATOR RULED ON IT.
-
-**Written first because the entry below originally ranked it the WORST
-offender, and that was wrong.** Fable found the ruling; it is verified in the
-real files, twice over:
-
-`_otr_captions.py:19-40`, **operator ruling 2026-08-05**: *"PERFORMANCE
-DIRECTION IS SHOWN ON PURPOSE. A caption burns the RAW ledger line, so a
-parenthetical like `(forcefully winding the clock)` appears on screen even
-though the voice never speaks it -- TTS independently strips it via
-`clean_spoken_text`. Caption and audio therefore diverge BY DESIGN; measured
-at 255 cues across 95 of 915 shipped episodes."* The operator's own words:
-*"it's a nice easter egg as long as it's built and we know and it's
-documented."* `tests/test_otr_captions.py` pins it **so the divergence cannot
-be "corrected" by accident later** -- which is exactly what the entry below
-was about to send someone off to do.
-
-**And the raw text is LOAD-BEARING on the visual side, verified:**
-`_otr_motion_clause._line_text_index` (`:135-143`) reads raw `lines[].text`
-and hands it to the i2v motion clause under the standing directive *"the line
-drives the motion"* (`:47`); it also feeds the still-image prompt and the HUD.
-Stripping direction out of `lines[].text` would quietly degrade stills AND
-motion.
-
-**So this is a deliberate TWO-SURFACE design, not a shim.** `lines[].text` is
-the canonical, direction-bearing record; the microphone gets a deterministic
-projection of it. The no-shims law is about AUTHORSHIP -- who may write the
-record -- and `clean_spoken_text` at TTS time writes nothing back. **Leave it
-alone: do not remove it, do not gate it on the unclean flag, do not add
-logging.** The 80/40 character caps are deliberate bounds on deletion power,
-not a latent bug: the regex only deletes fragments short enough to be
-unambiguously stage business, and anything longer is left for the model.
-
-**WHAT WOULD REOPEN IT:** a live episode where the regex deleted words a model
-had BLESSED as genuine speech. That population is greppable -- rows where
+**What would reopen it:** a live episode where the regex deleted words a model
+had BLESSED as genuine speech -- greppable as rows where
 `clean_spoken_text(text) != text` with no `unclean_spoken_text` flag and no
-policy finding. If it contains eaten dialogue, narrow the net; do not remove
-it.
+policy finding. Narrow the net then; never remove it.
 
-**STILL A DIFFERENT QUESTION, and NOT settled by the above:**
-`_otr_scifi_codex._canonicalize_script_spoken_text` (`:3249`) runs the same
-function but writes the stripped text back INTO the script artifact, which
-becomes the ledger. That is not a projection at the mic -- it edits the
-RECORD, and the record is what stills and motion read. Lower priority than it
-looked, but not covered by the captions ruling.
+### OPEN -- the no-shims violations that ARE real, ranked
 
-**A NEW TENSION THE CLEAN STAGE CREATES, and it is ours:** the clean stage
-REWRITES `lines[].text`, so a repaired row no longer carries the direction the
-2026-08-05 ruling calls load-bearing for stills and i2v motion. It degrades
-gently -- the repair FOLDS the action into the speech rather than deleting it,
-and `compute_source_hash` includes the dialogue so a changed line correctly
-regenerates its motion clause -- but the two rulings pull on the same field
-from opposite ends. Worth one conscious look before the clean stage is trusted
-on a video leg; it does not block the audio path.
+Found by a three-way read-only audit 2026-08-14, every claim verified against
+the real files. **The announcer fallback (was #1) is FIXED and pushed.**
 
-### THE REST OF THE SWEEP STANDS
+1. **`_otr_line_composer.compose_line_draft` (`:1016-1046`)** -- the per-beat
+   dialogue call for EVERY writer-lane bank is a cold reroll: the identical
+   `messages` object re-sent with the temperature RAISED +0.1 per attempt, and
+   the model told nothing about what was wrong. Then
+   `raise LineCompositionFailedError`, for which **no `except` exists anywhere
+   in `nodes/`** and whose call site (`OTR_LedgerScriptWriter.py:5679`) is
+   unwrapped -- an empty beat appears to kill the episode. Two independent
+   audits reached this separately. **This is the biggest one left.**
+2. **Codex `P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`)** -- the pass
+   whose whole job is "read it back and fix it" never repairs: a content failure
+   gets ONE generic repair turn that sees 400 characters of its own draft, then
+   three cold rerolls, then `CodexPassError` kills the render.
+3. **`_pass_news_read` (`_otr_scifi_fable2.py:1547`)** -- passes **no
+   `post_validator` at all**, so the pro lane's source attribution is never
+   checked, while its codex twin (P6) verifies and cleans it.
+4. **The stage-3 widget advertises a repair that does not exist.**
+   `enable_production_stage3_validators` (`OTR_LedgerScriptWriter.py:3181-3208`)
+   promises *"ONE repair regenerate attempt with the finding messages threaded
+   in"*; findings are telemetry only (`_otr_line_composer.py:1076-1090`).
+   **Measured `True` in `workflows/otr_canonical.json`** -- production runs with
+   a promise it does not keep. Fix the code or fix the tooltip.
+5. **`_canonicalize_script_spoken_text` (`_otr_scifi_codex.py:3249`)** -- runs
+   `clean_spoken_text` but writes the stripped text back INTO the record, which
+   is what stills and motion read. Not covered by the captions ruling above.
+6. **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
+   `PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS`
+   (`:25-82`) driving model rewrites, contrary to the 2026-08-03 directive, plus
+   two bare `RuntimeError`s (`:328`, `:334`) that would kill a render. Nothing
+   calls it. Delete it or rebuild it before anything wires it back.
 
-`clean_spoken_text` (`_otr_script_prep.py:21-30`) is three regexes:
+**Measured good news, so nobody re-audits it:** the whole-remaining-window
+runaway shape (`ProviderCapacityMessages`) is constructed ONLY in the two news
+lanes -- every writer-lane call already carries a numeric ceiling. And
+`set_line_text_metrics` really is the sole writer of `row["text"]`.
 
-```python
-_SPEAKER_PREFIX = re.compile(r"^[A-Z][A-Z .'\-]{1,30}:\s*")
-_PAREN          = re.compile(r"\([^)]{1,80}\)")
-_BRACKET        = re.compile(r"\[[^\]]{1,40}\]")
-```
+### OPEN -- a tension the clean stage created, worth one look
 
-It deletes the parenthetical and staples the halves together. **Read the
-CORRECTION above before acting on any of this** -- at TTS time that is
-sanctioned and must stay. Recorded here for the map of where it runs:
-* **at TTS time**, producing the string the voice actor speaks
-  (`eng_chatterbox.py:137`, `eng_dia.py:137`, `eng_indextts2.py:175`,
-  `_otr_voice_node_common.py:796/800`) -- so it runs **AFTER** the clean
-  stage and silently edits the rows the clean stage flagged and shipped;
-* **in the codex lane at compile time**
-  (`_otr_scifi_codex.py:3259` `_canonicalize_script_spoken_text`, and
-  `:3728` on the coda before its verifier ever reads it).
+The clean stage REWRITES `lines[].text`, which is the field the 2026-08-05
+ruling calls load-bearing for stills and i2v motion. It degrades gently -- the
+repair FOLDS the action into the speech rather than deleting it, and
+`compute_source_hash` includes the dialogue so a changed line correctly
+regenerates its motion clause -- but two rulings now pull on the same field
+from opposite ends. **Look before the clean stage is trusted on a VIDEO leg;
+it does not affect the audio path.**
 
-**This still resolves a measurement mystery.** `scifi_news` graded 0% F1 not
-because the lane is clean but because the codex lane's compile-time
-canonicalization had already removed the evidence from the record. The
-`re.fullmatch` blind spot in `_spoken_text_finding` (`:3400`) is therefore not
-the leak. **The 80/40 caps are NOT a latent bug** -- they are deliberate
-bounds on deletion power, so only fragments short enough to be unambiguously
-stage business are removed and anything longer is left for the model.
-
-**PYTHON AUTHORS BROADCAST PROSE.** `validate_announcer_line`
-(`_otr_line_composer.py:1140`) rejects a model's announcer line for containing
-any of `[]{}` -- then `:1320-1323` ships `fallback_announcer_intro`, a
-hardcoded Python sentence: *"Good evening. This is SIGNAL LOST. Tonight: ..."*
-No reroll, no repair, no model. This is the furthest any site sits from the
-operator's law.
-
-**THE BUSIEST CALL IN THE PIPELINE IS A COLD REROLL.**
-`compose_line_draft` (`_otr_line_composer.py:1016-1046`) -- the per-beat
-dialogue path for EVERY writer-lane bank -- re-sends the identical `messages`
-object with the temperature RAISED `+0.1` per attempt and tells the model
-nothing about what was wrong. Then `raise LineCompositionFailedError` (:1046),
-for which **no `except` exists anywhere in `nodes\`** and whose call site
-(`OTR_LedgerScriptWriter.py:5679`) is unwrapped -- an empty beat kills the
-episode. (Two independent audits reached this conclusion separately.)
-
-**THE PASS WHOSE JOB IS "READ IT BACK AND FIX IT" NEVER REPAIRS.** Codex
-`P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`): a content failure
-gets ONE generic repair turn that sees 400 characters of its own draft
-(`_otr_repair_prompts.py:47`), then three cold rerolls carrying
-`_WRITER_RETRY_INSTRUCTION` (*"The prior candidate is abandoned"*), then
-`CodexPassError` kills the render.
-
-**THE PRO LANE NEVER CHECKS ITS SOURCE ATTRIBUTION.** `_pass_news_read`
-(`_otr_scifi_fable2.py:1547`) passes **no `post_validator` at all**, so the one
-row telling the listener where fact stopped and fiction started is accepted as
-written -- while its codex twin (P6) verifies and cleans it.
-
-**A WIDGET ADVERTISES A REPAIR THAT DOES NOT EXIST.**
-`enable_production_stage3_validators` (`OTR_LedgerScriptWriter.py:3181-3208`)
-promises *"ONE repair regenerate attempt with the finding messages threaded in
-as the reroll hint."* That code is not in the tree; findings are telemetry
-only (`_otr_line_composer.py:1076-1090`). **Measured 2026-08-14: the widget is
-`True` in `workflows/otr_canonical.json`,** so production runs with a promise
-it does not keep.
-
-**ALSO PYTHON REWRITING SEALED PROSE:** `_otr_ledger_scrub.scrub_ledger`
-(`:219-221`) regex-rewrites the FINAL accepted ledger downstream of the clean
-stage; `_otr_ledger_cleanup._complete_deterministic` (`:251-263`) blanks a
-spoken row to a skip when a regex says it has no surface;
-`_otr_line_composer.strip_action_marker` / `_MD_BOLD_ITALIC_RE` (`:66-89`)
-delete `ACTION:` runs and every `*` `_` backtick globally rather than as
-wrappers.
-
-**DORMANT BUT LOADED:** `_otr_content_safety.py` still carries hardcoded
-`PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS` lists
-(`:25-82`) driving model rewrites -- directly contrary to the 2026-08-03
-no-guardrails directive -- plus two bare `RuntimeError`s (`:328`, `:334`) that
-would kill a render. Nothing calls it today. Delete it or rebuild it before
-anything wires it back.
-
-**GOOD NEWS, MEASURED:** the whole-remaining-window runaway shape
-(`ProviderCapacityMessages`) is constructed **only** in the two news lanes;
-every writer-lane call already carries a numeric ceiling. And
-`set_line_text_metrics` really is the sole writer of `row["text"]` -- a
-repo-wide grep returns only that line.
-
-**RESOLVED WHILE AUDITING:** `use_exchange` is **`True`** in
-`workflows/otr_canonical.json` (widget idx 13; count 33 == 33, no drift), so
-`compose_exchange` -- the one genuine informed detect-and-repair in the writer
-lane (`_otr_compose_exchange.py:585`, which feeds its Tier-A verdict reasons
-back into the rewrite) -- IS live in production. That answers open question 2
-in the word-rip list by measurement instead of assumption.
-
-**RANKED, worst first, for whoever takes this next:**
-1. The announcer fallback -- Python-authored prose on air, no reroll, no
-   repair. The clearest violation left.
-2. `compose_line_draft` -- cold reroll + an apparently uncaught raise, on the
-   busiest call in the pipeline, on every bank.
-3. Codex `P5R` -- a review pass that cannot repair and can kill the render.
-4. `_pass_news_read` -- unverified source attribution on the pro lane.
-5. The stage-3 widget's phantom repair -- `True` in the canonical graph.
-6. `_canonicalize_script_spoken_text` -- the codex lane writing the stripped
-   text back into the RECORD, which is a different act from projecting it at
-   the microphone.
-
-**`clean_spoken_text` at TTS time is NOT on this list.** It was ranked first
-here until the 2026-08-05 captions ruling was found; see the correction at the
-top of this section.
-
-### DO WE NEED MORE LLM PASSES? -- Fable read the real flow, 2026-08-14
-
-Operator asked, and asked for the ACTUAL pass flow to be read rather than the
-docs. Fable read `_otr_ledger_clean.py`, the codex lane's `P5B`/`P5R`/`P6` and
-their validators, `_otr_outline.py`'s three-stage cascade, and the shared
-tail. The answer, ranked:
-
-1. **NOTHING NEW FOR F1.** The layering is already correct and
-   non-duplicative: upstream `P5B`/`P5R` catch WHOLE-LINE markup with
-   `re.fullmatch` at authoring time, where a finding is still a cheap
-   rerollable complaint inside the structured ladder; the tail judge catches
-   what upstream structurally cannot -- EMBEDDED and UNPUNCTUATED stage
-   business. The segment-list schema closes the "finds one, misses the
-   second" gap INSIDE that pass rather than needing a sibling. Another F1
-   pass would re-read text a judge already reads.
-2. **THE ONE REAL GAP: F2's CONTENT HALF HAS NO DETECTOR ANYWHERE.**
-   `f2_findings` checks bookkeeping only. Nothing in the flow ever asks *"do
-   these WORDS belong to this speaker?"* -- the gender/voice-contradiction
-   class the operator keeps explicitly open as a CORRECTNESS defect. **This
-   is the next pass, and it is the only one that earns its wall-clock.**
-   Shape, and it is deliberately narrow:
-   * **one job** -- "does this line read as spoken BY this speaker?" Do NOT
-     bolt it onto the F1 judge; a 2B model given two questions degrades on
-     both.
-   * **window** -- the line, the beat's speaker + intent, the cast list, and
-     the same `_CONTEXT_ROWS` prior-row window the F1 judge already builds.
-   * **DETECTOR-GATED on free Python signals**, which is where the
-     wall-clock is won (~0-3 calls an episode instead of +16): the speaker's
-     own name used as a vocative inside their own line; two consecutive rows
-     by the same speaker where the second answers the first; a first-person
-     self-description contradicting the cast row. Optionally UNGATED on the
-     two adaptation lanes, where the bug has actually been observed.
-   * **returns** `{"belongs_to_speaker": bool, "likely_speaker": str,
-     "why": str}` and **REPAIRS NOTHING** -- the beat owns the speaker, so
-     rewriting prose to fit a wrong attribution asks a writer to fix a
-     bookkeeping fault. It appends to the receipt, flags, logs, continues.
-     Report-only also means a 2B misfire costs a flag, never a mangled line.
-3. **REMOVE NOTHING.** `P5R` is the safe cut if wall-clock ever must shrink
-   -- it owns NO exclusive ledger fields, rewriting row `text` only through
-   the same accepted-rows path `P5B` feeds -- but its job is scene coherence
-   against the spine, which the clean stage does not and should not do.
-   Arcs are the stated point of the pipeline. Keep it.
-
-**EXPLICITLY REJECTED: a whole-episode "final table read" pass.** It is the
-`PBUG-20260814-03` failure shape in reverse -- a 2B model handed a whole
-episode averages it into a summary -- and it violates the one-job /
-small-window rule that fixed that bug.
-
-### THE SCIENCE-NEWS REVIEW PASSES DO NOT CATCH AN EMBEDDED STAGE DIRECTION
-
-**Found 2026-08-14 answering the operator's question -- *"I thought we had an
-LLM pass that looks AND fixes for things like this."* He is right that the
-passes exist, and they still miss this.** `scifi_news` runs `P5R`
-`_call_scene_review` (*"read the scene back and fix it against its own
-spine"*, `_otr_scifi_codex.py:3034`) and `P6`'s coda clean. Both validate
-through `_spoken_text_finding`, whose markup rule is
-
-```python
-re.fullmatch(r"\s*(?:\[[^\]]+\]|\([^)]*\))\s*", text)
-```
-
-**`fullmatch`.** It only fires when the WHOLE line is a stage direction. A
-parenthetical embedded in real dialogue -- which is the actual measured
-defect shape -- passes both passes clean. That is the best available
-explanation for `scifi_news_pro` at 32% and `scifi_news` at 18% F1 despite
-having a review pass. The clean stage covers it because both lanes reach the
-shared tail; the narrow `fullmatch` is left alone deliberately, since
-widening it would be another verb-list shim.
-
-
-**This block outranks the CURRENT RUNWAY table below, including its row 1.** The
-Story Lab is PARKED and is being RETIRED, not resumed: row 1's "resume the
-upstream lab and A/B against it" order is SUPERSEDED. The lab at
-`C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OTR-UpstreamStoryLab`
-(branch `main`) is READ-ONLY reference for this work. We read it, we port
-individually approved features out of it, we do not develop in it. Its problem
-statement of record is `docs/PROD_PROBLEM_STATEMENT.md` **in the lab repo**
-(there is no such file in production).
-
-**The history in one paragraph.** The stories were working about a week ago
-(early August 2026). A round of prose updates to the writing prompts broke them,
-and they have not been right since. The lab was built to work the storywriting
-out in isolation rather than debug it in a live system; it grew more complicated
-than the problem it was meant to solve and is now parked. It was not wasted --
-it produced one real improvement (acts, below) and it sharpened the diagnosis
-down to the two defects below.
-
-**The goal:** a story ledger we trust, so production can be tested and frozen.
-
-### The two big misses -- production still has both
-
-### NEXT CHUNK -- A GRADUATED EXTRACTION CONTRACT (operator 2026-08-14)
+### OPEN -- the graduated extraction contract (operator 2026-08-14, NOT STARTED)
 
 *"If it fails once on extraction, we relax the extraction requirements on the
-second pass. It just has to get the gist of the story and populate the coda at
-the end."*
+second pass -- it just has to get the gist of the story and populate the coda."*
 
-**This is the right answer to the model floor below, and it is better than
-refusing the model.** Attempt 1 keeps the strict contract. On failure the
-retry drops to a RELAXED contract instead of re-asking for the same thing at a
-lower temperature -- which is the cold-redraw defect this file already names.
-
-**What the strict contract demands that a small model cannot deliver:** the
-`source_spans` -- field, character offsets, and a VERBATIM quote that must
-match the payload. That is the measured failure (`quote_not_literal`), and it
-is a transcription task, not a comprehension one.
-
-**What the coda actually needs is much less.** `_news_coda_source_anchors`
-reads entity NAMES and number VERBATIMS. It never reads a span. So the relaxed
-pass is well defined:
+Attempt 1 keeps the strict contract. On failure the retry drops to a RELAXED
+one instead of re-asking for the same thing at a lower temperature.
 
 | | strict (attempt 1) | relaxed (attempt 2) |
 |---|---|---|
@@ -585,702 +156,46 @@ pass is well defined:
 | entity names, numbers | yes | yes |
 | `source_spans` with literal quotes | required | **dropped** |
 
-That is enough to ground the drama and to name the source in the coda, which
-is the whole job.
-
-**THE ONE THING THE RULING DOES NOT SAY, AND IT IS LOAD-BEARING: STAMP IT.**
-A relaxed extraction is no longer span-proven, so nothing downstream may claim
-verified provenance for it. `meta` must record which contract produced the
-index, and every consumer that reads a span needs a defined answer when there
-is none -- that is the standing "a ripped pass may not leave a ledger field
-unowned" rule applied to a field that is now conditionally absent. Enumerate
-the span readers (`_span_ok`, `_span_mismatch`, the citation audit,
-`_otr_scifi_source_repair`) and give each an explicit behaviour before writing
-the relaxed pass, not after.
-
-**Applies to both news lanes:** `scifi_news` P0 and `scifi_news_pro`'s dossier
-fail the same way for the same reason.
-
-**Not started 2026-08-14** -- specified here at the end of the session so the
-design is not lost. The measurement that motivates it is below.
-
-### THE MODEL FLOOR IS REAL, UNWRITTEN, AND IT GRINDS INSTEAD OF REFUSING
-
-**Measured 2026-08-14.** `gemma-2-2b-it` drove `original` at act 3 to a
-complete, F2-clean ledger in **5.1 minutes** -- the fastest good result of the
-session. The same model could not get `scifi_news` past **P0**: it burned all
-three attempts on the first source window, moved to the second, and was killed
-at 34 minutes having produced nothing.
-
-**IT WAS NOT A RUNAWAY, and the distinction matters.** The evidence: 10 P0
-attempts distributed 1/3 x2, 2/3 x2, 3/3 x1 -- the ladder working across two
-windows -- one halt caught and rerolled by the guard, and a longest single
-decode of **1,581 tokens** against the 8,128 and 13,912 of the real runaways.
-It was bounded, honest, futile work. P0 runs PER SOURCE WINDOW and each window
-gets up to nine attempts, so a long article times that cost by the window
-count.
-
-**THE OPERATOR'S MEMORY IS CORRECT AND THE CORPUS CONFIRMS IT.**
-`gemma-2-2b-it` produced **25 complete episodes in early June**, all
-`(unstamped)` -- before `source_bank` was a field -- at 16 spoken rows each.
-So the news bank DID run on a 2B model once. What changed is not the model and
-not a regression: the LANE was replaced. `scifi_news` today is the codex v4
-machine (adopted 2026-07-19, `_otr_lane_specs.py`) with an evidence contract
-the June pipeline never had -- literal source quotes, character-offset spans,
-a capped fact index, cast-coverage gates. **The bank kept its name; the machine
-underneath it changed, and the model floor rose with it.**
-
-Across the recorded journals (2026-07-11 onward) the models that have actually
-driven `scifi_news` P0 are `Mistral-Nemo` (67 episodes), `openrouter:slot-a`
-(17), `gemma-4-12b-it` (10), its GGUF (4) and `gemma-4-E4B-it` (3). **`gemma-2-2b`
-appears zero times.**
-
-| | |
-|---|---|
-| `scifi_news`, `scifi_news_pro` | need a real model. Proven: `gemma-4-12b-it`, `Mistral-Nemo` |
-| `original`, `shakespeare`, `public_domain`, `media_archive` | `gemma-2-2b-it` is fine, and fast |
-
-**THE DEFECT IS NOT THE FLOOR, IT IS THE SILENCE.** A model that cannot
-satisfy a lane's contract should be refused at the top of the run with the
-reason, not discovered after 34 minutes of bounded retries. Do NOT delete
-`gemma-2-2b-it` to fix this -- it is the fastest writer-lane model on the box,
-and deleting it would trade a working capability for a missing message.
-
-### ONE CLEAN EPISODE IN THE WHOLE CORPUS, AND IT IS TODAY'S
-
-Graded ~1,400 episodes on disk with `scripts/otr_ledger_view.py`. **Exactly one
-passes F1+F2: the 2026-08-14 `scifi_news` run.** Every earlier episode fails,
-because every earlier episode shipped `speaker: None` on every spoken row.
-That is the true blast radius of `PBUG-20260814-01` and the sharpest available
-measure of what the fix bought.
-
-### A SCHEMA CAP MUST NEVER SIT AT THE NUMBER A TRIM ALREADY ENFORCES
-
-**Found live 2026-08-14, then swept.** `scifi_news_pro` died twice on a UCLA
-Health story that names 11 places and 14 institutions. The model extracted them
-correctly; the pydantic cap on `NamedEntities` refused the reply three times
-and killed the episode. The cap was **redundant** -- `_merge_dossiers` already
-trims every bucket via `_balanced_window_values(limit=...)` -- so the refusal
-fired in front of the trim written to handle exactly that case.
-
-Sweeping every bounded list field in the story lanes found **three more** in
-the same model (`facts_to_keep`, `allowed_numbers`, `dramatizable_vectors`).
-One killed episodes; the others were the same failure waiting for a richer
-source. All four ceilings are now backstops against a degenerate decode; the
-limits stay at the merge. Fixed and proven live (`8884b4d2`).
-
-**STILL SUSPECT, DELIBERATELY NOT FIXED:** the codex lane carries the same
-shape on `MAX_FACT_ROWS` (6) and `MAX_ENTITY_ROWS` (4) -- caps equal to the
-`_balanced_p0_records(limit=...)` trim. That lane decodes under a grammar, so
-the ceiling TRUNCATES during generation rather than refusing: a different
-symptom (silent evidence thinning, not a crash) and unproven on an artifact.
-Six facts and four entities is tight for a real news story, and it is a better
-explanation for thin evidence than quote-literalness alone. **Prove it on an
-artifact before touching it.**
-
-### F1 IS ON EVERY BANK, AND PER-BEAT IS NOT THE FIX FOR FIVE OF THEM
-
-**Measured 2026-08-14 with `scripts/otr_ledger_view.py` over 250 episodes on
-disk, grouped by bank.** Operator: *"we need to fix these similar [problems] on
-all source banks if they are present."* They are present.
-
-| bank | ends on announcer | spoken rows carrying action |
-|---|---|---|
-| `media_archive` | 100% | **40%** |
-| `scifi_news_pro` | 100% | **32%** |
-| `original` | 100% | **30%** |
-| `scifi_news` | 43% -> fixed | 18% -> **0%** on the 2026-08-14 leg |
-| `public_domain` | 100% | 13% |
-| `shakespeare` | 100% | 11% |
-
-**Two things this settles.**
-
-1. **The CODA defect was `scifi_news`-only.** Every other bank already ends on
-   an announcer row. (An earlier cut of this audit reported "no coda anywhere"
-   -- it was counting the `news_coda` compose flag, which only the codex lane
-   sets. Measurement error, corrected here.) What is NOT yet measured on the
-   other banks is whether that closing announcer NAMES its source; only the
-   codex lane stores a fact index to check against.
-2. **PER-BEAT DIALOGUE IS NOT THE FIX FOR THE WRITER-LANE BANKS.** `original`,
-   `shakespeare`, `public_domain` and `media_archive` ALREADY compose one
-   model call per beat (`_otr_outline` stage 3) and are still dirtier than
-   `scifi_news` was. Their job size was never the problem, so shrinking it
-   cannot be the answer. What they need is the CLEAN STAGE this file already
-   specifies -- code detects, a model repairs -- which is **built as a
-   detector and NOT yet wired as a repair pass.**
-
-**The detector now exists and is shared.** `otr_ledger_view.grade()` is the
-same F1/F2 grader for every bank; the repair pass can reuse it rather than
-growing a second opinion about what "action" means.
-
-**Grade the fidelity lanes with care.** On `shakespeare` and `public_domain`
-the author's own language is carried as written, so a third-person construction
-that came from the source is not a defect. The detector cannot tell those apart
-and will over-report there; its findings on those two banks are a reading list,
-not a verdict.
-
-**MISS 1's ROOT CAUSE IS FIXED ON `scifi_news` -- 2026-08-14,
-`PBUG-20260814-03` closed in code.** The dialogue job is ONE BEAT now, and each
-scene is read back by a review pass before anything downstream. Per scene: one
-`P5B` job per accepted beat, then one `P5R` review. The window is the fix --
-a beat job sees its own intent, its scene's spine, and `rows_so_far`, never the
-whole line graph, so the writer answers the line before this one instead of
-averaging an act into a summary. The review may rewrite against the spine and
-may not add, drop or renumber. Per-job decode budgets shipped in the same
-change, because they are the same change: right-size the job, never raise the
-guard. **What is NOT yet proven:** only a generated episode shows whether the
-ledger reads as dialogue. The code change is the hypothesis; the story is the
-evidence.
-
-**MISS 1 -- CHARACTER ACTION IS BLEEDING INTO THE DIALOGUE.** Rows that should
-contain nothing but spoken words are carrying stage business: what a character
-does, how a line is delivered, what is heard. Every sealed line becomes TTS
-audio, so a stage direction inside a line **gets read aloud on air**. The sealed
-ledger holds exactly three things -- announcer speech, character dialogue, music
-cues -- and never a stage direction, action row, narration or delivery note.
-Observed on the accepted 2026-08-13 `wan_ti2v` episode and standing as a live
-content receipt.
-
-**MISS 2 IS FIXED ON `scifi_news` -- 2026-08-14, `PBUG-20260814-02` CLOSED.**
-The coda is now **P6**, a pass that owns one job, running after P5 against the
-episode that was actually written. Code detects whether it names an indexed
-source anchor and is pure speech; a firing verifier triggers ONE bounded clean
-told exactly what was still wrong, never a refusal and never a reroll. Python
-appends the validated row LAST, so the position is a property of the code
-rather than a hope about a draft, and `_assert_news_coda_is_last` re-asserts
-the pro lane's three parser rules afterwards. Three outcomes, all of which
-continue the render: clean, unclean (ships, flagged), absent (nothing
-invented). **Still open:** the same defect shape on `shakespeare` -- the close
-should credit the play -- which rides the writer lane's own `compose_news_coda`
-path and was not touched by this change. The original diagnosis is kept below
-because it is the reason the fix looks the way it does.
-
-**MISS 2 -- THE CODA IS NOT ANNOUNCING THE SOURCE.** On the `scifi_news` lane
-the closing announcer read does not name the real news story the episode was
-drawn from. The same defect shape applies on `shakespeare`, where the close
-should credit the play. The episode ends without telling the listener what it
-was drawn from. **The defect is that the coda does not NAME THE SOURCE -- not
-that the coda's surface or structure is wrong.** Do not redesign the ending.
-
-**BOTH ARE NOW CONFIRMED ON THE PUBLISHED 2026-08-13 LEDGER, and logged as
-`PBUG-20260814-01/02/03`. NEITHER IS FIXED.** The evidence gate is passed, so the
-next window fixes rather than re-diagnoses. Root causes, all traced:
-* **F1** -- the dialogue job writes a WHOLE ACT in one model call, so the model
-  returns a summary of the act in narrated prose. Fix is per-beat dialogue plus
-  an act-review pass.
-* **F2** -- `Ledger.set_lines()` omits `speaker` from its normalized row schema
-  while its sibling `set_beats()` carries it. **Shared by every bank**, so a
-  lane-only fix leaves the rest broken.
-* **MISS 2** -- the coda is prompt text glued onto two other passes, with nothing
-  reserving the row and nothing verifying it afterwards. `scifi_news_pro` already
-  enforces it structurally and is the model to copy.
-
-### The dialogue-cleanup pass -- decided 2026-08-14
-
-**A test pass that only says PASS is waste.** Operator: *"i dont want to waste too
-many on test passes that dont do anything ... test passes should say 'look for
-non-dialogue, if you see it, look at the acts and beats so far and rewrite the
-ledger so there's no action in the dialogue'."* So the pass DETECTS and then
-REPAIRS, with the acts and the beats so far as its context.
-
-**And the repair is a MODEL CALL, never Python.** Operator: *"i hate shims and
-assertions of py to fix things, i like llm calls to ask it to fix things, that
-should be documented."* Code may detect the defect and describe it precisely; the
-rewrite is always a model pass. No regex surgery on a line, no Python stripping
-parentheticals, no `assert`. **This is the documentation that ruling asked for.**
-
-| Decision | Ruling (operator 2026-08-14) |
-|---|---|
-| Which model repairs | **`creative_writing_model`** -- it is rewriting dialogue, so the tier that wrote the line rewrites it, and the repaired line still sounds like its neighbours |
-| Repair fails again | **Bounded retries, then flag loudly.** Each retry is told what was still wrong with the last attempt. On final failure the ledger records the line as unclean and the log says so; the render continues. **Never a silent pass, never a hard stop** |
-| Where stripped action goes | **Nowhere. Deleted.** Operator: *"i dont want any non-spoken lines in ledger."* The ledger holds spoken lines and music cues, full stop |
-
-**THAT VERIFICATION IS DONE -- 2026-08-14, and the answer is reassuring.** The
-question was whether any downstream consumer reads a non-spoken row, because
-deleting one would otherwise open a hole in the ledger.
-
-**There is no stage-direction / action / narration ROW TYPE in this codebase at
-all.** The only non-spoken rows are `music_open` / `music_close` / `music_inter`,
-whose `text` is empty by design (the `sfx` role was retired 2026-07-01 and is now
-a hard error, `scene_sequencer.py:905-908`). Music cues are exactly what the
-operator's rule already permits in the ledger, so nothing needs deleting.
-
-**Those music rows ARE load-bearing and must stay:** per-beat audio slicing
-dispatches on `speaker_role` with an explicit music passthrough
-(`scene_sequencer.py:909-956`); still generation keys off `music_opening_001` /
-`music_closing_001` (`otr_meta_brief_image_prompt.py:1246-1273`); and the video
-tail-loop window is derived from `music_close` rows
-(`otr_silent_composite.py:419-422`, `render_driver.py:4764`).
-
-**So F1 is purely a CONTENT defect, not a schema one.** The action text is inside
-spoken rows' `text`; there is no separate field it should have gone to and none
-to remove. The repair pass rewrites the row's text and nothing else moves.
-
-**THE BAR, in the operator's words 2026-08-14:** *"as long as the ledger is legal
--- no action in the ledger, good character consistency -- we are good."* That is
-the acceptance test for this whole tranche. Not a word number, not a green suite.
-
-### THE ARC MACHINERY ALREADY EXISTS -- keep it, just cut the words out
-
-**Measured 2026-08-14. This is the single most important finding so far and it
-shrinks the acts work to a removal.** The operator described the shape he wants:
-*"here is a story and you've already cast the cast, we need you to build an X
-number act story arc for this -- that gives me the whole story arc summarized
-composing of X acts, and then prompts after that flesh out the acts and create
-the dialogue."* **Production already does exactly that.** `_otr_outline.py:876-895`:
-
-| Stage | Calls | Job |
-|---|---|---|
-| 1 macro | 1 | the whole arc, summarized |
-| 2 phase | **`act_count`** | per-act beat skeleton -- one call per act |
-| 3 beat | `num_voiced_beats` | flesh out each beat, compose the lines |
-
-Total LLM calls = `1 + act_count + num_voiced_beats`. **The act count already
-drives the pass topology.** Operator confirmation: *"hopefully a lot of the act /
-spine / beat writing prompt architecture can stay basically the same."* **It can.
-It stays.**
-
-**And the beat topology is ALREADY act-driven, not word-driven.**
-`_otr_episode_budget.py:275` -- `per_phase_beats = tuple(cfg["voiced_beats_per_act"])`
-comes from `ACT_COUNT_CONFIG` alone. Words never touch it.
-
-**So here is the entire word surface, and it is smaller than feared:**
-
-| Where | What it does | Verdict |
-|---|---|---|
-| `_otr_outline.py:809-811` | injects `"Requested spoken length: about {target_words} words"` **into the macro prompt** -- the word count literally reaching the model | **DELETE** (3 lines) |
-| `_otr_episode_budget.py:273` | `per_phase_words = round(target_words * f)` | DELETE |
-| `:276-292` | `words_per_beat_range` / `BEAT_WORD_HARD_MAX` per-beat word ceilings | DELETE |
-| `:216-227` | `_max_target_words_for_act_count` | DELETE |
-| `:293+` | fail-fast word-feasibility guard | DELETE |
-| `:70-104` | `_DEFAULT_ACT_BREAKPOINTS`, `default_act_count`, `max_act_count` | DELETE |
-| `_otr_outline.py:814-826` | acts, arc phases, beats per phase, music inter, announcer beats | **KEEP -- this is the spine** |
-
-**AND THERE IS A LIVE WORD-COUNT VETO IN PRODUCTION RIGHT NOW, which contradicts
-the operator's own standing law.** `compute_episode_budget` RAISES
-`InvalidEpisodeBudgetError` when `act_count < default_act_count(target_words)`
-or `act_count > max_act_count(target_words)` -- so the word total can currently
-REFUSE the operator's act choice outright. The law says `target_words` is
-advisory: *"no refusals, no hard caps, no shunts."* This is one. It goes with the
-rest.
-
-**THE PACK PROMPTS ARE ALREADY CLEAN OF WORDS.** Grepped all six banks
-2026-08-14: the only word-count strings anywhere are in `custom_source_bank`
-(`runnable: false`) and one description line in `pipelines.json`. **The word
-authority is entirely Python-side.** So this removal does NOT require rewriting
-prompts on six lanes, which keeps it inside the one-lane-at-a-time rule.
-
-**THE OLD VIOLENCE CLAUSE IS ALREADY GONE.** Grepped for "blood / guns / knives /
-graphic violence" across all six packs: no hits. The only match is a
-`spark_deck` prop ("bloodstains of beet dye"). The fidelity defect named in
-`CLAUDE.md` was fixed before this window. Do not re-fix it.
-
-### Story rulings -- operator 2026-08-14
-
-| Lane question | Ruling |
-|---|---|
-| **Shakespeare: the 14 Folger scenes are famous MIDDLE scenes with no ending** | **Dramatize the scene faithfully and let it end where it ends.** Fidelity beats arc. The pack already says this -- `tone_guardrails`: *"Put a MICROPHONE on the scene; do not re-plot it"*, *"Compression is allowed; replacement is not"*, and the macro seam says *"Land the scene's OWN turn, not a turn you supply"* |
-| **Science news: how far may the drama depart from the real story?** | **Springboard -- invent freely from a real premise.** The news is the seed, not a cage. **This makes MISS 2 load-bearing**: because the fiction departs freely, the coda is the ONLY thing telling the listener where fact stopped and fiction started |
-| **`original`: no source to credit, `coda_mode` is empty** | **A reflective close on the story's theme.** The announcer lands what the story was about, crediting nothing. Originals get the same weight of ending the adaptations get |
-
-**THIS CHANGES THE AUDIT CRITERION FOR THE ADAPTATION LANES, so grade them
-correctly.** "Produces a story" was going to be tested as want / cost / reversal.
-On `shakespeare` and `public_domain` that is the WRONG test -- the operator has
-ruled fidelity above arc. The right test on those lanes is **dramatize versus
-narrate**: are the characters speaking and acting in the moment (drama), or is
-someone summarizing what happened (recap)? A faithful scene that ends unresolved
-is a PASS. The want / cost / reversal test still governs `original`, `scifi_news`
-and `scifi_news_pro`, which author their own stories.
-
-### THE ACCEPTANCE TEST -- operator 2026-08-14, and it is only two things
-
-*"The only thing that's failure is if the ledger includes action, or the
-characters and the dialogue get mismatched -- there has to be consistency, so
-John is not speaking Mary's lines and vice versa."*
-
-| # | Failure | |
-|---|---|---|
-| **F1** | **Action in the ledger** | a spoken row carrying stage business, delivery notes or narration |
-| **F2** | **Speaker/line mismatch** | a character's row carrying another character's words |
-
-**NOTHING ELSE IS A FAILURE.** This is the 2026-08-04 "story quality is done"
-law applied, not a new rule: prose quality is not a defect, and character
-consistency is explicitly carved out as one that is. So the bank audit REPORTS
-story shape as an observation and GRADES only on F1 and F2. A lane whose prose
-is merely unexciting is not broken.
-
-**F2's LEDGER HALF IS FIXED -- 2026-08-14, `PBUG-20260814-01` is CLOSED and
-promoted to the Bible as `BUG-12.101`.** `set_lines()` now names `speaker`,
-every assembly site supplies it from the row that already owns it, and the
-symmetry between the two normalizers is pinned by a test in both repos. What
-remains open under F2 is the CONTENT half -- a character speaking another
-character's words -- which the clean stage below owns. The diagnosis that
-follows is kept because it is the reason the fix looks the way it does.
-
-**F2's ROOT CAUSE WAS FOUND AND VERIFIED -- 2026-08-14, and it is NOT where this
-file previously said.** The earlier note sent the reader to
-`repair_script_artifact_metadata` (from `e679b754`). **THAT FUNCTION DOES NOT
-EXIST -- repo-wide grep, zero hits.** It was removed sometime after July 11. Do
-not go looking for it.
-
-**The real cause is one line-schema omission, and it is SHARED BY EVERY BANK:**
-
-| Site | Carries `speaker`? |
-|---|---|
-| `production_ledger.py:1118` -- `Ledger.set_beats()` | **YES** -- `"speaker": _safe_str(r.get("speaker")) or None` |
-| `production_ledger.py:1281-1300` -- `Ledger.set_lines()` | **NO. The key is absent from the normalized row schema entirely** |
-
-So a caller may pass `speaker` on a line row and `set_lines()` **silently drops
-it**. Both news lanes also fail to supply it upstream --
-`_otr_scifi_codex.py:3211` and `_otr_scifi_fable2.py:2749-2786` build line rows
-with `char_id`/`speaker_role` but no `speaker`, because `ScriptLineV4`
-(`_otr_scifi_codex.py:760-784`) has no speaker field at all.
-
-**THE FIX MUST LAND IN BOTH HALVES AT ONCE:** add `speaker` to the `set_lines()`
-normalized schema (mirroring `set_beats()`), AND carry the owning beat's speaker
-name onto the line row at each assembly site. **Fixing only the lane leaves
-`set_lines()` dropping it; fixing only `set_lines()` leaves the lanes not
-supplying it.** And because the root is the SHARED ledger method, a lane-only fix
-leaves every other bank broken.
-
-**Why it shipped unnoticed:** `production_ledger.py:1806-1822` has a
-`cast[].char_id -> name` fallback that masks the omission for ONE consumer. The
-raw ledger JSON on disk still says `speaker: None` on every line row.
-
-### RERolls ARE THE RUNAWAY -- operator 2026-08-14
-
-*"You can look at the story reroll and story killer and maybe kill some of them,
-they were causing runaways -- LLMs repeating itself multiple times and failed
-episodes."* And: **"I don't need 20 rerolls, I just need a correct ledger."**
-
-**What is actually there, measured 2026-08-14:**
-
-| Thing | Value |
-|---|---|
-| `_otr_scifi_codex.py` reroll references | **20** -- the most in the tree, and it is the `scifi_news` lane that owns BOTH misses |
-| `MAX_CANDIDATE_CYCLES` | 3 (operator ruling 2026-08-13) |
-| `_otr_structured_call._DEFAULT_MAX_ATTEMPTS` | 3 rungs per cycle |
-| **Attempts per pass** | **3 x 3 = 9** |
-| Passes in the circuit | P0, P1, P2, P3, P5 -- so the worst case across an episode is many times nine |
-
-**THE MECHANISM, and it explains the repetition.** A reroll is a
-REJECT-AND-REDRAW: it throws the candidate away and asks the model again **cold**
--- same prompt, same model, no word about what was wrong. That is the
-cold-regeneration defect class already logged in this file. **A cold redraw is
-why the model repeats itself: nine identical asks get nine similar answers.**
-More rolls are not more evidence; they are the same roll nine times.
-
-**THE DIRECTION, and it is what the operator already chose for the dialogue
-repair: REPAIR, NOT REROLL.** One informed pass that says *"this line has action
-in it, here are the acts and the beats so far, rewrite it as pure speech"* beats
-nine cold redraws, costs a fraction, and cannot run away. Note the existing code
-already knows the difference -- `repair_max_attempts` is **1** where a repair
-function exists.
-
-**What must NOT be touched:** the runaway GUARDS (decode-loop, repetition,
-`_otr_decode_guard.py`) are code-side and STAY. They are not reroll loops and
-not length limits. Killing rerolls does not mean killing the guard that stops a
-decode which never reaches a stop token.
-
-**Do not kill a reroll site without naming it first.** Bring the operator the
-specific list with what each one recovers from -- `016ad146`'s cast-coverage
-reroll is the one that took `scifi_news` from 0-for-4 to reliable, so it is a
-real capability and not merely waste.
-
-### THE TARGET ARCHITECTURE -- operator 2026-08-14, stated in three messages
-
-*"I need 3-5 LLM passes to clean the ledger."*
-*"The lab may have a post-story ledger clean phase, I'm open to that, before it
-hits the TTS."*
-*"I really don't want rerolls as much. I just want a story, and LLMs cleaning up
-the story."*
-
-**So: WRITE THE STORY ONCE, THEN CLEAN IT.**
-
-```
-   story passes (write it once, no reroll storm)
-        |
-   POST-STORY LEDGER CLEAN -- 3-5 bounded LLM passes
-        |  detect with code, repair with a model
-        |  F1: no action in any spoken row
-        |  F2: no character speaking another's lines
-        v
-   sealed ledger  ->  TTS
-```
-
-This REPLACES reject-and-redraw with detect-and-repair. It is cheaper (a bounded
-handful of informed passes instead of nine cold redraws per pass), it cannot run
-away, and it is the only shape that can actually FIX a defect rather than hope
-the next cold roll avoids it. The clean stage runs AFTER the story exists and
-BEFORE anything reaches TTS.
-
-### WHAT THE LAB HAS FOR THIS -- inventoried 2026-08-14, READ-ONLY, nothing ported yet
-
-The lab already built the detection half, and it is built in exactly the shape
-the operator's law requires: **verifiers that return FINDINGS, not rewrites.**
-
-| Lab asset | Lines | What it is | Serves |
-|---|---|---|---|
-| `src/upstream_story_lab/spoken_text_policy.py` | 695 | `SPOKEN_TEXT_POLICY_ID = "otr.spoken-text-only.v1"`. Detects production cues, delimited stage directions, physical-action verbs, attribution verbs ("he said"), pronoun narration, scene narration, third-person reference, bare stage lines. Returns `SpokenTextFinding` objects | **F1** |
-| `src/upstream_story_lab/ledger_verifiers.py` | 429 | `verify_ledger_integrity`, `verify_news_capture`, `verify_announcer_open`, **`verify_announcer_news_coda`**, `verify_music_bookends` | **MISS 2** + structure |
-| `contracts/ledger_bible_v2.json` | -- | the lab's ledger contract | both |
-
-**`verify_announcer_news_coda` is a detector for MISS 2 that production does not
-have**, and `spoken_text_policy` is a detector for MISS 1 that production
-retired at `314dd481`. **These are DETECTORS. They pair with a model repair pass;
-they never rewrite prose themselves.** That is why they are portable under the
-operator's law where the old reroll machinery was not.
-
-**PORT APPROVED 2026-08-14 -- both files.** The operator approved the coda
-verifier in terms that also set its behaviour: *"we need to see our codas are
-working, and if not the LLM cleans up the coda -- not fails it, not rerolls
-it."* A firing verifier triggers a CLEAN. Never a refusal, never a reroll.
-
-### THE REPAIR MUST THINK, NOT STRIP -- operator 2026-08-14
-
-*"If it detects non-dialogue it should ask it to THINK and update the ledger
-beat with updated text. Make its best choice -- mix of removing the stage
-directions and updating the dialogue. It should think of the best edit."*
-
-**So the F1 repair is NOT a strip.** Deleting the parenthetical and leaving the
-rest is the wrong answer: it can leave a line that no longer makes sense, or
-lose something the moment needed. The model gets the line, the speaker, and the
-acts and beats so far, and is asked to produce **the best edit** -- which is
-usually removing the stage business AND adjusting the dialogue so the moment
-still plays as pure speech. Sometimes the action becomes implied in what the
-character says. That judgement is the model's, which is exactly why this may
-never be Python.
-
-### RERolls: THE LINE IS *UPSTREAM VS THE WRITTEN STORY* -- operator 2026-08-14
-
-*"Some cast rerolls are OK -- it's upstream, it won't reroll the whole darn
-story."* And: *"we can remove the rerolls."*
-
-**The rule that falls out of that, and it is the right one:**
-
-| Reroll position | Verdict |
-|---|---|
-| **UPSTREAM of the writing** -- casting, cast coverage, source selection | **KEEP.** Cheap, bounded, and it does not throw away written prose. `016ad146`'s cast-coverage reroll stays; it is what took `scifi_news` from 0-for-4 to reliable |
-| **ON THE WRITTEN STORY** -- reject a drafted candidate and redraw it cold | **REMOVE.** This is the runaway: nine cold asks get nine similar answers, and it discards work instead of fixing it. Replaced by the clean stage |
-
-### THE CLEAN STAGE -- driver's recommendation, requested by the operator 2026-08-14
-
-The operator asked for a best-practice approach given the spread between small
-local models and frontier ones, and floated tuning `scifi_news_pro` for frontier
-and `scifi_news` for local. **That would collide with the standing law "one
-prompt per job for every model tier, no per-model variants."** The resolution:
-
-**VARY THE JOB SIZE, NOT THE PROMPT TEXT.** A 2B local model can reliably answer
-*"does this one line contain action, and if so rewrite it as pure speech"*. It
-cannot reliably answer *"clean this ledger"*. So every pass gets ONE JOB and a
-SMALL WINDOW -- which a local model can do and a frontier model simply does
-better with the identical prompt. **Where the tiers legitimately differ is which
-MODEL the lane selects**, which is already a dropdown; `scifi_news_pro` naturally
-points at the stronger one. **The lane picks the model; the prompt stays single.**
-No fork, law intact, and the operator's capability instinct is still served.
-
-| # | Pass | Window it sees | Fires when |
-|---|---|---|---|
-| 1 | Action out of dialogue (**F1**) | one flagged line + speaker + acts/beats so far | `spoken_text_policy` returns a finding |
-| 2 | Speaker/line consistency (**F2**) | one flagged line + the cast | attribution is wrong |
-| 3 | Coda names the source | episode structure only | `verify_announcer_news_coda` fires |
-| 4 | Announcer open sets story/place/time/premise | episode structure only | `verify_announcer_open` fires |
-
-Then **code re-runs the detectors -- free** -- and if anything is still dirty,
-ONE bounded repair round, then flag loudly and continue. Never a hard stop.
-
-**EVERY PASS IS DETECTOR-GATED, which is the property that makes this affordable
-on local models: a clean episode costs ZERO cleaning calls.** You pay only for
-what is actually broken, instead of nine cold redraws on every pass regardless.
-
-### RUNAWAY PREVENTION -- operator 2026-08-14: *"that has to be in there"*
-
-The lab design already carries the key mechanism, and it is the right one:
-**per-job-kind decode budgets.** *"A beat needs a small fraction of an act, so
-the runaway guard stops binding on honest work."* The old truncation was a
-whole-act reply hitting a guard sized for something smaller; per-beat replies are
-small, so the guard only fires on a genuine runaway instead of on legitimate
-output. **Right-size the budget to the job -- do not raise the guard.**
-
-The full set, and none of it is a length limit on the story:
-
-| Mechanism | What it stops |
-|---|---|
-| **Per-job-kind decode budgets** | the guard binding on honest work, and a whole-act reply truncating |
-| **Existing two-signal decode guard** (`_otr_decode_guard.py`) | a decode that never reaches a stop token. **Live-proven, do not reopen or remove either signal** |
-| **Feed the failure back on retry** | the cold-redraw repetition loop -- a retry that is told what was wrong is not the same roll again |
-| **Progress requirement** | a repair that does not reduce the finding count does not get retried identically |
-| **Bounded attempts, then flag loudly** | grinding. Never a hard stop; the ledger records the row as unclean and the log says so |
-| **Detector-gating** (driver addition) | paying for clean work -- `act_cleanup` need only do real work where a finding exists |
-
-**PORTING NOTE -- this is a SHAPE port, not a file copy.** The lab design is
-written against the lab's job system (`story_authoring.py`,
-`authoring_executor.py`, `AUTHORING_JOB_SEAMS`). Production's writer is a
-different structure (`_otr_outline.py` three-stage cascade, and the
-`_otr_scifi_codex.py` P0-P5 circuit). The per-beat split, the review job, the
-separate cleanup job and the dedicated announcer jobs all have to be re-expressed
-in production's own seams. **Do not copy the lab's executor into production** --
-`CLAUDE.md` forbids shipping the lab's duplicate workflow/mirror/bridge into OTR.
-
-### RUNAWAYS -- THE WHOLE PLAN, and most of it already shipped
-
-Yesterday's research is six documents: `2026-08-13-writer-runaway-root-cause.md`,
-`-blind-runaway-detection-problem.md`, `-cross-bank-runaway-exposure.md`,
-`-decode-guard-alternatives.md`, `-codex-consult-indecode-halt.md`,
-`-process-audit-runaway-fix.md`, plus the `WRITER_INPUT_MATRIX.md` gate.
-**It reduces to one sentence:**
-
-> **Three failure shapes. Two signals. One install rule.**
-
-**THREE SHAPES** -- captured specimens, not theory (2026-08-13):
-
-| | Specimen | Size | Repeats? |
-|---|---|---|---|
-| A | P3 anaphoric peroration loop | 13,828 tok | yes |
-| B | P5 escalating repetition | 14,521 tok | yes |
-| C | P2 pure **elaboration spiral** | 15,355 tok | **never** |
-
-**TWO SIGNALS** -- and neither is redundant, because C has no cycle to find:
-
-| Signal | Catches | Where |
-|---|---|---|
-| `find_repeating_cycle` -- 48..1024 tok, 3 verbatim repeats | A, B | `_otr_decode_guard.py:99` |
-| `OpenStringTracker` -- one string open > 2,048 tokens | **C** | `_otr_decode_guard.py:225` |
-
-The second is **not a length gate**: it does not measure output, it measures how
-long ONE string has gone without closing. A 20,000-token draft of complete
-fields never approaches it.
-
-**ONE INSTALL RULE** -- *a degeneracy guard is a LIVENESS CONTRACT, so it belongs
-on every local `generate()` call, whether or not a grammar is bound.* The
-research's #1 priority was that the halt installed on `schema_model is not None`
-and therefore missed `scifi_news_pro`'s fable2 markup call, which passes
-`schema_model=None` -- the worst path in the repo.
-
-**THAT IS SHIPPED.** `b37e095b` un-gated the install and added
-`tests/test_decode_guard_covers_every_local_route.py`. **Verified 2026-08-14, not
-taken on trust: 38 passed** across that file and
-`tests/test_decode_degeneracy_guard.py`. `OTR_LedgerScriptWriter.py:977` says it
-outright -- the guard is NOT gated on schema. Also shipped: structural ceilings
-on every model-authored string with a reroll on an exact-ceiling hit, so a
-forced-shut string can never ship as clean-parsing text cut off mid-word.
-
-**SO WHAT IS ACTUALLY LEFT IS TWO SMALL THINGS AND NEITHER IS A NEW GUARD:**
-
-1. **Per-job-kind decode budgets** (from the per-beat design). A beat needs a
-   small fraction of an act, so a right-sized budget stops the guard binding on
-   honest work. This is the fix for the `gemma-4-12b-it` truncation. **Right-size
-   the job; never raise the guard.**
-2. **Feed the failure back on retry.** A retry told what was wrong is not the
-   same roll again. This is what ends the cold-redraw repetition loop, and it is
-   the same mechanism the clean stage needs anyway.
-
-Everything else the research lists for the four legacy lanes is **finite-surface
-hygiene, and the research says so explicitly** -- on a post-validated lane an
-uncapped authored string is untidy, not a runaway cure. Not urgent.
-
-### CORRECTION 2026-08-14 -- THE RUNAWAY IS A REQUISITION DEFECT, NOT A DETECTION ONE
-
-**The operator pushed back on "mostly shipped" with live evidence -- *"we keep
-hitting runaways"* and *"the code yesterday was inviting runaways"* -- and he was
-right. Detection is shipped and verified. The runaways continue anyway, because
-THE CODE ASKS FOR THEM.**
-
-`_otr_generation_budget.ProviderCapacityMessages` sets
-`_otr_reserve_remaining_output_capacity = True`, and
-`OTR_LedgerScriptWriter.py:905`:
-
-```python
-requested_max_new_tokens = context_cap if reserve_remaining else max(1, int(max_new_tokens))
-```
-
-On the story lanes the request is **the entire remaining window** --
-`16,384 cap - 2,472 prompt = 13,912 tokens, no stop string, no schema ceiling`
-(`WRITER_INPUT_MATRIX.md` section 3). A model handed 13,912 tokens of room uses
-them. **The guard is the ambulance at the bottom of the cliff. This is the cliff.**
-
-**AND THE SPLIT IS EXACT -- the lanes that behave are the ones with a number:**
-
-| Lane | Ceiling |
-|---|---|
-| outline macro / phase / beat | 250 / 200 / 150 |
-| cast description / `compose_exchange` / `SlotJobFields` | 250 / 320 / 192 |
-| media / shakespeare / public-domain briefs | 520 |
-| **codex P3 / P5** (`scifi_news`) | **whole remaining window** |
-| **fable2 pitch / treatment / news read / casting** (`scifi_news_pro`) | **whole remaining window** |
-| **fable2 P3 raw markup** | **whole window, no stops, NO SCHEMA** |
-
-`WRITER_INPUT_MATRIX.md:120` states it plainly: *"The inline lanes are safe from
-a full-window runaway because every call carries a NUMERIC ceiling."* **The only
-two lanes that request everything are the two story lanes in daily use.** That is
-why it looked sudden.
-
-**THE ROOT CONFUSION, and it is a category error, not a coding slip.** The
-`ProviderCapacityMessages` docstring says it is for *"prose whose size must never
-be pre-judged"* -- the no-word-count law, applied to the DECODE BUDGET. Two
-different things were collapsed:
-
-| | |
-|---|---|
-| **The STORY** | must never be length-gated. **Correct, and it stays.** |
-| **One model CALL** | still needs a sane request size. That is machine capacity, not a story instruction |
-
-**Do not chase the archaeology (operator 2026-08-14: *"I'm suspect but don't want
-to waste tokens chasing it"*).** The docstring already gives the why; who wrote it
-and when does not change the fix.
-
-**THE FIX IS PER-JOB DECODE BUDGETS, AND IT IS NOT A SMALL ITEM -- it is the main
-event.** An earlier line in this file called it one of "two small things"; that
-was wrong and is withdrawn.
-
-**AND IT ONLY BECOMES SAFE ONCE DIALOGUE IS PER-BEAT.** With a whole-act request,
-ANY ceiling is dangerous because an honest reply really is enormous -- which is
-exactly why "raise the ceiling" kept treating the symptom and why
-`gemma-4-12b-it` truncated. A BEAT's reply genuinely fits a small budget, so the
-ceiling only ever cuts a runaway and never honest work. **Per-beat dialogue and
-per-job budgets are ONE change, not two.**
-
-**IS A PER-JOB BUDGET LEGAL UNDER THE NO-WORD-COUNT LAW? YES, and the line is
-sharp.** The law forbids a token ceiling **derived from a word target**. A budget
-derived from the **job shape** -- a beat is two exchanges -- is not that. The
-inline lanes have carried numeric ceilings from the beginning and nobody has ever
-called 250 a word-count authority. The test to apply: **can the number move when
-`target_words` moves?** If yes it is illegal; if it is a property of the job, it
-is capacity.
-
-### OPERATOR DECISIONS OWED FROM THE WORD RIP (three, all small)
-
-1. **7 acts yields FEWER voiced beats than 6** -- measured 1->3, 2->6, 3->14,
-   4->14, 5->17, 6->**20**, 7->**19**, 8->22. INHERITED, not introduced: the
-   7-act row predates the rip and was probably tuned to fit a word budget rather
-   than to describe a dramatic shape. It contradicts "more acts means more
-   turns". **Pinned in `tests/test_voiced_beat_count.py` with the reasoning
-   rather than silently changed** -- altering it changes every episode rendered
-   at 7 acts. Nothing breaks mechanically. **Fix the row, or accept it?**
-2. **`exchange_system` is a REQUIRED seam whose widget defaults FALSE**
-   (`use_exchange`, `OTR_LedgerScriptWriter.py:3164-3165`). The canonical graph
-   ships it TRUE, so production is fine -- but a fresh graph would run
-   `shakespeare` and `public_domain` without it. **Flip the default, or leave it?**
-3. **`media_archive` always takes feed entry 0** (`_otr_media_archive_sources.py:191-221`)
-   while `shakespeare` draws across all 14 scenes and `public_domain` across all
-   65 units. **Randomize it, or is entry-0 deliberate?**
-
-### SMALL FORWARD ITEM -- the `__main__` self-test blocks are not tests
-
-Nothing executes them, so they rot. Three false assertions were found and fixed
-in passing 2026-08-14 (a `seed` widget that does not exist and was raising
-`KeyError`, killing the block so nothing after it ran; a cast max pinned at 6
-against a real 10; a Beat validator asserted to uppercase when it only strips).
-`OTR_LedgerScriptWriter.py`'s block still stops on an unrelated
-`creative_writing_model` default drift. **Wire them into pytest or delete them.**
-
-
-### QUEUED -- RENAME THE LANES OFF "codex" AND "fable2" (operator 2026-08-14)
-
-*"Ideally I'd like to not call them codex or fable lanes -- they are scifi /
-science news pro / non-pro."* Correct, and it is the standing naming rule: a name
-that does not tell the reader what the thing does gets renamed. The BANK ids are
-already right (`scifi_news`, `scifi_news_pro`); the internals lag.
+The measured failure is `quote_not_literal` -- a TRANSCRIPTION task, not a
+comprehension one. `_news_coda_source_anchors` reads entity NAMES and number
+VERBATIMS and never reads a span, so the relaxed pass still grounds the drama
+and still names the source.
+
+**THE LOAD-BEARING PART THE RULING DOES NOT SAY: STAMP WHICH CONTRACT PRODUCED
+THE INDEX.** A relaxed extraction is no longer span-proven, so nothing
+downstream may claim verified provenance for it. Enumerate every span reader
+(`_span_ok`, `_span_mismatch`, the citation audit, `_otr_scifi_source_repair`)
+and give each a defined behaviour BEFORE writing the relaxed pass -- the
+standing "a ripped pass may not leave a ledger field unowned" rule applied to a
+field that becomes conditionally absent. Applies to BOTH news lanes.
+
+### OPEN -- the model floor should REFUSE, not grind
+
+A model that cannot satisfy a lane's contract should be refused at the top of
+the run WITH THE REASON, not discovered after 34 minutes of bounded retries.
+Measured: `gemma-2-2b-it` drove `original` at act 3 to a clean ledger in 5.1
+minutes and could not get `scifi_news` past P0 in 34. It was not a runaway --
+it was bounded, honest, futile work. **The defect is the silence, not the
+floor.** Proven for `scifi_news` / `scifi_news_pro`: `gemma-4-12b-it` and
+`Mistral-Nemo`. Do NOT delete `gemma-2-2b-it` -- it is the fastest writer-lane
+model on the box.
+
+### OPEN -- F1's last miss class
+
+The three surviving misses on the 12B are all `scene_report`: a scene sentence
+and real dialogue sharing one row ("The monitor flatlines. Someone should call
+the desk."). The per-sentence lever catches them and costs precision elsewhere;
+a calibration example for the MIXED row is the cheaper thing to try first.
+
+### OPEN -- still suspect, deliberately not fixed
+
+The codex lane carries the cap-equals-trim shape on `MAX_FACT_ROWS` (6) and
+`MAX_ENTITY_ROWS` (4). That lane decodes under a grammar, so the ceiling
+TRUNCATES during generation rather than refusing -- silent evidence thinning,
+not a crash, and unproven on an artifact. Six facts and four entities is tight
+for a real news story. **Prove it on an artifact before touching it.**
+
+### QUEUED -- rename the lanes off "codex" and "fable2" (approved, sequenced last)
 
 | Now | After |
 |---|---|
@@ -1289,216 +204,62 @@ already right (`scifi_news`, `scifi_news_pro`); the internals lag.
 | `_otr_fable2_markup.py` | `_otr_scifi_news_pro_markup.py` |
 | `codex_*_system` (6 seams) | `scifi_news_*_system` |
 | `fable2_*_system` (6 seams) | `scifi_news_pro_*_system` |
-| `CodexGraphError` / `CodexTargetRangeError` | `ScifiNewsGraphError` / ... |
 
-Surface measured 2026-08-14: 3 modules, ~55 files mentioning `codex`, ~52
-mentioning `fable2` (docs and kibitz runs included), and **12 seam ids**.
+Surface: 3 modules, ~55 files mentioning `codex`, ~52 mentioning `fable2`, and
+**12 seam ids**. The seam ids are the risky part: they are PROMPT ROUTING KEYS
+in the pack JSONs and `pipelines.json`, and a dead seam looks exactly like a
+live one. Pack JSON + `pipelines.json` + the Python that reads them move
+ATOMICALLY. **Build the seam-resolution check FIRST and keep it** -- a test that
+every `required_seams` / `declared_seams` entry resolves to a real prompt turns
+this from risky into verifiable.
 
-**THE SEAM IDS ARE THE ONLY RISKY PART, and they are risky for a specific
-reason:** they are PROMPT ROUTING KEYS in the pack JSONs and `pipelines.json`.
-Rename one inconsistently and that seam goes DEAD -- and dead pack text looks
-exactly like live pack text, which is the trap the bank audit exists to catch.
-Pack JSON + `pipelines.json` + the Python that reads them must move atomically.
+### OPERATOR DECISIONS OWED (three, all small, all blocked on Jeffrey)
 
-**SEQUENCING: after the word rip lands green, as its own change.** It touches the
-same three files the rip is mid-way through, and two large diffs on one file
-makes a red gate unattributable.
+1. **7 acts yields FEWER voiced beats than 6** -- measured 1->3, 2->6, 3->14,
+   4->14, 5->17, 6->**20**, 7->**19**, 8->22. INHERITED, not introduced, and
+   pinned in `tests/test_voiced_beat_count.py` with the reasoning rather than
+   silently changed. **Fix the row, or accept it?**
+2. **`media_archive` always takes feed entry 0**
+   (`_otr_media_archive_sources.py:191-221`) while `shakespeare` draws across
+   all 14 scenes and `public_domain` across all 65 units. **Randomize, or is
+   entry-0 deliberate?**
+3. **The `__main__` self-test blocks are not tests.** Nothing executes them, so
+   they rot -- three false assertions were found and fixed in passing.
+   `OTR_LedgerScriptWriter.py`'s block still stops on a `creative_writing_model`
+   default drift. **Wire them into pytest, or delete them?**
 
-**Build the seam-resolution check FIRST and keep it.** A test that every
-`required_seams` / `declared_seams` entry resolves to a real prompt turns this
-rename from risky into verifiable -- run it before, run it after, compare. That
-check is owed to the bank audit anyway (step 1 asks which declared seams are
-routed by nothing), so it is not rename-only scaffolding.
+### STANDING RULES for this work -- do not relitigate
+
+* Only TWO things are failure: **action in the ledger**, and **a character
+  speaking another character's lines**. Story quality is NOT a defect
+  (2026-08-04); character consistency IS -- and is now accepted as a
+  documented limitation, above.
+* Code may DETECT and explain. **Only a MODEL may rewrite prose.** No Python
+  stripper, no shim, no regex surgery on a line, and never the name "dummy".
+* No word-count authority anywhere. `act_count` 1..8 is the only knob that
+  shapes an episode; length is an observation.
+* Runaway guards are code-side and STAY. Right-size the JOB; never raise the
+  guard.
+* The ledger holds spoken lines and music cues only. `music_*` rows are
+  load-bearing (audio slicing, still keys, video tail window) and stay.
+* Rerolls split by POSITION: upstream casting rerolls STAY; rerolls that redraw
+  written story GO.
+* Shakespeare and public_domain: **FIDELITY OUTRANKS ARC.** A faithful scene
+  that ends unresolved is a PASS.
+* A schema cap must never sit at the number a downstream trim already enforces
+  (Bible 12.102). Ceilings are backstops; limits live at the trim.
+* One prompt per job for every model tier. Vary the JOB SIZE, not the text.
 
 ### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
-
-Straight from `2026-08-13-blind-runaway-detection-problem.md`. Every one of these
-was tried or measured:
 
 | Rejected | Why |
 |---|---|
 | `repetition_penalty` | **inert here**, up to its maximum -- HF's penalty is not frequency-aware |
 | `no_repeat_ngram_size` | unusable with the grammar -- the ban and the mask both write `-inf`, the intersection can be EMPTY and sampling crashes |
 | lower temperature | helped one run, failed another. Not reliable |
-| a stop string / "end with END." | a locked decode never emits it |
-| prompt wording alone | "capacity is a ceiling, never a target" shipped, and a runaway recurred hours later with it live |
-| **a hard token ceiling** | forbidden -- a legitimately long field and a runaway field are indistinguishable by length |
-
-**ADDED 2026-08-14 -- a `RobustRepetitionStoppingCriteria` drop-in (periods
-1..48, `torch.equal` per token) was offered and DECLINED.** Grounded against the
-real files, it is a regression in three ways: (1) its 48-token ceiling sits BELOW
-the measured ~384-token runaway, so production's floor is its ceiling; (2) as a
-*drop-in replacement* it deletes `OpenStringTracker`, the only signal that sees
-specimen C; (3) periods 1..48 are excluded here **on purpose** -- JSON structural
-keys recur in every array element and dialogue has refrains, so it would fire on
-healthy output. Its "negligible cost" claim also assumes CPU: `torch.equal` on
-CUDA tensors forces a device sync, up to ~96 per token, where production compares
-a Python list every 32 tokens. **If short-period token spam is ever OBSERVED, the
-correct addition is narrow -- periods 1..8 at a HIGH repeat count, on the list, at
-the existing cadence -- and it needs the artifact first, per the admission rule.**
-
-### BANK AUDIT RESULTS -- all six, 2026-08-14 (step 1 of the operator brief)
-
-Three parallel read-only audits, every claim traced to a model call rather than
-read off a declaration. **All 12 news-lane seams and all 9 legacy-lane seams are
-LIVE** -- no bank is shipping dead prompt text. Two real findings:
-
-**1. `pipelines.json` DOES NOT drive the four legacy banks, confirmed.**
-`legacy_many_pass` / `legacy_many_pass_adapt` are `executable: false` and the
-file says so itself (`pipelines.json:87-89`, "DESCRIPTIVE ONLY"). The real router
-is `_otr_lane_specs.py:119-123` (`INLINE_PIPELINES`) plus
-`_otr_creative_prompt_router.py:158-219`. **One nuance that is NOT purely
-descriptive:** `declared_seams` for `original_multi_pass` IS consumed, at
-`_otr_story_routing.py:408`, to extend the seam allowlist -- a validation
-contract, not an execution driver.
-
-**2. THE ONE CONDITIONALLY-DEAD SEAM: `exchange_system`.** It is a REQUIRED seam
-for `shakespeare` and `public_domain` (`banks.json:119,157`), but its pass only
-runs when the `use_exchange` widget is true -- **and the widget default is FALSE**
-(`OTR_LedgerScriptWriter.py:3164-3165`, gate at `:5618`). So a required seam is
-off by default. The lane still works (per-beat `line_composer_system` covers
-dialogue), which is why this never surfaced. The canonical workflow appears to
-ship it TRUE, but that reading rests on positional `widgets_values` in a file
-currently mid-edit -- **re-confirm after the workflow is regenerated.**
-
-| Bank | Verdict | Owning weakness |
-|---|---|---|
-| `shakespeare` | working | `exchange_system` conditionally dead by default |
-| `public_domain` | working | same |
-| `media_archive` | working | selection is `index 0` of the live feed, not a random draw |
-| `original` | working | -- |
-| `scifi_news` | **weak** | coda/announcer are prompt text only, nothing reserves position, nothing verifies after; plus the shared speaker drop |
-| `scifi_news_pro` | weak | shares the speaker drop, but its coda IS structurally enforced |
-
-**Source breadth is genuinely good on the adaptation lanes** -- `shakespeare`
-draws uniformly across all 14 scenes (`_otr_shakespeare_sources.py:276-285`) and
-`public_domain` across all 65 units (`_otr_public_domain_sources.py:308-335`,
-fixed 2026-08-04; it previously always drew the same pinned unit).
-**`media_archive` is the exception:** `payloads[_configured_index() % len]` with
-the index defaulting to 0 (`_otr_media_archive_sources.py:191-221`) -- always
-entry 0 of whatever the feed returns. Not random, unlike its siblings.
-
-**Dramatize-vs-recap: all four legacy banks PASS**, and the pack text is better
-than feared -- shakespeare's `exchange_system` says *"Where the scene gives these
-characters words, CARRY THEM"* and *"Do NOT summarize the play"*; public_domain
-converts narration into speech explicitly.
-
-### MISS 2 -- MECHANISM CONFIRMED, and the pro lane already solved it
-
-**`scifi_news`: the coda is prompt text and nothing else.**
-`codex_coda_contract_system` is never its own pass -- it is string-concatenated
-onto the P3 score prompt (`_otr_scifi_codex.py:3557`) and the P5 script prompt
-(`:2756`). Those are the ONLY two occurrences of "coda" in a 3,639-line file.
-There is no coda output type, no beat kind for it, nothing reserving a final
-announcer row, and **nothing verifying afterwards that a coda exists or names the
-source**. The only structural rule is cast coverage -- every cast row needs at
-least one beat SOMEWHERE (`:1238-1269`), position unchecked. **A model that gives
-the announcer one beat, mid-episode, passes every gate** -- which is exactly the
-published artifact.
-
-**`scifi_news_pro` already does it right, and is the model to copy.** Its markup
-parser is a state machine that REFUSES a draft without a coda or an announcer
-outro (`_otr_fable2_markup.py:432-444`), rejects a second coda (`:419-430`),
-rejects closing music before the coda (`:385-391`), and requires the opening
-music + intro before the first scene (`:398-402`). On top of that,
-`fable2_news_read_system` is a DEDICATED pass whose validated output is
-**unconditionally Python-appended as its own row** (`_otr_scifi_fable2.py:2897-2908`).
-
-**So the fix for MISS 2 is not invention -- it is bringing the non-pro lane up to
-the pro lane's structure.** Note this is a STRUCTURE port between two production
-lanes, not a lab port.
-
-The six banks run two different machines. Four (`shakespeare`, `public_domain`,
-`media_archive`, `original`) declare 8-9 shared seams on a `legacy_many_pass`
-pipeline that has **`announcer_coda` as its OWN dedicated pass**. The two news
-banks declare **zero** shared seams and run their own pipelines.
-
-`scifi_news_circuit` DOES carry a coda seam -- `codex_coda_contract_system` --
-but it is **not a pass**. It is folded in as a CONTRACT on `P3_radio_score` and
-`P5_first_play`. So on the legacy banks the coda is GENERATED BY ITS OWN PASS;
-on the news lane it is A RULE ATTACHED TO THE PASS THAT WRITES THE SCRIPT. If the
-model does not honour it, nothing reserves the slot. That matches the older note
-in this file that the coda *"remained a prompt wish."*
-
-**Confirm before fixing:** that the seam text actually reaches a model, and
-whether P5 physically reserves a coda row. Also note `legacy_many_pass` is
-`executable: false`, so for those four banks `pipelines.json` may be DESCRIBING
-the writer rather than driving it -- real routing would be in Python. That is the
-dead-text-looks-like-live-text trap; verify per bank, do not read the JSON as
-truth.
-
-### Standing rules for this work -- learned the hard way
-
-* The sealed ledger holds announcer speech, character dialogue and music cues.
-  Nothing else, ever. Every sealed line becomes TTS audio -- that is MISS 1.
-* **Code may DETECT a defect and explain it. Only a MODEL PASS may rewrite
-  prose.** No Python that edits an author's or a model's words.
-* No content guardrails. Generated episode content is not filtered; a source's
-  own violence is carried as the author wrote it. The packs once forbade "blood,
-  guns, knives" while adapting Macbeth and King Lear -- a fidelity defect, not a
-  safety win.
-* ONE PROMPT PER JOB for every model tier. No per-model variants.
-* No bare `assert` in shipped code -- `python -O` strips it.
-* Licence and non-commercial notices ride the PRINTED CREDITS, never the audio.
-  Folger is CC BY-NC 3.0 and must not be read aloud; Shakespeare gets the spoken
-  credit.
-* Regenerate sealed fixtures with their generators; never hand-edit a digest.
-* The untracked operator files under `config/profiles/`,
-  `config/source_banks/_corpus/` and `docs/H3_LICENSE_ATTESTATION*.md` are NOT
-  OURS -- do not touch, move or commit them.
-
-### Out of scope unless the operator says otherwise
-
-Casting (production's is intact and stays); the ending coda STRUCTURE (only its
-failure to name the source is in scope); source selection and corpus breadth
-(production selects across a whole bank -- that is a STRENGTH, do not replace it).
-
-### Order of work -- one feature at a time, gates green between
-
-1. **Audit all six working source banks** -- `shakespeare`, `public_domain`,
-   `media_archive`, `original`, `scifi_news`, `scifi_news_pro`. Per bank: which
-   prompt seams actually REACH A MODEL and which are declared but routed by
-   nothing (**dead text in a pack looks exactly like live text -- verify, do not
-   assume; this has bitten before**); whether source selection can draw from the
-   whole bank (14 Folger scenes, 65 public-domain works) rather than re-adapting
-   one pinned source, and if it can, how to take better advantage of it; and
-   whether the lane actually PRODUCES A STORY -- does a person want something,
-   does it cost them something, does anything reverse. **A lane that recaps its
-   source instead of dramatizing it has FAILED even if every gate is green.**
-   Report per lane working / weak / broken, with evidence and the seam that owns
-   each weakness.
-2. **Confirm the two misses, with evidence. Do not fix them yet.** Show where the
-   action text enters the dialogue, and why the coda is not naming the source on
-   the science-news lane.
-3. **Diff the lab, then ASK.** Read its two planning documents
-   (`docs/2026-08-14-lab-to-prod-porting-plan.md` and
-   `docs/2026-08-14-prod-to-lab-transplant-plan.md` in the lab repo), diff the
-   two trees, and return a RANKED candidate feature list. The operator decides
-   FEATURE BY FEATURE, not by batch. Two findings that save time: the media banks
-   are ALREADY IDENTICAL on both sides (Shakespeare byte-for-byte, the same 65
-   public-domain works), and production selects across a whole bank while the lab
-   could not -- source selection and corpus breadth are a production strength.
-4. **Patch production one feature at a time, without breaking it.** Each accepted
-   feature lands on its own, with the gates green before the next starts.
-   Production works today apart from the named defects, and a careful patch that
-   preserves that is worth more than a fast one that does not.
-
-**ASK THE OPERATOR BEFORE:** porting any lab feature; changing a prompt on more
-than one lane at once; deleting a seam; touching anything downstream of the
-ledger.
-
-**"The tests pass" is not success. READ THE STORY.**
-
-**How to run one.** ComfyUI's interpreter is
-`C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` (Python 3.12.11,
-torch 2.10.0+cu130, CUDA live on the 5080). The system Python 3.10 has a CPU-only
-torch and cannot load a model. The two LLM dropdowns are `creative_writing_model`
-and `technical_model`; `DEFAULT_LLM` is `mistralai/Mistral-Nemo-Instruct-2407`;
-`HF_HOME` is `C:\ComfyUI-Models\huggingface`. Downloaded and ready:
-`gemma-2-2b-it`, `gemma-4-E2B-it`, `gemma-4-E4B-it`, `gemma-4-12b-it`,
-`Mistral-Nemo-Instruct-2407`. The unsloth GGUFs and `Qwen2.5-14B` are NOT
-downloaded. Use a small gemma for a cheap first pass, Mistral-Nemo for a real
-judgement.
+| agreement voting on the clean judge | -4% precision for +45 calls |
+| per-sentence judging on a 12B | strictly worse than whole-line there |
+| a whole-episode "final table read" pass | the `PBUG-20260814-03` failure shape in reverse -- a small model handed a whole episode averages it into a summary |
 
 ## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
 
@@ -1515,962 +276,40 @@ queue in the same push.
 
 | # | Active work | Exit condition |
 |---:|---|---|
-| 1 | **Resume the original Story Lab for the published `scifi_news` regression, then root-fix the proven bug cluster** | Start from the recovered upstream lab and its old `science_news` production mirror -- **not** from a blank design. Use the old lane as the control and current `scifi_news` as the challenger. The requested and executed bank was `scifi_news`, yet the published script lost the announcer opening that introduces the drama, its place/time and real-news premise; lost the announcer closing that summarizes the real news; and contains stage direction/cross-speaker prose in spoken rows. Recover proven old mechanisms selectively, preserve useful new contracts, and fix the real authority. Do **not** treat target-vs-actual word count as the fix: `target_words` is advisory, and what should govern episode duration is a separate Story Lab design question. After the story contract is clean, capability-gate silent I2V performance prompts and repair the false per-beat motion receipt. Then continue with timeout `/interrupt`, boot-contract refusal timing, mesh zero-clip verdict transparency, and cast-coverage/cold-regeneration. Every production fix needs executable regression, full suite + Bug Bible + variants green, Sonnet post-code QA clean, and push. Do not mint a PBUG/Bible rule from static review alone. Row 5b VRAM retention remains measurement-first until the mechanism is proven. |
+| 1 | **SUPERSEDED -- see PRIORITY 1 at the top of this file** | Story work moved into production 2026-08-14 and the upstream Story Lab is RETIRED, read-only reference. Much of this row is now DELIVERED: the clean stage removes stage direction and cross-speaker prose from spoken rows (shipped, measured); the announcer open and close are authored and now get an informed retry before any fallback; the coda names its source (P6). What REMAINS of this row lives in PRIORITY 1 as named open items -- the graduated extraction contract, the model floor refusing rather than grinding, the ranked no-shims violations, and the `scene_report` miss class. Do NOT restart from the lab. |
 | 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
 | 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
 | 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
 | 5 | **Release runway** | `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. |
 
-### STORY LAB RECOVERY BASE -- OPERATOR DECISION 2026-08-13
-
-**A new lab window does not mean a new story system from zero.** Resume
-[`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab).
-Its current `main` is commit `7df7c80`, the transplant workspace built around a
-July 2 SFX-free production mirror. It retains the old production writer modules,
-12 story-pack fixtures including `science_news`, an executable runner/bridge,
-drift checks and the transplant plans. A clean LF checkout was re-verified on
-2026-08-13: **50 passed**, `validate_lab.py` OK, `verify_tree.py` 52 Python / 30
-JSON / 0 errors. The byte-hash mirror gate requires LF checkout
-(`core.autocrlf=false`); a normal Windows CRLF conversion creates a false mirror
-hash failure.
-
-The original standalone v1 lab is deliberately preserved at `41c6512`: its 12
-fixtures, preview/validator nodes, 5 contract tests and validator all pass today.
-Use it as provenance and recover pieces with `git show 41c6512:<path>`; do not
-reset the whole workspace to v1. The stronger starting point is current `main`,
-because it keeps the old production mirror and adds the executable comparison
-surface.
-
-**Control arm:** the old `science_news` many-pass recipe and the old lab/story-
-showdown evidence -- hard announcer open and close, an opening that locates the
-drama in place/time and introduces its real-news premise, a source-backed ending
-news summary, spoken-line ownership/hygiene and its repair tests, plus the old
-duration recipe.
-**Challenger arm:** current independent `scifi_news` P0-P5 circuit, fact graph,
-typed schemas, liveness guard and current ledger contract. Reproduce the accepted
-2026-08-13 P3/P5 artifacts as fixtures, then compare both arms before choosing
-what returns. Port proven mechanisms; do not resurrect the old stack wholesale
-and do not discard the current architecture wholesale.
-
-**Canonical `scifi_news` episode topology, operator 2026-08-13:** opening music
--> ANNOUNCER introduction -> character drama, with interstitial music only where
-the accepted script requests it -> ANNOUNCER source-backed real-news summary ->
-closing music. Opening/closing music and both ANNOUNCER bookends are structural
-reservations independent of `target_words`; body music remains script-owned. The
-opening must establish story, place and time and connect the premise to the news.
-The ending must summarize the real news and distinguish fact from fiction.
-
-**Ownership lock:** the new Story Lab window owns all story/writer experimentation
-and code until it hands back a converged transplant. OTR windows remain read-only
-on story code meanwhile. Production transplant is a later serialized OTR coder
-chunk, including `workflows/otr_canonical.json` in the same change if wiring moves.
-That prevents two coder windows from editing the writer or canonical graph at once.
-The separate repository is an experiment/control surface, not a second production
-package: do not ship its duplicate workflow, production mirror or bridge into OTR.
-
-**Why row 3 waits until after rows 1-2:** the remaining legs are not seven boxes
-to consume. They are the end-to-end acceptance and regression proof for the code
-that will exist after the bug and Lemmy work. Running them first would qualify a
-tree we are about to change and would make the expensive evidence stale.
-
-**REBUILD THE SEVEN-LEG RUNNER AFTER LEMMY.** Today's temporary row-3 helpers
-were deleted. Never revive or reuse them, a cached prompt, a generated workflow,
-an old results table, or old profile-derived environment. Build a fresh
-one-engine-at-a-time runner from the then-current `workflows/otr_canonical.json`,
-the then-current profiles' own `launch.env`, registered engine IDs, and current
-success contract. Snapshot `tmp/_w45_results.json` immediately before every
-launch. The token enables engines; profile env satisfies the boot contract; prove
-both from the server process's own environment.
-
-**Closed work does not belong in this queue.** All 21 engine packets/preflight
-rows, the cost-row refusal fix, the two-signal decode liveness guard, the model
-slug work, multi-GPU learned upscaling, and the Macbeth probe are receipted in
-`docs/HANDOFF_LOG.md`.
-
-### VIDEO LANE BUILD -- CLOSED; RENDER ACCEPTANCE IS RUNWAY ROW 3
-
-**ALL 21 PACKETS ARE CLOSED (2026-08-12).** Lanes 0-21 are built, receipted
-and pushed; the preflight matrix is 29 engines x 7 gates with ZERO non-green
-cells and ZERO `EXPECTED_RED` entries. Per-lane detail lives in
-`docs/evidence/lane_receipts/` and the closed diagnoses in `docs/HANDOFF_LOG.md`
--- **not here**.
-
-The only forward video-lane work is the seven-leg render acceptance in runway
-row 3, parked behind Story Lab/bugs and Lemmy. The packet/preflight build itself
-is closed.
-
-**THE WHOLE CHEAP SHELF IS GREEN** -- four visualizers, four still families,
-8/8 with INERT G2 rows and declared continuity. All four still families refuse
-a missing still, the ffmpeg gate is at preflight on the shared base, and the
-synthesised dark floor is kept as a control with no occupant (**L22**), asserted
-both ways.
-
-**Lanes 19-21 are NEW ENGINE work, not repairs.** Lanes 10-18 fixed lanes that
-already existed; 19 and 20 ADD the two MiniMax H3 adapters (one shared
-implementation module, two registrations, two public ids) and 21 is a
-standalone `h3_low_mime` runner that is NOT registered this build. Read
-`docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md` section 1 for the full H3 spec
-before starting -- it is the largest surface in the campaign and the corpus
-explicitly put it LAST so it inherits every lesson. Nothing on this shelf's
-lessons transfers automatically: H3 has a real frame grid (124..362 step 17), a
-24->25 fps conversion, a Sage gate and a mouth-policy carve-out. Baselines to
-detect drift against (REFRESHED 2026-08-13 late): Bug Bible **20 passed / 24
-skipped / 3 xfailed** at **278** entries; full suite **10410 passed / 110
-skipped / 1 xfailed, NOTHING DESELECTED**; `scripts/build_variants.py --check`
-**50 variants, 0 failures**. **THE OLD BASELINES ON THIS LINE WERE STALE and
-cost a re-grounding pass** -- they read 9963/109/1 and 46 variants, which was
-lane 10's era, while lanes 11-22 and the title-card work had moved the suite
-~400 tests since. If your run does not match, check the DELTA against
-`git stash` + `pytest --collect-only` before assuming a regression: that is how
-the 2026-08-13 window proved its +7 was its own seven new tests and the rest was
-drift already on `origin`. Box is CLEAN after the 2026-08-13 WAN pass (no
-resident server, port 8000 clear, no campaign lock, VRAM 1,353 MiB).
-
-**A `mesh_stage`-CLASS PASS IS WEAKER EVIDENCE THAN IT LOOKS, and the runner
-does not say so.** That lane leaves NO per-shot clips, so `coverage` reads
-`not measured` and the frame-level no-reuse audit audits zero clips -- yet the
-runner still prints PASS. It fails closed when the registry is unreadable but
-stays quiet when there are simply no clips. **Queued coder fix: say it out loud
-in the verdict**, so a PASS that audited nothing cannot read as a PASS that
-audited everything.
-
-**RUN `scripts/build_variants.py --check` BEFORE STARTING A LANE.** Lane 7
-inherited five red variants from lane 5 and had to distinguish them from its
-own. A red at the start of a lane belongs to whoever caused it.
-
-**REVIEW ROUTING -- OPERATOR DIRECTIVE 2026-08-11 (supersedes the 2026-08-04
-full-kibitz gate while it stands).** Operator, handing the build off while away:
-"skip the kibitz ... do a coding post QA with Sonnet ... using Codex CLI for
-your quandaries and Sonnet QA for post QA, no full r1-r3 is needed." So, per
-coding item:
-* **NO full `kibitz-plugin:kibitz` r1-r4 arc.** Do not open one, and do not
-  report a scoped tail as an arc.
-* **Codex CLI is the consult of record for a QUANDARY** -- a genuine fork, a
-  defect whose model you doubt, a third failed fix. Use it instead of guessing
-  or instead of stopping to ask.
-* **Sonnet 5 runs the post-coding QA** on the finished diff, before the push.
-  Lane 9 proves it earns its keep: it found a stray table cell carrying stale
-  contradictory text and a superseded comment block, both real, both fixed
-  pre-push.
-* **KEEP CODING.** The operator is away and explicitly asked that the window
-  not stop. Take routine judgment calls yourself, record them in the receipt,
-  and only escalate what is genuinely irreversible or outside the queue.
-The two-strikes floor from `CLAUDE.md` still stands underneath this: if a bug
-survives two of your fixes, consult before the third swing -- that consult is
-Codex CLI now, not a four-round panel.
-
-**WHAT DROPPING THE PANEL DOES NOT DROP (operator, 2026-08-11, explicit):
-"of course Bug Bible to be run at every turn, check for BOM, that always
-stands."** Routing reviews to Codex + Sonnet removes ONE gate and nothing else.
-Every turn, unchanged:
-* **Bug Bible regression EVERY TURN**, not just at wrap-up -- `cd` to
-  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide` and run
-  the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
-  path fails to collect). Baseline **20 passed / 24 skipped / 3 xfailed at 278
-  entries**. Sync to the Bible repo's origin/main first; never pin a stale copy.
-* **BOM check on every touched file, always** -- UTF-8, NO BOM. First three
-  bytes must not be `EF BB BF`. Never write Python source with `Set-Content` /
-  `Out-File` (they inject BOM or mojibake); use
-  `[System.IO.File]::WriteAllText(..., UTF8)` or the file tools.
-* Plus the standing per-change set: full suite, `build_variants.py --check`,
-  AST parse on touched `.py`, dead-ref grep, and HEAD == origin after the push.
-
-**Panel history:** lane 7 ran an r1 panel (it found lesson L12 before the
-fix shipped; artifacts `kibitz-runs/2026-08-11-lane07-ltx-audio-in/r1/`).
-No lane has had a full four-round arc, and lanes 0-6 have had no panel on
-their diffs at all -- still the operator's call. Live routing is the
-REVIEW ROUTING block above, not this history.
-
-Operator build law, reaffirmed 2026-08-10: **one lane is open at a time; close
-its QA before touching the next.** A lane may take several commits when
-measurement must be separated from a root fix, but no other lane starts between
-them. A lane's registration, public id, alias, node-87 strings,
-profile/variant, `ENGINE_MATRIX.md` row and canonical-workflow delta land
-ATOMICALLY with that lane -- there is no later global naming sweep.
-
-The per-lane loop is in `docs/2026-08-09-TRANSPLANT-PLAN-per-lane.md`; the gate
-each lane must flip green is a row of `tests/test_lane_preflight_matrix.py`.
-Every open defect below is bound to a lane by an `EXPECTED_RED` entry in that
-suite, so the work list is executable rather than prose: run the suite, read
-your lane's rows.
-
-Status values: `DONE` (pushed green, preflight row green, smoke receipted),
-`OPEN` (the one lane in progress), `PARKED` (attempted, backed out, note
-written), `TODO`.
-
-| # | Lane (public / internal) | Owns | Status |
-|---:|---|---|---|
-| 0-22 | **ALL 21 PACKETS CLOSED.** Per-lane detail lives in `docs/evidence/lane_receipts/lane*.md` and `docs/HANDOFF_LOG.md`, never here | 21 engines, built + receipted + pushed | **DONE** |
-| 2b | boot-contract enforcement TIMING | plumb `boot_contract` into the frozen director policy so the check fires at ShotLock preflight instead of inside the render phase; keep the render-time check as defence in depth | TODO |
-| 5a | cost-row seeds | **PARTLY DONE** -- the three HuMo NET figures are in the manifest as `otr_side_legs` and seed rows (11,911 / 12,664 / 13,321 MB). `wan_i2v` is recorded `seeds_cost_row: false` (an nvidia-smi sample, a lower bound, not a probe max). `wan_ti2v` + `fastwan` peaks were MEASURED and dropped by `render_driver._clip_summary`; **the passthrough patch is in the 2026-08-11 handoff reply and should ride lane 7's commit**, then ONE re-smoke each recovers both -- no measurement campaign. | TODO |
-| 5b | `wan_ti2v` retention (S7) | instrument the post-close boundary, collect telemetry on a live chained leg, THEN pick a release branch from what it names. A measurement campaign, not a code change -- inventing a release without the telemetry is what S7 forbids. **S7.1 also adopts the free-units instrument (operator 2026-08-11): record `free_vram_mb()` at render start and its MINIMUM during the window; that difference IS the demand in the units admission compares against, with no baseline arithmetic to get wrong.** **THE TELEMETRY THIS ROW WAS WAITING FOR ARRIVED 2026-08-13, unprompted, on a live chained render-gate leg -- and it cost that leg.** Measured: `wan_ti2v VRAM render-phase peak 12870 MB / post 7942 MB`. Nearly 8 GB stayed resident AFTER the render phase closed. The `fastwan_8gb` leg then died on the next shot: `MotionBudgetError: static frame budget 69 (snapped 69) exceeds the cost-model's affordable 18 frames (free=9549 MB, margin=0.85)` -- the beat needed 69 frames, only 9.5 GB of 16 was free because of the retention above, and the engine REFUSED rather than silently resizing (correct fail-closed behaviour, not the defect). So this is not a `fastwan_8gb` fault and **not** the still-spine defect -- that repair held, there is no missing-still signature anywhere in the leg. It is cross-engine retention: engine A does not release before engine B's cost model prices its work. S7 says pick the release branch FROM the telemetry rather than inventing one; the telemetry now exists and has a consequence attached. **A SECOND SAMPLE LOOKED LIKE A CONTROL AND WAS NOT -- corrected 30 minutes after it was written, and the correction is the finding.** `wan_i2v` was first measured `peak 14106 MB / post 2504 MB`, which reads as a clean sibling release, and this row briefly concluded the retention was `wan_ti2v`-specific. The SAME engine on its NEXT render in the SAME leg measured `peak 16074 MB / post 8517 MB`. Every sample tonight:
-
-| engine | peak MB | post MB |
-|---|---|---|
-| `wan_i2v` | 14106 | **2504** |
-| `wan_i2v` | 16074 | **8517** |
-| `wan_ti2v` | 7985 .. 13041 (first 7 samples shown) | 6737 .. 8113 |
-
-So `wan_i2v` retains too, and **retention is NOT engine-specific** -- `wan_ti2v` is merely consistent about it while `wan_i2v` released once and held once. Do not build an engine-specific fix on the single clean sample; that is exactly the trap this row fell into for half an hour. Note also `wan_i2v` peaking **16074 MB**, over the 14.5 GiB working ceiling and at the 16 GB card's limit, which is its own open question. What the samples DO still rule out is "add a release between engines" is the WRONG SHAPE: an engine-boundary reclaim already exists (`render_driver.py:3893`, the CS-3 inter-beat reclaim) and it FIRES -- its steps are `unload_llm`, `_unload_bark`, `gc.collect`, `soft_empty_cache` and the cuda flushes, every one aimed at OTR's OUT-OF-BAND caches, which is what it was built for. `soft_empty_cache` frees cached blocks; it does not EVICT a resident ComfyUI-managed model, and no step in that reclaim does. So the question row 5b should answer is: **what decides whether a finished render gives its VRAM back**, given the SAME engine did both within one leg. The candidate branch is a targeted `free_memory(required, device)` before a DIFFERENT engine prices its work -- explicitly NOT `unload_all_models`, which V-4/V-5 forbid and which was measured freeing 0 MB. **Fifteen samples exist now; no conclusion was drawn deliberately.** Get more only if the mechanism still cannot be named; do not conclude from one. | TODO -- 15 samples, no conclusion yet |
-| 9b | `ltx_video` HEADROOM | the f169 marker leg peaked at 15,916 MB ABSOLUTE -- over the 14.5 GiB working ceiling, 97.6% of this 16 GB card -- while its NET 13,313 MB is comfortably under. No diet contract has ever been tried on this adapter, and lane 7b proved the `reserve_vram_gb` half of that lever is INERT on the LTX-AV adapter (its own in-process 4.0 GB reserve dominates), so whether `--disable-pinned-memory` alone buys anything HERE is genuinely unknown. A measurement, not a code change | TODO |
-
-### WHAT IS ACTUALLY LEFT -- READ THIS FIRST (2026-08-13, after the fresh-seed WAN pass)
-
-The 45-word render gate is **14 of 21 passed**. It is deliberately PARKED behind
-the root-bug tranche and Lemmy, leaving **seven post-change acceptance legs**.
-
-**`wan_ti2v` PASSED on the fresh seed.** The campaign completed in 179.8 minutes;
-the server logged `Prompt executed in 02:59:40` and `obs_publish OK`; the result
-is exact engine/profile `wan_ti2v` / `otr_w45_wan_ti2v`, exit 0, 13 clips,
-`audio 168.06s video 169.12s clips 13 COVERS`. The OBS deliverable exists at
-`C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\signal_lost_the_light_of_possibility_20260813_172801_silent_procgen_blended_captioned_with_credits_final.mp4`.
-This proves the current w45 lane can finish; the earlier fresh-attempt miss was
-a writer/seed miss before any engine frame, not a lane failure. It is not the
-first historical full `wan_ti2v` publication: canonical published episodes are
-proven as far back as 2026-07-23, and published history reaches June.
-
-**Mechanical PASS is not content acceptance.** Operator eyeball on this exact
-episode found substantial stage direction/description leaking into spoken
-dialogue, a dubbed-old-film synchronization feel, and a video recipe that is
-eerie and interesting but not yet good. More seriously,
-the `scifi_news` episode neither introduced its news story nor summarized it at
-the end, violating the bank's expected story shape despite the green render
-receipt. Treat these as a live production-quality receipt at the FRONT of row 1:
-preserve the subjective observation, trace the source-bank -> writer -> ledger
-contract and exact timing mechanism, and root-fix rather than tuning blind.
-
-The ledger confirms this was not just a wrong credit: `source_bank`,
-`owner_bank`, and title provenance all say `scifi_news`. The treatment contains
-only one announcer row and repeatedly places narration or another character's
-quoted speech in a character's spoken row. Its 357 actual words against the
-45-word test request are evidence only, **not a clamp target**: word count is
-advisory by law. Story Lab must separately redesign which semantic control sets
-episode duration. First compare bank form and dialogue ownership against the old
-Story Lab/`science_news` control; only then judge clip timing and the WAN visual
-recipe, because a malformed script contaminates both downstream judgments.
-
-**Do not roll back the runaway guard for this.** It never fired on the accepted
-run; accepted P3/P5 artifacts were far below its thresholds. The engine/render
-gate is PASS while the episode-content contract is FAIL. The exact regression
-chain now has three seams: `e679b754` (2026-07-11) projected P5's accepted line
-graph without authoritative speaker names/cast identity even though the prompt
-tells P5 to use the graph's speaker; `2129ce84` (2026-07-23) narrowed current-lane
-spoken-surface acceptance to explicit markup/control checks; `314dd481`
-(2026-07-24) retired the shared narration/stage-direction detectors and tests and
-weakened the `scifi_news` P3/P5 prompt contract. The old `science_news` family,
-with its physically reserved announcer open/close, was retired separately at
-`499386aa` on July 17; current `scifi_news` was renamed at `f03128fa` on July 19.
-There was no executable first-announcer/final-factual-coda invariant in the
-current lane to mutate -- it remained a prompt wish. The August 13 guard commits
-did not cause this artifact, and `b37e095b` must not be reverted.
-
-The Story Lab first seam is therefore an evidence A/B, not a rollback: restore
-score-owned speaker identity to P5 input; test a recoverable bank-specific
-ANNOUNCER opening that establishes story/place/time and the real-news premise,
-plus a terminal ANNOUNCER source-backed news summary; port the old utterance-only narration/cross-speaker
-detector class into the current repair seam; and separate render-engine PASS from
-episode-content PASS. Keep duration telemetry honest while the lab chooses a
-semantic duration authority. Do not reinstate a global subjective-quality gate
-or a word-count veto.
-
-**The perceived lip-sync problem is not mux drift.** All 13 delivered beat clips
-are CFR 25 fps and positioned within 19.521 ms of the master audio -- under half a
-frame. The causal defect is that `wan_ti2v` is a mute image-to-video engine, yet
-every character M4 prompt begins `face visible, speaking to camera`; TTS is muxed
-later, so the invented mouth motion cannot track speech. Make the performance
-prompt capability-aware: silent I2V gets action/reaction/cutaway direction, while
-audio-conditioned engines may receive speaking/lip-performance direction. Do not
-hide this with timestamp offsets. The episode also exposes a separate false
-receipt: all 13 `audio_motion_profiles` rows record zero start/duration timing and
-roughly one segment's length, not the positioned multi-segment beat. Repair that
-durable producer boundary before using the receipt for sync decisions.
-
-**Visual judgment remains deliberately open.** No learned upscaler ran: native
-832x480 WAN was resized to 1920x1080 by FFmpeg Lanczos + unsharp. The episode
-rolled `shakespeare_stage_realism`, full-strength procgen blending and 17 internal
-chain seams. After story and performance-prompt fixes, compare raw clip versus
-final with a pinned neutral `sci_fi_radio` style and matched script/stills/seeds;
-do not diagnose the WAN recipe from this confounded artifact alone.
-
-**THE SEVEN LEGS LEFT, in their required order and boot groups.** The launcher's
-second argument enables engines; the profile's own `launch.env` satisfies the
-contract. They are separate. Re-read the env from each current profile and prove
-it in the server process's own environment.
-
-| boot | token | profile contract | legs left, in order |
-|---|---|---|---|
-| 1 | `WAN` | no clamp | `wan_i2v` |
-| 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo`, `humo_14B_169`, `humo_1.7B`, `humo_1.7B_169` |
-| 4 | none | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
-
-`wan_i2v` remains genuinely unknown on this box: the prior run page-thrashed at
-89.7-106.3 s/iteration, peaked at 16,074 MB and retained 8,517 MB. The HuMo four
-and H3 pair have not run in this gate.
-
-**Purpose of the seven:** prove the final post-bugfix/post-Lemmy code through the
-real canonical graph on every still-unqualified heavy path. Each proof must show
-the exact registered public engine, no fallback, correct token plus boot env,
-canonical result success, `COVERS`, server completion/publish receipts, and the
-OBS asset on disk. A pass against pre-change code does not satisfy this purpose.
-
-**Runner recreation gate:** after Lemmy lands and before boot 1, create a fresh
-serial runner from current source. Load only `workflows/otr_canonical.json`;
-derive `--only` values from current registry/result engine IDs; derive boot env
-from current profile JSON; snapshot `tmp/_w45_results.json` before every launch;
-and verify queue empty, lock absent, exact server ownership and baseline VRAM
-between legs. Never run the deleted 2026-08-13 helper or any stale copy.
-
-**Current machine handoff:** port 8000 clear, no owned server/campaign/watchdog,
-no campaign lock, GPU at 1,353 MiB after selective teardown. The GPU is free for
-the coding and Lemmy work.
-
-### OPERATOR ORDER (set 2026-08-13 after the WAN pass)
-
-1. Resume the original upstream Story Lab from `7df7c80`, recover the old
-   `science_news` control from its production mirror/`41c6512`, and A/B it against
-   current `scifi_news`. Root-fix the published structural failure: an ANNOUNCER
-   opening must introduce the drama, place/time and real-news premise, and an
-   ANNOUNCER ending must summarize the source-backed real news. Then fix spoken
-   narration/cross-speaker leakage, capability-gate the mute I2V performance
-   prompt, and repair the false motion-timing receipt. Separately settle the semantic episode-
-   duration authority; do not turn the 45-word request into a clamp.
-2. Complete Lemmy Phases 2-4 and the live Lemmy PBUGs.
-3. Recreate the runner and execute the seven post-change render proofs above.
-4. Take only the narrow learned-upscale resolver hardening later; the learned
-   multi-GPU stage is already closed.
-
-### THE 45-WORD RENDER GATE -- parked runbook; current count and order are above
-
-**IT NEEDS THREE BOOTS, NOT ONE. This was wrong in the plan until now and would
-have burned ~5 GPU-hours.** Legs are grouped by the `launch.boot_contract` in
-their own profile (nested under `launch`, NOT top-level -- a top-level read
-returns `None` for every profile):
-
-| boot | flags | legs |
-|---|---|---|
-| A -- unclamped | none | `ltx_8gb`, `fastwan_8gb`, `ltx_video`, `wan_i2v`, `wan_ti2v` |
-| B -- `humo_diet` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 **+ `ltx_audio_in`** |
-| C -- `h3` | `--reserve-vram 12 --disable-pinned-memory`, sage off | `minimax_h3_video`, `minimax_h3_audio_in` |
-
-**THE TABLE ABOVE IS INCOMPLETE, corrected 2026-08-13 while running it.** The
-`boot_contract` governs the VRAM CLAMPS. It does NOT enable the heavy engines --
-that is the launcher's SECOND ARGUMENT, and it defaults to enabling NOTHING:
-`LTX` sets `OTR_ENABLE_LTX_VIDEO` + `OTR_ENABLE_LTX_AV`, `WAN` sets both Wan
-engines, `HUMO` sets HuMo. So boot A above is not one boot: its five legs need
-at least two different tokens, and booting all five with no token leaves the
-heavy engines OFF and the lanes fall to the floor. **Group by
-`(boot_contract, launcher token)`, not by contract alone.** `ltx_8gb`,
-`fastwan_8gb` and the H3 pair carry NO enable flag and so ride any boot.
-Historical full grouping (completed legs remain only to explain the contracts;
-the exact seven-leg queue above governs):
-
-| boot | token | clamp | legs |
-|---|---|---|---|
-| 1 | `WAN` | none | `wan_i2v`, `wan_ti2v`, `fastwan_8gb`, `ltx_8gb` |
-| 2 | `LTX` | `--disable-pinned-memory` (ltx_av_diet) | `ltx_video`, `ltx_audio_in` |
-| 3 | `HUMO` | `--reserve-vram 2.921 --disable-pinned-memory` | `humo` x4 |
-| 4 | (none) | `--reserve-vram 12 --disable-pinned-memory` | the two H3 lanes |
-
-**THE TOKEN AND THE ENV ARE TWO SEPARATE THINGS AND YOU NEED BOTH.** Walked into
-this 2026-08-13 despite quoting L24 an hour earlier. The launcher's SECOND
-ARGUMENT (`LTX` / `WAN` / `HUMO`) enables the ENGINES. The profile's own
-`launch.env` satisfies the CONTRACT. Booting the LTX lane with the right token
-and no env gets you a server where `ltx_video` runs happily and `ltx_audio_in`
-is heading for a render-phase refusal an hour later, because `ltx_av_diet`
-requires `OTR_HEADLESS_DISABLE_PINNED=1` and nothing had set it. Read the env
-out of the profile and export it BEFORE `Start-Process`; do not infer it from
-this table, which lists the clamp but cannot show you the token. Verify it
-landed by reading the launched server process's OWN environment. The launcher's
-`[launch]` echoes go to the detached console, not the server log, so their
-absence from the log proves nothing either way.
-
-**AND THE PROFILE FILENAME IS NOT THE ENGINE ID.** `config/profiles/otr_w45_fastwan.json`
-registers the engine **`fastwan_8gb`**; `--only fastwan` is refused. The refusal
-is clean and loud ("names engines that are not registered local engines"), so it
-costs a relaunch rather than a leg -- but derive `--only` names from a prior
-results file's `engine` field, never from the profile filenames.
-
-B covers `ltx_audio_in` too: its `ltx_av_diet` contract sets
-`reserve_vram_gb: None`, which means "does not constrain that knob", so HuMo's
-2.921 satisfies both while the shared `disable_pinned_memory` is what that lane
-actually needs. **Take each boot's env from the profile's own `launch.env`
-block** rather than typing it -- that is what stops a contract being written
-down but not applied (lesson L24).
-
-**The HuMo contract check fires INSIDE THE RENDER PHASE, not at preflight**
-(lane 2b, still TODO). So a HuMo leg on the wrong boot spends ~80 min on writer
-+ audio and only then refuses. That is the ~5 hours grouping avoids.
-
-The detailed pass/fail chronology belongs in `docs/HANDOFF_LOG.md`. The only
-live count is **14/21, seven parked** in the authoritative block above.
-
-### TIMEOUT CANCELLATION DOES NOT REACH THE SERVER -- OPEN
-
-The two-signal in-decode liveness guard is shipped and live-proven; do not reopen
-it or remove either signal. Its detailed diagnosis and proof belong in
-`docs/HANDOFF_LOG.md`.
-
-The separate remaining defect is client cancellation. When `scripts/otr_api.py`
-reaches its timeout it returns TIMEOUT without POSTing ComfyUI's `/interrupt`, so
-an in-flight server prompt can continue after the client has abandoned it.
-Re-ground the endpoint and prompt-ownership semantics, add interruption on the
-timeout path, and cover both the POST and safe failure handling.
-
-### CAST COVERAGE -- OPEN, and it is a defect class rather than a lane
-
-A cast member with NO line hard-fails the freeze cascade for EVERY bank, but
-**only 2 of 10 packs tell their writer** (`scifi_news`, `scifi_news_pro`). Four
-narrative packs share an identical six-stage structure and are all silent --
-including `folger_scene_adaptation`, the shakespeare pack `mesh_stage` died on.
-
-The obvious seam is WRONG: `outline_phase_system` plans ONE phase and cannot
-enforce an episode-level invariant. Codex placed the check after the Stage-2
-loop (`_otr_outline.py:1862`), BEFORE any Stage-3 call, and refuted the driver's
-premise that a retry path already exists there -- `generate_outline()` completes
-every Stage-2 and Stage-3 call and then only RAISES.
-
-**Codex's cross-bank findings, each a claim to verify before building:**
-
-1. **The legacy line composer has fix A's defect class** -- every attempt in
-   `compose_line_draft` reuses unchanged `messages` and never sends the rejected
-   line or the reason back. **If true, this is the same cold-regeneration bug in
-   the writer five banks share.** Highest-value open item in this document.
-2. `_otr_scifi_codex.py` has **NO `led.save()` at all**, so a P3/P5 death loses
-   every accepted-stage receipt.
-3. `scifi_news` ALREADY closes the coverage asymmetry through a fresh-candidate
-   loop. It is the model to copy and must NOT be modified.
-4. A deterministic sorted round-robin already assigns story speakers on the
-   multi-cast fallback, which would violate "no deterministic Python deciding
-   story" and could satisfy any coverage check without a model choosing.
-5. Unchecked `led.save()` remain at `OTR_LedgerScriptWriter.py` lines 4774, 4868,
-   4913, 5077, 5759, 5896, 5945 and 5990. Line 4245 is a diagnostic stamp: warn,
-   then preserve the original halt.
-6. Pack `examples` are POPULATED in three of the four packs and INERT by design
-   (`_otr_story_pack.py:155-159`). Do not "fix" them.
-
-### CURRENT BASELINE -- carry forward, detect drift
-
-| Thing | Current verified value |
-|---|---|
-| Branch / HEAD before this docs update | `v2.0-alpha`, `8c3ed304`, equal to `origin/v2.0-alpha` |
-| Full suite | **10410 passed / 110 skipped / 1 xfailed**, nothing deselected |
-| Bug Bible | **20 passed / 24 skipped / 3 xfailed** at **278 entries**; run without `--pack-dir` |
-| Variants | `scripts/build_variants.py --check`: **50 variants / 0 failures** |
-| Canonical workflow | `workflows/otr_canonical.json`; every API/headless/render run loads this real file |
-
-If a window reads a different number, explain the delta before building on it.
-`kibitz-runs/` is gitignored, so inspect it directly when grounding work that may
-have prior review evidence.
-
-### WHEN THE SUITE IS RED, CHECK `git status` FIRST
-
-Standing gotcha, learned 2026-08-11: three "failures" were a concurrent
-window's uncommitted edit, not a defect. Check for another window's
-in-flight work before diagnosing -- and never sweep their files into your
-commit. Deselecting tests to get a green number hides real failures.
-
-### LEMMY COCKNEY -- NOT BLOCKED (corrected 2026-08-10), Phase 1 shipped, 2-4 open
-
-**THE "ACTIVE, SECOND WINDOW -- do not collide" HEADER WAS STALE and is
-withdrawn.** Measured 2026-08-10: **no window is holding any Lemmy file** --
-`git status` shows nothing dirty under `cast_pools.py`, `cast_lock.py`,
-`_otr_dialogue_policy.py`, `_otr_line_composer.py` or `_otr_compose_exchange.py`.
-That window shipped Phase 1 in `bec0ca79` and left. The only window still
-holding anything is the VIDEO one (`eng_wan_i2v.py`), which touches nothing here.
-Lemmy is CPU-only work and available.
-
-**AND r1's OWN `final.md` IS NOW STALE ON ITS STEP 1.** It opens the order of
-work with *"Reconcile D-1: `accent: 'neutral'` contradicts a description saying
-broad friendly Cockney"*. **That is FIXED** -- `config/cast_pools.py:317` reads
-`"accent": "cockney"`, landed by Phase 1 AFTER r1 was written. Anyone resuming
-from `kibitz-runs/2026-08-08-lemmy-cockney/r1/final.md` must skip its step 1.
-D-4 (governing the writer) is also partly addressed by Phase 1's
-`dialogue_orthography`, `speech_signature` and `nodes/_otr_dialogue_policy.py`.
-
-**LEMMY r2 RAN 2026-08-10 (both lanes) -- see `kibitz-runs/2026-08-10-lemmy-cockney/r2/`.
-r3 NOT run, deliberately: r2 hit a PLAN-LEVEL blocker that is now operator row 14.**
-
-**SHIPPED from r2's cleanest finding:** the qualification receipt is honest now.
-`approved_native_routes` had listed bark as APPROVED via the bare string
-`canonical_bark_preset_v1` -- no artifact, no hash, no test lines, no operator
-verdict -- while r1 states plainly that no voice on any engine is audition-proven.
-A field that reads as evidence and is not, sitting inside the policy meant to
-prevent exactly that. `approved_native_routes` is now EMPTY, `canonical_route`
-keeps bark as a ROUTING fact with `qualification_receipt: None`, and
-`QUALIFICATION_RECEIPT_REQUIRED_FIELDS` + `is_qualified_route()` define what a
-real receipt must contain (artifact + sha256, both audition lines verbatim, seed,
-engine/impl version, identity, settings, **operator_verdict**, date). Fail-closed:
-a bare string, a missing field, or a present-but-empty field is UNQUALIFIED.
-34 new tests, mutation-checked -- restoring the bare string turns the guard red.
-**Zero behaviour risk: `LEMMY_VOICE_POLICY` has no production consumer** (Phase 1
-shipped it defined-but-unwired), so this could land without a re-baseline.
-**This gives the audition (D-3) a target to fill in rather than an approval to
-explain away.**
-
-**WHAT IS ACTUALLY LEFT, verified at the line 2026-08-10 -- D-2, the
-partial-rollout state both r1 lanes called the worst possible one.** The
-per-character voice pin still does NOT reach pre-locked LEMMY:
-`_otr_casting.py:1815-1837` builds `cast_voice_slots` for every row, but
-`timbre`, `role` and `age_band` all come from the ensemble slot, and a pre-locked
-row has none -- the code comment says so outright ("empty for the pre-locked
-announcer / LEMMY rows which have no ensemble slot"). `voice_cast_decision` is
-likewise built only for open characters and only under `hybrid_voice_fit_enabled()`.
-So he is hard-pinned to bark via `lemmy_row()` and cast on **gender alone** on the
-other six char-voice engines.
-**D-2 IS OPEN ON SIX ENGINES ONLY (scoped 2026-08-11).** The `indextts2` half is
-closed by the Branch A qualified route, which pins him directly and never reads
-`cast_voice_slots`. On the OTHER SIX char-voice engines nothing changed: a
-pre-locked LEMMY row still has no ensemble slot and is still cast on GENDER
-ALONE. **A pin there still owes a DECLARED re-baseline** -- Branch A did not,
-measured (unclaimed rows are byte-identical against a no-policy baseline at both
-`allow_voice_reuse` settings), but that result does not transfer.
-
-### OPERATOR DECISION -- six committed variants whose SOURCE PROFILES are untracked (raised 2026-08-11, lane 11)
-
-**`scripts/build_variants.py --check` CRASHES ON A FRESH CLONE.** Not fails --
-crashes. Found while closing lane 11, verified rather than reasoned, and it is
-the gate the build law requires green before EVERY lane.
-
-`workflows/variants/otr_sbcov_{1..6}.json` + their `.launch.md` recipes are
-**COMMITTED**. Their six source profiles `config/profiles/otr_sbcov_{1..6}.json`
-are **UNTRACKED** -- `git log --all` on them is empty, they are NOT gitignored,
-they are dated 2026-07-20 and marked `status: draft`. So the repo ships six
-generated artifacts whose sources it has never tracked.
-
-`--check` regenerates every committed variant from its profile id. A missing
-profile raises `ProfileError`; the loop catches only `EmitRefused`. Measured:
-
-| | MRO |
-|---|---|
-| `EmitRefused` | `EmitRefused -> RuntimeError -> Exception` |
-| `ProfileError` | `ProfileError -> ValueError -> Exception` |
-| caught by `except EmitRefused`? | **False** |
-
-It reports "46 variants, 0 failures" on this box **only because those six
-untracked files happen to exist here.**
-
-**THE PROVENANCE SETTLES IT, and it was found by the Codex consult reading a
-file I had not opened.** `tmp/_gen_profiles.py` (2026-07-20) is the generator
-that wrote all six, and its own docstring says:
-
-> "These are throwaway smoke config (like a temp probe script) -- written into
-> config/profiles/ because load_profile() only reads that dir, and DELETED
-> after the sweep. **NOT committed.**"
-
-So the profiles are behaving exactly as designed. **What leaked is the OTHER
-half: the twelve generated `otr_sbcov_*` variant + recipe artifacts got
-committed and should not have been.** The question is therefore not "adopt six
-sources?" but:
-
-**Your call:**
-1. **DELETE the twelve leaked `workflows/variants/otr_sbcov_{1..6}.json` +
-   `.launch.md` artifacts** (recommended -- it matches the stated intent, and
-   they are unreproducible on any box without the throwaway profiles), OR
-2. **COMMIT the six profiles** if the sbcov sweep is in fact still live work
-   and those variants are meant to ship.
-
-A coder window must not pick: deleting committed artifacts changes what ships.
-**Independently of the choice, `--check` should catch `ProfileError` and report
-a named failure instead of crashing** -- a plain robustness bug any window may
-fix once you have decided.
-
-**Not blocking lane 11 any more.** The lane closed 7/7 on its own merits by
-declaring its profile canvas channel INERT rather than reconciling it, which
-makes G2.3 skip the profile comparison entirely -- so `otr_sbcov_4.json` is
-irrelevant to it. Detail: `docs/evidence/lane_receipts/lane11-viz_green.md`.
-
-**Related, same defect class, found the same way:** the "46 variants" figure
-quoted as a baseline in this file is WORKSTATION-DEPENDENT. `git ls-files`
-counts **45** tracked variants; the 46th on disk is another window's untracked
-`otr_upscale_ltx_probe.json`. `--check` globs the directory, so its headline
-count silently includes files the repo has never seen.
-
-### WAITING ON THE OPERATOR -- the whole list, in one place (2026-08-09)
-
-Nothing below is blocked on a coder. Each row needs YOU. Collected here because
-they were scattered across nine sections and no window could answer "what is
-waiting on me?" without reading the whole file.
-
-| # | What | What kind of answer | Where the detail is |
-|---:|---|---|---|
-| ~~7~~ | ~~**The 8 swept survival-guide guards**~~ **DECIDED 2026-08-10: KEEP THEM.** The operator delegated the call (*"between you and Sonnet you can ensure we keep or remove those tests"*) after the original question was found to carry a false premise. Two corrections of record: `656c36e` touched TWO files, not eight (`BUG_BIBLE.yaml` + `tests/bug_bible_regression.py`), so the 8 `test_otr_*` items are FUNCTIONS in one file; and **none of them is video-related** -- they guard positioned-media timeline ownership, explicit word delivery, outer-word-fit fail-closed, protected-suffix surface, cast-role identity, rename transactions, canonical ledger text metrics, and P5 text transport. New video-lane tests would replace NONE of them, so deleting cost coverage and bought nothing. A follow-up commit in that repo should document what rode along in `656c36e` | -- | -- |
-| ~~8~~ | ~~**`otr_upscaled_dir()` is DEAD**~~ **ANSWERED 2026-08-10: DELETE. Executed -- helper, `__all__` entry, contract-test reference and a dangling history mention all removed.** | -- | -- |
-| ~~9~~ | ~~**`meta.perfect_run_spacesaver`**~~ **ANSWERED 2026-08-10, and the answer REOPENED IT AS A FEATURE, not a cleanup.** Operator: *"once people get the workflow going wouldn't it be nice not to store all the little files on their drive and just save the last otr/obs episode ... if it doesn't work let's rip it out and design a new one, or keep it actually and make it work as intended"*. So: the flag is NOT to be quietly dropped -- it either becomes real or is replaced by a designed successor. Scoped as a coder item below | -- | -- |
-| 10 | **The 28 portrait conflicts are unreviewed.** `FATHER BROWN` shipped female; `Clara` gendered male with "her" in her own prose | READ THE LIST, rule case by case. Do not total it. `ROSALIND` is NOT one -- Ganymede keeps her female voice by your earlier ruling | sprint item 8 |
-| ~~11~~ | ~~**`story_orchestrator.py` cast-merge ruling**~~ **ANSWERED 2026-08-10: operator wants AN LLM PASS to clean this up**, not a test pinning today's behaviour and not a mechanical re-baseline. Scoped as a coder item below | -- | -- |
-| 12 | **v2.1 candidate:** a low-footprint LOCAL model steeped in OTR diction | A CONSCIOUS RE-OPEN. It collides with your 2026-08-04 "story quality is done" directive, so only you can reopen it | STILL OPEN item 7 |
-| 13 | **The Nano Banana still model may be RETIRED UPSTREAM (new 2026-08-09, and it may affect already-shipped stills).** The `Nano Banana 2 (Gemini 3.1 Flash Image)` selector resolves to `gemini-3.1-flash-image-preview` and is sent to a **Vertex proxy** (`cloud_media_invoke.py:510`), NOT the catalog endpoint that was measured -- so catalog presence does not prove that route works. Codex reports a public Google shutdown of 2026-06-25 with `gemini-3.1-flash-image` as replacement; **UNVERIFIED from this box** and the id was still catalog-listed on 2026-08-09 | **ONE RENDER SETTLES IT** -- push one still through the Nano Banana lane; it either renders or the proxy rejects the id. Then: repoint the selector at the stable twin (already shipped, confirmed live), or leave it. It is a MODEL SWAP on the stills path, so it is recipe-adjacent and yours, not a coder's | `docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md` Â§0A |
-
-| 14 | **LEMMY PHASE 2 CANNOT BE BUILT AS SPECIFIED -- a scope call, surfaced by the r2 panel 2026-08-10 and confirmed at the line.** The plan's central behaviour is *"if an engine cannot meet the Cockney floor, suppress the cameo on that engine rather than silently substitute"*. **That is not expressible in the current graph.** Lemmy is selected UPSTREAM in the writer (`OTR_LedgerScriptWriter.py:4412-4426`); the voice engine is chosen LATER by nodes 80/81, and `BatchCharacterVoices` exposes ONE engine for the entire character bus. So by the time anything knows the engine, the cameo is already written into the script | **PICK ONE:** (a) downgrade the requirement to a FAIL-CLOSED CastLock error (no new surface, but a bad combination stops the render instead of degrading); (b) add ONE upstream engine-policy authority feeding writer + CastLock + renderer so the writer can decline the cameo before authoring -- this needs a NEW NODE/WIDGET SURFACE and `otr_canonical.json` wiring, which r1 explicitly ruled out of scope, so it is a deliberate scope change only you can authorise; or (c) accept the cameo on any engine and drop the floor | `kibitz-runs/2026-08-10-lemmy-cockney/r2/` |
-| 15 | **Should LEMMY be able to appear in `scifi_news` again?** It was his FIRST lane and it worked under the legacy cast picker; the lane later became CONTENT-OWNED, so the writer's cameo picker never runs and the ledger records no decision at all. Not a careless break -- a capability lost to an architectural change (PBUG-20260811-03, root cause established) | A PRODUCT call, then a coder task. YES -> the lane runner offers the cameo when it builds its cast. NO -> it stamps an explicit declined-policy so the ledger says so. Either way the silence ends | `docs/PROD_BUG_LOG.md` PBUG-20260811-03; OPEN BUGS trio above |
-
-**Two that are NOT waiting on you, despite reading that way:** H3 no longer owes
-a dropdown ruling (it became a sprint series), and queue item 1 is closed.
-
-### GOOGLE SLUGS -- TWO OPERATOR CALLS OWED (the build shipped `4bc760c8`)
-
-Verifier: `python scripts/verify_google_slugs.py` (exit 0/2/3/4/5; never
-writes a date back). Measurement: `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`.
-
-**TWO THINGS NEED THE OPERATOR, and neither is a code defect:**
-
-1. **`gemini-2.0-flash` and `gemini-2.0-flash-lite` are GONE from Google's
-   catalog.** Found by the new verifier on its first live run (exit 2, a complete
-   52-id listing). They are still shipped in `GOOGLE_API_LEGACY_TEXT_MODELS`, so
-   selecting either would hit a model Google no longer lists. **Left in place and
-   left loud** -- removing a model from the operator's choices is his call, and
-   making the gap impossible to hide is what the tooling is for.
-2. **`gemini-3.1-flash-image-preview` is still the one named preview exception.**
-   It IS in the catalog, and that settles nothing: runtime sends it to a Vertex
-   proxy, not the endpoint fetched, so presence proves the id is listed, never
-   that the route works. It also undercuts the reported 2026-06-25 shutdown --
-   the id is listed 46 days later. Cheapest settlement is unchanged: one still
-   through the Nano Banana lane. It either renders or the proxy rejects it.
-
-Run it any time: `python scripts/verify_google_slugs.py` (exit 0/2/3/4/5; it
-never writes a date back).
-
-### FOLLOW-UP CHIPS OWED -- coder work, no operator input needed
-
-Consolidated 2026-08-09 from four tombstones. **Verified against the tree, and
-two chips that were listed as owed are already DONE** -- the upscale-model SHA
-is pinned (`eng_spandrel_esrgan.py:79`, a real 64-hex digest, not the empty
-bootstrap) and the `visual_style_receipt["attempts"]` thread landed in
-`e16e9a63`. Both are struck below rather than deleted, so nobody re-derives them.
-
-1. **Stale metadata retention across legs** (SF#1, Codex r4 MF-1). A downstream
-   reader consuming an obsolete field is a different defect class from "helper
-   unwired". Needs its own arc.
-2. **Audio-cache corruption-warning coverage. REWRITTEN 2026-08-09 from the
-   kibitz r1 judgment -- THE ORIGINAL CHIP TEXT WAS WRONG TWICE and is not a safe
-   basis to build from.** It claimed `_write_audio_atomic` had no coverage; in
-   fact missing payload, hash mismatch, cache-key mismatch and partial
-   atomic-write failure are ALREADY covered at
-   `tests/test_audio_cache_wiring.py:117-163,205-219` -- a grep for
-   `degraded_write|_write_audio_atomic` misses them because they use other names.
-   And there are **nine** warning exits, not "a warning":
-   `_otr_audio_cache.py:333,343,348,351,355,361,364,372,382`.
-   **Real deliverable: warning/COUNT coverage layered on existing behavioural
-   coverage.** "ONE bounded warning" (`:172-175`) is the load-bearing half of the
-   promise, and a test asserting mere presence would pass if the code logged six.
-   **THE TAXONOMY IS NOW DECIDED (Fable design ruling 2026-08-09) AND THE
-   SIDECAR HALF IS SHIPPED.** Absent -> silent (the definitional miss every cold
-   cache hits). Schema drift -> silent (a DESIGNED invalidation; the record is
-   intact, the reader's target moved). **Present-but-unparseable -> ONE bounded
-   warning**, added in `get()`'s `except`, which is where it is FORCED to live:
-   `load()` reaches the sidecar only through `get()`, and by then the failure
-   class has already collapsed into `None`.
-   **Why it is corruption and not an ordinary miss:** `put()` publishes the
-   sidecar LAST via `os.replace` precisely so its presence IS the commit signal,
-   so a garbled one means the commit marker itself is damaged -- the strictest
-   corruption this cache can exhibit, and the only one that was silent while
-   nine lesser ones warned. It is also a CLOUD cache, so each silent instance
-   re-bills the provider with no trace. BOM contamination from a stray
-   PowerShell write lands in exactly this branch, which this project has met
-   before. The docstring was RIGHT; the code was wrong.
-   **Remaining here:** the payload-level warning/COUNT coverage described above.
-   **Two existing tests cannot reach the branch they are named for:**
-   `sample_rate`/`channels` at `:137-150` are IDENTITY fields
-   (`_otr_resolved_request.py:75-84`), so changing one changes the cache KEY and
-   `get()` returns an ordinary miss before reaching `:348/351`. **BUG-12.87
-   again** -- the second live instance found on 2026-08-09. Correct technique:
-   mutate the persisted SIDECAR with the request/key held fixed.
-3. **A dying cache-enabled line reports `cache=off`** (SF#1, Fable gate).
-   `cache_status` initialises `"off"` at `_otr_voice_node_common.py:829`;
-   `generate_voice` sits inside the try at `:831-850` and the enabled-path P-OBS
-   tail is emitted from its `finally` at `:935-939`, so a raise mid-generation
-   reaches the tail with the initial value intact.
-   **Correction (kibitz r1):** the earlier text here implied the cache-OFF path
-   also emits `cache=off`. It does NOT -- cache-off emits the original BARE line
-   with **no `cache=` token at all** (`:790-796`), pinned by the byte-identity
-   test at `tests/test_audio_cache_wiring.py:592-598`.
-   **Fix, panel-preferred over inventing a token:** set `cache_status = "miss"`
-   immediately after an enabled lookup returns `None`, BEFORE generation -- true
-   at that moment, existing vocabulary, and it cannot touch cache-off bytes.
-   Then extend the two-node partial-exception test (`:681-748`) to require
-   exactly one dying-line P-OBS carrying `cache=miss`.
-   Receipts: `kibitz-runs/2026-08-09-audio-cache-chips/r1/judgment.md`
-   (GITIGNORED; **r1 ONLY -- a scoped receipt, never to be called an arc**).
-4. **`SpandrelEsrgan._resolve_model` robustness pair -- LATER.** An unreadable
-   NON-winning candidate aborts the whole search instead of skipping; the
-   winning file is stat'ed twice with a TOCTOU window. This is a third touch of
-   the logic: use Codex CLI only if the implementation remains a genuine
-   quandary/third swing, then Sonnet 5 post-code QA. The 2026-08-11 directive
-   suspended the full-kibitz gate.
-5. ~~Upscale-model SHA pin~~ **DONE** -- `_model_sha256` is pinned.
-6. ~~`visual_style_receipt["attempts"]` always reports 1~~ **DONE** (`e16e9a63`),
-   and the shared `on_attempt_complete` contract three callers depend on is now
-   pinned against the real ladder.
-
-### OPERATOR-DIRECTED WORK, SCOPED 2026-08-10 (answers to the decision round)
-
-**A. THE SPACE-SAVER BECOMES REAL (or gets a designed successor).**
-Operator's words: *"wouldn't it be nice not to store all the little files on
-their drive and just save the last otr/obs episode ... if it doesn't work let's
-rip it out and design a new one, or keep it actually and make it work as
-intended."*
-
-`perfect_run_spacesaver` is currently a DEPRECATED no-op checkbox that still
-stamps `ledger.meta`. It is NOT to be silently dropped.
-
-* **The checkbox itself must survive regardless of the design.** `widgets_values`
-  is POSITIONAL (BUG-LOCAL-097) -- removing a widget shifts every saved value in
-  every saved graph. Any successor either reuses this slot or appends a new one.
-* **THIS FEATURE DELETES USER FILES, so it needs a real spec before code.** The
-  output-tree contract exists because obs/ must hold exactly ONE mp4 per episode
-  and intermediates were deliberately moved under per-episode subdirs. A
-  space-saver interacts with that contract directly.
-* **WHAT IT SWEEPS -- operator, 2026-08-10: "it deletes images and video clips,
-  not the ledger."** So the target set is the per-episode visual intermediates
-  (stills/frames and the per-beat/segment clips), and the LEDGER IS EXPLICITLY
-  PRESERVED. That is the safe shape: the ledger is the replay and audit record,
-  so an episode stays reproducible and inspectable after the sweep even though
-  its intermediate media are gone. Keep the published `otr/obs/` deliverable.
-* Open design questions that remain: is AUDIO in or out (the operator named
-  images and clips, not audio -- and the content-addressed audio cache is a
-  separate store with its own lifetime, so do not sweep it by accident); does it
-  run only on a SUCCESSFUL publish; opt-in per render or a global setting; and
-  what a re-render does when it needs a swept clip.
-* **Hard constraint:** it may never delete anything before `obs_publish OK`, and
-  it must never touch another episode's tree.
-
-**B. AN LLM PASS TO RECONCILE MERGED CAST ROWS.**
-Operator, on the merge that can take a character's VOICE from one row and its
-GENDER from another (`story_orchestrator.py:416-421`, each field folded under its
-own independent guard): *"there should be an LLM pass to clean this stuff up."*
-
-* This is CORRECTNESS work, not story-quality chasing -- a character's
-  gender/voice contradicting itself is explicitly carved out of the 2026-08-04
-  "story quality is done" directive.
-* **The ledger-completeness rule governs any new pass:** enumerate every field it
-  writes, give each exactly one owner, and prove it on a LIVE leg. A pass that
-  reconciles cast rows touches casting, which is downstream of everything.
-* Note the collision: changing merged output MOVES the gender roll, which breaks
-  replay parity and needs a declared re-baseline. The LLM pass must be designed
-  with that in mind rather than discovering it late.
-* Held while LEMMY is active -- it exercises casting.
-
-### STANDING POLICY -- provider model slugs (from the closed curation chunks)
-
-Queue item 1 is CLOSED (chunks A and B both shipped; see the tombstone in THE
-QUEUE). What survives as a RULE:
-
-**SUPERSEDED AND HARDENED 2026-08-10 -- the operator calls them EVERGREEN
-slugs.** "Remove all dead slugs and only keep dynamic ones -- latest -- that
-won't die." It is now an ENFORCED policy, not a preference:
-`EVERGREEN_EXEMPTIONS` in `nodes/_otr_slug_provenance.py` fails the build on any
-concrete slug that has neither a pointer nor a written, measured reason none
-exists. Applied fully where possible (the Google text lane is three pointers and
-nothing else, and gained `gemini-pro-latest`, which Google publishes and this
-pack simply was not offering). Exempt where measured impossible: Google ships NO
-`-latest` for image, speech or music, ElevenLabs has no pointer convention, and
-Comfy's partner catalog is a pinned list whose pointer support is unverified.
-
-**AND BOTH OPENROUTER SLOTS NOW DEFAULT TO `openrouter/auto`** (operator, same
-day). The argument that carried it is his and it is a good one: a
-`~vendor/model-latest` pointer dies with its vendor, a router does not --
-`~latest` is evergreen at the VERSION level, a router is evergreen at the VENDOR
-level. Two routers are offered (`openrouter/auto`, `openrouter/auto-beta`) and
-exactly two are eligible: `bodybuilder`, `fusion` and `pareto-code` declare no
-`supported_parameters` at all, so they cannot serve a schema-constrained writer
-pass. **The standing objection is recorded in the code and was overruled, not
-forgotten:** a router picks by criteria this pack does not control, so the writer
-model can differ between episodes -- which the 2026-08-04 "story quality is DONE"
-directive had settled. `meta["resolved_models"]` makes every run auditable after
-the fact, which is what makes it survivable.
-
-* **Prefer `~family-latest` pointers.** Carry a concrete id only where a version
-  genuinely matters, and DATE it.
-* **NEVER carry a `:free` / promo slug.** A `:free` id is a price promise baked
-  into an identifier, and promises expire while identifiers do not. That is what
-  killed `tencent/hy3:free`.
-* **Do NOT add an auto-router.** `openrouter/auto` and `auto-beta` are real and
-  listed, but `auto-beta` routes by what the community spent most on over a
-  trailing week -- a config that resolves differently week to week undercuts the
-  resolved-model replay stamp. Good for exploration, wrong for reproducible
-  receipts.
-* **The technical default stays `deepseek/deepseek-v4-pro`.** The only DeepSeek
-  pointer is the FLASH tier, so aliasing it is a capability DROP, not a swap.
-
-**The honest limit, do not report it later as a failure:** curation removes our
-OFFER. It cannot remove a dead slug from a STALE PER-MACHINE cache under
-`OTR_OPENROUTER_FULL_CATALOG=1` -- `models/openrouter_models.json` is untracked
-and gitignored. Running the refresh script clears it.
-
-### BIBLE PROMOTION -- standing contract + what is pending
-
-**A window MAY promote a SINGLE genuinely-uncovered entry** directly under the
-Three-File Contract, because `otr_coverage_index.yaml` makes checking coverage
-cheap. **The BULK fan-out over the backlog is still the operator's** (waiting-on-
-operator row 6). Operator's reason for the change, 2026-08-07: *"we keep hitting
-the same bugs so we need to update the bible and test regularly."*
-
-Live at survival-guide `656c36e`: **263 entries, index 371 rows**, 20 passed /
-24 skipped / 3 xfailed. Recent promotions: **BUG-12.87** ("a gate reports success
-from its own error path" -- the tell being that another component has quietly
-reimplemented the same check with a comment saying the shared one cannot be
-trusted) and **BUG-12.86** (a receipt keyed on a producer string the producer
-never emits, so it reads empty forever).
-
-**Pending operator decision (waiting-on-operator row 7):** `656c36e` also swept
-in 8 pre-existing uncommitted `test_otr_*` guards, staged by a whole-file
-`git add` without checking `git status` in that repo first. Nothing is broken and
-the suite is green, but the commit message does not describe them.
-
-### STILL OPEN, SMALL, UNSCHEDULED
-
-0. **THREE FINDINGS FROM THE UPSCALE-FINGERPRINT CHUNK (2026-08-08), all
-   deliberately NOT swept into `088dabc8` / `7c26ec86`:**
-   * ~~**`scripts/validate_canonical_workflow.py` CAN EXIT 0 WITHOUT
-     VALIDATING.**~~ **FIXED `5fdf93f1` (2026-08-09), and it was WORSE than
-     recorded here.** The contract had never run ON ANY BOX: the package dir
-     is `ComfyUI-OldTimeRadio` (HYPHEN) and ComfyUI loads it BY PATH, so the
-     old `importlib.import_module(name.replace("-","_"))` was PERMANENTLY
-     unsatisfiable -- it always took the skip, always returned `[]`, always
-     printed OK. The item-8 receipt "clean (23 nodes, 56 links)" was the skip
-     path. Fixed at root with `spec_from_file_location` on `__init__.py` (the
-     technique `otr_macbeth_probe.py` already used to route AROUND this
-     script), and an unrunnable contract is now a PROBLEM. 5 tests in
-     `tests/test_validate_canonical_workflow_fails_closed.py`, including a
-     control that fail-closed has not become fail-always.
-     **Carry-forward lesson:** the workaround shipped and the shared gate
-     stayed broken for weeks. When you route around a gate, fix the gate.
-   * **`otr_upscaled_dir()` (`nodes/_otr_paths.py:383`) is DEAD.** Its only
-     producer was `OTR_RTXUpscale`; references now are the definition, the
-     `__all__` entry, and the output-tree contract test that iterates every
-     helper. Documented in place in `7c26ec86`. Removing a public path
-     helper is an operator call, not a comments-only change -- item 10
-     (lean-mean/dead-code) material.
-   * **`SpandrelEsrgan._resolve_model` robustness pair** (Sonnet QA on
-     `088dabc8`, deferred on purpose): an unreadable NON-WINNING candidate
-     aborts the whole search instead of skipping to the next, and the
-     winning file is stat'ed twice with a TOCTOU window that can turn
-     ordinary absence into a bare NaN. **This is the same absence-vs-fault
-     logic already reworked twice, so per the two-strikes rule the third
-     attempt follows the live 2026-08-11 review route: Codex CLI for a genuine
-     quandary/third swing, then Sonnet 5 post-code QA; no full arc.**
-   **Banked so it is never re-derived:** `Path.is_file()` on Python 3.12.11
-   does NOT swallow every `OSError` -- pathlib filters through
-   `_ignore_error()`, which whitelists only ENOENT/ENOTDIR/EBADF/ELOOP and
-   RE-RAISES `PermissionError` and `OSError(EIO)`. Measured on the venv
-   interpreter and independently confirmed against its `pathlib.py` source.
-   Both r4 review lanes asserted the opposite and a compensating
-   classification pass was written, proven unreachable, and deleted.
-
-1. **`load_all_ledger_fixtures` / `_looks_like_l3_ledger` (`tests/_helpers.py:26-118`)
-   is DEAD test infrastructure** -- no callers anywhere, and none of the 5 JSON
-   fixtures match its `l3-` prefix filter. Delete-or-revive, separate small item.
-2. **The parked worktree rip must be RE-GROUNDED.**
-   `.claude/worktrees/awesome-brahmagupta-a509b4` holds the uncommitted removal
-   of `news_coda_spoken_reduction` / `finalize_news_coda_surface`, and its target
-   lines now live INSIDE `_compose_and_stamp_announcer_close`. **ARC** if reopened.
-3. **`BUG_BIBLE.yaml` does not `yaml.safe_load`** -- `ScannerError` at line 834
-   col 217, an unquoted inline JSON fragment whose colon breaks the scan.
-   Pre-existing at survival-guide `3759ae5`; the contract test counts `^- id:`
-   with a regex, so nothing notices. The README calls it machine-readable.
-   Separate repo, separate item.
-4. **`docs/known-failures.md` + the conftest KNOWN-FAIL-GUARD** exit **2**, not
-   1, on a new failure, and swallow the traceback in `-q` runs. Not a defect,
-   but it has cost mis-diagnoses -- know it before reading a red line.
-5. **`reasoning.default_enabled` is captured and never read.**
-   `_otr_openrouter_backend.py:918` slims it into every cached catalog row, but
-   only `mandatory` and `supported_efforts` are ever consulted (`:324`, `:330`).
-   Found 2026-08-07 while grounding the slug curation; PRE-EXISTING, not caused
-   there. Sibling to the freshly promoted BUG-12.86 class (a field that reads
-   as though it informs a decision and informs nothing). Per the admission rule
-   a static observation does NOT create a PBUG -- delete-or-consume, small item.
-6-STATUS. **PARTLY CLOSED 2026-08-09 (`ab76f6bc`).** `nodes/_otr_slug_provenance.py`
-   + `tests/test_slug_provenance.py` now require an ENTRY for every shipped
-   concrete slug in the comfy / google_api / elevenlabs / comfy_image /
-   google_image lanes -- either a verified date or an explicit `UNVERIFIED`
-   marker naming the authority that could settle it. **Dates were NOT invented:**
-   21 of 35 are honestly UNVERIFIED and the suite prints that backlog out loud.
-   The 6 comfy dates are carried forward from the 2026-08-07 OpenRouter check,
-   recorded as a SIGNAL (OpenRouter presence is not proof Comfy serves a slug).
-   Also `tests/test_saved_workflow_model_values_resolve.py`: a saved graph's
-   model widgets must exist in the LIVE dropdown -- the class-level fix for the
-   `value_not_in_list` that made `otr_story_only.json` unrunnable, which the
-   slugfest audit had PREDICTED two days earlier.
-   **STILL OPEN from the audit, deliberately not in that commit:**
-   * **VIDEO lanes** (`eng_cloud_video`, `eng_google_omni_video`,
-     `eng_google_veo_video`) -- excluded because a concurrent window owns those
-     files and a guard would red-flag its in-flight edits. Add them once it lands.
-   * **LOCAL checkpoint filenames** (`z_image_turbo_bf16.safetensors`,
-     `flux-2-klein-4b-Q4_K_M.gguf`, `stable_audio_3_small_music.safetensors`,
-     ...) -- same staleness class, authority is local disk.
-   * **FOUR `preview`-marked slugs** (`gemini-3.1-flash-tts-preview`,
-     `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`,
-     `lyria-3-clip-preview`). "preview" in an identifier is a LIFECYCLE PROMISE
-     baked into an id -- the same class as `:free`, which is what killed
-     `tencent/hy3:free`. Decide whether to ban, warn, or date them.
-   Full inventory: `kibitz-runs/2026-08-07-slugfest/antigravity_slug_audit.md`
-   (GITIGNORED -- read it there, it is not in git).
-
-6. **THE OTHER PINNED SLUG LISTS -- same defect class, NOT yet curated
-   (operator asked 2026-08-07: "do we need to review the comfy llm engine slugs
-   too?"). Answer: yes, and it is wider than that one list.** Chunk A dated and
-   guarded the OpenRouter ids only. The same "concrete version pin, no date,
-   nothing able to notice it went stale" pattern is live in at least:
-   `_otr_comfy_backend.COMFY_LLM_MODELS` (6 slugs, curated 2026-07-04, **no disk
-   cache and no refresh script -- the catalog IS a constant**);
-   `_otr_google_api/models.py` (`GOOGLE_API_LEGACY_/STABLE_/STATIC_TEXT_MODELS`);
-   and the audio/image engine lists (`eng_cloud_elevenlabs._SUPPORTED_MODELS`,
-   `eng_google_tts`, `eng_google_lyria`, `eng_cloud_image._NANO_MODELS` /
-   `_SEEDREAM_MODELS` / `_KREA_MODELS` / `_LUMA_PHOTON_MODELS`,
-   `eng_google_image.SUPPORTED_MODELS`).
-   **SIGNAL-CHECKED 2026-08-07 -- and the news is better than first stated:
-   ALL SIX `COMFY_LLM_MODELS` slugs are LIVE.** Checked against the live
-   OpenRouter catalog: `google/gemini-3.5-flash`, `deepseek/deepseek-v3.2`,
-   `mistralai/mistral-large-2512`, `x-ai/grok-4.20`, `openai/gpt-5.5`,
-   `anthropic/claude-opus-4.7` all present. **No dead ids** -- unlike the
-   OpenRouter dropdown, which carried a genuinely dead one. This list is
-   VERSION-BEHIND, not broken, and that distinction should not be lost again.
-   *Authority caveat:* Comfy Cloud's partner catalog is what decides whether
-   Comfy SERVES a slug; OpenRouter presence is a signal, not proof. An
-   authoritative pass still owes a check against Comfy's own catalog.
-   ~~**The stale PREMISE is the real defect, not the version lag.**~~
-   **RESOLVED 2026-08-09 (`5fdf93f1`) -- AND THIS PLAN'S READING WAS THE WRONG
-   ONE. Do not re-open it; the comment is now load-bearing documentation.**
-   This file had recorded the `_otr_comfy_backend.py:84-91` block ("Reasoning
-   models ... are DELIBERATELY EXCLUDED") as STALE, reasoning that essentially
-   every frontier SKU now advertises reasoning -- including `deepseek-v3.2` and
-   `x-ai/grok-4.20` sitting inside that very list -- so the comment described an
-   exclusion the list no longer performed. **That conflates two different
-   things.** The rule excludes reasoning-BRANDED SKUs (the `-pro` / `-thinking` /
-   `sonar-reasoning` tiers) because they EMPIRICALLY BREAK STRUCTURED JSON; it
-   never claimed the survivors cannot reason. The list still performs exactly
-   that, which is why `deepseek-v3.2` sits there labelled NON-reasoning while
-   `deepseek-*-pro` does not.
-   **The re-confirmation was accidental, and therefore worth trusting:** an
-   unrelated OpenRouter roundtable run on 2026-08-09 put `deepseek/deepseek-v4-pro`
-   on a 3-model panel and it returned EMPTY CONTENT with `finish_reason=length`,
-   having spent its whole token budget on hidden reasoning -- the exact failure
-   the block was written about, on the exact SKU pattern it names, thirteen
-   months of model churn later.
-   **Carry-forward lesson:** "this comment sounds dated" is not evidence. The
-   cheap half of this item was never the comment; re-dating the slugs is the
-   whole remaining mechanical half.
-   **Why it is NOT a copy of chunk A:** each lane has a DIFFERENT source of
-   truth. Comfy Credits slugs are Comfy Cloud's partner catalog, Google's are
-   Google's, ElevenLabs' are theirs -- none is verifiable against OpenRouter's
-   `/api/v1/models`, so each needs its own verification path. The reusable part
-   is the POLICY and the guard shape (`OPENROUTER_VERIFIED_ON_BY_ID` +
-   `tests/test_openrouter_slug_curation.py`): every concrete id carries a
-   verified-on date, and a test fails when one is added undated.
-7. **v2.1 CANDIDATE (operator, 2026-08-07): a low-footprint LOCAL model added
-   to the mix.** Operator: *"if there's a cool local model we can add to the mix
-   without much footprint change ... but that's later, maybe 2.1."* The two
-   ideas raised were a model steeped in public-domain OTR diction, and one
-   tuned for Early Modern English on the Shakespeare lane. **Grounding worth
-   keeping so it is not re-derived:** the Shakespeare lane would benefit LEAST
-   -- THE ADAPTATION DESIGN makes it a VERBATIM compiler and the ownership table
-   rules `exchange_compose` NOT RUN there ("there is no dialogue to author"), so
-   a period-tuned model would only touch announcer/bridge/stage-setting prose,
-   never a line Shakespeare wrote. The `original` and `media_archive` lanes DO
-   generate their text and are where such a model would actually land. Note the
-   collision to settle first: this is adjacent to the 2026-08-04 "story quality
-   is done, stop chasing it" directive, so reopening it is a conscious operator
-   call, not a drift. Offline-first also means a FINE-TUNE, not a download.
+### STORY LAB RECOVERY BASE -- TOMBSTONED 2026-08-14
+
+**This plan was not executed and is not the plan.** The 2026-08-13 decision was
+to resume `ComfyUI-OTR-UpstreamStoryLab` and A/B the old `science_news` recipe
+against the current lane. The operator superseded it on 2026-08-14: the lab is
+PARKED and being RETIRED, it is READ-ONLY reference, and the story work was done
+IN PRODUCTION instead -- which is what shipped.
+
+Kept only as provenance: the lab repo is
+[`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab)
+(`main` = `7df7c80`; standalone v1 preserved at `41c6512`). Its byte-hash mirror
+gate needs an LF checkout (`core.autocrlf=false`) or it reports a false hash
+failure. **Do not develop in it. Do not ship its duplicate workflow, production
+mirror or bridge into OTR.**
+
+Its two detector files were inventoried and NOT ported, deliberately:
+`spoken_text_policy.py` (695 lines) and `ledger_verifiers.py` (429) are both
+REGEX detectors -- the lab's own header says *"a future fuzzy or model-assisted
+policy requires a new policy"* -- so porting them would not have solved the
+generalization problem the model judge was built for.
+
+**The canonical `scifi_news` episode topology from that ruling STANDS and is
+still the contract:** opening music -> ANNOUNCER introduction -> character drama
+with interstitial music only where the script asks -> ANNOUNCER source-backed
+real-news summary -> closing music. Both announcer bookends and the opening and
+closing music are structural reservations independent of `target_words`. The
+opening establishes story, place and time and connects the premise to the news;
+the ending summarizes the real news and distinguishes fact from fiction.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 

@@ -4311,3 +4311,49 @@ only visible because the cameo was FORCED and then did not appear.
 - status: FIXED 2026-08-14 in code. **The published-artifact proof is a
   separate act:** only a generated episode shows whether the ledger is
   dialogue rather than narration, and that read is recorded in the handoff.
+
+## PBUG-20260814-04 -- the clean stage ran BLIND to the act on every writer-lane row
+
+- discovered: 2026-08-14, live `media_archive` episode at act 3
+  (`gemma-2-2b-it`), during the first legs of the new post-story clean stage.
+- symptom: the pass judged and rewrote spoken lines with an EMPTY act block.
+  `beat_intent` resolved on **0 of 16** rows and `arc_phase` on **0 of 16**,
+  so every judge and repair prompt shipped with "WHERE THE STORY IS" blank.
+  Nothing complained: the render succeeded, the log looked normal, and the
+  full suite was green throughout.
+- root cause: `nodes/_otr_ledger_clean.py` read `arc_phase` / `beat_intent`
+  off the BEAT row. The writer lane stamps both on the LINE row and leaves
+  its beat rows carrying transport only (`beat_id`, `char_id`, `line_ids`,
+  `scene_id`, `shot_id`, `start_s`, `dur_s`). The codex lane populates both,
+  which is why the shape looked right when it was written.
+- why it stayed invisible: the unit fixtures put the fields on the BEAT --
+  a shape no writer-lane ledger has -- so the tests agreed with the bug. A
+  green suite cannot see a field that is merely always empty.
+- fix: read the UNION, line row first (`_story_field`), since the codex lane
+  does populate beats. Plus three things so it cannot recur silently:
+  * `meta.ledger_clean.context_seen` counts, per episode, how many rows
+    resolved an arc phase, a beat intent, a cast name, and lines before and
+    after. A zero in that block IS the blindness, visible in the artifact.
+  * `meta.ledger_clean.context_verified` SHA-verifies that the context we
+    BUILT appears in the prompt bytes we SENT, reported as a fixed-position
+    sight string (`11111` = all five fields landed, `11011` = the act did
+    not). This catches the second shape of the same fault, which the field
+    count cannot: a value threaded into a prompt builder and never rendered.
+  * a test against the REAL production ledger shape, plus one against the
+    codex shape, so neither lane can regress alone.
+- coverage: `tests/test_ledger_clean_stage.py` --
+  `test_the_act_is_read_from_the_line_row_where_production_puts_it`,
+  `test_the_receipt_proves_what_the_model_actually_saw`,
+  `test_the_beat_row_still_works_for_the_lane_that_populates_it`,
+  `test_the_sha_check_proves_the_context_reached_the_prompt`,
+  `test_a_field_built_but_never_rendered_is_caught_and_named`.
+- bible: **already covered by `BUG-12.86`** (receipt keyed on a string the
+  producer never emits) -- cause shape 3, "a dict/key lookup for a key that
+  was renamed or never existed on that row shape". Its verify clause already
+  prescribes the fix arrived at here independently: *"a prompt-context test
+  must check that the field's CONTENT reached the prompt, not merely that the
+  label appears."* Checked against `otr_coverage_index.yaml` and
+  `BUG_BIBLE.yaml`; NOT promoted, index row appended instead.
+- status: FIXED and PROVEN 2026-08-14 -- the lab reports `act on 6 row(s),
+  intent on 6, brief on 6, before 5, after 5` on every bank, and a
+  production-shaped ledger returns `sight 11111 ok true`.
