@@ -231,6 +231,25 @@ class TestConsumerFailsClosed:
         assert PE.decide_from_meta(None).publishable is False
         assert PE.decide_from_meta("meta").publishable is False
 
+    def test_an_ANONYMOUS_receipt_cannot_answer_for_a_named_episode(self):
+        """Unprovable is not the same as agreed.
+
+        A receipt with the current version, a valid `eligible` flag and NO
+        episode id clears every earlier gate. An earlier cut then skipped the
+        identity check entirely when either side was empty, so this receipt
+        would have answered for any episode that asked. Found by the agy QA
+        round. (No `expected` supplied is still fine -- the caller asserted
+        nothing, so there is nothing to disprove.)
+        """
+        anonymous = {PE.PUBLICATION_ELIGIBILITY_META_KEY: {
+            "version": PE.PUBLICATION_ELIGIBILITY_VERSION,
+            "eligible": True, "episode_id": "", "reasons": [],
+        }}
+        blocked = PE.decide_from_meta(anonymous, expected_episode_id="tonight")
+        assert blocked.publishable is False
+        assert blocked.reason == PE.DECISION_EPISODE_MISMATCH
+        assert PE.decide_from_meta(anonymous).publishable is True
+
 
 # --------------------------------------------------------------------------- #
 # the freeze: G14 warns, the render survives, and the receipt is stamped there
@@ -382,6 +401,45 @@ class TestMuxConsumesTheReceipt:
         d = MUX._publication_decision(str(tmp_path / "whatever_silent.mp4"))
         assert d.publishable is False
         assert d.reason == PE.DECISION_NO_RECEIPT
+
+    def test_ep1_does_NOT_answer_for_ep10(self, tmp_path, monkeypatch):
+        """A bare prefix test is not an identity test.
+
+        `stem.startswith(episode_id)` says yes for `ep1` against `ep10`'s
+        video. Inherited from `_default_out`, where it only misfiled a video;
+        here it decides which ledger grants publication, so `ep10` could have
+        published under `ep1`'s rights receipt. Found by the agy QA round.
+        """
+        episodes_root = tmp_path / "output" / "otr" / "episodes"
+        audio_dir = episodes_root / "ep1" / "audio"
+        audio_dir.mkdir(parents=True)
+        (tmp_path / "output" / "otr" / "obs").mkdir(parents=True)
+        ledger_path = audio_dir / "ep1_ledger.json"
+        led = _ledger(_CLEARED, _NAMED, episode_id="ep1")
+        PE.stamp_publication_eligibility(led)
+        assert OTRL.save_ledger_safe(ledger_path, led) is True
+        monkeypatch.setattr(MUX, "_episodes_root", lambda: episodes_root)
+        monkeypatch.setattr(OTRL, "in_flight_ledger_path", lambda: ledger_path)
+
+        # ep1's own video still resolves -- the guard must not be so tight it
+        # stops the episode the singleton actually belongs to.
+        assert MUX._publication_decision(
+            str(episodes_root / "ep1" / "ep1_silent.mp4")).publishable is True
+        # ep10's video must NOT pick up ep1's ledger.
+        stolen = MUX._publication_decision(
+            str(episodes_root / "ep10" / "ep10_silent.mp4"))
+        assert stolen.publishable is False
+        assert stolen.reason == PE.DECISION_NO_RECEIPT
+
+    def test_the_stem_boundary_rule_directly(self):
+        assert MUX._stem_belongs_to_episode("ep1", "ep1") is True
+        assert MUX._stem_belongs_to_episode("ep1_silent", "ep1") is True
+        assert MUX._stem_belongs_to_episode(
+            "ep1_silent_procgen_blended_captioned_with_credits", "ep1") is True
+        assert MUX._stem_belongs_to_episode("ep10", "ep1") is False
+        assert MUX._stem_belongs_to_episode("ep10_silent", "ep1") is False
+        assert MUX._stem_belongs_to_episode("", "ep1") is False
+        assert MUX._stem_belongs_to_episode("ep1", "") is False
 
     def test_a_STALE_singleton_from_another_episode_fails_closed(self, episode):
         """The in-flight ledger belongs to `the_test_episode`; this video does

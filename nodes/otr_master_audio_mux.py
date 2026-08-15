@@ -410,6 +410,27 @@ def _is_inside_obs_dir(path: str) -> bool:
         return False
 
 
+def _stem_belongs_to_episode(stem: str, episode_id: str) -> bool:
+    """Does this video stem belong to THIS episode, on a name boundary?
+
+    A BARE PREFIX TEST IS NOT AN IDENTITY TEST. `stem.startswith(episode_id)`
+    says yes for episode `ep1` against episode `ep10`'s video, because `ep10`
+    starts with `ep1`. This check came from `_default_out`, where the cost was a
+    file in the wrong folder; it now decides which ledger answers for an
+    episode, so the same slip would let one episode PUBLISH under another's
+    rights receipt -- the exact stale-singleton confusion the check exists to
+    prevent.
+
+    The chain appends suffixes with a leading underscore (`_silent`,
+    `_procgen_blended`, `_captioned`, `_with_credits`), so the episode id is
+    either the whole stem or is followed by one. Anything else is a different
+    episode that happens to share an opening.
+    """
+    if not stem or not episode_id:
+        return False
+    return stem == episode_id or stem.startswith(episode_id + "_")
+
+
 def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
     """The in-flight ledger and episode dir, but ONLY if they are THIS episode.
 
@@ -444,7 +465,7 @@ def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
         if (candidate.parent == expected_root
                 and candidate.name
                 and not candidate.name.startswith("_")
-                and stem.startswith(candidate.name)):
+                and _stem_belongs_to_episode(stem, candidate.name)):
             return Path(ledger_path), candidate
     except Exception as exc:  # noqa: BLE001 -- callers all have a safe path
         log.info(

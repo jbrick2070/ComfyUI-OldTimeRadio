@@ -47,8 +47,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Tuple
+
+log = logging.getLogger("OTR")
 
 __all__ = [
     "PUBLICATION_ELIGIBILITY_VERSION",
@@ -196,6 +199,17 @@ def _rights_reasons(meta: Mapping[str, Any]) -> List[str]:
         # A malformed rights record is NOT read as a block. The gap audit
         # already reports shape faults, and inventing a rights denial out of a
         # type error would withhold an episode for a reason nobody stated.
+        # It is still SAID OUT LOUD: `normalize_provenance` always returns a
+        # dict, so this shape means something upstream wrote the field by hand,
+        # and a rights record nobody can read is worth a line in the log even
+        # though it is not worth withholding an episode over.
+        log.warning(
+            "[OTR_PublicationEligibility] meta.provenance has type %s; "
+            "expected a mapping from normalize_provenance. Rights cannot be "
+            "read from it, so this episode is recorded as %s and is NOT "
+            "blocked on that basis.",
+            type(prov).__name__, REASON_RIGHTS_MALFORMED,
+        )
         return [REASON_RIGHTS_MALFORMED]
     if prov.get("blocks_publish"):
         return [REASON_RIGHTS_RESEARCH_ONLY]
@@ -279,10 +293,17 @@ def decide_from_meta(
 
     Strict by design (the module docstring explains the asymmetry): absent,
     malformed, unknown-version and episode-mismatched receipts all return
-    ``publishable=False``. ``expected_episode_id`` is compared only when the
-    caller supplies one AND the receipt carries one -- a receipt from a
-    pre-eligibility ledger has no episode id to disagree with, and it is
-    already blocked by version/absence before this check is reached.
+    ``publishable=False``.
+
+    ``expected_episode_id`` is enforced whenever the caller supplies one, and an
+    ANONYMOUS receipt fails that check rather than skipping it. An earlier cut
+    compared the two only when BOTH were non-empty, reasoning that a receipt
+    with no episode id "has nothing to disagree with" -- but a receipt carrying
+    the current version, a valid ``eligible`` flag and an empty ``episode_id``
+    clears every earlier gate and then silently skipped this one, so it would
+    have answered for any episode that asked. A caller that asserts an identity
+    is asking to be told when the receipt cannot match it; unprovable is not
+    the same as agreed.
     """
     if not isinstance(meta, Mapping):
         return PublicationDecision(
@@ -322,12 +343,18 @@ def decide_from_meta(
 
     receipt_episode = _clean(receipt.get("episode_id"))
     expected = _clean(expected_episode_id)
-    if expected and receipt_episode and receipt_episode != expected:
+    if expected and receipt_episode != expected:
+        detail = (
+            "receipt carries no episode id, so it cannot be shown to belong to "
+            "%r" % expected
+            if not receipt_episode
+            else "receipt is stamped for %r; this episode is %r"
+                 % (receipt_episode, expected)
+        )
         return PublicationDecision(
             publishable=False,
             reason=DECISION_EPISODE_MISMATCH,
-            detail="receipt is stamped for %r; this episode is %r"
-                   % (receipt_episode, expected),
+            detail=detail,
             episode_id=receipt_episode,
         )
 

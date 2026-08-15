@@ -108,6 +108,38 @@ walker outside test mode -- but a partial graph run that skips
 `OTR_LedgerFreezeCascade` would withhold a legitimate episode. Not a defect
 today; worth a deliberate decision before the qualifying live leg.
 
+### The SECOND agy round earned its keep -- all four accepted
+
+`kibitz-runs/2026-08-15-chunk05-qa/r4/final.md`. It edited the repo again
+despite the brief's new read-only rule, then reverted itself with `git restore`;
+because everything was already pushed, that restored FROM the commit and nothing
+was lost. The findings, though, were the best of either round.
+
+* **`stem.startswith(episode_id)` matches `ep1` against `ep10`.** A real defect,
+  and mine by inheritance: the check came from `_default_out` and the contract
+  told me to reuse it, so I reused its bug. It cost a misfiled video before; it
+  now decides which ledger grants PUBLICATION, so `ep10` could have published
+  under `ep1`'s rights receipt -- the exact stale-singleton confusion the check
+  exists to prevent. Fixed with `_stem_belongs_to_episode`: the stem must equal
+  the episode id or continue with `_`, which is how every suffix in the chain
+  (`_silent`, `_procgen_blended`, `_captioned`, `_with_credits`) is formed.
+  Both directions tested -- `ep1`'s own video must still resolve.
+* **An anonymous receipt bypassed the episode check, and my docstring's reason
+  for it was wrong.** I had written that a receipt with no episode id "has
+  nothing to disagree with"; in fact one carrying the current version and a
+  valid `eligible` flag clears every earlier gate and then skipped the identity
+  check, so it would have answered for any episode that asked. `decide_from_meta`
+  now blocks whenever the caller asserts an id the receipt cannot match.
+* Legacy re-mux path: taken as documentation -- it is the open question above.
+* Malformed `provenance` now logs a warning. `normalize_provenance` always
+  returns a dict, so that shape means something wrote the field by hand; worth
+  saying out loud, still not worth withholding an episode over.
+
+**Two rounds, ten findings, five real.** The reviewer is worth running and its
+patches are not: every accepted fix here is a rewrite of what it proposed, and
+its single most confident change (a new `INPUT_TYPES` entry) would have broken a
+hard project law.
+
 **Next.** Chunk 0.75 (the D4 vendor gate: all 65 sidecars generated,
 schema-validated, freshness-verified).
 

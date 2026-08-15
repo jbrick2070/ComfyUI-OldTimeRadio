@@ -34,11 +34,12 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10610 / 110 / 1**, Bible **20 / 26 / 3**,
+**BASELINES to detect drift:** suite **10613 / 110 / 1**, Bible **20 / 26 / 3**,
 variants 50 emitted (3 refused -- the standing unratified cloud profiles).
 (10532 -> 10561 was the specification session; 10561 -> 10608 is chunk 0.5's
 46 new tests plus a net +1 in `TestG14PublishGate`; 10608 -> 10610 is the two
-`output_path` tests from the agy QA round. No regressions at any step.)
+`output_path` tests from agy QA round 1; 10610 -> 10613 is the three from
+round 2. No regressions at any step.)
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
