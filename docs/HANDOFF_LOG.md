@@ -3,6 +3,92 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-14 -- base HEAD 4216b937 -> 9217995d (v2.0-alpha) -- CODER (all three story bugs fixed and PROVEN on live episodes; a ledger inspector and live window; four schema caps that were refusing legitimate sources)
+
+Did: closed `PBUG-20260814-01/02/03` and proved each on a generated episode
+rather than on the suite. **Ten commits**, all pushed:
+`8da8f457` speaker on every ledger line row; `fa001688` the coda as its own
+pass; `4d905037` per-beat dialogue plus a scene review with per-job decode
+budgets; `9ef9fead` + `665ef39a` `scripts/otr_ledger_view.py` and its live
+window; `169a7722` the regression pass; `8884b4d2` the schema caps;
+`9217995d` the forward-only plan trim. Bible: **12.101** (`a6035b2`) and
+**12.102** (`3d89149`) in the survival-guide repo, both under the Three-File
+Contract.
+
+**THE PROOF IS A STORY, NOT A SUITE.** Same grader over the same lane:
+the published 2026-08-13 episode reads `DIRTY -- 8 rows with action, 11 rows
+misattributed`, no coda. The 2026-08-14 `scifi_news` leg (act 1,
+`gemma-4-12b-it`, `frozen_clean`, 21:02) reads **`CLEAN`**. Its coda names
+AstroRad, StemRad, Artemis I, 60 percent and 26 -> 16 kilograms -- the row did
+not exist before. Before: *"Ada turns to Leo, her eyes alight. '...' Her voice
+trembles."* After: *"I know the math, Doctor. I've seen the telemetry."*
+
+**F2 IS PROVEN FIXED ON ALL THREE CODE PATHS**, which unit tests could not
+show: the codex lane (`scifi_news`), the writer lane via
+`init_lines_from_outline` (`pending_20260814_182303`, `original`, act 3, 5.1
+min, 0 F2 findings -- covers `shakespeare`/`public_domain`/`media_archive`
+too), and `scifi_news_pro` (`pending_20260814_183830`, 33 rows, 581 words,
+0 F2, speakers ANNOUNCER / Elena / The Echo, ends on the announcer).
+
+**A SCHEMA CAP MUST NEVER SIT AT THE NUMBER A TRIM ALREADY ENFORCES.**
+`scifi_news_pro` died twice on a UCLA Health story naming 11 places and 14
+institutions. The model extracted them correctly; the pydantic cap on
+`named_entities` -- written at the same number `_merge_dossiers` already trims
+to -- refused three times and killed the episode. Sweeping every bounded list
+field found **three more** in the same model. All four ceilings are now
+backstops; the limits stay at the merge. Proven live: the retry cleared its
+dossier windows on first attempt and ran to assembly.
+
+**THE MODEL FLOOR IS REAL AND UNWRITTEN.** `gemma-2-2b-it` drove `original` to
+a clean ledger in 5.1 minutes but could not get `scifi_news` past P0 -- killed
+at 34 minutes. **NOT a runaway**: 10 P0 attempts distributed 1/3 x2, 2/3 x2,
+3/3 x1 across two source windows, one halt caught by the guard, longest single
+decode 1,581 tokens against the 8,128 and 13,912 of the real runaways. Bounded,
+honest, futile. The corpus confirms the operator's memory: `gemma-2-2b` made
+**25 complete episodes in early June**, all `(unstamped)`, before `source_bank`
+existed -- the bank kept its name and the LANE was replaced (codex v4,
+2026-07-19), raising the floor. Do not delete the model; make the lane refuse
+it with a reason.
+
+**ONE CLEAN EPISODE IN ~1,400 GRADED, AND IT IS TODAY'S.** Every earlier
+episode fails F1+F2 because every earlier episode shipped `speaker: None`.
+
+Reviews: agy fan-out (scoped **r2 only**, 1 external call, scope receipt in
+`kibitz-runs/2026-08-14-story-cleanup-regression/r2/`) plus a Sonnet 5 QA pass
+on the diff. Accepted agy's type-safety finding and widened it from 2 sites to
+6; **rejected** its top MUST-FIX with evidence (it assumed the announcer owns
+no beat; `compile_radio_score_draft` retires any such score, and that gate is
+the busiest in the lane). Sonnet found a receipt that could blame the wrong
+draft -- fixed. Driver found the unbounded beat window the panel missed.
+
+Gates: suite **10445 passed / 110 skipped / 1 xfailed** (baseline 10355 + new
+guards), Bug Bible **20 passed / 26 skipped / 3 xfailed** at 280 entries,
+`build_variants --check` 50 variants 0 failures, AST+BOM clean on every touched
+file, HEAD == origin after every push.
+
+Box at wrap-up: **server RESIDENT on port 8000, ~12.4 GB VRAM** (finished-run
+behaviour, not a crash -- CLAUDE.md section 5). Live-window watchers stopped.
+Reset per section 4 before the next headless run.
+
+Current step: the three PBUGs are closed. Open: F1 (action in dialogue) on the
+five non-`scifi_news` banks -- 11-40% of spoken rows, worst `media_archive` at
+40% -- which needs the CLEAN STAGE (detector built and corpus-graded, model
+repair pass NOT built); and the graduated extraction contract the operator
+specified at the end of the session.
+
+Next: build the clean stage, or the graduated extraction contract -- both are
+specified in `GO_FORWARD_PLAN.md` under PRIORITY 1. Neither is blocked on the
+operator. The lane rename (codex/fable2 -> scifi news pro/non-pro) is still
+queued behind them; build the seam-resolution check FIRST when it starts.
+
+Models: `gemma-4-12b-it` for the proof leg and the `scifi_news_pro` retry;
+`gemma-2-2b-it` for the writer-lane sweep. Review routing per the 2026-08-11
+directive as GO_FORWARD states it -- **no r1-r4 arc opened**; agy fan-out was a
+SCOPED r2 TAIL with a receipt, plus Sonnet 5 post-coding QA.
+
+Commits: 8da8f457, fa001688, 4d905037, 9ef9fead, 665ef39a, 169a7722, 8884b4d2,
+9217995d (v2.0-alpha); a6035b2, 3d89149 (survival-guide main).
+
 ## 2026-08-14 -- base HEAD 707b39e9 -> c0cec79b (v2.0-alpha) -- THE WORD RIP (acts replace words; both story misses proven on the published ledger)
 
 Did: removed the word-count authority from the story writer and made `act_count`
