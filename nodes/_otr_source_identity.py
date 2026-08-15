@@ -121,6 +121,36 @@ class SourceIdentity:
         }
 
 
+def _canonical_url(
+    meta: Mapping[str, Any], source_meta: Mapping[str, Any]
+) -> "tuple[str, str]":
+    """Where the source URL lives differs by lane. Return (url, meta path).
+
+    THE FIDELITY LANES KEEP IT IN THE OTHER SIDEBAR. `source_meta_from_unit`
+    (`_otr_public_domain_sources.py:553-563`) and `source_meta_from_scene`
+    (`_otr_shakespeare_sources.py:428-457`) both emit bibliographic fields ONLY
+    -- no `source_url`. That key lives in the sibling rights record built by
+    `source_rights_from_unit` / `source_rights_from_scene`. The RSS lanes are
+    the other way round: `_rss_source_fetch_result`
+    (`_otr_source_payload.py:604-610`) puts `source_url` INSIDE `source_meta`.
+
+    Reading only `source_meta` therefore returned "" on every public_domain and
+    shakespeare episode -- the two banks this code actually runs on -- while
+    looking correct against a hand-built fixture. Try the bibliographic sidecar
+    first, then the rights sidecar, and RECORD WHICH ONE ANSWERED so the
+    receipt's field provenance stays truthful rather than merely present.
+    """
+    url = _clean(source_meta.get("source_url"))
+    if url:
+        return url, "meta.source_meta.source_url"
+    rights = meta.get("source_rights")
+    if isinstance(rights, Mapping):
+        url = _clean(rights.get("source_url"))
+        if url:
+            return url, "meta.source_rights.source_url"
+    return "", ""
+
+
 def _source_kind_of(meta: Mapping[str, Any], source_meta: Mapping[str, Any]) -> str:
     """Which extraction shape applies.
 
@@ -151,6 +181,9 @@ def identity_from_meta(meta: Any) -> SourceIdentity:
 
     kind = _source_kind_of(meta, source_meta)
     prov: Dict[str, str] = {}
+    url, url_path = _canonical_url(meta, source_meta)
+    if url_path:
+        prov["canonical_url"] = url_path
 
     if kind == _KIND_SHAKESPEARE:
         title = _clean(source_meta.get("play_title"))
@@ -161,7 +194,7 @@ def identity_from_meta(meta: Any) -> SourceIdentity:
             source_kind=kind,
             work_title=title,
             author=_SHAKESPEARE_AUTHOR if title else "",
-            canonical_url=_clean(source_meta.get("source_url")),
+            canonical_url=url,
             provenance=prov,
         )
 
@@ -177,7 +210,7 @@ def identity_from_meta(meta: Any) -> SourceIdentity:
             source_kind=kind,
             work_title=title,
             author=author,
-            canonical_url=_clean(source_meta.get("source_url")),
+            canonical_url=url,
             provenance=prov,
         )
 
@@ -194,7 +227,7 @@ def identity_from_meta(meta: Any) -> SourceIdentity:
             source_kind=kind,
             work_title=publisher,
             post_headline=headline,
-            canonical_url=_clean(source_meta.get("source_url")),
+            canonical_url=url,
             provenance=prov,
         )
 

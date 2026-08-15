@@ -4064,7 +4064,38 @@ class OTR_LedgerScriptWriter:
             # lane as unowned and fall back to the raw LLM note, which is the leak
             # itself. Ownership is `"provenance" in meta`, stamped just above and
             # never conditional.
-            meta["provenance_coda_line"] = _OTRPROV.spoken_coda_line(_prov)
+            # NAME WHAT WE ADAPTED (operator ruling 2026-08-15). Three live
+            # episodes closed without naming their source: ghost_of_elsinore
+            # said only "We've lost our signal.", and midnights_ticktock said
+            # "a work in the public domain" while adapting Leacock's "Gertrude
+            # the Governess". The mechanism was this call: spoken_coda_line
+            # keyed on licence STATUS alone and took no per-work input, so it
+            # could not have named a title even though `meta["source_meta"]`
+            # (stamped just above) carries the title and the author.
+            #
+            # The identity is stamped as its own receipt because it carries
+            # FIELD-LEVEL PROVENANCE -- which meta path each spoken name came
+            # from -- so a wrong credit is fixable at its source instead of
+            # being argued about downstream, and a DEGRADED identity (a lane
+            # that could not name its work) is visible in the artifact rather
+            # than silently becoming the generic sentence.
+            try:
+                from . import _otr_source_identity as _OTRSID
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_source_identity as _OTRSID  # type: ignore
+            _identity = _OTRSID.identity_from_meta(meta)
+            meta["source_identity"] = _identity.as_receipt()
+            meta["provenance_coda_line"] = _OTRPROV.spoken_coda_line(
+                _prov, _identity)
+            if _identity.is_degraded:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] the closing announcer could not "
+                    "name this source: kind=%r title=%r author=%r -- the coda "
+                    "falls back to the generic sentence and "
+                    "meta.source_identity records why",
+                    _identity.source_kind, _identity.work_title,
+                    _identity.author,
+                )
             if not str(meta.get("credits_source_line") or "").strip():
                 _pc = _OTRPROV.printed_credit_line(_prov)
                 if _pc:

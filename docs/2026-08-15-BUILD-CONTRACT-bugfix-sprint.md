@@ -478,7 +478,7 @@ suite, variants, the Bug Bible regression, AST/BOM/zero-byte checks, and
 
 | Defect | Invariant | Artifact assertion |
 |---|---|---|
-| D1 | the fact appears byte-identically, exactly once | byte identity in ledger text, captions and `text_for_tts`/receipt hashes, then the rendered slice verified by the project's ASR check -- "audio contains the fact" is not a binary assertion on its own |
+| D1 | the fact appears byte-identically, exactly once | **the announcer row's final `text` is byte-identical to `meta["provenance_coda_line"]`, AND `meta["ledger_clean"]["rows"]` carries NO entry for that `line_id`.** A row-edit entry means the judge touched it and the pass is LUCK regardless of how similar the output looks -- similarity cannot distinguish "protected" from "rewritten into something close". Then byte identity in captions and `text_for_tts` hashes, and the rendered slice via the project's ASR check. "Audio contains the fact" is not a binary assertion on its own. |
 | D2 | final hashes equal shipped text; every diff attributed | authorized mutation succeeds; unauthorized helper call raises; the tail catches, restores every surface, stamps degradation and completes |
 | D3 | supported END forms resolve to one delimiter; speech untouched | bare/dotted/bracketed/bold accepted; unpaired and content-bearing rejected; the required-shape diagnostic pinned |
 | D4 | a source-backed pin controls the voice without changing allocator traversal | GERTRUDE and LORD RONALD no longer render inverted, measured per line |
@@ -486,6 +486,21 @@ suite, variants, the Bug Bible regression, AST/BOM/zero-byte checks, and
 | D5a | eligibility has one owner and survives caching | identical mux inputs with changed eligibility do not reuse a cached result; ineligible yields archival success, no OBS copy, no OBS path |
 | D6 | selection durably identified; concurrent runs never pick the same unexpired URL | a real MULTI-PROCESS race proves exactly one reservation succeeds |
 | D7 | no collision with another configured work title | Macbeth-not-Tempest regression fixture |
+
+**LIVE-LEG TIMING, decided 2026-08-15 (driver + Antigravity, independently).**
+**DEFER the qualifying leg until chunk 2 (D1) has landed.** Until the clean
+stage is scoped, it may still rewrite the coda row, so a leg cannot qualify D5
+either way: a pass is luck (non-deterministic model output) and a failure is
+already known from three artifacts. Run it on `public_domain` pinned to
+`gertrude_governess:main` once D1 is merged and green.
+
+*Rejected on grounding:* a proposed "dry-run / ledger-only validation" third
+option via `scripts/otr_canonical_api_run.py --dry-run`. The script and flag
+both exist, but `--dry-run` only *"build[s] and dump[s] the API prompt without
+POST /prompt"* (`:191`, `:222`) -- no writer runs, so it validates no ledger, no
+receipt and no coda. Its GOAL is already met at zero VRAM by the seam tests in
+`tests/test_source_identity_coda.py`, which mirror the writer's exact call
+sequence against the real shipped meta shapes.
 
 **Live legs through `workflows/otr_canonical.json`:** media_archive twice
 (D1/D5/D6); public_domain (D1/D4/D5); shakespeare (D1/D5/D7); scifi_news (D2);
