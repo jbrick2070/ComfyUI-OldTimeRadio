@@ -555,7 +555,3 @@ def _cli(argv: list[str]) -> int:
         print(Path(out).read_text(encoding="utf-8"))
         return 0
     return 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(_cli(sys.argv[1:]))

@@ -342,7 +342,3 @@ def _self_test() -> int:
         )
     )
     return failures
-
-
-if __name__ == "__main__":
-    raise SystemExit(1 if _self_test() else 0)
