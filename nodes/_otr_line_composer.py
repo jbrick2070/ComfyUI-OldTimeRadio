@@ -14,6 +14,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_ledger_clean import PROTECTED_FACT_COMPONENT_FLAG
+except ImportError:  # pragma: no cover
+    from _otr_ledger_clean import PROTECTED_FACT_COMPONENT_FLAG  # type: ignore
+
 try:  # pragma: no cover - package / standalone import styles
     from ._otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN
 except ImportError:  # pragma: no cover
@@ -1458,9 +1463,25 @@ def compose_news_coda(
     *, creative_fn, news_close_brief, premise, intro_text="",
     creative_repo_id=None, source_bank_id: str = "media_archive",
 ) -> LineResult:
-    """Author one bridge and append the complete source fact unchanged."""
+    """Author one bridge and append the complete source fact unchanged.
+
+    THE RETURNED ROW IS A COMPOSITE AND SAYS SO. Everything after the bridge is
+    Python-owned text that no later pass may rewrite, so every result that
+    actually carries a fact is stamped `PROTECTED_FACT_COMPONENT_FLAG`. The
+    clean stage reads that flag and skips the row before it judges anything --
+    without it, a model rewrote the whole row and deleted the attribution on 9
+    of 14 voiced rows across three episodes (PBUG-20260815-01).
+
+    The flag rides on the RESULT rather than being inferred downstream because
+    this function is the only place that knows a fact was appended: by the time
+    the ledger is read back, a fact-only row and an ordinary authored row look
+    identical.
+    """
     fact = _clean_news_coda_fact(news_close_brief)
     if not fact:
+        # No fact was appended, so nothing here is Python-owned and the row
+        # stays fully judgeable. Marking it protected would exempt an ordinary
+        # authored line from cleaning for no reason.
         return LineResult("", ("news_coda_no_brief",))
     system = _resolved_closing_prompt(
         creative_repo_id, phase="coda_system",
@@ -1481,8 +1502,14 @@ def compose_news_coda(
     if not ok:
         bridge = ""
     result = _assemble_news_coda_surface(bridge, fact)
+    # The bridge outcome and the protection are INDEPENDENT facts. The bridge
+    # may have failed validation and been dropped -- the fact is still there,
+    # still Python-owned, and still must not be rewritten. Deriving protection
+    # from `news_coda_bridge`/`news_coda_fact_only` would also make it
+    # circular: those are decided here, after the point where a clean pass
+    # needs to already know to keep its hands off.
     flag = "news_coda_bridge" if bridge else "news_coda_fact_only"
-    return LineResult(result, (flag,))
+    return LineResult(result, (flag, PROTECTED_FACT_COMPONENT_FLAG))
 
 
 def compose_announcer_outro(

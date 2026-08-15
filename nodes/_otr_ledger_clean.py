@@ -92,10 +92,46 @@ __all__ = [
     "LEDGER_CLEAN_VERSION",
     "UNCLEAN_COMPOSE_FLAG",
     "MISATTRIBUTED_COMPOSE_FLAG",
+    "PROTECTED_FACT_COMPONENT_FLAG",
     "run_ledger_clean",
 ]
 
 LEDGER_CLEAN_VERSION = "ledger_clean_v2"
+
+#: A ROW THIS PASS MAY NOT REWRITE, BECAUSE PYTHON OWNS PART OF ITS TEXT.
+#:
+#: THE DEFECT THIS EXISTS FOR (PBUG-20260815-01). The closing announcer row is
+#: a COMPOSITE: a model-authored bridge plus a deterministic, Python-appended
+#: source fact. This pass had no concept of a protected span inside a row -- it
+#: judged the row as one undifferentiated block and handed the whole thing to a
+#: model to rewrite. `reel_of_mystery` b016 composed a factual Library of
+#: Congress note naming three real films and SHIPPED *"Clarisse's gaze meets
+#: the reel's enigmatic label"*: the fact was simply gone, while `meta` still
+#: advertised that the episode had spoken it. Measured at 9 of 14 voiced rows
+#: across three episodes in one overnight gate.
+#:
+#: ONE CONSTANT, TWO READERS. `_otr_line_composer.compose_news_coda` stamps it
+#: at the moment it appends the fact; the loop below reads it before any judge
+#: call. Two hand-spelled literals is `BUG_BIBLE.yaml` 12.86 -- a
+#: producer/consumer mismatch where the emitter and the reader drift apart and
+#: the guard silently stops guarding.
+#:
+#: STAMPED INDEPENDENTLY OF THE BRIDGE OUTCOME. Not derived from
+#: `news_coda_bridge` / `news_coda_fact_only`: those describe whether the
+#: bridge survived validation, which is decided AFTER cleaning would have run.
+#: A flag that cannot identify the row before it is judged is useless to a
+#: check whose whole job is to fire first.
+#:
+#: WHY A WHOLE-ROW SKIP RATHER THAN A CLEVERER SCOPE. The guarantee has to be
+#: STRUCTURAL -- the protected text must be physically unable to enter the
+#: model's edit surface. Asking a model nicely to preserve a fact leaves a
+#: model deciding, and a post-hoc "did the fact survive" check ships the wrong
+#: row and merely notices. Scoping by `speaker_role` was considered and
+#: rejected: announcer rows are legitimately judged, and
+#: `tests/test_ledger_clean_stage.py` pins `judge_calls == 3` on a synthetic
+#: ledger whose announcer row carries no flags, so a role-keyed exemption
+#: would drop it to 2.
+PROTECTED_FACT_COMPONENT_FLAG = "protected_fact_component"
 
 #: Stamped on a row that survived the whole repair budget still dirty, so the
 #: defect is visible in the artifact and not only in the log.
@@ -1655,6 +1691,11 @@ def run_ledger_clean(
             "acts_summarized": 0,
             "episode_context": "",
         },
+        # Line ids skipped because Python owns part of their text. Its own
+        # key, deliberately: `rows` means "the judge touched this", and the
+        # D1 acceptance test asserts a protected row appears in NEITHER
+        # `rows` nor any repair count.
+        "protected_rows": [],
         "voiced_rows": 0,
         "judged_dirty": 0,
         "segments_named": 0,
@@ -1683,6 +1724,19 @@ def run_ledger_clean(
         receipt["voiced_rows"] += 1
         line_id = str(row.get("line_id") or "")
         speaker = str(row.get("speaker") or "").strip()
+
+        # PYTHON OWNS PART OF THIS ROW. Hands off, before any judge call --
+        # see PROTECTED_FACT_COMPONENT_FLAG. Recorded in its OWN list, never in
+        # `rows`: an entry there means the judge read the row and something
+        # rewrote it, which is exactly what must not have happened here.
+        if PROTECTED_FACT_COMPONENT_FLAG in (row.get("compose_flags") or ()):
+            receipt["protected_rows"].append(line_id)
+            log.info(
+                "[ledger_clean] %s carries a Python-owned fact component; "
+                "skipped before judging (%s)",
+                line_id or "<no line_id>", PROTECTED_FACT_COMPONENT_FLAG,
+            )
+            continue
 
         seen = receipt["context_seen"]
         seen["episode_context"] = episode

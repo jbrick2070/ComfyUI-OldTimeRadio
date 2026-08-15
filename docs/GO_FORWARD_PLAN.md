@@ -34,10 +34,12 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10624 / 110 / 1**, Bible **20 / 26 / 3**,
+**BASELINES to detect drift:** suite **10633 / 110 / 1**, Bible **20 / 26 / 3**
+(the Bible now holds **281** entries -- `12.103` landed with chunk 2),
 variants 50 emitted (3 refused -- the standing unratified cloud profiles).
 (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610, 10613,
-10624 are the three agy QA rounds folded in. No regressions at any step.)
+10624 the three agy QA rounds; -> 10633 chunk 2 / D1. No regressions at any
+step.)
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
@@ -48,12 +50,25 @@ decision with its rationale. It survived four review rounds and was rewritten
 forward-only at r4 because layered corrections had left it contradicting itself.
 Read it INSTEAD OF re-deriving anything below.
 
-**NEXT WINDOW STARTS AT CHUNK 0.75 (the D4 vendor gate -- all 65 sidecars
-generated, schema-validated, freshness-verified).** Chunk 0's identity half is
-DONE and pushed (`99cb8856`); **chunk 0.5 (publication eligibility, end to end)
-is DONE and pushed** -- see the receipt in `docs/HANDOFF_LOG.md`. The chunk
-order is in the contract; it is not the defect order and two of its edges are
-load-bearing:
+**DONE AND PUSHED SO FAR:** chunk 0's identity half (`99cb8856`), chunk 0.5
+publication eligibility, and **chunk 2 / D1 -- the clean stage no longer
+deletes the Python-owned coda fact** (Bible `12.103` promoted with it).
+Receipts in `docs/HANDOFF_LOG.md`.
+
+**STILL OWED FROM CHUNK 0:** the transition-receipt schema and its composite
+validator were never built -- only the identity adapter shipped. Nothing in
+`nodes/` or `tests/` mentions `transition_receipt` / `authorized_stage`. It is
+D2 machinery, so it belongs with chunks 1 and 3; the point is that chunk 0 is
+NOT closed.
+
+**NEXT: chunk 0.75 (the D4 vendor gate) or chunks 1+3 (D2).** D1 is in, so the
+qualifying live leg is now unblocked. Before starting 0.75, check
+`.claude/worktrees/awesome-brahmagupta-a509b4/` -- it already holds a full set
+of provenance sidecars, which is exactly what 0.75 builds, so another window
+may be on it.
+
+The chunk order is in the contract; it is not the defect order and two of its
+edges are load-bearing:
 
 * **D2 must land before D3.** Fix the `END` grammar first and `scifi_news_pro`
   clears the markup ladder only to die at the freeze cascade on a

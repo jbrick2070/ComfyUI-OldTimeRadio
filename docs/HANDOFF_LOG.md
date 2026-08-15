@@ -3,6 +3,60 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- CODER (chunk 2 / D1: the clean stage stops deleting the fact Python owns, and the sprint's first Bible entry lands with it)
+
+**Did.** Chunk 2 of the build contract (D1, the component boundary), plus its
+Bible promotion. Green and pushed. Taken OUT of contract order deliberately:
+the operator wanted maximum code before a long live run, and D1 is the
+load-bearing edge -- *"D1 must land before the qualifying live leg"* -- so no
+leg could qualify anything without it.
+
+**The defect, from the artifact.** The closing announcer row is a COMPOSITE: a
+model-authored bridge plus a deterministic source fact Python appends verbatim.
+The clean stage had no concept of a protected span -- it judged the row as one
+block and handed the whole thing to a model. `reel_of_mystery` b016 composed a
+factual Library of Congress note naming three real films and shipped
+*"Clarisse's gaze meets the reel's enigmatic label"*. 9 of 14 voiced rows across
+three episodes.
+
+**The fix is structural, not persuasive.** `compose_news_coda` stamps
+`PROTECTED_FACT_COMPONENT_FLAG` at the moment it appends the fact;
+`run_ledger_clean` reads it before any judge call and skips the row. The
+protected text physically cannot enter the model's edit surface -- asking a
+model nicely leaves a model deciding, and a post-hoc check ships the wrong row
+and merely notices.
+
+Three details each came from a wrong turn considered and rejected:
+
+* **ONE shared constant**, imported by emitter and reader. Two hand-spelled
+  literals is `BUG_BIBLE.yaml` 12.86, and an AST test now forbids the composer
+  hardcoding the string.
+* **Stamped independently of the bridge outcome.** Not derived from
+  `news_coda_bridge`/`news_coda_fact_only`: those are decided AFTER the point
+  where the clean pass needs to already know to keep its hands off.
+* **Not scoped by `speaker_role`.** Announcer rows are legitimately judged, and
+  `tests/test_ledger_clean_stage.py` pins `judge_calls == 3` on a ledger whose
+  announcer row carries no flags -- a role-keyed exemption drops it to 2. That
+  suite still passes 35/35 untouched.
+
+**Checked and deliberately NOT marked:** the `scifi_news` lane appends its own
+coda row (`_otr_scifi_codex.py:4006`, `compose_flags: ["news_coda"]`), and it
+looked like the same shape. It is not -- that coda is MODEL-authored prose
+validated against source anchors, so cleaning it is legitimate. Its problem is
+that the row sits in `_CodexTailFinalizer.expected`, which is D2, chunks 1 and
+3. Marking it would have wrongly exempted model prose from the clean stage.
+
+**Test note worth keeping.** The first cut asserted the protected fact never
+appeared in a judge PROMPT, and failed -- correctly. The coda legitimately
+appears inside a neighbouring row's before/after context window; the pass is
+supposed to show the judge what surrounds a line. Context is not jeopardy.
+The assertion is now on `THE LINE:` -- the row under judgement.
+
+**Bible 12.103 promoted with it** (survival guide `2e98ebe`), 280 -> 281
+entries, README counts bumped for the three-file contract, index row appended.
+This is the sprint's FIRST promotion; the other six stay drafted until their
+chunks land.
+
 ## 2026-08-15 -- CODER (chunk 0.5: publication became a decision with one owner, and the rule that "blocks publish" stopped meaning "destroys the episode")
 
 **Did.** Chunk 0.5 of `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
