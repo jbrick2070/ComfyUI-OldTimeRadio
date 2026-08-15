@@ -764,11 +764,11 @@ def test_the_sha_check_proves_the_context_reached_the_prompt():
         ledger, slot_fn=slot, bank_id="media_archive")
 
     verified = receipt["context_verified"]
-    assert verified["prompts_checked"] > 0
-    assert verified["prompts_missing_context"] == 0
-    assert verified["fields_that_did_not_land"] == []
-    assert verified["prompts_complete"] == verified["prompts_checked"]
-    assert verified["context_shas"], "every prompt gets a context digest"
+    # A sight string and a short sha. 1 = saw it, 0 = did not.
+    assert verified["sight"] == "1" * len(lcl.CONTEXT_FIELDS)
+    assert verified["ok"] is True
+    assert len(verified["sha"]) == 8
+    assert verified["prompts"] > 0
 
 
 def test_a_field_built_but_never_rendered_is_caught_and_named():
@@ -780,11 +780,29 @@ def test_a_field_built_but_never_rendered_is_caught_and_named():
     landed = lcl.verify_context_landed(built, {
         "line": "I told you he would not stay.",
         # threaded into the builder, never rendered into the body
-        "where": "this is the rising of the story",
+        "act": "this is the rising of the story",
     })
     assert landed["ok"] is False
-    assert landed["did_not_land"] == ["where"]
-    assert "line" in landed["supplied"]
+    assert landed["missing"] == ["act"]
+    # position 2 is `act` -- the one that did not arrive
+    assert landed["sight"] == "11011", landed["sight"]
+
+
+def test_the_sight_string_reads_left_to_right_in_a_fixed_order():
+    """"11011" must mean the same thing in every log line, forever."""
+    assert lcl.CONTEXT_FIELDS == (
+        "line", "speaker", "act", "around", "complaint")
+
+    built = [{"role": "user", "content": "THE LINE: hello there"}]
+    all_there = lcl.verify_context_landed(built, {"line": "hello there"})
+    assert all_there["sight"] == "11111", "a field not needed reads 1"
+
+    lost_two = lcl.verify_context_landed(built, {
+        "line": "hello there",
+        "speaker": "Nan Reyes",       # built, never rendered
+        "complaint": "1. '(he sighs)'",  # built, never rendered
+    })
+    assert lost_two["sight"] == "10110", lost_two["sight"]
 
 
 def test_the_digest_is_stable_and_ignores_empty_fields():
@@ -797,7 +815,6 @@ def test_the_digest_is_stable_and_ignores_empty_fields():
         {"one": "alpha", "two": "beta"},
     )
     assert a["sha"] == b["sha"], "an empty field must not change the digest"
-    assert a["empty"] == ["three"]
     assert a["ok"] and b["ok"]
 
 

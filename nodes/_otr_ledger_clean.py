@@ -336,17 +336,35 @@ def _as_findings(findings: "Sequence[_POLICY.Finding]") -> "list[dict[str, str]]
     return [{"quote": f.detail, "why": f.kind} for f in findings]
 
 
+#: THE FIVE THINGS a prompt in this pass is built to show the model, in a
+#: FIXED order so the sight string means the same thing every time:
+#:
+#:     line  speaker  act  around  complaint
+#:      1       1      1     1        1       -> "11111", it saw everything
+#:      1       1      0     1        1       -> "11011", the ACT never landed
+#:
+#: `complaint` is repair-only and the act can be legitimately absent, so a
+#: field this job never needed reads 1 -- nothing to see, nothing lost. A 0
+#: ALWAYS means we built it and it did not arrive, which is the only thing
+#: worth an alarm.
+CONTEXT_FIELDS = ("line", "speaker", "act", "around", "complaint")
+
+#: Digest length. Eight hex is four billion values -- ample to tell two
+#: context blocks apart, short enough to read in a log line.
+_SHA_CHARS = 8
+
+
 def context_digest(*parts: str) -> str:
     """A short SHA-256 over the context we built, house style.
 
     Same idea the ledger already uses on a spoken row's
-    ``text_for_tts_source_sha256``: a short digest is a cheap, exact name for
+    ``text_for_tts_source_sha256``: a small digest is a cheap, exact name for
     "the bytes we meant", and it makes two runs comparable at a glance.
     """
     import hashlib
 
     joined = "\n".join(p for p in parts if p)
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:_SHA_CHARS]
 
 
 def verify_context_landed(
@@ -375,20 +393,41 @@ def verify_context_landed(
     kill an episode.
     """
     sent = "\n".join(str(m.get("content") or "") for m in prompt)
-    missing = [
-        name for name, value in required.items()
-        if str(value or "").strip() and str(value).strip() not in sent
-    ]
     supplied = {
-        name: value for name, value in required.items()
+        name: str(value).strip() for name, value in required.items()
         if str(value or "").strip()
     }
+    missing = [k for k, v in supplied.items() if v not in sent]
+
+    # THE SIGHT STRING: one digit per field, ALWAYS in CONTEXT_FIELDS order.
+    # 1 = I see it, 0 = I do not. Operator's format, 2026-08-14, and it is
+    # the right one -- "10111" tells you at a glance that the SPEAKER never
+    # landed, in a way no dict of booleans does. Fixed positions mean two
+    # runs are comparable by eye and greppable in a log.
+    #
+    # A field this job never needed reads 1: there was nothing to see and
+    # nothing was lost. A 0 ALWAYS means "we built it and it did not arrive",
+    # which is the only thing worth an alarm.
+    unknown = [k for k in required if k not in CONTEXT_FIELDS]
+    if unknown:
+        # A KEY WITH NO POSITION WOULD MAKE THE SIGHT STRING LIE -- it would
+        # read 11111 while `ok` was False, which is worse than no check at
+        # all. Caught here rather than shipped: this is a coding mistake, and
+        # it is exactly the class this whole verification exists to surface.
+        log.error(
+            "[ledger_clean] context field(s) %s have no position in "
+            "CONTEXT_FIELDS, so they cannot appear in the sight string. Add "
+            "them to CONTEXT_FIELDS or use the existing names: %s",
+            ", ".join(sorted(unknown)), " ".join(CONTEXT_FIELDS),
+        )
+    sight = "".join(
+        "0" if name in missing else "1" for name in CONTEXT_FIELDS
+    )
     return {
         "sha": context_digest(*(supplied[k] for k in sorted(supplied))),
-        "supplied": sorted(supplied),
-        "empty": sorted(k for k in required if k not in supplied),
-        "did_not_land": missing,
-        "ok": not missing and bool(supplied),
+        "sight": sight,
+        "ok": bool(supplied) and not missing,
+        "missing": missing,
     }
 
 
@@ -946,17 +985,17 @@ def _judge_row(
     landed = verify_context_landed(built, {
         "line": text,
         "speaker": speaker,
-        "where": where,
-        "lines_around": "\n".join(lines_around),
+        "act": where,
+        "around": "\n".join(lines_around),
     })
     if sightings is not None:
         sightings.append(dict(landed, job="judge"))
-    if landed["did_not_land"]:
+    if not landed["ok"]:
         log.error(
             "[ledger_clean] THE JUDGE IS PARTLY BLIND on this line: %s was "
             "built but is not in the prompt that was sent (context sha %s). "
             "That is a wiring fault in this pass, not a model problem.",
-            ", ".join(landed["did_not_land"]), landed["sha"],
+            ", ".join(landed["missing"]), landed["sha"],
         )
     try:
         # LLM slot: creative -- it is reading DIALOGUE for what a listener
@@ -1175,18 +1214,18 @@ def _call_repair(
     landed = verify_context_landed(built, {
         "line": text,
         "speaker": speaker,
-        "where": where,
+        "act": where,
+        "around": "\n".join(lines_around),
         "complaint": complaint,
-        "lines_around": "\n".join(lines_around),
     })
     if sightings is not None:
         sightings.append(dict(landed, job="repair"))
-    if landed["did_not_land"]:
+    if not landed["ok"]:
         log.error(
             "[ledger_clean] THE REPAIR IS PARTLY BLIND: %s was built but is "
             "not in the prompt that was sent (context sha %s). Wiring fault "
             "in this pass, not the model.",
-            ", ".join(landed["did_not_land"]), landed["sha"],
+            ", ".join(landed["missing"]), landed["sha"],
         )
     try:
         # LLM slot: creative -- it is rewriting DIALOGUE, so the tier that
@@ -1413,28 +1452,34 @@ def run_ledger_clean(
 
     receipt["context_seen"]["acts_summarized"] = len(act_briefs)
     # THE SHA VERDICT for the episode: did what we built reach what we sent?
-    blind = [s for s in sightings if s["did_not_land"]]
+    blind = [s for s in sightings if s["missing"]]
+    # AND the per-prompt sight strings: a 0 in any prompt shows as a 0 for
+    # the episode, so one glance at "11011" says the act went missing
+    # somewhere without opening a single prompt.
+    rolled = "".join(
+        "1" if all(s["sight"][i] == "1" for s in sightings) else "0"
+        for i in range(len(CONTEXT_FIELDS))
+    ) if sightings else ""
     receipt["context_verified"] = {
-        "prompts_checked": len(sightings),
-        "prompts_complete": sum(1 for s in sightings if s["ok"]),
-        "prompts_missing_context": len(blind),
-        "fields_that_did_not_land": sorted({
-            name for s in blind for name in s["did_not_land"]
-        }),
-        "context_shas": sorted({s["sha"] for s in sightings})[:12],
+        "sight": rolled,
+        "sha": context_digest(*(s["sha"] for s in sightings)),
+        "ok": bool(sightings) and not blind,
+        "fields": list(CONTEXT_FIELDS),
+        "prompts": len(sightings),
     }
     if blind:
         log.error(
-            "[ledger_clean] %d of %d prompt(s) went out MISSING context that "
-            "was built for them (%s). That is a wiring fault in this pass.",
+            "[ledger_clean] CONTEXT DID NOT LAND on %d of %d prompt(s): %s "
+            "was built and never reached the model. Wiring fault in this "
+            "pass, not the model.",
             len(blind), len(sightings),
-            ", ".join(receipt["context_verified"]["fields_that_did_not_land"]),
+            ", ".join(sorted({n for s in blind for n in s["missing"]})),
         )
     elif sightings:
         log.info(
-            "[ledger_clean] context verified: %d/%d prompt(s) carried every "
-            "field they were built with.",
-            receipt["context_verified"]["prompts_complete"], len(sightings),
+            "[ledger_clean] context %s sha %s across %d prompt(s) (%s)",
+            rolled, receipt["context_verified"]["sha"], len(sightings),
+            " ".join(CONTEXT_FIELDS),
         )
     _log_verdict(receipt)
     meta = ledger_data.setdefault("meta", {})
