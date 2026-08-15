@@ -3,6 +3,100 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 99cb8856 (v2.0-alpha) -- CODER (the bug-fix sprint specified across four review rounds, two of the seven defects re-rooted, both writer failures diagnosed off the act change, and chunk 0 landed live)
+
+**Did.** Eight pushed commits: six docs, two code. No live render leg -- deferred
+on purpose, see Next.
+
+* **The review campaign, and it earned its keep.** Four rounds, 14 external
+  reviews, output = `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
+  (`79a702bf`), rewritten forward-only at r4 because three rounds of layered
+  corrections had left it contradicting itself in three places. Every round
+  overturned something the driver was confident about.
+* **PBUG-20260815-01 is the finding that re-rooted the sprint** (`86014bb1`).
+  The clean stage shipped 2026-08-14 DELETES Python-owned source attributions.
+  `reel_of_mystery` b016 composed a factual Library of Congress close naming
+  three real films and shipped only *"Clarisse's gaze meets the reel's enigmatic
+  label"*. So the operator's *"What news story???"* was never the interpreter's
+  fault -- the coda was correct when composed. Rewrite rate 9 of 14 voiced rows
+  on all three episodes checked. This merges the archive-coda defect with the
+  `scifi_news` crash under ONE root cause needing OPPOSITE remedies: preventive
+  isolation vs detective re-sealing.
+* **Both writer failures diagnosed, and NEITHER is the act-topology change.**
+  `scifi_news` died at `l004`, the first row the clean stage repaired, on a leg
+  carrying **8 voiced rows, not 12** (`tmp/_overnight_server.log:25934, 25998`).
+  `scifi_news_pro` died because `_otr_fable2_markup.py:41` demands `END.` and the
+  model wrote `END` -- reproduced offline, both reported defects from one cause.
+  **The plan's named revert experiment is CANCELLED**; it would have spent a live
+  roll testing a falsified hypothesis.
+* **Gender resolved by MEASURING the delivered audio**, per line, windows
+  verified contiguous. `midnights_ticktock` is a RECIPROCAL inversion across
+  twelve lines: GERTRUDE (a woman) male on all six, **LORD RONALD (a man) female
+  on all six -- a second instance the operator never reported**. `JULIANA` does
+  NOT reproduce (240 Hz, female, all six lines), so the invented-lane half is
+  dropped. The voice bank audits CLEAN -- 41 references, zero label
+  disagreements -- so no relabelling. Sole fault: no provenance sidecar for that
+  unit; one exists for 65 units.
+* **Chunk 0 landed and is LIVE for the fidelity lanes** (`9c343c01`,
+  `99cb8856`). `nodes/_otr_source_identity.py` is a versioned identity adapter
+  with field-level provenance; `spoken_coda_line` takes an optional identity and
+  is byte-identical without one. `midnights_ticktock` would now close on
+  *"Tonight's tale was adapted from Nonsense Novels, by Stephen Leacock."* and
+  `ghost_of_elsinore` on *"...William Shakespeare's Hamlet."* -- while still
+  never speaking Folger or CC BY.
+* **Sonnet QA found a real defect in that code and it was the driver's.**
+  `canonical_url` read `source_meta["source_url"]`, a key the two fidelity lanes
+  do not have -- it lives in the sibling rights record -- so the receipt's URL
+  was blank on every real episode of both banks. Worse, the test fixture invented
+  that key too, so the suite validated the bug. Fixed, and the fixture now
+  mirrors the real two-sidecar split.
+* **Rejected on grounding, so nobody reinstates them:** the anthology
+  display-title rule (all four reviewers recommended it; the manifest refutes it
+  -- `label` is a scene descriptor on 60 of 65 units, so dracula would have been
+  announced as *"Harker at the castle"*); hand-balancing the name pools and
+  cutting model ranking from the media picker (both superseded by operator
+  rulings); a third LLM parse rung; voice-bank relabelling.
+
+**Suite 10561 / 110 / 1. Bible 20 / 26 / 3.** Both run this session, green.
+Box CLEAN at wrap-up: port 8000 clear, VRAM 1706 MiB, zero ComfyUI processes.
+No `INPUT_TYPES`, widget, node-registration or `workflows/otr_canonical.json`
+change anywhere in the session.
+
+**Current step.** Chunk 0's identity half is done. The contract's build order is
+the authority and is NOT the defect order.
+
+**Next.** **Start at chunk 0.5 -- publication eligibility end to end** (one
+aggregator OUTSIDE the read-only gap audit, the mux consuming it, the
+`IS_CHANGED` cache key, and the blocked-path behaviour that must clear both OBS
+path aliases). Two ordering edges are load-bearing: **D2 before D3** (fix the
+`END` grammar first and `scifi_news_pro` clears the ladder only to die at the
+freeze cascade instead) and **D1 before the qualifying live leg**. The live leg
+is DEFERRED by joint driver + Antigravity decision -- until the clean stage is
+scoped it cannot qualify D5 either way, since a pass is luck and a failure is
+already known. Run it on `public_domain` pinned to `gertrude_governess:main`
+after chunk 2, asserting the announcer row is byte-identical to
+`meta["provenance_coda_line"]` AND that `meta["ledger_clean"]["rows"]` carries
+NO entry for that `line_id`. Blocked on nobody.
+
+**Models.** Opus drove and judged. Panel: Codex all four rounds; **Antigravity
+r1 ONLY** -- quota-held (`RESOURCE_EXHAUSTED` 429) through r2-r4, recovered
+afterwards and broke the live-leg tie; cloud (GPT-5.6-sol, Gemini 3.1 Pro,
+DeepSeek-v4-pro) on r1 and r3; Fable structural gate, Sonnet implementability
+audit and a Haiku fresh-eyes pass on r1; Sonnet QA on the finished diff.
+**This was NOT a clean two-reviewer four-round arc and the contract says so at
+its top.** Cloud spend $0.36; everything else local and $0.
+
+**Bible.** Delta-scrape DONE without re-scraping indexed history: **02(b) is
+already covered by `11.18`**; seven genuinely uncovered shapes are drafted as
+`12.103`-`12.109` in `docs/2026-08-15-BIBLE-PROMOTION-DRAFT-bugfix-sprint.md`.
+NOT promoted yet on purpose -- all seven are still `OPEN, fix not landed`, and a
+Bible `fix:` field claims something was fixed and proven. Promote each with its
+green chunk.
+
+**Commits.** `bc43999c`, `899c967a`, `86014bb1`, `7692a5c3`, `b1871625`,
+`79a702bf` (docs); `9c343c01`, `99cb8856` (code). All pushed, HEAD == origin
+verified after each.
+
 ## 2026-08-15 -- HEAD 11920cbc (v2.0-alpha) -- CODER (the clean stage proven live on the codex lane; the headless entrypoint had been dead for a day; four operator rulings reshaped the act topology; an all-night six-bank gate found two deterministic writer failures)
 
 **Did.** Five green pushed chunks plus two evidence docs.

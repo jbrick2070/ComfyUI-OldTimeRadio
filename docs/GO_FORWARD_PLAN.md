@@ -21,15 +21,64 @@ Sonnet-or-Flash QA-and-retest pass on the finished diff. Anything you are NOT
 confident about goes to the panel BEFORE you write code. Ground every panel
 claim against the real Windows files and discard what does not survive.
 
+**THE ARC FOR THIS SPRINT ALREADY RAN (2026-08-15) -- do not re-run it.** Four
+rounds, 14 external reviews, output =
+`docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`. Provenance, stated precisely
+because a partial campaign may never be reported as a full arc: Codex covered
+all four rounds; **Antigravity covered r1 ONLY** and was quota-held
+(`RESOURCE_EXHAUSTED` 429) through r2-r4, recovering only afterwards; the cloud
+panel (GPT-5.6-sol, Gemini 3.1 Pro, DeepSeek-v4-pro) covered r1 and r3; Fable,
+Sonnet and Haiku covered r1. Cloud spend $0.36 total.
+
+**The panel gate for the REMAINING chunks is the diff-level one above** -- your
+fix, then Sonnet/Flash QA on the finished diff -- because the design is already
+panelled. Open a fresh arc only for a chunk that departs from the contract.
+
+**BASELINES to detect drift:** suite **10561 / 110 / 1**, Bible **20 / 26 / 3**,
+variants 50/0. (Suite was 10532 at session start; +29 is this session's new
+tests, no regressions.)
+
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
-The gender/voice fix is explicitly GREEN-LIT: *"we tried to update gender voice
-a while ago -- go for it."*
+**THE SPRINT IS SPECIFIED. THE CONTRACT IS
+`docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md` AND IT IS THE SINGLE
+AUTHORITY** -- build order, per-defect acceptance, test fallout, and every
+decision with its rationale. It survived four review rounds and was rewritten
+forward-only at r4 because layered corrections had left it contradicting itself.
+Read it INSTEAD OF re-deriving anything below.
 
-Seven defects, all from LIVE artifacts on 2026-08-15, all admissible. Evidence:
+**NEXT WINDOW STARTS AT CHUNK 0.5.** Chunk 0's identity half is DONE and pushed
+(`99cb8856`). The chunk order is in the contract; it is not the defect order and
+two of its edges are load-bearing:
+
+* **D2 must land before D3.** Fix the `END` grammar first and `scifi_news_pro`
+  clears the markup ladder only to die at the freeze cascade on a
+  content-authorship mismatch. The corpse moves; the lane still fails.
+* **D1 must land before the qualifying live leg.** Until the clean stage is
+  scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
+  way -- a pass is luck, a failure is already known from three artifacts.
+
+### What changed about the seven defects (do NOT work from the old framing)
+
+* The **`media_archive` coda defect was never the interpreter's fault.** The
+  clean stage DELETED a factual Library of Congress close. That merged it with
+  the `scifi_news` crash under one root cause -- and they need OPPOSITE
+  remedies: D1 is preventive isolation, D2 is detective re-sealing.
+* **Neither writer failure is the act-topology change.** `scifi_news` died at 8
+  voiced rows on the first row the clean stage repaired; `scifi_news_pro` died on
+  a regex demanding `END.` when the model wrote `END`. The plan's named revert
+  experiment is CANCELLED -- it would spend a live roll to test a falsified
+  hypothesis.
+* **Gender halved and doubled.** The `original`-lane instance does NOT reproduce
+  (measured 240 Hz, female, per line). The `public_domain` instance is a
+  RECIPROCAL inversion -- LORD RONALD is a second, unreported instance in the
+  same episode. One root cause: no provenance sidecar for that unit.
+* **The LLM-parse fork is CLOSED.** Four independent reviews plus the driver
+  rejected it. Fix the grammar and make the defect state the required shape.
+
+Original evidence, still valid, do not re-derive:
 `docs/2026-08-15-operator-eyeball-findings.md` and
-`docs/2026-08-15-overnight-bank-gate-findings.md`. **Do not re-derive them --
-they are already grounded against the real ledgers.**
+`docs/2026-08-15-overnight-bank-gate-findings.md`.
 
 ### A. THE CLOSING ANNOUNCER DOES NOT NAME WHAT IT ADAPTED (3 banks, one family)
 
@@ -82,13 +131,22 @@ Operator asks whether the scene is actually Macbeth. Check the ledger's
 selected scene against the title. A title naming the wrong play would be a
 FIDELITY defect on the lane where fidelity outranks arc.
 
-### OWED, NOT DONE THIS SESSION
+### OWED -- STATE AS OF 2026-08-15 WRAP-UP
 
-* **Bug Bible promotion.** Seven live-artifact defects landed tonight and NONE
-  has been checked against `otr_coverage_index.yaml` or promoted. Do this per
-  the delta-scrape discipline -- never re-scrape indexed history.
-* **`PROD_BUG_LOG.md` entries** for the two bank-gate failures and the two
-  voice-gender instances.
+* **`PROD_BUG_LOG.md` entries: DONE.** PBUG-20260815-01..08 landed (`86014bb1`).
+  07 is a REJECTION, recorded so nobody re-chases the `original`-lane report.
+* **Bug Bible delta-scrape: DONE. Promotion: DELIBERATELY NOT YET.** The scrape
+  ran against `otr_coverage_index.yaml` (394 records) and `BUG_BIBLE.yaml` (280
+  entries, HEAD `fbeddad`) without re-scraping indexed history. Result:
+  **02(b) -- "a post-generation audit whose only failure mode destroys finished
+  work" -- is ALREADY COVERED by `11.18`**, index row only, no new entry. The
+  other seven shapes are genuinely uncovered and are drafted as `12.103`-`12.109`
+  in `docs/2026-08-15-BIBLE-PROMOTION-DRAFT-bugfix-sprint.md`, each with an
+  automatable verify clause and its index row.
+  **They are NOT promoted yet on purpose:** every one is still `OPEN --
+  diagnosed, fix not landed`, and a Bible entry's `fix:` field is a claim that
+  something was fixed and proven. Promote each one WITH its green chunk, per the
+  contract's documentation gate. The draft exists so no re-scrape is ever needed.
 
 ## OPERATOR RULINGS 2026-08-15 (hard -- these settle three OWED decisions)
 

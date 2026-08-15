@@ -49,14 +49,18 @@ Anti-drift on resume:
   and `/mnt/user-data/uploads/` is a lagging snapshot that reports phantom
   corruption. Route everything through Desktop Commander on the Windows paths.
 - **Review routing is whatever GO_FORWARD says TODAY -- read it, do not assume.**
-  This skill used to hard-code "any coding item carries the full
-  `kibitz-plugin:kibitz` gate (r1-r4)". That gate is SUSPENDED as of the
-  operator's 2026-08-11 directive, which routes a QUANDARY to **Codex CLI** and
-  the post-coding QA on the finished diff to **Sonnet 5**, with no r1-r4 arc
-  opened and no scoped tail ever reported as one. The 08-04 full-kibitz gate is
-  suspended, not dead, and returns if the operator withdraws 08-11 -- so state
-  the ROUTING YOU READ in the opening statement, with its date, rather than
-  repeating either from memory.
+  This skill has twice gone stale by naming a specific directive here, so it no
+  longer names one. The routing has swung more than once: the 2026-08-04 full
+  `kibitz-plugin:kibitz` gate (r1-r4) was SUSPENDED by the 2026-08-11 directive
+  (quandary -> Codex CLI, post-coding QA on the finished diff -> Sonnet 5), and
+  then RESTORED by the 2026-08-15 REVIEW ROUTING block at the top of GO_FORWARD
+  for the bug-fix sprint. **Read the REVIEW ROUTING block and state the routing
+  you read, with its date, in the opening statement.** Never repeat a routing
+  from this skill or from memory.
+  Two things survive every swing: a partial campaign is reported as a scoped
+  tail with a scope receipt and is NEVER worded as a full arc; and when a design
+  has already been panelled, the remaining chunks take the diff-level gate
+  rather than a fresh arc.
 - What 08-11 did NOT drop, and no routing change ever does: **Bug Bible
   regression every turn**, the BOM check on every touched file, the full suite,
   `build_variants.py --check`, AST parse on touched `.py`, and HEAD == origin
