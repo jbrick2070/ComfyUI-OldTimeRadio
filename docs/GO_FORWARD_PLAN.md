@@ -34,9 +34,11 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10561 / 110 / 1**, Bible **20 / 26 / 3**,
-variants 50/0. (Suite was 10532 at session start; +29 is this session's new
-tests, no regressions.)
+**BASELINES to detect drift:** suite **10608 / 110 / 1**, Bible **20 / 26 / 3**,
+variants 50 emitted (3 refused -- the standing unratified cloud profiles).
+(10532 -> 10561 was the specification session; 10561 -> 10608 is chunk 0.5's
+46 new tests plus a net +1 in `TestG14PublishGate`. No regressions at either
+step.)
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
@@ -47,9 +49,12 @@ decision with its rationale. It survived four review rounds and was rewritten
 forward-only at r4 because layered corrections had left it contradicting itself.
 Read it INSTEAD OF re-deriving anything below.
 
-**NEXT WINDOW STARTS AT CHUNK 0.5.** Chunk 0's identity half is DONE and pushed
-(`99cb8856`). The chunk order is in the contract; it is not the defect order and
-two of its edges are load-bearing:
+**NEXT WINDOW STARTS AT CHUNK 0.75 (the D4 vendor gate -- all 65 sidecars
+generated, schema-validated, freshness-verified).** Chunk 0's identity half is
+DONE and pushed (`99cb8856`); **chunk 0.5 (publication eligibility, end to end)
+is DONE and pushed** -- see the receipt in `docs/HANDOFF_LOG.md`. The chunk
+order is in the contract; it is not the defect order and two of its edges are
+load-bearing:
 
 * **D2 must land before D3.** Fix the `END` grammar first and `scifi_news_pro`
   clears the markup ladder only to die at the freeze cascade on a
@@ -57,6 +62,27 @@ two of its edges are load-bearing:
 * **D1 must land before the qualifying live leg.** Until the clean stage is
   scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
   way -- a pass is luck, a failure is already known from three artifacts.
+
+### FOR THE OPERATOR EYEBALL -- one behaviour change landed with chunk 0.5
+
+**A research_only source no longer kills the render. It withholds the OBS
+copy.** The 2026-07-17 rule ("a research_only source BLOCKS publish") was
+implemented as `G14` appending to the gap audit's ERROR list, which at Phase 10
+means `FreezeAssertionError` -- so the rule was carried out by DESTROYING a
+finished episode after it had been written, cast, voiced, rendered and muxed,
+and the operator was left without even the archival copy such a source IS
+cleared for. That is the contract's Law 7 ("a render must not die"; structural
+refusal belongs BEFORE generation, and the freeze is long past it), and the
+contract's own live-leg list demands the opposite outcome: *"a research-only
+terminal case proving an archival final with no `obs_publish OK`, no OBS copy
+and a durable non-publishable receipt."*
+
+So: `G14` still reports, as a WARNING, and the block now lands at the
+publication boundary. Nothing was weakened -- a research_only episode still
+never reaches `otr\obs\`, deterministically -- and the freeze's structural
+errors are untouched and still fatal. **If the operator wants a research_only
+source to keep killing the render instead, say so and it is a one-line
+revert.**
 
 ### What changed about the seven defects (do NOT work from the old framing)
 

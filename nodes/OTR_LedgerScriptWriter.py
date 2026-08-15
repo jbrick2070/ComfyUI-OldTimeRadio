@@ -4044,8 +4044,13 @@ class OTR_LedgerScriptWriter:
             meta["credits_source_line"] = _credits_line
         # v4 P1(viii): opt-in source-provenance normalizer. Map source_rights ->
         # one normalized record; stamp the spoken coda line + fill
-        # credits_source_line when the bank default did not. The deterministic
-        # G14 terminal blocks publish on a research_only source.
+        # credits_source_line when the bank default did not. A research_only
+        # source still BLOCKS publish, deterministically -- but at the
+        # publication boundary now, not the freeze (2026-08-15, build contract
+        # D5a): `blocks_publish` feeds the publication-eligibility receipt that
+        # Phase 10 stamps and OTR_MasterAudioMux consumes, so the episode keeps
+        # its archival final and only the OBS copy is withheld. G14 in the gap
+        # audit reports the same fact as a warning.
         # ACTIVE on public_domain and shakespeare (nodes/story_packs/banks.json),
         # pinned by tests/test_provenance_v4.py. This comment read "inert for
         # every current bank" for a day after both banks opted in on 2026-08-04,

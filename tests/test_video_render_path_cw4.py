@@ -322,6 +322,30 @@ def test_master_audio_mux_terminal_stamp_owns_all_final_paths(
     assert pathlib.Path(saved["meta"]["paths"]["obs_final"]).is_file()
 
 
+def _publishable_episode(tmp_path, monkeypatch, ep_id):
+    """An episode whose ledger CLEARS publication, wired as the in-flight one.
+
+    Since 2026-08-15 (build contract D5a) the mux publishes to obs only when the
+    ledger carries an eligibility receipt that says so, and it fails CLOSED --
+    no ledger means no OBS copy. That is deliberate (a stale singleton must
+    never publish one episode under another's rights), and it means a test about
+    the PUBLISHED copy now has to supply the episode the copy belongs to.
+    """
+    from nodes import _otr_ledger as otr_ledger
+    from nodes import _otr_publication_eligibility as pub
+
+    ledger_path = (tmp_path / "out" / "otr" / "episodes" / ep_id / "audio"
+                   / f"{ep_id}_ledger.json")
+    ledger_path.parent.mkdir(parents=True)
+    led = {"episode_id": ep_id, "lines": [], "meta": {"source_bank": "original"}}
+    # Stamp through the real producer, so this fixture cannot drift away from
+    # the receipt shape the mux actually reads.
+    assert pub.stamp_publication_eligibility(led).eligible is True
+    ledger_path.write_text(json.dumps(led), encoding="utf-8")
+    monkeypatch.setattr(otr_ledger, "in_flight_ledger_path", lambda: ledger_path)
+    return ledger_path
+
+
 @needs_ffmpeg
 def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     """OUTPUT HYGIENE (2026-06-09): the muxed FINAL episode mp4 is the
@@ -337,6 +361,7 @@ def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
         get_output_directory=lambda: str(tmp_path / "out"))
     monkeypatch.setitem(sys.modules, "folder_paths", fake_fp)
     monkeypatch.delenv("OTR_OBS_DIR", raising=False)
+    _publishable_episode(tmp_path, monkeypatch, "silent")
     node = OTRMasterAudioMux()
     final, status = node.mux(str(silent), str(master))
     assert final and os.path.isfile(final)

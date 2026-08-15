@@ -3,6 +3,83 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- CODER (chunk 0.5: publication became a decision with one owner, and the rule that "blocks publish" stopped meaning "destroys the episode")
+
+**Did.** Chunk 0.5 of `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
+(publication eligibility, end to end) -- one complete producer/consumer pair,
+green and pushed. No live leg: the contract defers the qualifying leg to chunk 2.
+
+* **`nodes/_otr_publication_eligibility.py` is the ONE producer.** A versioned
+  receipt combining RIGHTS reason codes (from the normalised rights sidecar) and
+  IDENTITY reason codes (from chunk 0's `_otr_source_identity`) into a single
+  durable `meta.publication_eligibility`. Rights decide; identity only explains
+  -- a degraded identity is recorded and never blocks, because 0 of 65 units
+  lack a title or author and a rule that could only fire on a corpus fault
+  should produce a receipt, not a withheld episode.
+* **The rule moved to where publication actually happens, and that is the one
+  behaviour change an eyeball should see.** `G14` used to append to the gap
+  audit's ERROR list, so "a research_only source BLOCKS publish" was enforced by
+  `FreezeAssertionError` -- destroying a finished render after writing, casting,
+  voicing, rendering and muxing, and leaving the operator without even the
+  archival copy such a source IS cleared for. That is Law 7, and the contract's
+  own live-leg list asks for the opposite: an archival final with no
+  `obs_publish OK`. G14 now WARNS; `OTR_MasterAudioMux` withholds the OBS copy.
+  Deterministic as before, and the freeze's structural errors are untouched and
+  still fatal (pinned by a test).
+* **The producer stamps at the freeze, never inside the audit.**
+  `run_gap_audit` is read-only by contract, so Phase 10 -- a writer, on the one
+  path every family crosses, persisted immediately after -- stamps the receipt.
+  A rejected freeze stamps nothing, and an absent receipt reads as BLOCKED.
+* **The consumer fails closed on purpose, and the asymmetry is tested in both
+  directions.** Absent, malformed, unknown-version and episode-MISMATCHED
+  receipts are all not-publishable: publishing is the irreversible half (the
+  file lands in the folder the operator watches) and withholding is recoverable.
+  The stale-singleton case is the one that motivated it -- a leftover in-flight
+  ledger must never gate tonight's episode on last night's verdict.
+* **`IS_CHANGED` was a real latent hole.** It hashed `clip_manifest_json` alone
+  -- a RETIRED connector that feeds nothing -- so two runs with the same
+  manifest were indistinguishable to ComfyUI's cache even when they were
+  different episodes with different rights. A cached node does not execute, and
+  a mux that does not execute cannot withhold anything. Now: episode identity +
+  eligibility digest, as a reproducible SHA-256 rather than `hash()`, which
+  Python salts per interpreter.
+* **No OBS pointer on a blocked episode, guaranteed at the field's owner.**
+  `save_ledger_safe` is the sole synchroniser of the two aliases
+  (`meta.obs_final_path` and `meta.paths.obs_final`), so the suppression lives
+  there -- no later write-back or post-hoc tool can resurrect a claim that
+  nothing will ever arrive at.
+* **The episode/stem validation now has one copy, three consumers.** The
+  in-flight-singleton check at `otr_master_audio_mux.py:416-435` was extracted;
+  the output path, the publication decision and the cache key all ask the same
+  question and cannot drift into answering for different episodes.
+
+**Test fallout, stated plainly.** Three files.
+`tests/test_provenance_v4.py::TestG14PublishGate` was rewritten:
+`test_phase_10_raises` is gone and two tests replace it, asserting the episode
+FREEZES and that the block is stamped where publication reads it.
+`tests/test_publication_eligibility.py` is new (46 tests).
+`tests/test_video_render_path_cw4.py::test_master_audio_mux_publishes_final_to_obs`
+went red for a REAL reason and is the useful one: it drives the live `mux()`
+with no in-flight ledger at all, so fail-closed withheld the copy. It now
+supplies the episode its published copy belongs to, stamped through the real
+producer so the fixture cannot drift from the receipt shape. That red was the
+fail-closed rule working -- worth knowing it fires.
+
+**Green.** Suite **10608 / 110 / 1** (baseline 10561; +47 = 46 new plus the net
++1 above, no regressions). Bible **20 / 26 / 3**, exactly baseline. Variants 50
+emitted, 3 refused (the standing unratified cloud profiles). AST / BOM /
+zero-byte clean on all touched files. No `INPUT_TYPES`, widget, registration or
+`workflows/otr_canonical.json` change, so contract Law 10 holds and
+`OTR_MasterAudioMux` is still registered at `__init__.py:315`.
+
+**No Bible promotion for this chunk, and that is correct, not skipped.** The
+promotion draft maps `12.103`-`12.109` to PBUG-20260815-01..08; D5a has no PBUG
+because it is a gap found by design review, not a production failure with an
+artifact -- and the admission rule forbids inventing one.
+
+**Next.** Chunk 0.75 (the D4 vendor gate: all 65 sidecars generated,
+schema-validated, freshness-verified).
+
 ## 2026-08-15 -- HEAD 99cb8856 (v2.0-alpha) -- CODER (the bug-fix sprint specified across four review rounds, two of the seven defects re-rooted, both writer failures diagnosed off the act change, and chunk 0 landed live)
 
 **Did.** Eight pushed commits: six docs, two code. No live render leg -- deferred

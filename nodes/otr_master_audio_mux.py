@@ -16,6 +16,14 @@ guards do not apply here; it only polls the interrupt flag so Cancel is honoured
 Audio-identity is asserted by decoding both the muxed output's audio and the
 master to canonical PCM and comparing SHA-256 -- container-agnostic proof that
 the audio was copied, not re-encoded or trimmed. Cold-import clean (stdlib only).
+
+IT IS ALSO THE PUBLICATION BOUNDARY (2026-08-15, build contract D5a). Producing
+the episode and publishing it are two decisions, and only the second one is
+governed by the source's rights. The archival final is written for every
+episode that gets this far; the OBS copy -- the file the operator watches -- is
+made only when the ledger's publication-eligibility receipt says so. That rule
+used to be enforced upstream by refusing to freeze, which destroyed a finished
+render to prevent a copy; here it withholds the copy and keeps the render.
 """
 from __future__ import annotations
 
@@ -351,6 +359,123 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     return master_audio_path
 
 
+def _episodes_root() -> Path:
+    """``<output>/otr/episodes``, or ``./otr/episodes`` outside ComfyUI."""
+    try:
+        import folder_paths  # type: ignore
+        root = folder_paths.get_output_directory()
+    except Exception:  # noqa: BLE001
+        root = "."
+    return Path(root) / "otr" / "episodes"
+
+
+def _episode_stem(silent_video_path: str) -> str:
+    return os.path.splitext(os.path.basename(silent_video_path or "episode"))[0]
+
+
+def _inflight_episode_for_stem(stem: str) -> "tuple[Path | None, Path | None]":
+    """The in-flight ledger and episode dir, but ONLY if they are THIS episode.
+
+    ONE PIECE OF VALIDATION, THREE CONSUMERS. The output path, the publication
+    decision and the cache key all need the same answer to the same question --
+    "which episode is this node actually finishing?" -- and three copies of that
+    check is three chances for one of them to drift and answer for a different
+    episode.
+
+    The in-flight ledger is the path authority: filename suffix peeling is
+    necessarily incomplete whenever a new terminal enrichment lands (captions
+    exposed this -- ``_captioned`` created a fake sibling episode directory).
+    But the singleton is accepted only when it is a direct child of the
+    configured episodes root AND the incoming video stem starts with that
+    episode id. The prefix check is what rejects a STALE singleton left over
+    from a prior episode -- the difference between reading this episode's
+    receipt and gating this episode on somebody else's.
+
+    Returns ``(ledger_path, episode_dir)``, or ``(None, None)`` when no
+    singleton answers for this stem. Never raises.
+    """
+    try:
+        try:
+            from . import _otr_ledger as _OTRL
+        except ImportError:  # pragma: no cover -- direct-script fallback
+            import _otr_ledger as _OTRL  # type: ignore
+        ledger_path = _OTRL.in_flight_ledger_path()
+        if ledger_path is None:
+            ep_root = _episodes_root().resolve()
+            if ep_root.exists():
+                for candidate in ep_root.iterdir():
+                    if candidate.is_dir() and not candidate.name.startswith("_") and stem.startswith(candidate.name):
+                        cand_ledger = candidate / "audio" / f"{candidate.name}_ledger.json"
+                        if cand_ledger.is_file():
+                            return cand_ledger, candidate
+            return None, None
+        candidate = Path(ledger_path).resolve().parent.parent
+        expected_root = _episodes_root().resolve()
+        if (candidate.parent == expected_root
+                and candidate.name
+                and not candidate.name.startswith("_")
+                and stem.startswith(candidate.name)):
+            return Path(ledger_path), candidate
+    except Exception as exc:  # noqa: BLE001 -- callers all have a safe path
+        log.info(
+            "[OTR_MasterAudioMux] in-flight episode path unavailable: %s", exc,
+        )
+    return None, None
+
+
+def _publication_decision(silent_video_path: str):
+    """May this episode be copied to the operator's OBS folder?
+
+    Consumes the ONE durable receipt stamped at the freeze
+    (``_otr_publication_eligibility``). This node decides nothing about rights
+    itself -- it reads a verdict, which is the whole point of the receipt.
+
+    FAILS CLOSED, ON PURPOSE. No ledger, no receipt, a malformed receipt, an
+    unreadable version, or a receipt stamped for a DIFFERENT episode all come
+    back not-publishable. Publishing is the irreversible half of this node (the
+    file lands in the folder the operator watches, and on a research-only
+    source that is the exact thing the rule forbids), while withholding is
+    recoverable -- the archival final is still on disk and a re-freeze
+    republishes it. Between a guess and a receipt, take the receipt.
+    """
+    try:
+        try:
+            from . import _otr_ledger as _OTRL
+            from . import _otr_publication_eligibility as _PE
+        except ImportError:  # pragma: no cover -- direct-script fallback
+            import _otr_ledger as _OTRL  # type: ignore
+            import _otr_publication_eligibility as _PE  # type: ignore
+        ledger_path, _ = _inflight_episode_for_stem(
+            _episode_stem(silent_video_path))
+        if ledger_path is None:
+            return _PE.PublicationDecision(
+                publishable=False,
+                reason=_PE.DECISION_NO_RECEIPT,
+                detail="no in-flight ledger answers for this episode",
+            )
+        led = _OTRL.load_ledger_safe(ledger_path)
+        if led is None:
+            return _PE.PublicationDecision(
+                publishable=False,
+                reason=_PE.DECISION_NO_RECEIPT,
+                detail="could not load %s" % ledger_path.name,
+            )
+        return _PE.decide_from_meta(
+            led.get("meta"),
+            expected_episode_id=str(led.get("episode_id") or ""),
+        )
+    except Exception as exc:  # noqa: BLE001 -- fail closed, never crash the mux
+        try:
+            from . import _otr_publication_eligibility as _PE  # type: ignore
+        except ImportError:  # pragma: no cover
+            import _otr_publication_eligibility as _PE  # type: ignore
+        return _PE.PublicationDecision(
+            publishable=False,
+            reason=_PE.DECISION_MALFORMED,
+            detail="%s: %s" % (type(exc).__name__, exc),
+        )
+
+
 class OTRMasterAudioMux:
     """Registered as ``OTR_MasterAudioMux``. Terminal audio mux (V-1: the ONLY
     node that adds audio). ``-c:a copy``, NO ``-shortest``, byte-identical assert."""
@@ -379,6 +504,10 @@ class OTRMasterAudioMux:
                     "default": "", "forceInput": True,
                     "tooltip": "Audio-done gate (EpisodeAssembler out3). Orders the mux AFTER the audio freezes. Opaque.",
                 }),
+                "ledger_frozen": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "Ledger freeze gate. Orders the mux AFTER the freeze cascade.",
+                }),
                 "declared_credits_tail_s": ("FLOAT", {
                     "default": 0.0, "forceInput": True,
                     "tooltip": "OTR_CreditsRoll's declared silent-credits tail "
@@ -404,39 +533,9 @@ class OTRMasterAudioMux:
         return True
 
     def _default_out(self, silent_video_path: str) -> str:
-        try:
-            import folder_paths  # type: ignore
-            root = folder_paths.get_output_directory()
-        except Exception:  # noqa: BLE001
-            root = "."
-        episodes_root = Path(root) / "otr" / "episodes"
-        stem = os.path.splitext(
-            os.path.basename(silent_video_path or "episode"))[0]
-
-        # The in-flight ledger is the path authority. Filename suffix peeling
-        # is necessarily incomplete whenever a new terminal enrichment lands
-        # (captions exposed this: `_captioned` created a fake sibling episode
-        # directory). Resolve the current ledger's parent first, but accept it
-        # only when it is a direct child of the configured episodes root AND
-        # the incoming video stem starts with that episode id. The prefix check
-        # rejects a stale singleton from a prior episode.
-        out_dir = None
-        try:
-            from . import _otr_ledger as _OTRL
-            ledger_path = _OTRL.in_flight_ledger_path()
-            if ledger_path is not None:
-                candidate = Path(ledger_path).resolve().parent.parent
-                expected_root = episodes_root.resolve()
-                if (candidate.parent == expected_root
-                        and candidate.name
-                        and not candidate.name.startswith("_")
-                        and stem.startswith(candidate.name)):
-                    out_dir = candidate
-        except Exception as exc:  # noqa: BLE001 -- safe suffix fallback below
-            log.info(
-                "[OTR_MasterAudioMux] in-flight episode path unavailable; "
-                "using suffix-derived path: %s", exc,
-            )
+        episodes_root = _episodes_root()
+        stem = _episode_stem(silent_video_path)
+        _, out_dir = _inflight_episode_for_stem(stem)
 
         # OUTPUT HYGIENE (operator directive 2026-06-09): the final lands in
         # the episode's OWN folder under otr/episodes/<ep>/ (the obs copy is
@@ -500,7 +599,7 @@ class OTRMasterAudioMux:
     def _stamp_terminal_paths(
         self,
         final_path: str,
-        obs_path: str,
+        obs_path: "str | None",
         master_audio_path: str,
     ) -> str:
         """Truthfully stamp all terminal asset pointers in the live ledger.
@@ -513,6 +612,13 @@ class OTRMasterAudioMux:
         validates the published path and synchronizes ``meta.paths.obs_final``.
         Best-effort -- a stamp failure must NEVER block the deliverable, so it is
         caught and reported, never raised. Returns a single report line.
+
+        ``obs_path`` is ``None`` when publication was WITHHELD. It stamps no OBS
+        pointer then and actively clears any stale one, because a path key on a
+        ledger reads as "the deliverable is there" to everything downstream --
+        and on a blocked episode nothing ever arrives. The archival
+        ``final_video_path`` / ``final_audio_path`` are stamped either way: the
+        work exists, it simply may not be published.
         """
         try:
             try:
@@ -532,37 +638,77 @@ class OTRMasterAudioMux:
             led["final_audio_path"] = str(master_audio_path)
             led["final_video_path"] = str(final_path)
             meta = led.setdefault("meta", {})
-            meta["obs_final_path"] = str(obs_path)
+            if obs_path is None:
+                meta.pop("obs_final_path", None)
+                paths = meta.get("paths")
+                if isinstance(paths, dict):
+                    paths.pop("obs_final", None)
+                    paths.pop("obs_dir", None)
+            else:
+                meta["obs_final_path"] = str(obs_path)
             if not _OTRL.save_ledger_safe(ledger_p, led):
                 return f"terminal path stamp failed: save returned False for {ledger_p.name}"
+            obs_note = (
+                "no obs_final_path (publication withheld)" if obs_path is None
+                else f"obs_final_path -> {os.path.basename(str(obs_path))}"
+            )
             return (
                 f"stamped ledger {ledger_p.name}: final_audio_path -> "
                 f"{os.path.basename(str(master_audio_path))}; final_video_path -> "
-                f"{os.path.basename(str(final_path))}"
+                f"{os.path.basename(str(final_path))}; {obs_note}"
             )
         except Exception as exc:  # noqa: BLE001 -- best-effort, never blocks the mux
             return f"terminal path stamp failed: {type(exc).__name__}: {exc}"
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
+        """Cache key: the manifest, the EPISODE, and its inputs.
+
+        Cache invalidation when rights change is handled naturally by
+        ComfyUI's graph invalidation, thanks to the ledger_frozen input wire.
+        """
         manifest = str(kwargs.get("clip_manifest_json") or "")
-        return hash(manifest)
+        stem = _episode_stem(str(kwargs.get("silent_video_path") or ""))
+        parts = (manifest, stem, str(kwargs.get("master_audio_path") or ""),
+                 str(kwargs.get("declared_credits_tail_s") or ""))
+        return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
     def mux(self, silent_video_path, master_audio_path, audio_done="",
+            ledger_frozen="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
             ffmpeg="ffmpeg", output_path=""):
         # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
         # still wired on the canonical graph and hashed by IS_CHANGED, but it
         # feeds nothing -- the SFX bed compiler it once armed is deleted.
         master_audio_path = _reresolve_master_audio(master_audio_path)
-        out = output_path.strip() or self._default_out(silent_video_path)
+        out = self._default_out(silent_video_path)
         try:
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
                 declared_credits_tail_s=float(declared_credits_tail_s or 0.0),
             )
-            obs_copy = self._publish_to_obs(final)
-            report.append("obs_publish OK -> " + obs_copy)
+            # PUBLICATION IS A SEPARATE DECISION FROM PRODUCTION. The archival
+            # final above is written unconditionally -- it is finished work and
+            # the operator keeps it. The OBS copy is the PUBLISHED deliverable,
+            # and a research-only source is cleared for exactly the first and
+            # not the second. Withholding is not a failure: this node returns
+            # success either way and says which happened, out loud.
+            decision = _publication_decision(silent_video_path)
+            if decision.publishable:
+                obs_copy = self._publish_to_obs(final)
+                report.append("obs_publish OK -> " + obs_copy)
+                if output_path.strip() and output_path.strip() != final:
+                    import shutil
+                    os.makedirs(os.path.dirname(output_path.strip()), exist_ok=True)
+                    shutil.copy2(final, output_path.strip())
+            else:
+                obs_copy = None
+                report.append("obs_publish BLOCKED -- " + decision.summary())
+                log.warning(
+                    "[OTR_MasterAudioMux] obs_publish BLOCKED (%s) -- the "
+                    "archival final is on disk at %s and no OBS copy was made",
+                    decision.summary(), final,
+                )
             # N2 (truthful ledger): this terminal node restamps
             # final_video_path over node 93's pre-credits/pre-mux blend.
             report.append(self._stamp_terminal_paths(

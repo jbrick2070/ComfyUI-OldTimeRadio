@@ -707,14 +707,29 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
 
 
 
-# G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Phase 0 collect / Phase 10
-# raise. Operator decision (2026-07-17): a research_only source BLOCKS publish.
-# Opt-in via meta["provenance"] (the writer stamps the normalized record when the
-# bank sets defaults.provenance_normalize); ACTIVE on public_domain and
-# shakespeare since 2026-08-04, and inert elsewhere. Freeze
-# precedes publish, so raising here prevents the episode from ever publishing --
-# the deterministic realisation of the rule. Only the research_only status blocks;
+# G14 PROVENANCE PUBLISH GATE (v4 campaign P1(viii)). Operator decision
+# (2026-07-17): a research_only source BLOCKS publish. Opt-in via
+# meta["provenance"] (the writer stamps the normalized record when the bank sets
+# defaults.provenance_normalize); ACTIVE on public_domain and shakespeare since
+# 2026-08-04, and inert elsewhere. Only the research_only status blocks;
 # public_domain_us / cc0 / licensed / synthetic all pass.
+#
+# G14 IS NOW A WARNING, AND THE RULE IS STRONGER FOR IT (2026-08-15, build
+# contract D5a). This used to append to `errors`, which at Phase 10 means
+# FreezeAssertionError -- so the rule was realised by DESTROYING a finished
+# render. The episode had already been written, cast, voiced, rendered and
+# muxed; it died at the freeze and the operator was left with nothing, not even
+# the archival copy a research-only source is actually cleared for. That is the
+# Law 7 violation ("a render must not die"; structural refusal belongs BEFORE
+# generation), and the freeze is long past generation.
+#
+# The block now lands where publication happens. `_otr_publication_eligibility`
+# is the ONE producer of the durable verdict -- stamped by Phase 10 below, from
+# this same `blocks_publish` fact -- and OTR_MasterAudioMux consumes it: the
+# archival final is written either way and only the OBS copy is withheld.
+# Nothing weakened: "blocks publish" still blocks publish, deterministically,
+# and now says so in a receipt instead of in a traceback. This diagnostic stays
+# because the audit report is where an operator looks to find out WHY.
 
 
 def _check_g14_provenance_publish(
@@ -722,7 +737,11 @@ def _check_g14_provenance_publish(
     errors: List[str],
     warnings: List[str],
 ) -> None:
-    """G14: a research_only source must not reach a published episode."""
+    """G14: a research_only source must not reach a PUBLISHED episode.
+
+    Reports; does not stamp. `run_gap_audit` is read-only by contract, so the
+    durable eligibility receipt is written by Phase 10, never from in here.
+    """
     meta = ledger_data.get("meta")
     if not isinstance(meta, dict):
         return
@@ -731,11 +750,12 @@ def _check_g14_provenance_publish(
         return  # opt-in; stamped on public_domain and shakespeare, absent elsewhere
     if prov.get("blocks_publish"):
         label = str(prov.get("source_label") or prov.get("license_label") or "")
-        errors.append(
+        warnings.append(
             f"G14: source provenance is 'research_only' ({label!r}) -- the "
-            f"operator rule BLOCKS publication of a research-only source. This "
-            f"episode cannot freeze; select a public-domain / cc0 / cleared "
-            f"source, or the operator must lift the block for this lane."
+            f"operator rule BLOCKS publication of a research-only source. The "
+            f"episode still freezes and still keeps its archival final; "
+            f"OTR_MasterAudioMux will withhold the OBS copy on the "
+            f"publication-eligibility receipt."
         )
 
 
@@ -870,6 +890,47 @@ def _report_dict(report: GapAuditReport) -> dict:
     }
 
 
+def _stamp_publication_eligibility(ledger_data: dict) -> None:
+    """Stamp the durable publication verdict at the freeze.
+
+    THE FREEZE IS THE RIGHT AUTHORITY AND THE ONLY WRITER. Freeze precedes
+    publish on every family's path, the ledger is persisted immediately after
+    (`_otr_freeze_cascade._persist_cascade_meta`), and the terminal mux reads it
+    back from disk -- so one stamp here reaches every consumer without any node
+    needing its own opinion about rights.
+
+    It is stamped from `run_gap_audit`'s SUBJECT MATTER but never from inside
+    it: the audit is read-only by contract, and a stamping audit is how a
+    read-only guarantee quietly stops being true.
+
+    Fail-soft. A publication receipt that could not be computed leaves the field
+    ABSENT, and an absent receipt is read as BLOCKED by the consumer -- so the
+    failure mode of this stamper is a withheld OBS copy, never a false claim of
+    clearance.
+    """
+    try:
+        try:
+            from ._otr_publication_eligibility import stamp_publication_eligibility
+        except ImportError:  # pragma: no cover -- flat test/standalone load
+            from _otr_publication_eligibility import (  # type: ignore
+                stamp_publication_eligibility,
+            )
+        eligibility = stamp_publication_eligibility(ledger_data)
+    except Exception as exc:  # noqa: BLE001 -- see the fail-soft note above
+        log.warning(
+            "[LFC:phase_10] publication eligibility not stamped (%s: %s) -- "
+            "the terminal mux will withhold the OBS copy until it is",
+            type(exc).__name__, exc,
+        )
+        return
+    if not eligibility.eligible:
+        log.warning(
+            "[LFC:phase_10] publication BLOCKED for this episode (%s) -- the "
+            "archival final is still produced; the OBS copy is withheld",
+            ", ".join(eligibility.blocking_reasons) or "unspecified",
+        )
+
+
 def phase_0_gap_audit_pre(led) -> GapAuditReport:
     """LFC Phase 0. Deterministic warn-mode audit on entry to the cascade.
 
@@ -912,6 +973,9 @@ def phase_10_gap_audit_post_and_freeze(led) -> GapAuditReport:
         meta.freeze_timestamp      = ISO-8601 UTC string
         meta.freeze_verdict        = "frozen_clean" if no warnings,
                                      else "frozen_with_warns"
+        meta.publication_eligibility = the durable publish verdict
+                                     (sole producer -- see
+                                     `_stamp_publication_eligibility`)
 
     When `meta` is the wrong type (list / str / etc.), the audit has
     already flagged it as a critical gap -- the function then raises
@@ -952,6 +1016,7 @@ def phase_10_gap_audit_post_and_freeze(led) -> GapAuditReport:
         "frozen_with_warns" if report.warnings else "frozen_clean"
     )
     meta["freeze_verdict"] = verdict
+    _stamp_publication_eligibility(ledger_data)
     if report.warnings:
         log.info(
             "[LFC:phase_10] frozen_with_warns -- %d soft gap(s).",

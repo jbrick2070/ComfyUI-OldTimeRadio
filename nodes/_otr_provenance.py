@@ -26,11 +26,15 @@ The spoken line names the SOURCE, never the licence identifier; the licence
 text rides on the printed credit. Attribution under CC BY is satisfied "in the
 manner specified", which does not mean read aloud mid-drama.
 
-Terminal = ``_otr_ledger_freeze._check_g14_provenance_publish`` (in
-``run_gap_audit`` -> the one path every family crosses): raises
-``FreezeAssertionError`` when ``blocks_publish`` is True (research_only), so the
-episode never freezes and therefore never publishes. Pure; never raises.
-Self-contained. UTF-8 no BOM, SFW.
+Terminal = the publication boundary, not the freeze (2026-08-15, build contract
+D5a). ``blocks_publish`` feeds ``_otr_publication_eligibility``, whose receipt
+Phase 10 stamps and ``OTR_MasterAudioMux`` consumes: a research_only episode
+still freezes and still keeps its ARCHIVAL final, and only the OBS copy -- the
+published deliverable -- is withheld. ``G14`` in ``run_gap_audit`` reports the
+same fact as a WARNING so the audit still explains why. It used to raise
+``FreezeAssertionError``, which enforced the rule by destroying a finished
+render and left the operator without even the copy a research-only source is
+cleared for. Pure; never raises. Self-contained. UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 

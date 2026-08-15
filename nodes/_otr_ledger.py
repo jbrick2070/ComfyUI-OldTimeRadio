@@ -332,6 +332,61 @@ def _where_unserializable(ledger, exc) -> str:
         return ""
 
 
+def _strip_obs_aliases_when_publication_blocked(meta: dict) -> bool:
+    """Remove every OBS pointer from a ledger that may not be published.
+
+    THE POINTER IS A CLAIM, AND AN UNPUBLISHABLE EPISODE HAS NO CLAIM TO MAKE.
+    Two surfaces spell the OBS final -- ``meta.obs_final_path`` (what the
+    terminal mux stamps) and ``meta.paths.obs_final`` (rebuilt on every save,
+    which before publication holds the PLANNED ``<episode_id>.mp4``). A planned
+    pointer is a fair thing to carry while an episode is merely unfinished; it
+    is a false one on an episode that is forbidden to publish, because nothing
+    will ever arrive at that path and every reader downstream -- soak reports,
+    the citation audit, an operator reading the ledger -- would take it for a
+    deliverable that went missing.
+
+    Doing it HERE rather than at the mux is deliberate. ``save_ledger_safe`` is
+    the sole synchroniser of the two aliases, so suppressing them at the same
+    place they are built means no later write-back can resurrect one, and a
+    post-hoc tool that touches a blocked ledger cannot reintroduce the claim by
+    forgetting a rule it never read.
+
+    Reads only the durable receipt from the ONE producer
+    (``_otr_publication_eligibility``). Absent or unreadable receipt -> this
+    does nothing, because "we cannot tell" is not "we know it is blocked"; the
+    consumer at the mux is the one that fails closed. Returns True when a
+    pointer was actually removed. Never raises.
+    """
+    try:
+        try:
+            from ._otr_publication_eligibility import (
+                PUBLICATION_ELIGIBILITY_META_KEY,
+            )
+        except ImportError:  # pragma: no cover -- flat test/standalone load
+            from _otr_publication_eligibility import (  # type: ignore
+                PUBLICATION_ELIGIBILITY_META_KEY,
+            )
+        try:
+            from ._otr_publication_eligibility import decide_from_meta
+        except ImportError:  # pragma: no cover -- flat test/standalone load
+            from _otr_publication_eligibility import decide_from_meta  # type: ignore
+        decision = decide_from_meta(meta)
+        if decision.publishable is not False:
+            return False
+        removed = meta.pop("obs_final_path", None) is not None
+        paths = meta.get("paths")
+        if isinstance(paths, dict):
+            removed = paths.pop("obs_final", None) is not None or removed
+            removed = paths.pop("obs_dir", None) is not None or removed
+        return removed
+    except Exception as exc:  # noqa: BLE001 -- a save must never die on this
+        log.warning(
+            "[OTR_Ledger] could not check publication eligibility while "
+            "saving (%s: %s); OBS pointers left as-is", type(exc).__name__, exc,
+        )
+        return False
+
+
 def save_ledger_safe(path: Path, ledger: dict) -> bool:
     """Write a ledger dict back to disk with schema_version + meta.paths
     stamped. ATOMIC via tempfile + ``os.replace`` (BUG-LOCAL-127).
@@ -415,6 +470,11 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
             )
             if candidate is not None and str(candidate) == chosen_obs:
                 meta["obs_final_path"] = chosen_obs
+        if _strip_obs_aliases_when_publication_blocked(meta):
+            log.info(
+                "[OTR_Ledger] publication is blocked for this episode; "
+                "OBS pointers withheld from meta (archival final unaffected)"
+            )
         payload = json.dumps(ledger, indent=2, ensure_ascii=False)
         target = Path(path)
         # tempfile.mkstemp in the SAME dir as the target so os.replace

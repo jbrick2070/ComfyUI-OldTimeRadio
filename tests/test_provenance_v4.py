@@ -1,9 +1,12 @@
-"""v4 campaign P1(viii): source-provenance normalizer + G14 publish gate.
+"""v4 campaign P1(viii): source-provenance normalizer + the G14 publish report.
 
-Maps every lane's source_rights shape onto one normalized record, renders the
-spoken-coda + printed-credit lines per status, and enforces the operator rule
-that a research_only source BLOCKS publish (deterministic G14, opt-in, inert for
-every current bank). Pure / CPU. UTF-8 no BOM, SFW.
+Maps every lane's source_rights shape onto one normalized record and renders the
+spoken-coda + printed-credit lines per status. The operator rule that a
+research_only source BLOCKS publish is still deterministic and still opt-in per
+bank (ACTIVE on public_domain and shakespeare since 2026-08-04) -- but since
+2026-08-15 it is ENFORCED at the publication boundary rather than by refusing to
+freeze, so G14 here REPORTS and `tests/test_publication_eligibility.py` owns the
+end-to-end proof. Pure / CPU. UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 
@@ -205,36 +208,78 @@ def _led(prov):
             "lines": [{"line_id": "b1", "speaker_role": "character", "text": "hi"}]}
 
 
-def _g14_errors(ledger_data):
+def _freezable_led(prov):
+    """`_led` plus the structural keys Phase 10 requires.
+
+    The two freeze tests below drive the REAL cascade phase, so the fixture has
+    to be able to pass it on everything except the thing under test -- otherwise
+    "it froze" and "it did not freeze" would both be answers about missing
+    top-level lists rather than about provenance.
+    """
+    led = _led(prov)
+    # `_led` pins the historical l3 schema on purpose for the coda tests; the
+    # freeze asserts the CURRENT one, so read it from the module under test
+    # rather than restating a version string that moves.
+    led["schema_version"] = LF.EXPECTED_SCHEMA_VERSION
+    led["meta"].update({"episode_title": "T", "style": "s"})
+    led["cast"] = [{"char_id": "c01", "name": "NARRATOR"}]
+    led["lines"] = [{"line_id": "b1", "char_id": "c01",
+                     "speaker_role": "character", "text": "hi"}]
+    for key in ("beats", "scenes", "shots", "music", "clips"):
+        led[key] = []
+    return led
+
+
+def _g14_findings(ledger_data):
+    """(errors, warnings) from the G14 check alone."""
     errors: list = []
-    LF._check_g14_provenance_publish(ledger_data, errors, [])
-    return errors
+    warnings: list = []
+    LF._check_g14_provenance_publish(ledger_data, errors, warnings)
+    return errors, warnings
 
 
 class TestG14PublishGate:
-    def test_blocks_research_only(self):
+    """G14 REPORTS; the publication boundary ENFORCES (2026-08-15, D5a).
+
+    These assertions moved deliberately. G14 used to append to `errors`, which
+    at Phase 10 means FreezeAssertionError -- so "a research_only source blocks
+    publish" was carried out by destroying a finished render, leaving the
+    operator without even the archival copy such a source IS cleared for. The
+    rule is unchanged and still deterministic; it now lands at
+    `OTR_MasterAudioMux`, which withholds the OBS copy on the durable
+    publication-eligibility receipt. `tests/test_publication_eligibility.py`
+    owns the end-to-end proof.
+    """
+
+    def test_research_only_is_reported_as_a_warning(self):
         led = _led({"status": "research_only", "blocks_publish": True,
                     "source_label": "Restricted"})
-        errs = _g14_errors(led)
-        assert errs and "G14" in errs[0]
+        errors, warnings = _g14_findings(led)
+        assert errors == []
+        assert warnings and "G14" in warnings[0]
 
     def test_public_domain_passes(self):
         led = _led({"status": "public_domain_us", "blocks_publish": False})
-        assert _g14_errors(led) == []
+        assert _g14_findings(led) == ([], [])
 
     def test_inert_without_provenance(self):
-        assert _g14_errors(_led(None)) == []
+        assert _g14_findings(_led(None)) == ([], [])
 
     def test_run_gap_audit_includes_g14(self):
         led = _led({"status": "research_only", "blocks_publish": True})
         report = LF.run_gap_audit(led, label="pre")
-        assert any("G14" in e for e in report.errors)
+        assert any("G14" in w for w in report.warnings)
+        assert not any("G14" in e for e in report.errors)
 
-    def test_phase_10_raises(self):
-        led = _led({"status": "research_only", "blocks_publish": True})
-        with pytest.raises(LF.FreezeAssertionError) as ei:
-            LF.phase_10_gap_audit_post_and_freeze(led)
-        assert any("G14" in e for e in ei.value.errors)
+    def test_phase_10_freezes_instead_of_killing_the_render(self):
+        led = _freezable_led({"status": "research_only", "blocks_publish": True})
+        LF.phase_10_gap_audit_post_and_freeze(led)
+        assert led["meta"]["freeze_verdict"] == "frozen_with_warns"
+
+    def test_phase_10_stamps_the_block_where_publication_reads_it(self):
+        led = _freezable_led({"status": "research_only", "blocks_publish": True})
+        LF.phase_10_gap_audit_post_and_freeze(led)
+        assert led["meta"]["publication_eligibility"]["eligible"] is False
 
 
 if __name__ == "__main__":  # pragma: no cover
