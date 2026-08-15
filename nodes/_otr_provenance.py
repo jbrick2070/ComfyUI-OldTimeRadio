@@ -100,14 +100,61 @@ _CODA_BY_STATUS = {
 }
 
 
-def spoken_coda_line(provenance: Any) -> str:
+#: THE SAME FOUR STATUSES, SAID PROPERLY WHEN WE KNOW WHAT WE ADAPTED.
+#: Each takes ``work_title`` and ``author``. The cc0 line keeps the exact
+#: phrase "dedicated to the public domain" that
+#: ``tests/test_public_domain_library_roll.py`` pins, so naming the work ADDS
+#: to that sentence rather than replacing it.
+_NAMED_CODA_BY_STATUS = {
+    "public_domain_us": "Tonight's tale was adapted from {work_title}, by {author}.",
+    "cc0": ("Tonight's tale was adapted from {work_title}, by {author}, "
+            "a work dedicated to the public domain."),
+    "research_only": ("Tonight's tale draws on {work_title}, by {author}, "
+                      "a source cleared for research use only."),
+}
+
+#: A LICENSED source names the AUTHOR AND THE WORK, never the edition or the
+#: licensor. Shakespeare's lane is `licensed_noncommercial` (Folger CC BY-NC),
+#: which is why it fell through to "" and closed on "We've lost our signal."
+#: naming nobody.
+_LICENSED_NAMED_CODA = "Tonight's scene was drawn from {author}'s {work_title}."
+
+_LICENSED_STATUSES = frozenset({"licensed_commercial", "licensed_noncommercial"})
+
+
+def spoken_coda_line(provenance: Any, identity: Any = None) -> str:
     """A short spoken acknowledgement for the announcer coda.
 
-    EMPTY for a licensed source: the licensor is not the author, and print is
-    where that credit belongs. Never raises.
+    ``identity`` is an optional :class:`_otr_source_identity.SourceIdentity`.
+    WITHOUT it this returns exactly what it always returned, so every existing
+    caller and test is unaffected; WITH it the sentence names the work and its
+    author.
+
+    THE 2026-08-05 LICENSED-SOURCE RULING IS SUPERSEDED FOR AUTHOR AND WORK
+    (operator, 2026-08-15). That ruling stopped the announcer reciting a
+    LICENCE, and its own reasoning was "Folger publishes the edition and
+    Shakespeare wrote the play" -- yet what shipped also stopped it naming the
+    author and the play, which is the opposite of what that sentence argues.
+    Naming Shakespeare is not a licence claim. The licensor and the licence are
+    still never spoken; they remain print-only via ``printed_credit_line``.
+
+    Never raises. An identity that cannot name a work degrades to the generic
+    sentence, so a missing field costs the listener some detail and costs the
+    render nothing.
     """
     prov = provenance if isinstance(provenance, dict) else {}
     status = str(prov.get("status") or "")
+
+    work_title = str(getattr(identity, "work_title", "") or "").strip()
+    author = str(getattr(identity, "author", "") or "").strip()
+    if work_title and author:
+        if status in _LICENSED_STATUSES:
+            return _LICENSED_NAMED_CODA.format(
+                work_title=work_title, author=author)
+        template = _NAMED_CODA_BY_STATUS.get(status)
+        if template:
+            return template.format(work_title=work_title, author=author)
+
     if status in _CODA_BY_STATUS:
         return _CODA_BY_STATUS[status]
     # A LICENSED SOURCE GETS NO SPOKEN LINE (operator ruling 2026-08-05):
