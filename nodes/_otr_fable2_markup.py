@@ -38,7 +38,26 @@ _RE_TITLE = re.compile(r"^TITLE:\s*(.+)$", re.IGNORECASE)
 _RE_MUSIC = re.compile(r"^MUSIC:\s*(.+)$", re.IGNORECASE)
 _RE_SCENE = re.compile(r"^SCENE\s+(\d{1,2}):\s*(.+)$", re.IGNORECASE)
 _RE_CODA = re.compile(r"^CODA:\s*(.+)$", re.IGNORECASE)
-_RE_END = re.compile(r"^END\.\s*$", re.IGNORECASE)
+#: THE TERMINAL DELIMITER, AND IT USED TO DEMAND A PERIOD NOBODY ASKED FOR.
+#:
+#: This was ``^END\.\s*$``. A model that wrote a bare ``END`` fell past it, past
+#: ``_RE_SPEAKER`` (which needs a colon), onto ``BAD_LINE_SHAPE`` -- and because
+#: ``on_end`` never fired, the end-of-text check then added ``MISSING_END`` too.
+#: TWO reported defects, ONE missing character. `scifi_news_pro` died on it at
+#: 3.3 minutes with ``BAD_LINE_SHAPE: END`` (PBUG-20260815-03).
+#:
+#: FOUR ACCEPTED FORMS, and no more: ``END``, ``END.``, ``[END]``, ``[END.]``.
+#: The bracketed pair is admitted because the lane's own house style brackets
+#: transport elsewhere, and the bold-unwrap path (shape 4) already delivers
+#: ``**END**`` here as a bare ``END``.
+#:
+#: WHAT STAYS A LOUD DEFECT, deliberately: an UNPAIRED bracket (``[END`` or
+#: ``END]``), anything with trailing content (``END. Fade out.``), and any
+#: content-bearing variant. Widening a terminal delimiter into "anything
+#: containing END" is how a structural marker stops being structural -- the
+#: point of this grammar is that the parser can tell the end of the script from
+#: a line of dialogue about endings.
+_RE_END = re.compile(r"^(?:END\.?|\[END\.?\])\s*$", re.IGNORECASE)
 _RE_SPEAKER = re.compile(r"^([^:\r\n]+):\s*(\S(?:.*\S)?)$")
 
 

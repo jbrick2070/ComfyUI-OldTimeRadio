@@ -34,12 +34,12 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10633 / 110 / 1**, Bible **20 / 26 / 3**
-(the Bible now holds **281** entries -- `12.103` landed with chunk 2),
-variants 50 emitted (3 refused -- the standing unratified cloud profiles).
-(10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610, 10613,
-10624 the three agy QA rounds; -> 10633 chunk 2 / D1. No regressions at any
-step.)
+**BASELINES to detect drift:** suite **10657 / 110 / 1**, Bible **20 / 26 / 3**
+(the Bible now holds **282** entries -- `12.103` landed with chunk 2, `12.105`
+with chunk 3.5), variants 50 emitted (3 refused -- the standing unratified
+cloud profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5;
+-> 10610, 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1;
+-> 10657 chunk 3.5 / D3. No regressions at any step.)
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
@@ -51,9 +51,16 @@ forward-only at r4 because layered corrections had left it contradicting itself.
 Read it INSTEAD OF re-deriving anything below.
 
 **DONE AND PUSHED SO FAR:** chunk 0's identity half (`99cb8856`), chunk 0.5
-publication eligibility, and **chunk 2 / D1 -- the clean stage no longer
-deletes the Python-owned coda fact** (Bible `12.103` promoted with it).
+publication eligibility, **chunk 2 / D1** (the clean stage no longer deletes the
+Python-owned coda fact; Bible `12.103`), and **chunk 3.5 / D3** (the `END`
+grammar plus a repair note that states the required shape; Bible `12.105`).
 Receipts in `docs/HANDOFF_LOG.md`.
+
+**D3 LANDED EARLY AND THE LANE IS NOT FIXED YET.** The contract puts D3 after
+D2 and that edge holds: `scifi_news_pro` now clears the markup ladder only to
+die at the freeze cascade on a content-authorship mismatch. D3's code is
+correct standalone -- do NOT read it as "that lane works now". **D2 (chunks 1 +
+3) is what finishes it.**
 
 **STILL OWED FROM CHUNK 0:** the transition-receipt schema and its composite
 validator were never built -- only the identity adapter shipped. Nothing in

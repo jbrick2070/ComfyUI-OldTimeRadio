@@ -1944,6 +1944,66 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     return ""
 
 
+#: The four forms the parser accepts, quoted exactly as it will read them.
+#: Sourced from `_otr_fable2_markup._RE_END`'s grammar rather than restated by
+#: hand -- a diagnostic that drifts from its validator teaches the model the
+#: wrong target, which is worse than saying nothing.
+_END_ACCEPTED_FORMS = ("END", "END.", "[END]", "[END.]")
+
+
+def _end_delimiter_repair_note(defects) -> str:
+    """Tell the repair rung the SHAPE it must produce, not just the offence.
+
+    THE DEFECT (PBUG-20260815-03). The ladder burned all four rungs re-emitting
+    a bare ``END`` while the parser demanded ``END.``. The plumbing was fine --
+    each rung really did carry the rejected draft plus its defect list forward.
+    What it carried was useless: ``BAD_LINE_SHAPE`` and ``MISSING_END`` describe
+    what is WRONG and never once state the one-character fix that would satisfy
+    them. A model cannot infer "add a period" from "your line's shape is bad"
+    and "the terminal marker is missing" -- those are two symptoms of one
+    omission, not two facts to reason from.
+
+    So this note names the accepted literals. Where the accepted set is small
+    and fixed, showing the strings beats describing the pattern.
+
+    ITS OWN HELPER, not an extra branch on
+    `_standalone_stage_direction_repair_note`. That one answers a different
+    question (a stage direction wearing a speaker label) from different defect
+    data, and folding two unrelated diagnoses into one function is how the next
+    reader learns the wrong rule for their defect.
+
+    Returns "" when no END-shaped defect is present, so an unrelated repair turn
+    is not handed a lecture about a delimiter it got right.
+    """
+    # Read the REAL record: `ParseDefect.code` is a `Fable2ParseDefect` enum,
+    # not a string. An earlier cut compared `str(code)` to "MISSING_END" --
+    # which never matches, because str() of that enum is
+    # "Fable2ParseDefect.MISSING_END". It would have shipped as a helper that
+    # could not fire, with a green unit suite behind it, because the test stub
+    # invented a `.kind` attribute production never sets.
+    missing_end = False
+    end_shaped_bad_line = False
+    for defect in defects or ():
+        code = getattr(defect, "code", None)
+        if code is Fable2ParseDefect.MISSING_END:
+            missing_end = True
+        elif code is Fable2ParseDefect.BAD_LINE_SHAPE:
+            # The bare `END` the model wrote arrives here as the defect detail.
+            if "END" in str(getattr(defect, "detail", "") or "").upper():
+                end_shaped_bad_line = True
+    if not (missing_end or end_shaped_bad_line):
+        return ""
+    forms = ", ".join("'%s'" % f for f in _END_ACCEPTED_FORMS)
+    return (
+        "\nFORMAT REPAIR RULE -- THE TERMINAL MARKER. The script must end with "
+        f"a line that is EXACTLY one of these, and nothing else: {forms}. "
+        "The marker sits alone on the final line with no trailing words and no "
+        "unpaired bracket -- 'END' followed by anything else, '[END' without "
+        "its closing bracket, and 'END]' without its opening one are all "
+        "rejected. Emit the marker once, as the last line of the episode."
+    )
+
+
 #: Characters per token for English prose, which tokenizes near 4.0 on the
 #: models this pipeline runs. The three factors below MULTIPLY, so stacking
 #: a pessimistic value here on top of two safety margins is not caution --
@@ -2188,6 +2248,10 @@ def _run_markup_ladder(
             # because `PassAttemptTrace.parse_defects` enforces exactly that.
             + _standalone_stage_direction_repair_note(
                 defects, cast_names=cast_names)
+            # The required SHAPE, not only the offence. Both notes are
+            # self-silencing when their defect is absent, so a repair turn
+            # carries exactly the rules its own defects call for.
+            + _end_delimiter_repair_note(defects)
             + "\n" + rendered
         )
 

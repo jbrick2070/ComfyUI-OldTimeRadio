@@ -3,6 +3,54 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- CODER (chunk 3.5 / D3: the terminal delimiter, and the diagnostic that never named it)
+
+**Did.** D3's code and tests, plus Bible `12.105`. Green and pushed.
+
+**Ordering, stated honestly.** The contract puts D3 strictly after D2, and that
+edge is real -- fixing the grammar alone means `scifi_news_pro` clears the
+markup ladder only to die at the freeze cascade. But that edge is about not
+wasting a LIVE ROLL, and tonight's legs are public_domain / shakespeare /
+media_archive, so no roll is spent either way. The code is correct on its own
+and lands early under the operator's "code as much as possible before the long
+run" directive. **The lane is still not end-to-end until D2 (chunks 1 + 3).**
+
+**Both halves, because fixing one leaves the class open.**
+
+* **The grammar.** `_RE_END` demanded `END.` with a period. A bare `END` fell
+  past it, past `_RE_SPEAKER` (needs a colon), onto `BAD_LINE_SHAPE` -- and
+  since `on_end` never fired, the end-of-text check added `MISSING_END` too.
+  Two reported defects, one missing character. Now
+  `^(?:END\.?|\[END\.?\])\s*$`: four accepted forms (`END`, `END.`, `[END]`,
+  `[END.]`), and the bold-unwrap path already delivers `**END**` as bare `END`.
+  Unpaired brackets, trailing content and content-bearing variants stay LOUD --
+  widening it to "anything containing END" would stop the parser being able to
+  tell the end of the script from a line of dialogue about endings.
+* **The diagnostic**, which is the half that actually burned the four rungs.
+  The retry plumbing was fine; every rung carried the rejected draft and its
+  defects forward. What it carried was useless. `_end_delimiter_repair_note`
+  now states the accepted literals verbatim. Its OWN helper, not a branch on
+  `_standalone_stage_direction_repair_note` -- different defect data, different
+  question -- and self-silencing, so a repair turn carries only the rules its
+  own defects call for.
+
+**The near-miss worth recording.** The first cut of the helper compared
+`str(defect.code)` against `"MISSING_END"`. Production sets `.code` to a
+`Fable2ParseDefect` ENUM, whose `str()` is `"Fable2ParseDefect.MISSING_END"` --
+so the helper could never have fired. It passed its tests because the test stub
+invented a `.kind` string attribute production never sets: **the fixture agreed
+with the bug.** Caught only because the real
+`_standalone_stage_direction_repair_note` threw `AttributeError` on the same
+stub. The test now builds a real `ParseDefect`, and that lesson is verify clause
+(5) of the Bible entry -- it is the same shape as 12.86 and as 12.103's own
+fixture gap.
+
+**Bible 12.105 promoted** (survival guide `a0d2b8e`), 281 -> 282 entries.
+
+**OWED, and blocked:** the entry's verify clause (2) -- that the ladder
+CONVERGES within budget on the one-character gap -- needs a live
+`scifi_news_pro` leg, which needs D2 first. Suite-proven, not live-proven.
+
 ## 2026-08-15 -- CODER (chunk 2 / D1: the clean stage stops deleting the fact Python owns, and the sprint's first Bible entry lands with it)
 
 **Did.** Chunk 2 of the build contract (D1, the component boundary), plus its
