@@ -3,6 +3,61 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 56c1a224 (v2.0-alpha) -- CODER (four chunks of the bug-fix sprint, three live legs, and the live legs found the day's real bug)
+
+**Did.** Chunks 0.5, 2 (D1), 3.5 (D3) and D2's schema half, all green and
+pushed; two Bible entries promoted; three live legs through
+`workflows/otr_canonical.json`; one self-inflicted regression found and fixed.
+Detail in the four entries below this one.
+
+Receipts: `84313d67`, `a9e28130`, `54e86383`, `17fa22db` (chunk 0.5 + 3 QA
+rounds), `13cf4f56` (GO_FORWARD sweep), `e7e10148` (D1), `c8735ed1` (D3),
+`92981bc4` (D2 schema + the rename fix), `56c1a224` (PBUG + next-window order).
+Survival guide: `2e98ebe` (12.103), `a0d2b8e` (12.105), `63ad1ab` (index row).
+
+**Suite 10683 / 110 / 1** (from 10561; +122, no regressions at any step).
+**Bug Bible 20 / 26 / 3**, Bible now 282 entries. Variants 50 emitted, 3 refused
+(the standing unratified cloud profiles). AST/BOM/zero-byte clean on every
+touched file. No `INPUT_TYPES`, widget, node-registration or
+`workflows/otr_canonical.json` change all session, so contract Law 10 holds.
+
+**Live legs: 3 of 3 RESULT SUCCESS** (public_domain, shakespeare,
+media_archive). D1 proved on all three artifacts -- each protected its coda row
+`b016`, none overlapped the rows the clean stage touched, the source fact is
+byte-present in each. D5's codas now NAME the work on real episodes
+(*"adapted from Condensed Novels, by Bret Harte"*; *"drawn from William
+Shakespeare's Much Ado About Nothing"*).
+
+**THE DAY'S REAL FINDING, and it was mine: `otr\obs\` is EMPTY after three
+successful renders.** `PBUG-20260815-09`. The freeze stamps the publication
+receipt under `pending_<ts>`; the cascade renames the episode; the mux read the
+id mismatch as a stale singleton and withheld every OBS copy. Every unit test
+pins a fixed episode id, so the suite was green over it -- only a live leg
+renames. Fixed at `rename_episode` (`92981bc4`), suite-proven, **NOT live-proven.
+That is the next window's first job.**
+
+**Current step.** Sprint chunks 0.5, 2, 3.5 done. D2 is HALF built -- schema and
+composite validator landed and green; the emitter and chunk 1's
+transaction/restore are NOT wired, so `scifi_news` / `scifi_news_pro` stay
+broken. Chunk 0.75 (D4 vendor gate) untouched; 1 of 65 public_domain sidecars
+exist.
+
+**Next.** (1) Prove `obs_publish OK` on one `public_domain` leg -- until then
+assume publication is broken. (2) Finish D2's emitter + transaction. (3) Chunk
+0.75, after checking `.claude/worktrees/awesome-brahmagupta-a509b4/`, which
+already holds a full sidecar set another window may be building.
+
+**Models.** Opus for all code; **no cloud spend, $0**. Review was the
+2026-08-15 REVIEW ROUTING diff-level gate (the four-round arc had already run
+for this sprint, so remaining chunks take the diff gate, not a fresh arc). Four
+agy QA rounds ran -- three on chunk 0.5, one on D2 -- **each a single-reviewer
+scoped tail, NEVER a full arc**. Yield across all four: 17 findings, 10 real.
+Two rounds violated the read-only rule and edited the repo; one of those landed
+inside a pushed commit and was backed out in `a9e28130`.
+
+**Box.** CLEAN. Headless server stopped selectively by CommandLine, port 8000
+empty, GPU 2.5 GB baseline. Nothing running.
+
 ## 2026-08-15 -- CODER (D2's transition schema, and a LIVE leg catching a regression no unit test could)
 
 **Did.** Chunk 0's owed transition-receipt schema + D2's composite validator,
