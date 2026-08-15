@@ -324,6 +324,137 @@ feared failure" -- writing "no Arkham" implants Arkham).
 
 ---
 
+---
+
+## r2 CORRECTIONS -- the plan was NOT codeable; these make it so
+
+### The bridge-only boundary does not exist yet (blocks D1)
+
+The r1 panel converged on "clean the bridge upstream of composition". **That
+boundary is not a switch to flip and the scoping rule was circular.**
+
+* `run_ledger_clean()` accepts and mutates an ENTIRE ledger
+  (`_otr_ledger_clean.py:1590-1990`).
+* The coda is already composed and written EARLIER
+  (`OTR_LedgerScriptWriter.py:2674-2825`).
+* **The compose flag is DERIVED from whether the cleaned bridge is empty**, so
+  `news_coda_bridge` vs `news_coda_fact_only` **cannot identify the row before
+  cleaning.** Keying the exemption on that flag is circular.
+
+Required: a component API (`clean_spoken_component(...) -> ComponentCleanResult`),
+a STABLE PRE-COMPOSITION ownership marker, a whole-ledger skip rule keyed on that
+marker, and ONE post-clean call that composes canonical `lines[].text`.
+Cost guard: the component bridge is judged ONCE and the composed fact-bearing row
+must not then incur a second whole-row judge call (per-row ceiling documented at
+`OTR_LedgerScriptWriter.py:6715-6744`).
+
+### The reseal point is later than stated, and rollback is wider (D2)
+
+Reconcile **immediately after `run_ledger_cleanup()` and BEFORE
+`stamp_text_for_tts_delivery()`** -- the writer currently runs clean, cleanup,
+TTS-delivery stamping, consistency, telemetry, and only then the lane finalizer
+(`:6745-6834`).
+
+Take a transient pre-clean snapshot and atomically reconcile or roll back ALL of:
+`text`, `skip`, `tts_skip_reason`, counts, compose flags, `text_for_tts*`,
+`_CodexTailFinalizer.expected`, `line_text_sha256`, `accepted_lines`,
+`content_authorship`, coverage, `writer_word_delivery`. **A row-only rollback
+leaves false receipts.**
+
+**Do NOT overwrite `accepted_lines`** (`_otr_scifi_codex.py:4016-4060`) -- that
+destroys the distinction between ACCEPTED MODEL TEXT and CLEANED CANONICAL TEXT.
+And restamping `content_authorship.line_proofs` does not PROVE the accepted
+artifact still owns the transformed text: schema v1 binds artifact and final line
+hashes but has **no transition chain** (`_otr_content_authorship.py:83-207`).
+Build content-authorship v2 OR a separately validated transition receipt
+(pre/post hashes, authorized stage, affected ids, cleaner receipt), and
+**preserve v1 validation for historical ledgers.**
+
+**Scope the four-surface reseal to lanes that CARRY those proof surfaces.** Not
+"every lane crossing the shared tail" -- legacy adaptation lanes need
+coda-component protection, not fabricated codex/content-authorship state.
+
+### D7's terminal fallback is logically impossible as written
+
+"Must pass the collision check" + "must be model-authored" + "must never raise"
+cannot all hold: the first candidate may collide, the single re-ask may collide,
+and then no validated model-authored candidate exists. Current code falls back to
+`outline.title` with NO collision validation (`:1349-1526, 6293-6320`).
+**Pick one:** additional bounded model calls, OR an explicit degraded colliding
+title shipped with a receipt, OR an authorized deterministic source-title
+fallback (which relaxes Law 2 and must say so).
+
+Also specify the collision inventory and normalization concretely -- which
+manifests are scanned, article handling, punctuation/Unicode normalization,
+exact phrase boundaries. "Explicit-title-phrase" is not executable.
+
+### `[END]` was over-promised (D3)
+
+The matrix requires `[END]`, but the canonicalizer does NOT unwrap brackets and
+`_RE_END` requires `END.` (`_otr_fable2_markup.py:41-60, 108-199`). Either pin
+the paired grammar explicitly -- e.g. `^(?:END\.?|\[END\.?\])\s*$` -- or drop
+`[END]` from the accepted set. Test unpaired brackets and content-bearing
+variants as FAILURES. Name the function that emits the required-shape diagnostic.
+
+### D6 reservation and empty-pool (blocks the no-repeat invariant)
+
+`fetch_media_archive_rss()` returns one payload immediately (`:191-221`),
+`_rss_source_fetch_result()` has no reservation token (`:585-621`), and the
+legacy history code is unlocked read-modify-write best-effort
+(`story_orchestrator.py:1193-1268`). Define candidate/reservation/history
+schemas, canonical-URL rules, lock or atomic-replace behaviour, lease expiry,
+explicit-index precedence, and a reservation token carried through
+`SourceFetchResult`. **Commit only after the terminal save and audit succeed**
+(`:6890-6915`), with guaranteed release or lease expiry on every exception.
+
+**Empty pool contradicts no-repeat:** with one unexpired candidate and two
+concurrent renders the second must repeat, refuse, or break the matrix.
+**Choose a typed pre-generation `MediaSelectionUnavailable`** -- consistent with
+Law 7's structural-refusal allowance. Silent reuse is not. Also define
+ranking-failure behaviour: `_llm_rank_news_candidates()` RAISES rather than
+falling back when `load_config` is present (`:1272-1388`).
+
+**Do NOT import `story_orchestrator`** to reuse its private selectors -- it
+imports optional Transformers and runtime modules at module load (`:25-75`).
+Extract a lightweight selector/history module, or inject a ranking callback.
+
+### Sidecar fork RESOLVED -- vendor all 65
+
+Codex overrules the on-demand proposal: the render reader is deliberately
+local/read-only (`_otr_roster_gender.py:226-263`) and on-demand render caching
+would need a SECOND storage and merge authority. **Vendor all 65 once**, with
+stale detection from `body_sha256` plus ladder/model/prompt versions, resumable
+generation, and NO render-time network or cache writes.
+
+### Law 7 vs `_check_g14_provenance_publish` -- RESOLVED
+
+It is part of the general freeze audit and raises a Phase-10 exception
+(`_otr_ledger_freeze.py:680-738`; `tests/test_provenance_v4.py:197-237`).
+**Smallest consistent fix: stamp a non-publishable eligibility receipt, permit
+ledger freeze and render, and enforce the block at `obs_publish`.** A render may
+complete and be non-publishable.
+
+### "Byte-identical no-op" narrowed
+
+An unconditional reseal receipt necessarily changes serialized bytes. The
+guarantee is: a no-mutation run leaves **the four protected surfaces** unchanged
+and emits **no reseal marker**; ordinary clean telemetry may still differ.
+
+### D5 needs one identity adapter
+
+`spoken_coda_line()` accepts only provenance (`:95-128`); public_domain identity
+lives in `source_meta.title`/`author` (`_otr_public_domain_sources.py:540-580`)
+while **Shakespeare uses `play_title` and has NO author field**
+(`_otr_shakespeare_sources.py:428-458`). Define ONE extractor returning a typed
+bibliographic identity plus a coda builder returning canonical text AND receipt,
+with exact degraded behaviour for missing fields.
+
+### Cut, confirmed
+
+The documented whole-row-exemption fallback for D1 is **cut** -- it violates the
+component-ownership architecture and invites a later shim instead of forcing the
+boundary to be built. The second body-rerank pass for D6 is **cut**.
+
 ## ACCEPTANCE -- a green suite proves none of this
 
 | Defect | Invariant | Artifact assertion |
