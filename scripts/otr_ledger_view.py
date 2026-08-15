@@ -230,6 +230,7 @@ def grade(path: Path) -> LedgerReport:
         "lane_status": (_as_dict(lane.get("news_coda")).get("status") or ""),
     }
 
+    clean = _as_dict(meta.get("ledger_clean"))
     schedule = _as_dict(_as_dict(lane.get("call_journal")).get("script_schedule"))
     report.receipts = {
         "act_count": _as_dict(
@@ -242,6 +243,19 @@ def grade(path: Path) -> LedgerReport:
         or meta.get("creative_model") or "",
         "freeze_verdict": meta.get("freeze_verdict") or "",
         "news_coda_status": report.coda["lane_status"],
+        # THE CLEAN STAGE'S OWN RECEIPT, surfaced HERE because this is the
+        # tool that actually gets run. A blindness verdict that lives only in
+        # a server log is a verdict nobody reads -- and the pass shipped
+        # blind on 16/16 rows of a live episode while every log line looked
+        # normal.
+        "clean_sight": _as_dict(clean.get("context_verified")).get("sight"),
+        "clean_sha": _as_dict(clean.get("context_verified")).get("sha"),
+        "clean_fields": _as_dict(
+            clean.get("context_verified")).get("fields") or [],
+        "clean_ok": _as_dict(clean.get("context_verified")).get("ok"),
+        "act_briefs": _as_dict(clean.get("act_briefs")),
+        "clean_repaired": clean.get("repaired"),
+        "clean_unclean": clean.get("unclean"),
     }
     return report
 
@@ -323,6 +337,20 @@ def render_text(report: LedgerReport) -> str:
         add(f"freeze   {receipts['freeze_verdict']}")
     add(f"rows     {len(report.rows)} total, {len(report.voiced)} spoken, "
         f"{report.spoken_words} spoken words")
+    if receipts.get("clean_sight"):
+        blind = "" if receipts.get("clean_ok") else "   *** SOMETHING WAS "            "BUILT AND NEVER REACHED THE MODEL ***"
+        add(f"clean    sight {receipts['clean_sight']} "
+            f"[{' '.join(receipts.get('clean_fields') or [])}] "
+            f"sha {receipts.get('clean_sha')} "
+            f"repaired={receipts.get('clean_repaired')} "
+            f"unclean={receipts.get('clean_unclean')}{blind}")
+        # THE ANTI-RED-DRESS CHECK. The bits above prove the context reached
+        # the prompt; they cannot prove the model LOOKED at it. These briefs
+        # were written FROM the episode's own lines, so a specific one is
+        # evidence of attention in a way no byte-check can be -- and a vague
+        # or empty one is the tell that it was staring past them.
+        for phase, brief in (receipts.get("act_briefs") or {}).items():
+            add(f"  act    {phase}: {brief}")
     if report.cast:
         add("cast     " + ", ".join(
             f"{cid}={name}" for cid, name in report.cast.items()))
