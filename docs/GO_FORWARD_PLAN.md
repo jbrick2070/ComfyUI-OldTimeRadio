@@ -200,6 +200,35 @@ monitoring the shielding of a device at 60% capacity."* That is a real read of
 the material -- the model can see the act. ~5 calls an episode, one per arc
 phase, never fatal.
 
+### CHARACTER DRIFT IS ACCEPTED. DO NOT CHASE IT. (operator ruling 2026-08-14 -- HARD)
+
+*"Sure, we just accept character drift, don't chase. Be honest in the README --
+note that if they want to chase it, they need a frontier model above what my
+16 GB card can do."*
+
+**F2's CONTENT half is CLOSED as a work item.** It was built, lab-tested,
+failed its own test, and is shipped disabled. It is not a bug to fix, an
+oversight to revisit, or a TODO. A future window that reopens it without NEW
+EVIDENCE is chasing something the operator has explicitly stopped.
+
+What "new evidence" would mean: a measured run on the F2 fixtures showing a
+model that is both accurate AND stable across repeats. Nothing else.
+
+* **Documented in the README** under "Known limitation: character drift",
+  honestly -- what it is, that it ships disabled, why (the 3/6-then-1/6
+  instability), that the constraint is the 16 GB card rather than the design,
+  and exactly how to turn it on and measure it with a bigger model.
+* **The code stays** (`JUDGE_ATTRIBUTION = False`), tested, so nobody rebuilds
+  it and anyone with a frontier model can flip one flag.
+* **F1 -- action in a spoken row -- remains ON and is the shipped capability.**
+  That half of the acceptance test works and is measured.
+
+**This does NOT reopen the 2026-08-04 story-quality law, and it does not
+contradict it.** Character consistency was carved out of that law as a
+CORRECTNESS defect, and it still is -- we simply measured the cost of fixing
+it on this hardware and the operator has priced it. Accepting a known,
+documented, disabled-by-default limitation is a decision, not a regression.
+
 ### F2 WAS LAB-TESTED BEFORE SHIPPING, AND IT DID NOT PASS. IT IS OFF.
 
 **Operator, 2026-08-14: *"Fable had a good idea, but we need a real laboratory

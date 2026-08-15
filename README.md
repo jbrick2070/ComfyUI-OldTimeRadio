@@ -243,6 +243,55 @@ review findings never create entries on their own.
 
 ---
 
+## Known limitation: character drift
+
+**Some episodes will hand a line to the wrong character**, and this pack does not
+fix that. You may hear a character claim a job that belongs to someone else, say
+they don't know something they plainly do, or — rarest and most obvious — address
+themselves by name. It is uncommon, it does not break a render, and the episode
+still plays. But it is real and you should know about it before you run this.
+
+Everything else in the acceptance test **is** handled. A post-story clean stage
+reads every spoken row with a model and rewrites anything that is not speech —
+stage directions, sound cues, narration that would otherwise be read aloud by the
+voice actor. That works, and it is measured (see below).
+
+**Why character drift is not fixed, honestly.** It was built and tested, and it
+did not pass. On a planted test set where the same line appears twice — once in
+the wrong character's mouth and once in the right one — the detector found 3 of 6
+planted defects on one run and 1 of 6 on the next, with an identical detector and
+identical inputs. It reliably caught only the blatant case (a character naming
+themselves) and never caught the subtler ones. A detector that unstable cannot be
+trusted to rewrite dialogue, so it ships **disabled** rather than quietly making
+episodes worse.
+
+**The constraint is hardware, not design.** This project is deliberately 100%
+local and offline — the reference machine is a 16 GB laptop GPU, and the largest
+model that comfortably fits is in the 12B class. Judging whether a line belongs to
+a particular character means holding the whole cast, and who knows what, in mind
+while reading a single sentence. That is a harder ask than spotting a stage
+direction, and a 12B is not reliable at it.
+
+**If you want to chase it:** the pass is written, tested and ready — set
+`JUDGE_ATTRIBUTION = True` in `nodes/_otr_ledger_clean.py`, and use a **frontier
+model well above what a 16 GB card can run**. The measurement rig is included so
+you can check whether your model actually does better rather than taking anyone's
+word for it:
+
+```bash
+python scripts/otr_clean_stage_lab.py --f2 --model <your-model>
+```
+
+It scores recall (planted defects caught) *and* false alarms on clean lines, which
+is the half a normal render cannot show you. Do not judge a change on recall
+alone — it is easy to catch everything by suspecting everything, and that rewrites
+good dialogue.
+
+The same rig, without `--f2`, measures the stage-direction cleanup that **is**
+shipped and on by default.
+
+---
+
 ## The LEMMY easter egg
 
 Every so often a character named **Lemmy** makes a cameo — a small tribute carried across the
