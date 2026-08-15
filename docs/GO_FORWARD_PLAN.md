@@ -158,22 +158,18 @@ Operator asks whether the scene is actually Macbeth. Check the ledger's
 selected scene against the title. A title naming the wrong play would be a
 FIDELITY defect on the lane where fidelity outranks arc.
 
-### OWED -- STATE AS OF 2026-08-15 WRAP-UP
+### OWED -- the Bible promotions, one per green chunk
 
-* **`PROD_BUG_LOG.md` entries: DONE.** PBUG-20260815-01..08 landed (`86014bb1`).
-  07 is a REJECTION, recorded so nobody re-chases the `original`-lane report.
-* **Bug Bible delta-scrape: DONE. Promotion: DELIBERATELY NOT YET.** The scrape
-  ran against `otr_coverage_index.yaml` (394 records) and `BUG_BIBLE.yaml` (280
-  entries, HEAD `fbeddad`) without re-scraping indexed history. Result:
-  **02(b) -- "a post-generation audit whose only failure mode destroys finished
-  work" -- is ALREADY COVERED by `11.18`**, index row only, no new entry. The
-  other seven shapes are genuinely uncovered and are drafted as `12.103`-`12.109`
-  in `docs/2026-08-15-BIBLE-PROMOTION-DRAFT-bugfix-sprint.md`, each with an
-  automatable verify clause and its index row.
-  **They are NOT promoted yet on purpose:** every one is still `OPEN --
-  diagnosed, fix not landed`, and a Bible entry's `fix:` field is a claim that
-  something was fixed and proven. Promote each one WITH its green chunk, per the
-  contract's documentation gate. The draft exists so no re-scrape is ever needed.
+The delta-scrape is DONE and must never be re-run (it cost ~4M tokens once).
+Seven uncovered shapes are drafted as `12.103`-`12.109` in
+`docs/2026-08-15-BIBLE-PROMOTION-DRAFT-bugfix-sprint.md`, each with an
+automatable verify clause and its index row; 02(b) needed none, already covered
+by `11.18`.
+
+**They are deliberately NOT promoted yet.** A Bible entry's `fix:` field claims
+something was fixed and proven, so each one lands WITH its green chunk per the
+contract's documentation gate. Also note PBUG-20260815-07 is a REJECTION,
+recorded so nobody re-chases the `original`-lane voice report.
 
 ## OPERATOR RULINGS 2026-08-15 (hard -- these settle three OWED decisions)
 
@@ -311,28 +307,17 @@ policy finding. Narrow the net then; never remove it.
 ### OPEN -- the no-shims violations that ARE real, ranked
 
 Found by a three-way read-only audit 2026-08-14, every claim verified against
-the real files. **The announcer fallback (was #1) is FIXED and pushed.**
+the real files. Four of the seven are fixed and pushed (`3661bc42` plus the
+announcer fallback); receipts in `docs/HANDOFF_LOG.md`. These three are open:
 
-1. ~~`compose_line_draft`'s cold reroll + the unhandled raise~~ **DONE
-   `3661bc42`.** The retry now carries the model's own rejected reply plus the
-   complaint and runs cooler; both writer call sites handle the failure and
-   leave the row EMPTY for `_otr_ledger_cleanup` to mark an explicit skip.
-2. **Codex `P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`)** -- the pass
+1. **Codex `P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`)** -- the pass
    whose whole job is "read it back and fix it" never repairs: a content failure
    gets ONE generic repair turn that sees 400 characters of its own draft, then
    three cold rerolls, then `CodexPassError` kills the render.
-3. ~~`_pass_news_read` passes no `post_validator`~~ **DONE `3661bc42`** -- it
-   now proves the close names a dossier anchor and carries no invented
-   character, both findings returned together.
-4. ~~The stage-3 widget advertises a repair that does not exist~~ **DONE
-   `3661bc42`** -- the TOOLTIP was the defect and was fixed, not the code:
-   THE LAW forbids rerolling for length or language (most of what these
-   validators report), and attribution repair was measured unstable and
-   shipped disabled on 08-14. Telemetry is the correct behaviour.
-5. **`_canonicalize_script_spoken_text` (`_otr_scifi_codex.py:3249`)** -- runs
+2. **`_canonicalize_script_spoken_text` (`_otr_scifi_codex.py:3249`)** -- runs
    `clean_spoken_text` but writes the stripped text back INTO the record, which
    is what stills and motion read. Not covered by the captions ruling above.
-6. **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
+3. **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
    `PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS`
    (`:25-82`) driving model rewrites, contrary to the 2026-08-03 directive, plus
    two bare `RuntimeError`s (`:328`, `:334`) that would kill a render. Nothing
@@ -424,14 +409,6 @@ ATOMICALLY. **Build the seam-resolution check FIRST and keep it** -- a test that
 every `required_seams` / `declared_seams` entry resolves to a real prompt turns
 this from risky into verifiable.
 
-### OPERATOR DECISIONS OWED -- ALL THREE ANSWERED 2026-08-15, section removed
-
-The 7-act inversion, the `media_archive` entry-0 pick and the `__main__`
-self-test blocks were all ruled on. See the OPERATOR RULINGS block above; the
-act table and the `__main__` deletion SHIPPED (`9c2d721d`, `f5fee5b9`), and the
-`media_archive` picker is the one still open, now scoped as
-"copy the science-news picker" rather than the seeded shuffle first proposed.
-
 ### STANDING RULES for this work -- do not relitigate
 
 * Only TWO things are failure: **action in the ledger**, and **a character
@@ -480,35 +457,26 @@ queue in the same push.
 
 | # | Active work | Exit condition |
 |---:|---|---|
-| 1 | **SUPERSEDED -- see PRIORITY 1 at the top of this file** | Story work moved into production 2026-08-14 and the upstream Story Lab is RETIRED, read-only reference. Much of this row is now DELIVERED: the clean stage removes stage direction and cross-speaker prose from spoken rows (shipped, measured); the announcer open and close are authored and now get an informed retry before any fallback; the coda names its source (P6). What REMAINS of this row lives in PRIORITY 1 as named open items -- the graduated extraction contract, the model floor refusing rather than grinding, the ranked no-shims violations, and the `scene_report` miss class. Do NOT restart from the lab. |
+| 1 | **SUPERSEDED -- what remains is PRIORITY 1 at the top of this file** | Do NOT restart from the Story Lab. |
 | 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
 | 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
 | 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
 | 5 | **Release runway** | `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. |
 
-### STORY LAB RECOVERY BASE -- TOMBSTONED 2026-08-14
+### THE STORY LAB IS RETIRED -- two guardrails survive it
 
-**This plan was not executed and is not the plan.** The 2026-08-13 decision was
-to resume `ComfyUI-OTR-UpstreamStoryLab` and A/B the old `science_news` recipe
-against the current lane. The operator superseded it on 2026-08-14: the lab is
-PARKED and being RETIRED, it is READ-ONLY reference, and the story work was done
-IN PRODUCTION instead -- which is what shipped.
-
-Kept only as provenance: the lab repo is
-[`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab)
-(`main` = `7df7c80`; standalone v1 preserved at `41c6512`). Its byte-hash mirror
-gate needs an LF checkout (`core.autocrlf=false`) or it reports a false hash
-failure. **Do not develop in it. Do not ship its duplicate workflow, production
-mirror or bridge into OTR.**
+The lab ([`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab),
+`main` = `7df7c80`) is READ-ONLY reference. **Do not develop in it. Do not ship
+its duplicate workflow, production mirror or bridge into OTR.**
 
 Its two detector files were inventoried and NOT ported, deliberately:
-`spoken_text_policy.py` (695 lines) and `ledger_verifiers.py` (429) are both
-REGEX detectors -- the lab's own header says *"a future fuzzy or model-assisted
-policy requires a new policy"* -- so porting them would not have solved the
-generalization problem the model judge was built for.
+`spoken_text_policy.py` and `ledger_verifiers.py` are both REGEX detectors --
+the lab's own header says *"a future fuzzy or model-assisted policy requires a
+new policy"* -- so porting them would not solve the generalization problem the
+model judge was built for.
 
-**The canonical `scifi_news` episode topology from that ruling STANDS and is
-still the contract:** opening music -> ANNOUNCER introduction -> character drama
+**The canonical `scifi_news` episode topology STANDS and is still the
+contract:** opening music -> ANNOUNCER introduction -> character drama
 with interstitial music only where the script asks -> ANNOUNCER source-backed
 real-news summary -> closing music. Both announcer bookends and the opening and
 closing music are structural reservations independent of `target_words`. The
@@ -644,11 +612,10 @@ contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
 Item 1 is the structural work and consumes most of a session; items 2-3 are
-small and share one campaign. **Items 8 AND 9 are DONE**
--- item 9 SHIPPED 2026-08-06 as `e499b7fc`; detail in `docs/HANDOFF_LOG.md`.** The live open work is sections 0
-(video matrix pattern, did NOT converge), 0-BIS (no-mirror, CODE-READY),
-0-QUATER's deferred shield-scoping chunk (own kibitz arc), and the 0-QUINQUE
-MiniMax ruling.
+small and share one campaign. Items 8 and 9 are DONE (receipts in
+`docs/HANDOFF_LOG.md`). The live open work is sections 0 (video matrix pattern,
+did NOT converge), 0-BIS (no-mirror, CODE-READY), 0-QUATER's deferred
+shield-scoping chunk (own kibitz arc), and the 0-QUINQUE MiniMax ruling.
 Work by priority, not by number -- the numbering is historical.
 
 **RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
