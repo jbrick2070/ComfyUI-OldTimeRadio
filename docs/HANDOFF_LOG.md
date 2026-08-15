@@ -5,6 +5,58 @@ GO_FORWARD_PLAN.md stays lean and forward-only.
 
 ## 2026-08-14 -- base HEAD 4216b937 -> 9217995d (v2.0-alpha) -- CODER (all three story bugs fixed and PROVEN on live episodes; a ledger inspector and live window; four schema caps that were refusing legitimate sources)
 
+### THE ONE-SCREEN VERSION
+
+| | |
+|---|---|
+| Bugs closed | `PBUG-20260814-01/02/03`, all three, all proven on generated episodes |
+| Bugs found by RUNNING | 4 schema caps refusing legitimate sources; a receipt that blamed the wrong draft; an unbounded prompt window |
+| Live episodes | 5 (`scifi_news` x2, `original`, `scifi_news_pro` x1 of 3 attempts) |
+| New tools | `scripts/otr_ledger_view.py` -- grade / watch / ladder-census |
+| Corpus measured | ~1,400 episodes graded, 101 ladder journals censused |
+| Commits | 11 on `v2.0-alpha`, 2 on survival-guide `main` |
+| Suite | 10355 -> **10445 passed**, 110 skipped, 1 xfailed |
+| Still open | F1 on five banks (clean stage); graduated extraction contract |
+
+### WHAT THE NEXT WINDOW SHOULD READ FIRST
+
+1. `docs/GO_FORWARD_PLAN.md` PRIORITY 1 -- rewritten today, forward-only.
+2. `scripts/otr_ledger_view.py` -- the module docstring is the contract.
+   You do not need to write a grader; there is one.
+3. This entry's **OPEN WORK** section at the bottom.
+
+### THE TOOL YOU NOW HAVE (use it before writing any new audit)
+
+`scripts/otr_ledger_view.py` reads any ledger and grades it on the operator's
+only two failures. It DETECTS and explains; it never edits or writes a ledger.
+
+```
+python scripts/otr_ledger_view.py                 # newest episode
+python scripts/otr_ledger_view.py <id|path|frag>  # a specific one
+python scripts/otr_ledger_view.py --list 20       # what is on disk
+python scripts/otr_ledger_view.py --html out.html # a page to eyeball
+python scripts/otr_ledger_view.py --json          # machine-readable verdict
+python scripts/otr_ledger_view.py --ladder 60     # retry-ladder census
+python scripts/otr_ledger_view.py --watch 3 --html tmp/otr_live.html
+```
+
+`--watch` is the live window: pass, attempt, token rate, GPU, and the stream
+stitched back into the sentence being typed. It turns red and NAMES the phrase
+when the model repeats itself. `OTR_WRITER_HEARTBEAT_EVERY=16` at server boot
+makes the stream read smoothly (default 64).
+
+**Three detector lessons, all paid for in false alarms today -- do not undo
+them:**
+- Curly SINGLE quotes are apostrophes, not quotation. Including them made
+  every ordinary "It's" read as embedded speech.
+- A bare action verb is not evidence. "We stand", "to finally stand", "Then
+  step back" and "the vest stands" are first person, an infinitive, an
+  imperative and a metaphor. An action needs a third-person SUBJECT, and a
+  stoplist of sentence-openers.
+- A detector with a narrower view than its own display reads as an ALL-CLEAR.
+  The repeat tell examined 4 heartbeat samples while the window rendered 24,
+  so a loop plainly readable on screen went unflagged.
+
 Did: closed `PBUG-20260814-01/02/03` and proved each on a generated episode
 rather than on the suite. **Ten commits**, all pushed:
 `8da8f457` speaker on every ledger line row; `fa001688` the coda as its own
@@ -24,11 +76,52 @@ not exist before. Before: *"Ada turns to Leo, her eyes alight. '...' Her voice
 trembles."* After: *"I know the math, Doctor. I've seen the telemetry."*
 
 **F2 IS PROVEN FIXED ON ALL THREE CODE PATHS**, which unit tests could not
-show: the codex lane (`scifi_news`), the writer lane via
-`init_lines_from_outline` (`pending_20260814_182303`, `original`, act 3, 5.1
-min, 0 F2 findings -- covers `shakespeare`/`public_domain`/`media_archive`
-too), and `scifi_news_pro` (`pending_20260814_183830`, 33 rows, 581 words,
-0 F2, speakers ANNOUNCER / Elena / The Echo, ends on the announcer).
+show. The fix is shared, so ONE live run per path covers every bank on it:
+
+| path | proof episode | result |
+|---|---|---|
+| codex lane | `pending_20260814_174350` `scifi_news` act 1, 12b | **CLEAN**, 8 rows |
+| writer lane (`init_lines_from_outline`) | `pending_20260814_182303` `original` act 3, 2b, 5.1 min | **0 F2**, 18 rows -- covers `shakespeare`, `public_domain`, `media_archive` |
+| `scifi_news_pro` assembly | `pending_20260814_183830` act 3, 12b | **0 F2**, 33 rows / 581 words, speakers ANNOUNCER / Elena / The Echo, ends on the announcer |
+
+### WHAT EACH BUG ACTUALLY WAS, AND WHERE
+
+**`PBUG-20260814-01` -- the speaker drop.** `Ledger.set_lines()` rebuilds each
+row as a literal dict that ENUMERATES the keys it keeps, and `speaker` was not
+among them, while its sibling `set_beats()` carried it. The asymmetry IS the
+bug: a key-enumerating normalizer silently drops everything it does not name.
+Fixed in both halves at once -- the schema, and every assembly site supplying
+it from the row that already owns it (`init_lines_from_outline` stamps the
+outline beat's speaker; `_otr_scifi_codex._assemble_ledger` takes `b.speaker`
+off the OWNING beat rather than asking P5 twice; `_otr_scifi_fable2._beat()`
+now READS it back off the line row so the two cannot disagree). Golden fixture
+`tests/fixtures/fable2/golden_s1b_assembly.json` regenerated deliberately.
+Bible **12.101**.
+
+**`PBUG-20260814-02` -- no coda, source never named.** The coda was prompt text
+string-concatenated onto the P3 and P5 system messages: no output type, nothing
+reserving a row, nothing verifying afterwards, and the only structural rule was
+cast coverage, which never checks POSITION. Now **P6**, its own pass, running
+after P5 against the episode actually written, reusing the existing
+`codex_coda_contract_system` seam -- job size changed, prompt text did not.
+Code detects (`_news_coda_source_anchors` -> entity names of 3+ chars and
+source-spanned figures; word-boundary matching so "MIT" is not found inside
+"transmitted"); a firing verifier triggers ONE bounded CLEAN with the complaint
+attached, never a refusal and never a reroll. Three outcomes, all continuing
+the render: `clean`, `unclean` (ships, flagged), `absent` (nothing invented).
+Python appends the row LAST and `_assert_news_coda_is_last` re-asserts the pro
+lane's three parser rules.
+
+**`PBUG-20260814-03` -- narrated prose.** The dialogue job wrote the whole play
+in one call, up to 24 rows in one reply, and returned a summary of a play.
+`_call_script_text_draft` kept its name and became the SCHEDULE: per scene, one
+`P5B` dialogue job per beat then one `P5R` scene review. **The window is the
+fix, not the loop** -- a beat job sees its own intent/speaker/arc/facts, its
+scene's spine, and `rows_so_far`, never the whole line graph. The review may
+rewrite against the spine and may not add, drop or renumber. Per-job decode
+budgets shipped in the same change because they are the same change. The
+canonical-surface hygiene check MOVED into the per-beat validator, where a
+finding can still reroll.
 
 **A SCHEMA CAP MUST NEVER SIT AT THE NUMBER A TRIM ALREADY ENFORCES.**
 `scifi_news_pro` died twice on a UCLA Health story naming 11 places and 14
@@ -53,6 +146,60 @@ it with a reason.
 **ONE CLEAN EPISODE IN ~1,400 GRADED, AND IT IS TODAY'S.** Every earlier
 episode fails F1+F2 because every earlier episode shipped `speaker: None`.
 
+### MEASUREMENTS -- do not re-derive these, they cost hours
+
+**F1 by bank** (`otr_ledger_view` over 250 episodes on disk). The four
+writer-lane banks ALREADY compose one model call per beat, so the per-beat fix
+that worked on `scifi_news` CANNOT help them:
+
+| bank | ends on announcer | spoken rows carrying action |
+|---|---|---|
+| `media_archive` | 100% | **40%** |
+| `scifi_news_pro` | 100% | **32%** |
+| `original` | 100% | **30%** |
+| `scifi_news` | 43% -> fixed | 18% -> **0%** on the 2026-08-14 leg |
+| `public_domain` | 100% | 13% |
+| `shakespeare` | 100% | 11% |
+
+Grade the two FIDELITY lanes with care: on `shakespeare` and `public_domain`
+the author's own language is carried as written, so a third-person construction
+from the source is not a defect. The detector over-reports there; its findings
+on those two are a reading list, not a verdict.
+
+**Retry-ladder census** (`--ladder`, 101 journals). A pass whose FIRST attempt
+almost never survives is not unlucky -- its prompt or schema is wrong:
+
+| pass | ladders | 1st ok | py-fix | abandoned |
+|---|---|---|---|---|
+| P0 fact index | 26 | **0 (0%)** | 25 | 1 |
+| P1 question | 20 | 19 (95%) | 0 | 0 |
+| P2 cast | 20 | 17 (85%) | 1 | 0 |
+| P3 score | 31 | **14 (45%)** | 0 | **11** |
+| P5 script | 21 | 18 (86%) | 0 | 1 |
+
+**P0's 0% is FINE and costs zero model calls** -- the deterministic repair
+searches the payload for the model's quote and corrects the offsets. 31 of 49
+repairs lost nothing; only **0.26 evidence rows per episode** are actually
+dropped, when the model paraphrased a quote that is not in the source. An
+earlier draft of the temperature doc overstated this ~8x and was corrected.
+
+**P3 is the expensive one**: 11 of 31 ladders ABANDON, dominated by
+`cast_coverage` -- the score forgetting to give the announcer a beat. That is
+the strongest candidate for a schema fix in the lane: a topology that cannot
+omit the announcer would DELETE the reroll rather than recover from it.
+
+**Which models have ever driven `scifi_news` P0** (journals from 2026-07-11):
+`Mistral-Nemo` 67 episodes, `openrouter:slot-a` 17, `gemma-4-12b-it` 10, its
+GGUF 4, `gemma-4-E4B-it` 3. **`gemma-2-2b` appears zero times.**
+
+**The creativity knob does nothing on `scifi_news`.** It maps to
+(temperature, top_p) in `OTR_LedgerScriptWriter` and drives the WRITER lane's
+line composer; the codex lane hard-codes `base_temperature=.72` on every pass
+and never reads it. Same widget, two meanings, and on one bank no meaning.
+Written up in `docs/2026-08-14-temperature-problem-statement.md` with three
+coherent options -- delete it, make it real everywhere, or rename it to say
+which lanes it governs. Doing nothing keeps a widget that lies.
+
 Reviews: agy fan-out (scoped **r2 only**, 1 external call, scope receipt in
 `kibitz-runs/2026-08-14-story-cleanup-regression/r2/`) plus a Sonnet 5 QA pass
 on the diff. Accepted agy's type-safety finding and widened it from 2 sites to
@@ -70,16 +217,57 @@ Box at wrap-up: **server RESIDENT on port 8000, ~12.4 GB VRAM** (finished-run
 behaviour, not a crash -- CLAUDE.md section 5). Live-window watchers stopped.
 Reset per section 4 before the next headless run.
 
-Current step: the three PBUGs are closed. Open: F1 (action in dialogue) on the
-five non-`scifi_news` banks -- 11-40% of spoken rows, worst `media_archive` at
-40% -- which needs the CLEAN STAGE (detector built and corpus-graded, model
-repair pass NOT built); and the graduated extraction contract the operator
-specified at the end of the session.
+### OPEN WORK -- in the order the operator put it
 
-Next: build the clean stage, or the graduated extraction contract -- both are
-specified in `GO_FORWARD_PLAN.md` under PRIORITY 1. Neither is blocked on the
-operator. The lane rename (codex/fable2 -> scifi news pro/non-pro) is still
-queued behind them; build the seam-resolution check FIRST when it starts.
+**1. THE CLEAN STAGE (biggest, and the only thing standing between the five
+remaining banks and "passable").** F1 is 11-40% of spoken rows on every bank
+except `scifi_news`. Those lanes already write per beat, so job size is not
+their problem. The design is already in `GO_FORWARD_PLAN.md`: code DETECTS,
+a MODEL repairs, every pass detector-gated so a clean episode costs zero
+cleaning calls. **The detector half exists and is corpus-graded** --
+`otr_ledger_view.grade()` is the same F1/F2 grader for every bank; reuse it
+rather than growing a second opinion about what "action" means. The repair is
+`creative_writing_model`, bounded retries each told what was still wrong, then
+flag loudly in the ledger and CONTINUE. Never a silent pass, never a hard stop.
+
+**2. THE GRADUATED EXTRACTION CONTRACT** (operator, end of session): *"if it
+fails once on extraction, we relax the extraction requirements on the second
+pass -- it just has to get the gist of the story and populate the coda."*
+Attempt 1 strict, attempt 2 drops `source_spans` (the literal-quote
+transcription a small model cannot do) while keeping fact claims, entity names
+and numbers -- which is exactly what the coda anchors need and nothing more.
+**The part the ruling does not say and that is load-bearing: STAMP WHICH
+CONTRACT PRODUCED THE INDEX.** A relaxed extraction is not span-proven, so
+enumerate every span reader (`_span_ok`, `_span_mismatch`, the citation audit,
+`_otr_scifi_source_repair`) and give each a defined behaviour BEFORE writing
+the relaxed pass. That is the standing "a ripped pass may not leave a ledger
+field unowned" rule applied to a field that becomes conditionally absent.
+
+**3. THE MODEL FLOOR SHOULD REFUSE, NOT GRIND.** A model that cannot satisfy a
+lane's contract should be refused at the top of the run with the reason, not
+discovered after 34 minutes of bounded retries. Do NOT delete `gemma-2-2b-it`
+to fix this -- it is the fastest writer-lane model on the box (5.1 min for a
+clean 3-act `original`).
+
+**4. Suspect, deliberately NOT fixed:** the codex lane carries the same
+cap-equals-trim shape as Bible 12.102 on `MAX_FACT_ROWS` (6) and
+`MAX_ENTITY_ROWS` (4). That lane decodes under a grammar, so the ceiling
+TRUNCATES during generation rather than refusing -- silent evidence thinning,
+not a crash, and unproven on an artifact. Six facts and four entities is tight
+for a real news story. **Prove it on an artifact before touching it.**
+
+**5. Queued behind the above:** the lane rename (codex/fable2 -> scifi news
+pro/non-pro). Build the seam-resolution check FIRST -- the 12 seam ids are
+prompt ROUTING KEYS in the pack JSONs and an inconsistent rename silently kills
+a seam.
+
+**Inherited, unchanged, do not re-litigate:** 7 acts yields fewer voiced beats
+than 6 (20 -> 19), pinned in `tests/test_voiced_beat_count.py` with reasoning.
+`exchange_system`'s `use_exchange` widget defaults False but the canonical
+graph ships it TRUE. `media_archive` always takes feed entry 0 while siblings
+draw at random.
+
+Next: build the clean stage. Nothing above is blocked on the operator.
 
 Models: `gemma-4-12b-it` for the proof leg and the `scifi_news_pro` retry;
 `gemma-2-2b-it` for the writer-lane sweep. Review routing per the 2026-08-11
