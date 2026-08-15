@@ -3307,6 +3307,57 @@ class _CodexTailFinalizer:
             if row.get("line_id") in self.expected and row.get("text") != self.expected[row["line_id"]]:
                 raise CodexPreTailAuditError(f"line receipt mismatch for {row.get('line_id')}")
 
+    # -- the clean-window proof protocol (`_otr_clean_transaction`) --------
+    #
+    # `expected` is the accepted text held IN MEMORY, and nothing on disk can
+    # rebuild it -- so the writer's authorized clean/cleanup window cannot be
+    # committed or undone from the ledger alone. These three are how this lane
+    # carries its proof through that window: snapshot it, put it back, or
+    # re-point it at text an authorized stage rewrote.
+
+    def snapshot_proof_state(self) -> dict[str, str]:
+        return dict(self.expected)
+
+    def restore_proof_state(self, state: Mapping[str, str] | None) -> None:
+        self.expected = dict(state or {})
+
+    def reseal_proof(self, ledger_data: MutableMapping[str, Any]) -> None:
+        """Re-point the acceptance proof at authorized post-clean text.
+
+        `accepted_lines` is deliberately NOT rewritten. It records what the
+        model ACCEPTED, which is not what ships after an authorized clean, and
+        relabelling cleaned text as accepted output would destroy the only
+        record that the two ever differed. `line_text_sha256` IS rewritten,
+        because it is the mirror `_proof` compares `expected` against -- and it
+        is DERIVED from `expected` here rather than rebuilt from the ledger
+        independently, so the two surfaces cannot drift into disagreeing (the
+        producer/consumer mismatch of `BUG_BIBLE.yaml` 12.86).
+
+        A row that vanished from `lines` outright leaves the proof: there is
+        nothing left to prove. A row the cleanup BLANKED is still present and
+        stays proved -- as empty -- because that is the guarantee which stops
+        anything refilling it later with unattributed text.
+        """
+        live = {
+            str(row.get("line_id") or ""): str(row.get("text") or "")
+            for row in (ledger_data.get("lines") or [])
+            if isinstance(row, Mapping)
+        }
+        self.expected = {
+            line_id: live[line_id]
+            for line_id in self.expected
+            if line_id in live
+        }
+        lane = ledger_data.setdefault("meta", {}).setdefault("scifi_codex", {})
+        lane["line_text_sha256"] = {
+            k: hashlib.sha256(v.encode("utf-8")).hexdigest()
+            for k, v in self.expected.items()
+        }
+        # Prove the reseal instead of assuming it, using the SAME primitive the
+        # pre-save gate and the saved-ledger audit call. If it passes here it
+        # passes there; if it does not, the transaction still has its snapshot.
+        self._proof(ledger_data)
+
     def before_save(self, *, ctx: Any) -> None:
         self._proof(ctx.led.data)
         pre = _otr_ledger_freeze.phase_0_gap_audit_pre(ctx.led)

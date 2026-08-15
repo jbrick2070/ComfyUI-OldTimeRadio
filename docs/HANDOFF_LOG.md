@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 6475f9c4 (v2.0-alpha) -- CODER (D2 finishes: the clean window becomes a transaction, and an unprovable reseal now costs a repair instead of a render)
+
+Did: **Finished D2 -- both owed halves, chunk 1 and chunk 3.** The acceptance
+receipt was minted upstream of two sanctioned passes that run between it and
+the audit, so the audit failed on the pipeline's own legitimate output:
+`scifi_news` died `line receipt mismatch for l004` at 13.6 minutes, and `l004`
+was provably the first row the clean stage repaired while `l001`/`l002` shipped
+still-unclean and passed.
+
+**One window, captured once, reconciled once.** `open_transaction` at
+`OTR_LedgerScriptWriter.py:6798` immediately before `run_ledger_clean`;
+`reconcile()` at `:6819` after `run_ledger_cleanup` and before
+`stamp_text_for_tts_delivery`. One transition spans BOTH stages because one per
+stage is impossible by construction -- the second stage's pre-state is the first
+stage's output, so it could never equal the acceptance the chain must start
+from. On success the codex finalizer's `expected` and
+`meta.scifi_codex.line_text_sha256` re-point at the authorized text, the mirror
+DERIVED from `expected` rather than rebuilt separately (12.86); `accepted_lines`
+and the v1 receipt are PRESERVED, because `accepted_lines` records what the
+model accepted and that is not what ships after a clean. A no-op emits nothing.
+
+**The second defect inside PBUG-20260815-02 is the one worth reading.** The
+audit's only verb was "raise", so a proof it could not reconcile had no outcome
+except destroying finished work. The window is now a transaction: on an
+unprovable reseal it restores the accepted ledger, stamps
+`meta.content_transition_degraded` naming the cause, re-proves the restored
+state, and the episode ships without the repairs. Law 7 holds -- the repair is
+sacrificed, never the render.
+
+**Three things that were nearly missed, all found by writing the tests.**
+(1) The restore had to be IN PLACE: the writer tail holds `meta` as a local, so
+rebinding `led.data["meta"]` would have left every later stamp writing into a
+detached dict -- a silent hole shaped exactly like a working ledger. Pinned by
+identity, not equality. (2) The snapshot copies the CONTAINERS, not a field
+list; a field list goes stale the first time a pass learns to write one more
+key. (3) The degrade path originally re-called `reseal_proof` to verify the
+rollback -- which is usually the very thing that just failed, so it reported the
+same error twice and labelled a good rollback corrupt. That was a real bug in
+my first draft; the verify is read-only now.
+
+Also: `meta.writer_word_delivery` is restamped after the window on every lane
+under a NEW stage `writer_final_rows_post_clean`, so the pre-clean receipt
+survives beside it in `word_budget.actual_receipts` instead of being
+overwritten. And a stale comment in `_otr_readiness.py:264` claiming
+`phase_7_audio_readiness` "REWRITES canonical `line.text` in place" is
+corrected -- it writes only `text_for_tts*` and has for some time, which matters
+because the reconcile ordering is only safe if nothing after it moves a hash the
+proof covers.
+
+**Test fallout, disclosed:** `tests/test_story_brief_c5a2.py`'s ordering pin
+asserted exactly ONE `stamp_actual` call site. It now pins TWO, by stage, plus
+the full order including the requirement that the post-clean restamp stays
+BEHIND the summary -- so it is stricter than before, not looser.
+
+Numbers: suite **10711 / 110 / 1** (from 10683; +28, no regressions). Bible
+**20 / 26 / 3** at **283** entries -- `12.104` written, which closes the forward
+reference `_otr_content_transition.py` had been citing to an entry that did not
+exist. The survival-guide repo's Three-File Contract also required bumping the
+README's cited count in three places; skipping that turns its regression red.
+
+**NOT DONE, and it is the honest headline: D2 has no live leg.** `scifi_news`
+and `scifi_news_pro` were not run. The 1-in-3 exposure on
+`roll (any eligible bank)` is *believed* closed, not proven.
+
+**Chunk 0.75 / D4 was NOT started, deliberately.** Another window is mid-build
+on exactly that artifact: `config/source_banks/_corpus/` holds a fetched
+Gutenberg corpus (`_vendor_report.json`: 63 ok, 3 failed -- `ghost_ship`,
+`purple_cloud`, `beleaguered_city`) plus ONE proof sidecar,
+`monkeys_paw.provenance.json`. Sidecar count tree-wide is still **16**
+(14 shakespeare + 1 public_domain + that one), so the 64-of-65 gap is unchanged.
+Worth flagging for whoever picks it up: that sidecar's schema is
+`otr_source_provenance_v1` carrying `work_title` / `author` / `license_label` /
+`body_sha256` -- **D5's** identity fields. It has no `gender_by_name`, which is
+the field D4 actually needs. Same file, same generator, two consumers.
+
 ## 2026-08-15 -- HEAD 7655e708 (v2.0-alpha) -- CODER (the obs fix is live-proven, canonical gets still_flat + both rolls, and AHAB is a third gender instance)
 
 Did: **Closed PBUG-20260815-09 with a live leg.**

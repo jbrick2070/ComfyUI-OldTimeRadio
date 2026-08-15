@@ -34,13 +34,20 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10683 / 110 / 1**, Bible **20 / 26 / 3**
-(the Bible now holds **282** entries -- `12.103` landed with chunk 2, `12.105`
-with chunk 3.5), variants 50 emitted (3 refused -- the standing unratified
-cloud profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5;
--> 10610, 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1;
--> 10657 chunk 3.5 / D3; -> 10683 D2's transition schema + the rename fix.
+**BASELINES to detect drift:** suite **10711 / 110 / 1**, Bible **20 / 26 / 3**
+(the Bible now holds **283** entries -- `12.103` landed with chunk 2, `12.105`
+with chunk 3.5, `12.104` with D2's transaction), variants 50 emitted
+(3 refused -- the standing unratified cloud profiles). (10532 -> 10561
+specification session; -> 10608 chunk 0.5; -> 10610, 10613, 10624 the three agy
+QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5 / D3; -> 10683 D2's
+transition schema + the rename fix; -> 10711 D2's emitter + transaction.
 No regressions at any step.)
+
+**A Bible entry now costs a README bump.** The survival-guide repo enforces a
+Three-File Contract -- `BUG_BIBLE.yaml`'s entry count must equal the count cited
+in `README.md`, in three places -- so adding an entry and not touching the
+README turns `tests/bug_bible_regression.py` red (20/26/3 became 19+1F/26/3 on
+`12.104` until the README said 283). Bump both in the same commit.
 
 ## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
 
@@ -63,11 +70,10 @@ die at the freeze cascade on a content-authorship mismatch. D3's code is
 correct standalone -- do NOT read it as "that lane works now". **D2 (chunks 1 +
 3) is what finishes it.**
 
-**STILL OWED FROM CHUNK 0:** the transition-receipt schema and its composite
-validator were never built -- only the identity adapter shipped. Nothing in
-`nodes/` or `tests/` mentions `transition_receipt` / `authorized_stage`. It is
-D2 machinery, so it belongs with chunks 1 and 3; the point is that chunk 0 is
-NOT closed.
+**CHUNK 0 IS NOW CLOSED (2026-08-15).** Its identity half shipped at
+`99cb8856`; its transition half -- the receipt schema, the composite validator,
+and the emitter/transaction that consume them -- landed with D2. Nothing is
+outstanding from chunk 0.
 
 ### NEXT WINDOW -- START HERE, IN THIS ORDER
 
@@ -84,15 +90,24 @@ the directory was never empty. Also note the real output base is
 `C:\Users\jeffr\Documents\ComfyUI\output\otr\` -- checking the repo-relative
 `otr\` reports a false EMPTY, which is the same shape as the bug itself.
 
-**1. FINISH D2 -- it is HALF BUILT.** `nodes/_otr_content_transition.py` and the
-composite validator are landed and green; the EMITTER and chunk 1's
-transaction/restore are NOT wired. Capture one window around BOTH
-`run_ledger_clean` and `run_ledger_cleanup` (`OTR_LedgerScriptWriter.py`
-~6784-6798), stamp ONCE after cleanup, before `stamp_text_for_tts_delivery`.
-`scifi_news` and `scifi_news_pro` stay broken until this lands -- **and that is
-now louder than it was**, because `source_bank` is set to
-`roll (any eligible bank)` in canonical, so 2 of the 6 rollable banks currently
-fail. Until D2 lands, an unattended run has roughly a 1-in-3 chance of dying.
+**1. D2 IS BUILT AND PUSHED (2026-08-15) -- BUT IT IS NOT LIVE-PROVEN.** Both
+owed halves landed: chunk 3's proof surfaces and chunk 1's transaction/restore.
+One window is captured around BOTH `run_ledger_clean` and `run_ledger_cleanup`
+(opened `OTR_LedgerScriptWriter.py:6798`, reconciled `:6819`) and stamped once,
+before `stamp_text_for_tts_delivery`. On success the finalizer's `expected` and
+`meta.scifi_codex.line_text_sha256` re-point at the authorized text while
+`accepted_lines` and the v1 receipt are preserved; a no-op emits nothing. On an
+unprovable reseal the transaction restores the accepted ledger IN PLACE, stamps
+`meta.content_transition_degraded`, and the episode SHIPS -- that closes the
+second defect inside PBUG-20260815-02, the one where a finished render died for
+a proof it could not reconcile. New module `nodes/_otr_clean_transaction.py`,
+28 tests in `tests/test_clean_transaction.py`, Bible `12.104` (the id
+`_otr_content_transition.py` had been citing before it existed).
+
+**WHAT IS STILL OWED ON D2: the qualifying live legs.** `scifi_news` (D2) and
+`scifi_news_pro` (D2/D3) have NOT been run. Code-green is not lane-green, and
+the 1-in-3 exposure on `roll (any eligible bank)` is only *believed* closed
+until those two legs pass. Do not record the lane as fixed on the suite alone.
 
 **2. Then chunk 0.75 (D4 vendor gate) -- PROMOTED IN URGENCY.** Check
 `.claude/worktrees/awesome-brahmagupta-a509b4/` first -- it already holds a full

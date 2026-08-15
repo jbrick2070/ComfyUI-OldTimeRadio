@@ -6781,6 +6781,24 @@ class OTR_LedgerScriptWriter:
         # BEFORE run_ledger_cleanup, deliberately -- that pass re-stamps text
         # metrics, so a row rewritten here is measured after the rewrite
         # rather than before it.
+        # BOTH PASSES BELOW ARE ONE AUTHORIZED WINDOW, AND IT IS A
+        # TRANSACTION. They run AFTER a content-owned lane stamped its
+        # acceptance receipt and BEFORE the freeze cascade re-validates it, so
+        # every row they legitimately rewrite invalidates that receipt --
+        # which is how `scifi_news` came to die `line receipt mismatch for
+        # l004` 13.6 minutes in, with the script already finished. The window
+        # is captured ONCE around both passes (one transition per pass is
+        # impossible -- the second's pre-state is the first's output, so the
+        # chain could never start at the acceptance) and reconciled once at
+        # the end. If the reseal cannot be PROVED, the transaction restores
+        # the accepted ledger, stamps a degradation receipt and the episode
+        # ships without the repairs: Law 7, a render must not die. A lane with
+        # no acceptance receipt has nothing to protect and gets no
+        # transaction.
+        from . import _otr_clean_transaction as _OTRTXN
+        _clean_window = _OTRTXN.open_transaction(
+            led, finalizer=tail_finalizer)
+
         from . import _otr_ledger_clean as _OTRLCLN
         with slot_scheduler.helper_context("ledger_clean"):
             _OTRLCLN.run_ledger_clean(
@@ -6796,6 +6814,24 @@ class OTR_LedgerScriptWriter:
                 slot_fn=technical_generate_fn,
                 bank_id=str(meta.get("source_bank") or ""),
             )
+
+        if _clean_window is not None:
+            _clean_window.reconcile()
+
+        # THE DELIVERED WORD RECEIPT IS RESTAMPED HERE, on every lane, because
+        # the window above is the last thing that touches canonical `text`:
+        # the clean stage rewrites rows and the cleanup re-stamps their
+        # metrics, so the receipt taken at `writer_final_rows` describes a
+        # draft that no longer exists. A SEPARATE stage name, not a re-use:
+        # `stamp_actual` files each receipt under its stage in
+        # `word_budget.actual_receipts`, so restamping under the old name
+        # would overwrite the pre-clean record instead of adding the
+        # post-clean one. Counts are telemetry, never a gate (THE LAW).
+        _writer_word_receipt = _OTRWD.stamp_actual(
+            led.data,
+            stage="writer_final_rows_post_clean",
+        )
+        meta["writer_word_delivery"] = dict(_writer_word_receipt)
 
         from ._otr_readiness import stamp_text_for_tts_delivery
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta

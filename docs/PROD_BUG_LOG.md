@@ -4435,7 +4435,56 @@ only visible because the cameo was FORCED and then did not appear.
 - bible-worthy: yes -- "an integrity snapshot taken upstream of a later
   sanctioned mutator", plus "a post-generation audit whose only failure mode
   destroys finished work".
-- status: OPEN -- diagnosed, fix specified, not yet landed.
+- FIXED 2026-08-15 (build-contract chunks 1 + 3). The clean/cleanup window is
+  now ONE TRANSACTION: opened at `OTR_LedgerScriptWriter.py:6798`, immediately
+  before `run_ledger_clean`, and reconciled at `:6819` after
+  `run_ledger_cleanup` and before `stamp_text_for_tts_delivery`. New module
+  `nodes/_otr_clean_transaction.py`; the codex lane grew the three-method proof
+  protocol at `_otr_scifi_codex.py:3318-3359`
+  (`snapshot_proof_state` / `restore_proof_state` / `reseal_proof`).
+  - COMMIT PATH: ONE transition covers BOTH authorized stages -- one per stage
+    is impossible by construction, since the second stage's pre-state is the
+    first stage's output and could never equal the acceptance the chain starts
+    from. The finalizer's `expected` and `meta.scifi_codex.line_text_sha256`
+    are re-pointed at the authorized text, the mirror DERIVED from `expected`
+    rather than rebuilt separately so the two cannot drift (12.86). The
+    composite validator re-proves before the tail continues. A no-op emits
+    nothing at all.
+  - RECORD CORRECTION to the "four surfaces" bullet above:
+    `meta.scifi_codex.accepted_lines` is PRESERVED, not resealed. It records
+    what the model ACCEPTED, which is not what ships after an authorized clean;
+    relabelling cleaned text as accepted output would destroy the only record
+    that the two ever differed. The build contract settled this, and preserving
+    it is what landed.
+  - THE SECOND DEFECT IS CLOSED TOO -- an unprovable reseal no longer raises.
+    The transaction restores the accepted ledger IN PLACE (the writer tail
+    holds `meta` as a local, so rebinding the container would silently detach
+    every later stamp), stamps `meta.content_transition_degraded` naming the
+    cause, carries the rolled-back passes' telemetry INTO that receipt so no
+    surviving `ledger_clean` entry claims edits that no longer exist, re-proves
+    the restored state, and the episode ships without the repairs. Law 7 holds:
+    the repair is sacrificed, never the render.
+  - `meta.writer_word_delivery` is restamped after the window on every lane,
+    under a NEW stage `writer_final_rows_post_clean`, so the pre-clean receipt
+    survives beside it in `word_budget.actual_receipts` instead of being
+    silently overwritten.
+  - stale-comment fix: `_otr_readiness.py:264` claimed `phase_7_audio_readiness`
+    "REWRITES canonical `line.text` in place". It does not, and has not for some
+    time -- `:242-246` writes only `text_for_tts*`. That matters here because
+    the reconcile ordering is only safe if nothing after it moves a hash the
+    proof covers.
+  - coverage: `tests/test_clean_transaction.py` (27 tests) -- commit path,
+    no-op, rollback, in-memory state restore, container identity, the lane
+    protocol, and an END-TO-END `_run_writer_tail` test proving the writer
+    actually OPENS the transaction (a pass that ships and runs dormant is this
+    defect's own shape). `tests/test_story_brief_c5a2.py`'s ordering pin was
+    updated in the same change: it asserted exactly ONE `stamp_actual` call
+    site and now pins two, by stage, plus the full order.
+  - Bible: promoted as `12.104` -- the id `_otr_content_transition.py` already
+    cited as a forward reference and which did not exist until now.
+    `otr_coverage_index.yaml` row appended.
+- status: FIXED -- landed and green. NOT yet live-proven: the qualifying
+  `scifi_news` and `scifi_news_pro` legs are still owed.
 
 ## PBUG-20260815-03 -- `scifi_news_pro` markup ladder exhausts because the terminal delimiter regex demands a period
 

@@ -252,16 +252,42 @@ def test_call_site_before_led_save(execute_fn):
     )
 
 
+def _stage_kwarg(call: ast.Call) -> str:
+    """The literal `stage=` a `stamp_actual` call files its receipt under."""
+    for kw in call.keywords:
+        if kw.arg == "stage" and isinstance(kw.value, ast.Constant):
+            return str(kw.value.value)
+    return ""
+
+
 def test_reflections_follow_final_telemetry_and_precede_summary(execute_fn):
-    """Reflection describes the final canonical rows without a length gate."""
+    """Reflection describes the final canonical rows without a length gate.
+
+    TWO delivered-word stamps since D2 (2026-08-15), not one. The tail's last
+    authorized mutation of canonical `text` is the clean/cleanup window, which
+    runs long after the reflections -- so the receipt taken up here describes a
+    draft that no longer ships, and a second one is stamped once that window
+    closes. The law this test protects is the ORDER, and it is unchanged:
+    telemetry, then reflection, then summary.
+    """
     refl = _reflection_call(execute_fn)
-    actual_calls = _find_call_site(execute_fn, "stamp_actual")
+    actual_calls = sorted(
+        _find_call_site(execute_fn, "stamp_actual"), key=_line_of)
     produced_calls = _find_call_site(execute_fn, "run_produced_story_summary")
 
-    assert len(actual_calls) == 1
+    assert len(actual_calls) == 2
     assert len(produced_calls) == 1
-    assert _line_of(actual_calls[0]) < _line_of(refl)
+    first, post_clean = actual_calls
+    assert _line_of(first) < _line_of(refl)
     assert _line_of(refl) < _line_of(produced_calls[0])
+
+    # The post-clean restamp stays BEHIND the summary. Were it ever to drift in
+    # front of the reflection, the reflection would read rows the clean window
+    # is about to rewrite -- the exact staleness this ordering exists to
+    # prevent -- and a bare count assertion would not notice.
+    assert _line_of(produced_calls[0]) < _line_of(post_clean)
+    assert _stage_kwarg(first) == "writer_final_rows"
+    assert _stage_kwarg(post_clean) == "writer_final_rows_post_clean"
 
 
 # ---------------------------------------------------------------------------

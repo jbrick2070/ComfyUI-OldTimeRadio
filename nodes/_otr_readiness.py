@@ -261,20 +261,31 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
 # Content-owned delivery stamping (720-bakeoff C2 / S2 P1.3)
 # ---------------------------------------------------------------------------
 #
-# Legacy lanes (science_news, public_domain, ...) run
-# `phase_7_audio_readiness`, which REWRITES canonical `line.text` in place
-# (Dr. -> Doctor, digits -> words). That is a proof breaker for a
-# content-owned lane whose canonical text is sealed against a proof map,
-# so the freeze cascade SKIPS Phase 7 under `content_owned_readonly`
-# (r2 P0.1) -- which switched the pronunciation normalization OFF for
-# fable2. C2 restores it WITHOUT touching canonical: the SAME
-# normalization is stamped onto a separate `text_for_tts` delivery field
-# (+ a source-text sha for staleness detection + a receipt), leaving
-# `text`/counts/proof pristine. The voice node speaks `text_for_tts` via
-# the delivery resolver (`_otr_text_delivery`); the C1 durable-identity
-# merge keeps the stamp alive across incremental saves only while the
-# canonical text is unchanged (a changed line invalidates it -> the
-# resolver then fails loud rather than speaking stale delivery text).
+# Legacy lanes (science_news, public_domain, ...) get their pronunciation
+# normalization (Dr. -> Doctor, digits -> words) from
+# `phase_7_audio_readiness`. The freeze cascade SKIPS Phase 7 under
+# `content_owned_readonly` (r2 P0.1), which switched that normalization
+# OFF for fable2; C2 restores it on the content-owned boundary instead --
+# the SAME normalization stamped onto a separate `text_for_tts` delivery
+# field (+ a source-text sha for staleness detection + a receipt), leaving
+# `text`/counts/proof pristine.
+#
+# CORRECTION (2026-08-15): this note used to say Phase 7 "REWRITES
+# canonical `line.text` in place", and offered that as the reason it is
+# skipped. It does not. `:242-246` writes only `text_for_tts`, its source
+# hash and its receipt -- exactly what `stamp_text_for_tts_delivery` below
+# writes. NEITHER function mutates canonical text, and the distinction is
+# load-bearing rather than tidy: the D2 clean window reconciles the
+# acceptance proof immediately BEFORE this stamp, and that ordering is
+# only safe because nothing here can move a hash the proof covers. A
+# reader who believes the old claim goes hunting for a mutator that does
+# not exist.
+#
+# The voice node speaks `text_for_tts` via the delivery resolver
+# (`_otr_text_delivery`); the C1 durable-identity merge keeps the stamp
+# alive across incremental saves only while the canonical text is
+# unchanged (a changed line invalidates it -> the resolver then fails loud
+# rather than speaking stale delivery text).
 
 
 def text_for_tts_source_sha256(canonical_text: str) -> str:
