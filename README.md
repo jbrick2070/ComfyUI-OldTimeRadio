@@ -173,20 +173,23 @@ alone. Explicit profiles are still available for deliberate route testing, such 
 Headless/API smoke runs must use the canonical workflow wrapper:
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Words 30
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Acts 3
 ```
 
 For a no-queue validation of the exact API prompt shape:
 
 ```
-C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_canonical_api_run.py --offline-schemas --dry-run --words 30
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_canonical_api_run.py --offline-schemas --dry-run --act-count 3
 ```
 
 Cloud route example:
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile cloud_all -Words 30
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile cloud_all -Acts 3
 ```
+
+`--words` no longer exists anywhere on this path. It went with the `target_words`
+widget: act count is the only episode-shape knob, and length is an observation.
 
 That path always loads `workflows/otr_canonical.json`; engine dropdowns move only
 through explicit profiles, and ad-hoc `--set` patches are limited to creative/story

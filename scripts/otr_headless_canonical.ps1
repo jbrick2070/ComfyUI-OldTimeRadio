@@ -9,14 +9,19 @@
 
   Examples:
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 `
-      -Profile otr_cloud_lanes -Words 30 -Set OTR_LedgerScriptWriter.source_bank=science_news
+      -Profile otr_cloud_lanes -Acts 3 -Set OTR_LedgerScriptWriter.source_bank=science_news
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 `
-      -NoBoot -Profile none -Words 30 -DryRun
+      -NoBoot -Profile none -DryRun
+
+  2026-08-15: `-Words` is GONE. It forwarded `--words`, which the runner
+  dropped on 2026-08-14 together with the target_words widget -- so every
+  invocation of this wrapper died in argparse before reaching the API. Episode
+  shape is `-Acts`; length is an observation, never a request.
 #>
 param(
     [string]$Profile = "none",
-    [int]$Words = 30,
+    [int]$Acts = 0,
     [string[]]$Set = @(),
     [switch]$DryRun,
     [switch]$NoBoot,
@@ -191,10 +196,12 @@ $argsList = @(
     "-u",
     "scripts\otr_canonical_api_run.py",
     "--profile", $Profile,
-    "--words", "$Words",
     "--timeout", "$Timeout",
     "--poll-s", "$PollSeconds"
 )
+if ($Acts -gt 0) {
+    $argsList += @("--act-count", "$Acts")
+}
 if ($Workflow -ne "") {
     $argsList += @("--workflow", $Workflow)
 }

@@ -13,6 +13,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -449,7 +450,7 @@ def test_headless_process_selectors_never_claim_the_interactive_gui():
     )
     assert selected(
         "Test-OtrCanonicalRunnerCommand",
-        r"C:\Python\python.exe C:\OTR\scripts\otr_canonical_api_run.py --words 30",
+        r"C:\Python\python.exe C:\OTR\scripts\otr_canonical_api_run.py --act-count 3",
     )
     assert not selected("Test-OtrCanonicalRunnerCommand", gui)
 
@@ -472,3 +473,71 @@ def test_watchdog_recognizes_canonical_terminal_result(tmp_path):
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "DONE" in completed.stdout
     assert "DONE" in (tmp_path / "leg.log.watchdog").read_text(encoding="ascii")
+
+
+class _StopParsing(Exception):
+    """Raised to seize the runner's real parser before it consumes argv."""
+
+
+def _runner_option_strings() -> set[str]:
+    """Every long flag `otr_canonical_api_run.main` actually accepts.
+
+    The parser is seized from the LIVE `main()` rather than re-derived from
+    the source text, so a flag that moves, is renamed, or is deleted is caught
+    by construction. Only `parse_args` is patched -- swapping the
+    `ArgumentParser` CLASS recurses, because argparse's own `__init__`
+    resolves the class through the same module global.
+    """
+    import argparse
+
+    captured: list[argparse.ArgumentParser] = []
+    original = argparse.ArgumentParser.parse_args
+
+    def _seize(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        captured.append(self)
+        raise _StopParsing
+
+    argparse.ArgumentParser.parse_args = _seize  # type: ignore[method-assign]
+    try:
+        with contextlib.suppress(_StopParsing):
+            canonical.main([])
+    finally:
+        argparse.ArgumentParser.parse_args = original  # type: ignore[method-assign]
+
+    assert captured, "the runner never built its parser"
+    options: set[str] = set()
+    for action in captured[0]._actions:  # noqa: SLF001 -- no public accessor exists
+        options.update(opt for opt in action.option_strings if opt.startswith("--"))
+    return options
+
+
+def test_headless_wrapper_only_forwards_flags_the_runner_accepts():
+    """The wrapper and the runner must agree on the CLI, or nothing runs.
+
+    2026-08-15: they did not. `--words` was deleted from the runner on
+    2026-08-14 with the `target_words` widget, and this wrapper kept sending
+    it -- so the ONE sanctioned headless entrypoint died in argparse (exit 2)
+    before it ever reached the API, on every single invocation. The failure
+    was invisible because no test read the wrapper's argument list and the
+    runner's parser at the same time. This one does.
+    """
+    wrapper = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
+    start = wrapper.index("$argsList = @(")
+    tail = wrapper[start:wrapper.index("& $Python @argsList", start)]
+    forwarded = set(re.findall(r'"(--[a-z0-9-]+)"', tail))
+
+    assert forwarded, "no forwarded flags found; the wrapper's arg block moved"
+    unknown = forwarded - _runner_option_strings()
+    assert not unknown, (
+        f"otr_headless_canonical.ps1 forwards {sorted(unknown)}, which "
+        f"otr_canonical_api_run.py does not accept -- the wrapper would exit 2 "
+        f"before submitting anything"
+    )
+
+
+def test_headless_wrapper_no_longer_carries_a_word_count_knob():
+    """Length is an observation. `-Words` is not a knob that came back."""
+    wrapper = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
+    param_block = wrapper[wrapper.index("param("):wrapper.index(")", wrapper.index("param("))]
+    assert "$Words" not in param_block
+    assert "$Acts" in param_block
