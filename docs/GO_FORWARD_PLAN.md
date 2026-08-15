@@ -71,26 +71,50 @@ NOT closed.
 
 ### NEXT WINDOW -- START HERE, IN THIS ORDER
 
-**1. PROVE THE OBS FIX ON ONE LIVE LEG. Nothing else first.**
-`PBUG-20260815-09`: three successful renders on 2026-08-15 left `otr\obs\`
-EMPTY. The freeze stamped the publication receipt under `pending_<ts>`, the
-cascade renamed the episode, and the mux read the mismatch as a stale singleton
-and withheld every OBS copy. Fixed at `rename_episode` (`92981bc4`) and
-suite-proven, **but no leg has yet reached `obs_publish OK` with the fix in.**
-Until one does, assume publication is broken. One `public_domain` leg answers
-it; look for `obs_publish OK` in the server log and a file in `otr\obs\`.
+**PBUG-20260815-09 IS CLOSED -- LIVE-PROVEN 2026-08-15.** Do not re-prove it.
+Leg `signal_lost_the_price_of_a_soul_20260815_132024` (public_domain,
+Moby-Dick) published: `obs_publish OK` plus a **165.2 MB** file on disk, and it
+did so AFTER the cascade renamed the episode off `pending_<ts>` -- the exact
+condition that broke it. `Prompt executed in 00:23:18`.
 
-**2. FINISH D2 -- it is HALF BUILT.** `nodes/_otr_content_transition.py` and the
+**Correction to the record, so nobody hunts a ghost:** the earlier entry saying
+`otr\obs\` was "EMPTY" is WRONG as written. That directory holds **150 files**,
+including seven from earlier the same morning. Those three legs were WITHHELD;
+the directory was never empty. Also note the real output base is
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\` -- checking the repo-relative
+`otr\` reports a false EMPTY, which is the same shape as the bug itself.
+
+**1. FINISH D2 -- it is HALF BUILT.** `nodes/_otr_content_transition.py` and the
 composite validator are landed and green; the EMITTER and chunk 1's
 transaction/restore are NOT wired. Capture one window around BOTH
 `run_ledger_clean` and `run_ledger_cleanup` (`OTR_LedgerScriptWriter.py`
 ~6784-6798), stamp ONCE after cleanup, before `stamp_text_for_tts_delivery`.
-`scifi_news` and `scifi_news_pro` stay broken until this lands.
+`scifi_news` and `scifi_news_pro` stay broken until this lands -- **and that is
+now louder than it was**, because `source_bank` is set to
+`roll (any eligible bank)` in canonical, so 2 of the 6 rollable banks currently
+fail. Until D2 lands, an unattended run has roughly a 1-in-3 chance of dying.
 
-**3. Then chunk 0.75 (D4 vendor gate).** Check
+**2. Then chunk 0.75 (D4 vendor gate) -- PROMOTED IN URGENCY.** Check
 `.claude/worktrees/awesome-brahmagupta-a509b4/` first -- it already holds a full
 set of provenance sidecars, which is exactly what 0.75 builds, so another window
-may be on it.
+may be on it. **A THIRD live gender instance landed 2026-08-15 and its root
+cause is now confirmed on the artifact, not inferred:** the operator heard
+**AHAB** -- unambiguously male in Moby-Dick -- speaking with a female voice in
+`signal_lost_the_price_of_a_soul_20260815_132024`. That episode's
+`meta.cast_source_contract.gender_by_name` is `{}`, and `moby_dick_quarterdeck`
+has **no provenance sidecar**. Only 16 sidecars exist tree-wide (15
+`shakespeare` + `time_machine__arrival`), so **64 of 65 public_domain units
+carry no gender facts at all**.
+
+**The operator proposed an A/B/C local-LLM gender bakeoff plus possible web
+search. Both are the wrong instrument and the evidence says so.** Neither
+answers "how do we know Ahab is male" -- that question is not failing, because
+Melville's own text says "he" throughout. What fails is that the FIELD built to
+carry the fact is empty for 64 of 65 units. A better prompt cannot fill a
+sidecar that was never written, and a web search would add a cloud dependency
+against the standing 100%-local rule to fetch a fact the source already states.
+Build the sidecars; the gap is plumbing, not knowledge. (This restates the
+existing section B ruling, now with a third instance behind it.)
 
 The chunk order is in the contract; it is not the defect order and two of its
 edges are load-bearing:
@@ -101,6 +125,43 @@ edges are load-bearing:
 * **D1 must land before the qualifying live leg.** Until the clean stage is
   scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
   way -- a pass is luck, a failure is already known from three artifacts.
+
+### CANONICAL WIDGET DEFAULTS CHANGED 2026-08-15 (operator, live in-session)
+
+Saved dropdown values in `workflows/otr_canonical.json` ONLY -- no code, no
+hardcoded default, no new widget. Operator was explicit: *"not some weird
+hardcode native, just as if I saved it myself"*.
+
+| node | widget | was | now |
+|---|---|---|---|
+| `OTR_VideoDirector` | announcer / music / character **video** | `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera` | `still_flat (16:9)` |
+| `OTR_VideoDirector` | announcer / music / character **image** | `z_image_turbo` | unchanged (already local Z-Image Turbo) |
+| `OTR_LedgerScriptWriter` | `source_bank` | `scifi_news` | `roll (any eligible bank)` |
+| `OTR_LedgerScriptWriter` | `visual_style` | `sci_fi_radio` | `roll (any style)` |
+
+**Why the video slots mattered:** all three were audio-reactive visualizers
+flagged *"no scene image"*, so they never requested a still. The 08-15 proof leg
+logged `[LFC:phase_8] cast=0/3 with portrait, voiced=0/14 with visual` -- zero
+portraits minted, which is why the operator could not see stills and why the
+visual half of the gender check was impossible. `still_flat` restores it.
+
+**Roll safety, VERIFIED against the live registry, do not re-derive:** the roll
+pools deliberately differ from the dropdowns. Banks: menu 8, pool **6** --
+`custom_source_bank` is NOT selectable by a roll, and the sentinel cannot select
+itself. Styles: menu 11, pool **10**, sentinel excluded. So neither
+"declare your own" escape hatch is reachable unattended.
+
+**Style and bank roll INDEPENDENTLY -- there is no affinity.** The proof leg
+rendered Moby-Dick in `sci_fi_radio`. Expect Shakespeare in `cartoon`. If the
+operator wants the two fidelity lanes to lean toward `archival_documentary` /
+`storybook_engraving` / `shakespeare_stage_realism`, that is a real feature and
+an OPEN decision -- not yet scoped, do not assume it.
+
+**Lemmy asked and answered (operator, 2026-08-15):** `media_archive` and
+`original` ALREADY get the cameo. `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` is exactly
+`{"public_domain", "shakespeare"}` -- the fidelity lanes only, normalized
+through `base_source_bank_id` so bake-off variants inherit it. No change made,
+none needed.
 
 ### FOR THE OPERATOR EYEBALL -- one behaviour change landed with chunk 0.5
 
@@ -1916,7 +1977,9 @@ opt-in bake-off arms, never the default.
 Per-window mapping: RENDER windows = local production models + the Codex-app monitor,
 Claude/Codex only to launch, judge and wrap. CODER windows use the cheapest competent
 local triage first; Codex CLI is reserved for a genuine quandary/third swing and
-Sonnet 5 performs post-code QA. The 2026-08-11 directive suspended full kibitz.
+Sonnet 5 performs post-code QA. **Review routing is the dated REVIEW ROUTING block at
+the TOP of this file (2026-08-15), which RESTORED the panel and supersedes the
+2026-08-11 suspension this paragraph used to cite.** Read it there, never from here.
 
 ## THE LAW (operator, 2026-07-22 -- supersedes anything that disagrees)
 
@@ -1955,7 +2018,8 @@ rip are inventoried and queued for removal as ON DECK item 5.
 * The remaining hard rules (root-cause fixes, no content guardrails on generated
   episodes, no word-count chasing, the ledger-completeness rule for any ripped LLM
   pass, git policy) live in `CLAUDE.md` and are not duplicated here. Review routing is
-  the dated 2026-08-11 block above; the older full-kibitz gate is suspended.
+  the dated REVIEW ROUTING block at the TOP of this file (2026-08-15), which restored
+  the panel; the 2026-08-11 suspension named here previously is SUPERSEDED.
 
 ## Window packing (credit discipline -- one line starts any window)
 

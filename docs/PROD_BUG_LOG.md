@@ -4510,8 +4510,30 @@ only visible because the cameo was FORCED and then did not appear.
 - bible-worthy: yes -- "an armed consumer with no producer": the render path
   knew how to read a roster fact that vendor time never wrote for 64 of 65
   units.
-- status: OPEN -- diagnosed. Fix is the vendor-time stamper already specified in
-  `docs/2026-08-05-character-gender-ladder-SPEC.md`, never built.
+- THIRD INSTANCE, 2026-08-15 afternoon, on a DIFFERENT source: artifact
+  `signal_lost_the_price_of_a_soul_20260815_132024` (public_domain, Moby-Dick,
+  unit `moby_dick_quarterdeck`). Operator heard **AHAB** -- a man, and one of
+  the least ambiguous in English literature -- speak with a FEMALE voice. Root
+  cause re-confirmed on this artifact rather than assumed:
+  `meta.cast_source_contract.gender_by_name` is `{}` and
+  `moby_dick_quarterdeck` has no `.provenance.json`. Sidecar census at the time:
+  **16 tree-wide** -- 15 `shakespeare` plus `time_machine__arrival` -- so 64 of
+  65 public_domain units still carry no gender facts. This instance matters
+  because it is a THIRD independent reproduction on a THIRD source, which
+  retires any remaining "one bad unit" reading.
+- REJECTED REMEDIES, recorded so they are not re-proposed: the operator proposed
+  an A/B/C local-LLM gender bakeoff over prompts/logic, plus possible web
+  search. Neither addresses this defect. Both answer "how do we learn Ahab is
+  male", and that question is not failing -- Melville's own text says "he"
+  throughout, and the roster is already local. What fails is that the FIELD
+  built to carry the fact was never written for 64 of 65 units. A better prompt
+  cannot populate an absent sidecar, and web search would add a cloud dependency
+  against the standing 100%-local rule to fetch a fact the source already
+  states. The gap is plumbing, not knowledge.
+- status: OPEN -- diagnosed, three live instances across three sources. Fix is
+  the vendor-time stamper already specified in
+  `docs/2026-08-05-character-gender-ladder-SPEC.md`, never built; it is chunk
+  0.75 / the D4 vendor gate in the current sprint.
 
 ## PBUG-20260815-05 -- the episode title names a DIFFERENT play from the one it adapted
 
@@ -4611,7 +4633,16 @@ only visible because the cameo was FORCED and then did not appear.
   (public_domain), `signal_lost_a_tomb_of_secrets_20260815_122546`
   (shakespeare), `signal_lost_the_weight_of_the_brass_key_20260815_125005`
   (media_archive). All three RESULT SUCCESS, all three archival finals on disk,
-  **`otr\obs\` empty**.
+  **all three WITHHELD from obs**.
+- WORDING CORRECTED 2026-08-15: an earlier cut of this entry, and the handoff
+  that quoted it, said `otr\obs\` was "EMPTY". That is false and it sends the
+  next reader hunting a vanished directory. The real obs base --
+  `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\`, NOT the repo-relative
+  `otr\` -- held 150 files at the time, seven of them from earlier the same
+  morning. What happened is narrower: these three legs published nothing while
+  every prior leg had published fine. Note the path trap itself, because it
+  fakes this bug's symptom: checking the repo-relative `otr\obs\` reports a
+  false EMPTY whether or not publication works.
 - symptom, from the server log:
   `obs_publish BLOCKED (eligibility_receipt_episode_mismatch: receipt is
   stamped for 'pending_20260815_115325'; this episode is
@@ -4640,5 +4671,11 @@ only visible because the cameo was FORCED and then did not appear.
   path RESOLUTION to an authorization GATE: the data was correct, only the name
   was stale, and the consequence was a withheld deliverable rather than a
   mis-resolved path. Index row appended pointing at `12.66`.
-- status: FIXED, suite-proven, **NOT yet live-proven**. Needs one leg that
-  reaches `obs_publish OK`.
+- status: **FIXED and LIVE-PROVEN 2026-08-15.** Leg
+  `signal_lost_the_price_of_a_soul_20260815_132024` (public_domain, Moby-Dick)
+  logged `obs_publish OK ->
+  ...\output\otr\obs\signal_lost_the_price_of_a_soul_20260815_132024_silent_procgen_blended_captioned_with_credits_final.mp4`
+  with the file present on disk at **165.2 MB**, `Prompt executed in 00:23:18`.
+  The proof is only a proof because that episode RENAMED -- it entered the
+  freeze as `pending_<ts>` and published under its final slug, which is the
+  exact condition that produced the block. CLOSED; do not re-prove.

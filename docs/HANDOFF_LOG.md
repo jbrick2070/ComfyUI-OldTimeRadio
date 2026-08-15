@@ -3,6 +3,88 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 7655e708 (v2.0-alpha) -- CODER (the obs fix is live-proven, canonical gets still_flat + both rolls, and AHAB is a third gender instance)
+
+Did: **Closed PBUG-20260815-09 with a live leg.**
+`signal_lost_the_price_of_a_soul_20260815_132024` (public_domain, Moby-Dick,
+act 3, `gemma-4-12b-it`) through the real `workflows/otr_canonical.json`:
+`obs_publish OK` to
+`...\output\otr\obs\..._silent_procgen_blended_captioned_with_credits_final.mp4`,
+**165.2 MB on disk**, `Prompt executed in 00:23:18`. The proof counts because
+that episode RENAMED -- it entered the freeze as `pending_<ts>` and published
+under its final slug, the exact condition that withheld every episode.
+
+**Two record corrections, both worth more than the bugs they describe.**
+(1) The prior entry's *"`otr\obs\` is EMPTY"* is FALSE. That directory holds
+150 files, 7 from earlier the same morning; the three legs were WITHHELD, never
+a wiped directory. (2) The real output base is
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\`, NOT the repo-relative `otr\` --
+and checking the wrong one reports a false EMPTY whether or not publishing
+works, which is how the claim got made. Both fixed in `PROD_BUG_LOG.md`.
+
+**Canonical widget defaults changed (operator, live in-session).** Saved
+dropdown values ONLY -- no code, no hardcoded default, no new widget
+(*"not some weird hardcode native, just as if I saved it myself"*). All three
+beat classes `viz_mxc_cpu` / `viz_mxc_mandala` / `viz_camera` -> `still_flat
+(16:9)`; `source_bank` -> `roll (any eligible bank)`; `visual_style` -> `roll
+(any style)`. Image slots were ALREADY `z_image_turbo` (local) on all three.
+The visualizers declare *"no scene image"* and never requested one -- the proof
+leg logged `cast=0/3 with portrait, voiced=0/14 with visual`, so the stills
+were minted and never shown. Roll pools verified against the live registry to
+exclude both escape hatches (banks menu 8 / pool 6; styles menu 11 / pool 10;
+neither sentinel self-selects). Lemmy asked and answered: `media_archive` and
+`original` ALREADY get the cameo -- `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` is the
+two fidelity lanes only. No change needed.
+
+**Seven test pins moved with it, one deliberately NOT weakened.** The
+workflow-json guardrail cross-checked slots 22/23 against the registered-bank
+and eligible-style pools, and the sentinels are in neither by design; it now
+asserts sentinel OR registered id, keeping the typo/re-order catch it exists
+for. Also corrected a docstring in `test_workflow_live_passes_validator` that
+claimed node 87 routes to `ltx_video` -- wrong since 2026-07-07, when the lean
+visualizer defaults landed and only the assertions moved.
+
+**AHAB is a THIRD gender instance, root cause re-confirmed on the artifact.**
+Operator heard AHAB -- a man -- speak female. That episode's
+`meta.cast_source_contract.gender_by_name` is `{}` and `moby_dick_quarterdeck`
+has no `.provenance.json`; 16 sidecars exist tree-wide (15 `shakespeare` + 1
+public_domain), so 64 of 65 public_domain units carry no gender facts.
+Appended to `PBUG-20260815-04` rather than opened as a new PBUG. **The
+proposed A/B/C local-LLM gender bakeoff and web search are recorded as
+REJECTED with reasons:** both answer "how do we learn Ahab is male", which is
+not the failing step -- Melville's text says "he" throughout. The FIELD built
+to carry it was never written. Plumbing, not knowledge; and web search would
+breach the 100%-local rule for a fact the source already states.
+
+**Suite 10683 / 110 / 1** (baseline, zero drift). Bug Bible green. Variants
+regenerated from the new canonical: **50 emitted, 3 refused**, check clean.
+No `INPUT_TYPES`, node-registration or widget-COUNT change -- widget VALUES
+only, counts verified unchanged at 15 and 33, every value confirmed against
+live `/object_info`, 0 dangling links.
+
+Current step: PBUG-09 CLOSED. Sprint chunks 0.5, 2 (D1), 3.5 (D3) done. D2
+still HALF built -- schema and composite validator landed and green, the
+EMITTER and chunk 1's transaction/restore NOT wired.
+
+Next: (1) finish D2's emitter + transaction -- now louder, because canonical
+rolls its bank and 2 of the 6 rollable lanes (`scifi_news`,
+`scifi_news_pro`) still fail, so an unattended run has ~1-in-3 odds of dying.
+(2) Chunk 0.75 / D4 vendor gate, promoted in urgency by AHAB. **Another window
+is already on it:** `config/source_banks/_corpus/` now holds untracked
+`monkeys_paw.provenance.json`, `monkeys_paw.txt` and `_vendor_report.json`.
+Coordinate before building; do not stage those files.
+
+Models: Opus for all code and judgement; **no cloud spend, $0**. Review was the
+2026-08-15 REVIEW ROUTING diff-level gate (the four-round arc already ran for
+this sprint, so remaining chunks take the diff gate, not a fresh arc). No
+external panel this session -- **NOT a full arc, and not reported as one.**
+
+Commits: `7655e708` (canonical + 7 test pins + 50 regenerated variants), plus
+this docs commit.
+
+Box: CLEAN. Headless server stopped selectively by CommandLine after the leg;
+port free, GPU at desktop baseline. Nothing running.
+
 ## 2026-08-15 -- HEAD 56c1a224 (v2.0-alpha) -- CODER (four chunks of the bug-fix sprint, three live legs, and the live legs found the day's real bug)
 
 **Did.** Chunks 0.5, 2 (D1), 3.5 (D3) and D2's schema half, all green and
