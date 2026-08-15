@@ -4,6 +4,92 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## REVIEW ROUTING FOR THE BUG-FIX WINDOW (operator 2026-08-15 -- READ FIRST)
+
+**`kibitz` IS BACK ON AND IS TOP OF MIND.** The operator restored the panel for
+this sprint and named the roster himself: **`/kibitz-plugin:kibitz`** (the
+PLUGIN skill by name -- `anthropic-skills:kibitz` is the older duplicate),
+**Antigravity / Flash 3.7**, and **Sonnet + Fable subagent FAN-OUT** for
+diagnosis and fixes. This supersedes the 2026-08-11 suspension for this work.
+
+**You still take your own QA, and you remain the judge:**
+> *"You take your QA -- if you think you found it on your first pass, make your
+> own fix and have Sonnet or Flash 3.7 QA and code and retest."*
+
+So: a defect you are confident about on the first pass gets YOUR fix, then a
+Sonnet-or-Flash QA-and-retest pass on the finished diff. Anything you are NOT
+confident about goes to the panel BEFORE you write code. Ground every panel
+claim against the real Windows files and discard what does not survive.
+
+## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
+
+The gender/voice fix is explicitly GREEN-LIT: *"we tried to update gender voice
+a while ago -- go for it."*
+
+Seven defects, all from LIVE artifacts on 2026-08-15, all admissible. Evidence:
+`docs/2026-08-15-operator-eyeball-findings.md` and
+`docs/2026-08-15-overnight-bank-gate-findings.md`. **Do not re-derive them --
+they are already grounded against the real ledgers.**
+
+### A. THE CLOSING ANNOUNCER DOES NOT NAME WHAT IT ADAPTED (3 banks, one family)
+
+| bank | what shipped | what is wrong |
+|---|---|---|
+| `shakespeare` | `spoken_coda_source: none`, closes *"We've lost our signal."* | names NOBODY -- not the play, not Shakespeare |
+| `public_domain` | coda fires, says the literal words *"public domain work."* | never names the title or the author |
+| `media_archive` | coda type `news_close_brief` | it is an ARCHIVE bank (LoC / Film Preservation posts) being asked to summarize a news story it never had |
+
+**The shakespeare row needs an OPERATOR RULING ON WORDING before it is coded.**
+It looks like an over-application of the 2026-08-05 licensed-source ruling:
+that ruling stopped the announcer reciting a LICENCE, and its own reasoning was
+*"Folger publishes the edition and Shakespeare wrote the play"* -- yet what
+shipped also stopped it naming the author and the play. Naming Shakespeare is
+not a licence claim. Ask before writing the sentence.
+
+### B. VOICE GENDER CONTRADICTS THE CHARACTER -- GREEN-LIT, DO IT
+
+Two live instances in one night, two different banks: **GERTRUDE DEMONGMORENCI
+MCFIGGIN** and **JULIANA SIMPSON** both spoke with male voices. Explicitly
+carved OUT of the story-quality freeze (2026-08-04: *"fixing 'Malvolio speaks
+with a woman's voice' is a bug fix"*).
+
+**No web search.** The operator asked; the answer is no -- hard scope rule
+(100% local, offline, no API keys) -- and it is unnecessary: the source text
+already names Gertrude as a woman. The gap is plumbing, not knowledge.
+`slot.gender` already feeds the description LLM, the outline prompt, the
+dialogue cast block and the image prompt (see section 3); what it does not do
+is reliably pin the VOICE. Start from
+`docs/2026-08-05-character-gender-ladder-SPEC.md`.
+
+### C. TWO BANK-GATE WRITER FAILURES (4/6 passed)
+
+* `scifi_news` -- `CodexPreTailAuditError: line receipt mismatch`. Died at 13.6
+  min, AFTER writing, so it is an integrity check failing on assembled output.
+* `scifi_news_pro` -- `Fable2ScriptError: markup ladder exhausted`,
+  `BAD_LINE_SHAPE: END`. Died at 3.3 min.
+
+**Prime suspect for BOTH is the act change, not the writer fixes**: these are
+the first legs ever to assemble a 12-beat script instead of an 8-beat one.
+**The named experiment: reproduce with the act change reverted LOCALLY (do not
+commit the revert).** That one run separates cause from coincidence. If the act
+change is implicated, fix the CONSUMER -- the pre-tail audit, the markup ladder
+-- never the topology, which is an operator ruling.
+
+### D. UNDIAGNOSED -- do not call it anything yet
+
+`tempests_midnight_revelations` (bank `shakespeare`): title says Tempest.
+Operator asks whether the scene is actually Macbeth. Check the ledger's
+selected scene against the title. A title naming the wrong play would be a
+FIDELITY defect on the lane where fidelity outranks arc.
+
+### OWED, NOT DONE THIS SESSION
+
+* **Bug Bible promotion.** Seven live-artifact defects landed tonight and NONE
+  has been checked against `otr_coverage_index.yaml` or promoted. Do this per
+  the delta-scrape discipline -- never re-scrape indexed history.
+* **`PROD_BUG_LOG.md` entries** for the two bank-gate failures and the two
+  voice-gender instances.
+
 ## OPERATOR RULINGS 2026-08-15 (hard -- these settle three OWED decisions)
 
 **THE EPISODE SHAPE IS A REQUEST, TOP TO BOTTOM. NOT THE BEATS, NOT THE ACTS.**
@@ -142,27 +228,22 @@ policy finding. Narrow the net then; never remove it.
 Found by a three-way read-only audit 2026-08-14, every claim verified against
 the real files. **The announcer fallback (was #1) is FIXED and pushed.**
 
-1. **`_otr_line_composer.compose_line_draft` (`:1016-1046`)** -- the per-beat
-   dialogue call for EVERY writer-lane bank is a cold reroll: the identical
-   `messages` object re-sent with the temperature RAISED +0.1 per attempt, and
-   the model told nothing about what was wrong. Then
-   `raise LineCompositionFailedError`, for which **no `except` exists anywhere
-   in `nodes/`** and whose call site (`OTR_LedgerScriptWriter.py:5679`) is
-   unwrapped -- an empty beat appears to kill the episode. Two independent
-   audits reached this separately. **This is the biggest one left.**
+1. ~~`compose_line_draft`'s cold reroll + the unhandled raise~~ **DONE
+   `3661bc42`.** The retry now carries the model's own rejected reply plus the
+   complaint and runs cooler; both writer call sites handle the failure and
+   leave the row EMPTY for `_otr_ledger_cleanup` to mark an explicit skip.
 2. **Codex `P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`)** -- the pass
    whose whole job is "read it back and fix it" never repairs: a content failure
    gets ONE generic repair turn that sees 400 characters of its own draft, then
    three cold rerolls, then `CodexPassError` kills the render.
-3. **`_pass_news_read` (`_otr_scifi_fable2.py:1547`)** -- passes **no
-   `post_validator` at all**, so the pro lane's source attribution is never
-   checked, while its codex twin (P6) verifies and cleans it.
-4. **The stage-3 widget advertises a repair that does not exist.**
-   `enable_production_stage3_validators` (`OTR_LedgerScriptWriter.py:3181-3208`)
-   promises *"ONE repair regenerate attempt with the finding messages threaded
-   in"*; findings are telemetry only (`_otr_line_composer.py:1076-1090`).
-   **Measured `True` in `workflows/otr_canonical.json`** -- production runs with
-   a promise it does not keep. Fix the code or fix the tooltip.
+3. ~~`_pass_news_read` passes no `post_validator`~~ **DONE `3661bc42`** -- it
+   now proves the close names a dossier anchor and carries no invented
+   character, both findings returned together.
+4. ~~The stage-3 widget advertises a repair that does not exist~~ **DONE
+   `3661bc42`** -- the TOOLTIP was the defect and was fixed, not the code:
+   THE LAW forbids rerolling for length or language (most of what these
+   validators report), and attribution repair was measured unstable and
+   shipped disabled on 08-14. Telemetry is the correct behaviour.
 5. **`_canonicalize_script_spoken_text` (`_otr_scifi_codex.py:3249`)** -- runs
    `clean_spoken_text` but writes the stripped text back INTO the record, which
    is what stills and motion read. Not covered by the captions ruling above.
@@ -258,20 +339,13 @@ ATOMICALLY. **Build the seam-resolution check FIRST and keep it** -- a test that
 every `required_seams` / `declared_seams` entry resolves to a real prompt turns
 this from risky into verifiable.
 
-### OPERATOR DECISIONS OWED (three, all small, all blocked on Jeffrey)
+### OPERATOR DECISIONS OWED -- ALL THREE ANSWERED 2026-08-15, section removed
 
-1. **7 acts yields FEWER voiced beats than 6** -- measured 1->3, 2->6, 3->14,
-   4->14, 5->17, 6->**20**, 7->**19**, 8->22. INHERITED, not introduced, and
-   pinned in `tests/test_voiced_beat_count.py` with the reasoning rather than
-   silently changed. **Fix the row, or accept it?**
-2. **`media_archive` always takes feed entry 0**
-   (`_otr_media_archive_sources.py:191-221`) while `shakespeare` draws across
-   all 14 scenes and `public_domain` across all 65 units. **Randomize, or is
-   entry-0 deliberate?**
-3. **The `__main__` self-test blocks are not tests.** Nothing executes them, so
-   they rot -- three false assertions were found and fixed in passing.
-   `OTR_LedgerScriptWriter.py`'s block still stops on a `creative_writing_model`
-   default drift. **Wire them into pytest, or delete them?**
+The 7-act inversion, the `media_archive` entry-0 pick and the `__main__`
+self-test blocks were all ruled on. See the OPERATOR RULINGS block above; the
+act table and the `__main__` deletion SHIPPED (`9c2d721d`, `f5fee5b9`), and the
+`media_archive` picker is the one still open, now scoped as
+"copy the science-news picker" rather than the seeded shuffle first proposed.
 
 ### STANDING RULES for this work -- do not relitigate
 
