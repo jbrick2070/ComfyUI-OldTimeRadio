@@ -84,16 +84,34 @@ fault, which is precisely the bug that got through.
 | pattern floor only (`--dry`) | 12/15 (80%) | **26/28 (93%)** | 0 |
 | + the model judge | **13/15 (87%)** | 15/28 (**54%**) | 131 |
 
-**READ THAT HONESTLY: on a 2B the judge is NOT yet a win.** It buys one extra
-defect -- and every miss the patterns have is a `scene_report`, the
-unpunctuated class only a model can catch, so the ceiling is real -- but it
-costs ELEVEN false alarms on clean dialogue. A recipe is better only when
-recall rises and traps kept does NOT fall. This one is not there.
+**READ THAT HONESTLY: on a 2B the judge is NOT a win.** It buys one extra
+defect and costs ELEVEN false alarms on clean dialogue.
 
-**Next experiments, cheapest first** (the lab makes each one minutes, not a
-ten-minute render): ask the judge twice and act only on agreement; try the
-judge on `gemma-4-12b-it` while the repair stays local; tighten the
-calibration examples toward the trap shapes that actually fire.
+**THEN THE SAME LAB ANSWERED THE RECIPE QUESTION IN ONE RUN:**
+
+| recipe | recall | traps kept | repaired | calls |
+|---|---|---|---|---|
+| pattern floor only | 12/15 (80%) | 26/28 (93%) | 0 | 0 |
+| judge on `gemma-2-2b-it` | 13/15 (87%) | 15/28 (**54%**) | 4 | 131 |
+| **judge on `gemma-4-12b-it`** | 13/15 (87%) | **24/28 (86%)** | **13** | **79** |
+
+**THE CLEAN STAGE HAS A MODEL FLOOR, and it is now measured rather than
+guessed.** The 12B holds the 2B's recall, recovers precision from 54% to 86%
+-- within a hair of the pattern floor -- repairs THIRTEEN rows where the 2B
+repaired four, and does it in FEWER calls (79 vs 131), because it converges
+instead of grinding two attempts into a flag. Its act briefs are visibly
+better reads too: *"Kaelen asks for a baseline regarding a sixty percent
+figure."*
+
+This is the same shape as the news lanes' documented floor, now proven for
+the clean stage with ground truth: **`gemma-2-2b-it` writes a fine `original`
+episode but cannot JUDGE one.** Route the clean stage's slot accordingly.
+
+**Still open on the recipe** (the lab makes each experiment minutes, not a
+ten-minute render): the two surviving misses are both `scene_report`, and
+`scifi_news_pro`'s `quoting` trap fires on both models -- worth one more
+calibration example. Asking the judge twice and acting only on agreement is
+the next cheap lever if precision needs more.
 
 ### THE PASS WAS BLIND TO THE ACT ON EVERY LIVE EPISODE -- FIXED 2026-08-14
 
