@@ -608,6 +608,131 @@ title-phrase boundaries. The current work is excluded by **stable work
 identity**, not by title text. Scanned inventory: the configured
 `curated_scenes` manifest for the active bank.
 
+---
+
+## r3 WIRING CORRECTIONS -- where the code actually is
+
+### DEC-5 AMENDED: the component clean happens IN PLACE, not at the tail
+
+"One final composer writes `lines[].text` exactly once" never said WHERE, and
+the natural reading -- at the shared clean boundary -- **is wrong**. The factual
+close is composed and written at `OTR_LedgerScriptWriter.py:2681-2831`; TITLE
+GENERATION reads the ledger at `:6285-6305`; the whole-ledger cleaner runs much
+later at `:6748-6754`. Deferring final composition to the clean boundary would
+make title generation AND the intervening reflection passes consume a
+bridge-only or placeholder close.
+
+**Split the I.5 path IN PLACE:** author bridge -> `clean_spoken_component()` ->
+`finalize_news_coda_surface()` -> ONE `patch_line_text` -- and only then let
+title and reflections run. The later whole-ledger cleaner SKIPS that row via the
+marker.
+
+Add a sequencing assertion: the factual coda is complete BEFORE
+`_generate_title_from_script` and both reflection passes. Exact-once
+audio/caption assertions cannot detect a temporarily incomplete ledger consumed
+upstream.
+
+### The component receipt would be DESTROYED under the obvious key
+
+`run_ledger_clean()` CREATES AND OVERWRITES `meta.ledger_clean`
+(`_otr_ledger_clean.py:1630-1678, 1843-1846`). A component receipt stamped
+earlier under that same key disappears. **Store component receipts under a
+separate durable key, or explicitly merge them into the later episode
+receipt.**
+
+`ComponentCleanResult` fields: final bridge text, outcome, model-call count,
+before/after hashes, findings.
+
+**Use ONE shared marker constant imported by both the I.5 emitter and the
+whole-ledger skip reader** -- per `BUG_BIBLE.yaml` entry `12.86`, the
+producer/consumer mismatch rule. Two independently-spelled string literals is
+exactly that bug.
+
+### ComfyUI caching: the publish decision is hidden external state
+
+`OTRMasterAudioMux.IS_CHANGED()` hashes only `clip_manifest_json`
+(`otr_master_audio_mux.py:546-549`). A publication-eligibility decision that
+lives outside that hash means **ComfyUI can reuse a cached terminal result
+after eligibility changes.** Include the matched ledger's
+eligibility/episode digest in `IS_CHANGED`, reusing the episode/stem validation
+already applied to the in-flight ledger at `:416-435`. Never gate one episode
+using a stale singleton.
+
+### The publish gate has to touch the MUX, not just the freeze
+
+OBS publication happens UNCONDITIONALLY inside `OTRMasterAudioMux.mux()`
+(`:551-569`) while G14 currently raises into freeze errors
+(`_otr_ledger_freeze.py:695-697, 720-739`). The chunk: G14 stamps durable
+eligibility WITHOUT a freeze error, then the mux validates the matching
+in-flight ledger before `_publish_to_obs`. An ineligible episode **retains the
+archival final, returns success with `obs_publish BLOCKED`, omits the OBS copy,
+and stamps NO false `obs_final_path`.**
+
+### The ranker cannot use the writer's slot scheduler at the fetch point
+
+RSS selection happens in `_resolve_inputs()` (`:3841-3888`), but `_SlotScheduler`
+is not constructed until `:3969-3980`. **Do not move all source resolution
+later** without re-auditing the writer. Extract a lightweight selector/ranker
+accepting `technical_model`, `load_config` and `policy` that lazily requests the
+technical slot, matching the existing science fetch contract. Preserve the
+bounded network seam at `_otr_feed_fetch.py:64-95`. Ranking failure is defined
+BY BACKEND CLASS -- the GGUF path raises when `load_config` is present
+(`story_orchestrator.py:1365-1388`); remote/non-GGUF behaviour must be stated.
+
+### The reservation token has no path today
+
+`SourceFetchResult` carries only payload/meta/rights/document
+(`_otr_source_payload.py:134-155`); `normalize_fetch_result_with_document()`
+returns a four-tuple and drops other transient state (`:228-240`);
+`_resolve_inputs()` returns no reservation field
+(`OTR_LedgerScriptWriter.py:2040-2109`). Add a typed transient
+`selection_reservation`, propagate it through a deliberately updated normalizer
+contract and `resolved`, and commit only after BOTH `led.save()` and
+`tail_finalizer.after_save()` succeed (`:6894-6908`). Lease expiry must cover
+every earlier exception path.
+
+### D4: two different "undetermined" states, and the invalidation is currently inert
+
+The vendor ladder is TOTAL and forbids `unknown` sidecar rows
+(`docs/2026-08-05-character-gender-ladder-SPEC.md:126-165,417-484`). Only a
+RENDER-TIME cast name that fails to JOIN a complete sidecar may preserve the
+existing roll. State that distinction; they are not the same thing.
+
+**And the proposed invalidation metadata would never affect render behaviour:**
+`load_roster_characters()` reads only `characters` and ignores `body_sha256`,
+model and prompt metadata (`_otr_roster_gender.py:222-252`). Add selected-unit
+body-hash validation and a durable stale/missing/join-miss status reaching
+`cast_source_contract` -- otherwise stale sidecars keep pinning voices and the
+metadata is decoration.
+
+Corpus gate: require one FRESH, COMPLETE sidecar per manifest unit and verify
+`gender_ladder.body_sha256` against the normalized text. **A count of 65 files
+permits stale or duplicated receipts.**
+
+### D3: a dedicated defect helper, not an overload
+
+Do NOT overload `_standalone_stage_direction_repair_note()`
+(`_otr_scifi_fable2.py:1856-1944`) -- it handles different defect data. Add a
+dedicated typed-defect helper that states the four accepted END forms. The
+current repair message only says "TITLE through END" (`:2180-2192`).
+
+### BUILD-ORDER AMENDMENT
+
+**D7 is NOT independent** -- its positive identity anchor depends on chunk 0.
+Corrected: *"D4's pin application is independent; D7 starts after chunk 0."*
+Put the G14-to-mux relocation inside the D5 chunk and the reservation
+propagation inside the D6 chunk, so **each green commit contains its complete
+producer/consumer pair.**
+
+### Two acceptance tests the matrix was missing
+
+* A MULTI-PROCESS reservation test (not threads): two selectors race for one
+  available canonical URL, exactly one reservation succeeds, and expiry/release
+  then permits a later selection.
+* A terminal integration test proving `research_only` yields a canonical
+  episode final, NO OBS copy, no `obs_publish OK`, and a durable
+  non-publishable receipt. Current tests pin only the freeze-time failure.
+
 ## ACCEPTANCE -- a green suite proves none of this
 
 | Defect | Invariant | Artifact assertion |
