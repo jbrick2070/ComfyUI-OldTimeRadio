@@ -36,14 +36,17 @@ schema first.**
 
 | # | Chunk | Gate |
 |---|---|---|
-| 0 | Source-identity / Python-owned-fact schema | breaks both cycles |
-| 1 | Mutation lifecycle + shared reseal contract | precedes D1 and D2 |
-| 2 | D1 component boundary | needs chunk 1 |
-| 3 | D2 lane integrations (both content-owned lanes) | **must precede D3** |
+| 0 | Source-identity schema + fact schema + identity adapter + transition-receipt schema/validator | breaks both cycles; DEC-3, DEC-12 |
+| 0.5 | Law-7 publish gate (`_check_g14_provenance_publish` -> eligibility receipt, block at `obs_publish`) | DEC-10; before any affected render acceptance |
+| 0.75 | D4 vendor gate: all 65 sidecars generated, schema-validated, stale-checked | DEC-11; before the read-only runtime path is enabled |
+| 1 | Mutation lifecycle + transaction object + shared reseal mechanics | DEC-1, DEC-2; precedes D1 and D2 |
+| 2 | D1 component boundary (`clean_spoken_component`, pre-composition marker, one composer) | DEC-5; needs chunk 1 |
+| 3 | D2 lane integrations (both content-owned lanes' proof surfaces) | **must precede 3.5** |
+| 3.5 | **D3 `END` grammar + required-shape diagnostics** | DEC-8, DEC-9. **Was missing from this table entirely** -- as written the fix would never have been built |
 | 4 | D5 non-media codas (shakespeare, public_domain) | needs chunk 0 |
-| 5 | D6 media selector + durable post identity | produces media identity |
+| 5 | D6 media selector + reservation + durable post identity | DEC-6, DEC-7 |
 | 6 | D5 media_archive close | consumes chunk 5 |
-| -- | D4 and D7 are independent, may run in parallel | -- |
+| -- | D4's *pin application* and D7 are independent, may run in parallel | D4's vendor gate is 0.75 |
 
 **D2 -> D3 is load-bearing and non-obvious.** If the `END` grammar lands before
 the reseal, `scifi_news_pro` clears the markup ladder and then dies at the
@@ -454,6 +457,156 @@ with exact degraded behaviour for missing fields.
 The documented whole-row-exemption fallback for D1 is **cut** -- it violates the
 component-ownership architecture and invites a later shim instead of forcing the
 boundary to be built. The second body-rerank pass for D6 is **cut**.
+
+---
+
+## DECISIONS TAKEN (r3) -- every "pick one" is now picked
+
+The panel repeatedly and correctly refused to choose between options. Choosing
+is the driver's job. These are decided; do not reopen without new evidence.
+
+### DEC-1. The raise/degrade contradiction, resolved by LAYER
+
+My own acceptance table said an unattributed divergence "degrades with a
+receipt and does NOT kill the render", while
+`tests/test_scifi_codex_lane.py:627-635` must "still raise". Both are true at
+different layers:
+
+* **The reconciliation helper RAISES a typed internal error.** `_proof` keeps
+  its current behaviour, so the existing regression stays green and an
+  unattributed divergence is still a hard failure at the helper boundary.
+* **`_run_writer_tail` CATCHES it**, restores the complete transaction
+  snapshot, stamps a degradation receipt, and continues. The render survives.
+
+Law 7 is satisfied and the unit test is unchanged. Add separate tests for
+helper rejection and for render-path survival.
+
+### DEC-2. A TRANSACTION OBJECT, not a ledger snapshot
+
+A transient ledger snapshot cannot restore the in-memory
+`_CodexTailFinalizer.expected`. The transaction snapshots **both** ledger
+surfaces **and** finalizer state before cleaning, and restores both on any
+failure. Reconciliation runs immediately after `run_ledger_cleanup()` and
+before `stamp_text_for_tts_delivery()`.
+
+### DEC-3. A parent-linked TRANSITION RECEIPT, not content-authorship v2
+
+`_otr_content_authorship.py` hardcodes `SCHEMA_VERSION = 1` and strictly
+compares `proof_by_id[line_id]["text_sha256"]` to the live digest. **Keep v1
+unchanged for historical ledgers** and add a narrow, separately validated
+transition receipt: schema version, authorized stage, cleaner receipt hash,
+affected line ids, pre/post text hashes, pre/post voiced coverage, and the
+parent content-authorship receipt hash. Its validator wires into the freeze
+cascade. **Do NOT restamp v1 `line_proofs` as if transformed text were directly
+accepted model output**, and do NOT migrate to v2 -- that carries historical
+migration risk for no gain. Schema and validator land in chunk 0; transaction
+mechanics in chunk 1; lane proof surfaces in chunk 3.
+
+### DEC-4. D7 terminal fallback = THE SOURCE WORK'S OWN TITLE
+
+Bounded model re-asks first. If they still collide, the episode takes the
+source work's own title verbatim (`play_title`, e.g. *"Macbeth"*), stamped with
+a receipt naming it as the deterministic fallback.
+
+**Why this and not a degraded non-publishable colliding title:** Python is
+SELECTING an existing metadata string, not composing prose, so Law 2 holds --
+the same reasoning that lets the coda name the work. It terminates, it can
+never collide (it IS this work's title), and on a lane where fidelity outranks
+arc a plain correct title beats a wrong evocative one. Non-publishable receipts
+are reserved for genuinely unresolvable identity, not for a title we can always
+supply correctly.
+
+### DEC-5. D1 -- reject a bridge that repeats the fact
+
+"The fact appears exactly once" fails if the cleaned bridge itself contains it.
+Before composition, deterministically detect a byte-identical occurrence of the
+fact in the cleaned bridge; on a hit, reject that bridge and compose FACT-ONLY
+with a receipt. This is detection and selection, not Python rewriting prose --
+Laws 2 and 3 both hold.
+
+Never reconstruct a bridge from already-composed text: that contradicts the
+component boundary and breaks for fact-only rows and colon-bearing facts.
+
+### DEC-6. D6 -- reservation is PENDING-BEFORE-GENERATION
+
+"Commit only after terminal save" leaves a dual-write hole: the ledger can save
+and the history commit then fail, the lease expires, and the same URL is
+selected again. **Persist a durable PENDING reservation BEFORE generation,
+carry its token and canonical URL in the ledger, and reconcile pending records
+against sealed ledgers before releasing expired leases.** Plain lease expiry is
+insufficient. Use an inter-process lock plus atomic replace -- a thread-only
+lock does not protect concurrent render processes -- and convert lock timeout
+to a pre-generation `MediaSelectionUnavailable`.
+
+**Explicit-index override:** reject malformed and out-of-range values; do NOT
+modulo-wrap. The override may bypass model ranking but must still acquire a
+unique reservation; if that URL is reserved or unexpired, refuse
+pre-generation.
+
+**Ranking failure:** typed pre-generation refusal. Silently falling back to
+entry 0 would bypass the operator-mandated model ranking, which is the whole
+defect.
+
+### DEC-7. D6 -- the fetcher signature change is AUTHORIZED
+
+A model cannot rank without a config/client, and `fetch_media_archive_rss`
+currently takes only `bank`, `technical_model`, `source_ref` while
+`_otr_source_payload.py:693` discards `load_config`/`policy`. **Expanding that
+signature is explicitly authorized**, and `tests/test_source_payload_chunk3.py:472-474`
+is updated in the same change -- it is the test that pins the old contract.
+Prefer injecting a ranking callback over importing `story_orchestrator`, which
+pulls optional Transformers at module load (`:25-75`).
+
+### DEC-8. D3 grammar, pinned
+
+`^(?:END\.?|\[END\.?\])\s*$`, retaining the existing bold-unwrap path so
+`**END**` still reaches it as bare `END`. Explicit FAILING tests for `[END`,
+`END]`, `[END] trailing` and content-bearing variants, plus an explicit test
+that `**END**` unwraps rather than matching the bracket branch.
+
+### DEC-9. D3 IS CHUNK 3.5 -- it was missing from the build order
+
+The prose said "D2 -> D3 is load-bearing" but the table never assigned D3 a
+chunk, so as written the `END` fix would never be built. **D3 is chunk 3.5,
+strictly after chunk 3.**
+
+### DEC-10. Law 7 / publish gate is CHUNK 0.5
+
+The `_check_g14_provenance_publish` change had no chunk. It lands before any
+affected render acceptance: freeze stamps and preserves a non-publishable
+eligibility receipt, render continues, and `obs_publish` rejects that exact
+receipt. Verify the receipt actually propagates from freeze output to
+`obs_publish` -- otherwise the block is lost between save and publication.
+
+### DEC-11. D4 sidecar generation is a PRE-RENDER GATE (chunk 0.75)
+
+All 65 sidecars generated, schema-validated and stale-checked before the
+read-only runtime path is enabled. Define sidecar naming/keying, atomic
+write/resume, model/config source, bounded retries, and what constitutes a
+model/prompt/ladder version. **Runtime stale or missing entries preserve the
+allocator's existing roll and stamp unresolved status, with no network
+access.**
+
+### DEC-12. D5 identity adapter, versioned, in chunk 0
+
+One versioned adapter returning a typed bibliographic identity:
+`source_kind`, `work_title`, `author`, `post_headline`, `canonical_url`, plus
+field-level provenance. Mappings: public_domain from `source_meta.title`/
+`author`; Shakespeare from `play_title` plus the constant "William
+Shakespeare" (that lane has NO author field --
+`_otr_shakespeare_sources.py:428-458`); media from the selection identity.
+The coda builder returns canonical text AND a receipt; it never infers
+lane-specific keys ad hoc. A missing title yields a detected degraded coda plus
+a non-publishable receipt, never an exception.
+
+### DEC-13. D7 collision matching, made executable
+
+Deterministic configured-title matching only -- no fuzzy or model judgment.
+Normalization pipeline: Unicode NFC, case folding, punctuation stripped,
+whitespace folded, leading articles handled, whole-title or explicit
+title-phrase boundaries. The current work is excluded by **stable work
+identity**, not by title text. Scanned inventory: the configured
+`curated_scenes` manifest for the active bank.
 
 ## ACCEPTANCE -- a green suite proves none of this
 
