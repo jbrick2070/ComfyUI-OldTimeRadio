@@ -55,6 +55,9 @@ __all__ = [
 
 # Generation params
 _BASE_TEMPERATURE = 0.8
+#: The second ask is a CORRECTION, not a fresh invention, so it runs cooler --
+#: the same 2B principle the structured-call ladder uses for its own retry.
+_STRUCTURAL_RETRY_TEMPERATURE = 0.35
 _MAX_NEW_TOKENS_PER_LINE = 200
 
 # Exact response-transport marker; this is syntax, not prose classification.
@@ -1129,6 +1132,60 @@ def clean_one_line(text: str, max_chars: int = 0) -> str:
     return " ".join(str(text or "").split()).strip(" \t\"'").strip()
 
 
+#: What to tell the model when its announcer line came back unusable. It is
+#: the SAME complaint the validator applies, said out loud -- the point is
+#: that the model is TOLD, not silently replaced.
+_ANNOUNCER_COMPLAINT = (
+    "Your last line cannot be used: it came back empty or it contained "
+    "brackets or braces. A voice actor reads this line aloud exactly as "
+    "written, so [ ] { } are script apparatus and would be performed as "
+    "speech. Write the same opening again as plain spoken words -- no "
+    "brackets, no braces, no speaker label, no stage direction."
+)
+
+
+def _authored_or_one_more_ask(
+    creative_fn, messages, validator, *, complaint: str = _ANNOUNCER_COMPLAINT,
+) -> "tuple[bool, str, bool]":
+    """Ask; if the line is unusable, TELL the model why and ask once more.
+
+    WHY THIS EXISTS. These three announcer sites used to be
+    reject-and-substitute: one call, and if the line held a single bracket
+    Python threw it away and shipped a hardcoded sentence of its own --
+    "Good evening. This is SIGNAL LOST." -- on air, with no reroll and no
+    repair. That is Python AUTHORING BROADCAST PROSE, which is the furthest
+    any call site in this repo sat from the operator's standing law that only
+    a model may write a spoken line.
+
+    The fix is not to delete the fallback -- a render is never killed, and a
+    silent opening is worse than a plain one. The fix is to give the model
+    the one thing it never got: the complaint. A model told "you used a
+    bracket, write it as plain speech" fixes it most of the time, and the
+    Python line becomes what it should always have been -- the last resort
+    after the model was actually asked, rather than the second thing tried.
+
+    Returns ``(ok, text, retried)``. ``retried`` is receipted by the caller so
+    the artifact shows the model needed a second ask.
+    """
+    raw = _announcer_generate(creative_fn, messages)
+    ok, cleaned = validator(
+        strip_line_formatting(raw or "", _ANNOUNCER_LABELS))
+    if ok:
+        return True, cleaned, False
+
+    retry = list(messages) + [
+        {"role": "assistant", "content": str(raw or "")},
+        {"role": "user", "content": complaint},
+    ]
+    # Cooler on the second ask: this is a correction, not a fresh invention.
+    raw2 = _announcer_generate(
+        creative_fn, retry, temperature=_STRUCTURAL_RETRY_TEMPERATURE,
+    )
+    ok2, cleaned2 = validator(
+        strip_line_formatting(raw2 or "", _ANNOUNCER_LABELS))
+    return ok2, cleaned2, True
+
+
 def validate_announcer_line(
     text: str, *, min_chars: int = 0, max_chars: int = 0,
 ) -> tuple[bool, str]:
@@ -1310,17 +1367,29 @@ def compose_announcer_intro(
     system = _resolved_closing_prompt(
         creative_repo_id, phase=phase, source_bank_id=source_bank_id,
     )
-    raw = _announcer_generate(creative_fn, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": context + "\nWrite the opening now."},
-    ])
-    ok, cleaned = validate_announcer_line(
-        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
+    ok, cleaned, retried = _authored_or_one_more_ask(
+        creative_fn,
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": context + "\nWrite the opening now."},
+        ],
+        validate_announcer_line,
     )
-    return (
-        LineResult(cleaned, ("announcer_intro",))
-        if ok else LineResult(fallback, ("announcer_intro_structural_fallback",))
+    if ok:
+        return LineResult(
+            cleaned,
+            ("announcer_intro_after_retry",) if retried
+            else ("announcer_intro",),
+        )
+    # Only now, and the flag says so: the model was ASKED TWICE, told what was
+    # wrong the second time, and still could not give a usable line. A plain
+    # Python opening ships rather than silence -- that is the last resort it
+    # was always meant to be, not the second thing tried.
+    log.warning(
+        "[OTR_AnnouncerPass] the opening was unusable twice; shipping the "
+        "structural fallback and flagging it",
     )
+    return LineResult(fallback, ("announcer_intro_structural_fallback",))
 
 
 def validate_news_coda_bridge(text) -> tuple[bool, str]:
@@ -1364,16 +1433,17 @@ def compose_news_coda(
         creative_repo_id, phase="coda_system",
         source_bank_id=source_bank_id,
     )
-    raw = _announcer_generate(creative_fn, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": (
-            f"PREMISE: {clean_one_line(premise)}\n"
-            f"OPENING TONE: {clean_one_line(intro_text)}\n"
-            "Write only a transition into the source note."
-        )},
-    ])
-    ok, bridge = validate_news_coda_bridge(
-        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
+    ok, bridge, bridge_retried = _authored_or_one_more_ask(
+        creative_fn,
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": (
+                f"PREMISE: {clean_one_line(premise)}\n"
+                f"OPENING TONE: {clean_one_line(intro_text)}\n"
+                "Write only a transition into the source note."
+            )},
+        ],
+        validate_news_coda_bridge,
     )
     if not ok:
         bridge = ""
@@ -1409,15 +1479,20 @@ def compose_announcer_outro(
         ),
         "Write the closing now.",
     )))
-    raw = _announcer_generate(creative_fn, [
-        {"role": "system", "content": system},
-        {"role": "user", "content": context},
-    ])
-    ok, cleaned = validate_announcer_line(
-        strip_line_formatting(raw or "", _ANNOUNCER_LABELS)
+    ok, cleaned, retried = _authored_or_one_more_ask(
+        creative_fn,
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": context},
+        ],
+        validate_announcer_line,
     )
     return (
-        LineResult(cleaned, ("announcer_outro",))
+        LineResult(
+            cleaned,
+            ("announcer_outro_after_retry",) if retried
+            else ("announcer_outro",),
+        )
         if ok else LineResult(
             fallback_announcer_outro(close or brief),
             ("announcer_outro_structural_fallback",),
