@@ -62,12 +62,41 @@ tests AST-parse the node sources off disk, so a mid-run edit is a torn read that
 looks exactly like a real break. Both pass clean on a settled tree; the cost was
 a full re-run. Recorded in `GO_FORWARD_PLAN.md`.
 
-Numbers: suite **10729 / 110 / 1** (from 10711; +18, no regressions). Bible
-**20 / 26 / 3** at **284** entries.
+Numbers: suite **10736 / 110 / 1** (from 10711; +25, no regressions). Bible
+**20 / 26 / 3** at **284** entries. Variants 50 / 0 failures.
 
-**STILL OWED: the live legs.** `scifi_news` (D2 + P5R) is running as this is
-written; `scifi_news_pro` (D2/D3) has not been run. Nothing here is
-live-proven yet.
+**THE LEG PASSED, and it is the first `scifi_news` render that ever has.**
+`signal_lost_the_architecture_of_error_20260815_152004` through the real
+canonical workflow: `RESULT SUCCESS`, `obs_publish OK`, **33.4 MB** on disk,
+`Prompt executed in 00:40:56`. That lane was dead twice over -- PBUG-20260815-02
+killed it at 13.6 minutes and PBUG-20260815-10 killed it at 10:18 -- and it
+cleared both. My transaction ran in production
+(`[clean-transaction] the authorized window changed nothing; the acceptance
+receipt stands unmodified`) and the freeze cascade then returned
+`freeze_verdict=frozen_clean (pre_warns=0 post_warns=0)`, which is the exact
+audit that used to raise `line receipt mismatch`.
+
+**AND HERE IS WHAT IT DOES NOT PROVE.** That episode's clean stage changed
+nothing, so the leg exercised the NO-OP path only. The RESEAL path and the
+DEGRADATION path are still covered by unit tests alone. Whether the clean stage
+dirties a row is model-dependent -- it rewrote 9 of 14 rows on the three victim
+ledgers -- so proving those two needs a leg that happens to rewrite one.
+`scifi_news_pro` (D2/D3) has not been run.
+
+**THE FABLE GATE EARNED ITS SPEND, and this is the part worth carrying
+forward.** It caught that the P5R fix I had already pushed was HALF a fix:
+sizing the request to the actual scene cured the constant but left the death
+reachable, because scene size is the MODEL's choice -- the schema accepts 8
+beats per scene and the P3 prompt at `:786` literally instructs "at most 8 beats
+per scene", so a legal, invited draft reproduces the 8320 that killed the leg.
+The review now chunks at 8 rows, derived from the real topology. I folded the
+lesson back into Bible `12.106` rather than leaving the entry giving the same
+partial advice, because "size it to the job" is wrong guidance when the job size
+is not yours to choose. Its other finding -- a re-fetch silently deleting the
+gender roster it does not own -- is fixed too, with the subtlety that
+`characters` has two owners split by lane (shakespeare's fetcher authors it;
+only public_domain falls through to the stamper), which is why the carry-forward
+uses `setdefault`.
 
 ## 2026-08-15 -- HEAD 6475f9c4 (v2.0-alpha) -- CODER (D2 finishes: the clean window becomes a transaction, and an unprovable reseal now costs a repair instead of a render)
 

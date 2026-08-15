@@ -4483,8 +4483,23 @@ only visible because the cameo was FORCED and then did not appear.
   - Bible: promoted as `12.104` -- the id `_otr_content_transition.py` already
     cited as a forward reference and which did not exist until now.
     `otr_coverage_index.yaml` row appended.
-- status: FIXED -- landed and green. NOT yet live-proven: the qualifying
-  `scifi_news` and `scifi_news_pro` legs are still owed.
+- status: **FIXED, and the wiring is LIVE-PROVEN 2026-08-15 -- but only the
+  no-op path.** Leg `signal_lost_the_architecture_of_error_20260815_152004`
+  (scifi_news, real canonical workflow) is the FIRST successful run of this
+  lane, `RESULT SUCCESS` + `obs_publish OK` + 33.4 MB on disk,
+  `Prompt executed in 00:40:56`. The transaction ran in production --
+  `[clean-transaction] the authorized window changed nothing; the acceptance
+  receipt stands unmodified` -- and the freeze cascade then returned
+  `freeze_verdict=frozen_clean (pre_warns=0 post_warns=0)`, which is the exact
+  audit that used to raise `line receipt mismatch`.
+  **WHAT THAT DOES NOT PROVE, stated so nobody over-reads it:** this episode's
+  clean stage changed NOTHING, so the leg exercised the no-op path only. The
+  RESEAL path (a transition stamped, the finalizer re-pointed) and the
+  DEGRADATION path (restore + receipt) are still covered by unit tests alone.
+  Whether the clean stage rewrites a row is model-dependent -- it rewrote 9 of
+  14 on the three victim ledgers -- so proving those two needs a leg that
+  happens to dirty a row, not another clean one. `scifi_news_pro` (D2/D3) is
+  also still owed.
 
 ## PBUG-20260815-03 -- `scifi_news_pro` markup ladder exhausts because the terminal delimiter regex demands a period
 
@@ -4774,6 +4789,23 @@ only visible because the cameo was FORCED and then did not appear.
 - bible-worthy: yes -- "a generation request derived from a SCHEMA ceiling
   rather than the job in hand can exceed the model's entire context, and a test
   that pins the constant agrees with it".
-- status: FIXED, suite green. NOT yet live-proven -- it blocked the D2
-  qualifying leg, so the re-run proves both.
+- SECOND DEFECT, SAME BUG, found by the Fable gate before it shipped: sizing
+  the request to the actual scene cured the CONSTANT and left the death
+  reachable, because SCENE SIZE IS THE MODEL'S CHOICE. The schema accepts up to
+  `_RADIO_SCORE_MAX_BEATS_PER_SCENE` (8) beats x 2 lines = 16 rows and the P3
+  prompt at `:786` literally instructs "at most 8 beats per scene", so a legal,
+  actively invited draft reproduces 8320. It bites from 7 beats up: 7296 plus
+  the measured ~1203-token prompt already exceeds 8192. The review now CHUNKS at
+  `_SCENE_REVIEW_MAX_ROWS_PER_CALL` = `BEATS_PER_ACT` x 2 = 8 rows, derived from
+  the real topology and never from the schema ceiling. Every call still carries
+  the whole scene's rows and spine, so only the RETURN set narrows; a real
+  4-beat scene is 8 rows and takes ONE call, so production is byte-identical.
+  Not fixed by narrowing the prompt's advertised ceiling: schema headroom exists
+  because models overshoot what they are told, so an advertised limit is
+  guidance where this must be a guarantee.
+- status: **FIXED and LIVE-PROVEN 2026-08-15.** Leg
+  `signal_lost_the_architecture_of_error_20260815_152004` (scifi_news, through
+  the real `workflows/otr_canonical.json`) cleared P5R -- a 100% deterministic
+  death before -- and ran to `RESULT SUCCESS` with `obs_publish OK` and a
+  **33.4 MB** file on disk, `Prompt executed in 00:40:56`. CLOSED.
 

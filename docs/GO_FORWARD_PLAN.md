@@ -34,15 +34,16 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10729 / 110 / 1**, Bible **20 / 26 / 3**
+**BASELINES to detect drift:** suite **10736 / 110 / 1**, Bible **20 / 26 / 3**
 (the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
 with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
 budget), variants 50 emitted (3 refused -- the standing unratified cloud
 profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610,
 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5
 / D3; -> 10683 D2's transition schema + the rename fix; -> 10711 D2's emitter +
-transaction; -> 10729 D4's sidecars + the P5R budget fix. No regressions at any
-step.)
+transaction; -> 10729 D4's sidecars + the P5R budget fix; -> 10732 the P5R
+chunking fix; -> 10736 the sidecar re-fetch carry-forward. No regressions at
+any step.)
 
 **A Bible entry now costs a README bump.** The survival-guide repo enforces a
 Three-File Contract -- `BUG_BIBLE.yaml`'s entry count must equal the count cited
@@ -105,7 +106,7 @@ the directory was never empty. Also note the real output base is
 `C:\Users\jeffr\Documents\ComfyUI\output\otr\` -- checking the repo-relative
 `otr\` reports a false EMPTY, which is the same shape as the bug itself.
 
-**1. D2 IS BUILT AND PUSHED (2026-08-15) -- BUT IT IS NOT LIVE-PROVEN.** Both
+**1. D2 IS BUILT, PUSHED, AND ITS WIRING IS LIVE-PROVEN (2026-08-15).** Both
 owed halves landed: chunk 3's proof surfaces and chunk 1's transaction/restore.
 One window is captured around BOTH `run_ledger_clean` and `run_ledger_cleanup`
 (opened `OTR_LedgerScriptWriter.py:6798`, reconciled `:6819`) and stamped once,
@@ -119,10 +120,21 @@ a proof it could not reconcile. New module `nodes/_otr_clean_transaction.py`,
 28 tests in `tests/test_clean_transaction.py`, Bible `12.104` (the id
 `_otr_content_transition.py` had been citing before it existed).
 
-**WHAT IS STILL OWED ON D2: the qualifying live legs.** `scifi_news` (D2) and
-`scifi_news_pro` (D2/D3) have NOT been run. Code-green is not lane-green, and
-the 1-in-3 exposure on `roll (any eligible bank)` is only *believed* closed
-until those two legs pass. Do not record the lane as fixed on the suite alone.
+**THE `scifi_news` LEG PASSED -- the first successful run of that lane.**
+`signal_lost_the_architecture_of_error_20260815_152004` through the real
+canonical workflow: `RESULT SUCCESS`, `obs_publish OK`, **33.4 MB** on disk,
+`Prompt executed in 00:40:56`. The transaction ran in production
+(`[clean-transaction] the authorized window changed nothing`) and the freeze
+cascade then returned `freeze_verdict=frozen_clean (pre_warns=0 post_warns=0)`
+-- the exact audit that used to raise `line receipt mismatch`.
+
+**WHAT IS STILL OWED, and do not over-read the green.** That episode's clean
+stage changed NOTHING, so the leg exercised the NO-OP path only. The RESEAL path
+(a transition stamped, the finalizer re-pointed) and the DEGRADATION path
+(restore + receipt) are still covered by unit tests alone. Whether the clean
+stage dirties a row is model-dependent -- it rewrote 9 of 14 rows on the three
+victim ledgers -- so proving those needs a leg that happens to rewrite one, not
+another clean one. `scifi_news_pro` (D2/D3) has also not been run.
 
 **2. D4's DATA GAP IS CLOSED (2026-08-15) -- the sidecars are written.** All
 **65** public_domain units now carry a provenance sidecar with a `characters`
