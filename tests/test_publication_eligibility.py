@@ -231,6 +231,35 @@ class TestConsumerFailsClosed:
         assert PE.decide_from_meta(None).publishable is False
         assert PE.decide_from_meta("meta").publishable is False
 
+    def test_every_refusal_states_a_REMEDY_not_just_an_offence(self):
+        """The defect class this sprint is fixing in D3, applied to itself.
+
+        A markup ladder burned four rungs re-emitting `END` because nothing
+        ever said `END.` (Bible 12.105). "No eligibility receipt" has the same
+        shape: it says what happened and leaves the operator to discover that
+        the producer is Phase 10 of the freeze cascade. Every consumer-side
+        refusal must name the fix, and a NEW refusal cannot ship without one.
+        """
+        refusals = {
+            name: getattr(PE, name) for name in dir(PE)
+            if name.startswith("DECISION_") and name != "DECISION_REMEDIES"
+        }
+        assert refusals, "no DECISION_* constants found"
+        missing = [n for n, v in refusals.items() if v not in PE.DECISION_REMEDIES]
+        assert missing == [], "refusals with no remedy: %s" % missing
+        for value in refusals.values():
+            summary = PE.PublicationDecision(False, value, "detail").summary()
+            assert "TO FIX:" in summary
+            assert PE.DECISION_REMEDIES[value] in summary
+
+    def test_a_rights_block_gets_NO_remedy(self):
+        """`ineligible` is the system working, not a fault to repair. Telling
+        an operator how to "fix" a research-only source would be inviting them
+        to defeat the rule."""
+        led = _ledger(_RESEARCH, _NAMED)
+        PE.stamp_publication_eligibility(led)
+        assert "TO FIX:" not in PE.decide_from_meta(led["meta"]).summary()
+
     def test_an_ANONYMOUS_receipt_cannot_answer_for_a_named_episode(self):
         """Unprovable is not the same as agreed.
 
@@ -594,6 +623,46 @@ class TestMuxStampAndCacheKey:
         assert not MUX._is_inside_obs_dir(seen["out"]), seen["out"]
         assert not MUX._is_inside_obs_dir(path), path
         assert "obs_publish BLOCKED" in report
+
+    @pytest.mark.parametrize("variant", [
+        "exact", "upper", "mixed", "trailing_sep", "the_dir_itself", "dotdot",
+    ])
+    def test_obs_containment_holds_across_windows_path_spellings(
+            self, tmp_path, monkeypatch, variant):
+        """Raised as a case-folding miss; REFUTED by measurement, now pinned.
+
+        The claim was that `Path.resolve()` preserves input casing for
+        components that do not exist on disk, so an UPPERCASED `output_path`
+        would slip past containment. It does preserve the casing -- but
+        `PureWindowsPath` comparison is case-INSENSITIVE, so `==` and
+        `in .parents` both still match. Pinned rather than argued so the next
+        reviewer sees a test instead of a comment, and so a future pathlib
+        change cannot quietly open the hole.
+        """
+        obs = tmp_path / "output" / "otr" / "obs"
+        obs.mkdir(parents=True)
+        monkeypatch.setattr(MUX, "_obs_dir", lambda: obs)
+        target = {
+            "exact": str(obs / "ep_final.mp4"),
+            "upper": str(obs).upper() + "\\ep_final.mp4",
+            "mixed": str(tmp_path) + "\\OutPut\\OtR\\ObS\\ep_final.mp4",
+            "trailing_sep": str(obs) + "\\",
+            "the_dir_itself": str(obs),
+            "dotdot": str(obs / ".." / "obs" / "ep_final.mp4"),
+        }[variant]
+        assert MUX._is_inside_obs_dir(target) is True
+
+    @pytest.mark.parametrize("sibling", ["episodes", "obs_backup", "obsidian"])
+    def test_an_obs_LOOKALIKE_sibling_is_not_inside_obs(
+            self, tmp_path, monkeypatch, sibling):
+        """Containment must not become its own prefix bug -- `obs_backup`
+        starts with `obs`, and this is the same class of mistake as `ep1`
+        matching `ep10`."""
+        obs = tmp_path / "output" / "otr" / "obs"
+        obs.mkdir(parents=True)
+        monkeypatch.setattr(MUX, "_obs_dir", lambda: obs)
+        assert MUX._is_inside_obs_dir(
+            str(tmp_path / "output" / "otr" / sibling / "ep.mp4")) is False
 
     def test_output_path_is_HONOURED_when_the_episode_may_publish(
             self, episode, monkeypatch, tmp_path):

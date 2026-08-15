@@ -135,10 +135,39 @@ was lost. The findings, though, were the best of either round.
   returns a dict, so that shape means something wrote the field by hand; worth
   saying out loud, still not worth withholding an episode over.
 
-**Two rounds, ten findings, five real.** The reviewer is worth running and its
-patches are not: every accepted fix here is a rewrite of what it proposed, and
+### The THIRD round -- read-only at last, and it caught the sprint's own defect class
+
+`kibitz-runs/2026-08-15-chunk05-qa-r3/r4/final.md`. The brief's RULE ZERO held:
+findings only, no edits. Three findings.
+
+* **ACCEPTED -- a blocked publish named the offence and never the remedy.**
+  `obs_publish BLOCKED -- eligibility_receipt_absent: no receipt on this
+  ledger` tells an operator what happened and leaves them to discover that the
+  producer is Phase 10 of the freeze cascade. That is EXACTLY the defect class
+  this sprint is fixing in D3 (Bible 12.105: a markup ladder burned four rungs
+  re-emitting `END` because nothing ever said `END.`) -- found in our own new
+  code, by a reviewer, one chunk after we wrote the entry describing it.
+  `DECISION_REMEDIES` now maps every consumer-side refusal to its fix and
+  `summary()` appends it, with a test asserting a NEW refusal cannot ship
+  without one. A rights block gets no remedy on purpose: `ineligible` is the
+  system working, and telling an operator how to "fix" it invites defeating it.
+* **REJECTED on measurement -- the Windows case-folding miss.** The claim was
+  that `Path.resolve()` preserves input casing for non-existent components, so
+  an UPPERCASED `output_path` slips past `_is_inside_obs_dir`. It does preserve
+  the casing; but `PureWindowsPath` comparison is case-INSENSITIVE, so `==` and
+  `in .parents` still match. Measured across six spellings (upper, mixed,
+  trailing separator, `..` walk-in, the dir itself) -- all contained. Pinned as
+  tests rather than settled in a comment, plus a lookalike-sibling case so
+  containment cannot grow its own `obs_backup`-matches-`obs` prefix bug.
+* **Already covered:** logging both ids on an episode mismatch. The detail
+  string carries both and the mux logs `summary()`, so they are already in the
+  render log.
+
+**Three rounds, thirteen findings, six real.** The reviewer is worth running and
+its patches are not: every accepted fix is a rewrite of what it proposed, and
 its single most confident change (a new `INPUT_TYPES` entry) would have broken a
-hard project law.
+hard project law. The value climbed once the brief carried RULE ZERO and a
+settled-findings list -- round 3 spent none of itself re-reporting round 1.
 
 **Next.** Chunk 0.75 (the D4 vendor gate: all 65 sidecars generated,
 schema-validated, freshness-verified).

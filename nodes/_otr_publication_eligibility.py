@@ -109,6 +109,41 @@ DECISION_MALFORMED = "eligibility_receipt_malformed"
 DECISION_VERSION_UNKNOWN = "eligibility_receipt_version_unknown"
 DECISION_EPISODE_MISMATCH = "eligibility_receipt_episode_mismatch"
 
+#: WHAT TO DO ABOUT IT, PER REFUSAL. A diagnostic that names the offence and
+#: not the required shape is a defect class this very sprint is fixing
+#: elsewhere (`BUG_BIBLE.yaml` 12.105: a markup ladder burned four rungs
+#: re-emitting `END` because nothing ever said `END.`). "No eligibility
+#: receipt" tells an operator what happened and leaves them to guess what to
+#: do; a withheld episode with no stated remedy reads as a broken render.
+#:
+#: Keyed by decision reason so the remedy has ONE owner and a new refusal
+#: cannot ship without one -- `tests/test_publication_eligibility.py` asserts
+#: every `DECISION_*` constant appears here.
+DECISION_REMEDIES = {
+    DECISION_NO_RECEIPT: (
+        "no publication verdict was ever stamped for this episode. The "
+        "producer is OTR_LedgerFreezeCascade Phase 10 -- re-run the graph "
+        "through the freeze, or re-freeze this ledger, and the mux will "
+        "publish on the next pass. The archival final is already on disk and "
+        "nothing was lost"
+    ),
+    DECISION_MALFORMED: (
+        "the receipt is present but unreadable, so it was written by "
+        "something other than the current producer. Re-freeze the ledger to "
+        "restamp it rather than hand-editing meta.publication_eligibility"
+    ),
+    DECISION_VERSION_UNKNOWN: (
+        "the receipt was stamped by a different version of the eligibility "
+        "rules than this node reads. Re-freeze the ledger on the current "
+        "build to restamp it"
+    ),
+    DECISION_EPISODE_MISMATCH: (
+        "this receipt belongs to a DIFFERENT episode, which usually means a "
+        "stale in-flight ledger singleton. Re-run the graph so the writer "
+        "claims this episode, then re-freeze"
+    ),
+}
+
 
 def _clean(value: Any) -> str:
     """Trim to a usable string. ``None`` and junk both become ``''``."""
@@ -180,14 +215,22 @@ class PublicationDecision:
     receipt: Dict[str, Any] = field(default_factory=dict)
 
     def summary(self) -> str:
-        """The reason phrase, for a caller that supplies its own marker.
+        """The reason phrase, AND what to do about it.
 
         Deliberately carries no "BLOCKED"/"OK" prefix of its own: the terminal
         node prints ``obs_publish BLOCKED -- <summary>`` beside its existing
         ``obs_publish OK -> <path>``, and a second verdict word inside the
         summary would read as two verdicts about one decision.
+
+        The REMEDY is appended for the consumer-side refusals, because an
+        operator reading "no eligibility receipt" in a render log otherwise
+        has to go and find out that the producer is Phase 10 of the freeze
+        cascade. A rights BLOCK (``ineligible``) gets no remedy on purpose --
+        that one is working as designed and there is nothing to repair.
         """
-        return "%s: %s" % (self.reason, self.detail) if self.detail else self.reason
+        head = "%s: %s" % (self.reason, self.detail) if self.detail else self.reason
+        remedy = DECISION_REMEDIES.get(self.reason)
+        return "%s. TO FIX: %s" % (head, remedy) if remedy else head
 
 
 def _rights_reasons(meta: Mapping[str, Any]) -> List[str]:
