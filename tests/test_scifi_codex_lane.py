@@ -33,6 +33,17 @@ def _payload() -> dict[str, str]:
     }
 
 
+#: What the fake P6 pass returns. Held here because several assertions below
+#: have to account for the Python-appended coda row (PBUG-20260814-02): it is
+#: a real voiced ledger row that P5 did not write, so every receipt that spans
+#: the ledger counts it and every assertion about the COPIED P5 artifact does
+#: not. Chosen to survive `clean_spoken_text` unchanged.
+_FAKE_NEWS_CODA = (
+    "Tonight's drama was drawn from a report of a repeating signal; the "
+    "reporting ends there and the rest was ours."
+)
+
+
 def _fact_index_from_p0(artifact_inputs: dict[str, Any]) -> lane.FactIndexV4:
     allowed = artifact_inputs["allowed_source_fields"]
     evidence = artifact_inputs["payload"]["payload"]
@@ -344,6 +355,13 @@ def _run_lane(
                     )
                 ]
             )
+        elif pass_id == "P6":
+            # The closing announcer read is its own pass (PBUG-20260814-02).
+            # The fake index carries no entities or figures, so the
+            # source-naming half of the verifier does not apply here; the
+            # dedicated coverage for a real anchor lives in
+            # tests/test_codex_news_coda.py.
+            result = lane.NewsCodaV4(text=_FAKE_NEWS_CODA)
         else:  # pragma: no cover - the assertion below is the public contract
             raise AssertionError(f"unexpected model pass {pass_id}")
 
@@ -377,11 +395,13 @@ def _run_lane(
         state["p5_script"] = script
         return script
 
-    def tracked_assemble(led, score, cast, script, meta):
+    def tracked_assemble(led, score, cast, script, meta, *, news_coda=None):
         state["assemble_calls"] += 1
         state["assembled_score"] = score
         state["assembled_script"] = script
-        return real_assemble(led, score, cast, script, meta)
+        state["assembled_news_coda"] = news_coda
+        return real_assemble(led, score, cast, script, meta,
+                             news_coda=news_coda)
 
     monkeypatch.setattr(lane, "invoke_codex_structured", fake_invoke)
     monkeypatch.setattr(lane, "_call_radio_score_draft", tracked_p3)
@@ -451,11 +471,23 @@ def test_fixed_topology_calls_exact_passes_and_keeps_one_p3_story_authority(
             ("codex_play_system", "codex_coda_contract_system"),
             lane.ScriptTextDraftV4,
         ),
+        # PBUG-20260814-02: the coda seam stopped being decoration glued onto
+        # two other prompts and became a pass that owns one job.
+        (
+            "P6",
+            "creative",
+            ("codex_coda_contract_system",),
+            lane.NewsCodaV4,
+        ),
     ]
     assert state["trace"][0][4] is state["technical_fn"]
     assert all(row[4] is state["creative_fn"] for row in state["trace"][1:])
     assert state["retry_flags"] == [
         ("P0", True), ("P1", True), ("P2", True), ("P3", True), ("P5", True),
+        # P6 does NOT reroll. A coda that does not name its source is a good
+        # draft missing one thing, so the verifier triggers a CLEAN told what
+        # was wrong -- never a cold redraw (operator ruling 2026-08-14).
+        ("P6", False),
     ]
     assert state["p3_calls"] == state["p5_calls"] == 1
     assert state["p3_max_new_tokens"] is None
@@ -501,16 +533,24 @@ def test_spoken_identity_canonicalization_fans_out_from_one_copied_artifact(
     assert {line.text for line in canonical.lines} == {clean_text}
     assert state["assembled_script"] is canonical
 
+    # The canonicalization surface covers the COPIED P5 ARTIFACT. The coda row
+    # is authored by P6 and appended by Python, so it is not part of that copy
+    # -- but it IS a voiced ledger row, and every receipt spanning the ledger
+    # below has to carry it.
     expected = {
         str(row["line_id"]): clean_text
         for row in state["ledger"].data["lines"]
         if not row.get("skip")
+        and "news_coda" not in (row.get("compose_flags") or [])
     }
+    expected[lane._NEWS_CODA_LINE_ID] = state["assembled_news_coda"]
     for row in state["ledger"].data["lines"]:
-        if row.get("line_id") in expected:
-            assert row["text"] == clean_text
-            assert row["char_count"] == len(clean_text)
-            assert row["word_count"] == lane.canonical_word_count(clean_text)
+        line_id = row.get("line_id")
+        if line_id in expected:
+            wanted = expected[line_id]
+            assert row["text"] == wanted
+            assert row["char_count"] == len(wanted)
+            assert row["word_count"] == lane.canonical_word_count(wanted)
     lane_meta = state["meta"]["scifi_codex"]
     assert lane_meta["script_text_identity_generation"] \
         == "clean_spoken_text.v1"
@@ -567,11 +607,16 @@ def test_spoken_identity_counterfactual_retains_raw_text_hashes(
         line_text=lambda _line_id, _index: raw_text,
     )
 
+    # P5's rows keep their raw text under the disabled canonicalization; the
+    # P6 coda is canonicalized by its own pass and is unaffected by this
+    # counterfactual, so it is named explicitly rather than folded in.
     raw_expected = {
         str(row["line_id"]): raw_text
         for row in state["ledger"].data["lines"]
         if not row.get("skip")
+        and "news_coda" not in (row.get("compose_flags") or [])
     }
+    raw_expected[lane._NEWS_CODA_LINE_ID] = state["assembled_news_coda"]
     lane_meta = state["meta"]["scifi_codex"]
     assert lane_meta["accepted_lines"] == raw_expected
     assert lane_meta["line_text_sha256"] == {
@@ -692,8 +737,14 @@ def test_arbitrary_spoken_prose_length_publishes_with_telemetry_only(
         line_text=prose,
     )
 
-    expected_lines = lane._codex_target_beat_count(act_count, 2)
-    expected_actual = expected_lines * words_per_line
+    # +1 for the Python-appended closing announcer read (PBUG-20260814-02):
+    # P5 writes the drama, P6 writes the row that names the real story, and
+    # both are voiced ledger rows the receipts have to account for.
+    expected_lines = lane._codex_target_beat_count(act_count, 2) + 1
+    expected_actual = (
+        (expected_lines - 1) * words_per_line
+        + lane.canonical_word_count(_FAKE_NEWS_CODA)
+    )
     receipt = state["meta"]["scifi_codex"]["word_receipt"]
     assert receipt["target_status"] == "not_requested"
     assert receipt["actual_total_voiced_words"] == expected_actual
@@ -703,6 +754,43 @@ def test_arbitrary_spoken_prose_length_publishes_with_telemetry_only(
     assert coverage["voiced_line_count"] == expected_lines
     assert coverage["proved_line_count"] == expected_lines
     assert coverage["complete"] is True
+
+
+def test_the_assembled_coda_is_the_last_row_and_the_announcer_speaks_it(
+    monkeypatch, tmp_path,
+):
+    """PBUG-20260814-02, at the ledger rather than at the pass.
+
+    The published 2026-08-13 episode had exactly ONE announcer row and it sat
+    in the middle, because the only structural rule was cast coverage and
+    position went unchecked. Python now appends the closing read, so the
+    position is a property of the code and this asserts it end to end.
+    """
+    state = _run_lane(monkeypatch, tmp_path)
+
+    rows = state["ledger"].data["lines"]
+    coda = rows[-1]
+    assert coda["line_id"] == lane._NEWS_CODA_LINE_ID
+    assert coda["beat_id"] == lane._NEWS_CODA_BEAT_ID
+    assert coda["speaker_role"] == "announcer"
+    assert coda["char_id"] == "announcer"
+    assert coda["speaker"] == "ANNOUNCER"
+    assert coda["text"] == _FAKE_NEWS_CODA
+    assert coda["compose_flags"] == ["news_coda"]
+    assert [row["compose_flags"] for row in rows].count(["news_coda"]) == 1
+
+    # The row owns a beat, and that beat rides the closing shot rather than
+    # inventing one with no authored visual prompt.
+    beats = {row["beat_id"]: row for row in state["ledger"].data["beats"]}
+    coda_beat = beats[lane._NEWS_CODA_BEAT_ID]
+    assert coda_beat["line_ids"] == [lane._NEWS_CODA_LINE_ID]
+    assert coda_beat["speaker"] == "ANNOUNCER"
+    shot_ids = {row["shot_id"] for row in state["ledger"].data["shots"]}
+    assert coda_beat["shot_id"] in shot_ids
+
+    receipt = state["meta"]["scifi_codex"]["news_coda"]
+    assert receipt["status"] == "clean"
+    assert receipt["max_new_tokens"] == lane._NEWS_CODA_MAX_OUTPUT_TOKENS
 
 
 def test_divergent_fiction_is_canonical_when_ledger_contract_is_intact(
@@ -722,7 +810,10 @@ def test_divergent_fiction_is_canonical_when_ledger_contract_is_intact(
         if not row.get("skip")
     ]
     assert spoken
-    assert set(spoken) == {text}
+    # The drama is entirely the model's invention and none of it is checked
+    # against the source -- that is the lane's springboard licence. The coda
+    # is the one row that is NOT free, which is exactly why it is there.
+    assert set(spoken) == {text, _FAKE_NEWS_CODA}
     assert state["assemble_calls"] == 1
     coverage = state["ledger"].data["meta"]["content_authorship"]["coverage"]
     assert coverage["complete"] is True

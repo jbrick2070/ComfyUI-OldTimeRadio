@@ -411,6 +411,14 @@
           "description": "Writes the sole compact closed {line_id,text} spoken artifact. The creative structured ladder repairs only malformed schema or closed graph/roster IDs."
         },
         {
+          "pass_id": "P6_news_coda",
+          "slot": "creative",
+          "seam_refs": [
+            "codex_coda_contract_system"
+          ],
+          "description": "Authors the closing announcer read as its own pass, against the episode P5 actually wrote. Code detects whether it names an indexed source anchor and is pure speech; a firing verifier triggers ONE bounded clean told what was still wrong, never a refusal and never a reroll. Python appends the validated row last, so the coda's position is a property of the code."
+        },
+        {
           "pass_id": "same_story_safety_cleanup",
           "slot": "technical",
           "seam_refs": [],

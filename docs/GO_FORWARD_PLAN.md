@@ -36,6 +36,20 @@ cues -- and never a stage direction, action row, narration or delivery note.
 Observed on the accepted 2026-08-13 `wan_ti2v` episode and standing as a live
 content receipt.
 
+**MISS 2 IS FIXED ON `scifi_news` -- 2026-08-14, `PBUG-20260814-02` CLOSED.**
+The coda is now **P6**, a pass that owns one job, running after P5 against the
+episode that was actually written. Code detects whether it names an indexed
+source anchor and is pure speech; a firing verifier triggers ONE bounded clean
+told exactly what was still wrong, never a refusal and never a reroll. Python
+appends the validated row LAST, so the position is a property of the code
+rather than a hope about a draft, and `_assert_news_coda_is_last` re-asserts
+the pro lane's three parser rules afterwards. Three outcomes, all of which
+continue the render: clean, unclean (ships, flagged), absent (nothing
+invented). **Still open:** the same defect shape on `shakespeare` -- the close
+should credit the play -- which rides the writer lane's own `compose_news_coda`
+path and was not touched by this change. The original diagnosis is kept below
+because it is the reason the fix looks the way it does.
+
 **MISS 2 -- THE CODA IS NOT ANNOUNCING THE SOURCE.** On the `scifi_news` lane
 the closing announcer read does not name the real news story the episode was
 drawn from. The same defect shape applies on `shakespeare`, where the close

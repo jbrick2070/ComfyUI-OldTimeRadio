@@ -848,6 +848,47 @@ class ScriptTextDraftV4(_Strict):
     )
 
 
+class NewsCodaV4(_Strict):
+    """The closing announcer read, authored by its OWN pass (P6).
+
+    PBUG-20260814-02: the coda used to exist only as prompt text glued onto
+    the P3 and P5 system messages. Nothing reserved a row for it, nothing
+    placed it last, and nothing checked afterwards that it named the real
+    news story -- so the published 2026-08-13 episode shipped with its single
+    announcer row in the MIDDLE and never said where the fact stopped and the
+    fiction began. The sibling lane `scifi_news_pro` already solves this the
+    right way: a dedicated pass whose validated output Python appends as its
+    own row. This is that pass for this lane.
+    """
+
+    text: str = Field(
+        min_length=1, max_length=_SCRIPT_TEXT_DRAFT_MAX_LINE_CHARS,
+    )
+
+
+#: The reserved ids for the Python-appended coda row. The compiler numbers
+#: score-owned lines from ``l001`` and beats from ``b000``, and the score
+#: topology tops out at 12 beats / 24 lines, so these cannot collide. They keep
+#: the ``l\d{3}`` / ``b\d{3}`` shape every downstream reader already matches.
+_NEWS_CODA_LINE_ID = "l999"
+_NEWS_CODA_BEAT_ID = "b999"
+
+#: RIGHT-SIZE THE JOB, NEVER RAISE THE GUARD. P3 and P5 author a whole score
+#: or a whole script and run on provider capacity; this pass writes ONE
+#: announcer read. Handing it the same unbounded budget would let a degenerate
+#: decode spend a whole episode's allowance on a single sentence before the
+#: two-signal guard notices. 384 tokens is several times the longest coda this
+#: project has ever shipped and a small fraction of a script pass -- a budget
+#: sized to the job, not a length authority over the writing.
+_NEWS_CODA_MAX_OUTPUT_TOKENS = 384
+
+#: One authoring pass, then ONE clean told exactly what was still wrong. The
+#: operator's clean-stage ruling is bounded on purpose: "then flag loudly in
+#: the ledger and CONTINUE". A third swing is another cold roll wearing a
+#: repair's clothes.
+_NEWS_CODA_MAX_ATTEMPTS = 2
+
+
 _SCRIPT_SCENE_FORBIDDEN_KEYS = frozenset({"speaker", "shots", "beats"})
 _SCRIPT_TEXT_DRAFT_ROOT_INSTRUCTION = (
     "\nSCRIPT TEXT DRAFT ROOT CONTRACT: Return one JSON object with exactly one "
@@ -3107,6 +3148,278 @@ def _p5_raw_spoken_findings(
     return findings
 
 
+def _news_coda_source_anchors(fact_index: FactIndexV4) -> tuple[str, ...]:
+    """Verbatim strings that would PROVE a coda named the real source.
+
+    Entity names and source-spanned figures, in index order, deduplicated
+    case-insensitively. Names shorter than three characters are dropped: a
+    one- or two-letter "entity" matches inside ordinary words and would let a
+    coda that names nothing pass by accident, which is worse than no check.
+    """
+    anchors: list[str] = []
+    for entity in fact_index.entities:
+        name = str(entity.name or "").strip()
+        if len(name) >= 3:
+            anchors.append(name)
+    for number in fact_index.numbers:
+        token = str(number.verbatim or "").strip()
+        if token:
+            anchors.append(token)
+    for fact in fact_index.facts:
+        for raw_token in fact.numeric_tokens:
+            token = str(raw_token or "").strip()
+            if token:
+                anchors.append(token)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for anchor in anchors:
+        key = anchor.casefold()
+        if key not in seen:
+            seen.add(key)
+            ordered.append(anchor)
+    return tuple(ordered)
+
+
+def _names_a_source_anchor(text: str, anchors: Sequence[str]) -> str | None:
+    """Return the first anchor the text actually says, or None.
+
+    Word-boundary matching, not a bare substring: "MIT" must not be found
+    inside "transmitted". The boundaries are non-alphanumeric lookarounds
+    rather than ``\\b`` so a multi-word anchor ending in punctuation still
+    matches the way a reader would judge it.
+    """
+    for anchor in anchors:
+        pattern = (
+            r"(?<![A-Za-z0-9])" + re.escape(anchor) + r"(?![A-Za-z0-9])"
+        )
+        if re.search(pattern, text, re.IGNORECASE):
+            return anchor
+    return None
+
+
+def _news_coda_findings(
+    text: str,
+    anchors: Sequence[str],
+    label_pattern: "re.Pattern[str]",
+) -> list[str]:
+    """Everything wrong with one candidate coda, reported all at once.
+
+    Code DETECTS and explains; the repair is always a model pass. Both
+    findings are handed to the clean pass together so it never spends its one
+    bounded attempt fixing half the complaint.
+    """
+    findings: list[str] = []
+    hygiene = _spoken_text_finding("news_coda", text, label_pattern)
+    if hygiene is not None:
+        findings.append(hygiene)
+    if anchors and _names_a_source_anchor(text, anchors) is None:
+        findings.append(
+            "news_coda: the closing read never names the real source -- none "
+            "of the indexed entities or figures appears in it, so the "
+            "listener is never told where the fact stopped and the fiction "
+            "started. Name at least one of source_anchors verbatim."
+        )
+    return findings
+
+
+def _call_news_coda(
+    *,
+    slot_fn: GenerateFn,
+    pack: Any,
+    fact_index: FactIndexV4,
+    score: RadioScoreV4,
+    cast: CastPlanV4,
+    episode_spoken_text: Sequence[str],
+    call_journal: MutableMapping[str, Any],
+) -> "tuple[str | None, dict[str, Any]]":
+    """Author the closing announcer read as its OWN pass, then CLEAN it.
+
+    OPERATOR RULING 2026-08-14: a firing verifier triggers a CLEAN -- never a
+    refusal and never a reroll. So the ladder's own ``post_validator`` stays
+    empty on purpose: a coda that does not name its source is not a malformed
+    artifact to be thrown away and redrawn cold, it is a good draft missing
+    one thing. It comes back with the complaint attached and gets ONE bounded
+    chance to fix exactly that.
+
+    The science-news lane is a SPRINGBOARD -- the fiction departs freely from
+    the real story -- which is precisely why this row is load-bearing: it is
+    the only thing that tells the listener where the reporting ended.
+
+    Three outcomes, all of which CONTINUE the render:
+      clean    -- the read names the source and is pure speech.
+      unclean  -- it still does not, after the bounded clean. It SHIPS
+                  anyway and the ledger says so; an imperfect attribution
+                  beats none, and an episode is never killed for it.
+      absent   -- the pass could not produce any text at all. Nothing is
+                  appended and the ledger records the hole loudly. Python
+                  does not invent the sentence: authoring prose is a model's
+                  job, and a fabricated attribution would be worse than a
+                  missing one.
+    """
+    anchors = _news_coda_source_anchors(fact_index)
+    label_pattern = _spoken_label_pattern(cast)
+    base_inputs: dict[str, Any] = {
+        "story_context": {
+            "title": score.title,
+            "premise": score.premise,
+            "setting": score.setting,
+        },
+        "fact_index": {
+            "facts": [
+                {"fact_id": fact.fact_id, "claim": fact.claim}
+                for fact in fact_index.facts
+            ],
+            "tone": fact_index.tone,
+        },
+        "source_anchors": list(anchors),
+        "episode_spoken_text": list(episode_spoken_text),
+    }
+    receipt: dict[str, Any] = {
+        "status": "pending",
+        "source_anchor_count": len(anchors),
+        "max_new_tokens": _NEWS_CODA_MAX_OUTPUT_TOKENS,
+        "attempts": [],
+    }
+    if not anchors:
+        # SAY SO RATHER THAN PRETEND. With no indexed entity or figure there
+        # is no verbatim string the coda could be REQUIRED to say, so the
+        # source-naming half of the verifier cannot run. Demanding an anchor
+        # that P0 never found would refuse an episode for an upstream gap;
+        # inventing one would be worse. The receipt carries the zero.
+        log.warning(
+            "[scifi_codex] P0 indexed no entities or figures, so the news "
+            "coda cannot be checked for naming its source; only spoken-text "
+            "hygiene applies to it on this episode.",
+        )
+    text: str | None = None
+    findings: list[str] = []
+
+    for attempt in range(1, _NEWS_CODA_MAX_ATTEMPTS + 1):
+        artifact_inputs = dict(base_inputs)
+        if findings:
+            artifact_inputs["previous_attempt"] = text
+            artifact_inputs["unmet_requirements"] = list(findings)
+        try:
+            result = invoke_codex_structured(
+                pass_id="P6",
+                slot="creative",
+                slot_fn=slot_fn,
+                pack=pack,
+                seam_refs=("codex_coda_contract_system",),
+                artifact_inputs=artifact_inputs,
+                result_type=NewsCodaV4,
+                post_validator=lambda _value: None,
+                base_temperature=.62,
+                structural_retry_temperature=.32,
+                max_new_tokens=_NEWS_CODA_MAX_OUTPUT_TOKENS,
+                call_journal=call_journal,
+                retry_until_valid=False,
+            )
+        except ScifiCodexError as exc:
+            receipt["attempts"].append({
+                "attempt": attempt,
+                "outcome": "call_failed",
+                "detail": str(exc)[:240],
+            })
+            log.error(
+                "[scifi_codex] P6 news coda attempt %d could not produce an "
+                "artifact (%s: %s). The render CONTINUES.",
+                attempt, type(exc).__name__, exc,
+            )
+            break
+        # Canonicalize FIRST, then judge. The coda becomes TTS audio like
+        # every other spoken row, so it goes through the same identity
+        # surface P5 text does -- and the verifier must grade the sentence
+        # that will actually be read aloud, not a draft of it.
+        candidate = clean_spoken_text(
+            str(getattr(result, "text", "") or "")
+        ).strip()
+        findings = _news_coda_findings(candidate, anchors, label_pattern)
+        if candidate:
+            text = candidate
+        receipt["attempts"].append({
+            "attempt": attempt,
+            "outcome": "clean" if not findings else "unclean",
+            "findings": list(findings),
+        })
+        if not findings:
+            break
+        log.warning(
+            "[scifi_codex] P6 news coda attempt %d is unclean (%s); handing "
+            "the complaint back for ONE bounded clean rather than rerolling "
+            "it cold.",
+            attempt, "; ".join(findings),
+        )
+
+    if text and not findings:
+        receipt["status"] = "clean"
+    elif text:
+        receipt["status"] = "unclean"
+        log.error(
+            "[scifi_codex] the news coda STILL does not satisfy its "
+            "verifier after %d bounded pass(es): %s. The row ships and the "
+            "ledger records it as unclean -- a render is never killed for "
+            "this.",
+            _NEWS_CODA_MAX_ATTEMPTS, "; ".join(findings),
+        )
+    else:
+        receipt["status"] = "absent"
+        log.error(
+            "[scifi_codex] NO news coda was authored, so this episode ends "
+            "without naming the real story it was drawn from. The ledger "
+            "records meta.scifi_codex.news_coda.status='absent'; nothing is "
+            "invented in its place.",
+        )
+    return text, receipt
+
+
+def _assert_news_coda_is_last(
+    ledger_data: Mapping[str, Any], *, expected_present: bool,
+) -> None:
+    """Post-condition on the Python-appended row, not a model gate.
+
+    The row is placed by code, so a violation here means THIS code is wrong
+    and the loud failure is the point. The pro lane enforces the same three
+    rules through its markup parser: exactly one coda, an announcer speaks
+    it, and nothing spoken follows it.
+    """
+    rows = [
+        row for row in ledger_data.get("lines", []) or []
+        if isinstance(row, dict)
+    ]
+    coda_indices = [
+        index for index, row in enumerate(rows)
+        if "news_coda" in (row.get("compose_flags") or [])
+    ]
+    if not expected_present:
+        if coda_indices:
+            raise CodexGraphError(
+                "a news-coda row was assembled although no coda text was "
+                "authored"
+            )
+        return
+    if len(coda_indices) != 1:
+        raise CodexGraphError(
+            f"the ledger carries {len(coda_indices)} news-coda rows; exactly "
+            f"one is the contract"
+        )
+    index = coda_indices[0]
+    coda_row = rows[index]
+    if coda_row.get("speaker_role") != "announcer":
+        raise CodexGraphError(
+            "the news-coda row is not spoken by the announcer"
+        )
+    trailing_spoken = [
+        row for row in rows[index + 1:]
+        if row.get("speaker_role") in ("character", "announcer")
+    ]
+    if trailing_spoken:
+        raise CodexGraphError(
+            "spoken rows follow the news coda; the coda is the last thing "
+            "the listener hears"
+        )
+
+
 def _apply_script_safety_cleanup(
     script: ScriptArtifactV4,
     technical_fn: GenerateFn,
@@ -3153,7 +3466,7 @@ def _bark_preset_pools() -> tuple[list, list]:
     return male, female
 
 
-def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: ScriptArtifactV4, meta: MutableMapping[str, Any]) -> dict[str, str]:
+def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: ScriptArtifactV4, meta: MutableMapping[str, Any], *, news_coda: str | None = None) -> dict[str, str]:
     # Bark voices used to be a hardcoded per-char_id map --
     # {"c01": speaker_6, "c02": speaker_3, "c03": speaker_0} -- all three MALE,
     # keyed on slot and never once reading the row's gender. Measured over the
@@ -3223,6 +3536,51 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
                     music_ids.append(lid)
                 elif not src.skip:
                     expected[lid] = src.text
+    # THE CODA IS APPENDED BY PYTHON, UNCONDITIONALLY (PBUG-20260814-02), which
+    # is exactly how the pro lane seals its own validated news read. The score
+    # graph cannot own this row: P3 plans the DRAMA, and the whole defect was
+    # that leaving the ending to a planner produced an episode whose only
+    # announcer beat sat in the middle. Placing it here makes "the coda is the
+    # last thing the listener hears" a property of the code rather than a hope
+    # about a draft.
+    if news_coda:
+        last_scene = score.scenes[-1]
+        last_beat = last_scene.beats[-1]
+        announcer_row = next(
+            (row for row in cast.cast if row.char_id == "announcer"), None,
+        )
+        coda_speaker = announcer_row.name if announcer_row else "ANNOUNCER"
+        # The coda shares the closing shot rather than inventing one: shots
+        # carry the visual prompts the image lane renders, so a shot with no
+        # authored description would open a hole downstream.
+        beats.append({
+            "beat_id": _NEWS_CODA_BEAT_ID,
+            "shot_id": last_beat.shot_id,
+            "scene_id": last_scene.scene_id,
+            "speaker": coda_speaker,
+            "char_id": "announcer",
+            "line_ids": [_NEWS_CODA_LINE_ID],
+        })
+        lines.append({
+            "line_id": _NEWS_CODA_LINE_ID,
+            "beat_id": _NEWS_CODA_BEAT_ID,
+            "shot_id": last_beat.shot_id,
+            "speaker": coda_speaker,
+            "char_id": "announcer",
+            "speaker_role": "announcer",
+            "text": news_coda,
+            "skip": False,
+            "tts_skip_reason": None,
+            "traits": "",
+            "boundary": "beat_start",
+            "arc_phase": last_beat.arc_phase,
+            "compose_flags": ["news_coda"],
+            "beat_intent": (
+                "name the real news story this drama was drawn from"
+            ),
+            "dialogue_slot_id": None,
+        })
+        expected[_NEWS_CODA_LINE_ID] = news_coda
     led.set_cast(cast_rows)
     led.set_scenes(scenes)
     led.set_shots(shots)
@@ -3264,6 +3622,7 @@ def _assemble_ledger(led: Any, score: RadioScoreV4, cast: CastPlanV4, script: Sc
         for cue in script.music_cues
     ]
     led.set_music(music)
+    _assert_news_coda_is_last(led.data, expected_present=bool(news_coda))
     led.data["clips"] = []
     stamp_word_counts(led)
     meta["scifi_codex"]["line_text_sha256"] = {k: hashlib.sha256(v.encode("utf-8")).hexdigest() for k, v in expected.items()}
@@ -3613,7 +3972,26 @@ def run_scifi_codex_episode(
     lane_meta["script_text_identity_generation"] = (
         _SCRIPT_TEXT_IDENTITY_GENERATION
     )
-    expected = _assemble_ledger(led, score, p2, script, meta)
+    # P6 -- THE CLOSING ANNOUNCER READ, ITS OWN PASS. It runs AFTER P5 because
+    # it is written against the episode the listener actually just heard, not
+    # against a plan of it.
+    news_coda, coda_receipt = _call_news_coda(
+        slot_fn=creative_fn,
+        pack=pack,
+        fact_index=p0,
+        score=score,
+        cast=p2,
+        episode_spoken_text=[
+            line.text for line in script.lines
+            if not line.skip
+            and line.speaker_role in ("character", "announcer")
+        ],
+        call_journal=journal,
+    )
+    lane_meta["news_coda"] = coda_receipt
+    expected = _assemble_ledger(
+        led, score, p2, script, meta, news_coda=news_coda,
+    )
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_codex_assembled"
     )

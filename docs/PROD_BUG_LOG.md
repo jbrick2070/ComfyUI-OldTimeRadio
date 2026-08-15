@@ -4203,7 +4203,44 @@ only visible because the cameo was FORCED and then did not appear.
   output is unconditionally Python-appended as its own row (`_otr_scifi_fable2.py:2897-2908`).
   **So the fix is levelling the non-pro lane up to the pro lane's structure, not
   inventing one.**
-- status: OPEN -- diagnosed and artifact-verified, not yet fixed.
+- fix (2026-08-14): the coda stopped being decoration and became **P6**, a pass
+  that owns one job. It runs AFTER P5 -- it is written against the episode the
+  listener actually just heard, not against a plan of it -- and reuses the
+  already-authored `codex_coda_contract_system` seam as its own system message,
+  so the JOB SIZE changed and the prompt text did not (the standing "one prompt
+  per job for every model tier" law).
+  * **Detector, code-side:** `_news_coda_source_anchors` projects the P0 index
+    into the verbatim strings a coda would have to say -- entity names (three
+    characters or more, because a two-letter "entity" matches inside ordinary
+    words and would wave a bad coda through) plus source-spanned figures.
+    `_names_a_source_anchor` matches on word boundaries, so "MIT" is not found
+    inside "transmitted". `_news_coda_findings` reports the missing
+    attribution AND any spoken-text defect together, because the clean pass
+    gets one bounded turn and a one-defect-at-a-time validator spends it on
+    the first complaint and dies on the second.
+  * **A firing verifier triggers a CLEAN, never a refusal and never a reroll**
+    (operator ruling). The ladder's `post_validator` is deliberately empty and
+    `retry_until_valid=False`: a coda missing its attribution is a good draft
+    missing one thing, so it comes back once with `previous_attempt` and
+    `unmet_requirements` attached instead of being redrawn cold.
+  * **Three outcomes, all of which CONTINUE the render:** `clean`; `unclean`
+    (it ships anyway and `meta.scifi_codex.news_coda.status` says so, because
+    an imperfect attribution beats none); `absent` (nothing is appended and
+    nothing is invented -- Python does not author the sentence).
+  * **Placement is now a property of the code, not a hope about a draft.**
+    `_assemble_ledger` Python-appends the validated row last, exactly as the
+    pro lane appends its news read, and `_assert_news_coda_is_last` re-asserts
+    the pro lane's three parser rules afterwards: exactly one coda, an
+    announcer speaks it, nothing spoken follows it.
+  * **Right-size the job, never raise the guard:** the pass carries its own
+    384-token decode budget instead of running on provider capacity like the
+    whole-script pass.
+  * Coverage: `tests/test_codex_news_coda.py` (19 tests) plus
+    `test_the_assembled_coda_is_the_last_row_and_the_announcer_speaks_it` and
+    the P6 row in the fixed-topology assertion in `tests/test_scifi_codex_lane.py`.
+    `nodes/story_packs/pipelines.json` declares the pass so the written
+    topology matches the executed one.
+- status: FIXED 2026-08-14.
 
 ## PBUG-20260814-03 -- the sealed ledger is narrated third-person prose, so TTS reads stage directions on air
 
