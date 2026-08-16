@@ -330,7 +330,7 @@ def _build_user_prompt(
 
       [optional]
       Cast so far:
-      - LEMMY (M, gravelly engineer, 50s, gruff mechanic)
+      - LEMMY (M, genial communications officer, 50s, warm Cockney)
       - BOB   (M, weary doctor, 40s, dry humor)
 
       JSON only:
@@ -1277,11 +1277,120 @@ CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS = frozenset({
 })
 
 
+#: The two ``lemmy_policy`` values that describe a cameo actually DECIDED, and
+#: the three knob states that describe what the operator ASKED FOR. They are
+#: constants rather than literals because a policy string is a contract between
+#: a producer and a reader who never meet, and one of them retyping it is a
+#: whole Bible-covered defect class. Every spelling in this module resolves
+#: here.
+LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION = "source_fidelity_exclusion"
+LEMMY_POLICY_OPERATOR_CAMEO = "operator_cameo"
+
+LEMMY_KNOB_NATURAL_ROLL = "natural_roll"
+LEMMY_KNOB_FORCED_INCLUDE = "forced_include"
+LEMMY_KNOB_FORCED_EXCLUDE = "forced_exclude"
+
+#: Versioned because this dict lands in durable ledger meta and outlives the
+#: code that wrote it.
+LEMMY_CAMEO_DECISION_SCHEMA = "lemmy-cameo-decision.v1"
+
+
+@dataclass(frozen=True)
+class LemmyCameoDecision:
+    """One episode's cameo answer, decided ONCE at runner entry.
+
+    Immutable on purpose: every consumer -- the cast contract, the roll
+    receipt, the prompt contract, the voice deal -- must be reading the same
+    answer. A mutable decision is how a lane ends up stamping ``lemmy_hit:
+    False`` beside a Lemmy who is standing in the script.
+
+    ``knob_state`` records what the OPERATOR asked for and ``lemmy_policy``
+    records what the BANK allowed. Keeping them separate is what lets a reader
+    tell "he was excluded from an adaptation" from "the roll came up short",
+    even when both land on ``lemmy_hit: False``.
+    """
+
+    lemmy_hit: bool
+    lemmy_policy: str
+    knob_state: str
+    source_bank_id: str
+    roll_executed: bool
+
+    def to_meta(self) -> dict:
+        """A PRIMITIVE-ONLY dict, because ``Ledger.save()`` never raises.
+
+        A non-serializable object in meta logs a warning, returns None, and a
+        dozen call sites never check -- so the episode loses its receipt in
+        silence. Everything below is a bool, an int or a str by construction.
+        """
+        return {
+            "schema_version": LEMMY_CAMEO_DECISION_SCHEMA,
+            "lemmy_hit": bool(self.lemmy_hit),
+            "lemmy_policy": str(self.lemmy_policy),
+            "knob_state": str(self.knob_state),
+            "source_bank_id": str(self.source_bank_id),
+            "roll_executed": bool(self.roll_executed),
+        }
+
+
+def resolve_lemmy_cameo(source_bank_id, force_lemmy) -> LemmyCameoDecision:
+    """Decide the cameo once, before any authoring.
+
+    Called EXACTLY ONCE per episode at runner entry. It must be early because
+    the content-owned lanes derive their cast FROM the finished script and then
+    gate on it -- so a cameo injected after the script cannot pass those gates,
+    and one decided twice could disagree with itself between the prompt and the
+    cast.
+
+    ``roll_lemmy()`` is called in exactly one branch and nowhere else, so the
+    ~11% OS-entropy roll happens once or not at all. Exclusion OUTRANKS the
+    operator knob: a fidelity lane refuses the cameo even when the operator
+    forced it, because the source's cast is the point of that lane.
+    """
+    if force_lemmy is None:
+        knob_state = LEMMY_KNOB_NATURAL_ROLL
+    elif force_lemmy:
+        knob_state = LEMMY_KNOB_FORCED_INCLUDE
+    else:
+        knob_state = LEMMY_KNOB_FORCED_EXCLUDE
+
+    # The RAW id is recorded; the exclusion test normalizes internally. The
+    # receipt should say what it was handed, not what the check made of it.
+    bank_id = str(source_bank_id or "").strip()
+
+    if _source_bank_excludes_lemmy(bank_id):
+        return LemmyCameoDecision(
+            lemmy_hit=False,
+            lemmy_policy=LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION,
+            knob_state=knob_state,
+            source_bank_id=bank_id,
+            roll_executed=False,
+        )
+
+    if force_lemmy is None:
+        return LemmyCameoDecision(
+            lemmy_hit=bool(_POOLS.roll_lemmy()),
+            lemmy_policy=LEMMY_POLICY_OPERATOR_CAMEO,
+            knob_state=knob_state,
+            source_bank_id=bank_id,
+            roll_executed=True,
+        )
+
+    return LemmyCameoDecision(
+        lemmy_hit=bool(force_lemmy),
+        lemmy_policy=LEMMY_POLICY_OPERATOR_CAMEO,
+        knob_state=knob_state,
+        source_bank_id=bank_id,
+        roll_executed=False,
+    )
+
+
 def content_owned_cast_contract(
     *,
     source_bank_id: str | None,
     num_characters_request: int,
     num_characters_locked: int,
+    decision: "LemmyCameoDecision | None" = None,
 ) -> dict:
     """Build ``meta.cast_contract`` for a lane that owns its own cast.
 
@@ -1305,21 +1414,33 @@ def content_owned_cast_contract(
     :data:`CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS`; the shapes are held equal by
     ``tests/test_content_owned_cast_contract.py``.
     """
-    excluded = _source_bank_excludes_lemmy(source_bank_id)
-    return {
-        # No cameo is cast on these lanes today. The roll itself is chunk B and
-        # is a genuine design fork -- both runners build the cast FROM the
-        # finished script, and forcing a pre-locked row killed the scifi_news_pro
-        # writer once already (PBUG-20260811-01). Until it lands this records
-        # the true state rather than a hopeful one.
-        "lemmy_hit":              False,
+    if decision is None:
+        # NO DECISION SUPPLIED -- the pre-chunk-B answer, byte-for-byte. A lane
+        # that has not yet migrated keeps stamping exactly what it stamped
+        # before, so the API can land green ahead of its callers.
+        #
+        # No cameo is cast on such a lane: it builds its cast FROM the finished
+        # script and never runs the roll. This records the true state rather
+        # than a hopeful one.
+        #
         # Fidelity still outranks the lane's own silence: if a content-owned
-        # pipeline is ever pointed at an adaptation bank, the reason the cameo
-        # is absent is the exclusion, not the missing roll.
-        "lemmy_policy": (
-            "source_fidelity_exclusion" if excluded
+        # pipeline is pointed at an adaptation bank, the reason the cameo is
+        # absent is the exclusion, not the missing roll.
+        lemmy_hit = False
+        lemmy_policy = (
+            LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION
+            if _source_bank_excludes_lemmy(source_bank_id)
             else CONTENT_OWNED_NO_CAMEO_ROLL
-        ),
+        )
+    else:
+        # A MIGRATED LANE. The contract and the roll receipt now read from one
+        # decision, so they cannot disagree about whether Lemmy is in the show.
+        lemmy_hit = bool(decision.lemmy_hit)
+        lemmy_policy = str(decision.lemmy_policy)
+
+    return {
+        "lemmy_hit":              lemmy_hit,
+        "lemmy_policy":           lemmy_policy,
         # The writer's cast LLM made zero attempts here, which is the honest
         # count -- this lane's casting attempts live in its own pass receipts.
         "casting_attempts":       [],
@@ -1946,9 +2067,9 @@ def lock_cast(
     meta.update({
         "lemmy_hit":              lemmy_hit,
         "lemmy_policy": (
-            "source_fidelity_exclusion"
+            LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION
             if _source_bank_excludes_lemmy(source_bank_id)
-            else "operator_cameo"
+            else LEMMY_POLICY_OPERATOR_CAMEO
         ),
         "casting_attempts":       casting_attempts,
         "num_characters_request": num_characters,

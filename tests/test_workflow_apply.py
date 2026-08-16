@@ -340,15 +340,34 @@ def test_patch_creative_can_force_the_lemmy_cameo(schemas, master_copy):
 
 def test_the_forced_value_is_one_the_writer_actually_accepts():
     """Guards against whitelisting a dial and then setting a string it does not
-    take. `_LEMMY_CAMEO_FORCE.get()` returns None for an unknown key, which is
-    the NATURAL ROLL -- so a typo here would silently render an episode without
-    the cameo while looking like it forced one."""
+    take. The three spellings are the contract between the workflow applier and
+    the writer, so they are pinned literally."""
     from nodes.OTR_LedgerScriptWriter import _LEMMY_CAMEO_FORCE
 
     assert _LEMMY_CAMEO_FORCE["always include"] is True
     assert _LEMMY_CAMEO_FORCE["never include"] is False
     assert _LEMMY_CAMEO_FORCE["roll (~11% chance)"] is None
-    assert _LEMMY_CAMEO_FORCE.get("force") is None      # the value a review invented
+
+
+def test_a_mistyped_cameo_choice_now_fails_loud_instead_of_rolling():
+    """The old behaviour was the bug: `_LEMMY_CAMEO_FORCE.get()` returned None
+    for an unknown key, and None is the NATURAL ROLL -- so a typo rendered an
+    episode WITHOUT the cameo while looking like it forced one, and nothing
+    downstream could tell the two apart.
+
+    `_resolve_inputs` now rejects an unknown choice outright, and the message
+    names all three so the fix is obvious from the error alone."""
+    import pytest
+
+    from nodes.OTR_LedgerScriptWriter import _resolve_inputs
+
+    with pytest.raises(ValueError) as excinfo:
+        _resolve_inputs(lemmy_cameo="force")     # the value a review invented
+
+    message = str(excinfo.value)
+    assert "force" in message
+    for choice in ("roll (~11% chance)", "always include", "never include"):
+        assert choice in message
 
 
 def test_whitelisting_the_cameo_did_not_open_a_route_or_engine_field():

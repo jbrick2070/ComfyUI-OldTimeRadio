@@ -1802,6 +1802,10 @@ def _resolve_inputs(
     # None on a non-gguf run (request_slot then resolves from the policy).
     preflight_policy: Any = None,
     technical_load_config: Any = None,
+    # The LEMMY cameo knob, resolved HERE so every lane reads one answer.
+    # Defaulted from the choices list rather than a repeated literal: the two
+    # spellings drifting apart is the failure this parameter exists to end.
+    lemmy_cameo: str = _LEMMY_CAMEO_CHOICES[0],
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1816,6 +1820,19 @@ def _resolve_inputs(
     ``run()`` once cast_seed and script_brief both exist. The old
     three-way style_custom/combo/LLM-picker resolver is gone.
     """
+    # THE CAMEO KNOB IS VALIDATED FIRST, before any RSS fetch or source work.
+    # EXACT membership, and a typo FAILS LOUD naming the three choices. The
+    # legacy path used `_LEMMY_CAMEO_FORCE.get(...)`, which turns an unknown
+    # string into None -- i.e. silently into the natural roll -- so a misspelled
+    # "always include" read as "leave it to chance" and nobody could tell the
+    # difference from the outside. Failing here costs nothing; failing after a
+    # fetch costs a network round trip to learn a widget was mistyped.
+    if lemmy_cameo not in _LEMMY_CAMEO_FORCE:
+        raise ValueError(
+            "lemmy_cameo=%r is not one of %s"
+            % (lemmy_cameo, ", ".join(repr(c) for c in _LEMMY_CAMEO_CHOICES))
+        )
+
     # S30 B2a: normalize each model id by stripping the [NOT DOWNLOADED]
     # dropdown suffix. Raw widget values never reach a consumer / meta
     # stamp -- catalog._strip_label_suffix is the single normalization
@@ -2106,6 +2123,10 @@ def _resolve_inputs(
         # field, because source_meta is copied wholesale into durable ledger
         # metadata and this holds the complete work. Nothing may stamp it.
         "source_document": source_document,
+        # The cameo decision as a tri-state: None = roll, True/False = forced.
+        # Every consumer -- the legacy block and every dispatched lane runner --
+        # reads THIS key. The widget string is resolved exactly once, here.
+        "lemmy_force": _LEMMY_CAMEO_FORCE[lemmy_cameo],
     }
 
 
@@ -3134,8 +3155,9 @@ class OTR_LedgerScriptWriter:
                     {
                         "default": "roll (~11% chance)",
                         "tooltip": (
-                            "LEMMY easter-egg cameo -- the gravelly "
-                            "engineer who occasionally joins the cast.\n\n"
+                            "LEMMY easter-egg cameo -- the genial Cockney "
+                            "communications officer who occasionally joins "
+                            "the cast.\n\n"
                             "  roll (~11% chance) -- default; LEMMY may "
                             "appear at random. The roll uses OS entropy "
                             "and is NOT tied to the seed (BUG-LOCAL-260), "
@@ -3890,6 +3912,11 @@ class OTR_LedgerScriptWriter:
             # the gemma env fallback.
             preflight_policy=_llm_preflight.policy,
             technical_load_config=_llm_preflight.load_config_by_slot.get("technical"),
+            # THE FORWARDING WHOSE ABSENCE MADE THE WIDGET INERT. Without this
+            # line the dispatched lane runners never saw the operator's cameo
+            # choice at all -- only the legacy in-line path did, by reading the
+            # run() local directly. A reach-test pins this arrival.
+            lemmy_cameo=lemmy_cameo,
         )
 
         log.info(
@@ -4611,7 +4638,10 @@ class OTR_LedgerScriptWriter:
         # lemmy_cameo widget -> force_lemmy override (BUG-LOCAL-260).
         # None lets cast_pools.roll_lemmy's OS-entropy ~11% decide;
         # True / False force the cameo into / out of the cast.
-        lemmy_force = _LEMMY_CAMEO_FORCE.get(lemmy_cameo)
+        # Read from `resolved`, not from the run() local: ONE resolution site,
+        # already validated, so this path and the dispatched lanes can never
+        # disagree about what the operator asked for.
+        lemmy_force = resolved["lemmy_force"]
         with slot_scheduler.helper_context("lock_cast"):
             cast_rows, cast_meta = _OTRCAST.lock_cast(
                 creative_fn=creative_generate_fn,
@@ -4638,7 +4668,12 @@ class OTR_LedgerScriptWriter:
         meta["cast_contract_version"] = "cast-v1"
         meta["cast_contract"] = {
             "lemmy_hit":              cast_meta["lemmy_hit"],
-            "lemmy_policy":           cast_meta.get("lemmy_policy", "operator_cameo"),
+            # The policy string has ONE spelling, and it lives beside the
+            # decision type in _otr_casting. `lock_cast` always sets the key, so
+            # this default is unreachable -- which is exactly why it was free to
+            # drift out of step with the producer had it stayed a literal.
+            "lemmy_policy": cast_meta.get(
+                "lemmy_policy", _OTRCAST.LEMMY_POLICY_OPERATOR_CAMEO),
             "casting_attempts":       cast_meta["casting_attempts"],
             "num_characters_request": cast_meta["num_characters_request"],
             "num_characters_locked":  cast_meta["num_characters_locked"],

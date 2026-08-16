@@ -721,8 +721,11 @@ def lemmy_row() -> dict:
     """Return a fully-populated LEMMY cast row in the same shape
     pick_announcer / casting LLM responses produce.
 
-    LEMMY is always rendered through Bark with the gravelly
-    `v2/en_speaker_8` preset, so the row stamps `tts_model="bark"`.
+    `v2/en_speaker_8` is LEMMY's WRITER-STAGE identity, and the row stamps
+    `tts_model="bark"` to say so. It is not a claim about delivery: CastLock
+    may resolve the qualified IndexTTS2 route for him instead, and on the
+    canonical graph it does. The preset survives on the row either way --
+    CastLock's stamp writes engine and reference, never `voice_preset`.
     """
     return {
         "name":                  LEMMY_PROFILE["name"],
