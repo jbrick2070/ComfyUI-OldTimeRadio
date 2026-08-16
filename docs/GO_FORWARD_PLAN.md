@@ -446,6 +446,21 @@ regression signal.
 * **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
   this is NEW construction in two places, not a wiring fix that regressed.
 
+**1.5 OPERATOR REQUEST (2026-08-16, mid-sweep): QUICK STORY-QUALITY SCORING --
+a FINDER, not a chase.** "At some point I'd like quick scoring -- story
+quality -- good stories?" This does NOT reopen the 2026-08-04 story-quality
+freeze: no rewriting, no prompt-craft, no writer bake-offs. It is a READ-ONLY
+ranking tool so the operator can find the good episodes in a ~1,900-ledger
+corpus. Constraints settled at intake: THE LAW applies in full (score =
+telemetry/report; it may never reject, reroll, retire or block an episode,
+and it never wires into the render path); 100% local ($0, `gemma-4-12b`
+judge, one call per episode, overnight batch); reads frozen ledgers only.
+Sketch: `scripts/otr_story_score.py` -- deterministic checks (arc
+start/middle/end, cast utilization, coda present + names its source,
+dialogue-vs-direction ratio) + one local judge call ("keep listening? 1-10,
+one sentence"), ranked CSV + top-N shortlist. Queue position: AFTER the
+Lemmy sprint's chunk B; does not jump anything.
+
 **2. PBUG-20260815-11 -- UNBLOCKED 2026-08-15 BY A NARROWED RULING. Build it
 AFTER the Lemmy sprint, the six-bank sweep and the tag -- it does not jump the
 queue.** 34 characters sound one gender and look the other, measured over 1,686
