@@ -108,10 +108,20 @@ def _decide(name: str, text: str, others: List[str]) -> Tuple[str, str, str]:
     """
     for record in parse_character_roster(text):
         if record.matches(name):
-            gender = infer_gender(record.description or record.name)
+            # TWO arguments and a TUPLE back -- `infer_gender(name, description)`
+            # returns `(gender, source)`, and the roster module's own call sites
+            # (`_otr_character_roster.py:290,333,335`) all unpack it. This line
+            # passed ONE argument and assigned the result to a bare name, so it
+            # raised TypeError the instant a cast block parsed, and nothing
+            # caught it -- it would have killed the whole 65-unit run rather
+            # than one unit. It never fired only because prose has no cast
+            # block, so every shipped sidecar reads `"roster": 0`.
+            gender, basis = infer_gender(
+                record.name, record.description or record.name)
             if gender in ("male", "female"):
                 return gender, "roster", (
-                    "source cast list: %s" % (record.description or record.name)
+                    "source cast list (%s): %s"
+                    % (basis, record.description or record.name)
                 )
     verdict = scan_gender(name, text, other_names=others)
     if verdict.decided:

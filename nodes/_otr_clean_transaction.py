@@ -147,10 +147,17 @@ class CleanTransaction:
     def restore(self) -> None:
         """Put the ledger back exactly as the lane accepted it.
 
-        IN PLACE on both containers, deliberately. The writer tail holds `meta`
-        as a local variable and the lane runners hold row references; rebinding
-        either container would leave those aliases pointing at a detached copy,
-        and every later stamp would land somewhere the ledger never sees.
+        IN PLACE on the two TOP-LEVEL containers, and that is the exact extent
+        of the guarantee. `led.data["lines"]` and `led.data["meta"]` keep their
+        identity, because the writer tail holds `meta` as a local variable and
+        rebinding it would leave every later stamp landing in a detached dict --
+        a silent hole shaped exactly like a working ledger.
+        NESTED objects are REPLACED, not mutated: an individual row dict, or
+        `meta["scifi_codex"]`, comes back as a fresh deep copy. Nothing in the
+        tail holds such a reference across this window today -- the only
+        finalizer keeps text strings -- but a future caller that stashed
+        `row = led.data["lines"][i]` before the clean stage would be holding a
+        stale object afterwards, and would not be told.
         """
         data = self._led.data
         rows = data.get("lines")
@@ -169,11 +176,52 @@ class CleanTransaction:
 
     # -- commit ----------------------------------------------------------
     def reconcile(self) -> Dict[str, Any]:
-        """Prove the window's rewrites, or roll them back and keep going."""
+        """Prove the window's rewrites, or roll them back and keep going.
+
+        BOTH arms are guarded, and the second one is the point. `_degrade` was
+        originally called from a bare `except`, so anything IT raised -- a
+        finalizer whose `restore_proof_state` threw, a ledger that would not
+        deep-copy -- propagated straight out of here to an unguarded call site
+        and killed the render. That is the Law 7 violation this module exists to
+        prevent, occurring inside its own rollback path, which is the last place
+        anyone would look for it.
+
+        So the fallback has a fallback. If even degrading fails there is nothing
+        left to try: say so as loudly as possible, hand back a receipt that
+        records BOTH failures, and let the freeze cascade decide. The one thing
+        that must not happen is an exception leaving this method.
+        """
         try:
             return self._reseal()
         except Exception as exc:  # noqa: BLE001 -- Law 7: never kill the render
-            return self._degrade(exc)
+            try:
+                return self._degrade(exc)
+            except Exception as degrade_exc:  # noqa: BLE001
+                log.error(
+                    "[clean-transaction] the rollback ITSELF failed (%s: %s) "
+                    "after the reseal failed (%s: %s). The ledger may be in a "
+                    "mixed state; the freeze cascade is the terminal authority "
+                    "and will refuse it if it is unusable. Continuing rather "
+                    "than raising, because raising here destroys finished work "
+                    "and proves nothing.",
+                    type(degrade_exc).__name__, degrade_exc,
+                    type(exc).__name__, exc,
+                )
+                receipt = {
+                    "outcome": "rollback_failed",
+                    "authorized_stages": list(CLEAN_WINDOW_STAGES),
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "rollback_error_type": type(degrade_exc).__name__,
+                    "rollback_error": str(degrade_exc),
+                    "restored_state_proved": False,
+                }
+                try:
+                    self._led.data.setdefault("meta", {})[
+                        DEGRADATION_META_KEY] = receipt
+                except Exception:  # noqa: BLE001 -- nothing left to salvage
+                    pass
+                return receipt
 
     def _reseal(self) -> Dict[str, Any]:
         _CT = _transition()

@@ -327,6 +327,35 @@ class TestDegradation:
         assert led.data["meta"] is meta_obj
         assert led.data["lines"] is lines_obj
 
+    def test_a_ROLLBACK_that_itself_fails_still_does_not_kill_the_render(self):
+        """The Law 7 violation hiding inside the Law 7 enforcement.
+
+        `_degrade` used to be called from a bare `except`, so anything IT raised
+        -- here a finalizer whose `restore_proof_state` throws -- propagated out
+        of `reconcile()` to an unguarded call site and killed the render. The
+        fallback needed a fallback, and this is the test that says so.
+        """
+        led = _accepted_led()
+
+        class _Hostile(_LaneProof):
+            def restore_proof_state(self, state):
+                raise RuntimeError("the rollback itself is broken")
+
+        proof = _Hostile({"l1": "Exact raw text."}, fail_reseal=True)
+        window = txn.open_transaction(led, finalizer=proof)
+        _clean_stage_rewrites(led, "l1", "Exact repaired text.")
+
+        receipt = window.reconcile()  # must not raise
+
+        assert receipt["outcome"] == "rollback_failed"
+        assert receipt["rollback_error_type"] == "RuntimeError"
+        assert receipt["restored_state_proved"] is False
+        # Still durable: whoever reads this ledger must be able to see BOTH
+        # failures, or the mixed state looks like an ordinary episode.
+        stamped = led.data["meta"][txn.DEGRADATION_META_KEY]
+        assert stamped["outcome"] == "rollback_failed"
+        assert "cannot be resealed" in stamped["error"]
+
     def test_a_lane_with_no_finalizer_degrades_the_same_way(self):
         """scifi_news_pro carries no tail_finalizer but DOES stamp
         content_authorship, enforced terminally at

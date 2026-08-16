@@ -3449,9 +3449,16 @@ class _CodexTailFinalizer:
             k: hashlib.sha256(v.encode("utf-8")).hexdigest()
             for k, v in self.expected.items()
         }
-        # Prove the reseal instead of assuming it, using the SAME primitive the
-        # pre-save gate and the saved-ledger audit call. If it passes here it
-        # passes there; if it does not, the transaction still has its snapshot.
+        # A CONSISTENCY CHECK, and its limits are worth stating plainly rather
+        # than overselling. `expected` was just rebuilt FROM these rows and the
+        # hash mirror was just derived FROM `expected`, so `_proof` is comparing
+        # two values this function produced moments apart: it cannot fail here
+        # on correct code, and it is NOT independent evidence that the reseal is
+        # right. What it does buy is real but narrow -- it runs the same
+        # primitive the pre-save gate and saved-ledger audit will run, so a
+        # future edit that updates one of the two surfaces and forgets the other
+        # fails HERE, inside the transaction that still holds a snapshot, rather
+        # than at the freeze where the only options are refuse or ship.
         self._proof(ledger_data)
 
     def before_save(self, *, ctx: Any) -> None:

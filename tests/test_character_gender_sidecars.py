@@ -137,6 +137,51 @@ def _sidecar(slug: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+class TestTheLadderItself:
+    """Tier 1 had NEVER executed, and nothing in the tree would have said so.
+
+    `_decide` called `infer_gender(one_arg)` where the real signature is
+    `infer_gender(name, description) -> (gender, source)`. It raised TypeError
+    the instant a cast block parsed, and nothing caught it -- one bad unit would
+    have killed the whole 65-unit run. It stayed dormant purely because prose
+    has no cast block, so every shipped sidecar reads `"roster": 0` and the
+    corpus test above passed over a tier that could not run.
+    """
+
+    _CAST_TEXT = (
+        "CHARACTERS\n"
+        "\n"
+        "LORD ALFRED, a nobleman of the county\n"
+        "MARGARET, daughter to Lord Alfred\n"
+        "\n"
+        "The scene opens on a quiet hall.\n"
+    )
+
+    def _decide(self, name):
+        import importlib
+
+        stamper = importlib.import_module("otr_stamp_character_genders")
+        return stamper._decide(name, self._CAST_TEXT, [name])
+
+    def test_tier_1_RUNS_at_all(self):
+        """The regression: this raised TypeError before the fix."""
+        gender, tier, evidence = self._decide("LORD ALFRED")
+        assert gender in ("male", "female", "")
+        assert isinstance(evidence, str)
+
+    def test_tier_1_reads_the_cast_block_and_wins_over_the_pronoun_scan(self):
+        gender, tier, evidence = self._decide("LORD ALFRED")
+        assert (gender, tier) == ("male", "roster")
+        assert "source cast list" in evidence
+
+    def test_a_RELATION_word_in_the_cast_block_outranks_a_title(self):
+        """"daughter to Lord Alfred" is a woman despite the Lord -- the
+        precedence `infer_gender` implements, which a single-argument call could
+        never have exercised."""
+        gender, tier, _evidence = self._decide("MARGARET")
+        assert (gender, tier) == ("female", "roster")
+
+
 class TestVendoredCorpus:
     def test_every_manifest_unit_has_a_sidecar(self):
         """64 of 65 were bare. That is the whole defect, so it is the first

@@ -4440,7 +4440,7 @@ only visible because the cameo was FORCED and then did not appear.
   before `run_ledger_clean`, and reconciled at `:6819` after
   `run_ledger_cleanup` and before `stamp_text_for_tts_delivery`. New module
   `nodes/_otr_clean_transaction.py`; the codex lane grew the three-method proof
-  protocol at `_otr_scifi_codex.py:3318-3359`
+  protocol at `_otr_scifi_codex.py:3414-3462`
   (`snapshot_proof_state` / `restore_proof_state` / `reseal_proof`).
   - COMMIT PATH: ONE transition covers BOTH authorized stages -- one per stage
     is impossible by construction, since the second stage's pre-state is the
@@ -4473,7 +4473,7 @@ only visible because the cameo was FORCED and then did not appear.
     time -- `:242-246` writes only `text_for_tts*`. That matters here because
     the reconcile ordering is only safe if nothing after it moves a hash the
     proof covers.
-  - coverage: `tests/test_clean_transaction.py` (27 tests) -- commit path,
+  - coverage: `tests/test_clean_transaction.py` (29 tests) -- commit path,
     no-op, rollback, in-memory state restore, container identity, the lane
     protocol, and an END-TO-END `_run_writer_tail` test proving the writer
     actually OPENS the transaction (a pass that ships and runs dormant is this
@@ -4483,6 +4483,19 @@ only visible because the cameo was FORCED and then did not appear.
   - Bible: promoted as `12.104` -- the id `_otr_content_transition.py` already
     cited as a forward reference and which did not exist until now.
     `otr_coverage_index.yaml` row appended.
+- **SONNET QA PASS 2026-08-15 found two defects the Fable gate did not**, both
+  now fixed with coverage. (1) `_degrade` was called from a bare `except`, so
+  anything IT raised -- a finalizer whose `restore_proof_state` threw -- left
+  `reconcile()` and reached an UNGUARDED call site at
+  `OTR_LedgerScriptWriter.py:6819`, killing the render. That is the Law 7
+  violation this module exists to prevent, occurring inside its own rollback
+  path. The fallback now has a fallback: it logs both failures, stamps an
+  `outcome: rollback_failed` receipt and continues. (2) Two docstrings claimed
+  more than the code delivers -- `reseal_proof`'s closing `_proof()` call is a
+  CONSISTENCY check between two surfaces the same function just derived, not
+  independent evidence, and `restore()` preserves object identity for the two
+  TOP-LEVEL containers only, replacing nested rows with fresh deep copies. Both
+  now say so.
 - status: **FIXED, and the wiring is LIVE-PROVEN 2026-08-15 -- but only the
   no-op path.** Leg `signal_lost_the_architecture_of_error_20260815_152004`
   (scifi_news, real canonical workflow) is the FIRST successful run of this
