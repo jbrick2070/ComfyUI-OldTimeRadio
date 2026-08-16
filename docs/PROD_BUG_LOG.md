@@ -4898,3 +4898,38 @@ only visible because the cameo was FORCED and then did not appear.
   question is settled.
 - status: **OPEN, BLOCKED ON THE OPERATOR.** Measured and reported by an
   existing audit; the fix requires a ruling change.
+
+## PBUG-20260811-03 EXTENDED -- it is BOTH content-owned lanes, confirmed on 2026-08-15 artifacts
+
+- The existing entry records `scifi_news` losing the LEMMY cameo and shipping an
+  empty `cast_contract`. Re-checked against the two legs rendered 2026-08-15 on
+  HEAD `50790099`, reading the frozen ledgers directly:
+
+      signal_lost_the_architecture_of_error_20260815_152004  (scifi_news)
+          cast_contract: {}   lemmy in cast: False
+      signal_lost_blood_red_water_20260815_195226            (scifi_news_pro)
+          cast_contract: {}   lemmy in cast: False
+
+  **`scifi_news_pro` has the same defect and the log did not say so.** Both
+  content-owned lanes build their own cast and never reach `lock_cast()`, which
+  is what applies the cameo -- so the exposure is twice what was recorded, and
+  it is still silent: nothing fails and nothing logs.
+- The established root cause and the warning both stand: routing content-owned
+  lanes back through `lock_cast()` is THE WRONG FIX -- that block deliberately
+  withholds `cast_seed` because claiming one on a lane-owned cast detonated
+  CastLock's replay (`num_characters must be 1-6, got 0`). The repair belongs in
+  each lane runner, and it is two things, not one: the cameo roll AND the cast
+  contract.
+- **Sibling risk, do not fix these in isolation:** PBUG-20260811-01 says forcing
+  the cameo KILLS the `scifi_fable2` writer on `scifi_news_pro` (markup ladder
+  exhausted, BAD_LINE, reproduced at 30 and 90 target words). A cameo fix on that
+  lane must be proved against that failure, not just against an empty contract.
+- **Observed alongside, worth its own look:** the cast names on those two legs
+  were `Dr. Aris Thorne / Elias Vance / Unit 7` and `Elias / Sarah`. Two
+  different lanes, two different stories, both produced an "Elias". These lanes
+  do not use the 154-name pool -- they name through their own model call with no
+  diversity mechanism -- which is the operator's long-standing "it always picks
+  the same name" complaint, seen live for the first time. Two samples is not a
+  measurement; `scripts/otr_name_randomness_lab.py` was built this session to
+  measure it properly and has not been run.
+- status: OPEN. Evidence refreshed, scope corrected from one lane to two.

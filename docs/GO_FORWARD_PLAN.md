@@ -351,18 +351,36 @@ edges are load-bearing:
 The bug-fix sprint's D2 is CLOSED and D4's data gap is closed. What remains, in
 the order I would take it:
 
-**1. PBUG-20260815-11 -- BLOCKED ON THE OPERATOR, ask before anything else.**
+**1. THE LEMMY SPRINT -- the operator asked for it by name at the 2026-08-15
+wrap ("fix lemmy, test it all and tag").** Start here.
+PBUG-20260811-03 was re-confirmed on that session's own artifacts and its SCOPE
+GREW: `cast_contract` is `{}` and the cameo is absent on BOTH content-owned
+lanes, not just `scifi_news`. Read the refreshed entry at the end of
+`PROD_BUG_LOG.md` before planning.
+Three things that will save a wasted swing: the obvious fix (route content-owned
+lanes back through `lock_cast()`) is explicitly THE WRONG ONE and the repair
+belongs in each lane runner; the fix is TWO things, the cameo roll and the cast
+contract; and PBUG-20260811-01 says forcing the cameo KILLS the fable2 writer on
+`scifi_news_pro`, so any cameo work there must be proved against that failure
+rather than only against an empty contract. PBUG-20260811-02 (missing
+materialized still, seen ONCE) wants a re-run before its cause is theorised.
+The operator also asked for a full six-bank live sweep and a tag once it passes
+-- three banks are proven at tag `otr-2026-08-15-d2-closed`
+(`scifi_news`, `scifi_news_pro`, `public_domain`); `shakespeare`,
+`media_archive` and `original` are NOT.
+
+**2. PBUG-20260815-11 -- BLOCKED ON THE OPERATOR, ask before building.**
 34 characters sound one gender and look the other, measured over 1,686 real
 ledgers. The fix is forbidden by a live contract that survived four review
 rounds. The operator has to choose: leave it, narrow the ruling, or strengthen
 the prompt (the only option buildable today). Do NOT build a description
 validator without an explicit reversal, and do NOT edit the ruling comment away.
 
-**2. The contract's remaining chunks**, `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
+**3. The contract's remaining chunks**, `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
 is still the authority: chunk 4 (D5 non-media codas), chunk 5 (D6 selector +
 reservation), chunk 6 (D5 media_archive close), and D7. D1/D2/D3 are done.
 
-**3. Shakespeare's 24 unresolved rows** (CALIBAN, ARIEL, Sir Andrew, the
+**4. Shakespeare's 24 unresolved rows** (CALIBAN, ARIEL, Sir Andrew, the
 mechanicals). The sanctioned instrument is ten more curated lines in
 `roster_gender_supplement.json`, keyed by FOLGER CODE (`Tmp`, `MND`), not slug.
 Both r1 reviewers independently said do NOT point a model at this lane.
