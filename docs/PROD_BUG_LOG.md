@@ -4933,3 +4933,42 @@ only visible because the cameo was FORCED and then did not appear.
   measurement; `scripts/otr_name_randomness_lab.py` was built this session to
   measure it properly and has not been run.
 - status: OPEN. Evidence refreshed, scope corrected from one lane to two.
+
+### Operator context, 2026-08-15 -- NOT derivable from the code, recorded so it is not lost
+
+**MEASURE THE PART, NOT THE PRESENCE. The presence question is already
+answered.** Lemmy is cast **190** times and SPEAKS in **188**; the only two
+silent castings are from June and pre-date the current cameo code. His identity
+is stable in every single one -- `char_id` **c02**, male, `v2/en_speaker_8`, the
+fixed Cockney `speech_signature`. **The variable is the SIZE and fidelity of the
+part**, not whether he turns up.
+
+**The first GOOD Lemmy was seen 2026-08-15 and the operator flagged it himself.**
+Two `media_archive` episodes that day -- 01:34 and 04:23 -- gave him **6 speaking
+lines each**, against a **3.2** average for that bank and a **1.5-5.0** range
+across all banks. The biggest parts he has had in 190 castings. Read the exemplar
+before touching anything:
+`signal_lost_reel_of_mystery_20260815_041350_ledger.json`.
+
+**That is a DIFFERENT, LATER, QUALITY-SIDE item and is NOT in this sprint.** The
+sprint is the STRUCTURAL defect below: the `scifi_*` family never casts him at
+all and always ships an empty `cast_contract`. Fix that first.
+
+**DETECTOR WARNING -- this will burn a window if it is not read.** Ledger LINES
+identify the speaker by `char_id`, **not by name**. Lemmy is always `c02`.
+Matching the string `"LEMMY"` in a line's speaker field returns a near-total
+FALSE NEGATIVE -- it reports him silent in **188 of 190**. The operator made
+exactly that mistake on 2026-08-15 and caught it. **Resolve his `char_id` from
+the CAST row first, then match lines on that id.** (Cast ROWS do carry the name,
+so name-matching is correct there and wrong one level down -- which is precisely
+why the trap is easy to fall into.)
+
+**Scope note, recorded because two counts are in play.** The operator described
+the affected family as ~14 lane variants. The shipped registry at HEAD
+`d96dd8e2` shows **2** scifi banks (`scifi_news`, `scifi_news_pro`), **2** scifi
+pipelines (`scifi_news_circuit`, `scifi_news_pro_multipass`) and therefore **2
+repair sites** -- `_otr_scifi_codex.run_scifi_codex_episode` and
+`_otr_scifi_fable2.run_scifi_fable2_episode`. Both figures are recorded rather
+than one overwriting the other: **the fix lands in 2 runner modules regardless of
+how many variants route through them**, but if there really are ~14 the
+reconciliation is worth doing before the sweep claims coverage.

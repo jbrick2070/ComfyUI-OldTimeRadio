@@ -369,6 +369,25 @@ The operator also asked for a full six-bank live sweep and a tag once it passes
 (`scifi_news`, `scifi_news_pro`, `public_domain`); `shakespeare`,
 `media_archive` and `original` are NOT.
 
+**TWO OPERATOR CORRECTIONS (2026-08-15) THAT CHANGE HOW THIS IS MEASURED --
+full text at the END of `PROD_BUG_LOG.md`:**
+
+1. **Do NOT measure the cameo by PRESENCE.** That question is answered: Lemmy is
+   cast 190 times and speaks in 188, identity stable throughout (`c02`, male,
+   `v2/en_speaker_8`, fixed Cockney signature). The two silent castings are from
+   June and pre-date the current code. **The open variable is the SIZE and
+   fidelity of the part** -- and that is a LATER, quality-side item, explicitly
+   NOT in this sprint. The sprint is the STRUCTURAL `scifi_*` gap.
+2. **DETECTOR TRAP, read before writing any verifier.** Ledger LINES identify the
+   speaker by `char_id`, never by name; Lemmy is always `c02`. Matching the
+   string `"LEMMY"` against a line's speaker field reports him silent in 188 of
+   190 -- a near-total false negative the operator hit and caught himself.
+   Resolve his `char_id` from the CAST row (which DOES carry the name), then
+   match lines on that id.
+
+**Repair sites: TWO runner modules** -- `_otr_scifi_codex` and
+`_otr_scifi_fable2` -- whatever the variant count above them.
+
 **2. PBUG-20260815-11 -- UNBLOCKED 2026-08-15 BY A NARROWED RULING. Build it
 AFTER the Lemmy sprint, the six-bank sweep and the tag -- it does not jump the
 queue.** 34 characters sound one gender and look the other, measured over 1,686
