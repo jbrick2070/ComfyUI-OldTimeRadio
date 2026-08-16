@@ -10,28 +10,18 @@
   "body_bytes": 8492,
   "body_words": 1516,
   "text_path": "config/source_banks/public_domain_story/sources/mote_middle_distance.txt",
-  "characters": [
-    {
-      "name": "Keith Tantalus",
-      "gender": "male",
-      "gender_source": "pronouns",
-      "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 6 vs she/her/hers 0 across 2 mention window(s) for 'keith tantalus', 'tantalus'",
-      "aliases": [
-        "tantalus"
-      ]
-    }
-  ],
+  "characters": [],
   "gender_ladder": {
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 1,
+      "pronouns": 0,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 3,
     "declined": [
+      "Keith Tantalus",
       "Eva",
       "the narrator"
     ]

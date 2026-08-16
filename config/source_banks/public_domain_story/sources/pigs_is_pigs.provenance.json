@@ -27,28 +27,19 @@
       "aliases": [
         "morehouse"
       ]
-    },
-    {
-      "name": "the head-office clerk",
-      "gender": "male",
-      "gender_source": "pronouns",
-      "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 4 vs she/her/hers 0 across 1 mention window(s) for 'the head-office clerk', 'head-office clerk', 'clerk'",
-      "aliases": [
-        "head-office clerk",
-        "clerk"
-      ]
     }
   ],
   "gender_ladder": {
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 3,
+      "pronouns": 2,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 3,
-    "declined": []
+    "declined": [
+      "the head-office clerk"
+    ]
   }
 }

@@ -32,16 +32,6 @@
       ]
     },
     {
-      "name": "Herbert White",
-      "gender": "male",
-      "gender_source": "pronouns",
-      "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 4 vs she/her/hers 0 across 2 mention window(s) for 'herbert white'; ignored shared form(s) ['white']",
-      "aliases": [
-        "white"
-      ]
-    },
-    {
       "name": "Sergeant-Major Morris",
       "gender": "male",
       "gender_source": "pronouns",
@@ -56,11 +46,13 @@
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 4,
+      "pronouns": 3,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": []
+    "declined": [
+      "Herbert White"
+    ]
   }
 }

@@ -201,6 +201,37 @@ sidecar generation feeds **D5** identity fields (`work_title` / `author` /
 `license_label`), not D4's gender fields -- same file, same generator, two
 consumers. Worth knowing before anyone assumes it covers this.
 
+**NAME/GENDER MISMATCH ON THE INVENTION LANES IS ACCEPTED TOO (operator
+ruling 2026-08-15).** On `original`, the operator said: *"we accept the risk --
+original has a mismatch since it's inventing a male 'Jane'. Since it's original
+I accept that."*
+
+The line is FIDELITY IS ONLY OWED WHERE A SOURCE STATES SOMETHING. `original`
+has no source, so a male JANE is a creative choice, not a defect. The adaptation
+lanes are the opposite and unchanged: AHAB and ROSALIND must match what the text
+says, which is what the sidecar pins exist to enforce.
+
+Scope, precisely, so this is not read wider than it is:
+
+* **Pool mode (the default, and what production runs) already cannot produce
+  this.** Since the unisex bucket was retired every pool name carries a definite
+  tag, so `_repair_ensemble_names` always has an answer and a pool-drawn name
+  cannot ride a mismatched slot.
+* The mismatch is reachable only through **`llm_slot_fill`**, where the model
+  invents a name that is not in the pool at all. `gender_of_first_name` returns
+  `"unknown"` for it, and `"unknown"` fails the guard's
+  `if tag in ("male","female")` test exactly as `"unisex"` used to
+  (`_otr_casting.py:1495`). **`unknown` is the new unisex, and retiring the
+  bucket did not touch it** -- the mechanism was never the bucket, it is that
+  only male/female tags trigger the guard. That mode is opt-in via
+  `OTR_NAME_MODE` and nothing in production sets it, so this is a trapdoor under
+  a door nobody currently opens.
+* **There is already a designed lever for doing it ON PURPOSE:**
+  `OTR_NAME_CROSS_GENDER_RATE` (default `0.0` = repair everything) lets a
+  deterministic, seeded fraction of mismatches stand as deliberate cross-gender
+  names. If the show ever wants a male Jane by intent rather than by accident,
+  that is the knob, and it stays reproducible.
+
 **GENDER DRIFT IS ACCEPTED (operator ruling 2026-08-15 -- do not re-open).**
 Presented with the residual risk, the operator said: *"yeah I see it can fail, I
 accept the gender drift."* So the deterministic ladder is the ANSWER, not a

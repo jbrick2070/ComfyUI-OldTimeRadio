@@ -58,11 +58,43 @@ __all__ = [
 #: next character's paragraph is usually out of reach.
 MENTION_WINDOW_CHARS = 240
 
-#: A decision needs BOTH a floor and a margin. The floor stops a single stray
-#: pronoun from deciding a barely-mentioned name; the ratio stops a genuinely
-#: mixed scene (two people talking about each other) from being read as
-#: evidence. Calibration is tunable; DECLINING BELOW THE FLOOR IS NOT.
-SCORE_FLOOR = 4
+#: A decision needs BOTH a floor and a margin. The floor stops a thin, heavily
+#: contaminated count from deciding; the ratio stops a genuinely mixed scene
+#: (two people talking about each other) from being read as evidence.
+#: Calibration is tunable; DECLINING BELOW THE FLOOR IS NOT.
+#:
+#: THE FLOOR WAS 4 AND THAT WAS TOO LOW -- it shipped a confidently WRONG pin,
+#: which is the one outcome this module is supposed to make impossible.
+#: `buck_rogers` pinned "a Han patrol" -- a squad of soldiers -- as FEMALE on
+#: 0 male / 4 female, because the female protagonist's pronouns fell inside
+#: their mention window. `miss_mix` pinned "the housekeeper" male on 6/2 in a
+#: Jane Eyre parody.
+#:
+#: THE RATIO CANNOT CATCH THIS, and that is the structural point:
+#: `winner >= 3 * loser` is trivially TRUE when loser is 0, so one-sided
+#: contamination sails through the margin untouched and only the floor stands
+#: between it and a wrong answer.
+#:
+#: 8 was chosen by measuring the whole corpus, not by taste. It declines both
+#: observed errors (4 and 6), keeps every pin at 8+ that eyeballs correct
+#: (Dr. Watson 8/2, Sam 9/0, the detectives 9/0), and costs 9 low-confidence
+#: pins -- 133 decided drops to 124. All three of the live failures this module
+#: exists to fix still resolve (AHAB 61-0, Gertrude 31-101, Lord Ronald by
+#: self-designation), and they are nowhere near the floor.
+#:
+#: WHY TRADING 9 CORRECT PINS FOR 2 WRONG ONES IS RIGHT, since raw error counts
+#: say otherwise: a declined name keeps the 40/40/20 roll, which re-rolls every
+#: episode and is wrong half the time. A wrong PIN is written into the sidecar
+#: and mis-genders that character in EVERY future episode from that source. The
+#: durable error is worth several transient ones.
+#:
+#: REJECTED, and measured before rejecting: truncating each window at the next
+#: OTHER candidate's mention. It fixes "the housekeeper" but NOT "a Han patrol"
+#: -- the contaminating "she" frequently has no nearby mention of its owner to
+#: truncate at -- while declining `Dr. Watson` and `Leggatt`, which are correct.
+#: Fixing the mechanism would have been better than moving a threshold; this
+#: mechanism cannot be fixed that way.
+SCORE_FLOOR = 8
 DOMINANCE_RATIO = 3.0
 
 #: A gendered word carried by the name itself ("Lord Ronald", "the Governess")

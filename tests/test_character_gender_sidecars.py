@@ -59,13 +59,26 @@ _MANIFEST = (
 # --------------------------------------------------------------------------- #
 class TestPronounScan:
     def test_it_reads_the_authors_own_pronouns(self):
+        """Sized to clear SCORE_FLOOR deliberately, not by luck.
+
+        This fixture used to carry ~4 pronouns and passed under the old floor of
+        4. Raising the floor to 8 (see the module constant) broke it, which is
+        the fixture being thin rather than the scan regressing -- a real passage
+        that decides a character is not four words long. It now clears the floor
+        with margin, and asserts the score so the relationship to the constant
+        is visible instead of implied.
+        """
         text = (
             "Ahab paced the deck. He said nothing for a long while, and his "
-            "eyes never left the horizon. Ahab turned. He spoke at last."
+            "eyes never left the horizon. Ahab turned; he had made up his "
+            "mind, and he would not be moved. Ahab raised his arm. He struck "
+            "the rail with his fist, and his voice carried the length of the "
+            "ship. Ahab was himself again."
         )
         verdict = scan_gender("Ahab", text)
         assert verdict.gender == "male"
-        assert verdict.male_score > verdict.female_score
+        assert verdict.male_score >= SCORE_FLOOR
+        assert verdict.male_score >= DOMINANCE_RATIO * verdict.female_score
 
     def test_a_NAME_THAT_NAMES_ITSELF_decides_before_any_counting(self):
         """LORD RONALD is why this is a short-circuit and not a heavy weight.
