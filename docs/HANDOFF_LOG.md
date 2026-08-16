@@ -3,6 +3,89 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-16 -- HEAD 4b8a4aa6 (v2.0-alpha) -- CODER (docs-only: a stale ruling cite corrected, a narrowed ruling recorded, and the Lemmy sprint scoped into a safe half and a panelled half)
+
+Did: **No code. Three docs corrections, all pushed.**
+
+**The portrait-ruling citation was STALE and pointed at the wrong comment.**
+  `otr_meta_brief_image_prompt.py:1585-1588` is the MUSIC-MESH comment
+  (`radio_form_from_meta`, `music_visual`); the ruling actually lives at
+  **:1706-1707**. Verified by reading both ranges. Corrected in GO_FORWARD,
+  PROD_BUG_LOG and HANDOFF_LOG, and **re-anchored on the QUOTED SENTENCE rather
+  than a line number**, per the operator -- the number had already gone stale
+  once. Note the sentence spans a line break (`...can reject,` /
+  `rewrite, or block...`), so a single-line grep for it returns NOTHING, which is
+  probably how the cite drifted unnoticed.
+
+**PBUG-20260815-11 is UNBLOCKED by a narrowed ruling (operator, 2026-08-16),
+  and it is narrower than the option that was put to him.** The ruling STANDS for
+  the portrait-prompt path -- node 89 still gets no classifier. What is permitted
+  is upstream and different in kind: in `_otr_casting.py`, where `:365-369`
+  already says gender is a Python-decided fact the LLM writes into, the
+  description producer may check its own returned prose against the gender it was
+  handed and RE-ASK. Bounded retries, then keep the last answer -- a render must
+  not die, so it DEGRADES rather than raising. Neither r4 blocker applies: no
+  reach-back from node 89, and no new field for `Ledger.set_cast` to drop.
+  Acceptance: a live leg plus a re-run of
+  `scripts/audit_voice_gender_consistency.py`; **34 portrait conflicts is the
+  BEFORE number.** It does NOT jump the queue -- Lemmy first.
+
+**Recorded perishable operator context on Lemmy that is not derivable from code**
+  (full text at the END of PROD_BUG_LOG.md, summary in queue item 1):
+  * **Measure the PART, not the PRESENCE.** He is cast 190 times and SPEAKS in
+    188; the 2 silent ones are from June and pre-date the current cameo code.
+    Identity is stable in all of them (`c02`, male, `v2/en_speaker_8`, fixed
+    Cockney signature). The open variable is part SIZE and fidelity -- a LATER,
+    quality-side item, explicitly NOT in this sprint.
+  * **DETECTOR TRAP.** Ledger LINES key the speaker on `char_id`, never name.
+    Matching `"LEMMY"` against a line's speaker field reports him silent in 188
+    of 190. Seductive because it is correct one level up -- cast ROWS do carry
+    the name. Resolve char_id from the cast row, then match lines on it. The
+    operator hit this himself and caught it.
+  * Exemplar to read first:
+    `signal_lost_reel_of_mystery_20260815_041350_ledger.json`.
+
+**Scoped the Lemmy sprint into two halves and wrote NO code for either.** Chunk A
+  (stamp the cast contract on both content-owned runners) is confident and safe.
+  Chunk B (the cameo roll) is a genuine design fork -- both runners derive cast
+  FROM the already-written script, so the cameo either goes back through the
+  pre-locked row that killed the fable2 writer (PBUG-20260811-01, reproduced at
+  30 and 90 words) or lands as a cast row with no dialogue. Panel it first.
+  **Neither runner mentions Lemmy at all** -- zero occurrences -- so this is new
+  construction in two places, not a regression to repair.
+
+**Scope discrepancy left visible rather than resolved:** the operator described
+  the affected family as ~14 lane variants; the shipped registry shows 2 scifi
+  banks, 2 scifi pipelines, and therefore 2 repair sites. Both figures are
+  recorded. The fix lands in 2 modules either way, but if there really are ~14
+  the reconciliation is owed BEFORE the sweep claims coverage.
+
+Current step: queue item 1 (Lemmy sprint) is scoped but UNBUILT. Chunk A is ready
+  to code; chunk B needs the panel. The six-bank sweep and tag are still owed --
+  3 of 6 banks proven at tag `otr-2026-08-15-d2-closed` (`scifi_news`,
+  `scifi_news_pro`, `public_domain`); `shakespeare`, `media_archive` and
+  `original` are NOT.
+Next: build chunk A (cast contract, both runners) + tests, Sonnet-QA the diff
+  BEFORE pushing, then panel chunk B. Then the six-bank sweep and the tag.
+Models: CODER window. **No rung could be cited -- the MODEL & CREDIT BUDGET table
+  in GO_FORWARD has a header, a separator, and NO ROWS**, which the routing block
+  itself flags. Answered from the per-window mapping instead. Routing read and
+  followed: the dated **2026-08-15 REVIEW ROUTING block** -- kibitz restored, but
+  the gate for THIS work is the diff-level one (my fix -> Sonnet/Flash QA on the
+  finished diff) because the sprint's four-round arc already ran; anything I am
+  not confident about goes to the panel BEFORE code, which is why chunk B is
+  panelled and chunk A is not. No panel was run this session and none is claimed.
+  No cloud spend.
+Gates: Bug Bible **20/26/3 at 284 entries** (survival-guide `275ab57`), variants
+  **50 / 0 failures**. **Full suite NOT run -- docs-only session, no `.py`
+  touched**; the 10751/110/1 baseline carries forward unverified rather than
+  being re-quoted as if measured. BOM/CR checked on every touched doc.
+Box: ComfyUI server still RESIDENT and idle on port 8000 (launcher pid 45360),
+  GPU ~3.0 GB / 6% -- inherited that way and NOT reset, because no live leg ran.
+  The next window must reset per CLAUDE.md section 4 before any leg.
+Commits: `d96dd8e2` (stale cite + narrowed ruling), `4b8a4aa6` (Lemmy operator
+  context), plus this handoff. Docs-only throughout.
+
 ## 2026-08-15 -- HEAD 50790099 (v2.0-alpha) -- CODER (D2 closed on both lanes, D4's data gap closed, and four bugs found by measuring rather than by shipping)
 
 Did: **Closed the sprint's D2 end to end, and both proofs are live.** `scifi_news`

@@ -388,6 +388,30 @@ full text at the END of `PROD_BUG_LOG.md`:**
 **Repair sites: TWO runner modules** -- `_otr_scifi_codex` and
 `_otr_scifi_fable2` -- whatever the variant count above them.
 
+**THE SPRINT SPLITS IN TWO, AND ONLY ONE HALF IS SAFE TO BUILD BLIND
+(scoped 2026-08-16, no code written):**
+
+* **Chunk A -- the cast contract. CONFIDENT, build it first.** Both runners
+  stamp a real cameo DECISION (`lemmy_hit`, `lemmy_policy`, the counts) even
+  though the lane owns its cast. This closes the SILENT half: today the key is
+  omitted entirely, so a reader cannot tell "declined" from "never asked". The
+  repo already states the rule these lanes break -- `_otr_casting.py:1852-1854`:
+  *"ONE stable shape on EVERY lane -- the invention lanes stamp an empty
+  contract rather than omitting the key, so a downstream reader never has to
+  distinguish 'no source' from 'field never written'."* No render-path behaviour
+  changes and no cameo appears; provable without a GPU.
+* **Chunk B -- the cameo ROLL. NOT confident: PANEL IT BEFORE WRITING CODE.**
+  Both runners derive their cast FROM the script the model already wrote
+  (`speaker_order` -> `_assign_voices` in fable2). So a cameo has only two
+  shapes and both are bad as stated: ask the model to write him in, which is
+  exactly the pre-locked row that killed the fable2 writer in PBUG-20260811-01
+  (markup ladder exhausted, reproduced at 30 AND 90 words); or inject him after
+  the script, which yields a cast row with no dialogue. That is a real design
+  fork with a known live failure attached -- the routing block says panel it
+  rather than spend a swing.
+* **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
+  this is NEW construction in two places, not a wiring fix that regressed.
+
 **2. PBUG-20260815-11 -- UNBLOCKED 2026-08-15 BY A NARROWED RULING. Build it
 AFTER the Lemmy sprint, the six-bank sweep and the tag -- it does not jump the
 queue.** 34 characters sound one gender and look the other, measured over 1,686
