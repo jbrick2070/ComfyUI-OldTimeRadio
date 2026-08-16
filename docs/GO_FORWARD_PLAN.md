@@ -360,8 +360,41 @@ kibitz arc output (10 external calls; Antigravity quota-held at r4 and the
 partial r4 panel is recorded as such). Build order, per-lane designs, the
 decision truth table, fixture updates and acceptance are all in the
 contract; do not re-derive them from the history below. Chunk B acceptance
-REQUIRES a fresh server boot at the implemented HEAD -- the resident server
-holds `da44f642` modules.
+REQUIRES a fresh server boot at the implemented HEAD.
+
+**LATER THE SAME DAY, and the contract moved under it:** `scifi_news` was
+RIPPED (full-family, `dae1fb3c`, PBUG-20260816-01) and the fable2 surface was
+RENAMED to `scifi_news_pro` (`01d0730c` -- module `_otr_scifi_news_pro.py`,
+`NewsPro*` classes, `meta["scifi_news_pro"]` ledger namespace,
+`OTR_SCIFI_NEWS_PRO_SEED`). The BUILD CONTRACT carries a SCOPE CUT header:
+the codex half is MOOT and **chunk B is now a ONE-LANE build** on the renamed
+module. Both changes are live-proven (post-rip legs 3/3; rename leg
+`signal_lost_rename_proof_scifi_news_pro_20260816_141310`, 32:38,
+`obs_publish OK`, new namespace on the frozen ledger).
+
+**1.1 LEMMY ON EVERY TTS ENGINE (operator 2026-08-16: "we need to be sure we
+have lemmy working on all tts engines", NO-SKIP directive, and "audition"
+means BUILD IT -- "do your best to get a lemmy going").** Measured: he has a
+real identity on 2 of 7 character engines (bark `v2/en_speaker_8`; indextts2
+qualified route). The DECIDED matrix (driver-decided on the operator's
+delegation, correcting the no-skip draft against the tree):
+
+| engine | route | state |
+|---|---|---|
+| indextts2 | qualified clone -- ALREADY DONE, do not re-train | shipped |
+| bark | `v2/en_speaker_8` | shipped |
+| google_tts | **`gt_algenib`** -- his own source voice (gravelly, F0 97 Hz); NOT Neural2-D, which is a Cloud-TTS id our Gemini integration cannot reach | map it |
+| chatterbox | clone the approved wav (rights scope already covers "local engines") | build |
+| dia | clone the approved wav (same rights) | build |
+| kokoro | `bm_george` -- warmest British male; a friendly-broadcaster cousin, NOT Cockney, accepted under no-skip | map it |
+| elevenlabs | verify `el_harry` (bank tags him AMERICAN -- tag or recollection is wrong); `el_dave` is not in the bank | listen first |
+
+Build shape: extend `LEMMY_VOICE_POLICY.approved_native_routes` per engine +
+bank rows where needed; render his canonical audition lines per engine off
+the G1 harness (`scripts/otr_g1_lemmy_audition.py` pattern) into ONE listen
+page; the operator's ears confirm; then the policy rows land. Coding item ->
+full `kibitz-plugin:kibitz` arc on a short plan doc BEFORE code (the
+bug-fix-sprint diff-level routing was scoped to that sprint).
 
 Historical framing of the sprint, kept for context:
 PBUG-20260811-03 was re-confirmed on that session's own artifacts and its SCOPE
@@ -411,9 +444,10 @@ and every `scifi_*` bank id has ZERO castings ever. Expected per bank:
 `media_archive` / `original` -- the cameo MAY appear (11% OS-entropy roll;
 absence on any single leg is NOT a failure); `public_domain` / `shakespeare` --
 NO LEMMY row, contract stamped with `lemmy_policy=source_fidelity_exclusion`;
-`scifi_news_pro` -- until chunk B lands, NO cameo, and a stamped contract
-with `lemmy_hit: false` and the content-owned no-roll policy. (`scifi_news`
-was RIPPED 2026-08-16 and is no longer a sweep lane.) Lemmy absent on the scifi pair is the EXPECTED state, not a
+`scifi_news_pro` -- until chunk B lands, NO cameo, and the stamped contract
+is REQUIRED (chunk A landed `da44f642`, live-proven): `lemmy_hit: false` +
+the content-owned no-roll policy. (`scifi_news` was RIPPED 2026-08-16 and is
+no longer a sweep lane.) Lemmy absent on the scifi pair is the EXPECTED state, not a
 regression signal.
 
 **Repair site: ONE runner module** -- `_otr_scifi_fable2` (the codex runner
@@ -456,6 +490,59 @@ was deleted with the 2026-08-16 `scifi_news` rip).
   demands exactly one entry per script speaker).
 * **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
   this is NEW construction in two places, not a wiring fix that regressed.
+
+**1.2 VIDEO ENGINES SPRINT -- the video-lab proposal, grounded, is ONE real
+item plus one additive prompt fix.** Authority:
+`docs/2026-08-16-video-lab-proposal-GROUNDED.md`. The lab's P2 "8 GB
+additions" are ALREADY SHIPPED at identical recipes (`h3_low_video`,
+`h3_low_audio_in`, `ltx23_low_audio_in` -- 7.36 GiB @ 1024x576 matches to the
+digit), and HuMo is already dieted (13.06 GiB; the proposed Clamp-13 is a
+0.22 GiB delta the recipe rule exists to refuse). What remains:
+
+* **BUILD: the `ltx_distilled` sprint/draft lane.** Every prerequisite is on
+  disk (22B fp8 transformer 23.5 GB, both VAEs, Gemma-3 encoder, ltxv LoRA).
+  16 GB lane (13.11 GiB measured), rides the LTX sage-free boot token.
+  **Sample-path folded in (operator 2026-08-16):** the lab-proven recipe IS
+  the new lane's starting spec -- `res_multistep` sampler, `simple`
+  scheduler, 20 steps, denoise 1.0, 832x480 @ 25 fps, frames 8k+1 up to 193
+  (7.72 s), first/last-frame chaining. No sampler change to any SHIPPED lane
+  is proposed and none would be accepted without the operator reversing the
+  recipe rule. Engine selection for acceptance goes through a capability
+  profile (`role_overrides`) -- the engine widgets are managed.
+* **BUILD (additive): P1's verbatim-dialogue half** -- inject the actual
+  spoken line into the video prompt on the audio-in lanes so the encoder can
+  predict visemes. Rewrites nothing; the no-rewrite ruling is untouched.
+* **DECIDED (driver, on the operator's delegation): P1's kinetic half goes on
+  the VIDEO-prompt path** (`_otr_line_composer` / the motion clause), as
+  ADDITIVE motion language -- no damping-word stripping anywhere, so
+  `otr_meta_brief_image_prompt.py`'s ruling (:1706-1707, survived the
+  2026-08-05 r4) is not touched. Revisit condition: if measured damping
+  persists after video-path injection, the still-path stripping question goes
+  BACK TO THE OPERATOR as a ruling change; it is never slipped in.
+* Coding item -> full `kibitz-plugin:kibitz` arc on the sprint doc BEFORE
+  code. Acceptance legs need the LTX boot lane, so they pause the soak.
+
+**1.3 UPSCALERS + THE 4060 FULL-STACK GATE.** Operator 2026-08-16: multiple
+upscalers need downloading and testing; the FULL-workflow + TTS + image +
+upscaler pass on the physical 4060 8 GB happens ON THE MAIN REPO "once we
+are ready w/ low vram updates done". **The low-VRAM gate is ALREADY OPEN**
+(see 1.2 -- the lanes shipped), so that test is gated only on the upscaler
+work. Constraint from runway row 4: the multi-GPU learned-upscale STAGE is
+CLOSED and must not be reopened -- this item is (a) pick + download candidate
+ESRGAN-family models (web lookups allowed per the 2026-08-15 ruling;
+downloads can run in the background any time), (b) harden the two
+`SpandrelEsrgan._resolve_model` edge cases if still reproducible, (c) rotate
+the candidates through the EXISTING stage on this rig, soak-profile style.
+The 4060 run itself is the operator's, on his schedule.
+
+**GPU SOAK (LIVE as of 2026-08-16 ~14:53).** `scripts/otr_gpu_soak_matrix.py`
+is cycling 1-act legs, 5 banks x 10 styles x 10 engine profiles (all five
+still-family video engines x all five local image engines, rotated through
+committed `otr_soak_*` capability profiles that never emit variants).
+Receipts: `otr_soak_receipts/soak_*.json`, rewritten after every leg. Stop:
+kill the `otr_gpu_soak_matrix` python (and any in-flight
+`otr_canonical_api_run`). A post-rip/rename TAG is READY once the soak
+receipt shows every bank passing -- operator-gated, one word.
 
 **1.5 STORY-QUALITY FINDER: v1 SHIPPED 2026-08-16 (`a1f1577b`), operator
 jumped it mid-sweep ("quick scoring now").** `scripts/otr_story_score.py`
@@ -636,12 +723,20 @@ commit the revert).** That one run separates cause from coincidence. If the act
 change is implicated, fix the CONSUMER -- the pre-tail audit, the markup ladder
 -- never the topology, which is an operator ruling.
 
-### D. UNDIAGNOSED -- do not call it anything yet
+### D. NO LONGER UNDIAGNOSED -- the wrong-play frame is MEASURED, twice
 
-`tempests_midnight_revelations` (bank `shakespeare`): title says Tempest.
-Operator asks whether the scene is actually Macbeth. Check the ledger's
-selected scene against the title. A title naming the wrong play would be a
-FIDELITY defect on the lane where fidelity outranks arc.
+`tempests_midnight_revelations` was the suspicion; the 2026-08-16 blind
+narrative read is the measurement
+(`docs/2026-08-16-blind-bank-narrative-ranking.md`): a Twelfth Night scene
+announced as *"Verona ... Capulets and Montagues"*, and a Tempest scene
+framed as Romeo and Juliet -- both current-era `shakespeare` episodes. The
+announcer FRAME is sampled independently of the selected excerpt instead of
+being generated from the same metadata record. FIDELITY defect on the lane
+where fidelity outranks arc; deterministic root shape; same family as the
+speaker-tag leaks, corrupted-text lines and truncated closers the same read
+surfaced. A real fix candidate for the next coding window -- panel it first
+(the root cause is diagnosed by SHAPE, not yet traced to the exact sampling
+site).
 
 ### OWED -- the Bible promotions, one per green chunk
 
