@@ -5099,3 +5099,39 @@ EXPECTED result, not a regression signal.
   live-proven; the rip is ONE atomic commit, so `git revert` restores it whole.
   A restored bank re-enters at gate 1 and must re-qualify on a live leg.
 - status: **DONE.**
+
+---
+
+## PBUG-20260816-02 -- scifi_news_pro script pass invents speakers outside the cast (ladder exhaustion, 4th live sighting of the class)
+
+- surfaced: GPU soak leg 1, 2026-08-16 15:21 (`SOAK01 scifi_news_pro
+  sci_fi_radio still_motion_flux2_klein`, 1 act, canonical graph, renamed
+  module `_otr_scifi_news_pro` at HEAD `96240ce1`-era boot). Died 27.9 min
+  in: `NewsProScriptError: pass 'script' failed after 4 attempt(s): markup
+  ladder exhausted`.
+- symptom: EVERY last defect is `UNKNOWN_SPEAKER` -- the model wrote dialogue
+  for `DR. LIAO` and `PROF. ZHANG` (7 lines), speakers that are not in the
+  treatment's declared cast. The ladder's repair rule names the allowed
+  speakers; the model kept its invented ones through all four attempts.
+- class: the SAME stochastic markup non-compliance that killed the 08-10
+  sweep leg and the 08-11 probe B (`UNKNOWN_SPEAKER: LUCY`, `REPORTER`) --
+  the class the PBUG-20260811-01 correction identified after withdrawing the
+  cameo attribution. This is its 4th live sighting and its 1st since the D3
+  END-grammar fix, which proves D3 fixed a DIFFERENT member of the family.
+- NOT the rename: the rename proof leg passed this exact lane cleanly an
+  hour earlier (`signal_lost_rename_proof_scifi_news_pro_20260816_141310`),
+  and the failure is model-stochastic (Mistral-class writer inventing cast).
+- **measurement now RUNNING, and that is the point:** the 08-16 correction
+  to PBUG-20260811-01 flagged "the lane's baseline ladder-exhaustion rate is
+  unmeasured" as the open question. The GPU soak
+  (`scripts/otr_gpu_soak_matrix.py`, receipts in `otr_soak_receipts/`) is
+  now collecting exactly that rate across all five banks. DO NOT theorize a
+  fix from n=1; let the soak deliver an incidence rate first.
+- fix: NONE YET, deliberately. Candidate direction if the rate warrants it
+  (for the panel, not for a solo swing): the ladder's repair note already
+  states the allowed speakers (the D3 pattern); the next rung up is a
+  DETERMINISTIC speaker-map repair -- an unknown speaker whose line count
+  and position match a declared cast member gets mapped, not rerolled --
+  which is roster repair (sanctioned fail-closed territory), never prose
+  rewriting. Panel it against THE LAW before building.
+- status: OPEN, measuring.
