@@ -51,7 +51,25 @@ GENERATED_BY = "scripts/build_variants.py"
 # Lane presets are applied onto a live canonical by the operator, not
 # emitted as standalone platform variants.
 LANE_PRESETS = ("google_veo_media", "google_omni_media",
-                "google_veo_all", "google_omni_all")
+                "google_veo_all", "google_omni_all",
+                # SOAK INSTRUMENTS (2026-08-16), not platform targets. They
+                # exist so `scripts/otr_gpu_soak_matrix.py` can rotate the
+                # still/image engines through the SANCTIONED surface -- those
+                # widgets are managed and `patch_creative` refuses them, so a
+                # profile's role_overrides is the only legitimate lever. They
+                # are excluded from emission because nobody installs OTR to
+                # run a soak: shipping ten near-identical variant graphs would
+                # be noise in the user-facing variant set.
+                "otr_soak_still_flat_z_image_turbo",
+                "otr_soak_still_flat_flux_gen1",
+                "otr_soak_still_motion_lumina_image",
+                "otr_soak_still_motion_flux2_klein",
+                "otr_soak_still_pan_flux_gen1",
+                "otr_soak_still_pan_ideo",
+                "otr_soak_still_word_flux2_klein",
+                "otr_soak_still_word_z_image_turbo",
+                "otr_soak_word_razzle_ideo",
+                "otr_soak_word_razzle_lumina_image")
 
 
 class EmitRefused(RuntimeError):
