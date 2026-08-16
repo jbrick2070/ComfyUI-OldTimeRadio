@@ -201,6 +201,41 @@ sidecar generation feeds **D5** identity fields (`work_title` / `author` /
 `license_label`), not D4's gender fields -- same file, same generator, two
 consumers. Worth knowing before anyone assumes it covers this.
 
+**GENDER DRIFT IS ACCEPTED (operator ruling 2026-08-15 -- do not re-open).**
+Presented with the residual risk, the operator said: *"yeah I see it can fail, I
+accept the gender drift."* So the deterministic ladder is the ANSWER, not a
+stepping stone, and the SPEC's tier 3 (a web-search model call per undecided
+character) is NOT being built.
+
+What that concretely accepts, so the ruling is informed rather than vague:
+
+* **86 of 219** public_domain candidates and **24 of 85** shakespeare rows are
+  undecided and fall to the 40/40/20 roll -- roughly a third of characters get a
+  coin flip, and some will be audibly wrong.
+* The three failures the operator actually HEARD are fixed: AHAB, GERTRUDE and
+  LORD RONALD all resolve correctly.
+* **A confident WRONG pin still cannot happen.** The ladder declines rather than
+  guesses, so an undecided character keeps the roll it always had. That property
+  is what makes the drift tolerable, and it is why the decision margin
+  (floor 4, ratio 3x) must not be loosened to raise coverage -- DOROTHY of Oz
+  scores 8 male / 3 female under a looser estimator because her scene is crowded
+  with the Scarecrow and the Lion.
+
+**The scalability objection stands and was not dismissed.** The operator's point
+-- *"someone needs to remember, when adding new sources, that we need to sidecar
+a gender"* -- is exactly the failure mode that produced this defect: 64 sidecars
+went unwritten because a manual step was forgotten. Two things blunt it. The
+stamper is idempotent and re-runnable over the whole corpus (`--write` rewrites
+only what changed), so the step is "re-run one script", not "hand-edit 65 files".
+And `cast_hints` are hand-authored per source ANYWAY, so adding a source already
+requires listing its characters -- an automatic gender tier would move that
+memory step, not remove it.
+
+**Revisit if the corpus starts growing regularly.** The straggler list is a
+measured artifact: run `scripts/otr_stamp_character_genders.py` with no
+`--write` and it prints every declined name. That is the exact input a future
+web tier would need, so nothing is lost by deferring it.
+
 **3. SHAKESPEARE HAS THE SAME GENDER HOLE, MEASURED 2026-08-15 -- 24 of 85
 character rows still fall through to the 40/40/20 roll.** Not a PBUG: this is a
 STATIC AUDIT, and the admission rule says a static finding never creates one on
