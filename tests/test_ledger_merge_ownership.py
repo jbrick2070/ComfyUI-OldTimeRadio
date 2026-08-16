@@ -69,7 +69,6 @@ def test_intentionally_cleared_text_survives_save_roundtrip(tmp_path):
         ("original", True),
         ("public_domain", True),
         ("shakespeare", True),
-        ("scifi_news", False),
         ("scifi_news_pro", False),
     ],
 )

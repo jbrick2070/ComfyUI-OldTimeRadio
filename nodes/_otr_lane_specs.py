@@ -13,7 +13,7 @@ view, no shadow copy.
 The two request-compatibility entry points (`assert_supported` and
 `is_roll_compatible`) were REMOVED 2026-08-14 along with `RollRequest` and the
 word authority. Both existed to ask a lane whether it would accept a
-`target_words`; only `scifi_news_circuit` ever declared a band (30..900).
+`target_words`; exactly one retired lane ever declared a band (30..900).
 
 A lane that genuinely cannot build a requested SHAPE still fails loudly when
 it tries -- only the timing of that failure moved.
@@ -60,7 +60,7 @@ class LaneSpec:
     """One dispatched lane, by NAME. Nothing here is imported eagerly."""
 
     module: str
-    """Runner module, relative to this package (e.g. "_otr_scifi_codex")."""
+    """Runner module, relative to this package (e.g. "_otr_scifi_fable2")."""
 
     runner_attr: str
     """The lane entry point inside `module`."""
@@ -76,12 +76,6 @@ LANE_SPECS: "dict[str, LaneSpec]" = {
     "scifi_news_pro_multipass": LaneSpec(
         module="_otr_scifi_fable2",
         runner_attr="run_scifi_fable2_episode",
-    ),
-    # 2026-07-19: base scifi_codex (v1) was retired and the v4 lane became
-    # the direct scifi_news runner.
-    "scifi_news_circuit": LaneSpec(
-        module="_otr_scifi_codex",
-        runner_attr="run_scifi_codex_episode",
     ),
 }
 

@@ -21,7 +21,7 @@ from nodes import _otr_user_banks as ub
 
 SHIPPED_IDS = frozenset({
     "media_archive", "original", "public_domain", "shakespeare",
-    "scifi_news", "scifi_news_pro", "custom_source_bank",
+    "scifi_news_pro", "custom_source_bank",
 })
 
 

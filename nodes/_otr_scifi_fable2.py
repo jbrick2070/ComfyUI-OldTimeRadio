@@ -1590,7 +1590,7 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
 def _news_read_source_anchors(dossier: DossierLLM) -> "tuple[str, ...]":
     """Verbatim strings that would PROVE the factual close named its source.
 
-    The twin of `_otr_scifi_codex._news_coda_source_anchors`, reading this
+    The twin of the retired codex lane's `_news_coda_source_anchors`, reading this
     lane's dossier instead of that lane's fact index. Names shorter than three
     characters are dropped for the same reason: a one- or two-letter "entity"
     matches inside ordinary words and would let a close that names nothing

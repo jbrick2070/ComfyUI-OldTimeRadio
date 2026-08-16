@@ -598,7 +598,7 @@ def test_fidelity_banks_default_off_and_variants_inherit(monkeypatch):
                  "public_domain_v3", "  Shakespeare  "):
         assert b.source_bank_excludes_banana(bank), bank
         assert b.banana_gate({"source_bank": bank}, lane="stills") is False
-    for bank in ("original", "media_archive", "scifi_news", ""):
+    for bank in ("original", "media_archive", "scifi_news_pro", ""):
         assert not b.source_bank_excludes_banana(bank), bank
 
 

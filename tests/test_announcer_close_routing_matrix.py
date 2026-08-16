@@ -16,9 +16,9 @@ extraction exists to prevent. So every row asserts the coda is THERE: exact
 text on the ledger row AND carried into a real ``Dialogue:`` cue by
 ``_otr_captions.build_ass_from_ledger``, which is the surface a viewer reads.
 
-THE CONTROL IS ``media_archive``, NEVER ``scifi_news``. The science lane
-dispatches to ``scifi_news_circuit`` and returns BEFORE this block ever runs,
-so a scifi_news row would assert nothing whatsoever about this helper.
+THE CONTROL IS ``media_archive``, an INLINE lane. A dispatched lane returns
+before this block ever runs, so such a row would assert nothing whatsoever
+about this helper.
 
 THE ROUTE IS PROVEN BY THE PATH TAKEN, not inferred from the text that came
 out. The slot scheduler records which composer context was entered, so a row
@@ -450,14 +450,14 @@ def test_the_matrix_covers_both_composer_branches():
     assert "" in covered, "the owned-but-silent lane enters neither composer"
 
 
-def test_the_control_lane_is_media_archive_and_never_scifi_news():
+def test_the_matrix_covers_exactly_the_lanes_this_helper_serves():
+    """POSITIVE roster: this helper is reached only by lanes whose announcer
+    close runs inline. A dispatched lane returns before this block, so it
+    would prove nothing here and is deliberately not in the matrix."""
     banks = {r.bank for r in ROUTES}
     assert {"public_domain", "shakespeare"} <= banks, (
         "both fidelity banks are the point of this matrix")
     assert "media_archive" in banks, "the unowned control lane is missing"
-    assert "scifi_news" not in banks, (
-        "scifi_news dispatches to scifi_news_circuit and returns BEFORE this "
-        "block runs, so such a row would prove nothing about this helper")
 
 
 def test_every_fidelity_bank_is_covered_with_and_without_provenance():

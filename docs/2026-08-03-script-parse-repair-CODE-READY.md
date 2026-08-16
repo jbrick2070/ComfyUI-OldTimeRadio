@@ -310,7 +310,7 @@ authorship)**:
 > A bank whose script pass returns FREE TEXT parsed by pattern is exposed to
 > model formatting drift: decoration the parser does not recognise becomes a
 > structural defect and kills the episode, however good the story. Prefer a
-> schema-bound pass (`scifi_news_circuit` is the reference). A raw-text lane
+> schema-bound pass (the retired codex lane WAS the reference). A raw-text lane
 > MUST provide (a) a documented closed grammar for what is stripped as
 > transport, (b) bounded row adjudication over defect-bearing rows only,
 > preserving all other bytes, and (c) fixtures proving a decorated draft is

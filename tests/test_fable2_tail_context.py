@@ -222,7 +222,7 @@ def test_tail_preserves_lane_seals_on_disk(tmp_path, monkeypatch):
     assert saved["meta"]["fable2"]["final_draft"] == sealed
 
 
-@pytest.mark.parametrize("source_bank", ["scifi_news", "scifi_news_pro"])
+@pytest.mark.parametrize("source_bank", ["scifi_news_pro"])
 def test_content_owned_tail_stamps_delivery_before_finalizer(
         tmp_path, monkeypatch, source_bank):
     from nodes._otr_readiness import text_for_tts_source_sha256

@@ -151,7 +151,7 @@ def test_source_fidelity_banks_skip_lemmy_even_when_forced(source_bank_id):
 
 @pytest.mark.parametrize(
     "source_bank_id",
-    ["scifi_news", "scifi_news_pro", "media_archive", "original", "", None],
+    ["scifi_news_pro", "media_archive", "original", "", None],
 )
 def test_invention_banks_keep_the_operator_cameo(source_bank_id):
     """Only the fidelity families lose the cameo -- everything else keeps it."""

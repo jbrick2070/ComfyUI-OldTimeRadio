@@ -368,7 +368,7 @@ def test_shipped_pipeline_flags():
 # (4) science byte-identity -- wrapper forwarding pins
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("bank_id", ["scifi_news", "scifi_news_pro"])
+@pytest.mark.parametrize("bank_id", ["scifi_news_pro"])
 def test_science_rss_wrapper_forwards_runtime_policy(
         monkeypatch, bank_id):
     """Both science RSS banks share the same source-fetch contract."""

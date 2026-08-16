@@ -528,7 +528,6 @@ class TestSoftGapsAdvanceCleanly:
         "original",
         "public_domain",
         "shakespeare",
-        "scifi_news",
         "scifi_news_pro",
     ])
     def test_punctuation_glue_count_is_clean_for_every_bank(self, source_bank):

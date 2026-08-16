@@ -50,7 +50,7 @@ lanes' evidence passes, and never could.
 
 1. THE CLEAN STAGE. This is the only thing between five banks and "passable".
    F1 (action inside a spoken row) is 11-40% of rows on every bank except
-   scifi_news -- media_archive 40%, scifi_news_pro 32%, original 30%. Those
+   the retired codex lane -- media_archive 40%, scifi_news_pro 32%, original 30%. Those
    lanes ALREADY write one model call per beat, so job size is not their
    problem and today's per-beat fix cannot help them.
    Shape (already specified in GO_FORWARD): code DETECTS, a MODEL repairs,
@@ -113,7 +113,8 @@ lanes' evidence passes, and never could.
 * P3 abandons 11 of 31 ladders on cast_coverage (the score forgetting the
   announcer a beat). DEFAULT: leave it; it is the strongest candidate for a
   schema fix later, not now.
-* The creativity knob does nothing on scifi_news (the codex lane hard-codes
+* [CLOSED-BY-RIP 2026-08-16] The creativity knob did nothing on the retired
+  codex lane (it hard-coded
   .72). Three options are written up in
   docs/2026-08-14-temperature-problem-statement.md. DEFAULT: leave it, it is
   the operator's call.
@@ -148,7 +149,7 @@ fixes gets a consult before the third swing.
   run          python scripts/otr_canonical_api_run.py --workflow
                workflows/otr_story_only.json --source-bank <bank>
                --act-count 3 --creative-model '<exact dropdown string>'
-  MODEL FLOOR  scifi_news / scifi_news_pro need gemma-4-12b-it or
+  MODEL FLOOR  scifi_news_pro needs gemma-4-12b-it or
                Mistral-Nemo. gemma-2-2b-it is fine and FAST on the other four.
   grade        python scripts/otr_ledger_view.py            (newest episode)
                python scripts/otr_ledger_view.py --ladder 60

@@ -1,4 +1,4 @@
-"""Freeze-policy resolution for the six live story banks.
+"""Freeze-policy resolution for the live story banks.
 
 The policy decides who may perform the bounded same-story safety cleanup. It
 never converts word count, visual vocabulary, style, or craft observations into
@@ -35,7 +35,7 @@ def test_inline_banks_receive_same_story_cleanup_policy(bank_id):
     assert policy.terminal_error == ""
 
 
-@pytest.mark.parametrize("bank_id", ["scifi_news", "scifi_news_pro"])
+@pytest.mark.parametrize("bank_id", ["scifi_news_pro"])
 def test_fixed_topology_banks_are_content_owned(bank_id):
     policy = LFC.resolve_freeze_policy({"source_bank": bank_id})
     assert policy.name == "content_owned_readonly"

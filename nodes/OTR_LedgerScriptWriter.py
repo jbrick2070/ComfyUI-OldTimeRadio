@@ -1774,7 +1774,7 @@ def _resolve_inputs(
     # Threaded into the resolved dict as the ONE authoritative value for
     # meta/ledger stamping + prompt threading. Already gated runnable by
     # run() (require_runnable_bank fires before this call).
-    source_bank: str = "scifi_news",
+    source_bank: str = "scifi_news_pro",
     # Stage 3C (2026-07-06): the visual_style widget selection; same
     # authoritative-value contract (gated by resolve_visual_style in run()).
     visual_style: str = "sci_fi_radio",
@@ -1867,7 +1867,7 @@ def _resolve_inputs(
     # custom_premise on this lane is NOT a source article: it rides
     # source_meta["operator_hint"] into the concept pass as material
     # (kibitz r4 P2) -- never the payload.
-    _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_news")
+    _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_news_pro")
     # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
     # bank resolution and BEFORE the three source branches so a frozen source
     # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is
@@ -1878,7 +1878,7 @@ def _resolve_inputs(
     # live branch would (spark_atoms for the original lane, cast_hints for the
     # adaptation lanes), so every downstream owner is fed unchanged.
     _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
-        source_bank or "scifi_news",
+        source_bank or "scifi_news_pro",
     )
     # Only the live fetch branch can produce one: the snapshot envelope is the
     # seven-key payload whose full_text is already the capped projection, and
@@ -1898,7 +1898,7 @@ def _resolve_inputs(
         log.info(
             "[OTR_LedgerScriptWriter] source-snapshot REPLAY: bank=%r base=%r "
             "seed_source=%r sha=%s",
-            source_bank or "scifi_news",
+            source_bank or "scifi_news_pro",
             _source_snapshot.base_source_bank_id,
             seed_source,
             _source_snapshot.payload_sha256[:12],
@@ -1989,7 +1989,7 @@ def _resolve_inputs(
         # no-op on the six; for a client bank it hands resolution the ONE
         # bundle allowed to execute for that id. The result still flows through
         # normalize_fetch_result below -- client code never reaches the ledger.
-        _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_news")
+        _fetch_bank = _otr_story_routing.get_bank(source_bank or "scifi_news_pro")
         _fetch_owner = _otr_story_routing.user_bank_bundle(
             _fetch_bank.source_bank_id)
         _fetch_entry = _otr_source_payload.resolve_fetcher(
@@ -2093,7 +2093,7 @@ def _resolve_inputs(
         "comfy_slot_b_model": str(comfy_slot_b_model or ""),
         # Stage 2C: the ONE authoritative source_bank value for prompt
         # threading + meta/ledger stamping (run() gated it runnable already).
-        "source_bank": str(source_bank or "scifi_news"),
+        "source_bank": str(source_bank or "scifi_news_pro"),
         # Stage 3C: the ONE authoritative visual_style value (gated in run()).
         "visual_style": str(visual_style or "sci_fi_radio"),
         "google_api_slot_a_model": str(google_api_slot_a_model or ""),
@@ -2236,7 +2236,7 @@ def _apply_intro_rewrite_result(
 
 # The pipeline -> lane authority moved OUT of this file to
 # `nodes/_otr_lane_specs.py` (2026-07-31). `_run_fable2_lane`,
-# `_run_scifi_codex_lane`, `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`
+# the per-lane wrappers, `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`
 # and `_resolve_lane_runner` all lived here; they are GONE, not aliased.
 # Lazy runner import is unchanged -- `_LANES.runner_for()` resolves the
 # module by name at dispatch time, exactly as the old wrappers did.
@@ -3386,15 +3386,15 @@ class OTR_LedgerScriptWriter:
                     [_ROLLS.BANK_SENTINEL]
                     + list(_otr_story_routing.list_bank_ids()),
                     {
-                        "default": "scifi_news",
+                        "default": "scifi_news_pro",
                         "tooltip": (
                             "Story-path SOURCE BANK (multi-modal story "
                             "schema). Selects which registered story pack "
                             "supplies the pack-routed creative prompts and "
-                            "which lane the episode runs. scifi_news = the "
-                            "local default bank; scifi_news_pro = the "
-                            "alternate LLM-first bank using the configured "
-                            "model slots. "
+                            "which lane the episode runs. scifi_news_pro = "
+                            "the local default sci-fi bank, an LLM-first "
+                            "multipass lane using the configured model "
+                            "slots. "
                             "Each lane is an INDEPENDENT bank (own pack + "
                             "bank metadata). The only non-runnable row is '+ Add "
                             "Your Own' (custom_source_bank) -- picking it "
@@ -3671,7 +3671,7 @@ class OTR_LedgerScriptWriter:
         # appended at the END of the widget surface (slot 23). Default
         # science_news = the production lane, byte-identical. Gated FIRST
         # in the body via require_runnable_bank (no fallback).
-        source_bank="scifi_news",
+        source_bank="scifi_news_pro",
         # Stage 3C (2026-07-06): the visual-style selector, appended at the
         # END of the widget surface (slot 24). Default sci_fi_radio = the
         # production look, byte-identical. Validated fail-loud beside the
@@ -3742,8 +3742,8 @@ class OTR_LedgerScriptWriter:
             _otr_visual_styles.resolve_visual_style(visual_style)
         # The lane REQUEST GATE (2026-07-31) was removed 2026-08-14 with the
         # word authority. It sat here to let a dispatched lane refuse a
-        # `target_words` outside its band -- `scifi_news_circuit`'s 30..900
-        # was the only band any lane ever declared. There is no target to
+        # `target_words` outside its band -- one since-retired lane's
+        # 30..900 was the only band ever declared. There is no target to
         # refuse, so there is nothing to gate: the act count is always
         # honoured, and every bank's topology accepts every act count.
         # Story-scaffold UI toggle (2026-06-24) -- resolve the widget into the

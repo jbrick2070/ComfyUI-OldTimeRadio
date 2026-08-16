@@ -7,7 +7,7 @@ kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 Pins:
   1. Widget surface: source_bank stays pinned at slot 22; choices come
      LIVE from the routing registry (exact list, registry order, including
-     non-runnable custom banks -- the honest-error contract); default scifi_news.
+     non-runnable custom banks -- the honest-error contract); default scifi_news_pro.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
      (deliberate exception to the "INPUT_TYPES must never raise"
      convention; no baked-in fallback choice list).
@@ -85,13 +85,13 @@ class TestWidgetSurface:
         assert choices[1:] == list(routing.list_bank_ids())
         assert rolls.BANK_SENTINEL not in routing.list_bank_ids()
         # The saved graph still stores a concrete id, so no canonical diff.
-        assert meta["default"] == "scifi_news"
+        assert meta["default"] == "scifi_news_pro"
         # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
         assert _PUBLIC_DOMAIN_BANK in choices
 
     def test_default_is_a_runnable_bank(self):
-        bank = routing.require_runnable_bank("scifi_news")
+        bank = routing.require_runnable_bank("scifi_news_pro")
         assert bank.runnable is True
 
 
@@ -237,7 +237,7 @@ class TestThreading:
 class TestResolvedSurface:
     def test_resolve_inputs_carries_source_bank(self):
         resolved = _resolve_inputs(custom_premise="test premise")
-        assert resolved["source_bank"] == "scifi_news"
+        assert resolved["source_bank"] == "scifi_news_pro"
         resolved2 = _resolve_inputs(
             custom_premise="test premise", source_bank=_PUBLIC_DOMAIN_BANK)
         assert resolved2["source_bank"] == _PUBLIC_DOMAIN_BANK
@@ -266,7 +266,7 @@ class TestHeadlessSurface:
         }
         workflow = otr_api.load_workflow(str(_CANONICAL_WORKFLOW))
         otr_api.patch_widget_by_name(
-            workflow, 1, "source_bank", "scifi_news", schemas)
+            workflow, 1, "source_bank", "scifi_news_pro", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
         # The Google API selectors and source_ref were appended after
         # visual_style; source_bank stays at slot 22 (was 25 before the
@@ -274,7 +274,7 @@ class TestHeadlessSurface:
         # target_words removal). S5 platform-portability appended the six
         # llm runtime-policy widgets at 27-32 (vector = 33).
         assert len(node1["widgets_values"]) == 33
-        assert node1["widgets_values"][22] == "scifi_news"
+        assert node1["widgets_values"][22] == "scifi_news_pro"
         assert node1["widgets_values"][24] == "(select Google API model)"
         assert node1["widgets_values"][25] == "(select Google API model)"
         assert node1["widgets_values"][26] == ""
@@ -361,7 +361,7 @@ class TestClientBankReachesTheWidget:
         # It joins as a peer -- the shipped rows and the default are untouched.
         assert _PUBLIC_DOMAIN_BANK in choices
         assert _NON_RUNNABLE_BANK in choices
-        assert meta["default"] == "scifi_news"
+        assert meta["default"] == "scifi_news_pro"
         # Choice 0 is the roll command (a UI command, never a registry row);
         # everything after it is exactly the registry, client row included.
         from nodes import _otr_rolls as rolls

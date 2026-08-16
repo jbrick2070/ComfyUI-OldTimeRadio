@@ -1,3 +1,9 @@
+> **CLOSED-BY-RIP 2026-08-16 (PBUG-20260816-01).** This document's own scope
+> line reads "the work below is `scifi_news` only", and every span reader it
+> enumerates lived in `_otr_scifi_codex.py` / `_otr_scifi_source_repair.py`,
+> both deleted with the lane. NOTHING here is owed. Kept as the record of
+> what the relaxed-extraction contract would have required.
+
 # The graduated extraction contract -- every span reader, and what each one does when the spans are gone
 
 **Operator ruling, 2026-08-14:** *"If it fails once on extraction, we relax the

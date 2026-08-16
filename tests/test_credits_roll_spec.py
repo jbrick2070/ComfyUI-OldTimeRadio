@@ -57,7 +57,7 @@ def _led():
             "episode_title": "Neon Truth",
             "style": "silent_scientific_protest",
             "visual_style": "sci_fi_radio",
-            "source_bank": "scifi_news",
+            "source_bank": "scifi_news_pro",
             "episode_seed": 42,
             "cast_contract": {"cast_seed": 70303, "seed_source": "os-entropy"},
             "gen_params_initial": {
@@ -142,7 +142,7 @@ def test_hero_is_episode_title_subtitle_is_signal_lost():
     # story scaffold -- which lied on screen twice in one day
     # ('asteroid_mining_labor_dispute' over a cartographer's-guild tale,
     # 'pirate_radio_resistance_drama' over a film-reel story).
-    assert "scifi_news" in lay["meta_strip"]
+    assert "scifi_news_pro" in lay["meta_strip"]
     assert "sci_fi_radio" in lay["meta_strip"]
     assert "silent_scientific_protest" not in lay["meta_strip"]
     assert "1920x1080" in lay["meta_strip"]

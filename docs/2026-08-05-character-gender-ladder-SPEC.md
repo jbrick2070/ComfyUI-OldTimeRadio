@@ -704,7 +704,7 @@ the conftest already forces `OTR_TEST_MODE` / no CUDA.
 - **The ANNOUNCER.** Deliberately random male/female, by design, on every lane.
   Not a defect; do not "fix" it. The stamper drops announcer-shaped candidate
   names (5.0) so this ladder can never pin one.
-- **The invented lanes: `original`, `scifi_news`, `scifi_news_pro`,
+- **The invented lanes: `original`, `scifi_news_pro`,
   `media_archive`.** Their characters are MADE UP by the writer at run time.
   There is no fact to look up, and a name search there risks matching a real
   living person. Gender there is a free choice and ROLLING IS CORRECT. Do not

@@ -1,4 +1,4 @@
-"""Registry coverage for the six runnable story banks."""
+"""Registry coverage for the five runnable story banks."""
 from __future__ import annotations
 
 import sys
@@ -19,7 +19,6 @@ LIVE_BANKS = (
     "scifi_news_pro",
     "public_domain",
     "shakespeare",
-    "scifi_news",
 )
 
 EXPECTED_PIPELINES = {
@@ -28,7 +27,6 @@ EXPECTED_PIPELINES = {
     "scifi_news_pro": "scifi_news_pro_multipass",
     "public_domain": "legacy_many_pass_adapt",
     "shakespeare": "legacy_many_pass_adapt",
-    "scifi_news": "scifi_news_circuit",
 }
 
 
@@ -39,7 +37,7 @@ def _fresh_registry():
     ROUTING._REGISTRY = None
 
 
-def test_registry_exposes_exact_six_runnable_banks_plus_custom():
+def test_registry_exposes_exact_five_runnable_banks_plus_custom():
     ids = ROUTING.list_bank_ids()
     assert ids == LIVE_BANKS + ("custom_source_bank",)
     assert tuple(

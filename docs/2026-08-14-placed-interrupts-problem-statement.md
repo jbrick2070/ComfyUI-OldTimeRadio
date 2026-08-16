@@ -1,3 +1,7 @@
+> **NOTE 2026-08-16.** This doc's premise episode was a `scifi_news` leg;
+> that lane is retired (PBUG-20260816-01). The interrupt question itself is
+> lane-agnostic and still open on the surviving banks.
+
 # Placed interrupts -- problem statement
 
 **Operator-requested, 2026-08-14. A SMALL improvement, scoped to the banks it

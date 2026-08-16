@@ -1,3 +1,8 @@
+> **PARTLY CLOSED-BY-RIP 2026-08-16.** The "creativity knob does nothing on
+> `scifi_news`" half is moot -- that lane was retired (PBUG-20260816-01) and
+> was the only grammar-bound lane. The general question (what the knob should
+> mean across surviving lanes) stands.
+
 # Temperatures, the creativity knob, and whether a pass is unlucky or broken
 
 **Problem statement, 2026-08-14. Operator-requested.** For a panel, or for the

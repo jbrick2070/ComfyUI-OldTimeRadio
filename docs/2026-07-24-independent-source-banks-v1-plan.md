@@ -17,7 +17,7 @@ Streamlined code; hard-fail-loud + fix bugs over defensive subsystems.
 
 Each bank is self-contained and EQUAL, exactly like the shipped six
 (`media_archive`, `original`, `public_domain`, `shakespeare`, `scifi_news`,
-`scifi_news_pro`). A client adds a 7th+ the SAME shape, from their own folder,
+`scifi_news_pro`). A client adds a 6th+ the SAME shape, from their own folder,
 without editing shipped repo files. A client bank provides: the bank definition
 (row: id / label / source_kind / fetcher / interpreter / default pipeline /
 default story model / defaults / required_seams), its fetcher + interpreter, a
@@ -56,7 +56,7 @@ fail a story (THE LAW).
   `legacy_many_pass` topology. Six-row INDEPENDENT execution (grounded):
   media_archive->legacy_many_pass, original->original_multi_pass,
   public_domain & shakespeare->legacy_many_pass_adapt (inline);
-  scifi_news->scifi_news_circuit, scifi_news_pro->scifi_news_pro_multipass
+  scifi_news_pro->scifi_news_pro_multipass, scifi_news_pro->scifi_news_pro_multipass
   (own-runner). `_RUNNER_BY_PIPELINE`=2, `_LEGACY_INLINE_PIPELINES`=3.
 
 ## In v1 (lean scope)

@@ -97,7 +97,7 @@ def _build(user_root: Path, *, row=None, activate: bool = True,
 
 
 SHIPPED_IDS = ("media_archive", "original", "scifi_news_pro", "public_domain",
-               "shakespeare", "scifi_news", "custom_source_bank")
+               "shakespeare", "custom_source_bank")
 
 
 # -- (a) the stock install is unchanged -------------------------------------

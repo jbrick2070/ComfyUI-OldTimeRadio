@@ -8,10 +8,14 @@ declined cameo from one that was never considered, and nothing failed and
 nothing logged.
 
 Chunk A of the Lemmy sprint: ``content_owned_cast_contract`` in
-``nodes/_otr_casting.py`` builds the decision receipt, and each runner stamps
-it -- ``_otr_scifi_codex._stamp_cast_contract`` after ``_assemble_ledger``,
-``_otr_scifi_fable2._stamp_cast_contract`` after ``_assemble`` (which saves and
-rebinds ``led.data``, so the stamp reacquires the live meta).
+``nodes/_otr_casting.py`` builds the decision receipt, and the runner stamps
+it -- ``_otr_scifi_fable2._stamp_cast_contract`` after ``_assemble`` (which
+saves and rebinds ``led.data``, so the stamp reacquires the live meta).
+
+The codex runner carried the twin stamp until the 2026-08-16 ``scifi_news``
+rip; its cases went with it. The helper is lane-agnostic and still covers
+both announcer row shapes, because a future content-owned lane may ship
+either one.
 
 Load-bearing absences, pinned here: NO ``cast_seed`` and NO
 ``cast_seed_source``. ``cast_seed`` is a replay claim -- OTR_CastLock replays
@@ -55,7 +59,7 @@ def _read(rel_path: str) -> str:
 
 def test_shape_is_legacy_minus_replay_keys():
     contract = content_owned_cast_contract(
-        source_bank_id="scifi_news",
+        source_bank_id="scifi_news_pro",
         num_characters_request=2,
         num_characters_locked=3,
     )
@@ -101,7 +105,7 @@ def test_policy_is_fidelity_exclusion_on_adaptation_banks():
 
 
 def test_policy_is_content_owned_no_roll_on_the_scifi_family():
-    for bank in ("scifi_news", "scifi_news_pro", "", None):
+    for bank in ("scifi_news_pro", "", None):
         contract = content_owned_cast_contract(
             source_bank_id=bank,
             num_characters_request=2,
@@ -115,7 +119,7 @@ def test_policy_is_not_operator_cameo():
     roll, and stamping a decline nobody made is the same silence in a better
     disguise."""
     contract = content_owned_cast_contract(
-        source_bank_id="scifi_news",
+        source_bank_id="scifi_news_pro",
         num_characters_request=2,
         num_characters_locked=2,
     )
@@ -124,7 +128,7 @@ def test_policy_is_not_operator_cameo():
 
 def test_no_cameo_and_no_attempts():
     contract = content_owned_cast_contract(
-        source_bank_id="scifi_news",
+        source_bank_id="scifi_news_pro",
         num_characters_request=2,
         num_characters_locked=3,
     )
@@ -137,8 +141,10 @@ def test_no_cameo_and_no_attempts():
 # ------------------------------------------------- count_locked_characters
 
 
-def test_count_excludes_announcer_by_char_id_codex_shape():
-    # scifi_news ships char_id "announcer" (2026-08-15 proof ledger shape).
+def test_count_excludes_announcer_by_char_id_shape():
+    # A lane whose announcer row uses char_id "announcer" (the shape the
+    # retired codex lane shipped; kept because it is a real ledger shape
+    # a future content-owned lane may reproduce).
     cast = [
         {"char_id": "announcer", "name": "ANNOUNCER"},
         {"char_id": "c01", "name": "Dr. Aris Thorne"},
@@ -168,33 +174,10 @@ def test_count_tolerates_junk_and_empty():
 # ---------------------------------------------------------- runner stamps
 
 
-def test_codex_runner_stamps_after_assemble():
-    led = SimpleNamespace(data={
-        "meta": {},
-        "cast": [
-            {"char_id": "announcer", "name": "ANNOUNCER"},
-            {"char_id": "c01", "name": "A"},
-            {"char_id": "c02", "name": "B"},
-        ],
-    })
-    from nodes import _otr_scifi_codex as codex
-
-    contract = codex._stamp_cast_contract(
-        led,
-        resolved={"num_characters": 2},
-        source_bank_row=SimpleNamespace(source_bank_id="scifi_news"),
-    )
-    meta = led.data["meta"]
-    assert meta["cast_contract"] is contract
-    assert contract["lemmy_policy"] == CONTENT_OWNED_NO_CAMEO_ROLL
-    assert contract["lemmy_hit"] is False
-    assert contract["num_characters_request"] == 2
-    assert contract["num_characters_locked"] == 2
-    # Found reading the 08-15 proof ledger: this lane froze cast_status
-    # "building" on a published episode. The stamp closes it.
-    assert meta["cast_status"] == "locked"
-    for key in CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS:
-        assert key not in contract
+# `test_codex_runner_stamps_after_assemble` lived here and pinned the twin
+# stamp on the codex runner, including that it closed `cast_status` (which
+# froze "building" on published episodes). It went with the 2026-08-16
+# `scifi_news` rip. The fable2 case below is now the only runner stamp.
 
 
 def test_fable2_runner_stamps_live_meta():
@@ -219,14 +202,6 @@ def test_fable2_runner_stamps_live_meta():
     assert contract["num_characters_locked"] == 2
     for key in CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS:
         assert key not in contract
-
-
-def test_codex_call_site_sits_between_assemble_and_delivery_stamp():
-    src = _read(os.path.join("nodes", "_otr_scifi_codex.py"))
-    call = src.rindex("_stamp_cast_contract(")
-    assert call > src.index("def run_scifi_codex_episode(")
-    assert call > src.index("expected = _assemble_ledger(")
-    assert call < src.index('stage="scifi_codex_assembled"')
 
 
 def test_fable2_call_site_sits_between_assemble_and_receipt_save():

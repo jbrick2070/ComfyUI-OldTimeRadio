@@ -5045,3 +5045,57 @@ shows the codex/fable2 family ever casting Lemmy under any name. Every
 `scifi_*` bank id: zero castings, ever. A six-bank sweep finding Lemmy only on
 media_archive / original and absent on the scifi pair is therefore the
 EXPECTED result, not a regression signal.
+
+---
+
+## PBUG-20260816-01 -- `scifi_news` RETIRED (rip), and what closed with it
+
+- surfaced: not a failure report -- an OPERATOR DECISION on measured evidence,
+  logged here because the teardown protocol's ledger-discipline item requires a
+  rip to leave a causal record rather than a silent absence.
+- evidence: the blind per-bank narrative read
+  (`docs/2026-08-16-blind-bank-narrative-ranking.md`) scored `scifi_news` LAST
+  of six at **2.0/10** (worst sample 1/10, "it is not a story"; one leg
+  broadcast pipeline metadata as dialogue -- *"final coda, factual report
+  backed by P0 facts F01-F06"*), while `scifi_news_pro` scored FIRST at
+  **7.5/10**. The deterministic structure score ranked the same two banks last
+  (67.9 median) and first (93.8 median) independently. The reader re-paired all
+  twelve blind transcripts into their six banks 6/6 correct, so the ranking is
+  signal.
+- operator ruling 2026-08-16: *"we ditch scifi_news and the pro becomes the
+  standard... we leave the name pro since it won."*
+- fix: **retired the runnable bank + its pipeline/route.** Depth FULL-FAMILY:
+  `scifi_news` was the only bank on `scifi_news_circuit`, whose runner was
+  `nodes/_otr_scifi_codex.py` (4,664 lines), so the module, its dedicated
+  `_otr_scifi_source_repair.py` helper, the pack dir, the `LANE_SPECS` entry,
+  both registry rows and 13 dedicated lane tests went with it. Writer defaults
+  re-point to `scifi_news_pro`. Plan + full surface enumeration:
+  `docs/2026-08-16-scifi-news-RIP-PLAN.md`.
+- **LEDGER GATE PASSED, stated explicitly because it is the one that could have
+  blocked this:** every field the lane stamped was inside the
+  `meta["scifi_codex"]` namespace with ZERO surviving production readers, or a
+  shared key whose writer survives. Computed f-string keys were swept -- the
+  bank id was never interpolated into a meta key, only used as a value. No hole.
+- **CLOSED-BY-RIP** (these were OPEN against the retired lane and are not
+  outstanding work any more): the codex `P5R _call_scene_review` no-shims
+  violation; `_canonicalize_script_spoken_text` writing stripped text back into
+  the record; the graduated-extraction span-reader enumeration
+  (`docs/2026-08-15-graduated-extraction-span-reader-enumeration.md`, whose own
+  scope line read "this work is `scifi_news` only"); the creativity-knob
+  no-op on that lane; and the `scifi_news` P0 convergence blocker.
+- **COVERAGE LAPSED, recorded honestly rather than quietly:** `_CodexTailFinalizer`
+  was the ONLY implementer of both the writer `TailFinalizer` protocol and the
+  clean transaction's three-method proof protocol, so
+  `tests/test_clean_transaction.py::TestFinalizerProtocol` ("a renamed method
+  would go unnoticed") is gone. The transaction machinery is still covered by
+  stub-driven tests and the writer-tail test. The protocol SURFACE is
+  deliberately KEPT as extension space -- restore that class when a lane
+  implements it. Same shape: four codex bark-allocator tests in
+  `test_gender_normalization.py`; the surviving lane reads
+  `cast_pools.open_voice_pool` directly, so the defect they guarded is
+  unreachable by construction there.
+- reversal: `SOURCE_BANK_PREFLIGHT.md` "Reversal" section. Pre-rip anchor tag
+  `otr-2026-08-16-sixbank-lemmyA` at `da44f642`, where all six banks were
+  live-proven; the rip is ONE atomic commit, so `git revert` restores it whole.
+  A restored bank re-enters at gate 1 and must re-qualify on a live leg.
+- status: **DONE.**

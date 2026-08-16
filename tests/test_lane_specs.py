@@ -19,7 +19,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_lane_specs as LANES
-from nodes import _otr_scifi_codex as CODEX
 from nodes import _otr_scifi_fable2 as FABLE2
 
 
@@ -57,8 +56,6 @@ def test_every_declared_name_actually_resolves():
 # ---------------------------------------------------------------------------
 
 def test_runner_for_resolves_the_dispatched_lanes():
-    assert LANES.runner_for("scifi_news_circuit") is (
-        CODEX.run_scifi_codex_episode)
     assert LANES.runner_for("scifi_news_pro_multipass") is (
         FABLE2.run_scifi_fable2_episode)
 
@@ -79,7 +76,7 @@ def test_runner_for_raises_on_an_unregistered_pipeline():
 
 
 def test_is_dispatched_matches_the_table():
-    assert LANES.is_dispatched("scifi_news_circuit") is True
+    assert LANES.is_dispatched("scifi_news_pro_multipass") is True
     assert LANES.is_dispatched("legacy_many_pass") is False
     assert LANES.is_dispatched("not_a_real_pipeline") is False
 
@@ -91,7 +88,7 @@ def test_is_dispatched_matches_the_table():
 #
 # * `assert_supported(bank, req)` -- raised the lane's OWN error type (e.g.
 #   `CodexTargetRangeError`) when a `RollRequest(target_words=...)` fell
-#   outside the lane's declared band (only scifi_news_circuit declared one,
+#   outside the lane's declared band (only one retired lane declared one,
 #   30..900).
 # * `is_roll_compatible(bank, req)` -- the same check as a bool, swallowing
 #   ONLY the lane's declared compat errors, which the bank roll used to
@@ -101,7 +98,6 @@ def test_is_dispatched_matches_the_table():
 # word-count authority (operator directive 2026-08-14): the writer no longer
 # takes a `target_words` request, so there is no target left for a lane to
 # accept or decline, and a gate whose only input is gone is worse than no
-# gate at all -- it still reads as live. The hoisted codex preflight these
-# tests also pinned -- `CODEX.WordSteerV4` and
-# `CODEX.assert_supported_target_words` -- was removed in the same change;
-# the act count is the only length-shaped knob now (see `CODEX.ActSteerV4`).
+# gate at all -- it still reads as live. The hoisted lane preflight these
+# tests also pinned was removed in the same change; the act count is the
+# only length-shaped knob now.

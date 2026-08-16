@@ -89,7 +89,6 @@ LANE_SHAPE = {
     "shakespeare": "writer",
     "public_domain": "writer",
     "media_archive": "writer",
-    "scifi_news": "codex",
     "scifi_news_pro": "codex",
 }
 
@@ -309,34 +308,6 @@ def fixtures() -> "dict[str, dict]":
             {"speaker": "ANNOUNCER",
              "text": "And the diary closes upon that night.",
              "trap": "clean announcer close", "why": "plain narration"},
-        ],
-    )
-
-    banks["scifi_news"] = _ledger(
-        "scifi_news",
-        [("ANNOUNCER", "announcer"), ("Dr. Imani Osei", "c01"), ("Kaelen", "c02")],
-        [
-            {"speaker": "ANNOUNCER",
-             "text": "Tonight, a story drawn from this morning's wire.",
-             "trap": "clean announcer open", "why": "plain address"},
-            {"speaker": "Dr. Imani Osei",
-             "text": "(She leans over the console.) The shielding held at "
-                     "sixty percent.",
-             "planted": "bracket_start",
-             "intent": "report the shielding result"},
-            {"speaker": "Kaelen",
-             "text": "Sixty percent of what, exactly? Give me the baseline.",
-             "trap": "question", "why": "a question with a number"},
-            {"speaker": "Dr. Imani Osei",
-             "text": "Twenty-six kilograms down to sixteen. He nods slowly.",
-             "planted": "third_person",
-             "intent": "give the mass figures"},
-            {"speaker": "Kaelen",
-             "text": "We stand at the precipice, and you bring me arithmetic.",
-             "trap": "metaphor", "why": "first person and an image"},
-            {"speaker": "ANNOUNCER",
-             "text": "Tonight's drama was drawn from reporting on AstroRad.",
-             "trap": "clean coda", "why": "names the source, pure speech"},
         ],
     )
 

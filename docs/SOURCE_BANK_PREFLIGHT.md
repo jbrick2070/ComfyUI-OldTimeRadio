@@ -425,11 +425,17 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 
 **Step 0 -- decide the removal DEPTH (this drives everything below):**
 - **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. the 2026-07-19 rip
-  of base `scifi_codex` while its shared runner + the renamed `scifi_news` sibling stayed): remove only the bank's OWN row/pack/rules + its
+  of a base bank while its shared runner and a renamed sibling stayed): remove only the bank's OWN row/pack/rules + its
   DEDICATED pipeline. KEEP the shared lane runner module and any shared pipeline.
 - **Full-family removal** (NO surviving sibling of that lane, e.g. `scifi_sonnet_v3` is the only sonnet
   bank): ALSO delete the lane runner module + its interpreter/source-kind registration + the dedicated
   lane test. "Only version of its family" is the tell that a rip goes deep.
+  **THE TELL IS THE RUNNER, NOT THE NAME (2026-08-16).** `scifi_news` and
+  `scifi_news_pro` read as siblings and are not: they are separate lanes on
+  separate runners, so ripping `scifi_news` was FULL-FAMILY even though a
+  same-prefixed bank survived. Ask "does any surviving bank route to this
+  runner?", never "does a similar name survive?" -- and note a bare grep for
+  the ripped id also matches the survivor's prefix.
 
 **Surfaces to clean (each: PASS + a file:line / test / grep evidence):**
 - [ ] **Hard:** Bank row deleted from `nodes/story_packs/banks.json`.

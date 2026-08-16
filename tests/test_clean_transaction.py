@@ -19,7 +19,7 @@ TWO THINGS THIS FILE REFUSES TO LET DRIFT.
 
 1. THE PROOF IS NOT LOOSENED. An unattributed mutation still fails exactly as
    loudly as before -- `_CodexTailFinalizer._proof` stays fail-loud, and
-   `tests/test_scifi_codex_lane.py:627-635` calls that primitive directly with
+   the (now-deleted) codex lane test called that primitive directly with
    an unattributed mutation and must keep raising. A transaction that made
    corruption survivable would be worse than the bug.
 
@@ -372,135 +372,18 @@ class TestDegradation:
         assert led.data["lines"][0]["text"] == "Exact raw text."
         validate_receipt(led.data)
 
-
 # --------------------------------------------------------------------------- #
-# the lane side of the protocol
+# the lane side of the protocol -- COVERAGE LAPSED 2026-08-16 (scifi_news rip)
 # --------------------------------------------------------------------------- #
-class TestFinalizerProtocol:
-    def _finalizer(self):
-        from nodes._otr_scifi_codex import _CodexTailFinalizer
-
-        return _CodexTailFinalizer({"l1": "Exact raw text.", "l2": "Second line."})
-
-    def _lane_ledger(self, finalizer):
-        import hashlib
-
-        data = _ledger_data()
-        data["meta"]["scifi_codex"] = {
-            "line_text_sha256": {
-                k: hashlib.sha256(v.encode("utf-8")).hexdigest()
-                for k, v in finalizer.expected.items()
-            },
-            "accepted_lines": dict(finalizer.expected),
-        }
-        return data
-
-    def test_the_real_codex_finalizer_speaks_the_protocol(self):
-        """A rename that misses a caller is the producer/consumer mismatch of
-        Bible 12.86. This pins the trio the transaction calls."""
-        finalizer = self._finalizer()
-        for name in txn._FINALIZER_PROTOCOL:
-            assert callable(getattr(finalizer, name, None)), name
-
-    def test_reseal_repoints_expected_AND_its_hash_mirror(self):
-        import hashlib
-
-        finalizer = self._finalizer()
-        data = self._lane_ledger(finalizer)
-        data["lines"][0]["text"] = "Exact repaired text."
-
-        finalizer.reseal_proof(data)
-
-        assert finalizer.expected["l1"] == "Exact repaired text."
-        assert data["meta"]["scifi_codex"]["line_text_sha256"]["l1"] == (
-            hashlib.sha256("Exact repaired text.".encode("utf-8")).hexdigest())
-
-    def test_reseal_PRESERVES_accepted_lines(self):
-        """`accepted_lines` records what the model ACCEPTED, which is not what
-        ships after an authorized clean. Relabelling cleaned text as accepted
-        output destroys the only record that the two ever differed."""
-        finalizer = self._finalizer()
-        data = self._lane_ledger(finalizer)
-        data["lines"][0]["text"] = "Exact repaired text."
-
-        finalizer.reseal_proof(data)
-
-        assert data["meta"]["scifi_codex"]["accepted_lines"]["l1"] == (
-            "Exact raw text.")
-
-    def test_reseal_PROVES_itself(self):
-        """It ends by calling the same `_proof` primitive the pre-save gate and
-        the saved-ledger audit call, so a reseal that passes here passes there
-        -- and one that does not still has the transaction's snapshot."""
-        from nodes._otr_scifi_codex import CodexPreTailAuditError
-
-        finalizer = self._finalizer()
-        data = self._lane_ledger(finalizer)
-
-        def _sabotage(_data):
-            raise CodexPreTailAuditError("mirror disagrees")
-
-        finalizer._proof = _sabotage
-        with pytest.raises(CodexPreTailAuditError):
-            finalizer.reseal_proof(data)
-
-    def test_a_blanked_row_stays_PROVED_as_empty(self):
-        """The guarantee that stops anything refilling it later with
-        unattributed text."""
-        finalizer = self._finalizer()
-        data = self._lane_ledger(finalizer)
-        data["lines"][1]["text"] = ""
-
-        finalizer.reseal_proof(data)
-
-        assert finalizer.expected["l2"] == ""
-
-    def test_the_transaction_composes_with_the_REAL_codex_finalizer(self):
-        """Every transaction test above drives a STUB lane proof. This one
-        wires the actual `_CodexTailFinalizer` in, because the seam between the
-        two is exactly where a renamed method would go unnoticed -- the stub
-        would keep passing while production quietly lost its reseal."""
-        import hashlib
-
-        from nodes._otr_scifi_codex import _CodexTailFinalizer
-
-        led = _accepted_led()
-        expected = {"l1": "Exact raw text.", "l2": "Second line."}
-        finalizer = _CodexTailFinalizer(expected)
-        led.data["meta"]["scifi_codex"] = {
-            "line_text_sha256": {
-                k: hashlib.sha256(v.encode("utf-8")).hexdigest()
-                for k, v in expected.items()
-            },
-            "accepted_lines": dict(expected),
-        }
-        window = txn.open_transaction(led, finalizer=finalizer)
-        _clean_stage_rewrites(led, "l1", "Exact repaired text.")
-
-        report = window.reconcile()
-
-        assert report["outcome"] == "resealed"
-        # The pre-save gate that used to raise `line receipt mismatch`.
-        finalizer._proof(led.data)
-        validate_receipt(led.data)
-        assert led.data["meta"]["scifi_codex"]["accepted_lines"]["l1"] == (
-            "Exact raw text.")
-
-    def test_a_PARTIAL_protocol_is_LOUD_and_never_silent(self, caplog):
-        """Half the protocol means a rename missed a caller. It must not raise
-        -- this runs after the script is written and Law 7 outranks a tidy
-        failure -- but it must never pass quietly either."""
-        partial = SimpleNamespace(snapshot_proof_state=lambda: {})
-        with caplog.at_level(logging.ERROR):
-            assert txn._finalizer_hook(partial) is None
-        assert "protocol" in caplog.text
-
-    def test_no_finalizer_at_all_is_ordinary_and_silent(self, caplog):
-        with caplog.at_level(logging.ERROR):
-            assert txn._finalizer_hook(None) is None
-        assert caplog.text == ""
-
-
+# `TestFinalizerProtocol` lived here and pinned the ONE real implementer of
+# both the writer TailFinalizer protocol and this module's three-method proof
+# protocol: `_CodexTailFinalizer`. It died with the codex lane.
+#
+# The transaction machinery itself is STILL covered -- every test above drives
+# a stub lane proof, and the writer-tail test below exercises the real seam.
+# What lapsed is the "a renamed method would go unnoticed" guard, which needs
+# a REAL implementer to bite. The protocol surface is deliberately KEPT as
+# extension space, so restore this class the moment a lane implements it.
 # --------------------------------------------------------------------------- #
 # the wiring -- code that is not called is dead code
 # --------------------------------------------------------------------------- #

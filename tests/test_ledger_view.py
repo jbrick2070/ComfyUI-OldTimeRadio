@@ -53,7 +53,7 @@ def _ledger(rows, *, beats=None, cast=None, anchors=None):
         "beats": beats,
         "lines": rows,
         "meta": {
-            "source_bank": "scifi_news",
+            "source_bank": "scifi_news_pro",
             "scifi_codex": {
                 "fact_index": {
                     "entities": [{"name": n} for n in (anchors or ["MIT"])],

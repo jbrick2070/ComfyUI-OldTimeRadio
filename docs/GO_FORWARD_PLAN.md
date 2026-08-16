@@ -411,13 +411,13 @@ and every `scifi_*` bank id has ZERO castings ever. Expected per bank:
 `media_archive` / `original` -- the cameo MAY appear (11% OS-entropy roll;
 absence on any single leg is NOT a failure); `public_domain` / `shakespeare` --
 NO LEMMY row, contract stamped with `lemmy_policy=source_fidelity_exclusion`;
-`scifi_news` / `scifi_news_pro` -- until chunk B lands, NO cameo, and (once
-chunk A lands) a stamped contract with `lemmy_hit: false` and the content-owned
-no-roll policy. Lemmy absent on the scifi pair is the EXPECTED state, not a
+`scifi_news_pro` -- until chunk B lands, NO cameo, and a stamped contract
+with `lemmy_hit: false` and the content-owned no-roll policy. (`scifi_news`
+was RIPPED 2026-08-16 and is no longer a sweep lane.) Lemmy absent on the scifi pair is the EXPECTED state, not a
 regression signal.
 
-**Repair sites: TWO runner modules** -- `_otr_scifi_codex` and
-`_otr_scifi_fable2` -- whatever the variant count above them.
+**Repair site: ONE runner module** -- `_otr_scifi_fable2` (the codex runner
+was deleted with the 2026-08-16 `scifi_news` rip).
 
 **THE SPRINT SPLITS IN TWO, AND ONLY ONE HALF IS SAFE TO BUILD BLIND
 (scoped 2026-08-16, no code written):**
@@ -531,7 +531,8 @@ portraits minted, which is why the operator could not see stills and why the
 visual half of the gender check was impossible. `still_flat` restores it.
 
 **Roll safety, VERIFIED against the live registry, do not re-derive:** the roll
-pools deliberately differ from the dropdowns. Banks: menu 8, pool **6** --
+pools deliberately differ from the dropdowns. Banks: menu 7, pool **5** (after
+the 2026-08-16 `scifi_news` rip) --
 `custom_source_bank` is NOT selectable by a roll, and the sentinel cannot select
 itself. Styles: menu 11, pool **10**, sentinel excluded. So neither
 "declare your own" escape hatch is reachable unattended.

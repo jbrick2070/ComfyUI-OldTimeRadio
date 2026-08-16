@@ -18,15 +18,16 @@ fix does NOT cover).
 
 ## 1. Lane map -- which bank runs which writer, and what shape it decodes
 
-The single most load-bearing fact in this file: **only `scifi_codex` binds a
-grammar during decoding.** `_bind_local_slot_schema` is defined and called only
-in `nodes/_otr_scifi_codex.py`; the writer merely EXPOSES the capability
-(`OTR_LedgerScriptWriter.py:740`) and nothing else consumes it. Everything else
-is post-validated -- a schema instruction in text, parsed after the fact.
+The single most load-bearing fact in this file, and it INVERTED on 2026-08-16:
+**no shipped lane binds a grammar during decoding any more.** The only lane that
+ever did was the codex runner, retired with the `scifi_news` rip
+(PBUG-20260816-01), and `_bind_local_slot_schema` went with it. The writer still
+EXPOSES the capability (`OTR_LedgerScriptWriter.py`) and NOTHING consumes it --
+live extension space, not a live path. Every shipped lane is post-validated: a
+schema instruction in text, parsed after the fact.
 
 | bank | pipeline (`nodes/story_packs/banks.json`) | module | decode shape | grammar-bound? | reserves whole window? |
 |---|---|---|---|---|---|
-| `scifi_news` | `scifi_news_circuit` | `_otr_scifi_codex` | constrained JSON | **YES (lmfe)** | yes (P3 13,912 measured) |
 | `scifi_news_pro` | `scifi_news_pro_multipass` | `_otr_scifi_fable2` | post-validated JSON + **raw markup P3** | no | **YES -- critical** |
 | `media_archive` | `legacy_many_pass` | writer inline body | post-validated JSON + inline | no | no |
 | `shakespeare` | `legacy_many_pass_adapt` | writer inline body | post-validated JSON + inline | no | no |
@@ -35,9 +36,9 @@ is post-validated -- a schema instruction in text, parsed after the fact.
 
 **Why "grammar-bound" is the column that matters:** a `max_length` on a
 post-validated model does NOT stop a decode. Without token-selection binding it
-is a post-hoc validation failure -- the tokens are already spent. The ceilings
-shipped in `832eaf6b` are a cure on `scifi_codex` for exactly that reason and
-would be hygiene-only anywhere else.
+is a post-hoc validation failure -- the tokens are already spent. That is now
+true of EVERY shipped lane, so schema ceilings are hygiene everywhere and the
+runaway guard has to be the numeric output ceiling, never the schema.
 
 ## 2. Context cap -- what wins, in order
 

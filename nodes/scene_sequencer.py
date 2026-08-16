@@ -935,7 +935,7 @@ class SceneSequencer:
 
             line_id_for_log = item.get("line_id") or "?"
             # dedicated music_inter sentinel (legacy/fable2) OR an ordinary
-            # dialogue row (scifi_news).  In the latter case the cue is
+            # dialogue row.  In the latter case the cue is
             # inserted first and the dialogue still consumes its own voice
             # clip and receives its normal timing stamp.
 

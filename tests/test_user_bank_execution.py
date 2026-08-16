@@ -297,11 +297,11 @@ def test_empty_ids_still_fail_with_the_contract_missing_error(bundle):
 
 def test_shipped_bank_resolution_is_unaffected():
     """No owner, shipped ids: byte-identical behaviour to wave 2."""
-    shipped = _Row("scifi_news", fetcher="science_rss",
+    shipped = _Row("scifi_news_pro", fetcher="science_rss",
                    interpreter="news_interpreter")
     assert osp.resolve_fetcher(shipped).seed_source == "rss_fetch"
     assert callable(osp.resolve_interpreter(shipped))
-    unknown = _Row("scifi_news", fetcher="not_a_fetcher")
+    unknown = _Row("scifi_news_pro", fetcher="not_a_fetcher")
     with pytest.raises(osp.UnknownFetcherError):
         osp.resolve_fetcher(unknown)
 

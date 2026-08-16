@@ -674,7 +674,7 @@ class TestSixBankAuthoredVocabulary:
             ("original", "BOB FLANDERS", "Flanders discovers a velvet chair"),
             ("public_domain", "FILBY", "Filby waits beside the machine"),
             ("shakespeare", "MACBETH", "Macbeth watches the smoking heath"),
-            ("scifi_news", "Dr. Aris Thorne", "Thorne studies a 1940s console"),
+            ("scifi_news_pro", "Dr. Aris Thorne", "Thorne studies a 1940s console"),
             ("scifi_news_pro", "LARKIN", "Larkin argues under Victorian lamps"),
         ],
     )

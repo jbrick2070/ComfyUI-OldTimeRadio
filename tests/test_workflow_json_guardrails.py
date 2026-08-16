@@ -714,7 +714,7 @@ class TestWriterB2aSurface:
         # must be a REGISTERED bank id (cross-checked against the live routing
         # registry so a re-order / typo cannot ship silently). The roster trim
         # (2026-07-17) retired the science_news family; the default lane is now
-        # scifi_news (the local-default sci-fi bank).
+        # scifi_news_pro (the local-default sci-fi bank).
         # 2026-08-15 (operator): canonical now ships the ROLL sentinel so an
         # unattended run varies its bank. The sentinel is deliberately NOT a
         # registered bank id -- `eligible_bank_ids()` excludes it (and excludes

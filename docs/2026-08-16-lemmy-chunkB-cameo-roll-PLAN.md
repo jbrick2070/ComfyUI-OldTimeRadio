@@ -1,3 +1,8 @@
+> **SUPERSEDED 2026-08-16.** `scifi_news` was ripped; the codex fork this
+> plan asked the panel to settle no longer exists. The BUILD CONTRACT
+> (`docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md`) is the authority and is
+> now fable2-only.
+
 # Lemmy Chunk B -- the cameo ROLL on the content-owned lanes (r1 input)
 
 Status: DRAFT for the kibitz panel. Chunk A (the cast contract) is pushed at
@@ -76,7 +81,7 @@ menu deal; the menu allocates for everyone else). The casting pass must
 return an entry for him like any speaker; his voice fields are overridden by
 the pin regardless of what the menu proposed.
 
-### Codex (`scifi_news`) -- THE FORK, panel input wanted
+### Codex (`scifi_news`) -- MOOT: lane RIPPED 2026-08-16, fork closed
 
 * **Option A -- DISPLACE (driver's lean):** schema untouched. On a hit, the
   P2 prompt instructs that one story row MUST be LEMMY with his pinned

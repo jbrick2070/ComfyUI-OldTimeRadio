@@ -84,13 +84,13 @@ class TestStoryScaffoldDefault:
     def test_every_other_runnable_bank_keeps_the_scaffold(self):
         # Absent means "on" -- today's behaviour for every non-original bank.
         # Enumerated from the LIVE registry rather than the EXPECTED table,
-        # which predates this key and omits scifi_news (QA 2026-08-03) -- a
+        # which predates this key and omits the sci-fi lane (QA 2026-08-03) -- a
         # hand-list drifts, the registry cannot.
         others = [b for b in SR.runnable_bank_ids() if b != "original"] \
             if hasattr(SR, "runnable_bank_ids") else None
         if others is None:
             others = [bid for bid in
-                      ("media_archive", "scifi_news", "scifi_news_pro",
+                      ("media_archive", "scifi_news_pro",
                        "public_domain", "shakespeare")]
         assert others, "registry returned no non-original runnable banks"
         for bank_id in others:

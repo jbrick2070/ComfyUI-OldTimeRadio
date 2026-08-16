@@ -127,7 +127,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         approx_safetensors_gb=24.0,
         notes="Audio C7 regression baseline -- soak-tested. Default for both "
         "slots. Effective context window raised to 16384 (2026-07-19) so the "
-        "scifi_news 420/720w script pass fits; short legs are unaffected "
+        "the local sci-fi 420/720w script pass fits; short legs are unaffected "
         "(they never reached the 8192 output-budget clamp) so C7 audio "
         "byte-identity holds.",
         prompt_profile="modern",
@@ -1401,7 +1401,7 @@ HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
 # vram_fit_tier=="PASS" row is AUTHORITATIVE (see resolve_context_cap):
 # it is the value that row was proven at, not a guess to be re-clamped by
 # the generic HARD_VRAM_CONTEXT_LIMIT. Mistral-Nemo is raised to 16384
-# (2026-07-19) so the local scifi_news 420/720w script pass fits the
+# (2026-07-19) so the local sci-fi 420/720w script pass fits the
 # context window (config.json advertises 131072); NF4 4-bit weights + a
 # DynamicCache keep the ~1.8 GB KV at 720w inside the 16 GB card
 # (live-proven). Short legs never reached the old 8192 output-budget

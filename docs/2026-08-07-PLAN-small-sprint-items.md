@@ -552,8 +552,8 @@ quoting "17" as a fixed expectation** once the entry lands.
   Restored verbatim in substance: both fidelity banks (public_domain and
   shakespeare) x {non-empty, empty} provenance, PLUS an owned/non-empty case with
   `_style_grammar_on == False`. **Assert the coda is PRESENT, not merely that the
-  URL is absent.** Control is **`media_archive`, NEVER `scifi_news`** -- that lane
-  dispatches to `scifi_news_circuit` and returns before this block, so it would
+  URL is absent.** Control is **`media_archive`, an INLINE lane** -- a DISPATCHED lane
+  returns before this block, so such a row would
   prove nothing. Assert the coda in `lines[].text` and in a `Dialogue:` cue from
   `build_ass_from_ledger`.
 * **Wire the audit tests to the REAL constant (Codex).**

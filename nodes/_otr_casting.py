@@ -1285,7 +1285,7 @@ def content_owned_cast_contract(
 ) -> dict:
     """Build ``meta.cast_contract`` for a lane that owns its own cast.
 
-    The content-owned lanes (``_otr_scifi_codex``, ``_otr_scifi_fable2``)
+    The content-owned lane (``_otr_scifi_fable2``)
     derive their cast from the script the model already wrote, so they never
     reach :func:`lock_cast` and never stamped this key at all -- both shipped
     ``cast_contract: {}`` on every episode (PBUG-20260811-03, re-measured on

@@ -344,7 +344,7 @@ class TestDualLedgerFix:
 
     @pytest.mark.parametrize("bank", [
         "media_archive", "original", "public_domain", "shakespeare",
-        "scifi_news", "scifi_news_pro",
+        "scifi_news_pro",
     ])
     def test_rename_rebases_shared_six_bank_episode_paths(self, tmp_out, bank):
         old_id = f"pending_{bank}"
@@ -883,7 +883,6 @@ class TestSetters:
         "original",
         "public_domain",
         "shakespeare",
-        "scifi_news",
         "scifi_news_pro",
     ])
     def test_save_self_heals_all_text_metrics_for_every_bank(

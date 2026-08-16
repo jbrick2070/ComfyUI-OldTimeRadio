@@ -68,10 +68,10 @@ def test_rolling_the_bank_does_not_roll_the_style():
 
 
 def test_rolling_the_style_does_not_roll_the_bank():
-    bank, bank_receipt = ROLLS.resolve_bank_selection("scifi_news", env={})
+    bank, bank_receipt = ROLLS.resolve_bank_selection("scifi_news_pro", env={})
     style, style_receipt = ROLLS.resolve_style_selection(
         ROLLS.STYLE_SENTINEL, env={})
-    assert bank == "scifi_news" and bank_receipt is None
+    assert bank == "scifi_news_pro" and bank_receipt is None
     assert style_receipt is not None and style in ROLLS.eligible_style_ids()
 
 
@@ -89,7 +89,7 @@ def test_both_surfaces_can_roll_in_the_same_run_with_separate_seeds():
 # the manual path stays byte-identical
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("picked", ["scifi_news", "shakespeare", "anything"])
+@pytest.mark.parametrize("picked", ["scifi_news_pro", "shakespeare", "anything"])
 def test_a_manual_bank_pick_returns_unchanged_with_no_receipt(picked):
     assert ROLLS.resolve_bank_selection(picked, env={}) == (picked, None)
 
@@ -287,7 +287,7 @@ def test_both_dropdowns_carry_their_sentinel_as_choice_zero():
 def test_the_shipped_defaults_are_still_concrete_ids_not_the_roll():
     """Zero canonical-JSON diff: the saved graph's VALUES do not change."""
     optional = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()["optional"]
-    assert optional["source_bank"][1]["default"] == "scifi_news"
+    assert optional["source_bank"][1]["default"] == "scifi_news_pro"
     assert optional["visual_style"][1]["default"] == "sci_fi_radio"
 
 

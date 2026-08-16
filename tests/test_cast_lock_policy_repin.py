@@ -269,9 +269,10 @@ def test_the_exclusion_the_contract_rests_on_is_real_and_covers_both_banks():
 #:
 #: CORRECTED 2026-08-11 FROM A LIVE SWEEP, and the correction is the lesson.
 #: The first version of this map was written from the bank list without
-#: measuring anything, and it asserted `scifi_news: cameo_allowed`. A six-bank
+#: measuring anything, and it asserted a cameo rule for the since-retired
+#: sci-fi news lane. A six-bank
 #: render sweep with the cameo FORCED on every leg proved otherwise: that lane
-#: runs the `scifi_news_circuit` pipeline, which never calls `lock_cast()`, so
+#: ran a content-owned pipeline that never calls `lock_cast()`, so
 #: it writes an EMPTY `cast_contract` -- no cast_seed, no lemmy_hit, no
 #: lemmy_policy -- and ignores both `lemmy_cameo` and `num_characters` (asked
 #: for 2 characters, produced 3).
@@ -287,20 +288,6 @@ BANK_CAMEO_POLICY = {
     # lemmy_policy="source_fidelity_exclusion" recorded on the ledger.
     "public_domain": "source_fidelity_excluded",
     "shakespeare": "source_fidelity_excluded",
-    # PRODUCT-level loss, LANE-level never-had (corrected 2026-08-16 by git
-    # archaeology + a full-corpus ledger census; PBUG-20260811-03 corrections).
-    # The operator's memory -- "built with Lemmy in mind and always used to
-    # work, the first Lemmy plan" -- is consistent with the record for the
-    # RETIRED science_news lane (legacy_many_pass -> inline lock_cast, 14
-    # measured castings through 2026-07-15). Today's scifi_news was born
-    # scifi_codex_v4, runner-dispatched from birth, and no commit in its
-    # history ever contained the string "lemmy": the LANE never regressed; the
-    # PRODUCT default lost the cameo when 499386aa retired science_news and
-    # f03128fa reused the name two days later.
-    #
-    # The value stays "cameo_allowed" because that is the INTENT and the target
-    # state; the guard below is what fails while reality disagrees.
-    "scifi_news": "cameo_allowed",
     # NOT MEASURED. Its leg failed in the WRITER before casting ran
     # ("[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
     # exhausted"), so nothing about its cameo behaviour was observed. Marked

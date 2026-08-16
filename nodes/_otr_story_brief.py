@@ -558,7 +558,7 @@ def run_story_brief_reflection(
     # even when the ladder had retried twice before succeeding. A receipt that
     # can only ever print one value is not a measurement.
     # `on_attempt_complete` fires once per ladder attempt (structured_call
-    # :1010-1013); the same hook the scifi_codex passes already use.
+    # :1010-1013); the same hook the structured lane passes already use.
     _attempts_seen = 0
 
     def _mark_attempt(attempts_run, _last_raw, _error):

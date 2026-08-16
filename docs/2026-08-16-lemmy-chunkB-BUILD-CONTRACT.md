@@ -11,10 +11,21 @@ three-agent grounding fan-out verified the r3 wiring claims 6/6. Driver:
 Claude, sole judge; every folded claim grounded against the tree at
 `da44f642`.
 
+## SCOPE CUT 2026-08-16 -- this contract is now ONE LANE
+
+`scifi_news` was RIPPED hours after this contract was written
+(PBUG-20260816-01): the operator retired it on measured evidence and made
+`scifi_news_pro` the standard. **The entire codex half of this contract is
+MOOT** -- the schema-locked slot reserve, the five grammar-decoded vocabulary
+sites, the P5/P5R speaker-contract route and the conditional preset pre-seed
+all described a module that no longer exists. The panel's hard half went with
+it. Everything below that names the codex lane is retained ONLY as the record
+of what was decided and why; the BUILDABLE contract is the fable2 sections.
+
 ## What this builds
 
-Both content-owned lanes -- `scifi_news` (`nodes/_otr_scifi_codex.py`) and
-`scifi_news_pro` (`nodes/_otr_scifi_fable2.py`) -- gain the LEMMY cameo ROLL:
+The surviving content-owned lane -- `scifi_news_pro`
+(`nodes/_otr_scifi_fable2.py`) -- gains the LEMMY cameo ROLL:
 decided at runner entry, before any authoring; identity pinned from
 `config/cast_pools.LEMMY_PROFILE`; the model authors only his
 episode-specific stake; the contract and receipts tell the truth in every
@@ -76,7 +87,7 @@ exists at node 1 index 12 and is already headless-whitelisted. The
 
 Fixture updates, complete list: `tests/test_fable2_source_windows.py:505,
 :578,:781`, `tests/test_p0_deterministic_repair_wired.py:488`,
-`tests/test_p0_source_windows.py:309`, `tests/test_scifi_codex_lane.py:435`
+`tests/test_p0_source_windows.py:309`, (the codex lane test, deleted with the rip)
 add `lemmy_force=False`; the two bare `SimpleNamespace()` ledgers in the p0
 fixtures become save-capable doubles (real `production_ledger.Ledger` or a
 double whose `save()` returns a truthy path and preserves `.data`),
@@ -146,7 +157,7 @@ to a `_resolve_inputs` ValueError test; the three mapping assertions stay.
   voice. `_assert_unique_bark_voices` runs on the merged rows before
   `_assemble`.
 
-## Codex (`scifi_news`)
+## Codex (`scifi_news`) -- MOOT, lane ripped 2026-08-16 (record only)
 
 * ON HIT, P2's `artifact_inputs` carries the cameo contract (the seam
   exists; P2 today receives only P1's question). One story slot of
@@ -213,7 +224,7 @@ checks, commit, push, verify HEAD == origin/v2.0-alpha
 5. Acceptance: RESET the box per CLAUDE.md section 4, boot a FRESH server
    at the implemented HEAD (the resident server holds pre-chunk-B modules
    -- acceptance against a stale boot proves nothing), then one forced-hit
-   leg per lane through `workflows/otr_canonical.json` via
+   leg (one lane remains) through `workflows/otr_canonical.json` via
    `scripts/otr_canonical_api_run.py --source-bank <lane bank> --set
    "OTR_LedgerScriptWriter.lemmy_cameo=always include"`. Per leg:
    `Prompt executed` + `obs_publish OK` in the server log, the canonical

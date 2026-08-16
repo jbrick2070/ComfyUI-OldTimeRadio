@@ -1031,7 +1031,9 @@ def test_deterministic_repair_return_still_reports_its_attempt():
     return skipped notify_attempt while every other successful return called
     it, so a caller counting attempts under-reported by one on this path.
 
-    Reachable in production from _otr_scifi_codex.py, which passes
+    NO production caller passes one since the 2026-08-16 codex rip -- this
+    is deliberate extension space, exercised here directly. It was reachable
+    from the codex lane, which passed
     `deterministic_repair`. Pinned here rather than there because the defect
     is in the shared ladder, not in any one caller.
     """

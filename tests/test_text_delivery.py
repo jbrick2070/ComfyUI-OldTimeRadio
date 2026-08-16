@@ -1,4 +1,4 @@
-"""Canonical-versus-TTS delivery behavior for all six banks."""
+"""Canonical-versus-TTS delivery behavior for every shipped bank."""
 from __future__ import annotations
 
 import sys
@@ -31,7 +31,6 @@ from nodes.scene_sequencer import _verify_bus_clip_counts
         ("original", LEGACY),
         ("public_domain", LEGACY),
         ("shakespeare", LEGACY),
-        ("scifi_news", CONTENT_OWNED),
         ("scifi_news_pro", CONTENT_OWNED),
     ],
 )

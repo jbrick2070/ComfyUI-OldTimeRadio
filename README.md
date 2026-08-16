@@ -89,14 +89,13 @@ News → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
 ## Story sources (source banks)
 
 The writer's `source_bank` dropdown selects where each episode's story comes from.
-Default: `scifi_news` (the local, offline-first sci-fi lane). Every lane is an
+Default: `scifi_news_pro` (the local, offline-first sci-fi lane). Every lane is an
 INDEPENDENT bank (its own story pack + story_rules) with no dependency on any
 other lane.
 
 | Bank | What it does |
 |------|--------------|
-| `scifi_news` | proof-pressure sci-fi radio; the local default (robust on a local LLM) |
-| `scifi_news_pro` | alternate LLM-first multipass sci-fi writer using the configured model slots |
+| `scifi_news_pro` | sci-fi radio drawn from a live science feed; the local default, an LLM-first multipass writer using the configured model slots |
 | `media_archive` | media RSS / archive items → restoration-adventure episodes |
 | `public_domain` | faithful radio adaptation of a public-domain source |
 | `shakespeare` | Folger scene adaptation |
@@ -107,8 +106,8 @@ source override on the article lanes. Every lane is fail-closed: a bad source, c
 overflow, or contract violation stops loudly instead of shipping a degraded story, and
 the LLM writes all story text — Python validates, it never rewrites prose.
 
-**Add your own source bank:** every bank is independent, and you can author a seventh
-peer to the shipped six — your own feed, archive, or source strategy — running through
+**Add your own source bank:** every bank is independent, and you can author a sixth
+peer to the shipped five — your own feed, archive, or source strategy — running through
 the same trusted writer. The requirements contract (above all: the episode ledger must
 be COMPLETE for every downstream consumer) lives in
 [`docs/EXTENDING_OTR.md`](docs/EXTENDING_OTR.md); read it before authoring.
