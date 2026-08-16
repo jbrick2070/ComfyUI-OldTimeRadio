@@ -346,6 +346,32 @@ edges are load-bearing:
   scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
   way -- a pass is luck, a failure is already known from three artifacts.
 
+### THE ORDER, DRIVER-SET 2026-08-16 LATE (supersedes the 08-15 list order;
+### the numbered bodies below are the reference detail, this is the sequence)
+
+1. **Lemmy on every TTS engine** (item 1.1) -- operator ask, smallest, and
+   its listen page wants his ears the moment he is back. Short full kibitz
+   arc, then config/bank rows + clone renders + ONE listen page.
+2. **Chunk B, the cameo roll** (item 1) -- contract done, ONE lane now
+   (`_otr_scifi_news_pro`). Build -> Sonnet QA -> forced-hit leg. Makes
+   Lemmy visible in the show; pairs naturally right after his voices.
+3. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
+   updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
+   kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Needs
+   the LTX boot, so it pauses the soak; one arc covers the sprint doc.
+4. **The Shakespeare wrong-play frame family** (section D, measured twice by
+   the blind read) + the assembly-lint class (speaker-tag leaks, truncated
+   closers). Correctness on the fidelity lane; panel before code.
+5. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
+   under any of the above; the two `_resolve_model` hardenings ride along.
+   Then the operator's own 4060 full-stack pass (gate already open).
+6. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
+   during renders.
+7. **PBUG-20260815-11** (item 2) -- stays queued; does not jump.
+
+Standing tail unchanged: the bug-fix contract's chunks 4/5/6/D7, and the
+shakespeare supplement rows (item 4).
+
 ### NEXT WINDOW -- THE ORDER (2026-08-15 wrap)
 
 The bug-fix sprint's D2 is CLOSED and D4's data gap is closed. What remains, in
@@ -491,13 +517,32 @@ was deleted with the 2026-08-16 `scifi_news` rip).
 * **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
   this is NEW construction in two places, not a wiring fix that regressed.
 
-**1.2 VIDEO ENGINES SPRINT -- the video-lab proposal, grounded, is ONE real
-item plus one additive prompt fix.** Authority:
-`docs/2026-08-16-video-lab-proposal-GROUNDED.md`. The lab's P2 "8 GB
-additions" are ALREADY SHIPPED at identical recipes (`h3_low_video`,
-`h3_low_audio_in`, `ltx23_low_audio_in` -- 7.36 GiB @ 1024x576 matches to the
-digit), and HuMo is already dieted (13.06 GiB; the proposed Clamp-13 is a
-0.22 GiB delta the recipe rule exists to refuse). What remains:
+**1.2 VIDEO ENGINES SPRINT -- RECONCILED WITH THE LAB 2026-08-16.** Authority:
+`docs/2026-08-16-video-lab-proposal-GROUNDED.md` + the lab's answers to
+`docs/2026-08-16-TO-THE-LAB-reconcile-video-proposal.md`. The lab WITHDREW
+three rows on receipt of the evidence: both H3 engines ("no material
+difference; we missed the `public_engines.py` alias mapping"), the 848x480
+legacy-resolution claim (came from LTX upstream defaults, not OTR), and HuMo
+Clamp-13 (peak-VRAM-only evidence, no abort-rate data -- refused by the
+recipe rule). The reconciled transplant list is THREE items:
+
+* **The `Q5_K_M` quant, correctly framed (operator 2026-08-16: "there are no
+  defaults, we have multiple video lanes... I'm going to ship w/ multiple
+  JSONs").** OTR's LTX-AV lane loads `ltx-2.3-22b-dev-Q3_K_M.gguf` through
+  the `OTR_LTX_AV_UNET` env override, so: TESTING Q5 is zero-code (set the
+  env, run a leg, measure); PRODUCTIZING it is a SIBLING VARIANT JSON /
+  profile, never a swap inside the shipped lane -- no recipe-rule collision
+  by construction. **Source: VERIFIED by direct HF listing, not by search
+  result.** The dev-DiT file is
+  `unsloth/LTX-2.3-GGUF / ltx-2.3-22b-dev-Q5_K_M.gguf` -- **16.07 GB**
+  (a UD-Q5_K_M sibling exists at 18.3 GB). The lab's suggested
+  `QuantStack/LTX-2.3-GGUF` has NO Q5 file (checked); `city96` is v0.9.1,
+  wrong architecture. The DISTILLED quant ladder (for the NEW lane, if its
+  GGUF option is wanted above the on-disk Q3) is
+  `Abiray/LTX-2.3-22B-DISTILLED-1.1-GGUF` (Q3 14.7 / Q4 17.8 / Q5 19.4 /
+  Q6 21.0 / Q8 25.5 GB). Note 16.07 GB means dev-Q5 is a 16 GB-card weight
+  with offload -- the lab's "8 GB baseline upgrade" framing needs its 4060
+  peak-VRAM receipt before anyone repeats it.
 
 * **BUILD: the `ltx_distilled` sprint/draft lane.** Every prerequisite is on
   disk (22B fp8 transformer 23.5 GB, both VAEs, Gemma-3 encoder, ltxv LoRA).
