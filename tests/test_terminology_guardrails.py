@@ -22,8 +22,8 @@ def test_active_operator_surfaces_use_bank_names():
     plan = (REPO_ROOT / "docs" / "GO_FORWARD_PLAN.md").read_text(
         encoding="utf-8"
     )
-    assert "Fable2 lane" not in readme
+    assert "NewsPro lane" not in readme
     assert "Codex lane" not in readme
     assert "Sci-Fi Codex reverify tail" not in plan
-    assert "Fable2 C5 consumers" not in plan
-    assert "canonical fable2 full-media qualification leg" not in plan
+    assert "NewsPro C5 consumers" not in plan
+    assert "canonical scifi_news_pro full-media qualification leg" not in plan

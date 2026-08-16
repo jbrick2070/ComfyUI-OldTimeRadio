@@ -25,11 +25,11 @@ WHAT THESE TESTS PROTECT, in order of how badly it would hurt:
 """
 from __future__ import annotations
 
-from nodes._otr_fable2_markup import parse_fable2_markup
-from nodes import _otr_scifi_fable2 as fable2
+from nodes._otr_scifi_news_pro_markup import parse_scifi_news_pro_markup
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
-EXAMPLE = fable2._FABLE2_FORMAT_EXAMPLE
+EXAMPLE = scifi_news_pro._FABLE2_FORMAT_EXAMPLE
 EXAMPLE_CAST = ["MAUD", "PERCY"]
 
 
@@ -39,7 +39,7 @@ EXAMPLE_CAST = ["MAUD", "PERCY"]
 def test_the_example_PARSES_with_zero_defects():
     """The one non-negotiable. Teaching a malformed example would make every
     attempt worse, and the failure would look like a model problem."""
-    parsed, defects = parse_fable2_markup(EXAMPLE, EXAMPLE_CAST)
+    parsed, defects = parse_scifi_news_pro_markup(EXAMPLE, EXAMPLE_CAST)
     assert not defects, [str(d) for d in defects]
     assert parsed is not None
 
@@ -55,7 +55,7 @@ def test_the_example_demonstrates_every_structural_element():
 def test_the_example_has_MORE_THAN_ONE_scene():
     """One scene would not show that a second SCENE header is legal, and the
     live failures included an `EMPTY_SCENE` and scene-boundary breaks."""
-    parsed, _ = parse_fable2_markup(EXAMPLE, EXAMPLE_CAST)
+    parsed, _ = parse_scifi_news_pro_markup(EXAMPLE, EXAMPLE_CAST)
     assert len(parsed.scenes) >= 2
 
 
@@ -95,7 +95,7 @@ def test_the_framing_turn_tells_the_model_NOT_to_copy_the_example():
     """The example alone is an invitation. The instruction is what bounds it."""
     import inspect
 
-    src = inspect.getsource(fable2._run_markup_ladder)
+    src = inspect.getsource(scifi_news_pro._run_markup_ladder)
     assert "FORMAT sample only" in src
     assert "must not carry this example" in src
 
@@ -107,7 +107,7 @@ def test_the_script_pass_PASSES_the_example():
     """The regression that would silently restore the dead-code state."""
     import inspect
 
-    src = inspect.getsource(fable2._pass_script)
+    src = inspect.getsource(scifi_news_pro._pass_script)
     assert "format_example=_FABLE2_FORMAT_EXAMPLE" in src
 
 
@@ -123,7 +123,7 @@ def test_the_example_reaches_the_model_as_an_ASSISTANT_turn():
         seen["contents"] = [r["content"] for r in rows]
         return EXAMPLE                      # a valid play -> accepted first try
 
-    fable2._run_markup_ladder(
+    scifi_news_pro._run_markup_ladder(
         writer,
         pass_id="script",
         system="system prompt",
@@ -147,7 +147,7 @@ def test_the_ladder_still_works_with_NO_example():
         assert [r["role"] for r in messages] == ["system", "user"]
         return EXAMPLE
 
-    _raw, parsed, _diag = fable2._run_markup_ladder(
+    _raw, parsed, _diag = scifi_news_pro._run_markup_ladder(
         writer,
         pass_id="script",
         system="system prompt",

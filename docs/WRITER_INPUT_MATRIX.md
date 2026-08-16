@@ -28,7 +28,7 @@ schema instruction in text, parsed after the fact.
 
 | bank | pipeline (`nodes/story_packs/banks.json`) | module | decode shape | grammar-bound? | reserves whole window? |
 |---|---|---|---|---|---|
-| `scifi_news_pro` | `scifi_news_pro_multipass` | `_otr_scifi_fable2` | post-validated JSON + **raw markup P3** | no | **YES -- critical** |
+| `scifi_news_pro` | `scifi_news_pro_multipass` | `_otr_scifi_news_pro` | post-validated JSON + **raw markup P3** | no | **YES -- critical** |
 | `media_archive` | `legacy_many_pass` | writer inline body | post-validated JSON + inline | no | no |
 | `shakespeare` | `legacy_many_pass_adapt` | writer inline body | post-validated JSON + inline | no | no |
 | `public_domain` | `legacy_many_pass_adapt` | writer inline body | post-validated JSON + inline | no | no |

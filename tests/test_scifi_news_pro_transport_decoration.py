@@ -2,7 +2,7 @@
 
 THE LIVE FAILURE (2026-08-01). A local model wrapped its markup in Markdown --
 ``**TITLE:** ...``, ``**ANNOUNCER:** ...``, ``**END.**``. Every classifier in
-``_otr_fable2_markup`` is ``^``-anchored, so a decorated line missed its own
+``_otr_scifi_news_pro_markup`` is ``^``-anchored, so a decorated line missed its own
 classifier and fell through to the ``_RE_SPEAKER`` catch-all, whose group(1)
 became a character literally named ``**TITLE``. Not in the cast -> UNKNOWN_SPEAKER
 AND SKELETON_BREAK, on every line, for all four ladder rungs. Measured across one
@@ -17,10 +17,10 @@ import hashlib
 
 import pytest
 
-from nodes._otr_fable2_markup import (
+from nodes._otr_scifi_news_pro_markup import (
     _canonicalize_transport_line,
-    normalize_fable2_markup_text,
-    parse_fable2_markup,
+    normalize_scifi_news_pro_markup_text,
+    parse_scifi_news_pro_markup,
 )
 
 _LINES = (
@@ -190,8 +190,8 @@ def test_a_wrapped_reserved_keyword_line_is_transport_not_dialogue():
     )
     bare = wrapped.replace("**MUSIC: what does it mean**",
                            "MUSIC: what does it mean")
-    _, wrapped_defects = parse_fable2_markup(wrapped, ["SELA"])
-    _, bare_defects = parse_fable2_markup(bare, ["SELA"])
+    _, wrapped_defects = parse_scifi_news_pro_markup(wrapped, ["SELA"])
+    _, bare_defects = parse_scifi_news_pro_markup(bare, ["SELA"])
     assert [str(d) for d in wrapped_defects] == [str(d) for d in bare_defects], (
         "wrapped and bare reserved-keyword lines must behave identically; if "
         "they diverge, shape 4 has changed the grammar rather than the surface")
@@ -222,7 +222,7 @@ def test_shape_four_defect_line_now_parses_as_a_scene():
     )
     assert "**SCENE 1: the mountain relay room**" in script
 
-    parsed, defects = parse_fable2_markup(script, ["SELA"])
+    parsed, defects = parse_scifi_news_pro_markup(script, ["SELA"])
     assert not defects, f"expected a clean parse, got {defects}"
     assert parsed is not None
     assert parsed.scenes[0].setting == "the mountain relay room"
@@ -242,7 +242,7 @@ def test_a_genuinely_unknown_speaker_still_raises_unknown_speaker():
 
     Decoration is stripped BEFORE the catch-all, so an undecorated name that is
     simply not in the cast still fails -- the diagnostic keeps its meaning."""
-    parsed, defects = parse_fable2_markup(_script(speaker="STRANGER"), ["SELA"])
+    parsed, defects = parse_scifi_news_pro_markup(_script(speaker="STRANGER"), ["SELA"])
     assert parsed is None
     rendered = " ".join(str(d) for d in defects)
     assert "UNKNOWN_SPEAKER" in rendered, rendered
@@ -253,7 +253,7 @@ def test_a_decorated_unknown_speaker_is_reported_by_its_REAL_name():
     """Before the fix every decorated label became an unknown speaker, so the
     real defect was buried under 106 false ones. A decorated name that is
     genuinely off-roster must now be named WITHOUT its decoration."""
-    parsed, defects = parse_fable2_markup(
+    parsed, defects = parse_scifi_news_pro_markup(
         _decorate(_script(speaker="STRANGER")), ["SELA"])
     assert parsed is None
     rendered = " ".join(str(d) for d in defects)
@@ -265,21 +265,21 @@ def test_a_decorated_unknown_speaker_is_reported_by_its_REAL_name():
 # the two normalizers must not diverge (kibitz r1 MUST-FIX 3)
 # --------------------------------------------------------------------------- #
 def test_decorated_script_parses_and_hashes_the_same_text():
-    """``normalize_fable2_markup_text`` builds normalized_source + its sha256 +
+    """``normalize_scifi_news_pro_markup_text`` builds normalized_source + its sha256 +
     the proof map; ``_normalize_line`` decides classification. If only one of
     them canonicalized, the accepted script would differ from the artifact
     hashed beside it -- a receipt describing a document nobody parsed."""
     clean = _script()
     decorated = _decorate(clean)
 
-    parsed_cln, defects_cln = parse_fable2_markup(clean, ["SELA"])
-    parsed_dec, defects_dec = parse_fable2_markup(decorated, ["SELA"])
+    parsed_cln, defects_cln = parse_scifi_news_pro_markup(clean, ["SELA"])
+    parsed_dec, defects_dec = parse_scifi_news_pro_markup(decorated, ["SELA"])
     assert defects_cln == (), defects_cln
     assert defects_dec == (), defects_dec
     assert parsed_cln is not None and parsed_dec is not None
 
-    n_cln = normalize_fable2_markup_text(clean)
-    n_dec = normalize_fable2_markup_text(decorated)
+    n_cln = normalize_scifi_news_pro_markup_text(clean)
+    n_dec = normalize_scifi_news_pro_markup_text(decorated)
     assert n_dec == n_cln
     assert (hashlib.sha256(n_dec.encode()).hexdigest()
             == hashlib.sha256(n_cln.encode()).hexdigest())
@@ -287,7 +287,7 @@ def test_decorated_script_parses_and_hashes_the_same_text():
 
 def test_the_exact_live_failure_now_parses():
     """The decorated form that killed 3 of 6 legs now parses clean."""
-    parsed, defects = parse_fable2_markup(_decorate(_script()), ["SELA"])
+    parsed, defects = parse_scifi_news_pro_markup(_decorate(_script()), ["SELA"])
     assert defects == (), defects
     assert parsed is not None
     assert parsed.title == "The Quiet Relay"

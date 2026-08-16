@@ -1285,7 +1285,7 @@ def content_owned_cast_contract(
 ) -> dict:
     """Build ``meta.cast_contract`` for a lane that owns its own cast.
 
-    The content-owned lane (``_otr_scifi_fable2``)
+    The content-owned lane (``_otr_scifi_news_pro``)
     derive their cast from the script the model already wrote, so they never
     reach :func:`lock_cast` and never stamped this key at all -- both shipped
     ``cast_contract: {}`` on every episode (PBUG-20260811-03, re-measured on
@@ -1309,7 +1309,7 @@ def content_owned_cast_contract(
     return {
         # No cameo is cast on these lanes today. The roll itself is chunk B and
         # is a genuine design fork -- both runners build the cast FROM the
-        # finished script, and forcing a pre-locked row killed the fable2
+        # finished script, and forcing a pre-locked row killed the scifi_news_pro
         # writer once already (PBUG-20260811-01). Until it lands this records
         # the true state rather than a hopeful one.
         "lemmy_hit":              False,
@@ -1340,7 +1340,7 @@ def count_locked_characters(cast_rows) -> int:
     an off-by-one dressed as a fact.
 
     A TWO-SHAPE ALLOWLIST, not a general rule (QA note 2026-08-16): codex
-    ships ``char_id == "announcer"``, fable2 ships ``name == "ANNOUNCER"`` at
+    ships ``char_id == "announcer"``, scifi_news_pro ships ``name == "ANNOUNCER"`` at
     ``c01``. A third content-owned lane with a differently keyed announcer row
     would be miscounted -- add its shape here when it exists.
     """

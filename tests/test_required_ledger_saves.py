@@ -11,7 +11,7 @@ THIS IS THE THIRD FORM OF ONE DEFECT IN A SINGLE SESSION:
 
 * PBUG-20260812-02 -- a value that could not serialize (a bound method),
 * PBUG-20260812-04 -- a live pydantic model reaching the ledger,
-* the fable2 deal receipt, which was added to make dead legs reproducible and
+* the scifi_news_pro deal receipt, which was added to make dead legs reproducible and
   then called `save()` unchecked, i.e. a receipt that could silently not happen.
 
 Each time the write failed quietly and the consequence surfaced far away. The
@@ -29,7 +29,7 @@ import inspect
 
 import pytest
 
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 class _Ledger:
@@ -47,7 +47,7 @@ class _Ledger:
 
 def test_a_successful_save_returns_quietly():
     led = _Ledger("C:/x/ep_ledger.json")
-    fable2.require_ledger_save(led, "the thing")
+    scifi_news_pro.require_ledger_save(led, "the thing")
     assert led.calls == 1
 
 
@@ -55,8 +55,8 @@ def test_a_FAILED_save_raises_instead_of_continuing():
     """The whole point. Previously this returned None and the pipeline carried
     on writing to a ledger that was not on disk."""
     led = _Ledger(None)
-    with pytest.raises(fable2.Fable2Error) as caught:
-        fable2.require_ledger_save(led, "the TTS delivery-text stamp")
+    with pytest.raises(scifi_news_pro.NewsProError) as caught:
+        scifi_news_pro.require_ledger_save(led, "the TTS delivery-text stamp")
     assert "did not persist" in str(caught.value)
 
 
@@ -64,9 +64,9 @@ def test_the_refusal_NAMES_what_was_being_saved():
     """A bare 'save failed' sends the reader hunting. The boundary name is the
     difference between one look and an hour."""
     led = _Ledger(None)
-    with pytest.raises(fable2.Fable2Error) as caught:
-        fable2.require_ledger_save(led, "the fable2 pass receipts")
-    assert "the fable2 pass receipts" in str(caught.value)
+    with pytest.raises(scifi_news_pro.NewsProError) as caught:
+        scifi_news_pro.require_ledger_save(led, "the scifi_news_pro pass receipts")
+    assert "the scifi_news_pro pass receipts" in str(caught.value)
 
 
 def test_the_refusal_points_at_the_warning_that_carries_the_CAUSE():
@@ -74,8 +74,8 @@ def test_the_refusal_points_at_the_warning_that_carries_the_CAUSE():
     location of an unserializable value. The refusal should send the reader
     there rather than restating it."""
     led = _Ledger(None)
-    with pytest.raises(fable2.Fable2Error) as caught:
-        fable2.require_ledger_save(led, "x")
+    with pytest.raises(scifi_news_pro.NewsProError) as caught:
+        scifi_news_pro.require_ledger_save(led, "x")
     message = str(caught.value)
     assert "OTR_Ledger" in message and "warning" in message.lower()
 
@@ -83,8 +83,8 @@ def test_the_refusal_points_at_the_warning_that_carries_the_CAUSE():
 def test_it_explains_WHY_it_refuses_rather_than_just_that_it_did():
     """The next reader needs to know that continuing is worse than stopping."""
     led = _Ledger(None)
-    with pytest.raises(fable2.Fable2Error) as caught:
-        fable2.require_ledger_save(led, "x")
+    with pytest.raises(scifi_news_pro.NewsProError) as caught:
+        scifi_news_pro.require_ledger_save(led, "x")
     assert "downstream" in str(caught.value)
     assert "disk" in str(caught.value)
 
@@ -95,7 +95,7 @@ def test_it_explains_WHY_it_refuses_rather_than_just_that_it_did():
 def test_the_TTS_DELIVERY_STAMP_boundary_is_checked():
     """The voice nodes read this stamp. If it did not persist they speak stale
     text -- and the stamp exists precisely so they do not."""
-    src = inspect.getsource(fable2)
+    src = inspect.getsource(scifi_news_pro)
     idx = src.find("stamp_text_for_tts_delivery(led)")
     assert idx > 0, "test is stale: the delivery stamp moved"
     following = src[idx:idx + 400]
@@ -104,7 +104,7 @@ def test_the_TTS_DELIVERY_STAMP_boundary_is_checked():
 
 
 def test_the_PASS_RECEIPTS_boundary_is_checked():
-    src = inspect.getsource(fable2)
+    src = inspect.getsource(scifi_news_pro)
     idx = src.find('f2["pass_receipts"] = receipts')
     assert idx > 0, "test is stale: the receipts stamp moved"
     following = src[idx:idx + 400]
@@ -115,8 +115,8 @@ def test_the_DEAL_RECEIPT_stays_a_warning_not_a_refusal():
     """Deliberately NOT required. The episode is still renderable without the
     deal receipt, and killing a render over a diagnostic would be a worse trade
     than losing the diagnostic -- but it must WARN, never swallow."""
-    src = inspect.getsource(fable2)
-    idx = src.find("[scifi_fable2] deal:")
+    src = inspect.getsource(scifi_news_pro)
+    idx = src.find("[scifi_news_pro] deal:")
     assert idx > 0
     following = src[idx:idx + 900]
     assert "led.save() is None" in following
@@ -127,6 +127,6 @@ def test_the_DEAL_RECEIPT_stays_a_warning_not_a_refusal():
 def test_the_helper_is_documented_as_REQUIRED_only():
     """A helper this blunt must say where it belongs, or it gets used on
     diagnostic checkpoints and turns a lost log line into a dead episode."""
-    doc = inspect.getdoc(fable2.require_ledger_save) or ""
+    doc = inspect.getdoc(scifi_news_pro.require_ledger_save) or ""
     assert "REQUIRED" in doc
     assert "Diagnostic" in doc or "diagnostic" in doc

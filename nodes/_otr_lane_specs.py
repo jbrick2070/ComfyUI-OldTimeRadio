@@ -60,7 +60,7 @@ class LaneSpec:
     """One dispatched lane, by NAME. Nothing here is imported eagerly."""
 
     module: str
-    """Runner module, relative to this package (e.g. "_otr_scifi_fable2")."""
+    """Runner module, relative to this package (e.g. "_otr_scifi_news_pro")."""
 
     runner_attr: str
     """The lane entry point inside `module`."""
@@ -74,8 +74,8 @@ class LaneSpec:
 # A pipeline absent from BOTH this table and INLINE_PIPELINES raises.
 LANE_SPECS: "dict[str, LaneSpec]" = {
     "scifi_news_pro_multipass": LaneSpec(
-        module="_otr_scifi_fable2",
-        runner_attr="run_scifi_fable2_episode",
+        module="_otr_scifi_news_pro",
+        runner_attr="run_scifi_news_pro_episode",
     ),
 }
 

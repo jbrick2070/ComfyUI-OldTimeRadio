@@ -66,7 +66,7 @@ class StableAudioTheme:
     FUNCTION = "generate"
     # 720-bakeoff C3: ONE padded AUDIO batch of ALL cues + the manifest that
     # maps each batch row back to a cue (opening / closing / interstitial,
-    # fable2 authored cues included). The old three-AUDIO opening/closing/
+    # scifi_news_pro authored cues included). The old three-AUDIO opening/closing/
     # interstitial surface is retired -- consumers slice by manifest sample_count.
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("cue_audio_clips", "cue_manifest_json", "render_log", "done")
@@ -239,7 +239,7 @@ class StableAudioTheme:
     def _render_clips(self, adapter, engine, script_json, ledger_json):
         """Render every cue for this episode into raw clips + metadata.
 
-        fable2 lane: one clip per authored ``ledger.music[]`` row (each carries
+        scifi_news_pro lane: one clip per authored ``ledger.music[]`` row (each carries
         its own generation_prompt / placement / anchor_line_id). Legacy lane
         (no ledger.music[]): SYNTHESIZE the three fixed cues via
         compose_music_prompt with the SLOT seed key -- byte-identical to the
@@ -296,7 +296,7 @@ class StableAudioTheme:
 
     # ------------------------------------------------------------------ #
     def _resolve_cue_specs(self, meta, music_rows, ledger_lines=None):
-        """Build the ordered cue-spec list. fable2 (authored music[]) vs legacy
+        """Build the ordered cue-spec list. scifi_news_pro (authored music[]) vs legacy
         (synthesize the 3 fixed cues, byte-parity slot seed keys)."""
         from ._otr_music_prompt import CUE_DURATIONS, compose_music_prompt
         from .production_ledger import music_cue_spec_sha256

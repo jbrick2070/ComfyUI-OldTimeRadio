@@ -535,7 +535,7 @@ def required_field_gaps(ledger_data: Mapping[str, Any]) -> "list[str]":
     # Claiming it here also made the tail non-reproducible -- a freshly minted
     # seed is by construction not derivable from the inputs, so a pass that
     # mints one for every lane cannot be byte-identical across two runs of the
-    # same inputs (tests/test_fable2_tail_context.py pins exactly that).
+    # same inputs (tests/test_scifi_news_pro_tail_context.py pins exactly that).
     return gaps
 
 

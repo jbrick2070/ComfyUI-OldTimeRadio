@@ -132,7 +132,7 @@ def _make_ctx(tmp_path: Path, monkeypatch, **overrides) -> WriterTailContext:
         "style_grammar_on": False,
         "source_bank_row": SimpleNamespace(
             source_bank_id="scifi_news_pro",
-            default_story_pipeline="scifi_fable2_circuit",
+            default_story_pipeline="scifi_scifi_news_pro_circuit",
             defaults={
                 "title_form_label": "science-fiction radio drama",
                 "hud_origin_label": "",
@@ -213,13 +213,13 @@ def test_tail_preserves_lane_seals_on_disk(tmp_path, monkeypatch):
         "artifact_sha256": "5" * 64,
         "p3_attempts": [{"attempt": 1, "outcome": "accepted"}],
     }
-    ctx.led.data["meta"]["fable2"] = {"final_draft": sealed}
+    ctx.led.data["meta"]["scifi_news_pro"] = {"final_draft": sealed}
 
     OTR_LedgerScriptWriter()._run_writer_tail(ctx)
 
-    assert ctx.led.data["meta"]["fable2"]["final_draft"] == sealed
+    assert ctx.led.data["meta"]["scifi_news_pro"]["final_draft"] == sealed
     saved = json.loads(Path(ctx.led.path).read_text(encoding="utf-8"))
-    assert saved["meta"]["fable2"]["final_draft"] == sealed
+    assert saved["meta"]["scifi_news_pro"]["final_draft"] == sealed
 
 
 @pytest.mark.parametrize("source_bank", ["scifi_news_pro"])
@@ -362,7 +362,7 @@ def test_title_override_wins_without_regen(tmp_path, monkeypatch):
     OTR_LedgerScriptWriter()._run_writer_tail(ctx)
 
     assert ctx.led.data["meta"]["episode_title"] == "The Authored Play Title"
-    assert ctx.led.data["meta"]["title_source"] == "fable2_script_title"
+    assert ctx.led.data["meta"]["title_source"] == "scifi_news_pro_script_title"
     assert ctx.canon.title == "The Authored Play Title"
     assert regen_calls == []
 

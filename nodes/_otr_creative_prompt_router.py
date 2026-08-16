@@ -133,7 +133,7 @@ _MODERN_BY_PHASE: dict[str, str] = {
 # (resolve_story_pack via banks.json), no fixed path. Stage 2C: the workflow
 # `source_bank` widget selection threads through `source_bank_id`; this
 # literal is now ONLY the parameter default. It must name a LEGACY-SEAM bank
-# (fable2 declares only fable2_* stages), so it points at a kept legacy lane.
+# (scifi_news_pro declares only scifi_news_pro_* stages), so it points at a kept legacy lane.
 _DEFAULT_SEAM_BANK_ID = "media_archive"
 _PHASE_TO_PACK_SEAM: dict[str, str] = {
     "line_composer_system": "line_composer_system",

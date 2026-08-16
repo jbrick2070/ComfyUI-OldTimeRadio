@@ -3,7 +3,7 @@
 FOUND BY A LIVE RUN. The `viz_green` leg of the 45-word every-visual-path
 campaign (2026-08-12) died in `OTR_LedgerScriptWriter` after 3.0 minutes:
 
-    [scifi_fable2] pass 'script' failed after 4 attempt(s):
+    [scifi_news_pro] pass 'script' failed after 4 attempt(s):
     markup ladder exhausted; last defects:
     - UNKNOWN_SPEAKER: *SFX (line 25)
     - SKELETON_BREAK: character line (*SFX) after the last scene
@@ -15,7 +15,7 @@ WITH a colon -- `*SFX: a door slams` -- parses as a SPEAKER instead, so the
 defect is `UNKNOWN_SPEAKER` and the detail opens with `*`. The note returned ""
 and the repair rung got only the generic "repair the malformed FORMAT defects
 below". The model re-emitted the same shape on all four attempts. That ending is
-recorded twice already in `_otr_fable2_markup`'s own docstring; this is the
+recorded twice already in `_otr_scifi_news_pro_markup`'s own docstring; this is the
 third.
 
 WHAT THIS SUITE PINS, and every item was learned by getting it wrong first --
@@ -30,7 +30,7 @@ once from the QA pass, once from the kibitz panel (Codex + Antigravity,
 * **The note takes TYPED `ParseDefect` objects.** `str(defect)` appends
   ` (line N)`, and re-parsing that string is what corrupted the token. The
   objects carry `code`, `detail` and `line_no` already.
-* **`Fable2ParseDefect` is a PLAIN enum, not a `str` enum**, so codes are
+* **`NewsProParseDefect` is a PLAIN enum, not a `str` enum**, so codes are
   compared as MEMBERS. A string membership test would be False forever and the
   note would silently never fire -- the live defect, reintroduced by its own fix.
 * **The two codes carry different data.** `UNKNOWN_SPEAKER.detail` is the bare
@@ -43,13 +43,13 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_fable2_markup import (
+from nodes._otr_scifi_news_pro_markup import (
     ANNOUNCER_NAME,
-    Fable2ParseDefect,
+    NewsProParseDefect,
     ParseDefect,
-    parse_fable2_markup,
+    parse_scifi_news_pro_markup,
 )
-from nodes._otr_scifi_fable2 import _standalone_stage_direction_repair_note
+from nodes._otr_scifi_news_pro import _standalone_stage_direction_repair_note
 
 
 CAST = ("Ada", "Bo")
@@ -78,7 +78,7 @@ def script_with(*body_lines):
 
 def real_defects(*body_lines, cast=CAST):
     """The typed defects the LIVE ladder hands the note."""
-    _parsed, defects = parse_fable2_markup(script_with(*body_lines), cast)
+    _parsed, defects = parse_scifi_news_pro_markup(script_with(*body_lines), cast)
     return defects
 
 
@@ -89,7 +89,7 @@ def test_the_fixture_helper_really_produces_typed_defects():
     defects = real_defects("*SFX: a door slams")
     assert defects, "the parser accepted the illegal row -- fixture is broken"
     assert all(isinstance(d, ParseDefect) for d in defects)
-    assert any(d.code is Fable2ParseDefect.UNKNOWN_SPEAKER for d in defects)
+    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects)
 
 
 def test_a_clean_script_raises_nothing_and_earns_no_note():
@@ -101,8 +101,8 @@ def test_the_defect_code_enum_is_NOT_a_string_enum():
     """Why codes are compared as members. If this ever becomes a `str` enum the
     member comparison still works -- but a future author must not "simplify" it
     back to strings on the assumption that it is one."""
-    assert not isinstance(Fable2ParseDefect.UNKNOWN_SPEAKER, str)
-    assert Fable2ParseDefect.UNKNOWN_SPEAKER != "UNKNOWN_SPEAKER"
+    assert not isinstance(NewsProParseDefect.UNKNOWN_SPEAKER, str)
+    assert NewsProParseDefect.UNKNOWN_SPEAKER != "UNKNOWN_SPEAKER"
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ def test_the_rule_names_the_speaker_label_case_explicitly():
 def test_the_rule_reports_the_line_number_it_was_given():
     """`line_no` travels as its own field now, instead of being smuggled inside
     a stringified detail."""
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
     assert "line 25" in got
 
 
@@ -158,7 +158,7 @@ def test_a_REAL_cast_name_wearing_a_stray_marker_is_told_to_RESTORE_the_label():
     wrong -- silence returns the generic instruction that already failed four
     attempts. A decorated real name has a safe repair, so say it."""
     defects = real_defects("*Ada: We continue.")
-    assert any(d.code is Fable2ParseDefect.UNKNOWN_SPEAKER for d in defects), (
+    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects), (
         "fixture drift: the parser now resolves a stray-marker name, so this "
         "test no longer exercises the case it was written for -- re-derive it")
     got = note(*defects)
@@ -174,7 +174,7 @@ def test_the_role_parenthetical_survives_the_decoration_strip():
     """`*Ada (Engineer)` must resolve to Ada, not to `Ada (Engineer`. The parser
     already understands trailing role parentheticals; mangling it here would
     defeat that and hand a real character the delete-me rule."""
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER,
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER,
                            "*Ada (Engineer)", 9))
     assert "Restore the plain canonical label" in got
 
@@ -182,7 +182,7 @@ def test_the_role_parenthetical_survives_the_decoration_strip():
 def test_a_decorated_TYPO_name_still_gets_the_stage_direction_rule():
     """`*Adda` resolves to nothing on the roster, so it is treated as a stage
     direction -- which is the honest reading of an unknown decorated token."""
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, "*Adda", 9))
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "*Adda", 9))
     assert "FORMAT REPAIR RULE" in got
     assert "Restore the plain canonical label" not in got
 
@@ -191,7 +191,7 @@ def test_an_UNDECORATED_misspelled_cast_name_gets_NO_advice_at_all():
     """The original promise, still kept: an ordinary unknown speaker is not this
     note's business, and inventing advice for it would lose a line."""
     defects = real_defects("Adda: We continue.")
-    assert any(d.code is Fable2ParseDefect.UNKNOWN_SPEAKER for d in defects)
+    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects)
     assert note(*defects) == ""
 
 
@@ -199,12 +199,12 @@ def test_the_roster_check_is_case_and_space_insensitive():
     """Matches the parser's own `_speaker_key`, so the guard cannot be evaded by
     capitalization the roster does not use."""
     for label in ("(ada)", "(  Ada  )", "*ADA"):
-        got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, label, 9))
+        got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, label, 9))
         assert "Restore the plain canonical label" in got, label
 
 
 def test_the_announcer_counts_as_roster_even_though_it_is_not_in_the_cast():
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER,
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER,
                            "(%s)" % ANNOUNCER_NAME, 9))
     assert "Restore the plain canonical label" in got
 
@@ -212,15 +212,15 @@ def test_the_announcer_counts_as_roster_even_though_it_is_not_in_the_cast():
 def test_a_protected_cast_defect_does_not_suppress_a_LATER_genuine_one():
     """A roster hit returns its own rule, so this asserts ordering explicitly:
     whichever matches FIRST wins, and neither silences the other."""
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, "*Adda", 4),
-               ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "*Adda", 4),
+               ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
     assert "FORMAT REPAIR RULE" in got
     assert "*Adda" in got
 
 
 @pytest.mark.parametrize("code", [
-    Fable2ParseDefect.MISSING_END,
-    Fable2ParseDefect.SKELETON_BREAK,
+    NewsProParseDefect.MISSING_END,
+    NewsProParseDefect.SKELETON_BREAK,
 ])
 def test_an_unrelated_defect_code_is_silent(code):
     assert note(ParseDefect(code, "(something)", 3)) == ""
@@ -236,7 +236,7 @@ def test_an_empty_defect_list_is_silent():
 def test_a_BAD_LINE_SHAPE_detail_never_gets_a_roster_lookup():
     """Its detail is `line[:80]`, so a roster hit would be meaningless -- a line
     that merely BEGINS with a cast name is not a decorated label."""
-    got = note(ParseDefect(Fable2ParseDefect.BAD_LINE_SHAPE,
+    got = note(ParseDefect(NewsProParseDefect.BAD_LINE_SHAPE,
                            "(Ada crosses to the window)", 12))
     assert "FORMAT REPAIR RULE" in got
     assert "Restore the plain canonical label" not in got
@@ -246,13 +246,13 @@ def test_the_prompt_does_not_claim_a_truncated_fragment_is_the_exact_row():
     """`BAD_LINE_SHAPE` details are cut at 80 chars, so the earlier wording --
     'the malformed source row is exactly ...' -- was false evidence handed to
     the repair rung."""
-    got = note(ParseDefect(Fable2ParseDefect.BAD_LINE_SHAPE, "(" + "x" * 79, 12))
+    got = note(ParseDefect(NewsProParseDefect.BAD_LINE_SHAPE, "(" + "x" * 79, 12))
     assert "may be truncated" in got
     assert "is exactly" not in got
 
 
 def test_an_UNKNOWN_SPEAKER_prompt_calls_the_detail_a_LABEL_not_a_row():
-    got = note(ParseDefect(Fable2ParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "*SFX", 25))
     assert "illegal speaker label" in got
     assert "is exactly" not in got
 
@@ -265,7 +265,7 @@ def test_a_real_SKELETON_BREAK_detail_cannot_open_with_a_marker():
     Its detail is a descriptive sentence that merely CONTAINS the token. This is
     the assertion that would have caught the invented fixture."""
     defects = real_defects(f"{ANNOUNCER_NAME}: An outro.", "*SFX: a door slams")
-    breaks = [d for d in defects if d.code is Fable2ParseDefect.SKELETON_BREAK]
+    breaks = [d for d in defects if d.code is NewsProParseDefect.SKELETON_BREAK]
     assert breaks, defects
     for defect in breaks:
         assert not str(defect.detail).lstrip().startswith(("(", "[", "*"))
@@ -275,5 +275,5 @@ def test_a_stage_direction_outside_a_scene_is_STILL_covered():
     """Because the same line always raises `UNKNOWN_SPEAKER` too -- which is why
     leaving `SKELETON_BREAK` out costs nothing."""
     defects = real_defects(f"{ANNOUNCER_NAME}: An outro.", "*SFX: a door slams")
-    assert any(d.code is Fable2ParseDefect.SKELETON_BREAK for d in defects)
+    assert any(d.code is NewsProParseDefect.SKELETON_BREAK for d in defects)
     assert note(*defects), defects

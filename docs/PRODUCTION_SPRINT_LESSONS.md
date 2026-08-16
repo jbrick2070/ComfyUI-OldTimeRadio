@@ -760,6 +760,58 @@ the blind read ranked the same bank first and the same bank last) is
 stronger evidence than either alone. And a scoring instrument must stay
 telemetry: THE LAW forbids a score becoming a gate, however good it looks.
 
+## 41. A rename reorders test collection, and that surfaces latent pollution
+
+Renaming `test_fable2_*.py` to `test_scifi_news_pro_*.py` moved those files
+alphabetically past `test_perfect_run_spacesaver_deprecated_noop.py`, and one
+test began failing in the full suite while passing in isolation. Nothing the
+rename touched was broken. The polluter had been latent for months:
+
+```python
+sys.modules.pop("nodes.OTR_LedgerScriptWriter", None)   # then re-import
+```
+
+That installs a SECOND writer module for the rest of the session. A later
+test does `import nodes.OTR_LedgerScriptWriter as m; monkeypatch.setattr(m,
+...)` and then invokes a writer class captured from the OTHER module object,
+so the patch silently does nothing and the spy never fires.
+
+- **Never pop-and-re-import a production module in a test.** If the goal is
+  "avoid a stale singleton", ask what the test actually reads -- this one only
+  needed `INPUT_TYPES` off the class, so the re-import bought nothing and cost
+  a session-wide hazard. Restoring `sys.modules` afterwards is NOT sufficient
+  and was tried first: other references captured during the second import
+  outlive the restore.
+- **A test that passes alone and fails in the suite is an ORDERING bug, not a
+  flake.** Bisect the alphabetical range the file moved across
+  (`pytest <range> <victim>`), then bisect within the polluting file to the
+  single test. That is four commands and beats any amount of theorising.
+- **Renames are a legitimate way to FIND these.** The pollution was real
+  before the rename; only the ordering hid it. Expect one or two when
+  renaming a test family, and treat them as found bugs, not rename fallout.
+
+## 42. A regression guard must not swallow the traceback
+
+`tests/conftest.py`'s known-fail guard ends with `raise SystemExit(2)` inside
+`pytest_sessionfinish` so CI can distinguish a regression from an ordinary
+failure. That exception aborts the remaining `sessionfinish` hooks --
+INCLUDING the terminal reporter's -- so pytest never prints the `FAILURES`
+section. Every regression in this repo reports as a bare nodeid with NO
+traceback, which is precisely the information needed to fix it. Measured
+2026-08-16: a failing run produced 27 lines of output and zero assertion
+detail.
+
+- To read a traceback today: temporarily neutralize the `raise`, run, then
+  restore it. Marking the hook `trylast=True` helps ordering but did NOT by
+  itself restore the report in testing -- treat the decorator as a partial
+  improvement and the temporary neutralize as the reliable diagnostic.
+- The durable fix is to set the exit status without raising, or to emit the
+  guard's verdict from a hook that runs after the terminal summary. Not yet
+  done; recorded so the next window does not rediscover the blindness.
+- General rule: **a guard that hides evidence costs more than the failure it
+  guards.** Any hook that raises must be checked against what else the
+  framework still had to do.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

@@ -21,13 +21,13 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_text_metrics import canonical_word_count  # type: ignore
 
 __all__ = [
-    "Fable2ParseDefect",
+    "NewsProParseDefect",
     "ParseDefect",
     "ParsedLine",
     "ParsedScene",
     "ParsedScript",
-    "normalize_fable2_markup_text",
-    "parse_fable2_markup",
+    "normalize_scifi_news_pro_markup_text",
+    "parse_scifi_news_pro_markup",
     "render_defects",
 ]
 
@@ -243,7 +243,7 @@ def _normalize_line(line: str) -> "tuple[str, tuple[str, ...]]":
     return _canonicalize_transport_line(line)
 
 
-def normalize_fable2_markup_text(text: str) -> str:
+def normalize_scifi_news_pro_markup_text(text: str) -> str:
     """Return the parser's normalized proof artifact.
 
     SHARES ``_canonicalize_transport_line`` WITH THE PARSER ON PURPOSE (kibitz
@@ -255,7 +255,7 @@ def normalize_fable2_markup_text(text: str) -> str:
         _canonicalize_transport_line(raw)[0] for raw in str(text).splitlines())
 
 
-class Fable2ParseDefect(enum.Enum):
+class NewsProParseDefect(enum.Enum):
     """Defect classes for the markup ladder (doc section 6, exact set)."""
 
     MISSING_TITLE = "MISSING_TITLE"
@@ -277,7 +277,7 @@ class Fable2ParseDefect(enum.Enum):
 class ParseDefect:
     """One collected defect: class + human detail + 1-based source line."""
 
-    code: Fable2ParseDefect
+    code: NewsProParseDefect
     detail: str = ""
     line_no: "int | None" = None
 
@@ -370,18 +370,18 @@ class _Parse:
         """Case/spacing-insensitive identity; display text stays canonical."""
         return " ".join(str(value).split()).casefold()
 
-    def defect(self, code: Fable2ParseDefect, detail: str = "",
+    def defect(self, code: NewsProParseDefect, detail: str = "",
                line_no: "int | None" = None) -> None:
         self.defects.append(ParseDefect(code, detail, line_no))
 
     def skeleton(self, detail: str, line_no: "int | None" = None) -> None:
-        self.defect(Fable2ParseDefect.SKELETON_BREAK, detail, line_no)
+        self.defect(NewsProParseDefect.SKELETON_BREAK, detail, line_no)
 
     # -- per-shape handlers ---------------------------------------------------
 
     def on_title(self, text: str, no: int) -> None:
         if self.title is not None:
-            self.defect(Fable2ParseDefect.DUPLICATE_TITLE, text, no)
+            self.defect(NewsProParseDefect.DUPLICATE_TITLE, text, no)
             return
         self.title = text
         if self.state != _EXPECT_TITLE:
@@ -411,7 +411,7 @@ class _Parse:
 
     def _close_scene(self, no: "int | None") -> None:
         if self.scenes and not self.scenes[-1][2]:
-            self.defect(Fable2ParseDefect.EMPTY_SCENE,
+            self.defect(NewsProParseDefect.EMPTY_SCENE,
                         f"SCENE {self.scenes[-1][0]} has no spoken lines", no)
 
     def _check_preamble_complete(self, no: int) -> None:
@@ -431,13 +431,13 @@ class _Parse:
             self._close_scene(no)
         expected = (self.scenes[-1][0] + 1) if self.scenes else 1
         if n != expected:
-            self.defect(Fable2ParseDefect.SCENE_ORDER,
+            self.defect(NewsProParseDefect.SCENE_ORDER,
                         f"SCENE {n} where SCENE {expected} was expected", no)
         self.scenes.append((n, setting, []))
 
     def on_coda(self, text: str, no: int) -> None:
         if self.coda is not None:
-            self.defect(Fable2ParseDefect.MULTIPLE_CODA, text, no)
+            self.defect(NewsProParseDefect.MULTIPLE_CODA, text, no)
             return
         if self.state in (_EXPECT_TITLE, _PREAMBLE):
             self.skeleton("CODA before any scene", no)
@@ -489,7 +489,7 @@ class _Parse:
                 )
         if canonical_name is None:
             self.defect(
-                Fable2ParseDefect.UNKNOWN_SPEAKER, supplied_name, no
+                NewsProParseDefect.UNKNOWN_SPEAKER, supplied_name, no
             )
             canonical_name = supplied_name
         if canonical_name == ANNOUNCER_NAME:
@@ -521,9 +521,9 @@ class _Parse:
             )
 
 
-def parse_fable2_markup(text: str, cast_names) -> (
+def parse_scifi_news_pro_markup(text: str, cast_names) -> (
         "tuple[ParsedScript | None, tuple[ParseDefect, ...]]"):
-    """Parse whole-play fable2 markup against the legal cast.
+    """Parse whole-play scifi_news_pro markup against the legal cast.
 
     ``cast_names`` is the treatment's canonical display-name roster;
     ANNOUNCER is implicitly legal. Matching ignores case and repeated spacing,
@@ -539,7 +539,7 @@ def parse_fable2_markup(text: str, cast_names) -> (
         if not line:
             continue
         if p.state == _DONE:
-            p.defect(Fable2ParseDefect.CONTENT_AFTER_END, line[:80], no)
+            p.defect(NewsProParseDefect.CONTENT_AFTER_END, line[:80], no)
             continue
         line, notes = _normalize_line(line)
         normalizations.extend(f"line {no}: {n}" for n in notes)
@@ -568,13 +568,13 @@ def parse_fable2_markup(text: str, cast_names) -> (
         if m:
             p.on_speaker(m.group(1), m.group(2).strip(), no)
             continue
-        p.defect(Fable2ParseDefect.BAD_LINE_SHAPE, line[:80], no)
+        p.defect(NewsProParseDefect.BAD_LINE_SHAPE, line[:80], no)
         if p.state == _EXPECT_TITLE:
             p.state = _PREAMBLE
 
     # ---- end-of-text checks -------------------------------------------------
     if p.title is None:
-        p.defect(Fable2ParseDefect.MISSING_TITLE)
+        p.defect(NewsProParseDefect.MISSING_TITLE)
     elif not p.title_first:
         p.skeleton("TITLE is not the first line")
     if not p.saw_end:
@@ -582,11 +582,11 @@ def parse_fable2_markup(text: str, cast_names) -> (
         # derivative postamble messages until an END line actually arrives.
         if p.state == _SCENES:
             p._close_scene(None)
-        p.defect(Fable2ParseDefect.MISSING_END)
+        p.defect(NewsProParseDefect.MISSING_END)
     spoken = {ln.speaker for _n, _s, lines in p.scenes for ln in lines}
     for name in p.cast_names:
         if name not in spoken:
-            p.defect(Fable2ParseDefect.CAST_MEMBER_SILENT, name)
+            p.defect(NewsProParseDefect.CAST_MEMBER_SILENT, name)
 
     if p.defects:
         return None, tuple(p.defects)

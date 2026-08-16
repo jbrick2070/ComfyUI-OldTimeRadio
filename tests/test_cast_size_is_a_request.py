@@ -30,7 +30,7 @@ import inspect
 
 import pytest
 
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 from nodes import OTR_LedgerScriptWriter as writer_node
 
 
@@ -48,17 +48,17 @@ def test_MAX_SPEAKING_CAST_equals_the_live_voice_stock():
     """The constant is a literal because pydantic needs one at class-build
     time. This is what keeps that literal honest: grow or shrink the pool and
     this reports the drift instead of letting the cap quietly mismatch."""
-    assert fable2.MAX_SPEAKING_CAST == voice_stock_size(), (
+    assert scifi_news_pro.MAX_SPEAKING_CAST == voice_stock_size(), (
         "MAX_SPEAKING_CAST (%d) no longer matches the voice stock (%d) -- "
         "update the constant, or the cast can be validated to a size casting "
-        "cannot fill" % (fable2.MAX_SPEAKING_CAST, voice_stock_size()))
+        "cannot fill" % (scifi_news_pro.MAX_SPEAKING_CAST, voice_stock_size()))
 
 
 def test_the_node_widget_bound_agrees_with_the_writer():
     """`INPUT_TYPES` cannot import the writer module (registration-time import
     order), so the bound is duplicated. This is the check that makes the
     duplicate safe."""
-    assert writer_node._FABLE2_MAX_CAST == fable2.MAX_SPEAKING_CAST
+    assert writer_node._FABLE2_MAX_CAST == scifi_news_pro.MAX_SPEAKING_CAST
 
 
 def test_the_widget_advertises_the_real_ceiling_not_the_old_cap():
@@ -67,7 +67,7 @@ def test_the_widget_advertises_the_real_ceiling_not_the_old_cap():
         entry = spec.get(section, {}).get("num_characters")
         if entry:
             opts = entry[1]
-            assert opts["max"] == fable2.MAX_SPEAKING_CAST, (
+            assert opts["max"] == scifi_news_pro.MAX_SPEAKING_CAST, (
                 "the widget still caps at %r" % opts["max"])
             assert opts["min"] == 1
             return
@@ -79,11 +79,11 @@ def test_the_widget_advertises_the_real_ceiling_not_the_old_cap():
 # ---------------------------------------------------------------------------
 def test_a_treatment_may_EXCEED_the_requested_cast_size():
     """THE DIRECTIVE. A request of 2 must not refuse a cast of 4."""
-    check = fable2._make_treatment_validator(
+    check = scifi_news_pro._make_treatment_validator(
         dossier=None, n_max=2, provenance={}, digest="")
-    treatment = fable2.Treatment(
+    treatment = scifi_news_pro.Treatment(
         title="T", dramatic_question="Q?", setting="S",
-        cast_shapes=[fable2.CastShape(name=n, role="r", want="w",
+        cast_shapes=[scifi_news_pro.CastShape(name=n, role="r", want="w",
                                       pressure="p", register="dry")
                      for n in ("Ada", "Bo", "Cy", "Di")],
         turn="turn",
@@ -94,8 +94,8 @@ def test_a_treatment_may_EXCEED_the_requested_cast_size():
 
 
 def test_a_pitch_may_EXCEED_the_requested_cast_size():
-    check = fable2._make_pitch_validator([{"name": "card"}], n_max=2)
-    pitch = fable2.Pitch.model_construct(cast_size=5, frame_card="card")
+    check = scifi_news_pro._make_pitch_validator([{"name": "card"}], n_max=2)
+    pitch = scifi_news_pro.Pitch.model_construct(cast_size=5, frame_card="card")
     assert check(pitch) is None
 
 
@@ -104,18 +104,18 @@ def test_a_pitch_may_EXCEED_the_requested_cast_size():
 # ---------------------------------------------------------------------------
 def test_a_treatment_beyond_the_VOICE_STOCK_is_refused_by_the_validator():
     """Refused in the treatment pass, not after a whole script is written."""
-    check = fable2._make_treatment_validator(
+    check = scifi_news_pro._make_treatment_validator(
         dossier=None, n_max=2, provenance={}, digest="")
-    oversized = fable2.Treatment.model_construct(
-        cast_shapes=[object()] * (fable2.MAX_SPEAKING_CAST + 1))
+    oversized = scifi_news_pro.Treatment.model_construct(
+        cast_shapes=[object()] * (scifi_news_pro.MAX_SPEAKING_CAST + 1))
     verdict = check(oversized)
     assert verdict and "voices in stock" in verdict
 
 
 def test_a_pitch_beyond_the_VOICE_STOCK_is_refused():
-    check = fable2._make_pitch_validator([{"name": "card"}], n_max=2)
-    pitch = fable2.Pitch.model_construct(
-        cast_size=fable2.MAX_SPEAKING_CAST + 1, frame_card="card")
+    check = scifi_news_pro._make_pitch_validator([{"name": "card"}], n_max=2)
+    pitch = scifi_news_pro.Pitch.model_construct(
+        cast_size=scifi_news_pro.MAX_SPEAKING_CAST + 1, frame_card="card")
     verdict = check(pitch)
     assert verdict and "voices in stock" in verdict
 
@@ -123,11 +123,11 @@ def test_a_pitch_beyond_the_VOICE_STOCK_is_refused():
 def test_the_schema_admits_a_cast_up_to_the_voice_stock():
     """The pydantic bound moved with the policy -- an 8-item literal would now
     refuse two legal voices."""
-    for model, field in ((fable2.Treatment, "cast_shapes"),
-                         (fable2.CastingVoices, "cast")):
+    for model, field in ((scifi_news_pro.Treatment, "cast_shapes"),
+                         (scifi_news_pro.CastingVoices, "cast")):
         meta = model.model_fields[field].metadata
         maxes = [m.max_length for m in meta if hasattr(m, "max_length")]
-        assert maxes and maxes[0] == fable2.MAX_SPEAKING_CAST, (
+        assert maxes and maxes[0] == scifi_news_pro.MAX_SPEAKING_CAST, (
             "%s.%s caps at %r" % (model.__name__, field, maxes))
 
 
@@ -135,7 +135,7 @@ def test_two_characters_still_never_share_a_voice():
     """The invariant the ceiling exists to protect. If this ever stops being
     enforced, the ceiling is arbitrary and should be reconsidered -- not
     silently kept."""
-    source = inspect.getsource(fable2._make_casting_validator)
+    source = inspect.getsource(scifi_news_pro._make_casting_validator)
     assert "already taken" in source and "never share a voice" in source
 
 
@@ -145,7 +145,7 @@ def test_two_characters_still_never_share_a_voice():
 def test_the_prompt_no_longer_calls_the_request_a_CEILING():
     """The model was being told N_MAX was a ceiling while the code no longer
     treats it as one -- the prompt and the validator must not disagree."""
-    source = inspect.getsource(fable2)
+    source = inspect.getsource(scifi_news_pro)
     assert "N_MAX (speaking-character ceiling)" not in source
     assert "REQUESTED cast size" in source
     assert "a REQUEST, not a limit" in source

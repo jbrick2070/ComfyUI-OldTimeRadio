@@ -1,7 +1,7 @@
-"""scifi_fable2 markup parser -- every defect class + parser properties (S0).
+"""scifi_news_pro markup parser -- every defect class + parser properties (S0).
 
 Pure Python: no GPU, no LLM, no I/O. Grammar single source of truth is the
-pack seam fable2_script_system (architecture doc sections 4 + 6).
+pack seam scifi_news_pro_script_system (architecture doc sections 4 + 6).
 """
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nodes._otr_fable2_markup import (  # noqa: E402
-    Fable2ParseDefect as D,
+from nodes._otr_scifi_news_pro_markup import (  # noqa: E402
+    NewsProParseDefect as D,
     ParsedScript,
-    parse_fable2_markup,
+    parse_scifi_news_pro_markup,
     render_defects,
 )
 
@@ -45,7 +45,7 @@ def _codes(defects):
 
 
 def _parse(text, cast=CAST):
-    return parse_fable2_markup(text, cast)
+    return parse_scifi_news_pro_markup(text, cast)
 
 
 # ---------------------------------------------------------------------------
@@ -227,11 +227,11 @@ class TestDefectClasses:
         assert script.normalizations == ()
 
     def test_normalize_helper_matches_parser_view(self):
-        from nodes._otr_fable2_markup import normalize_fable2_markup_text
+        from nodes._otr_scifi_news_pro_markup import normalize_scifi_news_pro_markup_text
         text = GOLDEN.replace(
             "MARA: Then we have until nine.",
             "  MARA: Then we have until nine.  ")
-        norm = normalize_fable2_markup_text(text)
+        norm = normalize_scifi_news_pro_markup_text(text)
         assert "MARA: Then we have until nine." in norm
         script, defects = _parse(text)
         assert script is not None and defects == ()
@@ -240,7 +240,7 @@ class TestDefectClasses:
         for sc in script.scenes:
             for ln in sc.lines:
                 assert ln.text in norm
-        assert normalize_fable2_markup_text(norm) == norm
+        assert normalize_scifi_news_pro_markup_text(norm) == norm
 
     def test_scene_setting_brackets_are_preserved(self):
         text = GOLDEN.replace(
@@ -417,7 +417,7 @@ class TestProperties:
         for _ in range(25):
             text, cast, char_words, ann_words, n_scenes, inter = \
                 _gen_script(rng)
-            script, defects = parse_fable2_markup(text, cast)
+            script, defects = parse_scifi_news_pro_markup(text, cast)
             assert defects == (), render_defects(defects)
             assert script.character_word_count == char_words
             assert script.announcer_word_count == ann_words
@@ -440,7 +440,7 @@ class TestProperties:
         for _ in range(10):
             text, cast, *_rest = _gen_script(rng)
             mutate, expected = mutations[rng.randrange(len(mutations))]
-            script, defects = parse_fable2_markup(mutate(text), cast)
+            script, defects = parse_scifi_news_pro_markup(mutate(text), cast)
             assert script is None
             assert expected in [d.code for d in defects], (
                 f"expected {expected} in {render_defects(defects)}")
@@ -459,7 +459,7 @@ def test_a_speaker_restated_with_its_ROLE_still_resolves_to_the_cast():
     UNKNOWN_SPEAKER, the repair ladder burned its four attempts, and
     OTR_LedgerScriptWriter failed the whole episode:
 
-        [scifi_fable2] pass 'script' failed after 4 attempt(s):
+        [scifi_news_pro] pass 'script' failed after 4 attempt(s):
         markup ladder exhausted; last defects:
         - UNKNOWN_SPEAKER: Commander Vance (Space Force Tactician) (line 5)
 

@@ -18,7 +18,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from nodes import _otr_scifi_fable2 as F2  # noqa: E402
+from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 
 
 PACK_PATH = (
@@ -31,12 +31,12 @@ PACK_PATH = (
 PIPELINES_PATH = REPO_ROOT / "nodes" / "story_packs" / "pipelines.json"
 
 MODEL_SEAMS = {
-    "fable2_dossier_system",
-    "fable2_pitch_system",
-    "fable2_treatment_system",
-    "fable2_news_read_system",
-    "fable2_script_system",
-    "fable2_casting_system",
+    "scifi_news_pro_dossier_system",
+    "scifi_news_pro_pitch_system",
+    "scifi_news_pro_treatment_system",
+    "scifi_news_pro_news_read_system",
+    "scifi_news_pro_script_system",
+    "scifi_news_pro_casting_system",
 }
 
 FIXED_PASSES = [

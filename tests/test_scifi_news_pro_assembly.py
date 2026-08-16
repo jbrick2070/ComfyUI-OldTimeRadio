@@ -1,10 +1,10 @@
-"""scifi_fable2 S1b -- P7 assembly golden chain (architecture doc s7/s13).
+"""scifi_news_pro S1b -- P7 assembly golden chain (architecture doc s7/s13).
 
-Asserts fable2's OWN ledger contract. The committed
-tests/fixtures/fable2/legacy_reference_ledger.json (captured from the
+Asserts scifi_news_pro's OWN ledger contract. The committed
+tests/fixtures/scifi_news_pro/legacy_reference_ledger.json (captured from the
 S1a science live smoke, scrubbed) serves ONLY as the row-role-ordering +
 tail-output-contract REFERENCE -- never a byte-match target (r4/CUT2).
-The golden happy-path fixture (golden_s1b_assembly.json) pins fable2's
+The golden happy-path fixture (golden_s1b_assembly.json) pins scifi_news_pro's
 own deterministic assembly output.
 
 Covers: five-hierarchy emission (r1/S2), exact music sentinel rows +
@@ -26,11 +26,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nodes import _otr_scifi_fable2 as F2  # noqa: E402
+from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
-from nodes._otr_fable2_markup import parse_fable2_markup  # noqa: E402
+from nodes._otr_scifi_news_pro_markup import parse_scifi_news_pro_markup  # noqa: E402
 
-_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "fable2"
+_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "scifi_news_pro"
 _LEGACY = _FIXTURES / "legacy_reference_ledger.json"
 _GOLDEN = _FIXTURES / "golden_s1b_assembly.json"
 
@@ -144,7 +144,7 @@ _PAYLOAD = {
 def _sealed_draft(markup: str, *, act_count: int = 3,
                   treatment: "F2.Treatment | None" = None):
     treatment = treatment or _treatment()
-    parsed, defects = parse_fable2_markup(markup, _CAST_NAMES)
+    parsed, defects = parse_scifi_news_pro_markup(markup, _CAST_NAMES)
     assert parsed is not None, defects
     trace = F2.PassAttemptTrace(
         attempt=1,
@@ -166,9 +166,9 @@ def _sealed_draft(markup: str, *, act_count: int = 3,
 def _assembled(tmp_path: Path):
     """Run the pure-python golden chain into a REAL tmp ledger."""
     parsed, draft, envelope = _sealed_draft(_MARKUP)
-    led = _PL.new_ledger(episode_id="fable2_golden_ep",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_golden_ep",
                          out_dir=str(tmp_path / "ep"))
-    led.data.setdefault("meta", {})["fable2"] = {}
+    led.data.setdefault("meta", {})["scifi_news_pro"] = {}
     # the golden play carries 51 character words -> target 50 (band 46-56)
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
@@ -187,7 +187,7 @@ def _hierarchies(led) -> dict:
 
 def test_golden_happy_path_matches_fixture(tmp_path):
     """The deterministic assembly output IS the committed golden fixture.
-    Regenerate deliberately (tests/fixtures/fable2/README.md) when the
+    Regenerate deliberately (tests/fixtures/scifi_news_pro/README.md) when the
     assembly contract changes -- never to paper over a drift."""
     led, _parsed, _meta = _assembled(tmp_path)
     golden = json.loads(_GOLDEN.read_text(encoding="utf-8"))
@@ -249,7 +249,7 @@ def test_same_speaker_runs_merge_with_verbatim_proof(tmp_path):
     assert vera["text"] == (
         "Play it again, and this time keep the gain low. "
         "The mountain does not repeat itself for committees.")
-    proof = {p["line_id"]: p for p in meta["fable2"]["proof_map"]}
+    proof = {p["line_id"]: p for p in meta["scifi_news_pro"]["proof_map"]}
     assert len(proof[vera["line_id"]]["constituents"]) == 2
     for c in proof[vera["line_id"]]["constituents"]:
         assert c["artifact"] == "winning_draft"
@@ -260,7 +260,7 @@ def test_every_spoken_row_proved_and_news_read_named(tmp_path):
     led, _parsed, meta = _assembled(tmp_path)
     spoken = [r for r in led.data["lines"]
               if r["speaker_role"] in ("character", "announcer")]
-    proof = {p["line_id"]: p for p in meta["fable2"]["proof_map"]}
+    proof = {p["line_id"]: p for p in meta["scifi_news_pro"]["proof_map"]}
     assert set(proof) == {r["line_id"] for r in spoken}
     news_rows = [r for r in spoken if r["text"] == _NEWS_READ]
     assert len(news_rows) == 1
@@ -268,20 +268,20 @@ def test_every_spoken_row_proved_and_news_read_named(tmp_path):
             for c in proof[news_rows[0]["line_id"]]["constituents"]}
     assert arts == {"treatment.news_close_read"}
     on_disk = json.loads(Path(led.path).read_text(encoding="utf-8"))
-    assert on_disk["meta"]["fable2"]["proof_map"] == \
-        led.data["meta"]["fable2"]["proof_map"]
+    assert on_disk["meta"]["scifi_news_pro"]["proof_map"] == \
+        led.data["meta"]["scifi_news_pro"]["proof_map"]
     # the retired draft-text side channel never enters the ledger
-    assert "_winning_draft_text" not in meta["fable2"]
+    assert "_winning_draft_text" not in meta["scifi_news_pro"]
 
 
 def test_verbatim_proof_gate_fails_loud_on_foreign_text(tmp_path):
     _parsed, draft, envelope = _sealed_draft(_MARKUP)
-    led = _PL.new_ledger(episode_id="fable2_proof_fail",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_proof_fail",
                          out_dir=str(tmp_path / "ep2"))
-    led.data.setdefault("meta", {})["fable2"] = {}
+    led.data.setdefault("meta", {})["scifi_news_pro"] = {}
     forged = replace(
         draft, normalized_source="TITLE: Something Else\nEND.")
-    with pytest.raises(F2.Fable2ScriptError, match="seal"):
+    with pytest.raises(F2.NewsProScriptError, match="seal"):
         F2._assemble(
             led, forged, _treatment(), _CAST_ROWS, _PAYLOAD,
             owner_bank="scifi_news_pro")
@@ -304,9 +304,9 @@ def test_multiple_inter_cues_after_one_scene_all_survive(tmp_path):
         "MUSIC: single sustained violin note, rising\n"
         "MUSIC: distant kettle drums, answering")
     parsed, draft, envelope = _sealed_draft(markup)
-    led = _PL.new_ledger(episode_id="fable2_intercues",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_intercues",
                          out_dir=str(tmp_path / "ep7"))
-    led.data.setdefault("meta", {})["fable2"] = {}
+    led.data.setdefault("meta", {})["scifi_news_pro"] = {}
     F2._assemble(
         led, draft, _treatment(), _CAST_ROWS, _PAYLOAD,
         owner_bank="scifi_news_pro")
@@ -331,15 +331,15 @@ def test_boundary_stamps(tmp_path):
 
 
 def test_role_set_matches_legacy_reference(tmp_path):
-    # r4 anchor: assembled fable2 SPOKEN role set == the legacy role set
+    # r4 anchor: assembled scifi_news_pro SPOKEN role set == the legacy role set
     # (the reference fixture is ordering/contract truth, never a
     # byte-match target); the full set stays sequencer-legal.
     led, _parsed, _meta = _assembled(tmp_path)
     legacy = json.loads(_LEGACY.read_text(encoding="utf-8"))
     legacy_roles = {r["speaker_role"] for r in legacy["lines"]}
-    fable2_spoken = {r["speaker_role"] for r in led.data["lines"]
+    scifi_news_pro_spoken = {r["speaker_role"] for r in led.data["lines"]
                      if not r["speaker_role"].startswith("music_")}
-    assert fable2_spoken == legacy_roles == {"announcer", "character"}
+    assert scifi_news_pro_spoken == legacy_roles == {"announcer", "character"}
     all_roles = {r["speaker_role"] for r in led.data["lines"]}
     assert all_roles <= _SEQUENCER_LEGAL_ROLES
 
@@ -365,13 +365,13 @@ def test_row_role_ordering_follows_legacy_reference(tmp_path):
 
 
 def test_assembled_ledger_passes_the_freeze_gap_audit(tmp_path):
-    # kibitz r4 M2: run the assembled fable2 ledger through the freeze
+    # kibitz r4 M2: run the assembled scifi_news_pro ledger through the freeze
     # module's own gap audit -- zero critical gaps, no skip rows, and
     # the Phase-10 contract facts (roles legal, char_ids resolvable)
     # hold BEFORE any live cascade touches it.
     from nodes import _otr_ledger_freeze as FREEZE
     led, _parsed, _meta = _assembled(tmp_path)
-    report = FREEZE.run_gap_audit(led.data, label="fable2_s1b_test")
+    report = FREEZE.run_gap_audit(led.data, label="scifi_news_pro_s1b_test")
     assert report.errors == [], report.errors
     for r in led.data["lines"]:
         assert not r.get("skip"), r["line_id"]
@@ -390,7 +390,7 @@ def test_line_id_equals_beat_id_and_beats_reference_lines(tmp_path):
 
 
 def test_compose_flags_absent_freeze_assertion(tmp_path):
-    # fable2 rows are born WITHOUT compose flags; set_lines coerces the
+    # scifi_news_pro rows are born WITHOUT compose flags; set_lines coerces the
     # absent field to [] (schema-legal for the freeze path).
     led, _parsed, _meta = _assembled(tmp_path)
     for r in led.data["lines"]:
@@ -400,9 +400,9 @@ def test_compose_flags_absent_freeze_assertion(tmp_path):
 def test_incremental_saves_after_preamble_and_each_scene(tmp_path,
                                                          monkeypatch):
     _parsed, draft, envelope = _sealed_draft(_MARKUP)
-    led = _PL.new_ledger(episode_id="fable2_saves",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_saves",
                          out_dir=str(tmp_path / "ep3"))
-    led.data.setdefault("meta", {})["fable2"] = {}
+    led.data.setdefault("meta", {})["scifi_news_pro"] = {}
     saves = []
     real_save = led.save
     monkeypatch.setattr(led, "save",
@@ -416,11 +416,11 @@ def test_incremental_saves_after_preamble_and_each_scene(tmp_path,
 
 def test_speaker_set_gate_fails_loud(tmp_path):
     _parsed, draft, envelope = _sealed_draft(_MARKUP)
-    led = _PL.new_ledger(episode_id="fable2_castgate",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_castgate",
                          out_dir=str(tmp_path / "ep4"))
-    led.data.setdefault("meta", {})["fable2"] = {}
+    led.data.setdefault("meta", {})["scifi_news_pro"] = {}
     missing_doku = [r for r in _CAST_ROWS if r["name"] != "DOKU"]
-    with pytest.raises(F2.Fable2AssembleError, match="speaker set"):
+    with pytest.raises(F2.NewsProAssembleError, match="speaker set"):
         F2._assemble(
             led, draft, _treatment(), missing_doku, _PAYLOAD,
             owner_bank="scifi_news_pro")
@@ -465,13 +465,13 @@ def test_line_row_contract_superset_of_legacy_reference(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 3. No-model contract test (r3 optional, adopted): smallest fable2
+# 3. No-model contract test (r3 optional, adopted): smallest scifi_news_pro
 #    ledger through assemble_script_text_from_ledger + set_music --
 #    catches cue-id drift against the EpisodeAssembler bookend ids.
 # ---------------------------------------------------------------------------
 
 def test_no_model_contract_smallest_ledger(tmp_path):
-    led = _PL.new_ledger(episode_id="fable2_smallest",
+    led = _PL.new_ledger(episode_id="scifi_news_pro_smallest",
                          out_dir=str(tmp_path / "ep6"))
     led.set_cast([_CAST_ROWS[0], _CAST_ROWS[1]])
     led.set_music([

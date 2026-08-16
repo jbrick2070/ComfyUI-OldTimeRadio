@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_lane_specs as LANES
-from nodes import _otr_scifi_fable2 as FABLE2
+from nodes import _otr_scifi_news_pro as FABLE2
 from nodes import _otr_story_routing as ROUTING
 
 
@@ -18,12 +18,12 @@ REPO = Path(__file__).resolve().parents[1]
 PACK_DIR = REPO / "nodes" / "story_packs" / "scifi_news_pro"
 FABLE2_SEAMS = frozenset(
     {
-        "fable2_dossier_system",
-        "fable2_pitch_system",
-        "fable2_treatment_system",
-        "fable2_news_read_system",
-        "fable2_script_system",
-        "fable2_casting_system",
+        "scifi_news_pro_dossier_system",
+        "scifi_news_pro_pitch_system",
+        "scifi_news_pro_treatment_system",
+        "scifi_news_pro_news_read_system",
+        "scifi_news_pro_script_system",
+        "scifi_news_pro_casting_system",
     }
 )
 
@@ -42,7 +42,7 @@ def test_bank_routes_to_dedicated_runner():
     # The lane authority resolves the runner by NAME, lazily -- assert on
     # the resolved callable so a renamed entry point cannot pass silently.
     assert LANES.runner_for(bank.default_story_pipeline) is (
-        FABLE2.run_scifi_fable2_episode
+        FABLE2.run_scifi_news_pro_episode
     )
 
 
@@ -73,7 +73,7 @@ def test_pack_owns_exactly_the_six_model_seams():
 
 def test_frame_deck_is_well_formed_generation_guidance():
     deck = json.loads((PACK_DIR / "frame_deck.json").read_text(encoding="utf-8"))
-    assert deck["schema_version"] == "fable2_deck_v1"
+    assert deck["schema_version"] == "scifi_news_pro_deck_v1"
     assert len(deck["cards"]) >= 3
     assert len(deck["stances"]) >= 1
     assert len({card["name"] for card in deck["cards"]}) == len(deck["cards"])

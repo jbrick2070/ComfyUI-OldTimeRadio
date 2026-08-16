@@ -68,7 +68,7 @@ def execute_fn(writer_ast) -> ast.FunctionDef:
 
     Originally the `run` method (the ComfyUI node-execution entrypoint;
     the fixture name `execute_fn` mirrors the historical spec's
-    "execute()" wording). scifi_fable2 S1a (2026-07-10): the whole tail
+    "execute()" wording). scifi_news_pro S1a (2026-07-10): the whole tail
     (J.5 -> M save, including K.5.5/K.5.6) moved into the extracted
     `_run_writer_tail` (architecture doc sections 11/13) -- every
     call-site pin below follows it there. The placement laws are

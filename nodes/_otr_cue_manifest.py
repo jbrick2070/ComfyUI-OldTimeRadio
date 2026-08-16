@@ -228,7 +228,7 @@ def index_by_cue_id(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
 def index_by_anchor_line_id(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """anchor_line_id -> row, skipping rows with no anchor (legacy synth cues).
     Used by SceneSequencer to resolve a music-boundary sentinel line to its
-    cue (fable2 sentinels carry no cue_id -- the anchor is the only link)."""
+    cue (scifi_news_pro sentinels carry no cue_id -- the anchor is the only link)."""
     out: Dict[str, Dict[str, Any]] = {}
     for row in (manifest.get("cues") or []):
         anchor = row.get("anchor_line_id")

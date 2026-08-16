@@ -289,7 +289,7 @@ BANK_CAMEO_POLICY = {
     "public_domain": "source_fidelity_excluded",
     "shakespeare": "source_fidelity_excluded",
     # NOT MEASURED. Its leg failed in the WRITER before casting ran
-    # ("[scifi_fable2] pass 'script' failed after 4 attempt(s): markup ladder
+    # ("[scifi_news_pro] pass 'script' failed after 4 attempt(s): markup ladder
     # exhausted"), so nothing about its cameo behaviour was observed. Marked
     # unmeasured rather than assumed from its sibling -- that assumption is the
     # one that made this map wrong the first time.

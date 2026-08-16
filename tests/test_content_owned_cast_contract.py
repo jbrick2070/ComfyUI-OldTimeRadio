@@ -9,7 +9,7 @@ nothing logged.
 
 Chunk A of the Lemmy sprint: ``content_owned_cast_contract`` in
 ``nodes/_otr_casting.py`` builds the decision receipt, and the runner stamps
-it -- ``_otr_scifi_fable2._stamp_cast_contract`` after ``_assemble`` (which
+it -- ``_otr_scifi_news_pro._stamp_cast_contract`` after ``_assemble`` (which
 saves and rebinds ``led.data``, so the stamp reacquires the live meta).
 
 The codex runner carried the twin stamp until the 2026-08-16 ``scifi_news``
@@ -154,7 +154,7 @@ def test_count_excludes_announcer_by_char_id_shape():
     assert count_locked_characters(cast) == 3
 
 
-def test_count_excludes_announcer_by_name_fable2_shape():
+def test_count_excludes_announcer_by_name_scifi_news_pro_shape():
     # scifi_news_pro ships ANNOUNCER at char_id "c01" (blood_red_water shape),
     # so len(cast) - 1 arithmetic is exactly what this helper must NOT be.
     cast = [
@@ -177,10 +177,10 @@ def test_count_tolerates_junk_and_empty():
 # `test_codex_runner_stamps_after_assemble` lived here and pinned the twin
 # stamp on the codex runner, including that it closed `cast_status` (which
 # froze "building" on published episodes). It went with the 2026-08-16
-# `scifi_news` rip. The fable2 case below is now the only runner stamp.
+# `scifi_news` rip. The scifi_news_pro case below is now the only runner stamp.
 
 
-def test_fable2_runner_stamps_live_meta():
+def test_scifi_news_pro_runner_stamps_live_meta():
     led = SimpleNamespace(data={
         "meta": {},
         "cast": [
@@ -189,9 +189,9 @@ def test_fable2_runner_stamps_live_meta():
             {"char_id": "c03", "name": "Sarah"},
         ],
     })
-    from nodes import _otr_scifi_fable2 as fable2
+    from nodes import _otr_scifi_news_pro as scifi_news_pro
 
-    contract = fable2._stamp_cast_contract(
+    contract = scifi_news_pro._stamp_cast_contract(
         led,
         resolved={"num_characters": 2},
         source_bank_row=SimpleNamespace(source_bank_id="scifi_news_pro"),
@@ -204,9 +204,9 @@ def test_fable2_runner_stamps_live_meta():
         assert key not in contract
 
 
-def test_fable2_call_site_sits_between_assemble_and_receipt_save():
-    src = _read(os.path.join("nodes", "_otr_scifi_fable2.py"))
+def test_scifi_news_pro_call_site_sits_between_assemble_and_receipt_save():
+    src = _read(os.path.join("nodes", "_otr_scifi_news_pro.py"))
     call = src.rindex("_stamp_cast_contract(")
-    assert call > src.index("def run_scifi_fable2_episode(")
+    assert call > src.index("def run_scifi_news_pro_episode(")
     assert call > src.index("    _assemble(")
-    assert call < src.index('require_ledger_save(led, "the fable2 pass receipts")')
+    assert call < src.index('require_ledger_save(led, "the scifi_news_pro pass receipts")')

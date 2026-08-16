@@ -60,7 +60,7 @@ def test_writer_no_longer_owns_a_second_lane_table():
     """
     for dead in (
         "_RUNNER_BY_PIPELINE", "_LEGACY_INLINE_PIPELINES",
-        "_resolve_lane_runner", "_run_fable2_lane", "_run_scifi_codex_lane",
+        "_resolve_lane_runner", "_run_scifi_news_pro_lane", "_run_scifi_codex_lane",
     ):
         assert not hasattr(writer, dead), (
             f"{dead} is back in the writer; _otr_lane_specs is the ONE "

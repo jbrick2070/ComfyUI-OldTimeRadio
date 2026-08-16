@@ -25,7 +25,7 @@ of what was decided and why; the BUILDABLE contract is the fable2 sections.
 ## What this builds
 
 The surviving content-owned lane -- `scifi_news_pro`
-(`nodes/_otr_scifi_fable2.py`) -- gains the LEMMY cameo ROLL:
+(`nodes/_otr_scifi_news_pro.py`) -- gains the LEMMY cameo ROLL:
 decided at runner entry, before any authoring; identity pinned from
 `config/cast_pools.LEMMY_PROFILE`; the model authors only his
 episode-specific stake; the contract and receipts tell the truth in every
@@ -115,7 +115,7 @@ to a `_resolve_inputs` ValueError test; the three mapping assertions stay.
    pre-locked-row convention; credits read the signature ONLY from this
    key). Cameo row only; no receipts invented for other rows.
 
-## Fable2 (`scifi_news_pro`)
+## NewsPro (`scifi_news_pro`)
 
 * ON HIT, the pitch AND treatment prompts carry the cameo contract: LEMMY
   exists (fixed name; genial Cockney COMMUNICATIONS OFFICER -- the
@@ -217,7 +217,7 @@ checks, commit, push, verify HEAD == origin/v2.0-alpha
    legacy consumer + all fixture updates + workflow_apply evolution.
 2. Decision API + serialization + `content_owned_cast_contract(decision=
    None)` + chunk A test extensions.
-3. Fable2, complete with tests.
+3. NewsPro, complete with tests.
 4. Codex, ONE commit: P2 validator + normalization + speaker-contract
    route + conditional pre-seed + stamps + tests (an intermediate commit
    would pin the voice while dialogue cannot see the register).

@@ -214,8 +214,17 @@ def pytest_runtest_makereport(item, call):  # kept: pytest hook signature contra
     setattr(item, f"rep_{rep.when}", rep)
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature contract
     """Diff the actual-failed-nodeid set against EXPECTED_FAILED_NODEIDS.
+
+    `trylast=True` IS LOAD-BEARING (2026-08-16). The `raise SystemExit(2)`
+    below aborts every remaining `pytest_sessionfinish` implementation --
+    including the terminal reporter's, which is what prints the `FAILURES`
+    section and the short summary. Without this decorator a regression is
+    reported as a bare nodeid with NO TRACEBACK, so the guard built to
+    surface regressions was hiding the one thing needed to fix them. Running
+    last lets the report print first, then the hard exit still happens.
 
     NEW failures (actual - expected): regression -- hard-fail with
     exit code 2 so CI surfaces it distinctly from a normal pytest

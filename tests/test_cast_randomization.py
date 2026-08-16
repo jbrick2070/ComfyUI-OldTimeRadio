@@ -152,8 +152,8 @@ def test_pinning_OTR_CAST_SEED_pins_the_inline_lanes(monkeypatch):
     the cast; now it pins the voices and the music bed too, because they all
     derive from the same stamped number.
 
-    INLINE lanes only. The content-owned fable2 runner mints its own seed and is
-    pinned by OTR_FABLE2_SEED; the soak launcher sets both under OTR_C7.
+    INLINE lanes only. The content-owned scifi_news_pro runner mints its own seed and is
+    pinned by OTR_SCIFI_NEWS_PRO_SEED; the soak launcher sets both under OTR_C7.
     """
     monkeypatch.setenv("OTR_CAST_SEED", "12345")
     seed, source = _resolve_cast_rng_seed()

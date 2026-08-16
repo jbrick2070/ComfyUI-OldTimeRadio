@@ -49,7 +49,7 @@ WRITER_FAILURE = [
         "exception_type": "TypeError",
         "traceback": [
             '  File "C:\\...\\execution.py", line 1, in execute',
-            '  File "C:\\...\\_otr_scifi_fable2.py", line 1532, in _script_user_prompt',
+            '  File "C:\\...\\_otr_scifi_news_pro.py", line 1532, in _script_user_prompt',
             "    json.dumps(treatment.model_dump())",
         ],
         # THE BULK IS THE POINT. ComfyUI's `handle_execution_error` attaches
@@ -80,7 +80,7 @@ def test_it_keeps_the_frame_that_names_OUR_code(api):
     """The tail of the traceback is where our frames are -- keeping the head
     would preserve only ComfyUI's executor."""
     got = api.describe_execution_error(WRITER_FAILURE)
-    assert "_otr_scifi_fable2.py" in got
+    assert "_otr_scifi_news_pro.py" in got
     assert "_script_user_prompt" in got
 
 

@@ -1,6 +1,6 @@
 """PBUG-20260710-07 -- no silent cast-keyed role mutation (named regression pin).
 
-PBUG-20260710-07 (scifi_fable2 30w live smoke roll 22, 2026-07-10): a postamble
+PBUG-20260710-07 (scifi_news_pro 30w live smoke roll 22, 2026-07-10): a postamble
 ANNOUNCER row arrived ``speaker_role="character"`` with ``skip=True`` and a NULL
 reason after a green 8-pass spine -- flipped by an UNIDENTIFIED cast-keyed
 mutator with NO compose-flag breadcrumb (silent data corruption; PROMOTED

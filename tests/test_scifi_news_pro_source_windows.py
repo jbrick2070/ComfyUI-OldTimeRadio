@@ -13,7 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from nodes import _otr_scifi_fable2 as F2  # noqa: E402
+from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 from nodes import production_ledger as PL  # noqa: E402
 
 
@@ -222,7 +222,7 @@ def test_news_seed_route_coordinates_must_match_selected_article(
     }
     news_seed[field] = wrong_value
 
-    with pytest.raises(F2.Fable2DossierError, match="meta.news_seed"):
+    with pytest.raises(F2.NewsProDossierError, match="meta.news_seed"):
         F2._source_coverage_receipt(
             payload,
             windows,
@@ -330,7 +330,7 @@ def test_a_source_richer_than_the_bucket_limit_still_parses():
     Measured 2026-08-14: a UCLA Health story names 11 places and 14
     institutions. The model extracted them correctly and the pydantic cap --
     set to the same number the MERGE already trims to -- rejected the reply
-    three times and killed the episode with `Fable2DossierError`. The refusal
+    three times and killed the episode with `NewsProDossierError`. The refusal
     fired in front of the trim that exists to handle exactly this.
 
     The schema ceiling is now a backstop against a degenerate decode; the
@@ -502,7 +502,7 @@ def _run_until_treatment(
     monkeypatch.setattr(F2, "_pass_treatment", stop_at_treatment)
     meta = led.data.setdefault("meta", {})
     with pytest.raises(_StopAfterPitch):
-        F2.run_scifi_fable2_episode(
+        F2.run_scifi_news_pro_episode(
             payload=payload,
             pack=_pack(),
             resolved={
@@ -550,7 +550,7 @@ def test_real_runner_invokes_every_window_and_pitch_sees_tail(monkeypatch):
     assert "tail fact from final source window" in pitch_user
     assert "TailEntity" in pitch_user
     assert '"909"' in pitch_user
-    assert meta["fable2"]["source_coverage"]["coverage_complete"] is True
+    assert meta["scifi_news_pro"]["source_coverage"]["coverage_complete"] is True
 
 
 def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
@@ -574,8 +574,8 @@ def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
     # on it. A double that omits a method the real object has is an
     # incomplete double, not a reason to make production defensive.
     led = SimpleNamespace(data={"meta": meta}, save=lambda: True)
-    with pytest.raises(F2.Fable2DossierError, match="coverage ends"):
-        F2.run_scifi_fable2_episode(
+    with pytest.raises(F2.NewsProDossierError, match="coverage ends"):
+        F2.run_scifi_news_pro_episode(
             payload=payload,
             pack=_pack(),
             resolved={
@@ -596,7 +596,7 @@ def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
             episode_id="partial-source-test",
         )
     assert model_calls["count"] == 0
-    assert "source_coverage" not in meta["fable2"]
+    assert "source_coverage" not in meta["scifi_news_pro"]
 
 
 def test_source_coverage_survives_real_ledger_save(
@@ -606,7 +606,7 @@ def test_source_coverage_survives_real_ledger_save(
     payload = _payload(body=_long_body() + " Ω")
     body = payload["full_text"]
     led = PL.new_ledger(
-        episode_id="fable2_source_coverage",
+        episode_id="scifi_news_pro_source_coverage",
         out_dir=str(tmp_path / "episode"),
     )
     meta = led.data.setdefault("meta", {})
@@ -624,12 +624,12 @@ def test_source_coverage_survives_real_ledger_save(
         led=led,
         payload=payload,
     )
-    before = dict(led.data["meta"]["fable2"]["source_coverage"])
+    before = dict(led.data["meta"]["scifi_news_pro"]["source_coverage"])
 
     saved_path = Path(led.save())
-    after = led.data["meta"]["fable2"]["source_coverage"]
+    after = led.data["meta"]["scifi_news_pro"]["source_coverage"]
     reopened = json.loads(saved_path.read_text(encoding="utf-8"))
-    on_disk = reopened["meta"]["fable2"]["source_coverage"]
+    on_disk = reopened["meta"]["scifi_news_pro"]["source_coverage"]
 
     assert after == before
     assert on_disk == before
@@ -648,7 +648,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
     payload = _payload(body=_long_body())
     body = payload["full_text"]
     led = PL.new_ledger(
-        episode_id="fable2_assembly_rebind",
+        episode_id="scifi_news_pro_assembly_rebind",
         out_dir=str(tmp_path / "assembly-rebind"),
     )
     meta = led.data.setdefault("meta", {})
@@ -716,7 +716,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
     ):
         counting_fn([], temperature=0.75, max_new_tokens=None)
         raw = _valid_markup()
-        parsed, defects = F2.parse_fable2_markup(raw, cast_names)
+        parsed, defects = F2.parse_scifi_news_pro_markup(raw, cast_names)
         assert parsed is not None, defects
         trace = F2.PassAttemptTrace(
             attempt=1,
@@ -766,7 +766,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         assert ledger.save()
         # Simulate the exact nested-meta loss the post-assembly reacquisition
         # guards. A shallow disk merge will not restore a missing nested key.
-        ledger.data["meta"]["fable2"].pop("source_coverage")
+        ledger.data["meta"]["scifi_news_pro"].pop("source_coverage")
 
     monkeypatch.setattr(F2, "_assemble", assemble_and_drop_live_receipt)
     monkeypatch.setattr(
@@ -774,11 +774,11 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         "stamp_actual",
         lambda *_args, **_kwargs: {"actual_words": 5},
     )
-    # (The `scan_spoken_ledger` stub that used to sit here is gone: the fable2
+    # (The `scan_spoken_ledger` stub that used to sit here is gone: the scifi_news_pro
     # lane's terminal spoken-safety scan was removed 2026-08-05 by operator
     # directive, so there is no longer a symbol on F2 to neutralize.)
 
-    parts = F2.run_scifi_fable2_episode(
+    parts = F2.run_scifi_news_pro_episode(
         payload=payload,
         pack=_pack(),
         resolved={
@@ -796,14 +796,14 @@ def test_runner_restamps_coverage_after_assembly_rebind(
             source_bank_id="scifi_news_pro"
         ),
         episode_root=tmp_path,
-        episode_id="fable2_assembly_rebind",
+        episode_id="scifi_news_pro_assembly_rebind",
     )
 
-    receipt = parts.fable2_meta["source_coverage"]
+    receipt = parts.scifi_news_pro_meta["source_coverage"]
     assert receipt["coverage_complete"] is True
-    assert receipt == led.data["meta"]["fable2"]["source_coverage"]
+    assert receipt == led.data["meta"]["scifi_news_pro"]["source_coverage"]
     reopened = json.loads(Path(led.path).read_text(encoding="utf-8"))
-    assert receipt == reopened["meta"]["fable2"]["source_coverage"]
+    assert receipt == reopened["meta"]["scifi_news_pro"]["source_coverage"]
 
 
 def test_old_prefix_counterfactual_loses_tail():

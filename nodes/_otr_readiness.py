@@ -265,7 +265,7 @@ def phase_7_audio_readiness(led) -> AudioReadinessReport:
 # normalization (Dr. -> Doctor, digits -> words) from
 # `phase_7_audio_readiness`. The freeze cascade SKIPS Phase 7 under
 # `content_owned_readonly` (r2 P0.1), which switched that normalization
-# OFF for fable2; C2 restores it on the content-owned boundary instead --
+# OFF for scifi_news_pro; C2 restores it on the content-owned boundary instead --
 # the SAME normalization stamped onto a separate `text_for_tts` delivery
 # field (+ a source-text sha for staleness detection + a receipt), leaving
 # `text`/counts/proof pristine.

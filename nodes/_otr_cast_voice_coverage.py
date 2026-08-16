@@ -9,7 +9,7 @@ ledger `pending_20260802_024714`): gemma cast "The Relay" and wrote its five
 lines as pure stage direction -- no sayable dialogue. Every existing check
 passed, because every existing check asks a different question:
 
-  * the fable2 assemble gate checks RAW text -- stage direction counts, pass;
+  * the scifi_news_pro assemble gate checks RAW text -- stage direction counts, pass;
   * `stamp_receipt` minted authorship proofs from those rows -- voiced then;
   * the writer-tail cleanup (`_otr_ledger_cleanup.py:255`) then stripped stage
     directions, found "nothing sayable", and -- CORRECTLY -- emptied the rows
@@ -23,7 +23,7 @@ raw text. A row this gate accepts is exactly a row the cleanup will never
 empty, which is what makes proofs minted after it stable.
 
 WHERE IT RUNS: the top of `_otr_content_authorship.stamp_receipt`, the one
-call site both content-owned lanes share (`_otr_scifi_fable2.py:2538`,
+call site both content-owned lanes share (`_otr_scifi_news_pro.py:2538`,
 the retired codex lane), immediately BEFORE proofs are minted and BEFORE
 the ledger is frozen -- the panels' converged placement (Sonnet wiring review
 B6; codex CUT 1: enforce pre-assembly so no portrait, caption, credit, voice

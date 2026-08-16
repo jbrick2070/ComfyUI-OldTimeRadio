@@ -397,7 +397,7 @@ def test_the_writer_tail_actually_reseals_an_authorized_clean(
     tail's real signature; if that helper is renamed this fails at import,
     loudly, which is the correct outcome.
     """
-    from tests.test_fable2_tail_context import _make_ctx
+    from tests.test_scifi_news_pro_tail_context import _make_ctx
     from nodes import _otr_ledger_clean
     from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
 
@@ -435,7 +435,7 @@ def test_the_delivered_word_receipt_is_restamped_after_the_window(
     receipt taken at `writer_final_rows` describes a draft that no longer
     exists. The post-clean stamp lands under its OWN stage name, so the
     pre-clean record survives beside it instead of being overwritten."""
-    from tests.test_fable2_tail_context import _make_ctx
+    from tests.test_scifi_news_pro_tail_context import _make_ctx
     from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
 
     ctx = _make_ctx(tmp_path, monkeypatch)

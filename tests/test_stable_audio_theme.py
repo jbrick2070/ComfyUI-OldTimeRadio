@@ -195,8 +195,8 @@ def test_canonical_placement_accepts_historical_aliases(
     assert StableAudioTheme._canonical_placement(placement, cue_id) == expected
 
 
-def test_fable2_music_rows_render_by_cue_id(monkeypatch):
-    """fable2 lane: one clip per authored ledger.music[] row, keyed by cue_id,
+def test_scifi_news_pro_music_rows_render_by_cue_id(monkeypatch):
+    """scifi_news_pro lane: one clip per authored ledger.music[] row, keyed by cue_id,
     carrying its placement + anchor_line_id into the manifest (720-bakeoff C3).
     inter_NN maps to placement 'interstitial' (MF-B: never a KeyError)."""
     import json

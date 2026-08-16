@@ -51,7 +51,7 @@ def _envelope(base="scifi_news_pro", **overrides):
         "seed_receipt": {
             "OTR_CAST_SEED": "42",
             "OTR_STYLE_SEED": "42",
-            "OTR_FABLE2_SEED": "42",
+            "OTR_SCIFI_NEWS_PRO_SEED": "42",
         },
     }
     env.update(overrides)
@@ -131,7 +131,7 @@ def test_valid_snapshot_is_returned_with_validated_fields(tmp_path, monkeypatch)
 # ---------------------------------------------------------------------------
 
 def test_base_mismatch_is_rejected_loud(tmp_path, monkeypatch):
-    # Envelope keyed under scifi_fable2 but DECLARES a different base.
+    # Envelope keyed under scifi_news_pro but DECLARES a different base.
     manifest = _write_manifest(
         tmp_path, {"scifi_news_pro": _envelope(base="media_archive")})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
@@ -199,10 +199,10 @@ def test_existing_source_meta_cast_hints_not_clobbered(tmp_path, monkeypatch):
 
 
 def test_path_pointer_entry_resolves_relative_to_manifest_dir(tmp_path, monkeypatch):
-    (tmp_path / "scifi_fable2_env.json").write_text(
+    (tmp_path / "scifi_scifi_news_pro_env.json").write_text(
         json.dumps(_envelope("scifi_news_pro")), encoding="utf-8")
     manifest = _write_manifest(
-        tmp_path, {"scifi_news_pro": {"path": "scifi_fable2_env.json"}})
+        tmp_path, {"scifi_news_pro": {"path": "scifi_scifi_news_pro_env.json"}})
     monkeypatch.setenv(SS.SNAPSHOT_MANIFEST_ENV, manifest)
     snap = SS.load_snapshot_for_bank("scifi_news_pro")
     assert snap is not None

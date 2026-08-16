@@ -7,12 +7,12 @@ counts are telemetry only. Prose style, visual vocabulary, and word drift
 never replace the accepted story or fail the episode.
 
 Posture: PURE module -- stdlib + pydantic + the shared structured_call
-ladder + the fable2 markup parser + config.cast_pools + _otr_canon. No
+ladder + the scifi_news_pro markup parser + config.cast_pools + _otr_canon. No
 ComfyUI imports, no GPU, and NEVER an import of OTR_LedgerScriptWriter
-(r4/M3: the runner returns a plain `Fable2TailParts`; the WRITER builds
+(r4/M3: the runner returns a plain `NewsProTailParts`; the WRITER builds
 its own WriterTailContext from the parts, keeping the import graph
 acyclic -- pinned by the pure-import test). Every failure raises a
-`Fable2Error` subclass naming the pass. **No fallback to
+`NewsProError` subclass naming the pass. **No fallback to
 legacy_many_pass, ever.**
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
@@ -52,14 +52,14 @@ try:
         MAX_QUOTE_CHARS,
         p0_source_chunks,
     )
-    from ._otr_fable2_markup import (
+    from ._otr_scifi_news_pro_markup import (
         ANNOUNCER_NAME,
-        Fable2ParseDefect,
+        NewsProParseDefect,
         ParseDefect,
         ParsedScript,
         _strip_role_parenthetical,
-        normalize_fable2_markup_text,
-        parse_fable2_markup,
+        normalize_scifi_news_pro_markup_text,
+        parse_scifi_news_pro_markup,
         render_defects,
     )
     from . import _otr_canon as _OTRC
@@ -80,14 +80,14 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         MAX_QUOTE_CHARS,
         p0_source_chunks,
     )
-    from _otr_fable2_markup import (  # type: ignore
+    from _otr_scifi_news_pro_markup import (  # type: ignore
         ANNOUNCER_NAME,
-        Fable2ParseDefect,
+        NewsProParseDefect,
         ParseDefect,
         ParsedScript,
         _strip_role_parenthetical,
-        normalize_fable2_markup_text,
-        parse_fable2_markup,
+        normalize_scifi_news_pro_markup_text,
+        parse_scifi_news_pro_markup,
         render_defects,
     )
     import _otr_canon as _OTRC  # type: ignore
@@ -126,8 +126,8 @@ warnings.filterwarnings(
 # Errors (doc s2: ctor (pass_id, reason, attempts))
 # ---------------------------------------------------------------------------
 
-class Fable2Error(Exception):
-    """Base: any fail-loud fable2 lane problem. Names the pass."""
+class NewsProError(Exception):
+    """Base: any fail-loud scifi_news_pro lane problem. Names the pass."""
 
     def __init__(self, pass_id: str, reason: str, attempts: int = 0) -> None:
         self.pass_id = pass_id
@@ -135,40 +135,40 @@ class Fable2Error(Exception):
         self.attempts = attempts
         att = f" after {attempts} attempt(s)" if attempts else ""
         super().__init__(
-            f"[scifi_fable2] pass {pass_id!r} failed{att}: {reason} "
+            f"[scifi_news_pro] pass {pass_id!r} failed{att}: {reason} "
             f"(no fallback to legacy_many_pass)"
         )
 
 
-class Fable2DossierError(Fable2Error):
+class NewsProDossierError(NewsProError):
     pass
 
 
-class Fable2PitchError(Fable2Error):
+class NewsProPitchError(NewsProError):
     pass
 
 
-class Fable2TreatmentError(Fable2Error):
+class NewsProTreatmentError(NewsProError):
     pass
 
 
-class Fable2ScriptError(Fable2Error):
+class NewsProScriptError(NewsProError):
     pass
 
 
-class Fable2ParseError(Fable2Error):
+class NewsProParseError(NewsProError):
     pass
 
 
-class Fable2CastError(Fable2Error):
+class NewsProCastError(NewsProError):
     pass
 
 
-class Fable2AssembleError(Fable2Error):
+class NewsProAssembleError(NewsProError):
     pass
 
 
-class Fable2AuditError(Fable2Error):
+class NewsProAuditError(NewsProError):
     pass
 
 
@@ -212,7 +212,7 @@ _DOSSIER_ENTITIES_PER_BUCKET_MAX = 10
 #: Measured 2026-08-14: a UCLA Health story names 11 places and 14
 #: institutions. The model extracted them correctly, the schema rejected the
 #: reply three times, and the episode died with
-#: `Fable2DossierError: 2 validation errors for DossierLLM`. The model was
+#: `NewsProDossierError: 2 validation errors for DossierLLM`. The model was
 #: right and the cap was wrong -- and news stories with more than ten proper
 #: nouns are ordinary, not exotic.
 #:
@@ -259,7 +259,7 @@ _RETIRED_SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
 # prose-bearing pass below uses the provider's remaining output capacity.
 _MAX_NEW_TOKENS = {"dossier": 700}
 
-_SCHEMA_VERSION = "fable2_v1"
+_SCHEMA_VERSION = "scifi_news_pro_v1"
 
 _DECK_PATH = (
     Path(__file__).resolve().parent / "story_packs" / "scifi_news_pro"
@@ -471,7 +471,7 @@ def _seam(pack: Any, name: str) -> str:
     stages = getattr(pack, "prompt_stages", None) or {}
     value = str(stages.get(name) or "")
     if not value.strip():
-        raise Fable2Error(
+        raise NewsProError(
             "seam",
             f"pack seam {name!r} missing/empty (pack "
             f"{getattr(pack, 'story_model_id', '?')!r}); author it in the "
@@ -507,9 +507,9 @@ def _ledger_meta(led: Any) -> dict:
     return led.data.setdefault("meta", {})
 
 
-def _fable2_meta(led: Any) -> dict:
-    """Return the live Fable2 mapping; never retain it across save()."""
-    return _ledger_meta(led).setdefault("fable2", {})
+def _news_pro_meta(led: Any) -> dict:
+    """Return the live NewsPro mapping; never retain it across save()."""
+    return _ledger_meta(led).setdefault("scifi_news_pro", {})
 
 
 def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
@@ -546,7 +546,7 @@ def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
     )
     _ledger_meta(led)["cast_contract"] = contract
     log.info(
-        "[scifi_fable2] cast contract stamped: lemmy_hit=%s policy=%s "
+        "[scifi_news_pro] cast contract stamped: lemmy_hit=%s policy=%s "
         "characters requested=%d locked=%d",
         contract["lemmy_hit"], contract["lemmy_policy"],
         contract["num_characters_request"],
@@ -556,16 +556,16 @@ def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
 
 
 def _resolve_seed() -> int:
-    """OTR_FABLE2_SEED reproduces the frame-card/stance deal AND the
+    """OTR_SCIFI_NEWS_PRO_SEED reproduces the frame-card/stance deal AND the
     announcer voice draw (r3/S2); OS entropy otherwise. The resolved
-    value is stamped in meta.fable2.seed either way."""
-    raw = os.environ.get("OTR_FABLE2_SEED", "").strip()
+    value is stamped in meta.scifi_news_pro.seed either way."""
+    raw = os.environ.get("OTR_SCIFI_NEWS_PRO_SEED", "").strip()
     if raw:
         try:
             return int(raw)
         except ValueError:
-            raise Fable2Error(
-                "deal", f"OTR_FABLE2_SEED must be an int, got {raw!r}")
+            raise NewsProError(
+                "deal", f"OTR_SCIFI_NEWS_PRO_SEED must be an int, got {raw!r}")
     return random.SystemRandom().randrange(2 ** 63)
 
 
@@ -626,22 +626,22 @@ def _load_frame_deck(path: "Path | None" = None) -> dict:
     try:
         deck = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise Fable2PitchError(
+        raise NewsProPitchError(
             "pitch", f"frame deck unreadable at {p}: {exc}") from exc
-    if deck.get("schema_version") != "fable2_deck_v1":
-        raise Fable2PitchError(
+    if deck.get("schema_version") != "scifi_news_pro_deck_v1":
+        raise NewsProPitchError(
             "pitch",
             f"frame deck schema_version "
-            f"{deck.get('schema_version')!r} != 'fable2_deck_v1'")
+            f"{deck.get('schema_version')!r} != 'scifi_news_pro_deck_v1'")
     cards = deck.get("cards") or []
     stances = deck.get("stances") or []
     names = [c.get("name") for c in cards]
     if len(cards) < 3 or len(set(names)) != len(names):
-        raise Fable2PitchError(
+        raise NewsProPitchError(
             "pitch",
             f"frame deck needs >= 3 uniquely-named cards, got {len(cards)}")
     if not stances:
-        raise Fable2PitchError("pitch", "frame deck has no stances")
+        raise NewsProPitchError("pitch", "frame deck has no stances")
     return deck
 
 
@@ -679,7 +679,7 @@ def _build_envelope(act_count: int) -> SceneEnvelope:
     """Advisory scene count for this act count. Never a delivery gate."""
     acts = int(act_count)
     if not (_OTRB.MIN_ACT_COUNT <= acts <= _OTRB.MAX_ACT_COUNT):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "script",
             f"act_count must be {_OTRB.MIN_ACT_COUNT}..{_OTRB.MAX_ACT_COUNT}, "
             f"got {acts}",
@@ -689,12 +689,12 @@ def _build_envelope(act_count: int) -> SceneEnvelope:
 
 def _validate_scene_envelope(envelope: Any) -> None:
     if type(envelope) is not SceneEnvelope:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft",
             "envelope must be an exact SceneEnvelope artifact",
         )
     if envelope != _build_envelope(envelope.scene_count):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft",
             "envelope does not match its advisory scene plan",
         )
@@ -830,7 +830,7 @@ def _deal_voice_menu(cast_size: int) -> VoiceMenu:
         for i, (preset, short) in enumerate(pool)
     )
     if len(entries) < int(cast_size):
-        raise Fable2CastError(
+        raise NewsProCastError(
             "casting_voices",
             f"voice stock capacity {len(entries)} < cast size {cast_size} "
             f"(preflight, before any P6 LLM call)")
@@ -1085,7 +1085,7 @@ def _validate_dossier_windows(
 ) -> None:
     """Prove that a proposed window set covers the selected body exactly."""
     if not windows:
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier", "complete-source window set is empty")
     header = _digest_header(payload)
     _route, body = _source_body(payload)
@@ -1093,7 +1093,7 @@ def _validate_dossier_windows(
     previous: "_DossierWindow | None" = None
     for expected_index, window in enumerate(windows):
         if window.index != expected_index:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 "complete-source windows have non-sequential indices",
             )
@@ -1102,38 +1102,38 @@ def _validate_dossier_windows(
             or window.body_end < window.body_start
             or window.body_end > len(body)
         ):
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 f"source window {window.index} has invalid body coordinates",
             )
         if expected_index == 0 and window.body_start != 0:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier", "complete-source coverage does not start at zero")
         if previous is not None:
             if window.body_start > covered_end:
-                raise Fable2DossierError(
+                raise NewsProDossierError(
                     "dossier",
                     f"source window {window.index} leaves a coverage gap",
                 )
             if previous.body_end - window.body_start != overlap_chars:
-                raise Fable2DossierError(
+                raise NewsProDossierError(
                     "dossier",
                     f"source window {window.index} overlap drifted from "
                     f"{overlap_chars} characters",
                 )
         if body and window.body_end <= covered_end:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 f"source window {window.index} does not advance coverage",
             )
         expected_digest = header + body[window.body_start:window.body_end]
         if window.digest != expected_digest:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 f"source window {window.index} digest is not its exact slice",
             )
         if len(window.digest) > _DIGEST_CHAR_CAP:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 f"source window {window.index} exceeds "
                 f"{_DIGEST_CHAR_CAP} characters",
@@ -1141,7 +1141,7 @@ def _validate_dossier_windows(
         covered_end = max(covered_end, window.body_end)
         previous = window
     if covered_end != len(body):
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier",
             f"complete-source coverage ends at {covered_end}, "
             f"not {len(body)}",
@@ -1156,7 +1156,7 @@ def _build_digest_windows(
     _route, body = _source_body(payload)
     allowance = _DIGEST_CHAR_CAP - len(header)
     if allowance < 1 and body:
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier",
             "source framing leaves no room for the selected article body",
         )
@@ -1252,7 +1252,7 @@ def _merge_dossiers(
 ) -> "tuple[DossierLLM, dict[str, dict[str, int]]]":
     """Merge complete-source extractions without widening the schema."""
     if not window_dossiers:
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier", "complete-source extraction produced no dossiers")
 
     facts, facts_count = _balanced_window_values(
@@ -1333,7 +1333,7 @@ def _source_coverage_receipt(
         == len(attempts_by_window)
         == len(local_dossiers)
     ):
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier", "source-window extraction receipt lengths disagree")
     if any(
         not isinstance(value, int)
@@ -1341,7 +1341,7 @@ def _source_coverage_receipt(
         or value < 1
         for value in attempts_by_window
     ):
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier", "every source window requires a completed model call")
 
     route, body = _source_body(payload)
@@ -1359,7 +1359,7 @@ def _source_coverage_receipt(
         if receipt_body_source not in {
             "rss_full", "url_scrape", "summary_fallback", "summary_only",
         }:
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier", "meta.news_seed has an invalid body_source")
         if (
             type(receipt_count) is not int
@@ -1373,7 +1373,7 @@ def _source_coverage_receipt(
                 )
             )
         ):
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier", "meta.news_seed has invalid RSS coordinates")
         expected = {
             "body_chars": len(body),
@@ -1382,7 +1382,7 @@ def _source_coverage_receipt(
         }
         if any(news_seed_receipt.get(key) != value
                for key, value in expected.items()):
-            raise Fable2DossierError(
+            raise NewsProDossierError(
                 "dossier",
                 "complete-source coverage disagrees with meta.news_seed",
             )
@@ -1392,7 +1392,7 @@ def _source_coverage_receipt(
         receipt_match = True
 
     return {
-        "schema_version": "fable2_source_coverage_v1",
+        "schema_version": "scifi_news_pro_source_coverage_v1",
         "coverage_complete": True,
         "source_field": route,
         "body_source": body_source,
@@ -1463,7 +1463,7 @@ def _extract_complete_source_dossier(
     dropped: "list[str]" = []
     for window in windows:
         before = box["calls"]
-        with _helper_ctx(slot_scheduler, "fable2_dossier"):
+        with _helper_ctx(slot_scheduler, "scifi_news_pro_dossier"):
             local = _pass_dossier(fn, pack, window.digest)
         attempts = box["calls"] - before
         local, local_dropped = _filter_dossier_entities(
@@ -1497,7 +1497,7 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
         return structured_call(
             prompt=[
                 {"role": "system",
-                 "content": _seam(pack, "fable2_dossier_system")},
+                 "content": _seam(pack, "scifi_news_pro_dossier_system")},
                 {"role": "user", "content": f"SCIENCE STORY:\n{digest}"},
             ],
             schema=DossierLLM,
@@ -1507,10 +1507,10 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_dossier_validator(digest),
             max_new_tokens=_MAX_NEW_TOKENS["dossier"],
-            helper_name="fable2_dossier",
+            helper_name="scifi_news_pro_dossier",
         )
     except StructuredCallFailedError as exc:
-        raise Fable2DossierError(
+        raise NewsProDossierError(
             "dossier", str(exc.last_error), exc.attempts) from exc
 
 
@@ -1531,7 +1531,7 @@ def _pass_pitch(
         # LLM slot: creative -- P1 pitch.
         return structured_call(
             prompt=ProviderCapacityMessages([
-                {"role": "system", "content": _seam(pack, "fable2_pitch_system")},
+                {"role": "system", "content": _seam(pack, "scifi_news_pro_pitch_system")},
                 {"role": "user", "content": user},
             ]),
             schema=Pitch,
@@ -1541,10 +1541,10 @@ def _pass_pitch(
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_pitch_validator(cards, n_max),
             max_new_tokens=None,
-            helper_name="fable2_pitch",
+            helper_name="scifi_news_pro_pitch",
         )
     except StructuredCallFailedError as exc:
-        raise Fable2PitchError(
+        raise NewsProPitchError(
             "pitch", str(exc.last_error), exc.attempts,
         ) from exc
 
@@ -1569,7 +1569,7 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
         return structured_call(
             prompt=ProviderCapacityMessages([
                 {"role": "system",
-                 "content": _seam(pack, "fable2_treatment_system")},
+                 "content": _seam(pack, "scifi_news_pro_treatment_system")},
                 {"role": "user", "content": user},
             ]),
             schema=Treatment,
@@ -1580,10 +1580,10 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
             post_validator=_make_treatment_validator(
                 dossier, n_max, provenance, digest),
             max_new_tokens=None,
-            helper_name="fable2_treatment",
+            helper_name="scifi_news_pro_treatment",
         )
     except StructuredCallFailedError as exc:
-        raise Fable2TreatmentError(
+        raise NewsProTreatmentError(
             "treatment", str(exc.last_error), exc.attempts) from exc
 
 
@@ -1687,7 +1687,7 @@ def _pass_news_read(
             prompt=ProviderCapacityMessages([
                 {
                     "role": "system",
-                    "content": _seam(pack, "fable2_news_read_system"),
+                    "content": _seam(pack, "scifi_news_pro_news_read_system"),
                 },
                 {"role": "user", "content": user},
             ]),
@@ -1698,10 +1698,10 @@ def _pass_news_read(
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_news_read_validator(dossier, cast_names),
             max_new_tokens=None,
-            helper_name="fable2_news_read",
+            helper_name="scifi_news_pro_news_read",
         )
     except StructuredCallFailedError as exc:
-        raise Fable2TreatmentError(
+        raise NewsProTreatmentError(
             "news_read", str(exc.last_error), exc.attempts
         ) from exc
 
@@ -1789,7 +1789,7 @@ def _strip_conversational_wrapper(raw: str) -> str:
 
     trimmed = "\n".join(lines[start:stop])
     log.info(
-        "[scifi_fable2] stripped a conversational wrapper: %d line(s) before "
+        "[scifi_news_pro] stripped a conversational wrapper: %d line(s) before "
         "TITLE:, %d after END. (the script itself is untouched)",
         start, len(lines) - stop,
     )
@@ -1802,21 +1802,21 @@ def _strip_conversational_wrapper(raw: str) -> str:
 _STAGE_DIRECTION_PREFIXES = ("(", "[", "*")
 
 #: The two defect codes a stage-direction-shaped row can raise. Compared as ENUM
-#: MEMBERS, never as strings: ``Fable2ParseDefect`` is a plain ``enum.Enum``, not
+#: MEMBERS, never as strings: ``NewsProParseDefect`` is a plain ``enum.Enum``, not
 #: a ``str`` enum, so ``defect.code in ("UNKNOWN_SPEAKER", ...)`` is False
 #: FOREVER -- the note would silently never fire and every stage-direction leg
 #: would burn its four attempts again, from code that reads correctly.
 #:
 #: ``SKELETON_BREAK`` IS DELIBERATELY ABSENT and listing it would be dead code.
-#: Every ``skeleton()`` detail in ``_otr_fable2_markup`` is a descriptive English
+#: Every ``skeleton()`` detail in ``_otr_scifi_news_pro_markup`` is a descriptive English
 #: sentence that merely CONTAINS the token -- the row reads ``character line
 #: (*SFX) after the last scene`` -- so it can never open with a marker. It was
 #: briefly listed here on 2026-08-12 and matched nothing. Nothing is lost: a
 #: stage-direction row that trips a skeleton break always raises
 #: ``UNKNOWN_SPEAKER`` for the same line first.
 _STAGE_DIRECTION_CODES = (
-    Fable2ParseDefect.BAD_LINE_SHAPE,
-    Fable2ParseDefect.UNKNOWN_SPEAKER,
+    NewsProParseDefect.BAD_LINE_SHAPE,
+    NewsProParseDefect.UNKNOWN_SPEAKER,
 )
 
 
@@ -1840,7 +1840,7 @@ def require_ledger_save(led, what: str) -> None:
     say so out loud rather than swallowing the result.
     """
     if led.save() is None:
-        raise Fable2Error(
+        raise NewsProError(
             "ledger_save",
             "the ledger did not persist after %s -- refusing to continue, "
             "because every downstream node reads it from disk and would read "
@@ -1857,7 +1857,7 @@ def _speaker_identity_key(value: str) -> str:
 def _resolves_to_cast(label: str, roster: "set[str]") -> bool:
     """Whether ``label`` names someone on the roster, the parser's way.
 
-    Mirrors the two-step lookup at `_otr_fable2_markup` `on_speaker`: exact
+    Mirrors the two-step lookup at `_otr_scifi_news_pro_markup` `on_speaker`: exact
     identity first, then the same trailing-role-parenthetical fallback, so
     ``Ada (Engineer)`` resolves to Ada exactly as it does during parsing.
     Imported rather than reimplemented -- the parser is the one authority on
@@ -1946,7 +1946,7 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
         where = (" (reported at line %d)" % defect.line_no
                  if defect.line_no is not None else "")
 
-        if defect.code is Fable2ParseDefect.UNKNOWN_SPEAKER:
+        if defect.code is NewsProParseDefect.UNKNOWN_SPEAKER:
             label = _undecorated_label(detail)
             if not label:
                 continue  # an undecorated unknown name -- not our business
@@ -1988,7 +1988,7 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
 
 
 #: The four forms the parser accepts, quoted exactly as it will read them.
-#: Sourced from `_otr_fable2_markup._RE_END`'s grammar rather than restated by
+#: Sourced from `_otr_scifi_news_pro_markup._RE_END`'s grammar rather than restated by
 #: hand -- a diagnostic that drifts from its validator teaches the model the
 #: wrong target, which is worse than saying nothing.
 _END_ACCEPTED_FORMS = ("END", "END.", "[END]", "[END.]")
@@ -2018,19 +2018,19 @@ def _end_delimiter_repair_note(defects) -> str:
     Returns "" when no END-shaped defect is present, so an unrelated repair turn
     is not handed a lecture about a delimiter it got right.
     """
-    # Read the REAL record: `ParseDefect.code` is a `Fable2ParseDefect` enum,
+    # Read the REAL record: `ParseDefect.code` is a `NewsProParseDefect` enum,
     # not a string. An earlier cut compared `str(code)` to "MISSING_END" --
     # which never matches, because str() of that enum is
-    # "Fable2ParseDefect.MISSING_END". It would have shipped as a helper that
+    # "NewsProParseDefect.MISSING_END". It would have shipped as a helper that
     # could not fire, with a green unit suite behind it, because the test stub
     # invented a `.kind` attribute production never sets.
     missing_end = False
     end_shaped_bad_line = False
     for defect in defects or ():
         code = getattr(defect, "code", None)
-        if code is Fable2ParseDefect.MISSING_END:
+        if code is NewsProParseDefect.MISSING_END:
             missing_end = True
-        elif code is Fable2ParseDefect.BAD_LINE_SHAPE:
+        elif code is NewsProParseDefect.BAD_LINE_SHAPE:
             # The bare `END` the model wrote arrives here as the defect detail.
             if "END" in str(getattr(defect, "detail", "") or "").upper():
                 end_shaped_bad_line = True
@@ -2235,7 +2235,7 @@ def _run_markup_ladder(
             max_new_tokens=None,
         )
         raw = _strip_conversational_wrapper(raw)
-        parsed, defects = parse_fable2_markup(raw, cast_names)
+        parsed, defects = parse_scifi_news_pro_markup(raw, cast_names)
         if parsed is not None:
             traces.append(PassAttemptTrace(
                 attempt=attempt,
@@ -2298,7 +2298,7 @@ def _run_markup_ladder(
             + "\n" + rendered
         )
 
-    raise Fable2ScriptError(
+    raise NewsProScriptError(
         pass_id,
         f"markup ladder exhausted; last defects:\n{last_defect_text}",
         len(traces),
@@ -2345,7 +2345,7 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                  envelope: SceneEnvelope, cast_names: "list[str]",
                  ) -> "tuple[str, ParsedScript, dict]":
     """P3 whole-play markup through the shared observed-attempt ladder."""
-    system = _seam(pack, "fable2_script_system")
+    system = _seam(pack, "scifi_news_pro_script_system")
     return _run_markup_ladder(
         creative_fn,
         pass_id="script",
@@ -2397,7 +2397,7 @@ def _pass_casting(
             prompt=ProviderCapacityMessages([
                 {
                     "role": "system",
-                    "content": _seam(pack, "fable2_casting_system"),
+                    "content": _seam(pack, "scifi_news_pro_casting_system"),
                 },
                 {"role": "user", "content": user},
             ]),
@@ -2408,10 +2408,10 @@ def _pass_casting(
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_casting_validator(menu, speakers),
             max_new_tokens=None,
-            helper_name="fable2_casting_voices",
+            helper_name="scifi_news_pro_casting_voices",
         )
     except StructuredCallFailedError as exc:
-        raise Fable2CastError(
+        raise NewsProCastError(
             "casting_voices", str(exc.last_error), exc.attempts
         ) from exc
 
@@ -2432,13 +2432,13 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
     for i, name in enumerate(speaker_order):
         cv = by_name.get(name)
         if cv is None:
-            raise Fable2CastError(
+            raise NewsProCastError(
                 "casting_voices",
                 f"speaker {name!r} missing from validated casting -- "
                 f"speaker-set equality gate should have caught this")
         entry = by_id.get(cv.timbre)
         if entry is None or cv.timbre in taken:
-            raise Fable2CastError(
+            raise NewsProCastError(
                 "casting_voices",
                 f"{name}: timbre {cv.timbre!r} unknown or already taken "
                 f"post-validation -- validator drift")
@@ -2523,7 +2523,7 @@ def _prove_constituents(constituents, artifact_name: str, artifact_norm: str,
         norm = _norm_ws(text)
         idx = artifact_norm.find(norm)
         if idx < 0:
-            raise Fable2AssembleError(
+            raise NewsProAssembleError(
                 "assemble",
                 f"verbatim proof FAILED for line {line_id}: constituent "
                 f"{norm[:80]!r} is not a substring of artifact "
@@ -2535,7 +2535,7 @@ def _prove_constituents(constituents, artifact_name: str, artifact_norm: str,
         })
     joined = " ".join(_norm_ws(t) for t in constituents)
     if _norm_ws(merged_text) != joined:
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble",
             f"merged row {line_id} text != space-join of its proven "
             f"constituents")
@@ -2547,7 +2547,7 @@ def _build_proof_map(parsed: ParsedScript, treatment: Treatment,
     """Build every spoken-row proof without touching a ledger or meta."""
     artifact_norm = _norm_ws(normalized_source)
     if not artifact_norm:
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble", "winning draft artifact is empty")
     news_norm = _norm_ws(treatment.news_close_read)
     entries: "list[ProofMapEntry]" = []
@@ -2589,7 +2589,7 @@ def _build_proof_map(parsed: ParsedScript, treatment: Treatment,
             )
 
     if not parsed.scenes:
-        raise Fable2AssembleError("assemble", "script has no scenes")
+        raise NewsProAssembleError("assemble", "script has no scenes")
     post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
     post_index = 0
     for text in parsed.announcer_outro:
@@ -2610,7 +2610,7 @@ def _build_proof_map(parsed: ParsedScript, treatment: Treatment,
     )
     ids = [entry.line_id for entry in entries]
     if len(ids) != len(set(ids)):
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble", f"proof map contains duplicate line ids: {ids}")
     return tuple(entries)
 
@@ -2653,17 +2653,17 @@ def _validate_attempt_sequence(
     if not rows:
         return
     if any(type(row) is not PassAttemptTrace for row in rows):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft",
             f"{label} attempts must contain exact PassAttemptTrace artifacts",
         )
     if tuple(row.attempt for row in rows) != tuple(range(1, len(rows) + 1)):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} attempts must be contiguous from 1"
         )
     selected = [row for row in rows if row.selected]
     if len(selected) != 1 or selected[0] is not rows[-1]:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft",
             f"{label} must have exactly one selected final attempt",
         )
@@ -2679,16 +2679,16 @@ def build_final_draft(
     """Build proof and hash seals for the sole accepted P3 artifact."""
     p3_attempts = tuple(p3_attempts)
     _validate_attempt_sequence("P3", p3_attempts)
-    normalized = normalize_fable2_markup_text(raw_source)
+    normalized = normalize_scifi_news_pro_markup_text(raw_source)
     cast_names = [shape.name for shape in treatment.cast_shapes]
-    authoritative, defects = parse_fable2_markup(raw_source, cast_names)
+    authoritative, defects = parse_scifi_news_pro_markup(raw_source, cast_names)
     if authoritative is None:
-        raise Fable2ParseError(
+        raise NewsProParseError(
             "final_draft",
             "raw source does not parse: " + render_defects(defects),
         )
     if _parsed_payload(authoritative) != _parsed_payload(parsed):
-        raise Fable2ParseError(
+        raise NewsProParseError(
             "final_draft",
             "provided ParsedScript does not match the authoritative raw parse",
         )
@@ -2725,49 +2725,49 @@ def build_final_draft(
 def _validate_final_draft_integrity(label: str, draft: Any) -> None:
     """Recompute every structural/proof seal on the accepted artifact."""
     if type(draft) is not FinalDraft:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} must be an exact FinalDraft artifact"
         )
     if type(draft.hashes) is not FinalDraftHashes:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label}.hashes must be FinalDraftHashes"
         )
     if type(draft.parsed) is not ParsedScript:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label}.parsed must be ParsedScript"
         )
     if not isinstance(draft.raw_source, str) or not isinstance(
         draft.normalized_source, str
     ):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} source fields must be strings"
         )
     if type(draft.p3_attempts) is not tuple:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} attempt receipts must be a tuple"
         )
     _validate_attempt_sequence(f"{label} P3", draft.p3_attempts)
 
-    normalized = normalize_fable2_markup_text(draft.raw_source)
+    normalized = normalize_scifi_news_pro_markup_text(draft.raw_source)
     if normalized != draft.normalized_source:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} normalized source seal is stale"
         )
-    authoritative, defects = parse_fable2_markup(
+    authoritative, defects = parse_scifi_news_pro_markup(
         draft.raw_source, _speakers_in_order(draft.parsed)
     )
     if authoritative is None:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft",
             f"{label} raw source no longer parses: {render_defects(defects)}",
         )
     if _parsed_payload(authoritative) != _parsed_payload(draft.parsed):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} parsed artifact seal is stale"
         )
 
     if type(draft.proof_map) is not tuple:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label}.proof_map must be an immutable tuple"
         )
     line_ids: list[str] = []
@@ -2776,11 +2776,11 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         if type(entry) is not ProofMapEntry or type(
             entry.constituents
         ) is not tuple:
-            raise Fable2ScriptError(
+            raise NewsProScriptError(
                 "final_draft", f"{label} proof map contains a forged row"
             )
         if not isinstance(entry.line_id, str) or not entry.line_id:
-            raise Fable2ScriptError(
+            raise NewsProScriptError(
                 "final_draft", f"{label} proof line id is invalid"
             )
         line_ids.append(entry.line_id)
@@ -2795,18 +2795,18 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
                 or not isinstance(proof.text, str)
                 or not isinstance(proof.artifact, str)
             ):
-                raise Fable2ScriptError(
+                raise NewsProScriptError(
                     "final_draft", f"{label} contains a forged proof"
                 )
             if proof.artifact == "winning_draft" and (
                 proof.span[1] > len(source_norm)
                 or source_norm[proof.span[0]:proof.span[1]] != proof.text
             ):
-                raise Fable2ScriptError(
+                raise NewsProScriptError(
                     "final_draft", f"{label} proof span no longer resolves"
                 )
     if len(line_ids) != len(set(line_ids)):
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} proof line ids are not unique"
         )
 
@@ -2831,7 +2831,7 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
         artifact_sha256=artifact_hash,
     )
     if draft.hashes != expected:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", f"{label} hash seal does not match its content"
         )
 
@@ -2843,7 +2843,7 @@ def _validate_selected_final_draft(
 ) -> None:
     _validate_final_draft_integrity("selected final draft", draft)
     if not draft.p3_attempts:
-        raise Fable2ScriptError(
+        raise NewsProScriptError(
             "final_draft", "selected draft has no observed P3 attempts"
         )
     if treatment is not None:
@@ -2851,7 +2851,7 @@ def _validate_selected_final_draft(
             draft.parsed, treatment, draft.normalized_source
         )
         if draft.proof_map != expected_proof:
-            raise Fable2ScriptError(
+            raise NewsProScriptError(
                 "final_draft",
                 "selected draft proof map does not match treatment/source",
             )
@@ -2889,7 +2889,7 @@ def _assemble(
     winning_draft_text = final_draft.normalized_source
     draft_norm = _norm_ws(winning_draft_text)
     if not draft_norm:
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble", "selected FinalDraft normalized source is empty")
     news_read_norm = _norm_ws(treatment.news_close_read)
     proof_by_id = {
@@ -2902,7 +2902,7 @@ def _assemble(
     spoken = set(_speakers_in_order(parsed))
     cast_names = {r["name"] for r in cast_rows} - {ANNOUNCER_NAME}
     if spoken != cast_names:
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble",
             f"speaker set {sorted(spoken)} != cast rows {sorted(cast_names)}")
     # Gate (c): skeleton complete (the parser guarantees this on a
@@ -2910,7 +2910,7 @@ def _assemble(
     if not (parsed.music_open and parsed.music_close and parsed.coda
             and parsed.announcer_intro and parsed.announcer_outro
             and parsed.scenes):
-        raise Fable2AssembleError("assemble", "skeleton incomplete")
+        raise NewsProAssembleError("assemble", "skeleton incomplete")
     # Gate (e): every cast member speaks (parser CAST_MEMBER_SILENT
     # guarantees; equality in gate (b) re-covers it).
 
@@ -2948,27 +2948,27 @@ def _assemble(
         del artifact_norm  # pure proof construction already consumed it
         entry = proof_by_id.get(line_id)
         if entry is None or line_id in consumed_proof_ids:
-            raise Fable2AssembleError(
+            raise NewsProAssembleError(
                 "assemble",
                 f"spoken row {line_id} has no unique prebuilt proof entry",
             )
         expected = tuple(_norm_ws(value) for value in constituents)
         actual = tuple(proof.text for proof in entry.constituents)
         if expected != actual:
-            raise Fable2AssembleError(
+            raise NewsProAssembleError(
                 "assemble",
                 f"spoken row {line_id} constituents disagree with its "
                 "prebuilt proof entry",
             )
         if any(proof.artifact != artifact_name
                for proof in entry.constituents):
-            raise Fable2AssembleError(
+            raise NewsProAssembleError(
                 "assemble",
                 f"spoken row {line_id} proof artifact drifted from "
                 f"{artifact_name!r}",
             )
         if _norm_ws(text) != " ".join(expected):
-            raise Fable2AssembleError(
+            raise NewsProAssembleError(
                 "assemble",
                 f"spoken row {line_id} text differs from proven constituents",
             )
@@ -3064,13 +3064,13 @@ def _assemble(
         led.set_lines(line_rows)
         led.save()
 
-    # --- postamble: final shot. ALL fable2 announcer rows carry the
+    # --- postamble: final shot. ALL scifi_news_pro announcer rows carry the
     # SENTINEL char_id "announcer" (22nd live smoke 2026-07-10: a
     # cast-keyed downstream mutator in the freeze cascade flipped a c01
     # postamble row to character+skip with no breadcrumb -> Phase 10
     # critical gap. The sentinel id is exempt from every cast-keyed
     # code path by design; the announcer TTS bus keys on speaker_role.
-    # The legacy fixture's c01 postamble was a legacy-lane quirk fable2
+    # The legacy fixture's c01 postamble was a legacy-lane quirk scifi_news_pro
     # does not copy.) --------------------------------------------------
     post_shot = f"shot_{parsed.scenes[-1].n + 1:03d}"
     shot_rows.append({
@@ -3123,16 +3123,16 @@ def _assemble(
 
     missing_proofs = sorted(set(proof_by_id) - consumed_proof_ids)
     if missing_proofs:
-        raise Fable2AssembleError(
+        raise NewsProAssembleError(
             "assemble",
             f"prebuilt proof entries were not consumed: {missing_proofs}",
         )
 
-    _fable2_meta(led)["proof_map"] = proof_map
+    _news_pro_meta(led)["proof_map"] = proof_map
 
     from ._otr_content_authorship import stamp_receipt
     meta = _ledger_meta(led)
-    # B1 (bake-off): provenance is the SELECTED lane id (scifi_fable2_v2/v3),
+    # B1 (bake-off): provenance is the SELECTED lane id (scifi_scifi_news_pro_v2/v3),
     # never the base -- the writer already stamped meta.source_bank to it, so
     # this setdefault is a no-op on the live path and keeps the direct-call
     # tests self-consistent.
@@ -3212,8 +3212,8 @@ def _apply_fable_safety_cleanup(
     content guardrails on generated episodes). This built a projection of every
     spoken row -- intro, scene lines, outro, coda, news read -- scanned it,
     asked the model to rewrite any row matching the profanity / weapon / sexual
-    list, and raised Fable2AuditError when a term survived: two terminal content
-    failures inside the fable2 lane.
+    list, and raised NewsProAuditError when a term survived: two terminal content
+    failures inside the scifi_news_pro lane.
 
     The projection fed that scan and nothing else -- no receipt, no treatment
     mutation, no patched_news propagation read it -- so it is gone with the scan
@@ -3235,9 +3235,9 @@ def _apply_fable_safety_cleanup(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
-class Fable2OutlineView:
+class NewsProOutlineView:
     """The tail's outline duck-type: .premise + .title (+ .setting for
-    forensics). fable2: premise = the treatment's dramatic-question line,
+    forensics). scifi_news_pro: premise = the treatment's dramatic-question line,
     title = the treatment title."""
 
     premise: str
@@ -3246,13 +3246,13 @@ class Fable2OutlineView:
 
 
 @dataclass
-class Fable2TailParts:
-    outline_view: Fable2OutlineView
+class NewsProTailParts:
+    outline_view: NewsProOutlineView
     canon: Any
     final_title_override: str
     run_story_spine: bool = False   # the P4/P5/P8 loop is this lane's spine
     refine_active: bool = False     # refine loop unsupported S1-S3
-    fable2_meta: "dict | None" = None
+    scifi_news_pro_meta: "dict | None" = None
 
 
 _TIME_OF_DAY_WORDS = (
@@ -3278,7 +3278,7 @@ def _derive_time_of_day(treatment: Treatment, parsed: ParsedScript) -> str:
 # The runner
 # ---------------------------------------------------------------------------
 
-def run_scifi_fable2_episode(
+def run_scifi_news_pro_episode(
     *,
     payload: "dict[str, Any]",
     pack: Any,
@@ -3291,7 +3291,7 @@ def run_scifi_fable2_episode(
     source_bank_row: Any,
     episode_root: Any,
     episode_id: str,
-) -> Fable2TailParts:
+) -> NewsProTailParts:
     """Produce one proof-backed story with target-independent topology."""
     del episode_root, episode_id
     # `target = int(resolved["target_words"])` and its `< 1` guard were removed
@@ -3330,7 +3330,7 @@ def run_scifi_fable2_episode(
             "Requested and actual words are telemetry only.",
         ],
     }
-    meta["fable2"] = f2
+    meta["scifi_news_pro"] = f2
     meta["news"] = None
 
     source_preview = _build_source_preview(payload)
@@ -3365,11 +3365,11 @@ def run_scifi_fable2_episode(
 
     # PERSIST THE DEAL BEFORE ANY PASS THAT CAN DIE ON IT.
     #
-    # `seed`, `cards_dealt` and `stance` were written into `meta["fable2"]` in
+    # `seed`, `cards_dealt` and `stance` were written into `meta["scifi_news_pro"]` in
     # memory and the ledger was not saved again until the whole pipeline had
     # finished -- so an episode that died in the SCRIPT pass recorded none of
     # them. Three consecutive `scifi_news_pro` failures on 2026-08-12 were
-    # therefore UNREPRODUCIBLE: the on-disk ledger had no `fable2` block, the
+    # therefore UNREPRODUCIBLE: the on-disk ledger had no `scifi_news_pro` block, the
     # exception message did not carry the deal, and nothing logged it. We could
     # not even say which of the 14 frame cards or 6 stances had been dealt.
     #
@@ -3382,7 +3382,7 @@ def run_scifi_fable2_episode(
     # Logged as well as saved: a leg that dies before `obs_publish` still leaves
     # its deal in the server log, which is where a stuck run gets read first.
     log.info(
-        "[scifi_fable2] deal: seed=%s frame_card=%r stance=%r",
+        "[scifi_news_pro] deal: seed=%s frame_card=%r stance=%r",
         seed,
         cards[0].get("name") if cards else None,
         stance.get("name") if isinstance(stance, Mapping) else stance,
@@ -3396,7 +3396,7 @@ def run_scifi_fable2_episode(
     # deal, so a failed save degrades to log-only rather than to nothing.
     if led.save() is None:
         log.warning(
-            "[scifi_fable2] the deal receipt did NOT persist -- if this leg "
+            "[scifi_news_pro] the deal receipt did NOT persist -- if this leg "
             "dies later, seed=%s / frame_card=%r / stance=%r are recoverable "
             "only from the line above, not from the ledger",
             seed,
@@ -3404,14 +3404,14 @@ def run_scifi_fable2_episode(
             stance.get("name") if isinstance(stance, Mapping) else stance,
         )
     fn, box = _counting(creative_fn)
-    with _helper_ctx(slot_scheduler, "fable2_pitch"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_pitch"):
         pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max)
     receipt("pitch", creative_model, box["calls"],
             _TEMP["pitch"], None)
     f2["pitch"] = pitch.model_dump()
 
     fn, box = _counting(creative_fn)
-    with _helper_ctx(slot_scheduler, "fable2_treatment"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_treatment"):
         treatment = _pass_treatment(
             fn, pack, dossier, pitch, stance, n_max=n_max,
             provenance=provenance, digest=source_preview,
@@ -3422,7 +3422,7 @@ def run_scifi_fable2_episode(
     meta["num_characters_locked"] = len(cast_names)
 
     fn, box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_news_read"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_news_read"):
         read = _pass_news_read(
             fn, pack, dossier, provenance, source_preview, cast_names
         )
@@ -3437,19 +3437,19 @@ def run_scifi_fable2_episode(
         "gating": False,
     }
     fn, box = _counting(creative_fn)
-    with _helper_ctx(slot_scheduler, "fable2_script"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_script"):
         script_text, parsed, p3_meta = _pass_script(
             fn, pack, treatment, source_preview, envelope, cast_names
         )
     p3_attempts = tuple(p3_meta["attempt_trace"])
     if box["calls"] != len(p3_attempts):
-        raise Fable2ScriptError("script", "P3 attempt/call count drift")
+        raise NewsProScriptError("script", "P3 attempt/call count drift")
     receipt(
         "script", creative_model, box["calls"], _TEMP["script"],
         None, trace=p3_attempts,
     )
 
-    with _helper_ctx(slot_scheduler, "fable2_same_story_safety"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_same_story_safety"):
         script_text, parsed, treatment, safety = (
             _apply_fable_safety_cleanup(
                 script_text, parsed, treatment,
@@ -3477,7 +3477,7 @@ def run_scifi_fable2_episode(
         for item in menu.entries
     ]
     fn, box = _counting(technical_fn)
-    with _helper_ctx(slot_scheduler, "fable2_casting_voices"):
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_casting_voices"):
         casting = _pass_casting(fn, pack, final_draft, treatment, menu)
     receipt("casting", technical_model, box["calls"],
             _TEMP["casting_voices"], None)
@@ -3492,23 +3492,23 @@ def run_scifi_fable2_episode(
     )
     # `_assemble` saves incrementally and Ledger.save() rebinds `led.data`.
     # Reacquire the live mapping and preserve the complete-source receipt.
-    _fable2_meta(led)["source_coverage"] = source_coverage
+    _news_pro_meta(led)["source_coverage"] = source_coverage
     _stamp_cast_contract(
         led, resolved=resolved, source_bank_row=source_bank_row,
     )
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_news_pro_assembled"
     )
-    f2 = _fable2_meta(led)
+    f2 = _news_pro_meta(led)
     f2["delivery_telemetry"] = delivery
     # Terminal "safety_scan" over the assembled ledger DELETED 2026-08-05
-    # (operator directive). It was the last of the fable2 lane's content
+    # (operator directive). It was the last of the scifi_news_pro lane's content
     # refusals -- a fully assembled episode thrown away for a word.
     f2["pass_receipts"] = receipts
     # REQUIRED: the completed episode's receipts and every f2 field the
     # downstream consumers key on.
-    require_ledger_save(led, "the fable2 pass receipts")
-    f2 = _fable2_meta(led)
+    require_ledger_save(led, "the scifi_news_pro pass receipts")
+    f2 = _news_pro_meta(led)
 
     canon = _OTRC.episode_canon_from_outline_dict({
         "title": treatment.title,
@@ -3518,13 +3518,13 @@ def run_scifi_fable2_episode(
         "sound_palette": [],
     })
     log.info(
-        "[scifi_fable2] fixed story complete: seed=%d cast=%d scenes=%d "
+        "[scifi_news_pro] fixed story complete: seed=%d cast=%d scenes=%d "
         "character_words=%d", seed, len(cast_names),
         len(final_draft.parsed.scenes),
         final_draft.parsed.character_word_count,
     )
-    return Fable2TailParts(
-        outline_view=Fable2OutlineView(
+    return NewsProTailParts(
+        outline_view=NewsProOutlineView(
             premise=treatment.dramatic_question,
             title=treatment.title,
             setting=treatment.setting,
@@ -3533,5 +3533,5 @@ def run_scifi_fable2_episode(
         final_title_override=final_draft.parsed.title,
         run_story_spine=False,
         refine_active=False,
-        fable2_meta=f2,
+        scifi_news_pro_meta=f2,
     )

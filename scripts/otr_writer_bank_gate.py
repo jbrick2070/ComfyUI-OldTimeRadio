@@ -66,7 +66,7 @@ WRITER_MARKERS = (
     "OTR_LedgerScriptWriter",
     "markup ladder exhausted",
     "pass 'script' failed",
-    "Fable2ScriptError",
+    "NewsProScriptError",
 )
 
 

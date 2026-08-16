@@ -19,7 +19,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import _otr_lane_specs as LANES
-from nodes import _otr_scifi_fable2 as FABLE2
+from nodes import _otr_scifi_news_pro as FABLE2
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def test_every_declared_name_actually_resolves():
 
 def test_runner_for_resolves_the_dispatched_lanes():
     assert LANES.runner_for("scifi_news_pro_multipass") is (
-        FABLE2.run_scifi_fable2_episode)
+        FABLE2.run_scifi_news_pro_episode)
 
 
 def test_runner_for_returns_none_for_a_known_inline_lane():

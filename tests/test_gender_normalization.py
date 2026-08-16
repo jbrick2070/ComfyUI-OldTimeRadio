@@ -243,7 +243,7 @@ def test_presentation_gender_survives_set_cast(tmp_path):
 def test_set_cast_omits_presentation_gender_when_unstamped(tmp_path):
     """Carried conditionally, like provider_voice_id: a writer-stage row nobody
     has cast yet stays byte-identical to the legacy cast-row contract, so the
-    drift guard in test_fable2_assembly keeps its teeth. Absence is read through
+    drift guard in test_scifi_news_pro_assembly keeps its teeth. Absence is read through
     by get_presentation_gender."""
     from nodes.production_ledger import Ledger
 

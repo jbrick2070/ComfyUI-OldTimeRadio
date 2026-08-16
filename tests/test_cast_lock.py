@@ -364,7 +364,7 @@ def test_source_is_ascii_no_em_dash():
 # --------------------------------------------------------------------------- #
 # Content-owned lanes own their cast: CastLock must VERIFY, never REPLAY.
 #
-# A content-owned lane (scifi_codex / gemini / sonnet / fable2) builds its own
+# A content-owned lane (scifi_codex / gemini / sonnet / scifi_news_pro) builds its own
 # cast rows and stamps their voice_preset in the lane runner. The writer's
 # seeded picker never ran, so there is no sequence to replay and no
 # num_characters_request to replay it with. Live regression (2026-07-11): the

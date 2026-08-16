@@ -135,19 +135,19 @@
       "executable": true,
       "requires_source_contract": false,
       "declared_seams": [
-        "fable2_dossier_system",
-        "fable2_pitch_system",
-        "fable2_treatment_system",
-        "fable2_news_read_system",
-        "fable2_script_system",
-        "fable2_casting_system"
+        "scifi_news_pro_dossier_system",
+        "scifi_news_pro_pitch_system",
+        "scifi_news_pro_treatment_system",
+        "scifi_news_pro_news_read_system",
+        "scifi_news_pro_script_system",
+        "scifi_news_pro_casting_system"
       ],
       "passes": [
         {
           "pass_id": "dossier",
           "slot": "technical",
           "seam_refs": [
-            "fable2_dossier_system"
+            "scifi_news_pro_dossier_system"
           ],
           "description": "P0: python-capped source digest -> DossierArtifact (facts, allowed numbers, entities, dramatizable vectors)."
         },
@@ -155,7 +155,7 @@
           "pass_id": "pitch",
           "slot": "creative",
           "seam_refs": [
-            "fable2_pitch_system"
+            "scifi_news_pro_pitch_system"
           ],
           "description": "P1 creative: dossier + one dealt frame card + stance -> one pitch object. This is the pitch authority."
         },
@@ -163,7 +163,7 @@
           "pass_id": "treatment",
           "slot": "creative",
           "seam_refs": [
-            "fable2_treatment_system"
+            "scifi_news_pro_treatment_system"
           ],
           "description": "P2 creative: dossier + sole pitch + stance + N_MAX -> Treatment (cast shapes, priced ending, news thread). Cast names are born here."
         },
@@ -171,7 +171,7 @@
           "pass_id": "news_read",
           "slot": "technical",
           "seam_refs": [
-            "fable2_news_read_system"
+            "scifi_news_pro_news_read_system"
           ],
           "description": "P2 technical: dossier + provenance -> the factual close under source-grounding laws; stamped onto treatment.news_close_read."
         },
@@ -179,7 +179,7 @@
           "pass_id": "script",
           "slot": "creative",
           "seam_refs": [
-            "fable2_script_system"
+            "scifi_news_pro_script_system"
           ],
           "description": "P3 creative: treatment + digest -> the complete play in strict markup. Only malformed or truncated markup opens a bounded retry; the first clean parse wins."
         },
@@ -199,7 +199,7 @@
           "pass_id": "casting_voices",
           "slot": "technical",
           "seam_refs": [
-            "fable2_casting_system"
+            "scifi_news_pro_casting_system"
           ],
           "description": "Technical casting: the accepted parsed script + cast shapes + dealt voice menu -> CastingVoices. Story text is not rewritten."
         },
@@ -213,7 +213,7 @@
       "notes": [
         "Visible experiment; failure NEVER routes to legacy_many_pass.",
         "Consumes the bank fetcher payload via the writer's shared fetch lane; interpreter intentionally empty -- the treatment IS the interpretation.",
-        "executable:true = nodes/_otr_scifi_fable2.py via the writer's _RUNNER_BY_PIPELINE dispatch. Every requested duration runs the same fixed one-pitch, one-P3-artifact topology.",
+        "executable:true = nodes/_otr_scifi_news_pro.py via the writer's _RUNNER_BY_PIPELINE dispatch. Every requested duration runs the same fixed one-pitch, one-P3-artifact topology.",
         "Python judges; the LLM writes: every spoken ledger row must be traceable to a named LLM artifact (proof gate)."
       ]
     },

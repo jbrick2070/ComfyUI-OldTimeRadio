@@ -43,11 +43,11 @@ import pkgutil
 import pytest
 from pydantic import BaseModel
 
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 #: The writer models on the path that failed live.
-WRITER_MODELS = (fable2.Treatment, fable2.CastShape)
+WRITER_MODELS = (scifi_news_pro.Treatment, scifi_news_pro.CastShape)
 
 
 def shadowing_fields(model_cls):
@@ -71,7 +71,7 @@ def shadowing_fields(model_cls):
 # ---------------------------------------------------------------------------
 def test_register_is_REQUIRED_and_has_no_inherited_default():
     """The whole defect in one assertion: `is_required()` was False."""
-    field = fable2.CastShape.model_fields["register"]
+    field = scifi_news_pro.CastShape.model_fields["register"]
     assert field.is_required(), (
         "CastShape.register has gone optional again -- the `Field(...)` was "
         "removed and pydantic is using the inherited ModelMetaclass.register "
@@ -81,7 +81,7 @@ def test_register_is_REQUIRED_and_has_no_inherited_default():
 def test_the_schema_handed_to_the_writer_REQUIRES_register():
     """The quiet half of the defect. The crash was survivable; a contract
     field the model is never asked for is a corrupted script."""
-    schema = fable2.CastShape.model_json_schema()
+    schema = scifi_news_pro.CastShape.model_json_schema()
     assert "register" in schema["required"], (
         "the writer's structured-output schema no longer demands `register`, "
         "so the model may omit a documented load-bearing field")
@@ -91,14 +91,14 @@ def test_omitting_register_now_REFUSES_instead_of_carrying_a_method():
     """Honest and retryable beats silent and wrong: a ValidationError goes to
     the repair ladder, a bound method goes into the episode."""
     with pytest.raises(Exception) as caught:
-        fable2.CastShape(name="Ada", role="lead", want="w", pressure="p")
+        scifi_news_pro.CastShape(name="Ada", role="lead", want="w", pressure="p")
     assert "register" in str(caught.value)
 
 
 def test_a_validated_cast_shape_serializes_cleanly():
     """The normal path, which was always fine -- which is exactly why this hid
     for as long as it did."""
-    shape = fable2.CastShape(name="Ada", role="lead", want="w", pressure="p",
+    shape = scifi_news_pro.CastShape(name="Ada", role="lead", want="w", pressure="p",
                              register="dry")
     dumped = shape.model_dump()
     assert dumped["register"] == "dry"
@@ -109,15 +109,15 @@ def test_the_contract_field_is_still_spelled_register():
     """The fix must not have renamed it. `register` is prompt vocabulary the
     writer is instructed in (doc s5); renaming the field would silently change
     the contract the model is answering."""
-    assert "register" in fable2.CastShape.model_fields
-    assert "register" in fable2.CastShape.model_json_schema()["properties"]
+    assert "register" in scifi_news_pro.CastShape.model_fields
+    assert "register" in scifi_news_pro.CastShape.model_json_schema()["properties"]
 
 
 def test_model_construct_can_no_longer_hand_back_a_bound_method():
     """`model_construct` skips validation, so it is the last way a shape could
     reach `model_dump` without the field. With no default there is nothing to
     fall through TO, so the attribute is simply absent -- loud, not silent."""
-    shape = fable2.CastShape.model_construct(
+    shape = scifi_news_pro.CastShape.model_construct(
         name="Ada", role="lead", want="w", pressure="p")
     with pytest.raises(AttributeError):
         shape.register
@@ -158,7 +158,7 @@ def test_the_sweep_actually_sees_the_models_it_claims_to_check():
     renamed package would make the sweep pass by finding nothing."""
     models = all_pydantic_models()
     assert len(models) > 50, "the model sweep collapsed -- it found %d" % len(models)
-    assert fable2.CastShape in models
+    assert scifi_news_pro.CastShape in models
 
 
 def test_no_pydantic_field_defaults_to_a_non_serializable_value():
@@ -192,8 +192,8 @@ def test_the_known_shadowed_name_is_still_only_CastShape_register():
     """Scopes the collision itself, separately from the default rule above. A
     NEW shadowing field is worth a human look even when it is safely
     defaulted."""
-    assert shadowing_fields(fable2.Treatment) == []
-    assert shadowing_fields(fable2.CastShape) == ["register"]
+    assert shadowing_fields(scifi_news_pro.Treatment) == []
+    assert shadowing_fields(scifi_news_pro.CastShape) == ["register"]
 
 
 def test_the_shadowed_name_arrives_via_the_METACLASS_not_the_class_body():

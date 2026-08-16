@@ -22,23 +22,23 @@ def stages():
 
 def test_exact_six_model_seams(stages):
     assert set(stages) == {
-        "fable2_dossier_system",
-        "fable2_pitch_system",
-        "fable2_treatment_system",
-        "fable2_news_read_system",
-        "fable2_script_system",
-        "fable2_casting_system",
+        "scifi_news_pro_dossier_system",
+        "scifi_news_pro_pitch_system",
+        "scifi_news_pro_treatment_system",
+        "scifi_news_pro_news_read_system",
+        "scifi_news_pro_script_system",
+        "scifi_news_pro_casting_system",
     }
 
 
 @pytest.mark.parametrize(
     "seam",
     [
-        "fable2_dossier_system",
-        "fable2_pitch_system",
-        "fable2_treatment_system",
-        "fable2_news_read_system",
-        "fable2_casting_system",
+        "scifi_news_pro_dossier_system",
+        "scifi_news_pro_pitch_system",
+        "scifi_news_pro_treatment_system",
+        "scifi_news_pro_news_read_system",
+        "scifi_news_pro_casting_system",
     ],
 )
 def test_structured_seams_request_one_json_artifact(stages, seam):
@@ -46,7 +46,7 @@ def test_structured_seams_request_one_json_artifact(stages, seam):
 
 
 def test_script_seam_owns_complete_plain_text_grammar(stages):
-    prompt = stages["fable2_script_system"]
+    prompt = stages["scifi_news_pro_script_system"]
     for marker in (
         "TITLE: <episode title>",
         "MUSIC: <mood and instruments>",
@@ -62,7 +62,7 @@ def test_script_seam_owns_complete_plain_text_grammar(stages):
 
 
 def test_pitch_seam_describes_the_direct_pitch_artifact(stages):
-    prompt = stages["fable2_pitch_system"]
+    prompt = stages["scifi_news_pro_pitch_system"]
     for field in (
         "frame_card", "logline", "hook", "scifi_device", "cast_size",
         "ending_shape",
@@ -72,7 +72,7 @@ def test_pitch_seam_describes_the_direct_pitch_artifact(stages):
 
 
 def test_casting_seam_assigns_voices_without_rewriting_story(stages):
-    prompt = stages["fable2_casting_system"]
+    prompt = stages["scifi_news_pro_casting_system"]
     assert "available voice-stock id" in prompt.lower()
     assert "copy names and voice-stock ids exactly" in prompt.lower()
     assert "do not rewrite story text" in prompt.lower()

@@ -206,7 +206,7 @@ __all__ = ["OTR_LedgerScriptWriter"]
 # Constants
 # ---------------------------------------------------------------------------
 
-#: Widget bound for `num_characters`, mirroring `_otr_scifi_fable2`'s
+#: Widget bound for `num_characters`, mirroring `_otr_scifi_news_pro`'s
 #: `MAX_SPEAKING_CAST` (one speaking character per distinct voice in stock).
 #:
 #: DUPLICATED ON PURPOSE, not imported. `INPUT_TYPES` runs at node-registration
@@ -2235,7 +2235,7 @@ def _apply_intro_rewrite_result(
 
 
 # The pipeline -> lane authority moved OUT of this file to
-# `nodes/_otr_lane_specs.py` (2026-07-31). `_run_fable2_lane`,
+# `nodes/_otr_lane_specs.py` (2026-07-31). `_run_scifi_news_pro_lane`,
 # the per-lane wrappers, `_RUNNER_BY_PIPELINE`, `_LEGACY_INLINE_PIPELINES`
 # and `_resolve_lane_runner` all lived here; they are GONE, not aliased.
 # Lazy runner import is unchanged -- `_LANES.runner_for()` resolves the
@@ -2518,8 +2518,13 @@ def _stamp_story_style_receipt(meta: dict, *, contract,
 def _title_source_for_custom_override(source_bank_row: Any) -> str:
     """Return truthful custom-lane title provenance without changing ctx."""
     bank_id = str(getattr(source_bank_row, "source_bank_id", "") or "").strip()
-    if bank_id == "scifi_news_pro":
-        return "fable2_script_title"
+    # The special case that used to sit here returned the LEGACY literal
+    # `fable2_script_title` for this one lane (PBUG-20260712-05 preserved it
+    # when every custom runner was wrongly stamped with that lane's value).
+    # The 2026-08-16 rename made the legacy literal equal to what the generic
+    # branch already derives, so the branch was dead and is gone. Frozen
+    # ledgers keep their old `fable2_script_title` string on disk; nothing
+    # branches on this value, it is provenance telemetry.
     if bank_id:
         return f"{bank_id}_script_title"
     return "custom_pipeline_script_title"
@@ -2532,7 +2537,7 @@ def _title_source_for_custom_override(source_bank_row: Any) -> str:
 
 @dataclass
 class WriterTailContext:
-    """Everything the writer's tail consumes -- scifi_fable2 S1a (r1/C2,
+    """Everything the writer's tail consumes -- scifi_news_pro S1a (r1/C2,
     fields PINNED r2 by direct read of the tail body; one name only).
 
     The tail (`OTR_LedgerScriptWriter._run_writer_tail`) spans, in order:
@@ -2543,7 +2548,7 @@ class WriterTailContext:
 
     The legacy path BUILDS this from its run() locals (byte-identical
     behavior: final_title_override=None, run_story_spine=True keeps the
-    env-gated spine default). The fable2 lane (S1b+) builds it from its
+    env-gated spine default). The scifi_news_pro lane (S1b+) builds it from its
     parsed artifacts. The tail consumes ONLY this context -- no closure
     over run() locals.
     """
@@ -2553,24 +2558,24 @@ class WriterTailContext:
     resolved: dict
     outline_view: Any          # needs: .premise, .title (regen grounding +
                                # fallback + consistency guard + news payload).
-                               # fable2: premise = treatment.dramatic_question
+                               # scifi_news_pro: premise = treatment.dramatic_question
                                # line, title = treatment.title
     canon: Any                 # episode canon object; the tail is the only
                                # canon WRITER (J.5 re-titles + writes it)
     episode_root: Any
     episode_id: str
-    contract: Any | None       # style contract; fable2 = None ("" slug path)
-    style_grammar_on: bool     # fable2 = False (receipt stamp honest)
+    contract: Any | None       # style contract; scifi_news_pro = None ("" slug path)
+    style_grammar_on: bool     # scifi_news_pro = False (receipt stamp honest)
     source_bank_row: Any       # defaults: title_form_label, hud_origin_label
     slot_scheduler: Any
     creative_fn: Any
     technical_fn: Any
-    run_story_spine: bool      # legacy True (env-gated as today); fable2
+    run_story_spine: bool      # legacy True (env-gated as today); scifi_news_pro
                                # FALSE -- its P4/P5/P8 loop is the lane's
                                # equivalent; revisit post-S3
     final_title_override: str | None
-                               # r3/M3: fable2 sets the play's parsed TITLE
-                               # here (title_source="fable2_script_title").
+                               # r3/M3: scifi_news_pro sets the play's parsed TITLE
+                               # here (title_source="scifi_news_pro_script_title").
                                # Tail precedence: user-typed episode_title >
                                # override > LLM regen. Legacy passes None ->
                                # byte-identical behavior.
@@ -4172,14 +4177,14 @@ class OTR_LedgerScriptWriter:
                 type(_sweep_exc).__name__, str(_sweep_exc)[:200],
             )
 
-        # --- scifi_fable2 S2: pipeline-runner dispatch (doc s11) --------
+        # --- scifi_news_pro S2: pipeline-runner dispatch (doc s11) --------
         # Consulted exactly ONCE, here: after the shared front (bank
         # resolve -> runnable gate -> science_rss fetch ->
         # validate_source_payload -> D.1 new_ledger + meta stamps +
         # skeleton save) and BEFORE the D.2 news-interpreter branch.
         # Hit -> the lane runner fills led/meta to the tail boundary and
         # the writer hands off to _run_writer_tail (the runner returns
-        # plain Fable2TailParts; the WRITER builds WriterTailContext --
+        # plain NewsProTailParts; the WRITER builds WriterTailContext --
         # r4/M3 acyclic import graph). Miss (legacy_many_pass / the
         # original bank-shape branch) -> everything below runs
         # byte-identically. An unknown pipeline raises LOUD inside
@@ -4488,7 +4493,7 @@ class OTR_LedgerScriptWriter:
         # mismatch would print a receipt for a render that did not happen.
         # Content-owned lanes never reach this line and keep their own stamp in
         # the writer tail. OTR_CAST_SEED pins the INLINE lanes for the C7 gate;
-        # the content-owned fable2 runner has its own OTR_FABLE2_SEED.
+        # the content-owned scifi_news_pro runner has its own OTR_SCIFI_NEWS_PRO_SEED.
         meta["episode_seed"] = int(cast_seed)
         log.info(
             "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast + voices + "
@@ -6214,7 +6219,7 @@ class OTR_LedgerScriptWriter:
         )
         led.save()
 
-        # --- Tail handoff (scifi_fable2 S1a extraction) ----------------
+        # --- Tail handoff (scifi_news_pro S1a extraction) ----------------
         # Everything from J.5 to the M save lives in _run_writer_tail and
         # consumes ONLY the context below. The legacy path builds it from
         # its locals: final_title_override=None (LLM regen path as today)
@@ -6248,7 +6253,7 @@ class OTR_LedgerScriptWriter:
         story-spine orchestrator (or writer-LLM unload) -> REJECT gate ->
         provenance stamps -> L return assembly -> M save.
 
-        Consumes ONLY ``ctx`` (scifi_fable2 S1a extraction -- no closure
+        Consumes ONLY ``ctx`` (scifi_news_pro S1a extraction -- no closure
         over run() locals). Returns
         ``(script_text, script_json, news_json, est_minutes,
         technical_model)`` -- the writer's output tuple.
@@ -6533,7 +6538,7 @@ class OTR_LedgerScriptWriter:
         # LLM slot: technical
         # Read the durable meta stamp rather than `resolved`: run() writes
         # `meta["visual_style"]` at :3925 before dispatch, and other lanes
-        # (fable2, tests) build their own `resolved` dicts that need not
+        # (scifi_news_pro, tests) build their own `resolved` dicts that need not
         # carry a `visual_style` key. Meta is the tail's declared field on
         # WriterTailContext; the resolver dict is not.
         _is_dynamic_style = (
@@ -6757,7 +6762,7 @@ class OTR_LedgerScriptWriter:
         # the content-owned block just below for lanes that never run it --
         # and a freshly minted seed is not derivable from the inputs, so a
         # pass that minted one for every lane would make this tail
-        # irreproducible (tests/test_fable2_tail_context.py pins that).
+        # irreproducible (tests/test_scifi_news_pro_tail_context.py pins that).
         # THE CLEAN STAGE, and it runs FIRST at this boundary. A MODEL reads
         # every spoken row and names anything in it that is not speech; a
         # MODEL then rewrites it. Every sealed line becomes TTS audio, so a

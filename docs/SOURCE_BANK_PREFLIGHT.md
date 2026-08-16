@@ -505,6 +505,46 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
   a change there is a red flag; verify it strands no COMBO id, BUG-08.06/12.23); commit + push;
   `HEAD == origin`; AST-parse touched `.py`.
 
+## Renaming a lane's CODE surface (learned 2026-08-16, `fable2` -> `scifi_news_pro`)
+
+A bank rename and a LANE-MODULE rename are different jobs. The bank id lives
+in registries; the lane's code surface is module name, runner function,
+exception classes, log prefix, ledger namespace, pack seam ids, test files
+and fixture dirs. Do the code rename as its OWN atomic commit, after any
+teardown, with the suite between them.
+
+- [ ] **Rename by IDENTIFIER CLASS, longest-first, never one blanket
+  substitution.** `Fable2` -> `NewsPro` applied before `_otr_scifi_fable2` ->
+  `_otr_scifi_news_pro` corrupts the module name. Record a count per class
+  and eyeball it: a count that looks too round usually means a pattern
+  matched something it should not have.
+- [ ] **A substitution can hit a list that ALREADY contains the target.**
+  `"scifi_news" -> "scifi_news_pro"` inside a parametrize list that already
+  carried `scifi_news_pro` produced a silent DUPLICATE case (caught by QA,
+  2026-08-16). After any list edit, diff for repeated entries.
+- [ ] **NEVER let the sweep touch append-only records.** `HANDOFF_LOG.md` and
+  `PROD_BUG_LOG.md` quote log lines that were ACTUALLY EMITTED. Rewriting
+  them produced self-contradictory history (`[scifi_news_pro] ... rules_id
+  must be 'scifi_fable2'`) -- a line that never existed. Restrict doc edits
+  to files describing CURRENT code; historical/dated docs keep the old names
+  as the record of what things were called.
+- [ ] **Pack seam ids are a PAIR.** `declared_seams` in `pipelines.json` and
+  the pack's `prompt_stages` keys must be renamed in lockstep; assert the set
+  difference is empty before running anything.
+- [ ] **Grep the UPPERCASE forms too.** `OTR_FABLE2_SEED` survives every
+  lowercase and CamelCase pattern. An env var read by code and set by the
+  launcher must move together or seeded reproduction breaks silently.
+- [ ] **Use `git mv`** for the module, test files and fixture dirs so history
+  follows, and clear `__pycache__` afterwards.
+- [ ] **Expect the rename to expose test-ordering bugs** -- see
+  `PRODUCTION_SPRINT_LESSONS.md` lesson 41. They are found bugs, not fallout.
+- [ ] **A rename can turn a special case into dead code.** A branch that
+  existed only to preserve a legacy literal became identical to the generic
+  branch and was deleted. Look for those; they are free simplifications.
+- [ ] Gate: full suite, Bible, variants, node-registry import smoke, and a
+  LIVE leg on the renamed lane (the ledger namespace and seam ids are only
+  exercised by a real render).
+
 ## Reversal -- restoring a removed bank (the inverse of the teardown)
 
 Written 2026-08-16 during the `scifi_news` rip, because the cheapest moment

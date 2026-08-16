@@ -290,7 +290,7 @@ def test_title_call_passes_premise_for_grounding():
     self-test calls in its `__main__` block that pass no premise --
     those are scoped out by walking only the owning method body.)
 
-    scifi_fable2 S1a (2026-07-10): the J.5 block moved from `run` into
+    scifi_news_pro S1a (2026-07-10): the J.5 block moved from `run` into
     the extracted `_run_writer_tail` (tail extraction, architecture doc
     sections 11/13) -- the pin follows it there.
     """

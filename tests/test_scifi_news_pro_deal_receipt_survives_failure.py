@@ -11,11 +11,11 @@ vary one, I could not: **none of the three recorded what it had been dealt.**
 * one of 14 frame cards (`The Night Operator`, `Two Rooms Apart`, ...),
 * one of 6 stances (`Wonder first`, `Procedural calm`, `Elegiac`, ...),
 
-and the card/stance deal is reproducible from `OTR_FABLE2_SEED`. All three were
-written into `meta["fable2"]` IN MEMORY before the pitch pass, and the ledger
+and the card/stance deal is reproducible from `OTR_SCIFI_NEWS_PRO_SEED`. All three were
+written into `meta["scifi_news_pro"]` IN MEMORY before the pitch pass, and the ledger
 was not saved again until the entire pipeline finished. So an episode that died
 in the SCRIPT pass -- which is exactly what kept happening -- left an on-disk
-ledger with no `fable2` block at all. The exception message did not carry the
+ledger with no `scifi_news_pro` block at all. The exception message did not carry the
 deal either, and nothing logged it.
 
 Same defect class as a truncated traceback: the failure path discards the
@@ -30,13 +30,13 @@ from __future__ import annotations
 
 import inspect
 
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 def pipeline_source():
     """The pipeline body that deals the cards -- located by the deal itself so
     a rename cannot silently skip these checks."""
-    for name, obj in vars(fable2).items():
+    for name, obj in vars(scifi_news_pro).items():
         if not callable(obj) or not hasattr(obj, "__code__"):
             continue
         try:
@@ -70,27 +70,27 @@ def test_the_deal_is_LOGGED_so_a_stuck_run_can_be_read_from_the_server_log():
     """The ledger is the durable record; the log is where a stuck or dead leg
     actually gets read first."""
     _name, src = pipeline_source()
-    assert "[scifi_fable2] deal:" in src
+    assert "[scifi_news_pro] deal:" in src
     for token in ("seed=", "frame_card=", "stance="):
         assert token in src, token
 
 
 def test_the_seed_is_reproducible_and_stamped():
-    """`OTR_FABLE2_SEED` is the lever that makes the card/stance deal
+    """`OTR_SCIFI_NEWS_PRO_SEED` is the lever that makes the card/stance deal
     repeatable. Without it the experiment the panel asked for is impossible."""
-    src = inspect.getsource(fable2._resolve_seed)
-    assert "OTR_FABLE2_SEED" in src
+    src = inspect.getsource(scifi_news_pro._resolve_seed)
+    assert "OTR_SCIFI_NEWS_PRO_SEED" in src
 
 
 def test_an_explicit_seed_reproduces_the_SAME_deal(monkeypatch):
     """The property the whole receipt exists to enable: same seed, same card
     and stance, so one input can be varied at a time."""
-    monkeypatch.setenv("OTR_FABLE2_SEED", "12345")
+    monkeypatch.setenv("OTR_SCIFI_NEWS_PRO_SEED", "12345")
     import random
 
-    deck = fable2._load_frame_deck()
-    first = fable2._deal(random.Random(fable2._resolve_seed()), deck)
-    second = fable2._deal(random.Random(fable2._resolve_seed()), deck)
+    deck = scifi_news_pro._load_frame_deck()
+    first = scifi_news_pro._deal(random.Random(scifi_news_pro._resolve_seed()), deck)
+    second = scifi_news_pro._deal(random.Random(scifi_news_pro._resolve_seed()), deck)
     assert first[0][0]["name"] == second[0][0]["name"]
     assert first[1]["name"] == second[1]["name"]
 
@@ -99,10 +99,10 @@ def test_a_DIFFERENT_seed_can_reach_a_different_deal():
     """Guards the test above from passing on a deck with one card."""
     import random
 
-    deck = fable2._load_frame_deck()
+    deck = scifi_news_pro._load_frame_deck()
     seen = {
-        (fable2._deal(random.Random(s), deck)[0][0]["name"],
-         fable2._deal(random.Random(s), deck)[1]["name"])
+        (scifi_news_pro._deal(random.Random(s), deck)[0][0]["name"],
+         scifi_news_pro._deal(random.Random(s), deck)[1]["name"])
         for s in range(40)
     }
     assert len(seen) > 1, "every seed deals the same card/stance"
@@ -112,7 +112,7 @@ def test_the_deck_really_carries_the_documented_spread():
     """The measurement plan assumes a real spread to hold constant. 14 cards x
     6 stances is what the pack ships; a shrunken deck would quietly narrow
     every experiment built on it."""
-    deck = fable2._load_frame_deck()
+    deck = scifi_news_pro._load_frame_deck()
     assert len(deck["cards"]) >= 3
     assert len(deck["stances"]) >= 2
     names = [c["name"] for c in deck["cards"]]

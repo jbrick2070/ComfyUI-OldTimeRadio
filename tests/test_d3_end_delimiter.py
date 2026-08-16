@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import pytest
 
-from nodes import _otr_fable2_markup as markup
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro_markup as markup
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 # --------------------------------------------------------------------------- #
@@ -79,20 +79,20 @@ def _Defect(code_name: str, detail: str = ""):
     """A REAL `ParseDefect`, not a stand-in.
 
     The first cut of this file invented a stub with a `.kind` string attribute.
-    Production sets `.code` to a `Fable2ParseDefect` ENUM -- so the helper under
+    Production sets `.code` to a `NewsProParseDefect` ENUM -- so the helper under
     test was written to match the stub, could never have fired on a real defect,
     and the suite would have been green over dead code. Build the real record
     and the test cannot drift from what the ladder actually passes.
     """
     return markup.ParseDefect(
-        code=getattr(markup.Fable2ParseDefect, code_name), detail=detail)
+        code=getattr(markup.NewsProParseDefect, code_name), detail=detail)
 
 
 class TestTheRepairNoteStatesTheRequiredShape:
     def test_MISSING_END_gets_the_accepted_literals_verbatim(self):
-        note = fable2._end_delimiter_repair_note([_Defect("MISSING_END")])
+        note = scifi_news_pro._end_delimiter_repair_note([_Defect("MISSING_END")])
         assert note, "a missing terminal marker must produce a repair rule"
-        for form in fable2._END_ACCEPTED_FORMS:
+        for form in scifi_news_pro._END_ACCEPTED_FORMS:
             assert f"'{form}'" in note, (
                 f"the note never shows the accepted literal {form!r} -- naming "
                 "the offence without the target is the whole defect")
@@ -100,43 +100,43 @@ class TestTheRepairNoteStatesTheRequiredShape:
     def test_a_BAD_LINE_SHAPE_carrying_END_also_triggers_it(self):
         """The live failure reported BOTH defects from one omission, and the
         bare `END` arrived as a BAD_LINE_SHAPE detail."""
-        note = fable2._end_delimiter_repair_note(
+        note = scifi_news_pro._end_delimiter_repair_note(
             [_Defect("BAD_LINE_SHAPE", "END")])
         assert "'END.'" in note
 
     def test_the_note_names_the_unpaired_bracket_cases(self):
-        note = fable2._end_delimiter_repair_note([_Defect("MISSING_END")])
+        note = scifi_news_pro._end_delimiter_repair_note([_Defect("MISSING_END")])
         assert "[END" in note and "END]" in note
 
     def test_an_unrelated_defect_gets_NO_delimiter_lecture(self):
         """Self-silencing. A repair turn should carry the rules its own defects
         call for and nothing else -- padding every turn with every rule is how
         the one that matters gets lost."""
-        assert fable2._end_delimiter_repair_note(
+        assert scifi_news_pro._end_delimiter_repair_note(
             [_Defect("UNKNOWN_SPEAKER", "*SFX")]) == ""
-        assert fable2._end_delimiter_repair_note([]) == ""
-        assert fable2._end_delimiter_repair_note(None) == ""
+        assert scifi_news_pro._end_delimiter_repair_note([]) == ""
+        assert scifi_news_pro._end_delimiter_repair_note(None) == ""
 
     def test_a_BAD_LINE_SHAPE_about_something_else_is_not_hijacked(self):
-        assert fable2._end_delimiter_repair_note(
+        assert scifi_news_pro._end_delimiter_repair_note(
             [_Defect("BAD_LINE_SHAPE", "(he crosses to the window)")]) == ""
 
     def test_it_is_its_OWN_helper_not_a_branch_on_the_stage_direction_note(self):
         """Different defect data, different question. Folding two unrelated
         diagnoses into one function is how the next reader learns the wrong
         rule for their defect."""
-        assert callable(fable2._end_delimiter_repair_note)
-        assert (fable2._end_delimiter_repair_note
-                is not fable2._standalone_stage_direction_repair_note)
+        assert callable(scifi_news_pro._end_delimiter_repair_note)
+        assert (scifi_news_pro._end_delimiter_repair_note
+                is not scifi_news_pro._standalone_stage_direction_repair_note)
         # The stage-direction note must stay SILENT on a delimiter defect --
         # if it started answering this too, the split would be cosmetic.
-        assert fable2._standalone_stage_direction_repair_note(
+        assert scifi_news_pro._standalone_stage_direction_repair_note(
             [_Defect("MISSING_END")], cast_names=()) == ""
 
 
 def test_the_note_and_the_parser_cannot_drift():
     """A diagnostic that names a form its own validator rejects teaches the
     model a wrong target -- worse than saying nothing at all."""
-    for form in fable2._END_ACCEPTED_FORMS:
+    for form in scifi_news_pro._END_ACCEPTED_FORMS:
         assert markup._RE_END.match(form), (
             f"the repair note advertises {form!r} but the parser rejects it")

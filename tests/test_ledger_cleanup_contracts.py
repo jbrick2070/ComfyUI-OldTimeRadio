@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 from nodes import _otr_content_safety as safety
-from nodes import _otr_fable2_markup as markup
+from nodes import _otr_scifi_news_pro_markup as markup
 from nodes import _otr_openrouter_backend as openrouter
-from nodes import _otr_scifi_fable2 as fable2
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 from nodes._otr_video_engines import render_driver as rd
 
 
@@ -140,8 +140,8 @@ def test_scifi_markup_repair_names_the_offending_standalone_row():
     looks up. The note now reads `code`, `detail` and `line_no` directly, so the
     line number no longer has to be smuggled through the detail.
     """
-    note = fable2._standalone_stage_direction_repair_note(
-        (markup.ParseDefect(markup.Fable2ParseDefect.BAD_LINE_SHAPE,
+    note = scifi_news_pro._standalone_stage_direction_repair_note(
+        (markup.ParseDefect(markup.NewsProParseDefect.BAD_LINE_SHAPE,
                             "(A sharp beep sounds.)", 6),),
         cast_names=("Ada", "Bo"),
     )

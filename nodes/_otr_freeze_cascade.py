@@ -679,7 +679,7 @@ def _run_inline_safety_cleanup(generate_fn, led) -> dict[str, Any]:
 
     The PHASE is not deleted along with the pass. ``same_story_safety_cleanup``
     is a declared cascade phase with a registry entry, a telemetry group and a
-    ledger field that two fable2 artifact tests assert on, so it keeps
+    ledger field that two scifi_news_pro artifact tests assert on, so it keeps
     stamping -- with a retired status and zero edits -- exactly the way the
     producer-owned branch already stamps its not-applicable receipt. A ripped
     pass may not leave an unowned field.

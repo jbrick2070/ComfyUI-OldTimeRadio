@@ -22,11 +22,21 @@ NODES_DIR = REPO / "nodes"
 def test_widget_still_defined_on_writer():
     """The widget MUST exist in OTR_LedgerScriptWriter's INPUT_TYPES -- removing
     it shifts every later widget index and breaks saved workflows."""
-    import importlib
-    import sys
-    # Avoid a stale singleton on repeat runs.
-    sys.modules.pop("nodes.OTR_LedgerScriptWriter", None)
-    m = importlib.import_module("nodes.OTR_LedgerScriptWriter")
+    # DO NOT pop + re-import the writer module here. The original code did
+    # (`sys.modules.pop(...)` then `importlib.import_module(...)`) to "avoid a
+    # stale singleton", but this test only reads INPUT_TYPES off the class --
+    # a fresh module instance buys nothing, and installing a SECOND writer
+    # module for the rest of the session is cross-test pollution: a later test
+    # patches one module object while the writer it invokes lives in the other,
+    # so the patch silently does nothing. That bit on 2026-08-16, when a rename
+    # moved test_scifi_news_pro_tail_context.py past this file alphabetically
+    # and its title-regen spy stopped firing. Import normally.
+    import nodes.OTR_LedgerScriptWriter as m
+
+    _assert_widget_present(m)
+
+
+def _assert_widget_present(m) -> None:
     cls = None
     for name in dir(m):
         obj = getattr(m, name)

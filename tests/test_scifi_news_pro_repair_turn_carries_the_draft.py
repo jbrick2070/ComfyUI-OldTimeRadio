@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_fable2_markup import ANNOUNCER_NAME
-from nodes import _otr_scifi_fable2 as fable2
+from nodes._otr_scifi_news_pro_markup import ANNOUNCER_NAME
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 CAST = ["Ada", "Bo"]
@@ -65,7 +65,7 @@ class ScriptedWriter:
 
 
 def run_ladder(writer, temperature=0.75):
-    return fable2._run_markup_ladder(
+    return scifi_news_pro._run_markup_ladder(
         writer,
         pass_id="script",
         system="system prompt",
@@ -148,7 +148,7 @@ def test_temperature_HOLDS_when_the_draft_could_not_be_carried(monkeypatch):
     """A cold rung at 0.30 re-derives the structure it just produced -- the
     current failure mode. If the draft cannot ride, the retry must at least be
     free to explore."""
-    monkeypatch.setattr(fable2, "_draft_fits_repair_turn",
+    monkeypatch.setattr(scifi_news_pro, "_draft_fits_repair_turn",
                         lambda base_user, draft, system="": False)
     writer = ScriptedWriter([BAD, BAD, play()])
     run_ladder(writer, temperature=0.75)
@@ -184,7 +184,7 @@ def test_a_REAL_episode_draft_fits_at_every_length_we_ship(words):
     an edge case. Dropping the draft there silently restores the exact
     cold-regeneration bug this change exists to fix."""
     base_user, draft = realistic_prompt_and_draft(words)
-    assert fable2._draft_fits_repair_turn(base_user, draft), (
+    assert scifi_news_pro._draft_fits_repair_turn(base_user, draft), (
         "a %d-word episode draft (%d chars) was DROPPED beside a %d-char "
         "prompt -- the ladder silently reverts to cold regeneration"
         % (words, len(draft), len(base_user)))
@@ -195,19 +195,19 @@ def test_the_guard_still_budgets_for_the_REPLY_not_just_the_prompt():
     corrected episode back has not actually helped."""
     base_user, draft = realistic_prompt_and_draft(1520)
     cap = 8192
-    prompt_tokens = (len(base_user) + len(draft)) / fable2._CHARS_PER_TOKEN
-    reply_tokens = (len(draft) / fable2._CHARS_PER_TOKEN) * fable2._REPAIR_REPLY_MARGIN
+    prompt_tokens = (len(base_user) + len(draft)) / scifi_news_pro._CHARS_PER_TOKEN
+    reply_tokens = (len(draft) / scifi_news_pro._CHARS_PER_TOKEN) * scifi_news_pro._REPAIR_REPLY_MARGIN
     assert (prompt_tokens + reply_tokens) < cap, (
         "prompt+reply do not fit the window at the structural ceiling")
 
 
 def test_an_absurdly_long_draft_is_DROPPED():
     """Better one cold retry than a truncated prompt."""
-    assert not fable2._draft_fits_repair_turn("base", "x" * 500_000)
+    assert not scifi_news_pro._draft_fits_repair_turn("base", "x" * 500_000)
 
 
 def test_an_empty_draft_is_not_carried():
-    assert not fable2._draft_fits_repair_turn("base", "")
+    assert not scifi_news_pro._draft_fits_repair_turn("base", "")
 
 
 def test_the_temperature_sequence_is_NON_INCREASING_even_when_a_draft_drops():
@@ -223,7 +223,7 @@ def test_the_temperature_sequence_is_NON_INCREASING_even_when_a_draft_drops():
 
     import pytest as _pytest
     monkey = _pytest.MonkeyPatch()
-    monkey.setattr(fable2, "_draft_fits_repair_turn", only_second_drops)
+    monkey.setattr(scifi_news_pro, "_draft_fits_repair_turn", only_second_drops)
     try:
         writer = ScriptedWriter([BAD, BAD, BAD, play()])
         run_ladder(writer, temperature=0.75)
@@ -249,5 +249,5 @@ def test_a_clean_first_attempt_still_costs_exactly_one_call():
 def test_an_unrepairable_model_still_fails_CLOSED():
     """Carrying the draft must not make an invalid script valid."""
     writer = ScriptedWriter([BAD] * 8)
-    with pytest.raises(fable2.Fable2ScriptError):
+    with pytest.raises(scifi_news_pro.NewsProScriptError):
         run_ladder(writer)

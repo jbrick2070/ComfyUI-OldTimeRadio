@@ -375,7 +375,7 @@ class TestRunWiringPins:
         assert "_apply_intro_rewrite_result" in block
 
     def test_title_regen_assembles_from_ledger(self):
-        # scifi_fable2 S1a (2026-07-10): the J.5 title-regen block moved
+        # scifi_news_pro S1a (2026-07-10): the J.5 title-regen block moved
         # from run() into the extracted _run_writer_tail (tail
         # extraction, architecture doc sections 11/13) -- the positive
         # pin follows it; the stale-join negative pin covers BOTH

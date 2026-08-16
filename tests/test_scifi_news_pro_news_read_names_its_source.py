@@ -21,7 +21,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from nodes import _otr_scifi_fable2 as F2  # noqa: E402
+from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 
 
 def _dossier(*, people=(), places=(), things=(), numbers=()):

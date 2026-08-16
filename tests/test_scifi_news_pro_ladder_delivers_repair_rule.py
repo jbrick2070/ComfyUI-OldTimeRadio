@@ -26,8 +26,8 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_fable2_markup import ANNOUNCER_NAME
-from nodes import _otr_scifi_fable2 as fable2
+from nodes._otr_scifi_news_pro_markup import ANNOUNCER_NAME
+from nodes import _otr_scifi_news_pro as scifi_news_pro
 
 
 CAST = ["Ada", "Bo"]
@@ -63,7 +63,7 @@ class ScriptedWriter:
 
 
 def run_ladder(writer):
-    return fable2._run_markup_ladder(
+    return scifi_news_pro._run_markup_ladder(
         writer,
         pass_id="script",
         system="system prompt",
@@ -152,7 +152,7 @@ def test_a_model_that_never_repairs_exhausts_the_ladder_and_RAISES():
     """Four identical bad answers must still fail closed -- the fix makes the
     rung better informed, it does not make an invalid script valid."""
     writer = ScriptedWriter([play("*SFX: a door slams")] * 8)
-    with pytest.raises(fable2.Fable2ScriptError) as caught:
+    with pytest.raises(scifi_news_pro.NewsProScriptError) as caught:
         run_ladder(writer)
     assert "markup ladder exhausted" in str(caught.value)
     # ...and every retry after the first carried the rule, so the exhaustion is
