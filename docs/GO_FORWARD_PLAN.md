@@ -86,269 +86,33 @@ document. Windows are currently answering from the per-window mapping paragraph
 beneath it. Either restore the rungs or retire the instruction; asking each
 window to state a rung from an empty table is a question with no answer.
 
-## PRIORITY 0 -- THE BUG-FIX SPRINT (operator, 2026-08-15 -- START HERE)
+## THE 08-15 BUG-FIX SPRINT IS CLOSED -- receipts live elsewhere, rulings live here
 
-**THE SPRINT IS SPECIFIED. THE CONTRACT IS
-`docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md` AND IT IS THE SINGLE
-AUTHORITY** -- build order, per-defect acceptance, test fallout, and every
-decision with its rationale. It survived four review rounds and was rewritten
-forward-only at r4 because layered corrections had left it contradicting itself.
-Read it INSTEAD OF re-deriving anything below.
+D1/D2/D3/D4 and chunks 0/0.5/A are DONE and live-proven; the receipts are in
+`docs/HANDOFF_LOG.md` and `docs/PROD_BUG_LOG.md`, the remaining contract
+chunks are queue item 3. What SURVIVES here is only what still binds future
+work:
 
-**DONE AND PUSHED SO FAR:** chunk 0's identity half (`99cb8856`), chunk 0.5
-publication eligibility, **chunk 2 / D1** (the clean stage no longer deletes the
-Python-owned coda fact; Bible `12.103`), and **chunk 3.5 / D3** (the `END`
-grammar plus a repair note that states the required shape; Bible `12.105`).
-Receipts in `docs/HANDOFF_LOG.md`.
-
-**D3 LANDED EARLY AND THE LANE IS NOT FIXED YET.** The contract puts D3 after
-D2 and that edge holds: `scifi_news_pro` now clears the markup ladder only to
-die at the freeze cascade on a content-authorship mismatch. D3's code is
-correct standalone -- do NOT read it as "that lane works now". **D2 (chunks 1 +
-3) is what finishes it.**
-
-**CHUNK 0 IS NOW CLOSED (2026-08-15).** Its identity half shipped at
-`99cb8856`; its transition half -- the receipt schema, the composite validator,
-and the emitter/transaction that consume them -- landed with D2. Nothing is
-outstanding from chunk 0.
-
-### NEXT WINDOW -- START HERE, IN THIS ORDER
-
-**PBUG-20260815-09 IS CLOSED -- LIVE-PROVEN 2026-08-15.** Do not re-prove it.
-Leg `signal_lost_the_price_of_a_soul_20260815_132024` (public_domain,
-Moby-Dick) published: `obs_publish OK` plus a **165.2 MB** file on disk, and it
-did so AFTER the cascade renamed the episode off `pending_<ts>` -- the exact
-condition that broke it. `Prompt executed in 00:23:18`.
-
-**Correction to the record, so nobody hunts a ghost:** the earlier entry saying
-`otr\obs\` was "EMPTY" is WRONG as written. That directory holds **150 files**,
-including seven from earlier the same morning. Those three legs were WITHHELD;
-the directory was never empty. Also note the real output base is
-`C:\Users\jeffr\Documents\ComfyUI\output\otr\` -- checking the repo-relative
-`otr\` reports a false EMPTY, which is the same shape as the bug itself.
-
-**1. D2 IS CLOSED -- BOTH PATHS LIVE-PROVEN ON BOTH LANES (2026-08-15).**
-Receipts in `docs/HANDOFF_LOG.md` and `PROD_BUG_LOG.md` PBUG-20260815-02.
-`scifi_news` proved the NO-OP path (`signal_lost_the_architecture_of_error_
-20260815_152004`, 33.4 MB, 40:56); `scifi_news_pro` proved the RESEAL path
-(`signal_lost_blood_red_water_20260815_195226`, 45.1 MB, 42:44) with the clean
-stage actually rewriting `shot_004_b3` and the frozen ledger carrying the
-transition receipt. Both were the FIRST successful renders of those lanes. The
-1-in-3 exposure on `roll (any eligible bank)` is closed with evidence.
-The DEGRADATION path has never fired live and probably never will -- that is the
-point of it, and it is unit-tested. Do not schedule work to force it.
-
-**2. D4's DATA GAP IS CLOSED (2026-08-15) -- the sidecars are written.** All
-**65** public_domain units now carry a provenance sidecar with a `characters`
-roster; before this there were 16 tree-wide and 64 of 65 units held no gender
-fact at all. Stamper: `scripts/otr_stamp_character_genders.py`; the scan:
-`nodes/_otr_gender_pronoun_scan.py`. Re-running writes 0 files, so it is
-genuinely idempotent -- the staleness identity is the CONTENT, never `ran_utc`.
-
-**THE PLUMBING WAS ALREADY COMPLETE, AND THAT IS THE LESSON.**
-`source_meta_from_unit` (`_otr_public_domain_sources.py:565-567`) already loaded
-the sidecar's `characters` into `source_meta`, and
-`OTR_LedgerScriptWriter.py:4335` already joined the cast names against it. Every
-link existed; only the DATA was missing. A correct pipeline over absent data
-looks exactly like a correct pipeline, which is why a green suite never noticed
-and only a listener could. **No render-path code changed for D4.**
-
-Proven through the real join, with the cast names spelled the way the failing
-artifacts spelled them: **AHAB -> male** (61-0, joining "Captain Ahab" via the
-`short_form` tier), **GERTRUDE -> female** (31-101), **LORD RONALD -> male**.
-`gender_by_name` goes from `{}` to populated. 18 tests in
-`tests/test_character_gender_sidecars.py`, anchored on the REAL sidecars rather
-than invented fixtures.
-
-**COVERAGE IS 133 OF 219 CANDIDATES, AND THE 86 DECLINES ARE DELIBERATE.** A
-name the ladder cannot decide is OMITTED from the sidecar, so downstream it is a
-join miss and keeps today's roll -- a no-change, never an `unknown` row anyone
-has to branch on. **Do not loosen the margin to raise that number:** measured,
-DOROTHY of Oz scores male 8 / female 3 under a first-pronoun-only estimator
-because her scene is crowded with the Scarecrow and the Lion. A looser threshold
-buys a confident lie in the same shape as the bug, not coverage.
-
-**WEB SEARCH IS NOW ALLOWED (operator, 2026-08-15, stated twice).** The earlier
-"web search breaks the 100%-local rule" ruling is WITHDRAWN -- the operator's
-reasoning is that the pipeline already fetches RSS as standard, so a remote
-lookup at VENDOR time is not a new class of dependency. That reopens the SPEC's
-tier 3 (LLM + web, character-in-work) and tier 4 (name frequency) for the 86
-stragglers. The A/B/C local-LLM *bakeoff* remains rejected on separate grounds:
-comparing models does not fill a field that was never written.
-
-**THE STRAGGLER LIST IS A MEASURED ARTIFACT, not a guess** -- run
-`scripts/otr_stamp_character_genders.py` (no `--write`) and it prints every
-declined name with its source. Aim tier 3 at that list; do not re-vendor all 65.
-
-**NOT part of this window's work:** `config/source_banks/_corpus/` (a fetched
-Gutenberg corpus, `_vendor_report.json` = 63 ok / 3 failed) and
-`docs/H3_LICENSE_ATTESTATION*.md` remain UNTRACKED and were never staged. That
-sidecar generation feeds **D5** identity fields (`work_title` / `author` /
-`license_label`), not D4's gender fields -- same file, same generator, two
-consumers. Worth knowing before anyone assumes it covers this.
-
-**NAME/GENDER MISMATCH ON THE INVENTION LANES IS ACCEPTED TOO (operator
-ruling 2026-08-15).** On `original`, the operator said: *"we accept the risk --
-original has a mismatch since it's inventing a male 'Jane'. Since it's original
-I accept that."*
-
-The line is FIDELITY IS ONLY OWED WHERE A SOURCE STATES SOMETHING. `original`
-has no source, so a male JANE is a creative choice, not a defect. The adaptation
-lanes are the opposite and unchanged: AHAB and ROSALIND must match what the text
-says, which is what the sidecar pins exist to enforce.
-
-Scope, precisely, so this is not read wider than it is:
-
-* **Pool mode (the default, and what production runs) already cannot produce
-  this.** Since the unisex bucket was retired every pool name carries a definite
-  tag, so `_repair_ensemble_names` always has an answer and a pool-drawn name
-  cannot ride a mismatched slot.
-* The mismatch is reachable only through **`llm_slot_fill`**, where the model
-  invents a name that is not in the pool at all. `gender_of_first_name` returns
-  `"unknown"` for it, and `"unknown"` fails the guard's
-  `if tag in ("male","female")` test exactly as `"unisex"` used to
-  (`_otr_casting.py:1495`). **`unknown` is the new unisex, and retiring the
-  bucket did not touch it** -- the mechanism was never the bucket, it is that
-  only male/female tags trigger the guard. That mode is opt-in via
-  `OTR_NAME_MODE` and nothing in production sets it, so this is a trapdoor under
-  a door nobody currently opens.
-* **There is already a designed lever for doing it ON PURPOSE:**
-  `OTR_NAME_CROSS_GENDER_RATE` (default `0.0` = repair everything) lets a
-  deterministic, seeded fraction of mismatches stand as deliberate cross-gender
-  names. If the show ever wants a male Jane by intent rather than by accident,
-  that is the knob, and it stays reproducible.
-
-**`original` STAYS AS IT IS (operator ruling 2026-08-15).** Asked whether the
-invention lane should stop drawing from a fixed name pool, the operator said
-"leave original as is, fine". So `OTR_NAME_MODE` stays `pool`, `llm_slot_fill`
-stays OFF, and nobody should reopen it as part of gender work.
-
-Worth writing down so the next window knows what that means rather than
-rediscovering it: an `original` character's name is a pairing from **154 first
-names x 54 surnames**, drawn by seeded RNG -- not invented. First names
-therefore recur across episodes, and the female side is much thinner (117 male
-vs 36 female), so a female character recycles a first name roughly three times
-faster than a male one. That is a known, accepted property of the lane, NOT a
-defect, and it is not the gender machinery's business.
-
-**THE VOICE/PORTRAIT MISMATCH IS REAL, MEASURED, AND BLOCKED BY A STANDING
-RULING -- READ THIS BEFORE PROPOSING THE OBVIOUS FIX.** Measured 2026-08-15 over
-1,686 real ledgers with `scripts/audit_voice_gender_consistency.py`:
-
-    VIOLATIONS        : 0     <- what the audience HEARS is always right
-    portrait conflict : 34    <- rows whose PROSE asserts the opposite gender
-
-Examples: `SHERLOCK HIBBERT` assigned male, description says "her";
-`FATHER BROWN` assigned female, description says "father". Those characters
-sound one gender and look the other, which is exactly what the operator asked
-never to happen.
-
-Cause: the description prompt TELLS the model `Gender: male`
-(`_otr_casting.py`), and the only check on what comes back is `v.strip()`.
-It asks and never verifies -- the same pattern the 40/40/20 balance was moved
-out of the prompt to escape.
-
-**DO NOT BUILD THE VALIDATOR WITHOUT THE OPERATOR REVERSING A RULING.**
-`otr_meta_brief_image_prompt.py` -- anchored by the SENTENCE, not a line number, because the number has already gone stale once: *"No Python vocabulary or overlap classifier can reject, rewrite, or block the prompt."* (at :1706-1707 as of 2026-08-15; :1585 is the music-mesh comment and never held this) is a LIVE DESIGN CONTRACT: *"No
-Python vocabulary or overlap classifier can reject, rewrite, or block the
-prompt."* This exact fix was proposed in the 2026-08-05 item-8 campaign --
-Codex wanted candidate rejection inside the bounded loop, agy wanted a fallback
-template -- and BOTH were overruled at r4, with "update the stale comment"
-explicitly rejected as a resolution because editing away a deliberate decision
-to permit a new classifier is the quiet reversal the directives exist to
-prevent. That is why the audit REPORTS the 34 and gates nothing.
-
-Two further constraints that campaign established, so the cheap fix is not
-available either: node 89 cannot reach the description generator, and
-`Ledger.set_cast` rebuilds a fixed nine-key row that silently drops new fields.
-
-**The three live options, unresolved:** (1) leave it, read the audit list;
-(2) the operator narrows the ruling for this case only -- a contradiction
-between two PYTHON-OWNED facts is arguably not a "vocabulary classifier
-judging prose", and that is the only ground the ruling could be revisited on;
-(3) strengthen the description PROMPT rather than checking its output, which
-rejects nothing and is permitted as the ruling stands. Option 3 is the only one
-buildable today.
-
-**GENDER DRIFT IS ACCEPTED (operator ruling 2026-08-15 -- do not re-open).**
-Presented with the residual risk, the operator said: *"yeah I see it can fail, I
-accept the gender drift."* So the deterministic ladder is the ANSWER, not a
-stepping stone, and the SPEC's tier 3 (a web-search model call per undecided
-character) is NOT being built.
-
-What that concretely accepts, so the ruling is informed rather than vague:
-
-* **86 of 219** public_domain candidates and **24 of 85** shakespeare rows are
-  undecided and fall to the 40/40/20 roll -- roughly a third of characters get a
-  coin flip, and some will be audibly wrong.
-* The three failures the operator actually HEARD are fixed: AHAB, GERTRUDE and
-  LORD RONALD all resolve correctly.
-* **A confident WRONG pin still cannot happen.** The ladder declines rather than
-  guesses, so an undecided character keeps the roll it always had. That property
-  is what makes the drift tolerable, and it is why the decision margin
-  (floor 4, ratio 3x) must not be loosened to raise coverage -- DOROTHY of Oz
-  scores 8 male / 3 female under a looser estimator because her scene is crowded
-  with the Scarecrow and the Lion.
-
-**The scalability objection stands and was not dismissed.** The operator's point
--- *"someone needs to remember, when adding new sources, that we need to sidecar
-a gender"* -- is exactly the failure mode that produced this defect: 64 sidecars
-went unwritten because a manual step was forgotten. Two things blunt it. The
-stamper is idempotent and re-runnable over the whole corpus (`--write` rewrites
-only what changed), so the step is "re-run one script", not "hand-edit 65 files".
-And `cast_hints` are hand-authored per source ANYWAY, so adding a source already
-requires listing its characters -- an automatic gender tier would move that
-memory step, not remove it.
-
-**Revisit if the corpus starts growing regularly.** The straggler list is a
-measured artifact: run `scripts/otr_stamp_character_genders.py` with no
-`--write` and it prints every declined name. That is the exact input a future
-web tier would need, so nothing is lost by deferring it.
-
-**3. SHAKESPEARE HAS THE SAME GENDER HOLE, MEASURED 2026-08-15 -- 24 of 85
-character rows still fall through to the 40/40/20 roll.** Not a PBUG: this is a
-STATIC AUDIT, and the admission rule says a static finding never creates one on
-its own. It needs a live artifact before it is logged as a production bug.
-
-How the lane decides gender, for whoever picks this up: `parse_character_roster`
-reads the play's own "CHARACTERS IN THE PLAY" block, `infer_gender(name,
-description)` reads relation words first and titles second (*"daughter to Duke
-Senior"* -> female, *"a shepherd"* -> male), and whatever that cannot decide
-falls to the curated supplement
-`config/source_banks/shakespeare/roster_gender_supplement.json`, keyed by FOLGER
-PLAY CODE (`Mac`, `Tmp`, `MND`), NOT by slug. Names are never pool-drawn and
-never repaired -- shakespeare slots are `source_owned`, which is what keeps
-ROSALIND named ROSALIND.
-
-Coverage today: **61 of 85 rows (71%) pin**; the remaining 24 get a coin flip.
-
-* `Tmp` has **NO supplement entry at all** -> ARIEL, CALIBAN unresolved.
-* `MND` is covered but leaves the mechanicals: QUINCE, SNOUT, STARVELING,
-  FLUTE, ROBIN, plus the four fairies.
-* `TN` leaves ANDREW (Sir Andrew Aguecheek); `Ado` leaves BOY, PRINCE,
-  BALTHASAR.
-
-**CALIBAN and Sir Andrew can be cast female.** Some of the rest are genuinely
-open -- ARIEL is a spirit often played by women, and Peaseblossom/Cobweb/Mote/
-Mustardseed are fairies -- but CALIBAN, QUINCE, FLUTE, ROBIN and ANDREW are not
-ambiguous. Filling the supplement is the sanctioned instrument here; the SPEC
-calls it a Shakespeare device, and it is a curated data file, NOT the
-"hand-balancing the first-name pools" that the contract rejects.
-
-**A trap for whoever measures this:** the sidecars carry `slug` (`midsummer`),
-the supplement is keyed `MND`, and `source_meta.play_code` is what the render
-path actually passes. Probing with the slug reports ZERO supplement coverage and
-looks exactly like a dead key-mismatch bug. It is not; it is the wrong key.
-
-The chunk order is in the contract; it is not the defect order and two of its
-edges are load-bearing:
-
-* **D2 must land before D3.** Fix the `END` grammar first and `scifi_news_pro`
-  clears the markup ladder only to die at the freeze cascade on a
-  content-authorship mismatch. The corpse moves; the lane still fails.
-* **D1 must land before the qualifying live leg.** Until the clean stage is
-  scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
-  way -- a pass is luck, a failure is already known from three artifacts.
+* **Web search is ALLOWED at vendor time** (operator 2026-08-15, stated
+  twice; the RSS precedent).
+* **Gender drift is ACCEPTED** -- the deterministic ladder is the ANSWER, not
+  a stepping stone. Do not loosen the decision margin (floor 4, ratio 3x):
+  DOROTHY of Oz measures 8/3 male under a looser estimator because her scene
+  is crowded. A confident WRONG pin must stay impossible; decline-and-roll is
+  the accepted behaviour.
+* **Fidelity is owed only where a source states something.** `original` may
+  ship a male JANE (operator accepted); the adaptation lanes may not ship a
+  wrong AHAB. Pool mode cannot produce a mismatch (every pool name carries a
+  definite tag); `llm_slot_fill` stays OFF; the deliberate lever for
+  on-purpose cross-gender names is `OTR_NAME_CROSS_GENDER_RATE` (default 0).
+  `unknown` behaves like the retired `unisex` in the guard -- a trapdoor
+  under a door nobody opens; do not reopen.
+* **DETECTOR TRAP (cost a window once):** ledger LINES key speakers by
+  `char_id`, never name -- but frozen post-audio ledgers may DROP char_id on
+  lines. Resolve identity from the CAST row, then match lines by whatever
+  key the era carries.
+* **Shakespeare gender supplement is keyed by FOLGER CODE** (`Tmp`, `MND`),
+  never slug -- probing by slug reports phantom zero coverage.
 
 ### THE ORDER, DRIVER-SET 2026-08-16 LATE (supersedes the 08-15 list order;
 ### the numbered bodies below are the reference detail, this is the sequence)
@@ -387,32 +151,6 @@ can demote any of them later without archaeology.
 
 Standing tail unchanged: the bug-fix contract's chunks 4/5/6/D7, and the
 shakespeare supplement rows (item 4).
-
-### NEXT WINDOW -- THE ORDER (2026-08-15 wrap)
-
-The bug-fix sprint's D2 is CLOSED and D4's data gap is closed. What remains, in
-the order I would take it:
-
-**1. THE LEMMY SPRINT -- 2026-08-16 STATUS: chunk A SHIPPED AND LIVE-PROVEN,
-the six-bank sweep is 6/6 PASSED, the tag is pushed
-(`otr-2026-08-16-sixbank-lemmyA` at `da44f642`), and chunk B is PANELLED.
-WHAT REMAINS IS BUILDING CHUNK B, and its single authority is
-`docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md`** -- a full four-round
-kibitz arc output (10 external calls; Antigravity quota-held at r4 and the
-partial r4 panel is recorded as such). Build order, per-lane designs, the
-decision truth table, fixture updates and acceptance are all in the
-contract; do not re-derive them from the history below. Chunk B acceptance
-REQUIRES a fresh server boot at the implemented HEAD.
-
-**LATER THE SAME DAY, and the contract moved under it:** `scifi_news` was
-RIPPED (full-family, `dae1fb3c`, PBUG-20260816-01) and the fable2 surface was
-RENAMED to `scifi_news_pro` (`01d0730c` -- module `_otr_scifi_news_pro.py`,
-`NewsPro*` classes, `meta["scifi_news_pro"]` ledger namespace,
-`OTR_SCIFI_NEWS_PRO_SEED`). The BUILD CONTRACT carries a SCOPE CUT header:
-the codex half is MOOT and **chunk B is now a ONE-LANE build** on the renamed
-module. Both changes are live-proven (post-rip legs 3/3; rename leg
-`signal_lost_rename_proof_scifi_news_pro_20260816_141310`, 32:38,
-`obs_publish OK`, new namespace on the frozen ledger).
 
 **1.1 LEMMY ON EVERY TTS ENGINE (operator 2026-08-16: "we need to be sure we
 have lemmy working on all tts engines", NO-SKIP directive, and "audition"
@@ -663,87 +401,6 @@ without a customer at 65 frozen units. Revisit only if the corpus starts growing
 in bulk -- the straggler list is a measured artifact, printed by running
 `scripts/otr_stamp_character_genders.py` with no `--write`.
 
-### CANONICAL WIDGET DEFAULTS CHANGED 2026-08-15 (operator, live in-session)
-
-Saved dropdown values in `workflows/otr_canonical.json` ONLY -- no code, no
-hardcoded default, no new widget. Operator was explicit: *"not some weird
-hardcode native, just as if I saved it myself"*.
-
-| node | widget | was | now |
-|---|---|---|---|
-| `OTR_VideoDirector` | announcer / music / character **video** | `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera` | `still_flat (16:9)` |
-| `OTR_VideoDirector` | announcer / music / character **image** | `z_image_turbo` | unchanged (already local Z-Image Turbo) |
-| `OTR_LedgerScriptWriter` | `source_bank` | `scifi_news` | `roll (any eligible bank)` |
-| `OTR_LedgerScriptWriter` | `visual_style` | `sci_fi_radio` | `roll (any style)` |
-
-**Why the video slots mattered:** all three were audio-reactive visualizers
-flagged *"no scene image"*, so they never requested a still. The 08-15 proof leg
-logged `[LFC:phase_8] cast=0/3 with portrait, voiced=0/14 with visual` -- zero
-portraits minted, which is why the operator could not see stills and why the
-visual half of the gender check was impossible. `still_flat` restores it.
-
-**Roll safety, VERIFIED against the live registry, do not re-derive:** the roll
-pools deliberately differ from the dropdowns. Banks: menu 7, pool **5** (after
-the 2026-08-16 `scifi_news` rip) --
-`custom_source_bank` is NOT selectable by a roll, and the sentinel cannot select
-itself. Styles: menu 11, pool **10**, sentinel excluded. So neither
-"declare your own" escape hatch is reachable unattended.
-
-**Style and bank roll INDEPENDENTLY -- there is no affinity.** The proof leg
-rendered Moby-Dick in `sci_fi_radio`. Expect Shakespeare in `cartoon`. If the
-operator wants the two fidelity lanes to lean toward `archival_documentary` /
-`storybook_engraving` / `shakespeare_stage_realism`, that is a real feature and
-an OPEN decision -- not yet scoped, do not assume it.
-
-**Lemmy asked and answered (operator, 2026-08-15):** `media_archive` and
-`original` ALREADY get the cameo. `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` is exactly
-`{"public_domain", "shakespeare"}` -- the fidelity lanes only, normalized
-through `base_source_bank_id` so bake-off variants inherit it. No change made,
-none needed.
-
-### FOR THE OPERATOR EYEBALL -- one behaviour change landed with chunk 0.5
-
-**A research_only source no longer kills the render. It withholds the OBS
-copy.** The 2026-07-17 rule ("a research_only source BLOCKS publish") was
-implemented as `G14` appending to the gap audit's ERROR list, which at Phase 10
-means `FreezeAssertionError` -- so the rule was carried out by DESTROYING a
-finished episode after it had been written, cast, voiced, rendered and muxed,
-and the operator was left without even the archival copy such a source IS
-cleared for. That is the contract's Law 7 ("a render must not die"; structural
-refusal belongs BEFORE generation, and the freeze is long past it), and the
-contract's own live-leg list demands the opposite outcome: *"a research-only
-terminal case proving an archival final with no `obs_publish OK`, no OBS copy
-and a durable non-publishable receipt."*
-
-So: `G14` still reports, as a WARNING, and the block now lands at the
-publication boundary. Nothing was weakened -- a research_only episode still
-never reaches `otr\obs\`, deterministically -- and the freeze's structural
-errors are untouched and still fatal. **If the operator wants a research_only
-source to keep killing the render instead, say so and it is a one-line
-revert.**
-
-### What changed about the seven defects (do NOT work from the old framing)
-
-* The **`media_archive` coda defect was never the interpreter's fault.** The
-  clean stage DELETED a factual Library of Congress close. That merged it with
-  the `scifi_news` crash under one root cause -- and they need OPPOSITE
-  remedies: D1 is preventive isolation, D2 is detective re-sealing.
-* **Neither writer failure is the act-topology change.** `scifi_news` died at 8
-  voiced rows on the first row the clean stage repaired; `scifi_news_pro` died on
-  a regex demanding `END.` when the model wrote `END`. The plan's named revert
-  experiment is CANCELLED -- it would spend a live roll to test a falsified
-  hypothesis.
-* **Gender halved and doubled.** The `original`-lane instance does NOT reproduce
-  (measured 240 Hz, female, per line). The `public_domain` instance is a
-  RECIPROCAL inversion -- LORD RONALD is a second, unreported instance in the
-  same episode. One root cause: no provenance sidecar for that unit.
-* **The LLM-parse fork is CLOSED.** Four independent reviews plus the driver
-  rejected it. Fix the grammar and make the defect state the required shape.
-
-Original evidence, still valid, do not re-derive:
-`docs/2026-08-15-operator-eyeball-findings.md` and
-`docs/2026-08-15-overnight-bank-gate-findings.md`.
-
 ### A. THE CLOSING ANNOUNCER DOES NOT NAME WHAT IT ADAPTED (3 banks, one family)
 
 | bank | what shipped | what is wrong |
@@ -758,35 +415,6 @@ that ruling stopped the announcer reciting a LICENCE, and its own reasoning was
 *"Folger publishes the edition and Shakespeare wrote the play"* -- yet what
 shipped also stopped it naming the author and the play. Naming Shakespeare is
 not a licence claim. Ask before writing the sentence.
-
-### B. VOICE GENDER CONTRADICTS THE CHARACTER -- GREEN-LIT, DO IT
-
-Two live instances in one night, two different banks: **GERTRUDE DEMONGMORENCI
-MCFIGGIN** and **JULIANA SIMPSON** both spoke with male voices. Explicitly
-carved OUT of the story-quality freeze (2026-08-04: *"fixing 'Malvolio speaks
-with a woman's voice' is a bug fix"*).
-
-**No web search.** The operator asked; the answer is no -- hard scope rule
-(100% local, offline, no API keys) -- and it is unnecessary: the source text
-already names Gertrude as a woman. The gap is plumbing, not knowledge.
-`slot.gender` already feeds the description LLM, the outline prompt, the
-dialogue cast block and the image prompt (see section 3); what it does not do
-is reliably pin the VOICE. Start from
-`docs/2026-08-05-character-gender-ladder-SPEC.md`.
-
-### C. TWO BANK-GATE WRITER FAILURES (4/6 passed)
-
-* `scifi_news` -- `CodexPreTailAuditError: line receipt mismatch`. Died at 13.6
-  min, AFTER writing, so it is an integrity check failing on assembled output.
-* `scifi_news_pro` -- `Fable2ScriptError: markup ladder exhausted`,
-  `BAD_LINE_SHAPE: END`. Died at 3.3 min.
-
-**Prime suspect for BOTH is the act change, not the writer fixes**: these are
-the first legs ever to assemble a 12-beat script instead of an 8-beat one.
-**The named experiment: reproduce with the act change reverted LOCALLY (do not
-commit the revert).** That one run separates cause from coincidence. If the act
-change is implicated, fix the CONSUMER -- the pre-tail audit, the markup ladder
--- never the topology, which is an operator ruling.
 
 ### D. NO LONGER UNDIAGNOSED -- the wrong-play frame is MEASURED, twice
 
@@ -949,29 +577,18 @@ had BLESSED as genuine speech -- greppable as rows where
 `clean_spoken_text(text) != text` with no `unclean_spoken_text` flag and no
 policy finding. Narrow the net then; never remove it.
 
-### OPEN -- the no-shims violations that ARE real, ranked
+### OPEN -- the one no-shims violation that survived the rip
 
-Found by a three-way read-only audit 2026-08-14, every claim verified against
-the real files. Four of the seven are fixed and pushed (`3661bc42` plus the
-announcer fallback); receipts in `docs/HANDOFF_LOG.md`. These three are open:
+The 2026-08-14 audit found three; the 2026-08-16 `scifi_news` rip closed two
+(codex `P5R _call_scene_review` and `_canonicalize_script_spoken_text` died
+with the module). One remains:
 
-1. **Codex `P5R` `_call_scene_review` (`_otr_scifi_codex.py:3034`)** -- the pass
-   whose whole job is "read it back and fix it" never repairs: a content failure
-   gets ONE generic repair turn that sees 400 characters of its own draft, then
-   three cold rerolls, then `CodexPassError` kills the render.
-2. **`_canonicalize_script_spoken_text` (`_otr_scifi_codex.py:3249`)** -- runs
-   `clean_spoken_text` but writes the stripped text back INTO the record, which
-   is what stills and motion read. Not covered by the captions ruling above.
-3. **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
-   `PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS`
-   (`:25-82`) driving model rewrites, contrary to the 2026-08-03 directive, plus
-   two bare `RuntimeError`s (`:328`, `:334`) that would kill a render. Nothing
-   calls it. Delete it or rebuild it before anything wires it back.
-
-**Measured good news, so nobody re-audits it:** the whole-remaining-window
-runaway shape (`ProviderCapacityMessages`) is constructed ONLY in the two news
-lanes -- every writer-lane call already carries a numeric ceiling. And
-`set_line_text_metrics` really is the sole writer of `row["text"]`.
+* **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
+  `PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS`
+  (`:25-82`) driving model rewrites, contrary to the 2026-08-03 no-guardrails
+  directive, plus two bare `RuntimeError`s (`:328`, `:334`) that would kill a
+  render. Nothing calls it. Delete it or rebuild it before anything wires it
+  back.
 
 ### OPEN -- a tension the clean stage created, worth one look
 
@@ -982,33 +599,6 @@ repair FOLDS the action into the speech rather than deleting it, and
 regenerates its motion clause -- but two rulings now pull on the same field
 from opposite ends. **Look before the clean stage is trusted on a VIDEO leg;
 it does not affect the audio path.**
-
-### OPEN -- the graduated extraction contract (operator 2026-08-14, NOT STARTED)
-
-*"If it fails once on extraction, we relax the extraction requirements on the
-second pass -- it just has to get the gist of the story and populate the coda."*
-
-Attempt 1 keeps the strict contract. On failure the retry drops to a RELAXED
-one instead of re-asking for the same thing at a lower temperature.
-
-| | strict (attempt 1) | relaxed (attempt 2) |
-|---|---|---|
-| fact claims | yes | yes |
-| entity names, numbers | yes | yes |
-| `source_spans` with literal quotes | required | **dropped** |
-
-The measured failure is `quote_not_literal` -- a TRANSCRIPTION task, not a
-comprehension one. `_news_coda_source_anchors` reads entity NAMES and number
-VERBATIMS and never reads a span, so the relaxed pass still grounds the drama
-and still names the source.
-
-**THE LOAD-BEARING PART THE RULING DOES NOT SAY: STAMP WHICH CONTRACT PRODUCED
-THE INDEX.** A relaxed extraction is no longer span-proven, so nothing
-downstream may claim verified provenance for it. Enumerate every span reader
-(`_span_ok`, `_span_mismatch`, the citation audit, `_otr_scifi_source_repair`)
-and give each a defined behaviour BEFORE writing the relaxed pass -- the
-standing "a ripped pass may not leave a ledger field unowned" rule applied to a
-field that becomes conditionally absent. Applies to BOTH news lanes.
 
 ### OPEN -- the model floor should REFUSE, not grind
 
@@ -1035,46 +625,6 @@ The codex lane carries the cap-equals-trim shape on `MAX_FACT_ROWS` (6) and
 TRUNCATES during generation rather than refusing -- silent evidence thinning,
 not a crash, and unproven on an artifact. Six facts and four entities is tight
 for a real news story. **Prove it on an artifact before touching it.**
-
-### QUEUED -- rename the lanes off "codex" and "fable2" (approved, sequenced last)
-
-| Now | After |
-|---|---|
-| `_otr_scifi_codex.py` | `_otr_scifi_news.py` |
-| `_otr_scifi_fable2.py` | `_otr_scifi_news_pro.py` |
-| `_otr_fable2_markup.py` | `_otr_scifi_news_pro_markup.py` |
-| `codex_*_system` (6 seams) | `scifi_news_*_system` |
-| `fable2_*_system` (6 seams) | `scifi_news_pro_*_system` |
-
-Surface: 3 modules, ~55 files mentioning `codex`, ~52 mentioning `fable2`, and
-**12 seam ids**. The seam ids are the risky part: they are PROMPT ROUTING KEYS
-in the pack JSONs and `pipelines.json`, and a dead seam looks exactly like a
-live one. Pack JSON + `pipelines.json` + the Python that reads them move
-ATOMICALLY. **Build the seam-resolution check FIRST and keep it** -- a test that
-every `required_seams` / `declared_seams` entry resolves to a real prompt turns
-this from risky into verifiable.
-
-### STANDING RULES for this work -- do not relitigate
-
-* Only TWO things are failure: **action in the ledger**, and **a character
-  speaking another character's lines**. Story quality is NOT a defect
-  (2026-08-04); character consistency IS -- and is now accepted as a
-  documented limitation, above.
-* Code may DETECT and explain. **Only a MODEL may rewrite prose.** No Python
-  stripper, no shim, no regex surgery on a line, and never the name "dummy".
-* No word-count authority anywhere. `act_count` 1..8 is the only knob that
-  shapes an episode; length is an observation.
-* Runaway guards are code-side and STAY. Right-size the JOB; never raise the
-  guard.
-* The ledger holds spoken lines and music cues only. `music_*` rows are
-  load-bearing (audio slicing, still keys, video tail window) and stay.
-* Rerolls split by POSITION: upstream casting rerolls STAY; rerolls that redraw
-  written story GO.
-* Shakespeare and public_domain: **FIDELITY OUTRANKS ARC.** A faithful scene
-  that ends unresolved is a PASS.
-* A schema cap must never sit at the number a downstream trim already enforces
-  (Bible 12.102). Ceilings are backstops; limits live at the trim.
-* One prompt per job for every model tier. Vary the JOB SIZE, not the text.
 
 ### RULED OUT BY MEASUREMENT -- do not re-propose without new evidence
 
@@ -2072,6 +1622,11 @@ session traces.
    as its own rip with the ledger law (every field one owner).
 
 ## OPEN OPERATOR QUESTIONS (flagged, awaiting a ruling)
+
+* A research_only source now WITHHOLDS the OBS copy instead of killing
+  the finished render (chunk 0.5 behaviour change, live since 08-15).
+  If the operator wants the old kill-the-render behaviour back, it is a
+  one-line revert -- say so.
 
 * **Does `media_archive` want the catalog premise at all**, or the same
   scaffold-off treatment as `original`? Found by the five-bank beat test: a
