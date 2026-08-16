@@ -232,6 +232,19 @@ Scope, precisely, so this is not read wider than it is:
   names. If the show ever wants a male Jane by intent rather than by accident,
   that is the knob, and it stays reproducible.
 
+**`original` STAYS AS IT IS (operator ruling 2026-08-15).** Asked whether the
+invention lane should stop drawing from a fixed name pool, the operator said
+"leave original as is, fine". So `OTR_NAME_MODE` stays `pool`, `llm_slot_fill`
+stays OFF, and nobody should reopen it as part of gender work.
+
+Worth writing down so the next window knows what that means rather than
+rediscovering it: an `original` character's name is a pairing from **154 first
+names x 54 surnames**, drawn by seeded RNG -- not invented. First names
+therefore recur across episodes, and the female side is much thinner (117 male
+vs 36 female), so a female character recycles a first name roughly three times
+faster than a male one. That is a known, accepted property of the lane, NOT a
+defect, and it is not the gender machinery's business.
+
 **GENDER DRIFT IS ACCEPTED (operator ruling 2026-08-15 -- do not re-open).**
 Presented with the residual risk, the operator said: *"yeah I see it can fail, I
 accept the gender drift."* So the deterministic ladder is the ANSWER, not a

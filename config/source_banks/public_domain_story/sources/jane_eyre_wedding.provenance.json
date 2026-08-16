@@ -36,9 +36,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 62 vs she/her/hers 9 across 22 mention window(s) for 'richard mason', 'mason'",
+      "evidence": "pronoun scan: he/him/his 62 vs she/her/hers 10 across 23 mention window(s) for 'richard mason', 'mason', 'richard'",
       "aliases": [
-        "mason"
+        "mason",
+        "richard"
       ]
     }
   ],

@@ -18,7 +18,8 @@
       "gender_confidence": "known",
       "evidence": "the source's own name for this character states the gender: 'Constable X 36' contains a gendered title or relation word",
       "aliases": [
-        "36"
+        "36",
+        "constable"
       ]
     }
   ],

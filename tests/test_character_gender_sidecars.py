@@ -140,6 +140,38 @@ class TestPronounScan:
                                                     "water ghost", "ghost")
         assert mention_forms("Gertrude") == ("gertrude",)
 
+    def test_the_GIVEN_name_is_searched_too_not_just_the_surname(self):
+        """The scan used to hunt a word some stories never use.
+
+        It took the surname only, on the reasoning that prose introduces
+        "Captain Ahab" once and then says "Ahab". True of Melville, false of
+        Austen, Montgomery and Twain. Measured on the shipped corpus:
+        "Shirley" appears 0 times and "Anne" 75; "Bennet" 0 and "Elizabeth" 9.
+        Anne Shirley therefore declined for want of a search term, not for want
+        of evidence -- and the characters it failed were the LEADS.
+        """
+        assert "jane" in mention_forms("Jane Eyre")
+        assert "anne" in mention_forms("Anne Shirley")
+        assert "elizabeth" in mention_forms("Elizabeth Bennet")
+
+    def test_a_RANK_or_abbreviation_is_never_searched_as_a_name(self):
+        """"Captain" matches every officer aboard, not this character."""
+        assert "captain" not in mention_forms("Captain Ahab")
+        assert "mrs." not in mention_forms("Mrs. White")
+        assert "dr." not in mention_forms("Dr. Grimesby Roylott")
+
+    def test_an_ARTICLE_marks_a_description_so_its_head_is_not_a_name(self):
+        """THE REGRESSION GUARD. Widening the net to first names re-broke
+        `buck_rogers`: "a Han patrol" scanned for "Han", the antagonist RACE,
+        which opened a window on every enemy in the story and swept up the
+        female lead's pronouns -- taking a defect that scored 4 to 9, clear over
+        the floor. An article marks a description, not a proper name, and that
+        one test separates "Jane Eyre" from "a Han patrol"."""
+        assert "han" not in mention_forms("a Han patrol")
+        assert "water" not in mention_forms("the water ghost")
+        # ... while a genuine proper name is unaffected.
+        assert "jane" in mention_forms("Jane Eyre")
+
 
 # --------------------------------------------------------------------------- #
 # the vendored corpus -- the artifact, not a fixture

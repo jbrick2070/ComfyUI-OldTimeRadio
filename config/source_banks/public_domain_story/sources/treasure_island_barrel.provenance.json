@@ -16,9 +16,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 18 vs she/her/hers 0 across 16 mention window(s) for 'long john silver', 'silver'",
+      "evidence": "pronoun scan: he/him/his 19 vs she/her/hers 0 across 20 mention window(s) for 'long john silver', 'silver', 'long'",
       "aliases": [
-        "silver"
+        "silver",
+        "long"
       ]
     },
     {
@@ -26,9 +27,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 11 vs she/her/hers 0 across 7 mention window(s) for 'israel hands', 'hands'",
+      "evidence": "pronoun scan: he/him/his 22 vs she/her/hers 0 across 14 mention window(s) for 'israel hands', 'hands', 'israel'",
       "aliases": [
-        "hands"
+        "hands",
+        "israel"
       ]
     },
     {

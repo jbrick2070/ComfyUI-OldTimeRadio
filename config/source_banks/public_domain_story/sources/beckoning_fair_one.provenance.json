@@ -16,9 +16,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 651 vs she/her/hers 120 across 211 mention window(s) for 'paul oleron', 'oleron'",
+      "evidence": "pronoun scan: he/him/his 722 vs she/her/hers 162 across 242 mention window(s) for 'paul oleron', 'oleron', 'paul'",
       "aliases": [
-        "oleron"
+        "oleron",
+        "paul"
       ]
     }
   ],

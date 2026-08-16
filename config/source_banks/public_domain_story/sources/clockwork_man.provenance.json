@@ -38,19 +38,28 @@
       "gender_source": "pronouns",
       "gender_confidence": "known",
       "evidence": "pronoun scan: he/him/his 13 vs she/her/hers 0 across 5 mention window(s) for 'gregg'"
+    },
+    {
+      "name": "Arthur Withers",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 22 vs she/her/hers 7 across 18 mention window(s) for 'arthur withers', 'withers', 'arthur'",
+      "aliases": [
+        "withers",
+        "arthur"
+      ]
     }
   ],
   "gender_ladder": {
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 3,
+      "pronouns": 4,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Arthur Withers"
-    ]
+    "declined": []
   }
 }

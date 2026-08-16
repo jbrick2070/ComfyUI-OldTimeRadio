@@ -25,7 +25,8 @@
       "gender_confidence": "known",
       "evidence": "the source's own name for this character states the gender: 'Aunt Em' contains a gendered title or relation word",
       "aliases": [
-        "em"
+        "em",
+        "aunt"
       ]
     },
     {

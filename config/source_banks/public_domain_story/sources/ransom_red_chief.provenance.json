@@ -17,19 +17,29 @@
       "gender_source": "pronouns",
       "gender_confidence": "known",
       "evidence": "pronoun scan: he/him/his 9 vs she/her/hers 0 across 8 mention window(s) for 'sam'"
+    },
+    {
+      "name": "Bill Driscoll",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 60 vs she/her/hers 0 across 35 mention window(s) for 'bill driscoll', 'driscoll', 'bill'",
+      "aliases": [
+        "driscoll",
+        "bill"
+      ]
     }
   ],
   "gender_ladder": {
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 1,
+      "pronouns": 2,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 4,
     "declined": [
-      "Bill Driscoll",
       "Johnny",
       "Ebenezer Dorset"
     ]

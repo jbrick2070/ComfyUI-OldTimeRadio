@@ -16,9 +16,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 36 vs she/her/hers 0 across 14 mention window(s) for 'dorian gray', 'gray'",
+      "evidence": "pronoun scan: he/him/his 72 vs she/her/hers 0 across 29 mention window(s) for 'dorian gray', 'gray', 'dorian'",
       "aliases": [
-        "gray"
+        "gray",
+        "dorian"
       ]
     },
     {
@@ -26,9 +27,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 46 vs she/her/hers 0 across 13 mention window(s) for 'basil hallward', 'hallward'",
+      "evidence": "pronoun scan: he/him/his 64 vs she/her/hers 0 across 21 mention window(s) for 'basil hallward', 'hallward', 'basil'",
       "aliases": [
-        "hallward"
+        "hallward",
+        "basil"
       ]
     }
   ],

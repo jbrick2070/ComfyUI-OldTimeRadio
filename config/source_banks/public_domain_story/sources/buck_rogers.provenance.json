@@ -10,19 +10,30 @@
   "body_bytes": 21735,
   "body_words": 3785,
   "text_path": "config/source_banks/public_domain_story/sources/buck_rogers.txt",
-  "characters": [],
+  "characters": [
+    {
+      "name": "Wilma Deering",
+      "gender": "female",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 0 vs she/her/hers 14 across 5 mention window(s) for 'wilma deering', 'deering', 'wilma'",
+      "aliases": [
+        "deering",
+        "wilma"
+      ]
+    }
+  ],
   "gender_ladder": {
     "version": "gender_ladder_v1",
     "tier_counts": {
       "roster": 0,
-      "pronouns": 0,
+      "pronouns": 1,
       "llm_web": 0,
       "name_frequency": 0
     },
     "candidates": 3,
     "declined": [
       "Anthony Rogers",
-      "Wilma Deering",
       "a Han patrol"
     ]
   }

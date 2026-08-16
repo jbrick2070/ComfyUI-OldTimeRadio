@@ -16,9 +16,10 @@
       "gender": "male",
       "gender_source": "pronouns",
       "gender_confidence": "known",
-      "evidence": "pronoun scan: he/him/his 10 vs she/her/hers 0 across 8 mention window(s) for 'jonathan harker', 'harker'",
+      "evidence": "pronoun scan: he/him/his 12 vs she/her/hers 0 across 12 mention window(s) for 'jonathan harker', 'harker', 'jonathan'",
       "aliases": [
-        "harker"
+        "harker",
+        "jonathan"
       ]
     },
     {

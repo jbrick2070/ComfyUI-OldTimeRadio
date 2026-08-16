@@ -117,6 +117,14 @@ _MALE_WORDS = _MALE_RELATION_SET | _MALE_TITLE_SET
 _FEMALE_WORDS = _FEMALE_RELATION_SET | _FEMALE_TITLE_SET
 
 _ARTICLES = ("the ", "a ", "an ")
+
+#: Leading words that are a RANK, not a name. Scanning for these would match
+#: every officer or physician in the book instead of this character. Imported
+#: from the roster module so the two cannot drift apart.
+try:  # package import (normal)
+    from ._otr_character_roster import _HONORIFICS as _HONORIFIC_HEADS
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_character_roster import _HONORIFICS as _HONORIFIC_HEADS  # type: ignore
 _WORD_RE = re.compile(r"[a-z']+")
 
 
@@ -147,8 +155,28 @@ def mention_forms(name: str) -> Tuple[str, ...]:
     """Every string in the text that plausibly refers to this character.
 
     The full name, the same without a leading article ("the water ghost" ->
-    "water ghost"), and for a multi-token name its final token, because prose
-    introduces "Captain Ahab" once and then says "Ahab" four hundred times.
+    "water ghost"), its final token, AND its first token.
+
+    BOTH ENDS, because assuming one was a real defect. This function used to
+    take the SURNAME only, on the reasoning that prose introduces "Captain
+    Ahab" once and then says "Ahab" four hundred times. True of Melville, and
+    false of Austen, Montgomery and Twain, who use the GIVEN name throughout.
+    Measured on the shipped corpus:
+
+        Anne Shirley      "Shirley"  0 occurrences   "Anne"      75
+        Elizabeth Bennet  "Bennet"   0              "Elizabeth"   9
+        Huck Finn         "Finn"     1              "Huck"        7
+
+    So the scan was hunting a word those stories never use, finding nothing,
+    and declining -- and the characters it failed on were the LEADS, the ones a
+    listener is most certain to notice. Those declines were never ambiguity;
+    they were the wrong search term.
+
+    The first token is taken only when it is TITLE-CASED as authored and is not
+    an honorific or an abbreviation. Lower-case openers are role words, not
+    names ("the water ghost" must not scan for "water", which would flood the
+    count with unrelated windows), and "Captain"/"Mrs."/"Dr." match every
+    officer, wife and physician in the book rather than this character.
     """
     base = str(name or "").strip()
     if not base:
@@ -160,6 +188,23 @@ def mention_forms(name: str) -> Tuple[str, ...]:
     tokens = [t for t in bare.split() if t]
     if len(tokens) > 1 and tokens[-1] not in forms:
         forms.append(tokens[-1])
+    # AN ARTICLE MARKS A DESCRIPTION, NOT A NAME, and that single test is what
+    # separates the two cases. "Jane Eyre" is a person and "Jane" refers to her;
+    # "a Han patrol" is a description and "Han" refers to a whole race. Measured:
+    # without this test, `buck_rogers` pinned "a Han patrol" FEMALE at 0/9 --
+    # scanning for "Han" opened a window on every enemy in the story and swept
+    # up the female lead's pronouns, taking a defect that scored 4 before the
+    # first-token change and pushing it to 9, clear over the floor. So the
+    # widened net applies ONLY to names the source states as proper nouns.
+    if len(tokens) > 1 and bare == base:
+        head = tokens[0]
+        usable = (
+            head[:1].isupper()
+            and not head.endswith(".")
+            and head.lower().strip(".,'") not in _HONORIFIC_HEADS
+        )
+        if usable and head not in forms:
+            forms.append(head)
     seen = []
     for form in forms:
         low = form.lower().strip()
