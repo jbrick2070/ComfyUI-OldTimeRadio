@@ -3,6 +3,79 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-15 -- HEAD 50790099 (v2.0-alpha) -- CODER (D2 closed on both lanes, D4's data gap closed, and four bugs found by measuring rather than by shipping)
+
+Did: **Closed the sprint's D2 end to end, and both proofs are live.** `scifi_news`
+published `signal_lost_the_architecture_of_error_20260815_152004` (33.4 MB,
+`obs_publish OK`, 00:40:56) exercising the NO-OP path; `scifi_news_pro` published
+`signal_lost_blood_red_water_20260815_195226` (45.1 MB, 00:42:44) exercising the
+RESEAL path -- the clean stage rewrote `shot_004_b3`, and the frozen ledger
+carries `authorized_stages ['ledger_clean','ledger_cleanup']`,
+`affected_line_ids ['shot_004_b3']`, a parent digest, 37/37 rows and no
+degradation receipt, after which the freeze cascade returned `frozen_with_warns`.
+Both were the FIRST successful renders of those lanes. The degradation path has
+still never fired live and probably never will.
+
+**D4's data gap is closed**: 65 provenance sidecars written by a new deterministic
+vendor-time scan. The render-time plumbing was already complete end to end --
+only the DATA was missing -- so NO render-path code changed for D4. AHAB, GERTRUDE
+and LORD RONALD, the three the operator heard, all resolve correctly.
+
+**Four defects found by measuring, three of which I would otherwise have shipped:**
+* P5R requested 8320 tokens against an 8192 context -- unsatisfiable for any
+  prompt. Fixed, then the Fable gate proved the fix was HALF a fix (scene size is
+  the model's choice and the P3 prompt invites 8 beats); now chunked. PBUG-20260815-10,
+  Bible `12.106`.
+* The Sonnet QA pass -- which I skipped before pushing and ran after -- found
+  `otr_stamp_character_genders.py` calling `infer_gender` with ONE argument where
+  it takes two and returns a tuple. Tier 1 had never executed once, and would have
+  killed the whole 65-unit run the first time a cast block parsed. It also found
+  `_degrade` could raise out of `reconcile()` into an unguarded call site: the
+  Law 7 violation, inside the rollback that exists to enforce Law 7.
+* The scan shipped a confidently WRONG pin -- `buck_rogers` had "a Han patrol", a
+  squad of soldiers, as female. The ratio test `winner >= 3*loser` is VACUOUS when
+  loser is 0, so one-sided contamination sails through. Floor 4 -> 8.
+* The scan was searching for SURNAMES only: "Shirley" appears 0 times where "Anne"
+  appears 75. Fixed; and the fix itself caused a regression (scanning for "Han",
+  the antagonist race) caught by re-measuring, fixed by a principled rule -- an
+  article marks a description, not a name.
+
+**Retired the unisex name bucket** on the operator's ruling ("I don't trust it"):
+30 of 153 names, one draw in five, were exempt from the coherence repair with
+nothing verifying them. Every name now carries a definite tag. That also exposed
+`tests/golden/capture_cast_baseline.py` as UNRUNNABLE in three independent ways --
+a hardcoded temp path that made it raise on its SUCCESS path, an incoherent-seed
+search that ran post-repair and could only return None, and a missing voice replay
+that made captured baselines unmatchable. All three fixed; re-captured.
+
+**Built three diagnostic labs** (nothing in the render path reads them) and ran a
+blind control: gemma-4-E4B scored 20/20 on known literary characters and zero
+flat-out wrong -- but confidently invented a gender for `Dr. Lira Kell`, a character
+the operator wrote. Three separate probes agree: give the model an escape hatch and
+it uses it honestly; remove it -- by dropping "unsure", or by pressuring it off 0.5
+-- and it produces stable, confident, wrong answers. Also found a 140-token cap in
+my own lab that faked an entire table of failures.
+
+Current step: the sprint's D1/D2/D3 are done and D4's data is landed. PBUG-20260815-11
+(34 characters sounding one gender and looking the other) is measured and BLOCKED on
+an operator ruling.
+
+Next: ASK THE OPERATOR about PBUG-20260815-11 before building anything -- the fix is
+forbidden by a live contract that survived four rounds. Then the contract's chunks 4,
+5, 6 and D7. Shakespeare's 24 unresolved rows want ten curated supplement lines, not
+a model.
+
+Models: CODER window, $0 rung throughout -- own work plus the Windows venv suite. Not
+a full kibitz arc and not reported as one: a Fable gate on the finished diff, a Sonnet
+QA-and-retest pass, one Antigravity/Gemini-3.1-Pro scoped review, and two independent
+r1 design reviews (Fable + agy) on a tier that was then NOT built. Both reviews that
+ran on already-pushed code found real defects, which is the argument for running the
+cheap one BEFORE the push.
+
+Commits: e8da2920, 5194ab90, 8e2bd10b, cab94644, 17ad87bd, a96367bc, 0f15ae47,
+e29e78a2, b8206412, bfd2bb29, 4792217b, f9627eb0, 912917c3, 50790099 (+ this docs
+commit). Survival guide: 6d6c4f0, c2b0998, 275ab57.
+
 ## 2026-08-15 -- HEAD e8da2920 (v2.0-alpha) -- CODER (D4's sidecars land, and the leg meant to prove D2 found a pass that could never have run)
 
 Did: **Closed D4's data gap.** All **65** public_domain units now carry a

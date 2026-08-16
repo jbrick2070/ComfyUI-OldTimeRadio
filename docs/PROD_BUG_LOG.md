@@ -4496,8 +4496,33 @@ only visible because the cameo was FORCED and then did not appear.
   independent evidence, and `restore()` preserves object identity for the two
   TOP-LEVEL containers only, replacing nested rows with fresh deep copies. Both
   now say so.
-- status: **FIXED, and the wiring is LIVE-PROVEN 2026-08-15 -- but only the
-  no-op path.** Leg `signal_lost_the_architecture_of_error_20260815_152004`
+- **RESEAL PATH LIVE-PROVEN 2026-08-15, and this closes the defect.** Leg
+  `signal_lost_blood_red_water_20260815_195226` (scifi_news_pro, real canonical
+  workflow): `RESULT SUCCESS`, `obs_publish OK`, **45.1 MB** on disk,
+  `Prompt executed in 00:42:44`. The clean stage rewrote a row this time, so the
+  transaction took the RESEAL branch rather than the no-op one:
+  `[clean-transaction] authorized window resealed: 1 row(s) rewritten
+  ['shot_004_b3'], 0 dropped`. The frozen ledger carries the receipt durably --
+  `authorized_stages ['ledger_clean','ledger_cleanup']` (ONE window spanning
+  BOTH passes), `affected_line_ids ['shot_004_b3']` (exactly the row that
+  moved), a `parent_authorship_digest` binding it to this acceptance, 37 pre /
+  37 post rows, and NO degradation receipt -- and the freeze cascade then
+  returned `frozen_with_warns`, which is a clean freeze. That cascade is the
+  code that used to raise `line receipt mismatch for l004`.
+  `word_budget.actual_receipts` carries BOTH `writer_final_rows` and
+  `writer_final_rows_post_clean`, so the restamp preserved the pre-clean record
+  instead of overwriting it.
+  **This lane matters specifically:** `scifi_news_pro` is where D3's `END` fix
+  landed early and left the lane clearing the markup ladder only to die at the
+  freeze cascade on this exact mismatch. Both halves are now closed on one
+  render.
+- **STILL NEVER EXERCISED LIVE: the DEGRADATION path.** `content_transition_degraded`
+  was absent on both legs, correctly, because nothing failed. A rollback may
+  never occur in production, which is the point of it -- it stays covered by
+  unit tests only, and that is an accepted state rather than an outstanding task.
+- status: **FIXED and LIVE-PROVEN on both content-owned lanes.**
+  Superseded status line, kept for the record: FIXED, wiring live-proven,
+  no-op path only -- Leg `signal_lost_the_architecture_of_error_20260815_152004`
   (scifi_news, real canonical workflow) is the FIRST successful run of this
   lane, `RESULT SUCCESS` + `obs_publish OK` + 33.4 MB on disk,
   `Prompt executed in 00:40:56`. The transaction ran in production --
@@ -4822,3 +4847,54 @@ only visible because the cameo was FORCED and then did not appear.
   death before -- and ran to `RESULT SUCCESS` with `obs_publish OK` and a
   **33.4 MB** file on disk, `Prompt executed in 00:40:56`. CLOSED.
 
+## PBUG-20260815-11 -- 34 characters sound one gender and look the other
+
+- artifact: `scripts/audit_voice_gender_consistency.py --root <output>/otr/episodes`,
+  run 2026-08-15 over **1,686 ledgers** (65 policy-era, 1,621 legacy).
+  `VIOLATIONS: 0` -- every ACTIVE voice field agrees with the assigned gender,
+  so what the audience HEARS is right. But
+  `portrait conflict : 34 row(s) whose prose asserts the opposite gender`.
+  Examples: `SHERLOCK HIBBERT` assigned male, description says "her";
+  `FATHER BROWN` assigned female, description says "father"; `RICK STEINER`
+  assigned male, description says "mother".
+- why it matters: the description IS the portrait prompt -- the writer builds
+  `visual_plan.characters[].portrait_prompt` from `character_description`. Those
+  characters are voiced as one gender and drawn as the other. Operator, same
+  day: *"Jane should always look and sound the same gender."* The repo already
+  carries the rule in the auditor's own words -- *"CONSISTENCY BEATS ACCURACY:
+  a female Scrooge with a female voice and a female portrait is coherent but
+  unfaithful; a male Scrooge with a female voice is broken."*
+- root cause: the description prompt TELLS the model `Gender: male`
+  (`_otr_casting.py` -- "Gender / timbre / role are Python-decided facts the LLM
+  writes into"), and the only validation on what comes back is
+  `_strip_desc -> v.strip()`. It ASKS and never VERIFIES -- the same pattern the
+  40/40/20 ensemble balance was moved out of the prompt to escape.
+- **NOT an inflated count.** The detector already excludes possessives ("his
+  mother" belongs to someone else) and possessive nouns ("widow's peak" is a
+  hairline); its own comment records that without the second rule it reported
+  170 rows. A DISGUISE plot is a legitimate hit -- ROSALIND-as-Ganymede and
+  VIOLA-as-Cesario keep female voices by operator ruling -- so 34 is a list to
+  read, not a total to fix. `FATHER BROWN` and `SHERLOCK HIBBERT` are not
+  disguises.
+- **BLOCKED, and this is the important part: the obvious fix is FORBIDDEN by a
+  standing ruling.** `otr_meta_brief_image_prompt.py:1585-1588` is a live design
+  contract -- *"No Python vocabulary or overlap classifier can reject, rewrite,
+  or block the prompt."* The 2026-08-05 item-8 campaign proposed exactly this
+  fix twice (Codex: reject contradictory candidates inside the bounded loop;
+  agy: fall back to the deterministic template) and BOTH were overruled at r4,
+  with "update the stale comment" explicitly rejected as a resolution. Two
+  further constraints from that campaign block the cheap route: node 89 cannot
+  reach the description generator, and `Ledger.set_cast` rebuilds a fixed
+  nine-key row that silently drops new fields.
+- the three live options, for the operator: (1) leave it and read the audit
+  list; (2) narrow the ruling for this case only -- a contradiction between two
+  PYTHON-OWNED facts is arguably not a vocabulary classifier judging prose, and
+  that is the only ground it could be revisited on; (3) strengthen the
+  description PROMPT rather than checking its output, which rejects nothing and
+  is permitted as the ruling stands. Option 3 is the only one buildable without
+  reversing a four-round decision.
+- bible-worthy: not yet. The lesson ("a constraint stated in a prompt and never
+  verified is not enforced") has no fix to generalise from until the ruling
+  question is settled.
+- status: **OPEN, BLOCKED ON THE OPERATOR.** Measured and reported by an
+  existing audit; the fix requires a ruling change.

@@ -34,7 +34,7 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10736 / 110 / 1**, Bible **20 / 26 / 3**
+**BASELINES to detect drift:** suite **10751 / 110 / 1**, Bible **20 / 26 / 3**
 (the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
 with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
 budget), variants 50 emitted (3 refused -- the standing unratified cloud
@@ -42,8 +42,9 @@ profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610,
 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5
 / D3; -> 10683 D2's transition schema + the rename fix; -> 10711 D2's emitter +
 transaction; -> 10729 D4's sidecars + the P5R budget fix; -> 10732 the P5R
-chunking fix; -> 10736 the sidecar re-fetch carry-forward. No regressions at
-any step.)
+chunking fix; -> 10736 the sidecar re-fetch carry-forward; -> 10740 the QA
+round; -> 10748 the unisex retirement; -> 10751 the given-name mention fix.
+No regressions at any step.)
 
 **A Bible entry now costs a README bump.** The survival-guide repo enforces a
 Three-File Contract -- `BUG_BIBLE.yaml`'s entry count must equal the count cited
@@ -122,35 +123,16 @@ the directory was never empty. Also note the real output base is
 `C:\Users\jeffr\Documents\ComfyUI\output\otr\` -- checking the repo-relative
 `otr\` reports a false EMPTY, which is the same shape as the bug itself.
 
-**1. D2 IS BUILT, PUSHED, AND ITS WIRING IS LIVE-PROVEN (2026-08-15).** Both
-owed halves landed: chunk 3's proof surfaces and chunk 1's transaction/restore.
-One window is captured around BOTH `run_ledger_clean` and `run_ledger_cleanup`
-(opened `OTR_LedgerScriptWriter.py:6798`, reconciled `:6819`) and stamped once,
-before `stamp_text_for_tts_delivery`. On success the finalizer's `expected` and
-`meta.scifi_codex.line_text_sha256` re-point at the authorized text while
-`accepted_lines` and the v1 receipt are preserved; a no-op emits nothing. On an
-unprovable reseal the transaction restores the accepted ledger IN PLACE, stamps
-`meta.content_transition_degraded`, and the episode SHIPS -- that closes the
-second defect inside PBUG-20260815-02, the one where a finished render died for
-a proof it could not reconcile. New module `nodes/_otr_clean_transaction.py`,
-28 tests in `tests/test_clean_transaction.py`, Bible `12.104` (the id
-`_otr_content_transition.py` had been citing before it existed).
-
-**THE `scifi_news` LEG PASSED -- the first successful run of that lane.**
-`signal_lost_the_architecture_of_error_20260815_152004` through the real
-canonical workflow: `RESULT SUCCESS`, `obs_publish OK`, **33.4 MB** on disk,
-`Prompt executed in 00:40:56`. The transaction ran in production
-(`[clean-transaction] the authorized window changed nothing`) and the freeze
-cascade then returned `freeze_verdict=frozen_clean (pre_warns=0 post_warns=0)`
--- the exact audit that used to raise `line receipt mismatch`.
-
-**WHAT IS STILL OWED, and do not over-read the green.** That episode's clean
-stage changed NOTHING, so the leg exercised the NO-OP path only. The RESEAL path
-(a transition stamped, the finalizer re-pointed) and the DEGRADATION path
-(restore + receipt) are still covered by unit tests alone. Whether the clean
-stage dirties a row is model-dependent -- it rewrote 9 of 14 rows on the three
-victim ledgers -- so proving those needs a leg that happens to rewrite one, not
-another clean one. `scifi_news_pro` (D2/D3) has also not been run.
+**1. D2 IS CLOSED -- BOTH PATHS LIVE-PROVEN ON BOTH LANES (2026-08-15).**
+Receipts in `docs/HANDOFF_LOG.md` and `PROD_BUG_LOG.md` PBUG-20260815-02.
+`scifi_news` proved the NO-OP path (`signal_lost_the_architecture_of_error_
+20260815_152004`, 33.4 MB, 40:56); `scifi_news_pro` proved the RESEAL path
+(`signal_lost_blood_red_water_20260815_195226`, 45.1 MB, 42:44) with the clean
+stage actually rewriting `shot_004_b3` and the frozen ledger carrying the
+transition receipt. Both were the FIRST successful renders of those lanes. The
+1-in-3 exposure on `roll (any eligible bank)` is closed with evidence.
+The DEGRADATION path has never fired live and probably never will -- that is the
+point of it, and it is unit-tested. Do not schedule work to force it.
 
 **2. D4's DATA GAP IS CLOSED (2026-08-15) -- the sidecars are written.** All
 **65** public_domain units now carry a provenance sidecar with a `characters`
@@ -363,6 +345,35 @@ edges are load-bearing:
 * **D1 must land before the qualifying live leg.** Until the clean stage is
   scoped, it can still rewrite the coda row, so a leg cannot qualify D5 either
   way -- a pass is luck, a failure is already known from three artifacts.
+
+### NEXT WINDOW -- THE ORDER (2026-08-15 wrap)
+
+The bug-fix sprint's D2 is CLOSED and D4's data gap is closed. What remains, in
+the order I would take it:
+
+**1. PBUG-20260815-11 -- BLOCKED ON THE OPERATOR, ask before anything else.**
+34 characters sound one gender and look the other, measured over 1,686 real
+ledgers. The fix is forbidden by a live contract that survived four review
+rounds. The operator has to choose: leave it, narrow the ruling, or strengthen
+the prompt (the only option buildable today). Do NOT build a description
+validator without an explicit reversal, and do NOT edit the ruling comment away.
+
+**2. The contract's remaining chunks**, `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
+is still the authority: chunk 4 (D5 non-media codas), chunk 5 (D6 selector +
+reservation), chunk 6 (D5 media_archive close), and D7. D1/D2/D3 are done.
+
+**3. Shakespeare's 24 unresolved rows** (CALIBAN, ARIEL, Sir Andrew, the
+mechanicals). The sanctioned instrument is ten more curated lines in
+`roster_gender_supplement.json`, keyed by FOLGER CODE (`Tmp`, `MND`), not slug.
+Both r1 reviewers independently said do NOT point a model at this lane.
+
+**NOT scheduled, deliberately:** the local-LLM gender tier. Two r1 reviews
+designed it in full (evidence packages from mention windows, LMFE-constrained
+JSON with "undetermined" first-class, quote-verification against the on-disk
+text, a content-keyed cache) and the measured verdict is that it is machinery
+without a customer at 65 frozen units. Revisit only if the corpus starts growing
+in bulk -- the straggler list is a measured artifact, printed by running
+`scripts/otr_stamp_character_genders.py` with no `--write`.
 
 ### CANONICAL WIDGET DEFAULTS CHANGED 2026-08-15 (operator, live in-session)
 
