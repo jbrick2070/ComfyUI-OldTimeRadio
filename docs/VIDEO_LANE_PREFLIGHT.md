@@ -117,8 +117,12 @@ never as an empty paper checklist)
 
 - `SOURCE_BANK_PREFLIGHT.md` - exists (the format authority).
 - `VIDEO_LANE_PREFLIGHT.md` - this file; enforced by the S8c suite.
+- `TTS_VOICE_PREFLIGHT.md` - exists (2026-08-16); enforced by
+  `tests/test_tts_voice_preflight_matrix.py`. Seeded from the cross-engine
+  Lemmy work, so its gates are the ones that actually bit: a degraded dropdown
+  two engines short, a generator one command from deleting rows it could not
+  recreate, and a route tier that would have raised at render time.
 - Future, each backed by its own enforcement code before the doc is written:
-  `STILL_LANE_PREFLIGHT.md`, `TTS_VOICE_PREFLIGHT.md`,
-  `MUSIC_AUDIO_PREFLIGHT.md`, `LLM_WRITER_PREFLIGHT.md`,
-  `UPSCALER_PREFLIGHT.md`. Seed their gates from this file's shape plus the
-  Bug Bible's per-subsystem entries.
+  `STILL_LANE_PREFLIGHT.md`, `MUSIC_AUDIO_PREFLIGHT.md`,
+  `LLM_WRITER_PREFLIGHT.md`, `UPSCALER_PREFLIGHT.md`. Seed their gates from
+  this file's shape plus the Bug Bible's per-subsystem entries.

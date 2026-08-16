@@ -25,13 +25,20 @@ from ._otr_voice_node_common import OTRVoiceNodeBase, voice_input_types
 class AnnouncerVoice(OTRVoiceNodeBase):
     """Generic announcer-voice node. Registered as ``OTR_AnnouncerVoice``.
 
-    Engine order: kokoro (legacy byte-identical default) > chatterbox > dia.
+    Engine order is legacy-first: kokoro is the byte-identical default.
     """
 
     ROLE = "announcer_voice"
     LINE_ROLES = ("announcer",)
     DONE_PREFIX = "announcer"
-    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia")
+    # MUST equal `_otr_engine_profiles.ENGINES_BY_ROLE["announcer_voice"]`, in
+    # order -- the same drift the character node carried: elevenlabs and
+    # google_tts were appended to the profiles table and this copy was not
+    # updated, so a degraded boot offered a dropdown that could not represent a
+    # saved graph using either. Held equal by
+    # `tests/test_tts_voice_preflight_matrix.py`.
+    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia", "elevenlabs",
+                             "google_tts")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

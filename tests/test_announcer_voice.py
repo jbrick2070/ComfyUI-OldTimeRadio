@@ -112,7 +112,12 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
 
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
     engines = list(A.INPUT_TYPES()["required"]["engine"][0])
-    assert engines == ["kokoro", "chatterbox", "dia"]
+    # UPDATED 2026-08-16, same drift as the character node: elevenlabs and
+    # google_tts were appended to the profiles table and this hardcoded stand-in
+    # was never updated, so the assertion had become the bug's bodyguard.
+    # tests/test_tts_voice_preflight_matrix.py now holds the two lists equal.
+    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs", "google_tts"]
+    assert engines[0] == "kokoro", "index 0 is the byte-identical default"
     assert engines
 
 

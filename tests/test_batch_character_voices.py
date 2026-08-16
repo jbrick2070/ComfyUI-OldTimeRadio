@@ -126,7 +126,19 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
     it = B.INPUT_TYPES()  # must not raise (C-5)
     engines = list(it["required"]["engine"][0])
-    assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro"]  # hardcoded fallback
+    # UPDATED 2026-08-16. This assertion used to pin a five-engine list, which
+    # is what the tuple had drifted to: elevenlabs and google_tts were appended
+    # to the profiles table and this hardcoded stand-in was never updated. The
+    # test was pinning the drift, so it had become the bug's bodyguard -- a
+    # degraded boot offered a dropdown that could not even represent a saved
+    # graph using either engine, and the test said that was correct.
+    #
+    # The fallback's job is to STAND IN for the profiles list when the profiles
+    # import raises, so equality with that list is the property worth pinning;
+    # tests/test_tts_voice_preflight_matrix.py holds the two equal directly.
+    assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro",
+                       "elevenlabs", "google_tts"]  # hardcoded fallback
+    assert engines[0] == "indextts2", "index 0 is the byte-identical default"
     assert engines, "engine combo must never be empty (C-5)"
 
 
