@@ -101,9 +101,12 @@ resume after; do NOT blanket-reset per section 4 without killing the soak
 first, and never kill the MCP pythons.
 Next: item 1.1's kibitz arc + config; then chunk B (one lane, contract at
 docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md with its SCOPE CUT header);
-then the video sprint (1.2, reconciled). Blocked-on-operator: his ears on
-the Lemmy listen page + el_harry; the Q5-variant listen/judge after its
-test; the post-rip TAG (one word).
+then the video sprint (1.2, reconciled). Blocked-on-operator: NOTHING
+(amended same session, operator ruling: ALL eyes/ears deferred -- code every
+sprint straight through on the driver's picks; listen/eyeball artifacts
+accumulate into ONE batch review for his return; elevenlabs provisional pick
+el_daniel with el_harry flagged). Only the post-rip TAG still wants his one
+word.
 Models: CODER window. Rung: the MODEL & CREDIT BUDGET table still has NO
 ROWS -- answered from the per-window mapping (local triage, Sonnet 5
 post-code QA x3 this session incl. the rip FIX-FIRST catch, Fable for the

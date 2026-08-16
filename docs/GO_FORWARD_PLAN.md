@@ -353,6 +353,18 @@ edges are load-bearing:
 ### THE ORDER, DRIVER-SET 2026-08-16 LATE (supersedes the 08-15 list order;
 ### the numbered bodies below are the reference detail, this is the sequence)
 
+**OPERATOR RULING 2026-08-16 (latest, supersedes every eyes-gate below):
+ALL Lemmy/video listen-and-eyeball sessions are DEFERRED -- "we can get eyes
+after all sprints are coded since I will be remote." Code items 1-4 STRAIGHT
+THROUGH on the driver's picks; nothing waits on his ears.** Every artifact
+that wanted eyes ACCUMULATES into one batch review for his return:
+the Lemmy cross-engine listen page, the el_harry-vs-el_daniel elevenlabs
+verdict (provisional pick = `el_daniel`, the only bank-tagged British male;
+`el_harry` stays flagged for the batch listen), the Q5_K_M-vs-Q3 A/B clips,
+chunk B's forced-hit cameo episode, and the soak's best/worst shortlist.
+Provisional rows land WITH receipts saying they are provisional; his ears
+can demote any of them later without archaeology.
+
 1. **Lemmy on every TTS engine** (item 1.1) -- operator ask, smallest, and
    its listen page wants his ears the moment he is back. Short full kibitz
    arc, then config/bank rows + clone renders + ONE listen page.
