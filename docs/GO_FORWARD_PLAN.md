@@ -201,6 +201,41 @@ sidecar generation feeds **D5** identity fields (`work_title` / `author` /
 `license_label`), not D4's gender fields -- same file, same generator, two
 consumers. Worth knowing before anyone assumes it covers this.
 
+**3. SHAKESPEARE HAS THE SAME GENDER HOLE, MEASURED 2026-08-15 -- 24 of 85
+character rows still fall through to the 40/40/20 roll.** Not a PBUG: this is a
+STATIC AUDIT, and the admission rule says a static finding never creates one on
+its own. It needs a live artifact before it is logged as a production bug.
+
+How the lane decides gender, for whoever picks this up: `parse_character_roster`
+reads the play's own "CHARACTERS IN THE PLAY" block, `infer_gender(name,
+description)` reads relation words first and titles second (*"daughter to Duke
+Senior"* -> female, *"a shepherd"* -> male), and whatever that cannot decide
+falls to the curated supplement
+`config/source_banks/shakespeare/roster_gender_supplement.json`, keyed by FOLGER
+PLAY CODE (`Mac`, `Tmp`, `MND`), NOT by slug. Names are never pool-drawn and
+never repaired -- shakespeare slots are `source_owned`, which is what keeps
+ROSALIND named ROSALIND.
+
+Coverage today: **61 of 85 rows (71%) pin**; the remaining 24 get a coin flip.
+
+* `Tmp` has **NO supplement entry at all** -> ARIEL, CALIBAN unresolved.
+* `MND` is covered but leaves the mechanicals: QUINCE, SNOUT, STARVELING,
+  FLUTE, ROBIN, plus the four fairies.
+* `TN` leaves ANDREW (Sir Andrew Aguecheek); `Ado` leaves BOY, PRINCE,
+  BALTHASAR.
+
+**CALIBAN and Sir Andrew can be cast female.** Some of the rest are genuinely
+open -- ARIEL is a spirit often played by women, and Peaseblossom/Cobweb/Mote/
+Mustardseed are fairies -- but CALIBAN, QUINCE, FLUTE, ROBIN and ANDREW are not
+ambiguous. Filling the supplement is the sanctioned instrument here; the SPEC
+calls it a Shakespeare device, and it is a curated data file, NOT the
+"hand-balancing the first-name pools" that the contract rejects.
+
+**A trap for whoever measures this:** the sidecars carry `slug` (`midsummer`),
+the supplement is keyed `MND`, and `source_meta.play_code` is what the render
+path actually passes. Probing with the slug reports ZERO supplement coverage and
+looks exactly like a dead key-mismatch bug. It is not; it is the wrong key.
+
 The chunk order is in the contract; it is not the defect order and two of its
 edges are load-bearing:
 
