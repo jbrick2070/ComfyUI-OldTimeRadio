@@ -673,6 +673,93 @@ freeze, and proof failures remain loud. A raw unsafe candidate is retryable;
 unsafe text that somehow remains after acceptance is an invariant failure.
 
 
+## 37. Prove the control reaches the code path before blaming the control
+
+A reproduction that varies a knob proves nothing until the knob is shown to
+REACH the failing lane. The 2026-08-11 record concluded "forcing the LEMMY
+cameo kills the `scifi_news_pro` writer" from a clean-looking matrix -- two
+forced legs died, one natural leg passed. On 2026-08-16 the attribution was
+withdrawn: at that very commit the lane dispatch returned BEFORE the force
+value was computed, the runner took no cameo argument, and the module
+contained zero occurrences of the string. The widget was inert on that lane.
+The matrix was three independent stochastic draws of a control connected to
+nothing, and the real cause was ordinary writer markup non-compliance.
+
+Do this before attributing any failure to a setting:
+
+- trace the setting from its widget to the failing function and name the
+  line where it is consumed; if the lane returns before that line, the
+  setting is not in play;
+- read the actual leg log for the setting's own name -- the 2026-08-11 logs
+  contained ZERO occurrences of "lemmy" and would have refuted the
+  attribution on day one;
+- treat a 2-of-3 outcome split on an unmeasured baseline as coincidence
+  until the baseline failure rate is known.
+
+A wrong attribution is worse than an open bug: it fences off a design (here,
+the cameo roll) for months on evidence that never supported it.
+
+## 38. A retired name reused elsewhere makes an absence look like a regression
+
+`scifi_news` shipped an empty cameo contract, the operator remembered the
+cameo working, and the log recorded a REGRESSION. The archaeology says
+otherwise: the lane that ran the cameo was `science_news` (inline
+`lock_cast`), retired 2026-07-17; two days later a rename moved the NAME
+`scifi_news` onto a different, runner-dispatched lane that never had the
+feature. A case-insensitive pickaxe over BOTH runners' full history returns
+EMPTY -- no commit ever added or removed the string.
+
+The operator's memory was correct at the PRODUCT level and the log was wrong
+at the LANE level, and both statements had to be recorded to describe
+reality. Before writing "regression" about a missing capability:
+
+- `git log --follow --pickaxe-regex -S "<feature-string>" -- <file>` over the
+  suspect module; an EMPTY result means the file never had it;
+- check for a rename or retirement near the date the capability "vanished"
+  (`git log --diff-filter=RA --name-status`, and the roster/registry
+  history);
+- separate PRODUCT-level loss (real, worth fixing) from LANE-level
+  regression (may never have existed). The repair is the same; the framing
+  decides whether anyone hunts a nonexistent breaking commit.
+
+## 39. A diagnostic that coalesces absence into a default destroys the finding
+
+The bug log recorded `cast_contract: {}` on two frozen ledgers, and the
+defect was written up as an EMPTY contract. Reading the artifacts directly
+showed the key was ABSENT -- the `{}` came from the probe's own
+`meta.get("cast_contract") or {}`. The distinction was the entire defect:
+"field never written" is exactly what the one-stable-shape rule exists to
+prevent, and the probe erased it.
+
+Probes that inspect a field's PRESENCE must not normalize. Use
+`key in obj` and report absent / empty / populated as three outcomes, and
+quote the raw value in the bug entry. The same rule applies to any consumer
+that reads with a default and then reports what it read.
+
+## 40. When asking "did it get better," blind the judge
+
+Two questions this project could not answer with metrics -- "are the stories
+better than the last bake-off" and "which bank tells the best stories" --
+were answered by handing a reader unlabelled transcripts and asking it to
+FIND the grouping. It recovered the era split 10/10 and the six-bank
+grouping 6/6, which is what makes the rankings credible; a judge told which
+group is "new" cannot produce that evidence.
+
+The method, reusable as-is (`scratchpad/make_transcripts.py`,
+`bank_transcripts.py`):
+
+- extract spoken lines only, so the judge reads a STORY and not a ledger;
+- equalize the confound -- sample comparable lengths, or the judge sorts by
+  size rather than craft;
+- withhold the mapping in a separate key file the judge is told not to open;
+- ask it to discover the split and state its confidence BEFORE the reveal;
+- accept "no meaningful difference" as a valid, useful answer.
+
+Two independent instruments agreeing (the deterministic structure score and
+the blind read ranked the same bank first and the same bank last) is
+stronger evidence than either alone. And a scoring instrument must stay
+telemetry: THE LAW forbids a score becoming a gate, however good it looks.
+
 ## Sprint receipt
 
 Record this at the end of every production sprint:

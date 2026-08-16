@@ -498,3 +498,60 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
   equal `239 187 191`, since the builder has no `head`) (Bible 02.11/12/13); `workflows/otr_canonical.json` byte-unchanged (registry-driven --
   a change there is a red flag; verify it strands no COMBO id, BUG-08.06/12.23); commit + push;
   `HEAD == origin`; AST-parse touched `.py`.
+
+## Reversal -- restoring a removed bank (the inverse of the teardown)
+
+Written 2026-08-16 during the `scifi_news` rip, because the cheapest moment
+to record how to undo a teardown is while enumerating its surfaces. A rip is
+a legitimate, encouraged decision -- but a lane retired on a Tuesday
+judgement should not cost a rebuild if the operator wants it back in March.
+
+**THE RIP MUST BE ONE ATOMIC COMMIT. This is a constraint ON the teardown,
+not advice for later.** Every surface in the checklist above -- registry
+rows, pipeline entries, pack dir, story rules, lane module, tests, docs --
+lands in a SINGLE commit whose message names the ripped id in its subject.
+That commit IS the restoration recipe, and `git revert <sha>` is the first
+move of any reversal. A rip smeared across three commits cannot be reverted
+without hand-merging, which is how a reversible decision quietly becomes a
+permanent one.
+
+**Anchor the pre-rip state with a TAG** when the bank was live-proven before
+removal (e.g. `otr-2026-08-16-sixbank-lemmyA` precedes the `scifi_news`
+rip). The tag is the known-good tree the restored lane must be diffed
+against; without it, "what did this lane look like when it worked" is an
+archaeology exercise.
+
+**What a revert DOES restore, cleanly:** the bank row, the pipeline entries
+in both registries, the pack dir + story rules, the lane runner module, the
+`LANE_SPECS` entry, the deleted tests, and the cameo-policy row. These are
+all tracked text; git owns them completely.
+
+**What a revert does NOT restore, and must be re-checked by hand:**
+
+- [ ] **Downstream drift.** The surviving tree moved on. A reverted runner
+  may call helpers whose signatures changed after the rip; AST-parse it and
+  run its restored tests FIRST, before any live leg.
+- [ ] **Roster arithmetic.** Roster/bijection tests and roll-pool counts were
+  updated to the smaller roster; the revert restores the old numbers, which
+  may now conflict with OTHER banks added since. Re-derive, never trust the
+  reverted list.
+- [ ] **Model/asset availability.** A lane's default story model, feeds, or
+  reference assets may have been deleted or gone stale independently of the
+  code; confirm each still resolves.
+- [ ] **Frozen ledgers are NOT a problem.** Historical episodes naming the
+  removed bank keep parsing throughout -- a rip never invalidates published
+  artifacts, which is precisely why `runnable` curation and row deletion are
+  both safe for the corpus.
+
+**A restored bank RE-ENTERS AT GATE 1, not at "it used to work."** Run the
+full add-a-bank ladder: registry consistency, import smoke, the ledger-field
+ownership audit, then a LIVE qualifying leg through
+`workflows/otr_canonical.json` with `RESULT SUCCESS` + `obs_publish OK` + the
+asset on disk. The reason a lane was ripped is usually that it was WORSE, so
+restoring it without re-qualifying re-admits the defect that got it removed.
+
+**Record the reversal in `PROD_BUG_LOG.md` against the original rip entry**
+-- "retired 2026-08-16, restored <date> because <reason>, re-qualified by
+<leg>". A lane that silently returns is indistinguishable from one that was
+never removed, and the next window inherits a contradiction between the log
+and the registry.
