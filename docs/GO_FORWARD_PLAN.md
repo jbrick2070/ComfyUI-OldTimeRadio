@@ -245,6 +245,45 @@ vs 36 female), so a female character recycles a first name roughly three times
 faster than a male one. That is a known, accepted property of the lane, NOT a
 defect, and it is not the gender machinery's business.
 
+**THE VOICE/PORTRAIT MISMATCH IS REAL, MEASURED, AND BLOCKED BY A STANDING
+RULING -- READ THIS BEFORE PROPOSING THE OBVIOUS FIX.** Measured 2026-08-15 over
+1,686 real ledgers with `scripts/audit_voice_gender_consistency.py`:
+
+    VIOLATIONS        : 0     <- what the audience HEARS is always right
+    portrait conflict : 34    <- rows whose PROSE asserts the opposite gender
+
+Examples: `SHERLOCK HIBBERT` assigned male, description says "her";
+`FATHER BROWN` assigned female, description says "father". Those characters
+sound one gender and look the other, which is exactly what the operator asked
+never to happen.
+
+Cause: the description prompt TELLS the model `Gender: male`
+(`_otr_casting.py`), and the only check on what comes back is `v.strip()`.
+It asks and never verifies -- the same pattern the 40/40/20 balance was moved
+out of the prompt to escape.
+
+**DO NOT BUILD THE VALIDATOR WITHOUT THE OPERATOR REVERSING A RULING.**
+`otr_meta_brief_image_prompt.py:1585-1588` is a LIVE DESIGN CONTRACT: *"No
+Python vocabulary or overlap classifier can reject, rewrite, or block the
+prompt."* This exact fix was proposed in the 2026-08-05 item-8 campaign --
+Codex wanted candidate rejection inside the bounded loop, agy wanted a fallback
+template -- and BOTH were overruled at r4, with "update the stale comment"
+explicitly rejected as a resolution because editing away a deliberate decision
+to permit a new classifier is the quiet reversal the directives exist to
+prevent. That is why the audit REPORTS the 34 and gates nothing.
+
+Two further constraints that campaign established, so the cheap fix is not
+available either: node 89 cannot reach the description generator, and
+`Ledger.set_cast` rebuilds a fixed nine-key row that silently drops new fields.
+
+**The three live options, unresolved:** (1) leave it, read the audit list;
+(2) the operator narrows the ruling for this case only -- a contradiction
+between two PYTHON-OWNED facts is arguably not a "vocabulary classifier
+judging prose", and that is the only ground the ruling could be revisited on;
+(3) strengthen the description PROMPT rather than checking its output, which
+rejects nothing and is permitted as the ruling stands. Option 3 is the only one
+buildable today.
+
 **GENDER DRIFT IS ACCEPTED (operator ruling 2026-08-15 -- do not re-open).**
 Presented with the residual risk, the operator said: *"yeah I see it can fail, I
 accept the gender drift."* So the deterministic ladder is the ANSWER, not a

@@ -55,7 +55,7 @@ from config import cast_pools as POOLS  # noqa: E402
 #: Bump when the QUESTION changes -- a report built on a different prompt is not
 #: comparable with an older one, and a lab whose runs cannot be compared is a
 #: lab that proves nothing.
-PROMPT_VERSION = "gender_probability_v1"
+PROMPT_VERSION = "gender_probability_v2_global_aggregate"
 
 #: Default panel: three genuinely different local families, smallest first so a
 #: broken harness is discovered cheaply rather than after a 24 GB load.
@@ -79,31 +79,54 @@ class NameGenderProbability(BaseModel):
 
 
 def _prompt(name: str) -> str:
+    """ONE GLOBAL NUMBER. No country, no culture, no hedging.
+
+    The first version of this prompt asked the model to "state the basis -- the
+    language or culture it comes from". That instruction shaped the answers
+    badly: the model went looking for a CULTURE first, and when it could not
+    identify one it returned exactly 0.50 with a basis of "No specific cultural
+    data found" -- 18 names came back that way, including ordinary English ones
+    like Stone, Hayes and Kelly that it plainly has an opinion about. It was
+    declining to name a culture, not declining to gender the name, and the
+    prompt could not tell the difference.
+
+    So: ask for the WORLDWIDE aggregate across everyone alive who carries the
+    name, and say explicitly that a per-country split is not what is wanted.
+    0.5 now means "genuinely used equally", not "I could not place it".
+    """
     return (
-        f'For the given name "{name}", what share of people bearing it are '
-        f"male?\n"
-        "Answer with share_male as a number between 0.0 and 1.0, where 1.0 "
-        "means always male and 0.0 means always female. Use 0.5 only when the "
-        "name is genuinely used equally for both.\n"
-        "State the basis in one short phrase -- the language or culture it "
-        "comes from, and the era if that matters. If you do not recognise the "
-        "name, say so in the basis and answer 0.5."
+        f'Worldwide, across everyone who has the given name "{name}", what '
+        f"share of them are male?\n"
+        "Answer share_male as ONE overall number between 0.0 and 1.0, where "
+        "1.0 means essentially all male and 0.0 means essentially all female.\n"
+        "Give a single GLOBAL aggregate. Do NOT break the answer down by "
+        "country, culture or era, and do NOT answer 0.5 merely because the "
+        "name is used in more than one language -- estimate the overall "
+        "balance across all of them.\n"
+        "Use 0.5 ONLY when the name is genuinely close to evenly split "
+        "between men and women worldwide.\n"
+        "Put a very short justification in basis."
     )
 
 
 def _ask(generate_fn, name: str) -> Dict[str, Any]:
     messages = [
         {"role": "system", "content":
-            "You answer questions about personal names. You are precise about "
-            "what you do and do not know, and you never invent a statistic to "
-            "sound confident."},
+            "You estimate worldwide statistics about personal names. You give "
+            "ONE global aggregate number, never a per-country breakdown. You "
+            "are precise about what you do and do not know, and you never "
+            "invent a statistic to sound confident -- but not knowing which "
+            "culture a name comes from is NOT a reason to answer 0.5."},
         {"role": "user", "content": _prompt(name)},
     ]
-    raw = generate_fn(messages, temperature=0.2, max_new_tokens=160)
+    # 256, not 160. The blind-control run proved 140 truncated the JSON mid
+    # `reason` on exactly the rows whose text ran long, producing a table of
+    # unparseable rows that looked like a model failure and was a budget bug.
+    raw = generate_fn(messages, temperature=0.2, max_new_tokens=256)
     try:
         parsed = NameGenderProbability.model_validate_json(raw)
     except Exception:  # noqa: BLE001 -- a lab reports, it does not raise
-        return {"share_male": None, "basis": "UNPARSEABLE", "raw": raw[:200]}
+        return {"share_male": None, "basis": "UNPARSEABLE", "raw": raw[-90:]}
     return {"share_male": float(parsed.share_male), "basis": parsed.basis}
 
 
