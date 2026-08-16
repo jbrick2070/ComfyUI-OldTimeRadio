@@ -245,7 +245,7 @@ It asks and never verifies -- the same pattern the 40/40/20 balance was moved
 out of the prompt to escape.
 
 **DO NOT BUILD THE VALIDATOR WITHOUT THE OPERATOR REVERSING A RULING.**
-`otr_meta_brief_image_prompt.py:1585-1588` is a LIVE DESIGN CONTRACT: *"No
+`otr_meta_brief_image_prompt.py` -- anchored by the SENTENCE, not a line number, because the number has already gone stale once: *"No Python vocabulary or overlap classifier can reject, rewrite, or block the prompt."* (at :1706-1707 as of 2026-08-15; :1585 is the music-mesh comment and never held this) is a LIVE DESIGN CONTRACT: *"No
 Python vocabulary or overlap classifier can reject, rewrite, or block the
 prompt."* This exact fix was proposed in the 2026-08-05 item-8 campaign --
 Codex wanted candidate rejection inside the bounded loop, agy wanted a fallback
@@ -369,12 +369,30 @@ The operator also asked for a full six-bank live sweep and a tag once it passes
 (`scifi_news`, `scifi_news_pro`, `public_domain`); `shakespeare`,
 `media_archive` and `original` are NOT.
 
-**2. PBUG-20260815-11 -- BLOCKED ON THE OPERATOR, ask before building.**
-34 characters sound one gender and look the other, measured over 1,686 real
-ledgers. The fix is forbidden by a live contract that survived four review
-rounds. The operator has to choose: leave it, narrow the ruling, or strengthen
-the prompt (the only option buildable today). Do NOT build a description
-validator without an explicit reversal, and do NOT edit the ruling comment away.
+**2. PBUG-20260815-11 -- UNBLOCKED 2026-08-15 BY A NARROWED RULING. Build it
+AFTER the Lemmy sprint, the six-bank sweep and the tag -- it does not jump the
+queue.** 34 characters sound one gender and look the other, measured over 1,686
+real ledgers.
+
+**WHAT THE OPERATOR PERMITTED, and it is narrower than the option that was put
+to him.** The ruling STANDS AS WRITTEN for the PORTRAIT PROMPT path: nothing
+downstream of casting may reject, rewrite or block a prompt, and **node 89 gets
+no classifier**. What is permitted is upstream and different in kind -- in
+`_otr_casting.py`, where the comment at `:365-369` already states that gender is
+a Python-decided fact the LLM writes into, **the description producer may check
+its own returned prose against the gender it was handed and RE-ASK.** Bounded
+retries, then keep the last answer: **a render must not die, so it degrades
+rather than raising.**
+
+Neither r4 blocker applies, which is why this is buildable where the 2026-08-05
+proposals were not: we never reach back from node 89, and we add no new field
+for `Ledger.set_cast` to drop.
+
+**Acceptance:** prove it on a live leg and re-run
+`scripts/audit_voice_gender_consistency.py`. **34 portrait conflicts is the
+BEFORE number.**
+
+Do NOT put a classifier at node 89, and do NOT edit the ruling comment away.
 
 **3. The contract's remaining chunks**, `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`
 is still the authority: chunk 4 (D5 non-media codas), chunk 5 (D6 selector +

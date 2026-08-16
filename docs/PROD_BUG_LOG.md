@@ -4877,7 +4877,7 @@ only visible because the cameo was FORCED and then did not appear.
   read, not a total to fix. `FATHER BROWN` and `SHERLOCK HIBBERT` are not
   disguises.
 - **BLOCKED, and this is the important part: the obvious fix is FORBIDDEN by a
-  standing ruling.** `otr_meta_brief_image_prompt.py:1585-1588` is a live design
+  standing ruling.** `otr_meta_brief_image_prompt.py` -- anchored by the SENTENCE, not a line number, because the number has already gone stale once: *"No Python vocabulary or overlap classifier can reject, rewrite, or block the prompt."* (at :1706-1707 as of 2026-08-15; :1585 is the music-mesh comment and never held this) is a live design
   contract -- *"No Python vocabulary or overlap classifier can reject, rewrite,
   or block the prompt."* The 2026-08-05 item-8 campaign proposed exactly this
   fix twice (Codex: reject contradictory candidates inside the bounded loop;

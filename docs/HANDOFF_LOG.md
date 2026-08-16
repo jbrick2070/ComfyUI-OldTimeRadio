@@ -4542,7 +4542,7 @@ Did: shipped the operator's credits request, then ran a full four-round kibitz a
   would have shipped a fix nothing could read -- the same class as the Item 7 defect.
   r3 inverted the ownership (producers produce the presentation, CastLock persists) and
   killed the driver's own "regenerate the description" ruling -- node 89 cannot reach
-  that generator. r4 found `otr_meta_brief_image_prompt.py:1585-1588` is a LIVE CONTRACT
+  that generator. r4 found `otr_meta_brief_image_prompt.py` -- anchored by the SENTENCE, not a line number, because the number has already gone stale once: *"No Python vocabulary or overlap classifier can reject, rewrite, or block the prompt."* (at :1706-1707 as of 2026-08-15; :1585 is the music-mesh comment and never held this) is a LIVE CONTRACT
   ("no Python vocabulary or overlap classifier can reject, rewrite, or block the
   prompt"), which forbids the candidate-rejection both reviewers proposed; chunk 2
   shrank to normalize-and-report. **Driver overruled both lanes there.**
