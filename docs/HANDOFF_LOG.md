@@ -62,7 +62,22 @@ tests AST-parse the node sources off disk, so a mid-run edit is a torn read that
 looks exactly like a real break. Both pass clean on a settled tree; the cost was
 a full re-run. Recorded in `GO_FORWARD_PLAN.md`.
 
-Numbers: suite **10736 / 110 / 1** (from 10711; +25, no regressions). Bible
+**THE QA PASS I SKIPPED FOUND THE WORST BUG OF THE WINDOW.** The routing block
+orders it QA -> Fable -> push; I ran suite -> push -> Fable -> Sonnet, so both
+reviews landed on code already sitting on origin. Sonnet caught that
+`scripts/otr_stamp_character_genders.py:111` called `infer_gender` with ONE
+argument where it takes two and returns a TUPLE -- tier 1 of the gender ladder
+had therefore NEVER executed, and would have `TypeError`d and killed the whole
+65-unit run the first time a cast block parsed. It was dormant only because
+prose has no cast block, which is why every shipped sidecar reads `"roster": 0`
+and the corpus test passed over a tier that could not run. The D4 commit message
+claimed that tier works. It did not. Fixed, with three tests, and the fix
+changes no decisions -- the stamper still reports 133 decided / 86 declined and
+0 sidecars changed. Sonnet also found `_degrade` could raise out of
+`reconcile()` into an unguarded call site: the Law 7 violation, inside the
+rollback that exists to enforce Law 7. Both fixed in `0f15ae47`.
+
+Numbers: suite **10740 / 110 / 1** (from 10711; +29, no regressions). Bible
 **20 / 26 / 3** at **284** entries. Variants 50 / 0 failures.
 
 **THE LEG PASSED, and it is the first `scifi_news` render that ever has.**

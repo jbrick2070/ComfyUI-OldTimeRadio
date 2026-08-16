@@ -51,6 +51,22 @@ in `README.md`, in three places -- so adding an entry and not touching the
 README turns `tests/bug_bible_regression.py` red (20/26/3 became 19+1F/26/3 on
 `12.104` until the README said 283). Bump both in the same commit.
 
+**THE REVIEW ORDER IS QA -> FABLE -> PUSH, AND SKIPPING THE FIRST STEP COST
+REAL DEFECTS THIS WINDOW.** The routing block at the top says *"make your own
+fix and have Sonnet or Flash 3.7 QA and code and retest"*. This window ran
+suite -> push -> Fable -> Sonnet, i.e. both reviews landed on code that was
+already on origin. Both found defects, and the CHEAP one found the worse bug:
+* Fable: the P5R fix was HALF a fix -- sizing the request to the actual scene
+  still dies whenever the model draws a 7-8 beat scene, which the P3 prompt
+  literally invites. Cost: commit `cab94644` cleaning up `5194ab90`, plus a
+  Bible amendment, where one correct commit and one entry would have done.
+* Sonnet: `scripts/otr_stamp_character_genders.py:111` called `infer_gender`
+  with ONE argument where it takes two and returns a TUPLE -- a plain wrong
+  arity that would `TypeError` and kill the whole 65-unit run the first time a
+  cast block parsed. It shipped inside a commit whose message asserted that
+  tier "works". A QA pass catches that in seconds; Fable did not.
+Run the QA pass on the finished diff BEFORE the push, and before spending Fable.
+
 **NEVER EDIT A TRACKED FILE WHILE THE SUITE IS RUNNING.** Cost this window: two
 phantom regressions (`test_p0_deterministic_repair_wired`,
 `test_scifi_candidate_liveness`) that both pass clean on a settled tree. Several
