@@ -1249,6 +1249,112 @@ def _source_bank_excludes_lemmy(source_bank_id: str | None) -> bool:
     return normalized in _LEMMY_EXCLUDED_SOURCE_BANK_IDS
 
 
+#: ``lemmy_policy`` for a lane that builds its OWN cast and never runs the
+#: cameo roll at all. Deliberately NOT ``operator_cameo``: that value asserts
+#: the 11% roll ran and came up short, so stamping it beside ``lemmy_hit:
+#: False`` would record a decline nobody ever made -- the same silence in a
+#: better disguise. A reader can now tell "asked and declined" from "never
+#: asked", which is the whole point of the stamp (PBUG-20260811-03).
+CONTENT_OWNED_NO_CAMEO_ROLL = "content_owned_cast_no_cameo_roll"
+
+#: The two keys a content-owned contract MUST NOT carry, and why. Named here
+#: rather than left implicit because both are load-bearing absences:
+#:
+#: - ``cast_seed`` is not a generic episode seed. It is a CLAIM that the
+#:   writer's seeded picker produced this cast and can be replayed from it.
+#:   OTR_CastLock replays the picker whenever it sees the key, and a lane-owned
+#:   cast has no ``num_characters_request`` to replay with, so claiming it
+#:   detonates the replay ("num_characters must be 1-6, got 0"). The durable
+#:   seed receipt a content-owned lane owes downstream is ``meta.episode_seed``,
+#:   stamped by the shared writer tail.
+#: - ``cast_seed_source`` describes a seed that is not here.
+#:
+#: otr_credits_roll reads ``cast_contract.get("cast_seed", meta.episode_seed)``,
+#: so the key must be ABSENT rather than present-and-None -- a None default
+#: would satisfy ``.get`` and hand credits a null seed.
+CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS = frozenset({
+    "cast_seed", "cast_seed_source",
+})
+
+
+def content_owned_cast_contract(
+    *,
+    source_bank_id: str | None,
+    num_characters_request: int,
+    num_characters_locked: int,
+) -> dict:
+    """Build ``meta.cast_contract`` for a lane that owns its own cast.
+
+    The content-owned lanes (``_otr_scifi_codex``, ``_otr_scifi_fable2``)
+    derive their cast from the script the model already wrote, so they never
+    reach :func:`lock_cast` and never stamped this key at all -- both shipped
+    ``cast_contract: {}`` on every episode (PBUG-20260811-03, re-measured on
+    two 2026-08-15 legs). That is the SILENT half of the defect: a downstream
+    reader could not distinguish a cameo that was declined from a cameo that
+    was never considered, and nothing failed and nothing logged.
+
+    This is the same rule the invention lanes already follow twelve hundred
+    lines below -- *one stable shape on every lane, stamp the empty contract
+    rather than omitting the key* -- applied to the lanes that were missing it.
+
+    Routing these lanes back through :func:`lock_cast` is explicitly the WRONG
+    fix: it would claim a ``cast_seed`` for a cast its picker never rolled.
+    The contract is built here and stamped by each runner instead.
+
+    Returns exactly the legacy contract's key set minus
+    :data:`CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS`; the shapes are held equal by
+    ``tests/test_content_owned_cast_contract.py``.
+    """
+    excluded = _source_bank_excludes_lemmy(source_bank_id)
+    return {
+        # No cameo is cast on these lanes today. The roll itself is chunk B and
+        # is a genuine design fork -- both runners build the cast FROM the
+        # finished script, and forcing a pre-locked row killed the fable2
+        # writer once already (PBUG-20260811-01). Until it lands this records
+        # the true state rather than a hopeful one.
+        "lemmy_hit":              False,
+        # Fidelity still outranks the lane's own silence: if a content-owned
+        # pipeline is ever pointed at an adaptation bank, the reason the cameo
+        # is absent is the exclusion, not the missing roll.
+        "lemmy_policy": (
+            "source_fidelity_exclusion" if excluded
+            else CONTENT_OWNED_NO_CAMEO_ROLL
+        ),
+        # The writer's cast LLM made zero attempts here, which is the honest
+        # count -- this lane's casting attempts live in its own pass receipts.
+        "casting_attempts":       [],
+        # Kept as a PAIR on purpose. These lanes take num_characters as a
+        # request and routinely land somewhere else (a leg asked for 2 and
+        # produced 3), and the divergence is only visible if both numbers are
+        # recorded. Neither is a gate -- THE LAW.
+        "num_characters_request": int(num_characters_request),
+        "num_characters_locked":  int(num_characters_locked),
+    }
+
+
+def count_locked_characters(cast_rows) -> int:
+    """Non-ANNOUNCER cast rows, for ``num_characters_locked``.
+
+    Counted by identity rather than ``len(cast) - 1`` so a lane that ships no
+    announcer row, or more than one, reports what it actually has instead of
+    an off-by-one dressed as a fact.
+
+    A TWO-SHAPE ALLOWLIST, not a general rule (QA note 2026-08-16): codex
+    ships ``char_id == "announcer"``, fable2 ships ``name == "ANNOUNCER"`` at
+    ``c01``. A third content-owned lane with a differently keyed announcer row
+    would be miscounted -- add its shape here when it exists.
+    """
+    total = 0
+    for row in cast_rows or []:
+        if not isinstance(row, dict):
+            continue
+        if (str(row.get("char_id") or "").strip().lower() == "announcer"
+                or row.get("name") == "ANNOUNCER"):
+            continue
+        total += 1
+    return total
+
+
 def assemble_pre_locked_rows(
     *,
     num_characters: int,

@@ -4374,6 +4374,57 @@ def _invoke_p0_window(
     return rebased
 
 
+def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
+                         source_bank_row: Any) -> dict:
+    """Stamp ``meta.cast_contract`` -- the cameo DECISION this lane never made.
+
+    This lane builds its cast from the script the model already wrote, so it
+    never reaches ``lock_cast()`` and, until now, never stamped this key: every
+    codex episode shipped ``cast_contract: {}`` (PBUG-20260811-03). Nothing
+    failed, nothing logged, and a reader could not tell a declined cameo from
+    one that was never considered.
+
+    Stamped HERE rather than in ``_assemble_ledger`` because the bank id lives
+    on ``source_bank_row``, and the cameo policy is a fact about the BANK. The
+    locked count is read back off the ledger the assemble just wrote, so it
+    describes the cast that actually shipped rather than the one requested.
+
+    No render-path behaviour changes: no cameo is cast, and the contract
+    carries no ``cast_seed``, so CastLock's replay branch stays untaken and
+    credits keep falling back to ``meta.episode_seed``.
+    """
+    from . import _otr_casting as _OTRCAST
+
+    meta = led.data.setdefault("meta", {})
+    contract = _OTRCAST.content_owned_cast_contract(
+        source_bank_id=str(
+            getattr(source_bank_row, "source_bank_id", "") or ""
+        ),
+        num_characters_request=int(resolved.get("num_characters") or 0),
+        num_characters_locked=_OTRCAST.count_locked_characters(
+            led.data.get("cast") or []
+        ),
+    )
+    meta["cast_contract"] = contract
+    # Found while reading the two 2026-08-15 proof ledgers: this lane also
+    # never closed `cast_status`. The writer stamps "building" up front and
+    # only the lock_cast branch flips it, so every published codex episode
+    # froze claiming its cast was still being assembled -- including
+    # `signal_lost_the_architecture_of_error_20260815_152004`, which shipped
+    # 33.4 MB to OBS saying "building". Same silent-bookkeeping defect, same
+    # boundary, so it gets its owner here. The fable2 lane already owns this
+    # in `_assemble`; ONE owner per lane, never two.
+    meta["cast_status"] = "locked"
+    log.info(
+        "[scifi_codex] cast contract stamped: lemmy_hit=%s policy=%s "
+        "characters requested=%d locked=%d",
+        contract["lemmy_hit"], contract["lemmy_policy"],
+        contract["num_characters_request"],
+        contract["num_characters_locked"],
+    )
+    return contract
+
+
 def run_scifi_codex_episode(
     *,
     payload: dict[str, str],
@@ -4577,6 +4628,9 @@ def run_scifi_codex_episode(
     lane_meta["news_coda"] = coda_receipt
     expected = _assemble_ledger(
         led, score, p2, script, meta, news_coda=news_coda,
+    )
+    _stamp_cast_contract(
+        led, resolved=resolved, source_bank_row=source_bank_row,
     )
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_codex_assembled"

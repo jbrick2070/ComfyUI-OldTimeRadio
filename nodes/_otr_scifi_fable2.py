@@ -512,6 +512,49 @@ def _fable2_meta(led: Any) -> dict:
     return _ledger_meta(led).setdefault("fable2", {})
 
 
+def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
+                         source_bank_row: Any) -> dict:
+    """Stamp ``meta.cast_contract`` -- the cameo DECISION this lane never made.
+
+    This lane derives its cast from the script the model already wrote
+    (``_speakers_in_order`` -> ``_assign_voices``), so it never reaches
+    ``lock_cast()`` and, until now, never stamped this key: every episode
+    shipped ``cast_contract: {}`` (PBUG-20260811-03, confirmed on
+    ``signal_lost_blood_red_water_20260815_195226``). Nothing failed and
+    nothing logged, and a reader could not tell a declined cameo from one that
+    was never considered.
+
+    Called AFTER ``_assemble``, which saves incrementally -- ``Ledger.save()``
+    rebinds ``led.data``, so the live meta is reacquired here rather than
+    written through the caller's stale mapping. ``require_ledger_save`` further
+    down persists it.
+
+    No render-path behaviour changes: no cameo is cast, and the contract
+    carries no ``cast_seed``, so CastLock's replay branch stays untaken and
+    credits keep falling back to ``meta.episode_seed``.
+    """
+    from . import _otr_casting as _OTRCAST
+
+    contract = _OTRCAST.content_owned_cast_contract(
+        source_bank_id=str(
+            getattr(source_bank_row, "source_bank_id", "") or ""
+        ),
+        num_characters_request=int(resolved.get("num_characters") or 0),
+        num_characters_locked=_OTRCAST.count_locked_characters(
+            led.data.get("cast") or []
+        ),
+    )
+    _ledger_meta(led)["cast_contract"] = contract
+    log.info(
+        "[scifi_fable2] cast contract stamped: lemmy_hit=%s policy=%s "
+        "characters requested=%d locked=%d",
+        contract["lemmy_hit"], contract["lemmy_policy"],
+        contract["num_characters_request"],
+        contract["num_characters_locked"],
+    )
+    return contract
+
+
 def _resolve_seed() -> int:
     """OTR_FABLE2_SEED reproduces the frame-card/stance deal AND the
     announcer voice draw (r3/S2); OS entropy otherwise. The resolved
@@ -3450,6 +3493,9 @@ def run_scifi_fable2_episode(
     # `_assemble` saves incrementally and Ledger.save() rebinds `led.data`.
     # Reacquire the live mapping and preserve the complete-source receipt.
     _fable2_meta(led)["source_coverage"] = source_coverage
+    _stamp_cast_contract(
+        led, resolved=resolved, source_bank_row=source_bank_row,
+    )
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_news_pro_assembled"
     )
