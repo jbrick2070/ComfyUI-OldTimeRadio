@@ -3,6 +3,100 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-16 -- HEAD a1f1577b (v2.0-alpha) -- CODER (chunk A shipped + live-proven, six-bank sweep 6/6 + tag, chunk B full-arc panelled to a BUILD CONTRACT, story finder v1 shipped, two PBUGs corrected by verification)
+
+Did, in order, all pushed:
+
+**PBUG-20260811-01 CLOSED AS MIS-ATTRIBUTED and PBUG-20260811-03 CORRECTED
+(`99f276c1`).** A three-agent adversarial pass, every claim driver-grounded:
+the cameo widget was provably INERT on the fable2 lane at the repro commit
+(dispatch returns at :4032; `lemmy_force` first computed at :4415), and both
+08-11 leg logs contain ZERO "lemmy" -- the deaths were stochastic
+Mistral-Nemo markup non-compliance (stage directions, invented speakers,
+SKELETON_BREAK; not END-shaped). "Forcing the cameo kills the writer" is
+WITHDRAWN. PBUG-03's `{}` was a probe fallback -- the key was ABSENT -- and
+the "regression" framing was rename archaeology: the lane that had Lemmy was
+retired `science_news` (14 measured castings through 07-15); today's
+`scifi_news` was born `scifi_codex_v4`, runner-dispatched from birth, no
+commit in either runner's history ever contained the string. Census over all
+1,686 ledgers: 190 castings / 186 speaking; current era = media_archive +
+original ONLY. Sweep pass criteria written into the plan from it.
+
+**CHUNK A SHIPPED (`da44f642`) AND LIVE-PROVEN.** `content_owned_cast_contract`
++ `count_locked_characters` in `_otr_casting`; `_stamp_cast_contract` in both
+runners; codex also closes `cast_status` (it froze "building" on published
+episodes). 14 new tests. Suite 10765/110/1 (= 10751 baseline + 14 -- THE NEW
+SUITE BASELINE IS 10765), Bible 20/26/3 at 284, variants 50/0. Sonnet QA on
+the diff BEFORE the push (verdict SHIP; its one note folded). Live proof on
+legs 4-5: both scifi ledgers carry the contract, truthful policy, no
+cast_seed, `cast_status: locked`.
+
+**SIX-BANK 1-ACT LIVE SWEEP: 6/6 PASSED, TAGGED `otr-2026-08-16-sixbank-
+lemmyA` at `da44f642`.** All through the real canonical JSON via
+`scripts/otr_canonical_api_run.py`, server reset per section 4 then booted
+fresh (log `comfyui_sweep16.log`). shakespeare 14:56, media_archive 17:35,
+original 17:49, scifi_news 39:19, scifi_news_pro 36:13, public_domain 16:17
+-- every leg `RESULT SUCCESS` + `obs_publish OK` + obs asset on disk +
+per-ledger cameo criteria met (exclusion stamped on fidelity lanes; rolls
+ran and missed truthfully on media_archive/original; D4's gender join live
+on public_domain). First live proofs of shakespeare/media_archive/original
+since the act-topology change.
+
+**CHUNK B: FULL FOUR-ROUND KIBITZ ARC RUN AND CLOSED (`1019020e`).**
+`docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md` IS THE SINGLE AUTHORITY for
+building the cameo roll. Provenance, precisely: Codex all four rounds;
+Antigravity r1-r3 (each needed one file-handoff retry -- narration-only
+first pass), QUOTA-HELD 429 at r4 (kibitz quota-hold on record; partial r4
+panel = Codex + driver, reported as such); Fable r1 cold FIRST opinion per
+the standing rule; two verification workflows grounded panel claims (r3:
+6/6 CONFIRMED). The panel corrected the driver twice (the n_max-1 cap
+violated cast-size-is-a-request; Python-appended shapes would fabricate
+model-owned stakes) -- both corrections are in the contract. 10 external
+calls, $0. Settled: reserve-not-widen on codex, model authors the stake /
+Python normalizes identity, preset reserved pre-deal, one decision API with
+a normative truth table, widget plumbing in-chunk with a reach-test.
+Gotcha for the record: the first fan-out died on WinError 206 -- the
+regenerated `.kibitz/comfyui.local.md` was 134 KB and overflowed
+CreateProcess; trimmed to 15 KB with trim notes (the 08-05 overlay was
+overwritten by `--force`; if hand notes existed there they are lost).
+
+**STORY FINDER v1 SHIPPED (`a1f1577b`), operator-jumped mid-sweep.** All
+1,692 ledgers scored deterministically; `reel_of_mystery` (the operator's
+own exemplar) ranked #2 unaided. Sonnet QA SHIP + five findings fixed
+pre-push (headline: a corpus-proven 27% news-lane coda-flag bias, closed
+with a structural fallback). Shortlist + CSV delivered to the operator.
+`--judge` (local 12B over the shortlist, GPU-idle only) is the queued
+remainder.
+
+**Worth one look next window: the Elias tally is now FIVE.** Elias Vance
+(scifi_news 08-15), Elias (scifi_news_pro 08-15), Elias Thorne (scifi_news
+leg 4), Elias (scifi_news_pro leg 5 -- with Sarah AGAIN, the identical pair
+as blood_red_water), Elias Voss (public_domain leg 6). The name-diversity
+complaint is no longer anecdotal; `scripts/otr_name_randomness_lab.py`
+exists and has never been run.
+
+**Bible promotions deliberately NOT made this session:** two candidates
+noted, not promoted -- (a) the chunk A shape lands with chunk B per the
+contract's documentation gate; (b) PBUG-01's lesson ("a forced-knob repro
+whose knob was provably inert") is a diagnosis-correction shape, no fix:
+clause yet. Check both against the index at promotion time.
+
+Models: CODER window. NO RUNG CITED -- the MODEL & CREDIT BUDGET table still
+has no rows (flagged in the routing block); answered from the per-window
+mapping: local triage + Sonnet 5 post-code QA (ran twice, both SHIP with
+real findings), Fable r1-cold + fable-model verifier fan-outs, kibitz local
+panel. Cloud spend $0.
+Gates at close: suite **10765/110/1** (new baseline, +14 chunk A tests),
+Bible **20/26/3 at 284**, variants **50/0**. BOM/CR clean on every touched
+file; every push lockstep-verified HEAD == origin.
+Box: server RESIDENT and idle on :8000 at `da44f642` modules, GPU ~3 GB.
+NEXT WINDOW: reset per CLAUDE.md section 4 before any leg, and chunk B
+acceptance requires a FRESH boot at the implemented HEAD.
+Commits: `99f276c1` (PBUG corrections + census + sweep criteria),
+`da44f642` (chunk A + tests), `1019020e` (chunk B contract + arc),
+`4433b044` (finder queued), `a1f1577b` (finder v1), tag
+`otr-2026-08-16-sixbank-lemmyA`, plus this handoff.
+
 ## 2026-08-16 -- HEAD 4b8a4aa6 (v2.0-alpha) -- CODER (docs-only: a stale ruling cite corrected, a narrowed ruling recorded, and the Lemmy sprint scoped into a safe half and a panelled half)
 
 Did: **No code. Three docs corrections, all pushed.**

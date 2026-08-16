@@ -351,8 +351,19 @@ edges are load-bearing:
 The bug-fix sprint's D2 is CLOSED and D4's data gap is closed. What remains, in
 the order I would take it:
 
-**1. THE LEMMY SPRINT -- the operator asked for it by name at the 2026-08-15
-wrap ("fix lemmy, test it all and tag").** Start here.
+**1. THE LEMMY SPRINT -- 2026-08-16 STATUS: chunk A SHIPPED AND LIVE-PROVEN,
+the six-bank sweep is 6/6 PASSED, the tag is pushed
+(`otr-2026-08-16-sixbank-lemmyA` at `da44f642`), and chunk B is PANELLED.
+WHAT REMAINS IS BUILDING CHUNK B, and its single authority is
+`docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md`** -- a full four-round
+kibitz arc output (10 external calls; Antigravity quota-held at r4 and the
+partial r4 panel is recorded as such). Build order, per-lane designs, the
+decision truth table, fixture updates and acceptance are all in the
+contract; do not re-derive them from the history below. Chunk B acceptance
+REQUIRES a fresh server boot at the implemented HEAD -- the resident server
+holds `da44f642` modules.
+
+Historical framing of the sprint, kept for context:
 PBUG-20260811-03 was re-confirmed on that session's own artifacts and its SCOPE
 GREW: `cast_contract` is ABSENT (the key is never written -- the `{}` in
 earlier notes was a probe's `or {}` fallback rendering) and the cameo is
@@ -446,20 +457,17 @@ regression signal.
 * **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
   this is NEW construction in two places, not a wiring fix that regressed.
 
-**1.5 OPERATOR REQUEST (2026-08-16, mid-sweep): QUICK STORY-QUALITY SCORING --
-a FINDER, not a chase.** "At some point I'd like quick scoring -- story
-quality -- good stories?" This does NOT reopen the 2026-08-04 story-quality
-freeze: no rewriting, no prompt-craft, no writer bake-offs. It is a READ-ONLY
-ranking tool so the operator can find the good episodes in a ~1,900-ledger
-corpus. Constraints settled at intake: THE LAW applies in full (score =
-telemetry/report; it may never reject, reroll, retire or block an episode,
-and it never wires into the render path); 100% local ($0, `gemma-4-12b`
-judge, one call per episode, overnight batch); reads frozen ledgers only.
-Sketch: `scripts/otr_story_score.py` -- deterministic checks (arc
-start/middle/end, cast utilization, coda present + names its source,
-dialogue-vs-direction ratio) + one local judge call ("keep listening? 1-10,
-one sentence"), ranked CSV + top-N shortlist. Queue position: AFTER the
-Lemmy sprint's chunk B; does not jump anything.
+**1.5 STORY-QUALITY FINDER: v1 SHIPPED 2026-08-16 (`a1f1577b`), operator
+jumped it mid-sweep ("quick scoring now").** `scripts/otr_story_score.py`
+scored all 1,692 frozen ledgers deterministically (structure only; THE LAW
+holds -- telemetry, never a gate, length unweighted). Calibration: the
+operator's own `reel_of_mystery` exemplar ranked #2 of 1,692 unaided.
+Sonnet QA verdict SHIP; its five findings (incl. a corpus-proven 27%
+news-lane coda bias) were fixed before the push. Reports land under
+`otr\episodes\_shared\state\story_scores\`. **REMAINING: the `--judge`
+pass** -- one local `gemma-4-12b` "keep listening? 1-10" call per
+SHORTLISTED episode (judge the candidates, not the corpus), GPU-idle only,
+never during renders. The flag exists and refuses politely until built.
 
 **2. PBUG-20260815-11 -- UNBLOCKED 2026-08-15 BY A NARROWED RULING. Build it
 AFTER the Lemmy sprint, the six-bank sweep and the tag -- it does not jump the
