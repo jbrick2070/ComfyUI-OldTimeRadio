@@ -34,7 +34,11 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift:** suite **10751 / 110 / 1**, Bible **20 / 26 / 3**
+**BASELINES to detect drift (updated 2026-08-16 late):** suite
+**10529 / 110 / 1** (chain that day: 10751 -> 10765 with chunk A's 14
+tests -> 10529 after the scifi_news rip deleted 13 dedicated lane test
+files and the rename trimmed the polluted re-import test), Bible
+**20 / 26 / 3**
 (the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
 with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
 budget), variants 50 emitted (3 refused -- the standing unratified cloud
@@ -584,7 +588,11 @@ The 4060 run itself is the operator's, on his schedule.
 is cycling 1-act legs, 5 banks x 10 styles x 10 engine profiles (all five
 still-family video engines x all five local image engines, rotated through
 committed `otr_soak_*` capability profiles that never emit variants).
-Receipts: `otr_soak_receipts/soak_*.json`, rewritten after every leg. Stop:
+Receipts: `otr_soak_receipts/soak_*.json`, rewritten after every leg.
+**Leg 1 already FAILED usefully** -- the 4th live UNKNOWN_SPEAKER ladder
+exhaustion (PBUG-20260816-02, `scifi_news_pro`); the soak is now the
+incidence-rate measurement that PBUG's correction said was missing. Do
+not theorize a fix from n=1; read the receipt's rate first. Stop:
 kill the `otr_gpu_soak_matrix` python (and any in-flight
 `otr_canonical_api_run`). A post-rip/rename TAG is READY once the soak
 receipt shows every bank passing -- operator-gated, one word.

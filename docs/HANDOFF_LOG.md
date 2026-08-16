@@ -3,6 +3,126 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-16 -- HEAD 7aaa953c (v2.0-alpha) -- CODER (second half: the rip, the rename, the soak, and the queue re-cut on evidence)
+
+Continues the a1f1577b entry below; this covers the afternoon.
+
+Did, all pushed, HEAD == origin at every step:
+
+**TWO BLIND NARRATIVE READS drove the day's two big decisions.** Era read
+(10 transcripts, 5 July bake-off incl. the cloud arms vs 5 August, labels
+withheld): the reader recovered the split 10/10 -- August wins on FLOORS
+(complete broadcasts with authored flaws) while July shows machine seams;
+best-of-era gap is small (7 vs 6). Per-bank read (12 transcripts, 2 per
+bank): re-paired all six banks 6/6 blind; scifi_news_pro FIRST at 7.5,
+scifi_news LAST at 2.0 ("it is not a story"; one leg read pipeline metadata
+on air). Both instruments agreed with the deterministic structure score.
+Receipts: docs/2026-08-16-blind-narrative-comparison.md and
+docs/2026-08-16-blind-bank-narrative-ranking.md. Also surfaced, CORRECTNESS
+class, recorded not scheduled: the shakespeare lane announced the WRONG PLAY
+twice (GO_FORWARD section D is now measured, no longer undiagnosed),
+speaker-tag leaks, corrupted assembly spoken aloud, truncated closers.
+
+**scifi_news RIPPED, full-family (`dae1fb3c`).** Operator call on the
+evidence above. The tell is the runner, not the name: it was the only bank
+on scifi_news_circuit -> _otr_scifi_codex.py (4,664 lines), so bank row,
+pipeline, pack, module, the dead _otr_scifi_source_repair helper and 13
+dedicated test files went in ONE atomic commit; writer defaults repointed to
+scifi_news_pro. Ledger-ownership gate PASSED (no hole -- the meta.scifi_codex
+namespace has zero surviving production readers). otr_canonical.json
+byte-unchanged (sha 02c51da6 verified). Four-agent survey enumerated every
+surface first (docs/2026-08-16-scifi-news-RIP-PLAN.md); Sonnet QA verdict
+FIX-FIRST caught a real defect pre-push (the id substitution created
+duplicate parametrize rows in two lists that already carried the _pro id) --
+fixed with the rest of its findings. Post-rip live proof 3/3
+(scifi_news_pro 27:57, media_archive 14:36, shakespeare 14:44, all
+obs_publish OK). PBUG-20260816-01 records the rip; the teardown protocol
+gained a REVERSAL section + the runner-not-name rule; pre-rip anchor tag
+otr-2026-08-16-sixbank-lemmyA.
+
+**fable2 RENAMED to scifi_news_pro (`01d0730c`).** Module, markup helper,
+runner fn, NewsPro* classes, [scifi_news_pro] log prefix, pack seam ids in
+lockstep with pipelines.json, 14 test files + fixture dir (git mv), the
+meta["fable2"] ledger namespace (operator: "i dont care about old ledgers")
+and OTR_SCIFI_NEWS_PRO_SEED. Historical logs deliberately NOT swept -- a
+first pass rewrote emitted log lines in the append-only records and was
+REVERTED; docs describing current code only. Two real bugs found by the
+rename and fixed: a months-latent cross-test pollution
+(test_perfect_run_spacesaver popped the writer from sys.modules and
+re-imported -- a later test patched one module object while invoking the
+other; fix = stop re-importing) and the known-fail guard swallowing every
+traceback (SystemExit in sessionfinish kills the terminal report; trylast
+added, documented as partial). Lessons 41-42 + a lane-rename checklist added
+to the preflight guide. Live proof:
+signal_lost_rename_proof_scifi_news_pro_20260816_141310, 32:38,
+obs_publish OK, frozen meta["scifi_news_pro"] with 8 keys, no fable2 key.
+
+**GPU SOAK live (`09338017`).** scripts/otr_gpu_soak_matrix.py cycles 1-act
+legs, 5 banks x 10 styles x 10 committed otr_soak_* profiles (5 still-family
+video x 5 local image engines via role_overrides -- the managed-widget
+guardrail refused --set by design, so profiles are the sanctioned lever;
+they sit in LANE_PRESETS and the variants gate stays 50/0). Leg 1 FAILED
+USEFULLY at 27.9 min: the 4th live UNKNOWN_SPEAKER ladder exhaustion
+(PBUG-20260816-02, OPEN, measuring -- the incidence rate the PBUG-01
+correction said was missing is now being collected). Receipts:
+otr_soak_receipts/soak_*.json.
+
+**Video-lab proposal grounded then RECONCILED (`6a892cca`, `49e4a105`,
+`96240ce1`).** Three of its rows were already shipped (both H3 lanes under
+the public_engines alias mapping; LTX already at 1024x576/7.36 GiB); the lab
+withdrew them plus the 848x480 claim and Clamp-13 (no abort-rate evidence).
+Survivors: the ltx_distilled lane (all weights on disk incl. a 9 GB
+distilled Q3 GGUF), P1 verbatim-viseme injection (additive), and the Q5_K_M
+quant as a SIBLING VARIANT per the operator's lanes-not-defaults ruling --
+source VERIFIED by direct HF listing: unsloth/LTX-2.3-GGUF
+ltx-2.3-22b-dev-Q5_K_M.gguf, 16.07 GB (QuantStack has no Q5; city96 is
+v0.9.1). P1's kinetic half is NOT built as proposed -- it is a vocabulary
+rewrite inside the file whose ruling forbids it; driver decision routes the
+motion language additively onto the video-prompt path, revisit condition
+named.
+
+**Lemmy cross-engine matrix DECIDED under the no-skip directive** (operator
+delegated the call): indextts2 done (do not re-train), bark shipped,
+google_tts = gt_algenib (his own source voice), chatterbox/dia = clone the
+approved wav (rights cover local engines), kokoro = bm_george accepted
+cousin, elevenlabs = verify el_harry's AMERICAN tag by ear. Queue item 1.1.
+
+**Story finder + judge and the day's docs** carry from the first-half entry.
+Sprint lessons 37-42 now recorded; PROD_BUG_LOG gained 16-01/16-02 and the
+corrections to 0811-01/03.
+
+Current step: THE ORDER, DRIVER-SET 2026-08-16 LATE in GO_FORWARD. Item 1 =
+Lemmy voices (1.1): short FULL kibitz-plugin:kibitz arc on a small plan doc
+BEFORE code, then bank rows + clone renders + one listen page for the
+operator's ears. GPU NOTE: the soak OWNS the GPU by operator order -- pause
+it (kill the otr_gpu_soak_matrix python + any in-flight
+otr_canonical_api_run, receipts survive) before any render of your own,
+resume after; do NOT blanket-reset per section 4 without killing the soak
+first, and never kill the MCP pythons.
+Next: item 1.1's kibitz arc + config; then chunk B (one lane, contract at
+docs/2026-08-16-lemmy-chunkB-BUILD-CONTRACT.md with its SCOPE CUT header);
+then the video sprint (1.2, reconciled). Blocked-on-operator: his ears on
+the Lemmy listen page + el_harry; the Q5-variant listen/judge after its
+test; the post-rip TAG (one word).
+Models: CODER window. Rung: the MODEL & CREDIT BUDGET table still has NO
+ROWS -- answered from the per-window mapping (local triage, Sonnet 5
+post-code QA x3 this session incl. the rip FIX-FIRST catch, Fable for the
+two blind narrative reads + r1-cold per the standing rule, kibitz local
+panel). Review routing read and applied: the 2026-08-15 REVIEW ROUTING
+block -- the sprint arc it references is spent; NEW coding items take the
+2026-08-04 full-arc gate, which is why chunk B ran r1-r4 (10 external
+calls, agy quota-held at r4, partial r4 reported as such, $0 cloud).
+Gates at close: suite **10529/110/1** (post-rip+rename baseline; chain in
+GO_FORWARD), Bible **20/26/3 at 284**, variants **50/0**, all 34 nodes load
+on a fresh boot, BOM clean on every touched file. Bible delta-check run:
+16-01 is a decision record and 16-02 has no fix yet -- NOTHING PROMOTED,
+nothing owed.
+Box: server RESIDENT on :8000 (comfyui_rename.log boot, rename-era code),
+GPU ~10 GB / soak rendering leg 2 at handoff. The soak is the DELIBERATE
+inherited state, not a leak.
+Commits: 75d1c113, 254d8d6b, 33141fd0, dae1fb3c, 01d0730c, 09338017,
+6a892cca, 49e4a105, 96240ce1, 7aaa953c, plus this handoff.
+
 ## 2026-08-16 -- HEAD a1f1577b (v2.0-alpha) -- CODER (chunk A shipped + live-proven, six-bank sweep 6/6 + tag, chunk B full-arc panelled to a BUILD CONTRACT, story finder v1 shipped, two PBUGs corrected by verification)
 
 Did, in order, all pushed:
