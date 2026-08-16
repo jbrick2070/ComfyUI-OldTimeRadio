@@ -354,16 +354,23 @@ the order I would take it:
 **1. THE LEMMY SPRINT -- the operator asked for it by name at the 2026-08-15
 wrap ("fix lemmy, test it all and tag").** Start here.
 PBUG-20260811-03 was re-confirmed on that session's own artifacts and its SCOPE
-GREW: `cast_contract` is `{}` and the cameo is absent on BOTH content-owned
-lanes, not just `scifi_news`. Read the refreshed entry at the end of
-`PROD_BUG_LOG.md` before planning.
+GREW: `cast_contract` is ABSENT (the key is never written -- the `{}` in
+earlier notes was a probe's `or {}` fallback rendering) and the cameo is
+missing on BOTH content-owned lanes, not just `scifi_news`. Read the refreshed
+entry and its 2026-08-16 corrections at the end of `PROD_BUG_LOG.md` before
+planning.
 Three things that will save a wasted swing: the obvious fix (route content-owned
 lanes back through `lock_cast()`) is explicitly THE WRONG ONE and the repair
 belongs in each lane runner; the fix is TWO things, the cameo roll and the cast
-contract; and PBUG-20260811-01 says forcing the cameo KILLS the fable2 writer on
-`scifi_news_pro`, so any cameo work there must be proved against that failure
-rather than only against an empty contract. PBUG-20260811-02 (missing
-materialized still, seen ONCE) wants a re-run before its cause is theorised.
+contract; and PBUG-20260811-01 is **CLOSED AS MIS-ATTRIBUTED (2026-08-16)** --
+at the repro commit the cameo widget was provably inert on that lane (dispatch
+returns before `lemmy_force` is even computed) and the two leg logs contain no
+"lemmy" at all, just stochastic Mistral-Nemo markup non-compliance -- so
+"forcing the cameo kills the fable2 writer" is WITHDRAWN as a constraint on
+cameo work. PBUG-20260811-02's cause is no longer open either: root cause
+ESTABLISHED in the log (pre-audio still planning plus a reservation that
+suppressed itself in both branches); the entry stays OPEN only pending live
+proof of the repair.
 The operator also asked for a full six-bank live sweep and a tag once it passes
 -- three banks are proven at tag `otr-2026-08-15-d2-closed`
 (`scifi_news`, `scifi_news_pro`, `public_domain`); `shakespeare`,
@@ -385,6 +392,19 @@ full text at the END of `PROD_BUG_LOG.md`:**
    Resolve his `char_id` from the CAST row (which DOES carry the name), then
    match lines on that id.
 
+**SWEEP PASS CRITERIA FOR THE CAMEO (2026-08-16, from the full-corpus ledger
+census -- write this into the sweep verdict so the expected result is not read
+as a failure):** in the current era Lemmy appears ONLY on `media_archive` (last
+2026-08-15) and `original` (last 2026-08-10); every other bank stops in July,
+and every `scifi_*` bank id has ZERO castings ever. Expected per bank:
+`media_archive` / `original` -- the cameo MAY appear (11% OS-entropy roll;
+absence on any single leg is NOT a failure); `public_domain` / `shakespeare` --
+NO LEMMY row, contract stamped with `lemmy_policy=source_fidelity_exclusion`;
+`scifi_news` / `scifi_news_pro` -- until chunk B lands, NO cameo, and (once
+chunk A lands) a stamped contract with `lemmy_hit: false` and the content-owned
+no-roll policy. Lemmy absent on the scifi pair is the EXPECTED state, not a
+regression signal.
+
 **Repair sites: TWO runner modules** -- `_otr_scifi_codex` and
 `_otr_scifi_fable2` -- whatever the variant count above them.
 
@@ -400,15 +420,29 @@ full text at the END of `PROD_BUG_LOG.md`:**
   contract rather than omitting the key, so a downstream reader never has to
   distinguish 'no source' from 'field never written'."* No render-path behaviour
   changes and no cameo appears; provable without a GPU.
-* **Chunk B -- the cameo ROLL. NOT confident: PANEL IT BEFORE WRITING CODE.**
-  Both runners derive their cast FROM the script the model already wrote
-  (`speaker_order` -> `_assign_voices` in fable2). So a cameo has only two
-  shapes and both are bad as stated: ask the model to write him in, which is
-  exactly the pre-locked row that killed the fable2 writer in PBUG-20260811-01
-  (markup ladder exhausted, reproduced at 30 AND 90 words); or inject him after
-  the script, which yields a cast row with no dialogue. That is a real design
-  fork with a known live failure attached -- the routing block says panel it
-  rather than spend a swing.
+* **Chunk B -- the cameo ROLL. Still panel it, and the design space is now
+  MEASURED (2026-08-16, three-agent verification, every claim driver-grounded
+  against the tree).** The altitude question is settled by construction: the
+  roll must be decided BEFORE the script pass, because both lanes derive cast
+  FROM the finished script and both gate on it -- fable2's gate (b) demands
+  speaker set == cast rows and codex's `cast_coverage` gate demands every cast
+  id scheduled, so post-script injection fails structurally. The old blocker is
+  GONE: PBUG-20260811-01 is closed as mis-attributed (widget inert on the lane,
+  no "lemmy" in either leg log), so there is NO known writer/cameo interaction
+  to design around -- the proof obligation is simply that a cameo-bearing cast
+  passes both gates on a live leg. What remains a genuine fork, and why the
+  panel is still owed: the two lanes need DIFFERENT designs. Codex is
+  SCHEMA-LOCKED -- `char_id`/`voice_slot` Literals + cast `max_length=4`
+  (`_otr_scifi_codex.py:277-286`), the id vocabulary repeated in `BeatPlanV4`
+  (:488), `RadioScoreDraftBeatV4` (:551, itself grammar-decoded in P3),
+  `ScriptLineV4` (:797) and the `_DRAFT_SPOKEN_CHAR_IDS` gate (:1221, enforced
+  :1352); the LMFE grammar on the local provider rebuilds from the models
+  automatically -- so a cameo either DISPLACES one of the three story slots or
+  widens five schema sites (no test pins the Literals; the lock lives entirely
+  in the production module). Fable2 has headroom: `MAX_SPEAKING_CAST = 10`, no
+  id vocabulary, no grammar binding -- a cameo needs no schema edit, but it
+  consumes one of the 10 live voices and MUST speak (the casting validator
+  demands exactly one entry per script speaker).
 * **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
   this is NEW construction in two places, not a wiring fix that regressed.
 

@@ -3559,7 +3559,7 @@ into it than it earned:**
   not tolerating a pre-locked row, rather than a portable contract. If a SECOND
   lane shows the same shape, the class ("a pre-locked cast row the writer pass
   cannot honour fails the whole render") would be.
-- status: OPEN
+- status: **CLOSED 2026-08-16 -- MIS-ATTRIBUTED.** See the correction below.
 
 **Reachability note, stated because it is my own change.** `lemmy_cameo` was
 whitelisted for headless drivers in `baf338ee` (Chunk D) so a qualification run
@@ -3568,6 +3568,38 @@ could force the cameo deterministically. That commit did not CREATE this defect
 the failure reachable from the sanctioned headless runner, which is how it was
 found. Four other banks force the cameo fine, so the whitelist is not the thing
 to revert.
+
+**CORRECTION AND CLOSURE, 2026-08-16 -- the attribution was wrong, proven two
+ways** (three-agent adversarial verification, every claim re-grounded by the
+driver against the artifacts before acceptance):
+
+1. **The widget was INERT on this lane at the repro commit.** At `baf338ee` the
+   runner dispatch returns at `OTR_LedgerScriptWriter.py:4032` and `lemmy_force`
+   is first computed at `:4415` -- AFTER the return, feeding the `lock_cast()`
+   call dispatched lanes never reach. `run_scifi_fable2_episode` took no lemmy
+   input and the module contained zero lemmy references at that commit. There
+   was never a pre-locked LEMMY row at ANY altitude on these legs; the
+   forced-fails / natural-passes matrix was three independent stochastic draws
+   of a widget that did nothing.
+2. **The surviving leg logs refute the attribution.** `comfyui_58123.log`
+   (BANKSWEEP scifi_news_pro, 30w) and `comfyui_59189.log` (PROBE B_90w_forced,
+   90w): ZERO occurrences of "lemmy" in either log. The actual last defects are
+   prose stage directions rejected as BAD_LINE_SHAPE ("Mike Brennan, pacing,
+   phone in hand"), invented speakers (UNKNOWN_SPEAKER: LUCY, REPORTER) and
+   SKELETON_BREAK -- ordinary stochastic markup non-compliance from
+   Mistral-Nemo at temp 0.85. No END-shaped defect either, so it is not the D3
+   grammar bug fixed 2026-08-15.
+
+The sentence "The pre-locked LEMMY row is what the scifi_fable2 script pass
+cannot satisfy" is WITHDRAWN, and the symptom's quoted `- BAD_LINE` was a
+truncation of BAD_LINE_SHAPE (no defect named BAD_LINE existed at `baf338ee`).
+The ladder-exhaustion class continues on its own record -- three live
+exhaustions (08-10 sweep, 08-11 probe B, 08-15 gate), the last of them the END
+grammar closed by D3 / Bible `12.105`. What survives for the Lemmy sprint is
+architectural, not this bug: a cameo must be OFFERED to the lane's own
+casting/script passes BEFORE the script is written, because fable2's gate (b)
+(speaker set == cast rows) and codex's cast_coverage gate reject post-script
+injection by construction.
 
 ---
 
@@ -4934,6 +4966,32 @@ only visible because the cameo was FORCED and then did not appear.
   measure it properly and has not been run.
 - status: OPEN. Evidence refreshed, scope corrected from one lane to two.
 
+**TWO CORRECTIONS, 2026-08-16** (verified against the frozen ledgers and the
+git record; the census that grounds them is at the end of this file):
+
+1. **The key is ABSENT, not `{}`.** Direct reads of both 2026-08-15 frozen
+   ledgers show NO `cast_contract` key at all (`meta.get("cast_contract")`
+   returns None); the `{}` in the artifact block above was the probe's own
+   `or {}` fallback rendering. Sharper defect, same repair: the key is omitted
+   entirely, which is exactly the "field never written" shape the invention
+   lanes' stable-shape rule exists to prevent.
+2. **The LANE never had the cameo; the PRODUCT did.** The base entry's sentence
+   "scifi_news predates the content-owned redesign, worked under the legacy
+   picker" is unsupported: today's `scifi_news` was born `scifi_codex_v4`
+   (`1fd7743d`, 2026-07-17), runner-dispatched from birth (`c22eef0a` wired the
+   runner into `_RUNNER_BY_PIPELINE` the day the module was created), and a
+   case-insensitive pickaxe over BOTH runners' full history returns EMPTY -- no
+   commit ever added or removed the string "lemmy". The lane that ran the cameo
+   was `science_news` (`legacy_many_pass` -> inline `lock_cast()` -> LEMMY
+   11%), retired at `499386aa` on 2026-07-17; two days later `f03128fa` renamed
+   scifi_codex_v4 -> scifi_news, landing the name on a lane that never had him.
+   The PRODUCT-level loss is real and measured -- `science_news` cast Lemmy
+   **14** times (all speaking) through 2026-07-15 -- so the operator's "it
+   always used to work, it was the first Lemmy plan" is CONSISTENT with the
+   record at product level; the science_news / scifi_news name collision is the
+   likely source of the "regression" framing. The repair is unchanged: both
+   content-owned runners need the contract and the roll built NEW.
+
 ### Operator context, 2026-08-15 -- NOT derivable from the code, recorded so it is not lost
 
 **MEASURE THE PART, NOT THE PRESENCE. The presence question is already
@@ -4972,3 +5030,18 @@ repair sites** -- `_otr_scifi_codex.run_scifi_codex_episode` and
 than one overwriting the other: **the fix lands in 2 runner modules regardless of
 how many variants route through them**, but if there really are ~14 the
 reconciliation is worth doing before the sweep claims coverage.
+
+**CENSUS, 2026-08-16 -- all 1,686 ledgers, cast-row NAME match with spoken
+lines resolved via char_id per the detector warning above.** 190 castings, 186
+speaking by strict non-empty-text match (the 08-15 count of 188 used its own
+method; both agree every silent casting predates the current cameo code -- all
+4 sit in the pre-bank era, before 2026-07-05). Current era: `media_archive`
+**9** (last 2026-08-15) and `original` **4** (last 2026-08-10) ONLY.
+July-and-earlier: `science_news` 14 (last 07-15), `shakespeare` 6 (07-30),
+`public_domain` 1 (07-23), scattered `_v2`/`_v3` singles, and 150 castings in
+the 942 pre-bank ledgers -- NONE of which carry either content-owned lane
+namespace (`meta["scifi_codex"]` / `meta["fable2"]`), so no surviving artifact
+shows the codex/fable2 family ever casting Lemmy under any name. Every
+`scifi_*` bank id: zero castings, ever. A six-bank sweep finding Lemmy only on
+media_archive / original and absent on the scifi pair is therefore the
+EXPECTED result, not a regression signal.
