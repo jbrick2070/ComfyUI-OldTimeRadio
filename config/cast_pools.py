@@ -136,19 +136,72 @@ FIRST_NAMES_BY_GENDER: dict[str, list[str]] = {
         "Doug", "Travis", "Will", "Faber", "Rick", "Glen", "Isidore", "Bob",
         "Manfred", "Leo", "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip",
         "Grover", "Peter",
+        # --- from the RETIRED "unisex" bucket, 2026-08-15 ------------------
+        # ADRIAN: male-coded English given name with its own female
+        # counterpart (Adrienne) and no surname reading.
+        "Adrian",
+        # Surname-style given names, male-leaning in US given-name usage.
+        # THE CLOSEST CALLS IN THE FILE -- a woman addressed as "Carter" or
+        # "Stone" is ordinary, especially in the military and noir registers
+        # this show works in. These are the first to flip if casts feel wrong.
+        "Stone", "Hayes", "Carter", "Palmer",
+        # English, male-leaning.
+        "Blake", "Dale", "Chris", "Charlie", "Rainn",
+        # Japanese, male-leaning usage.
+        "Ren", "Akira", "Sora",
+        # Thai, male.
+        "Krit", "Niran",
+        # Igbo; used for both, male-leaning in practice. CLOSE CALL.
+        "Chidi",
+        # Not personal names -- a sea monster, an invented sci-fi name, a
+        # spirit. There is no gender fact to get right or wrong; each is
+        # ASSIGNED rather than reasoned, and reads male in the register the
+        # show uses them in.
+        "Leviathan", "Tarkon", "Djinn",
     ],
     "female": [
         "Margot", "Nora", "Zuri", "Oya", "Nia", "Mali", "Anya", "Mira", "Edna",
         "Alice", "Ayesha", "Mina", "Wendy", "Pam", "Meredith", "Erin",
         "Phyllis", "Jenna", "Mindy", "Ellie", "Rashida", "Clarisse", "Donna",
         "Juliana",
+        # --- from the RETIRED "unisex" bucket, 2026-08-15 ------------------
+        # English/US usage has moved these decisively female in living memory.
+        "Quinn", "Reese", "Kelly", "Sailor",
+        # Japanese, female-leaning usage.
+        "Yuki", "Rei",
+        # Thai, female-leaning ("Dao" is star, "Som" is orange).
+        "Sunan", "Dao", "Pim", "Som",
+        # Yoruba; used for both, female-leaning standing alone. CLOSE CALL.
+        "Ayo",
+        # A nickname rather than a given name, female-leaning.
+        "Pinky",
     ],
-    "unisex": [
-        "Stone", "Hayes", "Quinn", "Reese", "Carter", "Blake", "Chidi", "Ayo",
-        "Ren", "Akira", "Yuki", "Sora", "Rei", "Krit", "Niran", "Sunan", "Dao",
-        "Pim", "Som", "Dale", "Pinky", "Leviathan", "Tarkon", "Adrian", "Chris",
-        "Kelly", "Rainn", "Charlie", "Palmer", "Sailor", "Djinn",
-    ],
+    # THE UNISEX BUCKET IS RETIRED, AND IT IS DELIBERATELY LEFT EMPTY RATHER
+    # THAN DELETED -- `names_for_genre` and `_verify_name_buckets` both index
+    # "unisex" by name, and the genre views iterate all three buckets.
+    #
+    # WHY IT WENT (operator ruling 2026-08-15: "I don't trust it"). A "unisex"
+    # tag was the ONE value that told `_repair_ensemble_names` to stand down: it
+    # exempted a name from the coherence check on EITHER binary slot gender. So
+    # membership was a promise that the name genuinely works with a male or a
+    # female voice -- and 30 of 153 names, one draw in five, were riding that
+    # promise with nothing verifying it. ADRIAN sat there, and ADRIAN on a
+    # female slot is the "Miss McFiggins" defect the gender work exists to stop.
+    #
+    # The existing coherence assertions could never have caught it. Both read
+    # `assert gender_of_first_name(name) in (row["gender"], "unisex", "unknown")`
+    # (`tests/test_cast_llm_naming.py:189,204`), where "unisex" is an
+    # unconditional free pass -- the test encodes the very assumption that was
+    # unsafe. `tests/test_cast_invariants.py` R10 replaces it with a
+    # BEHAVIOURAL bar instead.
+    #
+    # Every name now carries a definite tag, so the repair always has an answer
+    # and nothing is exempt. Assignments are best-judgment, not sourced, and
+    # each is grouped above with its basis so a single call can be flipped
+    # without re-litigating the rest. "unknown" still exists for names outside
+    # the pool entirely (the LLM slot-fill path can invent one) and is still
+    # treated as un-repairable -- that is a separate hole, and a real one.
+    "unisex": [],
 }
 
 # Reverse index UPPER(first name) -> "male"|"female"|"unisex". Names are stored

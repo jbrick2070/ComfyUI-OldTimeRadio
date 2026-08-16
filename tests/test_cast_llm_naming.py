@@ -170,8 +170,15 @@ def test_r7_llm_naming_applied_when_valid(monkeypatch):
     used: list = []
     items = []
     for r in _open(pool_cast):
-        bucket = r["gender"] if r["gender"] in ("male", "female") else "unisex"
-        first = next(n for n in _POOLS.FIRST_NAMES_BY_GENDER[bucket] if n not in used)
+        # An "other"-gender slot used to draw from the unisex bucket. That
+        # bucket was RETIRED on 2026-08-15 (operator: "I don't trust it") and is
+        # now empty, so this raised StopIteration. Any name suits an "other"
+        # slot anyway -- `_repair_ensemble_names` only judges male/female slots
+        # -- so it draws from the full pool.
+        bucket = r["gender"] if r["gender"] in ("male", "female") else None
+        pool = (_POOLS.FIRST_NAMES_BY_GENDER[bucket] if bucket
+                else _POOLS.FIRST_NAMES)
+        first = next(n for n in pool if n not in used)
         used.append(first)
         items.append({"char_id": r["char_id"], "name": f"{first} Tester",
                       "one_line_presence": "calm and precise",

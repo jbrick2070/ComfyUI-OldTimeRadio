@@ -223,3 +223,104 @@ def test_cross_gender_rate_controls_repair(monkeypatch):
 # ---------------------------------------------------------------------------
 # R7 / R8 / R9 are appended by S6 / S7 / S8 as their behavior lands.
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# R10 -- THE UNISEX BUCKET IS A PROMISE (2026-08-15, operator-raised)
+#
+# `_repair_ensemble_names` fires ONLY when a name's tag is male/female AND
+# disagrees with the slot. A "unisex" tag is therefore the one value that
+# exempts a name from the coherence check on EITHER binary gender -- it tells
+# the guard to stand down. Membership is a claim that the name genuinely works
+# with a male or a female voice, and a name that does not belong there has no
+# guard behind it at all.
+#
+# The pool's own policy (config/cast_pools.py) says only "genuinely
+# cross-cultural or ambiguous" names may sit there. ADRIAN, HAYES, STONE and
+# CARTER did, and none is either -- all four are clearly male-coded English
+# given names, ADRIAN with its own female counterpart. ADRIAN on a female slot
+# would have shipped unrepaired: the "Miss McFiggins" defect.
+#
+# The existing coherence assertions cannot catch this class, by construction:
+# `tests/test_cast_llm_naming.py:189` reads
+# `assert gender_of_first_name(name) in (row["gender"], "unisex", "unknown")`,
+# where "unisex" is an unconditional free pass. A mistagged name passes it
+# every time. That is why this bar is behavioural rather than another tag check.
+# ---------------------------------------------------------------------------
+
+
+def _slot(name: str, gender: str, *, source_owned: bool = False):
+    return _OTRC.EnsembleSlot(
+        char_id="c01", name=name, gender=gender,
+        timbre=_OTRC._TIMBRE_VOCAB[0], role=_OTRC._ROLE_VOCAB[0],
+        source_owned=source_owned,
+    )
+
+
+@pytest.mark.parametrize("first", ["ADRIAN", "HAYES", "STONE", "CARTER"])
+def test_R10_a_male_coded_name_on_a_female_slot_is_repaired(first):
+    """THE REGRESSION. Each of these returned "unisex" before the retag, so the
+    repair stood down and the name shipped against a female voice."""
+    out = _OTRC._repair_ensemble_names(
+        [_slot(f"{first} HIBBERT", "female")], cast_seed=42,
+    )
+    assert out[0].name != f"{first} HIBBERT", (
+        f"{first} rode a female slot unrepaired -- it is tagged "
+        f"{_POOLS.gender_of_first_name(first)!r}, and only male/female tags "
+        f"trigger the guard"
+    )
+    assert _POOLS.gender_of_first_name(out[0].name) in ("female", "unisex",
+                                                        "unknown")
+
+
+def test_R10_the_unisex_bucket_stays_EMPTY():
+    """Operator ruling 2026-08-15: "I don't trust it".
+
+    A "unisex" tag was the ONE value that exempted a name from the coherence
+    repair on either binary slot gender, and 30 of 153 names -- one draw in
+    five -- were riding that exemption unverified. The bucket is retired; every
+    name now carries a definite tag so the repair always has an answer.
+
+    Pinned as EMPTY rather than deleted because `names_for_genre` and
+    `_verify_name_buckets` both index the key by name.
+    """
+    assert _POOLS.FIRST_NAMES_BY_GENDER["unisex"] == []
+    strays = [n for n in _POOLS.FIRST_NAMES
+              if _POOLS.gender_of_first_name(n) == "unisex"]
+    assert strays == [], f"these names re-entered the exemption: {strays}"
+
+
+def test_R10_every_drawable_name_has_a_definite_tag():
+    """The point of retiring the bucket: no name in the roll pool may reach a
+    slot without the repair being able to judge it. "unknown" counts as a hole
+    here too -- it is treated exactly like the old unisex free pass."""
+    undecided = [
+        n for n in _POOLS.FIRST_NAMES
+        if _POOLS.gender_of_first_name(n) not in ("male", "female")
+    ]
+    assert undecided == [], (
+        f"{len(undecided)} drawable name(s) cannot be judged by the coherence "
+        f"repair: {undecided}"
+    )
+
+
+def test_R10_the_buckets_stay_a_partition():
+    """A name in two buckets makes `gender_of_first_name` order-dependent."""
+    seen: dict[str, str] = {}
+    for bucket, names in _POOLS.FIRST_NAMES_BY_GENDER.items():
+        for n in names:
+            key = n.upper()
+            assert key not in seen, (
+                f"{n!r} is in both {seen.get(key)!r} and {bucket!r}"
+            )
+            seen[key] = bucket
+
+
+def test_R10_source_owned_names_are_still_exempt():
+    """TOBY is Sir Toby Belch whatever the pool thinks. The retag must not
+    start renaming adapted characters -- that rename fired on 133 of 400 seeds
+    when it was last let loose."""
+    out = _OTRC._repair_ensemble_names(
+        [_slot("ADRIAN HIBBERT", "female", source_owned=True)], cast_seed=42,
+    )
+    assert out[0].name == "ADRIAN HIBBERT"

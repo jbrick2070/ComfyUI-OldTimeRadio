@@ -22,8 +22,8 @@ the R3 coherence test has a real bug case to repair.
 from __future__ import annotations
 
 import json
+import os
 import sys
-import traceback
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -34,6 +34,10 @@ for _p in (_REPO, _REPO / "nodes"):
 
 import _otr_casting as C  # noqa: E402
 from config import cast_pools as P  # noqa: E402
+
+#: The lever the repair itself reads -- 1.0 keeps every deliberate
+#: cross-gender name, exposing the RAW roll.
+_CROSS_RATE_ENV = "OTR_NAME_CROSS_GENDER_RATE"
 
 NUM = 4
 NEWS = "Scientists report a quiet anomaly in the upper atmosphere over the test range."
@@ -71,28 +75,91 @@ def _mismatches(cast):
 
 
 def _lock(seed):
-    cast, _meta = C.lock_cast(
+    """Lock a cast EXACTLY as `tests/test_cast_invariants.py::_lock` does.
+
+    These two had drifted apart, which is why the captured baseline no longer
+    matched the test that reads it. Two things were missing here:
+
+    * `cast_seed=seed` -- the test passes it; without it the repair's isolated
+      rng is keyed differently.
+    * the VOICE REPLAY. The writer no longer stamps bark `voice_preset`;
+      OTR_CastLock replays it post-freeze. The test applies that replay before
+      asserting, so a baseline captured without it carries EMPTY voice presets
+      and can never match, however correct its names and genders are.
+
+    If the test's `_lock` changes again, this must follow it. The byte-identity
+    surface is only meaningful while both sides build the cast the same way.
+    """
+    cast, meta = C.lock_cast(
         creative_fn=_stub, num_characters=NUM, news_seed=NEWS, style=STYLE,
-        rng=__import__("random").Random(seed),
+        rng=__import__("random").Random(seed), cast_seed=seed,
         force_lemmy=False, max_attempts_per_call=1,
     )
+    voices = C.replay_voice_assignment(
+        cast_seed=seed, num_characters=NUM, lemmy_hit=meta["lemmy_hit"])
+    for row in cast:
+        if row.get("char_id") in voices:
+            row["voice_preset"] = voices[row["char_id"]]
     return cast
 
 
+def _raw_mismatches(seed):
+    """Mismatches in the roll BEFORE the S2 repair touches it.
+
+    `OTR_NAME_CROSS_GENDER_RATE=1.0` is the lever the repair itself reads: at
+    1.0 every deliberate cross-gender name is kept, so what comes back is the
+    raw roll. Restored afterwards so the caller's environment is unchanged.
+    """
+    prior = os.environ.get(_CROSS_RATE_ENV)
+    os.environ[_CROSS_RATE_ENV] = "1.0"
+    try:
+        return _mismatches(_lock(seed))
+    finally:
+        if prior is None:
+            os.environ.pop(_CROSS_RATE_ENV, None)
+        else:
+            os.environ[_CROSS_RATE_ENV] = prior
+
+
 def main():
+    # THE TWO SEEDS ARE FOUND UNDER DIFFERENT CONDITIONS, and conflating them
+    # is why this script could no longer reproduce its own baseline.
+    #
+    # `_lock` runs the full `lock_cast`, which INCLUDES the S2 name-repair. So a
+    # post-repair cast never contains a binary mismatch (the repair just fixed
+    # them all), and the "lowest seed WITH a mismatch" search below could only
+    # ever return None. It worked when this file was written at S0 because the
+    # repair did not exist yet; the moment S2 landed, re-running this script
+    # would have silently blanked `known_incoherent_seed` and left
+    # `test_cross_gender_rate_controls_repair` indexing None.
+    #
+    # The incoherent seed is therefore hunted with the repair DISABLED, using
+    # the same lever the test itself uses -- OTR_NAME_CROSS_GENDER_RATE=1.0
+    # keeps every deliberate cross-gender name in place. That reveals the RAW
+    # roll, which is what "known incoherent" has always meant.
+    # BOTH seeds are judged on the RAW roll, and that is the whole subtlety.
+    # Asking `_mismatches(_lock(seed))` post-repair returns [] for EVERY seed --
+    # so "lowest coherent seed" would trivially answer 0 and R3's byte-identity
+    # assertion would run at a seed where the repair actually fires, passing
+    # only because both sides of the comparison go through it. Vacuous.
     coherent_seed = None
     incoherent_seed = None
     incoherent_detail = None
     for seed in range(0, 2000):
-        cast = _lock(seed)
-        ms = _mismatches(cast)
-        if not ms and coherent_seed is None:
+        raw = _raw_mismatches(seed)
+        if coherent_seed is None and not raw:
             coherent_seed = seed
-        if ms and incoherent_seed is None:
+        if incoherent_seed is None and raw:
             incoherent_seed = seed
-            incoherent_detail = ms
+            incoherent_detail = raw
         if coherent_seed is not None and incoherent_seed is not None:
             break
+    if incoherent_seed is None:
+        raise RuntimeError(
+            "no INCOHERENT seed found in range 0..2000 with the repair "
+            "disabled -- test_cross_gender_rate_controls_repair needs a real "
+            "bug case, and a baseline carrying None would make it index nothing"
+        )
     if coherent_seed is None:
         raise RuntimeError("no coherent seed found in range 0..2000")
 
@@ -118,15 +185,14 @@ def main():
 
 
 if __name__ == "__main__":
-    dbg = Path(r"C:\Users\jeffr\AppData\Local\Temp\otr_s0\capture_out.txt")
-    try:
-        g = main()
-        dbg.write_text(
-            "OK coherent_seed=%s incoherent_seed=%s\ncast=%s\nincoherent=%s\n" % (
-                g["seed"], g["known_incoherent_seed"],
-                json.dumps(g["cast"], indent=2),
-                json.dumps(g["known_incoherent_detail"], indent=2)),
-            encoding="utf-8")
-    except Exception:
-        dbg.write_text("ERROR\n" + traceback.format_exc(), encoding="utf-8")
-        raise
+    # Report to STDOUT. This used to write to a hardcoded
+    # C:\...\Temp\otr_s0\capture_out.txt, a directory nothing creates -- so the
+    # script raised FileNotFoundError on its SUCCESS path, and then its own
+    # except branch raised the same error again while trying to record the
+    # failure. The baseline had already been written by then, so the run looked
+    # like a crash while having actually succeeded, which is the worst of both.
+    g = main()
+    print("OK coherent_seed=%s incoherent_seed=%s" % (
+        g["seed"], g["known_incoherent_seed"]))
+    print("cast=%s" % json.dumps(g["cast"], indent=2))
+    print("incoherent=%s" % json.dumps(g["known_incoherent_detail"], indent=2))
