@@ -5229,3 +5229,50 @@ EXPECTED result, not a regression signal.
   three existing P3 tests all passed against the defective generator, because
   every one of them asked about rows.
 - status: FIXED, proven on the real bank write.
+
+## PBUG-20260817-01 -- the image engine's default NEGATIVE vetoes the visual style the episode selected
+
+- surfaced: 2026-08-17, from a published episode the operator watched --
+  `signal_lost_kinetic_motion_clause_live_test_20260817_050130`, `visual_style`
+  = `cartoon` (confirmed in its own credits roll). Live artifact, not a review.
+- symptom, measured on frames pulled from the delivered mp4: 00:04 bookend
+  CARTOON, 00:16 announcer CARTOON, 00:34 character PHOTOREAL, 00:43 announcer
+  painterly semi-real. One 74-second episode cutting between an animated short,
+  a live-action film and a painting. Operator: "some char beats were cartoony
+  and others not."
+- root cause, VERIFIED at the file: `nodes/_otr_image_engines/z_image_turbo.py:216-219`
+  ships a default negative of
+  `"oversaturated, glossy, clean digital, plastic skin, waxy skin, sterile
+  studio lighting, cartoon, illustration, text, watermark"`.
+  On a CARTOON episode every still is minted with positive "bright cartoon
+  illustration" AND negative "cartoon, illustration". The engine suppresses the
+  style the config selected. The negative is a house-style constant tuned for the
+  DEFAULT pack (`sci_fi_radio`, a filmic look) and is completely style-blind.
+  **It fights four of the nine packs** -- `cartoon`, `anime`,
+  `storybook_engraving`, `paper_origami` -- on EVERY mint.
+- why it looked like a gradient rather than a switch: where the positive body was
+  neutral or cartoon-worded, cartoon still won (hence the bookends); where the
+  body was anatomy-dense (an authored face description plus Python's own
+  "cinematic three-quarter portrait" geometry) it flipped photoreal. Then
+  `reference_latent` propagated that photoreal portrait into every character
+  scene still, and i2v carried each still faithfully into its clip -- the
+  face-consistency machinery working exactly as designed, amplifying the wrong
+  style.
+- **THE FRACTURE IS IN THE STILLS, NOT THE VIDEO PROMPTS.** The driver's first
+  diagnosis blamed the video-prompt branch split (`style_tail=True` at
+  `render_driver.py:2956` vs `False` at `:3044`) and was WRONG; the 620-char
+  branch is gated on `_google_text_provider` (`:2935`) and never ran on this
+  episode. `render_driver.py:2877-2884` states the doctrine the driver missed:
+  the i2v anchor carries the LOOK, the prompt's only job is to MOVE.
+- a prompt-text consistency pass CANNOT catch this class: every prompt in this
+  episode agreed and said "bright cartoon illustration". The images diverged
+  anyway. Any detector has to measure the IMAGES.
+- fix: NONE APPLIED. Queued as THE QUEUE item 1 in `GO_FORWARD_PLAN.md` -- a
+  pack-aware negative (default pack keeps its string verbatim so it stays
+  byte-identical), the operator's post-ledger style second pass, and a mint-time
+  style-spread gate on `stills_manifest.json`.
+- Bible: NOT promoted -- an entry's `fix:` claims something fixed and proven, and
+  this is diagnosed only. Checked against `otr_coverage_index.yaml` and the Bible
+  and the shape is genuinely UNCOVERED (the one near hit concerns an EMPTY
+  negative, the opposite defect). **Promote it with its green chunk.**
+- status: OPEN, root cause verified, fix designed and queued first.

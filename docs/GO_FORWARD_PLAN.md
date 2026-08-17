@@ -185,7 +185,24 @@ object to it; if chatterbox and dia both pass on the same cloned reference, whic
 is his default on the clone lanes; and `el_harry` vs `el_daniel`, still a
 metadata question (the bank tags them american and british respectively).
 
-1. **Video sprint** (item 1.2). **r1 of its kibitz arc RAN 2026-08-17 and the
+1. **ONE STYLE AUTHORITY -- the operator's next build, and it is FIRST**
+   (directed 2026-08-17, stated twice). One episode currently cuts between an
+   animated short, a live-action film and a painting. **Root cause is VERIFIED
+   and it is one line:** `nodes/_otr_image_engines/z_image_turbo.py:216-219`
+   sends a default negative containing `"cartoon, illustration"` -- on a CARTOON
+   episode, alongside a positive saying "bright cartoon illustration". It vetoes
+   the style the episode asked for, and it fights four of the nine packs
+   (`cartoon`, `anime`, `storybook_engraving`, `paper_origami`) on EVERY mint.
+   Three parts, full detail in the "NEXT BUILD -- ONE STYLE AUTHORITY" block
+   inside item 2 below: **(a)** the operator's post-ledger SECOND PASS over every
+   still and video prompt, prepending the style token where absent -- additive
+   only, idempotent, one choke point; **(b)** a pack-aware negative, because (a)
+   alone is a fight with itself; **(c)** a mint-time style-SPREAD gate on the
+   stills manifest, because a prompt-text pass provably cannot catch this class.
+   **Read that block before coding -- the driver's FIRST diagnosis was wrong and
+   both versions are recorded so nobody re-derives the wrong one.**
+
+2. **Video sprint** (item 1.2). **r1 of its kibitz arc RAN 2026-08-17 and the
    plan did NOT survive it. r2/r3/r4 have NOT run -- this is r1 only, and it may
    never be described as a full arc.** Read
    `kibitz-runs/2026-08-17-video-sprint/r1/final.md` (the reshaped plan) and
@@ -386,15 +403,15 @@ metadata question (the bank tags them american and british respectively).
    draft proposed; and **the Q5 quant is CUT** from the sprint by all three
    reviewers and the anchor independently. Needs the LTX boot, so it pauses any
    soak.
-2. **The Shakespeare wrong-play frame family** (section D, measured twice by
+3. **The Shakespeare wrong-play frame family** (section D, measured twice by
    the blind read) + the assembly-lint class (speaker-tag leaks, truncated
    closers). Correctness on the fidelity lane; panel before code.
-3. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
+4. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
    under any of the above; the two `_resolve_model` hardenings ride along.
    Then the operator's own 4060 full-stack pass (gate already open).
-4. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
+5. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
    during renders.
-5. **PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Stays
+6. **PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Stays
    queued; does not jump.
 
 Standing tail unchanged: the bug-fix contract's chunks 4/5/6/D7, and the
