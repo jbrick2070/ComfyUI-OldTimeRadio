@@ -147,8 +147,85 @@ work:
 * **Shakespeare gender supplement is keyed by FOLGER CODE** (`Tmp`, `MND`),
   never slug -- probing by slug reports phantom zero coverage.
 
-### THE ORDER, DRIVER-SET 2026-08-16 LATE (supersedes the 08-15 list order;
-### the numbered bodies below are the reference detail, this is the sequence)
+### THE QUEUE, DRIVER-SET 2026-08-17 LATE (this is the sequence; the numbered
+### bodies below are reference detail)
+
+**ITEM 1 IS DONE.** ONE STYLE AUTHORITY shipped, pushed and Bible-promoted.
+What follows is the next window's order, cheapest-certain first:
+
+**A. LUMINA IS MISSING ITS TRAINED INPUT CONVENTION -- a live defect, cheap.**
+ComfyUI's `CLIPTextEncodeLumina2` builds `f'{system_prompt} <Prompt Start>
+{user_prompt}'` (`comfy_extras/nodes_lumina2.py:113`). OTR's lumina graph uses
+plain `CLIPTextEncode` on both pos and neg (`lumina_image.py:160-163`), so
+**every lumina mint runs out-of-distribution.** Contained -- lumina is opt-in
+(`default_roles=()`, gated on `OTR_ENABLE_LUMINA=1`). Fix is engine-side and
+zero-LLM: prepend the system line + tag in `_build_lumina_graph`. **Confirm the
+node exists in this install via a live `/object_info` first** -- this is a
+static-audit finding until one live lumina mint verifies it (admission rule).
+
+**B. PROVE THE STYLE FIX ON ONE LIVE RENDER.** Fable's acceptance test, adopted
+verbatim: mint the same cartoon episode's character still on z_image before and
+after -- the effective negative must contain no illustration-family terms and
+the positive must lead with the pack token. Green gates are not a working fix.
+
+**C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
+runtime cost. Answers exist (three research rounds); the schema and the
+paste-ready research prompts are `docs/2026-08-17-per-engine-prompt-style-
+guide-RESEARCH.md`. **Strike z_image's negative-authoring clause before
+storing** -- see the trap in D.
+
+**D. THE PROMPT-STEERING QUESTION -- BLOCKED, do not build blind.**
+Fully designed across three research rounds + a Fable pass; artifacts in
+`kibitz-runs/`. Settled conclusions:
+* **NEVER build a post-hoc LLM rewriter.** Four measured receipts: F2 swung
+  3/6 then 1/6 on identical fixtures (`JUDGE_ATTRIBUTION=False`); P4 collapsed
+  articulation 4.15 -> 1.18 on a register change; **P8 is decisive -- a
+  PARAPHRASE scored half the canonical's articulation, 1.72 vs 3.32
+  (`render_driver.py:1345-1348`)**, and a paraphrase is exactly what a
+  rewriter emits. A content-preservation gate does NOT catch this: a faithful
+  paraphrase passes every entity check and still halves the score.
+* **The sanctioned pattern is generation-time steering** -- directive in the
+  WRITER's prompt for text that does not exist yet, validator, deterministic
+  fallback, env flag default OFF (`OTR_LTX_MOTION_CLAUSE` is the template, and
+  its trap was shipping with the flag set nowhere).
+* **THE BLOCKER:** the still-prompt writer does not know its target engine --
+  binding happens at dispatch and roles drift under `OTR_FORCE_ENGINE_MAP`. A
+  per-engine directive at generation time targets an engine it cannot see.
+  **Settle this (Codex was the intended lane) before any stills work.** Video
+  may be buildable first.
+* **Already in the tree, so this is cheaper than it looks:**
+  `_DIRECTIVE_KEYS = ("expression","motion","camera")` is the beat schema;
+  `_deterministic_template` is the fallback floor (BUG-046);
+  `_subject_anchor` already enforces subject-first.
+* **Conflict to resolve:** the panel scaffold says "never open with a camera or
+  framing word", but `_subject_anchor` deliberately opens talking-head prompts
+  with "face visible, speaking to camera" (round-5 F3, engines weigh leading
+  tokens hardest). Per-lane rule table, not a global one.
+* **Cheapest real win here:** the beat's empty-string directive keys
+  (`{k: "" for k in _DIRECTIVE_KEYS}`) become an explicit `NONE`. Blank is a
+  question the model answers; NONE is an instruction to omit.
+* **A/B traps:** stills seeds derive from `prompt_hash`, so changing prompt
+  text changes the seed -- **stills A/B must use `mode=fixed`**. Video is
+  clean (request hash is brief/cast/beat/char). **`otr_story_score.py` is NOT
+  a judge** -- it reads ledger structure, never a prompt or a pixel.
+
+**E. Upscalers + the 4060 full-stack gate** (item 1.3) -- candidate downloads
+run in the BACKGROUND under anything above.
+
+**F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
+
+**G. PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Does not jump.
+
+**DEFERRED, deliberately:** the visual-ledger AUDITOR. Fable's verdict is that
+five of its six proposed checks audit BOOKKEEPING written by the code being
+audited, and the only pixel check is Part 3's uncalibrated one. Build it only
+with the anchor-chain check promoted (flag when a scene still's
+`reference_latent` anchor is itself the episode's outlier and N stills derive
+from it -- that compound signature IS the measured episode) and corpus mode
+reframed as the CALIBRATION run for Part 3 (18,458 stills survive on disk; 174
+episodes on the mis-served packs).
+
+### THE OLDER ORDER, 2026-08-16 LATE (superseded above; kept for its rulings)
 
 **OPERATOR RULING 2026-08-16 (latest, supersedes every eyes-gate below):
 ALL Lemmy/video listen-and-eyeball sessions are DEFERRED -- "we can get eyes
@@ -185,7 +262,33 @@ object to it; if chatterbox and dia both pass on the same cloned reference, whic
 is his default on the clone lanes; and `el_harry` vs `el_daniel`, still a
 metadata question (the bank tags them american and british respectively).
 
-1. **ONE STYLE AUTHORITY -- the operator's next build, and it is FIRST**
+1. **ONE STYLE AUTHORITY -- SHIPPED AND CLOSED 2026-08-17** (`b2cc74c1`,
+   `5e780030`; Bible `12.108` at survival-guide `897693b`). The engine no
+   longer vetoes the style the episode selected. Do NOT re-open the block
+   below -- it is kept only for the rulings and traps inside it.
+   **What binds future work:**
+   * **A negative may never conflict with a visual style** (operator ruling).
+     `effective_negative()` drops any phrase a pack's own positive asks for, so
+     the class cannot return -- including for packs authored later and the
+     runtime-composed dynamic pack. `scripts/otr_style_traceroute.py` is the
+     check: **EFFECTIVE FIGHTS must be 0**; AUTHORED conflicts are housekeeping.
+   * **The pack owns the style negative; the engine owns only hygiene.** The
+     three photoreal packs carry the historical string verbatim. Compose pack +
+     per-object negative, NEVER precedence -- they are orthogonal axes.
+   * **`negative_tail` is KNOWN-but-OPTIONAL on purpose.** A required key fails
+     every frozen `embedded_visual_style_pack` and a default trips its sha256.
+   * **The style token has ONE derivation** (`_otr_visual_styles`), and
+     `render_driver` delegates. Do not add a second.
+   * **Shots are NOT styled at node 91** -- `_prefix_video_style_cue` already
+     front-anchors the identical token at five sites. Adding a node-91 shot
+     prepend double-prefixes via the ia2v fragment slice.
+   * **Part 3 is telemetry with NO threshold** (`threshold: null`,
+     uncalibrated). It may never gate or reroll -- THE LAW.
+   * **`RADIO_CONSOLE_NEG` now reaches pixels for the first time.** Announcer
+     stills legitimately change; that is the fix, not a regression.
+
+2. **ONE STYLE AUTHORITY -- the original build block (SHIPPED; read only for
+   its traps)**
    (directed 2026-08-17, stated twice). One episode currently cuts between an
    animated short, a live-action film and a painting. **Root cause is VERIFIED
    and it is one line:** `nodes/_otr_image_engines/z_image_turbo.py:216-219`

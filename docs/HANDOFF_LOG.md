@@ -3,6 +3,91 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (night) -- HEAD b2cc74c1 +docs (v2.0-alpha) -- CODER (ONE STYLE AUTHORITY shipped: the engine stops vetoing the episode's own style)
+
+> Boot from the sha in the kickoff line; read after the final push. Final shas:
+> repo `5e780030`, survival-guide `897693b`.
+
+**THE FIX (PBUG-20260817-01, `b2cc74c1`).** `z_image_turbo` shipped a
+style-BLIND default negative containing "cartoon, illustration" at cfg 2.0, so
+a cartoon episode minted every still with positive "bright cartoon
+illustration" AND that negative. The engine vetoed the style the episode
+selected. The style half moved into each pack as `negative_tail`; the engine
+keeps only `_HYGIENE_NEGATIVE`. The three photoreal packs carry the historical
+string VERBATIM so the default lane is unchanged.
+
+**A SECOND LIVE DEFECT RODE ALONG.** No image engine read
+`request["negative_prompt"]`, so the announcer's `radio_host_negative` was
+computed, safety-merged, carried and DISCARDED. Now honoured on the three
+negative-capable engines. **Announcer stills legitimately change** -- that is
+the fix, not a regression, and it belongs in the acceptance leg.
+
+**THE OPERATOR RULED MID-BUILD: a negative may never conflict with a visual
+style.** The traceroute found the default pack vetoing its own
+`announcer_subject_ltx_mouth` ("a living cartoon appliance face") and
+`still_word_title_mood_style` ("period illustration"). Fixed at the ROOT --
+`effective_negative()` drops any phrase a pack's own positive asks for -- so it
+holds for the dynamic pack and any pack authored later. **EFFECTIVE FIGHTS: 0.**
+
+**HIS OTHER TWO CALLS BOTH SHRANK THE WORK.** The visual ledger (his idea)
+replaced two disconnected receipts and rides the EXISTING `stamp_durable` call
+-- one owner, no new failure site. And the anime/flicker conflict collapsed
+from a video-side mechanism to a ONE-WORD pack edit once he pointed out local
+models cannot render flicker anyway; flicker is a graph property, not a prompt
+one (memory: `flicker-is-a-recipe-problem`).
+
+**WHAT THE PANEL CAUGHT THAT I DID NOT.**
+* **Fable (cold r1):** the style token is already present at the TAIL, so
+  "prepend where absent" would have done nothing on exactly the prompts that
+  fractured -- the predicate had to be POSITIONAL. And the build-breaker: a
+  REQUIRED pack key bricks every frozen `embedded_visual_style_pack`, whose
+  sha256 receipt also forbids injecting a default. Hence KNOWN-but-OPTIONAL.
+* **Antigravity Flash (v2 r1):** cut the shot-prompt loop entirely --
+  `render_driver` already front-anchors the identical token at five sites.
+  That deleted the riskiest mechanism in the build.
+* **Antigravity Pro 3.1:** an empty composed negative would have stripped
+  legacy ledgers of their anti-artifact terms. Hence the hygiene fallback.
+* **Sonnet (deep pass):** the 90->89 execution order (node IDs are NOT
+  execution order) and the durable `cache_keys.prompt_hash`.
+* **Sonnet QA:** SHIP, plus the "six of nine packs" claim was wrong -- it is
+  FOUR by literal phrase match. Corrected in four places.
+* **My own test caught my own bug:** I had put "western cartoon" in anime's
+  negative, re-creating the self-veto.
+
+**PROCESS NOTE, recorded honestly.** Two reviews graded a MOVING tree because I
+coded while they read. The r3 fan-out also launched before its anchor was
+written. Neither invalidated a finding, but the next window should freeze the
+tree while a review runs.
+
+**THE ARC, exactly as it ran (never describe it as a clean four-round arc):**
+campaign 1 r1/r2/r3 + campaign 2 r1 on the consolidated plan. **Codex was
+QUOTA-HELD for the entire session and produced ZERO reviews.** Lanes that did
+run: Antigravity Flash 3.6, Antigravity Gemini 3.1 Pro, Fable (cold r1 +
+design), Sonnet (r2, deep pass, QA, negative census). Cloud roundtable
+deliberately NOT spent. Artifacts under
+`kibitz-runs/2026-08-17-one-style-authority{,-v2,-v2-pro}/` and
+`kibitz-runs/2026-08-17-negative-prompt-census/`.
+
+**THE NEGATIVE CENSUS ANSWERED "can we remove most of them": NO.** Almost none
+are removable cruft -- they are working hygiene or frozen recipe, and most
+video negatives are INERT at cfg 1.0 anyway. Only genuine candidates: two
+duplicate-drift string variants (LTX-AV, HuMo). Zero live conflicts today.
+
+**PROMPT-STEERING IS DESIGNED, BLOCKED, AND MUST NOT BE BUILT BLIND** -- see
+THE QUEUE item D. The decisive receipt is **P8: a PARAPHRASE scored half the
+canonical's articulation (1.72 vs 3.32)**, which kills the post-hoc rewriter
+and is NOT caught by a content-preservation gate. The blocker is that the
+still-prompt writer cannot know its target engine.
+
+Current step: THE QUEUE item A (lumina `<Prompt Start>`, a live defect) then B
+(prove the fix on one render). Blocked-on-operator: the engine-visibility
+question (Codex lane), and "MM3" = MiniMax H3, noted.
+Models: CODER window, NO RUNG CITED -- the budget table still has no rows.
+Cloud spend $0.
+Gates at close: suite **10712/110/1** (baseline 10664, +48 new tests), Bible
+**20/26/3 at 286** (`12.108` promoted), traceroute **EFFECTIVE FIGHTS 0**,
+AST + BOM + LF clean on all 11 committed .py blobs, HEAD == origin.
+
 ## 2026-08-17 (late) -- HEAD 72430087 +handoff (v2.0-alpha) -- CODER (kinetic motion SHIPPED and operator-confirmed, Lemmy's identity reserved, the style fracture diagnosed to one line)
 
 > The sha above is the **second-to-last sha on the branch** when the handoff is a
