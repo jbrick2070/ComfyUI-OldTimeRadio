@@ -250,6 +250,41 @@ metadata question (the bank tags them american and british respectively).
    literal after the funnel, restamping `prompt_sha8` / `prompt_chars` /
    `banana_sha256_after` the way the cap path already does.
 
+   **OPEN DEFECT, INTRODUCED BY THE CAP RAISE, ACTIVE THE MOMENT THE FLAG GOES
+   ON (Sonnet r2 MUST-FIX 5, reproduced live -- FIX THIS BEFORE THE FIRST REAL
+   RENDER WITH `OTR_LTX_MOTION_CLAUSE=1`).** Raising `CLAUSE_MAX_CHARS` 70 -> 130
+   was justified only against the 240 budget; the 188-char branch
+   (`render_driver.py:2996-3010`) was never checked and it is a second consumer.
+   Measured with the repo's own `_OK_META` fixture and a realistic 108-char
+   clause: `core(86) + clause(108) + era_tail(20) = 218` into
+   `finish_visual_prompt(max_chars=188)` -- the motion clause is cut MID-SENTENCE
+   and the era tail is dropped entirely. Two aggravations: when `_mc_override`
+   fires it REPLACES the `["slow cinematic camera drift", "no on-screen text"]`
+   pair, so the anti-hallucination **"no on-screen text" steer is silently lost
+   on exactly those beats** -- and P4 already observed on-video text
+   hallucination on this lane; and `_prompt_protected_clause` is published only
+   `if not _mc_override:`, i.e. precisely when a real clause is NOT in play.
+   **Root fix (do not reach for the protected clause -- it cannot restore what
+   `finish_visual_prompt` already trimmed):** when `_mc_override` fires, budget
+   `core` dynamically against the clause's real length rather than the fixed
+   default 90, keep the "no on-screen text" steer, and publish the protected
+   clause for the real clause too.
+
+   **ALSO OPEN, the 240 branch has NO SLACK (Sonnet r2 MUST-FIX 3, measured).**
+   `_frag + _IA2V_TALKING_CLAUSE_CHARACTER` (131 chars, probe-locked and
+   unshrinkable per P8) sums to EXACTLY 240 on the repo's own `_char_face_shot()`
+   fixture. Realistic 57-68 char dialogue lines overflow by 1-12 chars even after
+   the identity fragment shrinks to its 40-char floor. So the injection's "what
+   if the line does not fit" is the DEFAULT case, not an edge case, and r3 must
+   pick one explicitly: a separate larger ceiling for this branch, a named
+   tradeoff against identity carryover, or a real degrade.
+
+   **AND THE INJECTION TARGET IS NOW NAMED (Sonnet r2 MUST-FIX 4):**
+   `render_driver.py:2741-2775`, the char-face talking branch -- the ONLY one
+   that reaches a lip-sync-capable engine. The 188 branch is gated
+   `not _is_char_face_beat`, so building there would structurally never reach a
+   lip-sync engine and would defeat the item's purpose.
+
    **TWO THINGS THAT NEED THE OPERATOR, both from r2:**
    1. **A `.env` file will NOT turn the flag on.** `enabled()` reads
       `os.environ` and NOTHING in this repo loads a `.env` -- no dotenv in
