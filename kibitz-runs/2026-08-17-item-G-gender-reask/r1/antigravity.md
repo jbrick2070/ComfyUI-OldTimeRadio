@@ -1,0 +1,6 @@
+[KIBITZ DIAGNOSTIC]
+Antigravity quota/backend exhaustion detected in recent CLI log C:\Users\jeffr\.gemini\antigravity-cli\log\cli-20260817_141301.log:
+"code": 429,
+"message": "Resource has been exhausted (e.g. check quota).",
+"status": "RESOURCE_EXHAUSTED"
+ERROR: logging before google.Init: E0817 14:13:02.915837       1 cli_setting_manager.go:841] failed to propagate telemetry setting: RESOURCE_EXHAUSTED (code 429): Resource has been exhausted (e.g. check quota).

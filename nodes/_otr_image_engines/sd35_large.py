@@ -34,6 +34,76 @@ log = logging.getLogger("OTR.image.sd35_large")
 #: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
 ENABLE_FLAG = "OTR_ENABLE_SD35"
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "One present-tense sentence, under 20 words, front-loading subject and action. "
+    "Preserve every required beat fact. Camera direction and speed only from "
+    "Camera; if NONE, no camera wording. Concrete nouns over adjectives."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+PROVENANCE FIRST: **the operator supplied this directive himself on 2026-08-17,
+drafted from PUBLIC DOCS and explicitly labelled "NOT yet validated".** Stored
+verbatim, not rewritten. This engine is default-OFF (``requires_flag =
+ENABLE_FLAG``), so it is opt-in rather than live in the menu.
+
+REGISTRY NOTES -- v2, VALIDATED by the operator against public docs 2026-08-17.
+Recorded as authored; the probe gate still rules and none of this is built.
+
+IDENTITY: 8B MMDiT with TRIPLE encoders -- CLIP-L + CLIP-G (77 tokens each) +
+T5-XXL. Real CFG, community band 4-7 (~4.5 typical), 28-40 steps.
+
+**THE effective_cap IS TWO-TIER, AND THE OPERATOR CALLS IT THE SHARPEST FACT IN THE
+REGISTRY. It is why this directive is the tightest of the thirteen** -- under 20
+words where the others say 24, plus "concrete nouns over adjectives":
+  * **Tokens 1-77 are seen by ALL THREE encoders.**
+  * **Everything past 77 exists for T5 ONLY and is invisible to both CLIPs** --
+    including their POOLED GLOBAL-STYLE vectors. Not truncated-and-lost in general:
+    lost to two of three encoders, one of which is the global style channel.
+  * Nominal T5 ceiling is 256 with edge artifacts near and past it; a training-side
+    finding puts the EFFECTIVE T5 length at **154**.
+  * **Working rule: the full-coverage budget is 77 tokens TOTAL, style-pack tokens
+    included; 154 is the conservative hard ceiling.**
+
+(The first version of this note said simply "CLIP truncates at 77 (~300 chars)" and
+called the cap the model's rather than ours. Directionally right, materially
+incomplete -- it missed that past-77 text still reaches T5, and that the pooled CLIP
+vectors are a style channel.)
+
+style_token_position: **SUBTLER than the draft, and the draft's reasoning was only
+half the story.** Prepending does spend CLIP budget before the subject is seen --
+true. But APPENDING can push the style pack past 77 where the CLIPs never see it at
+all, and pooled CLIP is the global-style channel. **Total tokens is the real
+control:** a 20-word beat plus a compact pack fits under 77 either way, making
+position SECOND-ORDER here. Test append per plan, but **log the total token count in
+the A/B** -- an over-77 run is a different experiment, not a position result.
+
+NEGATIVES: live at cfg 4-7 but **WEAK BY LINEAGE.** The SD3 line was not trained
+with negative prompts, and they perturb output the way a seed change does rather
+than removing elements. So keep any sampler-config negative minimal and **never
+chase negative-phrasing wins on this engine.** The writer stays positive-only, and
+the ownership answer is unchanged: the pack owns the style negative, the engine owns
+hygiene.
+
+PROMPTING: prose beats tags though both parse; front-load the subject; and "concrete
+nouns over adjectives" matches content-word-dominance findings -- so that clause is
+evidence-backed, not stylistic taste.
+
+THE GATE, endorsed unchanged and still NOT built: "engine selectable AND directive
+present, else hard refuse at selection." Nothing reads these constants yet; build it
+in the change that wires them.
+
+INSTALL-DAY VERIFY, for this engine: the **practical T5 ceiling on our graph, 154 vs
+256.**
+"""
+
 #: Env var pointing at the downloaded SD 3.5 Large checkpoint file. Absent / not a
 #: file -> ``assert_usable`` fails closed. Native in-stack load (ComfyUI loaders),
 #: so this is a WEIGHTS path, not a sidecar python.

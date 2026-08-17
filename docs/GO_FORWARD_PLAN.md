@@ -146,10 +146,19 @@ work:
 * **Web search is ALLOWED at vendor time** (operator 2026-08-15, stated
   twice; the RSS precedent).
 * **Gender drift is ACCEPTED** -- the deterministic ladder is the ANSWER, not
-  a stepping stone. Do not loosen the decision margin (floor 4, ratio 3x):
-  DOROTHY of Oz measures 8/3 male under a looser estimator because her scene
-  is crowded. A confident WRONG pin must stay impossible; decline-and-roll is
-  the accepted behaviour.
+  a stepping stone. Do not loosen the decision margin: DOROTHY of Oz measures
+  8/3 male under a looser estimator because her scene is crowded. A confident
+  WRONG pin must stay impossible; decline-and-roll is the accepted behaviour.
+  **THE FLOOR IS 8, NOT 4 -- CORRECTED 2026-08-17, and the old wording here was
+  actively dangerous.** This bullet said "floor 4, ratio 3x" for as long as it has
+  existed. The shipped values are `_otr_gender_pronoun_scan.SCORE_FLOOR = 8` and
+  `DOMINANCE_RATIO = 3.0`, and that module's own comment reads: *"THE FLOOR WAS 4
+  AND THAT WAS TOO LOW -- it shipped a confidently WRONG pin, which is the one
+  outcome this module is supposed to make impossible"* (`buck_rogers` pinned "a Han
+  patrol", a squad of soldiers, as FEMALE on 0 male / 4 female). So the number this
+  file named as the thing not to loosen WAS the regression. A window trusting the
+  doc could have "restored" 4 and called it fidelity to the ruling. Read
+  `SCORE_FLOOR`, never this sentence.
 * **Fidelity is owed only where a source states something.** `original` may
   ship a male JANE (operator accepted); the adaptation lanes may not ship a
   wrong AHAB. Pool mode cannot produce a mismatch (every pool name carries a
@@ -413,12 +422,50 @@ is imported. Suite 10755 -> **10819**, the delta exactly the new file.
 * **THE RESEARCH DOC ITSELF HAS AN ERROR:** its `ltx_video` block says frames go
   "up to 193". The engine ships `_LTX_MAX_FRAMES_DEFAULT = 169`, a MEASURED decode
   constraint, and 193 matches no constant in the file. Trust the engine.
-* **THREE REGISTERED IMAGE ENGINES ARE OUTSIDE THE TEN AND HAVE NO OVERLAY** --
-  an OPERATOR SCOPE CALL, not a driver one. `flux2_klein` (`requires_flag = None`,
-  so NOT gated -- it is live in the menu), `hidream_i1` and `sd35_large` (both
-  default-OFF opt-ins). None has a config block in the RESEARCH doc, so writing
-  directives for them would mean inventing the shipped-config research rather
-  than transcribing it. Decide whether the ten is the right ten.
+* **THE THREE EXTRA ENGINES ARE NOW IN -- SCOPE CALL CLOSED BY THE OPERATOR
+  2026-08-17. The map is THIRTEEN, not ten.** `flux2_klein` (`requires_flag = None`,
+  so NOT gated -- live in the menu), `hidream_i1` and `sd35_large` (default-OFF).
+  **He supplied all three directives himself**, drafted from public docs and then
+  validated in a v2 pass; they are stored VERBATIM, not rewritten. Counts as
+  measured: 235 / 228 / 217 chars.
+  * **HIS STATED COUNTS RUN ~5 CHARS LOW, CONSISTENTLY.** He labelled them
+    230 / 223 / 213; the test measures 235 / 228 / 217 -- exactly +5 on all three,
+    so it is a systematic difference in method, not a typo. Hand-counted at 235,
+    the flux2 string confirms the test. Trust `_HARD_CAP` and the test, and leave
+    margin when drafting near the ceiling: a draft he counts at 238 measures 243
+    and fails.
+  * **ONE FACTUAL CORRECTION HIS v2 PASS CAUGHT IN MY OWN STORED NOTE:** I wrote
+    that HiDream "SUPPORTS a negative, unlike FLUX.2". Wrong -- support is
+    **VARIANT-dependent**. Full runs cfg 5.0 with the negative LIVE; **dev and fast
+    run cfg 1.0 and have none**. So the registry must record VARIANT + cfg beside
+    that engine or the negative field silently lies -- the same defect class item
+    H-RECEIPT just closed on the dispatcher, arriving from another direction.
+    Whatever quant lands on disk decides the negative reality.
+  * **SD3.5's CAP IS TWO-TIER and it is the sharpest fact in the set.** Tokens
+    1-77 are seen by ALL THREE encoders; past 77 is T5-ONLY and invisible to both
+    CLIPs, INCLUDING their pooled global-STYLE vectors. Nominal T5 ceiling 256 with
+    edge artifacts; effective length reported at 154. Working rule: full-coverage
+    budget is **77 tokens TOTAL, style-pack included**; 154 is the conservative
+    hard ceiling. This makes style-token POSITION second-order on that engine and
+    TOTAL TOKENS the real control -- so an A/B there must log the token count, or
+    an over-77 run gets misread as a position result.
+  * **FLUX.2's cap is OURS, not the model's:** diffusers allows 512 tokens and
+    BFL calls 30-80 words ideal, while a 188-char beat is ~27-30 words -- the floor
+    of the ideal band. Its append ordering is now evidence-backed (BFL documents
+    front-to-back weighting, subject > action > style > context), which is the SAME
+    mechanism as Wan's subject-first training and the reason LTX's camera-first
+    guidance was rejected. Three engines, one mechanism.
+* **AN INSTALL-DAY VERIFY QUEUE IS OWED for the three, and it is cheap:** klein-4B's
+  embedder identity (read the checkpoint's `text_encoder` config -- Qwen3-8B is
+  confirmed only on the 9B); klein's local negative surface (expect none); **which
+  HiDream variant is actually on disk**, since that one fact decides its negative,
+  shift and step count; and SD3.5's practical T5 ceiling on our graph (154 vs 256).
+  Also recorded: klein 9B is out on TWO counts, non-commercial licence and ~29GB.
+* **THE PROPOSED SELECTION GATE IS ENDORSED AND DELIBERATELY NOT BUILT:** "engine
+  selectable AND directive present, else hard refuse at selection -- no bare-writer
+  run, no borrowed directive." Right in spirit, premature in fact: NOTHING reads
+  these constants, so the refusal would gate on a value no code consults. Build it
+  in the same change that wires the overlay.
 
 **WHAT THE RESEARCH HALF ACTUALLY FOUND, and four of these are TRAPS for the next
 reader rather than tips:**
@@ -616,7 +663,62 @@ run in the BACKGROUND under anything above.
 
 **F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
 
-**G. PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Does not jump.
+**G. PBUG-20260815-11 -- MEASURED 2026-08-17 AND THE RE-ASK SHOULD NOT BE BUILT.
+The number this item is named for is one the audit itself disowns.**
+
+Panel: Fable (the detection heuristic) + Sonnet (the mechanism) + the driver anchor;
+**both kibitz lanes were quota-held** (Codex to 08-19, Antigravity on confirmed
+`RESOURCE_EXHAUSTED`). Artifacts in `kibitz-runs/2026-08-17-item-G-gender-reask/`.
+r1 ONLY -- not an arc, and not a kibitz fan-out.
+
+**THE DECIDING MEASUREMENT, run live and read-only over the real corpus:**
+* `scripts/audit_voice_gender_consistency.py` reports **`VIOLATIONS: 0`** across all
+  1,710 ledgers. **The voice field agrees with assigned gender EVERYWHERE.** That is
+  the criterion the operator named on 2026-08-17: *"as long as it matches the gender
+  of the voice."* By his own test the defect measures ZERO.
+* The "34" (now **35**, the corpus grew) is the PORTRAIT-PROSE count, and the audit
+  prints beside it: *"a DISGUISE plot is a legitimate hit here -- ROSALIND-as-Ganymede
+  and VIOLA-as-Cesario keep female voices by operator ruling, so read this list, do
+  not total it."* **The item was named after a total the tool refuses to total.**
+* **THE CORPUS IS STALE, and the operator said so first.** The unisex bucket was
+  retired in `b8206412` (2026-08-15 17:55), and he notes the gender ASSIGNMENT was
+  reworked in a sprint about a month ago -- so the ledgers are stratified by at least
+  two regime changes. Split at the retirement: **pre = 4,994 binary rows / 26
+  unanimous conflicts (0.52%); post = 78 rows / ZERO.** The single post-retirement
+  flag is **VIOLA**, `opposing=['man']`, `matching=['her']` -- the disguise plot.
+  Stated honestly: 78 rows at 0.52% predicts ~0.4 conflicts, so zero is EXPECTED
+  either way. It does not prove the bug is gone; it proves **every piece of evidence
+  for building came from a regime that no longer exists.**
+
+**AND BUILDING IT NAIVELY WOULD KILL RENDERS.** A `post_validator` rejection raises
+`PostValidationError`, which SKIPS both the structural-retry and repair-syntax rungs,
+so a content chain exhausts at `attempts_run == 2` while `lock_cast` promotes only on
+`== max_attempts` (3). The equality fails, the bare `raise` fires, the render dies --
+the one outcome the ruling forbids, reachable on the first attempt. A degrade branch
+keyed on `isinstance(exc.last_error, PostValidationError)` is MANDATORY, not optional.
+Also: the ladder gives exactly **ONE** re-ask (base -> typed repair at the static
+0.10 repair floor), and no `max_attempts` knob changes that.
+
+**WHAT SURVIVES, if this is ever revived:** fire only on UNANIMOUS opposition
+(opposing cues present, matching absent) -- measured 26/26 true, 0/5,037 false, and
+it spares VIOLA; promote `portrait_gender_cues` out of `scripts/` into
+`nodes/_otr_roster_gender.py` so the trigger and the acceptance ruler are ONE fact;
+keep the FIRST schema-valid answer, not the last, because that makes the mechanism
+provably never-worse-than-today (log the deviation from the ruling's "last" rather
+than silently reinterpreting it); and do NOT reuse the name census -- its floor is 8
+and at 8 it can never fire on 40-word prose.
+
+**A DIFFERENT BUG IS HIDING IN THOSE ROWS AND DESERVES ITS OWN LOOK:** RICK STEINER
+carrying LUCILLE PENNY's description, OYA SATO carrying Hank Griswold's. That is a
+WRONG-CHARACTER PASTE, not a gender defect, and laundering it through a gender fix
+would hide it.
+
+**A LATENT GGUF SEED BUG, found in passing and unrelated to G:**
+`_otr_gguf_backend` derives `per_call_seed = base_seed + _ordinal["n"]` to make
+consecutive calls diverge, but `_ordinal` is rebuilt on EVERY call, so it is always 0
+-- every GGUF call in an episode gets the identical seed. Masked today only because
+repair prompts differ in text and temperature. Anyone "simplifying" a repair prompt
+toward the base prompt silently loses call independence.
 
 **H. SPLIT 2026-08-17 INTO H-RECEIPT (DONE) AND H-FLOOR (OPERATOR).**
 

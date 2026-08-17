@@ -50,6 +50,14 @@ _OWNERS = {
     "fastwan_8gb": "nodes/_otr_video_engines/eng_fastwan_8gb.py",
     "humo": "nodes/_otr_video_engines/eng_humo.py",
     "minimax_h3": "nodes/_otr_video_engines/eng_minimax_h3.py",
+    # The three the RESEARCH doc never enumerated, added 2026-08-17 on the
+    # operator's scope call. Their directives are HIS drafts from public docs,
+    # explicitly "NOT yet validated", stored verbatim. `flux2_klein` is the one
+    # that matters most: `requires_flag = None`, so it is selectable as shipped
+    # while its two siblings are default-OFF opt-ins.
+    "flux2_klein": "nodes/_otr_image_engines/flux2_klein.py",
+    "hidream_i1": "nodes/_otr_image_engines/hidream_i1.py",
+    "sd35_large": "nodes/_otr_image_engines/sd35_large.py",
 }
 
 #: The sibling that must NOT grow its own copy of the LTX family pair.
@@ -80,8 +88,18 @@ _LTX_POINTER_ONLY = "nodes/_otr_video_engines/eng_ltx_8gb.py"
 #: never the bare stem "exclu"; and it does NOT match a bare "avoid", because
 #: "avoid tag lists" is a legitimate PHRASING rule about how to write, not an
 #: instruction to author scene content that must be absent.
+#: A mention of "negative" is allowed only alongside one of these. Two shapes
+#: qualify, and the SECOND was missed on the first pass: saying the channel has no
+#: effect, and PROHIBITING the writer from emitting one. The operator's own
+#: `flux2_klein` draft closes with "No tags, weights, or negatives" -- the strongest
+#: possible form of the strike -- and the first version of this guard would have
+#: rejected it for containing the word. A rule that fails maximum compliance is a
+#: broken rule, so the prohibition shapes are listed too.
 _NEGATIVE_HEDGES = (
     "no negative",
+    "or negatives",
+    "no negatives",
+    "without negatives",
     "negative is inert",
     "negative is absent",
     "negative has no effect",
@@ -348,21 +366,21 @@ def test_the_owner_map_still_points_at_real_files():
     missed") promised a completeness it does not deliver: it checks the TEN the
     RESEARCH doc enumerated and cannot discover an engine nobody listed.
 
-    A Sonnet QA pass found three registered local image engines outside that
-    scope -- `flux2_klein` (`requires_flag = None`, so it is NOT gated and sits
-    live in the menu), `hidream_i1` and `sd35_large` (both default-OFF opt-ins).
-    None carries an overlay, and none has a configuration block in the RESEARCH
-    doc, so writing directives for them would mean inventing the shipped-config
-    research rather than transcribing it. That is an OPERATOR SCOPE CALL recorded
-    in GO_FORWARD_PLAN, not something this test should quietly decide either way.
+    A Sonnet QA pass found three registered local image engines outside the
+    RESEARCH doc's original ten -- `flux2_klein` (`requires_flag = None`, so it is
+    NOT gated and sits live in the menu), `hidream_i1` and `sd35_large` (both
+    default-OFF opt-ins). **The operator closed that scope call on 2026-08-17 and
+    supplied all three directives himself**, drafted from public docs and then
+    validated in a v2 pass, so the map is now THIRTEEN. His three are stored
+    verbatim; the original ten remain driver-derived. Neither set is measured.
     """
     for slug, rel_path in sorted(_OWNERS.items()):
         assert (_REPO / rel_path).is_file(), (
             "%s: %s no longer exists -- the overlay moved or the engine was "
             "renamed, and this map is now lying" % (slug, rel_path))
-    assert len(_OWNERS) == 10, (
-        "the RESEARCH doc decided TEN per-engine blocks; this map has %d. Three "
-        "further registered image engines (flux2_klein, hidream_i1, sd35_large) "
-        "are a known gap awaiting an operator scope call -- adding one here is a "
-        "deliberate act, so update this count in the same commit."
-        % len(_OWNERS))
+    assert len(_OWNERS) == 13, (
+        "this map has %d. It was TEN (the RESEARCH doc's blocks) until the "
+        "operator's 2026-08-17 scope call added flux2_klein, hidream_i1 and "
+        "sd35_large. Adding or removing one is a deliberate act, so update this "
+        "count in the same commit -- this assertion firing is the guard working, "
+        "not a bug." % len(_OWNERS))

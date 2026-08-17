@@ -32,6 +32,71 @@ log = logging.getLogger("OTR.image.hidream_i1")
 #: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
 ENABLE_FLAG = "OTR_ENABLE_HIDREAM"
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "One present-tense sentence, natural prose, under 24 words. Begin with the "
+    "subject and action. Preserve every required beat fact. Camera direction and "
+    "speed only from Camera; if NONE, no camera wording. No weight syntax, no tags."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+PROVENANCE FIRST: **the operator supplied this directive himself on 2026-08-17,
+drafted from PUBLIC DOCS and explicitly labelled "NOT yet validated".** Stored
+verbatim, not rewritten. This engine is default-OFF (``requires_flag =
+ENABLE_FLAG``), so it is opt-in rather than live in the menu.
+
+REGISTRY NOTES -- v2, VALIDATED by the operator against public docs 2026-08-17.
+Recorded as authored; the probe gate still rules and none of this is built.
+
+IDENTITY: 17B sparse-MoE MMDiT, MIT licence, 2025-04-07. **QUAD encoders:** CLIP-L
++ CLIP-G (77-token class, contributing POOLED GLOBAL vectors) + T5-XXL +
+Llama-3.1-8B-Instruct intermediate layers, with T5 and Llama concatenating into the
+sequence stream.
+
+**THE CORRECTION, AND IT INVALIDATES WHAT THIS FILE SAID AN HOUR EARLIER.** The
+first version of this note stated flatly that "HiDream SUPPORTS a negative, unlike
+FLUX.2". **That is wrong: negative support is VARIANT-dependent, not model-wide.**
+  * **Full** -- 50 steps, cfg 5.0, shift 3.0 -> negative **LIVE**.
+  * **Dev** -- 28 steps, cfg 1.0, shift 6.0 -> negative **INERT**.
+  * **Fast** -- 16 steps, cfg 1.0, shift 3.0 -> negative **INERT**.
+**So the registry MUST record variant + cfg beside the engine, or the negative field
+silently lies** -- which is precisely the class of defect item H just closed on the
+dispatcher side, arriving here from a different direction. Full at full precision
+needs 27GB+ and will NOT fit this box's 16GB; fp8/GGUF quants of any tier will.
+**Whatever lands on disk decides the negative reality**, sampler-side.
+
+effective_cap: reference `max_sequence_length` is **128 tokens** (~90 words), with
+community reports of degradation past it; SD.Next ships a 256 default via override.
+So: 128 default, extendable, QUALITY-GATED -- and a beat budget is far inside it.
+(The first draft said "128 reference, 248 tolerated"; the corrected framing is that
+extension is possible but costs quality, not that 248 is free.)
+
+style_token_position: **prepend-tolerant**, as drafted, and now with a reason --
+ordering pressure lives in the long T5/Llama sequence stream, while the CLIPs
+contribute POOLED vectors where position matters least. A/B per gate regardless.
+
+THE ONE-STRING CONTRACT IS CONFIRMED, and it stays the sharp caveat here:
+per-encoder prompt fields (clip vs llama splits) DO exist in advanced node packs.
+**Do not enable them without the schema change.** A reader who discovers the
+capability and wires it against a one-string writer sends one value into a slot
+that expects several.
+
+THE GATE, endorsed unchanged and still NOT built: "engine selectable AND directive
+present, else hard refuse at selection -- no bare-writer run, no borrowed
+directive." Nothing reads these constants yet, so build it in the change that wires
+them.
+
+INSTALL-DAY VERIFY, for this engine: **which variant is actually on disk**, because
+that single fact decides the negative, the shift and the step count.
+"""
+
 #: Env var pointing at the downloaded HiDream-I1 GGUF checkpoint file. Absent /
 #: not a file -> ``assert_usable`` fails closed. In-stack GGUF (the installed
 #: ComfyUI-GGUF loader), so this is a WEIGHTS path, not a sidecar python.

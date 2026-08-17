@@ -192,9 +192,36 @@ Box state at close: **CLEAN** -- port 8000 free, VRAM ~825 MiB (baseline), no
 resident server, no GPU leg run (item C is zero behaviour change, so no render was
 owed).
 
-Gates at close: suite **10824 passed / 110 skipped / 1 xfailed** (10755 baseline ->
-10819 with item C's 64 overlay tests -> 10824 with H-receipt's 5; each delta equals
-exactly the tests added, no other test moved). ENGINE_MATRIX drift **IDENTICAL**.
+**THEN THE OPERATOR CLOSED THE SCOPE CALL AND KILLED ITEM G, both in one exchange.**
+He supplied directives for the three engines outside the RESEARCH doc's ten
+(`flux2_klein`, `hidream_i1`, `sd35_large`), drafted from public docs and then
+validated in a v2 pass -- stored VERBATIM, map now THIRTEEN. **His v2 caught a
+factual error I had stored an hour earlier:** I wrote HiDream "supports a negative"
+flatly; support is VARIANT-dependent (Full cfg 5.0 live, dev and fast cfg 1.0 none),
+so the registry must record variant + cfg or that field silently lies -- the same
+defect class H-RECEIPT had just closed, from another direction. His stated char
+counts also run **exactly +5 low** on all three (230/223/213 vs measured
+235/228/217); hand-counting confirms the test, so trust `_HARD_CAP`.
+
+**AND HIS TWO ONE-LINERS KILLED ITEM G, correctly.** First: *"as long as it matches
+the gender of the voice"* -- the audit reports **`VIOLATIONS: 0`** across all 1,710
+ledgers, so by his own criterion the defect measures ZERO; the "34/35" is the
+PORTRAIT-PROSE count the audit itself prints "do not total it" beside. Second:
+*"only 3 days ago we removed the unisex pool so past history is not a good judge"* --
+split at `b8206412`, pre-retirement is 26 conflicts in 4,994 rows and
+**post-retirement is ZERO in 78**, the single flag being VIOLA's disguise plot. Both
+corrections were right and neither was mine. Recorded as MEASURED-AND-CLOSED rather
+than built; Sonnet separately proved a naive `post_validator` would have KILLED
+RENDERS on the first attempt (a content rejection skips two ladder rungs, exhausting
+at 2 while `lock_cast` promotes on 3). Two unrelated bugs were split out rather than
+laundered through it: wrong-character description pastes, and a latent GGUF seed
+defect where `_ordinal` is rebuilt every call so every call in an episode shares one
+seed.
+
+Gates at close: suite **10842 passed / 110 skipped / 1 xfailed** (10755 baseline ->
+10819 with item C's 64 overlay tests -> 10824 with H-receipt's 5 -> 10842 with the
+three extra engines' 18; each delta equals exactly the tests added, no other test
+moved). ENGINE_MATRIX drift **IDENTICAL**.
 Directives 176-232 chars against the 240 hard cap. AST + BOM + pure-ASCII +
 no-trailing-whitespace clean on every touched file. Bible **20 / 26 / 3** at
 **287**, **nothing promoted** -- every finding here is static-audit or a

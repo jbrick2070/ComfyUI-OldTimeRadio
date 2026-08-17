@@ -55,6 +55,92 @@ log = logging.getLogger("OTR.image.flux2_klein")
 #: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
 ENABLE_FLAG = "OTR_ENABLE_FLUX2_KLEIN"
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "One present-tense sentence in natural prose, under 24 words. Begin with the "
+    "subject and action. Preserve every required beat fact. Camera direction and "
+    "speed only from Camera; if NONE, no camera wording. No tags, weights, or "
+    "negatives."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+PROVENANCE FIRST, because this one is different from the other ten: **the operator
+supplied this directive himself on 2026-08-17, drafted from PUBLIC DOCS and
+explicitly labelled "NOT yet validated".** It is stored verbatim, not rewritten --
+the standing rule is to fix a colliding token and never the surrounding writing.
+The ten engines the RESEARCH doc enumerated carry driver-derived directives; this
+engine and its two siblings (``hidream_i1``, ``sd35_large``) carry the operator's
+drafts. Neither set is measured.
+
+THIS ENGINE IS NOT FLAG-GATED IN PRACTICE. ``ENABLE_FLAG`` exists above, but the
+class sets ``requires_flag = None`` and calls it "vestigial (registry IS the menu;
+no flag gate)". So unlike its two default-OFF siblings, flux2_klein is SELECTABLE
+as shipped -- which is why it was the one worth flagging when the audit found three
+registered image engines outside the RESEARCH doc's ten.
+
+FLUX.2 TAKES NO NEGATIVE AT ALL, so the directive's closing "no tags, weights, or
+negatives" is a prohibition on the WRITER emitting any -- which is the strongest
+possible form of the 2026-08-17 strike, not a violation of it. (It did trip the
+first version of the test guard, which flagged any mention of "negative" without an
+approved has-no-effect hedge; the guard was widened to recognise a PROHIBITION as
+compliant. The directive was not touched.)
+
+REGISTRY NOTES -- v2, VALIDATED by the operator against public docs 2026-08-17.
+Recorded as authored; the probe gate still rules and none of this is built.
+
+IDENTITY: released **2026-01-15**. Two tiers, 4B and 9B, and **both are step- AND
+guidance-distilled at 4 inference steps**. Undistilled Base tiers (~50 steps) exist
+for LoRA / fine-tune work ONLY -- not a render option.
+
+**RECORD tier=4B, and the reason is licence as much as VRAM.** The 4B is Apache-2.0
+at ~13GB bf16, with official FP8/NVFP4 quants cutting VRAM 40-55% and benchmarked on
+the RTX 5080 -- this box. The 9B is **non-commercial licence**, ~29GB, with a
+Qwen3-8B embedder: out of budget AND out of licence. Two independent disqualifiers,
+either of which settles it.
+
+NEGATIVES: **CONFIRMED none.** BFL states FLUX.2 takes no negative prompts
+family-wide, and distilled klein runs guidance 1.0 in the official pipeline -- inert
+twice over. **Third-party pages quoting "guidance 3.0-4.0" are describing the
+EMBEDDED-GUIDANCE parameter on hosted/turbo variants, not a CFG branch**, so a
+reader who finds one has not found a live negative. This is why the directive's "no
+tags, weights, or negatives" is a prohibition on the writer rather than advice.
+
+ENCODER: an LLM embedder. Qwen3-8B is confirmed on the 9B; **the 4B's exact Qwen3
+size is UNCONFIRMED -- read the checkpoint's `text_encoder` config at install.**
+Prose only: `(word:1.5)` and `++` are SILENTLY IGNORED, and tag lists parse as
+broken English. Klein applies the prompt as-is: there is no auto-enhancement layer
+to rescue a sloppy prompt.
+
+style_token_position: **APPEND, and it is now evidence-backed rather than
+drafted.** BFL documents front-to-back token weighting with priority
+subject > action > style > context, and style-first demonstrably makes style
+dominate while the subject drifts. That is the same mechanism recorded on
+``eng_wan_i2v.PROMPT_STYLE_NOTES`` (Wan's subject-first training) and the same
+reason the LTX camera-first guidance was rejected there -- three engines now, one
+mechanism. Keep the A/B anyway, per the gate.
+
+effective_cap: the diffusers hard limit is **512 tokens**, and BFL's bands are
+10-30 / 30-80 / 80+ words with 30-80 called ideal. A 188-char beat is ~27-30 words,
+sitting at the FLOOR of the ideal band. **So our cap here is pipeline POLICY, not a
+model limit** -- the clearest case in the set of "the budgets are ours" -- and the
+24-word target from `cap/7` is safe.
+
+THE GATE, endorsed unchanged and still NOT built: "engine selectable AND directive
+present, else hard refuse at selection -- no bare-writer run, no borrowed
+directive." Nothing reads these constants yet, so a refusal would gate on a value no
+code consults. Build it in the change that wires them.
+
+INSTALL-DAY VERIFY, for this engine: the **klein-4B embedder identity** (read the
+checkpoint config) and the **local negative surface** (expect none).
+"""
+
 #: Env var pointing at the downloaded FLUX.2 klein diffusion GGUF. Absent / not a
 #: file -> ``assert_usable`` fails closed. The GGUF UnetLoader resolves a basename
 #: via ComfyUI folder_paths, so set this to the full path (gate) -- the loader uses
