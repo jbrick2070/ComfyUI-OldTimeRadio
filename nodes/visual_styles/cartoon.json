@@ -42,5 +42,6 @@
     "western": "flat warm-ochre cartoon gradient, low sunny side light",
     "pulp": "flat bold-red cartoon gradient, punchy dramatic underlight",
     "default": "flat dark cartoon gradient, soft cheerful center light"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, realistic skin pores, film grain, 3d render, muted desaturated grade, text, watermark"
 }

@@ -102,7 +102,17 @@ class LuminaImage2Engine:
             "clip_name": os.path.basename(os.environ.get(CLIP_ENV, "") or _DEFAULT_CLIP),
             "vae_name": os.path.basename(os.environ.get(VAE_ENV, "") or _DEFAULT_VAE),
             "prompt": str(get("prompt") or ""),
-            "negative": os.environ.get("OTR_LUMINA_NEGATIVE", ""),
+            # The request's composed negative (pack style + per-object) wins;
+            # the env override stays for dev only. Before 2026-08-17 this read
+            # env ONLY, so the dispatcher's negative was computed and silently
+            # discarded on this lane (PBUG-20260817-01). Live here: cfg 4.0.
+            # `is not None`, not `or`: an explicitly-empty override means
+            # "render with no negative", and must not fall through to the
+            # request. Matches z_image_turbo._resolve_negative exactly -- one
+            # authority means one rule, including at the edges.
+            "negative": (_env_neg if (_env_neg := os.environ.get(
+                "OTR_LUMINA_NEGATIVE")) is not None
+                else str(get("negative_prompt") or "")),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_LUMINA_STEPS", 30),
             "cfg": _efloat("OTR_LUMINA_CFG", 4.0),

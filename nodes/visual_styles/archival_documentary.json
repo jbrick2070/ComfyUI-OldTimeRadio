@@ -42,5 +42,6 @@
     "western": "faded sepia-amber gradient, low warm daylight",
     "pulp": "deep faded-maroon gradient, hard raking daylight",
     "default": "soft muted-grey gradient, gentle natural light"
-  }
+  },
+  "negative_tail": "oversaturated, glossy, clean digital, plastic skin, waxy skin, sterile studio lighting, cartoon, illustration, text, watermark"
 }

@@ -42,5 +42,6 @@
     "western": "warm sand-amber paper-toned gradient, low golden raking light",
     "pulp": "rich crimson paper-toned gradient, bold dramatic side light",
     "default": "soft dark paper-toned gradient, gentle even studio light"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, realistic skin, film grain, glossy digital render, smooth gradients, text, watermark"
 }

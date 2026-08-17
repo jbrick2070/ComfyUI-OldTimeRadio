@@ -46,7 +46,12 @@ _V2_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
             "announcer_subject_object", "radio_object_look", "plate_look",
             "non_character_emblem_fallback", "still_word_title_mood_style",
             "open_subjects", "motion_registers", "still_word_typography",
-            "still_word_backdrop"}
+            "still_word_backdrop",
+            # ONE STYLE AUTHORITY (2026-08-17): the pack's own NEGATIVE. Schema-
+            # OPTIONAL so frozen embedded packs still validate, but every
+            # SHIPPED pack carries it -- pinned here and asserted non-empty in
+            # tests/test_visual_style_negative.py.
+            "negative_tail"}
 
 _META_BRIEF = {
     "story_brief_terms": {

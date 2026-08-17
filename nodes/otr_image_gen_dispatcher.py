@@ -377,6 +377,86 @@ def _assert_not_path(prompt: str) -> None:
         raise exc
 
 
+#: Stills whose edge statistics differ STRUCTURALLY rather than stylistically.
+#: Word/title cards are typographic by design -- flat plates with hard lettering
+#: -- so including them would make a healthy episode look fractured.
+_SPREAD_EXCLUDED_SOURCES = frozenset({"still_word"})
+
+
+def _laplacian_variance(pixels) -> float:
+    """Mean 4-neighbour Laplacian variance of one decoded still.
+
+    The identical formula the q-bakeoff uses for its sharpness rank
+    (`scripts/run_ltx_av_q_bakeoff.py`), applied to a single 3D `[H,W,C]`
+    frame instead of a sampled 4D stack.
+
+    This is a SHARPNESS statistic, not a style classifier, and it is recorded
+    on exactly that footing: a dense cross-hatched engraving and a detailed
+    photograph can both score high. It is useful only COMPARATIVELY, against
+    the episode's own median, and it never decides anything. Returns 0.0 on
+    anything it cannot measure -- telemetry must not raise.
+    """
+    try:
+        import numpy as np  # lazy, mirroring _coerce_pixels
+        arr = np.asarray(pixels)
+        if arr.ndim == 4:            # [N,H,W,C] -> first frame
+            arr = arr[0]
+        if arr.ndim == 2:            # already luma
+            g = arr.astype(np.float64)
+        elif arr.ndim == 3 and arr.shape[-1] >= 3:
+            f = arr.astype(np.float64)
+            g = 0.299 * f[..., 0] + 0.587 * f[..., 1] + 0.114 * f[..., 2]
+        else:
+            return 0.0
+        if g.shape[0] < 3 or g.shape[1] < 3:
+            return 0.0
+        lap = (g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]
+               - 4.0 * g[1:-1, 1:-1])
+        return round(float(lap.var()), 2)
+    except Exception:  # noqa: BLE001 -- telemetry never breaks a render
+        return 0.0
+
+
+def _style_spread(rows) -> dict:
+    """Max pairwise Laplacian spread across an episode's comparable stills.
+
+    RELATIVE to the episode's own median, never an absolute style constant --
+    the q-bakeoff shape, where sharpness is ranked against a baseline rather
+    than a fixed number.
+
+    It reports; it never gates. THE LAW forbids failing OR rerolling an episode
+    for style or visual vocabulary, and this is a style property, so `exceeded`
+    is a flag for a human and nothing downstream may branch a render on it.
+    `threshold: null` means the metric shipped uncalibrated and no claim about
+    spread is being made.
+    """
+    vals = [float(r.get("laplacian") or 0.0) for r in rows
+            if r.get("kind") != "shot"
+            and r.get("source") not in _SPREAD_EXCLUDED_SOURCES
+            and float(r.get("laplacian") or 0.0) > 0.0]
+    out = {
+        "metric": "laplacian_variance",
+        "comparable_stills": len(vals),
+        "excluded_sources": sorted(_SPREAD_EXCLUDED_SOURCES),
+        "median": None, "max_pairwise": None, "max_ratio": None,
+        "threshold": None, "exceeded": None,
+        # Procedural viz_* bookends never mint a still, so they cannot be
+        # measured here. This audits a SUBSET of the fracture surface.
+        "covers": "minted stills only",
+    }
+    if len(vals) < 2:
+        return out
+    ordered = sorted(vals)
+    mid = len(ordered) // 2
+    median = (ordered[mid] if len(ordered) % 2
+              else (ordered[mid - 1] + ordered[mid]) / 2.0)
+    out["median"] = round(median, 2)
+    out["max_pairwise"] = round(max(vals) - min(vals), 2)
+    if median > 0:
+        out["max_ratio"] = round(max(vals) / median, 3)
+    return out
+
+
 def _coerce_pixels(result, *, min_bytes: int = _MIN_PNG_BYTES,
                    wait_attempts: int = 40, wait_sleep_s: float = 0.05):
     """Decoded uint8 pixel array from a gen_fn result.
@@ -999,6 +1079,48 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     #: Read by the completion contract below, which raises BEFORE the images
     #: section (and its warnings) is stamped to the ledger.
     skip_evidence_by_oid: dict = {}
+    # ONE STYLE AUTHORITY (PBUG-20260817-01). This node is the only one holding
+    # BOTH prompt families' authors upstream of it -- ShotLock (video) and
+    # MetaBrief (stills) -- and it is upstream of every mint, so it is where the
+    # still family gets its style FRONT-anchored and where the pack's own
+    # negative is composed. Video prompts keep their existing prepend in
+    # render_driver, which already front-anchors the identical token.
+    try:
+        try:
+            from ._otr_visual_styles import (  # type: ignore
+                get_visual_style, prefix_style_cue, compact_style_cue,
+                effective_negative)
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_visual_styles import (  # type: ignore
+                get_visual_style, prefix_style_cue, compact_style_cue,
+                effective_negative)
+        _vstyle = get_visual_style(ledger.get("meta") or {})
+    except Exception as exc:  # noqa: BLE001
+        # A style that will not resolve must not kill a render: the mint simply
+        # keeps today's behaviour (no prefix, engine hygiene negative).
+        _vstyle = None
+        warnings.append(
+            f"style authority: visual style unresolved ({exc}); stills mint "
+            f"without a style prefix or pack negative"
+        )
+    _style_cue = compact_style_cue(_vstyle) if _vstyle is not None else ""
+    # The pack's negative with any phrase the pack's OWN positive asks for
+    # removed (operator ruling 2026-08-17: a negative may never conflict with a
+    # visual style). `_pack_negative_authored` is kept beside it so the ledger
+    # can show what the pack declared AND what actually conditioned the mint.
+    _pack_negative_authored = str(getattr(_vstyle, "negative_tail", "") or "")
+    _pack_negative = (effective_negative(_vstyle) if _vstyle is not None else "")
+    if _pack_negative != _pack_negative_authored:
+        log.info("[OTR.image.style_authority] pack %r self-veto resolved: "
+                 "authored=%r effective=%r",
+                 str(getattr(_vstyle, "style_id", "") or ""),
+                 _pack_negative_authored, _pack_negative)
+    #: The VISUAL LEDGER (operator-authorized 2026-08-17). One durable row per
+    #: visual prompt: what style was in force, whether this pass had to add it,
+    #: and the measured scalar. Before this, the final still prompts existed
+    #: only on the wire between two nodes and were never persisted, so nothing
+    #: on disk recorded what was actually rendered.
+    _visual_rows: list = []
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -1018,6 +1140,39 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         lettering_style = str(obj.get("lettering_style") or "")
         backdrop_family = str(obj.get("backdrop_family") or "")
         prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
+        # STYLE, FRONT-ANCHORED (ONE STYLE AUTHORITY). Additive only, and
+        # positional rather than membership-based on purpose: finish_visual_prompt
+        # already appends the style TAIL, so an "is it present" test would find
+        # it and skip exactly the prompts that fractured. Runs BEFORE the banana
+        # transform and the content hash below, so the stored hash describes the
+        # text actually rendered. Portraits are deliberately included -- the
+        # measured fracture propagated FROM a portrait via reference_latent.
+        _pre_style = prompt
+        if _vstyle is not None:
+            prompt = prefix_style_cue(_vstyle, prompt)
+        _styled_now = prompt != _pre_style
+        # THE NEGATIVE FOR THIS ROW, resolved once and recorded (operator
+        # 2026-08-17: "lock them in the ledger"). Composed, never precedence --
+        # the pack half is about STYLE and the object half (radio_host_negative)
+        # is about keeping the announcer radio-object FACELESS, so letting
+        # either win silently drops the other.
+        _obj_negative = str(obj.get("negative_prompt") or "")
+        _effective_neg = visual_safety_negative(
+            ", ".join(t for t in (_pack_negative, _obj_negative) if t))
+        # Named from what ACTUALLY contributed, per row. An episode-level label
+        # read off the pack alone reported "engine_hygiene" on announcer stills
+        # of a dynamic-pack episode, where the pack is empty by design but the
+        # object negative is real and is what conditioned the mint.
+        _neg_source = ("pack+request" if _pack_negative and _obj_negative
+                       else "pack" if _pack_negative
+                       else "request" if _obj_negative
+                       else "engine_hygiene")
+        if _styled_now:
+            # Provenance: MetaBrief stamped its own prompt_hash upstream for its
+            # report. The dispatch cache key is recomputed from prompt TEXT
+            # below and never trusts this field, but leaving it describing
+            # pre-style text would make the ledger contradict itself.
+            obj["prompt_hash"] = _prompt_content_hash(prompt)
         # Banana transform BEFORE the content hash, so flipping the switch
         # re-mints every cached still instead of serving a stale gun.
         #
@@ -1241,6 +1396,23 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     fresh["lettering_style"] = lettering_style
                 if backdrop_family:
                     fresh["backdrop_family"] = backdrop_family
+                if _vstyle is not None:
+                    fresh["visual_style"] = str(
+                        getattr(_vstyle, "style_id", "") or "")
+                # Recorded so the visual ledger covers the whole episode, with
+                # laplacian 0.0 meaning UNMEASURED -- a cache hit decodes no
+                # fresh pixels. _style_spread skips these rather than treating
+                # a missing measurement as a real value.
+                _visual_rows.append({
+                    "kind": kind, "object_id": oid, "role": role,
+                    "source": source, "beat_id": beat_id,
+                    "styled": bool(_styled_now),
+                    "already_styled": bool(_style_cue) and not _styled_now,
+                    "prompt_sha8": str(prompt_hash or "")[:8],
+            "negative": _effective_neg,
+            "negative_source": _neg_source,
+                    "laplacian": 0.0, "reused": True,
+                })
                 images.append(fresh)
                 ep_rows.append(fresh)
                 reused += 1
@@ -1307,8 +1479,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "kind": kind, "char_id": char_id, "beat_id": beat_id,
             "engine_id": engine_id, "engine_version": eng_version,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
-            "negative_prompt": visual_safety_negative(
-                str(obj.get("negative_prompt") or "")),
+            # COMPOSED, never precedence (ONE STYLE AUTHORITY). The two
+            # negatives are orthogonal: the pack's is about STYLE, the object's
+            # (radio_host_negative) is about keeping the announcer radio-object
+            # FACELESS. Letting either win outright silently drops the other --
+            # and dropping the pack half on an announcer still is precisely the
+            # fracture this build fixes. visual_safety_negative de-duplicates.
+            "negative_prompt": _effective_neg,
             # The character's canonical portrait, when this engine declared it
             # can condition on one. Empty string on every other path, so an
             # adapter that never opts in sees exactly the request it always saw.
@@ -1329,6 +1506,12 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
             )
             content_hash = _pl.compute_portrait_hash(pixels)
+            # Style-spread telemetry: measured here because the pixels are
+            # already a decoded CPU uint8 array on this line (the hash above
+            # consumes the same object), so it costs one numpy pass and adds no
+            # device sync. Aggregated once AFTER the loop -- a spread computed
+            # mid-loop would warn before the episode's stills exist.
+            _lap = _laplacian_variance(pixels)
             # portraits stamp the cast row (require_cast_entry for real cast);
             # scene stills only write the content-addressed file (no cast row
             # could ever exist for a beat).
@@ -1408,6 +1591,23 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _msid = str(obj.get("mesh_subject_id") or "")
         if _msid:
             row["mesh_subject_id"] = _msid
+        # Style attribution travels WITH the still: portrait rows carried no
+        # visual_style at all before this, so a still could not be traced back
+        # to the pack that shaped it.
+        if _vstyle is not None:
+            row["visual_style"] = str(getattr(_vstyle, "style_id", "") or "")
+        if _lap:
+            row["laplacian"] = _lap
+        _visual_rows.append({
+            "kind": kind, "object_id": oid, "role": role,
+            "source": source, "beat_id": beat_id,
+            "styled": bool(_styled_now),
+            "already_styled": bool(_style_cue) and not _styled_now,
+            "prompt_sha8": str(prompt_hash or "")[:8],
+            "negative": _effective_neg,
+            "negative_source": _neg_source,
+            "laplacian": _lap,
+        })
         images.append(row)
         ep_rows.append(row)
         cache_index[key] = image_id
@@ -1530,9 +1730,35 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # image_engines meta into the production-ledger SINGLETON and save
     # LOUDLY (raises LedgerStampError on save failure; test-mode injects
     # in-memory only). The late OTR_CreditsRoll node reads THIS.
+    # THE VISUAL LEDGER. Assembled here and stamped on the SAME durable call as
+    # the images section below -- one owner, no second LedgerStampError site.
+    _spread = _style_spread(_visual_rows)
+    ledger["visual"] = {
+        "authority_version": 1,
+        "style_id": (str(getattr(_vstyle, "style_id", "") or "")
+                     if _vstyle is not None else ""),
+        "style_token": _style_cue,
+        # What the pack DECLARED and what survived the self-veto resolution.
+        # Equal on a cleanly authored pack; different means the pack asked to
+        # suppress something it also asks for, and the mint kept the request.
+        "pack_negative_authored": _pack_negative_authored,
+        "pack_negative": _pack_negative,
+        "self_veto_resolved": _pack_negative != _pack_negative_authored,
+        # Per-ROW `negative` / `negative_source` live on each prompts[] entry:
+        # one episode-level label cannot describe a per-row composition.
+        "prompts": _visual_rows,
+        "spread": _spread,
+    }
+    _styled_n = sum(1 for r in _visual_rows if r.get("styled"))
+    log.info("[OTR.image.style_authority] style=%r token=%r styled=%d/%d "
+             "pack_negative=%s spread=%s",
+             ledger["visual"]["style_id"], _style_cue, _styled_n,
+             len(_visual_rows), bool(_pack_negative),
+             _spread.get("max_pairwise"))
+
     from .production_ledger import stamp_durable
     stamp_durable(
-        sections={"images": ledger["images"]},
+        sections={"images": ledger["images"], "visual": ledger["visual"]},
         meta_updates={"image_engines": _ie_meta["image_engines"]},
         source="image_dispatcher",
     )
@@ -1543,6 +1769,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             os.makedirs(ep_dir, exist_ok=True)
             manifest = {
                 "episode_id": ep, "image_revision": rev,
+                # Style telemetry beside the stills it describes, so the
+                # measurement is auditable without opening the ledger.
+                "visual_style": (str(getattr(_vstyle, "style_id", "") or "")
+                                 if _vstyle is not None else ""),
+                "style_spread": _spread,
                 "stills": [{
                     "object_id": r.get("object_id"),
                     "kind": r.get("kind"),
@@ -1562,6 +1793,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "banana_sha256_before": r.get("banana_sha256_before"),
                     "banana_sha256_after": r.get("banana_sha256_after"),
                     "banana_varieties": r.get("banana_varieties"),
+                    "visual_style": r.get("visual_style"),
+                    "laplacian": r.get("laplacian"),
                 } for r in ep_rows],
             }
             with open(os.path.join(ep_dir, "stills_manifest.json"), "w",

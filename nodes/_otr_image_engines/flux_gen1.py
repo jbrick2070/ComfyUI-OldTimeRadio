@@ -81,7 +81,16 @@ class FluxGen1ImageEngine:
             "ckpt_name": os.environ.get(
                 "OTR_FLUX_CKPT", "flux1-dev-fp8.safetensors"),
             "prompt": str(get("prompt") or ""),
-            "negative": os.environ.get("OTR_FLUX_NEGATIVE", ""),
+            # Same request-negative channel as the other two negative-capable
+            # engines (PBUG-20260817-01). INERT at the shipped cfg 1.0 -- Flux
+            # takes adherence from the FluxGuidance embedding, not from CFG --
+            # but OTR_FLUX_CFG is env-overridable, so leaving this one lane
+            # reading env-only would be a latent inconsistency, not a saved line.
+            # `is not None`, not `or` -- see lumina_image: an explicitly-empty
+            # override means "no negative", not "fall through to the request".
+            "negative": (_env_neg if (_env_neg := os.environ.get(
+                "OTR_FLUX_NEGATIVE")) is not None
+                else str(get("negative_prompt") or "")),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_FLUX_STEPS", 20),
             "cfg": _efloat("OTR_FLUX_CFG", 1.0),

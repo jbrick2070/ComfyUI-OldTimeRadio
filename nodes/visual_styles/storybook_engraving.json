@@ -42,5 +42,6 @@
     "western": "warm ochre parchment gradient, low golden etched light",
     "pulp": "rich crimson paper gradient, dramatic hatched side light",
     "default": "warm umber paper gradient, gentle engraved center light"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, glossy digital render, film grain, neon color, text, watermark"
 }

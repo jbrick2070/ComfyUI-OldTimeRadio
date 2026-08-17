@@ -79,6 +79,43 @@ _DEFAULT_VAE = "ae.safetensors"
 _DEFAULT_CLIP_TYPE = "qwen_image"       # CLIPLoader type for the Qwen3-4B TE (verified)
 _DEFAULT_LATENT_NODE = "EmptySD3LatentImage"   # 16-ch (matches the Flux ae VAE; verified)
 
+#: ANTI-ARTIFACT ONLY -- the hygiene floor, with NO style opinion in it.
+#:
+#: PBUG-20260817-01: this constant used to also carry "clean digital, cartoon,
+#: illustration", which made it a STYLE authority living engine-side. On a
+#: `cartoon` episode every still was minted with the positive "bright cartoon
+#: illustration" AND the negative "cartoon, illustration" -- the engine vetoed
+#: the style the episode had selected. By literal phrase match it fought FOUR
+#: of the nine packs (anime, cartoon, sci_fi_radio, storybook_engraving).
+#: The style half now lives in each pack's `negative_tail`, which the
+#: dispatcher composes into the request; `sci_fi_radio` carries the historical
+#: string verbatim so the default lane is unchanged.
+#:
+#: This remains the FALLBACK for a mint that arrives with no composed negative
+#: at all -- a legacy frozen pack, or a direct/standalone engine call. Falling
+#: back to nothing would strip legacy ledgers of their anti-artifact terms.
+_HYGIENE_NEGATIVE = (
+    "oversaturated, glossy, plastic skin, waxy skin, "
+    "sterile studio lighting, text, watermark"
+)
+
+
+def _resolve_negative(request_negative):
+    """The negative conditioning for THIS mint, and the one place that decides.
+
+    Order: an explicit ``OTR_ZIMAGE_NEGATIVE`` override wins (dev convenience,
+    deliberately OUT of the production chain -- the B6 lesson from
+    ``eng_ltx_8gb`` is that a boot-time env channel makes two boxes render
+    differently while stamping identical receipts). Otherwise the composed
+    request negative -- pack style + any per-object negative, already merged
+    and de-duplicated by the dispatcher. Empty falls back to hygiene, never to
+    nothing.
+    """
+    override = os.environ.get("OTR_ZIMAGE_NEGATIVE")
+    if override is not None:
+        return override
+    return str(request_negative or "").strip() or _HYGIENE_NEGATIVE
+
 
 def _installed_unets():
     """The installed ``z_image_turbo*.safetensors`` basenames in the
@@ -213,10 +250,7 @@ class ZImageTurboEngine:
             "latent_node": os.environ.get("OTR_ZIMAGE_LATENT_NODE", _DEFAULT_LATENT_NODE),
             "unet_dtype": os.environ.get("OTR_ZIMAGE_UNET_DTYPE", "default"),
             "prompt": str(get("prompt") or ""),
-            "negative": os.environ.get(
-                "OTR_ZIMAGE_NEGATIVE",
-                "oversaturated, glossy, clean digital, plastic skin, waxy skin, "
-                "sterile studio lighting, cartoon, illustration, text, watermark"),
+            "negative": _resolve_negative(get("negative_prompt")),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_ZIMAGE_STEPS", 8),       # distilled design point
             "cfg": _efloat("OTR_ZIMAGE_CFG", 2.0),       # keeps the negative live

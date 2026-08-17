@@ -42,5 +42,6 @@
     "western": "deep amber dusk haze, low golden horizon glow",
     "pulp": "deep crimson gradient haze, dramatic low uplight glow",
     "default": "soft dark gradient haze, faint warm center glow"
-  }
+  },
+  "negative_tail": "oversaturated, glossy, clean digital, plastic skin, waxy skin, sterile studio lighting, cartoon, illustration, text, watermark"
 }

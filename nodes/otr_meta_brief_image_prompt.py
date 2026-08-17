@@ -248,7 +248,7 @@ _RADIO_CONSOLE_FACE = ("its glowing tuning dial forming an expressive stylized "
 #: person anchors (_style_anchor_for_aspect -> STYLE_ANCHOR*) carry "full head
 #: and face", "period-accurate costume", "in-character" -- anatomy/person tokens
 #: that would defeat facelessness. radio_object leans on OBJECT/material language
-#: only (zero anatomy tokens; the still dispatcher has NO negative channel) and
+#: only (zero anatomy tokens; facelessness rides the POSITIVE) and
 #: an OBJECT anchor, and it never appends _radio_face_overtness (which returns
 #: face-bearing text). Exact anchor strings pinned (r3) so devs don't drift.
 _RADIO_OBJECT_SUBJECT = ("presented as a stylized tabletop radio set on its "
@@ -278,7 +278,7 @@ _RADIO_OBJECT_ANCHOR_WIDE = "%s, %s" % (RADIO_OBJECT_GEOMETRY_WIDE,
 #: (FLUX weights earlier tokens). Sub-plan C probes whether this actually
 #: lip-syncs; until then ltx_audio_in stays documented as AMBIENT motion.
 #: MATERIAL-ANCHORED (live catch 2026-07-02, probe B): the image dispatcher
-#: has NO negative channel (stills mint from the POSITIVE prompt only), so
+#: leans on the POSITIVE prompt for facelessness, so
 #: the object-row "no human" negative is inert on the still engines -- the
 #: first live mint rendered a literal HUMAN face inside the radio. Anatomy
 #: words must therefore be bound to APPLIANCE materials in the positive
@@ -300,7 +300,14 @@ _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship
 #: Per-style negative populated on the object row (schemas.py negative_prompt;
 #: NO schema change). All three live styles (console_face / ltx_radio_mouth /
 #: radio_object) are pure radios with NO person in frame, so they SHARE
-#: RADIO_CONSOLE_NEG (humans OUT). The still dispatcher has no negative channel,
+#: NOTE (ONE STYLE AUTHORITY, 2026-08-17): these comments used to add that
+#: the still dispatcher had NO negative channel and that these constants
+#: were therefore cosmetic. That is no longer true -- the dispatcher now
+#: composes the pack negative with this per-object value and the
+#: negative-capable still engines honour it, so editing these strings is a
+#: BEHAVIOUR change, not bookkeeping. The positive-side guarantee still
+#: stands and is what the tests pin.
+#: RADIO_CONSOLE_NEG (humans OUT). Facelessness rides the POSITIVE,
 #: so this is COSMETIC for the still engines -- facelessness rides the POSITIVE.
 RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
 #: Back-compat alias (default = the console look).
@@ -387,7 +394,7 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
     FACELESS stylized radio on its plate -- no dial-face, no person -- for a
     static / force-mapped announcer bookend (nothing animates a mouth, so no
     face). Facelessness is carried by the POSITIVE prompt (the still dispatcher
-    has NO negative channel): object/material language only, an OBJECT anchor
+    leans on the POSITIVE): object/material language only, an OBJECT anchor
     (NOT the person anchor), and NO overtness clause.
     All styles are brief-driven (:func:`radio_form_from_meta`); the face styles'
     overtness is brief-driven (:func:`_radio_face_overtness`), framed for the
@@ -653,7 +660,7 @@ def _talking_roles_from_policy(policy_json):
 #: must be ONE isolated subject on a neutral plate (a cinematic scene still
 #: meshes the whole environment -> the clay blob). The positive scaffold carries
 #: the isolation discipline (the pipeline mints stills from the POSITIVE prompt;
-#: there is no per-object negative channel today). The negative scaffold is
+#: the POSITIVE carries the isolation). The negative scaffold is
 #: checked in for the engines/lanes that DO consume a negative and as the canon
 #: of what fodder must NOT contain.
 MESH_FODDER_POS_SCAFFOLD = (

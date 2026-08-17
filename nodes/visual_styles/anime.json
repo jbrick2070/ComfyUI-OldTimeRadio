@@ -24,7 +24,7 @@
     "default": "{form} glowing warmly in flat cel color, vacuum tubes and dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Dial needle sweeps in crisp arcs. Speed lines flare and fade. Cel highlights flicker across the cabinet. Slow dramatic push-in.",
+    "announcer": "Continuous shot, same console throughout. Dial needle sweeps in crisp arcs. Speed lines flare and fade. Cel highlights alternate across the cabinet. Slow dramatic push-in.",
     "music_open": "Continuous shot, same console throughout. Dial whip-pans across frequencies. Speed lines burst outward. Cel glow ignites from cold to blazing. Dynamic dolly push forward.",
     "music_close": "Continuous shot, same console throughout. Dial settles. Cel glow cools from white to deep amber. Ink shadows lengthen. Slow dolly pull back.",
     "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Equalizer bars bounce in flat color. Speed lines pulse with the bass. Slow orbit around the speaker."
@@ -42,5 +42,6 @@
     "western": "warm dusk-orange cel gradient, low amber side light",
     "pulp": "bold crimson cel gradient, harsh dramatic underlight",
     "default": "soft dark cel gradient, gentle warm center light"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, realistic skin pores, film grain, 3d render, muddy color, text, watermark"
 }

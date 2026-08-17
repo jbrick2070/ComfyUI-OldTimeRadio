@@ -30,6 +30,15 @@ must additionally carry mouth-prominence vocabulary (the ia2v lip-sync
 contract). `motion_registers` values are budgeted at 240 chars at load
 (BUG-LOCAL-112). Authored style vocabulary is never classified or banned.
 
+ONE STYLE AUTHORITY (2026-08-17, PBUG-20260817-01): a pack also owns its own
+NEGATIVE (`negative_tail`) and this module owns the single derivation of the
+style TOKEN (`compact_style_cue`) and the single way it is applied
+(`prefix_style_cue`). Both used to live in `render_driver` serving video
+prompts only, while the negative lived hardcoded in `z_image_turbo` where it
+was style-blind and vetoed four of the nine packs on every mint. `negative_tail`
+is KNOWN-but-OPTIONAL rather than required so that FROZEN embedded packs, whose
+sha256 receipt forbids injecting a default, still validate.
+
 The byte-identity contract: sci_fi_radio.json's fields are byte-identical to
 the extraction-fixture constants (tails in _otr_story_brief_helpers.py; look/
 subject fixtures in otr_meta_brief_image_prompt.py + the open-subject
@@ -107,6 +116,30 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
     **{name: dict for name in _V2_DICT_FIELDS},
 }
 
+#: KNOWN-but-OPTIONAL fields: accepted when present, never demanded.
+#:
+#: `negative_tail` (2026-08-17, PBUG-20260817-01) is the pack's own NEGATIVE
+#: conditioning -- the style half of what `z_image_turbo` used to hardcode
+#: engine-side, where it was style-blind and vetoed four illustration-family
+#: packs on every mint.
+#:
+#: It is OPTIONAL rather than required for one hard reason: `get_visual_style`
+#: re-validates `embedded_visual_style_pack` out of FROZEN ledgers and then
+#: sha256s the exact canonical bytes against the stored receipt. A REQUIRED key
+#: would fail every pre-existing `visual_storybased` ledger on the missing-key
+#: path, and injecting a default to compensate would change those bytes and
+#: trip the sha instead -- the receipt structurally forbids back-compat
+#: defaults. Optional protects frozen history; a test pins that all nine
+#: SHIPPED packs carry a non-empty value, which protects the present.
+_OPTIONAL_FIELDS: "dict[str, type]" = {
+    "negative_tail": str,
+}
+
+#: Every key a pack may legally carry. The unknown-key guard reads THIS;
+#: the missing-key guard still reads `_REQUIRED_FIELDS`. Splitting the two is
+#: what makes a known-but-optional field expressible at all.
+_KNOWN_FIELDS: "dict[str, type]" = {**_REQUIRED_FIELDS, **_OPTIONAL_FIELDS}
+
 #: Template fields: field -> the exactly-once placeholder name.
 _TEMPLATE_STR_FIELDS: "dict[str, str]" = {
     "announcer_subject_ltx_mouth": "form",
@@ -164,6 +197,10 @@ class VisualStyle:
     motion_registers: "MappingProxyType"
     still_word_typography: "MappingProxyType"
     still_word_backdrop: "MappingProxyType"
+    # -- v2 NEGATIVE surface (optional; see _OPTIONAL_FIELDS) --
+    # Empty means "this pack expresses no style negative"; the engine then
+    # falls back to its hygiene default rather than to nothing.
+    negative_tail: str = ""
 
 
 # Lazy singleton -- built on first access, never at import time.
@@ -300,6 +337,13 @@ def compose_pack_from_card(card: VisualStyleCardModel | dict) -> dict:
             "pulp": f"rich crimson {med_for_gradient}-toned gradient, bold dramatic side light",
             "default": f"soft dark {med_for_gradient}-toned gradient, gentle even studio light",
         },
+        # Deliberately EMPTY, and stated rather than omitted. The card
+        # describes an ARBITRARY medium, so the anti-style terms would have to
+        # be inferred from the positive text -- a prompt-scanning heuristic,
+        # which is exactly what this build is forbidden to add. An empty value
+        # routes the mint to the engine's hygiene fallback (anti-artifact only,
+        # no style opinion), which is the correct neutral answer here.
+        "negative_tail": "",
     }
 
 
@@ -335,7 +379,7 @@ def validate_pack(raw: dict, expected_style_id: str | None = None) -> VisualStyl
         raise VisualStyleValidationError(
             "visual style pack: schema_version 'v1' is retired -- upgrade to v2"
         )
-    unknown = sorted(set(raw) - set(_REQUIRED_FIELDS))
+    unknown = sorted(set(raw) - set(_KNOWN_FIELDS))
     if unknown:
         raise VisualStyleValidationError(
             f"visual style pack: unknown key(s) {unknown!r}"
@@ -345,7 +389,10 @@ def validate_pack(raw: dict, expected_style_id: str | None = None) -> VisualStyl
         raise VisualStyleValidationError(
             f"visual style pack: missing required key(s) {missing!r}"
         )
-    for key, typ in _REQUIRED_FIELDS.items():
+    # Type-check every key PRESENT, not merely every required one -- an
+    # optional key that skipped this would let an int or list reach the
+    # dataclass and fail much later inside a string join.
+    for key, typ in ((k, t) for k, t in _KNOWN_FIELDS.items() if k in raw):
         val = raw[key]
         if typ is bool:
             if not isinstance(val, bool):
@@ -447,6 +494,8 @@ def validate_pack(raw: dict, expected_style_id: str | None = None) -> VisualStyl
         still_word_backdrop=MappingProxyType(
             dict(raw["still_word_backdrop"])
         ),
+        # Optional: absent on every pre-2026-08-17 frozen embedded pack.
+        negative_tail=raw.get("negative_tail", ""),
     )
 
 
@@ -567,6 +616,147 @@ def get_visual_style(meta: object) -> VisualStyle:
         return style_obj
 
     return resolve_visual_style(style_id)
+
+
+#: The one place a style TOKEN is derived, and the one place it is applied.
+#:
+#: ONE STYLE AUTHORITY (2026-08-17): this pair used to live only in
+#: `render_driver` as `_compact_style_talking_cue` / `_prefix_video_style_cue`,
+#: serving video prompts. Stills reached the engines with their style only
+#: TAIL-appended by `finish_visual_prompt`, i.e. in the weakest position on
+#: models that weight early tokens. Both families now share this derivation --
+#: a second, disagreeing definition of "the style word" is the failure mode
+#: this consolidation exists to prevent.
+
+
+def compact_style_cue(vstyle) -> str:
+    """The blunt 2-4 word style token for a pack, or "" for the default.
+
+    `sci_fi_radio` returns "" on purpose: it IS the house look, its tails are
+    byte-pinned to the shared constants, and prefixing it would churn every
+    default-lane golden for no visual gain.
+    """
+    if str(getattr(vstyle, "style_id", "") or "") == DEFAULT_STYLE_ID:
+        return ""
+    raw = str(getattr(vstyle, "positive_tail", "") or "").strip()
+    if not raw:
+        raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
+    words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
+    lowered = [word.lower() for word in words]
+    if lowered[:4] == ["recursive", "fractal", "light", "field"]:
+        return " ".join(words[:4]).strip()
+    limit = 2
+    for i, word in enumerate(words[:4]):
+        if word.lower() == "style":
+            limit = i + 1
+            break
+    return " ".join(words[:limit]).strip()
+
+
+def prefix_style_cue(vstyle, prompt: str) -> str:
+    """Front-anchor the pack's style token on ``prompt``. ADDITIVE ONLY.
+
+    Never rewrites, strips, reorders or rejects -- it only ever prepends, so it
+    stays on the permitted side of the authored-prompt law
+    (`otr_shot_lock.py`, "no Python vocabulary or token-overlap judge may
+    replace an authored non-empty visual prompt", whose own next line is an
+    unconditional additive prepend).
+
+    IDEMPOTENT, and deliberately POSITIONAL rather than membership-based: the
+    token is usually already present at the TAIL, so an "is it in the string"
+    test would find it and do nothing on exactly the prompts that need it.
+    """
+    prompt = str(prompt or "").strip()
+    cue = compact_style_cue(vstyle)
+    if not prompt or not cue:
+        return prompt
+    low_prompt = prompt.lower()
+    low_cue = cue.lower().rstrip(".")
+    if low_prompt.startswith(low_cue):
+        return prompt
+    if low_cue.endswith(" style"):
+        base_cue = low_cue[: -len(" style")].strip()
+        if base_cue and low_prompt.startswith(base_cue):
+            # Strip whatever punctuation followed the bare token. Stripping "."
+            # alone left `"Cartoon, a man"` -> `"cartoon style. , a man"`.
+            rest = prompt[len(base_cue):].lstrip(".,:; ")
+            return ("%s. %s" % (cue.rstrip("."), rest)
+                    if rest else "%s." % cue.rstrip("."))
+    return "%s. %s" % (cue.rstrip("."), prompt)
+
+
+#: The pack surfaces a still prompt is actually built from. A negative phrase
+#: that one of these asks for is a self-veto, by definition.
+_POSITIVE_SURFACES = (
+    "positive_tail", "image_grade_tail", "broadcast_tail", "era_tail",
+    "portrait_look", "portrait_look_talking", "portrait_instruction_look",
+    "scene_instruction_look", "plate_look",
+    "announcer_subject_face", "announcer_subject_ltx_mouth",
+    "announcer_subject_object", "radio_object_look",
+    "still_word_title_mood_style", "non_character_emblem_fallback",
+)
+#: DICT-valued surfaces whose VALUES also land in real prompt text -- the
+#: still-word card joins `still_word_typography[genre]` and
+#: `still_word_backdrop[genre]` straight into its prompt, and `open_subjects`
+#: feeds the opens. Omitting them left a hole: no shipped pack collides on them
+#: today, so nothing was broken, but a future edit to a pack's typography or
+#: backdrop wording could silently reintroduce a self-veto that neither the
+#: runtime resolution nor the traceroute would catch.
+_POSITIVE_DICT_SURFACES = (
+    "open_subjects", "still_word_typography", "still_word_backdrop",
+)
+#: Anti-ARTIFACT, never anti-STYLE. Kept even if the word appears in a
+#: positive surface -- "text" in a title-card description is not a request for
+#: a watermark.
+_ARTIFACT_PHRASES = frozenset({"text", "watermark"})
+
+
+def effective_negative(style) -> str:
+    """The pack's negative with any phrase its OWN positive asks for removed.
+
+    Operator ruling 2026-08-17: *"we can't have negative prompts conflicting
+    with any visual style."* PBUG-20260817-01 was one instance of that -- a
+    style-blind negative vetoing "cartoon, illustration" on a cartoon episode
+    -- and moving the negative into the packs fixed the cross-pack case but
+    not the self-veto case. `sci_fi_radio` still shipped "cartoon, illustration"
+    while its own `announcer_subject_ltx_mouth` asks for "a living cartoon
+    appliance face" and its `still_word_title_mood_style` asks for "atmospheric
+    period illustration".
+
+    Resolving it HERE rather than by hand-editing that one string is the root
+    fix: it holds for all ten identities, for the dynamic pack the composer
+    builds at runtime, and for any pack authored later. A pack can no longer
+    veto itself, by construction.
+
+    This reads OUR OWN CONFIG against itself and edits OUR OWN negative. It
+    never inspects or alters an authored prompt, so it is not the prompt-
+    scanning injector the build is forbidden to add, and THE LAW is untouched.
+
+    Comparison is on comma-separated PHRASES, not bare words: "plastic skin"
+    must not be dropped just because a portrait asks for realistic skin.
+    """
+    raw = str(getattr(style, "negative_tail", "") or "")
+    if not raw:
+        return ""
+    parts = [str(getattr(style, f, "") or "") for f in _POSITIVE_SURFACES]
+    for f in _POSITIVE_DICT_SURFACES:
+        values = getattr(style, f, None) or {}
+        try:
+            parts.extend(str(v or "") for v in values.values())
+        except AttributeError:  # not a mapping -- ignore rather than raise
+            pass
+    positive = " ".join(parts).lower()
+    kept = []
+    for chunk in raw.split(","):
+        phrase = chunk.strip()
+        low = phrase.lower()
+        if not phrase:
+            continue
+        if low not in _ARTIFACT_PHRASES and re.search(
+                r"\b%s\b" % re.escape(low), positive):
+            continue  # this pack asks for it -- never suppress it
+        kept.append(phrase)
+    return ", ".join(kept)
 
 
 def _clear_caches() -> None:

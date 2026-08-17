@@ -42,5 +42,6 @@
     "western": "recursive fractal light field background, molten amber graphite field with luminous raster folds",
     "pulp": "recursive fractal light field background, spectral magenta and cyan field with recursive bloom chambers",
     "default": "recursive fractal light field background, active graphite-black field with nested cyan magenta raster light"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, film grain, muddy blur, plastic skin, waxy skin, text, watermark"
 }

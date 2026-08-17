@@ -42,5 +42,6 @@
     "western": "warm ochre canvas gradient, low golden stage light",
     "pulp": "rich crimson curtain gradient, dramatic side light",
     "default": "warm umber stage gradient, gentle candlelit center light"
-  }
+  },
+  "negative_tail": "oversaturated, glossy, clean digital, plastic skin, waxy skin, sterile studio lighting, cartoon, illustration, text, watermark"
 }

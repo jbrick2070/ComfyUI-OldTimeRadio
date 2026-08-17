@@ -1361,6 +1361,23 @@ _IA2V_TALKING_CLAUSE_CHARACTER = (
     "with the speech, subtle head and hand gestures. Static camera.")
 
 
+def _style_authority():
+    """The shared style-token authority (`_otr_visual_styles`).
+
+    ONE STYLE AUTHORITY (2026-08-17): the derivation and the prepend used to
+    live here and served video prompts only. They now live in the style module
+    so the STILL path applies the identical token; two definitions of "the
+    style word" drifting apart is the defect this consolidation prevents.
+    """
+    try:
+        from .._otr_visual_styles import (  # type: ignore
+            compact_style_cue, prefix_style_cue)
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_visual_styles import (  # type: ignore
+            compact_style_cue, prefix_style_cue)
+    return compact_style_cue, prefix_style_cue
+
+
 def _compact_style_talking_cue(vstyle):
     """Compact pack cue for IA2V character prompts.
 
@@ -1369,21 +1386,8 @@ def _compact_style_talking_cue(vstyle):
     to the front of the prompt so the video model does not drift back to a
     generic cinematic portrait.
     """
-    if str(getattr(vstyle, "style_id", "") or "") == "sci_fi_radio":
-        return ""
-    raw = str(getattr(vstyle, "positive_tail", "") or "").strip()
-    if not raw:
-        raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
-    words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
-    lowered = [word.lower() for word in words]
-    if lowered[:4] == ["recursive", "fractal", "light", "field"]:
-        return " ".join(words[:4]).strip()
-    limit = 2
-    for i, word in enumerate(words[:4]):
-        if word.lower() == "style":
-            limit = i + 1
-            break
-    return " ".join(words[:limit]).strip()
+    compact_style_cue, _ = _style_authority()
+    return compact_style_cue(vstyle)
 
 
 def _prefix_video_style_cue(vstyle, prompt):
@@ -1392,23 +1396,8 @@ def _prefix_video_style_cue(vstyle, prompt):
     This is intentionally a short cue, not a full style tail. Long tails dilute
     LTX/IA2V talking prompts and can crowd out identity/motion tokens.
     """
-    prompt = str(prompt or "").strip()
-    cue = _compact_style_talking_cue(vstyle)
-    if not prompt or not cue:
-        return prompt
-    low_prompt = prompt.lower()
-    low_cue = cue.lower().rstrip(".")
-    if low_prompt.startswith(low_cue):
-        return prompt
-    if low_cue.endswith(" style"):
-        base_cue = low_cue[: -len(" style")].strip()
-        if base_cue and low_prompt.startswith(base_cue):
-            rest = prompt[len(base_cue):].lstrip()
-            if rest.startswith("."):
-                rest = rest[1:].lstrip()
-            return ("%s. %s" % (cue.rstrip("."), rest)
-                    if rest else "%s." % cue.rstrip("."))
-    return "%s. %s" % (cue.rstrip("."), prompt)
+    _, prefix_style_cue = _style_authority()
+    return prefix_style_cue(vstyle, prompt)
 
 
 def _ia2v_talking_register_active(engine_id):

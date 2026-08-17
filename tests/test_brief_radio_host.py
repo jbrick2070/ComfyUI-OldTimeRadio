@@ -111,10 +111,14 @@ def test_radio_head_person_style_is_retired_and_raises():
 
 def test_radio_object_is_faceless_no_anatomy():
     # The FACELESS static-bookend style: a stylized radio object, carrying the
-    # brief-driven form, with ZERO anatomy tokens (facelessness is positive-side
-    # -- the still dispatcher has no negative channel). Scope the no-anatomy
-    # assertion to the constructed subject + anchor (the era/grade tails are
-    # controlled, not sanitized).
+    # brief-driven form, with ZERO anatomy tokens. Facelessness is enforced
+    # positive-side HERE, which is what this test pins. (It used to say the
+    # still dispatcher had no negative channel; since ONE STYLE AUTHORITY,
+    # 2026-08-17, it does -- the dispatcher composes the pack negative with
+    # this row's radio_host_negative and the engines honour it. The
+    # positive-side guarantee is still the one under test.) Scope the
+    # no-anatomy assertion to the constructed subject + anchor (the era/grade
+    # tails are controlled, not sanitized).
     subj = "%s, %s" % (mbp.radio_form_from_meta(_SPACE_META),
                        mbp._RADIO_OBJECT_SUBJECT)
     for anchor in (mbp._RADIO_OBJECT_ANCHOR, mbp._RADIO_OBJECT_ANCHOR_WIDE):

@@ -42,5 +42,6 @@
     "western": "warm orange charcoal field with green phosphor drift",
     "pulp": "crimson and ultramarine field with layered magenta glow",
     "default": "deep charcoal field with red blue green phosphor bloom"
-  }
+  },
+  "negative_tail": "photograph, photorealistic, film grain, plastic skin, waxy skin, sterile studio lighting, text, watermark"
 }
