@@ -325,6 +325,47 @@ Fully designed across three research rounds + a Fable pass; artifacts in
   clean (request hash is brief/cast/beat/char). **`otr_story_score.py` is NOT
   a judge** -- it reads ledger structure, never a prompt or a pixel.
 
+**D-BIS. THE NEGATIVE-CENSUS RESIDUE (2026-08-17) -- five findings with no
+other home. STATIC-AUDIT findings, NOT PBUGs:** the admission rule reserves
+`PROD_BUG_LOG.md` for defects verified by a live artifact, and these came from a
+full-repo census plus a Fable design pass. Each needs one live observation
+before it may be promoted.
+1. **A cross-family negative conflict the style traceroute structurally cannot
+   see.** The CLOUD Wan negative (`eng_cloud_video.py:221-224`) bans "flicker",
+   while four packs' `motion_registers` ask for it -- `anime`'s announcer said
+   "Cel highlights flicker across the cabinet" until it was reworded to
+   "alternate" (2026-08-17). Narrow: opt-in cloud engine, credentials required,
+   and provider-side liveness is UNVERIFIABLE from this repo. The general
+   lesson is the important part: **the traceroute audits STILL packs only**, so
+   negative-vs-`motion_registers` conflicts on the video side are unchecked.
+   Extending `effective_negative`'s phrase test to `motion_registers` is the
+   guard -- but the video negatives are FROZEN RECIPE, so a guard may drop a
+   term at compose time and must never edit a recipe string.
+2. **Two duplicate-drift negative variants.** The same 7-term boilerplate exists
+   in four copies; `eng_ltx_av.py:107-109` and `eng_humo.py:112-114` have
+   diverged with extra terms and no recorded reason. HuMo's divergence looks
+   deliberate (hand/face artifacts are its real failure mode); LTX-AV's looks
+   accidental. Consolidation needs an operator recipe ruling either way -- flag
+   it, never "clean it up".
+3. **Three env negatives are NOT consent-gated.** `OTR_LTX_NEGATIVE`,
+   `OTR_LTX_AV_NEGATIVE` and `OTR_HUMO_NEGATIVE` are read with a plain
+   `os.environ.get` on EVERY render, while `eng_ltx_8gb.py:818-829` deliberately
+   demoted its equivalent because a boot-time env channel "made two boxes render
+   visibly different clips from the same episode while both stamped the same
+   recipe receipt". Same B6 reproducibility exposure, still open on three lanes.
+   Recipe-adjacent: needs the operator, not a driver decision.
+4. **The visual ledger cannot yet prove which negative conditioned which pixel.**
+   Two gaps: the negative text lives in `visual.prompts[]` while the
+   pixel-producing row lives in `images[]`, so it takes a join on `object_id`;
+   and **the cfg is recorded nowhere**, so a logged negative can be accurate and
+   still misleading -- at cfg 1.0 it conditioned nothing. Adding the resolved
+   cfg (or a `negative_live` bool) to the per-row record closes it.
+5. **Zero tests cover the visual-ledger RECORDING.** The negative-resolution
+   logic is well covered (48 tests), but nothing asserts the shape of
+   `ledger["visual"]`, `negative_source`, `self_veto_resolved`, `_style_spread`
+   or `_laplacian_variance`. The operator's "lock them in the ledger" ask is the
+   untested half.
+
 **E. Upscalers + the 4060 full-stack gate** (item 1.3) -- candidate downloads
 run in the BACKGROUND under anything above.
 
