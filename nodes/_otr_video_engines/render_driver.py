@@ -1326,6 +1326,13 @@ _LTX_MOTION_PROMPT_BY_ROLE = {
 #: short brief fragment appended AFTER, dropped if it breaks the budget).
 _LTX_MOTION_PROMPT_MAX = 240
 
+#: What a motion clause has to leave behind on the 188-char branch, so the story
+#: core can bid for the remainder instead of taking a fixed 90 off the top.
+#: Counted, not guessed: ", " joining core to the clause list (2) + ", " joining
+#: the clause to the steer (2) + "no on-screen text" (17) + headroom for the era
+#: tail `finish_visual_prompt` appends after the cap arithmetic (~24).
+_MC_JOINER_SLACK = 45
+
 #: TALKING register for the ia2v_canonical recipe (lips-dont-talk kibitz,
 #: 2026-07-02). Probe-proven: the ia2v two-stage recipe animates what the
 #: prompt NARRATES; the console-motion register above steers motion into
@@ -2989,14 +2996,46 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # Non-open text-engine roles keep the brief
             # logline core + beat clauses; the announcer/music OPEN roles use
             # the motion-centric branch above (the i2v still carries the look).
-            core = get_story_brief_ltx(_meta)
+            _mc_override = _motion_clause_override(shot)
+            # THE CORE IS BUDGETED AGAINST THE REAL CLAUSE, not a fixed default.
+            #
+            # `get_story_brief_ltx` defaults to 90 chars, sized when a motion
+            # clause could not exceed 70. The 2026-08-17 kinetic amendment raised
+            # `CLAUSE_MAX_CHARS` to 130 and justified it only against the 240
+            # budget -- but THIS branch is a second consumer at 188, and nobody
+            # checked it. Measured on the repo's own fixture with a realistic
+            # 108-char clause: core(86) + clause(108) + era tail(20) = 218 into a
+            # 188 cap, so the clause was cut MID-SENTENCE and the era tail was
+            # dropped whole. A kinetic clause that arrives truncated describes
+            # half a movement, which is the defect the amendment exists to end.
+            #
+            # So when a real clause is in play, the core bids for what is left
+            # after the clause and the joiners rather than taking 90 off the top.
+            # The floor keeps a brief that is still a brief; below it the clause
+            # is simply too long for this branch and the cap does its job.
+            _core_budget = 90
+            if _mc_override:
+                # CLAMPED TO THE DEFAULT, never above it. A first cut used only
+                # `max(40, 188 - len(clause) - slack)`, which for a SHORT clause
+                # hands the core MORE than its shipped 90 -- and core+clause then
+                # overflow 188 and the trim eats the clause tail. The budget may
+                # only ever shrink to make room; a short clause leaves the core
+                # exactly as it behaves on the non-override path today.
+                _core_budget = max(
+                    40, min(90, 188 - len(_mc_override) - _MC_JOINER_SLACK))
+            core = get_story_brief_ltx(_meta, max_chars=_core_budget)
             if not core:
                 _setting = _term_join("setting", 2)
                 core = ("cinematic establishing shot"
                         + (f", {_setting}" if _setting else ""))
-            _mc_override = _motion_clause_override(shot)
             if _mc_override:
-                clauses = [_mc_override]
+                # "no on-screen text" IS KEPT. The override used to replace the
+                # whole pair, silently dropping the anti-hallucination steer on
+                # exactly the beats that carry the most motion language -- and the
+                # P4 probe observed on-video text hallucination on this lane. The
+                # drift clause is the one that goes: it is a camera instruction
+                # and the clause now authors the motion.
+                clauses = [_mc_override, "no on-screen text"]
             else:
                 clauses = list(_beat_clauses(line, shot.get("shot_id")))
                 clauses.extend(["slow cinematic camera drift", "no on-screen text"])
@@ -3004,11 +3043,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _meta, f"{core}, {', '.join(clauses)}",
                 max_chars=188, style_tail=False, era_profile="still")
             _prompt_char_budget = 188
-            # The motion tail is only OURS to protect when we appended it. The
-            # _motion_clause_override sub-path replaced the clause list above,
-            # so it authored no drift clause and publishes none.
-            if not _mc_override:
-                _prompt_protected_clause = "slow cinematic camera drift"
+            # Both sub-paths now publish the tail they engineered and expect to
+            # survive the banana funnel's re-cap. The override path published
+            # NOTHING before, which meant a real motion clause -- the expensive,
+            # model-authored one -- was the only tail in this branch with no
+            # protection at all.
+            _prompt_protected_clause = ("no on-screen text" if _mc_override
+                                        else "slow cinematic camera drift")
             _pre_cue_chars = len(scene_prompt)
             scene_prompt = _prefix_video_style_cue(_vstyle, scene_prompt)
             # Budget is EXTENDED by exactly the cue's length, not re-truncated

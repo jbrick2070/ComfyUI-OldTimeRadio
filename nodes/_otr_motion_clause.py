@@ -252,8 +252,6 @@ def generate_motion_clauses(ledger: Any, *,
             continue
 
         try:
-            # LLM slot: creative -- per-beat KINETIC motion clause (writer slot)
-            #
             # 40 -> 64 TOKENS, and this is not cosmetic: 40 was sized for the old
             # 70-character cap. A compliant 130-char kinetic clause is roughly 33
             # tokens, so 40 left almost no headroom -- a slightly verbose answer
@@ -262,6 +260,8 @@ def generate_motion_clauses(ledger: Any, *,
             # amendment would then have bought nothing, invisibly, which is the
             # worst possible outcome for a change whose whole symptom is
             # "the video does not move".
+            #
+            # LLM slot: creative -- per-beat KINETIC motion clause (writer slot)
             raw = generate_fn(
                 build_clause_messages(subject, dialogue, scene_ctx),
                 temperature=0.4, max_new_tokens=64, stop=None)

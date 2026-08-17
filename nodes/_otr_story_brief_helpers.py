@@ -635,8 +635,24 @@ def finish_visual_prompt(meta: Any, prompt: str, *, max_chars: int = 0,
     if style_tail:
         pieces.append(_style.positive_tail)
     out = ", ".join(p for p in pieces if p)
-    if max_chars and len(out) > max_chars:
-        budget = max_chars - (len(NO_TEXT_CLAUSE) + 2 if keep_no_text else 0)
+    # THE TRIM DECISION MUST COUNT THE TAIL IT IS ABOUT TO RE-APPEND.
+    #
+    # This tested `len(out) > max_chars` while `NO_TEXT_CLAUSE` -- stripped at
+    # :633 and unconditionally added back at :646 -- was NOT in `out`. So a
+    # string in the 19-character window just under the cap skipped the
+    # word-boundary trim entirely, gained the clause, overshot, and fell to the
+    # hard slice below, which cut straight through the clause it was preserving:
+    # "...uneasy, no on-scr". The anti-hallucination steer arrived garbled on
+    # exactly the beats that most needed it.
+    #
+    # Latent since the clause was introduced, and unreachable until the
+    # 2026-08-17 kinetic amendment made the motion-clause branch publish
+    # NO_TEXT_CLAUSE for the first time -- so the QA that found it was reviewing
+    # a diff that merely opened the door. `budget` below was already correct;
+    # only the question being asked was wrong.
+    _tail_cost = (len(NO_TEXT_CLAUSE) + 2) if keep_no_text else 0
+    if max_chars and len(out) + _tail_cost > max_chars:
+        budget = max_chars - _tail_cost
         cut = out[:max(budget, 20)]
         idx = cut.rfind(" ")
         if idx >= 20:

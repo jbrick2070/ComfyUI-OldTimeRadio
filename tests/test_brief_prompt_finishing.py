@@ -363,3 +363,53 @@ def test_retired_role_a_on_ltx_no_longer_generic(monkeypatch):
     assert "lighthouse" in req["text_prompt"]
     # b-roll is NOT an open: no vintage-radio set-dressing clause
     assert "vintage radio set" not in req["text_prompt"]
+
+
+# ---------------------------------------------------------------------------
+# The 188-char motion-clause composition, swept. Added 2026-08-17 after a QA
+# pass reproduced a garbled steer through the real driver.
+# ---------------------------------------------------------------------------
+def test_no_text_clause_is_counted_before_the_trim_decision():
+    """THE LATENT BUG THE KINETIC AMENDMENT REACHED FIRST.
+
+    `finish_visual_prompt` strips NO_TEXT_CLAUSE, decides whether to trim, then
+    unconditionally re-appends it. The decision used to ignore the 19 characters
+    it was about to add back, so a string landing in that window skipped the
+    word-boundary trim, overshot the cap, and fell to the hard slice -- which cut
+    through the clause it was preserving: "...uneasy, no on-scr". The steer that
+    exists to stop on-video text arrived as garbage text.
+    """
+    from nodes._otr_story_brief_helpers import NO_TEXT_CLAUSE, finish_visual_prompt
+
+    for pad in range(150, 190):
+        out = finish_visual_prompt(
+            _OK_META, "x" * pad + f", {NO_TEXT_CLAUSE}",
+            max_chars=188, style_tail=False, era_profile="still")
+        assert len(out) <= 188, pad
+        assert out.endswith(NO_TEXT_CLAUSE), (pad, out[-30:])
+
+
+def test_a_motion_clause_and_its_steer_both_survive_the_188_budget():
+    """Swept, because the danger band is narrow and a single fixture misses it.
+
+    Pins BOTH halves of the 2026-08-17 composition fix: the story core bids
+    against the clause's real length (so the clause is never truncated), and the
+    core budget is CLAMPED to its default (so a SHORT clause cannot hand the core
+    extra room and overflow the cap from the other direction).
+    """
+    from nodes._otr_story_brief_helpers import (
+        finish_visual_prompt, get_story_brief_ltx,
+    )
+    from nodes._otr_video_engines.render_driver import _MC_JOINER_SLACK
+
+    src = "Mara wheels around and slams the switchboard hard with an open hand " * 4
+    for length in range(40, 131):
+        clause = src[:length].rstrip()
+        core = get_story_brief_ltx(
+            _OK_META, max_chars=max(40, min(90, 188 - length - _MC_JOINER_SLACK)))
+        out = finish_visual_prompt(
+            _OK_META, f"{core}, {clause}, no on-screen text",
+            max_chars=188, style_tail=False, era_profile="still")
+        assert clause in out, ("clause truncated at %d: %r" % (length, out[-40:]))
+        assert out.endswith("no on-screen text"), (length, out[-30:])
+        assert len(out) <= 188, (length, len(out))
