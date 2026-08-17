@@ -207,7 +207,37 @@ metadata question (the bank tags them american and british respectively).
      needs `OTR_LTX_MOTION_CLAUSE=1`; the default is byte-identical to today and
      the flag is set to `1` NOWHERE in the repo, so item 3 built there ships
      dormant. Its spec is *subtle motion, never big actions*, capped at 70 chars.
-   **r2 must answer one question before anything else can be specified:** is this
+   **KINETIC MOTION IS DONE AND PUSHED (`81f79412`, 2026-08-17).** The damping
+   was an INSTRUCTION, not a model limit: `build_clause_messages()` commanded
+   "SUBTLE motion", listed the only movements allowed and forbade "stands up,
+   walks, runs, turns around", so the clause writer could not describe a
+   character who moves. Amended per operator direction, lab-proven with his own
+   eyes (kinetic prompt language moves the video with NO graph change).
+   `CLAUSE_MAX_CHARS` opened 70 -> 130, bounded by `_LTX_MOTION_PROMPT_MAX = 240`.
+   A DECLARED amendment to `docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md`
+   -- **that spec doc still needs updating to match; it is OWED.**
+   **Two authored strings still say "subtle"** and the operator's directive is
+   that none should: `render_driver.py:1354` (the protected STATIC-CAMERA
+   talking clause) and `:1483`. Deliberately not blanket-changed -- on a close-up
+   lip-sync beat "kinetic" can walk the subject out of their own frame, so the
+   framing question wants one deliberate answer, not a find-and-replace.
+
+   **THE MECHANISM THE VERBATIM-DIALOGUE ITEM SHOULD USE -- do not invent a new
+   one.** `render_driver.py:2706-2718` documents a PROMPT-BUDGET INVARIANT that
+   already exists: every branch that caps its own prompt publishes BOTH the
+   number it capped to (`_prompt_char_budget`) AND the trailing clause it expects
+   to survive (`_prompt_protected_clause`), and the banana funnel downstream
+   re-caps to that number while PRESERVING that clause. So publishing the
+   verbatim line as the protected clause closes BOTH hazards r1 found with one
+   existing mechanism -- it survives the 188-char truncation, and it survives the
+   banana rewrite that would otherwise make a "verbatim" line diverge from the
+   audio. A branch that publishes nothing is never capped, which is why the
+   publication must happen INSIDE the sub-path that composed the prompt.
+
+   **r2 (Fable + Sonnet, replacing quota-held Codex) was running when the window
+   ended; its reviews are the gate before that code is written.**
+
+   **The remaining open question, if the lane work is ever revived:** is this
    a new adapter at all, or a RECIPE + profile over the existing `ltx_av` engine,
    whose `distilled_native` path (`eng_ltx_av.py:310-312`) is already described as
    "the new DEFAULT daily driver"? Also settled in r1: the prompt budget is 188
