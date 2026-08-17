@@ -8,10 +8,15 @@ GO_FORWARD_PLAN.md stays lean and forward-only.
 > **`+handoff` means the sha above is the last CODE head and this entry's own
 > commits land on top of it.** A commit cannot contain its own hash, so the
 > number in any handoff heading is always one commit stale by construction --
-> amending to "fix" it just changes it again. **The authoritative post-handoff
-> sha is the one in the kickoff line, read AFTER the push.** For this window
-> that is `c8832d35`. Convention adopted 2026-08-16 on the operator's catch and
-> written into the skill so it stops recurring.
+> amending to "fix" it just changes it again.
+>
+> **This note deliberately names NO post-handoff sha, and that is the fix.** An
+> earlier draft named one; committing that draft immediately made the named sha
+> stale, which is the same bug one level up. Any sha written here is wrong the
+> moment it is written. The authoritative post-handoff head is the one in the
+> **kickoff line**, read after the final push -- and for the next window, simply
+> `git rev-parse HEAD` on a clean tree. Convention adopted 2026-08-16 on the
+> operator's catch and written into the skill so it stops recurring.
 
 Did, all pushed, HEAD == origin verified after each:
 
