@@ -153,7 +153,43 @@ work:
 **ITEM 1 IS DONE.** ONE STYLE AUTHORITY shipped, pushed and Bible-promoted.
 What follows is the next window's order, cheapest-certain first:
 
-**A. LUMINA IS MISSING ITS TRAINED INPUT CONVENTION -- a live defect, cheap.**
+**A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- lumina is the first OUTPUT,
+not the whole item (operator 2026-08-17: "why just lumina because we only found
+it").** He is right, and the class has ALREADY recurred once: `flux_gen1.py`
+records BUG-411 -- the FluxGuidance node "the rewrite dropped it, flattening
+the look" -- which is the same defect wearing different clothes. Two instances
+is a class, and both were found by accident. Systematize it.
+
+**THE METHOD (cheap, deterministic, read-only):** ComfyUI ships DEDICATED nodes
+for model families that need special input handling -- `CLIPTextEncodeLumina2`
+exists precisely because Lumina2 needs a system line. So: boot headless, read
+`/object_info`, list the dedicated node classes per image-model family, compare
+against the node classes each engine in `nodes/_otr_image_engines/` actually
+builds, and **treat any dedicated node that EXISTS and is NOT used as a
+candidate defect.** Same shape as the style traceroute: our config against what
+the thing actually expects.
+
+**SCOPE:** only engines in the canonical workflow -- `z_image_turbo` (the
+stills default; its CLIP type + latent node were already GPU-verified 2026-06),
+`flux_gen1` (fallback, one known scar), `lumina_image` (opt-in). `sd35_large`,
+`flux2_klein`, `hidream_i1` are unused: last or never.
+
+**THE HONEST LIMIT:** this finds STRUCTURAL divergence only. It can prove a
+node is missing; it cannot prove the output is worse. Every hit needs ONE A/B
+at the same seed -- BUG-411's own "flattening the look" is the reminder that
+this class is visible only in comparison, never in isolation.
+
+**ROUTING -- do NOT burn a scalpel on a screw.** This item is MECHANICAL: a
+grep, an `/object_info` read, a comparison, a deterministic edit. Per `CLAUDE.md`
+section 9 that is explicitly NOT Fable work ("repo grep, mapping references,
+editing JSON, validation, wiring checks"). It needs **no kibitz arc** either --
+an arc pressure-tests DESIGN, and there is no design choice here, only a
+verifiable answer. General-purpose agents plus **Sonnet 5 QA on the finished
+diff before the push** is the correct and sufficient gate. Spend Fable only if
+the audit surfaces something needing judgment -- on this queue that is item D,
+not item A.
+
+**A1. The known hit: LUMINA IS MISSING ITS TRAINED INPUT CONVENTION.**
 ComfyUI's `CLIPTextEncodeLumina2` builds `f'{system_prompt} <Prompt Start>
 {user_prompt}'` (`comfy_extras/nodes_lumina2.py:113`). OTR's lumina graph uses
 plain `CLIPTextEncode` on both pos and neg (`lumina_image.py:160-163`), so
