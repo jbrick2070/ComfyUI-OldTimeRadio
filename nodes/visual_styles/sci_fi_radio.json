@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly, vacuum tubes and dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Tuning dial needle sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille trembles. Dust motes drift.",
-    "music_open": "Continuous shot, same console throughout. Tuning dial needle races across the frequencies. Tube filaments ignite from cold to fierce white. Brass grille shudders with the music.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Tube filaments cool from white through deep amber. Smoke trails from cooling tubes.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Oscilloscope dances to the rhythm. VU meters bounce. Tubes pulse with the bass."
+    "announcer": "Continuous shot, same console throughout. Tuning dial needle sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille trembles. Dust motes drift. Slow steady dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial races across frequencies. Tube filaments ignite from cold to fierce white. Speaker grille shudders with the music. Steady dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Tube filaments cool from white through deep amber. Smoke trails from cooling tubes. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Oscilloscope dances to the rhythm. VU meters bounce. Tubes pulse with the bass. Slow orbit around the speaker."
   },
   "still_word_typography": {
     "noir": "heavy condensed sans-serif capitals, tightly spaced",

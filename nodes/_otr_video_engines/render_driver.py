@@ -1306,30 +1306,39 @@ _OPENING_MUSIC_SUFFIX = "b000_music_open"
 # in build_request_from_shot (AST-pinned).
 _MOTION_REGISTER_KEYS = frozenset(
     {"announcer", "music_open", "music_close", "music_inter"})
-#: SUBJECT-FIRST REWRITE (operator directive 2026-08-17): "let the engine decide
-#: what an animated or hyper-realistic futuristic retro radio in action is." The
-#: registers now describe what the RADIO does and leave the CAMERA to the engine.
-#: The trailing camera-move clause is gone from all four, which is also where
-#: every provider-token collision lived: "Slow handheld dolly forward" tripped the
-#: cloud ban on "handheld", and music_open alone tripped FOUR Seedance softeners
-#: (whip-pans -> "slowly sweeps", white-hot, aggressively -> "subtly", dynamic
-#: dolly push), shipping "Dial slowly sweeps ..." with the energy inverted.
-#: Kept deliberately: the continuity opener, each beat's energy (open surges,
-#: close winds down), and "Tuning dial needle sweeps" (pinned by
-#: tests/test_brief_prompt_finishing.py).
+#: COLLIDING WORDS ONLY (operator call 2026-08-17, option B). An earlier sweep
+#: stripped the trailing camera clause from all four registers; a live LTX A/B
+#: measured the cost at ~40% less motion (0.220 vs 0.373 mean frame delta), and
+#: only TWO of the 35 camera clauses repo-wide ever actually collided. So the
+#: authored choreography and camera moves are RESTORED, and only the words that
+#: hit a frozen provider list changed:
+#:   "Dial whip-pans"            -> "Dial races"        (Wan ban + Seedance)
+#:   "white-hot"                 -> "fierce white"      (Seedance rewrote it to
+#:                                                       "bright warm glow",
+#:                                                       breaking the sentence)
+#:   "vibrates aggressively"     -> "shudders with the music"
+#:                                                      (Seedance rewrote it to
+#:                                                       "subtly" -- inverted)
+#:   "Slow handheld dolly forward" -> "Slow steady dolly forward"  ("handheld")
+#:   "Dynamic dolly push forward"  -> "Steady dolly push forward"
+#: `Slow dolly pull back` and `Slow orbit around the speaker` never collided and
+#: are untouched. Kept: the continuity opener and "Tuning dial needle sweeps"
+#: (pinned by tests/test_brief_prompt_finishing.py).
 _LTX_MOTION_PROMPT_BY_ROLE = {
     "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
                   "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
-                  "trembles. Dust motes drift."),
-    "music_open": ("Continuous shot, same console throughout. Tuning dial needle "
-                   "races across the frequencies. Tube filaments ignite from "
-                   "cold to fierce white. Brass grille shudders with the music."),
+                  "trembles. Dust motes drift. Slow steady dolly forward."),
+    "music_open": ("Continuous shot, same console throughout. Dial races across "
+                   "frequencies. Tube filaments ignite from cold to fierce "
+                   "white. Speaker grille shudders with the music. Steady dolly "
+                   "push forward."),
     "music_close": ("Continuous shot, same console throughout. Dial settles. "
                     "Tube filaments cool from white through deep amber. Smoke "
-                    "trails from cooling tubes."),
+                    "trails from cooling tubes. Slow dolly pull back."),
     "music_inter": ("Continuous shot, same console throughout. Dial steady, "
                     "glowing. Oscilloscope dances to the rhythm. VU meters "
-                    "bounce. Tubes pulse with the bass."),
+                    "bounce. Tubes pulse with the bass. Slow orbit around the "
+                    "speaker."),
 }
 #: BUG-LOCAL-112 char budget for the motion prompt (verb-only core + optional
 #: short brief fragment appended AFTER, dropped if it breaks the budget).

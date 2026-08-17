@@ -24,9 +24,9 @@
     "default": "{form} glowing warmly as a video-art feedback radio, dials and tubes suspended in color"
   },
   "motion_registers": {
-    "announcer": "Video-art feedback. Continuous shot, same console throughout. Phosphor bloom breathes. Rainbow planes fold inward. Dial light echoes recursively.",
-    "music_open": "Video-art feedback. Continuous shot, same console throughout. Dial sweep blooms into red blue green halos. Nested reflections unfold softly.",
-    "music_close": "Video-art feedback. Continuous shot, same console throughout. Dial settles. Prismatic halos contract softly. Layered color planes dim to charcoal.",
+    "announcer": "Video-art feedback. Continuous shot, same console throughout. Phosphor bloom breathes. Rainbow planes fold inward. Dial light echoes recursively. Slow sculptural push forward.",
+    "music_open": "Video-art feedback. Continuous shot, same console throughout. Dial sweep blooms into red blue green halos. Nested reflections unfold softly. Measured push forward.",
+    "music_close": "Video-art feedback. Continuous shot, same console throughout. Dial settles. Prismatic halos contract softly. Layered color planes dim to charcoal. Slow pull back.",
     "music_inter": "Video-art feedback. Continuous shot, same console throughout. Dial steady, glowing. Waveform light breathes across the surface. Translucent planes orbit slowly."
   },
   "still_word_typography": {

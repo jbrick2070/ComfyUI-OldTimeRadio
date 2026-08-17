@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly as a period stage radio, polished cabinet, dials and tubes"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Dial needle glides. Candlelight wavers across polished wood. Curtain shadows move softly.",
-    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Stage lamps rise from dim to warm. Cabinet highlights bloom.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Stage lamps fade to amber. Curtain shadows lengthen.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. VU meters pulse gently. Candlelight ripples on wood."
+    "announcer": "Continuous shot, same console throughout. Dial needle glides. Candlelight wavers across polished wood. Curtain shadows move softly. Slow theatrical dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Stage lamps rise from dim to warm. Cabinet highlights bloom. Measured dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Stage lamps fade to amber. Curtain shadows lengthen. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. VU meters pulse gently. Candlelight ripples on wood. Slow orbit around the speaker."
   },
   "still_word_typography": {
     "noir": "elegant stage-poster capitals, narrow serif strokes",

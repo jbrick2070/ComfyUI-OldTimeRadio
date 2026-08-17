@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly as a hand-tinted engraved radio, dials and tubes"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Etched dial needle glides. Hand-tinted highlights shimmer. Paper grain breathes softly.",
-    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Ink hatching brightens line by line. Paper glow rises.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Hand-tinted glow fades to amber. Ink shadows deepen gently.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Fine hatching ripples with rhythm. Paper texture shimmers."
+    "announcer": "Continuous shot, same console throughout. Etched dial needle glides. Hand-tinted highlights shimmer. Paper grain breathes softly. Slow illustrated dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Ink hatching brightens line by line. Paper glow rises. Measured dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Hand-tinted glow fades to amber. Ink shadows deepen gently. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Fine hatching ripples with rhythm. Paper texture shimmers. Slow orbit around speaker."
   },
   "still_word_typography": {
     "noir": "engraved condensed capitals, sharp ink hatching",

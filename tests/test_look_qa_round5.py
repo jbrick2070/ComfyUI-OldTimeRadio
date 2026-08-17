@@ -247,7 +247,7 @@ class TestPerBeatScenePrompts:
         # this very register -- it shipped as "vibrates subtly", i.e. the
         # energy inverted on the episode's most energetic beat. The assertion
         # is unchanged in intent: structure (music_open) beats role (announcer).
-        assert "races across the frequencies" in p        # dynamic music_open template
+        assert "races across frequencies" in p            # dynamic music_open template
         assert "Tuning dial needle sweeps" not in p       # NOT the announcer (structure won)
         # music_inter remains the calm rollback via env:
         monkeypatch.setenv("OTR_LTX_OPEN_MOTION_KEY", "music_inter")

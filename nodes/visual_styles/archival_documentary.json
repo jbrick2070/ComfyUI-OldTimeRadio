@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly, aged vacuum tubes and worn dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Tuning dial needle drifts steadily. Tubes glow and breathe. Dust motes float in window light.",
-    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Tube filaments warm from cold to bright. Grille cloth trembles gently.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Tube filaments fade through deep amber. A last curl of dust drifts down.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Needle quivers with the rhythm. Tubes pulse softly."
+    "announcer": "Continuous shot, same console throughout. Tuning dial needle drifts steadily. Tubes glow and breathe. Dust motes float in window light. Slow deliberate dolly forward.",
+    "music_open": "Continuous shot, same console throughout. Dial sweeps across frequencies. Tube filaments warm from cold to bright. Grille cloth trembles gently. Measured dolly push forward.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Tube filaments fade through deep amber. A last curl of dust drifts down. Slow dolly pull back.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Needle quivers with the rhythm. Tubes pulse softly. Slow orbit around the speaker."
   },
   "still_word_typography": {
     "noir": "restored condensed printed capitals, crisp aged ink",
