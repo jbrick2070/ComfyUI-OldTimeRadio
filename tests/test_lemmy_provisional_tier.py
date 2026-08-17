@@ -871,3 +871,62 @@ def test_no_family_stamps_a_route_and_none_of_them_RAISES(
     resolved = ROUTE.resolve_and_verify_reference(row, engine)
     assert resolved is ROUTE.LEGACY_REFERENCE
     assert resolved.is_policy_route is False
+
+
+# ---------------------------------------------------------------------------
+# 11. LEMMY STAYS IN HIS BOX (operator 2026-08-17). Measured on a published
+#     episode: MOE GORDON -- not Lemmy -- drew `idx_lemmy_algenib_cockney_v1`,
+#     the reference a blinded audition qualified as LEMMY'S voice.
+# ---------------------------------------------------------------------------
+def test_lemmys_own_clone_is_never_drawn_for_another_character(bank):
+    """A voice can only mean "this is Lemmy" if it is the only place it is heard.
+
+    Reserved rows are pre-filtered out of the pool exactly like audited rejects
+    -- a deterministic filter, never a score reweight.
+    """
+    from nodes._otr_voice_bank import assign_voice_for_slot, reserved_voice_ref_ids
+
+    reserved = reserved_voice_ref_ids()
+    assert reserved, "nothing is reserved -- the pin is vacuous"
+    for engine in ("indextts2", "chatterbox", "dia"):
+        for seed in range(40):
+            ref = assign_voice_for_slot(
+                role="char_voice", engine=engine, char_id="c03", gender="male",
+                timbre=(), age_band="adult", episode_seed=seed,
+                casting_policy_version="v1", allow_voice_reuse=True,
+                used_voice_ref_ids=set(), bank=bank)
+            assert ref.voice_ref_id not in reserved, (engine, seed, ref.voice_ref_id)
+
+
+def test_only_his_OWN_recording_is_reserved_not_the_voices_he_borrows():
+    """THE OVER-BROAD VERSION OF THIS FIX WOULD HAVE CAUSED ITS OWN REGRESSION.
+
+    A first cut reserved every voice any Lemmy route named, which swept in
+    `bm_george` -- a shared kokoro catalogue voice tagged `preferred_announcer`
+    -- plus the two shared cloud voices. He is provisionally POINTED AT those; he
+    does not own them, and pulling the preferred announcer from the pool to
+    protect a cameo trades one defect for another. Only `local_wav` routes, which
+    are clones of the operator-approved recording of Lemmy himself, are his.
+    """
+    from nodes._otr_voice_bank import reserved_voice_ref_ids
+
+    reserved = reserved_voice_ref_ids()
+    assert "idx_lemmy_algenib_cockney_v1" in reserved
+    assert CLONE_REF not in reserved, "a generic mirrored row must stay castable"
+    for borrowed in ("bm_george", "el_daniel", "gt_algenib"):
+        assert borrowed not in reserved, (
+            "%s is a shared catalogue voice, not Lemmy's identity" % borrowed)
+
+
+def test_reserving_his_voice_cannot_starve_lemmy_of_it(pin_provisional, bank):
+    """The policy path stamps its bank entry DIRECTLY and never comes through the
+    selector, so the reservation removes his voice from everyone else's pool
+    without removing it from his own."""
+    pin_provisional({"chatterbox": _provisional(
+        "chatterbox", "cb_lemmy_algenib_cockney_v1", "local_wav")})
+    out = CastLock().lock(script_json=_ledger(), voice_bank="default_clean",
+                          char_voice_engine="chatterbox",
+                          cast_voice_policy="auto_registry")[0]
+    lemmy = _rows(out)["c02"]
+    assert lemmy["voice_ref_id"] == "cb_lemmy_algenib_cockney_v1"
+    assert lemmy[ROUTE.CAST_ROW_TIER_FIELD] == ROUTE.ROUTE_TIER_PROVISIONAL

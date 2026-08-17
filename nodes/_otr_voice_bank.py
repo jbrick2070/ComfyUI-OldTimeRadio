@@ -102,6 +102,67 @@ class VoiceCastingError(RuntimeError):
     """Raised when no castable voice can be assigned to a slot (fail-closed)."""
 
 
+def reserved_voice_ref_ids() -> frozenset:
+    """Voice references that belong to ONE named character and nobody else.
+
+    DERIVED FROM THE POLICY, never a hand-kept list. Every `voice_ref_id` named
+    by a Lemmy route -- qualified or provisional, on any engine -- is reserved by
+    the act of being named there. Add a route and the reservation follows for
+    free; that is the whole reason this reads the policy instead of restating it,
+    because a second list is a list that drifts.
+
+    Fail-SOFT: an unimportable pack reserves nothing and casting behaves exactly
+    as it did before this existed. The strictness lives where a route is claimed,
+    not in a helper that would otherwise break every render on an import error.
+    """
+    try:
+        from ..config import cast_pools as _POOLS  # type: ignore
+    except ImportError:
+        try:
+            from config import cast_pools as _POOLS  # type: ignore
+        except ImportError:
+            return frozenset()
+    policy = getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
+    ids = set()
+
+    # ONLY A CLONE OF HIS OWN RECORDING IS HIS. The first cut of this reserved
+    # every voice any Lemmy route named, and that was too broad in a way that
+    # would have caused its own regression: `bm_george` is a shared kokoro
+    # catalogue voice tagged `preferred_announcer`, and `el_daniel` / `gt_algenib`
+    # are shared cloud voices. Lemmy is PROVISIONALLY POINTED AT those; he does
+    # not own them, and pulling the preferred announcer out of the pool to
+    # protect a cameo would trade one defect for another.
+    #
+    # A `local_wav` route is different in kind: those rows are clones of the
+    # operator-approved recording of Lemmy himself, so hearing that timbre IS
+    # hearing Lemmy. Those are reserved; the borrowed catalogue voices are not.
+    for key in ("approved_native_routes", "provisional_native_routes"):
+        routes = policy.get(key)
+        if not isinstance(routes, dict):
+            continue
+        for record in routes.values():
+            if not isinstance(record, dict):
+                continue
+            receipt = record.get("provisional_receipt")
+            if isinstance(receipt, dict):
+                if receipt.get("identity_kind") != "local_wav":
+                    continue
+                ref = str(record.get("voice_ref_id") or "").strip()
+                if ref:
+                    ids.add(ref)
+                continue
+            qual = record.get("qualification_record")
+            if isinstance(qual, dict):
+                ref_block = qual.get("reference")
+                if not (isinstance(ref_block, dict)
+                        and ref_block.get("kind") == "local_wav"):
+                    continue
+                ref = str(qual.get("voice_ref_id") or "").strip()
+                if ref:
+                    ids.add(ref)
+    return frozenset(ids)
+
+
 @dataclass(frozen=True)
 class VoiceBankEntry:
     """One castable voice reference (frozen; mirrors the E.1 schema)."""
@@ -445,6 +506,28 @@ def assign_voice_for_slot(
     # pass untouched, so the un-audited bank behaves exactly as before.
     candidates = [e for e in entries
                   if e.engine == engine and e.quality_tier != "reject"]
+    # A RESERVED IDENTITY IS NOT IN THE POOL (operator 2026-08-17: "Lemmy should
+    # only be Lemmy, not some random character -- Lemmy stays in the box unless
+    # Lemmy is called upon").
+    #
+    # Measured on a real published episode: MOE GORDON, a character who is not
+    # Lemmy, drew `idx_lemmy_algenib_cockney_v1` -- the reference a blinded
+    # operator audition qualified as LEMMY'S voice. Nothing was broken; the row
+    # simply sits in the char_voice pool like any other, so the seeded draw may
+    # hand his signature Cockney to anybody. That quietly undoes the identity the
+    # audition established: a voice can only mean "this is Lemmy" if it is the
+    # only place it is ever heard.
+    #
+    # THE POLICY PATH IS UNAFFECTED, which is what makes this safe. A qualified
+    # or provisional route stamps its bank entry DIRECTLY in CastLock and never
+    # comes through this selector, so reserving these ids cannot starve Lemmy of
+    # his own voice -- it only stops everyone else borrowing it.
+    #
+    # Same shape as the audited-reject filter above: a deterministic pool
+    # pre-filter, never a score reweight.
+    reserved = reserved_voice_ref_ids()
+    if reserved:
+        candidates = [e for e in candidates if e.voice_ref_id not in reserved]
     if require_commercial_clean:
         candidates = [e for e in candidates if e.commercial_clean is True]
     if not candidates:
