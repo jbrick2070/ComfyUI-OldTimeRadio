@@ -118,11 +118,25 @@ fights it. And as there: the whip-pan collision is the OPT-IN CLOUD lane's, not
 this one's -- every local video engine is clean, and importing the cloud
 constraint is the mistake the register rewrite already paid 40% of its motion for.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent):
+  * The subject-first MECHANISM applies here too and is recorded in full on
+    ``eng_wan_i2v.PROMPT_STYLE_NOTES``: Wan 2.2 captions were subject-first in
+    training and the model weights early tokens most heavily. Read it there.
+  * cfg 5.0 SITS INSIDE the published recommended band for Wan 2.2 (guides say
+    5-7), which is worth knowing because it means this lane's literal adherence is
+    the intended operating point rather than an overshoot. Its i2v sibling runs
+    3.5, below the band. Neither is a reason to touch a recipe.
+  * Published guides also warn against stacking camera moves in one short shot
+    ("zoom, drone orbit, handheld tracking, whip pan" in a single prompt). That is
+    the same failure the directive's "one subject, one action, one speed" prevents,
+    reached from the other direction.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. It is NOT a measured finding on OUR lane --
+web guidance describes the upstream model, not this deployment's recipe. Treat the
+string as a hypothesis until the probe A/B runs at a fixed seed.
 """
 
 #: The 2.1 VAE basename the 5B must NOT use (M8): its latent compression differs.

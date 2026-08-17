@@ -95,11 +95,29 @@ unconditional branch versus cfg 5.0 with a live negative), so the phrasing advic
 diverges even though the checkpoint does not. This is the case that shows why the
 overlay is keyed per ENGINE rather than per model file.
 
+EXTERNAL RESEARCH (2026-08-17) -- **NOT RUN SEPARATELY FOR THIS LANE, and saying
+so rather than implying coverage.** The other nine lanes got their own web lookup;
+this one did not, because FastWan is a DMD-distilled LoRA over the same Wan 2.2
+TI2V-5B base as ``wan_ti2v`` and there is no separate published prompting guidance
+for the distillation. What carries over, and what does not:
+  * CARRIES OVER: the subject-first MECHANISM recorded on
+    ``eng_wan_i2v.PROMPT_STYLE_NOTES`` -- Wan 2.2 captions were subject-first in
+    training and the weights favour early tokens. Same base weights, so the same
+    mechanism applies, and the directive's "Name the subject, then..." rests on it.
+  * DOES NOT CARRY OVER: everything about the guidance regime. Published Wan
+    guidance assumes cfg 5-7 with a live negative and treats negative prompting as
+    essential for artifact control. This lane runs one forward pass per step with no
+    unconditional branch, so that entire half of the upstream advice is inert here.
+    Importing it would be the single most likely way to get this engine's directive
+    wrong.
+  * OWED, if anyone wants this lane fully covered: a lookup on DMD / distilled
+    step-count regimes specifically, not on Wan 2.2 in general.
+
 PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+the five directive rules in the RESEARCH doc, with only the inherited Wan
+subject-first finding folded in. NOT a measured finding on our lane, and NOT a
+researched lane in its own right. Treat this string as a hypothesis until the probe
+A/B runs at a fixed seed.
 """
 
 #: THE CONSENT ACT, this adapter's own. Never shared with ``wan_ti2v``: one switch

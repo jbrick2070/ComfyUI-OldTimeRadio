@@ -115,11 +115,38 @@ rather than line, because GO_FORWARD's ``:766,909`` shifted by exactly the 53
 lines this diff inserted above them. That is an open static-audit finding needing
 the operator, not something a phrasing directive touches.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent). The richest lane of the ten:
+  * **NAMING SPEECH IN THE PROMPT IS ITSELF A LEVER.** Lightricks' own LTX-2
+    guidance says to mention "talking" or "speaking" in the POSITIVE prompt,
+    because the model uses prompt context to bias toward speech SEPARATELY from the
+    audio signal. That is a mechanism, not a style note, and it is why the
+    directive leads with "the speaking face" rather than "the face" -- a word we
+    were spending anyway turns out to be load-bearing.
+  * Emotion should be carried by PHYSICAL CUES, not labels -- "his jaw tightens
+    and he looks away" over "he is sad". Consistent with the whole overlay's rule
+    4 (describe HOW to phrase, never what the scene contains) and worth folding
+    into any future generation-time work on this lane.
+  * Single-shot framing is the upstream recommendation for dialogue that must stay
+    lip-synced, which is exactly what the packs' "Continuous shot, same console
+    throughout" opener already guarantees. Two tests pin that opener; leave it.
+  * **A REAL TENSION, RECORDED NOT RESOLVED: upstream expects 4-8 descriptive
+    sentences, and this lane's entire budget is 240 chars -- one sentence.** So we
+    are operating an order of magnitude below the recommended prompt length, and
+    the budget is OURS (a module constant), not the engine's. That does NOT make
+    raising it safe: P4 measured articulation collapsing 4.15 -> 1.18 from a
+    prompt-register change on this very lane, and Fable's reading is that long
+    prompts drown the speech tokens. So the upstream recommendation and our own
+    measurement point OPPOSITE WAYS, and the measurement wins until a render says
+    otherwise. This is the single best candidate on the whole overlay for a real
+    A/B, and it is a RENDER question, not a doc question.
+  * Not phrasing, noted for whoever tunes this lane: ``scale_a`` / ``scale_t``
+    balance audio-sync strength against text adherence upstream.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. It is NOT a measured finding on OUR lane.
+Treat the string as a hypothesis until the probe A/B runs at a fixed seed.
 """
 
 

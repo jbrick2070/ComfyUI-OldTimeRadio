@@ -138,11 +138,31 @@ THE NEGATIVE IS LIVE BUT THE DIRECTIVE SAYS NOTHING ABOUT AUTHORING ONE. Video
 negatives are FROZEN RECIPE here; that is why ``otr_style_traceroute.py
 --strict`` is deliberately not extended to the video side.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent). This is the ONE lane where the research
+returned a MECHANISM rather than advice, and it independently validates a decision
+this repo had already made on other grounds:
+  * Wan 2.2 was trained on video-caption pairs whose captions START WITH THE
+    SUBJECT and end with context, and the model allocates more representational
+    capacity to EARLY tokens -- a funnel where the first words are the sharpest
+    constraint. Published Wan 2.2 prompting guides say so directly.
+  * That is THREE independent arrivals at the same rule: the operator's
+    subject-first register rewrite (2026-08-17), the round-5 F3 note that engines
+    weigh leading tokens hardest, and now the model's own training description.
+    Subject-first is not a style preference on this lane, it is how the weights
+    were conditioned.
+  * Also confirmed: Wan does better describing HOW THINGS MOVE than what should
+    appear -- which is what "Describe motion, not the set" already says.
+  * NOT ADOPTED, recorded as an observation only: published guides recommend cfg
+    5-7 for Wan 2.2, and this engine ships 3.5 (its ti2v sibling ships 5.0, inside
+    the band). The recipes are not on the table, so this is a note, never a
+    change, and a bench would have to prove it on pixels first.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. It is NOT a measured finding on OUR lane --
+web guidance describes the upstream model, not this deployment's recipe. Treat the
+string as a hypothesis until the probe A/B runs at a fixed seed.
 """
 
 # A-ship in-process forward. Shared mechanics (resolution, declarative executor,

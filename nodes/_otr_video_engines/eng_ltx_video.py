@@ -138,11 +138,39 @@ either: video negatives are FROZEN RECIPE in this repo, which is exactly why
 video side -- gating on a string we may not edit would be a build-breaker by
 construction.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent). **THIS LANE PRODUCED A REAL CONFLICT.
+READ IT BEFORE "FIXING" THE DIRECTIVE.**
+  * Published LTX prompting guides say to **call the camera move in the FIRST
+    SENTENCE** (orbit, push in, slider, drone rise, locked off). Our directive says
+    the opposite -- begin with the subject -- and so does the research scaffold
+    ("never open with a style, medium, quality, mood, or camera word") and so does
+    ``_subject_anchor``, and so did the operator when he directed the 2026-08-17
+    register rewrite subject-first.
+  * **DO NOT ADOPT THE UPSTREAM ADVICE HERE, and do not read this note as
+    permission to.** Three reasons, in order of weight: (1) it is an OPERATOR
+    DIRECTIVE, not a driver preference; (2) the repo has a MEASURED result on this
+    exact axis and the public guides have none for our recipe -- when the registers
+    were rewritten the wrong way the pixels moved 40% less at a fixed seed, which
+    is more evidence than any guide offers; (3) the sibling Wan lane's training
+    description says subject-first outright, so a global camera-first rule would be
+    wrong on the other half of the video stack.
+  * **This IS the per-lane rule table item D asks for, arriving as evidence.**
+    Wan wants subject-first for a documented reason; LTX guidance wants
+    camera-first. One global opening rule cannot be right for both, which is
+    precisely why the overlay is keyed per engine. If the camera-first claim is
+    ever tested here, it is a RENDER at a fixed seed against the current register,
+    not a doc edit.
+  * Adopted as CONFIRMATION, not change: guides agree LTX does better with natural
+    everyday action than fantastical or highly stylised motion, and recommend ONE
+    main subject with at most one background action -- which is what "name the
+    subject, then what moves" already asks for.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above and DELIBERATELY LEFT DISAGREEING with it on
+opening order. It is NOT a measured finding on OUR lane. Treat the string as a
+hypothesis until the probe A/B runs at a fixed seed.
 """
 
 

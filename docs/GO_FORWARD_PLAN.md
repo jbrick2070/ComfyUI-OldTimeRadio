@@ -169,21 +169,18 @@ rewritten subject-first (B); the video-negative fork was panelled and answered
 "build no guard" (D-BIS 1). The DONE bodies have been compressed to the rules
 that still bind -- receipts live in `HANDOFF_LOG.md`.
 
-**`C`: THE STORE HALF IS DONE (2026-08-17), THE RESEARCH HALF IS STILL OWED.**
-All ten overlays are stored beside their engines with 64 tests and a green suite,
-zero behaviour change, nothing wired. But the directives were DERIVED by the
-driver from each engine's shipped configuration plus the schema's five rules --
-they are NOT the external research this item's step (1) asks for, and every
-`PROMPT_STYLE_NOTES` block says so in its PROVENANCE paragraph. Swapping in
-researched strings later is a one-line edit per engine against unchanged
-structure. **Do not read "C done" as "the research ran".**
+**`C` IS DONE, BOTH HALVES (2026-08-17).** Store: ten overlays beside their
+engines, 64 tests, green suite, zero behaviour change, nothing wired. Research:
+nine of ten lanes got their own web lookup, and `fastwan_8gb` is explicitly marked
+as inherited-only rather than implying coverage it did not get. **What is still
+NOT true is that any directive has been MEASURED** -- the adoption gate stands, the
+probe A/B has not run, and every PROVENANCE paragraph says so.
 
-**OPEN, in order: `C` step (1), the research** (ten engines, web search allowed,
-$0) -> **`H`**, and read its body before costing it, because item C's work
-REFRAMED it and it is bigger than "a small judgement" looked -> **G** / **F** /
-**E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are static-audit findings
-awaiting a live observation. B-OPEN is CLOSED -- the operator chose (B) and it
-shipped. What follows is that order, cheapest-certain first:
+**OPEN, in order: `H` IS NEXT** -- read its body before costing it, because item
+C's work REFRAMED it and it is bigger than "a small judgement" looked. Then
+**G** / **F** / **E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are static-audit
+findings awaiting a live observation. B-OPEN is CLOSED -- the operator chose (B)
+and it shipped. What follows is that order, cheapest-certain first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -392,6 +389,51 @@ is imported. Suite 10755 -> **10819**, the delta exactly the new file.
   default-OFF opt-ins). None has a config block in the RESEARCH doc, so writing
   directives for them would mean inventing the shipped-config research rather
   than transcribing it. Decide whether the ten is the right ten.
+
+**WHAT THE RESEARCH HALF ACTUALLY FOUND, and four of these are TRAPS for the next
+reader rather than tips:**
+* **PUBLIC GUIDANCE FOR `ltx_video` CONTRADICTS AN OPERATOR DIRECTIVE. DO NOT
+  ADOPT IT.** LTX guides say to call the camera move in the FIRST sentence; the
+  operator directed the registers subject-first, the scaffold forbids opening on a
+  camera word, and `_subject_anchor` enforces it. We have a MEASURED result on this
+  exact axis and the guides have none for our recipe -- rewriting the registers the
+  wrong way cost 40% of the motion at a fixed seed. Kept disagreeing, on purpose.
+* **AND THE SIBLING LANE PROVES ONE GLOBAL RULE CANNOT WORK.** Wan 2.2 was trained
+  on subject-first captions and weights early tokens most heavily -- so Wan wants
+  subject-first for a documented reason while LTX guidance wants camera-first.
+  **This is the per-lane rule table item D asks for, arriving as evidence.**
+* **MOST PUBLIC Z-IMAGE ADVICE ASSUMES A cfg WE DO NOT RUN.** Upstream defaults to
+  guidance 0.0, where the negative is ignored; we deliberately run cfg 2.0 to keep
+  it live. Every guide therefore says "negatives do nothing here", which is true
+  upstream and FALSE for us. A window reconciling the engine to a guide would
+  silently delete a deliberate departure.
+* **MOST FINDABLE "LUMINA PROMPTING" WRITING IS ABOUT NETA LUMINA, AN ANIME
+  FINETUNE**, whose own guidance says tags and natural language are equal-level
+  inputs. We load BASE Lumina-2. Do not import the tag tolerance; it was trained
+  into a model we do not run.
+* **`minimax_h3`: HOSTED IS NOT LOCAL.** Hailuo/MiniMax guides say the hosted UI
+  accepts a negative prompt. Our adapter has no negative field anywhere -- verified
+  twice. "Takes no negative at all" is true of THIS adapter, and a reader checking
+  it against a hosted-product guide will wrongly think it is a defect.
+* **THE BEST A/B CANDIDATE ON THE WHOLE OVERLAY IS `ltx_av`'s LENGTH.** Upstream
+  expects 4-8 descriptive sentences; our entire budget is 240 chars, one sentence.
+  So we run an order of magnitude below the recommended prompt length, and the
+  budget is OURS, not the engine's. But P4 measured articulation collapsing
+  4.15 -> 1.18 from a register change on this very lane, so the external
+  recommendation and our own measurement point OPPOSITE ways. The measurement wins
+  until a render says otherwise -- and that render is the highest-value one here.
+* **TWO CLAUSES CAME BACK CONFIRMED FROM BOTH DIRECTIONS**, which is the strongest
+  evidence anything in this overlay has: `humo`'s brevity rule (upstream says keep
+  it concise, P4 measured the collapse) and `flux_gen1`'s whole directive
+  (guidance-distilled so negatives are unsupported, subject-first, weight syntax
+  ignored, and our FluxGuidance 3.5 sits on the published sweet spot).
+* **ONE DIRECTIVE WAS CHANGED BY THE RESEARCH:** `minimax_h3` gained "as flowing
+  prose, never a keyword list", because H3's LLM backbone rewards narrative flow
+  and guides describe it as wanting a script rather than a checklist.
+* **A BIAS WORTH KNOWING FOR CAST WORK:** Z-Image skews toward Asian/Chinese
+  appearance unless ethnicity is stated explicitly. Not a phrasing rule and out of
+  the 240 chars, but it lands directly on the correctness class that IS still open
+  -- a character's appearance contradicting the source.
 
 **D. THE PROMPT-STEERING QUESTION -- BLOCKED, do not build blind.**
 Fully designed across three research rounds + a Fable pass; artifacts in

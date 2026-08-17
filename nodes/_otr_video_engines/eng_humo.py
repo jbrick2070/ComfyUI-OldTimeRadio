@@ -116,11 +116,30 @@ by env-var name rather than line, because GO_FORWARD's ``:748`` shifted by exact
 the 56 lines this diff inserted above it. Open static-audit finding, needs the
 operator, untouched by this overlay.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent):
+  * **THE BREVITY RULE IS CONFIRMED FROM OUTSIDE, and this is the only clause in
+    the whole overlay with agreement from BOTH directions.** Published HuMo guidance
+    says to keep prompts concise and focused rather than lengthy because text
+    adherence is strong; the P4 probe measured articulation collapsing 4.15 -> 1.18
+    from a prompt-register change on this lane. An external recommendation and an
+    in-repo measurement pointing the same way is the strongest evidence any
+    directive here has, and it is why "Keep it short" leads.
+  * Corroborates our own safe-render number: upstream describes the architecture as
+    capped around 97 frames at 25fps (~4 seconds), which is exactly
+    ``_HUMO_14B_SAFE_RENDER_FRAMES = 97`` in this file. That number was reached here
+    by measurement on this box; nice to know it matches the published ceiling rather
+    than being this hardware's own limit.
+  * Not phrasing, recorded for whoever tunes this lane: upstream exposes
+    ``scale_a`` / ``scale_t`` to balance audio-sync strength against text adherence,
+    and suggests ~50 denoising steps (30-40 for faster trials). Knobs, not wording,
+    and the recipes are not on the table.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. Its lead clause is the one place where
+external guidance and an in-repo measurement AGREE; the rest is still a hypothesis
+until the probe A/B runs at a fixed seed.
 """
 
 # A-ship in-process forward (the native graph PROVEN in scripts/render_humo_batch.py

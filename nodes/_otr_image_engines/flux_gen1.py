@@ -59,11 +59,28 @@ The FluxGuidance embedding at 3.5 is a learned conditioning input, not a cfg
 scale, so raising it does not restore a negative channel. Nothing a prompt can
 say re-enables one.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent). This lane came back CONFIRMED on every
+clause, which is worth recording precisely because it is the least interesting
+outcome and the easiest to leave unwritten:
+  * Negatives: FLUX.1-dev is guidance-distilled and does not support them.
+    Published guidance is to replace them with affirmative description -- write
+    "clean, sharp background" rather than trying to exclude "blurry background".
+    That is the directive's first clause, arrived at independently.
+  * Subject-first: guides say FLUX wants natural language WITH THE SUBJECT FIRST.
+  * Weight syntax: FLUX ignores parenthetical weight modifiers entirely, so the
+    "no weight syntax" clause is not stylistic tidiness -- those characters buy
+    literally nothing and cost budget.
+  * Our FluxGuidance of 3.5 sits exactly on the published sweet spot (3.5-4.0), and
+    guides warn that SD-habit values of 7.0+ produce oversaturated, artifact-heavy
+    output on this architecture. Nothing to change; good to know the number is not
+    accidental.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above and found to agree on all four clauses. Still
+NOT a measured finding on OUR lane. Treat the string as a hypothesis until the
+probe A/B runs at a fixed seed.
 """
 
 

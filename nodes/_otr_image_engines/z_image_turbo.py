@@ -144,11 +144,36 @@ ABOUT IT. Struck on operator instruction, and the repo agrees three ways:
 Negative phrasing is therefore not a phrasing question on this engine. It is an
 ownership question, and it already has an answer.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent):
+  * **THE UPSTREAM DEFAULT IS guidance 0.0, WHERE THE NEGATIVE IS IGNORED. OURS
+    IS cfg 2.0, WHERE IT IS LIVE.** Every public Z-Image-Turbo guide therefore says
+    "negative prompts do nothing, phrase everything positively" -- and that is TRUE
+    UPSTREAM AND FALSE HERE. This module's own docstring says why we depart: cfg 2.0
+    "keeps the NEGATIVE live -- a lever Flux@cfg 1.0 lacks". A future reader who
+    reconciles this engine to a public guide will silently delete a deliberate
+    departure, so it is written down here instead.
+  * CONFIRMED, independently: describe in natural language, a scene rather than
+    tag soup ("1girl, 8k"), and skip weight/parenthesis syntax. That is exactly
+    what the directive says, and the reason given upstream is ours too -- the text
+    encoder is an LLM.
+  * **A REAL BIAS WORTH KNOWING FOR CAST WORK:** published guides report Z-Image
+    skews toward Asian / Chinese appearance unless ethnicity is stated explicitly.
+    That is NOT a phrasing rule and it stays OUT of the 240 chars, but it is
+    directly relevant to the correctness class the operator does care about --
+    a character's appearance contradicting the source. If a source states a
+    character's appearance, the prompt has to say so on this engine.
+  * UNRESOLVED, flagged rather than folded: guides disagree about length. Some say
+    Z-Image rewards long detailed prompts, others that overly long prompts add
+    noise and it prefers precise and concise. No measurement either way on our
+    recipe, so the directive takes no position on length.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. It is NOT a measured finding on OUR lane --
+and note that most public guidance about this model assumes the upstream cfg 0.0
+default we deliberately do not run. Treat the string as a hypothesis until the
+probe A/B runs at a fixed seed.
 """
 
 

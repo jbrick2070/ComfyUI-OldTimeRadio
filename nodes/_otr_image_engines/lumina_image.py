@@ -147,11 +147,30 @@ consulted. That reframes item H: the label is not merely inaccurate for one
 engine, it is unverified for all of them. Storing this overlay neither fixes nor
 worsens it.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent):
+  * Confirmed: the encoder is Gemma-2-2B, and because Gemma-2 was trained
+    predominantly on English, English prompts perform best. Moot for this pipeline
+    (it is English throughout) but it is the reason grammar reads well here.
+  * **A TRAP IN THE PUBLIC MATERIAL, and it is the biggest one of the ten.** Most
+    findable "Lumina prompting" writing is about **NETA LUMINA**, an ANIME FINETUNE,
+    not base Lumina-Image 2.0. Neta's own guidance says it treats Danbooru-style
+    TAGS and natural language as equal-level inputs -- so a reader who follows it
+    will conclude tag soup is fine here. It is not: that tolerance was TRAINED INTO
+    the finetune, and we load base Lumina-2 weights. The directive's "full grammar,
+    not tag lists" stands, and this is exactly the "is this about the local weights
+    or a variant" caution the RESEARCH doc's own prompt asks the researcher to
+    honour.
+  * Confirmed and already in the directive: detailed, specific prompts produce
+    better embeddings here -- but read that alongside cfg 4.0 above, where the
+    expensive mistake is over-specification rather than under-specification. The
+    two are not in conflict: be specific about what must appear, not exhaustive.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above. It is NOT a measured finding on OUR lane, and
+most public guidance for this model name describes a finetune we do not load.
+Treat the string as a hypothesis until the probe A/B runs at a fixed seed.
 """
 
 

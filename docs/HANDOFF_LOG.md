@@ -3,9 +3,32 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-17 (item C window) -- HEAD 3fc0abcf +this (v2.0-alpha) -- CODER (the ten prompt-style overlays stored; a matrix-scraper regression caught and root-fixed; 8 of 21 cited line numbers proven wrong)
+## 2026-08-17 (item C window) -- HEAD fe204068 +this (v2.0-alpha) -- CODER (item C DONE, both halves: ten overlays stored, nine lanes researched; a matrix-scraper regression root-fixed; 8 of 21 cited line numbers proven wrong)
 
-**ITEM C's STORE HALF IS DONE. THE RESEARCH HALF IS NOT, AND THAT IS THE HEADLINE.**
+**THE RESEARCH HALF THEN RAN, AND IT PAID FOR ITSELF IN TRAPS RATHER THAN TIPS.**
+Nine of ten lanes got their own web lookup (allowed per the operator's 2026-08-15
+ruling); `fastwan_8gb` is marked inherited-only rather than implying coverage.
+Four findings are TRAPS for the next reader: public **LTX** guidance says call the
+camera move in the FIRST sentence, contradicting an operator directive and a
+measured 40%-motion result, so it is recorded and deliberately NOT adopted; most
+public **Z-Image** advice assumes upstream guidance 0.0 where negatives are
+ignored, while we deliberately run cfg 2.0 to keep them live; most findable
+"**Lumina** prompting" writing is about **Neta Lumina, an anime FINETUNE** whose
+tag tolerance was trained in and must not be imported to base weights; and
+**MiniMax** guides describe a hosted UI that accepts a negative while our adapter
+has no negative field at all. **The single most valuable finding is a mechanism:**
+Wan 2.2 was trained on subject-first captions and weights early tokens most
+heavily -- three independent arrivals at the same rule (the operator's register
+rewrite, round-5 F3, and now the model's own training description), and it proves
+one global opening rule cannot serve both Wan and LTX. That IS the per-lane rule
+table item D asks for. **The best A/B candidate on the overlay is `ltx_av`
+length:** upstream expects 4-8 sentences, our budget is 240 chars, and P4's
+4.15 -> 1.18 collapse points the other way -- measurement wins until a render says
+otherwise. Two clauses came back confirmed from BOTH directions (`humo` brevity,
+`flux_gen1` entire), and exactly ONE directive was changed by the research
+(`minimax_h3` gained "as flowing prose, never a keyword list").
+
+**THE STORE HALF CAME FIRST, AND THE PREMISE IT WAS BOOTED ON WAS FALSE.**
 The window booted on "the answers already exist from three research rounds --
 both are in the RESEARCH doc". They do not exist. That doc holds the decided
 schema, a reusable research PROMPT, and ten shipped-config blocks; it has no
@@ -89,10 +112,13 @@ option; giving lumina a floor stays an operator/recipe call needing a render.
 `sd35_large` (default-OFF). None has an overlay or a config block in the RESEARCH
 doc. Flagged as an operator scope call, deliberately not decided here.
 
-Current step: **item C step (1), the RESEARCH** (ten engines, one paste-ready
-block each; web search allowed, $0) -- then **H** (read its reframing first),
-then **G** / **F** / **E**. D stays BLOCKED; D-BIS 2-5 and D-TER remain
-static-audit findings awaiting a live observation.
+Current step: **H** -- and read its REFRAMING in GO_FORWARD before costing it;
+item C's work made it bigger than "a small judgement" looked, and the cheap option
+(fix the receipt) is now clearly asymmetric against the expensive one (give lumina
+a floor, which is an operator/recipe call needing a render). Then **G** / **F** /
+**E**. D stays BLOCKED; D-BIS 2-5 and D-TER remain static-audit findings awaiting a
+live observation. **Item C is closed on BOTH halves, but nothing in it is
+MEASURED** -- the adoption gate stands and the probe A/B has not run.
 
 Models: CODER window, **NO RUNG CITED -- the MODEL & CREDIT BUDGET table still has
 a header, a separator and no rows**; ran on the per-window mapping paragraph
@@ -103,7 +129,9 @@ answer. Review was a **three-way read-only Sonnet 5 fan-out** on the finished di
 (engine-file structural/factual QA, adversarial QA of the new test, and
 citation verification), operator-authorized mid-window. Every finding was
 re-grounded against the real Windows files before folding; the panel proposed, the
-driver disposed. Cloud spend **$0**.
+driver disposed. The RESEARCH half used **web search** (operator 2026-08-15, the
+RSS precedent) across nine lanes, and every claim folded is marked as describing
+the UPSTREAM model rather than our recipe. Cloud spend **$0**.
 
 Box state at close: **CLEAN** -- port 8000 free, VRAM ~825 MiB (baseline), no
 resident server, no GPU leg run (item C is zero behaviour change, so no render was

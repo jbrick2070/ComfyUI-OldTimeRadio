@@ -109,8 +109,8 @@ _LOG = logging.getLogger("OTR.video.minimax_h3")
 #: ``tests/test_prompt_style_directives.py``.
 PROMPT_STYLE_DIRECTIVE = (
     "This engine takes no negative prompt at all, so state every requirement "
-    "positively. Name the subject, then one action and its speed. Do not restate "
-    "the set; the still fixes it."
+    "positively. Name the subject, then one action and its speed as flowing prose, "
+    "never a keyword list. Do not restate the set."
 )
 
 #: Humans only -- never injected, never sent to a model.
@@ -139,11 +139,31 @@ is that a directive describes HOW to phrase, never what the scene contains or ho
 the clip is assembled. Recorded here only so a reader does not go looking for it
 in the 240 chars.
 
-PROVENANCE: authored by the driver from this engine's shipped configuration plus
-the five directive rules in the RESEARCH doc. NOT a measured finding and not a
-research-panel output -- the three pasted research rounds specify the consumer
-scaffold and leave the per-engine overlay as a placeholder. Treat this string as
-a hypothesis until the probe A/B runs at a fixed seed.
+EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
+2026-08-15 ruling, the RSS precedent):
+  * **HOSTED IS NOT LOCAL, AND THIS IS THE ENGINE WHERE IT BITES.** Published
+    MiniMax/Hailuo guides say the hosted UI DOES accept a negative prompt (to be
+    used sparingly). Our node does NOT -- verified twice by reading this file:
+    there is no negative field, parameter or payload key anywhere in the
+    conditioner nodes, the graph build, or the request body. So "takes no negative
+    prompt at all" is a true statement ABOUT THIS ADAPTER, and a reader who checks
+    it against a hosted-product guide will think it is wrong. It is not; they are
+    describing a different surface. If this adapter ever gains a negative input,
+    this directive is the first thing to revisit.
+  * ADOPTED INTO THE DIRECTIVE: guides describe H3 as wanting "a script, not a
+    checklist" -- its LLM backbone rewards narrative flow, and camera direction
+    should be written as part of the action rather than as a keyword list. That is
+    a genuine phrasing rule, it is checkable by reading a prompt, and it is why the
+    directive now says "as flowing prose, never a keyword list".
+  * Also upstream: do not stack camera moves in one short shot. The directive's
+    "one action and its speed" covers it.
+
+PROVENANCE: the DIRECTIVE was authored by the driver from this engine's shipped
+configuration plus the five directive rules in the RESEARCH doc, then checked
+against the external research above -- and the "flowing prose" clause was added
+BECAUSE of it, so this is the one directive of the ten that the research changed.
+It is still NOT a measured finding on OUR lane. Treat the string as a hypothesis
+until the probe A/B runs at a fixed seed.
 """
 
 
