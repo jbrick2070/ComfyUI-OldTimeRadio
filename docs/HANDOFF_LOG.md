@@ -76,12 +76,35 @@ tag gate must be judged on those, not on the 708.** Left RUNNING deliberately:
 operator-ordered state, holds no GPU. Same guardrail the r3 panel caught the
 driver planning to bypass for an acceptance leg.
 
-Current step: item 1.1's tier build (the plan is the contract) and chunk B's
-step 5 acceptance leg. Both need the GPU.
-Next: chunk B step 5 -- reset per section 4, FRESH boot at `b46db68e`, one
-forced-hit leg (`lemmy_cameo=always include` IS on the creative whitelist).
-Then the 1.1 tier. Then the video sprint (1.2), whose plan doc is written
-(`docs/2026-08-16-video-sprint-PLAN.md`) but whose kibitz arc has NOT run.
+**CHUNK B CLOSED -- ACCEPTANCE LEG PASSED 18/18 (operator said kill the soak
+and run it).** All soak harnesses and the resident server were torn down
+SELECTIVELY by CommandLine per section 4 -- 17 processes including the `nohup`
+wrappers that would have respawned them, while the 4 MCP extension pythons
+survived; port 8000 freed, VRAM to 821 MiB. (The broken harness had climbed
+703 -> 1112 legs in the interim.) Fresh boot at `91f20e7d` in 25 s, then one
+forced-hit leg: `signal_lost_chunkb_accept_forced_lemmy_scifi_news_pr_
+20260816_185234`, `Prompt executed in 00:37:39`, `obs_publish OK`, 83.2 MB in
+`otr/episodes/<ep>/` + 42.9 MB in `otr/obs/`.
+Verified against the contract, NOT against the exit code: one LEMMY row at
+`c04`; writer-stage `v2/en_speaker_8`; male; canonical communications-officer
+description; he SPEAKS, resolved via char_id FROM THE CAST ROW ("Testing, one,
+two... This is Lemmy at the relay station."); `lemmy_roll_receipt` =
+hit/forced_include/roll_executed=false; five-key seed-free `cast_contract`
+agreeing with it; voice-slot receipt carrying the Cockney signature.
+**Delivery resolved the QUALIFIED route** -- `voice_engine=indextts2`,
+`voice_ref_id=idx_lemmy_algenib_cockney_v1` -- so the frozen row keeps the
+writer-stage Bark preset while the audience hears his audition-proven voice,
+exactly the two-stage behaviour the contract predicted.
+Also proven in passing: `--set` works for `lemmy_cameo` because that widget IS
+on the creative whitelist -- the same lever the broken soak harness was
+misusing on MANAGED engine widgets.
+
+Current step: item 1.1's tier build (the plan is the contract).
+Next: the 1.1 provisional tier, then the video sprint (1.2), whose plan doc is
+written (`docs/2026-08-16-video-sprint-PLAN.md`) but whose kibitz arc has NOT
+run. The soak is STOPPED -- relaunch only the `--profile` form, and delete the
+`--set` engine-rotation path from `otr_gpu_soak_matrix.py` so the mistake is
+unrepresentable.
 Blocked-on-operator: NOTHING except the post-rip TAG.
 Models: CODER window. NO RUNG CITED -- the MODEL & CREDIT BUDGET table still
 has no rows; answered from the per-window mapping (local triage, Sonnet 5

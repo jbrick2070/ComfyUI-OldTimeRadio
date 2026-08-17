@@ -144,15 +144,28 @@ can demote any of them later without archaeology.
    the cross-engine harness with waveform normalization, and ONE canonical leg
    on kokoro. **Four findings from that arc are load-bearing and are stated in
    the plan; do not rediscover them the hard way.**
-2. **Chunk B, the cameo roll** (item 1) -- **STEPS 1, 2 AND 3 ARE DONE AND
-   PUSHED** (`7faf3bf7`, `b46db68e`). The widget reaches the lanes, the
-   decision API exists, and `scifi_news_pro` casts, voices and receipts the
-   cameo. **ALL THAT REMAINS IS STEP 5: the acceptance leg** -- reset the box
-   per CLAUDE.md section 4, boot a FRESH server at the implemented HEAD (a
-   stale boot proves nothing), then one forced-hit leg via
-   `--set "OTR_LedgerScriptWriter.lemmy_cameo=always include"` (that widget IS
-   on the creative whitelist, unlike the engine widgets). Acceptance criteria
-   are in the contract's step 5.
+2. **Chunk B, the cameo roll -- CLOSED. LIVE-PROVEN 2026-08-16 EVENING, 18/18
+   ACCEPTANCE CHECKS.** Steps 1-3 pushed (`7faf3bf7`, `b46db68e`); step 5's
+   forced-hit leg ran on a FRESH boot at `91f20e7d` after the box was reset,
+   and PASSED every criterion in the contract. Receipt:
+   `signal_lost_chunkb_accept_forced_lemmy_scifi_news_pr_20260816_185234`,
+   `Prompt executed in 00:37:39`, `obs_publish OK`, 83.2 MB in
+   `otr/episodes/<ep>/` and 42.9 MB in `otr/obs/`.
+   Exactly one LEMMY row at `char_id=c04`, writer-stage preset
+   `v2/en_speaker_8`, gender male, the canonical communications-officer
+   description, and he SPEAKS -- resolved through his char_id FROM THE CAST ROW,
+   never by name-matching lines (the operator's own detector trap):
+   *"Testing, one, two. Can you hear me? Maya, you there? This is Lemmy at the
+   relay station."* The `lemmy_roll_receipt` reads
+   `lemmy_hit=true / knob_state=forced_include / roll_executed=false` (forced,
+   so no roll was spent) and the five-key seed-free `cast_contract` agrees with
+   it; the voice-slot receipt carries the Cockney signature.
+   **The two-stage identity behaved exactly as the contract predicted:** the
+   frozen row keeps the writer-stage Bark preset while DELIVERY resolved the
+   qualified route -- `voice_engine=indextts2`,
+   `voice_ref_id=idx_lemmy_algenib_cockney_v1`. So the cameo is not merely
+   present, it is delivered in his audition-proven voice.
+   Nothing remains on chunk B.
 3. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
    updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
    kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Needs
