@@ -50,9 +50,17 @@ def test_validate_preserves_authored_vocabulary(text, subject):
     assert ok and reason == "ok"
 
 
+#: DERIVED, never a literal. This used to be `"Mara " + "x" * 80`, which was
+#: over budget only because the cap happened to be 70 -- so the legitimate
+#: 2026-08-17 cap opening (70 -> 130, to let the clause writer describe kinetic
+#: motion) turned a passing test red without any behaviour changing. A test that
+#: hardcodes the constant it is testing re-breaks on every honest change to it.
+_OVER_BUDGET = "Mara " + "x" * (mc.CLAUSE_MAX_CHARS + 1)
+
+
 @pytest.mark.parametrize("text,reason", [
     ("", "empty"),
-    ("Mara " + "x" * 80, "over_budget"),
+    (_OVER_BUDGET, "over_budget"),
 ])
 def test_validate_structural_rejections(text, reason):
     ok, got = mc.validate_motion_clause(text, "Mara")
@@ -145,7 +153,7 @@ def test_generate_authored_motion_is_preserved(flag_on):
 def test_generate_over_provider_budget_falls_back(flag_on):
     led = _ledger()
     counts = mc.generate_motion_clauses(
-        led, generate_fn=lambda *a, **k: "Mara " + "x" * 80,
+        led, generate_fn=lambda *a, **k: _OVER_BUDGET,
         name_resolver=_names)
     assert counts["invalid"] == 1 and counts["generated"] == 0
     assert led["video"]["shots"][0]["motion_clause"]["fallback"] is True
