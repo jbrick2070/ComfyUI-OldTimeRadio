@@ -312,8 +312,19 @@ Trap 3 is now handled STRUCTURALLY rather than remembered: both arms take the
 same explicit `--seed` straight into the KSampler, so the `prompt_hash` seed
 path is never consulted and the arms cannot drift onto two different rolls.
 
+**A "PERMANENT" INSTRUMENT IS GITIGNORED BY DEFAULT -- `git add -f` IT.**
+`.gitignore:71` carries `scripts/_*.py` ("per-task dev scripts, machine-local,
+not versioned"), so every A/B instrument this queue calls permanent lands
+UNTRACKED unless force-added. `_otr_style_authority_smoke.py` was one command
+from being local-only. Item A's `_otr_lumina_image_smoke.py` is tracked only
+because it predates the rule biting -- git ignores nothing already in the index,
+which is exactly why the trap is invisible until a NEW instrument is written.
+Check `git check-ignore -v <path>` before believing a new script is committed,
+and force-add anything the plan calls a permanent arm.
+
 **Receipts:** `otr/episodes/style_authority_smoke/stills/` --
-`style_{cartoon,sci_fi_radio}_{character,announcer}_{prefix,postfix}_seed7`.
+`style_{cartoon,sci_fi_radio}_{character,announcer}_{prefix,postfix}_seed7`;
+video A/B `output/otr_ltxmotion/motion_{OLD_camera,NEW_subject}_00001_.webm`.
 Six stills, all SUCCESS. Reset before every leg via the new
 `scripts/otr_reset_gpu.ps1` (12.3 GiB -> ~1.6 GiB, port free); note that
 `kill_otr_zombies.ps1` is NOT that tool -- it deliberately PRESERVES the
