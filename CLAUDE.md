@@ -47,6 +47,31 @@
   the panel proposes, Claude disposes, and every panel claim is checked against the real
   Windows files before it is folded in. This RAISES the two-strikes rule below -- a first-try
   root fix now gets a panel too. It is local, it is $0, and it costs a wait, not a budget.
+- **AMENDED 2026-08-17 (operator): MATCH THE REVIEW TO THE TASK -- a full arc is not the
+  answer to everything.** Operator: *"we aren't running a full kibitz on everything, it needs
+  to choose the best path for the right task."* The 08-04 directive above stands for what it
+  was aimed at; it was being applied to work that has no design in it, which wastes a wait and
+  teaches nobody anything.
+  **THE TEST, and it is one question: is there a design choice with more than one defensible
+  answer?**
+  * **YES -- new capability, architecture, a schema or ledger change, anything touching the
+    canonical workflow, anything where reasonable people would disagree** -> FULL four-round
+    arc BEFORE code, exactly as above. This is where the panel earns its keep: on the
+    2026-08-17 style build the panel killed a build-breaker (a required pack key would have
+    bricked every frozen embedded pack via its sha256 receipt), deleted the riskiest mechanism
+    outright, and corrected the driver's own execution-order claim.
+  * **NO -- one verifiable right answer: wiring conformance, a grep-and-fix, a stale comment,
+    a rename, an `/object_info` check, a deterministic edit** -> NO arc. An arc pressure-tests
+    DESIGN; there is nothing to pressure-test. Sonnet 5 QA on the finished diff before the
+    push is the correct and sufficient gate.
+  * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
+  **THE TWO-STRIKES FLOOR BELOW IS UNTOUCHED AND NEVER LAPSES.** A bug that survived two of
+  your fixes gets a panel on the third attempt no matter how mechanical it looks -- two failed
+  fixes IS the evidence that your model of the problem is wrong, which is a design problem
+  wearing mechanical clothes.
+  **Fable routing (section 9) is unchanged and is a separate axis:** never spend Fable on
+  mechanical work. Reserve it for narrative judgment and the final gate on a high-stakes,
+  hard-to-unwind structural change. Do not burn a scalpel on a screw.
 - **TWO STRIKES, THEN THE PANEL (operator directive 2026-07-14 -- hard).** You get **two**
   attempts to fix a given problem on your own. If the **third** attempt is about to begin --
   i.e. the same bug/failure survived two of your fixes -- you MUST `/kibitz` (local, $0,
