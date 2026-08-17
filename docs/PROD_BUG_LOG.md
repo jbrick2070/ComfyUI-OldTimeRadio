@@ -68,6 +68,16 @@ by a two-agent backsweep (git history + handoff/smoke docs), prod-only bar appli
 cross-checked against BUG_BIBLE.yaml (BUG-11.26 family, 12.47, 07.16 excluded as
 already promoted). Confidence tags preserved from the sweep.
 
+## PBUG-20260817-03 -- another character's NAME pasted into a character_description
+- surfaced: published ledger on disk, `signal_lost_midnight_circuit_20260803_162229_ledger.json` (found 2026-08-17 while measuring item G; verified by the driver reading the ledger, not inferred)
+- symptom: RICK STEINER's `character_description` opens *"Late 50s, Seasoned yet vulnerable LUCILLE PENNY. Face: Oval, knitted brows..."* -- i.e. it carries a DIFFERENT cast member's name, and the face/detail prose that follows belongs to her. A second instance was reported in the same sweep (OYA SATO carrying Hank Griswold's), not independently re-read.
+- root cause: UNKNOWN and deliberately not guessed. It is NOT a gender defect -- it surfaced inside item G's gender audit only because a female name in a male slot's prose trips the portrait cue extractor, which is what makes it dangerous: a gender "fix" would have laundered it. Candidate directions, none verified: the description producer receiving the wrong slot, prior-cast context bleeding into the prompt (`_format_prior_entry` feeds prior rows in), or a row-index mismatch when writing back.
+- fix: NONE. Logged only.
+- verify idea: assert no `character_description` contains the `name` of any OTHER row in the same cast. Cheap, deterministic, needs no model -- and it would have caught this on the episode that shipped it.
+- bible-worthy: LIKELY YES -- the class is "an LLM pass wrote one subject's identity into another's record, and the only audit that noticed was looking for something else". But the promotion is NOT done here: the delta-scrape discipline requires checking `otr_coverage_index.yaml` + the 287-entry Bible first, plus the README count bump in the same commit, and this window is out of context to do that properly. **Next window: check the index, promote if genuinely uncovered.**
+- promotion: PENDING
+- status: OPEN
+
 ## PBUG-20260612-01 -- headless boot dies on cp1252 emoji print
 - surfaced: detached headless soak/API boot, 2026-06-12
 - symptom: boot dies ~13s, exit 1, "SERVER DID NOT COME UP"

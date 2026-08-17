@@ -4,6 +4,41 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## HOW TO TALK TO THE OPERATOR (standing, 2026-08-17 -- read before your first reply)
+
+**He is a VIBE CODER and he named this profile himself. Treat it as the default
+operating mode, not something to re-derive each session.** He does not read code
+fluently -- *"I can look at colors and words on a screen"* -- but he follows
+architecture, tradeoffs and consequences perfectly well. So:
+
+* **Lead with the decision or the ask.** Never make him hunt for it.
+* **Plain language.** Jargon only when the jargon IS the point.
+* **Effect-on-output, not implementation detail.** "This changes what Lumina
+  paints", not "this changes the fourth ternary arm".
+* **A short options table** when there is a genuine fork; a **one-line bottom line**
+  at the end of anything long.
+
+**THERE ARE EXACTLY TWO LEGITIMATE REASONS TO STOP, and he said so in these words:**
+*"if you stop I need a question for me to answer, a real workflow coding decision
+that me, Jeffrey, a non-coder, can understand its impact for you to go forward -- or
+a heads up I'm at 75% and I feel it's time to stop."*
+1. **A real blocking decision**, framed as impact he can judge.
+2. **The context heads-up** -- name a rough % and say a fresh window would serve
+   him better. Estimate honestly; there is no exact readout, and false precision is
+   worse than a range.
+
+**EVERY STOP ENDS WITH TWO LINES: what you need from him (or "nothing --
+proceeding"), and your remaining-context estimate.** His cost, in his words: *"every
+time you stop I'm like, oh, what's going on here."* A stop is a context switch for
+him, so earn it.
+
+**BE DECISIVE ON THE OBVIOUS.** He pushed back hard on being handed three decisions
+at once, one of which ("give lumina a hygiene floor") he considered a no-brainer:
+*"seems a no brainer, not sure why you are asking me."* If a defensible answer
+exists, take it and report it. Escalate only genuine forks. Blanket approvals are
+DURABLE -- *"yes I agree lets move forward"* licenses working the queue without
+re-asking per item.
+
 ## HOW TO READ THIS FILE (lean pass 2026-08-16 evening)
 
 **Start at THE QUEUE. Everything below it is reference.** The queue is the only
@@ -467,50 +502,35 @@ is imported. Suite 10755 -> **10819**, the delta exactly the new file.
   these constants, so the refusal would gate on a value no code consults. Build it
   in the same change that wires the overlay.
 
-**WHAT THE RESEARCH HALF ACTUALLY FOUND, and four of these are TRAPS for the next
-reader rather than tips:**
-* **PUBLIC GUIDANCE FOR `ltx_video` CONTRADICTS AN OPERATOR DIRECTIVE. DO NOT
-  ADOPT IT.** LTX guides say to call the camera move in the FIRST sentence; the
-  operator directed the registers subject-first, the scaffold forbids opening on a
-  camera word, and `_subject_anchor` enforces it. We have a MEASURED result on this
-  exact axis and the guides have none for our recipe -- rewriting the registers the
-  wrong way cost 40% of the motion at a fixed seed. Kept disagreeing, on purpose.
-* **AND THE SIBLING LANE PROVES ONE GLOBAL RULE CANNOT WORK.** Wan 2.2 was trained
-  on subject-first captions and weights early tokens most heavily -- so Wan wants
-  subject-first for a documented reason while LTX guidance wants camera-first.
-  **This is the per-lane rule table item D asks for, arriving as evidence.**
-* **MOST PUBLIC Z-IMAGE ADVICE ASSUMES A cfg WE DO NOT RUN.** Upstream defaults to
-  guidance 0.0, where the negative is ignored; we deliberately run cfg 2.0 to keep
-  it live. Every guide therefore says "negatives do nothing here", which is true
-  upstream and FALSE for us. A window reconciling the engine to a guide would
-  silently delete a deliberate departure.
-* **MOST FINDABLE "LUMINA PROMPTING" WRITING IS ABOUT NETA LUMINA, AN ANIME
-  FINETUNE**, whose own guidance says tags and natural language are equal-level
-  inputs. We load BASE Lumina-2. Do not import the tag tolerance; it was trained
-  into a model we do not run.
-* **`minimax_h3`: HOSTED IS NOT LOCAL.** Hailuo/MiniMax guides say the hosted UI
-  accepts a negative prompt. Our adapter has no negative field anywhere -- verified
-  twice. "Takes no negative at all" is true of THIS adapter, and a reader checking
-  it against a hosted-product guide will wrongly think it is a defect.
-* **THE BEST A/B CANDIDATE ON THE WHOLE OVERLAY IS `ltx_av`'s LENGTH.** Upstream
-  expects 4-8 descriptive sentences; our entire budget is 240 chars, one sentence.
-  So we run an order of magnitude below the recommended prompt length, and the
-  budget is OURS, not the engine's. But P4 measured articulation collapsing
-  4.15 -> 1.18 from a register change on this very lane, so the external
-  recommendation and our own measurement point OPPOSITE ways. The measurement wins
-  until a render says otherwise -- and that render is the highest-value one here.
-* **TWO CLAUSES CAME BACK CONFIRMED FROM BOTH DIRECTIONS**, which is the strongest
-  evidence anything in this overlay has: `humo`'s brevity rule (upstream says keep
-  it concise, P4 measured the collapse) and `flux_gen1`'s whole directive
-  (guidance-distilled so negatives are unsupported, subject-first, weight syntax
-  ignored, and our FluxGuidance 3.5 sits on the published sweet spot).
-* **ONE DIRECTIVE WAS CHANGED BY THE RESEARCH:** `minimax_h3` gained "as flowing
-  prose, never a keyword list", because H3's LLM backbone rewards narrative flow
-  and guides describe it as wanting a script rather than a checklist.
-* **A BIAS WORTH KNOWING FOR CAST WORK:** Z-Image skews toward Asian/Chinese
-  appearance unless ethnicity is stated explicitly. Not a phrasing rule and out of
-  the 240 chars, but it lands directly on the correctness class that IS still open
-  -- a character's appearance contradicting the source.
+**WHAT THE RESEARCH FOUND -- FOUR TRAPS AND TWO FACTS. The full write-ups live in
+each engine's `PROMPT_STYLE_NOTES`; this is the index.**
+* **TRAP -- public `ltx_video` guidance CONTRADICTS an operator directive.** Guides
+  say camera-move-first; he directed subject-first, and rewriting the registers the
+  wrong way cost 40% of the motion at a fixed seed. **Do not adopt it.**
+* **TRAP -- and the sibling lane proves no global rule can work.** Wan 2.2 was
+  TRAINED on subject-first captions and weights early tokens hardest; FLUX.2's docs
+  say the same (subject > action > style). So Wan and FLUX.2 want subject-first for
+  documented reasons while LTX guidance wants camera-first. **This is item D's
+  per-lane rule table arriving as evidence.**
+* **TRAP -- most public Z-Image advice assumes a cfg we do not run.** Upstream
+  defaults to guidance 0.0 (negative ignored); we run cfg 2.0 deliberately to keep
+  it live. "Negatives do nothing here" is true upstream, FALSE for us. Reconciling
+  the engine to a guide would delete a deliberate departure.
+* **TRAP -- variant/host is not model.** Most findable "Lumina prompting" is about
+  **Neta Lumina, an anime FINETUNE** whose tag tolerance was trained in; we load
+  base. MiniMax guides describe a **hosted UI** that takes a negative; our adapter
+  has no negative field at all. HiDream's negative is **variant**-dependent (Full
+  only). In all three, the doc describes a different surface than the one we run.
+* **FACT -- two clauses confirmed from BOTH directions**, the strongest evidence in
+  the overlay: `humo`'s brevity (upstream says concise, P4 measured the 4.15 -> 1.18
+  collapse) and `flux_gen1`'s whole directive.
+* **FACT -- the best A/B on the overlay is `ltx_av` LENGTH.** Upstream expects 4-8
+  sentences; our budget is 240 chars, and the budget is OURS. External advice and
+  our own P4 measurement point OPPOSITE ways; the measurement wins until a render
+  says otherwise. **Highest-value render on the list.**
+* **Also: Z-Image skews Asian/Chinese unless ethnicity is stated explicitly.** Not a
+  phrasing rule, but it lands on the still-open correctness class -- a character's
+  appearance contradicting the source.
 
 **D. THE PROMPT-STEERING QUESTION -- BLOCKED, do not build blind.**
 Fully designed across three research rounds + a Fable pass; artifacts in
