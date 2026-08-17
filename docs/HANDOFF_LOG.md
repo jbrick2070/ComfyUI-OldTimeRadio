@@ -114,8 +114,19 @@ the 2026-08-15 REVIEW ROUTING block, whose sprint arc is SPENT -- so these were
 NEW coding items and took the 2026-08-04 full-arc gate.
 Gates at close: suite **10584/110/1**, Bible **20/26/3 at 284**, variants
 **50/0**, AST parse on every touched .py, BOM clean, HEAD == origin.
-Bible delta-check: PBUG-20260816-03 is a NEW live-verified bug but has NO FIX
-yet, so nothing promoted -- check it at fix time.
+Bible delta-check DONE, and ONE PROMOTED. `12.107` --
+*a configured widget that is never forwarded is inert while every mapping test
+passes* -- promoted from PBUG-20260811-03 now that chunk B's fix is live-proven
+(survival-guide `a8b985f`). Checked against `otr_coverage_index.yaml` and the
+Bible first: the shape was genuinely uncovered. Three-File Contract honoured --
+284 -> 285 entries, the README count updated in all THREE citations, an index
+row with `verdict: promoted`, and `tests/bug_bible_regression.py` green at
+20/26/3. Its verify clause is the lesson in executable form: assert ARRIVAL not
+mapping, prove the forwarding STRUCTURALLY rather than with a mock (a mock
+accepts any keyword and passes against the defect), and prove the control end
+to end on a real run.
+NOT promoted: PBUG-20260816-03 (the soak harness) is live-verified but has NO
+FIX yet, so it has no `fix:` to claim -- check it at fix time.
 Box: server RESIDENT on :8000, GPU ~1.9 GB idle. Three soak harnesses running,
 one of them uselessly (above).
 Commits: `7faf3bf7`, `873c24b1`, `b46db68e`, plus this handoff.
