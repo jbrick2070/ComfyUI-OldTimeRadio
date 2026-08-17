@@ -275,11 +275,46 @@ are untouched.**
 frozen provider list. A sweeping rewrite to fix them cost 40% of the motion and
 had to be walked back. Fix the colliding token, never the surrounding writing.
 
-**C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
-runtime cost. Answers exist (three research rounds); the schema and the
-paste-ready research prompts are `docs/2026-08-17-per-engine-prompt-style-
-guide-RESEARCH.md`. **Strike z_image's negative-authoring clause before
-storing** -- see the trap in D.
+**C. THE TEN PER-ENGINE PROMPT NOTES -- RESEARCH FIRST, THEN STORE.**
+
+> **CORRECTED 2026-08-17.** This entry used to read *"Answers exist (three
+> research rounds)"*. **That was false and it cost a window real time.** The
+> phrase was borrowed from item D, which genuinely had three rounds (its
+> conclusions cite measured receipts -- F2, P4, P8). C has none. Its own doc is
+> titled *"the research prompts"*, its "Where the answers go" section is written
+> in the future tense, and there is no kibitz-run or answer doc anywhere on
+> disk. **Grep before trusting an "answers exist" claim -- including this one.**
+
+**WHAT EXISTS** (`docs/2026-08-17-per-engine-prompt-style-guide-RESEARCH.md`):
+the SCHEMA, decided -- `prompt_style_directive` (**240 chars hard**, the only
+part that ever reaches an LLM) and `prompt_style_notes` (uncapped, humans only,
+never injected); the five rules for directive text; a reusable research prompt;
+and a per-engine config block for each of the ten engines, with the real shipped
+sampler/cfg facts already filled in. All paste-ready.
+
+**WHAT IS OWED:** (1) run the research, ten engines, one block each; (2) store
+the two fields as constants beside the engine that owns them -- same shape as
+`_HYGIENE_NEGATIVE` living in `z_image_turbo`. Storing is safe and free.
+
+**THREE CONSTRAINTS THAT BIND THE STORE STEP:**
+* **NOT WIRED, deliberately.** Storing is free; ACTING on a directive is a
+  separate measured change gated on a before/after with
+  `scripts/otr_talking_radio_probe_eval.py` at a fixed seed -- P4 measured
+  articulation collapsing 4.15 -> 1.18 from a prompt-register change on this
+  very lane. Store it, measure it, then enable it.
+* **A directive may never override a visual style pack.** Style is the pack's
+  job; the directive owns PHRASING only. Rule 3 of the schema, and it is the
+  same authority boundary PBUG-20260817-01 was about.
+* **Offline rule:** author the string ONCE and store it. Never fetch at runtime.
+* **Strike z_image's negative-authoring clause before storing** -- see the trap
+  in D. cfg 1.0 engines take no negative advice at all; several blocks already
+  say so.
+
+**ROUTING:** the STORE half is mechanical (schema decided, one verifiable
+answer) -> Sonnet 5 QA on the diff, no arc. The RESEARCH half is a factual
+lookup about how each model responds to phrasing, not a design fork -- web
+search is ALLOWED (operator 2026-08-15, the RSS precedent), so it is $0 and does
+not need a paid panel.
 
 **D. THE PROMPT-STEERING QUESTION -- BLOCKED, do not build blind.**
 Fully designed across three research rounds + a Fable pass; artifacts in
