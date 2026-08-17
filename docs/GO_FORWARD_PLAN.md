@@ -106,8 +106,10 @@ panelled. Open a fresh arc only for a chunk that departs from the contract.
 style-traceroute VIDEO tests -> **10755 at the item B close** -> **10819 with item
 C's 64 overlay tests** -> **10824 with H-receipt's 5 negative-source tests**; no
 regressions at any step, and each delta equals exactly the tests added). Bible
-**20 / 26 / 3**, and the Bible holds **287** entries (`12.109` promoted for
-PBUG-20260817-02; item C and H-receipt promoted NOTHING -- see their bodies).
+**20 / 26 / 3**, and the Bible holds **288** entries (`12.109` promoted for
+PBUG-20260817-02; **`11.61` promoted 2026-08-17 for PBUG-20260817-03**,
+survival-guide `ff0eb13`; item C and H-receipt promoted NOTHING -- see their
+bodies).
 
 > **CHECK THE DELTA, NOT YOUR RECOLLECTION.** H-receipt's write-up first said "six
 > tests"; the suite delta was +5 and the delta was right. Every count in this block
@@ -242,8 +244,12 @@ declared GPU session. **`E`'s candidate downloads can run in the BACKGROUND unde
 anything** -- the queue already says so. **`F` is not secretly cheap:** its root is
 diagnosed by shape only and it wants tracing plus a panel, ideally the whole one
 once Codex is back 2026-08-19. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are
-static-audit findings awaiting a live observation. B-OPEN is CLOSED. What follows
-is that order, cheapest-certain first:
+static-audit findings awaiting a live observation. B-OPEN is CLOSED. **`I` IS NEW
+(2026-08-17 late) and it is a live production defect, not an audit finding** --
+the wrong-person `character_description`, diagnosed at the files, promoted as
+Bible `11.61`, code fix open and wanting a full arc. It is the "different bug
+hiding in those rows" item G named. What follows is that order, cheapest-certain
+first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -683,6 +689,66 @@ run in the BACKGROUND under anything above.
 
 **F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
 
+**I. THE WRONG-PERSON CHARACTER DESCRIPTION -- DIAGNOSED, PROMOTED, NOT FIXED
+(PBUG-20260817-03, Bible `11.61`, 2026-08-17). This is the "different bug hiding
+in those rows" item G called out, and it is bigger than item G was.**
+
+**MEASURED, read-only over all 1,710 published ledgers:** cast rows carry a
+`character_description` about a DIFFERENT person, and the contaminated string is
+copied verbatim into `meta.visual_plan.characters[NAME].portrait_prompt`, so the
+portrait was painted of that other person too. The reported episode has **2 of 3
+rows** wrong. Most recent hit
+`signal_lost_lemmy_provisional_tier_kokoro_acceptance_20260816_210751`
+(2026-08-16), so unlike item G **this is live at HEAD, not a retired regime.**
+It also survives a FREEZE -- `baked_ledger.json` carries a contaminated row in
+fourteen copies.
+
+**THE CENSUS IS NOT DONE AND DO NOT QUOTE ONE NUMBER AS IF IT WERE.** Two
+independent detectors were built and neither is complete:
+* **pitch-cast scoped** -- flag a description containing a name from
+  `selected_concept.cast` that no roster row owns: **28 rows / 20 ledgers**, but
+  only 124 of 1,710 ledgers record that field, so it is blind to the rest.
+* **name-shape scoped** -- flag a person-name-shaped phrase in the identity head
+  that the roster does not own: **18 rows / 14 ledgers**, and it catches two the
+  first one misses (`the_wax_cylinders_whisper` OYA SATO <- *"30s, Henry 'Hank'
+  Griswold."*, `nightshift_erasure` RYAN KAPOOR <- *"60s, EDWARD 'ED'
+  GRISWOLD."*) while missing LUCILLE PENNY, which the first one catches.
+**The operator's second reported instance is therefore CONFIRMED**, and the real
+total is the union, uncomputed. Computing it properly is part of this item.
+
+**ROOT CAUSE, proven at the files -- TWO NAMING AUTHORITIES arbitrated inside a
+prompt.** The pitch names the characters (`selected_concept.cast[].name`) and the
+brief restates those names; the cast pool then assigns different ones;
+`_otr_casting.build_description_prompt` hands the model BOTH -- the brief on the
+`Story:` line, the assigned name on the `Name:` line -- and states no precedence.
+Its own CHARACTER VISUAL CONTRACT format reserves a free-text slot immediately
+after the age band (`"<age decade>, <story-linked role>. Face: ..."`) and the
+model fills it with the brief's name. **The prior-cast theory in the original log
+entry is DISPROVEN:** LUCILLE PENNY is not a cast row in that episode or anywhere
+in the corpus, so `_format_prior_entry` cannot be the path.
+
+**THE DETECTION SCOPE IS THE HARD-WON PART, and the obvious check is wrong in
+BOTH directions.** "No description may name another CAST ROW" returns 47 hits of
+which ~45 are legitimate relational prose (*"foil to the Time Traveler"*,
+*"Rosalind's loyal best friend"*) and it does NOT flag the reported episode at
+all. The check that works is **ensemble-foreign**: a proper name that no cast row
+owns, sourced from the pitch cast.
+
+**ROUTING: FULL FOUR-ROUND ARC BEFORE CODE.** There is a real design fork with
+more than one defensible answer -- reconcile the brief's names before it enters
+the prompt, state precedence in the prompt, gate ensemble-foreign names after
+generation, or some combination -- and it touches a live generation path plus a
+derived image surface. Codex is back 2026-08-19 20:31. **Do NOT reach for fuzzy
+name repair**, the reflex fix: it renames the intruder to the row's own name and
+leaves that other person's face, bearing and delivery prose in place, which turns
+a visible defect invisible. Bible `11.61` says exactly this.
+
+**AND IT CHANGES WHAT ITEM G'S "34/35 PORTRAIT CONFLICTS" MEANT.** Several hits
+are gender-crossed in both directions (RICK STEINER male <- LUCILLE PENNY; WENDY
+PALMER female <- SIR REGINALD PENNYWORTH), so a share of that count was never a
+gender defect at all. Do not re-derive the portrait number without subtracting
+these rows first.
+
 **G. PBUG-20260815-11 -- MEASURED 2026-08-17 AND THE RE-ASK SHOULD NOT BE BUILT.
 The number this item is named for is one the audit itself disowns.**
 
@@ -731,7 +797,11 @@ and at 8 it can never fire on 40-word prose.
 **A DIFFERENT BUG IS HIDING IN THOSE ROWS AND DESERVES ITS OWN LOOK:** RICK STEINER
 carrying LUCILLE PENNY's description, OYA SATO carrying Hank Griswold's. That is a
 WRONG-CHARACTER PASTE, not a gender defect, and laundering it through a gender fix
-would hide it.
+would hide it. **-> THAT IS NOW ITEM I, and both instances are CONFIRMED.** Root
+cause proven (two naming authorities arbitrated inside the description prompt),
+promoted as Bible `11.61`, code fix still open. Read item I before re-deriving
+this item's portrait numbers -- several of its hits are gender-crossed and were
+never gender defects at all.
 
 **A LATENT GGUF SEED BUG, found in passing and unrelated to G:**
 `_otr_gguf_backend` derives `per_call_seed = base_seed + _ordinal["n"]` to make
