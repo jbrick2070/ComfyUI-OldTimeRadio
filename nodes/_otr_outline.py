@@ -443,6 +443,19 @@ class OutlineRequest:
                              # beat intents) so the MACRO prompt REVISES the
                              # existing spine instead of starting from scratch.
                              # Empty (default) => byte-identical prompt.
+    work_title: str = ""
+                             # OPTIONAL (item F, 2026-08-17). The adapted work's
+                             # title on the fidelity lanes. Rendered by BOTH
+                             # prompt builders only when non-empty; empty (the
+                             # default, and every non-adaptation lane) =>
+                             # byte-identical prompt.
+                             #
+                             # It is here because the announcer was not the only
+                             # producer of the wrong place. `_MacroShape.setting`
+                             # is authored by THIS prompt from the brief alone,
+                             # so a fixed announcer could still be handed a
+                             # hallucinated "Verona" to read out. Naming the work
+                             # here stops the wrong place being minted upstream.
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -590,6 +603,20 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     # early-stage callers that pre-date the cast contract.
     parts.append(_format_cast_block(req))
     parts.append(f"Style: {req.style}")
+    # Item F parity with _build_macro_user_prompt. Production takes the macro
+    # path, but the test harnesses still exercise this builder, so leaving it
+    # unthreaded would let a green suite certify a prompt production never uses.
+    # Whitespace-collapsed inline rather than importing the composer's
+    # clean_one_line: this needs one line of normalization, and a new
+    # cross-module import on the outline hot path buys an import-cycle
+    # risk for nothing. A title carrying a newline would otherwise split
+    # this instruction across two prompt lines.
+    _work = " ".join(str(req.work_title or "").split())
+    if _work:
+        parts.append(
+            f"Adapted work: {_work} -- the setting must "
+            f"belong to this work and to no other."
+        )
     # target_length structure line removed 2026-05-11 (post-Phase-3
     # cleanup). The act-count signal now flows entirely through the
     # EPISODE BUDGET block below (when `budget` is non-None); the
@@ -1000,6 +1027,22 @@ def _build_macro_user_prompt(req: OutlineRequest) -> str:
         "",
         _format_cast_block(req),
     ]
+    # Item F (2026-08-17): name the adapted work BEFORE `setting` is authored.
+    # This builder's output becomes `_MacroShape.setting`, which is then handed
+    # to the announcer -- so a wrong place minted here survives every downstream
+    # fix. Appended (not inserted into the list above) so the prompt stays
+    # byte-identical on every lane that adapts nothing.
+    # Whitespace-collapsed inline rather than importing the composer's
+    # clean_one_line: this needs one line of normalization, and a new
+    # cross-module import on the outline hot path buys an import-cycle
+    # risk for nothing. A title carrying a newline would otherwise split
+    # this instruction across two prompt lines.
+    _work = " ".join(str(req.work_title or "").split())
+    if _work:
+        parts.append(
+            f"Adapted work: {_work} -- the setting must "
+            f"belong to this work and to no other."
+        )
     # KILL 2 (2026-06-24): inject the selected StoryContract's full grammar block
     # (label / sound_world / story_engine / ending_mode) so the body is composed in
     # that radio style. First + only caller of render_style_grammar (its prior

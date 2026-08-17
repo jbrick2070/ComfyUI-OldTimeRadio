@@ -216,6 +216,19 @@ class SafeOpenBrief:
     opening_status_quo: str
     cast: tuple[str, ...]
     era: str = ""
+    # The adapted work's title (item F, 2026-08-17). OPTIONAL FOREVER: it is
+    # never required, never validated, and never starves a brief -- lanes that
+    # adapt nothing (original, media_archive, the news lanes) carry "" and
+    # compose exactly as before. Adding it to `safe_open_viability` would raise
+    # `AnnouncerBriefStarvedError` on those lanes and kill the render, which is
+    # the one outcome the operator's rule forbids.
+    #
+    # It exists because the announcer was ordered to name "the play-world place"
+    # while holding zero play facts, so it invented one -- a Twelfth Night scene
+    # announced as Verona. The fix is to supply the fact, not to instruct
+    # harder: this seam already said "use ONLY the proper names in the cast
+    # list; invent none", and Verona shipped anyway.
+    work_title: str = ""
 
 
 @dataclass(frozen=True)
@@ -1245,14 +1258,49 @@ def fallback_announcer_intro(script_brief: str) -> str:
     )
 
 
+WORK_LINE_PREFIX = "a scene from "
+
+
+def _work_line(work_title: str) -> str:
+    """Render the announcer's WORK context value, or "" to omit the label.
+
+    A pure helper rather than an inline expression because the inline ternary
+    is exactly the shape that shipped an untestable wrong value in the image
+    dispatcher (`_neg_source`, 2026-08-17): there was nothing to call, so
+    nothing pinned it.
+
+    "a scene from" is carried here, not in the title, because the announcer
+    delivers ONE scene while the title names a whole play. Threading the bare
+    title makes every adaptation episode promise a play it does not perform --
+    systematic, where the wrong-play defect was intermittent. The empty return
+    is load-bearing: `compose_announcer_intro`'s context builder drops any label
+    whose value is falsy, so a lane that adapts nothing emits no WORK line at
+    all rather than a bare "WORK:" the model reads as a form to fill in.
+    """
+    cleaned = clean_one_line(work_title)
+    return f"{WORK_LINE_PREFIX}{cleaned}" if cleaned else ""
+
+
 def fallback_safe_open(safe_open_brief) -> str:
-    setting = clean_one_line(getattr(safe_open_brief, "setting", ""))
-    time_of_day = clean_one_line(getattr(safe_open_brief, "time_of_day", ""))
+    # DIRECT attribute access on all three fields. These two were the last
+    # getattr-with-default survivors on this path, and leaving them beside a
+    # direct `work_title` read would have said the doctrine is a style
+    # preference rather than the rule that a rename must raise here.
+    setting = clean_one_line(safe_open_brief.setting)
+    time_of_day = clean_one_line(safe_open_brief.time_of_day)
     where = ", ".join(p for p in (time_of_day, setting) if p)
-    return (
-        f"Good evening. This is SIGNAL LOST. We open on {where}."
-        if where else "Good evening. This is SIGNAL LOST."
-    )
+    # DIRECT attribute access, matching the prohibition recorded in
+    # compose_announcer_intro: a getattr-with-default is what once let `hook`
+    # sit silently empty on every episode. The dataclass default supplies the
+    # safety, so a rename raises here instead of quietly emptying the line.
+    work = clean_one_line(safe_open_brief.work_title)
+    tonight = f" Tonight, a scene from {work}." if work else ""
+    if where:
+        return (
+            f"Good evening. This is SIGNAL LOST.{tonight} "
+            f"We open on {where}."
+        )
+    return f"Good evening. This is SIGNAL LOST.{tonight}"
 
 
 def fallback_announcer_outro(news_close_brief: str) -> str:
@@ -1386,6 +1434,16 @@ def compose_announcer_intro(
         context = "\n".join(
             f"{label}: {value}"
             for label, value in (
+                # WORK leads, because the seam's sentence 1 names the work
+                # before it places the listener; a context block ordered
+                # against the instruction makes the instruction harder to obey.
+                # "a scene from" is rendered HERE rather than left to the seam
+                # to say: an instruction is persuasion and this very prompt has
+                # already been proven to ignore one, whereas a rendered label is
+                # material the model transcribes. The VALUE stays a clean
+                # bibliographic title -- the field owns the fact, the composer
+                # owns the phrasing.
+                ("WORK", _work_line(safe_open_brief.work_title)),
                 ("SETTING", clean_one_line(safe_open_brief.setting)),
                 ("TIME", clean_one_line(safe_open_brief.time_of_day)),
                 ("OPENING STATUS",

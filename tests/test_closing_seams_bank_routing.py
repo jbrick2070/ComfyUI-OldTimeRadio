@@ -18,7 +18,6 @@ Pins:
 """
 
 import sys
-import types
 from pathlib import Path
 
 import pytest
@@ -156,7 +155,15 @@ def test_compose_announcer_intro_sends_bank_intro_system():
 
 def test_compose_announcer_intro_safe_sends_bank_safe_system():
     fn, calls = _capturing_fn(_VALID_INTRO)
-    brief = types.SimpleNamespace(
+    # A REAL SafeOpenBrief, never SimpleNamespace. This fixture was a namespace
+    # until item F (2026-08-17) added `work_title` and the composer's DIRECT
+    # attribute access raised on it -- which is the accessor doing its job. A
+    # namespace silently grows whatever attribute it is asked for, so it can
+    # never notice a field the builder reads and the dataclass does not have;
+    # that is precisely how the `hook` bug shipped 23 episodes whose first
+    # spoken line asked the operator to supply the cast. The dataclass is the
+    # contract, so the test uses the contract.
+    brief = LC.SafeOpenBrief(
         cast=("MARA",),
         era="1947",
         time_of_day="night",

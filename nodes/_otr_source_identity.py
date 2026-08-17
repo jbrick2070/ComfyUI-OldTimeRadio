@@ -57,6 +57,19 @@ _KIND_PUBLIC_DOMAIN = "public_domain"
 _KIND_SHAKESPEARE = "shakespeare"
 _KIND_MEDIA_ARCHIVE = "media_archive"
 
+#: The lanes that ADAPT a pre-existing work, and therefore the only lanes whose
+#: `work_title` may be announced as something the episode performs.
+#:
+#: This exists because `work_title` carries two different meanings. On the
+#: adaptation lanes it is the work being performed ("Twelfth Night"). On
+#: `media_archive` it is the PUBLICATION the post came from ("Now See Hear!") --
+#: measured live: 56 of 98 media_archive ledgers on disk carry a `source_label`.
+#: Announcing "a scene from Now See Hear!" would invent a play that does not
+#: exist, which is a worse fidelity defect than the wrong-play frame item F was
+#: opened to fix. Any consumer that means "the work this episode performs" must
+#: gate on this set rather than on the truthiness of `work_title`.
+ADAPTATION_SOURCE_KINDS = frozenset({_KIND_PUBLIC_DOMAIN, _KIND_SHAKESPEARE})
+
 
 def _clean(value: Any) -> str:
     """Trim to a usable string. `None`, numbers and junk all become ''."""

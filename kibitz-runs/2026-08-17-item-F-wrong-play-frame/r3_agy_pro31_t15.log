@@ -1,0 +1,18 @@
+﻿Repo:       C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+Round:      r3
+Run folder: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\kibitz-runs\2026-08-17-item-F-r3-pro31-t15\r3
+Driver:     claude (KIBITZ_DRIVER)
+Agents:     antigravity
+Profiles:   comfyui, .kibitz\comfyui.local.md
+Fanning out (each agent reads the repo + writes its review to a FILE):
+  -> antigravity: model=Gemini 3.1 Pro (High) file-handoff -> antigravity.md
+  [OK] antigravity (rc=0) -> antigravity.md
+
+Reviews collected:
+  antigravity: OK
+
+Next (the driver, NOT the script):
+  1. Confirm the driver anchor was written before this fan-out; preserve it as driver_anchor.md.
+  2. Verify every claim in the agent reviews against the real code; discard misreads.
+  3. Record the judgment and merge survivors into C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\kibitz-runs\2026-08-17-item-F-r3-pro31-t15\r3\final.md.
+  4. Advance sequentially within the full arc or the explicit scoped/resume receipt.

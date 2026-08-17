@@ -177,6 +177,15 @@ from . import _otr_rolls as _ROLLS
 # module-import time, same posture as the routing/source-payload imports.
 from . import _otr_source_snapshot as _otr_source_snapshot
 from . import _otr_word_delivery as _OTRWD
+# MODULE SCOPE ON PURPOSE (item F, 2026-08-17). This module was previously
+# imported ONLY inside the `provenance_normalize` branch below, which is true
+# for two of the six banks. The announcer's work title is now read on the
+# bank-agnostic path, so a branch-local import would raise UnboundLocalError on
+# every `original`, `media_archive` and news-lane episode -- the majority of the
+# corpus, and invisible to any test that only exercises an adaptation lane.
+# `identity_from_meta` never raises and returns an empty title for a lane it
+# cannot name, so evaluating it unconditionally is safe by its own contract.
+from . import _otr_source_identity as _OTRSID
 
 # Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
 # reflection pure module is wired into execute() at K.5.5 -- see the
@@ -4061,6 +4070,25 @@ class OTR_LedgerScriptWriter:
         meta["source_ref"] = resolved["source_ref"]
         meta["source_meta"] = dict(resolved["source_meta"])
         meta["source_rights"] = dict(resolved["source_rights"])
+        # The announcer's work title, bound ONCE here -- immediately after
+        # `source_meta` is stamped and UNCONDITIONALLY, on every lane. It feeds
+        # the outline request and BOTH announcer-open producers further down.
+        # `identity_from_meta` is the single bibliographic authority: it reads
+        # `play_title` for shakespeare and `title` for public_domain, so no
+        # per-lane branch is needed here; it never raises, and a lane that
+        # adapts nothing yields "" and simply emits no WORK line.
+        _identity = _OTRSID.identity_from_meta(meta)
+        # GATED ON THE LANE, NOT ON TRUTHINESS. `work_title` means two
+        # different things: the work being PERFORMED on the adaptation lanes,
+        # and the PUBLICATION a post came from on media_archive, where 56 of 98
+        # live ledgers carry a `source_label` like "Now See Hear!". Announcing
+        # "a scene from Now See Hear!" would invent a play, which is a worse
+        # fidelity defect than the wrong-play frame this change fixes.
+        _work_title = (
+            _identity.work_title
+            if _identity.source_kind in _OTRSID.ADAPTATION_SOURCE_KINDS
+            else ""
+        )
         _stamp_news_seed_receipt(meta, resolved)
         # kibitz r2-r4 provenance: any bank whose defaults define
         # credits_source_line gets it stamped (data-driven -- the
@@ -4116,11 +4144,9 @@ class OTR_LedgerScriptWriter:
             # being argued about downstream, and a DEGRADED identity (a lane
             # that could not name its work) is visible in the artifact rather
             # than silently becoming the generic sentence.
-            try:
-                from . import _otr_source_identity as _OTRSID
-            except ImportError:  # pragma: no cover -- flat load
-                import _otr_source_identity as _OTRSID  # type: ignore
-            _identity = _OTRSID.identity_from_meta(meta)
+            # `_identity` is already bound above, unconditionally, from the
+            # same `meta` -- re-deriving it here would parse the same mapping
+            # twice and give this branch its own copy to drift from.
             meta["source_identity"] = _identity.as_receipt()
             meta["provenance_coda_line"] = _OTRPROV.spoken_coda_line(
                 _prov, _identity)
@@ -4826,6 +4852,7 @@ class OTR_LedgerScriptWriter:
             prior_critique="",
             style_grammar=(contract.grammar if contract else ""),
             story_engine=(contract.story_engine if contract else ""),
+            work_title=_work_title,
         )
         # The first structurally valid outline is authoritative.
         with slot_scheduler.helper_context("generate_outline"):
@@ -4864,6 +4891,7 @@ class OTR_LedgerScriptWriter:
                 opening_status_quo=_open_status_quo,
                 cast=tuple(character_cast),
                 era=str(meta.get("period", "") or ""),
+                work_title=_work_title,
             )
 
         # --- G. Build episode_canon (write deferred to section J.5) ----
@@ -6087,6 +6115,14 @@ class OTR_LedgerScriptWriter:
                             opening_status_quo=_rw_brief.opening_status_quo,
                             cast=tuple(_rw_brief.cast),
                             era=str(meta.get("period", "") or ""),
+                            # From `meta`, exactly as `era` is -- NOT recovered
+                            # from the scene-1 dialogue this rewrite reads. The
+                            # title is an immutable value we already hold;
+                            # parsing it back out of prose would be a
+                            # non-deterministic route to a known fact. Without
+                            # this line the rewrite silently restores the
+                            # wrong-play frame the first producer just fixed.
+                            work_title=_work_title,
                         ),
                         source_bank_id=resolved["source_bank"],
                     )

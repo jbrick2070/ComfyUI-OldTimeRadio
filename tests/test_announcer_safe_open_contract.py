@@ -341,3 +341,98 @@ def test_both_consumers_reach_the_shared_predicate(monkeypatch):
 
     assert sorted(seen) == ["composer", "story_brief"], (
         f"a consumer never reached the shared predicate: {seen}")
+
+
+# ---------------------------------------------------------------------------
+# ITEM F (2026-08-17) -- the announcer must name the WORK it is adapting.
+#
+# The defect: a Twelfth Night scene was announced as "Verona ... Capulets and
+# Montagues", a Tempest scene framed as Romeo and Juliet. The seam ordered the
+# announcer to name "the play-world place" and the prompt supplied no play, so
+# the model retrieved one. Note what this file's own header already proves:
+# asserting the bad string is ABSENT is satisfied by an empty prompt. So every
+# test below asserts the real value is PRESENT, and the cross-play test asserts
+# absence only in addition to a presence check.
+# ---------------------------------------------------------------------------
+
+WORK = "Twelfth Night"
+
+
+def test_the_work_reaches_the_prompt_as_a_scene_from():
+    """PRESENCE. The announcer is told which work, and that it gets one scene.
+
+    "a scene from" is rendered by the composer rather than requested in the
+    seam because a bare title makes the announcer promise a whole play it does
+    not perform -- systematic, where the wrong-play defect was intermittent.
+    """
+    _, calls = _compose(_brief(work_title=WORK))
+    user = _user_message(calls)
+    assert f"WORK: a scene from {WORK}" in user, (
+        f"the work never reached the prompt:\n{user}"
+    )
+
+
+def test_the_work_line_leads_the_context_block():
+    """The seam's sentence 1 names the work before it places the listener, so
+    the context must present WORK before SETTING or the instruction is ordered
+    against its own material."""
+    _, calls = _compose(_brief(work_title=WORK))
+    user = _user_message(calls)
+    assert user.index("WORK:") < user.index("SETTING:"), (
+        f"WORK must precede SETTING:\n{user}"
+    )
+
+
+def test_a_lane_that_adapts_nothing_emits_no_work_label():
+    """ABSENCE OF THE LABEL, not of a value. A bare 'WORK:' reads to the model
+    as a form to fill in -- the same failure mode the context builder's
+    `if value` filter was added to prevent."""
+    _, calls = _compose(_brief(work_title=""))
+    user = _user_message(calls)
+    assert "WORK" not in user, f"empty work_title still emitted a label:\n{user}"
+    assert f"SETTING: {SETTING}" in user, "the rest of the brief must survive"
+
+
+def test_an_empty_work_title_still_composes():
+    """work_title is OPTIONAL FOREVER. Four of the six banks adapt nothing, so
+    if an empty title could starve a brief this would kill most renders."""
+    result, calls = _compose(_brief(work_title=""))
+    assert calls, "the model was never called on a lane with no work title"
+    assert result.text.strip(), "no line composed without a work title"
+
+
+def test_work_title_is_not_part_of_the_starvation_predicate():
+    """A render must degrade, never raise. `safe_open_viability` raises
+    AnnouncerBriefStarvedError BEFORE the model call, so adding work_title to
+    it would kill every non-adaptation lane. Pinned at the signature so a later
+    'tidy-up' that adds the field fails here instead of in production."""
+    import inspect
+
+    params = inspect.signature(LC.safe_open_viability).parameters
+    assert "work_title" not in params, (
+        "work_title must never gate viability -- it would raise on every lane "
+        f"that adapts nothing; signature is {tuple(params)}"
+    )
+
+
+def test_the_fallback_line_also_names_the_work():
+    """The fallback is what ships when the model call fails, so a fix that
+    only lands on the happy path leaves the defect reachable."""
+    line = LC.fallback_safe_open(_brief(work_title=WORK))
+    assert f"a scene from {WORK}" in line, line
+    assert line.startswith("Good evening. This is SIGNAL LOST."), line
+
+
+def test_the_fallback_is_unchanged_without_a_work():
+    line = LC.fallback_safe_open(_brief(work_title=""))
+    assert line == (
+        f"Good evening. This is SIGNAL LOST. We open on {TIME}, {SETTING}."
+    ), line
+
+
+def test_work_line_helper_is_pure_and_omits_on_blank():
+    """The helper exists because an inline ternary is untestable -- the shape
+    that shipped a wrong `_neg_source` value on 2026-08-17."""
+    assert LC._work_line("Macbeth") == "a scene from Macbeth"
+    assert LC._work_line("") == ""
+    assert LC._work_line("   ") == ""
