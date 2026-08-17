@@ -367,9 +367,11 @@ def select_policy_route(policy: Any, active_engine: Optional[str]) -> Optional[d
 
     Three outcomes, and the difference between them is the whole contract:
 
-    * **No approved routes at all** -> ``None``. The policy is dormant. This is
-      the state shipping today (``approved_native_routes`` is ``{}``), so the
-      re-pin is inert until an operator audition fills it in.
+    * **No approved routes at all** -> ``None``. The policy is dormant. This was
+      the shipping state until 2026-08-10, when the G1 audition qualified
+      IndexTTS2 and filled the dict; it is still the state on a build whose pack
+      cannot be imported. (Comments elsewhere that call the dict empty predate
+      that audition -- do not trust them, read the pack.)
     * **Routes exist, but none for the engine actually rendering** -> ``None``.
       Nothing was selected, so nothing failed. Qualifying Lemmy on IndexTTS2 must
       not break every bark render.
@@ -516,6 +518,289 @@ def resolve_policy_route_claim(
         voice_ref_id=voice_ref_id,
         bank_entry=bank_entry,
         voice_route=_route_payload(record, engine, voice_ref_id),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# THE PROVISIONAL TIER -- a SIBLING resolver, deliberately not a parameter.
+#
+# WHY A SIBLING AND NOT A `tier=` ARGUMENT ON THE FUNCTIONS ABOVE. It was
+# proposed three times across the campaign and rejected three times for one
+# concrete reason: `cast_lock.py` does `dict(policy_claim.voice_route)`
+# UNCONDITIONALLY in both stamp branches. Any object of type `PolicyRouteClaim`
+# carrying a provisional (routeless) payload is a `TypeError` -- a ComfyUI server
+# crash -- one default-argument mistake away. `ProvisionalPolicyClaim` HAS NO
+# `voice_route` ATTRIBUTE AT ALL, so it cannot reach those lines even by accident.
+# The absence of that field is the safety property, not an omission.
+#
+# The second reason is the fail-closed path. Threading a tier through
+# `select_policy_route` / `resolve_policy_route_claim` puts unaudited rows inside
+# the machinery whose entire job is to refuse anything that cannot prove itself.
+# Those two functions are byte-unchanged and stay qualified-only.
+#
+# IT DEGRADES; IT NEVER RAISES. The qualified path is deliberately brutal --
+# "there is no fallback" -- because a proven route silently not applying is the
+# defect it was built to end. A provisional route inherits none of that: killing a
+# render over an unauditioned convenience row inverts the risk this tier exists to
+# reduce, and a render must not die. Everything that can go wrong here comes back
+# as a CLOSED reason code, the row takes today's ordinary draw, and the ledger
+# records `unrouted` plus the reason.
+# --------------------------------------------------------------------------- #
+
+#: The three tier values a cast row may carry. `unrouted` is not a failure state
+#: in production -- it is the honest name for "the ordinary seeded draw picked
+#: this voice", which is what every unclaimed row in the tree does today.
+ROUTE_TIER_QUALIFIED = "qualified"
+ROUTE_TIER_PROVISIONAL = "provisional"
+ROUTE_TIER_UNROUTED = "unrouted"
+ROUTE_TIERS = (ROUTE_TIER_QUALIFIED, ROUTE_TIER_PROVISIONAL, ROUTE_TIER_UNROUTED)
+
+#: The cast-row fields this tier owns. Named as constants because two modules
+#: write them and three read them, and a string literal in five places is a typo
+#: waiting to become a silent no-op.
+CAST_ROW_TIER_FIELD = "lemmy_route_tier"
+CAST_ROW_ROUTE_ID_FIELD = "lemmy_route_id"
+CAST_ROW_REASON_FIELD = "lemmy_route_reason_code"
+
+#: CLOSED set. A degradation reason that is not on this list is a bug in this
+#: module, not a new kind of failure -- the ledger consumer downstream reads these
+#: as an enumeration and a free-text reason would make it unreadable.
+PROVISIONAL_REASON_CODES = (
+    "no_policy",                  # no policy dict at all
+    "no_provisional_routes",      # the tier is empty -- the shipping state today
+    "engine_unresolved",          # no character engine resolved to check against
+    "no_route_for_engine",        # the tier exists but names a different engine
+    "record_malformed",           # the route record failed its structural checks
+    "bank_row_missing",           # the identity names a bank row that is not there
+    "bank_row_ambiguous",         # two bank rows share the id on this engine
+    "reference_file_missing",     # a local identity's file is not on disk
+    "reference_bytes_mismatch",   # it is on disk and it is not the file we meant
+    "provider_identity_mismatch",  # bank and receipt disagree about the voice id
+    "resolver_error",             # anything unforeseen; never a raise
+)
+
+#: Bank hash sentinels. `pending` means nobody hashed it yet, `cloud` means there
+#: are no local bytes to hash. Neither is a hash, and treating either as one would
+#: fail every kokoro and cloud row on a comparison that was never meaningful.
+_NON_HASH_BANK_SENTINELS = frozenset({"", "pending", "cloud", "none", "n/a"})
+
+
+@dataclass(frozen=True)
+class ProvisionalPolicyClaim:
+    """A deliberate, unauditioned identity for one cast row on one engine.
+
+    NOTE WHAT IS NOT HERE: there is no ``voice_route`` field, and there never may
+    be. ``voice_route`` means "a qualified route was proved" everywhere in this
+    tree -- ``resolve_and_verify_reference`` raises on any non-empty one whose
+    status is not exactly ``qualified`` -- so a provisional claim that carried one
+    would kill every render on these engines. The tier is legible instead through
+    ``lemmy_route_tier`` / ``lemmy_route_id`` on the cast row itself, which is what
+    persists to the ledger.
+    """
+
+    character_key: str
+    engine: str
+    route_id: str
+    identity_kind: str
+    identity_id: str
+    voice_ref_id: str
+    bank_entry: Any                       # VoiceBankEntry -- injected, not imported
+    tier: str = ROUTE_TIER_PROVISIONAL
+
+
+@dataclass(frozen=True)
+class ProvisionalRouteDegradation:
+    """Why no provisional route applied. Always a code, never an exception."""
+
+    reason_code: str
+    detail: str = ""
+    engine: str = ""
+    route_id: str = ""
+
+    def __bool__(self) -> bool:           # so `if claim:` is False for a failure
+        return False
+
+
+def _lemmy_pools():
+    """The cast-pools module, or None. Fail-soft: an unimportable pack means the
+    tier is dormant, exactly as it was before this tier existed."""
+    try:
+        from ..config import cast_pools as _POOLS  # type: ignore
+        return _POOLS
+    except ImportError:
+        try:
+            from config import cast_pools as _POOLS  # type: ignore
+            return _POOLS
+        except ImportError:
+            return None
+
+
+def select_provisional_route(policy: Any, active_engine: Optional[str]):
+    """The provisional record for ``active_engine``, or a degradation reason.
+
+    Unlike ``select_policy_route`` this NEVER raises on an unresolved engine. The
+    qualified selector is loud there because skipping a proven route silently is
+    the failure it exists to prevent; there is no such stake here, and a raise
+    would take down a render over a convenience row.
+
+    QUALIFIED WINS. An engine present in BOTH dicts resolves qualified and never
+    reaches this function -- the caller consults the tiers in order. This is
+    checked here as well, belt and braces, because "the caller will do it" is how
+    a second caller gets it wrong.
+    """
+    if not isinstance(policy, dict):
+        return ProvisionalRouteDegradation("no_policy", "policy is not a dict")
+
+    routes = policy.get("provisional_native_routes")
+    if not isinstance(routes, dict) or not routes:
+        return ProvisionalRouteDegradation(
+            "no_provisional_routes", "the provisional tier is empty")
+
+    engine = str(active_engine or "").strip()
+    if not engine:
+        return ProvisionalRouteDegradation(
+            "engine_unresolved",
+            "no character voice engine resolved, so no route can be matched")
+
+    qualified = policy.get("approved_native_routes")
+    if isinstance(qualified, dict) and engine in qualified:
+        return ProvisionalRouteDegradation(
+            "no_route_for_engine",
+            "engine %r has a QUALIFIED route -- the provisional tier is not "
+            "consulted for it" % (engine,), engine=engine)
+
+    record = routes.get(engine)
+    if not isinstance(record, dict):
+        return ProvisionalRouteDegradation(
+            "no_route_for_engine",
+            "the provisional tier names no route for engine %r" % (engine,),
+            engine=engine)
+    return record
+
+
+def resolve_provisional_route_claim(
+    policy: Any,
+    active_engine: Optional[str],
+    *,
+    bank_entries: Sequence,
+    repo_root: Optional[str] = None,
+    path_resolver: Optional[Callable[[str], Optional[str]]] = None,
+    require_local_bytes: bool = True,
+):
+    """Resolve the provisional identity for ``active_engine``.
+
+    Returns a ``ProvisionalPolicyClaim`` or a ``ProvisionalRouteDegradation``.
+    It does not raise: every failure mode is a reason code, and the caller falls
+    through to the ordinary draw.
+
+    Three identity kinds, each checked for what it actually claims:
+
+    * ``local_wav`` -- a clone reference. The bank row must exist, be unique on
+      this engine, and its file must be on disk with matching bytes when the bank
+      declares a real hash. Restricted by an explicit engine allowlist, because a
+      reference approved for LOCAL clone use must never be handed to a provider.
+    * ``bank_voice_id`` -- kokoro's ``.pt`` voice. Same bank checks; the file must
+      exist, and its bytes are compared only when the bank has a real hash for
+      them (``bm_george`` is recorded ``pending``).
+    * ``provider_voice`` -- a cloud voice id. No local file exists, and demanding
+      one is the category error that once made ``gt_algenib`` look like a usable
+      local reference. The bank row's provider id must agree with the receipt's.
+    """
+    record = select_provisional_route(policy, active_engine)
+    if isinstance(record, ProvisionalRouteDegradation):
+        return record
+
+    engine = str(active_engine or "").strip()
+    route_id = str(record.get("route_id") or "<unnamed provisional route>")
+
+    character_key = policy_character_key(policy)
+    if not character_key:
+        return ProvisionalRouteDegradation(
+            "record_malformed",
+            "the policy names no character_key, so a route claims nobody",
+            engine=engine, route_id=route_id)
+
+    pools = _lemmy_pools()
+    if pools is None or not hasattr(pools, "provisional_route_problems"):
+        return ProvisionalRouteDegradation(
+            "resolver_error",
+            "the cast-pools pack could not be imported, so the record cannot be "
+            "structurally checked", engine=engine, route_id=route_id)
+    problems = pools.provisional_route_problems(record, engine=engine)
+    if problems:
+        return ProvisionalRouteDegradation(
+            "record_malformed", "; ".join(problems),
+            engine=engine, route_id=route_id)
+
+    receipt = record.get("provisional_receipt") or {}
+    identity_kind = str(receipt.get("identity_kind") or "")
+    identity_id = str(receipt.get("identity_id") or "")
+    voice_ref_id = str(record.get("voice_ref_id") or identity_id).strip()
+
+    rows = [e for e in (bank_entries or [])
+            if str(getattr(e, "engine", "")) == engine
+            and str(getattr(e, "voice_ref_id", "")) == voice_ref_id]
+    if len(rows) > 1:
+        return ProvisionalRouteDegradation(
+            "bank_row_ambiguous",
+            "the voice bank has %d entries for %r on engine %r, so it cannot say "
+            "which one this route means" % (len(rows), voice_ref_id, engine),
+            engine=engine, route_id=route_id)
+    if not rows:
+        return ProvisionalRouteDegradation(
+            "bank_row_missing",
+            "voice_ref_id %r has no entry on engine %r in the active voice bank"
+            % (voice_ref_id, engine), engine=engine, route_id=route_id)
+    bank_entry = rows[0]
+
+    if identity_kind == "provider_voice":
+        want = str(receipt.get("provider_voice_id") or "").strip()
+        have = str(getattr(bank_entry, "provider_voice_id", "") or "").strip()
+        if want and have and want != have:
+            return ProvisionalRouteDegradation(
+                "provider_identity_mismatch",
+                "the route claims provider voice %r but bank row %r carries %r"
+                % (want, voice_ref_id, have), engine=engine, route_id=route_id)
+        if want and not have:
+            return ProvisionalRouteDegradation(
+                "provider_identity_mismatch",
+                "the route claims provider voice %r but bank row %r carries none"
+                % (want, voice_ref_id), engine=engine, route_id=route_id)
+    else:
+        ref_path = str(getattr(bank_entry, "ref_path", "") or "")
+        if require_local_bytes:
+            full = (path_resolver(ref_path) if path_resolver
+                    else _default_path_resolver(ref_path, repo_root)) or ref_path
+            if not full or not os.path.isfile(full):
+                return ProvisionalRouteDegradation(
+                    "reference_file_missing",
+                    "bank row %r points at %s, which is not a file on this box"
+                    % (voice_ref_id, full or ref_path),
+                    engine=engine, route_id=route_id)
+            claimed = str(getattr(bank_entry, "ref_sha256", "") or "").strip()
+            if claimed.lower() not in _NON_HASH_BANK_SENTINELS and _is_sha256(claimed):
+                actual = sha256_of_file(full)
+                if actual is None:
+                    return ProvisionalRouteDegradation(
+                        "reference_file_missing",
+                        "bank row %r names %s, which could not be read"
+                        % (voice_ref_id, full),
+                        engine=engine, route_id=route_id)
+                if actual.lower() != claimed.lower():
+                    return ProvisionalRouteDegradation(
+                        "reference_bytes_mismatch",
+                        "%s hashes to %s but bank row %r claims %s"
+                        % (full, actual, voice_ref_id, claimed.lower()),
+                        engine=engine, route_id=route_id)
+
+    return ProvisionalPolicyClaim(
+        character_key=character_key,
+        engine=engine,
+        route_id=str(record.get("route_id") or ""),
+        identity_kind=identity_kind,
+        identity_id=identity_id,
+        voice_ref_id=voice_ref_id,
+        bank_entry=bank_entry,
     )
 
 
@@ -718,4 +1003,9 @@ __all__ = [
     "cast_row_matches_policy", "select_policy_route", "resolve_policy_route_claim",
     "ResolvedReference", "LEGACY_REFERENCE", "LEGACY_REFERENCE_IDENTITY",
     "resolve_and_verify_reference", "_default_path_resolver",
+    "ROUTE_TIER_QUALIFIED", "ROUTE_TIER_PROVISIONAL", "ROUTE_TIER_UNROUTED",
+    "ROUTE_TIERS", "CAST_ROW_TIER_FIELD", "CAST_ROW_ROUTE_ID_FIELD",
+    "CAST_ROW_REASON_FIELD", "PROVISIONAL_REASON_CODES",
+    "ProvisionalPolicyClaim", "ProvisionalRouteDegradation",
+    "select_provisional_route", "resolve_provisional_route_claim",
 ]

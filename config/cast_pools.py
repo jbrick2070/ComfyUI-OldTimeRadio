@@ -456,6 +456,236 @@ LEMMY_AUDITION_LINES = {
     "approved_on": "2026-08-10",
 }
 
+# --------------------------------------------------------------------------- #
+# THE PROVISIONAL TIER -- a second, deliberately WEAKER class of route.
+#
+# WHY A SECOND TIER EXISTS AT ALL. Lemmy has a provable identity on two of seven
+# character engines. On the other five his voice is redrawn every episode, because
+# `assign_voice_for_slot` folds `episode_seed` into the cast seed and the pick is a
+# weighted draw -- so he is a different stranger each time. The operator asked for
+# him to work on every engine; his ears are deferred while he is remote; and
+# `operator_verdict` is a field only a human can supply. A tier that cannot lie
+# about which of those it has is the only honest way to build this.
+#
+# WHAT IT IS NOT, AND THIS IS THE WHOLE POINT. It is not a weaker qualification.
+# It is a DIFFERENT KIND OF CLAIM: "this is the identity Lemmy uses on this engine,
+# chosen deliberately, rendered where we could, and nobody has listened yet."
+# `is_qualified_route` returns False for every row below and always will -- there
+# is no field a provisional receipt could gain that would flip it, because the one
+# field that matters (`operator_verdict`) may never appear here at all. Promotion
+# is a human listening and a QUALIFIED route being written by hand.
+#
+# THE STRONGEST ARGUMENT AGAINST IT, kept visible: this makes an unauditioned voice
+# Lemmy's standing identity on up to five engines, so if one lands badly he is now
+# RELIABLY wrong there. Held anyway -- the alternative is not "no wrong voice", it
+# is a different wrong voice every episode, which is worse and unfixable in one
+# line. The tier stamp makes a bad pick a one-row change.
+# --------------------------------------------------------------------------- #
+
+#: The route contract version this tier speaks. Mirrors the qualified validator's
+#: `SUPPORTED_ROUTE_CONTRACT_VERSIONS` and is duplicated rather than imported
+#: because this module is config and that one is a node -- an import the other way
+#: is a cycle. `tests/test_lemmy_provisional_tier.py` pins the two together, so
+#: they cannot drift silently.
+PROVISIONAL_ROUTE_CONTRACT_VERSIONS = (1,)
+
+#: The two states a provisional route may be in, and the difference between them
+#: is the honesty of the whole tier:
+#:
+#: * ``rendered_pending_listen`` -- the engine really spoke the frozen audition
+#:   lines on this box, both clips are on disk and hashed, and nobody has
+#:   listened yet.
+#: * ``configured_unrendered`` -- the identity is chosen and the bank agrees, but
+#:   NO AUDIO EXISTS. The two cloud engines live here permanently on this install:
+#:   rendering them needs an API key and spends money, and the root CLAUDE.md
+#:   scope rule is "100% local, open source, offline-first -- no cloud services,
+#:   no API keys, no paid services".
+#:
+#: There is deliberately no third state meaning "good".
+PROVISIONAL_ROUTE_STATES = ("rendered_pending_listen", "configured_unrendered")
+
+#: How an engine's identity ARRIVES, and there are THREE kinds, not two. The
+#: qualified validator knows `local_wav` and `provider_voice`, and that vocabulary
+#: cannot express kokoro: `bm_george` is a `.pt` voice tensor named by BANK ID --
+#: not a WAV path a clone engine reads, and not a provider's voice id. Widening
+#: `local_wav` to mean "some local file" would blur the one distinction the clone
+#: allowlist below is built on, so the third kind is the honest answer.
+PROVISIONAL_IDENTITY_KINDS = ("local_wav", "bank_voice_id", "provider_voice")
+
+#: WHICH ENGINES MAY BE HANDED THE REFERENCE WAV -- an explicit list, because
+#: prose is not enforcement. A route's `rights.scope` is only ever read as a
+#: non-blank string, so a scope reading "cloud engines only" validates exactly
+#: like one reading the opposite. The approved Lemmy reference was self-generated
+#: for use as a clone reference on LOCAL engines; that permission is enforced here
+#: as a set membership test, and a provider engine can never be added to it
+#: without someone editing this line and seeing this comment.
+PROVISIONAL_LOCAL_CLONE_ENGINES = frozenset({"indextts2", "chatterbox", "dia"})
+
+#: Facts a machine can supply about itself. Nothing here is a judgement.
+_PROVISIONAL_RECEIPT_COMMON = frozenset({
+    "engine",
+    "identity_kind",
+    "identity_id",
+    "state",
+})
+
+#: What a RENDERED provisional route must additionally prove. Both clips, not one:
+#: the frozen audition is a neutral line AND an emotional line, and the emotional
+#: one is the whole reason the pair exists -- an accent that holds when calm and
+#: collapses under pressure is a fact a single clip cannot show.
+_PROVISIONAL_RECEIPT_RENDER_ARTIFACTS = frozenset({
+    "audition_manifest_path",
+    "audition_manifest_sha256",
+    "neutral_clip_path",
+    "neutral_clip_sha256",
+    "emotional_clip_path",
+    "emotional_clip_sha256",
+    "rendered_utc",
+})
+
+#: THE RECEIPT IS STATE-DEPENDENT, and a single flat field set cannot work. Demand
+#: the artifacts of every row and the two cloud rows are rejected for not having
+#: rendered; demand them of none and a half-rendered local row is accepted with an
+#: absent clip. So each state names exactly what it must have.
+PROVISIONAL_RECEIPT_REQUIRED_FIELDS = {
+    "rendered_pending_listen":
+        frozenset(_PROVISIONAL_RECEIPT_COMMON | _PROVISIONAL_RECEIPT_RENDER_ARTIFACTS),
+    "configured_unrendered": _PROVISIONAL_RECEIPT_COMMON,
+}
+
+#: And what each state must NOT have. `configured_unrendered` FORBIDS the render
+#: artifacts outright rather than ignoring them: a path field on a row that never
+#: rendered is a claim about audio nobody produced, which is the exact shape of
+#: evidence-that-is-not this whole module exists to refuse.
+PROVISIONAL_RECEIPT_FORBIDDEN_FIELDS = {
+    "rendered_pending_listen": frozenset(),
+    "configured_unrendered": _PROVISIONAL_RECEIPT_RENDER_ARTIFACTS,
+}
+
+#: FIELDS NO PROVISIONAL RECEIPT MAY EVER CARRY, in any state. Not "must be
+#: empty" -- ABSENT. A blank `operator_verdict` is an invitation to fill it in,
+#: and the moment a driver, a script or a helpful future session writes a sentence
+#: into it, this tier has manufactured the one thing it exists to not manufacture.
+#: `decided_by` is the same idea wearing a process hat: a name in a field is not a
+#: person who listened. A mechanical timestamp says everything true and nothing
+#: false.
+PROVISIONAL_RECEIPT_BANNED_FIELDS = frozenset({
+    "operator_verdict",
+    "decided_by",
+    "approved_by",
+    "verdict",
+})
+
+#: Keys that would make a provisional route look like a qualified one to a reader
+#: that only pattern-matches. Banned on the ROUTE, so the two tiers cannot be
+#: confused by any consumer, present or future.
+PROVISIONAL_ROUTE_BANNED_KEYS = frozenset({
+    "qualification_receipt",
+    "qualification_record",
+})
+
+
+def provisional_route_problems(route, *, engine=None) -> list:
+    """Every reason ``route`` is not a well-formed provisional route.
+
+    Empty list means well-formed. Reasons rather than a bare bool for the same
+    reason the qualified validator gives them: a route that silently does not
+    apply is a support ticket, and the person holding it needs to know which
+    field to fix.
+
+    STRUCTURAL ONLY. Whether the bank actually has the row, whether the WAV is
+    still on disk and whether its bytes match are questions about the world, and
+    they are asked by the resolver in ``nodes/_otr_voice_route.py``. This function
+    can be called from anywhere, cheaply, without touching a disk.
+    """
+    bad: list = []
+    if not isinstance(route, dict):
+        return ["provisional route record is not a dict"]
+
+    present_banned = sorted(PROVISIONAL_ROUTE_BANNED_KEYS & set(route))
+    if present_banned:
+        bad.append(
+            "provisional route carries qualified-tier key(s) %s -- a provisional "
+            "row may never wear the shape a qualified reader looks for"
+            % (present_banned,))
+
+    if not str(route.get("route_id") or "").strip():
+        bad.append("route_id is missing or blank")
+
+    version = route.get("route_contract_version")
+    if version not in PROVISIONAL_ROUTE_CONTRACT_VERSIONS:
+        bad.append(
+            "route_contract_version %r is not supported (known: %r)"
+            % (version, list(PROVISIONAL_ROUTE_CONTRACT_VERSIONS)))
+
+    route_engine = str(route.get("engine") or "").strip()
+    if not route_engine:
+        bad.append("engine is missing")
+    elif engine is not None and route_engine != str(engine).strip():
+        bad.append(
+            "ENGINE DISAGREEMENT: provisional route says %r but it is filed "
+            "under %r" % (route_engine, engine))
+
+    receipt = route.get("provisional_receipt")
+    if not isinstance(receipt, dict):
+        bad.append("provisional_receipt is missing or is not a dict")
+        return bad
+
+    banned = sorted(PROVISIONAL_RECEIPT_BANNED_FIELDS & set(receipt))
+    if banned:
+        bad.append(
+            "provisional_receipt carries banned field(s) %s -- only a human "
+            "listening session may produce a verdict, and it writes a QUALIFIED "
+            "route when it does" % (banned,))
+
+    state = receipt.get("state")
+    if state not in PROVISIONAL_ROUTE_STATES:
+        bad.append("provisional_receipt.state %r is not a defined state" % (state,))
+        return bad
+
+    for field in sorted(PROVISIONAL_RECEIPT_REQUIRED_FIELDS[state]):
+        if not str(receipt.get(field, "")).strip():
+            bad.append("provisional_receipt.%s is missing for state %r"
+                       % (field, state))
+    for field in sorted(PROVISIONAL_RECEIPT_FORBIDDEN_FIELDS[state] & set(receipt)):
+        bad.append(
+            "provisional_receipt.%s is present but state is %r -- a row that did "
+            "not render may not carry render artifacts" % (field, state))
+
+    kind = receipt.get("identity_kind")
+    if kind not in PROVISIONAL_IDENTITY_KINDS:
+        bad.append("provisional_receipt.identity_kind %r is not a defined kind"
+                   % (kind,))
+    elif kind == "local_wav" and route_engine not in PROVISIONAL_LOCAL_CLONE_ENGINES:
+        bad.append(
+            "engine %r may not take a local_wav provisional route -- the "
+            "reference WAV goes to local clone engines only (%s)"
+            % (route_engine, ", ".join(sorted(PROVISIONAL_LOCAL_CLONE_ENGINES))))
+    elif kind == "provider_voice":
+        for field in ("provider", "provider_voice_id"):
+            if not str(receipt.get(field, "")).strip():
+                bad.append("provisional_receipt.%s is missing for a "
+                           "provider_voice route" % field)
+
+    receipt_engine = str(receipt.get("engine") or "").strip()
+    if route_engine and receipt_engine and receipt_engine != route_engine:
+        bad.append(
+            "ENGINE DISAGREEMENT: provisional_receipt says %r but the route says "
+            "%r" % (receipt_engine, route_engine))
+    return bad
+
+
+def is_provisional_route(route, *, engine=None) -> bool:
+    """True only when ``route`` is a well-formed PROVISIONAL route.
+
+    Fail-closed exactly like ``is_qualified_route``, and MUTUALLY EXCLUSIVE with
+    it by construction: a provisional route may not carry a qualification receipt
+    or record at all, so no row can ever satisfy both predicates. That property is
+    the safety net under this whole tier and it is unit-pinned.
+    """
+    return not provisional_route_problems(route, engine=engine)
+
+
 LEMMY_VOICE_POLICY = {
     "policy_version": "lemmy-cockney-v1",
     # WHICH CAST ROW THIS POLICY CLAIMS, and why it is a field rather than a
@@ -518,6 +748,10 @@ LEMMY_VOICE_POLICY = {
     # in the checkpoints dir -- swap the weights and it changes -- computed that
     # way because hashing 4.7 GB of tensors on every check is not a contract
     # anyone would keep.
+    #
+    # NOTE FOR THE NEXT READER: this dict is NOT empty and has not been since
+    # 2026-08-10. Comments elsewhere in the tree that still call it empty are
+    # stale -- what is written here is the truth.
     "approved_native_routes": {
         "indextts2": {
             "route_id": "lemmy-indextts2-algenib-cockney-v1",
@@ -590,6 +824,95 @@ LEMMY_VOICE_POLICY = {
                 "audited_on": "2026-08-10",
             },
         },
+    },
+    # ----------------------------------------------------------------------- #
+    # THE PROVISIONAL TIER. A SEPARATE KEY, and the separation is load-bearing.
+    #
+    # Three readers index `approved_native_routes` today -- the dormancy gate and
+    # the key-set discriminator in `nodes/cast_lock.py`, and `select_policy_route`
+    # in `nodes/_otr_voice_route.py`. All three keep reading exactly what they read
+    # before this key existed. Adding a second tier INSIDE that dict would have:
+    #
+    #   * tripped `tests/test_otr_dialogue_policy.py`, which asserts the qualified
+    #     engine set is exactly {"indextts2"} -- a test that is CORRECT and whose
+    #     job is to fire when someone widens the qualified set; and
+    #   * widened a deliberately fail-closed RAISE (the discriminator decides
+    #     whether to abort when no character engine resolves) on the strength of
+    #     rows nobody has listened to.
+    #
+    # A PROVISIONAL ROUTE IS NEVER STAMPED INTO `cast_row["voice_route"]`. That
+    # field means "a qualified route was proved": `resolve_and_verify_reference`
+    # treats any non-empty `voice_route` as a route claim and RAISES unless its
+    # status is exactly `qualified`, so the natural implementation -- reuse the
+    # qualified payload for both tiers -- would have killed EVERY render on these
+    # engines. Both r1 reviewers found that independently. The provisional path
+    # stamps the ordinary bank identity plus `lemmy_route_tier` /
+    # `lemmy_route_id` on the CAST ROW, which is what persists to the ledger and
+    # is where a listener would look anyway.
+    #
+    # THE TWO CLOUD ROWS ARE `configured_unrendered` AND THE SPRINT SAYS SO. They
+    # are not "working" and they were never rendered: `eng_google_tts` resolves an
+    # API key and fails loudly without one, `eng_cloud_elevenlabs` goes through the
+    # partner node (credits + auth), and the root CLAUDE.md scope rule is 100%
+    # local, no API keys, no paid services. Configuring an identity costs nothing
+    # and stops the per-episode redraw; rendering it is not ours to spend.
+    # ----------------------------------------------------------------------- #
+    "provisional_native_routes": {
+        # HIS OWN SOURCE VOICE. `gt_algenib` is the Google voice the approved
+        # clone reference was generated FROM -- gravelly, measured median F0
+        # 97.2 Hz -- so on google_tts the honest identity is the original rather
+        # than a cousin. Not Neural2-D, which is a Cloud-TTS id this integration
+        # cannot reach.
+        #
+        # THE HISTORIC CLIPS ARE REAL AND THEY STILL CANNOT COMPLETE A RECEIPT.
+        # Three Algenib wavs from 2026-08-08 sit in the audition directory and the
+        # operator approved that accent, including under emotion. The LINES were
+        # never written down, so the clips cannot be tied to the frozen audition
+        # text -- which is the exact mistake `LEMMY_AUDITION_LINES` exists to stop
+        # repeating. They belong on the listen page, labelled for what they are:
+        # right voice, different words, prior approval. They do not belong in a
+        # receipt, and this row claims no artifacts at all.
+        "google_tts": {
+            "route_id": "lemmy-google_tts-algenib-provisional-v1",
+            "route_contract_version": 1,
+            "engine": "google_tts",
+            "voice_ref_id": "gt_algenib",
+            "provisional_receipt": {
+                "engine": "google_tts",
+                "identity_kind": "provider_voice",
+                "identity_id": "gt_algenib",
+                "provider": "google_tts",
+                "provider_voice_id": "Algenib",
+                "state": "configured_unrendered",
+            },
+        },
+        # THE OPERATOR'S PROVISIONAL PICK, and it stays flagged for his ears.
+        # `el_daniel` is the only bank-tagged BRITISH male on elevenlabs.
+        # `el_harry` -- the name recollection reached for -- is tagged AMERICAN in
+        # the bank, so either the tag or the recollection is wrong. That is a DATA
+        # question he can settle from the metadata without hearing a thing, so both
+        # rows go on the listen page with their tags shown and neither is presented
+        # as an audition arm.
+        "elevenlabs": {
+            "route_id": "lemmy-elevenlabs-daniel-provisional-v1",
+            "route_contract_version": 1,
+            "engine": "elevenlabs",
+            "voice_ref_id": "el_daniel",
+            "provisional_receipt": {
+                "engine": "elevenlabs",
+                "identity_kind": "provider_voice",
+                "identity_id": "el_daniel",
+                "provider": "elevenlabs",
+                "provider_voice_id": "onwK4e9ZLuTAKqWW03F9",
+                "state": "configured_unrendered",
+            },
+        },
+        # kokoro / chatterbox / dia land here once the cross-engine harness has
+        # rendered them and their manifest is finalized -- a route may not cite
+        # clips and hashes that do not exist yet. bark gets NO row on purpose: it
+        # has zero bank entries, its adapter reads `voice_preset`, and
+        # `lemmy_row()` already pins him at writer time, so bark has no defect to
+        # fix and the route machinery cannot express a preset anyway.
     },
 }
 

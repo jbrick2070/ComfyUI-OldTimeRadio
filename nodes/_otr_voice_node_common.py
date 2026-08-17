@@ -62,6 +62,44 @@ def _resolve_ref_to_disk(ref_path):
     return resolve_voice_ref_path(ref_path)
 
 
+def _provisional_identity_fingerprint(engine, voice_ref_id):
+    """Cache-key material for ONE provisional identity, or ``None`` to fail open.
+
+    A provisional row deliberately carries no ``voice_route`` -- that field means
+    "a qualified route was proved" -- so the route-shaped fingerprint above cannot
+    see it, and a swapped reference under an unchanged id would replay the
+    PREVIOUS render's audio while the ledger named the new identity.
+
+    Both LOCAL identity kinds are fingerprinted by their bytes: a clone engine's
+    reference WAV and kokoro's ``.pt`` voice tensor alike. Hashing only the WAV
+    would leave the one identity kind that neither the qualified route nor the
+    clone rows cover silently cacheable.
+
+    ``None`` means "expected a local file and could not read it", and the caller
+    turns that into NaN -- fail OPEN, rerun, and let the render path fail loudly,
+    rather than quietly serving audio nobody asked for. A provider voice has no
+    local bytes and is not a failure: it contributes its id and nothing else.
+    """
+    try:
+        from ._otr_voice_bank import load_voice_bank
+
+        bank, _sha = load_voice_bank()
+    except Exception:                         # noqa: BLE001 -- unreadable bank
+        return None
+    entry = next((e for e in bank
+                  if e.voice_ref_id == voice_ref_id and e.engine == engine), None)
+    if entry is None:
+        return None                           # the id names nothing -- fail open
+    ref_path = str(getattr(entry, "ref_path", "") or "")
+    if not ref_path or ref_path.startswith("cloud:"):
+        # NEVER a network call. A provider voice is identified by its id, which
+        # the caller already folded in.
+        return "provider:%s" % (getattr(entry, "provider_voice_id", "") or "",)
+    full = _resolve_ref_to_disk(ref_path) or ref_path
+    digest = _ROUTE.sha256_of_file(full)
+    return digest
+
+
 def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
     """Best-effort on-disk reference WAV for a cloning engine + cast row, or None.
 
@@ -487,6 +525,12 @@ class OTRVoiceNodeBase:
                 if isinstance(e, dict) and isinstance(e.get("voice_route"), dict)
                 and e.get("voice_route")
             ]
+            provisional_rows = [
+                e for e in (led.get("cast") or [])
+                if isinstance(e, dict)
+                and str(e.get(_ROUTE.CAST_ROW_TIER_FIELD) or "")
+                == _ROUTE.ROUTE_TIER_PROVISIONAL
+            ]
         except Exception:
             # No ledger yet, or one that will not parse. This is the ORDINARY
             # case at graph-eval time (upstream has not run), and it was
@@ -496,6 +540,7 @@ class OTRVoiceNodeBase:
             # as caution. Route safety is enforced on the render path, which
             # fails closed regardless of what this method answers.
             routes = []
+            provisional_rows = []
 
         # CALL-TIME NUMERIC PARAMS (Lemmy chunk A1), and they are read BEFORE
         # the no-routes shortcut because the defect has nothing to do with
@@ -516,7 +561,7 @@ class OTRVoiceNodeBase:
         except Exception:  # noqa: BLE001 -- unknown/duck-typed engine
             render_params = {}
 
-        if not routes and not render_params:
+        if not routes and not render_params and not provisional_rows:
             return "static"
 
         parts = [
@@ -550,6 +595,21 @@ class OTRVoiceNodeBase:
                 parts.append(digest)
             else:
                 parts.append(str(route.get("source_ref_sha256") or ""))
+
+        for row in sorted(provisional_rows,
+                          key=lambda r: str(r.get(_ROUTE.CAST_ROW_ROUTE_ID_FIELD) or "")):
+            row_engine = str(row.get("voice_engine") or engine or "")
+            voice_ref_id = str(row.get("voice_ref_id") or "")
+            parts.extend([
+                str(row.get(_ROUTE.CAST_ROW_ROUTE_ID_FIELD) or ""),
+                row_engine,
+                voice_ref_id,
+                str(row.get("provider_voice_id") or ""),
+            ])
+            identity = _provisional_identity_fingerprint(row_engine, voice_ref_id)
+            if identity is None:
+                return float("nan")          # fail OPEN, never reuse
+            parts.append(identity)
 
         import hashlib as _hashlib
         return _hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
