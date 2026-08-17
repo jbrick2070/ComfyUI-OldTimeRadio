@@ -67,7 +67,8 @@ panelled. Open a fresh arc only for a chunk that departs from the contract.
 
 **BASELINES to detect drift (updated 2026-08-17, item A close):** suite
 **10717 / 110 / 1** (10712 at the one-style-authority close -> 10717 with the
-five lumina input-convention tests; no regressions). Bible **20 / 26 / 3**.
+five lumina input-convention tests; no regressions). Bible **20 / 26 / 3**, and
+the Bible now holds **287** entries (`12.109` promoted for PBUG-20260817-02).
 Earlier chain: 10584 at the 08-16 close -> 10644 with the
 provisional tier's 60 tests -> 10654 with the audition/artifact and three-family
 integration tests plus two generator field-level pins -> 10659 with the
@@ -154,6 +155,21 @@ work:
 
 **ITEM 1 IS DONE.** ONE STYLE AUTHORITY shipped, pushed and Bible-promoted.
 What follows is the next window's order, cheapest-certain first:
+
+> **READ THIS BEFORE ANYTHING ELSE (2026-08-17 close): TWO COMMITS ARE LOCAL-ONLY
+> AND GIT AUTH IS BROKEN ON THIS BOX.** The push failed with
+> `remote: Invalid username or token. Password authentication is not supported
+> for Git operations` (OTR repo), and hung on a credential prompt (Bible repo).
+> Per the one-attempt rule neither was retried.
+> * OTR `ComfyUI-OldTimeRadio` -- local `ce8a1fad`, origin `7f6a6eca`, 1 unpushed
+>   (item A: the lumina fix + PBUG-20260817-02 + this plan).
+> * survival-guide -- local `0f4de67`, origin `897693b`, 1 unpushed
+>   (Bible `12.109` + README 286->287 + the coverage-index row).
+> **VERIFY BOTH ARE PUSHED BEFORE WRITING ANY CODE.** Local-only commits are the
+> exact failure mode the git policy exists to prevent, and a second window
+> committing on top of an unpushed one is how work gets swept. If auth is still
+> broken, that is the operator's to fix (token/credential-manager), not a thing
+> to work around.
 
 **A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17, one real hit
 of three, live-proven.** Receipt: `PBUG-20260817-02`. Ran exactly as directed --
@@ -244,10 +260,29 @@ three lumina files are on disk, and the engine is wired into
 `config/profiles/otr_soak_*_lumina_image.json` + `otr_sbcov_3`. It was reachable,
 not theoretical.
 
-**B. PROVE THE STYLE FIX ON ONE LIVE RENDER.** Fable's acceptance test, adopted
-verbatim: mint the same cartoon episode's character still on z_image before and
-after -- the effective negative must contain no illustration-family terms and
-the positive must lead with the pack token. Green gates are not a working fix.
+**B. PROVE THE STYLE FIX ON ONE LIVE RENDER -- NEXT, AND THE GPU IS FREE FOR IT
+(operator 2026-08-17).** Fable's acceptance test, adopted verbatim: mint the same
+cartoon episode's character still on z_image before and after -- the effective
+negative must contain no illustration-family terms and the positive must lead
+with the pack token. Green gates are not a working fix.
+
+**What the item-A window learned that this item should reuse, because it is the
+same measurement problem.** The lumina A/B is the working pattern: put BOTH arms
+in ONE script behind a flag, fix the seed, and keep the pre-fix arm permanently
+rather than deleting it after use (`scripts/_otr_lumina_image_smoke.py
+--no-system-prompt` is the template). A style change is exactly the class that is
+invisible in isolation and obvious in comparison.
+**Two traps carried forward:** (1) `RADIO_CONSOLE_NEG` now reaches pixels for the
+first time, so ANNOUNCER stills legitimately change -- that is the fix, not a
+regression, and the acceptance leg must say so up front or the eyeball reads it
+as a break. (2) `scripts/otr_style_traceroute.py` is the cheap pre-check --
+**EFFECTIVE FIGHTS must be 0** -- but it reads TEXT, and PBUG-20260817-01's own
+lesson is that every prompt agreed while the pixels diverged. The traceroute is
+necessary and not sufficient; the render is the proof.
+**Reset first** (CLAUDE.md section 4): at the 08-17 close the resident server
+held ~12.3 GiB with the lumina model still loaded from item A's A/B -- the
+documented finished-but-resident state, not a crash, but it must be torn down
+selectively by CommandLine before a fresh leg.
 
 **C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
 runtime cost. Answers exist (three research rounds); the schema and the
@@ -296,6 +331,22 @@ run in the BACKGROUND under anything above.
 **F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
 
 **G. PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Does not jump.
+
+**H. THE LUMINA HYGIENE-NEGATIVE FLOOR -- a small judgement, opened by item A's
+audit and deliberately left open.** `z_image_turbo._resolve_negative` ends
+`.strip() or _HYGIENE_NEGATIVE` (`z_image_turbo.py:117`); `lumina_image` has
+NEITHER the strip nor a floor, so an empty request negative reaches the encoder
+as `""` and a whitespace-only one is passed verbatim. The path is REACHABLE
+(`VISUAL_SAFETY_NEGATIVE_PROMPT` is `""`, and a pack may ship an empty
+`negative_tail`). **The sharp end is a receipt that lies:** the dispatcher stamps
+`_neg_source="engine_hygiene"` (`otr_image_gen_dispatcher.py:1169`) for exactly
+that case, so the ledger claims a hygiene floor this engine does not have. A
+comment asserting the two engines matched "including at the edges" was false and
+is already corrected; what remains is the actual call. It is NOT a
+copy-z_image-and-done: lumina runs cfg 4.0 against z_image's 2.0 and is a
+different model, so its artifact profile is its own question. Either give lumina
+a floor, or make the ledger stop claiming one it does not have -- but do not
+leave the receipt wrong.
 
 **DEFERRED, deliberately:** the visual-ledger AUDITOR. Fable's verdict is that
 five of its six proposed checks audit BOOKKEEPING written by the code being

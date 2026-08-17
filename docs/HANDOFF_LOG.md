@@ -3,6 +3,76 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (late night) -- HEAD ce8a1fad (v2.0-alpha) -- CODER (engine input-convention audit: one real hit of three, and TWO COMMITS ARE UNPUSHED)
+
+> **BOOT WARNING: git auth is broken on this box and two commits are local-only.**
+> OTR local `ce8a1fad` vs origin `7f6a6eca`; survival-guide local `0f4de67` vs
+> origin `897693b`. The OTR push returned `Invalid username or token. Password
+> authentication is not supported for Git operations`; the Bible push hung on a
+> credential prompt. One attempt each, per the rule. **Verify both are pushed
+> before writing code.**
+
+**ITEM A DONE, AND THE OPERATOR RE-SCOPED IT MID-WINDOW -- he was right.** The
+window opened on "fix lumina" and he stopped it: *"why just lumina because we
+only found it."* The item became a CONFORMANCE AUDIT across every engine in the
+canonical workflow. He also stripped the review: **no Fable, no kibitz arc** --
+*"don't burn a scalpel on a screw"* -- because a wiring conformance check has one
+verifiable answer and no design fork. That ruling is now repo law (`7f6a6eca`).
+
+**ONE REAL HIT OF THREE, and the two non-hits are the valuable part.**
+`lumina_image` fed raw text through plain `CLIPTextEncode`, so every mint since
+the adapter's first commit ran out-of-distribution. `z_image_turbo` and
+`flux_gen1` both have unused dedicated nodes and are both CONFORMANT.
+**THE RULE, and it is why name-matching would have shipped two false positives:**
+an unused dedicated node is only a defect where the family's TOKENIZER does not
+self-wrap. `lumina2.py` is a plain `SD1Tokenizer` with zero template handling;
+`qwen_image.py:32-36` shows `llama_template=None` means "use the built-in
+template". **Read the tokenizer, never the node name.**
+
+**WHAT THE SONNET QA PASS CAUGHT THAT I DID NOT: `engine_version`.** The fix
+changes ENCODER text, not PROMPT text, so every dispatch cache-key input was
+unchanged -- a resumed pre-fix cache entry would have re-served the stale still
+forever and the fix would have been retroactive to nothing. Bumped 1 -> 2. Blast
+radius is zero today (no persisted ledger references lumina), which is exactly
+why it was easy to miss. The QA-before-push order earned its keep again.
+
+**LIVE A/B, seed 7, both arms SUCCESS** (`otr/episodes/lumina_smoke/stills/
+lumina_smoke_{raw,sys}_seed7_00001_.png`). The composed arm reads brass where the
+raw arm reads dark silhouette, loses a hallucinated text-like marking on the mic
+collar, and resolves actual studio detail. **n=1, one prompt, one seed -- proof
+the conditioning changed MATERIALLY and in the expected direction, NOT a quality
+measurement, and it must not be quoted as one.** The pre-fix arm is kept
+permanently as `--no-system-prompt`; this class is invisible except in comparison.
+
+**TWO STALE FACTS CORRECTED.** Lumina is NOT "gated on `OTR_ENABLE_LUMINA=1`" --
+`requires_flag = None`, and the suite DELETES that var and still expects the
+engine usable. The real gate is the weights file, all three are on disk, and the
+engine is wired into two soak profiles + `otr_sbcov_3`; the lane was reachable,
+not theoretical. And a comment claiming lumina's negative matched z_image's
+"including at the edges" was false -- z_image floors to hygiene, lumina does not.
+Corrected; the underlying floor question is queued as item **H**, not folded in.
+
+**A RUNAWAY PROCESS WAS MINE AND HE FOUND IT BEFORE I DID.** A `find /
+-maxdepth 8` fallback in one of my compound commands blew its timeout, was
+backgrounded, and kept scanning every mounted drive for **58 minutes of CPU** --
+including after I called TaskStop on it, because **TaskStop kills the shell, not
+its children**. Killed, plus four orphaned `grep` log-tailers from 08-15 that
+were not mine. Lesson saved to memory. Do not write a filesystem-root search on
+this box; verify survivors by PID after any TaskStop.
+
+**CODEX IS OUT UNTIL 2026-08-19 20:31**, with that exact date from its own error
+(`You've hit your usage limit`). Not a soft hold -- do not plan a Codex lane
+before then.
+
+Current step: THE QUEUE item **B** (prove the style fix on one live render).
+**The operator says the GPU is free for it.** Reset per section 4 first -- the
+resident server was holding ~12.3 GiB with lumina still loaded at close.
+Models: CODER window, NO RUNG CITED -- the budget table still has no rows; ran on
+the per-window mapping (cheapest local triage + Sonnet 5 QA). Cloud spend $0.
+Gates at close: suite **10717/110/1** (baseline 10712 + exactly 5 new), Bible
+**20/26/3 at 287** (`12.109` promoted, README bumped in all three places, index
+row appended), AST + BOM clean on all three .py blobs, live A/B both arms SUCCESS.
+
 ## 2026-08-17 (night) -- HEAD b2cc74c1 +docs (v2.0-alpha) -- CODER (ONE STYLE AUTHORITY shipped: the engine stops vetoing the episode's own style)
 
 > Boot from the sha in the kickoff line; read after the final push. Final shas:
