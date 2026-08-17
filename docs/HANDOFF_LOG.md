@@ -3,6 +3,76 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (late) -- HEAD 72430087 +handoff (v2.0-alpha) -- CODER (kinetic motion SHIPPED and operator-confirmed, Lemmy's identity reserved, the style fracture diagnosed to one line)
+
+> The sha above is the **second-to-last sha on the branch** when the handoff is a
+> single commit. Boot from the sha in the kickoff line, read after the final push.
+
+**KINETIC MOTION SHIPPED AND THE OPERATOR CONFIRMED IT** (`81f79412`, `de6bffe6`).
+The damping was an INSTRUCTION, not a model limit: `build_clause_messages()`
+commanded "SUBTLE motion", listed the only movements allowed and forbade "stands
+up, walks, runs, turns around". Amended per operator direction and lab proof
+(kinetic prompt language moves the video with NO graph change). His verdict on
+the render: "it seems like real moving animation". `CLAUSE_MAX_CHARS` 70 -> 130,
+`max_new_tokens` 40 -> 64. Live receipt from a real leg with
+`OTR_LTX_MOTION_CLAUSE=1` in the SERVER's own environment:
+`motion_clause: {'generated': 6, 'reused': 0, 'fallback': 2, 'invalid': 0}` --
+generated=6 proves the flag arrived, invalid=0 proves the token raise holds at
+the new cap.
+
+**FIVE DEFECTS CAUGHT BY THE GATES, NOT BY HIM.** An undefined `_MC_JOINER_SLACK`
+(NameError on first render); a `# LLM slot:` tag separated from its call site
+(suite caught it); the 188-branch truncation the cap raise introduced, which cut
+a 102-char clause mid-sentence; a latent `finish_visual_prompt` bug this change
+was the first path to reach, where the trim decision ignored the 19-char tail it
+re-appends and hard-sliced through it ("...uneasy, no on-scr"); and my own slack
+formula letting a SHORT clause grow the core and overflow from the other
+direction. All fixed, swept across 91 clause lengths, two regression tests added.
+Sonnet QA said FIX on the finished diff and was right.
+
+**LEMMY STAYS IN HIS BOX** (`8f3c7615`). Measured on a published episode: MOE
+GORDON -- not Lemmy -- drew `idx_lemmy_algenib_cockney_v1`, the reference a
+blinded audition qualified as LEMMY'S voice. His clone rows are now pre-filtered
+out of the general pool, derived from the policy so a second list cannot drift.
+It cannot starve him: the policy path stamps its bank entry directly and never
+touches the selector. **Narrowed after a self-caught regression** -- the first cut
+also reserved `bm_george`, the `preferred_announcer` kokoro voice, which would
+have traded one defect for another. Only `local_wav` clones of his own recording
+are his.
+
+**THE STYLE FRACTURE, DIAGNOSED TO ONE LINE (PBUG-20260817-01, no fix yet).**
+Frames from the delivered mp4 at 00:04/00:16/00:34/00:43 show one 74-second
+episode cutting between an animated short, a live-action film and a painting.
+Root cause VERIFIED: `z_image_turbo.py:216-219` ships a style-blind default
+negative containing "cartoon, illustration" -- on a CARTOON episode -- so it
+fights four of nine packs on every mint. The anatomy-dense portrait flipped
+photoreal and `reference_latent` propagated that face into every character beat.
+**My first diagnosis blamed the video-prompt branch split and was WRONG** (the
+620 branch is gated on a cloud provider and never ran); both versions are
+recorded so nobody re-derives the wrong one. Fable's consultation found the real
+one and I verified its key claim at the file before accepting it.
+
+**THE VIDEO SPRINT ARC: r1 COMPLETE, r2 ON SUBSTITUTED LANES, r3/r4 NOT RUN.**
+r1 (Codex + Antigravity + a cold Fable read) killed the plan's premise -- its
+headline 13.11 GiB receipt belongs to a 2B checkpoint that ALREADY ships as
+`ltx098_low_video`. r2 ran on Fable + Sonnet after Codex hit a quota hold and
+Antigravity produced no file; **this is not a hardened four-round arc and must
+not be reported as one.**
+
+Current step: THE QUEUE item 1 is now ONE STYLE AUTHORITY -- pack-aware negative,
+the operator's post-ledger style second pass, and a mint-time style-spread gate.
+Blocked-on-operator: the post-rip TAG, the accumulated listen batch, and the two
+remaining "subtle" strings at `render_driver.py:1354`/`:1483` (framing call).
+Models: CODER window, NO RUNG CITED (the budget table still has no rows). Sonnet
+5 QA ran before and after every code chunk; Fable consulted twice and earned it
+both times. Cloud spend $0.
+Gates at close: suite **10664/110/1**, Bible **20/26/3 at 285**, variants
+**50/0**, AST clean, BOM clean, HEAD == origin.
+Bible delta-check DONE, NONE promoted. PBUG-20260816-04 judged COVERED by
+`12.99` + `12.101` (index row pushed, survival-guide `5a5dab3`).
+PBUG-20260817-01 is genuinely UNCOVERED but has no fix yet, so it has no `fix:`
+to claim -- promote it with its green chunk.
+
 ## 2026-08-17 -- HEAD 6a47300c +handoff (v2.0-alpha) -- CODER (item 1.1 CLOSED: the Lemmy provisional tier, four engines rendered, a green canonical leg on kokoro)
 
 > The sha above is the **second-to-last sha on the branch** when the handoff is a
