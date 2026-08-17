@@ -185,11 +185,37 @@ object to it; if chatterbox and dia both pass on the same cloned reference, whic
 is his default on the clone lanes; and `el_harry` vs `el_daniel`, still a
 metadata question (the bank tags them american and british respectively).
 
-1. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
-   updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
-   kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Plan doc
-   written (`docs/2026-08-16-video-sprint-PLAN.md`); its kibitz arc has NOT
-   run. Needs the LTX boot, so it pauses any soak; one arc covers the doc.
+1. **Video sprint** (item 1.2). **r1 of its kibitz arc RAN 2026-08-17 and the
+   plan did NOT survive it. r2/r3/r4 have NOT run -- this is r1 only, and it may
+   never be described as a full arc.** Read
+   `kibitz-runs/2026-08-17-video-sprint/r1/final.md` (the reshaped plan) and
+   `.../judgment.md`, NOT the 08-16 draft. Panel: Codex gpt-5.6-sol +
+   Antigravity, plus a cold Fable read before the anchor. Three findings, each
+   verified against the real files:
+   * **The plan's headline 13.11 GiB / 832x480 / 193-frame receipt belongs to a
+     lane that ALREADY SHIPS.** Its source is
+     `vram-recipe-lab/results/ltx_video_2b_distilled_cmp_832x480_f193_run2.json`
+     -- a **2B** checkpoint -- and `eng_ltx_8gb.py:98` shows shipped
+     `ltx098_low_video` already loads it. **No 22B-distilled measurement exists
+     on this box.**
+   * **Items 2/3 name the wrong subsystem** (found INDEPENDENTLY by Fable and
+     Codex). `_otr_line_composer.py` authors the spoken LINE and returns it
+     afterwards, so it cannot inject into a video request -- and editing it is
+     prompt-craft on the writer, inside the frozen story-quality directive. The
+     real boundary is `build_request_from_shot` in `render_driver.py`.
+   * **The real motion surface is OFF BY DEFAULT.** `_otr_motion_clause.py`
+     needs `OTR_LTX_MOTION_CLAUSE=1`; the default is byte-identical to today and
+     the flag is set to `1` NOWHERE in the repo, so item 3 built there ships
+     dormant. Its spec is *subtle motion, never big actions*, capped at 70 chars.
+   **r2 must answer one question before anything else can be specified:** is this
+   a new adapter at all, or a RECIPE + profile over the existing `ltx_av` engine,
+   whose `distilled_native` path (`eng_ltx_av.py:310-312`) is already described as
+   "the new DEFAULT daily driver"? Also settled in r1: the prompt budget is 188
+   chars non-open / 620 open, so a verbatim line silently deletes the scene
+   description; the repo's own distilled recipe is **8 steps**, not the 20 the
+   draft proposed; and **the Q5 quant is CUT** from the sprint by all three
+   reviewers and the anchor independently. Needs the LTX boot, so it pauses any
+   soak.
 2. **The Shakespeare wrong-play frame family** (section D, measured twice by
    the blind read) + the assembly-lint class (speaker-tag leaks, truncated
    closers). Correctness on the fidelity lane; panel before code.
