@@ -154,11 +154,17 @@ work:
 ### THE QUEUE, DRIVER-SET 2026-08-17 LATE (this is the sequence; the numbered
 ### bodies below are reference detail)
 
-**ITEM 1, A AND B ARE DONE.** ONE STYLE AUTHORITY shipped, pushed and
-Bible-promoted (item 1); the engine input-convention conformance audit closed
-with one real hit of three (item A); the style fix is now PROVEN ON LIVE PIXELS
-(item B), and D-BIS finding 1 is measured and reported. **The next open item is
-C.** What follows is the order, cheapest-certain first:
+**ITEMS 1, A AND B ARE DONE; D-BIS FINDING 1 IS DECIDED AND CLOSED.** ONE STYLE
+AUTHORITY shipped (1); the engine input-convention audit closed with one real hit
+of three (A); the style fix is PROVEN ON LIVE PIXELS and the motion registers are
+rewritten subject-first (B); the video-negative fork was panelled and answered
+"build no guard" (D-BIS 1). The DONE bodies have been compressed to the rules
+that still bind -- receipts live in `HANDOFF_LOG.md`.
+
+**OPEN, in order:** **B-OPEN** (one operator A/B call, minutes) -> **C** (cheap,
+ready) -> **H** (a small judgement) -> **G** / **F** / **E**. **D is BLOCKED**
+and **D-BIS 2-5 + D-TER** are static-audit findings awaiting a live observation.
+What follows is that order, cheapest-certain first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -176,94 +182,24 @@ C.** What follows is the order, cheapest-certain first:
 > failure before assuming the token: a GUI-prompting helper and a bad
 > credential look nothing alike but report almost the same thing.
 
-**A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17, one real hit
-of three, live-proven.** Receipt: `PBUG-20260817-02`. Ran exactly as directed --
-live `/object_info` (2,230 node classes), the dedicated-node inventory compared
-against what each in-scope engine builds, deterministic engine-side fix, one A/B
-at a fixed seed. No Fable, no arc; Sonnet 5 QA on the finished diff, which
-caught the `engine_version` bump the fix needed to be retroactive.
-
-**WHAT BINDS FUTURE WORK -- the rule, because name-matching would have produced
-TWO FALSE POSITIVES:** a dedicated node that exists and is unused is only a
-defect where the family's TOKENIZER does not apply the convention itself.
-`comfy/text_encoders/lumina2.py` is a plain `SD1Tokenizer` with zero template
-handling, so the caller MUST supply it -> real defect. Z-Image is the opposite:
-`comfy/text_encoders/qwen_image.py:32-36` shows `llama_template=None` means "use
-the built-in template", so plain `CLIPTextEncode` and `TextEncodeZImageOmni`
-emit identical tokens for text-only work. Check the tokenizer, not the node name.
-
-| engine | dedicated node | used | verdict |
-|---|---|---|---|
-| `z_image_turbo` | `TextEncodeZImageOmni` | no | CONFORMANT (tokenizer self-wraps; Omni's extra value is image refs, already reached via `ReferenceLatent`) |
-| `flux_gen1` | `CLIPTextEncodeFlux` | no | CONFORMANT (it is `CLIPTextEncode`+`FluxGuidance` fused; `FluxGuidance` IS wired at `flux_gen1.py:142`, the BUG-411 restore) |
-| `lumina_image` | `CLIPTextEncodeLumina2` | no | FIXED -- was out-of-distribution on every mint |
-
-**A NEW ITEM THE AUDIT SURFACED, deliberately not folded into the fix:** lumina
-has NO hygiene-negative floor while `z_image_turbo` does (`.strip() or
-_HYGIENE_NEGATIVE`, `z_image_turbo.py:117`), the empty-negative path is
-REACHABLE, and the dispatcher stamps `_neg_source="engine_hygiene"`
-(`otr_image_gen_dispatcher.py:1169`) for exactly that case -- **a receipt
-claiming a floor this engine does not have.** A comment asserting the two
-engines matched "including at the edges" was false and is corrected. Whether
-lumina should grow a floor is a RENDER decision at a different cfg on a
-different model; it needs a judgement, not a patch.
-
-*The original framing, kept because its reasoning still holds:* lumina was the
-first OUTPUT, not the whole item (operator 2026-08-17: "why just lumina because
-we only found it"). The class had ALREADY recurred once -- `flux_gen1.py`
-records BUG-411, the FluxGuidance node "the rewrite dropped it, flattening the
-look" -- the same defect wearing different clothes. Two instances found by
-accident is a class, so it got systematized.
-
-**THE METHOD (cheap, deterministic, read-only):** ComfyUI ships DEDICATED nodes
-for model families that need special input handling -- `CLIPTextEncodeLumina2`
-exists precisely because Lumina2 needs a system line. So: boot headless, read
-`/object_info`, list the dedicated node classes per image-model family, compare
-against the node classes each engine in `nodes/_otr_image_engines/` actually
-builds, and **treat any dedicated node that EXISTS and is NOT used as a
-candidate defect.** Same shape as the style traceroute: our config against what
-the thing actually expects.
-
-**SCOPE:** only engines in the canonical workflow -- `z_image_turbo` (the
-stills default; its CLIP type + latent node were already GPU-verified 2026-06),
-`flux_gen1` (fallback, one known scar), `lumina_image` (opt-in). `sd35_large`,
-`flux2_klein`, `hidream_i1` are unused: last or never.
-
-**THE HONEST LIMIT:** this finds STRUCTURAL divergence only. It can prove a
-node is missing; it cannot prove the output is worse. Every hit needs ONE A/B
-at the same seed -- BUG-411's own "flattening the look" is the reminder that
-this class is visible only in comparison, never in isolation.
-
-**ROUTING -- do NOT burn a scalpel on a screw.** This item is MECHANICAL: a
-grep, an `/object_info` read, a comparison, a deterministic edit. Per `CLAUDE.md`
-section 9 that is explicitly NOT Fable work ("repo grep, mapping references,
-editing JSON, validation, wiring checks"). It needs **no kibitz arc** either --
-an arc pressure-tests DESIGN, and there is no design choice here, only a
-verifiable answer. General-purpose agents plus **Sonnet 5 QA on the finished
-diff before the push** is the correct and sufficient gate. Spend Fable only if
-the audit surfaces something needing judgment -- on this queue that is item D,
-not item A.
-
-**A1. The known hit: LUMINA WAS MISSING ITS TRAINED INPUT CONVENTION -- SHIPPED.**
-`CLIPTextEncodeLumina2` builds `f'{system_prompt} <Prompt Start> {user_prompt}'`
-(`comfy_extras/nodes_lumina2.py:113`); OTR fed raw text through plain
-`CLIPTextEncode` on both branches, so every lumina mint ran out-of-distribution.
-Fixed engine-side, zero-LLM, in `_build_lumina_graph` via an idempotent
-`compose_encoder_text()`. Applied to BOTH branches, because that is what wiring
-a `CLIPTextEncodeLumina2` into each side of the KSampler does and the node has
-no negative-specific mode. `OTR_LUMINA_SYSTEM_PROMPT` picks `superior`
-(default) / `alignment`; an unknown value degrades LOUDLY, never fatally.
-`engine_version` 1 -> 2 so a resumed pre-fix cache entry cannot re-serve the old
-still. The A/B instrument is permanent: `scripts/_otr_lumina_image_smoke.py
---no-system-prompt` is the pre-fix arm.
-
-**THE CONTAINMENT LINE IN THE OLD ENTRY WAS STALE -- do not repeat it.** Lumina
-is NOT "gated on `OTR_ENABLE_LUMINA=1`": `requires_flag = None`
-(`lumina_image.py`), and `tests/test_lumina_image_engine.py` DELETES that var
-and still expects the engine usable. The real gate is the weights file, all
-three lumina files are on disk, and the engine is wired into
-`config/profiles/otr_soak_*_lumina_image.json` + `otr_sbcov_3`. It was reachable,
-not theoretical.
+**A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17
+(`PBUG-20260817-02`, Bible `12.109`). Receipts in `HANDOFF_LOG.md`. What still
+binds:**
+* **CHECK THE TOKENIZER, NOT THE NODE NAME.** A dedicated node that exists and
+  is unused is only a defect where the family's TOKENIZER does not apply the
+  convention itself. `lumina2.py` is a plain `SD1Tokenizer` with no template ->
+  real defect; `qwen_image.py:32-36` shows `llama_template=None` means "use the
+  built-in template" -> Z-Image is CONFORMANT. Name-matching would have shipped
+  TWO FALSE POSITIVES (`z_image_turbo`, `flux_gen1`).
+* **STRUCTURAL AUDITS CANNOT PROVE OUTPUT.** This class proves a node is
+  missing, never that the output is worse. Every hit needs ONE A/B at a fixed
+  seed. Permanent instrument: `scripts/_otr_lumina_image_smoke.py
+  --no-system-prompt` is the pre-fix arm.
+* **LUMINA IS NOT FLAG-GATED -- do not repeat the stale containment line.**
+  `requires_flag = None`; the suite DELETES `OTR_ENABLE_LUMINA` and still
+  expects the engine usable. The real gate is the weights file, all three are on
+  disk, and it is wired into two soak profiles + `otr_sbcov_3`.
+* The hygiene-floor gap the audit surfaced is queued as item **H**, not here.
 
 **B. PROVE THE STYLE FIX ON ONE LIVE RENDER -- DONE 2026-08-17, six live stills,
 both gates green on the shipped path.** Fable's acceptance test ran verbatim.
@@ -274,61 +210,57 @@ re-typed) so "this is what a real mint does" cannot quietly stop being true.
 No arc, per `7f6a6eca` -- an already-shipped fix measured against a
 pre-specified acceptance test has no design fork in it. Sonnet 5 QA on the diff.
 
-**THE ANNOUNCER ARM IS THE RECEIPT THAT MATTERS, AND IT IS WORSE THAN TRAP 1
-PREDICTED.** On a `cartoon` episode the PRE-FIX announcer still minted as a
-literal PHOTOGRAPH -- the engine's own "cartoon, illustration" negative drove a
-cartoon-pack still to photorealism. Post-fix it is a bold-outline cartoon radio.
-The trap said announcer stills "legitimately change" because `RADIO_CONSOLE_NEG`
-now reaches pixels; the measured change is far larger than that, and the
-illustration-family veto -- not the human-exclusion negative -- is what did it.
-The character still shows the same defect more quietly: pre-fix is a restrained
-flat-vector figure, post-fix is the rubber-hose cartoon the pack asks for.
+**What still binds** (receipts in `HANDOFF_LOG.md`):
+* **GREEN GATES ARE NOT A WORKING FIX, PROVEN TWICE IN ONE DAY.** On the stills
+  side a `cartoon` episode's PRE-FIX announcer minted as a literal PHOTOGRAPH
+  while every prompt agreed. On the video side all 36 rewritten registers passed
+  every text check and the pixels then moved **40% less**. The render is the
+  only proof; budget one every time a prompt or a negative changes.
+* **RUN THE CONTROL, NOT JUST THE ACCEPTANCE TEST.** My GATE 1 ("no
+  illustration-family terms") was Fable's wording scoped to an ILLUSTRATED pack;
+  generalized it fails the DEFAULT lane, where `clean digital` is legitimate.
+  The correct universal form is the repo's own `_fights_in` -- does this
+  negative contradict THIS pack's positive. The acceptance test alone would have
+  shipped the over-broad gate; the default-lane control caught it.
+* **THE DEFAULT LANE IS NOT BYTE-IDENTICAL AT A FIXED SEED, and that is
+  correct.** "The photoreal packs carry the historical string VERBATIM" is true
+  of the AUTHORED string and of the LOOK (the `sci_fi_radio` A/B is the same
+  photoreal noir, no regression). It is NOT true of the conditioning:
+  `effective_negative` drops `cartoon, illustration` from that pack too, because
+  its own announcer surface asks for a "living cartoon appliance face". Self-veto
+  resolution working, not drift -- a window expecting identical bytes misreads it.
+* **A "PERMANENT" INSTRUMENT IS GITIGNORED BY DEFAULT -- `git add -f` IT.**
+  `.gitignore:71` carries `scripts/_*.py`, so every A/B instrument this queue
+  calls permanent lands UNTRACKED. `_otr_style_authority_smoke.py` was one
+  command from local-only; item A's lumina smoke is tracked only because it
+  predates the rule biting (git ignores nothing already in the index, which is
+  why the trap stays invisible until a NEW instrument is written). Run
+  `git check-ignore -v <path>` before believing a new script is committed.
+* **`kill_otr_zombies.ps1` IS NOT THE SECTION 4 RESET** -- it deliberately
+  PRESERVES the port-8000 owner, the opposite of what section 4 needs. Use
+  `scripts/otr_reset_gpu.ps1` (selective kill by CommandLine with the Claude MCP
+  pythons protected, then VERIFIES port free + VRAM at baseline).
+* Instruments, both permanent: `scripts/_otr_style_authority_smoke.py --pre-fix`
+  (stills, submits the ENGINE'S OWN graph rather than a re-typed copy) and
+  `scripts/otr_ltx_motion_smoke.py` (video motion, now reads the pack instead of
+  a hardcoded copy that had already gone stale).
 
-**THE PRE-FIX ARM FOUND A THIRD FIGHTING PHRASE NOBODY HAD RECORDED.** The
-historical engine negative fought `cartoon` on THREE phrases, not two: `glossy`
-collides with that pack's own `still_word_typography` -> "glossy beveled shine".
-
-**THE DEFAULT-LANE CLAIM NEEDED ONE WORD OF PRECISION.** "The three photoreal
-packs carry the historical string VERBATIM so the default lane is unchanged" is
-true of the AUTHORED string and true of the LOOK -- the `sci_fi_radio` A/B is
-the same photoreal noir, same grade, no style regression. It is NOT true of the
-conditioning: `effective_negative` legitimately drops `cartoon, illustration`
-from that pack too (its own announcer surface asks for a "living cartoon
-appliance face"), so default-lane stills are NOT byte-identical at a fixed seed.
-That is the self-veto fix working, not drift -- but a window expecting identical
-bytes would misread it.
-
-**ONE GATE OF MINE WAS WRONG AND THE DEFAULT-LANE CONTROL CAUGHT IT.** "No
-illustration-family terms" is Fable's wording scoped to the ILLUSTRATED pack the
-test names; generalized naively it fails the default lane, where `clean digital`
-is a legitimate, intended negative. The correct universal form is the repo's own
-`_fights_in` -- does this negative contradict THIS pack's positive -- which
-resolves every case right. Run the control; the acceptance test alone would have
-shipped the over-broad gate.
-
-**Traps 2 and 3 held as written.** The traceroute pre-check was 0 EFFECTIVE
-FIGHTS before the render and it was necessary-not-sufficient exactly as warned.
-Trap 3 is now handled STRUCTURALLY rather than remembered: both arms take the
-same explicit `--seed` straight into the KSampler, so the `prompt_hash` seed
-path is never consulted and the arms cannot drift onto two different rolls.
-
-**A "PERMANENT" INSTRUMENT IS GITIGNORED BY DEFAULT -- `git add -f` IT.**
-`.gitignore:71` carries `scripts/_*.py` ("per-task dev scripts, machine-local,
-not versioned"), so every A/B instrument this queue calls permanent lands
-UNTRACKED unless force-added. `_otr_style_authority_smoke.py` was one command
-from being local-only. Item A's `_otr_lumina_image_smoke.py` is tracked only
-because it predates the rule biting -- git ignores nothing already in the index,
-which is exactly why the trap is invisible until a NEW instrument is written.
-Check `git check-ignore -v <path>` before believing a new script is committed,
-and force-add anything the plan calls a permanent arm.
-
-**Receipts:** `otr/episodes/style_authority_smoke/stills/` --
-`style_{cartoon,sci_fi_radio}_{character,announcer}_{prefix,postfix}_seed7`;
-video A/B `output/otr_ltxmotion/motion_{OLD_camera,NEW_subject}_00001_.webm`.
-Six stills, all SUCCESS. Reset before every leg via the new
-`scripts/otr_reset_gpu.ps1` (12.3 GiB -> ~1.6 GiB, port free); note that
-`kill_otr_zombies.ps1` is NOT that tool -- it deliberately PRESERVES the
-port-8000 owner, which is the opposite of what section 4 requires.
+**B-OPEN. THE ONE THING ITEM B LEFT UNDECIDED -- an operator call, cheap either
+way.** The subject-first rewrite stripped ALL 35 camera clauses, but only **TWO**
+ever collided with a frozen provider list (`Slow handheld dolly forward` via
+"handheld"; `Dynamic dolly push forward` via "dynamic dolly push"). `Slow dolly
+pull back`, `Slow orbit around the speaker`, `Measured dolly push forward`,
+`Slow bouncy dolly forward` and `Slow dramatic push-in` are all CLEAN. The live
+A/B measured the cost of over-stripping: **0.220 vs 0.373** mean frame delta,
+**3.50 vs 10.27** drift.
+* **(A) keep as landed** -- fully locked-off shot, engine decides all motion.
+  Literally what the operator asked for, and truer to the registers' own opening
+  line. Costs ~40% of the movement on a lane whose negatives ban "static".
+* **(B) restore the camera clauses, fix only the two** -- `Steady dolly push
+  forward` / `Slow steady dolly forward`, both verified clean against the
+  softener table and the ban list. Keeps the original energy AND zero collisions.
+**Driver recommends (B).** Not taken unilaterally: it is a taste call about the
+show's look. Whichever is chosen, re-run the video A/B to confirm the number.
 
 **C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
 runtime cost. Answers exist (three research rounds); the schema and the
@@ -2826,6 +2758,16 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 | duplicate-id cleanup | Same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
 | historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
+| **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
+
+**NOTHING WAS PROMOTED 2026-08-17 (item B window), deliberately.** The window's
+findings are all static-audit -- the positive-prose ban, the seven-call-site
+video negative, the B6 gate gap, the traceroute's coverage blind spot -- and the
+admission rule reserves the Bible for defects verified by a live artifact.
+`PBUG-20260817-01` was re-proved on pixels here but is ALREADY covered by Bible
+`12.108`, whose tag list literally includes `prompt-audit-cannot-see-pixels`.
+Bible stays **287**, README stays 287 in all three places; the Three-File
+Contract is intact.
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval queue is
 `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented fixture creates a row.
