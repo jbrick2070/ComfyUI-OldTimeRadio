@@ -907,12 +907,108 @@ LEMMY_VOICE_POLICY = {
                 "state": "configured_unrendered",
             },
         },
-        # kokoro / chatterbox / dia land here once the cross-engine harness has
-        # rendered them and their manifest is finalized -- a route may not cite
-        # clips and hashes that do not exist yet. bark gets NO row on purpose: it
-        # has zero bank entries, its adapter reads `voice_preset`, and
-        # `lemmy_row()` already pins him at writer time, so bark has no defect to
-        # fix and the route machinery cannot express a preset anyway.
+        # ------------------------------------------------------------------- #
+        # THE THREE LOCAL ROWS. Every one of these cites clips that exist on this
+        # box, rendered 2026-08-17 by `scripts/otr_lemmy_cross_engine_audition.py`
+        # from ONE manifest, speaking the frozen `LEMMY_AUDITION_LINES` at seed
+        # 20260816. They were written AFTER that render, not before, because a
+        # route that cites a hash for audio nobody has produced is the precise
+        # shape of evidence-that-is-not.
+        #
+        # `rendered_pending_listen` is the strongest thing that can honestly be
+        # said about them: the engine really spoke, the bytes are hashed, and
+        # nobody has heard them yet.
+        #
+        # bark gets NO row on purpose. It has zero bank entries, its adapter reads
+        # `voice_preset`, and `lemmy_row()` already pins him at writer time -- so
+        # bark has no defect to fix and the route machinery cannot express a
+        # preset anyway. Its two clips are on the listen page as a comparison.
+        # ------------------------------------------------------------------- #
+        # THE ONE IDENTITY KIND NEITHER OTHER TIER COVERS. `bm_george` is a `.pt`
+        # voice tensor named by bank id -- not a WAV a clone engine reads, and not
+        # a provider's voice id. Warmest British male in the bank; a
+        # friendly-broadcaster cousin, NOT Cockney, and the listen page says so
+        # rather than letting the row imply a match it does not have.
+        "kokoro": {
+            "route_id": "lemmy-kokoro-bm_george-provisional-v1",
+            "route_contract_version": 1,
+            "engine": "kokoro",
+            "voice_ref_id": "bm_george",
+            "provisional_receipt": {
+                "engine": "kokoro",
+                "identity_kind": "bank_voice_id",
+                "identity_id": "bm_george",
+                "state": "rendered_pending_listen",
+                "audition_manifest_path":
+                    "otr/episodes/lemmy_cross_engine/MANIFEST.json",
+                "audition_manifest_sha256":
+                    "ac55c90ce8325705862d6f8fbdaaadaf4153681444363dca4572f5583d4b2762",
+                "neutral_clip_path":
+                    "otr/episodes/lemmy_cross_engine/kokoro_neutral.wav",
+                "neutral_clip_sha256":
+                    "996d9e005e49ce6fc217c5df6b964e733c20a0cb2c43763240aff1ce9c6d230d",
+                "emotional_clip_path":
+                    "otr/episodes/lemmy_cross_engine/kokoro_emotional.wav",
+                "emotional_clip_sha256":
+                    "3902f5354d96fc75f61709122bb1ce11c64e530af3abe36a51cff726847e46ab",
+                "rendered_utc": "2026-08-17T03:57:18.948772+00:00",
+            },
+        },
+        # THE APPROVED COCKNEY REFERENCE, CLONED. Same wav, same bytes, same
+        # sha256 as the qualified IndexTTS2 route -- one mould, two more machines
+        # -- so comparing chatterbox against dia compares the ENGINES rather than
+        # the voice. Both rows are `local_wav`, which the clone allowlist permits
+        # and would refuse for any provider engine.
+        "chatterbox": {
+            "route_id": "lemmy-chatterbox-algenib-cockney-provisional-v1",
+            "route_contract_version": 1,
+            "engine": "chatterbox",
+            "voice_ref_id": "cb_lemmy_algenib_cockney_v1",
+            "provisional_receipt": {
+                "engine": "chatterbox",
+                "identity_kind": "local_wav",
+                "identity_id": "cb_lemmy_algenib_cockney_v1",
+                "state": "rendered_pending_listen",
+                "audition_manifest_path":
+                    "otr/episodes/lemmy_cross_engine/MANIFEST.json",
+                "audition_manifest_sha256":
+                    "ac55c90ce8325705862d6f8fbdaaadaf4153681444363dca4572f5583d4b2762",
+                "neutral_clip_path":
+                    "otr/episodes/lemmy_cross_engine/chatterbox_neutral.wav",
+                "neutral_clip_sha256":
+                    "4ac0a455825b77c4f4026b8ce0b03faa84935fefe5fb84d0a1dba1c454d64a8d",
+                "emotional_clip_path":
+                    "otr/episodes/lemmy_cross_engine/chatterbox_emotional.wav",
+                "emotional_clip_sha256":
+                    "fbd9a72962160b71fc479dd8fda3dfc772506ab5b0ffc320c15973aceb576437",
+                "rendered_utc": "2026-08-17T03:57:37.033042+00:00",
+            },
+        },
+        "dia": {
+            "route_id": "lemmy-dia-algenib-cockney-provisional-v1",
+            "route_contract_version": 1,
+            "engine": "dia",
+            "voice_ref_id": "dia_lemmy_algenib_cockney_v1",
+            "provisional_receipt": {
+                "engine": "dia",
+                "identity_kind": "local_wav",
+                "identity_id": "dia_lemmy_algenib_cockney_v1",
+                "state": "rendered_pending_listen",
+                "audition_manifest_path":
+                    "otr/episodes/lemmy_cross_engine/MANIFEST.json",
+                "audition_manifest_sha256":
+                    "ac55c90ce8325705862d6f8fbdaaadaf4153681444363dca4572f5583d4b2762",
+                "neutral_clip_path":
+                    "otr/episodes/lemmy_cross_engine/dia_neutral.wav",
+                "neutral_clip_sha256":
+                    "b576a561c2fb9c97d2cd8774f066537962582eccd9bf9fbbd334649ca74ba355",
+                "emotional_clip_path":
+                    "otr/episodes/lemmy_cross_engine/dia_emotional.wav",
+                "emotional_clip_sha256":
+                    "840acfde18b31e1b8fc0cc78e07c564d891a9a990621619e4a87742216830a72",
+                "rendered_utc": "2026-08-17T03:58:18.630673+00:00",
+            },
+        },
     },
 }
 

@@ -496,24 +496,58 @@ def test_a_stale_qualified_route_is_cleared_on_a_switch(pin_provisional, policy_
     assert "voice_route" not in _rows(out)["c02"]
 
 
+@pytest.mark.parametrize("policy_mode", ["auto_registry", "preserve_ledger"])
 @pytest.mark.parametrize("stale_field,stale_value", [
     ("provider_voice_id", "onwK4e9ZLuTAKqWW03F9"),
     ("voice_ref_path", "models/TTS/refs/indextts2/somebody_else.wav"),
     ("ref_path", "models/TTS/refs/indextts2/somebody_else.wav"),
 ])
 def test_stale_engine_specific_identity_is_cleared(pin_provisional, stale_field,
-                                                   stale_value):
+                                                   stale_value, policy_mode):
     """Clearing `voice_route` alone is NOT enough. The dispatch PREFERS an
     existing engine-specific field over resolving from the id stamped a moment
     ago, so a survivor is not stale metadata -- it is the file or the cloud voice
-    that actually renders."""
+    that actually renders.
+
+    PARAMETRIZED OVER BOTH MODES because an earlier cut of this test was not, and
+    the gap was an implementation gap too: preserve_ledger cleared before a
+    provisional stamp and not before a qualified one. A test pinned to one mode
+    says nothing about the other, and the canonical graph runs only one of them.
+    """
     cast = json.loads(json.dumps(CAST))
     cast[1][stale_field] = stale_value
     pin_provisional({"chatterbox": _provisional("chatterbox", CLONE_REF, "local_wav")})
     out = CastLock().lock(script_json=_ledger(cast=cast), voice_bank="default_clean",
                           char_voice_engine="chatterbox",
-                          cast_voice_policy="auto_registry")[0]
+                          cast_voice_policy=policy_mode)[0]
     assert stale_field not in _rows(out)["c02"]
+
+
+@pytest.mark.parametrize("policy_mode", ["auto_registry", "preserve_ledger"])
+def test_a_provisional_row_re_locked_QUALIFIED_drops_its_old_identity(policy_mode):
+    """THE OTHER DIRECTION, which the sprint contract names explicitly and an
+    earlier cut proved in only one branch: provisional -> qualified.
+
+    Uses the REAL shipped policy -- the qualified IndexTTS2 route -- so this
+    fails if the live receipt ever stops applying, not merely if a fixture rots.
+    """
+    cast = json.loads(json.dumps(CAST))
+    cast[1].update({
+        "voice_ref_id": PROVIDER_REF,
+        "voice_engine": "elevenlabs",
+        "provider_voice_id": PROVIDER_VOICE_ID,
+        ROUTE.CAST_ROW_TIER_FIELD: ROUTE.ROUTE_TIER_PROVISIONAL,
+        ROUTE.CAST_ROW_ROUTE_ID_FIELD: "lemmy-elevenlabs-daniel-provisional-v1",
+    })
+    out = CastLock().lock(script_json=_ledger(cast=cast), voice_bank="default",
+                          char_voice_engine="indextts2",
+                          cast_voice_policy=policy_mode)[0]
+    lemmy = _rows(out)["c02"]
+    assert lemmy[ROUTE.CAST_ROW_TIER_FIELD] == ROUTE.ROUTE_TIER_QUALIFIED
+    assert lemmy["voice_engine"] == "indextts2"
+    assert lemmy["voice_route"]["status"] == "qualified"
+    assert "provider_voice_id" not in lemmy, (
+        "an ElevenLabs voice id survived onto a row now claiming indextts2")
 
 
 def test_a_row_the_caster_never_reaches_is_left_EXACTLY_as_it_arrived(pin_provisional):
@@ -653,3 +687,187 @@ def test_a_cloud_identity_never_touches_the_network():
     from nodes._otr_voice_node_common import _provisional_identity_fingerprint
     answer = _provisional_identity_fingerprint("elevenlabs", PROVIDER_REF)
     assert answer == "provider:%s" % PROVIDER_VOICE_ID
+
+
+# ---------------------------------------------------------------------------
+# 9B. THE RECEIPTS MUST AGREE WITH THE ARTIFACTS, not merely look plausible.
+# ---------------------------------------------------------------------------
+def _output_root(relative_probe):
+    """The output root that actually CONTAINS ``relative_probe``, or None.
+
+    Receipt paths are written `otr/episodes/...`, relative to the output root --
+    the convention the qualified route already uses. There is more than one
+    plausible root on a box with a separate ComfyUI install, and picking the
+    first one that merely EXISTS is how this test came to skip silently while the
+    artifacts sat on disk a directory away. So it probes for the file, not for
+    the folder: a test that cannot find what it is checking must say nothing
+    rather than pass."""
+    candidates = []
+    try:
+        import folder_paths                              # ComfyUI runtime
+        candidates.append(folder_paths.get_output_directory())
+    except Exception:                                    # noqa: BLE001
+        pass
+    candidates.append(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.dirname(REPO_ROOT))), "ComfyUI", "output"))
+    for base in candidates:
+        if base and os.path.isfile(os.path.join(base, relative_probe)):
+            return base
+    return None
+
+
+def _rendered_routes():
+    return [(engine, record)
+            for engine, record in
+            POOLS.LEMMY_VOICE_POLICY["provisional_native_routes"].items()
+            if record["provisional_receipt"]["state"] == "rendered_pending_listen"]
+
+
+def test_a_rendered_receipt_names_artifacts_that_exist_and_still_match():
+    """TRANSCRIBING MACHINE FACTS BY HAND IS HOW A RECEIPT STARTS LYING. The
+    three local rows were written from a manifest by a human reading numbers off
+    a terminal; this checks the numbers against the bytes.
+
+    SKIPS on a tree with no renders -- a fresh clone has no artifacts and that is
+    not a failure. FAILS the moment they exist and disagree, which is the only
+    state anyone could be misled by.
+    """
+    rendered = _rendered_routes()
+    assert rendered, "no rendered provisional route to check"
+    probe = rendered[0][1]["provisional_receipt"]["audition_manifest_path"]
+    root = _output_root(probe)
+    if root is None:
+        pytest.skip("the audition artifacts are not on this box")
+    checked = 0
+    for engine, record in rendered:
+        receipt = record["provisional_receipt"]
+        manifest_path = os.path.join(root, receipt["audition_manifest_path"])
+        with open(manifest_path, "rb") as fh:
+            blob = fh.read()
+        assert hashlib.sha256(blob).hexdigest() == \
+            receipt["audition_manifest_sha256"], \
+            "%s cites a manifest hash that no longer matches the file" % engine
+
+        manifest = json.loads(blob.decode("utf-8"))
+        row = (manifest.get("engines") or {}).get(engine) or {}
+        assert row.get("identity_id") == receipt["identity_id"], engine
+        for kind in ("neutral", "emotional"):
+            path = os.path.join(root, receipt["%s_clip_path" % kind])
+            assert os.path.isfile(path), "%s: %s is missing" % (engine, path)
+            with open(path, "rb") as fh:
+                digest = hashlib.sha256(fh.read()).hexdigest()
+            assert digest == receipt["%s_clip_sha256" % kind], (
+                "%s %s clip has been re-rendered or replaced since its receipt "
+                "was written" % (engine, kind))
+            assert digest == (row.get("clips") or {}).get(kind, {}).get("sha256"), (
+                "%s %s: the receipt and the manifest disagree" % (engine, kind))
+            checked += 1
+    assert checked == 6, "expected two clips for each of three rendered routes"
+
+
+def test_every_rendered_route_cites_the_SAME_manifest():
+    """One audition, one manifest. Two manifests would mean two batches
+    presented as one comparison, and the whole point of the frozen lines is that
+    the arms differ only in the engine."""
+    digests = {record["provisional_receipt"]["audition_manifest_sha256"]
+               for _engine, record in _rendered_routes()}
+    assert len(digests) == 1, digests
+
+
+# ---------------------------------------------------------------------------
+# 10. ROUTE -> CASTLOCK -> DISPATCH, for all three identity families.
+#
+# WHY THESE EXIST WHEN THERE IS ALSO A LIVE LEG. One canonical leg pins ONE
+# engine, because the graph pins one character engine -- and the three identity
+# kinds reach the adapter through three different fields. A leg on kokoro proves
+# nothing about whether a provider route delivers its voice id or a clone route
+# resolves the right WAV. These cover the interfaces the leg cannot; the leg
+# covers the graph these cannot.
+#
+# They resolve the identity the SAME WAY the dispatch does, by importing the real
+# helpers rather than restating the logic -- a test that reimplements the code it
+# is testing agrees with itself and nothing else.
+# ---------------------------------------------------------------------------
+def _dispatch_identity(engine, cast_row, episode_seed=42):
+    """What the adapter would actually be handed for this row.
+
+    Mirrors `_render_per_line`: the ref FIELD comes from the adapter, a wav-path
+    engine falls back to the shared clone resolver when the row carries no path,
+    and nothing else is invented.
+    """
+    from nodes._otr_audio_engines import get_engine
+    from nodes._otr_voice_node_common import (
+        _engine_requires_voice_ref, _resolve_clone_ref_path,
+    )
+
+    adapter = get_engine(engine)
+    ref_field = getattr(adapter, "voice_ref_field", "voice_ref_path")
+    if ref_field == "voice_ref_path":
+        voice_ref = cast_row.get("voice_ref_path") or cast_row.get("ref_path")
+    else:
+        voice_ref = cast_row.get(ref_field)
+    if _engine_requires_voice_ref(adapter) and not voice_ref:
+        voice_ref = _resolve_clone_ref_path(engine, cast_row, episode_seed)
+    return ref_field, voice_ref
+
+
+def _locked_lemmy(pin_provisional, engine, ref, kind, voice_bank):
+    state = ("configured_unrendered" if kind == "provider_voice"
+             else "rendered_pending_listen")
+    pin_provisional({engine: _provisional(engine, ref, kind, state=state)})
+    out = CastLock().lock(script_json=_ledger(), voice_bank=voice_bank,
+                          char_voice_engine=engine,
+                          cast_voice_policy="auto_registry")[0]
+    return _rows(out)["c02"]
+
+
+def test_family_clone_wav_reaches_the_selected_bank_wav(pin_provisional):
+    row = _locked_lemmy(pin_provisional, "chatterbox", CLONE_REF, "local_wav",
+                        "default_clean")
+    ref_field, voice_ref = _dispatch_identity("chatterbox", row)
+    assert ref_field == "voice_ref_path"
+    assert voice_ref and os.path.isfile(voice_ref), voice_ref
+    # ...and it is the file the ROUTE names, not some other male reference the
+    # gender fallback would have been happy with.
+    entry = next(e for e in load_voice_bank()[0]
+                 if e.voice_ref_id == CLONE_REF and e.engine == "chatterbox")
+    assert os.path.basename(voice_ref) == os.path.basename(entry.ref_path)
+
+
+def test_family_bank_voice_id_reaches_voice_ref_id(pin_provisional):
+    row = _locked_lemmy(pin_provisional, "kokoro", KOKORO_REF, "bank_voice_id",
+                        "kokoro_builtin")
+    ref_field, voice_ref = _dispatch_identity("kokoro", row)
+    assert ref_field == "voice_ref_id"
+    assert voice_ref == KOKORO_REF
+
+
+def test_family_provider_voice_reaches_provider_voice_id(pin_provisional):
+    row = _locked_lemmy(pin_provisional, "elevenlabs", PROVIDER_REF,
+                        "provider_voice", "elevenlabs_cloud")
+    ref_field, voice_ref = _dispatch_identity("elevenlabs", row)
+    assert ref_field == "provider_voice_id"
+    assert voice_ref == PROVIDER_VOICE_ID
+    assert row["provider_voice_id"] == PROVIDER_VOICE_ID
+
+
+@pytest.mark.parametrize("engine,ref,kind,voice_bank", [
+    ("chatterbox", CLONE_REF, "local_wav", "default_clean"),
+    ("kokoro", KOKORO_REF, "bank_voice_id", "kokoro_builtin"),
+    ("elevenlabs", PROVIDER_REF, "provider_voice", "elevenlabs_cloud"),
+])
+def test_no_family_stamps_a_route_and_none_of_them_RAISES(
+        pin_provisional, engine, ref, kind, voice_bank):
+    """THE RENDER-KILLER, proved at the real call site rather than by inspection.
+
+    `resolve_and_verify_reference` is what the voice node calls for every cast
+    row before it builds a request, and it RAISES on any non-empty voice_route
+    whose status is not exactly `qualified`. Running it here on each family's
+    locked row is the difference between believing the tier is safe and knowing
+    it: a provisional row must resolve to LEGACY_REFERENCE and must not raise.
+    """
+    row = _locked_lemmy(pin_provisional, engine, ref, kind, voice_bank)
+    assert "voice_route" not in row
+    resolved = ROUTE.resolve_and_verify_reference(row, engine)
+    assert resolved is ROUTE.LEGACY_REFERENCE
+    assert resolved.is_policy_route is False

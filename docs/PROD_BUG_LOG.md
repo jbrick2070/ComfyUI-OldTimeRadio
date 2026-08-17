@@ -5188,3 +5188,44 @@ EXPECTED result, not a regression signal.
   two siblings, or deletion of the `--set` engine-rotation path in
   `scripts/otr_gpu_soak_matrix.py` so the mistake is unrepresentable.
 - status: OPEN. Do not read `soak_20260816_143448.json` as coverage.
+
+## PBUG-20260816-04 -- the mirror generator's "idempotent by ownership" fix was row-level, and it was still destroying FIELDS
+
+- surfaced: 2026-08-16 late, running `scripts/_otr_mirror_clone_refs.py` against
+  the real bank to mint the two Lemmy clone rows the provisional tier needs.
+  Live artifact: the actual `git diff` of the write, not a review reading.
+- the receipt LOOKED right and that is the whole lesson. The run printed
+  `mirrored=83 added=2 preserved-unmanaged=3` -- the exact line the 2026-08-16
+  r2 judgment cited as proof the generator had been made safe. That line counts
+  ROWS. The diff showed 37 insertions and **18 deletions** for a change that
+  should have been pure addition.
+- two distinct losses, both invisible to the counter:
+  1. **`speaker_id` stripped from all eight mirrored rows that carried one.**
+     The generator copied a fixed seven-field allow-list (`_COMMON`) that was
+     written before the bank gained the field. `speaker_id` records the real
+     HUMAN behind a reference and exists because a ref_path collision cannot
+     catch two recordings of one person -- LibriVox's Mark F. Smith has a plain
+     and a grandfatherly take in two different files. Without it one narrator
+     can be cast as two characters in the same episode, on chatterbox and dia
+     only, which is a casting defect nobody would trace back to a bank script.
+  2. **`cb_announcer_male` reverted.** The on-disk row had been re-pointed at
+     `vz_peter_yearsley` with curated timbre (`british`, `clear`, elder) and
+     `style_tags: [preferred_announcer, british_leaning]`. The generator owns
+     that key and rewrote it back to its hardcoded `vz_bill_boerst` literal,
+     dropping the style tags entirely.
+- root cause: "ownership" was implemented as *replace the whole row for a key I
+  generate*. A generator owns the fields it DERIVES; it does not own fields it
+  has never heard of, and it does not own a row it merely bootstrapped.
+- fix (applied): the mirror now copies every source field except the identity
+  pair (`voice_ref_id`, `engine`), so any future bank field mirrors without
+  anyone remembering to edit a list; owned keys MERGE over what is on disk
+  rather than replacing it; and the `cb_announcer_male` bootstrap row is created
+  only when it is ABSENT. Re-run diff is now **32 insertions, 0 deletions** --
+  exactly the two Lemmy rows. Counts also became honest: `mirrored=82
+  added=2 preserved-unmanaged=4`.
+- coverage: `tests/test_tts_voice_preflight_matrix.py::test_p3_4_the_generator_
+  never_drops_a_FIELD_from_a_row_it_owns` (every prior key must survive) and
+  `::test_p3_5_a_mirror_carries_its_sources_speaker_id` (the semantic pin). The
+  three existing P3 tests all passed against the defective generator, because
+  every one of them asked about rows.
+- status: FIXED, proven on the real bank write.

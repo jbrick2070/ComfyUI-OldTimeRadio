@@ -1198,6 +1198,14 @@ class CastLock:
             if not _ROUTE.cast_row_matches_policy(entry, claim.character_key):
                 continue
             if is_qualified:
+                # BOTH DIRECTIONS, and both branches. `auto_registry` clears
+                # before every stamp including this one; doing it here too is
+                # what makes the two modes agree. A row stamped provisional on
+                # ElevenLabs and re-locked under the qualified IndexTTS2 route
+                # otherwise keeps `provider_voice_id` -- inert for that engine
+                # today, and exactly the half-a-fix shape this sprint spent a
+                # bug-log entry on elsewhere.
+                _normalize_row_for_tier_switch(entry)
                 self._stamp(entry, claim.bank_entry, fallback="policy_route")
                 entry["voice_route"] = dict(policy_claim.voice_route)
                 _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_QUALIFIED,

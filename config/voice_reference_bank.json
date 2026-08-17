@@ -3514,6 +3514,38 @@
       "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
       "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "cb_lemmy_algenib_cockney_v1",
+      "engine": "chatterbox",
+      "gender": "male",
+      "timbre": [
+        "gravelly",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
+      "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
+      "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "dia_lemmy_algenib_cockney_v1",
+      "engine": "dia",
+      "gender": "male",
+      "timbre": [
+        "gravelly",
+        "warm"
+      ],
+      "roles": [
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
+      "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
+      "commercial_clean": true
     }
   ]
 }

@@ -178,6 +178,58 @@ def test_p3_3_generated_ids_do_not_carry_the_source_prefix():
     assert module._new_id("dia_", "vz_bill_boerst") == "dia_bill_boerst"
 
 
+def test_p3_4_the_generator_never_drops_a_FIELD_from_a_row_it_owns():
+    """P3.4 -- THE HALF THE ROW-LEVEL FIX MISSED, found by running it for real.
+
+    Ownership was fixed at the ROW level and the receipt said so:
+    `mirrored=83 added=2 preserved-unmanaged=3`. That line prints identically
+    whether or not a FIELD is lost, because it counts rows -- so the first real
+    run against the real bank quietly stripped `speaker_id` from all eight
+    mirrored rows that carried one (it was not on a seven-field allow-list
+    written before the field existed) and reverted a hand-improved
+    `cb_announcer_male` to a hardcoded literal.
+
+    A row that survives with fewer fields than it had has not survived.
+    """
+    before = _bank_rows()
+    after = {(row["engine"], row["voice_ref_id"]): row
+             for row in _mirror_module().plan_rows(before)["voices"]}
+
+    for row in before:
+        key = (row["engine"], row["voice_ref_id"])
+        missing = sorted(set(row) - set(after[key]))
+        assert not missing, (
+            "the generator would DROP %s from %r -- a generator owns the fields "
+            "it derives, never the ones it does not know about" % (missing, key))
+
+
+def test_p3_5_a_mirror_carries_its_sources_speaker_id():
+    """P3.5 -- and this is WHY the field-level rule matters, not just that it is
+    tidy. `speaker_id` records the real human behind a reference, because a
+    ref_path collision cannot catch two recordings of ONE person: LibriVox's
+    Mark F. Smith has a plain and a grandfatherly take in two different files.
+    Strip it from the clone engines and one narrator can be cast as two
+    characters in the same episode -- on chatterbox and dia only, which is a
+    casting defect nobody would trace back to a bank generator."""
+    planned = _mirror_module().plan_rows(_bank_rows())["voices"]
+    by_id = {(row["engine"], row["voice_ref_id"]): row for row in planned}
+
+    sources = [row for row in planned
+               if row["engine"] == "indextts2" and row.get("speaker_id")]
+    assert sources, "no indextts2 row carries a speaker_id -- the pin is vacuous"
+
+    for src in sources:
+        if "char_voice" not in src.get("roles", []):
+            continue
+        for engine, prefix in (("chatterbox", "cb_"), ("dia", "dia_")):
+            mirror = by_id.get(
+                (engine, _mirror_module()._new_id(prefix, src["voice_ref_id"])))
+            assert mirror is not None
+            assert mirror.get("speaker_id") == src["speaker_id"], (
+                "%s mirror of %r lost its speaker_id"
+                % (engine, src["voice_ref_id"]))
+
+
 # --- P4: the route contract -----------------------------------------------
 
 
