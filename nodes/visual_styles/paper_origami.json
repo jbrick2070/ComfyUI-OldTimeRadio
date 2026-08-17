@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly, folded paper tubes and creased dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Paper dial needle sweeps in gentle arcs. Creases flex and breathe. Paper edges flutter softly. Slow handheld dolly forward.",
-    "music_open": "Continuous shot, same console throughout. Paper dial whip-pans across frequencies. Folds spring open crease by crease. Grille pleats ripple sharply. Dynamic dolly push forward.",
-    "music_close": "Continuous shot, same console throughout. Paper dial settles. Folds ease flat and still. Paper glow fades to soft amber. Slow dolly pull back.",
-    "music_inter": "Continuous shot, same console throughout. Paper dial steady. Pleats ripple with the rhythm. Paper strips bounce like equalizer bars. Slow orbit around the speaker."
+    "announcer": "Continuous shot, same console throughout. Paper dial needle sweeps in gentle arcs. Creases flex and breathe. Paper edges flutter softly.",
+    "music_open": "Continuous shot, same console throughout. Paper dial needle races across the frequencies. Folds spring open crease by crease. Grille pleats ripple sharply.",
+    "music_close": "Continuous shot, same console throughout. Paper dial settles. Folds ease flat and still. Paper glow fades to soft amber.",
+    "music_inter": "Continuous shot, same console throughout. Paper dial steady. Pleats ripple with the rhythm. Paper strips bounce like equalizer bars."
   },
   "still_word_typography": {
     "noir": "sharply folded paper capitals, deep crease shadows",

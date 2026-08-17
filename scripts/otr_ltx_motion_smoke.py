@@ -34,10 +34,31 @@ URL = "http://127.0.0.1:8000"
 CKPT = "ltx-video-2b-v0.9.safetensors"
 T5 = "t5xxl_fp16.safetensors"
 STILL = "otr_ltx_smoke_still.png"   # in the comfy input dir
-# announcer motion template (BUG-LOCAL-112, <=188 chars), motion-only.
-MOTION_PROMPT = ("Continuous shot, same console throughout. Tuning dial needle "
-                 "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
-                 "trembles. Dust motes drift. Slow handheld dolly forward.")
+
+
+def _pack_register(key="announcer", style_id="sci_fi_radio"):
+    """The motion register READ FROM THE PACK -- never a typed copy.
+
+    This constant used to be a third hardcoded duplicate of the default pack's
+    register text (after the pack JSON itself and render_driver's
+    `_LTX_MOTION_PROMPT_BY_ROLE` fixture), and it went stale exactly as you'd
+    expect: it still carried "Slow handheld dolly forward." after the 2026-08-17
+    subject-first rewrite removed it, so a motion smoke would have measured a
+    prompt production no longer sends. Reading the pack costs one json.load and
+    cannot drift.
+
+    The pack JSON is read directly rather than through `_otr_visual_styles`
+    deliberately -- this script's whole point is to be BARE-BONES with no OTR
+    pipeline imports.
+    """
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "nodes", "visual_styles", "%s.json" % style_id)
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)["motion_registers"][key]
+
+
+MOTION_PROMPT = _pack_register("announcer")
 NEG = "low quality, worst quality, blurry, distorted, watermark, text, static"
 # The ComfyUI-Goofer 8-step distilled schedule (== OTR LTX_DISTILLED_SIGMAS).
 GOOFER_SIGMAS = "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"

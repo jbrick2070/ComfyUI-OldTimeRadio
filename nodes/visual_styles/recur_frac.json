@@ -24,10 +24,10 @@
     "default": "{form} glowing as recursive fractal light field raster hardware, nested dial geometry, vector membranes and luminous black depth"
   },
   "motion_registers": {
-    "announcer": "Recursive fractal light field. Continuous shot, same console throughout. Raster lattices breathe. Nested dial echoes fold inward. Cyan and magenta corridors open inside the grille. Slow recursive push forward.",
-    "music_open": "Recursive fractal light field. Continuous shot, same console throughout. Dial sweep ignites nested raster tunnels. Subpixel lattices expand radially. Emissive chambers fold inward. Smooth push forward.",
-    "music_close": "Recursive fractal light field. Continuous shot, same console throughout. Dial settles. Recursive tunnels contract into luminous black. Raster lines dim in layers. Slow pull back.",
-    "music_inter": "Recursive fractal light field. Continuous shot, same console throughout. Dial steady, glowing. Vector membranes ripple. Nested light echoes orbit the speaker. Slow Moebius-like turn."
+    "announcer": "Recursive fractal light field. Continuous shot, same console throughout. Raster lattices breathe. Nested dial echoes fold inward. Cyan and magenta corridors open inside the grille.",
+    "music_open": "Recursive fractal light field. Continuous shot, same console throughout. Dial sweep ignites nested raster tunnels. Subpixel lattices expand radially. Emissive chambers fold inward.",
+    "music_close": "Recursive fractal light field. Continuous shot, same console throughout. Dial settles. Recursive tunnels contract into luminous black. Raster lines dim in layers.",
+    "music_inter": "Recursive fractal light field. Continuous shot, same console throughout. Dial steady, glowing. Vector membranes ripple. Nested light echoes orbit the speaker."
   },
   "still_word_typography": {
     "noir": "recursive fractal light field luminous capitals, razor-clean thin cyan strokes with magenta inner echoes",

@@ -241,7 +241,13 @@ class TestPerBeatScenePrompts:
         s = _shot("shot_b000_music_open", "announcer_visual",
                   source_line_ids=[], start_s=0.0, dur_s=9.5)
         p = _rd.build_request_from_shot(s, led)["text_prompt"]
-        assert "vibrates aggressively" in p               # dynamic music_open template
+        # 2026-08-17 subject-first rewrite: the music_open discriminator moved
+        # from "vibrates aggressively" to "races across the frequencies". The
+        # old marker was one of FOUR phrases the Seedance softener rewrote on
+        # this very register -- it shipped as "vibrates subtly", i.e. the
+        # energy inverted on the episode's most energetic beat. The assertion
+        # is unchanged in intent: structure (music_open) beats role (announcer).
+        assert "races across the frequencies" in p        # dynamic music_open template
         assert "Tuning dial needle sweeps" not in p       # NOT the announcer (structure won)
         # music_inter remains the calm rollback via env:
         monkeypatch.setenv("OTR_LTX_OPEN_MOTION_KEY", "music_inter")

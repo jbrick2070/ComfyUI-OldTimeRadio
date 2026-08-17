@@ -47,6 +47,30 @@ CI (`--strict` fails only on effective conflicts). An AUTHORED conflict is a
 housekeeping note, not a defect: the runtime resolves it, and the raw string is
 kept so the default lane's historical negative stays legible.
 
+THE VIDEO SIDE (added 2026-08-17, GO_FORWARD D-BIS finding 1). Everything above
+audits STILL surfaces. `VIDEO_DICT_SURFACES` had existed here from the start but
+was only ever DISPLAYED -- `_fights_in` never read it -- so a video engine's
+negative contradicting a pack's own `motion_registers` was structurally
+invisible to this tool. It is now measured and REPORTED. What it found:
+
+  eng_cloud_video conflicts with FIVE packs. It bans "whip pans" while the
+  `music_open` register of `anime`, `cartoon`, `paper_origami` AND the DEFAULT
+  `sci_fi_radio` all ask for a dial that "whip-pans"; it bans "flicker" while
+  `shakespeare_stage_realism`'s announcer asks for candlelight that flickers.
+  Every LOCAL video engine (ltx_av, humo, ltx_8gb, ltx_video) is clean -- their
+  negatives are pure quality/artifact terms, so the exposure is confined to the
+  opt-in cloud lane.
+
+  This is a STATIC-AUDIT finding, not a PBUG: the cloud engine is opt-in,
+  requires credentials, and its provider-side behaviour is unverifiable from
+  this repo. It needs one live observation before promotion.
+
+  `--strict` IS DELIBERATELY NOT EXTENDED TO IT. The video negatives are FROZEN
+  RECIPE ("the recipes are not on the table"), so failing CI on a string this
+  repo may not edit would be a build-breaker by construction. Resolving these --
+  by dropping a term at COMPOSE time, never by editing a recipe string -- is an
+  operator ruling, not a driver decision.
+
     python scripts/otr_style_traceroute.py
     python scripts/otr_style_traceroute.py --style cartoon
     python scripts/otr_style_traceroute.py --fights-only
@@ -58,6 +82,7 @@ UTF-8, no BOM, ASCII output.
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import sys
@@ -98,6 +123,75 @@ NEGATIVE_ENGINES = (
 )
 NO_NEGATIVE_ENGINES = ("sd35_large", "flux2_klein", "hidream_i1",
                        "eng_google_image", "eng_cloud_image")
+
+#: THE VIDEO SIDE (2026-08-17, D-BIS finding 1). `VIDEO_DICT_SURFACES` has
+#: existed since this tool was written but was only ever DISPLAYED -- `_fights_in`
+#: reads STILL surfaces alone, so a video negative contradicting a pack's own
+#: `motion_registers` was structurally invisible here. These are the shipped
+#: per-engine video negatives, by (label, module path, constant name).
+#:
+#: They are read STATICALLY, by AST, rather than imported. This tool's promise is
+#: that it "renders nothing, loads no model, spends no GPU"; importing a video
+#: engine drags in the render stack and breaks that on the spot.
+VIDEO_NEGATIVE_SOURCES = (
+    ("eng_cloud_video", "nodes/_otr_video_engines/eng_cloud_video.py",
+     "_WAN_NEGATIVE_DEFAULT"),
+    ("eng_ltx_av", "nodes/_otr_video_engines/eng_ltx_av.py",
+     "_LTX_DEFAULT_NEGATIVE"),
+    ("eng_humo", "nodes/_otr_video_engines/eng_humo.py",
+     "_HUMO_DEFAULT_NEGATIVE"),
+    ("eng_ltx_8gb", "nodes/_otr_video_engines/eng_ltx_8gb.py",
+     "_LTX8_DEFAULT_NEGATIVE"),
+    ("eng_ltx_video", "nodes/_otr_video_engines/eng_ltx_video.py",
+     "_LTX_DEFAULT_NEGATIVE"),
+    # The word-card animator (Pixverse) is a SECOND negative-bearing engine in
+    # eng_cloud_video.py. It was missed on the first pass because this list is
+    # hand-curated -- see the coverage guard below, which is the real fix.
+    ("eng_cloud_word_razzle", "nodes/_otr_video_engines/eng_cloud_video.py",
+     "_RAZZLE_NEG_DEFAULT"),
+    # Shared by eng_wan_i2v + eng_wan_ti2v, which import it rather than
+    # defining their own. Found BY the coverage guard, not by hand -- which is
+    # the argument for the guard existing.
+    ("wan_shared (i2v + ti2v)", "nodes/_otr_video_engines/wan_shared.py",
+     "_WAN_DEFAULT_NEGATIVE"),
+)
+
+
+def discover_video_negative_constants():
+    """Every module-level `*NEGATIVE*` string constant in the video engines.
+
+    `VIDEO_NEGATIVE_SOURCES` above is hand-curated, which makes it wrong by
+    construction the moment an engine grows a negative -- exactly what happened
+    with `_RAZZLE_NEG_DEFAULT`. This discovers them instead, so the report can
+    say out loud when it is auditing fewer negatives than exist. Returns
+    ``{(relpath, const_name)}``.
+    """
+    found = set()
+    root = os.path.join(_REPO, "nodes", "_otr_video_engines")
+    try:
+        names = sorted(f for f in os.listdir(root) if f.endswith(".py"))
+    except OSError:
+        return found
+    for fname in names:
+        path = os.path.join(root, fname)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+        except (OSError, SyntaxError):
+            continue
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                name = getattr(target, "id", "")
+                if "NEGATIVE" not in name.upper() or name.endswith("_ENV"):
+                    continue
+                value = node.value
+                if isinstance(value, ast.Call) and value.args:
+                    value = value.args[0]
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    found.add(("nodes/_otr_video_engines/" + fname, name))
+    return found
 
 _WORD = re.compile(r"[a-z][a-z0-9-]+")
 #: Terms that are anti-ARTIFACT, not anti-STYLE. A pack may legitimately carry
@@ -168,6 +262,70 @@ def find_effective_fights(style):
     This is the one that must always be empty (operator ruling 2026-08-17).
     """
     return _fights_in(vs.effective_negative(style), style)
+
+
+def _literal_assign(path, name):
+    """The string a module assigns to ``name``, read by AST -- no import.
+
+    Handles the two shapes the video engines actually use: a plain (possibly
+    implicitly-concatenated) string literal, and a literal wrapped in a call --
+    `_WAN_NEGATIVE_DEFAULT = visual_safety_negative("...")`. The wrapper only
+    merges in `VISUAL_SAFETY_NEGATIVE_PROMPT`, which is "", so the literal is
+    the effective value. Returns "" when the name is absent or not a literal,
+    because this tool reports and must never fail a build.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+    except (OSError, SyntaxError):
+        return ""
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == name
+                   for t in node.targets):
+            continue
+        value = node.value
+        if isinstance(value, ast.Call) and value.args:
+            value = value.args[0]
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            return value.value
+    return ""
+
+
+def _motion_text(style):
+    """Every `motion_registers` value joined -- the pack's VIDEO positive."""
+    values = getattr(style, "motion_registers", None) or {}
+    try:
+        return " ".join(str(v or "") for v in values.values()).lower()
+    except AttributeError:
+        return ""
+
+
+def find_video_fights(negative_text, style):
+    """Phrases in a VIDEO negative that this pack's `motion_registers` ask for.
+
+    Same phrase discipline and the same artifact-term exclusion as
+    `_fights_in`, pointed at the video surface. It additionally matches simple
+    hyphen/plural variants, because the packs write "Dial whip-pans" where the
+    engine negative writes "whip pans" -- a strict literal test misses the
+    single widest conflict in the tree.
+    """
+    phrases = [c.strip().lower() for c in str(negative_text or "").split(",")
+               if c.strip() and c.strip().lower() not in _ARTIFACT_TERMS]
+    positive = _motion_text(style)
+    if not positive or not phrases:
+        return []
+    hits = []
+    for phrase in phrases:
+        stem = phrase.rstrip("s")
+        variants = {phrase, stem, phrase.replace(" ", "-"),
+                    phrase.replace("-", " "), stem.replace(" ", "-")}
+        for variant in variants:
+            if variant and re.search(r"\b%s" % re.escape(variant), positive):
+                hits.append(phrase)
+                break
+    return hits
 
 
 def describe(style, verbose=True):
@@ -265,6 +423,54 @@ def main(argv=None):
         out.append("  %-16s cfg %-4s %-6s %s" % (name, cfg, live, note))
     out.append("  no negative conditioning at all: %s"
                % ", ".join(NO_NEGATIVE_ENGINES))
+    # ---- THE VIDEO SIDE (D-BIS finding 1) --------------------------------
+    # Reported, NEVER gated. `--strict` stays scoped to STILL effective fights
+    # on purpose: the video negatives are FROZEN RECIPE ("the recipes are not
+    # on the table"), so failing CI on a string this repo may not edit would be
+    # a build-breaker by construction. Whether these conflicts should be
+    # resolved -- and by dropping a term at compose time, never by editing a
+    # recipe -- is an operator call, not a driver decision.
+    out.append("=" * 72)
+    out.append("VIDEO-SIDE: engine negative vs the pack's own motion_registers")
+    out.append("  (reported only -- --strict is deliberately NOT extended here)")
+    video_total = 0
+    for label, relpath, const in VIDEO_NEGATIVE_SOURCES:
+        negative = _literal_assign(os.path.join(_REPO, relpath), const)
+        if not negative:
+            out.append("  %-18s (negative not readable -- skipped)" % label)
+            continue
+        hit_packs = []
+        for sid in ids:
+            try:
+                style = vs.resolve_visual_style(sid)
+            except Exception:  # noqa: BLE001 -- already reported above
+                continue
+            hits = find_video_fights(negative, style)
+            if hits:
+                hit_packs.append("%s -> %s" % (sid, ", ".join(sorted(set(hits)))))
+                video_total += len(set(hits))
+        if hit_packs:
+            out.append("  %-18s CONFLICTS on %d pack(s):"
+                       % (label, len(hit_packs)))
+            for hp in hit_packs:
+                out.append("       %s" % hp)
+        else:
+            out.append("  %-18s clean against every pack" % label)
+
+    # COVERAGE GUARD: say out loud when a negative exists that this report did
+    # not audit. A hand-curated source list that silently omits an engine reads
+    # exactly like an engine with no conflicts.
+    audited = {(relpath, const) for _, relpath, const in VIDEO_NEGATIVE_SOURCES}
+    missed = sorted(discover_video_negative_constants() - audited)
+    if missed:
+        out.append("  !! NOT AUDITED -- %d video negative(s) exist that this "
+                   "report does not cover:" % len(missed))
+        for relpath, const in missed:
+            out.append("       %s :: %s" % (relpath, const))
+        out.append("     Add them to VIDEO_NEGATIVE_SOURCES.")
+    else:
+        out.append("  coverage: every discoverable video negative is audited")
+
     out.append("=" * 72)
     out.append("EFFECTIVE FIGHTS: %d   <- MUST BE 0. A negative may never "
                "conflict with a visual style" % fights_total)
@@ -272,6 +478,9 @@ def main(argv=None):
                "non-zero value here is a defect.")
     out.append("AUTHORED conflicts: %d  <- housekeeping only; resolved at mint "
                "by effective_negative()." % authored_total)
+    out.append("VIDEO conflicts:    %d  <- reported, not gated. Frozen recipe: "
+               "needs an operator ruling," % video_total)
+    out.append("                        never a driver edit to a recipe string.")
 
     print("\n".join(out))
     return 1 if (args.strict and fights_total) else 0

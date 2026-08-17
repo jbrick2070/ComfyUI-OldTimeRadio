@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly in flat cartoon color, vacuum tubes and dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Dial needle wags in bouncy arcs. Cabinet squashes and stretches gently with the voice. Tubes blink playfully. Slow bouncy dolly forward.",
-    "music_open": "Continuous shot, same console throughout. Dial whip-pans wildly. Cabinet springs and stretches to the downbeat. Tubes pop alight one by one. Energetic dolly push forward.",
-    "music_close": "Continuous shot, same console throughout. Dial settles with a wobble. Cabinet sighs into a gentle slump. Tube glow dims to a sleepy amber wink. Slow dolly pull back.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Cabinet sways side to side with the rhythm. Tubes bounce like piano keys. Slow orbit around the speaker."
+    "announcer": "Continuous shot, same console throughout. Dial needle wags in bouncy arcs. Cabinet squashes and stretches gently with the voice. Tubes blink playfully.",
+    "music_open": "Continuous shot, same console throughout. Dial needle spins wildly. Cabinet springs and stretches to the downbeat. Tubes pop alight one by one.",
+    "music_close": "Continuous shot, same console throughout. Dial settles with a wobble. Cabinet sighs into a gentle slump. Tube glow dims to a sleepy amber wink.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Cabinet sways side to side with the rhythm. Tubes bounce like piano keys."
   },
   "still_word_typography": {
     "noir": "chunky outlined cartoon capitals, bold black keyline",

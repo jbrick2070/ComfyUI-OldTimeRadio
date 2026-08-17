@@ -3,6 +3,125 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (item B window) -- HEAD 360cd4e5+ (v2.0-alpha) -- CODER (the style fix proven on live pixels; git auth root-caused; D-BIS finding 1 measured)
+
+**THE GIT BREAKAGE WAS NEVER THE TOKEN.** Both repos were genuinely stranded at
+boot (OTR `360cd4e5` vs origin `7f6a6eca`, three commits; survival-guide
+`0f4de67` vs `897693b`). But `gh` was authorized the whole time -- account
+`jbrick2070`, `repo` scope, token in the keyring. Git was wired to the **Git
+Credential Manager**, which answers by opening a GUI dialog, so a
+non-interactive push either hangs on it or dies `User cancelled dialog` (the
+operator saw the popup). The prior window's recorded `Invalid username or token`
+sent it hunting a credential that was never wrong. Root fix: `gh auth setup-git`
+-- an empty `credential.https://github.com.helper` to reset the inherited
+system-level `manager`, then the gh helper. Both pushes went first try.
+**A THIRD COMMIT LANDED MID-SESSION.** HEAD moved `dc98e5c1` -> `360cd4e5`
+between my first two commands -- the prior window's negative-census addendum,
+committed 11:11:33, ~56s before I noticed. My push carried it. Docs-only and
+since read, but it was a commit I had not reviewed when I pushed it. The reflog
+is what settled it; check it before assuming a surprise SHA is corruption.
+
+**ITEM B DONE -- SIX LIVE STILLS, AND THE ANNOUNCER ARM IS THE RECEIPT.** On a
+`cartoon` episode the PRE-FIX announcer still minted as a **literal
+photograph**: the engine's own "cartoon, illustration" negative drove a
+cartoon-pack still to photorealism. Post-fix it is a bold-outline cartoon radio.
+Trap 1 predicted announcer stills would "legitimately change" because
+`RADIO_CONSOLE_NEG` now reaches pixels; the real cause of the change is the
+illustration-family veto, and it is far bigger than the trap implied. The
+character still shows the same defect more quietly (restrained flat-vector ->
+the rubber-hose cartoon the pack asks for).
+
+**THE INSTRUMENT IS PERMANENT AND SUBMITS THE ENGINE'S OWN GRAPH.**
+`scripts/_otr_style_authority_smoke.py`, both arms behind `--pre-fix`, calling
+`_zimage_params` + `_build_zimage_graph` rather than re-typing the recipe -- the
+lumina smoke mirrors its graph by hand, which is one edit away from measuring
+itself. Trap 3 is handled STRUCTURALLY: both arms take the same explicit
+`--seed` into the KSampler, so the `prompt_hash` seed path is never consulted.
+
+**TWO THINGS THE CONTROL CAUGHT THAT THE ACCEPTANCE TEST WOULD NOT HAVE.**
+(1) My GATE 1 was over-broad. "No illustration-family terms" is Fable's wording
+scoped to the ILLUSTRATED pack; generalized it fails the default lane, where
+`clean digital` is legitimate. Correct form is the repo's own `_fights_in`.
+(2) "The default lane is unchanged" needed precision -- the LOOK is unchanged
+(same photoreal noir, no regression) but the conditioning is not, because
+`effective_negative` drops `cartoon, illustration` from `sci_fi_radio` too. So
+default-lane stills are NOT byte-identical at a fixed seed. That is the
+self-veto fix working; a window expecting identical bytes would misread it.
+Also new: the historical negative fought `cartoon` on THREE phrases, not two --
+`glossy` collides with that pack's own "glossy beveled shine".
+
+**D-BIS FINDING 1 MEASURED -- THE ENTRY WAS STALE BOTH WAYS.** "flicker" is now
+ONE pack (`shakespeare_stage_realism`), not four; the anime rewording already
+fixed the rest. The real, unrecorded finding is **"whip pans"**: the cloud Wan
+negative bans it while four packs' `music_open` ask for a dial that "whip-pans"
+-- including `sci_fi_radio`, the DEFAULT pack. It hid partly because the engine
+writes "whip pans" and every pack writes "whip-pans". Every LOCAL video engine
+is clean, so the exposure really is the opt-in cloud lane only. The traceroute
+now measures and REPORTS the video side, reading each engine's negative by AST
+rather than importing it (the tool promises it loads no model). **`--strict` is
+deliberately NOT extended** -- video negatives are frozen recipe, so gating CI
+on them is a build-breaker by construction. Still a STATIC-AUDIT finding, not a
+PBUG; it needs one live observation, and the resolve-or-leave call is the
+operator's.
+
+**A SECTION 4 RESET TOOL NOW EXISTS.** `scripts/otr_reset_gpu.ps1` -- selective
+kill by CommandLine with the Claude MCP pythons explicitly protected, the port
+kill, and it VERIFIES (port free + VRAM at baseline) instead of assuming.
+`kill_otr_zombies.ps1` is not this tool and never was: it deliberately
+PRESERVES the port-8000 owner, the opposite of what section 4 needs.
+
+**THE MOTION REGISTERS WERE REWRITTEN SUBJECT-FIRST (operator directive):**
+*"let the engine decide what an animated or hyper-realistic futuristic retro
+radio in action is."* All nine packs, 35 of 36 registers. Kept deliberately: the
+"Continuous shot, same console throughout" opener (a continuity guarantee, and
+pinned by two tests), each pack's characteristic verbs, the energy arc across
+the four beats, and `sci_fi_radio`'s "Tuning dial needle sweeps" (pinned by
+`test_brief_prompt_finishing.py:194`). Zero softener matches, zero banned
+phrases, all under the 240-char cap. VIDEO conflicts went 5 -> **0**.
+
+**THE REGISTERS HAVE THREE COPIES AND THE SUITE CAUGHT TWO OF THEM.** Changing
+the pack broke seven tests: `render_driver._LTX_MOTION_PROMPT_BY_ROLE` is a
+byte-pinned extraction fixture of the DEFAULT pack (`test_visual_styles_a1.py:208`
+asserts they are equal), and `test_look_qa_round5.py` used "vibrates
+aggressively" as its music_open discriminator -- one of the exact phrases the
+Seedance softener was inverting. Both updated, intent unchanged. The THIRD copy
+was `scripts/otr_ltx_motion_smoke.py`'s hardcoded `MOTION_PROMPT`, which no test
+covers and which had ALREADY gone stale; it now reads the pack JSON directly and
+cannot drift again.
+
+**I OVER-CORRECTED, AND THE RENDER IS WHAT PROVED IT.** A live LTX motion A/B at
+seed 42 (`otr_ltxmotion/motion_{OLD_camera,NEW_subject}_00001_.webm`) measured
+the subject-first register at **0.220 mean frame-to-frame delta vs 0.373**, and
+first-vs-last drift **3.50 vs 10.27** -- roughly 40% less motion, two-thirds less
+travel. The filmstrip confirms it: the old arm's framing visibly pushes in, the
+new arm is genuinely locked off. Then the collision test showed only **TWO** of
+the 35 camera clauses ever collided (`Slow handheld dolly forward` via
+"handheld", `Dynamic dolly push forward` via "dynamic dolly push"); `Slow dolly
+pull back`, `Slow orbit around the speaker`, `Measured dolly push forward`,
+`Slow bouncy dolly forward` and `Slow dramatic push-in` are all CLEAN. So
+stripping every camera clause was never required, and it cost measurable motion
+on a lane whose own negatives ban "static, frozen pose, still image".
+**AWAITING AN OPERATOR CALL:** (A) keep the fully locked-off registers as
+landed, or (B) restore the camera clauses and change only the two colliding
+phrasings (`Steady dolly push forward` / `Slow steady dolly forward`, both
+verified clean). Driver recommends **B**; it is a taste call about the show's
+look, so it was not taken unilaterally with a push pending.
+
+**THE GENERAL LESSON, worth more than this item:** the acceptance test passed on
+TEXT for all 36 registers and the pixels still moved 40% less. That is
+PBUG-20260817-01's lesson recurring on the video side within the same day --
+green gates are not a working fix, and the render is the only proof.
+
+Current step: **the A/B register call above**, then THE QUEUE item **C** (store
+the ten per-engine prompt notes; strike z_image's negative-authoring clause
+first, per the trap in D). Item D stays BLOCKED. Models: CODER window, NO RUNG
+CITED -- the budget table still has no rows; ran on the per-window mapping
+(cheapest local triage + Sonnet 5 QA + a four-way panel on the one design fork).
+Cloud spend $0. Gates at close: suite **10755/110/1** (baseline 10717; no
+regressions), Bible **20/26/3 at 287** (nothing promoted -- every finding here is
+static-audit and fails the admission rule), AST + BOM + ASCII clean on every
+touched file, six live stills + two live video clips on disk.
+
 ## 2026-08-17 (late night) -- HEAD ce8a1fad (v2.0-alpha) -- CODER (engine input-convention audit: one real hit of three, and TWO COMMITS ARE UNPUSHED)
 
 > **BOOT WARNING: git auth is broken on this box and two commits are local-only.**

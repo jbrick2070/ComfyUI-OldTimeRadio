@@ -24,10 +24,10 @@
     "default": "{form} glowing warmly in flat cel color, vacuum tubes and dials"
   },
   "motion_registers": {
-    "announcer": "Continuous shot, same console throughout. Dial needle sweeps in crisp arcs. Speed lines flare and fade. Cel highlights alternate across the cabinet. Slow dramatic push-in.",
-    "music_open": "Continuous shot, same console throughout. Dial whip-pans across frequencies. Speed lines burst outward. Cel glow ignites from cold to blazing. Dynamic dolly push forward.",
-    "music_close": "Continuous shot, same console throughout. Dial settles. Cel glow cools from white to deep amber. Ink shadows lengthen. Slow dolly pull back.",
-    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Equalizer bars bounce in flat color. Speed lines pulse with the bass. Slow orbit around the speaker."
+    "announcer": "Continuous shot, same console throughout. Dial needle sweeps in crisp arcs. Speed lines flare and fade. Cel highlights shiver across the cabinet.",
+    "music_open": "Continuous shot, same console throughout. Dial needle races across the frequencies. Speed lines burst outward. Cel glow ignites from cold to blazing.",
+    "music_close": "Continuous shot, same console throughout. Dial settles. Cel glow cools from white to deep amber. Ink shadows lengthen.",
+    "music_inter": "Continuous shot, same console throughout. Dial steady, glowing. Equalizer bars bounce in flat color. Speed lines pulse with the bass."
   },
   "still_word_typography": {
     "noir": "bold inked manga capitals, sharp tapered brush strokes",

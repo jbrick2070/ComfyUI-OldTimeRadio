@@ -1306,21 +1306,30 @@ _OPENING_MUSIC_SUFFIX = "b000_music_open"
 # in build_request_from_shot (AST-pinned).
 _MOTION_REGISTER_KEYS = frozenset(
     {"announcer", "music_open", "music_close", "music_inter"})
+#: SUBJECT-FIRST REWRITE (operator directive 2026-08-17): "let the engine decide
+#: what an animated or hyper-realistic futuristic retro radio in action is." The
+#: registers now describe what the RADIO does and leave the CAMERA to the engine.
+#: The trailing camera-move clause is gone from all four, which is also where
+#: every provider-token collision lived: "Slow handheld dolly forward" tripped the
+#: cloud ban on "handheld", and music_open alone tripped FOUR Seedance softeners
+#: (whip-pans -> "slowly sweeps", white-hot, aggressively -> "subtly", dynamic
+#: dolly push), shipping "Dial slowly sweeps ..." with the energy inverted.
+#: Kept deliberately: the continuity opener, each beat's energy (open surges,
+#: close winds down), and "Tuning dial needle sweeps" (pinned by
+#: tests/test_brief_prompt_finishing.py).
 _LTX_MOTION_PROMPT_BY_ROLE = {
     "announcer": ("Continuous shot, same console throughout. Tuning dial needle "
                   "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
-                  "trembles. Dust motes drift. Slow handheld dolly forward."),
-    "music_open": ("Continuous shot, same console throughout. Dial whip-pans "
-                   "across frequencies. Tube filaments ignite from cold to "
-                   "white-hot. Speaker grille vibrates aggressively. Dynamic "
-                   "dolly push forward."),
+                  "trembles. Dust motes drift."),
+    "music_open": ("Continuous shot, same console throughout. Tuning dial needle "
+                   "races across the frequencies. Tube filaments ignite from "
+                   "cold to fierce white. Brass grille shudders with the music."),
     "music_close": ("Continuous shot, same console throughout. Dial settles. "
                     "Tube filaments cool from white through deep amber. Smoke "
-                    "trails from cooling tubes. Slow dolly pull back."),
+                    "trails from cooling tubes."),
     "music_inter": ("Continuous shot, same console throughout. Dial steady, "
                     "glowing. Oscilloscope dances to the rhythm. VU meters "
-                    "bounce. Tubes pulse with the bass. Slow orbit around the "
-                    "speaker."),
+                    "bounce. Tubes pulse with the bass."),
 }
 #: BUG-LOCAL-112 char budget for the motion prompt (verb-only core + optional
 #: short brief fragment appended AFTER, dropped if it breaks the budget).

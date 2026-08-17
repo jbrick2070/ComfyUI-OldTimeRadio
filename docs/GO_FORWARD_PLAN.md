@@ -65,9 +65,10 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-17, item A close):** suite
-**10717 / 110 / 1** (10712 at the one-style-authority close -> 10717 with the
-five lumina input-convention tests; no regressions). Bible **20 / 26 / 3**, and
+**BASELINES to detect drift (updated 2026-08-17, item B close):** suite
+**10739 / 110 / 1** (10712 at the one-style-authority close -> 10717 with the
+five lumina input-convention tests -> 10739 with the 22 style-traceroute VIDEO
+tests; no regressions at any step). Bible **20 / 26 / 3**, and
 the Bible now holds **287** entries (`12.109` promoted for PBUG-20260817-02).
 Earlier chain: 10584 at the 08-16 close -> 10644 with the
 provisional tier's 60 tests -> 10654 with the audition/artifact and three-family
@@ -153,23 +154,27 @@ work:
 ### THE QUEUE, DRIVER-SET 2026-08-17 LATE (this is the sequence; the numbered
 ### bodies below are reference detail)
 
-**ITEM 1 IS DONE.** ONE STYLE AUTHORITY shipped, pushed and Bible-promoted.
-What follows is the next window's order, cheapest-certain first:
+**ITEM 1, A AND B ARE DONE.** ONE STYLE AUTHORITY shipped, pushed and
+Bible-promoted (item 1); the engine input-convention conformance audit closed
+with one real hit of three (item A); the style fix is now PROVEN ON LIVE PIXELS
+(item B), and D-BIS finding 1 is measured and reported. **The next open item is
+C.** What follows is the order, cheapest-certain first:
 
-> **READ THIS BEFORE ANYTHING ELSE (2026-08-17 close): TWO COMMITS ARE LOCAL-ONLY
-> AND GIT AUTH IS BROKEN ON THIS BOX.** The push failed with
-> `remote: Invalid username or token. Password authentication is not supported
-> for Git operations` (OTR repo), and hung on a credential prompt (Bible repo).
-> Per the one-attempt rule neither was retried.
-> * OTR `ComfyUI-OldTimeRadio` -- local `ce8a1fad`, origin `7f6a6eca`, 1 unpushed
->   (item A: the lumina fix + PBUG-20260817-02 + this plan).
-> * survival-guide -- local `0f4de67`, origin `897693b`, 1 unpushed
->   (Bible `12.109` + README 286->287 + the coverage-index row).
-> **VERIFY BOTH ARE PUSHED BEFORE WRITING ANY CODE.** Local-only commits are the
-> exact failure mode the git policy exists to prevent, and a second window
-> committing on top of an unpushed one is how work gets swept. If auth is still
-> broken, that is the operator's to fix (token/credential-manager), not a thing
-> to work around.
+> **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
+> The 08-17 breakage was NOT the token. `gh` was authorized the whole time
+> (account `jbrick2070`, `repo` scope, token in the keyring); git was wired to
+> the **Git Credential Manager**, which answers by opening a GUI dialog, so any
+> non-interactive push either hung on it or died with `User cancelled dialog`.
+> The `Invalid username or token` message recorded here sent the last window
+> hunting a credential that was never wrong.
+> **The root fix, already applied:** `gh auth setup-git`, which writes an empty
+> `credential.https://github.com.helper` (resetting the inherited system-level
+> `manager`) followed by the gh helper. Nothing is stored in a URL and no token
+> is echoed. Both pushes then went through first try.
+> **THE STANDING RULE IS UNCHANGED -- verify both are pushed before writing any
+> code.** It is two `git ls-remote` calls. If a push ever fails again, read the
+> failure before assuming the token: a GUI-prompting helper and a bad
+> credential look nothing alike but report almost the same thing.
 
 **A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17, one real hit
 of three, live-proven.** Receipt: `PBUG-20260817-02`. Ran exactly as directed --
@@ -260,29 +265,59 @@ three lumina files are on disk, and the engine is wired into
 `config/profiles/otr_soak_*_lumina_image.json` + `otr_sbcov_3`. It was reachable,
 not theoretical.
 
-**B. PROVE THE STYLE FIX ON ONE LIVE RENDER -- NEXT, AND THE GPU IS FREE FOR IT
-(operator 2026-08-17).** Fable's acceptance test, adopted verbatim: mint the same
-cartoon episode's character still on z_image before and after -- the effective
-negative must contain no illustration-family terms and the positive must lead
-with the pack token. Green gates are not a working fix.
+**B. PROVE THE STYLE FIX ON ONE LIVE RENDER -- DONE 2026-08-17, six live stills,
+both gates green on the shipped path.** Fable's acceptance test ran verbatim.
+The instrument is permanent: `scripts/_otr_style_authority_smoke.py`, both arms
+in one script behind `--pre-fix`, and it submits the ENGINE'S OWN graph
+(`_zimage_params` + `_build_zimage_graph` are imported and called, never
+re-typed) so "this is what a real mint does" cannot quietly stop being true.
+No arc, per `7f6a6eca` -- an already-shipped fix measured against a
+pre-specified acceptance test has no design fork in it. Sonnet 5 QA on the diff.
 
-**What the item-A window learned that this item should reuse, because it is the
-same measurement problem.** The lumina A/B is the working pattern: put BOTH arms
-in ONE script behind a flag, fix the seed, and keep the pre-fix arm permanently
-rather than deleting it after use (`scripts/_otr_lumina_image_smoke.py
---no-system-prompt` is the template). A style change is exactly the class that is
-invisible in isolation and obvious in comparison.
-**Two traps carried forward:** (1) `RADIO_CONSOLE_NEG` now reaches pixels for the
-first time, so ANNOUNCER stills legitimately change -- that is the fix, not a
-regression, and the acceptance leg must say so up front or the eyeball reads it
-as a break. (2) `scripts/otr_style_traceroute.py` is the cheap pre-check --
-**EFFECTIVE FIGHTS must be 0** -- but it reads TEXT, and PBUG-20260817-01's own
-lesson is that every prompt agreed while the pixels diverged. The traceroute is
-necessary and not sufficient; the render is the proof.
-**Reset first** (CLAUDE.md section 4): at the 08-17 close the resident server
-held ~12.3 GiB with the lumina model still loaded from item A's A/B -- the
-documented finished-but-resident state, not a crash, but it must be torn down
-selectively by CommandLine before a fresh leg.
+**THE ANNOUNCER ARM IS THE RECEIPT THAT MATTERS, AND IT IS WORSE THAN TRAP 1
+PREDICTED.** On a `cartoon` episode the PRE-FIX announcer still minted as a
+literal PHOTOGRAPH -- the engine's own "cartoon, illustration" negative drove a
+cartoon-pack still to photorealism. Post-fix it is a bold-outline cartoon radio.
+The trap said announcer stills "legitimately change" because `RADIO_CONSOLE_NEG`
+now reaches pixels; the measured change is far larger than that, and the
+illustration-family veto -- not the human-exclusion negative -- is what did it.
+The character still shows the same defect more quietly: pre-fix is a restrained
+flat-vector figure, post-fix is the rubber-hose cartoon the pack asks for.
+
+**THE PRE-FIX ARM FOUND A THIRD FIGHTING PHRASE NOBODY HAD RECORDED.** The
+historical engine negative fought `cartoon` on THREE phrases, not two: `glossy`
+collides with that pack's own `still_word_typography` -> "glossy beveled shine".
+
+**THE DEFAULT-LANE CLAIM NEEDED ONE WORD OF PRECISION.** "The three photoreal
+packs carry the historical string VERBATIM so the default lane is unchanged" is
+true of the AUTHORED string and true of the LOOK -- the `sci_fi_radio` A/B is
+the same photoreal noir, same grade, no style regression. It is NOT true of the
+conditioning: `effective_negative` legitimately drops `cartoon, illustration`
+from that pack too (its own announcer surface asks for a "living cartoon
+appliance face"), so default-lane stills are NOT byte-identical at a fixed seed.
+That is the self-veto fix working, not drift -- but a window expecting identical
+bytes would misread it.
+
+**ONE GATE OF MINE WAS WRONG AND THE DEFAULT-LANE CONTROL CAUGHT IT.** "No
+illustration-family terms" is Fable's wording scoped to the ILLUSTRATED pack the
+test names; generalized naively it fails the default lane, where `clean digital`
+is a legitimate, intended negative. The correct universal form is the repo's own
+`_fights_in` -- does this negative contradict THIS pack's positive -- which
+resolves every case right. Run the control; the acceptance test alone would have
+shipped the over-broad gate.
+
+**Traps 2 and 3 held as written.** The traceroute pre-check was 0 EFFECTIVE
+FIGHTS before the render and it was necessary-not-sufficient exactly as warned.
+Trap 3 is now handled STRUCTURALLY rather than remembered: both arms take the
+same explicit `--seed` straight into the KSampler, so the `prompt_hash` seed
+path is never consulted and the arms cannot drift onto two different rolls.
+
+**Receipts:** `otr/episodes/style_authority_smoke/stills/` --
+`style_{cartoon,sci_fi_radio}_{character,announcer}_{prefix,postfix}_seed7`.
+Six stills, all SUCCESS. Reset before every leg via the new
+`scripts/otr_reset_gpu.ps1` (12.3 GiB -> ~1.6 GiB, port free); note that
+`kill_otr_zombies.ps1` is NOT that tool -- it deliberately PRESERVES the
+port-8000 owner, which is the opposite of what section 4 requires.
 
 **C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
 runtime cost. Answers exist (three research rounds); the schema and the
@@ -330,17 +365,87 @@ other home. STATIC-AUDIT findings, NOT PBUGs:** the admission rule reserves
 `PROD_BUG_LOG.md` for defects verified by a live artifact, and these came from a
 full-repo census plus a Fable design pass. Each needs one live observation
 before it may be promoted.
-1. **A cross-family negative conflict the style traceroute structurally cannot
-   see.** The CLOUD Wan negative (`eng_cloud_video.py:221-224`) bans "flicker",
-   while four packs' `motion_registers` ask for it -- `anime`'s announcer said
-   "Cel highlights flicker across the cabinet" until it was reworded to
-   "alternate" (2026-08-17). Narrow: opt-in cloud engine, credentials required,
-   and provider-side liveness is UNVERIFIABLE from this repo. The general
-   lesson is the important part: **the traceroute audits STILL packs only**, so
-   negative-vs-`motion_registers` conflicts on the video side are unchecked.
-   Extending `effective_negative`'s phrase test to `motion_registers` is the
-   guard -- but the video negatives are FROZEN RECIPE, so a guard may drop a
-   term at compose time and must never edit a recipe string.
+1. **A cross-family negative conflict the style traceroute structurally could
+   not see -- NOW MEASURED AND REPORTED (2026-08-17, item B window). The entry
+   as first written was stale in BOTH directions.**
+   * **"flicker" is ONE pack, not four.** Only
+     `shakespeare_stage_realism:27` ("Candlelight flickers across polished
+     wood") still asks for it; the `anime` rewording to "alternate" already
+     fixed the rest. The original count described the state before that edit.
+   * **The real finding is "whip pans", and it was unrecorded.** The cloud Wan
+     negative bans it while the `music_open` register of **four** packs asks
+     for a dial that "whip-pans" -- `anime`, `cartoon`, `paper_origami` and
+     **`sci_fi_radio`, the DEFAULT pack**. That is what makes this the
+     widest-reach item rather than an exotic-pack curiosity. It stayed invisible
+     partly because the engine writes "whip pans" and every pack writes
+     "whip-pans", so a strict literal test finds none of the four.
+   * **Every LOCAL video engine is CLEAN** (`ltx_av`, `humo`, `ltx_8gb`,
+     `ltx_video`) -- their negatives are pure quality/artifact terms. The
+     exposure really is confined to the opt-in cloud lane.
+   **What shipped:** `scripts/otr_style_traceroute.py` now measures and REPORTS
+   the video side (`find_video_fights` + an AST reader that pulls each engine's
+   negative WITHOUT importing it, so the tool keeps its "loads no model, spends
+   no GPU" promise), with 22 tests. `VIDEO_DICT_SURFACES` had existed there from
+   the start but was only ever displayed; `_fights_in` never read it.
+   **`--strict` IS DELIBERATELY NOT EXTENDED TO IT** -- the video negatives are
+   FROZEN RECIPE, so gating CI on a string this repo may not edit would be a
+   build-breaker by construction.
+   **DECIDED 2026-08-17 by a four-way panel (Fable + Sonnet + Antigravity +
+   the driver anchor), UNANIMOUS: do NOT build a compose-time negative guard.**
+   Codex was quota-held and excluded. Two reasons neither the anchor nor D-BIS
+   had, both verified in code:
+   * **The ban is ALSO in the POSITIVE prompt.** `_WAN_SMOOTH_MOTION_CLAUSE`
+     (`eng_cloud_video.py:212-219`) reads "No whip pans, handheld shake, sudden
+     reframing, jump cuts, rapid zooms..." and is appended to every Wan positive
+     at line 266. Vidu has the same shape at 231-237. So a guard that strips the
+     NEGATIVE resolves one of three channels and stamps a receipt claiming the
+     fight is resolved while the ban still ships in the prompt body. **Every
+     negative-only audit in this repo, including the traceroute, is blind to a
+     prohibition written as positive prose.**
+   * **There is no video choke point.** Stills resolve the negative in ONE
+     function called from ONE place; video resolves it at SEVEN call sites
+     across FIVE files, and there is no per-shot negative ledger field at all
+     (`render_driver._stamp_prompt_meta` records positive-prompt fields only).
+     A guard would be building the first video negative receipt from scratch.
+   * **Mostly a HOMOGRAPH, not a conflict.** Every register opens "Continuous
+     shot, same console throughout" and the thing that whip-pans is the DIAL;
+     the negative's "whip pans" sits among jump cuts / rapid zooms / handheld
+     shake, i.e. CAMERA pathologies. The ban was PROTECTING the registers' own
+     first sentence. Unlike PBUG-20260817-01, where both sides meant the same
+     referent.
+   **WHAT WAS ACTUALLY BROKEN WAS SOMETHING ELSE, AND IT WAS SHIPPING.**
+   `_SEEDANCE_PROMPT_SOFTENERS` (`eng_cloud_video.py:176-198`) already rewrites
+   register text at compose time on the Seedance lane -- i.e. the "option (b)"
+   being debated was ALREADY BUILT on a sibling lane -- and as a blind regex
+   pass it produced `cartoon.music_open` -> **"Dial slowly sweeps wildly"** (a
+   contradiction) and, on the DEFAULT pack's most energetic beat, four
+   substitutions including "vibrates aggressively" -> **"vibrates subtly"**
+   (energy inverted) and "cold to white-hot" -> "cold to bright warm glow"
+   (broken phrase). Six registers across four packs. Fixed by the rewrite below;
+   the softener table itself is frozen recipe and was NOT touched.
+   **THE TRACEROUTE'S OWN BLIND SPOT, found by the panel:**
+   `VIDEO_NEGATIVE_SOURCES` was hand-curated and missed `_RAZZLE_NEG_DEFAULT`.
+   It now carries `discover_video_negative_constants()`, a coverage guard that
+   reports any negative the report does not audit -- which immediately found a
+   SEVENTH nobody had enumerated, `wan_shared._WAN_DEFAULT_NEGATIVE` (shared by
+   both local Wan engines). A hand-maintained source list reads exactly like
+   "no conflicts" when it is really "did not look".
+   **STILL A STATIC-AUDIT FINDING, NOT A PBUG:** opt-in engine, credentials
+   required, provider-side liveness unverifiable from this repo -- and the panel
+   sharpened this: there is no PATH to a live observation, because the lane
+   needs paid credentials the scope rules default against. A shipped video guard
+   would be permanently stuck at the evidentiary tier the stills fix explicitly
+   calls insufficient.
+
+**D-TER. THE B6 ENV GATE EXISTS IN ONLY ONE OF FIVE ENGINE FILES (2026-08-17,
+found by the panel -- this WIDENS D-BIS finding 3).** D-BIS recorded three
+ungated env negatives. The real count is worse: `eng_ltx_8gb` gates its override
+behind `_prequalification_active()` so production reads ONLY the frozen recipe,
+and **no other engine does**. `eng_humo:748`, `eng_ltx_av:766,909`,
+`eng_ltx_video:1169,1332` and `eng_cloud_video:815-817,1010-1012` all read their
+env override unconditionally, on every production render. That is the exact
+shape of the bug B6 fixed, still live in four of five files. Static-audit
+finding; recipe-adjacent, so it needs the operator, not a driver decision.
 2. **Two duplicate-drift negative variants.** The same 7-term boilerplate exists
    in four copies; `eng_ltx_av.py:107-109` and `eng_humo.py:112-114` have
    diverged with extra terms and no recorded reason. HuMo's divergence looks
