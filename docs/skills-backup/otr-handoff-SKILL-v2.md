@@ -112,10 +112,23 @@ Before appending the log entry, run the Bible check:
 
 ### 3. Append the HANDOFF_LOG entry (newest at top)
 
+**THE SHA IN THE HEADING IS ALWAYS ONE COMMIT STALE, AND THAT IS PHYSICS, NOT A
+MISTAKE (operator, 2026-08-16).** A commit cannot contain its own hash. The
+heading sha is written, then committing the entry produces a NEW head -- so the
+number in the log can never be the head that exists after the handoff lands.
+Chasing it is an infinite regress: amend to fix the sha and the amend changes
+the sha again.
+
+So SAY SO rather than pretending. The heading records **the last CODE head**,
+and the entry states plainly that the handoff commit sits on top of it. **The
+authoritative post-handoff sha is the one in the KICKOFF LINE, which is
+generated in step 5 AFTER the push** -- that is the only sha a fresh window
+should ever paste, and it is the only one that is real.
+
 Format -- match the existing entries exactly:
 
 ```
-## YYYY-MM-DD -- HEAD <sha> (v2.0-alpha) -- <WINDOW KIND> (<one-line what happened>)
+## YYYY-MM-DD -- HEAD <last-code-sha> +handoff (v2.0-alpha) -- <WINDOW KIND> (<one-line what happened>)
 
 Did: <what the session actually did, with receipts -- commit shas, suite
   numbers, artifact paths, the one log line that proves a live leg>.
@@ -124,9 +137,13 @@ Next: <the next window's first concrete action, including what it is blocked on>
 Models: <which rungs were actually used; whether the kibitz gate applied and
   what the panel really was -- a partial campaign is reported as a scoped tail
   with a scope receipt, NEVER worded as a full arc>.
-Commits: <shas pushed, or "docs-only">.
+Commits: <shas pushed, or "docs-only">. The handoff commit itself lands ON TOP
+  of these and is not listed here -- see the kickoff line for the real head.
 ```
 
+- The `+handoff` marker is the whole point: it tells the reader the number is
+  the code head and one docs commit follows it. A bare sha invites a window to
+  check out a head that is missing its own handoff.
 - No long logs -- the important line, exit code, hash, or path only.
 - ASCII punctuation throughout (`--`, plain quotes). UTF-8, no BOM.
 
@@ -143,12 +160,24 @@ Commits: <shas pushed, or "docs-only">.
 - If a stale `.git\index.lock` blocks the commit and `Get-Process git` is empty,
   remove the lock and retry once.
 
-### 5. Print the next kickoff
+### 5. Print the next kickoff -- AFTER the push, with the REAL head
+
+**Re-read the sha here. Do not reuse the one from the log heading.** Run
+`git rev-parse HEAD` AFTER the handoff push has landed and HEAD == origin is
+verified, and put THAT sha in the kickoff. It is the only sha in the whole
+handoff that is not stale, because it is the only one read after the last write.
+
+Order matters and it is the whole trick: write the entry -> commit -> push ->
+verify -> THEN read the head -> then print the kickoff.
 
 End with the one-line kickoff the next window pastes, in the GO_FORWARD "NEVER
-boot a window by letter" shape: resume + window kind + "read GO_FORWARD 'ON
-DECK'/QUEUE and execute in stated order" + full-kibitz gate + "state your MODEL
-& CREDIT BUDGET rung first".
+boot a window by letter" shape: resume + window kind + the real HEAD sha +
+"read GO_FORWARD 'HOW TO READ THIS FILE' and THE QUEUE, execute in stated
+order" + the review-routing gate + "state your MODEL & CREDIT BUDGET rung
+first".
+
+Say the sha out loud to the operator as the AFTER sha, so it is unambiguous
+which of the several shas in the session is the one to boot from.
 
 ## Standing guardrails (both modes)
 

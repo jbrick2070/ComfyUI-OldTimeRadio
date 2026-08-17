@@ -3,7 +3,15 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-16 -- HEAD 54d16e06 (v2.0-alpha) -- CODER (evening: chunk B CLOSED live-proven, the Lemmy arc closed, a TTS preflight created, a soak that was rendering nothing, and a GO_FORWARD lean pass)
+## 2026-08-16 -- HEAD 54d16e06 +handoff (v2.0-alpha) -- CODER (evening: chunk B CLOSED live-proven, the Lemmy arc closed, a TTS preflight created, a soak that was rendering nothing, and a GO_FORWARD lean pass)
+
+> **`+handoff` means the sha above is the last CODE head and this entry's own
+> commits land on top of it.** A commit cannot contain its own hash, so the
+> number in any handoff heading is always one commit stale by construction --
+> amending to "fix" it just changes it again. **The authoritative post-handoff
+> sha is the one in the kickoff line, read AFTER the push.** For this window
+> that is `c8832d35`. Convention adopted 2026-08-16 on the operator's catch and
+> written into the skill so it stops recurring.
 
 Did, all pushed, HEAD == origin verified after each:
 
