@@ -267,6 +267,50 @@ def resolve_engine_for_role(image_policy, role):
     return fb, slot, slot != "character_image_model" and bool(fb)
 
 
+#: The four values `negative_source` may take. COMPOSITION ONLY -- see
+#: `negative_source_label`. Exported so a test can pin the vocabulary rather than
+#: re-typing it, because this enum has already drifted once unnoticed: the
+#: one-style-authority PLAN documented `env_override`, which never shipped.
+NEGATIVE_SOURCE_LABELS = ("pack+request", "pack", "request", "none_contributed")
+
+
+def negative_source_label(pack_negative, obj_negative) -> str:
+    """Where THIS row's composed negative came from, and the one place that names it.
+
+    Pure, and deliberately blind to the engine. It answers exactly one question --
+    which of the two COMPOSITION inputs contributed -- so every value it can return
+    is verifiable from its own two arguments.
+
+    ITEM H (2026-08-17): the empty arm used to read `engine_hygiene`, a claim about
+    what the ENGINE adds on top. That was wrong twice over. It was computed before
+    `resolve_engine_for_role` picks an engine, so it asserted a property of an
+    engine not yet chosen -- accurate for `z_image_turbo` (which does end
+    `.strip() or _HYGIENE_NEGATIVE`) and false for `lumina_image` (no floor at all)
+    purely by coincidence. And it put two authorities in one value: composition
+    belongs to the dispatcher, the hygiene floor belongs to the engine.
+
+    Naming the empty case for what is actually known dissolves the ordering
+    coupling entirely -- the answer no longer depends on the engine, so it does not
+    matter where in the loop this is called. Per-engine hygiene telemetry, if ever
+    wanted, is a SEPARATE post-resolution field, and engines must DECLARE a floor
+    for it to read (the `engine_consumes_still` dual-read pattern) rather than be
+    matched by name, per item A's ruling that name-matching ships false positives.
+
+    `none_contributed` does NOT mean "no negative reached the model" -- an engine
+    may still apply its own hygiene floor. It means neither the pack nor the object
+    supplied one. Whether the negative was LIVE at all is a different question
+    again (at cfg 1.0 it conditions nothing) and wants the resolved cfg, which is
+    D-BIS finding 4 and is not recorded yet.
+    """
+    if pack_negative and obj_negative:
+        return "pack+request"
+    if pack_negative:
+        return "pack"
+    if obj_negative:
+        return "request"
+    return "none_contributed"
+
+
 #: Excerpt half-width around a path-guard match. The old report was
 #: ``prompt[:60]``, which shows nothing useful when the offending character sits
 #: late in a long prompt -- the excerpt is centred on the match instead.
@@ -1160,13 +1204,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         _effective_neg = visual_safety_negative(
             ", ".join(t for t in (_pack_negative, _obj_negative) if t))
         # Named from what ACTUALLY contributed, per row. An episode-level label
-        # read off the pack alone reported "engine_hygiene" on announcer stills
-        # of a dynamic-pack episode, where the pack is empty by design but the
-        # object negative is real and is what conditioned the mint.
-        _neg_source = ("pack+request" if _pack_negative and _obj_negative
-                       else "pack" if _pack_negative
-                       else "request" if _obj_negative
-                       else "engine_hygiene")
+        # read off the pack alone reported the empty case on announcer stills of a
+        # dynamic-pack episode, where the pack is empty by design but the object
+        # negative is real and is what conditioned the mint.
+        #
+        # COMPOSITION ONLY, and the one place that names it is
+        # `negative_source_label` -- read its docstring before changing a value.
+        # Item H (2026-08-17) renamed the empty arm off "engine_hygiene", which was
+        # a claim about the ENGINE made before `resolve_engine_for_role` below has
+        # chosen one.
+        _neg_source = negative_source_label(_pack_negative, _obj_negative)
         if _styled_now:
             # Provenance: MetaBrief stamped its own prompt_hash upstream for its
             # report. The dispatch cache key is recomputed from prompt TEXT

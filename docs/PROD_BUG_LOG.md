@@ -5362,5 +5362,14 @@ EXPECTED result, not a regression signal.
   "flattening the look") as the same class wearing different clothes. Promote at
   wrap-up per the delta-scrape discipline, with the README count bump in the
   same commit.
-- status: FIXED and live-proven. Residual OPEN: the lumina hygiene-floor /
-  `engine_hygiene` mislabel question above.
+- status: FIXED and live-proven. Residual NARROWED 2026-08-17: the
+  **`engine_hygiene` mislabel half is CLOSED** -- the dispatcher's fourth
+  `negative_source` arm now reads `none_contributed` and describes COMPOSITION only,
+  because the old value asserted engine behaviour at a point where the engine had
+  not been resolved (true of `z_image_turbo`, false of `lumina_image`, consulted in
+  neither case). See queue item H-RECEIPT in `GO_FORWARD_PLAN.md` and
+  `kibitz-runs/2026-08-17-item-H-receipt/`. **Residual STILL OPEN: only the lumina
+  hygiene FLOOR itself**, which changes conditioning at cfg 4.0 on a live engine and
+  is therefore an operator/recipe decision owing a render, not a driver fix. No new
+  PBUG is opened for either half: the mislabel was a static-audit finding and the
+  floor has no live observation yet.

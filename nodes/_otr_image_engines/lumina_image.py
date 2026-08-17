@@ -133,19 +133,25 @@ H. There is no ``_resolve_negative`` helper here at all (that name belongs to
 ``z_image_turbo``); the negative is resolved INLINE inside ``_lumina_params`` as a
 bare ``str(get("negative_prompt") or "")``, with neither z_image's ``.strip()`` nor
 its ``_HYGIENE_NEGATIVE`` fallback, and no hygiene constant exists in this file.
-So an empty request negative reaches the encoder as ``""`` while the dispatcher
-stamps ``_neg_source="engine_hygiene"``.
+So an empty request negative reaches the encoder as ``""``.
 
-AND THE RECEIPT IS WORSE THAN "WRONG FOR LUMINA" -- verified 2026-08-17 while
-storing this overlay. The dispatcher computes ``_neg_source`` from what the PACK
-and the OBJECT contributed, and it does that BEFORE it resolves which engine will
-serve the row (``resolve_engine_for_role`` is called ~56 lines later in the same
-per-object iteration). So the ``engine_hygiene`` arm asserts a property of an
-engine the code has not yet chosen. It is true of z_image by COINCIDENCE -- that
-engine does have a floor -- and false here, but in neither case was anything
-consulted. That reframes item H: the label is not merely inaccurate for one
-engine, it is unverified for all of them. Storing this overlay neither fixes nor
-worsens it.
+**THE RECEIPT HALF OF ITEM H IS NOW FIXED, AND IT WAS NEVER A LUMINA BUG.** The
+dispatcher's fourth ``_neg_source`` arm used to read ``"engine_hygiene"`` -- a
+claim about what the ENGINE would do -- and it was computed BEFORE
+``resolve_engine_for_role`` picks one, so it asserted a property of an engine not
+yet chosen. True of z_image by COINCIDENCE (that engine really does have a floor),
+false here, and consulted in neither case. It also mixed two authorities in one
+value: composition is the dispatcher's business, the hygiene floor is the
+engine's. That arm now reads ``"none_contributed"``, which is what the dispatcher
+actually knows, so the value is engine-independent and this engine's missing floor
+is no longer misreported by it.
+
+**WHAT REMAINS OPEN IS ONLY THE FLOOR ITSELF, and it is the operator's call.**
+Giving lumina a hygiene floor changes conditioning at cfg 4.0 on a live engine, so
+the recipes directive applies and a render is owed. Three options are parked for
+him: no floor, copy z_image's string, or a lumina-specific one. Do NOT copy
+z_image's by reflex while editing nearby -- z_image runs cfg 2.0 and is a different
+model with its own artifact profile.
 
 EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
 2026-08-15 ruling, the RSS precedent):
@@ -289,8 +295,10 @@ class LuminaImage2Engine:
             # so an empty request negative reaches the encoder as "" and a
             # whitespace-only one is passed verbatim. That gap is REACHABLE
             # (`VISUAL_SAFETY_NEGATIVE_PROMPT` is "" and a pack may ship an
-            # empty negative_tail), and the dispatcher labels exactly that case
-            # `_neg_source="engine_hygiene"` -- a label lumina does not honour.
+            # empty negative_tail). The dispatcher USED to label exactly that case
+            # `_neg_source="engine_hygiene"`, which lumina does not honour; as of
+            # 2026-08-17 that arm reads `none_contributed` and describes
+            # composition only, so the receipt no longer claims a floor here.
             # Whether this engine should grow its own floor is a RENDER
             # decision on a different model, not a comment fix; it is logged,
             # not folded in here.

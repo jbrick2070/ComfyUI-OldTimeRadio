@@ -65,13 +65,18 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-17, item C close):** suite
-**10819 passed / 110 skipped / 1 xfailed** (10712 at the one-style-authority close
+**BASELINES to detect drift (updated 2026-08-17, H-receipt close):** suite
+**10824 passed / 110 skipped / 1 xfailed** (10712 at the one-style-authority close
 -> 10717 with the five lumina input-convention tests -> 10739 with the 22
 style-traceroute VIDEO tests -> **10755 at the item B close** -> **10819 with item
-C's 64 overlay tests**; no regressions at any step, and the +64 is exactly the new
-file). Bible **20 / 26 / 3**, and the Bible holds **287** entries (`12.109`
-promoted for PBUG-20260817-02; item C promoted NOTHING -- see its body).
+C's 64 overlay tests** -> **10824 with H-receipt's 5 negative-source tests**; no
+regressions at any step, and each delta equals exactly the tests added). Bible
+**20 / 26 / 3**, and the Bible holds **287** entries (`12.109` promoted for
+PBUG-20260817-02; item C and H-receipt promoted NOTHING -- see their bodies).
+
+> **CHECK THE DELTA, NOT YOUR RECOLLECTION.** H-receipt's write-up first said "six
+> tests"; the suite delta was +5 and the delta was right. Every count in this block
+> is measured, and any future row should be too.
 
 > **THIS BLOCK SAID `10739` UNTIL 2026-08-17 AND THE ITEM B HANDOFF SAID `10755`.**
 > The receipt this file calls its single authority had drifted from the log entry
@@ -176,11 +181,25 @@ as inherited-only rather than implying coverage it did not get. **What is still
 NOT true is that any directive has been MEASURED** -- the adoption gate stands, the
 probe A/B has not run, and every PROVENANCE paragraph says so.
 
-**OPEN, in order: `H` IS NEXT** -- read its body before costing it, because item
-C's work REFRAMED it and it is bigger than "a small judgement" looked. Then
-**G** / **F** / **E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are static-audit
-findings awaiting a live observation. B-OPEN is CLOSED -- the operator chose (B)
-and it shipped. What follows is that order, cheapest-certain first:
+**`H` SPLIT AND HALF-CLOSED 2026-08-17.** H-RECEIPT shipped (panelled first, r1
+scoped); **H-FLOOR is parked as an operator decision** because it changes
+conditioning at cfg 4.0 and owes a render. Read H's body before costing what is
+left -- item C's work reframed it and a panel corrected the driver's
+execution-order claim.
+
+**OPEN, in order: `G` IS NEXT** and it is cheaper than its queue position implies
+-- PBUG-20260815-11 was **UNBLOCKED 2026-08-15 by a narrowed ruling** (body below,
+around the "UNBLOCKED" heading): the mechanism is the description producer in
+`_otr_casting.py` re-asking against the gender it was handed, bounded retries,
+degrade-not-raise, and **node 89 gets no classifier**. Only its ACCEPTANCE needs
+pixels (a live leg plus a re-run of `scripts/audit_voice_gender_consistency.py`;
+34 portrait conflicts is the BEFORE number), and that batches into the operator's
+declared GPU session. **`E`'s candidate downloads can run in the BACKGROUND under
+anything** -- the queue already says so. **`F` is not secretly cheap:** its root is
+diagnosed by shape only and it wants tracing plus a panel, ideally the whole one
+once Codex is back 2026-08-19. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are
+static-audit findings awaiting a live observation. B-OPEN is CLOSED. What follows
+is that order, cheapest-certain first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -245,6 +264,17 @@ pre-specified acceptance test has no design fork in it. Sonnet 5 QA on the diff.
   `effective_negative` drops `cartoon, illustration` from that pack too, because
   its own announcer surface asks for a "living cartoon appliance face". Self-veto
   resolution working, not drift -- a window expecting identical bytes misreads it.
+* **THE GITIGNORE TRAP HAS A SECOND FACE: `kibitz-runs/` (found 2026-08-17,
+  H-receipt).** `.gitignore:251` ignores the whole directory, yet **105 files under
+  it are tracked** -- because git ignores nothing already in the index, the exact
+  mechanism the bullet below describes for `scripts/_*.py`. So the CONVENTION is
+  that panel artifacts are committed, and the rule silently blocks only NEW ones.
+  H-receipt's scope receipt, driver anchor, judgment, final and both agy reviews
+  were one command from being local-only while GO_FORWARD cited their path (this
+  file cites `kibitz-runs/` paths eight times, and every one of them would dangle
+  on a fresh clone). **`git check-ignore -v` any new artifact path, not just
+  scripts** -- and note the trap is now proven in two different directories, so
+  treat it as a class rather than a `scripts/` quirk.
 * **A "PERMANENT" INSTRUMENT IS GITIGNORED BY DEFAULT -- `git add -f` IT.**
   `.gitignore:71` carries `scripts/_*.py`, so every A/B instrument this queue
   calls permanent lands UNTRACKED. `_otr_style_authority_smoke.py` was one
@@ -588,8 +618,61 @@ run in the BACKGROUND under anything above.
 
 **G. PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Does not jump.
 
-**H. THE LUMINA HYGIENE-NEGATIVE FLOOR -- a small judgement, opened by item A's
-audit and deliberately left open.** `z_image_turbo._resolve_negative` ends
+**H. SPLIT 2026-08-17 INTO H-RECEIPT (DONE) AND H-FLOOR (OPERATOR).**
+
+> **H-RECEIPT IS SHIPPED.** The dispatcher's fourth `_neg_source` arm no longer
+> reads `engine_hygiene`; it reads `none_contributed` and describes COMPOSITION
+> only. The four arms now live in one pure helper,
+> `otr_image_gen_dispatcher.negative_source_label`, with `NEGATIVE_SOURCE_LABELS`
+> exported and FIVE tests pinning them -- the inline ternary was untestable, which
+> is how the wrong value shipped. Panelled first (r1, scoped): two Antigravity
+> calls (Flash High + **Pro 3.1**), a Fable pass, and the driver anchor; Codex
+> excluded on quota. Artifacts in `kibitz-runs/2026-08-17-item-H-receipt/`.
+>
+> **THE PANEL CORRECTED THE DRIVER, AGAIN, ON EXECUTION ORDER.** The anchor
+> claimed an engine-aware label would need "a production reordering in a loop that
+> also computes cache keys, seeds and the banana transform". FALSE, both agy lanes
+> independently: `_neg_source` is ASSIGNED once per row, `engine_id` is bound by the
+> `resolve_engine_for_role` call BELOW that assignment, and the value is WRITTEN
+> into the two `"negative_source"` ledger entries (the cache-hit branch and the
+> fresh-mint branch) -- **both after engine resolution**. Pro sharpened it:
+> `_neg_source` is **write-only telemetry**, three references in the whole file,
+> decoupled from `prompt_hash` and the banana transform. (Cited by SYMBOL on
+> purpose. The first draft of this block used line numbers, and the 42-line helper
+> this very change added shifted every one of them -- the same trap item C recorded,
+> re-sprung by its author within the hour. Sonnet's QA caught it.) **That is the second time in one day a panel caught an
+> execution-order claim from this driver** (the 2026-08-17 style build was the
+> first). The lesson generalizes: where a value is COMPUTED is not where it is
+> USED, and only the latter decides what is in scope.
+>
+> **THE PANEL'S CONCLUSION WAS OVERRULED, ON PURPOSE.** Both agy lanes wanted the
+> field made engine-aware rather than renamed. Their facts were folded; their
+> conclusion re-commits the original defect -- a field named for composition
+> asserting engine behaviour is TWO AUTHORITIES IN ONE VALUE, which is the shape
+> that produced the lie. The rename also DISSOLVES the ordering coupling rather
+> than working around it. Flash's proposed mechanism (`matching "z_image_turbo"`)
+> was rejected outright: item A's ruling is that name-matching ships false
+> positives.
+>
+> **ALSO FIXED, same change:** the enum in
+> `docs/2026-08-17-one-style-authority-PLAN.md` documented
+> `pack | pack+request | env_override` -- a value that never shipped, missing two
+> that did. Evidence the vocabulary has no contract: it had already drifted once,
+> unnoticed, with zero consequence.
+>
+> **NOW KNOWN FEASIBLE AND DELIBERATELY NOT BUILT:** per-engine hygiene telemetry
+> as a SEPARATE post-resolution field (engines must DECLARE a floor, dual-read
+> default per `engine_consumes_still`; never name-matched), and D-BIS finding 4's
+> resolved-cfg / `negative_live` bool. Both add ledger surface, so both wait.
+
+**H-FLOOR -- STILL OPEN, AND IT IS THE OPERATOR'S CALL, NOT A DRIVER'S.** Three
+options, rejected 4/4 as a driver action because it changes conditioning at cfg 4.0
+on a live engine and therefore owes a render: **(a)** no floor -- now honestly
+reported, which was the only urgent part; **(b)** copy z_image's
+`_HYGIENE_NEGATIVE`, the cheapest and the trap (z_image runs cfg 2.0, lumina 4.0,
+different model, different artifact profile); **(c)** a lumina-specific string, most
+correct and most work. Any of them needs one A/B at a fixed seed on the shipped
+path. The original framing is kept below for its detail: `z_image_turbo._resolve_negative` ends
 `.strip() or _HYGIENE_NEGATIVE` (`z_image_turbo.py:117`); `lumina_image` has
 NEITHER the strip nor a floor, so an empty request negative reaches the encoder
 as `""` and a whitespace-only one is passed verbatim. The path is REACHABLE

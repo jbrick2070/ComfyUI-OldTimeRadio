@@ -3,7 +3,7 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-17 (item C window) -- HEAD fe204068 +this (v2.0-alpha) -- CODER (item C DONE, both halves: ten overlays stored, nine lanes researched; a matrix-scraper regression root-fixed; 8 of 21 cited line numbers proven wrong)
+## 2026-08-17 (item C + H-receipt window) -- HEAD 9804f7a2 +this (v2.0-alpha) -- CODER (item C DONE both halves; H split and its receipt half shipped; a matrix-scraper regression root-fixed; 8 of 21 cited line numbers proven wrong; the panel corrected the driver on execution order TWICE)
 
 **THE RESEARCH HALF THEN RAN, AND IT PAID FOR ITSELF IN TRAPS RATHER THAN TIPS.**
 Nine of ten lanes got their own web lookup (allowed per the operator's 2026-08-15
@@ -112,13 +112,68 @@ option; giving lumina a floor stays an operator/recipe call needing a render.
 `sd35_large` (default-OFF). None has an overlay or a config block in the RESEARCH
 doc. Flagged as an operator scope call, deliberately not decided here.
 
-Current step: **H** -- and read its REFRAMING in GO_FORWARD before costing it;
-item C's work made it bigger than "a small judgement" looked, and the cheap option
-(fix the receipt) is now clearly asymmetric against the expensive one (give lumina
-a floor, which is an operator/recipe call needing a render). Then **G** / **F** /
-**E**. D stays BLOCKED; D-BIS 2-5 and D-TER remain static-audit findings awaiting a
-live observation. **Item C is closed on BOTH halves, but nothing in it is
-MEASURED** -- the adoption gate stands and the probe A/B has not run.
+**THEN H WAS SPLIT AND HALF-CLOSED, AND THE PANEL CORRECTED ME ON EXECUTION ORDER
+FOR THE SECOND TIME IN ONE DAY.** H-RECEIPT shipped: the dispatcher's fourth
+`_neg_source` arm no longer reads `engine_hygiene` (a claim about the ENGINE) but
+`none_contributed` (what the dispatcher can actually verify from its own two
+inputs). The four arms moved into one pure helper,
+`otr_image_gen_dispatcher.negative_source_label`, with `NEGATIVE_SOURCE_LABELS`
+exported and FIVE tests -- the inline ternary was untestable, which is how the wrong
+value shipped in the first place. (Five, counted from the suite delta 10819 ->
+10824; my first write-up said six from memory. Check the delta, not the recollection.)
+
+**My anchor claimed an engine-aware label would need "a production reordering in a
+loop that also computes cache keys, seeds and the banana transform". That was
+FALSE**, caught independently by both agy lanes and then verified by me:
+`_neg_source` is ASSIGNED once per row, `engine_id` is bound by the
+`resolve_engine_for_role` call BELOW that assignment, and the value is WRITTEN into
+the two `"negative_source"` ledger entries -- both AFTER engine resolution. Pro 3.1
+sharpened it: `_neg_source` is **write-only telemetry**, three references in the
+file, decoupled from `prompt_hash` and the banana transform. I had conflated where a
+value is COMPUTED with where it is USED. **And I cited those four sites by LINE in
+the first draft of this entry, which the 42-line helper I was adding immediately
+invalidated** -- the exact trap item C recorded hours earlier, re-sprung by its
+author. Sonnet's QA caught it; both write-ups now cite symbols. GO_FORWARD already records the 08-17 style
+panel correcting a driver execution-order claim; that makes twice today, and it is
+the strongest argument in this log for panelling a ledger change.
+
+**I OVERRULED THE PANEL'S CONCLUSION ON PURPOSE.** Both agy lanes wanted the field
+made engine-aware rather than renamed. Facts folded, conclusion rejected: a field
+named for COMPOSITION asserting ENGINE behaviour is two authorities in one value,
+which is the shape that produced the lie -- and the rename DISSOLVES the ordering
+coupling instead of working around it. Flash's mechanism (`matching
+"z_image_turbo"`) was rejected outright against item A's name-matching ruling.
+**H-FLOOR is parked for the operator** with three options; rejected 4/4 as a driver
+action because it changes conditioning at cfg 4.0 and owes a render.
+
+**FABLE'S TIMING ARGUMENT IS WHY THIS SHIPPED NOW RATHER THAN WAITING.** The field
+has ZERO readers, ZERO tests and ZERO on-disk rows (4,795 JSON files scanned under
+the real output base; `negative_source`, `self_veto_resolved` and `_style_spread`
+all absent together while `visual_style` appears in 770 and `prompt_hash` in
+1,022). Its first real population will be the operator's declared GPU session -- so
+leaving `engine_hygiene` in place meant the first ledgers ever written would be
+BORN asserting a floor lumina does not have. Also fixed: the enum in the
+one-style-authority PLAN documented `env_override`, which never shipped, and omitted
+two values that did -- the vocabulary had already drifted once, unnoticed.
+
+Current step: **G** -- PBUG-20260815-11, and it is cheaper than its queue position
+implies. It was UNBLOCKED 2026-08-15 by a narrowed ruling: the description producer
+in `_otr_casting.py` re-asks against the gender it was handed, bounded retries,
+degrade-not-raise, node 89 gets NO classifier. Only ACCEPTANCE needs pixels (live
+leg + `scripts/audit_voice_gender_consistency.py`; 34 conflicts is the BEFORE
+number), and that batches into the declared GPU session. **E's candidate downloads
+can run in the BACKGROUND under anything.** **F is not secretly cheap** -- root
+diagnosed by shape only, wants tracing plus a whole panel once Codex returns
+2026-08-19. D stays BLOCKED; D-BIS 2-5 and D-TER remain static-audit findings.
+**Item C is closed on BOTH halves, but nothing in it is MEASURED** -- the adoption
+gate stands and the probe A/B has not run.
+
+**OWED TO THE GPU BATCH, not to code:** the entire `visual` ledger section has
+never been written to disk, so D-BIS finding 5 is worse than recorded -- no tests
+AND no live observation, and the operator's "lock them in the ledger" ask is
+unproven end to end. One render that writes the section at all is the cheapest
+close, and it now writes the CORRECTED label. Alongside it: item C's named best A/B
+(`ltx_av` length) and G's acceptance leg.
 
 Models: CODER window, **NO RUNG CITED -- the MODEL & CREDIT BUDGET table still has
 a header, a separator and no rows**; ran on the per-window mapping paragraph
@@ -137,12 +192,13 @@ Box state at close: **CLEAN** -- port 8000 free, VRAM ~825 MiB (baseline), no
 resident server, no GPU leg run (item C is zero behaviour change, so no render was
 owed).
 
-Gates at close: suite **10819 passed / 110 skipped / 1 xfailed** (baseline 10755;
-the +64 is exactly the new test file, no other test moved). ENGINE_MATRIX drift
-**IDENTICAL**. Directives 176-232 chars against the 240 hard cap. AST + BOM +
-pure-ASCII + no-trailing-whitespace clean on all 12 touched files. Bible
-**20 / 26 / 3** at **287**, **nothing promoted** -- every finding here is
-static-audit or a docs-accuracy defect and fails the admission rule.
+Gates at close: suite **10824 passed / 110 skipped / 1 xfailed** (10755 baseline ->
+10819 with item C's 64 overlay tests -> 10824 with H-receipt's 5; each delta equals
+exactly the tests added, no other test moved). ENGINE_MATRIX drift **IDENTICAL**.
+Directives 176-232 chars against the 240 hard cap. AST + BOM + pure-ASCII +
+no-trailing-whitespace clean on every touched file. Bible **20 / 26 / 3** at
+**287**, **nothing promoted** -- every finding here is static-audit or a
+docs-accuracy defect and fails the admission rule.
 
 ## 2026-08-17 (item B window) -- HEAD 5aa2fee6 +handoff (v2.0-alpha) -- CODER (style fix proven on live pixels; git auth root-caused; the video-negative fork panelled and answered)
 

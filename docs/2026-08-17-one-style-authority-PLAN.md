@@ -241,7 +241,11 @@ wholesale (`production_ledger.py:527-552`). Node 91 ALREADY calls it at
     )
 
 **Shape** (`ledger["visual"]`): `style_id`, `style_token`, `pack_negative`,
-`negative_source` (`pack` | `pack+request` | `env_override`),
+`negative_source` (`pack+request` | `pack` | `request` | `none_contributed`
+-- CORRECTED 2026-08-17: this doc listed `env_override`, which never shipped, and
+omitted both `request` and the empty case; the empty case shipped as
+`engine_hygiene` and was renamed to `none_contributed` in item H because it
+asserted engine behaviour the dispatcher cannot see at that point),
 `authority_version`; `prompts[]` with one row per visual prompt across BOTH
 families (`kind`, `object_id`|`beat_id`, `role`, `source`, `styled`,
 `already_styled`, `prompt_sha8`, `laplacian`); and `spread`

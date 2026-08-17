@@ -24,6 +24,7 @@ if str(_NODES) not in sys.path:
 
 import _otr_visual_styles as vs  # noqa: E402
 from nodes._otr_image_engines import z_image_turbo as zit  # noqa: E402
+from nodes import otr_image_gen_dispatcher as disp  # noqa: E402
 
 _PACK_DIR = _NODES / "visual_styles"
 _ALL_IDS = tuple(sorted(p.stem for p in _PACK_DIR.glob("*.json")))
@@ -183,6 +184,61 @@ class TestEngineNegative:
         params = zit.ZImageTurboEngine()._zimage_params(
             {"prompt": "a face", "seed": 1, "negative_prompt": "photograph"})
         assert params["negative"] == "photograph"
+
+
+class TestNegativeSourceLabel:
+    """Item H, the receipt half (2026-08-17).
+
+    `negative_source` answers ONE question -- which COMPOSITION input contributed
+    -- so every value must be verifiable from the two arguments alone. The fourth
+    arm used to read `engine_hygiene`, a claim about what the ENGINE would add,
+    computed before `resolve_engine_for_role` has chosen one. It was accurate for
+    `z_image_turbo` and false for `lumina_image` purely by coincidence.
+
+    These pin the vocabulary because it has ALREADY drifted once unnoticed: the
+    one-style-authority PLAN documented `env_override`, a value that never shipped.
+    """
+
+    def test_all_four_arms(self):
+        label = disp.negative_source_label
+        assert label("pack terms", "obj terms") == "pack+request"
+        assert label("pack terms", "") == "pack"
+        assert label("", "obj terms") == "request"
+        assert label("", "") == "none_contributed"
+
+    def test_the_empty_arm_makes_no_claim_about_any_engine(self):
+        """The whole point of the rename. A composition field may not assert
+        engine behaviour -- that mixes two authorities in one value, and it is
+        unverifiable at the point it is computed."""
+        empty = disp.negative_source_label("", "")
+        assert "engine" not in empty, (
+            "the empty arm is asserting engine behaviour again; per-engine hygiene "
+            "telemetry belongs in a SEPARATE post-resolution field, and engines "
+            "must DECLARE a floor rather than be matched by name")
+        assert "hygiene" not in empty
+
+    def test_the_vocabulary_is_closed_and_exported(self):
+        """A test that re-types the enum cannot catch the enum drifting."""
+        assert disp.NEGATIVE_SOURCE_LABELS == (
+            "pack+request", "pack", "request", "none_contributed")
+        produced = {
+            disp.negative_source_label(p, o)
+            for p in ("", "pack terms") for o in ("", "obj terms")}
+        assert produced == set(disp.NEGATIVE_SOURCE_LABELS)
+
+    def test_it_is_blind_to_the_engine_by_construction(self):
+        """Pure and two-argument: there is no engine to pass, which is why the
+        value no longer depends on WHERE in the loop it is computed."""
+        import inspect
+        params = list(inspect.signature(disp.negative_source_label).parameters)
+        assert params == ["pack_negative", "obj_negative"]
+
+    def test_falsy_shapes_are_treated_as_absent(self):
+        """The call site passes `str(... or "")`, but None must not become the
+        string "None" if a future caller is sloppier."""
+        label = disp.negative_source_label
+        assert label(None, None) == "none_contributed"
+        assert label(None, "obj terms") == "request"
 
 
 class TestStyleToken:
