@@ -5,18 +5,22 @@ GO_FORWARD_PLAN.md stays lean and forward-only.
 
 ## 2026-08-16 -- HEAD 54d16e06 +handoff (v2.0-alpha) -- CODER (evening: chunk B CLOSED live-proven, the Lemmy arc closed, a TTS preflight created, a soak that was rendering nothing, and a GO_FORWARD lean pass)
 
-> **`+handoff` means the sha above is the last CODE head and this entry's own
+> **`+handoff` means the sha above is the last CODE head, and the handoff
 > commits land on top of it.** A commit cannot contain its own hash, so the
-> number in any handoff heading is always one commit stale by construction --
-> amending to "fix" it just changes it again.
+> number in any handoff heading is one commit stale by construction -- amending
+> to "fix" it just changes it again.
 >
-> **This note deliberately names NO post-handoff sha, and that is the fix.** An
-> earlier draft named one; committing that draft immediately made the named sha
-> stale, which is the same bug one level up. Any sha written here is wrong the
-> moment it is written. The authoritative post-handoff head is the one in the
-> **kickoff line**, read after the final push -- and for the next window, simply
-> `git rev-parse HEAD` on a clean tree. Convention adopted 2026-08-16 on the
-> operator's catch and written into the skill so it stops recurring.
+> **State the POSITION, not another number** (operator's phrasing, 2026-08-16,
+> and it is the better one): when a handoff is a single commit, the sha above is
+> simply **the second-to-last sha on the branch**. That stays true forever,
+> because a position is relative and a written sha is not. An earlier draft of
+> this note tried naming the post-handoff sha outright and committing it made
+> THAT stale too -- the same bug one level up.
+>
+> This particular handoff ran long and took several docs commits rather than
+> one, so walk back from HEAD to the last non-docs commit; `git log --oneline`
+> makes it obvious. The authoritative sha for booting is the one in the kickoff
+> line, read after the final push.
 
 Did, all pushed, HEAD == origin verified after each:
 

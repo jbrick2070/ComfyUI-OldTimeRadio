@@ -119,11 +119,20 @@ number in the log can never be the head that exists after the handoff lands.
 Chasing it is an infinite regress: amend to fix the sha and the amend changes
 the sha again.
 
-So SAY SO rather than pretending. The heading records **the last CODE head**,
-and the entry states plainly that the handoff commit sits on top of it. **The
-authoritative post-handoff sha is the one in the KICKOFF LINE, which is
+So SAY SO rather than pretending, and say it as a POSITION rather than a
+number (operator's phrasing, and it is the better one): the heading records
+**the last CODE head**, which -- when the handoff is a single commit -- is the
+**second-to-last sha** on the branch once the entry lands. A position stays
+true; an absolute sha written into the thing being committed cannot.
+
+State it in the entry in those words: *"the sha above is the second-to-last on
+the branch; the last is this handoff commit."* If the handoff needed more than
+one commit, say how many instead of "second-to-last" -- the count is the honest
+part, and a reader can walk back that many.
+
+**The authoritative post-handoff sha is still the one in the KICKOFF LINE,
 generated in step 5 AFTER the push** -- that is the only sha a fresh window
-should ever paste, and it is the only one that is real.
+should paste. But a reader of the log alone can now locate the head without it.
 
 Format -- match the existing entries exactly:
 
