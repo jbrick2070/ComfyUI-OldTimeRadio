@@ -513,7 +513,7 @@ def _news_pro_meta(led: Any) -> dict:
 
 
 def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
-                         source_bank_row: Any) -> dict:
+                         source_bank_row: Any, decision=None) -> dict:
     """Stamp ``meta.cast_contract`` -- the cameo DECISION this lane never made.
 
     This lane derives its cast from the script the model already wrote
@@ -543,6 +543,10 @@ def _stamp_cast_contract(led: Any, *, resolved: Mapping[str, Any],
         num_characters_locked=_OTRCAST.count_locked_characters(
             led.data.get("cast") or []
         ),
+        # THE SAME decision the roll receipt carries. Passing it here is what
+        # makes the contract and the receipt incapable of disagreeing about
+        # whether Lemmy is in the show.
+        decision=decision,
     )
     _ledger_meta(led)["cast_contract"] = contract
     log.info(
@@ -809,17 +813,24 @@ class VoiceMenu:
         )
 
 
-def _deal_voice_menu(cast_size: int) -> VoiceMenu:
+def _deal_voice_menu(cast_size: int, taken: "set[str] | None" = None) -> VoiceMenu:
     """Menu derived at runtime from config/cast_pools (r1/S3 + r2/S4):
     the menu only ever offers what exists. Entries carry STABLE IDS
     (descriptions are not guaranteed unique); P6 orders BY menu_id and
     python validates BY menu_id. Preflight (r4/S1 stage 1): total usable
     capacity >= cast_size BEFORE P6 (gender is P6's choice, so
-    gender-compatibility cannot be pre-checked)."""
+    gender-compatibility cannot be pre-checked).
+
+    ``taken`` withholds presets already spoken for. On a cameo episode that is
+    LEMMY's fixed preset: it lives in the OPEN pool -- its timbre row literally
+    reads gravelly/engineer/mechanic, which is exactly what a casting LLM
+    reaches for -- so without withholding it the menu would offer his larynx to
+    another character and two people would share a voice.
+    """
     gender_by_preset = {
         p: g for p, g, _lang, _tags in _POOLS.VOICE_PROFILES
     }
-    pool = _POOLS.open_voice_pool(set())
+    pool = _POOLS.open_voice_pool(set(taken or ()))
     entries = tuple(
         VoiceMenuEntry(
             menu_id=f"m{i + 1:02d}",
@@ -948,8 +959,19 @@ def _make_treatment_validator(
     n_max: int,
     provenance: "dict[str, str]",
     digest: str = "",
+    decision=None,
 ):
-    """Gate the cast on the REAL ceiling -- the voice stock, not the request."""
+    """Gate the cast on the REAL ceiling -- the voice stock, not the request --
+    and on the cameo DECISION, which was made before any authoring.
+
+    The cameo checks are presence/count ONLY, never prose: a retry burned on
+    cosmetic drift is a retry not spent on the actual defect. On a hit the
+    treatment must name LEMMY exactly once AND leave room for somebody else --
+    a cast of Lemmy alone is a different show, not a cameo. On a miss the name
+    is RESERVED show-wide on this lane, because an accidental second Lemmy would
+    be dealt a random voice from the open pool and arrive as a stranger wearing
+    his name.
+    """
     del dossier, provenance, digest, n_max
 
     def _check(model: Treatment) -> "str | None":
@@ -957,9 +979,56 @@ def _make_treatment_validator(
             return (f"cast_shapes {len(model.cast_shapes)} > "
                     f"{MAX_SPEAKING_CAST}, the number of distinct voices in "
                     f"stock")
+
+        lemmy_shapes = [s for s in model.cast_shapes if _is_lemmy(s.name)]
+        if decision is not None and decision.lemmy_hit:
+            if len(lemmy_shapes) != 1:
+                return (f"the cameo is IN this episode, so the cast must name "
+                        f"{LEMMY_NAME} exactly once; found {len(lemmy_shapes)}")
+            if len(model.cast_shapes) < 2:
+                return (f"{LEMMY_NAME} is a cameo, so the cast needs at least "
+                        f"one other character alongside him")
+        elif lemmy_shapes:
+            return (f"{LEMMY_NAME} is not in this episode and the name is "
+                    f"reserved; remove that cast shape")
         return None
 
     return _check
+
+
+def _normalize_lemmy_shape(treatment: "Treatment", decision) -> "Treatment":
+    """Pin the cameo's IDENTITY on an accepted treatment; leave his STAKE alone.
+
+    Rewrites exactly two fields on the model's LEMMY shape:
+
+    * ``name`` -- so the spelling is the show's, not this episode's.
+    * ``register`` -- from ``LEMMY_PROFILE["speech_signature"]``. This is how
+      the Cockney reaches written dialogue at all: the script prompt consumes
+      ``shape.register`` verbatim, and the profile has no ``register`` key of
+      its own, so the signature is what belongs there.
+
+    ``want`` / ``pressure`` / ``role`` are the model's and stay untouched. The
+    stake is what makes him belong to THIS story; a Python-canned one is the
+    stapled-on cameo the six-line exemplar bar exists to reject.
+    """
+    if decision is None or not decision.lemmy_hit:
+        return treatment
+
+    shapes = []
+    rewritten = False
+    for shape in treatment.cast_shapes:
+        if _is_lemmy(shape.name):
+            shapes.append(shape.model_copy(update={
+                "name": LEMMY_NAME,
+                "register": _POOLS.LEMMY_PROFILE["speech_signature"],
+            }))
+            rewritten = True
+        else:
+            shapes.append(shape)
+
+    if not rewritten:
+        return treatment
+    return treatment.model_copy(update={"cast_shapes": shapes})
 
 
 def _make_casting_validator(menu: VoiceMenu, speakers: "list[str]"):
@@ -1549,18 +1618,42 @@ def _pass_pitch(
         ) from exc
 
 
+def _cameo_prompt_clause(decision) -> str:
+    """The cameo contract as the model sees it, or "" when he is not in.
+
+    Says WHO he is and that he must be one of the cast shapes; says nothing
+    about what he wants. His stake is the model's to invent -- that is what
+    makes him belong to this story rather than being stapled onto it.
+    """
+    if decision is None or not decision.lemmy_hit:
+        return ""
+    return (
+        f"RECURRING CAMEO -- this episode includes {LEMMY_NAME}, and he must be "
+        f"one of the cast shapes, spelled exactly {LEMMY_NAME}.\n"
+        f"He is: {_POOLS.LEMMY_PROFILE['character_description']}\n"
+        f"Give him a real reason to be in THIS story -- his own want and his own "
+        f"pressure, like any other character. He is a small part, not the lead.\n"
+    )
+
+
 def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
                     stance, *, n_max: int,
                     provenance: "dict[str, str]",
-                    digest: str = "") -> Treatment:
+                    digest: str = "", decision=None) -> Treatment:
+    # On a cameo episode the REQUEST is for the other characters, so the total
+    # still reads as the operator asked. A REQUEST throughout: never a cap, and
+    # never a refusal if the model returns a different number.
+    requested = max(0, n_max - 1) if (
+        decision is not None and decision.lemmy_hit) else n_max
     user = (
         f"SOURCE DOSSIER:\n"
         f"{json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)}\n\n"
         f"EDITORIAL STANCE: {stance['name']} -- {stance['note']}\n\n"
         f"WINNING PITCH:\n"
         f"{json.dumps(pitch.model_dump(), ensure_ascii=False, indent=2)}\n\n"
-        f"REQUESTED cast size: {n_max}. This is a REQUEST, not a limit -- use "
-        f"as many speaking characters as the story genuinely needs, up to "
+        f"{_cameo_prompt_clause(decision)}"
+        f"REQUESTED cast size: {requested}. This is a REQUEST, not a limit -- "
+        f"use as many speaking characters as the story genuinely needs, up to "
         f"{MAX_SPEAKING_CAST}.\n"
         f"Write the treatment now."
     )
@@ -1578,7 +1671,7 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
             structural_retry_temperature=_TEMP["treatment"] / 2.0,
             repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_make_treatment_validator(
-                dossier, n_max, provenance, digest),
+                dossier, n_max, provenance, digest, decision),
             max_new_tokens=None,
             helper_name="scifi_news_pro_treatment",
         )
@@ -1852,6 +1945,25 @@ def require_ledger_save(led, what: str) -> None:
 def _speaker_identity_key(value: str) -> str:
     """Case/spacing-insensitive speaker identity, matching the parser's own."""
     return " ".join(str(value).split()).casefold()
+
+
+#: LEMMY's name, from the ONE profile that owns his identity. Never a literal
+#: here -- the cameo is a recurring character and his name is a fact of the
+#: show, not of this lane.
+LEMMY_NAME = _POOLS.LEMMY_PROFILE["name"]
+
+_LEMMY_IDENTITY_KEY = _speaker_identity_key(LEMMY_NAME)
+
+
+def _is_lemmy(value: str) -> bool:
+    """Whether ``value`` names the cameo, under the parser's own identity rule.
+
+    Always this, never ``== "LEMMY"``. The model writes cast names and script
+    speaker labels in whatever case and spacing it likes, and the parser already
+    folds both; a raw comparison here would silently fail to recognize him and
+    the lane would deal a second voice to a second Lemmy.
+    """
+    return _speaker_identity_key(value) == _LEMMY_IDENTITY_KEY
 
 
 def _resolves_to_cast(label: str, roster: "set[str]") -> bool:
@@ -2374,11 +2486,21 @@ def _pass_casting(
     final_draft: FinalDraft,
     treatment: Treatment,
     menu: VoiceMenu,
+    speakers: "list[str] | None" = None,
 ) -> CastingVoices:
-    """Assign one legal voice-stock entry to each finished-script speaker."""
+    """Assign one legal voice-stock entry to each finished-script speaker.
+
+    ``speakers`` is the list this pass must cover. It is passed in rather than
+    recomputed so that ONE list decides the prompt, the validator, the menu size
+    and the row count. On a cameo episode the caller passes the speakers MINUS
+    LEMMY, because his voice is pinned from the profile and was never on the
+    menu -- asking the casting LLM to assign him one would either fail the
+    validator or hand him a stranger's larynx.
+    """
     _validate_selected_final_draft(final_draft, treatment=treatment)
     parsed = final_draft.parsed
-    speakers = _speakers_in_order(parsed)
+    if speakers is None:
+        speakers = _speakers_in_order(parsed)
     script_view = _script_view(parsed, treatment, include_news_read=False)
     shapes = json.dumps(
         [shape.model_dump() for shape in treatment.cast_shapes],
@@ -2418,18 +2540,41 @@ def _pass_casting(
 
 def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
                    rng: random.Random,
-                   speaker_order: "list[str]") -> "list[dict]":
+                   speaker_order: "list[str]",
+                   decision=None) -> "list[dict]":
     """r3/M8: returns COMPLETE ledger cast rows (set_cast contract):
     python-prebaked ANNOUNCER c01 (kokoro) + characters c02.. in
     first-appearance order (bark presets from the validated menu picks).
-    The LLM invents the person; Python picks the larynx."""
+    The LLM invents the person; Python picks the larynx.
+
+    On a cameo episode LEMMY is SYNTHESIZED here rather than looked up: the
+    casting artifact never covered him, because the menu he would have been cast
+    from never offered his voice. He still occupies his real position in
+    ``speaker_order``, so the assembly gate (speaker set == cast rows) holds by
+    construction -- he is in the script AND in the cast, and absent only from
+    the casting LLM's answer.
+    """
     by_id = menu.by_id()
     by_name = {c.name: c for c in casting.cast}
     announcer = dict(_POOLS.pick_announcer(rng))
     announcer["char_id"] = "c01"
     rows: "list[dict]" = [announcer]
     taken: set[str] = set()
+    cameo_in_play = bool(decision is not None and decision.lemmy_hit)
     for i, name in enumerate(speaker_order):
+        if cameo_in_play and _is_lemmy(name):
+            # Identity from the profile, never from the model or the menu.
+            rows.append({
+                "char_id": f"c{i + 2:02d}",
+                "name": LEMMY_NAME,
+                "character_description":
+                    _POOLS.LEMMY_PROFILE["character_description"],
+                "gender": _POOLS.LEMMY_PROFILE["gender"],
+                "tts_model": "bark",
+                "voice_preset": _POOLS.LEMMY_PROFILE["voice_preset"],
+                "voice_params": None,
+            })
+            continue
         cv = by_name.get(name)
         if cv is None:
             raise NewsProCastError(
@@ -3304,6 +3449,33 @@ def run_scifi_news_pro_episode(
     rng = random.Random(seed)
     meta["episode_seed"] = seed
     _OTRWD.stamp_contract(meta, owner="scifi_news_pro")
+
+    # Imported here, not at module scope, matching this file's existing
+    # convention for the casting module (see `_stamp_cast_contract`).
+    from . import _otr_casting as _OTRCAST
+
+    # THE CAMEO IS DECIDED HERE, ONCE, BEFORE ANY AUTHORING.
+    #
+    # It has to be this early because this lane derives its cast FROM the
+    # finished script and then gates on it: the assembly check demands the
+    # speaker set equal the cast rows. A cameo injected after the script is
+    # written cannot pass that gate, so the only place the decision can live is
+    # in front of the prompts that produce the script.
+    cameo = _OTRCAST.resolve_lemmy_cameo(
+        getattr(source_bank_row, "source_bank_id", ""),
+        resolved.get("lemmy_force"),
+    )
+    meta["lemmy_roll_receipt"] = cameo.to_meta()
+    # DURABLE, not best-effort: the receipt is the only record that the roll was
+    # spent at all, and a lost one is indistinguishable from a roll that never
+    # happened -- the exact ambiguity chunk A existed to close.
+    require_ledger_save(led, "the LEMMY roll receipt")
+    # `Ledger.save()` rebinds `led.data`, and this module warns against retained
+    # aliases, so reacquire META rather than keep writing through the old
+    # mapping. `f2` is deliberately NOT touched here: it is a fresh dict built
+    # further down and attached via `meta["scifi_news_pro"] = f2`, so binding it
+    # to the ledger accessor at this point would be dead and misleading.
+    meta = _ledger_meta(led)
     receipts: "list[dict[str, Any]]" = []
 
     def receipt(pass_id, model_id, attempts, temp, tokens, *, trace=()):
@@ -3414,8 +3586,11 @@ def run_scifi_news_pro_episode(
     with _helper_ctx(slot_scheduler, "scifi_news_pro_treatment"):
         treatment = _pass_treatment(
             fn, pack, dossier, pitch, stance, n_max=n_max,
-            provenance=provenance, digest=source_preview,
+            provenance=provenance, digest=source_preview, decision=cameo,
         )
+    # Identity is Python's, the stake is the model's. Runs on the ACCEPTED
+    # treatment, before anything downstream reads a cast name.
+    treatment = _normalize_lemmy_shape(treatment, cameo)
     receipt("treatment", creative_model, box["calls"],
             _TEMP["treatment"], None)
     cast_names = [shape.name for shape in treatment.cast_shapes]
@@ -3470,7 +3645,20 @@ def run_scifi_news_pro_episode(
         "attempt_trace": [_attempt_payload(value) for value in p3_attempts],
     }
 
-    menu = _deal_voice_menu(len(cast_names))
+    # ONE speaker list decides everything below it. `speaker_order` is the
+    # script's truth and drives the cast rows; `casting_speakers` is the subset
+    # the casting LLM is asked about, which excludes LEMMY on a cameo episode
+    # because his voice is pinned from the profile and was never on the menu.
+    # Computing these separately, or recomputing either one later, is how the
+    # menu size, the prompt and the row count drift apart.
+    speaker_order = _speakers_in_order(final_draft.parsed)
+    cameo_in_play = bool(cameo.lemmy_hit)
+    casting_speakers = ([s for s in speaker_order if not _is_lemmy(s)]
+                        if cameo_in_play else list(speaker_order))
+    reserved_presets = ({_POOLS.LEMMY_PROFILE["voice_preset"]}
+                        if cameo_in_play else set())
+
+    menu = _deal_voice_menu(len(casting_speakers), taken=reserved_presets)
     f2["casting_stock_dealt"] = [
         {"menu_id": item.menu_id, "gender": item.gender,
          "description": item.description}
@@ -3478,12 +3666,15 @@ def run_scifi_news_pro_episode(
     ]
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_casting_voices"):
-        casting = _pass_casting(fn, pack, final_draft, treatment, menu)
+        casting = _pass_casting(fn, pack, final_draft, treatment, menu,
+                                speakers=casting_speakers)
     receipt("casting", technical_model, box["calls"],
             _TEMP["casting_voices"], None)
-    cast_rows = _assign_voices(
-        casting, menu, rng, _speakers_in_order(final_draft.parsed)
-    )
+    cast_rows = _assign_voices(casting, menu, rng, speaker_order, cameo)
+    # Two characters never share a voice. The cameo's preset is withheld from
+    # the menu, so this proves the withholding actually worked rather than
+    # trusting it.
+    _OTRCAST._assert_unique_bark_voices(cast_rows)
     f2["casting"] = [item.model_dump() for item in casting.cast]
 
     _assemble(
@@ -3495,7 +3686,32 @@ def run_scifi_news_pro_episode(
     _news_pro_meta(led)["source_coverage"] = source_coverage
     _stamp_cast_contract(
         led, resolved=resolved, source_bank_row=source_bank_row,
+        decision=cameo,
     )
+    if cameo.lemmy_hit:
+        # The voice-slot receipt for the cameo row ONLY. Credits read the
+        # speech signature from this key and nowhere else, so without it his
+        # Cockney would be absent from the closing crawl even though it reached
+        # the dialogue. No receipts are invented for any other row.
+        lemmy_row = next(
+            (row for row in (led.data.get("cast") or [])
+             if isinstance(row, dict) and _is_lemmy(str(row.get("name") or ""))),
+            None,
+        )
+        if lemmy_row is not None:
+            signature = str(_POOLS.LEMMY_PROFILE["speech_signature"])
+            slots = _ledger_meta(led).setdefault("cast_voice_slots", {})
+            slots[str(lemmy_row.get("char_id") or "")] = {
+                "gender": "male",
+                "timbre": [],
+                "role": "",
+                "age_band": "",
+                "speech_signature": signature,
+                "description_digest": hashlib.sha1(
+                    str(lemmy_row.get("character_description") or "")
+                    .encode("utf-8")
+                ).hexdigest()[:12],
+            }
     delivery = _OTRWD.stamp_actual(
         led.data, stage="scifi_news_pro_assembled"
     )

@@ -95,9 +95,23 @@ ledger through the cast row, which is where a listener would look anyway.
 
 ### 3B. The rest of the tier
 
+* **THREE identity kinds, not two, and a STATE-DEPENDENT receipt.** The route
+  vocabulary today is `local_wav` / `provider_voice`
+  (`nodes/_otr_voice_route.py:54`) and that cannot express all five rows: clone
+  engines take a WAV path, **kokoro takes a bank `voice_ref_id`** (a `.pt` voice
+  -- neither of the existing kinds), and cloud takes `provider_voice_id`. So the
+  provisional union is `local_wav` / `bank_voice_id` / `provider_voice`, each
+  with kind-specific validation and exact `(engine, voice_ref_id)` bank
+  uniqueness.
+  Validation is by STATE: `rendered_pending_listen` requires the manifest plus
+  **both** clip paths and hashes (the frozen lines are two clips, not one);
+  `configured_unrendered` FORBIDS render-artifact fields outright. A single flat
+  required-field set would either reject the cloud rows or accept a
+  half-rendered local one.
 * **A shape that cannot be mistaken for a receipt.** `provisional_receipt`
   carries only machine-suppliable facts: `engine`, `identity_kind`,
-  `identity_id`, `artifact_path`, `artifact_sha256`, `rendered_utc`, `state`.
+  `identity_id`, `state`, and -- when rendered -- the clip paths, their hashes
+  and `rendered_utc`.
   **No `operator_verdict` field exists** -- not empty, absent -- so a
   provisional row cannot be promoted by filling in a blank. Promotion means a
   human listens and a qualified row is written.
@@ -119,6 +133,27 @@ ledger through the cast row, which is where a listener would look anyway.
   provisional tier's reachability depend on an unrelated dict. If the qualified
   route were ever demoted, every provisional route would go dormant with no
   error.
+* **Stale `voice_route` must be CLEARED on a tier switch.** `_stamp` overwrites
+  ordinary identity fields and never clears `voice_route`
+  (`nodes/cast_lock.py:1016-1049`). A Lemmy row locked once under the qualified
+  IndexTTS2 route and re-locked under a provisional engine keeps the old route,
+  and the voice node then raises ENGINE DISAGREEMENT
+  (`nodes/_otr_voice_route.py:612-617`). One transactional normalizer clears
+  prior policy-owned route and stale tier fields before any provisional,
+  unrouted or generic stamp. Tested qualified->provisional,
+  provisional->qualified and provisional->unrouted in BOTH branches.
+* **`preserve_ledger` must reach the provisional tier too.**
+  `_resolve_policy_claim` consults only the qualified dict, so a provisional
+  engine under `preserve_ledger` would never re-pin -- and unit tests on the
+  `auto_registry` branch would not notice, because the canonical graph runs
+  `auto_registry`. Both branches, or the stamp is invisible in half of
+  production.
+* **`IS_CHANGED` must fingerprint the provisional row.** It inspects
+  `voice_route` and returns `"static"` when there is none
+  (`nodes/_otr_voice_node_common.py:447-519`) -- and provisional rows
+  deliberately have none. So replacing a reference WAV under the same id would
+  replay STALE AUDIO from cache. Fingerprint the route id, the bank identity and
+  the local reference bytes.
 * **A local-clone allowlist replaces unenforced prose.** `rights.scope` is read
   only as a non-blank string (`:216-220`) -- a route whose scope read *"cloud
   engines only"* would validate identically. Provisional `local_wav` routes are
@@ -247,6 +282,28 @@ file is real: 298,170 bytes, PCM mono 24 kHz 16-bit, ~6.2 s, sha256
 4. **The routes.** **Five** provisional rows: kokoro (`bm_george`), chatterbox
    and dia (the appended clone ids, `local_wav`), google_tts (`gt_algenib`,
    `provider_voice`), elevenlabs (`el_daniel`, `provider_voice`). No bark row.
+### 5A. THE ENGINES DISAGREE ABOUT WAVEFORM RANK -- normalize or ship garbage
+
+**Bark and kokoro return `[1, 1, T]`; chatterbox and dia return `[C, T]`**
+(`eng_bark.py:155-156`, `eng_kokoro.py:236-237`, `eng_chatterbox.py:218-219`,
+`eng_dia.py:213-214`). The G1 harness writes
+`audio["waveform"].cpu().numpy().T` (`scripts/otr_g1_lemmy_audition.py:188`),
+which is correct for exactly ONE of those shapes.
+
+A cross-engine harness that copies that line writes **silently malformed clips
+for half the roster** -- and they still play, so the operator listens to garbage
+and blames the voice. Every result goes through `mono_safe` / `canonical_audio`
+(`nodes/_otr_audio_utils.py:24-53`), batch size is asserted to be one, and the
+file is written from `waveform[0].T`.
+
+### 5B. Activation ORDER (an earlier draft had it backwards)
+
+Routes must not be installed before the artifacts and hashes they cite exist, or
+a local row becomes selectable with incomplete evidence. The order is: empty
+machinery -> the ownership-safe generator -> render and FINALIZE the manifest ->
+populate the local provisional rows FROM that manifest. Cloud rows populate
+separately under the non-rendered schema.
+
 5. **The harness -- a NEW script; G1 stays frozen.**
    `scripts/otr_g1_lemmy_audition.py` is a durable blinded three-arm instrument
    whose output manifest is referenced BY SHA in the one qualified route
@@ -296,11 +353,31 @@ character engine -- node 80 `OTR_CastLock` and node 81
 proves the engine speaks but proves nothing about routing in production.
 Therefore:
 
-* **ONE canonical leg with both engine widgets switched to a PROVISIONAL
-  engine**, proving tier resolution, the ledger stamp, and a non-fatal render
-  through `workflows/otr_canonical.json`.
+* **Integration tests for all THREE identity families** (clone wav / kokoro
+  bank voice / provider voice), route -> CastLock -> dispatch, asserting that a
+  provider route stamps `provider_voice_id`, kokoro reaches `voice_ref_id`, a
+  clone route resolves the selected bank WAV, and **none of them stamps
+  `voice_route`**. One live leg cannot cover three interfaces; these can.
+* **ONE canonical leg on a provisional engine**, forcing the cameo, proving tier
+  resolution, the ledger stamp and a non-fatal render through
+  `workflows/otr_canonical.json`.
 * **The qualified-path regression proof is folded into chunk B's forced-hit
   acceptance leg**, which already runs the canonical graph on indextts2.
+
+**THE ENGINE WIDGETS CANNOT BE MOVED WITH `--set`, and an earlier draft of this
+plan was wrong to say the profile applier would do it.** `--set` goes through
+the creative-only whitelist and REJECTS managed engine widgets
+(`scripts/otr_api.py:831-872`) -- the same guardrail that refused `--set` during
+the soak, which is why the soak uses committed profiles. The instrument is a
+dedicated **local diagnostic capability profile** whose
+`slot_overrides.char_voice_engine` reaches BOTH nodes through the existing
+mapping (`config/profiles/widget_mapping.json:77-86`). The canonical file's
+production defaults are not touched, and the profile must prove both managed
+targets resolve to the same character engine.
+
+**The leg must FORCE the cameo** (`lemmy_cameo="always include"`) on a
+non-fidelity bank. The shipped default is the ~11% roll, so a green episode with
+no Lemmy row proves nothing.
 
 Five legs, one per engine, were proposed and **rejected as disproportionate**:
 the routing plumbing is engine-independent code, so that exercises one branch

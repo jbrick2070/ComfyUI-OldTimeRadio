@@ -510,6 +510,10 @@ def _run_until_treatment(
                 "num_characters": 1,
                 "creative_writing_model": "test/creative",
                 "technical_model": "test/technical",
+                # Pin the cameo OFF: the runner now decides it at entry, and an
+                # unpinned fixture would take the ~11% OS-entropy roll and make
+                # this test flaky one run in nine.
+                "lemmy_force": False,
             },
             led=led,
             meta=meta,
@@ -583,6 +587,10 @@ def test_partial_window_coverage_fails_before_any_model_call(monkeypatch):
                 "num_characters": 1,
                 "creative_writing_model": "test/creative",
                 "technical_model": "test/technical",
+                # Pin the cameo OFF: the runner now decides it at entry, and an
+                # unpinned fixture would take the ~11% OS-entropy roll and make
+                # this test flaky one run in nine.
+                "lemmy_force": False,
             },
             led=led,
             meta=meta,
@@ -786,6 +794,9 @@ def test_runner_restamps_coverage_after_assembly_rebind(
             "num_characters": 1,
             "creative_writing_model": "test/creative",
             "technical_model": "test/technical",
+            # Pin the cameo OFF -- see the note above; an unpinned fixture takes
+            # the ~11% roll and goes flaky.
+            "lemmy_force": False,
         },
         led=led,
         meta=meta,
