@@ -1,6 +1,9 @@
 r"""Per-beat LTX motion_clause -- generation, validation, and the read-side resolver.
 
-Spec: docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md (v2, roundtable-hardened).
+Spec: THIS MODULE is the charter's home. It began as
+docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md (v2, roundtable-hardened); that
+file was deleted by commit 22795799 and does not exist at HEAD, so the rules and
+the 2026-08-17 kinetic amendment live in `build_clause_messages` below.
 
 Two layers:
   * A SEPARATE post-brief BATCH pass (:func:`generate_motion_clauses`) fills
@@ -95,8 +98,13 @@ def build_clause_messages(subject_name: str, dialogue: str, scene_ctx: str) -> l
     # underneath a ceiling that made "livelier" mean a slightly bigger blink. The
     # amendment removes the ceiling and keeps the scaling.
     #
-    # THIS IS A DECLARED AMENDMENT to the roundtable-hardened charter in
-    # docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md, not a quiet reversal.
+    # THIS IS A DECLARED AMENDMENT to the roundtable-hardened charter, not a
+    # quiet reversal -- and THIS COMMENT IS NOW THAT CHARTER'S HOME.
+    # `docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md` was DELETED by commit
+    # 22795799 ("prune stale planning artifacts") and does not exist at HEAD, so
+    # the first draft of this amendment pointed at a ghost: it promised the spec
+    # would be updated in the same commit, and there was no spec to update. A
+    # declared amendment with no durable home is an undeclared one.
     #
     # WHAT IS NOT CHANGED, deliberately: nothing here rejects, rewrites, strips or
     # classifies an authored prompt. This edits what the MODEL IS ASKED FOR, which
@@ -244,10 +252,19 @@ def generate_motion_clauses(ledger: Any, *,
             continue
 
         try:
-            # LLM slot: creative -- subtle per-beat motion clause (writer slot)
+            # LLM slot: creative -- per-beat KINETIC motion clause (writer slot)
+            #
+            # 40 -> 64 TOKENS, and this is not cosmetic: 40 was sized for the old
+            # 70-character cap. A compliant 130-char kinetic clause is roughly 33
+            # tokens, so 40 left almost no headroom -- a slightly verbose answer
+            # would be cut mid-clause, fail `validate_motion_clause`, and fall
+            # back to the STATIC role map without a word in the log. The prompt
+            # amendment would then have bought nothing, invisibly, which is the
+            # worst possible outcome for a change whose whole symptom is
+            # "the video does not move".
             raw = generate_fn(
                 build_clause_messages(subject, dialogue, scene_ctx),
-                temperature=0.4, max_new_tokens=40, stop=None)
+                temperature=0.4, max_new_tokens=64, stop=None)
             text = _first_clause(raw)
         except Exception:  # noqa: BLE001 -- LLM failure must never abort the episode
             text = ""

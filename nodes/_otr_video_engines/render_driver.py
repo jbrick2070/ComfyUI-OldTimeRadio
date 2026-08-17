@@ -1458,7 +1458,8 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
 
 def _motion_clause_override(shot):
     """Opt-in per-beat motion clause text, or ``None`` (default OFF -> byte-identical).
-    See nodes/_otr_motion_clause + docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md.
+    See nodes/_otr_motion_clause, which is the charter's home (the old
+    docs/2026-06-16-ltx-motion/ spec was deleted by commit 22795799).
 
     BANANA ROUTE NOTE (docs/2026-08-06-BUILD-SPEC-banana-route.md, 7b): this is
     a SECOND video prompt surface, and when enabled its text lands on

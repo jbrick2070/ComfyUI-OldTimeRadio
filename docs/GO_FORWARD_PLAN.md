@@ -222,20 +222,47 @@ metadata question (the bank tags them american and british respectively).
    lip-sync beat "kinetic" can walk the subject out of their own frame, so the
    framing question wants one deliberate answer, not a find-and-replace.
 
-   **THE MECHANISM THE VERBATIM-DIALOGUE ITEM SHOULD USE -- do not invent a new
-   one.** `render_driver.py:2706-2718` documents a PROMPT-BUDGET INVARIANT that
-   already exists: every branch that caps its own prompt publishes BOTH the
-   number it capped to (`_prompt_char_budget`) AND the trailing clause it expects
-   to survive (`_prompt_protected_clause`), and the banana funnel downstream
-   re-caps to that number while PRESERVING that clause. So publishing the
-   verbatim line as the protected clause closes BOTH hazards r1 found with one
-   existing mechanism -- it survives the 188-char truncation, and it survives the
-   banana rewrite that would otherwise make a "verbatim" line diverge from the
-   audio. A branch that publishes nothing is never capped, which is why the
-   publication must happen INSIDE the sub-path that composed the prompt.
+   **r2 RAN ON FABLE (Sonnet lane was still out when the window ended), after
+   Codex hit a quota hold and Antigravity produced no file. Treat r2 as
+   ONE-LANE, not a clean round.** It found three defects in the SHIPPED kinetic
+   commit, all fixed: `max_new_tokens=40` was sized for the old 70-char cap, so a
+   compliant 130-char clause would truncate, fail validation and silently fall
+   back to the static map -- the amendment would have bought nothing, invisibly;
+   the cited `docs/2026-06-16-ltx-motion/MOTION_CLAUSE_SPEC.md` was DELETED by
+   commit `22795799` and does not exist, so three code sites cited a ghost and
+   the "declared amendment" had no home (the module is now the home); and a
+   stale "subtle" comment survived at the writer slot.
 
-   **r2 (Fable + Sonnet, replacing quota-held Codex) was running when the window
-   ended; its reviews are the gate before that code is written.**
+   **CORRECTION -- AN EARLIER NOTE HERE WAS WRONG AND WOULD HAVE BEEN CODED.**
+   It said to publish the verbatim line as `_prompt_protected_clause`. **Do not.**
+   That pair is NOT a protection mechanism for new content -- it is a
+   banana-recap ANCHOR that fires only inside the funnel and only when the
+   transform GROWS text past the published budget. It cannot restore anything
+   `finish_visual_prompt`'s own trim already cut, and
+   `tests/test_banana_route.py:537-543` pins that published clauses must be
+   TRANSFORM-INVARIANT -- a dialogue line containing a table noun is not, so
+   publishing it there silently loses the protection it was meant to buy.
+   **The correct shape:** place the dialogue AFTER
+   `_IA2V_TALKING_CLAUSE_CHARACTER`, because `cap_phrase_safe` keeps everything
+   from the clause match to end-of-string as a suffix -- the line then rides the
+   EXISTING protection with no new machinery. Keep `shield_quoted_card_text=False`
+   (flipping it regresses the scoped-shield revision) and RE-ASSERT the stored
+   literal after the funnel, restamping `prompt_sha8` / `prompt_chars` /
+   `banana_sha256_after` the way the cap path already does.
+
+   **TWO THINGS THAT NEED THE OPERATOR, both from r2:**
+   1. **A `.env` file will NOT turn the flag on.** `enabled()` reads
+      `os.environ` and NOTHING in this repo loads a `.env` -- no dotenv in
+      `prestartup_script.py`, no launcher sets `OTR_LTX_MOTION_CLAUSE`. Dropping
+      a `.env` in the repo root lands nowhere and item 1 ships dormant a second
+      time, which is r1's finding C repeating. Set it in the launcher `.cmd` or
+      as a machine-level env var, or dotenv loading becomes in-scope code.
+   2. **The landing map is narrower than it looks.** With the flag on, kinetic
+      clauses reach ONLY `ltx_video` / `wan_i2v` non-open beats and
+      non-talking-recipe opens -- never ia2v TALKING beats, HuMo, or minimax. If
+      the lab observation was made on the audio/talking lane, the shipped
+      amendment does not touch what was watched, and that needs confirming
+      before the win is claimed.
 
    **The remaining open question, if the lane work is ever revived:** is this
    a new adapter at all, or a RECIPE + profile over the existing `ltx_av` engine,
