@@ -34,10 +34,12 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-16 late):** suite
-**10529 / 110 / 1** (chain that day: 10751 -> 10765 with chunk A's 14
-tests -> 10529 after the scifi_news rip deleted 13 dedicated lane test
-files and the rename trimmed the polluted re-import test), Bible
+**BASELINES to detect drift (updated 2026-08-16 EVENING):** suite
+**10584 / 110 / 1** (chain: 10529 -> 10550 chunk B step 1+2 -> 10567 the TTS
+preflight gates + the two defects they caught -> 10584 chunk B step 3. Earlier
+that day: 10751 -> 10765 with chunk A's 14 tests -> 10529 after the scifi_news
+rip deleted 13 dedicated lane test files and the rename trimmed the polluted
+re-import test), Bible
 **20 / 26 / 3**
 (the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
 with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
@@ -129,12 +131,28 @@ chunk B's forced-hit cameo episode, and the soak's best/worst shortlist.
 Provisional rows land WITH receipts saying they are provisional; his ears
 can demote any of them later without archaeology.
 
-1. **Lemmy on every TTS engine** (item 1.1) -- operator ask, smallest, and
-   its listen page wants his ears the moment he is back. Short full kibitz
-   arc, then config/bank rows + clone renders + ONE listen page.
-2. **Chunk B, the cameo roll** (item 1) -- contract done, ONE lane now
-   (`_otr_scifi_news_pro`). Build -> Sonnet QA -> forced-hit leg. Makes
-   Lemmy visible in the show; pairs naturally right after his voices.
+1. **Lemmy on every TTS engine** (item 1.1) -- **THE ARC IS DONE. THE PLAN IS
+   THE CONTRACT: `docs/2026-08-16-lemmy-cross-engine-PLAN.md`**, hardened
+   through a full four-round `kibitz-plugin:kibitz` campaign (Codex all four
+   rounds; Antigravity r1-r3 plus a retried r4 after a narration-only pass --
+   artifacts under `kibitz-runs/2026-08-16-lemmy-cross-engine*/`). Read it
+   instead of re-deriving. **The bank half is already LANDED** (the mirror
+   generator now owns only the keys it produces and mints the two Lemmy clone
+   rows; `873c24b1`). What REMAINS is the tier itself: the separate
+   `provisional_native_routes` key, the sibling resolver, the two CastLock
+   stamp branches, the transition normalizer, the `IS_CHANGED` fingerprint,
+   the cross-engine harness with waveform normalization, and ONE canonical leg
+   on kokoro. **Four findings from that arc are load-bearing and are stated in
+   the plan; do not rediscover them the hard way.**
+2. **Chunk B, the cameo roll** (item 1) -- **STEPS 1, 2 AND 3 ARE DONE AND
+   PUSHED** (`7faf3bf7`, `b46db68e`). The widget reaches the lanes, the
+   decision API exists, and `scifi_news_pro` casts, voices and receipts the
+   cameo. **ALL THAT REMAINS IS STEP 5: the acceptance leg** -- reset the box
+   per CLAUDE.md section 4, boot a FRESH server at the implemented HEAD (a
+   stale boot proves nothing), then one forced-hit leg via
+   `--set "OTR_LedgerScriptWriter.lemmy_cameo=always include"` (that widget IS
+   on the creative whitelist, unlike the engine widgets). Acceptance criteria
+   are in the contract's step 5.
 3. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
    updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
    kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Needs
@@ -339,6 +357,15 @@ is cycling 1-act legs, 5 banks x 10 styles x 10 engine profiles (all five
 still-family video engines x all five local image engines, rotated through
 committed `otr_soak_*` capability profiles that never emit variants).
 Receipts: `otr_soak_receipts/soak_*.json`, rewritten after every leg.
+**READ THE RIGHT RECEIPT (2026-08-16 evening, PBUG-20260816-03).** Three
+harnesses are live and ONE OF THEM RENDERS NOTHING:
+`soak_20260816_143448.json` holds **708 legs, every one failed in ~12 seconds**,
+because that launch rotates the engines with `--set` on MANAGED widgets and
+`patch_creative` refuses them before submission. The real progress is the 8
+legs in `soak_20260816_143704.json` + `soak_20260816_145333.json` (6 passes,
+42-minute legs, `--profile otr_soak_*` -- the sanctioned lever). **The tag gate
+must be judged on those, never on the 708.** The failing harness was left
+running deliberately: it holds no GPU and it is operator-ordered state.
 **Leg 1 already FAILED usefully** -- the 4th live UNKNOWN_SPEAKER ladder
 exhaustion (PBUG-20260816-02, `scifi_news_pro`); the soak is now the
 incidence-rate measurement that PBUG's correction said was missing. Do

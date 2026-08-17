@@ -3,6 +3,100 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-16 -- HEAD b46db68e (v2.0-alpha) -- CODER (evening: chunk B built to its acceptance leg, the Lemmy arc closed, a TTS preflight created, and a soak that was rendering nothing)
+
+Did, all pushed, HEAD == origin verified after each:
+
+**CHUNK B STEPS 1-3 (`7faf3bf7`, `b46db68e`).** Step 1 closed the defect that
+made the cameo widget inert: `run()` never forwarded `lemmy_cameo` to
+`_resolve_inputs`, so only the legacy in-line path saw it. The knob now
+resolves ONCE into `resolved["lemmy_force"]`. A typo used to map to `None` via
+`.get()` -- and `None` IS the natural roll -- so a misspelling rendered without
+the cameo while looking like it forced one; it now raises naming the three
+choices. The reach-test AST-parses the writer off disk, because a mocked
+resolver accepts anything and papers over exactly that bug. Step 2 added
+`resolve_lemmy_cameo` + an immutable `LemmyCameoDecision`, `roll_lemmy()`
+unit-pinned to exactly one branch, policy/knob strings as constants. Step 3 put
+the cameo on `scifi_news_pro`: decided at runner entry (it must be -- the lane
+derives cast FROM the script and gates on speaker-set equality), prompts carry
+the contract, the validator demands one LEMMY plus one other on a hit and
+reserves the name on a miss, a deterministic pass pins name+register while the
+model keeps want/pressure/role, one speaker list drives the deal, his preset is
+withheld from the menu, and `_assert_unique_bark_voices` now runs on this lane.
+Two hazards caught mid-build: `_OTRCAST` is only imported LOCALLY in that
+module (a NameError on the first live render), and the three lane fixtures
+would have taken the real 11% roll -- flaky one run in nine -- so they pin it
+off. Sonnet QA on both diffs BEFORE the push: SHIP twice; the second traced
+`Ledger.save()`/`_merge_with_disk` to prove the receipt is durable and proved
+byte-identity on a miss via the parser's `CAST_MEMBER_SILENT` defect.
+
+**LEMMY CROSS-ENGINE ARC CLOSED -- FULL FOUR ROUNDS (`873c24b1`, `b46db68e`).**
+`docs/2026-08-16-lemmy-cross-engine-PLAN.md` is the contract. Provenance,
+precisely: Codex (gpt-5.6-sol high) all four rounds; Antigravity r1-r3, then a
+NARRATION-ONLY r4 that was re-run once (retry under
+`kibitz-runs/2026-08-16-lemmy-cross-engine-agyretry/`). 10 external calls, $0.
+Each round found something the last missed: r1 the render-killer (BOTH
+reviewers, independently -- any non-empty `voice_route` raises unless status is
+`qualified`, so the obvious implementation kills every render on five engines)
+and the destructive generator; r2 the schema gap (kokoro's `.pt` fits neither
+existing identity kind); r3 the waveform-rank mismatch (bark/kokoro `[1,1,T]`
+vs chatterbox/dia `[C,T]` -- the G1 `.numpy().T` would have written malformed
+clips that still PLAY); r4 stale engine-specific identity fields surviving a
+tier switch. **Two of the four were driver errors in the plan**, and I refused
+one Codex claim outright: that no cloud prohibition exists. It read only the
+repo CLAUDE.md and missed the ROOT one (`:62-64`, "No cloud services, no API
+keys, no paid services") -- accepting it would have spent the operator's money
+while he is remote.
+
+**TTS VOICE PREFLIGHT CREATED (`873c24b1`).**
+`VIDEO_LANE_PREFLIGHT.md`'s family section had named `TTS_VOICE_PREFLIGHT.md`
+as a sibling with the rule that enforcement lands BEFORE the doc.
+`tests/test_tts_voice_preflight_matrix.py` (17 gates) came first. Writing the
+gates caught two real defects: BOTH voice nodes' `LEGACY_FIRST_FALLBACK` had
+drifted two engines short of the profiles table (a degraded boot offered a
+dropdown that could not represent a saved graph using elevenlabs or google_tts,
+and both node tests were pinning the drift); and `_otr_mirror_clone_refs.py`
+was drop-and-rebuild, so a re-run invited by its own "idempotent" docstring
+would have deleted three announcer rows that nine assertions pin. My first fix
+was a `--force` guard; Codex r2 correctly called it a band-aid, so it was
+rewritten to own only the keys it produces -- idempotent by ownership, and it
+now MINTS the two Lemmy clone rows (`mirrored=83 added=2 preserved=3`). The
+music node has the same drift AND an index-0 disagreement with the shipped
+default; recorded for `MUSIC_AUDIO_PREFLIGHT.md`, deliberately not fixed in a
+voice sprint.
+
+**PBUG-20260816-03 -- A SOAK HARNESS RENDERED NOTHING FOR 2.5 HOURS.** Found
+reading receipts for this handoff. Of three live harnesses,
+`soak_20260816_143448.json` holds **708 legs, all failed, ~12 seconds each**.
+Reproduced by hand: it rotates engines with `--set` on MANAGED widgets and
+`patch_creative` refuses them before submission. Server was fine throughout
+(`:8000` listening, `/queue` 200). Real progress is the 8 legs in the other two
+receipts (6 passes, 42-min legs, `--profile` -- the sanctioned lever). **The
+tag gate must be judged on those, not on the 708.** Left RUNNING deliberately:
+operator-ordered state, holds no GPU. Same guardrail the r3 panel caught the
+driver planning to bypass for an acceptance leg.
+
+Current step: item 1.1's tier build (the plan is the contract) and chunk B's
+step 5 acceptance leg. Both need the GPU.
+Next: chunk B step 5 -- reset per section 4, FRESH boot at `b46db68e`, one
+forced-hit leg (`lemmy_cameo=always include` IS on the creative whitelist).
+Then the 1.1 tier. Then the video sprint (1.2), whose plan doc is written
+(`docs/2026-08-16-video-sprint-PLAN.md`) but whose kibitz arc has NOT run.
+Blocked-on-operator: NOTHING except the post-rip TAG.
+Models: CODER window. NO RUNG CITED -- the MODEL & CREDIT BUDGET table still
+has no rows; answered from the per-window mapping (local triage, Sonnet 5
+post-code QA x2 both SHIP, kibitz local panel x4 rounds + 1 retry, read-only
+Explore fan-outs for mapping). Cloud spend $0. Review routing read and applied:
+the 2026-08-15 REVIEW ROUTING block, whose sprint arc is SPENT -- so these were
+NEW coding items and took the 2026-08-04 full-arc gate.
+Gates at close: suite **10584/110/1**, Bible **20/26/3 at 284**, variants
+**50/0**, AST parse on every touched .py, BOM clean, HEAD == origin.
+Bible delta-check: PBUG-20260816-03 is a NEW live-verified bug but has NO FIX
+yet, so nothing promoted -- check it at fix time.
+Box: server RESIDENT on :8000, GPU ~1.9 GB idle. Three soak harnesses running,
+one of them uselessly (above).
+Commits: `7faf3bf7`, `873c24b1`, `b46db68e`, plus this handoff.
+
 ## 2026-08-16 -- HEAD 7aaa953c (v2.0-alpha) -- CODER (second half: the rip, the rename, the soak, and the queue re-cut on evidence)
 
 Continues the a1f1577b entry below; this covers the afternoon.

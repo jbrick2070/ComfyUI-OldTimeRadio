@@ -5134,4 +5134,57 @@ EXPECTED result, not a regression signal.
   and position match a declared cast member gets mapped, not rerolled --
   which is roster repair (sanctioned fail-closed territory), never prose
   rewriting. Panel it against THE LAW before building.
-- status: OPEN, measuring.
+- status: OPEN, measuring. **CORRECTION 2026-08-16 evening: the measurement
+  this entry promises is NOT being collected by the harness that looks busiest
+  -- see PBUG-20260816-03.** The real incidence data is the 8 legs in
+  `soak_20260816_143704.json` + `soak_20260816_145333.json`, not the 708 legs
+  in `soak_20260816_143448.json`, which never rendered anything.
+
+## PBUG-20260816-03 -- a GPU soak harness ran 708 legs and rendered nothing, because it patches MANAGED widgets with `--set`
+
+- surfaced: 2026-08-16 evening, reading `otr_soak_receipts/` for a handoff.
+  Three soak harnesses were live (seeds 816 / 1436 / 1451). Their receipts:
+
+  | receipt | legs | ok | longest leg |
+  |---|---|---|---|
+  | `soak_20260816_143448.json` | **708** | **0 true / 708 false** | 0.5 min |
+  | `soak_20260816_143704.json` | 5 | 4 true | 42.3 min |
+  | `soak_20260816_145333.json` | 3 | 2 true | 42.8 min |
+
+- symptom: every leg in the big receipt has `rc: 1` and `minutes` between 0.20
+  and 0.50 -- roughly twelve seconds, far too fast to be a render. Sustained
+  for about two and a half hours. The server was NOT down: `:8000` was
+  listening and `/queue` answered `HTTP 200` throughout.
+- root cause, REPRODUCED directly rather than inferred -- one leg re-run by
+  hand gives the exact refusal:
+
+      ValueError: patch_creative: widget 'character_video_model' is not on the
+      creative whitelist; managed widgets are patched ONLY via
+      apply_profile_to_workflow(--profile).
+
+  That harness rotates the video/image engines with
+  `--set OTR_VideoDirector.character_video_model=...` (and the announcer/music
+  siblings). Those are MANAGED widgets, so `patch_creative`
+  (`scripts/otr_api.py:868`) refuses them while the API prompt is still being
+  built -- before submission, before the GPU is touched.
+- the guardrail is RIGHT; the caller is wrong. `GO_FORWARD_PLAN.md` already
+  records the sanctioned lever ("the managed-widget guardrail refused `--set`
+  by design, so profiles are the sanctioned lever"), and the two harnesses that
+  use `--profile otr_soak_*` are rendering real 42-minute legs. One of the
+  three launches simply used the wrong instrument.
+- **why this is worse than wasted CPU:** the operator's tag gate is "ready once
+  the soak receipt shows every bank passing", and a reader opening
+  `otr_soak_receipts/` sees a 103 KB file reporting 708 legs. Read quickly that
+  looks like broad coverage. It is 708 rejections, and it also inflates the
+  apparent leg count roughly 90x over the real progress (8 legs, 6 passes).
+- related, same guardrail, same day: the Lemmy cross-engine r3 panel caught the
+  driver planning to move the canonical engine widgets with `--set` for an
+  acceptance leg. It cannot be done that way by anyone -- the instrument is a
+  capability profile whose `slot_overrides` reach both nodes through
+  `config/profiles/widget_mapping.json`.
+- fix: NONE APPLIED. The failing harness was left RUNNING deliberately -- it is
+  operator-ordered state, it holds no GPU, and killing it was not needed for
+  any work this window. What it needs is either the `--profile` lever like its
+  two siblings, or deletion of the `--set` engine-rotation path in
+  `scripts/otr_gpu_soak_matrix.py` so the mistake is unrepresentable.
+- status: OPEN. Do not read `soak_20260816_143448.json` as coverage.
