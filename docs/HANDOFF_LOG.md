@@ -3,7 +3,7 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-16 -- HEAD b46db68e (v2.0-alpha) -- CODER (evening: chunk B built to its acceptance leg, the Lemmy arc closed, a TTS preflight created, and a soak that was rendering nothing)
+## 2026-08-16 -- HEAD 54d16e06 (v2.0-alpha) -- CODER (evening: chunk B CLOSED live-proven, the Lemmy arc closed, a TTS preflight created, a soak that was rendering nothing, and a GO_FORWARD lean pass)
 
 Did, all pushed, HEAD == origin verified after each:
 
@@ -127,9 +127,32 @@ accepts any keyword and passes against the defect), and prove the control end
 to end on a real run.
 NOT promoted: PBUG-20260816-03 (the soak harness) is live-verified but has NO
 FIX yet, so it has no `fix:` to claim -- check it at fix time.
-Box: server RESIDENT on :8000, GPU ~1.9 GB idle. Three soak harnesses running,
-one of them uselessly (above).
-Commits: `7faf3bf7`, `873c24b1`, `b46db68e`, plus this handoff.
+**GO_FORWARD LEAN PASS (`54d16e06`).** The file had drifted to 2,435 lines
+against its own forward-only rule. Audited end to end first -- every heading
+classified open / standing-ruling / hard-fact / done / process -- because about
+a third of it is operator rulings phrased "do not re-open" and losing one costs
+more than the length. Added a HOW TO READ header naming the queue as the only
+authority on order; renumbered the queue 1-6 with an explicit CLOSED list so a
+stale paragraph cannot read as live work; cut 80 lines of pure done-narrative.
+**Killed two contradictions:** the suite receipt existed TWICE (top said
+10584/110/1, the validation section said 9081/111/1 and called itself current --
+900 tests and 9 days stale), now stated once in BASELINES; and the
+Lemmy-vs-render-proofs ordering had an 08-13 ruling fighting the 08-16 queue.
+**Replaced the stale kickoff:** the window-packing table and boot prompt still
+told a fresh window to resume the RETIRED Story Lab and read a heading that does
+not exist -- the one line a new window pastes without checking. The audit also
+found ELEVEN already-broken cross-references (`section 0`, `0-BIS`, `0-TER`,
+`0-QUATER`, `0A`, `WHAT IS ACTUALLY LEFT`, `NEXT CODING QUEUE`, `STORY LAB
+RECOVERY BASE`, `ON DECK item 5`); they are now named in the header so nobody
+hunts them. **A full archive split is still OWED** and is named as its own task
+-- not done blind, because the remaining bulk is done-narrative interleaved
+INSIDE live sections and needs prose-level editing, not section deletion.
+
+Box: server RESIDENT and idle on :8000 at `91f20e7d`-era modules, GPU 2.4 GB.
+**The soak is STOPPED** -- all three harnesses and the prior server were torn
+down selectively by CommandLine (17 processes; the 4 MCP pythons survived).
+Commits: `7faf3bf7`, `873c24b1`, `b46db68e`, `91f20e7d`, `16cbd77c`, `27bb2bfa`,
+`54d16e06`; survival-guide `a8b985f`.
 
 ## 2026-08-16 -- HEAD 7aaa953c (v2.0-alpha) -- CODER (second half: the rip, the rename, the soak, and the queue re-cut on evidence)
 
