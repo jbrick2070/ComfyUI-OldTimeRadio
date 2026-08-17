@@ -3,7 +3,12 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-17 (item B window) -- HEAD 360cd4e5+ (v2.0-alpha) -- CODER (the style fix proven on live pixels; git auth root-caused; D-BIS finding 1 measured)
+## 2026-08-17 (item B window) -- HEAD 5aa2fee6 +handoff (v2.0-alpha) -- CODER (style fix proven on live pixels; git auth root-caused; the video-negative fork panelled and answered)
+
+> **The sha above is the last CODE head. It is the second-to-last sha on the
+> branch once this entry lands; the last is this handoff commit.** A commit
+> cannot contain its own hash, so chasing it is an infinite regress. The
+> authoritative post-handoff sha is in the KICKOFF LINE, read after the push.
 
 **THE GIT BREAKAGE WAS NEVER THE TOKEN.** Both repos were genuinely stranded at
 boot (OTR `360cd4e5` vs origin `7f6a6eca`, three commits; survival-guide
@@ -101,26 +106,65 @@ pull back`, `Slow orbit around the speaker`, `Measured dolly push forward`,
 `Slow bouncy dolly forward` and `Slow dramatic push-in` are all CLEAN. So
 stripping every camera clause was never required, and it cost measurable motion
 on a lane whose own negatives ban "static, frozen pose, still image".
-**AWAITING AN OPERATOR CALL:** (A) keep the fully locked-off registers as
-landed, or (B) restore the camera clauses and change only the two colliding
-phrasings (`Steady dolly push forward` / `Slow steady dolly forward`, both
-verified clean). Driver recommends **B**; it is a taste call about the show's
-look, so it was not taken unilaterally with a push pending.
+**THE OPERATOR CHOSE (B), AND IT SHIPPED AND WAS RE-MEASURED.** The registers
+are the AUTHORED text with eleven word-level fixes; **25 of 36 are
+byte-identical to what he wrote**, and the camera moves, beat choreography and
+pack voices all survive. Re-measured live at seed 42: **mean 0.349, peak 0.757,
+drift 6.01** -- 94% of the original motion back with a HIGHER peak. Drift sits
+below the original because `Steady dolly push` is a calmer move than `Dynamic
+dolly push`, which was the phrase Seedance was rewriting anyway. `Slow dolly
+pull back` and `Slow orbit around the speaker` never collided and are untouched.
+One fix is a CRAFT restore rather than a collision: `Cel highlights alternate`
+-> `shiver`, because the earlier `flicker`->`alternate` edit swapped an anime
+term of art for a scheduling verb and charged the cost to local lanes that never
+had the conflict.
+
+**THE RULE WORTH CARRYING:** only SIX words in the entire tree ever collided
+with a frozen provider list. Fixing them with a sweeping rewrite cost 40% of the
+motion and had to be walked back within the hour. **Fix the colliding token,
+never the surrounding writing.**
 
 **THE GENERAL LESSON, worth more than this item:** the acceptance test passed on
 TEXT for all 36 registers and the pixels still moved 40% less. That is
 PBUG-20260817-01's lesson recurring on the video side within the same day --
 green gates are not a working fix, and the render is the only proof.
 
-Current step: **the A/B register call above**, then THE QUEUE item **C** (store
-the ten per-engine prompt notes; strike z_image's negative-authoring clause
-first, per the trap in D). Item D stays BLOCKED. Models: CODER window, NO RUNG
-CITED -- the budget table still has no rows; ran on the per-window mapping
-(cheapest local triage + Sonnet 5 QA + a four-way panel on the one design fork).
-Cloud spend $0. Gates at close: suite **10755/110/1** (baseline 10717; no
-regressions), Bible **20/26/3 at 287** (nothing promoted -- every finding here is
-static-audit and fails the admission rule), AST + BOM + ASCII clean on every
-touched file, six live stills + two live video clips on disk.
+Current step: THE QUEUE item **C** (store the ten per-engine prompt notes;
+**strike z_image's negative-authoring clause before storing**, per the trap in
+D), operator-set 2026-08-17. Then H, then G/F/E. **D stays BLOCKED** -- the
+still-prompt writer does not know its target engine, and Codex was the intended
+lane for settling that (back 2026-08-19 20:31). **D-BIS 2-5 and D-TER** are
+static-audit findings awaiting a live observation; D-BIS 1 is CLOSED.
+
+Models: CODER window, **NO RUNG CITED -- the MODEL & CREDIT BUDGET table still
+has a header, a separator and no rows**; ran on the per-window mapping paragraph
+beneath it (cheapest local triage; Sonnet 5 QA on the finished diff; a four-way
+panel on the one genuine design fork). Review routing read: the dated **REVIEW
+ROUTING FOR THE BUG-FIX WINDOW (operator 2026-08-15)** block at the top of
+GO_FORWARD, as amended by `7f6a6eca`. Panel provenance, stated precisely because
+a partial campaign may never be worded as a full arc: this was a **single-round
+scoped panel on ONE question**, not an r1-r4 arc -- Fable (craft), Sonnet
+(mechanism), Antigravity via `kibitz.py --only agy` (r1), plus the driver's own
+code-grounded anchor (`docs/2026-08-17-video-negative-conflict-DECISION.md`).
+**Codex excluded: quota-held until 2026-08-19 20:31.** Cloud spend **$0**.
+
+Box state at close: **CLEAN** -- port 8000 free, VRAM 788 MiB (baseline), no
+resident server, no background tasks running.
+
+Gates at close: suite **10755/110/1** (baseline 10717; no regressions at any
+step), Bible **20/26/3 at 287** with README 287 in all three places (Three-File
+Contract intact; **nothing promoted, deliberately** -- every finding here is
+static-audit and fails the admission rule, and PBUG-20260817-01 was re-proved on
+pixels but is already covered by `12.108`, whose tags include
+`prompt-audit-cannot-see-pixels`). AST + BOM + ASCII clean on every touched file.
+Artifacts: six live stills (`otr/episodes/style_authority_smoke/stills/`) and
+three live video clips (`output/otr_ltxmotion/motion_{OLD_camera,NEW_subject,
+RESTORED_optionB}_00001_.webm`).
+
+Commits: `18b5adca` (item B + traceroute video side + tests), `3c632751` (the
+gitignore trap), `0b52e9ed` (GO_FORWARD compression), `5aa2fee6` (option B
+restore). The handoff commit lands ON TOP of these -- see the kickoff line for
+the real head.
 
 ## 2026-08-17 (late night) -- HEAD ce8a1fad (v2.0-alpha) -- CODER (engine input-convention audit: one real hit of three, and TWO COMMITS ARE UNPUSHED)
 

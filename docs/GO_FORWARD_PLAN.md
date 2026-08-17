@@ -161,10 +161,11 @@ rewritten subject-first (B); the video-negative fork was panelled and answered
 "build no guard" (D-BIS 1). The DONE bodies have been compressed to the rules
 that still bind -- receipts live in `HANDOFF_LOG.md`.
 
-**OPEN, in order:** **B-OPEN** (one operator A/B call, minutes) -> **C** (cheap,
-ready) -> **H** (a small judgement) -> **G** / **F** / **E**. **D is BLOCKED**
-and **D-BIS 2-5 + D-TER** are static-audit findings awaiting a live observation.
-What follows is that order, cheapest-certain first:
+**OPEN, in order: `C` IS NEXT** (operator-set 2026-08-17) -> **H** (a small
+judgement) -> **G** / **F** / **E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER**
+are static-audit findings awaiting a live observation. B-OPEN is CLOSED -- the
+operator chose (B) and it shipped. What follows is that order, cheapest-certain
+first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -245,22 +246,34 @@ pre-specified acceptance test has no design fork in it. Sonnet 5 QA on the diff.
   `scripts/otr_ltx_motion_smoke.py` (video motion, now reads the pack instead of
   a hardcoded copy that had already gone stale).
 
-**B-OPEN. THE ONE THING ITEM B LEFT UNDECIDED -- an operator call, cheap either
-way.** The subject-first rewrite stripped ALL 35 camera clauses, but only **TWO**
-ever collided with a frozen provider list (`Slow handheld dolly forward` via
-"handheld"; `Dynamic dolly push forward` via "dynamic dolly push"). `Slow dolly
-pull back`, `Slow orbit around the speaker`, `Measured dolly push forward`,
-`Slow bouncy dolly forward` and `Slow dramatic push-in` are all CLEAN. The live
-A/B measured the cost of over-stripping: **0.220 vs 0.373** mean frame delta,
-**3.50 vs 10.27** drift.
-* **(A) keep as landed** -- fully locked-off shot, engine decides all motion.
-  Literally what the operator asked for, and truer to the registers' own opening
-  line. Costs ~40% of the movement on a lane whose negatives ban "static".
-* **(B) restore the camera clauses, fix only the two** -- `Steady dolly push
-  forward` / `Slow steady dolly forward`, both verified clean against the
-  softener table and the ban list. Keeps the original energy AND zero collisions.
-**Driver recommends (B).** Not taken unilaterally: it is a taste call about the
-show's look. Whichever is chosen, re-run the video A/B to confirm the number.
+**B-OPEN -- CLOSED 2026-08-17: the operator chose (B), and it is implemented and
+re-measured.** The registers are the AUTHORED text with only the colliding words
+changed; **25 of 36 are byte-identical to what the author wrote**, and the
+camera moves, beat choreography and pack voices all survive.
+
+| arm | mean frame delta | peak | drift |
+|---|---|---|---|
+| original (colliding) | 0.373 | 0.574 | 10.27 |
+| the sweep (all camera stripped) | 0.220 | 0.355 | 3.50 |
+| **(B) restored, colliding words fixed** | **0.349** | **0.757** | 6.01 |
+
+**THE ELEVEN WORD-LEVEL FIXES, and why each -- do not "tidy" them back:**
+`whip-pans` -> `races` / `spins wildly` (Wan ban + Seedance softener; a dial
+cannot pan, it was borrowed camera jargon); `flickers` -> `wavers` (Wan bans
+frame flicker; candlelight wavers); `white-hot` -> `fierce white` (Seedance
+rewrote it to "bright warm glow", breaking the sentence); `vibrates
+aggressively` -> `shudders with the music` (Seedance rewrote it to "subtly" --
+energy inverted); `Slow handheld dolly forward` -> `Slow steady dolly forward`;
+`Dynamic dolly push forward` -> `Steady dolly push forward`. Plus one CRAFT
+restore that is not a collision: `Cel highlights alternate` -> `shiver`, because
+the earlier `flicker`->`alternate` edit swapped an anime term of art for a
+scheduling verb and charged the cost to local lanes that never had the conflict.
+**`Slow dolly pull back` and `Slow orbit around the speaker` never collided and
+are untouched.**
+
+**THE RULE THIS LEAVES:** only SIX words in the whole tree ever collided with a
+frozen provider list. A sweeping rewrite to fix them cost 40% of the motion and
+had to be walked back. Fix the colliding token, never the surrounding writing.
 
 **C. STORE THE TEN PER-ENGINE PROMPT NOTES.** Zero behaviour change, zero
 runtime cost. Answers exist (three research rounds); the schema and the
