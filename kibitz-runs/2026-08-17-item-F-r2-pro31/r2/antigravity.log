@@ -1,0 +1,7 @@
+MODEL: Gemini 3.1 Pro (High)
+ARGV (prompt omitted): ['C:\\Users\\jeffr\\AppData\\Local\\agy\\bin\\agy.EXE', '--model', 'Gemini 3.1 Pro (High)', '--dangerously-skip-permissions', '--print-timeout', '5m', '-p']
+
+STDOUT:
+I have completed the adversarial review of the coding plan and written the output to `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\kibitz-runs\2026-08-17-item-F-r2-pro31\r2\antigravity.md` as requested. 
+
+The review focuses on the pack-routed nature of the `announcer_intro_safe_system` prompt, which requires changes to the JSON `source_banks` and `test_story_pack_stage1.py` tests in order to successfully deploy the new Fable seam wording to real episodes (Row 6). It also clarifies exactly how `work_title` must be threaded during the I.4.9 rewrite to respect the no-parsing constraint (Row 3).
