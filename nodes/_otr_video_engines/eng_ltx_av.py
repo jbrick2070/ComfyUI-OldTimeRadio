@@ -56,6 +56,72 @@ from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.eng_ltx_av")
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Keep the speaking face framed and the mouth visible. Describe motion that "
+    "does not turn the head away or leave frame. Do not restate the set; the "
+    "still fixes it. State requirements positively; exclusions have no effect."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: LTX-2.3 AV, local GGUF (Q3_K_M) via an env-overridden UNET.
+The favoured recipes -- sharp_lora, distilled_native, ia2v_canonical -- all run
+cfg 1.0, so the negative is INERT on every path that ships. ``distilled_native``
+is described in this file as the new default daily driver. The ia2v path is a
+TWO-STAGE lip-sync graph: the prompt must support mouth motion synced to audio
+that is supplied, not described.
+
+WHY "DOES NOT TURN THE HEAD AWAY OR LEAVE FRAME" IS THE UNIQUE RULE HERE, and it
+is not timidity. It is the exact tension the operator left deliberately unsettled
+on 2026-08-17: after the kinetic amendment, two authored strings still say it --
+``render_driver._IA2V_TALKING_PROMPT_ANNOUNCER`` ("glancing subtly as it speaks.
+The radio sits still; static camera") and
+``render_driver._IA2V_TALKING_CLAUSE_CHARACTER`` ("subtle head and hand gestures.
+Static camera.") -- and his directive is that none should. They were NOT
+blanket-changed, because on a close-up lip-sync beat "kinetic" can walk the
+subject out of their own frame. (GO_FORWARD_PLAN cites these as
+``render_driver.py:1354`` and ``:1483``; both are STALE -- neither line contains
+the word. Cite the SYMBOL, never the address.) So the framing question wanted one deliberate
+answer rather than a find-and-replace. This directive is that answer in phrasing
+form: motion is welcome, motion that costs the mouth is not. It asks for a
+constraint on WHERE the motion goes, never for less motion.
+
+BUDGET REALITY ON THIS LANE -- read before assuming a directive can add words.
+``render_driver._IA2V_TALKING_CLAUSE_CHARACTER`` is 131 chars (measured),
+probe-locked and unshrinkable per P8, and composed with the identity fragment it
+lands within single digits of the 240 ceiling on the repo's own
+``_char_face_shot()`` fixture. GO_FORWARD_PLAN says EXACTLY 240; a static trace of
+the fragment budget puts it at 237, and the shipped test asserts only
+``<= _LTX_MOTION_PROMPT_MAX``, so NOTHING pins the exact figure -- do not quote one
+without re-measuring. Either way realistic 57-68 char dialogue lines overflow even
+after the fragment shrinks to its 40-char floor. On this engine "what if it does
+not fit" is the DEFAULT case, not an edge case, and a directive that encouraged
+elaboration here would be actively harmful.
+
+THE NEGATIVE IS INERT ON EVERY SHIPPED RECIPE, so the directive states
+requirements positively and says nothing about authoring one. This engine is also
+one of the four carrying an UNGATED env negative override (D-TER): it reads
+``OTR_LTX_AV_NEGATIVE`` unconditionally at TWO sites on every production render,
+where ``eng_ltx_8gb`` keeps its equivalent (``OTR_LTX_8GB_NEGATIVE``, in the gated
+recipe-env map) behind ``_prequalification_active()``. Cited by env-var name
+rather than line, because GO_FORWARD's ``:766,909`` shifted by exactly the 53
+lines this diff inserted above them. That is an open static-audit finding needing
+the operator, not something a phrasing directive touches.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 def _env_num(name, default, cast):
     """``cast(os.environ[name])`` that can never take the IMPORT down.

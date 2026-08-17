@@ -3,6 +3,119 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (item C window) -- HEAD 3fc0abcf +this (v2.0-alpha) -- CODER (the ten prompt-style overlays stored; a matrix-scraper regression caught and root-fixed; 8 of 21 cited line numbers proven wrong)
+
+**ITEM C's STORE HALF IS DONE. THE RESEARCH HALF IS NOT, AND THAT IS THE HEADLINE.**
+The window booted on "the answers already exist from three research rounds --
+both are in the RESEARCH doc". They do not exist. That doc holds the decided
+schema, a reusable research PROMPT, and ten shipped-config blocks; it has no
+directive values, and `prompt_style` appears in exactly ONE file in the entire
+ComfyUI tree -- that doc. Nothing in any of the seven 2026-08-17 `kibitz-runs/`.
+The operator then pasted three research reports, but they were TWO distinct
+documents (the third was byte-identical to the synthesis's own appendix -- its
+231-char sample overlay matches the count the synthesis cited), and all of them
+leave the engine-specific slot as `{DIRECTIVE}` or a generic sample. **The
+operator committed this finding himself as `3fc0abcf` mid-session** and restated
+C as two steps. So the ten directives here were DERIVED by the driver from each
+engine's shipped configuration plus the schema's five rules, every
+`PROMPT_STYLE_NOTES` block says exactly that in a PROVENANCE paragraph, and
+GO_FORWARD now says "C done" does not mean "the research ran".
+
+**A REGRESSION THE OVERLAY ITSELF CAUSED, AND REGENERATING THE DOC WOULD HAVE
+BEEN THE WRONG FIX.** `tools/engine_matrix.py` scrapes engine sources for
+`docs/[A-Za-z0-9._-]+` and publishes every hit as FRAME-CAP EVIDENCE -- it exists
+because `eng_humo` once justified a 49-frame ceiling with a doc not in the tree.
+Citing the RESEARCH doc turned `test_the_doc_matches_the_live_registry` red on ten
+engines. Worse, the path was hyphen-wrapped across two comment lines, so the
+scraper captured `docs/2026-08-17-per-engine-prompt-style-guide-`, a path that
+does not exist. The tempting fix -- regenerate the matrix -- would have made
+`wan_ti2v` cite a PHRASING doc as its frame receipt, degrading a document whose
+own docstring says its whole value is being TRUE. Fixed at the source: name the
+doc without a path prefix, never wrap it. Drift back to IDENTICAL.
+
+**THE GUARD PLUGIN HIDES THE FAILURE IT REPORTS.** `pytest_sessionfinish`'s
+KNOWN-FAIL-GUARD names the regressing nodeid and exits before pytest prints its
+report, so `-rA --tb=long` yielded 24 lines with no traceback. Diagnosis came from
+diffing the generator's `render()` against the doc on disk instead. Worth knowing
+before spending time on escalating pytest flags.
+
+**A CITATION-VERIFICATION PASS FOUND 8 OF 21 WRONG, AND FIVE WERE MY OWN DIFF.**
+The shift equalled the insertion count exactly in each case: +53 `eng_ltx_av`, +56
+`eng_humo`, +46 `z_image_turbo`. The diff also broke a PRE-EXISTING comment in
+`lumina_image` citing `z_image_turbo.py:117`. **The lesson is not "renumber" -- it
+is CITE SYMBOLS.** All notes now cite constants and quotes. Three were substantive
+rather than numeric: the i2v doctrine sits ~8 lines below the cited span; "the 188
+appears at exactly ONE call site" is true only of the `max_chars` argument (the
+branch carries 188 three times); and `fastwan_8gb`'s note claimed no override
+could re-enable its negative, which is FALSE -- `prequalification_active` plus the
+`cfg` key in `_FASTWAN_RECIPE_ENV_KEYS` moves cfg off 1.0 through the inherited
+`WanTi2vEngine._resolve_render_config`, and the unconditional branch returns with
+it. **Absolutes in a note are where false authority gets in.**
+
+**AND THE JUSTIFICATION FOR A DESIGN DECISION WAS WRONG WHILE THE DECISION WAS
+RIGHT.** `ltx_8gb` carries a POINTER rather than a copy (two byte-identical
+strings is D-BIS finding 2's shape). The reason given was "same T5 encoder" --
+false in both directions: `ltx_video` runs GEMMA-3, `ltx_8gb` borrows shared
+T5-XXL. The pointer survives because not one clause of the directive is
+encoder-specific, and that is now recorded as the SPLIT CONDITION. Also corrected:
+the RESEARCH doc says `ltx_video` frames go "up to 193"; the engine ships
+`_LTX_MAX_FRAMES_DEFAULT = 169`, a measured decode constraint, and 193 matches no
+constant in the file.
+
+**THE FIRST VERSION OF THE NEGATIVE-AUTHORING GUARD WAS THEATRE.** The operator's
+strike ("strike z_image's negative-authoring clause") was made structural as a
+test -- but as a nine-phrase blocklist, a QA pass walked **14 of 16** plausible
+authoring instructions through it ("name what to avoid", "describe what to
+exclude", and even "add the negative prompt terms here", which the list missed
+because it required "negative" and "terms" to be adjacent). Rebuilt INVERTED: any
+mention of "negative" fails unless an approved has-no-effect hedge is present,
+because ways to say "this channel is inert" are a CLOSED set and ways to say
+"author one" are not. Same pass found the AST reader silently skipped `BinOp`,
+f-string, `.join()` and annotated assignments, which made three checks pass
+vacuously on `""`; it now fails loudly instead.
+
+**ITEM H IS BIGGER THAN "A SMALL JUDGEMENT" AND ITEM C IS WHY.** Two findings,
+both verified: there is no `lumina_image._resolve_negative` at all (the negative
+is resolved inline in `_lumina_params`), so a plan to "add the floor to
+`_resolve_negative`" targets a ghost; and the `engine_hygiene` receipt is not
+wrong for lumina, it is **UNVERIFIED FOR EVERY ENGINE** -- the dispatcher computes
+`_neg_source` about 56 lines BEFORE `resolve_engine_for_role` in the same
+per-object iteration, so that arm asserts a property of an engine not yet chosen.
+True of z_image by coincidence. The receipt fix is now the cheap asymmetric
+option; giving lumina a floor stays an operator/recipe call needing a render.
+
+**THREE REGISTERED IMAGE ENGINES SIT OUTSIDE THE TEN:** `flux2_klein`
+(`requires_flag = None`, so NOT gated -- live in the menu), `hidream_i1` and
+`sd35_large` (default-OFF). None has an overlay or a config block in the RESEARCH
+doc. Flagged as an operator scope call, deliberately not decided here.
+
+Current step: **item C step (1), the RESEARCH** (ten engines, one paste-ready
+block each; web search allowed, $0) -- then **H** (read its reframing first),
+then **G** / **F** / **E**. D stays BLOCKED; D-BIS 2-5 and D-TER remain
+static-audit findings awaiting a live observation.
+
+Models: CODER window, **NO RUNG CITED -- the MODEL & CREDIT BUDGET table still has
+a header, a separator and no rows**; ran on the per-window mapping paragraph
+beneath it. Review routing read: the dated **REVIEW ROUTING FOR THE BUG-FIX
+WINDOW (operator 2026-08-15)** block, as amended by `7f6a6eca`. **No arc, and that
+was correct** -- the schema was decided and the store half has one verifiable
+answer. Review was a **three-way read-only Sonnet 5 fan-out** on the finished diff
+(engine-file structural/factual QA, adversarial QA of the new test, and
+citation verification), operator-authorized mid-window. Every finding was
+re-grounded against the real Windows files before folding; the panel proposed, the
+driver disposed. Cloud spend **$0**.
+
+Box state at close: **CLEAN** -- port 8000 free, VRAM ~825 MiB (baseline), no
+resident server, no GPU leg run (item C is zero behaviour change, so no render was
+owed).
+
+Gates at close: suite **10819 passed / 110 skipped / 1 xfailed** (baseline 10755;
+the +64 is exactly the new test file, no other test moved). ENGINE_MATRIX drift
+**IDENTICAL**. Directives 176-232 chars against the 240 hard cap. AST + BOM +
+pure-ASCII + no-trailing-whitespace clean on all 12 touched files. Bible
+**20 / 26 / 3** at **287**, **nothing promoted** -- every finding here is
+static-audit or a docs-accuracy defect and fails the admission rule.
+
 ## 2026-08-17 (item B window) -- HEAD 5aa2fee6 +handoff (v2.0-alpha) -- CODER (style fix proven on live pixels; git auth root-caused; the video-negative fork panelled and answered)
 
 > **The sha above is the last CODE head. It is the second-to-last sha on the

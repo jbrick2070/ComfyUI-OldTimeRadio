@@ -64,6 +64,87 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+#:
+#: THIS PAIR IS THE WHOLE LTX FAMILY'S, ``ltx_8gb`` INCLUDED. The RESEARCH doc
+#: treats "ltx_video / ltx_8gb" as ONE block: same family, same cfg-1.0 distilled
+#: default, same i2v-anchor doctrine, so the phrasing advice is identical.
+#: ``eng_ltx_8gb`` therefore carries a POINTER here and NOT a copy -- two byte-
+#: identical strings in two files is the duplicate-drift shape D-BIS finding 2
+#: already flags in the negative constants (four copies, two silently diverged).
+PROMPT_STYLE_DIRECTIVE = (
+    "Describe motion only: the still already fixes the look. Name the subject, "
+    "then what moves and how fast. Do not restate set, wardrobe or lighting. "
+    "State requirements positively; exclusions have no effect."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: LTX-Video distilled, local. The DEFAULT sampler mode is
+"distilled" at cfg 1.0, so the negative is INERT on the default path; a
+non-default ksampler mode runs cfg 3.0. 832x480 @ 25fps typical, frame counts in
+8k+1 steps, and the configured ceiling is ``_LTX_MAX_FRAMES_DEFAULT = 169``
+(env-overridable via ``OTR_LTX_MAX_FRAMES``) -- a MEASURED decode constraint on
+this box, not a preference. The RESEARCH doc says "up to 193"; 193 matches no
+constant in this file, so the doc is wrong against the code and 169 is the number.
+The text encoder is GEMMA-3 via ``LTXAVTextEncoderLoader``, not T5 -- the sibling
+``ltx_8gb`` tier is the one on shared T5-XXL, and it loads the 2B distilled
+checkpoint.
+
+WHY "MOTION ONLY" IS THE FIRST AND LOUDEST RULE. This is an image-to-video lane:
+a rendered still is the conditioning anchor and it carries the LOOK. The doctrine
+is stated verbatim in ``render_driver``'s i2v comment: "the anchor carries the
+LOOK from the FLUX still, so the prompt's only job is to MOVE". (Cited by SYMBOL
+and by quote, not by line -- GO_FORWARD_PLAN puts it at ``:2877-2884`` and it is
+really eight lines further down. Every line citation in this file's notes rotted
+the moment this diff inserted lines above it, which is the general lesson: cite
+the constant or the quote, never the address.) A writer who re-describes the set
+is not merely wasting
+a tiny budget, it is spending the only channel that can express motion on
+information the anchor already fixed, and on this lane the budget is the binding
+constraint (~188 chars for a normal beat, 240 for the motion clause).
+
+"HOW FAST" IS DELIBERATE AND IT IS RECENT. The kinetic-motion amendment
+(2026-08-17, ``81f79412``) established that the damping was an INSTRUCTION, not a
+model limit: the clause writer had been commanded "SUBTLE motion" and forbidden
+"stands up, walks, runs, turns around", so it could not describe a character who
+moves. Do not reintroduce "subtle" into this directive -- that is the exact
+wording the operator directed out of the prompt path.
+
+THE BUDGETS ARE OURS, NOT THE ENGINE'S -- and that is a reason for care, not for
+raising them casually. The 240 is ``render_driver._LTX_MOTION_PROMPT_MAX``, a
+plain module constant. The non-open branch budgets 188, and GO_FORWARD_PLAN calls
+that "exactly ONE call site" -- true only of the ``max_chars=188`` argument. The
+number actually appears THREE times in that branch (the ``max_chars`` call plus
+two budget computations, one of them a ``max(40, min(90, 188 - ...))``), so
+"raise the one" would leave two behind. Mechanically trivial, then, but not a
+one-liner. It is also NOT free, and this is the receipt that says so: the P4
+probe measured
+articulation collapsing 4.15 -> 1.18 from a prompt-register change on this very
+lane. A ceiling raised without re-running
+``scripts/otr_talking_radio_probe_eval.py`` at the same seed is an untested
+change to lip-sync quality.
+
+THE NEGATIVE IS INERT ON THE DEFAULT PATH, so the directive states requirements
+positively. It says nothing about authoring a negative on the cfg-3.0 mode
+either: video negatives are FROZEN RECIPE in this repo, which is exactly why
+``scripts/otr_style_traceroute.py --strict`` is deliberately NOT extended to the
+video side -- gating on a string we may not edit would be a build-breaker by
+construction.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 def _resolve(folder, name):
     """Resolve a model filename to a full path via ComfyUI folder_paths (honors

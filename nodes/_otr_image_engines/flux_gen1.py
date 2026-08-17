@@ -26,6 +26,46 @@ from .._otr_shared.role_compat import ROLES
 
 log = logging.getLogger("OTR.image.flux_gen1")
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "State every requirement positively; exclusions have no effect at this "
+    "guidance. One flowing sentence, subject first. Prefer specific nouns over "
+    "stacked modifiers. Name lighting and lens facts plainly. No tag lists, no "
+    "weight syntax."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: FLUX.1-dev fp8, 20 steps, cfg 1.0 with a FluxGuidance
+embedding of 3.5. Guidance-distilled.
+
+WHY THE DIRECTIVE LEADS WITH "POSITIVELY". At cfg 1.0 there is no
+classifier-free-guidance branch, so the negative prompt is INERT -- it is not
+weak, it is not consulted. That is the single most consequential fact about
+phrasing for this engine, because the habit it breaks is universal: a writer who
+has learned to push a look away by naming what to avoid gets literally nothing
+here, silently, with no error and no receipt. The replacement is to name the
+desired condition affirmatively -- "even overcast light" rather than "not harsh
+light" -- which is why the directive spends its first clause on it and its last
+on the CLIP-lineage syntax that also buys nothing.
+
+The FluxGuidance embedding at 3.5 is a learned conditioning input, not a cfg
+scale, so raising it does not restore a negative channel. Nothing a prompt can
+say re-enables one.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 @register
 class FluxGen1ImageEngine:

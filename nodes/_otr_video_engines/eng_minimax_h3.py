@@ -100,6 +100,52 @@ from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.video.minimax_h3")
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "This engine takes no negative prompt at all, so state every requirement "
+    "positively. Name the subject, then one action and its speed. Do not restate "
+    "the set; the still fixes it."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: MiniMax H3 video. It accepts NO negative prompt -- not an
+inert one, none at all. Frame counts sit on the installed node's own grid
+(``n % 17 == 5``), the MODEL runs at 24 fps against the OTR timeline's 25 fps
+canvas, and the node's ``length`` tooltip declares a trained band of ~124-362.
+
+"NO NEGATIVE PROMPT AT ALL" IS A DIFFERENT FACT FROM "THE NEGATIVE IS INERT", and
+this is the one engine where the distinction matters. On ``flux_gen1``,
+``ltx_video``, ``ltx_av`` and ``fastwan_8gb`` a negative is accepted and then not
+consulted, because cfg 1.0 has no unconditional branch to evaluate it against;
+here there is no input field to populate in the first place. For a writer the
+practical instruction is identical, which is why the directive's remaining clauses
+match those lanes. For a LEDGER it is not identical: a per-row record claiming a
+negative conditioned a MiniMax pixel is not merely misleading, it is describing a
+parameter that does not exist on this engine. That is worth remembering against
+D-BIS finding 4, which is about the visual ledger not yet being able to prove
+which negative conditioned which pixel -- on this lane the honest value is
+"absent", never an empty string.
+
+THE 24/25 FPS SPLIT IS NOT A PHRASING CONCERN and deliberately stays out of the
+directive: it is resolved by the frame-grid code above, and rule 4 of the schema
+is that a directive describes HOW to phrase, never what the scene contains or how
+the clip is assembled. Recorded here only so a reader does not go looking for it
+in the 240 chars.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 # ---------------------------------------------------------------------------
 # THE MODEL GRID -- derived from the installed node's own rule, never typed

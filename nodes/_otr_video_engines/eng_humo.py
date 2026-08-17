@@ -58,6 +58,71 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Keep it short: long prompts crowd the speech tokens. Name the speaker and "
+    "the framing, then stop. Keep the mouth visible and the head toward camera. "
+    "Add no movement the beat does not state."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: HuMo 14B (plus a 1.7B tier) for audio-driven talking
+portraits, native portrait 480x832 @ 25fps. The 14B and the 1.7B PORTRAIT tiers
+run cfg 1.0, so the negative is INERT there; the 1.7B LANDSCAPE tier runs cfg 2.5,
+where it is LIVE. Lip-sync fidelity is the priority on every tier.
+
+"KEEP IT SHORT" IS FIRST BECAUSE IT IS THE ONLY RULE HERE WITH A MEASUREMENT
+BEHIND IT, and it is the strongest brevity case in the stack. The P4 probe
+measured articulation collapsing 4.15 -> 1.18 from a prompt-register change, and
+Fable's reading of that result is that long prompts drown the speech tokens. On a
+lane whose entire output is a mouth matching supplied audio, that is not a quality
+preference -- it is the deliverable degrading. "Then stop" is deliberately blunt
+for the same reason: the failure mode is a writer who keeps going because nothing
+told it to halt.
+
+"ADD NO MOVEMENT THE BEAT DOES NOT STATE" IS THE SCAFFOLD'S ``Motion: NONE``
+SEMANTICS, NOT A RETURN TO DAMPING. Read the distinction carefully, because the
+2026-08-17 kinetic amendment ripped "SUBTLE motion" out of the clause writer on
+the LTX lane and that directive must not be quietly undone here. The difference:
+the LTX defect was an instruction forbidding motion the BEAT DID ask for. This is
+a prohibition on inventing motion the beat did NOT ask for -- the research
+scaffold's own wording, and it names the reason the operator left the two
+surviving "subtle" strings -- ``render_driver._IA2V_TALKING_CLAUSE_CHARACTER`` and
+``_CHAR_FACE_FALLBACK_PROMPT`` -- deliberately unchanged rather than
+find-and-replacing them: on a close-up lip-sync beat, kinetic motion can walk the
+subject out of their own frame. Fidelity to the beat, in both directions.
+(GO_FORWARD_PLAN cites those as ``render_driver.py:1354`` and ``:1483``; both are
+STALE. Cite the SYMBOL, never the address -- every line number in these notes
+would have rotted the moment this diff inserted lines above it.)
+
+THE MIXED-cfg TIER SPLIT IS WHY THE DIRECTIVE NEVER MENTIONS THE NEGATIVE. One
+engine here spans cfg 1.0 (inert) and cfg 2.5 (live) depending on tier, so any
+directive clause about negative phrasing would be true on one tier and false on
+another within the same 240 chars. The ownership answer settles it anyway -- video
+negatives are frozen recipe -- but this engine is the clearest case that the
+overlay cannot carry per-tier conditioning facts and should not try.
+
+THIS ENGINE ALSO CARRIES AN UNGATED ENV NEGATIVE (D-TER): it reads
+``OTR_HUMO_NEGATIVE`` unconditionally on every production render, where
+``eng_ltx_8gb`` keeps its equivalent behind ``_prequalification_active()``. Cited
+by env-var name rather than line, because GO_FORWARD's ``:748`` shifted by exactly
+the 56 lines this diff inserted above it. Open static-audit finding, needs the
+operator, untouched by this overlay.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 # A-ship in-process forward (the native graph PROVEN in scripts/render_humo_batch.py
 # build_humo_prompt, verified on this RTX 5080 at 480x832 fp8). The graph TOPOLOGY +
 # widget values are legacy-proven; the exact checkpoint / encoder FILENAMES are

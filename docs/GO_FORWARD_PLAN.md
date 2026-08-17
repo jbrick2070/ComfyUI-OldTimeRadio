@@ -65,11 +65,19 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-17, item B close):** suite
-**10739 / 110 / 1** (10712 at the one-style-authority close -> 10717 with the
-five lumina input-convention tests -> 10739 with the 22 style-traceroute VIDEO
-tests; no regressions at any step). Bible **20 / 26 / 3**, and
-the Bible now holds **287** entries (`12.109` promoted for PBUG-20260817-02).
+**BASELINES to detect drift (updated 2026-08-17, item C close):** suite
+**10819 passed / 110 skipped / 1 xfailed** (10712 at the one-style-authority close
+-> 10717 with the five lumina input-convention tests -> 10739 with the 22
+style-traceroute VIDEO tests -> **10755 at the item B close** -> **10819 with item
+C's 64 overlay tests**; no regressions at any step, and the +64 is exactly the new
+file). Bible **20 / 26 / 3**, and the Bible holds **287** entries (`12.109`
+promoted for PBUG-20260817-02; item C promoted NOTHING -- see its body).
+
+> **THIS BLOCK SAID `10739` UNTIL 2026-08-17 AND THE ITEM B HANDOFF SAID `10755`.**
+> The receipt this file calls its single authority had drifted from the log entry
+> written at the same close. Corrected against a measured run. Also note the shape:
+> the trailing `1` is an **xfail**, not a failure -- a window reading "10755/110/1"
+> as one-test-red will go hunting for a break that does not exist.
 Earlier chain: 10584 at the 08-16 close -> 10644 with the
 provisional tier's 60 tests -> 10654 with the audition/artifact and three-family
 integration tests plus two generator field-level pins -> 10659 with the
@@ -161,11 +169,21 @@ rewritten subject-first (B); the video-negative fork was panelled and answered
 "build no guard" (D-BIS 1). The DONE bodies have been compressed to the rules
 that still bind -- receipts live in `HANDOFF_LOG.md`.
 
-**OPEN, in order: `C` IS NEXT** (operator-set 2026-08-17) -> **H** (a small
-judgement) -> **G** / **F** / **E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER**
-are static-audit findings awaiting a live observation. B-OPEN is CLOSED -- the
-operator chose (B) and it shipped. What follows is that order, cheapest-certain
-first:
+**`C`: THE STORE HALF IS DONE (2026-08-17), THE RESEARCH HALF IS STILL OWED.**
+All ten overlays are stored beside their engines with 64 tests and a green suite,
+zero behaviour change, nothing wired. But the directives were DERIVED by the
+driver from each engine's shipped configuration plus the schema's five rules --
+they are NOT the external research this item's step (1) asks for, and every
+`PROMPT_STYLE_NOTES` block says so in its PROVENANCE paragraph. Swapping in
+researched strings later is a one-line edit per engine against unchanged
+structure. **Do not read "C done" as "the research ran".**
+
+**OPEN, in order: `C` step (1), the research** (ten engines, web search allowed,
+$0) -> **`H`**, and read its body before costing it, because item C's work
+REFRAMED it and it is bigger than "a small judgement" looked -> **G** / **F** /
+**E**. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are static-audit findings
+awaiting a live observation. B-OPEN is CLOSED -- the operator chose (B) and it
+shipped. What follows is that order, cheapest-certain first:
 
 > **GIT AUTH IS FIXED (2026-08-17, item B window). Both repos are pushed.**
 > The 08-17 breakage was NOT the token. `gh` was authorized the whole time
@@ -315,6 +333,65 @@ answer) -> Sonnet 5 QA on the diff, no arc. The RESEARCH half is a factual
 lookup about how each model responds to phrasing, not a design fork -- web
 search is ALLOWED (operator 2026-08-15, the RSS precedent), so it is $0 and does
 not need a paid panel.
+
+**STORE HALF SHIPPED 2026-08-17.** Ten `PROMPT_STYLE_DIRECTIVE` /
+`PROMPT_STYLE_NOTES` pairs, 176-232 chars (max headroom 8, on `flux_gen1`), plus
+`tests/test_prompt_style_directives.py` -- 64 tests, AST-read so no engine module
+is imported. Suite 10755 -> **10819**, the delta exactly the new file.
+
+**WHAT BINDS ANY FUTURE WORK HERE:**
+* **THE OWNERSHIP ANSWER IS NOW STRUCTURAL, not a note.** No directive on ANY
+  engine instructs authoring a negative, and a test fails the suite if one ever
+  does. Stating a negative is inert or absent stays legal -- `minimax_h3` needs
+  it. The first version of that guard was a nine-phrase blocklist and a Sonnet QA
+  pass walked 14 of 16 plausible authoring instructions straight through it; the
+  rule is now INVERTED (any "negative" mention needs an approved has-no-effect
+  hedge) because ways to say "inert" are a closed set and ways to say "author
+  one" are not.
+* **`ltx_8gb` CARRIES A POINTER, NOT A PAIR.** The doc treats `ltx_video /
+  ltx_8gb` as ONE block and the directive is genuinely shared -- but the stated
+  reason was WRONG until QA caught it: the encoders differ (`ltx_video` runs
+  GEMMA-3, `ltx_8gb` borrows shared T5-XXL). The directive survives because not
+  one clause of it is encoder-specific. **That is also the split condition:** the
+  first encoder-specific clause means the 8GB tier needs its own pair.
+* **A `docs/...` PATH IN AN ENGINE MODULE BECOMES FRAME-CAP EVIDENCE.**
+  `tools/engine_matrix.py` scrapes engine sources for `docs/[A-Za-z0-9._-]+` and
+  publishes every hit in the ENGINE_MATRIX evidence column -- it exists because
+  `eng_humo` once justified a 49-frame ceiling with a doc not in the tree. Citing
+  the RESEARCH doc turned that column red on ten engines, and because the path
+  was wrapped across two comment lines it captured a truncated path that does not
+  exist. Regenerating the doc would have been the WRONG fix: `wan_ti2v` would
+  then cite a phrasing doc as its frame receipt. Name the doc WITHOUT the prefix.
+* **CITE SYMBOLS, NEVER LINE NUMBERS.** A citation-verification pass found **8 of
+  21 wrong**, and five were pure line-shift caused by this very diff inserting
+  lines above them -- the drift equalled the insertion count exactly (+53
+  `eng_ltx_av`, +56 `eng_humo`, +46 `z_image_turbo`). This diff also broke a
+  PRE-EXISTING comment in `lumina_image` that cited `z_image_turbo.py:117`. All
+  notes now cite constants and quotes.
+* **THIS FILE'S OWN CITATIONS ARE STALE, verified at the files 2026-08-17:**
+  `_LTX_MOTION_PROMPT_MAX` is at `render_driver.py:1345`, NOT `:1327` (`:1327` is
+  `_LTX_MOTION_PROMPT_BY_ROLE`); the two surviving "subtle" strings are
+  `_IA2V_TALKING_CLAUSE_CHARACTER` and `_CHAR_FACE_FALLBACK_PROMPT`, NOT `:1354`
+  and `:1483`; the i2v doctrine comment sits ~8 lines below the cited
+  `:2877-2884`; and "the 188 appears at exactly ONE call site" is true only of the
+  `max_chars=188` argument -- the branch carries 188 in THREE places, so "raise
+  the one" leaves two behind.
+* **ONE SUBSTANTIVE CLAIM WAS FALSE AND IS NOW CORRECTED:** `fastwan_8gb`'s note
+  asserted no env knob or prequalification override could re-enable its negative.
+  It can -- `prequalification_active` plus the `cfg` key in
+  `_FASTWAN_RECIPE_ENV_KEYS` lets the inherited
+  `WanTi2vEngine._resolve_render_config` move cfg off 1.0, and the unconditional
+  branch returns with it. What genuinely does not exist is a negative-TEXT
+  channel. Absolutes in a note are where false authority gets in.
+* **THE RESEARCH DOC ITSELF HAS AN ERROR:** its `ltx_video` block says frames go
+  "up to 193". The engine ships `_LTX_MAX_FRAMES_DEFAULT = 169`, a MEASURED decode
+  constraint, and 193 matches no constant in the file. Trust the engine.
+* **THREE REGISTERED IMAGE ENGINES ARE OUTSIDE THE TEN AND HAVE NO OVERLAY** --
+  an OPERATOR SCOPE CALL, not a driver one. `flux2_klein` (`requires_flag = None`,
+  so NOT gated -- it is live in the menu), `hidream_i1` and `sd35_large` (both
+  default-OFF opt-ins). None has a config block in the RESEARCH doc, so writing
+  directives for them would mean inventing the shipped-config research rather
+  than transcribing it. Decide whether the ten is the right ten.
 
 **D. THE PROMPT-STEERING QUESTION -- BLOCKED, do not build blind.**
 Fully designed across three research rounds + a Fable pass; artifacts in
@@ -484,6 +561,36 @@ copy-z_image-and-done: lumina runs cfg 4.0 against z_image's 2.0 and is a
 different model, so its artifact profile is its own question. Either give lumina
 a floor, or make the ledger stop claiming one it does not have -- but do not
 leave the receipt wrong.
+
+**REFRAMED 2026-08-17 by item C's work, and it is BIGGER than "lumina is
+missing a floor". Read this before costing H.** Two corrections, both verified at
+the files:
+* **There is no `lumina_image._resolve_negative`.** That name belongs to
+  `z_image_turbo` only. Lumina resolves its negative INLINE inside
+  `_lumina_params`, as a bare `str(get("negative_prompt") or "")`. The behaviour
+  this item describes is real; the function it names does not exist, so anyone
+  planning "add the floor to `_resolve_negative`" is planning against a ghost.
+* **THE RECEIPT IS NOT WRONG FOR LUMINA -- IT IS UNVERIFIED FOR EVERY ENGINE.**
+  The dispatcher computes `_neg_source` from what the PACK and the OBJECT
+  contributed, and it does that BEFORE it knows which engine will serve the row:
+  `resolve_engine_for_role` is called about 56 lines LATER in the same per-object
+  iteration. So the `engine_hygiene` arm asserts a property of an engine the code
+  has not yet chosen. It is true of `z_image` by COINCIDENCE (that engine does
+  have a floor) and false of lumina, but in neither case was anything consulted.
+**So the options are no longer symmetrical, and the cheap one got cheaper:**
+* **Fix the RECEIPT (driver-sized, zero pixels).** The first three arms
+  (`pack+request`, `pack`, `request`) describe contributions actually observed and
+  are honest. Only the fourth claims engine behaviour. Naming that arm for what
+  the dispatcher actually knows -- no composed negative contributed -- stops the
+  lie on ALL engines without touching a recipe or spending a render. Check the
+  consumers first: `engine_hygiene` appears in exactly two code sites (the
+  dispatcher's own comment and the value) plus docs, so the blast radius is small.
+  A truly engine-aware label is a different, larger job: it needs the stamp moved
+  after engine resolution, which is a production reordering.
+* **Give lumina a FLOOR (operator's call, needs a render).** This changes
+  conditioning on a live engine at cfg 4.0, so the recipes directive applies and
+  trap 1 applies: budget a render whenever a negative changes. Not a driver
+  decision, and the existing inline comment already says so in the code.
 
 **DEFERRED, deliberately:** the visual-ledger AUDITOR. Fable's verdict is that
 five of its six proposed checks audit BOOKKEEPING written by the code being

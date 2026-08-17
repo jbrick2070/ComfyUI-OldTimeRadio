@@ -40,6 +40,68 @@ from .registry import register
 #: receipts already on disk stop being interpretable.
 RECIPE_FASTWAN_8GB = "fastwan22_ti2v_5b_dmd3_i2v_v1"
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "There is no unconditional branch, so exclusions have no effect: state every "
+    "requirement positively. Name the subject, then one action and its speed. Do "
+    "not restate the set; the still fixes it. Keep it short."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: FastWan on the 8 GB tier -- a DMD-distilled LoRA over the same
+Q5_K_M Wan 2.2 TI2V-5B GGUF base ``wan_ti2v`` uses, run as ONE forward pass per
+step with NO unconditional branch, i.e. cfg 1.0. The negative is INERT.
+
+WHY THE NEGATIVE FACT LEADS, and why it is worded as a mechanism rather than a
+number. On the other inert lanes the negative is skipped because cfg is 1.0; here
+the distilled recipe runs ONE forward pass per step with no unconditional branch
+at all, so on the shipped path there is nothing for a negative to condition.
+Naming the mechanism keeps a future reader from "fixing" the directive when they
+notice the sibling ``wan_ti2v`` runs cfg 5.0 with a live negative over the same
+base weights.
+
+BE PRECISE ABOUT "CANNOT BE UNDONE" -- an earlier draft of this note claimed no
+env knob or prequalification override could re-enable a negative here, and a
+Sonnet QA pass proved that false. There IS such a path: ``prequalification_active``
+plus the ``cfg`` entry in ``_FASTWAN_RECIPE_ENV_KEYS`` lets the INHERITED
+``WanTi2vEngine._resolve_render_config`` move cfg off 1.0, and the moment cfg
+leaves 1.0 the unconditional branch is back and the frozen negative starts
+counting. That is a deliberate CONSENT act for measurement rather than a
+production render -- and it is exactly why the consent env is this adapter's own
+(``PREQUALIFICATION_ENV_FASTWAN``) instead of shared with ``wan_ti2v``: one switch
+for two tiers would open both.
+
+What genuinely does NOT exist is a negative-TEXT channel. ``_resolve_render_config``
+reads steps, cfg, shift, sampler, scheduler, sigmas and lora_strength, and no
+"negative" key -- so nothing can change WHAT the negative says, only whether it
+counts. The directive is written for the shipped path.
+
+"KEEP IT SHORT" IS THE 8 GB TIER TALKING. This adapter exists to fit a tighter
+budget than its sibling, and it is the same distilled-model reasoning as the LTX
+lanes: few steps, so early conditioning dominates and late correction is not
+available. Short is not a stylistic preference here, it is what the sampler can
+actually act on.
+
+THE BASE WEIGHTS ARE BIT-IDENTICAL TO ``wan_ti2v``'S, AND THE DIRECTIVES STILL
+DIFFER -- deliberately. Same weights, opposite guidance regime (cfg 1.0 with no
+unconditional branch versus cfg 5.0 with a live negative), so the phrasing advice
+diverges even though the checkpoint does not. This is the case that shows why the
+overlay is keyed per ENGINE rather than per model file.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 #: THE CONSENT ACT, this adapter's own. Never shared with ``wan_ti2v``: one switch
 #: for two tiers would open both and stamp ``+prequalification`` on a clip that had
 #: rendered frozen, and a receipt that lies in the safer direction still lies.

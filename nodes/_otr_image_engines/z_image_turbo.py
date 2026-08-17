@@ -99,6 +99,58 @@ _HYGIENE_NEGATIVE = (
     "sterile studio lighting, text, watermark"
 )
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Write one plain declarative sentence, subject first. Full grammar, not "
+    "comma-separated tags. Name materials, surfaces and light direction in "
+    "words. No weight or emphasis syntax, no parentheses, no tag lists."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: distilled 6B S3-DiT, 8 steps, cfg 2.0, euler/normal,
+ModelSamplingAuraFlow shift 3.0, 1024x1024. The text encoder is Qwen3-4B -- an
+LLM, not CLIP and not T5. On weights, be precise: ``_installed_unets`` RANKS
+nvfp4 > fp8 > bf16 and this box runs nvfp4, but the hardcoded fallback
+``_DEFAULT_UNET`` is bf16 -- so "fp8/nvfp4" describes what is preferred and
+installed, never a guarantee about an arbitrary box.
+
+WHY THE DIRECTIVE SAYS THAT. An LLM text encoder reads grammar, so a full
+sentence conditions better here than the comma-separated tag soup a CLIP-era
+prompt would use; tag lists and weight/parenthesis syntax are CLIP-lineage
+conventions this encoder has no special handling for, and they spend tokens
+without buying adherence. "Materials, surfaces and light direction" is the one
+place extra words earn their keep at 8 steps, because a distilled sampler
+resolves texture early and has few steps left to correct it.
+
+THE NEGATIVE IS LIVE AT cfg 2.0 -- AND THIS DIRECTIVE DELIBERATELY SAYS NOTHING
+ABOUT IT. Struck on operator instruction, and the repo agrees three ways:
+  * PBUG-20260817-01 is exactly what engine-side negative authoring produces --
+    this file's own negative used to carry "clean digital, cartoon,
+    illustration" and vetoed the style the episode had selected. A directive
+    teaching a writer to author negatives rebuilds that defect one layer up.
+  * The ownership ruling is settled: the PACK owns the style negative, the
+    engine owns only hygiene (``_HYGIENE_NEGATIVE`` above), and the dispatcher
+    composes them. A writer-authored negative would be a third authority.
+  * A model authoring negative text on a per-mint basis is a generative pass
+    over conditioning, which is the class the P8 receipt closed -- a paraphrase
+    scored 1.72 articulation against the canonical's 3.32.
+Negative phrasing is therefore not a phrasing question on this engine. It is an
+ownership question, and it already has an answer.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 def _resolve_negative(request_negative):
     """The negative conditioning for THIS mint, and the one place that decides.

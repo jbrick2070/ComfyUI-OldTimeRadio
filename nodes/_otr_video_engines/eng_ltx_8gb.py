@@ -94,6 +94,36 @@ from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.video.ltx_8gb")
 
+# PROMPT-STYLE OVERLAY: this engine has NO pair of its own, ON PURPOSE. The
+# RESEARCH doc (2026-08-17-per-engine-prompt-style-guide-RESEARCH.md, in the docs
+# dir -- named WITHOUT a path prefix because `tools/engine_matrix.py` scrapes
+# engine sources for cap-evidence citations and a phrasing doc is not frame
+# evidence) treats "ltx_video / ltx_8gb" as ONE block, and the shared facts are the
+# ones the directive is actually built from: same family, same cfg-1.0 distilled
+# default (so the negative is inert on both), same i2v-anchor doctrine (the still
+# carries the LOOK, the prompt moves), same tight char budget. The authority is
+# `eng_ltx_video.PROMPT_STYLE_DIRECTIVE` / `.PROMPT_STYLE_NOTES`. Read it there.
+#
+# THE ENCODERS ARE NOT THE SAME, and an earlier version of this comment said they
+# were -- a Sonnet QA pass caught it. This tier's 0.9.8 checkpoint carries no text
+# encoder and borrows the shared T5-XXL (`_LTX8_DEFAULT_T5`); `eng_ltx_video` runs
+# GEMMA-3 through `LTXAVTextEncoderLoader`. Two different encoder architectures.
+# It does not change the shared directive, because not one clause of it is
+# encoder-specific -- it is all i2v doctrine, cfg and budget. But it IS the
+# condition for splitting: the moment a clause turns encoder-specific (anything of
+# the "full grammar, not comma-separated tags" kind, which is exactly what
+# distinguishes an LLM encoder from a CLIP-lineage one on the stills side), this
+# tier needs its own pair rather than this pointer.
+#
+# DO NOT PASTE A COPY HERE. Two byte-identical strings in two files is the
+# duplicate-drift shape D-BIS finding 2 already flags in the negative constants:
+# the same 7-term boilerplate exists in four copies and two of them silently
+# diverged with no recorded reason. `tests/test_prompt_style_directives.py`
+# asserts this module defines neither constant, so a well-meaning copy fails the
+# suite instead of drifting quietly. A deliberate DEPARTURE for the 8GB tier is a
+# real possibility later -- if it happens, it gets its own pair plus a recorded
+# reason in the notes, which is what makes it a departure rather than a drift.
+
 #: Default 8GB-tier checkpoint (0.9.8 distilled 2B all-in-one; VAE embedded, no TE).
 _LTX8_DEFAULT_CKPT = "ltxv-2b-0.9.8-distilled.safetensors"
 #: Shared T5 text encoder (already on disk; the 0.9.8 checkpoint carries no TE).

@@ -92,6 +92,59 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Describe motion, not the set: the still fixes the look. Name the subject, "
+    "then one continuous action and its speed. Adherence is firm at this "
+    "guidance, so state one action, not a sequence."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: Wan 2.2 image-to-video, local in-process, cfg 3.5. The
+NEGATIVE IS LIVE -- and it is ``wan_shared._WAN_DEFAULT_NEGATIVE``, shared with
+``eng_wan_ti2v``: "low quality, worst quality, blurry, distorted, watermark,
+text, static".
+
+THAT NEGATIVE BANS "static", WHICH IS A PHRASING FACT AND NOT A TRIVIA ITEM. The
+engine's own conditioning is already pushing away from stillness, so a prompt
+describing a subject who does not move is fighting the recipe rather than
+directing it. That is the second reason the directive asks for an action AND a
+speed; the first is simply that this is an i2v lane where the anchor carries the
+look and motion is the only thing the prompt uniquely controls.
+
+"ONE ACTION, NOT A SEQUENCE" IS ABOUT cfg 3.5. Guidance is firm enough here that
+a two-clause action reads as two instructions competing for the same short clip,
+and the clip is not long enough to perform both. State the one that matters.
+
+THE LOCAL WAN LANE IS CLEAN OF THE CAMERA-JARGON CONFLICT -- do NOT import the
+cloud lane's constraint into this file. The 2026-08-17 census established that
+the "whip pans" collision lives on the OPT-IN CLOUD Wan lane
+(``eng_cloud_video``, where ``_WAN_SMOOTH_MOTION_CLAUSE`` bans it in the POSITIVE
+prompt body as well as the negative), and that every LOCAL video engine is clean
+-- their negatives are pure quality/artifact terms, as the string above shows.
+Adding a whip-pan prohibition here would be the trap the register rewrite already
+paid for once: only six words in the whole tree ever collided, and the sweeping
+fix cost 40% of the measured motion and had to be walked back. Fix the colliding
+token, never the surrounding writing -- and never on a lane that has no collision.
+
+THE NEGATIVE IS LIVE BUT THE DIRECTIVE SAYS NOTHING ABOUT AUTHORING ONE. Video
+negatives are FROZEN RECIPE here; that is why ``otr_style_traceroute.py
+--strict`` is deliberately not extended to the video side.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 # A-ship in-process forward. Shared mechanics (resolution, declarative executor,
 # silent bt709 encode, VRAM guard) are proven in wrapper_bridge; the GRAPH below is
 # the CORE-NODE Wan 2.2 image->video topology, VERIFIED against the installed

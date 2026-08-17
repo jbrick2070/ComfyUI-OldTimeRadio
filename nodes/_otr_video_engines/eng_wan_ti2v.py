@@ -76,6 +76,55 @@ _THIS = os.path.abspath(__file__)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_THIS)))
 _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Adherence is literal at this guidance, so every word lands: state one "
+    "subject, one action, one speed. Do not restate the set. Prefer plain verbs "
+    "over adverbs; each modifier is honoured."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: Wan 2.2 text+image-to-video (5B, GGUF Q5_K_M), local, cfg 5.0.
+The NEGATIVE IS LIVE, and it is ``wan_shared._WAN_DEFAULT_NEGATIVE`` -- the same
+string ``eng_wan_i2v`` uses: "low quality, worst quality, blurry, distorted,
+watermark, text, static".
+
+cfg 5.0 IS THE HIGHEST GUIDANCE OF ANY ENGINE IN THE STACK, stills included
+(lumina runs 4.0, z_image 2.0, and every distilled video lane runs 1.0). That one
+number is the whole reason this directive differs from ``eng_wan_i2v``'s despite
+the same model family and the same negative: at 3.5 a stray adverb is a nudge, at
+5.0 it is an instruction. "Each modifier is honoured" is the actionable form of
+that -- it tells the writer that restraint is cheaper than precision here, which
+is the opposite of the advice a low-guidance lane wants.
+
+The RESEARCH doc's block for this engine says "cfg 5.0 is high, so negative
+phrasing matters more than usual". That is true of the MODEL and irrelevant to the
+WRITER: the video negative is frozen recipe in this repo, so "matters more" means
+the recipe's negative is doing more work, not that a writer should start authoring
+one. The directive therefore says nothing about the negative -- same ownership
+reasoning as ``z_image_turbo.PROMPT_STYLE_NOTES``, reached from the opposite
+direction.
+
+"static" IS IN THE LIVE NEGATIVE HERE TOO, so as on ``eng_wan_i2v`` the recipe is
+already pushing away from stillness and a prompt describing a motionless subject
+fights it. And as there: the whip-pan collision is the OPT-IN CLOUD lane's, not
+this one's -- every local video engine is clean, and importing the cloud
+constraint is the mistake the register rewrite already paid 40% of its motion for.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 #: The 2.1 VAE basename the 5B must NOT use (M8): its latent compression differs.
 _WAN21_VAE_BASENAME = "wan_2.1_vae.safetensors"
 #: The APPROVED Wan2.2 VAE basenames (floor fail-closed whitelist, 2026-06-18

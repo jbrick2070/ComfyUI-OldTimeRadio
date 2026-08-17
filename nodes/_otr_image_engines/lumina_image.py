@@ -91,6 +91,69 @@ SYSTEM_PROMPTS = {
 SYSTEM_ENV = "OTR_LUMINA_SYSTEM_PROMPT"
 _DEFAULT_SYSTEM = "superior"
 
+#: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
+#: and the adoption gate: 2026-08-17-per-engine-prompt-style-guide-RESEARCH.md
+#: in the docs dir -- deliberately named WITHOUT a path prefix, because
+#: ``tools/engine_matrix.py`` scrapes engine sources for cap-evidence citations
+#: and a phrasing doc is not frame evidence. The directive is the only half that
+#: may ever reach a model or a prompt; 240 chars, hard, pinned by
+#: ``tests/test_prompt_style_directives.py``.
+PROMPT_STYLE_DIRECTIVE = (
+    "Write one declarative sentence, subject first. Adherence is literal at "
+    "this guidance, so state only what must appear. No preamble or instruction "
+    "wording; a system line is prepended. Full grammar, not tag lists."
+)
+
+#: Humans only -- never injected, never sent to a model.
+PROMPT_STYLE_NOTES = """\
+CONFIG AS SHIPPED: Lumina-Image 2.0, split-file, 30 steps, cfg 4.0, shift 6.0.
+The text encoder is Gemma-2 2B (CLIPLoader type ``lumina2``), and every mint is
+composed as ``{system line} <Prompt Start> {user text}`` by
+``compose_encoder_text`` above.
+
+WHY "NO PREAMBLE OR INSTRUCTION WORDING" IS THE UNIQUE RULE HERE. This is the
+only engine in the stack whose conditioning text already opens with an
+instruction addressed to an assistant ("You are an assistant designed to
+generate superior images..."). Anything instruction-shaped the writer emits
+lands AFTER that line and inside the same turn, so it reads as further
+instruction rather than as scene content -- a failure mode no other engine has.
+Gemma-2 is an LLM, so grammar is read: a full sentence conditions better than a
+tag list, same as the Qwen3 encoder on z_image.
+
+cfg 4.0 IS THE HIGHEST STILL GUIDANCE IN THE STACK (z_image runs 2.0), so
+adherence is literal and over-specification is the expensive mistake, not
+under-specification. Every clause the writer adds will be honoured.
+
+THE NEGATIVE IS LIVE AT cfg 4.0, AND THE DIRECTIVE SAYS NOTHING ABOUT IT -- for
+the ownership reason recorded on ``z_image_turbo.PROMPT_STYLE_NOTES``: the pack
+owns the style negative, the engine owns hygiene, and a writer-authored negative
+would be a third authority reintroducing PBUG-20260817-01 one layer up.
+SEPARATELY AND STILL OPEN: this engine has no hygiene floor at all -- queue item
+H. There is no ``_resolve_negative`` helper here at all (that name belongs to
+``z_image_turbo``); the negative is resolved INLINE inside ``_lumina_params`` as a
+bare ``str(get("negative_prompt") or "")``, with neither z_image's ``.strip()`` nor
+its ``_HYGIENE_NEGATIVE`` fallback, and no hygiene constant exists in this file.
+So an empty request negative reaches the encoder as ``""`` while the dispatcher
+stamps ``_neg_source="engine_hygiene"``.
+
+AND THE RECEIPT IS WORSE THAN "WRONG FOR LUMINA" -- verified 2026-08-17 while
+storing this overlay. The dispatcher computes ``_neg_source`` from what the PACK
+and the OBJECT contributed, and it does that BEFORE it resolves which engine will
+serve the row (``resolve_engine_for_role`` is called ~56 lines later in the same
+per-object iteration). So the ``engine_hygiene`` arm asserts a property of an
+engine the code has not yet chosen. It is true of z_image by COINCIDENCE -- that
+engine does have a floor -- and false here, but in neither case was anything
+consulted. That reframes item H: the label is not merely inaccurate for one
+engine, it is unverified for all of them. Storing this overlay neither fixes nor
+worsens it.
+
+PROVENANCE: authored by the driver from this engine's shipped configuration plus
+the five directive rules in the RESEARCH doc. NOT a measured finding and not a
+research-panel output -- the three pasted research rounds specify the consumer
+scaffold and leave the per-engine overlay as a placeholder. Treat this string as
+a hypothesis until the probe A/B runs at a fixed seed.
+"""
+
 
 def _resolve_system_key() -> str:
     """The system-prompt key for this mint, and the one place that decides.
@@ -199,8 +262,11 @@ class LuminaImage2Engine:
             # request. That override-precedence rule matches
             # z_image_turbo._resolve_negative -- but the EDGES DELIBERATELY DO
             # NOT MATCH, and an earlier version of this comment wrongly claimed
-            # they did. z_image ends `.strip() or _HYGIENE_NEGATIVE`
-            # (z_image_turbo.py:117); lumina has no hygiene floor and no strip,
+            # they did. `z_image_turbo._resolve_negative` ends
+            # `.strip() or _HYGIENE_NEGATIVE` (cited by SYMBOL: this comment used
+            # to say `z_image_turbo.py:117` and the 2026-08-17 overlay commit
+            # inserted lines above it, so the address was wrong within the hour);
+            # lumina has no hygiene floor and no strip,
             # so an empty request negative reaches the encoder as "" and a
             # whitespace-only one is passed verbatim. That gap is REACHABLE
             # (`VISUAL_SAFETY_NEGATIVE_PROMPT` is "" and a pack may ship an
