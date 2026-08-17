@@ -9,6 +9,25 @@ delta. Next free Bible id at scrape time: **12.103** (highest existing is
 continuing the phase-12 catch-all convention phase 12 has used for every
 OTR-discovered defect class since 12.86.
 
+> **THE ID RESERVATIONS BELOW ARE VOID -- ALLOCATE AT PROMOTION TIME
+> (2026-08-16).** This draft reserved `12.103`-`12.109` in advance, and reality
+> has already diverged: the entry that actually landed as **`12.106` is the P5R
+> token-budget shape (PBUG-20260815-10)**, not this file's "armed consumer, no
+> producer" (PBUG-04). Then `12.107` was allocated to
+> *a-configured-widget-that-is-never-forwarded* (PBUG-20260811-03) when chunk B
+> went green, because it was the next free id at that moment.
+>
+> So the mapping table below is a record of SHAPES, not of numbers. When one of
+> the remaining shapes is promoted, take the next free id from
+> `BUG_BIBLE.yaml` at that moment and update its index row to match. Reserving
+> ids ahead of promotion is what produced this collision; a shape's id is
+> decided when its fix is proven, never before.
+>
+> **Still unpromoted from this draft:** PBUG-20260815-05 (naming pass blind to
+> identity), -06 (live feed consumed by a constant index), -08 (renamed entity,
+> derived text kept the old name). Each still lands only WITH its green chunk,
+> per the documentation gate.
+
 Verdict summary:
 
 | PBUG | shape | verdict | new id |

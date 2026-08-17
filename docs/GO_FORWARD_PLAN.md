@@ -4,6 +4,37 @@
 Completed work lives in `docs/HANDOFF_LOG.md` (newest at top) and every prior
 revision of this file is in git. If a thing is DONE, it does not belong here.
 
+## HOW TO READ THIS FILE (lean pass 2026-08-16 evening)
+
+**Start at THE QUEUE. Everything below it is reference.** The queue is the only
+authority on ORDER; the numbered bodies further down are detail you read when
+you pick an item up, not a second to-do list.
+
+The file was audited end to end on 2026-08-16 and it had drifted badly from its
+own forward-only rule. What the audit found, so the next reader is not misled:
+
+* **Eleven internal cross-references are already BROKEN** -- they point at
+  headings that no longer exist (`section 0`, `0-BIS`, `0-TER`, `0-QUATER`,
+  `0A`, `WHAT IS ACTUALLY LEFT`, `NEXT CODING QUEUE`, `STORY LAB RECOVERY
+  BASE`, `ON DECK item 5`). If a pointer sends you nowhere, that is why: the
+  target was removed and the pointer was not. Do not go hunting.
+* **The bulk of the remaining length is DONE narrative inline inside OPEN
+  sections** -- receipts, shipped-work paragraphs and superseded framings mixed
+  into live items. Those receipts are all in `HANDOFF_LOG.md` and git.
+  **A full archive split is OWED and is a task of its own**; it was not done
+  blind here because roughly a third of these sections are standing operator
+  rulings phrased as "do not re-open", and losing one costs more than the
+  length does.
+* **Where a heading says something SHIPPED or CLOSED, believe it and move on.**
+  The value in those sections is the ruling or the trap attached to them, never
+  the receipt.
+
+**Two contradictions the audit found are now resolved in favour of the newer
+statement, and both old ones are struck:** the suite receipt (this file now has
+ONE, in BASELINES below), and the Lemmy-vs-render-proofs ordering (THE QUEUE
+below supersedes the 2026-08-13 ruling's ordering half; that ruling's
+non-ordering content still binds).
+
 ## REVIEW ROUTING FOR THE BUG-FIX WINDOW (operator 2026-08-15 -- READ FIRST)
 
 **`kibitz` IS BACK ON AND IS TOP OF MIND.** The operator restored the panel for
@@ -144,44 +175,38 @@ can demote any of them later without archaeology.
    the cross-engine harness with waveform normalization, and ONE canonical leg
    on kokoro. **Four findings from that arc are load-bearing and are stated in
    the plan; do not rediscover them the hard way.**
-2. **Chunk B, the cameo roll -- CLOSED. LIVE-PROVEN 2026-08-16 EVENING, 18/18
-   ACCEPTANCE CHECKS.** Steps 1-3 pushed (`7faf3bf7`, `b46db68e`); step 5's
-   forced-hit leg ran on a FRESH boot at `91f20e7d` after the box was reset,
-   and PASSED every criterion in the contract. Receipt:
-   `signal_lost_chunkb_accept_forced_lemmy_scifi_news_pr_20260816_185234`,
-   `Prompt executed in 00:37:39`, `obs_publish OK`, 83.2 MB in
-   `otr/episodes/<ep>/` and 42.9 MB in `otr/obs/`.
-   Exactly one LEMMY row at `char_id=c04`, writer-stage preset
-   `v2/en_speaker_8`, gender male, the canonical communications-officer
-   description, and he SPEAKS -- resolved through his char_id FROM THE CAST ROW,
-   never by name-matching lines (the operator's own detector trap):
-   *"Testing, one, two. Can you hear me? Maya, you there? This is Lemmy at the
-   relay station."* The `lemmy_roll_receipt` reads
-   `lemmy_hit=true / knob_state=forced_include / roll_executed=false` (forced,
-   so no roll was spent) and the five-key seed-free `cast_contract` agrees with
-   it; the voice-slot receipt carries the Cockney signature.
-   **The two-stage identity behaved exactly as the contract predicted:** the
-   frozen row keeps the writer-stage Bark preset while DELIVERY resolved the
-   qualified route -- `voice_engine=indextts2`,
-   `voice_ref_id=idx_lemmy_algenib_cockney_v1`. So the cameo is not merely
-   present, it is delivered in his audition-proven voice.
-   Nothing remains on chunk B.
-3. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
+2. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
    updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
-   kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Needs
-   the LTX boot, so it pauses the soak; one arc covers the sprint doc.
-4. **The Shakespeare wrong-play frame family** (section D, measured twice by
+   kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Plan doc
+   written (`docs/2026-08-16-video-sprint-PLAN.md`); its kibitz arc has NOT
+   run. Needs the LTX boot, so it pauses any soak; one arc covers the doc.
+3. **The Shakespeare wrong-play frame family** (section D, measured twice by
    the blind read) + the assembly-lint class (speaker-tag leaks, truncated
    closers). Correctness on the fidelity lane; panel before code.
-5. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
+4. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
    under any of the above; the two `_resolve_model` hardenings ride along.
    Then the operator's own 4060 full-stack pass (gate already open).
-6. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
+5. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
    during renders.
-7. **PBUG-20260815-11** (item 2) -- stays queued; does not jump.
+6. **PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Stays
+   queued; does not jump.
 
 Standing tail unchanged: the bug-fix contract's chunks 4/5/6/D7, and the
-shakespeare supplement rows (item 4).
+shakespeare supplement rows.
+
+**CLOSED and deliberately not in this queue** (receipts in `HANDOFF_LOG.md`):
+chunk A, **chunk B** (all steps + an 18/18 acceptance leg, 2026-08-16), D1-D4,
+the bug-fix sprint's chunks 0/0.5, the `scifi_news` rip, the
+`fable2 -> scifi_news_pro` rename, the TTS voice preflight, and the story
+finder v1. If you find a paragraph below describing any of these as work to
+do, it is stale narrative the archive split has not reached yet -- believe this
+list.
+
+**THE SOAK IS STOPPED (2026-08-16 evening, operator instruction).** All three
+harnesses and the resident server were torn down. When it restarts: **only the
+`--profile` form**, and the `--set` engine-rotation path should be deleted from
+`scripts/otr_gpu_soak_matrix.py` so the mistake is unrepresentable
+(PBUG-20260816-03 -- one harness ran 1,112 legs and rendered nothing).
 
 **1.1 LEMMY ON EVERY TTS ENGINE (operator 2026-08-16: "we need to be sure we
 have lemmy working on all tts engines", NO-SKIP directive, and "audition"
@@ -263,44 +288,6 @@ regression signal.
 
 **Repair site: ONE runner module** -- `_otr_scifi_fable2` (the codex runner
 was deleted with the 2026-08-16 `scifi_news` rip).
-
-**THE SPRINT SPLITS IN TWO, AND ONLY ONE HALF IS SAFE TO BUILD BLIND
-(scoped 2026-08-16, no code written):**
-
-* **Chunk A -- the cast contract. CONFIDENT, build it first.** Both runners
-  stamp a real cameo DECISION (`lemmy_hit`, `lemmy_policy`, the counts) even
-  though the lane owns its cast. This closes the SILENT half: today the key is
-  omitted entirely, so a reader cannot tell "declined" from "never asked". The
-  repo already states the rule these lanes break -- `_otr_casting.py:1852-1854`:
-  *"ONE stable shape on EVERY lane -- the invention lanes stamp an empty
-  contract rather than omitting the key, so a downstream reader never has to
-  distinguish 'no source' from 'field never written'."* No render-path behaviour
-  changes and no cameo appears; provable without a GPU.
-* **Chunk B -- the cameo ROLL. Still panel it, and the design space is now
-  MEASURED (2026-08-16, three-agent verification, every claim driver-grounded
-  against the tree).** The altitude question is settled by construction: the
-  roll must be decided BEFORE the script pass, because both lanes derive cast
-  FROM the finished script and both gate on it -- fable2's gate (b) demands
-  speaker set == cast rows and codex's `cast_coverage` gate demands every cast
-  id scheduled, so post-script injection fails structurally. The old blocker is
-  GONE: PBUG-20260811-01 is closed as mis-attributed (widget inert on the lane,
-  no "lemmy" in either leg log), so there is NO known writer/cameo interaction
-  to design around -- the proof obligation is simply that a cameo-bearing cast
-  passes both gates on a live leg. What remains a genuine fork, and why the
-  panel is still owed: the two lanes need DIFFERENT designs. Codex is
-  SCHEMA-LOCKED -- `char_id`/`voice_slot` Literals + cast `max_length=4`
-  (`_otr_scifi_codex.py:277-286`), the id vocabulary repeated in `BeatPlanV4`
-  (:488), `RadioScoreDraftBeatV4` (:551, itself grammar-decoded in P3),
-  `ScriptLineV4` (:797) and the `_DRAFT_SPOKEN_CHAR_IDS` gate (:1221, enforced
-  :1352); the LMFE grammar on the local provider rebuilds from the models
-  automatically -- so a cameo either DISPLACES one of the three story slots or
-  widens five schema sites (no test pins the Literals; the lock lives entirely
-  in the production module). Fable2 has headroom: `MAX_SPEAKING_CAST = 10`, no
-  id vocabulary, no grammar binding -- a cameo needs no schema edit, but it
-  consumes one of the 10 live voices and MUST speak (the casting validator
-  demands exactly one entry per script speaker).
-* **Neither runner mentions Lemmy at all** (zero occurrences in both files), so
-  this is NEW construction in two places, not a wiring fix that regressed.
 
 **1.2 VIDEO ENGINES SPRINT -- RECONCILED WITH THE LAB 2026-08-16.** Authority:
 `docs/2026-08-16-video-lab-proposal-GROUNDED.md` + the lab's answers to
@@ -528,26 +515,6 @@ not the seeded shuffle first proposed. **OPEN.**
 
 **THE `__main__` SELF-TEST BLOCKS: DELETE THEM.** *"If they aren't doing
 anything delete em."* **OPEN.**
-
-## PRIORITY 1 -- STORY CLEANUP. The clean stage SHIPPED 2026-08-14.
-
-**Forward-only.** What this section used to carry -- the build narrative, the
-diagnosis, the measurement tables -- is DONE and lives in the
-2026-08-14 CODER entry of `docs/HANDOFF_LOG.md`. What is left below is what is
-still open, still ruled, or still dangerous.
-
-### WHAT SHIPPED, in one paragraph, so nobody rebuilds it
-
-`nodes/_otr_ledger_clean.py` runs once from
-`OTR_LedgerScriptWriter._run_writer_tail`, just before
-`_otr_ledger_cleanup.run_ledger_cleanup` -- the ONE producer boundary all six
-banks reach. A MODEL judges every spoken row for anything that is not speech;
-a MODEL rewrites what it names, told the judge's own words plus the act, the
-speaker and the lines BEFORE AND AFTER. Bounded at two attempts, then the best
-rewrite ships flagged. Python never writes a word: the four calls that set row
-text all write a string the model returned, through `set_line_text_metrics`.
-`scripts/otr_clean_stage_lab.py` is the measurement rig -- a planted bad ledger
-per bank, shaped per lane, scored on recall AND false alarms.
 
 ### THE SHIPPING RECIPE, measured -- do not re-derive it
 
@@ -2172,22 +2139,27 @@ the same green push that closes a row.
 
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
-| **STORY LAB (next)** | Resume external lab `7df7c80` with LF checkout; old `science_news` control versus current `scifi_news` challenger. OTR story code stays read-only until the lab hands back a converged transplant | local story models + Claude/Codex to code/judge; Sonnet 5 post-code QA | none -- operator opened it | evidence-driven |
-| **OTR CODER** | After the lab converges, transplant its proven root fixes atomically into OTR; then Lemmy row 2; one green pushed chunk at a time | Claude/Codex codes and judges; Sonnet 5 post-code QA | Story Lab handoff | evidence-driven |
-| RENDER | PARKED until rows 1-2 land. Then recreate the runner and execute the exact seven post-change proofs in current order. Reset per CLAUDE.md section 4 before every leg | local production + Codex-app monitor | bugs + Lemmy green | GPU days |
-| PLANNER | Bug Bible operator fan-out + the `check_compatibility` fork; plan upkeep | rungs 2-4 | parallel with any coder window | docs |
+| **CODER** (the default) | Take THE QUEUE from the top: item 1 is the Lemmy provisional tier, whose plan is already a four-round-hardened contract. One green pushed chunk at a time | cheapest competent local triage; Sonnet 5 post-code QA on the finished diff; kibitz local panel for a full arc | none | evidence-driven |
+| RENDER | GPU legs only: acceptance legs for whatever the coder just landed, and the soak. Reset per CLAUDE.md section 4 before every leg; the soak restarts ONLY in its `--profile` form | local production + Codex-app monitor | a coder chunk needing live proof | GPU hours |
+| PLANNER | The archive split this file still owes; Bug Bible operator fan-out; the `check_compatibility` fork | rungs 2-4 | parallel with any coder window | docs |
 
-**NEVER boot a window by letter.** Boot by the current runway at the top, always:
+**THE STORY LAB ROW WAS REMOVED 2026-08-16.** The lab is RETIRED (see its
+tombstone below) and this table still listed it as "next" with a kickoff prompt
+telling the reader to resume an external repo and read a heading
+("STORY LAB RECOVERY BASE") that does not exist in this file. A stale kickoff is
+worse than none: it is the one line a fresh window pastes without checking.
 
-> resume the OTR Story Lab from `jbrick2070/ComfyUI-OTR-UpstreamStoryLab`
-> current main `7df7c80` with LF checkout. Read OTR GO_FORWARD "STORY LAB
-> RECOVERY BASE" and the top of HANDOFF_LOG. Use old `science_news` as the
-> control and current `scifi_news` as the challenger; do not start blank or edit
-> OTR story code concurrently. First make the typed ANNOUNCER opening introduce
-> story/place/time plus the real-news premise, and make the typed ANNOUNCER ending
-> summarize the source-backed news. Enforce opening music -> ANNOUNCER -> character
-> drama/optional script-requested music -> ANNOUNCER -> closing music. State your MODEL & CREDIT BUDGET rung first,
-> then the dated REVIEW ROUTING you actually read.
+**NEVER boot a window by letter.** Boot by THE QUEUE at the top of this file:
+
+> resume the OTR build as a CODER window. Repo:
+> `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`, branch
+> `v2.0-alpha`, HEAD `<sha>` == origin. Read `docs/GO_FORWARD_PLAN.md` --
+> "HOW TO READ THIS FILE", the REVIEW ROUTING block, BASELINES, then THE QUEUE
+> -- and the top entry of `docs/HANDOFF_LOG.md`. Work THE QUEUE in order.
+> State your MODEL & CREDIT BUDGET rung first (say plainly that the table is
+> empty and cite the per-window mapping), and state the dated REVIEW ROUTING
+> you actually read. New coding items take a full `kibitz-plugin:kibitz` arc
+> BEFORE code; Sonnet 5 QA on the finished diff BEFORE the push.
 
 ### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
 
@@ -2240,9 +2212,11 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 
 ## Validation and handoff law
 
-- **Current whole-tree receipt (2026-08-07 @ `2fc81f72`):** full Windows suite
-  **9081 passed / 111 skipped / 1 xfailed** (~4:19); Bug Bible **17 passed**. Prior
-  receipts live in `docs/HANDOFF_LOG.md` -- this file keeps only the current one.
+- **Current whole-tree receipt: see BASELINES at the top of this file.** It is
+  stated ONCE, there, and nowhere else. (A stale copy lived here until
+  2026-08-16 claiming `9081/111/1` @ `2fc81f72` and calling itself "current" --
+  nine hundred tests and nine days out of date. Two receipts in one file means
+  one of them is lying; keep one.)
 - **Standing acceptance receipt:**
   `python scripts/audit_voice_gender_consistency.py --root "C:\Users\jeffr\Documents\ComfyUI\output\otr"`
   -- expect exit 0 over 1,595 ledgers. Exit 2 means the scan did not FINISH and its
