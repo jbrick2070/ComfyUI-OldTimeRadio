@@ -3,6 +3,128 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 -- HEAD 6a47300c +handoff (v2.0-alpha) -- CODER (item 1.1 CLOSED: the Lemmy provisional tier, four engines rendered, a green canonical leg on kokoro)
+
+> The sha above is the **second-to-last sha on the branch** when the handoff is a
+> single commit -- a commit cannot contain its own hash. Boot from the sha in the
+> kickoff line, read after the final push.
+
+Did, all pushed, HEAD == origin verified after each:
+
+**THE PROVISIONAL TIER (`b645247c`).** Item 1.1 built to the four-round-hardened
+contract in `docs/2026-08-16-lemmy-cross-engine-PLAN.md` -- read it, do not
+re-derive it. A SEPARATE `provisional_native_routes` key, so the three readers of
+`approved_native_routes` keep reading exactly what they read before and the
+shipped tripwire asserting the qualified set is exactly `{indextts2}` stays
+correct. Three identity kinds, because the existing two cannot express kokoro's
+`.pt`. A state-dependent receipt: `rendered_pending_listen` demands both clips
+and their hashes, `configured_unrendered` FORBIDS render artifacts.
+`operator_verdict` and `decided_by` are ABSENT-not-blank in every state, so no
+route can be promoted by filling in a field. A SIBLING resolver whose claim type
+has no `voice_route` attribute at all -- that absence is the safety property, not
+an omission, because `cast_lock` does `dict(policy_claim.voice_route)`
+unconditionally in both stamp branches. Wired through BOTH CastLock branches (the
+canonical graph runs `auto_registry`, so a stamp wired only there is invisible in
+half of production), dormancy gate widened to both keys, and `IS_CHANGED` now
+fingerprints provisional rows including kokoro's `.pt` bytes.
+
+**CLEARING AND STAMPING ARE ONE OPERATION, and Sonnet QA caught why.** The first
+cut cleared the claimed row's stale cross-engine identity up front, before the
+casting loop. QA reproduced a row that was cleared, fell through a `continue` (a
+bank that resolves no character engine), and ended the lock carrying a stale
+ElevenLabs identity labelled `unrouted` -- a field asserting the ordinary draw
+chose a voice when nothing was drawn, which the credits roll would have
+published. Now every stamp clears first, and a row the caster never reaches is
+left exactly as it arrived.
+
+**PBUG-20260816-04 -- THE GENERATOR FIX WAS HALF A FIX AND ITS OWN RECEIPT
+CERTIFIED IT.** Running `scripts/_otr_mirror_clone_refs.py` for real -- not
+reviewing it -- gave 37 insertions against **18 deletions** on a change that
+should have been pure addition. Its summary counts ROWS, so
+`mirrored=83 added=2 preserved-unmanaged=3` prints identically whether or not a
+FIELD is lost, and that is the exact line the r2 judgment cited as proof it was
+safe. It was stripping `speaker_id` from all eight mirrored rows that had one --
+a seven-field allow-list written before the field existed, and without it one
+narrator can be cast as two characters in one episode on chatterbox and dia --
+and reverting a hand-curated `cb_announcer_male` to a hardcoded literal. Root
+fix: a mirror copies every source field but the identity pair, owned keys MERGE
+instead of replacing, and the bootstrap announcer row is created only when
+ABSENT. Re-run diff is 32 insertions / 0 deletions, and the counts became honest
+(`mirrored=82 preserved-unmanaged=4`). Two new tests ask about FIELDS; all three
+existing ones asked about rows and passed against the defect.
+
+**FOUR ENGINES, EIGHT CLIPS, ONE MANIFEST (`6a47300c`).**
+`scripts/otr_lemmy_cross_engine_audition.py` is NEW -- G1 stays frozen because
+its manifest is cited by sha inside the one qualified route. bark, kokoro,
+chatterbox and dia each spoke both frozen `LEMMY_AUDITION_LINES` at seed
+20260816. Every result normalizes through `canonical_audio`/`mono_safe` before
+writing, which is the r3 finding that mattered: bark and kokoro return
+`[1,1,T]`, chatterbox and dia return `[C,T]`, and G1's `.numpy().T` is right for
+exactly one of those -- copying it writes malformed clips that still PLAY.
+Probed afterwards: all eight mono, at each engine's own rate (24k/24k/24k/44.1k),
+5.3-8.0 s, peaks 0.35-1.0. The three local routes were then written FROM that
+manifest, and a test re-hashes all six clips plus the manifest against the
+receipts rather than trusting the transcription. **One own-goal worth recording:**
+the first render pass generated all eight clips and then lost every one of them,
+because `soundfile` cannot infer a format from a `.wav.part` temp name -- the
+atomic-write step, not the engines. Format is explicit now.
+
+**THE ACCEPTANCE LEG PASSED ON KOKORO.**
+`signal_lost_lemmy_provisional_tier_kokoro_acceptance_20260816_210751`:
+`RESULT SUCCESS`, `Prompt executed in 551.36 seconds`, `obs_publish OK`, 114 MB
+in `otr/episodes/<ep>/` and the final mp4 in `otr/obs/`. Driven by
+`config/profiles/otr_lemmy_kokoro_diag.json`, whose
+`slot_overrides.char_voice_engine` reaches BOTH managed nodes through
+`widget_mapping.json` -- never `--set`, which the creative-only whitelist refuses
+for managed widgets. Cameo forced. In the FROZEN post-mux ledger, LEMMY at `c02`
+carries `lemmy_route_tier=provisional`,
+`lemmy_route_id=lemmy-kokoro-bm_george-provisional-v1`, `voice_ref_id=bm_george`,
+`voice_engine=kokoro`, `voice_cast_fallback=provisional_route`, an explicitly
+empty reason code, and **no `voice_route`** -- the render-killer avoided in
+production, not just in tests. `voice_preset=v2/en_speaker_8` survived, proving
+the normalizer's deliberate bark carve-out. The two unclaimed rows carry no tier
+field at all. A leg landing `unrouted` would have FAILED the sprint; it resolved.
+
+**WAITING FOR HIS EARS, first item in the accumulating batch:**
+`output/otr/episodes/lemmy_cross_engine/LISTEN.html` -- 13 audio elements, zero
+dead links, hashes verified at assembly: the four fresh engines, the qualified
+IndexTTS2 arm referenced (never re-rendered), the three historic Algenib clips by
+exact filename (the fourth file in that directory is a control voice, not Lemmy,
+and is deliberately absent), and the two cloud rows as `configured_unrendered`
+with their bank tags shown, which settles `el_harry` vs `el_daniel` from metadata
+alone. `DECISIONS.json` beside it: one `pending` row per route, never overwritten
+once it holds answers.
+
+**GPU HOUSEKEEPING.** Found the box occupied on arrival -- a resident ComfyUI
+from chunk B's leg plus another window's `script-format-lab/run_experiment.py`
+at 100% util and 14.9 of 16.3 GB. Left both alone and reported; the operator
+cleared it explicitly ("if there is something, kill it"), so the four processes
+were killed SELECTIVELY by CommandLine per CLAUDE.md section 4 -- all four MCP
+extension pythons survived, port 8000 freed, VRAM to 880 MiB. The server booted
+for the leg was torn down after it.
+
+Current step: THE QUEUE item 1 is now the VIDEO SPRINT. Its plan doc is written
+(`docs/2026-08-16-video-sprint-PLAN.md`) and its kibitz arc has NOT run -- it
+needs a full one before code, and its acceptance legs need the LTX boot.
+Blocked-on-operator: NOTHING except the post-rip TAG and the accumulated listen
+batch, which is deferred by his own ruling and blocks nothing.
+Models: CODER window. NO RUNG CITED -- the MODEL & CREDIT BUDGET table still has
+no rows; answered from the per-window mapping (local triage + Sonnet 5 post-code
+QA). Sonnet 5 QA ran on BOTH chunk diffs BEFORE their pushes: chunk 1 SHIP with
+one confirmed finding, chunk 2 FIX with one confirmed finding; both fixed before
+the push, both with the coverage hole that let them through. Cloud spend $0.
+No kibitz arc opened: item 1.1's arc was already spent and converged at r4, and
+the operator's kickoff said build it rather than re-derive it.
+Gates at close: suite **10659/110/1**, Bible **20/26/3 at 285**, variants
+**50/0**, AST parse on every touched .py, BOM clean, HEAD == origin.
+Bible delta-check DONE, NONE promoted. PBUG-20260816-04 was checked against
+`otr_coverage_index.yaml` and the Bible and judged COVERED by `12.99` (a stale
+generator destroying the artifact it is named for) plus `12.101` (an enumerated
+key list silently dropping fields). The index row carries the refinement worth
+keeping: a data-destroying operation's own summary counter is not proof of its
+repair when the counter's unit is coarser than the defect's unit -- diff the
+artifact (survival-guide `5a5dab3`).
+
 ## 2026-08-16 -- HEAD 54d16e06 +handoff (v2.0-alpha) -- CODER (evening: chunk B CLOSED live-proven, the Lemmy arc closed, a TTS preflight created, a soak that was rendering nothing, and a GO_FORWARD lean pass)
 
 > **`+handoff` means the sha above is the last CODE head, and the handoff

@@ -65,17 +65,17 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-16 EVENING):** suite
-**10584 / 110 / 1** (chain: 10529 -> 10550 chunk B step 1+2 -> 10567 the TTS
-preflight gates + the two defects they caught -> 10584 chunk B step 3. Earlier
-that day: 10751 -> 10765 with chunk A's 14 tests -> 10529 after the scifi_news
-rip deleted 13 dedicated lane test files and the rename trimmed the polluted
-re-import test), Bible
-**20 / 26 / 3**
-(the Bible now holds **284** entries -- `12.103` landed with chunk 2, `12.105`
-with chunk 3.5, `12.104` with D2's transaction, `12.106` with the P5R token
-budget), variants 50 emitted (3 refused -- the standing unratified cloud
-profiles). (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610,
+**BASELINES to detect drift (updated 2026-08-17):** suite
+**10659 / 110 / 1** (chain: 10584 at the 08-16 close -> 10644 with the
+provisional tier's 60 tests -> 10654 with the audition/artifact and three-family
+integration tests plus two generator field-level pins -> 10659 with the
+tier-transition matrix parametrized over both CastLock modes. Earlier: 10529 ->
+10550 chunk B step 1+2 -> 10567 the TTS preflight gates -> 10584 chunk B step 3),
+Bible **20 / 26 / 3**
+(the Bible holds **285** entries -- `12.107` landed with chunk B; nothing was
+promoted on 2026-08-17, because PBUG-20260816-04 checked out as COVERED by
+`12.99` + `12.101`), variants **50 / 0** (3 refused -- the standing unratified
+cloud profiles; the new `otr_lemmy_kokoro_diag` diagnostic profile emits none). (10532 -> 10561 specification session; -> 10608 chunk 0.5; -> 10610,
 10613, 10624 the three agy QA rounds; -> 10633 chunk 2 / D1; -> 10657 chunk 3.5
 / D3; -> 10683 D2's transition schema + the rename fix; -> 10711 D2's emitter +
 transaction; -> 10729 D4's sidecars + the P5R budget fix; -> 10732 the P5R
@@ -162,43 +162,43 @@ chunk B's forced-hit cameo episode, and the soak's best/worst shortlist.
 Provisional rows land WITH receipts saying they are provisional; his ears
 can demote any of them later without archaeology.
 
-1. **Lemmy on every TTS engine** (item 1.1) -- **THE ARC IS DONE. THE PLAN IS
-   THE CONTRACT: `docs/2026-08-16-lemmy-cross-engine-PLAN.md`**, hardened
-   through a full four-round `kibitz-plugin:kibitz` campaign (Codex all four
-   rounds; Antigravity r1-r3 plus a retried r4 after a narration-only pass --
-   artifacts under `kibitz-runs/2026-08-16-lemmy-cross-engine*/`). Read it
-   instead of re-deriving. **The bank half is already LANDED** (the mirror
-   generator now owns only the keys it produces and mints the two Lemmy clone
-   rows; `873c24b1`). What REMAINS is the tier itself: the separate
-   `provisional_native_routes` key, the sibling resolver, the two CastLock
-   stamp branches, the transition normalizer, the `IS_CHANGED` fingerprint,
-   the cross-engine harness with waveform normalization, and ONE canonical leg
-   on kokoro. **Four findings from that arc are load-bearing and are stated in
-   the plan; do not rediscover them the hard way.**
-2. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
+**THE LISTEN PAGE NOW EXISTS AND IS THE FIRST ITEM IN THAT BATCH:**
+`output/otr/episodes/lemmy_cross_engine/LISTEN.html` -- 13 clips, zero dead
+links, hashes verified at assembly. It covers the whole roster in one sitting:
+the four freshly rendered local engines, the qualified IndexTTS2 arm referenced
+(never re-rendered), the three historic Algenib clips by exact filename, and the
+two cloud rows as `configured_unrendered` with their bank tags shown, which is
+enough to settle `el_harry` vs `el_daniel` from metadata without hearing a
+thing. `DECISIONS.json` beside it holds one `pending` row per route and is never
+overwritten once it has answers. **Nothing there can be promoted to qualified by
+editing a file** -- promotion means a human listened and a qualified route gets
+written by hand.
+
+1. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
    updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
    kinetic-on-video-path, with the Q5_K_M quant as a SIBLING VARIANT. Plan doc
    written (`docs/2026-08-16-video-sprint-PLAN.md`); its kibitz arc has NOT
    run. Needs the LTX boot, so it pauses any soak; one arc covers the doc.
-3. **The Shakespeare wrong-play frame family** (section D, measured twice by
+2. **The Shakespeare wrong-play frame family** (section D, measured twice by
    the blind read) + the assembly-lint class (speaker-tag leaks, truncated
    closers). Correctness on the fidelity lane; panel before code.
-4. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
+3. **Upscaler prep** (item 1.3) -- candidate downloads run in the BACKGROUND
    under any of the above; the two `_resolve_model` hardenings ride along.
    Then the operator's own 4060 full-stack pass (gate already open).
-5. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
+4. **Finder `--judge`** (item 1.5 remainder) -- GPU-idle filler, never
    during renders.
-6. **PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Stays
+5. **PBUG-20260815-11** -- the 34 portrait/voice gender conflicts. Stays
    queued; does not jump.
 
 Standing tail unchanged: the bug-fix contract's chunks 4/5/6/D7, and the
 shakespeare supplement rows.
 
 **CLOSED and deliberately not in this queue** (receipts in `HANDOFF_LOG.md`):
-chunk A, **chunk B** (all steps + an 18/18 acceptance leg, 2026-08-16), D1-D4,
-the bug-fix sprint's chunks 0/0.5, the `scifi_news` rip, the
-`fable2 -> scifi_news_pro` rename, the TTS voice preflight, and the story
-finder v1. If you find a paragraph below describing any of these as work to
+**item 1.1, the Lemmy provisional tier** (built, four engines rendered, a green
+canonical leg on kokoro, 2026-08-17), chunk A, **chunk B** (all steps + an 18/18
+acceptance leg, 2026-08-16), D1-D4, the bug-fix sprint's chunks 0/0.5, the
+`scifi_news` rip, the `fable2 -> scifi_news_pro` rename, the TTS voice preflight,
+and the story finder v1. If you find a paragraph below describing any of these as work to
 do, it is stale narrative the archive split has not reached yet -- believe this
 list.
 
@@ -208,29 +208,33 @@ harnesses and the resident server were torn down. When it restarts: **only the
 `scripts/otr_gpu_soak_matrix.py` so the mistake is unrepresentable
 (PBUG-20260816-03 -- one harness ran 1,112 legs and rendered nothing).
 
-**1.1 LEMMY ON EVERY TTS ENGINE (operator 2026-08-16: "we need to be sure we
-have lemmy working on all tts engines", NO-SKIP directive, and "audition"
-means BUILD IT -- "do your best to get a lemmy going").** Measured: he has a
-real identity on 2 of 7 character engines (bark `v2/en_speaker_8`; indextts2
-qualified route). The DECIDED matrix (driver-decided on the operator's
-delegation, correcting the no-skip draft against the tree):
+**1.1 LEMMY ON EVERY TTS ENGINE -- BUILT AND CLOSED 2026-08-17 (`b645247c`,
+`6a47300c`).** He now has a deliberate identity on all seven character engines:
+one QUALIFIED (indextts2), five PROVISIONAL, and bark unchanged because it never
+had the defect. Receipt in `HANDOFF_LOG.md`; the contract that built it is
+`docs/2026-08-16-lemmy-cross-engine-PLAN.md`.
 
-| engine | route | state |
-|---|---|---|
-| indextts2 | qualified clone -- ALREADY DONE, do not re-train | shipped |
-| bark | `v2/en_speaker_8` | shipped |
-| google_tts | **`gt_algenib`** -- his own source voice (gravelly, F0 97 Hz); NOT Neural2-D, which is a Cloud-TTS id our Gemini integration cannot reach | map it |
-| chatterbox | clone the approved wav (rights scope already covers "local engines") | build |
-| dia | clone the approved wav (same rights) | build |
-| kokoro | `bm_george` -- warmest British male; a friendly-broadcaster cousin, NOT Cockney, accepted under no-skip | map it |
-| elevenlabs | verify `el_harry` (bank tags him AMERICAN -- tag or recollection is wrong); `el_dave` is not in the bank | listen first |
-
-Build shape: extend `LEMMY_VOICE_POLICY.approved_native_routes` per engine +
-bank rows where needed; render his canonical audition lines per engine off
-the G1 harness (`scripts/otr_g1_lemmy_audition.py` pattern) into ONE listen
-page; the operator's ears confirm; then the policy rows land. Coding item ->
-full `kibitz-plugin:kibitz` arc on a short plan doc BEFORE code (the
-bug-fix-sprint diff-level routing was scoped to that sprint).
+**What still binds future work, and nothing else here does:**
+* **A provisional route is NEVER stamped into `cast_row["voice_route"]`.** That
+  field means a QUALIFIED route was proved, and `resolve_and_verify_reference`
+  raises on any non-empty one whose status is not exactly `qualified`. The tier
+  lives in `lemmy_route_tier` / `lemmy_route_id` on the cast row.
+* **No provisional receipt may carry `operator_verdict` or `decided_by`** -- not
+  blank, ABSENT. Promotion means a human listened and a qualified route is
+  written by hand. There is no automated path and there must not be.
+* **Clearing stale cross-engine identity and stamping are ONE operation**, in
+  both CastLock branches. A row that is not re-cast is left exactly as it
+  arrived; `unrouted` is a claim about a DRAW and may only be stamped on a row
+  that actually took one.
+* **The engine widgets move by capability PROFILE, never `--set`.** The
+  acceptance leg used `config/profiles/otr_lemmy_kokoro_diag.json`, which reaches
+  both managed nodes through `config/profiles/widget_mapping.json`.
+* **The cross-engine harness is `scripts/otr_lemmy_cross_engine_audition.py` and
+  G1 stays frozen** -- G1's manifest is cited by sha inside the one qualified
+  route, so generalizing it would invalidate the only real audition evidence.
+  Any new TTS harness normalizes through `canonical_audio`/`mono_safe`: bark and
+  kokoro return `[1,1,T]`, chatterbox and dia return `[C,T]`, and a hand-written
+  transpose is right for exactly one of them.
 
 Historical framing of the sprint, kept for context:
 PBUG-20260811-03 was re-confirmed on that session's own artifacts and its SCOPE
@@ -2139,7 +2143,7 @@ the same green push that closes a row.
 
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
-| **CODER** (the default) | Take THE QUEUE from the top: item 1 is the Lemmy provisional tier, whose plan is already a four-round-hardened contract. One green pushed chunk at a time | cheapest competent local triage; Sonnet 5 post-code QA on the finished diff; kibitz local panel for a full arc | none | evidence-driven |
+| **CODER** (the default) | Take THE QUEUE from the top: item 1 is now the VIDEO SPRINT, whose plan doc is written but whose kibitz arc has NOT run -- so it takes a full arc before code. One green pushed chunk at a time | cheapest competent local triage; Sonnet 5 post-code QA on the finished diff; kibitz local panel for a full arc | none | evidence-driven |
 | RENDER | GPU legs only: acceptance legs for whatever the coder just landed, and the soak. Reset per CLAUDE.md section 4 before every leg; the soak restarts ONLY in its `--profile` form | local production + Codex-app monitor | a coder chunk needing live proof | GPU hours |
 | PLANNER | The archive split this file still owes; Bug Bible operator fan-out; the `check_compatibility` fork | rungs 2-4 | parallel with any coder window | docs |
 
