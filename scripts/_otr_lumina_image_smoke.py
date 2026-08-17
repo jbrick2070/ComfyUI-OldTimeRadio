@@ -2,7 +2,8 @@
 
 Submits the EXACT node recipe LuminaImage2Engine._build_lumina_graph emits
 (UNETLoader + CLIPLoader[type=lumina2] + VAELoader -> ModelSamplingAuraFlow ->
-CLIPTextEncode pos/neg + EmptySD3LatentImage -> KSampler -> VAEDecode) to a live
+CLIPTextEncode pos/neg carrying Lumina-2's `<Prompt Start>` convention +
+EmptySD3LatentImage -> KSampler -> VAEDecode) to a live
 headless ComfyUI (:8000), with a SaveImage terminal, so the heavy forward runs in
 the EXECUTOR THREAD. Proves the real-on-GPU truth the CPU tests cannot: the lumina2
 node classes exist, the three weight files load (lumina_2_model_bf16 + gemma_2_2b
@@ -34,6 +35,11 @@ for _p in (_HERE, _REPO_ROOT):
 
 from otr_api import COMFYUI_URL, submit_prompt, poll_history  # noqa: E402
 from nodes import _otr_paths as P  # noqa: E402  (the one OTR path authority)
+# The encoder-text composition is IMPORTED, never re-typed: this script's whole
+# claim is that it submits the recipe the engine emits, and a second copy of
+# the system line is how that claim quietly stops being true.
+from nodes._otr_image_engines.lumina_image import (  # noqa: E402
+    compose_encoder_text)
 
 # The default lumina split-file weights (same basenames the engine defaults to;
 # resolved by ComfyUI folder_paths from C:/ComfyUI-Models/{diffusion_models,
@@ -54,9 +60,17 @@ _PROMPT = ("a 1940s science-fiction radio broadcast studio, brass microphone, "
            "35mm film still, rich saturated color")
 
 
-def build_graph(*, width, height, steps, cfg, shift, seed, prefix):
+def build_graph(*, width, height, steps, cfg, shift, seed, prefix,
+                system_prompt=True):
     """The Lumina-2 /prompt graph -- a 1:1 mirror of the engine recipe + a
-    SaveImage terminal so the still lands on disk for the file-check."""
+    SaveImage terminal so the still lands on disk for the file-check.
+
+    ``system_prompt=False`` submits the PRE-FIX form (raw text, no system line,
+    no ``<Prompt Start>``) so the conformance fix can be A/B'd at an identical
+    seed. Structural divergence is not proof that output improved -- BUG-411's
+    "flattening the look" was visible only in comparison -- so the arms exist in
+    one script and stay reproducible."""
+    _compose = compose_encoder_text if system_prompt else (lambda t: str(t or ""))
     return {
         "unet": {"class_type": "UNETLoader",
                  "inputs": {"unet_name": UNET, "weight_dtype": "default"}},
@@ -65,10 +79,13 @@ def build_graph(*, width, height, steps, cfg, shift, seed, prefix):
         "vae": {"class_type": "VAELoader", "inputs": {"vae_name": VAE}},
         "sampling": {"class_type": "ModelSamplingAuraFlow",
                      "inputs": {"model": ["unet", 0], "shift": float(shift)}},
+        # Lumina-2's trained convention on BOTH branches, exactly as
+        # _build_lumina_graph composes it (the lumina2 tokenizer applies no
+        # template of its own, so the caller must).
         "pos": {"class_type": "CLIPTextEncode",
-                "inputs": {"text": _PROMPT, "clip": ["clip", 0]}},
+                "inputs": {"text": _compose(_PROMPT), "clip": ["clip", 0]}},
         "neg": {"class_type": "CLIPTextEncode",
-                "inputs": {"text": "", "clip": ["clip", 0]}},
+                "inputs": {"text": _compose(""), "clip": ["clip", 0]}},
         "latent": {"class_type": "EmptySD3LatentImage",
                    "inputs": {"width": int(width), "height": int(height),
                               "batch_size": 1}},
@@ -95,24 +112,34 @@ def main(argv=None) -> int:
     ap.add_argument("--shift", type=float, default=6.0)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--timeout", type=int, default=900)
+    ap.add_argument("--no-system-prompt", action="store_true",
+                    help="submit the PRE-FIX form (raw text, no system line / "
+                         "<Prompt Start>) -- the A arm of the conformance A/B")
     args = ap.parse_args(argv)
 
+    use_system = not args.no_system_prompt
+    arm = "sys" if use_system else "raw"
+
     # Single path authority: the still lands in otr/episodes/<ep>/stills/. The
-    # SaveImage filename_prefix is relative to ComfyUI's output root.
+    # SaveImage filename_prefix is relative to ComfyUI's output root. The arm is
+    # in the filename so an A/B pair is self-describing on disk.
     stills_dir = P.otr_stills_dir(SMOKE_EPISODE)
     glob_dir = str(stills_dir)
-    prefix = (stills_dir / "lumina_smoke").relative_to(
-        P.comfy_output_dir()).as_posix()
+    prefix = (stills_dir / ("lumina_smoke_%s_seed%d" % (arm, args.seed))
+              ).relative_to(P.comfy_output_dir()).as_posix()
     started = time.time()
 
-    print("[lumina-smoke] %s  %dx%d steps=%d cfg=%.2f shift=%.2f seed=%d"
+    print("[lumina-smoke] %s  %dx%d steps=%d cfg=%.2f shift=%.2f seed=%d arm=%s"
           % (COMFYUI_URL, args.width, args.height, args.steps, args.cfg,
-             args.shift, args.seed), flush=True)
+             args.shift, args.seed, arm), flush=True)
     print("[lumina-smoke] unet=%s clip=%s vae=%s" % (UNET, CLIP, VAE), flush=True)
+    print("[lumina-smoke] positive: %s"
+          % (compose_encoder_text(_PROMPT) if use_system else _PROMPT)[:160],
+          flush=True)
 
     graph = build_graph(width=args.width, height=args.height, steps=args.steps,
                         cfg=args.cfg, shift=args.shift, seed=args.seed,
-                        prefix=prefix)
+                        prefix=prefix, system_prompt=use_system)
     prompt_id = submit_prompt(graph)
     print("[lumina-smoke] QUEUED prompt_id=%s" % prompt_id, flush=True)
     status, err = poll_history(prompt_id, timeout_s=args.timeout)

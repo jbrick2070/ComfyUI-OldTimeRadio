@@ -65,8 +65,10 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-17):** suite
-**10659 / 110 / 1** (chain: 10584 at the 08-16 close -> 10644 with the
+**BASELINES to detect drift (updated 2026-08-17, item A close):** suite
+**10717 / 110 / 1** (10712 at the one-style-authority close -> 10717 with the
+five lumina input-convention tests; no regressions). Bible **20 / 26 / 3**.
+Earlier chain: 10584 at the 08-16 close -> 10644 with the
 provisional tier's 60 tests -> 10654 with the audition/artifact and three-family
 integration tests plus two generator field-level pins -> 10659 with the
 tier-transition matrix parametrized over both CastLock modes. Earlier: 10529 ->
@@ -153,12 +155,44 @@ work:
 **ITEM 1 IS DONE.** ONE STYLE AUTHORITY shipped, pushed and Bible-promoted.
 What follows is the next window's order, cheapest-certain first:
 
-**A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- lumina is the first OUTPUT,
-not the whole item (operator 2026-08-17: "why just lumina because we only found
-it").** He is right, and the class has ALREADY recurred once: `flux_gen1.py`
-records BUG-411 -- the FluxGuidance node "the rewrite dropped it, flattening
-the look" -- which is the same defect wearing different clothes. Two instances
-is a class, and both were found by accident. Systematize it.
+**A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17, one real hit
+of three, live-proven.** Receipt: `PBUG-20260817-02`. Ran exactly as directed --
+live `/object_info` (2,230 node classes), the dedicated-node inventory compared
+against what each in-scope engine builds, deterministic engine-side fix, one A/B
+at a fixed seed. No Fable, no arc; Sonnet 5 QA on the finished diff, which
+caught the `engine_version` bump the fix needed to be retroactive.
+
+**WHAT BINDS FUTURE WORK -- the rule, because name-matching would have produced
+TWO FALSE POSITIVES:** a dedicated node that exists and is unused is only a
+defect where the family's TOKENIZER does not apply the convention itself.
+`comfy/text_encoders/lumina2.py` is a plain `SD1Tokenizer` with zero template
+handling, so the caller MUST supply it -> real defect. Z-Image is the opposite:
+`comfy/text_encoders/qwen_image.py:32-36` shows `llama_template=None` means "use
+the built-in template", so plain `CLIPTextEncode` and `TextEncodeZImageOmni`
+emit identical tokens for text-only work. Check the tokenizer, not the node name.
+
+| engine | dedicated node | used | verdict |
+|---|---|---|---|
+| `z_image_turbo` | `TextEncodeZImageOmni` | no | CONFORMANT (tokenizer self-wraps; Omni's extra value is image refs, already reached via `ReferenceLatent`) |
+| `flux_gen1` | `CLIPTextEncodeFlux` | no | CONFORMANT (it is `CLIPTextEncode`+`FluxGuidance` fused; `FluxGuidance` IS wired at `flux_gen1.py:142`, the BUG-411 restore) |
+| `lumina_image` | `CLIPTextEncodeLumina2` | no | FIXED -- was out-of-distribution on every mint |
+
+**A NEW ITEM THE AUDIT SURFACED, deliberately not folded into the fix:** lumina
+has NO hygiene-negative floor while `z_image_turbo` does (`.strip() or
+_HYGIENE_NEGATIVE`, `z_image_turbo.py:117`), the empty-negative path is
+REACHABLE, and the dispatcher stamps `_neg_source="engine_hygiene"`
+(`otr_image_gen_dispatcher.py:1169`) for exactly that case -- **a receipt
+claiming a floor this engine does not have.** A comment asserting the two
+engines matched "including at the edges" was false and is corrected. Whether
+lumina should grow a floor is a RENDER decision at a different cfg on a
+different model; it needs a judgement, not a patch.
+
+*The original framing, kept because its reasoning still holds:* lumina was the
+first OUTPUT, not the whole item (operator 2026-08-17: "why just lumina because
+we only found it"). The class had ALREADY recurred once -- `flux_gen1.py`
+records BUG-411, the FluxGuidance node "the rewrite dropped it, flattening the
+look" -- the same defect wearing different clothes. Two instances found by
+accident is a class, so it got systematized.
 
 **THE METHOD (cheap, deterministic, read-only):** ComfyUI ships DEDICATED nodes
 for model families that need special input handling -- `CLIPTextEncodeLumina2`
@@ -189,15 +223,26 @@ diff before the push** is the correct and sufficient gate. Spend Fable only if
 the audit surfaces something needing judgment -- on this queue that is item D,
 not item A.
 
-**A1. The known hit: LUMINA IS MISSING ITS TRAINED INPUT CONVENTION.**
-ComfyUI's `CLIPTextEncodeLumina2` builds `f'{system_prompt} <Prompt Start>
-{user_prompt}'` (`comfy_extras/nodes_lumina2.py:113`). OTR's lumina graph uses
-plain `CLIPTextEncode` on both pos and neg (`lumina_image.py:160-163`), so
-**every lumina mint runs out-of-distribution.** Contained -- lumina is opt-in
-(`default_roles=()`, gated on `OTR_ENABLE_LUMINA=1`). Fix is engine-side and
-zero-LLM: prepend the system line + tag in `_build_lumina_graph`. **Confirm the
-node exists in this install via a live `/object_info` first** -- this is a
-static-audit finding until one live lumina mint verifies it (admission rule).
+**A1. The known hit: LUMINA WAS MISSING ITS TRAINED INPUT CONVENTION -- SHIPPED.**
+`CLIPTextEncodeLumina2` builds `f'{system_prompt} <Prompt Start> {user_prompt}'`
+(`comfy_extras/nodes_lumina2.py:113`); OTR fed raw text through plain
+`CLIPTextEncode` on both branches, so every lumina mint ran out-of-distribution.
+Fixed engine-side, zero-LLM, in `_build_lumina_graph` via an idempotent
+`compose_encoder_text()`. Applied to BOTH branches, because that is what wiring
+a `CLIPTextEncodeLumina2` into each side of the KSampler does and the node has
+no negative-specific mode. `OTR_LUMINA_SYSTEM_PROMPT` picks `superior`
+(default) / `alignment`; an unknown value degrades LOUDLY, never fatally.
+`engine_version` 1 -> 2 so a resumed pre-fix cache entry cannot re-serve the old
+still. The A/B instrument is permanent: `scripts/_otr_lumina_image_smoke.py
+--no-system-prompt` is the pre-fix arm.
+
+**THE CONTAINMENT LINE IN THE OLD ENTRY WAS STALE -- do not repeat it.** Lumina
+is NOT "gated on `OTR_ENABLE_LUMINA=1`": `requires_flag = None`
+(`lumina_image.py`), and `tests/test_lumina_image_engine.py` DELETES that var
+and still expects the engine usable. The real gate is the weights file, all
+three lumina files are on disk, and the engine is wired into
+`config/profiles/otr_soak_*_lumina_image.json` + `otr_sbcov_3`. It was reachable,
+not theoretical.
 
 **B. PROVE THE STYLE FIX ON ONE LIVE RENDER.** Fable's acceptance test, adopted
 verbatim: mint the same cartoon episode's character still on z_image before and

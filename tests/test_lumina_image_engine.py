@@ -108,6 +108,105 @@ def test_lumina_render_builds_lumina2_graph(monkeypatch):
     assert captured["terminal"] == "decode"
 
 
+# --------------------------------------------------------------------------- #
+# The trained input convention (2026-08-17 engine input-convention audit).
+# Lumina-2 wants `{system} <Prompt Start> {user}`; comfy/text_encoders/lumina2.py
+# applies NO template of its own, so the caller must -- unlike Z-Image, whose
+# qwen_image tokenizer wraps the text internally.
+# --------------------------------------------------------------------------- #
+
+def test_lumina_composed_text_matches_comfyui_verbatim():
+    """The composed string is byte-identical to what CLIPTextEncodeLumina2
+    hands the tokenizer. The system lines are copied from ComfyUI, so this
+    test is where a silent upstream drift becomes visible."""
+    from nodes._otr_image_engines import lumina_image as m
+
+    superior = ("You are an assistant designed to generate superior images "
+                "with the superior degree of image-text alignment based on "
+                "textual prompts or user prompts.")
+    alignment = ("You are an assistant designed to generate high-quality "
+                 "images with the highest degree of image-text alignment "
+                 "based on textual prompts.")
+    assert m.SYSTEM_PROMPTS["superior"] == superior
+    assert m.SYSTEM_PROMPTS["alignment"] == alignment
+    assert m.PROMPT_START_TAG == "<Prompt Start>"
+
+    # CLIPTextEncodeLumina2.execute: f'{system_prompt} <Prompt Start> {user_prompt}'
+    assert (m.compose_encoder_text("a brass microphone", "superior")
+            == superior + " <Prompt Start> a brass microphone")
+    assert (m.compose_encoder_text("a brass microphone", "alignment")
+            == alignment + " <Prompt Start> a brass microphone")
+
+
+def test_lumina_compose_is_idempotent_and_handles_empty():
+    """Composing twice must not double-prefix, and an EMPTY prompt still gets
+    the system line -- which is exactly what the ComfyUI node emits for an
+    empty user_prompt."""
+    from nodes._otr_image_engines import lumina_image as m
+
+    once = m.compose_encoder_text("radio console", "superior")
+    assert m.compose_encoder_text(once, "superior") == once
+    assert once.count("<Prompt Start>") == 1
+
+    empty = m.compose_encoder_text("", "superior")
+    assert empty.startswith(m.SYSTEM_PROMPTS["superior"])
+    assert empty.endswith("<Prompt Start> ")
+    assert m.compose_encoder_text(None, "superior") == empty
+
+
+def test_lumina_system_prompt_env_knob(monkeypatch):
+    """The knob selects a known key; an unknown value degrades LOUDLY to the
+    default rather than killing the render (BUG-046 degrades, never dies)."""
+    from nodes._otr_image_engines import lumina_image as m
+    eng = ireg.get_engine("lumina_image")
+
+    monkeypatch.delenv(m.SYSTEM_ENV, raising=False)
+    assert eng._lumina_params({"prompt": "x"})["system_prompt"] == "superior"
+
+    monkeypatch.setenv(m.SYSTEM_ENV, "alignment")
+    assert eng._lumina_params({"prompt": "x"})["system_prompt"] == "alignment"
+
+    monkeypatch.setenv(m.SYSTEM_ENV, "not-a-real-key")
+    assert eng._lumina_params({"prompt": "x"})["system_prompt"] == "superior"
+
+
+def test_lumina_graph_carries_convention_on_both_branches(monkeypatch):
+    """BOTH pos and neg carry the convention -- wiring a CLIPTextEncodeLumina2
+    into each side of the KSampler is what conformance means, and that node has
+    no negative-specific mode. cfg defaults to 4.0, so the uncond branch is
+    genuinely sampled."""
+    from nodes._otr_image_engines import lumina_image as m
+    eng = ireg.get_engine("lumina_image")
+
+    monkeypatch.delenv(m.SYSTEM_ENV, raising=False)
+    params = eng._lumina_params({"prompt": "a brass microphone",
+                                 "negative_prompt": "blurry, watermark"})
+    g = eng._build_lumina_graph(params, lambda node, slot: {"_w": [node, slot]})
+
+    assert g["pos"]["inputs"]["text"] == m.compose_encoder_text(
+        "a brass microphone", "superior")
+    assert g["neg"]["inputs"]["text"] == m.compose_encoder_text(
+        "blurry, watermark", "superior")
+    for branch in ("pos", "neg"):
+        assert g[branch]["inputs"]["text"].count("<Prompt Start>") == 1
+
+
+def test_lumina_params_keep_the_raw_request_text(monkeypatch):
+    """The composition happens in the GRAPH, never in the params. The
+    dispatcher derives prompt_hash / cache key / seed from the REQUEST prompt
+    upstream, so the composed string must never leak back into it."""
+    from nodes._otr_image_engines import lumina_image as m
+    eng = ireg.get_engine("lumina_image")
+
+    monkeypatch.delenv("OTR_LUMINA_NEGATIVE", raising=False)
+    p = eng._lumina_params({"prompt": "a brass microphone",
+                            "negative_prompt": "blurry"})
+    assert p["prompt"] == "a brass microphone"
+    assert p["negative"] == "blurry"
+    assert m.PROMPT_START_TAG not in p["prompt"]
+    assert m.PROMPT_START_TAG not in p["negative"]
+
+
 def test_lumina_cold_import_clean():
     """Importing the adapter pulls NO heavy framework (V-12)."""
     root = pathlib.Path(__file__).resolve().parent.parent

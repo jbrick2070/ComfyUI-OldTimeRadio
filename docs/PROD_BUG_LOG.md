@@ -5276,3 +5276,91 @@ EXPECTED result, not a regression signal.
   and the shape is genuinely UNCOVERED (the one near hit concerns an EMPTY
   negative, the opposite defect). **Promote it with its green chunk.**
 - status: OPEN, root cause verified, fix designed and queued first.
+
+## PBUG-20260817-02 -- every lumina mint ran out-of-distribution: the engine skipped Lumina-2's trained input convention
+
+- surfaced: 2026-08-17, from the operator-directed ENGINE INPUT-CONVENTION
+  CONFORMANCE AUDIT (THE QUEUE item A). Not an accident this time -- the operator
+  refused to treat lumina as a one-off ("why just lumina because we only found
+  it") and asked for the class to be systematized.
+- admission evidence: a LIVE A/B on the real GPU through the headless server,
+  two mints at an identical seed differing only in encoder text --
+  `otr/episodes/lumina_smoke/stills/lumina_smoke_raw_seed7_00001_.png` (771,060 B)
+  and `lumina_smoke_sys_seed7_00001_.png` (832,524 B), both `SUCCESS` in ~30 s.
+  Not a static-audit finding.
+- root cause, VERIFIED at the files: Lumina-Image 2.0 is trained on an
+  instruction-style input. ComfyUI's own `CLIPTextEncodeLumina2` builds
+  `f'{system_prompt} <Prompt Start> {user_prompt}'`
+  (`comfy_extras/nodes_lumina2.py:113`). `nodes/_otr_image_engines/lumina_image.py`
+  mapped BOTH `pos` and `neg` to plain `CLIPTextEncode` and fed raw request text,
+  so no mint this engine ever produced carried the system line or the tag.
+- **WHY IT IS A DEFECT HERE AND NOT ON THE SIBLINGS -- this is the reusable
+  rule, and name-matching dedicated nodes would have produced two FALSE
+  POSITIVES.** The convention is owed only where the family's TOKENIZER does not
+  apply it internally. `comfy/text_encoders/lumina2.py` is 73 lines with zero
+  template handling -- a plain `SD1Tokenizer` -- so the caller must supply it.
+  Z-Image is the opposite: `comfy/text_encoders/qwen_image.py:32-36` shows
+  `llama_template=None` means "use the built-in instruction template", so plain
+  `CLIPTextEncode` and `TextEncodeZImageOmni` emit identical tokens for
+  text-only work.
+- audit scope + result (only engines in the canonical workflow):
+  | engine | dedicated node that EXISTS | used | verdict |
+  |---|---|---|---|
+  | `z_image_turbo` | `TextEncodeZImageOmni` | no | CONFORMANT -- tokenizer self-wraps; the Omni node's extra value is image refs, already reached via `ReferenceLatent` |
+  | `flux_gen1` | `CLIPTextEncodeFlux` | no | CONFORMANT -- that node is `CLIPTextEncode`+`FluxGuidance` fused; its only unique power is different `clip_l`/`t5xxl` text. `FluxGuidance` IS wired (`flux_gen1.py:142`, the BUG-411 restore) |
+  | `lumina_image` | `CLIPTextEncodeLumina2` | no | **DEFECT (this entry)** |
+- fix APPLIED, engine-side and zero-LLM: module constants copied verbatim from
+  ComfyUI (`SYSTEM_PROMPTS`, `PROMPT_START_TAG`), a pure idempotent
+  `compose_encoder_text()`, and `_build_lumina_graph` composing for BOTH
+  branches -- which is what wiring a `CLIPTextEncodeLumina2` into each side of
+  the KSampler does, and that node has no negative-specific mode. Feeding the
+  composed string to `CLIPTextEncode` is byte-identical to using the dedicated
+  node: both are `clip.tokenize(text)` then `encode_from_tokens_scheduled(tokens)`
+  (`nodes.py:73-77` vs `nodes_lumina2.py:114-115`). Kept one graph shape, one
+  class, and cold-import cleanliness (V-12) rather than swapping node classes.
+  `OTR_LUMINA_SYSTEM_PROMPT` selects `superior` (default) or `alignment`; an
+  unknown value degrades LOUDLY to the default rather than killing a render.
+- **`engine_version` BUMPED 1 -> 2, and this is the part that would have been
+  missed** (caught by the Sonnet QA pass on the finished diff). The dispatch
+  cache key is `(role, object_id, prompt_hash, seed, engine_id, engine_version,
+  kind, w, h)` (`otr_image_gen_dispatcher.py:124-145`) and the fix does not
+  change prompt TEXT, so without the bump a resumed episode holding a pre-fix
+  lumina cache entry would keep re-serving the out-of-distribution still
+  forever. No persisted ledger references lumina today, so the bump costs
+  nothing now and makes the fix retroactive for any future resume.
+- the composed string never leaks upstream: `prompt_hash`, cache key and seed are
+  frozen from the REQUEST prompt before `gen_fn(request)`, and composition happens
+  only inside the graph builder. `_lumina_params["prompt"]` stays raw, pinned by test.
+- **A SEPARATE DEFECT FOUND WHILE GROUNDING, DELIBERATELY NOT FOLDED IN.** A
+  comment in `_lumina_params` claimed its negative resolution "Matches
+  z_image_turbo._resolve_negative exactly -- including at the edges." It does
+  not: z_image ends `.strip() or _HYGIENE_NEGATIVE` (`z_image_turbo.py:117`)
+  while lumina has neither a strip nor a hygiene floor. The gap is REACHABLE
+  (`VISUAL_SAFETY_NEGATIVE_PROMPT` is `""`, and a pack may ship an empty
+  `negative_tail`), and the dispatcher labels exactly that case
+  `_neg_source="engine_hygiene"` (`otr_image_gen_dispatcher.py:1169`) -- **a
+  receipt claiming a hygiene floor lumina does not have.** The lying comment is
+  corrected; whether lumina should GROW a floor is a render decision on a
+  different model at a different cfg, and is queued rather than slipped in.
+- the queue's own containment sentence was STALE and is corrected: lumina is NOT
+  "gated on `OTR_ENABLE_LUMINA=1`". `requires_flag = None` and
+  `tests/test_lumina_image_engine.py` deletes that var and still expects the
+  engine usable; the real gate is the weights file, and all three lumina files
+  are on disk. The lane was reachable, and it is wired into
+  `config/profiles/otr_soak_*_lumina_image.json` and `otr_sbcov_3`.
+- honest limit on the A/B: n=1, one prompt, one seed. It proves the conditioning
+  changed MATERIALLY and in the expected direction (the brass microphone reads
+  as brass; a hallucinated text-like marking on the mic collar disappears; the
+  studio resolves frames/dial/equipment instead of a dark mass). It is NOT a
+  quality measurement across the lane and must not be quoted as one.
+- gates: suite 10717/110/1 (baseline 10712 + exactly the 5 new tests), Bible
+  20/26/3, AST + BOM clean, live A/B both arms SUCCESS.
+- Bible: candidate, genuinely uncovered as far as the audit reached -- the shape
+  is "a model family ships a DEDICATED node because its tokenizer does not
+  self-wrap, and an engine that hand-rolls the graph silently bypasses the
+  trained convention", with BUG-411 (`FluxGuidance` dropped in a rewrite,
+  "flattening the look") as the same class wearing different clothes. Promote at
+  wrap-up per the delta-scrape discipline, with the README count bump in the
+  same commit.
+- status: FIXED and live-proven. Residual OPEN: the lumina hygiene-floor /
+  `engine_hygiene` mislabel question above.

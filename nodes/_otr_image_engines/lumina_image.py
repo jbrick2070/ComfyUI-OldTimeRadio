@@ -10,9 +10,27 @@ split-file recipe is UNETLoader (the 2.6B bf16 diffusion model) + CLIPLoader wit
 VAEDecode. Lightweight (~7 GB working set, comfortably under the 14.5 GB single-
 resident ceiling) and Apache-2.0 (commercial-clean).
 
+THE TRAINED INPUT CONVENTION (2026-08-17 conformance audit). Lumina-2 is trained
+on an instruction-style input: ComfyUI's own ``CLIPTextEncodeLumina2`` builds
+``f'{system_prompt} <Prompt Start> {user_prompt}'``
+(``comfy_extras/nodes_lumina2.py:113``). That prefix is NOT optional decoration
+and it is NOT applied for us: ``comfy/text_encoders/lumina2.py``'s
+``LuminaTokenizer`` is a plain ``SD1Tokenizer`` with no template of its own. This
+is the exact opposite of Z-Image, whose ``qwen_image`` tokenizer wraps the text
+INTERNALLY (``comfy/text_encoders/qwen_image.py:32-36``) -- which is why
+``z_image_turbo`` is conformant on plain ``CLIPTextEncode`` and this engine was
+not. Until the audit, every lumina mint ran out-of-distribution. We compose the
+string here rather than swapping to ``CLIPTextEncodeLumina2`` because the graph
+keeps ONE shape (the two classes take different input names), the composition
+stays CPU-testable with no comfy import (V-12), and ComfyUI's own shipped
+Lumina-family blueprint composes it as a string into a plain ``CLIPTextEncode``.
+
 Flux stays gen 1; Lumina is an OPT-IN peer (``default_roles=()`` -- no model is
-"primary"), greyed until ``OTR_ENABLE_LUMINA=1`` AND its checkpoint exists. The
-fail-closed gate is the WEIGHTS FILE (``OTR_LUMINA_CKPT``): ``assert_usable``
+"primary"). ``requires_flag`` is None -- the registry IS the menu, and
+``OTR_ENABLE_LUMINA`` is vestigial, NOT a gate (pinned by
+``tests/test_lumina_image_engine.py``, which deletes the var and still expects
+the engine usable). The fail-closed gate is the WEIGHTS FILE
+(``OTR_LUMINA_CKPT``): ``assert_usable``
 raises MISSING_MODEL until it points at the downloaded diffusion model (ABSENT/
 greyed, never a silent stub -- BUG-046). The TE + VAE loaders fail LOUD at render
 if their files are absent (the dispatcher catches it fail-closed -> radio floor).
@@ -50,6 +68,69 @@ _DEFAULT_CKPT = "lumina_2_model_bf16.safetensors"
 _DEFAULT_CLIP = "gemma_2_2b_fp16.safetensors"
 _DEFAULT_VAE = "lumina2_ae.safetensors"
 
+#: The tag Lumina-2 was trained to split its system line from the user prompt on.
+PROMPT_START_TAG = "<Prompt Start>"
+
+#: The two system lines Lumina-2 ships with, copied VERBATIM from
+#: ``CLIPTextEncodeLumina2.SYSTEM_PROMPT`` (``comfy_extras/nodes_lumina2.py``).
+#: Held here rather than imported because this module is cold-import clean --
+#: importing ``comfy_extras`` at module scope would drag in torch (V-12).
+SYSTEM_PROMPTS = {
+    "superior": (
+        "You are an assistant designed to generate superior images with the "
+        "superior degree of image-text alignment based on textual prompts or "
+        "user prompts."
+    ),
+    "alignment": (
+        "You are an assistant designed to generate high-quality images with "
+        "the highest degree of image-text alignment based on textual prompts."
+    ),
+}
+
+#: Which system line to use. ``superior`` is ComfyUI's own first/default option.
+SYSTEM_ENV = "OTR_LUMINA_SYSTEM_PROMPT"
+_DEFAULT_SYSTEM = "superior"
+
+
+def _resolve_system_key() -> str:
+    """The system-prompt key for this mint, and the one place that decides.
+
+    An unknown value falls back to the default LOUDLY rather than raising: a
+    typo in an env var must not kill a render (BUG-046 degrades, never dies),
+    but it must not be silent either or the operator never learns the knob
+    missed."""
+    key = (os.environ.get(SYSTEM_ENV, "") or "").strip() or _DEFAULT_SYSTEM
+    if key not in SYSTEM_PROMPTS:
+        log.warning(
+            "[OTR.image.lumina_image] %s=%r is not one of %s -- falling back "
+            "to %r", SYSTEM_ENV, key, sorted(SYSTEM_PROMPTS), _DEFAULT_SYSTEM)
+        key = _DEFAULT_SYSTEM
+    return key
+
+
+def compose_encoder_text(user_text, system_key=None) -> str:
+    """Pure: the string Lumina-2 was trained to receive.
+
+    ``f'{system} <Prompt Start> {user}'`` -- byte-identical to what
+    ``CLIPTextEncodeLumina2.execute`` hands the tokenizer, so a plain
+    ``CLIPTextEncode`` fed this string and that node are the same two calls
+    (``clip.tokenize`` then ``encode_from_tokens_scheduled``).
+
+    IDEMPOTENT: text that already carries the tag is returned untouched, so a
+    caller that composes twice cannot double-prefix (the precedent is
+    ``_prefix_video_style_cue``'s already-prefixed check on the video side).
+    An EMPTY user prompt still gets the system line -- that is exactly what the
+    ComfyUI node emits for an empty ``user_prompt``, and conformance is the
+    whole point of composing it."""
+    text = str(user_text or "")
+    if PROMPT_START_TAG in text:
+        return text
+    # None means "resolve from the env" so an out-of-engine caller (the live
+    # smoke) composes the SAME string without duplicating the resolution rule.
+    key = system_key or _resolve_system_key()
+    system = SYSTEM_PROMPTS.get(key, SYSTEM_PROMPTS[_DEFAULT_SYSTEM])
+    return "%s %s %s" % (system, PROMPT_START_TAG, text)
+
 
 def _role_of(profile) -> str:
     if isinstance(profile, dict):
@@ -67,7 +148,14 @@ class LuminaImage2Engine:
     commercial_clean = True          # Apache-2.0 (C2 matrix; operator confirms weights provenance)
     requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
-    engine_version = "1"
+    # BUMPED 1 -> 2 by the 2026-08-17 input-convention fix. The dispatch cache
+    # key is (role, object_id, prompt_hash, seed, engine_id, engine_version,
+    # kind, w, h) -- and the prompt TEXT is unchanged by that fix, so without
+    # this bump a resumed episode holding a pre-fix lumina cache entry would
+    # keep re-serving the out-of-distribution still forever instead of
+    # regenerating. No persisted ledger references lumina today, so this costs
+    # nothing now; it is what makes the fix retroactive for any future resume.
+    engine_version = "2"
 
     #: Terminal graph node (its IMAGE output is the still).
     _TERMINAL = "decode"
@@ -108,11 +196,28 @@ class LuminaImage2Engine:
             # discarded on this lane (PBUG-20260817-01). Live here: cfg 4.0.
             # `is not None`, not `or`: an explicitly-empty override means
             # "render with no negative", and must not fall through to the
-            # request. Matches z_image_turbo._resolve_negative exactly -- one
-            # authority means one rule, including at the edges.
+            # request. That override-precedence rule matches
+            # z_image_turbo._resolve_negative -- but the EDGES DELIBERATELY DO
+            # NOT MATCH, and an earlier version of this comment wrongly claimed
+            # they did. z_image ends `.strip() or _HYGIENE_NEGATIVE`
+            # (z_image_turbo.py:117); lumina has no hygiene floor and no strip,
+            # so an empty request negative reaches the encoder as "" and a
+            # whitespace-only one is passed verbatim. That gap is REACHABLE
+            # (`VISUAL_SAFETY_NEGATIVE_PROMPT` is "" and a pack may ship an
+            # empty negative_tail), and the dispatcher labels exactly that case
+            # `_neg_source="engine_hygiene"` -- a label lumina does not honour.
+            # Whether this engine should grow its own floor is a RENDER
+            # decision on a different model, not a comment fix; it is logged,
+            # not folded in here.
             "negative": (_env_neg if (_env_neg := os.environ.get(
                 "OTR_LUMINA_NEGATIVE")) is not None
                 else str(get("negative_prompt") or "")),
+            # The system line is resolved here but applied in the GRAPH, so
+            # `prompt` / `negative` stay the RAW request text: the dispatcher's
+            # prompt_hash, cache key and seed derivation are computed upstream
+            # from the request, and the composed string must never leak back
+            # into them.
+            "system_prompt": _resolve_system_key(),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_LUMINA_STEPS", 30),
             "cfg": _efloat("OTR_LUMINA_CFG", 4.0),
@@ -145,6 +250,12 @@ class LuminaImage2Engine:
         format). UNETLoader out 0=MODEL; CLIPLoader out 0=CLIP; VAELoader out
         0=VAE; ModelSamplingAuraFlow out 0=MODEL (shifted)."""
         W = wire
+        # Lumina-2's trained convention, applied to BOTH branches -- which is
+        # what wiring a CLIPTextEncodeLumina2 into each side of the KSampler
+        # does, and that node has no negative-specific mode. cfg defaults to
+        # 4.0 here, so the uncond branch is genuinely sampled and an
+        # out-of-distribution negative is not a free pass.
+        _sys = params.get("system_prompt") or _DEFAULT_SYSTEM
         return {
             "unet": {"class": "unet",
                      "inputs": {"unet_name": params["unet_name"],
@@ -158,9 +269,11 @@ class LuminaImage2Engine:
                          "inputs": {"model": W("unet", 0),
                                     "shift": float(params["shift"])}},
             "pos": {"class": "pos",
-                    "inputs": {"text": params["prompt"], "clip": W("clip", 0)}},
+                    "inputs": {"text": compose_encoder_text(params["prompt"], _sys),
+                               "clip": W("clip", 0)}},
             "neg": {"class": "neg",
-                    "inputs": {"text": params["negative"], "clip": W("clip", 0)}},
+                    "inputs": {"text": compose_encoder_text(params["negative"], _sys),
+                               "clip": W("clip", 0)}},
             "latent": {"class": "latent",
                        "inputs": {"width": int(params["width"]),
                                   "height": int(params["height"]),
@@ -235,12 +348,15 @@ class LuminaImage2Engine:
             _wb.reclaim_idle_models(reason="lumina_image post-decode")
         log.info(
             "[OTR.image.lumina_image] minted still %dx%d seed=%d steps=%d "
-            "cfg=%.2f shift=%.2f", params["width"], params["height"],
-            params["seed"], params["steps"], params["cfg"], params["shift"])
+            "cfg=%.2f shift=%.2f system=%s", params["width"], params["height"],
+            params["seed"], params["steps"], params["cfg"], params["shift"],
+            params["system_prompt"])
         return frames[0]
 
     def teardown(self, prepared) -> None:  # pragma: no cover
         return None
 
 
-__all__ = ["LuminaImage2Engine", "ENABLE_FLAG", "MODEL_ENV", "CLIP_ENV", "VAE_ENV"]
+__all__ = ["LuminaImage2Engine", "ENABLE_FLAG", "MODEL_ENV", "CLIP_ENV", "VAE_ENV",
+           "SYSTEM_ENV", "SYSTEM_PROMPTS", "PROMPT_START_TAG",
+           "compose_encoder_text"]
