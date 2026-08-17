@@ -169,10 +169,21 @@ the four freshly rendered local engines, the qualified IndexTTS2 arm referenced
 (never re-rendered), the three historic Algenib clips by exact filename, and the
 two cloud rows as `configured_unrendered` with their bank tags shown, which is
 enough to settle `el_harry` vs `el_daniel` from metadata without hearing a
-thing. `DECISIONS.json` beside it holds one `pending` row per route and is never
-overwritten once it has answers. **Nothing there can be promoted to qualified by
-editing a file** -- promotion means a human listened and a qualified route gets
-written by hand.
+thing. `DECISIONS.json` beside it holds one row per route and is never overwritten once
+it has answers. **Nothing there can be promoted to qualified by editing a file**
+-- promotion means a human listened and a qualified route gets written by hand.
+
+**FIRST OPERATOR NOTE, 2026-08-17, recorded verbatim in `DECISIONS.json`:**
+*"bark was british the rest fine."* Applied as `keep_provisional` on the four
+RENDERED local rows -- the reversible decision that file exists for -- and
+deliberately **NOT** as a qualification. An eight-word note is not a reproducible
+verdict: it does not say which of the two frozen lines it covers, and it cannot
+speak for the two cloud rows, which have no audio at all. Three questions carried
+to a real session, all listed in the file: does "fine" ACCEPT kokoro's
+`bm_george`, which is warm British and deliberately not Cockney, or merely not
+object to it; if chatterbox and dia both pass on the same cloned reference, which
+is his default on the clone lanes; and `el_harry` vs `el_daniel`, still a
+metadata question (the bank tags them american and british respectively).
 
 1. **Video sprint** (item 1.2, RECONCILED with the lab 2026-08-16 -- see the
    updated body) -- `ltx_distilled` lane + verbatim-viseme injection +
