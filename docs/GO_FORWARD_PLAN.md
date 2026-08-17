@@ -718,6 +718,55 @@ and `RealESRGAN_x4plus_anime_6B` (ESRGAN, scale 4, tags `['64nf','6nb']`,
   than one defensible answer, so it takes an arc; the downloads did not.
 
 **F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
+**r1 RAN 2026-08-17, BOTH OPERATOR-NAMED LANES, AND IT DISPROVED SECTION D'S OWN
+DIAGNOSIS.** Artifacts: `kibitz-runs/2026-08-17-item-F-wrong-play-frame/`
+(`driver_anchor.md`, `r1_antigravity_flash37.md`, `r1_judgment.md`,
+`r1_final.md`) + `kibitz-runs/2026-08-17-item-F-pro31/r1/`. **r1 ONLY -- Codex is
+quota-held to 2026-08-19 20:31, so this is NOT a full arc and must not be
+reported as one.** `r1_final.md` is the input to r2 and supersedes the anchor
+where they disagree.
+
+* **SECTION D'S WORDING IS WRONG AND IS CORRECTED BELOW -- do not build from it.**
+  Nothing "samples" a play or a setting: the only draws choose the SCENE
+  (`select_shakespeare_scene_ref`, correctly) and a style slug (`select_style`,
+  deterministic sha256). **No constant on this path contains "Verona."** The
+  wrong place is a free-text LLM field, `_otr_outline._MacroShape.setting`.
+  Pro 3.1 raised this unprompted as a MUST-FIX, independently of the driver's
+  trace. A window reading "sampled" as a pool draw will hunt a pool that does
+  not exist.
+* **AND IT IS NOT "GENERATED FROM A DIFFERENT RECORD" -- the record is NEVER
+  HANDED TO IT.** `source_meta_from_scene` builds a complete record and the
+  writer stamps it into `meta`; it then dies three times -- the interpreter call
+  passes `source_meta` only inside its `except` branch, `OutlineRequest` has no
+  play field, and `SafeOpenBrief` has exactly five. So this is a THREADING fix,
+  not a consumption fix.
+* **THERE ARE TWO FRAME PRODUCERS AND A THIRD UPSTREAM SOURCE.** The I.4.9
+  rewrite (`announcer_intro_rewrite`) overwrites the first frame, and the macro
+  LLM authors `setting` from the brief alone -- so a fix landing only on the
+  announcer names the right play while describing the wrong place. All three
+  need the same change.
+* **THE ONE SYMBOL THAT SOLVES THE FAMILY:**
+  `_otr_source_identity.identity_from_meta(meta).work_title` already normalizes
+  `play_title` (shakespeare) and `title` (public_domain), never raises, and
+  returns `""` when degraded. No per-lane branch needed.
+* **STILL OPEN, and r2 owes it:** `SafeOpenBrief`'s docstring says the locked cast
+  is *"the only proper names the announcer may use"* -- a HALLUCINATION FENCE,
+  not a spoiler rule. Both lanes answered only the spoiler half. Does naming
+  "Twelfth Night" trade a wrong-PLAY frame for a wrong-SCENE one? Fable was
+  asked this on the operator's 2026-08-17 call.
+* **DRIVER ERROR, recorded:** the anchor tabled "wire
+  `_otr_passage_selector.select_passage`" because that module's docstring
+  contains the word *"Verona"*. It is a verbatim dialogue-window slicer,
+  built-and-parked for the passage lane (three healthy commits, its own QA doc,
+  called "already implemented" in the public-domain plays plan) -- unrelated, not
+  abandoned. **A docstring naming your symptom is not evidence the module solves
+  your defect.** Same family as item A's name-matching ruling.
+* **THE KIBITZ LANE-COLLISION TRAP (found here, applies to every future run):**
+  `kibitz.py`'s run folder is `<date>-<--topic>` and `--topic` DEFAULTS to
+  `kibitz`, so two lanes in one round silently overwrite each other -- both
+  returned rc=0 and both printed "Reviews collected: antigravity: OK". The first
+  Pro 3.1 review was lost this way. **`--topic` is the isolation lever: one topic
+  per lane, always.**
 
 **I. THE WRONG-PERSON CHARACTER DESCRIPTION -- DIAGNOSED, PROMOTED, NOT FIXED
 (PBUG-20260817-03, Bible `11.61`, 2026-08-17). This is the "different bug hiding
@@ -1497,7 +1546,14 @@ that ruling stopped the announcer reciting a LICENCE, and its own reasoning was
 shipped also stopped it naming the author and the play. Naming Shakespeare is
 not a licence claim. Ask before writing the sentence.
 
-### D. NO LONGER UNDIAGNOSED -- the wrong-play frame is MEASURED, twice
+### D. MEASURED TWICE -- but this section's ROOT-CAUSE WORDING WAS DISPROVEN 2026-08-17
+
+> **READ ITEM F IN THE QUEUE BEFORE THIS SECTION.** The MEASUREMENT below stands.
+> The sentence *"the announcer FRAME is sampled independently of the selected
+> excerpt"* is FALSE in both halves and was disproven by r1 (two agy lanes plus
+> the driver's own trace): nothing samples a play, and the frame does not read a
+> different record -- it is never handed one. Item F carries the corrected root
+> cause, the three producers, and the adopted plan.
 
 `tempests_midnight_revelations` was the suspicion; the 2026-08-16 blind
 narrative read is the measurement
