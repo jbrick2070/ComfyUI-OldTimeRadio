@@ -285,6 +285,84 @@ metadata question (the bank tags them american and british respectively).
    `not _is_char_face_beat`, so building there would structurally never reach a
    lip-sync engine and would defeat the item's purpose.
 
+   ### NEXT BUILD -- ONE STYLE AUTHORITY (operator-directed 2026-08-17, stated twice)
+
+   **The defect, measured on a published episode
+   (`signal_lost_kinetic_motion_clause_live_test_20260817_050130`, style
+   `cartoon`).** Frames from the delivered mp4: 00:04 bookend CARTOON, 00:16
+   announcer CARTOON, 00:34 character PHOTOREAL, 00:43 announcer painterly. One
+   74-second episode cutting between an animated short, a live-action film and a
+   painting.
+
+   **ROOT CAUSE, and the driver's first diagnosis was WRONG -- record both so
+   nobody re-derives the wrong one.** The driver blamed the video-prompt branch
+   split (`style_tail=True` at `:2956` vs `False` at `:3044`). A Fable
+   consultation traced it deeper and the key claim was VERIFIED at the file:
+   * `nodes/_otr_image_engines/z_image_turbo.py:216-219` -- the default negative
+     is `"oversaturated, glossy, clean digital, plastic skin, waxy skin, sterile
+     studio lighting, cartoon, illustration, text, watermark"`. On a CARTOON
+     episode every still was minted with positive "bright cartoon illustration"
+     AND negative "cartoon, illustration". **The engine vetoes the style the
+     episode asked for.** Four of nine packs are illustration-family (`cartoon`,
+     `anime`, `storybook_engraving`, `paper_origami`) so this fights all four, on
+     every mint.
+   * The 620-char branch is gated on `_google_text_provider` (`:2935`) and
+     **never ran** on this episode -- so the "bookends got the full tail"
+     explanation is false.
+   * **The fracture is in the STILLS, before any video prompt exists.** The
+     anatomy-dense character portrait flipped photoreal, `reference_latent`
+     propagated that face into every character scene still, and i2v carried each
+     still faithfully into its clip. The video prompt never lost a fight; it was
+     never in the arena (`render_driver.py:2877-2884` states the doctrine: the
+     i2v anchor carries the LOOK, the prompt's job is to MOVE).
+
+   **THE BUILD, three parts:**
+   1. **A SECOND PASS OVER EVERY STILL AND VIDEO PROMPT, after the ledger is
+      complete** (operator's design, stated twice). It PREPENDS the episode's
+      style token where absent and does nothing else -- additive only, never
+      rewriting, stripping or rejecting, so it stays on the permitted side of
+      `otr_shot_lock.py:915-919`. Idempotent: copy the already-prefixed check in
+      `_prefix_video_style_cue` (`render_driver.py:1389`), which is the existing
+      precedent for exactly this move on the video side. Value beyond the fix:
+      style becomes ONE choke point with a receipt, instead of being applied
+      differently in four places.
+   2. **A PACK-AWARE NEGATIVE.** Part 1 alone is not enough and the report must
+      not claim otherwise: prefixing "cartoon style" while the negative still
+      says "cartoon, illustration" is a fight with itself. Each pack supplies its
+      own negative (cartoon: "photograph, photorealistic, skin pores, film
+      grain"); `sci_fi_radio` keeps today's string VERBATIM as its fixture so the
+      default pack stays byte-identical. Plumbing exists -- `schemas.py:65` has
+      `negative_prompt` and the dispatcher already sends a distinct
+      `radio_host_negative` for announcers.
+   3. **A MINT-TIME STYLE-SPREAD GATE.** A prompt-text pass CANNOT catch this
+      class -- tonight's prompts all agreed and the images still diverged. So
+      measure the IMAGES: cheap PIL/numpy scalars per still (palette-
+      reconstruction error, Laplacian variance -- the BUG-412 A/B is in-repo
+      precedent), stamped into `stills_manifest.json`, gating on MAX PAIRWISE
+      SPREAD across the episode rather than any absolute style. Calibrate on two
+      anchors: this episode must FAIL, a known-good one must PASS. It judges
+      images we produced, not authored text, so the no-classifier law is
+      untouched -- and it fails before any video GPU is spent.
+
+   **THE BUDGET CEILINGS ARE OURS, NOT THE ENGINES' (operator asked 2026-08-17).**
+   `_LTX_MOTION_PROMPT_MAX = 240` is a module constant in
+   `render_driver.py:1327`; `max_chars=188` appears at exactly ONE call site
+   (`:3044`) and no test asserts it; the origin is a design doc, not a device --
+   `get_story_brief_ltx`'s docstring cites "refinement section 6.1: LTX motion
+   budget is 220-240 chars total with 80-100 for the brief fragment". So raising
+   them is mechanically trivial and nothing structural forbids it.
+   **It is not free, and this is the receipt that says so:** the P4 probe measured
+   articulation collapsing **4.15 -> 1.18** from a prompt-register change on this
+   very lane, and Fable's read of it is that long prompts drown the speech tokens.
+   So a raise is a MEASUREMENT, not an edit -- raise it, then re-run
+   `scripts/otr_talking_radio_probe_eval.py` on the same seed and compare. A
+   ceiling raised without that probe is an untested change to lip-sync quality.
+
+   **DO NOT** blindly rebalance the 188/620 budgets, set `style_tail=True` on character
+   video prompts, touch the kinetic clause or the probe-locked talking clause, or
+   add any prompt-scanning conditional injector. Fix the mint and the identity
+   chain carries the style for free.
+
    **TWO THINGS THAT NEED THE OPERATOR, both from r2:**
    1. **A `.env` file will NOT turn the flag on.** `enabled()` reads
       `os.environ` and NOTHING in this repo loads a `.env` -- no dotenv in
