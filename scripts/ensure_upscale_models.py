@@ -1,8 +1,13 @@
 """Ensure the pinned upscale-engine checkpoints are present under
 ``models/upscale_models/``. Idempotent; safe to run every session.
 
-Currently manages ONE asset: Real-ESRGAN x2plus (BSD-3-Clause), used by the
-shipped ``spandrel_esrgan`` upscale engine.
+Manages the Real-ESRGAN checkpoint family (BSD-3-Clause). One of them --
+``RealESRGAN_x2plus.pth`` -- is the checkpoint the shipped ``spandrel_esrgan``
+engine pins and loads. The others are CANDIDATES fetched under GO_FORWARD item
+E: present on disk, identity-verified, and deliberately WIRED TO NOTHING. The
+engine reads only its own ``_model_filename``, so a candidate sitting in
+``models/upscale_models/`` changes no behaviour; choosing among them is a
+separate design step that has not run.
 
 Behavior:
 * If the file exists at ``<comfy_root>/models/upscale_models/<filename>`` AND
@@ -59,6 +64,49 @@ ASSETS: "list[dict]" = [
         "license": "BSD-3-Clause",
         "notes": "Real-ESRGAN x2plus super-resolution weights; used by the "
                  "shipped `spandrel_esrgan` upscale engine.",
+    },
+    # ---------------------------------------------------------------------
+    # CANDIDATES (GO_FORWARD item E step a). Downloaded and identity-proven,
+    # wired to nothing. Each SHA below was NOT taken on faith from the
+    # download: the file was loaded through spandrel on CPU and its
+    # architecture, scale, channel count and block tags were read back and
+    # recorded beside it, the same rigour x2plus got. Pinning the hash of
+    # whatever happened to arrive would be circular; reading the architecture
+    # out of the weights is not.
+    #
+    # BOTH are the same ESRGAN / RRDBNet architecture the engine already
+    # loads, which is why they are here and the `realesr-*` v3 checkpoints
+    # are not: those are SRVGGNetCompact, a different architecture, and
+    # adopting one is part of the rotation design rather than a download.
+    {
+        "asset_id": "real-esrgan-x4plus",
+        "filename": "RealESRGAN_x4plus.pth",
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/"
+               "v0.1.0/RealESRGAN_x4plus.pth",
+        # VERIFIED 2026-08-17 through spandrel on CPU: ESRGAN, scale=4,
+        # 3->3 channels, purpose SR, tags ['64nf', '23nb'] -- the
+        # RealESRGAN_x4plus signature -- at 67,040,989 bytes.
+        "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+        "license": "BSD-3-Clause",
+        "notes": "CANDIDATE, not wired. The canonical x4 partner to the "
+                 "shipped x2plus: same architecture and block count "
+                 "(23nb), double the scale. The straight comparison for "
+                 "'does x4 in one pass beat x2 twice'.",
+    },
+    {
+        "asset_id": "real-esrgan-x4plus-anime-6b",
+        "filename": "RealESRGAN_x4plus_anime_6B.pth",
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/"
+               "v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+        # VERIFIED 2026-08-17 through spandrel on CPU: ESRGAN, scale=4,
+        # 3->3 channels, purpose SR, tags ['64nf', '6nb'] -- the six-block
+        # anime variant -- at 17,938,799 bytes.
+        "sha256": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da",
+        "license": "BSD-3-Clause",
+        "notes": "CANDIDATE, not wired. Six RRDB blocks instead of 23, so "
+                 "18 MB against 64 MB -- the cheapest candidate for the "
+                 "8 GB 4060 gate, and the one aimed at the illustrated and "
+                 "cartoon packs rather than the photoreal lanes.",
     },
 ]
 

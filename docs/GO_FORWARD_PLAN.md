@@ -100,8 +100,19 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (updated 2026-08-17, H-receipt close):** suite
-**10824 passed / 110 skipped / 1 xfailed** (10712 at the one-style-authority close
+**BASELINES to detect drift (re-measured 2026-08-17 late):** suite
+**10842 passed / 110 skipped / 1 xfailed**.
+
+> **THIS BLOCK SAID `10824` AND THE MEASURED NUMBER IS `10842` -- an 18-test gap
+> this file cannot account for.** Measured on a settled tree with a docs-and-
+> catalog-only change in it (item E's two pinned assets add no tests), so 10842
+> is the PRE-EXISTING count, not a delta this window created. Something landed
+> 18 tests without updating the receipt. **This is the second time in two days
+> the single-authority receipt has drifted from reality** -- it also said 10739
+> while the item B handoff said 10755. Re-measure before trusting it, and never
+> read the trailing `1` as a failure: it is an xfail.
+
+Earlier chain (10712 at the one-style-authority close
 -> 10717 with the five lumina input-convention tests -> 10739 with the 22
 style-traceroute VIDEO tests -> **10755 at the item B close** -> **10819 with item
 C's 64 overlay tests** -> **10824 with H-receipt's 5 negative-source tests**; no
@@ -684,8 +695,27 @@ finding; recipe-adjacent, so it needs the operator, not a driver decision.
    or `_laplacian_variance`. The operator's "lock them in the ledger" ask is the
    untested half.
 
-**E. Upscalers + the 4060 full-stack gate** (item 1.3) -- candidate downloads
-run in the BACKGROUND under anything above.
+**E. Upscalers + the 4060 full-stack gate** (item 1.3). **STEP (a) IS DONE
+2026-08-17 -- two candidates on disk, identity-proven, wired to nothing.**
+`RealESRGAN_x4plus` (ESRGAN, scale 4, tags `['64nf','23nb']`, 67,040,989 bytes)
+and `RealESRGAN_x4plus_anime_6B` (ESRGAN, scale 4, tags `['64nf','6nb']`,
+17,938,799 bytes), both BSD-3-Clause, both pinned by SHA in
+`scripts/ensure_upscale_models.py`, which now reports all three OK and exits 0.
+* **THE SHA WAS NOT TAKEN ON FAITH.** Each file was loaded through spandrel on
+  CPU and its architecture, scale, channel count and block tags read back and
+  recorded beside the pin -- the rigour x2plus got. Pinning the hash of whatever
+  arrived would certify the download, not the weights.
+* **THE `realesr-*` v3 CHECKPOINTS WERE DELIBERATELY LEFT OUT** (`x4v3`,
+  `animevideov3`; both exist, 4.7 MB and 2.4 MB). They are **SRVGGNetCompact,
+  a different architecture** from the RRDBNet/ESRGAN family the engine loads.
+  Adopting one is a design decision, not a download.
+* **STEPS (b) AND (c) REMAIN, AND (c) IS NOT MECHANICAL.** `SpandrelEsrgan` is
+  hard-pinned to ONE checkpoint -- `_model_filename`, `_model_sha256`,
+  `intrinsic_scale = 2` and a per-engine `commercial_clean` are all class
+  constants -- so "rotate the candidates through the existing stage" means
+  either an engine class per checkpoint or a parameterized engine, and the
+  cache fingerprint folds `declared_sha256`. That is a design fork with more
+  than one defensible answer, so it takes an arc; the downloads did not.
 
 **F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
 
