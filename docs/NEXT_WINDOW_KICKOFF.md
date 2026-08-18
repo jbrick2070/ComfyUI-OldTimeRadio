@@ -2,8 +2,8 @@
 
 resume the OTR build as a CODER window. Repo:
 `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`, branch
-`v2.0-alpha`, HEAD `75932b76` == origin. FIRST verify both repos are pushed --
-OTR `75932b76` == origin/v2.0-alpha and survival-guide `02e8bcb` == origin/main.
+`v2.0-alpha`, HEAD `42edb827` == origin. FIRST verify both repos are pushed --
+OTR `42edb827` == origin/v2.0-alpha and survival-guide `02e8bcb` == origin/main.
 Two `git ls-remote` calls.
 
 Read `docs/GO_FORWARD_PLAN.md` -- "HOW TO TALK TO THE OPERATOR", then "QUEUE
