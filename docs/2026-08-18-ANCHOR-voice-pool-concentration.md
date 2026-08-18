@@ -122,10 +122,24 @@ measurement, a few more episodes since.)
 
 ---
 
-## SEPARATE AND MORE URGENT: THE LEMMY RESERVATION DOES NOT COVER THIS PATH
+## SEPARATE: THE LEMMY RESERVATION DID NOT COVER THIS PATH -- FIXED IN `3a78703e`
 
-This is not a design fork. It is a live correctness defect with one right answer,
-and it reopens a row closed yesterday.
+> **STATUS CORRECTION (r1, 2026-08-18). THIS SECTION IS HISTORY, NOT OPEN WORK.**
+> The antigravity r1 lane read HEAD correctly and caught that this document had
+> not caught up with its own repo: everything below describes the defect as LIVE,
+> because the anchor was written BEFORE the fix landed. **It is fixed at HEAD.**
+> The reserved filter is now in `assign_voice_for_slot`
+> (`_otr_voice_bank.py:550-552`), `build_voice_cards` (`:706`),
+> `validate_voice_proposal`, and `gender_agnostic_fallback_ref` -- all three
+> pools plus the fallback -- with 18 tests in
+> `tests/test_lemmy_reserved_on_hybrid_path.py`. A third unguarded pool was found
+> by a Sonnet QA pass and fixed in the same commit. **Do not re-open it, do not
+> spend a round on it.** The section is kept because the CAUSE it documents (an
+> alphabetically-truncated fixed card list) is the same mechanism the live design
+> fork below is about -- Lemmy was card #1 for exactly the reason
+> `vz_bill_boerst` is.
+
+The text below is the original diagnosis, preserved as written.
 
 `reserved_voice_ref_ids()` is applied in exactly one place --
 `assign_voice_for_slot` (`_otr_voice_bank.py:528-531`). **Neither
@@ -230,8 +244,36 @@ the options behave differently:
    seed, candidate_ids, proposed_id, accepted_id, fallback_reason) is consumed at
    `cast_lock.py:688`. Not proposed here; listed so the panel prices it.
 
-Options 1-3 are not exclusive; 3 + a raised cap is the driver's current lean,
-because it fixes reachability and primacy with no new state and no ripped pass.
+~~Options 1-3 are not exclusive; 3 + a raised cap is the driver's current lean,
+because it fixes reachability and primacy with no new state and no ripped pass.~~
+
+> **THE LEAN DID NOT SURVIVE r1 (2026-08-18). Superseded -- see
+> `kibitz-runs/2026-08-18-voice-pool-concentration/r1/judgment.md`.**
+> * **Option 3 alone is not a fix.** The scorer is FLAT, so ties are the common
+>   case, and `build_voice_cards` breaks ties with `key=lambda e: e.voice_ref_id`
+>   (`:712`) -- an alphabetical secondary key returns today's order and leaves
+>   `vz_bill_boerst` at position 1. Ranking without a seeded tiebreak changes
+>   nothing.
+> * **Option 1 (raise the cap) is WITHDRAWN.** The 42% unreachability comes from
+>   alphabetically truncating a FIXED list, not from the cap. Rotate the
+>   shortlist per episode and every voice becomes reachable across episodes with
+>   the prompt still 12 cards long. Rotation subsumes the cap raise at zero token
+>   cost.
+> * **Option 4 (cross-episode use tracking) is WITHDRAWN.** Seeded rotation is
+>   stateless; recent-use tracking adds mutable cross-episode state to a pipeline
+>   that has none and fights the seed-reproducibility contract.
+> * **What replaces it:** seeded PER-EPISODE ROTATION of the card list, so the
+>   LLM's position bias becomes a variety driver rather than a concentration
+>   driver. `build_voice_cards` needs the slot's `timbre`/`role`/`age_band` plus
+>   `episode_seed`/`char_id`; `VOICE_FIT_POLICY_VERSION` bumps to `"2"` in the
+>   same change.
+> * **Implementation trap, measured:** `EnsembleSlot.timbre` is a `str` and the
+>   scorer does `set(timbre) & set(entry.timbre)`, so passing it unwrapped scores
+>   130 instead of 170 and silently no-ops timbre matching. Wrap it:
+>   `timbre=(ens.timbre,)`.
+> * **Still open into r2:** whether the hybrid pass earns its keep at all, given
+>   it may be a position-biased selector over a flat shortlist. Governed by the
+>   ledger rule if removal is ever chosen.
 
 **Everything above measures on CPU.** No GPU leg is needed to decide it.
 
