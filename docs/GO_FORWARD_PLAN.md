@@ -100,8 +100,8 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES to detect drift (re-measured 2026-08-17 late):** suite
-**10842 passed / 110 skipped / 1 xfailed**.
+**BASELINES (re-measured 2026-08-18):** suite
+**10913 passed / 110 skipped / 1 xfailed**.
 
 > **THIS BLOCK SAID `10824` AND THE MEASURED NUMBER IS `10842` -- an 18-test gap
 > this file cannot account for.** Measured on a settled tree with a docs-and-
@@ -279,53 +279,43 @@ first:
 > failure before assuming the token: a GUI-prompting helper and a bad
 > credential look nothing alike but report almost the same thing.
 
-### QUEUE STATE AT THE 2026-08-17 LATE CLOSE -- read this before the bodies below
+### QUEUE STATE AT THE 2026-08-18 CLOSE -- lean; this is the whole live list
 
-**DONE AND CLOSED:** 1, A, B, C, G (measured-not-built), H-RECEIPT, D-BIS 1,
-**E step (a)**, and **F** (coded, r1-r4, live-proven on shakespeare).
+**THE TITLE/IDENTITY FAMILY IS CLOSED AND PROVEN ON PIXELS.** PBUG-05 fixed,
+item I bisected, PBUG-04 built, title-provenance spec answered, and the GPU
+bank gate ran **4/4 banks PASS, 0 failed acceptance checks**, all published to
+`otr/obs/`: shakespeare announced *"a scene from Romeo and Juliet, by William
+Shakespeare, Act Two, Scene Two"*, public_domain *"The Jungle Book, by Rudyard
+Kipling"*. Instrument: `scripts/otr_title_identity_acceptance.py`.
 
-**THE OPEN LIST, and every one of these is a TITLE/IDENTITY defect or its
-receipt -- they are one family, not five errands:**
+**THE ONE ACTIVE ITEM IS THE VOICE IDENTITY FIX.** Spec is written, panelled
+and QA-corrected: `docs/2026-08-18-voice-identity-fix-ANCHOR.md` (eight `[QA-n]`
+corrections folded in; the first brief was a NO-GO). Build it, then prove the
+2x2 (line-vs-character seed x alpha 1.0 vs 0.4), then re-audition Lemmy.
+**Release gate: no release until a new Lemmy qualification and reproducible
+evidence exist.**
 
-| item | what it is | state |
-|---|---|---|
-| **I** | wrong-person `character_description` (Bible `11.61`) | r1 done, **premise inverted**: an accelerating regression, 6.8% Jul -> 50% Aug. **BISECT FIRST** |
-| **PBUG-20260817-04** | public_domain announcer invents a work title even when handed the real one | diagnosed, unfixed, needs a panel |
-| **PBUG-20260817-05** | harness run label becomes the on-screen title card | **fix decided** (see below), not built |
-| **title provenance** | append-only stamp chain so drift is catchable | spec written, reviewed right-sized |
-| **F residue** | public_domain leg FAILED; r4 never had the Codex lane | open |
-| **D / D-BIS 2-5 / D-TER** | static-audit findings awaiting a live observation | blocked |
+| item | state |
+|---|---|
+| **voice identity fix (PBUG-20260817-09)** | **SPEC READY, GO FOR CODING** |
+| PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
+| PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |
+| PBUG-20260817-08 | Lemmy cameo voice on 10.2% of all cast rows |
+| PBUG-20260817-07 | stage directions in captions -- **WILL-NOT-FIX** (operator ruling) |
+| 24 stale PBUGs | triaged ALREADY FIXED; close them out |
+| D / D-BIS 2-5 / D-TER | static-audit findings awaiting a live observation |
 
-**THE FIX FOR PBUG-05 IS DECIDED AND READY TO BUILD.** Panel recommendation (a),
-grounded by the driver: **remove `"--title", title` from `scripts/otr_gpu_soak_matrix.py`
-`leg()`** so the canonical workflow authors the title. Verified safe -- `leg()`
-correlates nothing by title (it detects success from `"RESULT SUCCESS"` in
-stdout) and no code reads the receipt's `title` key.
-* **AMENDMENT, and it matters:** the panel said "retain the leg label in the
-  receipt only". Doing exactly that leaves a receipt key NAMED `title` holding
-  something that is not the episode's title -- the same one-field-two-meanings
-  shape as Bible `12.110` and `11.61`. **Rename it `leg_label` and record the
-  ledger's real `episode_title` alongside it** in the same change.
-* **KNOWN COST, accepted:** soak legs will now run `_generate_title_from_script`,
-  an LLM call they have never made. That is what "mimic the entire workflow"
-  means and it closes a hole -- the soak has never exercised the title path every
-  real episode takes.
-* **THE CHEAPEST GUARD, take it regardless:** a headless run producing
-  `title_source == "user"` is a contradiction on its face. One assertion on the
-  output ledger would have caught all 17 published harness titles the day they
-  landed.
-
-**OPERATOR CONSTRAINTS SET THIS SESSION -- disqualifying, not advisory:**
-1. **`otr/obs/` publication may never be reduced, gated or relocated.** It is how
-   he reads success. A tidy-up was tried and reverted within minutes.
-2. **An automated run is a REAL EPISODE, start to finish** -- same code, same
-   canonical graph, ending in a published artifact. Testing one part is his
-   explicit exception to request, never one a fix imposes.
-3. **No saved harness graphs.** Every run regenerates from
-   `workflows/otr_canonical.json`. A fix may add a run-time PARAMETER; it may
-   never add a stored workflow.
-4. **A missing reviewer never blocks an arc** -- substitute Fable/Sonnet/Opus/
-   roundtable and state the roster honestly.
+**THREE FACTS THAT COST REAL TIME -- do not relearn them:**
+* **The models root is `C:\ComfyUI-Models`, not `ComfyUI\models`.** A
+  "162 of 206 voice refs are missing" claim was wrong-root error, retracted in
+  `f2eeb6fd`. Every ref resolves and hash-matches.
+* **A green suite can prove a fix fails SAFELY, not that it works.** A guarded
+  fix raised `NameError` on every episode and all 10,905 tests still passed.
+  Test the PRODUCT, not the absence of an exception.
+* **ONE FIELD, TWO MEANINGS is the dominant defect shape here** -- four
+  sightings in one day (`work_title`, the soak receipt's `title`,
+  `title_source`, and `lines[].text` spoken-vs-displayed). Gate on the LANE,
+  never on truthiness.
 
 **A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17
 (`PBUG-20260817-02`, Bible `12.109`). Receipts in `HANDOFF_LOG.md`. What still
