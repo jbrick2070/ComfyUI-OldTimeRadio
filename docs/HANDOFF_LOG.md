@@ -3,6 +3,77 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 LATE (title/identity window) -- HEAD 75932b76 +this (v2.0-alpha) -- CODER (item F shipped and live-proven; Bible 11.61 + 12.110 promoted; item I r1 inverted its own premise; the title-card defect traced, confirmed twice, and its fix decided; kibitz hardened and pushed public)
+
+**ITEM F IS DONE AND PROVEN ON PIXELS.** The wrong-play announcer frame: the
+adapted work's title was never threaded to the announcer while the pack seam
+ordered it to name "the play-world place", so it invented one. Fixed by
+threading `work_title` to BOTH producers and the outline, rendered as
+`WORK: a scene from <title>` by a pure helper. Live leg drew The Tempest and the
+announcer said *"Tonight, we bring you Shakespeare's 'The Tempest', where
+Prospero and Miranda brace against a gathering storm"* -- right play, only the
+locked cast, no other manifest title anywhere, **and the I.4.9 rewrite producer
+fired and the fix still held**, which was the likeliest silent undo.
+
+**THE SECOND LEG FAILED AND SPLIT THE VERDICT.** public_domain announced *"'The
+Adventure of the Purloined Paper'"* -- a work that does not exist -- while the
+prompt correctly carried `WORK: a scene from Nonsense Novels`. **The fix worked
+and the model ignored it**, which is a DIFFERENT root: supplying the fact is
+necessary and not sufficient. Logged `PBUG-20260817-04`, unfixed on purpose --
+the seam has said "invent none" the whole time, so guessing at wording is the
+mechanism this item already disproved.
+
+**THE ARC CAUGHT THREE DRIVER ERRORS, TWO OF THEM BUILD-BREAKERS.** r1 killed a
+candidate fix I tabled off a docstring keyword. r2 caught an `UnboundLocalError`
+that would have killed four of six banks -- my diff plan read a module imported
+inside a `provenance_normalize` branch. r3 caught the `media_archive` collision:
+I claimed every non-adaptation lane yields an empty title; 56 of 98 live ledgers
+carry a publisher there, so the announcer would have said "a scene from Now See
+Hear!" on 57% of a live lane. **Sonnet CLEARED that lane by reading the producer;
+Pro 3.1 CAUGHT it by reading the consumer; the corpus decided.** Promoted as
+Bible `12.110`.
+
+**ITEM I's r1 INVERTED ITS OWN PREMISE.** Opus measured, and the driver
+re-derived independently: among pitch-bearing ledgers the wrong-person
+description ran **6.8% in July and 50% in August**. Not a stable background rate
+-- an accelerating regression, so **the first move is a BISECT, not a fix.** Also
+established: my marquee symbol `build_description_prompt` DOES NOT EXIST (it is
+`_build_user_prompt`); my second detector was bogus (a bare name-shape test
+returns 765 ledgers because the contract's own role slot legitimately holds
+Title-Case prose); "fourteen baked copies" is ONE episode; and **the wrong name
+is SPOKEN ALOUD in 18 of 31 affected episodes** -- one shipped line has a
+character addressing herself by the other name. Option A is dead (continuity runs
+after the damage, on the corrupted rows); option C is reopened (my dismissal
+cited a rule this defect's own PBUG excludes).
+
+**THE OPERATOR CAUGHT THE TITLE CARDS FROM THE PIXELS.** Published episodes whose
+hero card read `CHUNKB ACCEPT FORCED LEMMY` and `SOAK05 SCIFI_NEWS_PRO`. Traced
+to one line -- `if resolved["episode_title"]:` in `_run_writer_tail`, comment
+*"User typed a value; respect it verbatim."* The box only asks "is it empty",
+cannot tell a person's title from a harness label, and that string becomes the
+card, filenames, folder, ledger name, treatment, canon, credits and the obs
+artifact. **Nothing is malfunctioning**; the contract never made the distinction.
+Confirmed by a BLIND independent trace that landed on the same line, the same
+branches, the same eight surfaces and the same verdict.
+
+**I WAS WRONG ABOUT obs, AND HE CORRECTED IT FAST.** Reading 17 harness runs in
+`otr/obs/` as pollution, I moved them to a `_diagnostics/` subfolder. They were
+his proof the full path ran: *"a test is not complete unless published to obs...
+if I see it in obs then it's somewhat a success"*, plus *"if I don't see it in
+obs and it took more than 5 minutes it's a fail."* All 17 restored, nothing
+deleted, and the rule is now hard in `CLAUDE.md`. **The complaint was cosmetic
+and I took a folder-level action on his deliverables.**
+
+**KIBITZ HARDENED AND PUSHED PUBLIC** (`jbrick2070/kibitz` `0c6b584`): a blind
+review now FAILS the leg structurally (`unreadable_review_diagnostic`), every
+file-handoff agent must prove its tools first and write `TOOL CHECK: FAIL`
+instead of a review, `--check-pins` catches a stale model pin at install, and the
+agy lane was refreshed 3.6 -> 3.7 Flash with the print timeout 5m -> 15m. **A
+timeout is NOT a quota block.** Note `kibitz/` is a NESTED git repo, so its
+commits never appear in OTR history.
+
+**Suite 10860 / 110 / 1xfail. Bible 20/26/3 at 289 entries.**
+
 ## 2026-08-17 (item F window) -- HEAD 87dee50d +this (v2.0-alpha) -- CODER (Bible 11.61 promoted; item E step a; item F coded, four-round arc, Fable gate, Sonnet QA, and PROVEN ON A LIVE LEG; three driver errors caught by the panel, two of them build-breakers)
 
 **THE WRONG-PLAY FRAME IS FIXED AND PROVEN ON PIXELS, and the plan's own

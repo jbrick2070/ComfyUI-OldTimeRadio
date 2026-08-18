@@ -117,9 +117,10 @@ Earlier chain (10712 at the one-style-authority close
 style-traceroute VIDEO tests -> **10755 at the item B close** -> **10819 with item
 C's 64 overlay tests** -> **10824 with H-receipt's 5 negative-source tests**; no
 regressions at any step, and each delta equals exactly the tests added). Bible
-**20 / 26 / 3**, and the Bible holds **288** entries (`12.109` promoted for
+**20 / 26 / 3**, and the Bible holds **289** entries (`12.109` promoted for
 PBUG-20260817-02; **`11.61` promoted 2026-08-17 for PBUG-20260817-03**,
-survival-guide `ff0eb13`; item C and H-receipt promoted NOTHING -- see their
+survival-guide `ff0eb13`; **`12.110` promoted 2026-08-17 for item F**,
+survival-guide `02e8bcb`; item C and H-receipt promoted NOTHING -- see their
 bodies).
 
 > **CHECK THE DELTA, NOT YOUR RECOLLECTION.** H-receipt's write-up first said "six
@@ -277,6 +278,54 @@ first:
 > code.** It is two `git ls-remote` calls. If a push ever fails again, read the
 > failure before assuming the token: a GUI-prompting helper and a bad
 > credential look nothing alike but report almost the same thing.
+
+### QUEUE STATE AT THE 2026-08-17 LATE CLOSE -- read this before the bodies below
+
+**DONE AND CLOSED:** 1, A, B, C, G (measured-not-built), H-RECEIPT, D-BIS 1,
+**E step (a)**, and **F** (coded, r1-r4, live-proven on shakespeare).
+
+**THE OPEN LIST, and every one of these is a TITLE/IDENTITY defect or its
+receipt -- they are one family, not five errands:**
+
+| item | what it is | state |
+|---|---|---|
+| **I** | wrong-person `character_description` (Bible `11.61`) | r1 done, **premise inverted**: an accelerating regression, 6.8% Jul -> 50% Aug. **BISECT FIRST** |
+| **PBUG-20260817-04** | public_domain announcer invents a work title even when handed the real one | diagnosed, unfixed, needs a panel |
+| **PBUG-20260817-05** | harness run label becomes the on-screen title card | **fix decided** (see below), not built |
+| **title provenance** | append-only stamp chain so drift is catchable | spec written, reviewed right-sized |
+| **F residue** | public_domain leg FAILED; r4 never had the Codex lane | open |
+| **D / D-BIS 2-5 / D-TER** | static-audit findings awaiting a live observation | blocked |
+
+**THE FIX FOR PBUG-05 IS DECIDED AND READY TO BUILD.** Panel recommendation (a),
+grounded by the driver: **remove `"--title", title` from `scripts/otr_gpu_soak_matrix.py`
+`leg()`** so the canonical workflow authors the title. Verified safe -- `leg()`
+correlates nothing by title (it detects success from `"RESULT SUCCESS"` in
+stdout) and no code reads the receipt's `title` key.
+* **AMENDMENT, and it matters:** the panel said "retain the leg label in the
+  receipt only". Doing exactly that leaves a receipt key NAMED `title` holding
+  something that is not the episode's title -- the same one-field-two-meanings
+  shape as Bible `12.110` and `11.61`. **Rename it `leg_label` and record the
+  ledger's real `episode_title` alongside it** in the same change.
+* **KNOWN COST, accepted:** soak legs will now run `_generate_title_from_script`,
+  an LLM call they have never made. That is what "mimic the entire workflow"
+  means and it closes a hole -- the soak has never exercised the title path every
+  real episode takes.
+* **THE CHEAPEST GUARD, take it regardless:** a headless run producing
+  `title_source == "user"` is a contradiction on its face. One assertion on the
+  output ledger would have caught all 17 published harness titles the day they
+  landed.
+
+**OPERATOR CONSTRAINTS SET THIS SESSION -- disqualifying, not advisory:**
+1. **`otr/obs/` publication may never be reduced, gated or relocated.** It is how
+   he reads success. A tidy-up was tried and reverted within minutes.
+2. **An automated run is a REAL EPISODE, start to finish** -- same code, same
+   canonical graph, ending in a published artifact. Testing one part is his
+   explicit exception to request, never one a fix imposes.
+3. **No saved harness graphs.** Every run regenerates from
+   `workflows/otr_canonical.json`. A fix may add a run-time PARAMETER; it may
+   never add a stored workflow.
+4. **A missing reviewer never blocks an arc** -- substitute Fable/Sonnet/Opus/
+   roundtable and state the roster honestly.
 
 **A. ENGINE INPUT-CONVENTION CONFORMANCE AUDIT -- DONE 2026-08-17
 (`PBUG-20260817-02`, Bible `12.109`). Receipts in `HANDOFF_LOG.md`. What still
