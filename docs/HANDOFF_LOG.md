@@ -3,6 +3,99 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-18 LATE -- HEAD 49a90266 +handoff (v2.0-alpha) -- CODER (emotion ceiling 0.560 shipped and closed; a 4-iteration scifi_news_pro closing-segment defect found and fixed, kibitz caught the real root cause after two solo misses; Bible +3; plan cleaned up)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit.
+
+Did: **Emotion ceiling 0.560 shipped and CLOSED, do not re-open.**
+`EMO_ALPHA_DEFAULT` -> 1.0 (pass-through), `EFFECTIVE_EMOTION_MASS_CAP` -> 0.56.
+Lemmy re-qualified: route `lemmy-indextts2-algenib-cockney-v2`, record
+`prod-audition-2026-08-18`, fingerprint `9bee950a7920fd00`. Closed on a
+blinded 3-arm listen: seed fix won 3-0 cleanly, ceiling won 2-1, operator
+settled the tie-break himself ("I dont like the real emo ones"). Proved on a
+live 3-act episode, published: `signal_lost_the_searing_relay_20260818_094723`
+-- 20/21 character lines through indextts2 at the shipped settings, both
+characters held one seed across every line, zero drift.
+
+**PBUG-20260818-01 (scifi_news_pro closing segment) FOUND, FIXED, LIVE-
+VERIFIED -- 4 render iterations, 2 of which disproved the fix before them,
+full honest chain in `PROD_BUG_LOG.md`.** Root cause, found by a SCOPED kibitz
+round (antigravity r3) after two solo attempts missed it: the script-writer's
+own prompt dumped a downstream pass's finished factual output into its
+context while telling it never to state a fact -- a small local model does
+not reliably resist a fact sitting in its own context. Live-proven both
+directions: `signal_lost_the_borrowed_voice_20260818_115506` shows the CODA
+echoing the news read almost verbatim (pre-fix); `signal_lost_the_last_
+reading_20260818_122159` shows zero leakage (post-fix), published. Same
+"who found it, end on a thought" shape applied to `media_archive` per
+operator's direct ask -- unit-tested, NOT yet live-verified.
+
+Bug Bible: +3 entries this session, 289 -> 292 (both README and coverage
+index updated in the same commits). 12.111 (audition instrument overwrites
+evidence its own record cites by hash), 12.112 (sequential blinded-arm loop
+must reset env state totally, not incrementally), 12.113 (a downstream pass's
+finished output fed back as context to an earlier pass explicitly forbidden
+from producing it). All three admitted per the live-observation rule --
+verified on real renders, not diagnosed-only.
+
+Standing rule change: **never report a context percentage.** Two bad
+estimates this session (one off by ~65 points, one that ended a window with
+half its room left) -- replaced with a hard ban in `GO_FORWARD_PLAN.md` and
+memory. The rest of the "say what you need" rule stands: name the ask in one
+line, or say nothing is needed.
+
+`GO_FORWARD_PLAN.md` compressed: removed 534 lines of a fully-superseded
+section that violated the file's own "DONE does not belong here" rule (full
+text preserved in git history at any commit before `49a90266`). The rest was
+checked and left alone -- it is already-distilled standing knowledge, not
+bloat.
+
+Gates run this session: OTR full suite **11028 passed, 110 skipped, 1
+xfailed** (verified after the last Python change; only docs/YAML changed
+after that point). Bug Bible regression (Bible repo's own suite) **20 passed,
+26 skipped, 3 xfailed**, run after both new entries landed. Both repos
+verified HEAD == origin before this handoff.
+
+Box state at handoff: VRAM at baseline (~2.1 GB), GPU idle. One ComfyUI
+server process is still resident on port 51202 from the last render leg --
+this is the documented "finished but resident" behavior (section 5,
+project CLAUDE.md), not a crash; `otr_headless_canonical.ps1`'s own
+selective reset will clean it on the next boot regardless. A second,
+unrelated server on port 8199 (`vram-recipe-lab`) predates this session and
+was never touched.
+
+Current step: the voice-identity and emotion-ceiling family, and
+PBUG-20260818-01, are ALL CLOSED -- do not re-open any of them. Queue top is
+now open between two items with no operator ordering between them yet: the
+cross-engine audition overwrite guard, and PBUG-20260817-08 (Lemmy cameo
+voice on 10.2% of all cast rows).
+
+Next: take the queue's topmost open item. THREE task chips are already
+spawned and pre-scoped -- check for them before writing a fresh brief for any
+of: (1) the cross-engine audition overwrite guard, (2) the scifi_news_pro
+news_read character-name hallucination (retry-ladder exhaustion, unrelated to
+the now-fixed CODA leak), (3) nothing chip-scoped yet for the media_archive
+live-verification gap -- that one is a single render leg, cheap enough to just
+run.
+
+Models: Sonnet 5 drove this whole window (mid-session switch from Opus 5,
+operator-initiated; unrelated to the render pipeline, which uses local models
+per project scope). Kibitz: local lanes were DOWN for the first half of the
+session (codex not installed on this box, antigravity 429-quota-held) --
+substituted per the 2026-08-17 directive with `/anthropic-skills:roundtable`
+(R1 + R2 only, reported honestly as a partial campaign, not a full arc) for
+the emotion-ceiling design fork. Antigravity recovered mid-session; ran ONE
+scoped single-round kibitz check (r3, antigravity, NOT a full arc -- a
+correctness check on an in-flight diff, not a design fork) for the coda fix,
+and it found the actual root cause after two solo passes had missed it.
+
+Commits: OTR repo, `d910b4ae`..`49a90266` (8): `fcfe445a` `dc4c6131`
+`5a02740b` `33943145` `04f69d75` `f342c65f` `abd28209` `49a90266`. Bible repo,
+`64c5f0b`..`1a2a715` (3): `64c5f0b` `34fddc1` `1a2a715`. The handoff commit
+itself lands on top of `49a90266` and is not listed here -- see the kickoff
+line below for the real head.
+
 ## 2026-08-18 (emotion-ceiling window) -- HEAD d910b4ae +this (v2.0-alpha) -- CODER (0.560 shipped as ONE knob; Lemmy re-qualified on a live 3-arm render; Bible 12.111 promoted; a listen is owed on the NEUTRAL lines)
 
 **THE EMOTION BLEND IS NOW ONE KNOB AND HE SET ITS VALUE.** On the log-odds

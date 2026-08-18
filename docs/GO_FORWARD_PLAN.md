@@ -336,13 +336,15 @@ not an open measurement.
   a small local model does not reliably resist a fact sitting in its own context. Fixed by
   excluding `news_close_read` from that one prompt-build call. `media_archive` got the same
   "who found it + end on a thought" shape but is NOT yet live-verified |
-| cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal |
+| cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal. A spawned task chip already scopes this fully -- check for it before writing a fresh brief |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
 | PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |
 | PBUG-20260817-08 | Lemmy cameo voice on 10.2% of all cast rows |
 | PBUG-20260817-07 | stage directions in captions -- **WILL-NOT-FIX** (operator ruling) |
 | 24 stale PBUGs | triaged ALREADY FIXED; close them out |
 | D / D-BIS 2-5 / D-TER | static-audit findings awaiting a live observation |
+| scifi_news_pro news_read hallucinated character names | OPEN -- retry-ladder exhaustion (2 attempts) on a factual pass that invented "Dr. Sharon Hame, Laura Goodkind". A spawned task chip already scopes this fully; unrelated to the fixed CODA-leak defect |
+| media_archive coda shape fix | Unit-tested only, NOT live-verified -- same "who found it + end on a thought" shape as scifi_news_pro's fix, applied to `_otr_media_archive_interpreter.py`. Needs one live `media_archive` render leg |
 
 **THREE FACTS THAT COST REAL TIME -- do not relearn them:**
 * **The models root is `C:\ComfyUI-Models`, not `ComfyUI\models`.** A
