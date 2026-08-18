@@ -126,12 +126,25 @@ episode (THE LAW: an audit may improve a story, never fail one):
   names; a second vocabulary is a second authority, which is the shape behind
   three separate defects logged this week.
 
-## Open, for the trace to answer
+## Open questions -- ANSWERED 2026-08-17 (title/identity window), at the files
 
-1. Every symbol that writes a title today (the in-flight trace enumerates these).
-2. Whether the harness label should stamp as `"user"` or gain its own
-   `"harness_label"` source -- the latter makes "is this a real episode" a field
-   lookup rather than a vocabulary guess.
-3. Whether `title` (the other field the operator named) is a distinct value or an
-   alias of `episode_title` -- **not proven yet**, and it decides whether this
-   block tracks one value or two.
+1. **The writer symbols.** One stored authority: `OTR_LedgerScriptWriter`'s J.5
+   block in `_run_writer_tail` stamps `meta.episode_title` + `meta.title_source`
+   (branches: widget/`user`, `ctx.final_title_override` via
+   `_title_source_for_custom_override`, `_generate_title_from_script` /
+   `llm_post_composition`, `outline_fallback`). No other writer exists today.
+2. **MOOT AFTER PBUG-20260817-05 (fixed `e21b27ba`).** The soak no longer passes
+   `--title`, `otr_writer_bank_gate.py` never did, and the harness receipt now
+   flags `title_source == "user"` on a headless run. No harness label reaches
+   the title path, so no `"harness_label"` source name is needed -- keep the
+   single vocabulary. (`otr_macbeth_probe.py` still stamps a probe label into a
+   PROBE meta dict -- an isolated fixture, not the canonical path.)
+3. **`title` is a READ chain, not a second authored value.**
+   `nodes/video_engine.py` resolves the on-screen title through five slots
+   (`led.meta.episode_title` -> `led.meta.title` -> `led.title` ->
+   widget -> timestamp); slots 2-3 are unstamped compatibility fallbacks with
+   no writer. **So the provenance block tracks ONE value.** Trap for a future
+   grep: `video_engine` computes a LOG-ONLY local `_title_source` with its own
+   vocabulary for its `TITLE_TRACE` line -- it is never written to the ledger
+   and is not a second authority. Stamp at the WRITER; the renderer's chain
+   belongs in the drift ledger as "which slot was read", if at all.
