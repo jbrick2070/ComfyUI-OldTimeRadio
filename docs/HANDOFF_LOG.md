@@ -3,6 +3,83 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-18 (emotion-ceiling window) -- HEAD d910b4ae +this (v2.0-alpha) -- CODER (0.560 shipped as ONE knob; Lemmy re-qualified on a live 3-arm render; Bible 12.111 promoted; a listen is owed on the NEUTRAL lines)
+
+**THE EMOTION BLEND IS NOW ONE KNOB AND HE SET ITS VALUE.** On the log-odds
+ladder (alpha pinned 1.0, only the ceiling varying) he ruled *"IF I WERE A KID
+I'D LIKE MORE BUT AS AN ADULT ARM0P560 IS PERFECT"*, and of the uncapped arm
+*"its not a real emtion ist coimputer emoption"*. Shipped:
+`EMO_ALPHA_DEFAULT` 0.4 -> **1.0**, `EFFECTIVE_EMOTION_MASS_CAP` 0.4 -> **0.56**.
+
+**THE KNOB INTERACTION WAS REAL.** Alpha binds BEFORE the ceiling, so setting
+the ceiling alone would have delivered 0.400 on a neutral line and 0.374 on the
+emotional one -- neither is the rung he approved. Alpha is kept (not deleted) as
+a diagnostic override that still keys the cache; the profile declares it at 1.0
+and deliberately declares NO `emo_mass_cap`, because the adapter resolves the
+ceiling and a second apparent authority that silently does nothing is the
+evidence-shaped field this repo refuses everywhere else.
+
+**RE-QUALIFIED ON A LIVE RENDER.** Route `lemmy-indextts2-algenib-cockney-v2`,
+record `prod-audition-2026-08-18`, fingerprint **9bee950a7920fd00**, manifest
+`otr/episodes/lemmy_production_audition_ceiling_2026-08-18/MANIFEST.json`
+sha256 `344ccdf8...0acff1`. Measured on the shipped arm: **0.5600 / 0.5590 /
+0.5600**, speaker retained 0.4400-0.4410. The 2026-08-10 record is preserved
+verbatim under `superseded_native_routes` and is deliberately unreadable by any
+selector.
+
+**WHAT IS OWED, AND IT IS A LISTEN, NOT A BUILD.** The ladder rendered the
+EMOTIONAL line only. Across 57 character lines sampled from the six most recent
+ledgers, **56 of 57 are calm-dominated** -- neutral delivery is what ordinary
+dialogue actually sounds like, and a neutral beat is where the original identity
+defect lived. Going 0.400 -> 0.560 hands back ~40% of the displacement the
+voice-identity fix removed, on exactly those lines. A blinded three-arm audition
+is rendered and waiting with `LISTEN.html`: **armY = shipped, armZ = same seed
+policy with the ceiling DISABLED, armX = full pre-fix**. If the neutral lines
+read wrong, the ceiling is one constant away from another rung.
+
+**FOUR THINGS THE PANEL CAUGHT THAT WOULD HAVE SHIPPED BROKEN:**
+* **An env-contamination bug the panel's OWN earlier advice would have caused.**
+  R1 said the shipped arm should "clear" its overrides; `_render_arm` applied
+  env INCREMENTALLY and the arms render in a SHUFFLED order, so a cleared arm
+  would inherit the previous arm's ceiling and be recorded as "shipped". Fixed
+  by popping every arm-controlled key first. **Proven live:** armX ran first
+  with cap=8 and armY still resolved 0.56.
+* **A profile key that would have been decoration.** Adding `emo_mass_cap` to
+  `default_params` has no runtime effect -- nothing reads the profile for it.
+* **Docstrings move the fingerprint too.** `live_engine_impl_version` sha256s
+  the WHOLE file, so prose edits must be frozen before rendering, not after.
+* **`zip(lines, captured)` silently truncated a partial arm**, so a two-of-three
+  render would have produced a manifest describing a complete arm that never
+  happened -- under a sha256 the record then cites.
+
+**BIBLE 12.111 PROMOTED** (pushed, `64c5f0b`): *an instrument that overwrites
+the evidence its own record cites by hash*. Coverage-index row added and its
+stale header refreshed (276 -> 290). **Its verify step 3 leaves one sibling
+open:** `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is
+cited by sha256 in THREE provisional records. It is deliberately RESUMABLE, so
+it needs an `--out-dir` flag plus a citation check -- not the blanket refusal
+the production audition got.
+
+**REVIEW PROVENANCE, STATED HONESTLY: THIS WAS NOT A FULL FOUR-ROUND ARC.**
+Both local kibitz lanes were down -- codex is not installed on this box and
+antigravity returned `RESOURCE_EXHAUSTED (429)` at the account level for every
+model -- so per the 2026-08-17 substitution directive the seats were filled with
+`/anthropic-skills:roundtable`. **R1** (gpt-5.6-sol + gemini-3.1-pro; deepseek
+returned empty on both attempts) and **R2** (those two + grok-4.3) ran. **R3's
+wiring question was answered by direct verification rather than by a round** --
+`emo_alpha`/`emo_mass_cap` are not workflow widgets; `indextts2` appears in
+`otr_canonical.json` only as the engine value on nodes 80 and 81, so there is no
+JSON change in this item. **R4 was not run.** Artifacts and judgments:
+`docs/2026-08-18-emotion-mass-single-knob/roundtable/`. Panel spend ~$0.42.
+
+**TWO TOOLING GOTCHAS WORTH NOT RELEARNING:**
+* **A regenerated `.kibitz/comfyui.local.md` can kill every reviewer.** The
+  fresh scrape was 134 KB (100 KB of it a "heavy imports" listing), which pushed
+  agy's argv past the Windows 32 KB `CreateProcess` limit -- `WinError 206`,
+  before any model read a word. Trimmed to 11.8 KB.
+* **The ladder that produced the decisive evidence has no generator in the
+  tree.** The clips and MANIFEST survive, but the script that made them is gone.
+
 ## 2026-08-17 LATE (title/identity window) -- HEAD 75932b76 +this (v2.0-alpha) -- CODER (item F shipped and live-proven; Bible 11.61 + 12.110 promoted; item I r1 inverted its own premise; the title-card defect traced, confirmed twice, and its fix decided; kibitz hardened and pushed public)
 
 **ITEM F IS DONE AND PROVEN ON PIXELS.** The wrong-play announcer frame: the

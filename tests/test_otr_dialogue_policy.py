@@ -82,6 +82,13 @@ def test_the_indextts2_route_is_approved_and_carries_its_receipt():
     as Indian rather than Cockney, which is the floor-evidence failure evidenced
     properly instead of inferred from its filename.
 
+    RE-AUDITIONED 2026-08-18 (`prod-audition-2026-08-18`). The voice-identity
+    fix and then the emotion-ceiling change both moved the code that renders
+    him, so the August record was withdrawn on its runtime fingerprint and a
+    new blinded audition was run through the PRODUCTION dispatch. The old
+    record is preserved verbatim under `superseded_native_routes`; this test
+    reads the CURRENT one.
+
     So the assertion flips, but the thing being protected does not: a route may
     only be here WITH the receipt that earned it. `is_qualified_route` is the
     cheap legacy helper and may never authorize a selected route on its own --
@@ -97,7 +104,7 @@ def test_the_indextts2_route_is_approved_and_carries_its_receipt():
         "its own support ticket")
     receipt = route["qualification_receipt"]
     assert receipt["operator_verdict"].startswith("PASS")
-    assert receipt["audited_on"] == "2026-08-10"
+    assert receipt["audited_on"] == "2026-08-18"
     assert receipt["identity_id"] == "idx_lemmy_algenib_cockney_v1"
 
 

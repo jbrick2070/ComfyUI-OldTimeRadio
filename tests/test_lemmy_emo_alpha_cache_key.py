@@ -133,8 +133,11 @@ def test_the_unset_env_default_is_the_re_anchored_alpha(monkeypatch):
     from nodes._otr_audio_engines.eng_indextts2 import EMO_ALPHA_DEFAULT
 
     monkeypatch.delenv("OTR_INDEXTTS2_EMO_ALPHA", raising=False)
-    assert EMO_ALPHA_DEFAULT == 0.4
-    assert get_engine("indextts2").current_emo_alpha() == 0.4
+    # 0.4 -> 1.0 on 2026-08-18: alpha and the ceiling used to share one job and
+    # the ceiling now owns it alone, so alpha is a pass-through. This is NOT a
+    # return to the pre-fix build, which was alpha 1.0 with no ceiling at all.
+    assert EMO_ALPHA_DEFAULT == 1.0
+    assert get_engine("indextts2").current_emo_alpha() == 1.0
 
 
 def test_the_alpha_is_normalized_to_the_resolution_the_key_keeps(monkeypatch):

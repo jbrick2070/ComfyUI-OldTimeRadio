@@ -350,29 +350,105 @@ def _vector(**weights):
 
 
 def test_the_neutral_line_now_keeps_most_of_the_character():
-    """b005's shape: `calm=1.0`, which at alpha 1.0 left NOTHING of the speaker.
+    """b005's shape: `calm=1.0`, which at alpha 1.0 and NO ceiling left nothing
+    of the speaker at all.
 
     `1 - effective_mass` is the share of his own emotional embedding that
     survives, so this asserts the fix in the units the defect was measured in.
+    Asserted against the CONSTANT, not a literal: the ceiling is a taste
+    setting the operator moves by ear, and a test that hardcodes today's number
+    fails for the wrong reason the next time he picks a different rung.
     """
     payload = get_engine("indextts2").emotion_payload(_vector(calm=1.0))
 
-    assert payload["effective_mass"] == pytest.approx(0.4)
-    assert 1.0 - payload["effective_mass"] == pytest.approx(0.6)
+    assert payload["effective_mass"] == pytest.approx(
+        EFFECTIVE_EMOTION_MASS_CAP)
+    assert 1.0 - payload["effective_mass"] == pytest.approx(
+        1.0 - EFFECTIVE_EMOTION_MASS_CAP)
+    assert payload["effective_mass"] < 1.0, "the speaker was fully displaced"
 
 
 def test_the_cap_is_applied_AFTER_alpha_never_before():
     """[QA-3 / D] Capping the raw vector first and letting alpha scale the
-    capped result would soften the delivery TWICE -- `0.4 * 0.4 == 0.16` -- and
-    quietly flatten every performance to make the arithmetic tidy."""
+    capped result would soften the delivery TWICE.
+
+    PROVED AT A NON-DEFAULT ALPHA ON PURPOSE. The shipped alpha is 1.0, and
+    scaling by 1.0 commutes with the ceiling -- both orders give 0.56, so the
+    default path cannot tell them apart and a test written there would assert
+    nothing. At alpha 0.4 the two orders diverge: cap-after-alpha gives
+    `min(0.4, 0.56) == 0.4`, cap-before-alpha would give `0.56 * 0.4 == 0.224`.
+    """
     payload = get_engine("indextts2").emotion_payload(
-        _vector(calm=1.0), alpha=EMO_ALPHA_DEFAULT)
+        _vector(calm=1.0), alpha=0.4)
 
     assert payload["effective_mass"] == pytest.approx(0.4)
-    assert payload["effective_mass"] != pytest.approx(0.16)
+    assert payload["effective_mass"] != pytest.approx(0.224)
     assert payload["mass_capped"] is False, (
-        "alpha alone already landed on the ceiling -- the cap must not fire "
+        "alpha alone already landed under the ceiling -- the cap must not fire "
         "again on top of it")
+
+
+def test_the_shipped_defaults_are_the_operators_chosen_rung():
+    """The two constants, asserted where a reader will look for them.
+
+    0.560 is the rung the operator picked by ear on the log-odds ladder, and
+    alpha is pinned at 1.0 so the ceiling is the only thing that decides the
+    blend. A silent drift in either would change every character's voice.
+    """
+    assert EMO_ALPHA_DEFAULT == 1.0
+    assert EFFECTIVE_EMOTION_MASS_CAP == 0.56
+
+
+def test_the_profile_default_agrees_with_the_adapter():
+    """The YAML is a cache-key declaration, not an authority -- but a profile
+    that disagreed with the adapter would put a value in the key that no render
+    ever used, and would mislead every reader of the file."""
+    from nodes._otr_engine_profiles import load_resolver
+
+    profile = load_resolver().get("char_indextts2_v1")
+
+    assert profile.default_params["emo_alpha"] == EMO_ALPHA_DEFAULT
+    assert "emo_mass_cap" not in profile.default_params, (
+        "the ceiling is resolved by the adapter; declaring it here would be a "
+        "second apparent source of truth that silently does nothing")
+
+
+def test_a_production_derived_vector_binds_at_the_ceiling():
+    """The shipped case, on real derived text rather than a hand-built vector.
+
+    Every character line sampled from recent episodes summed above the ceiling,
+    so this is what ordinary dialogue does: it lands ON the cap.
+    """
+    from nodes._otr_delivery_vector import deterministic_delivery_vector
+
+    vector = deterministic_delivery_vector(
+        "Don't you touch that dial! I've been chasing this frequency for six "
+        "hours and I'll not lose it now!", 0.8)
+    payload = get_engine("indextts2").emotion_payload(vector)
+
+    assert payload["mass_capped"] is True
+    assert payload["effective_mass"] <= EFFECTIVE_EMOTION_MASS_CAP
+    assert payload["effective_mass"] > EFFECTIVE_EMOTION_MASS_CAP - 0.01
+
+
+def test_a_below_ceiling_vector_passes_through_untouched():
+    """A ceiling is a MAXIMUM, not a target. Uniform mass is what the sampled
+    lines happen to do, never a requirement -- a quiet vector must keep its own
+    smaller budget rather than being pushed up to the cap.
+
+    "Untouched" means relative to `sanitize_delivery_vector`, which legitimately
+    clamps, rounds to three decimals and fills the missing keys.
+    """
+    from nodes._otr_audio_engines.eng_indextts2 import sanitize_delivery_vector
+    from nodes._otr_delivery_vector import EMOTIONS
+
+    raw = _vector(calm=0.2, happy=0.1)
+    payload = get_engine("indextts2").emotion_payload(raw)
+    expected = sanitize_delivery_vector(raw)
+
+    assert payload["mass_capped"] is False
+    assert payload["effective_mass"] == pytest.approx(0.3)
+    assert payload["emo_vector"] == [expected[e] for e in EMOTIONS]
 
 
 def test_a_hand_stamped_overweight_vector_is_capped_even_at_alpha_one():
@@ -503,8 +579,13 @@ def test_those_three_profiles_bumped_their_impl_version():
     from nodes._otr_engine_profiles import load_resolver
 
     resolver = load_resolver()
-    for pid in ("char_indextts2_v1", "char_chatterbox_v1", "char_dia_v1"):
-        assert resolver.get(pid).engine_impl_version == "2", pid
+    # indextts2 is at 3: the emotion ceiling moved on 2026-08-18 and this field
+    # is the profile's declared "the engine's behaviour changed" statement.
+    # The other two only ever took the seed change.
+    expected = {"char_indextts2_v1": "3",
+                "char_chatterbox_v1": "2", "char_dia_v1": "2"}
+    for pid, want in expected.items():
+        assert resolver.get(pid).engine_impl_version == want, pid
 
 
 def test_the_bumped_version_moves_the_cache_key():
@@ -593,48 +674,122 @@ def test_an_engine_with_no_recipe_is_never_demoted_on_this_ground():
     assert ROUTE.stale_runtime_fingerprint(record, "bark") is None
 
 
-def test_the_shipped_lemmy_route_is_no_longer_selected():
-    """The release gate, asserted: no new qualification, no selected route."""
+def _stale_lemmy_policy():
+    """The shipped policy with the runtime deliberately rotted.
+
+    THE SYNTHETIC STALE RECORD [2026-08-18]. Between 2026-08-10 and 2026-08-18
+    the SHIPPED record was itself stale, so these gates could be pointed
+    straight at `cast_pools.py`. Lemmy is qualified again on the current build,
+    which is the good outcome and also removes the only naturally-stale record
+    the suite had. The demotion path must stay covered regardless of whether
+    the shipped route happens to be stale today, so it gets a record that is
+    real in every respect except one rotted fingerprint.
+
+    THE ROTTED VALUE IS REAL HISTORY, NOT AN INVENTED ONE. It is read from the
+    superseded 2026-08-10 record -- the fingerprint this project actually
+    withdrew -- so the fixture cannot drift into a value no build ever had.
+    Exactly ONE field differs from the shipped record, which matters: a fixture
+    that is malformed in some other way would be rejected for the wrong reason
+    and the demotion path would go untested while looking green.
+    """
+    from config import cast_pools as POOLS
+
+    withdrawn = POOLS.LEMMY_VOICE_POLICY[
+        "superseded_native_routes"]["indextts2"][0]["engine_impl_version"]
+    stale = copy.deepcopy(
+        POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"])
+    assert stale["qualification_record"]["runtime"]["engine_impl_version"] != \
+        withdrawn, "the shipped record already carries the withdrawn runtime"
+    stale["qualification_record"]["runtime"]["engine_impl_version"] = withdrawn
+    return dict(POOLS.LEMMY_VOICE_POLICY,
+                approved_native_routes={"indextts2": stale})
+
+
+def test_the_shipped_lemmy_route_is_selected_again():
+    """The release gate, asserted from the other side: RE-QUALIFIED.
+
+    This test used to assert `is None`, and it was correct for exactly as long
+    as nobody had re-auditioned. `prod-audition-2026-08-18` re-qualified the
+    route on the shipped build, so the gate's own condition -- the record's
+    runtime matches the code that will render it -- is satisfied and the route
+    comes back. What must never happen is a route selecting WITHOUT that match,
+    which is what the stale-record test below still proves.
+    """
     from config import cast_pools as POOLS
     from nodes import _otr_voice_route as ROUTE
 
     ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    policy = POOLS.LEMMY_VOICE_POLICY
+    selected = ROUTE.select_policy_route(POOLS.LEMMY_VOICE_POLICY, "indextts2")
 
-    assert ROUTE.select_policy_route(policy, "indextts2") is None
+    assert selected is not None
+    assert selected["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
+    assert (selected["qualification_record"]["runtime"]["engine_impl_version"]
+            == _live_indextts2_fingerprint()), (
+        "the shipped record no longer describes the build that would render "
+        "it -- re-audition and re-record, do not hand-edit the fingerprint")
 
 
-def test_the_lemmy_record_itself_is_preserved_unedited():
+def test_a_stale_record_is_not_selected():
+    """The gate itself, on a record whose runtime no longer matches the code."""
+    from nodes import _otr_voice_route as ROUTE
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+
+    assert ROUTE.select_policy_route(_stale_lemmy_policy(), "indextts2") is None
+
+
+def test_the_superseded_lemmy_record_is_preserved_unedited():
     """PRESERVE THE OLD RECORD [QA-7]. The claim is withdrawn by the gate, not
-    by deleting the evidence -- a re-audition needs something to compare to."""
+    by deleting the evidence -- a re-audition needs something to compare to.
+
+    The withdrawn 2026-08-10 record now lives under `superseded_native_routes`,
+    where nothing can select it and nothing can quietly edit it. Its cited
+    manifest still hashes to the value it claims, so the August audition
+    remains re-verifiable byte for byte.
+    """
     from config import cast_pools as POOLS
 
-    record = POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"]
-    qual = record["qualification_record"]
+    superseded = POOLS.LEMMY_VOICE_POLICY["superseded_native_routes"]["indextts2"]
+    assert len(superseded) == 1
+    record = superseded[0]
 
     assert record["route_id"] == "lemmy-indextts2-algenib-cockney-v1"
-    assert qual["record_id"] == "g1-test-a-2026-08-10"
-    assert qual["status"] == "qualified"
-    assert qual["rights"]["status"] == "approved"
-    assert qual["runtime"]["engine_impl_version"] == "b965453f355661a3"
+    assert record["record_id"] == "g1-test-a-2026-08-10"
+    assert record["engine_impl_version"] == "b965453f355661a3"
+    assert record["audition_manifest"]["sha256"] == (
+        "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67")
+    assert record["operator_verdict"].startswith("PASS (blinded, 2026-08-10)")
+
+
+def test_a_superseded_record_is_never_selectable():
+    """Evidence, not a route. `superseded_native_routes` is deliberately not a
+    key anything reads -- so a withdrawn qualification can be audited forever
+    without ever coming back as a selected route."""
+    from config import cast_pools as POOLS
+    from nodes import _otr_voice_route as ROUTE
+
+    superseded = POOLS.LEMMY_VOICE_POLICY["superseded_native_routes"]
+    policy = {"policy_version": "test", "approved_native_routes": {},
+              "superseded_native_routes": copy.deepcopy(superseded)}
+
+    assert ROUTE.select_policy_route(policy, "indextts2") is None
 
 
 def test_a_re_qualified_record_selects_again():
     """The route is recoverable, and the ONLY thing that recovers it is a
     record whose runtime matches the build that will render it."""
-    from config import cast_pools as POOLS
     from nodes import _otr_voice_route as ROUTE
 
     live = _live_indextts2_fingerprint()
     requalified = copy.deepcopy(
-        POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"])
+        _stale_lemmy_policy()["approved_native_routes"]["indextts2"])
     requalified["qualification_record"]["runtime"]["engine_impl_version"] = live
     policy = {"policy_version": "test",
               "approved_native_routes": {"indextts2": requalified}}
 
     selected = ROUTE.select_policy_route(policy, "indextts2")
     assert selected is not None
-    assert selected["route_id"] == "lemmy-indextts2-algenib-cockney-v1"
+    assert selected["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
 
 
 def test_the_demotion_degrades_and_never_raises():
@@ -643,15 +798,18 @@ def test_the_demotion_degrades_and_never_raises():
     `resolve_policy_route_claim` is the call CastLock makes, and it raises on a
     SELECTED route that fails its checks. A demoted route must come back as
     None from here -- not as an exception that aborts the episode.
+
+    Runs against the SYNTHETIC stale record, because the shipped one is
+    qualified again. The law being tested is about what a demotion does, not
+    about which record happens to be demoted this week.
     """
     from datetime import datetime, timezone
 
-    from config import cast_pools as POOLS
     from nodes import _otr_voice_route as ROUTE
 
     ROUTE._LIVE_FINGERPRINT_CACHE.clear()
     claim = ROUTE.resolve_policy_route_claim(
-        POOLS.LEMMY_VOICE_POLICY, "indextts2", datetime.now(timezone.utc),
+        _stale_lemmy_policy(), "indextts2", datetime.now(timezone.utc),
         bank_entries=[])
 
     assert claim is None

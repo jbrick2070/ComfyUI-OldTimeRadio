@@ -288,16 +288,35 @@ bank gate ran **4/4 banks PASS, 0 failed acceptance checks**, all published to
 Shakespeare, Act Two, Scene Two"*, public_domain *"The Jungle Book, by Rudyard
 Kipling"*. Instrument: `scripts/otr_title_identity_acceptance.py`.
 
-**THE ONE ACTIVE ITEM IS THE VOICE IDENTITY FIX.** Spec is written, panelled
-and QA-corrected: `docs/2026-08-18-voice-identity-fix-ANCHOR.md` (eight `[QA-n]`
-corrections folded in; the first brief was a NO-GO). Build it, then prove the
-2x2 (line-vs-character seed x alpha 1.0 vs 0.4), then re-audition Lemmy.
-**Release gate: no release until a new Lemmy qualification and reproducible
-evidence exist.**
+**THE VOICE IDENTITY FIX IS BUILT, SHIPPED AND RE-QUALIFIED (2026-08-18).**
+Spec `docs/2026-08-18-voice-identity-fix-ANCHOR.md`; the emotion-ceiling
+follow-up is `docs/2026-08-18-emotion-mass-single-knob/`.
+
+**THE EMOTION BLEND IS NOW ONE KNOB, AND THE OPERATOR SET ITS VALUE BY EAR.**
+He heard the log-odds ladder (`otr/episodes/lemmy_emotion_ladder_logodds_2026-08-18/`,
+alpha pinned at 1.0, only the ceiling varying) and ruled: *"IF I WERE A KID I'D
+LIKE MORE BUT AS AN ADULT ARM0P560 IS PERFECT."* So `EMO_ALPHA_DEFAULT` went
+0.4 -> **1.0** (a pass-through, kept only as a diagnostic override) and
+`EFFECTIVE_EMOTION_MASS_CAP` 0.4 -> **0.56**. Alpha binds BEFORE the ceiling, so
+shipping the ceiling alone would have delivered 0.400 on a neutral line and
+0.374 on the emotional one -- not the rung he approved. Measured on the shipped
+build: **0.5600 / 0.5590 / 0.5600**, speaker retained 0.4400-0.4410.
+
+**OUTSTANDING, AND IT IS A LISTEN, NOT A BUILD.** The ladder rendered the
+EMOTIONAL line only. 56 of 57 character lines sampled from the six most recent
+ledgers are calm-dominated, so NEUTRAL delivery is what ordinary dialogue
+actually sounds like -- and a neutral beat is where the original identity defect
+lived. A blinded three-arm audition is rendered and waiting at
+`otr/episodes/lemmy_production_audition_ceiling_2026-08-18/` (armY = shipped,
+armZ = same seed policy with the ceiling disabled, armX = full pre-fix). If the
+neutral lines read wrong to him, the ceiling is one constant away from a
+different rung and the qualification record is re-cut.
 
 | item | state |
 |---|---|
-| **voice identity fix (PBUG-20260817-09)** | **SPEC READY, GO FOR CODING** |
+| **voice identity fix (PBUG-20260817-09)** | **DONE -- shipped, re-qualified as `prod-audition-2026-08-18`, route `...-cockney-v2`, fingerprint `9bee950a7920fd00`** |
+| **emotion ceiling 0.560** | **SHIPPED -- awaiting his listen on the NEUTRAL lines of the three-arm audition** |
+| cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
 | PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |
 | PBUG-20260817-08 | Lemmy cameo voice on 10.2% of all cast rows |

@@ -1,7 +1,7 @@
 # The 2x2 voice-identity proof (PBUG-20260817-09, QA-8) -- a permanent instrument.
 #
 #   seed axis:     char_v1 (fixed)      vs  line_v1 (the shipped pre-fix seed)
-#   emotion axis:  alpha 0.4 + cap 0.4  vs  alpha 1.0 + no cap (the pre-fix blend)
+#   emotion axis:  the SHIPPED ceiling  vs  no ceiling (the pre-fix blend)
 #
 # THE SPEC SAID "alpha 1.0 vs 0.4" AND THAT AXIS WOULD HAVE PROVED NOTHING.
 # On a neutral line -- calm=1.0, the shape of the very beat the operator
@@ -21,7 +21,7 @@
 #
 # Read the arms afterwards with:
 #   python scripts/otr_voice_identity_acceptance.py --log <arm>.pobs.log `
-#          --expect-policy char_v1 --expect-alpha 0.4 --expect-mass-cap 0.4
+#          --expect-policy char_v1 --expect-alpha 1.0 --expect-mass-cap 0.56
 # passing each arm its OWN contract -- a control arm booted without a ceiling
 # is supposed to exceed 0.4, and reporting that as a failure teaches the reader
 # to ignore the arms that matter.
@@ -49,10 +49,16 @@ if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Force -Path $OutDi
 
 #   A = the whole fix        B = seed fix only      C = emotion fix only
 #   D = the shipped defect, reproduced end to end
+# THE FIX ARMS INHERIT THE SHIPPED DEFAULTS ($null = do not set the variable),
+# so this harness can never certify a build the adapter has moved away from.
+# It used to hardcode alpha 0.4 / cap 0.4; when the ceiling became the single
+# knob at 0.56 those arms silently kept proving a configuration that no longer
+# shipped, which is how an acceptance instrument stops being believed.
+# Alpha is now 1.0 in every arm, so the emotion axis is purely the CEILING.
 $ARMS = @(
-  @{ Name = 'a_fix_both';       Seed = '1'; Alpha = '0.4'; Cap = '0.4' },
+  @{ Name = 'a_fix_both';       Seed = '1'; Alpha = $null; Cap = $null },
   @{ Name = 'b_fix_seed_only';  Seed = '1'; Alpha = '1.0'; Cap = '8'   },
-  @{ Name = 'c_fix_blend_only'; Seed = '0'; Alpha = '0.4'; Cap = '0.4' },
+  @{ Name = 'c_fix_blend_only'; Seed = '0'; Alpha = $null; Cap = $null },
   @{ Name = 'd_prefix_control'; Seed = '0'; Alpha = '1.0'; Cap = '8'   }
 )
 
@@ -79,7 +85,9 @@ foreach ($arm in $ARMS) {
   $legLog = Join-Path $OutDir ("{0}.leg.log" -f $name)
   $srvLog = Join-Path $OutDir ("{0}.server.log" -f $name)
 
-  Say ("==== ARM {0}: seed={1} alpha={2} mass_cap={3}" -f $name, $arm.Seed, $arm.Alpha, $arm.Cap)
+  $alphaLabel = if ($null -eq $arm.Alpha) { 'shipped-default' } else { $arm.Alpha }
+  $capLabel   = if ($null -eq $arm.Cap)   { 'shipped-default' } else { $arm.Cap }
+  Say ("==== ARM {0}: seed={1} alpha={2} mass_cap={3}" -f $name, $arm.Seed, $alphaLabel, $capLabel)
 
   # --- reset: never a blanket python kill (it would sever the MCP pythons) ---
   Say 'reset: selective kill + port + VRAM baseline'
@@ -106,8 +114,12 @@ foreach ($arm in $ARMS) {
   # The arm's environment, exported BEFORE the boot so the server log and the
   # command line stay auditable (the launcher consumes no hidden hook files).
   $env:OTR_VOICE_CHARACTER_SEED   = $arm.Seed
-  $env:OTR_INDEXTTS2_EMO_ALPHA    = $arm.Alpha
-  $env:OTR_INDEXTTS2_EMO_MASS_CAP = $arm.Cap
+  # REMOVE, never assign-empty: these arms run sequentially in one shell, so an
+  # arm that inherits the defaults must not pick up the previous arm's value.
+  if ($null -eq $arm.Alpha) { Remove-Item Env:OTR_INDEXTTS2_EMO_ALPHA -ErrorAction SilentlyContinue }
+  else { $env:OTR_INDEXTTS2_EMO_ALPHA = $arm.Alpha }
+  if ($null -eq $arm.Cap) { Remove-Item Env:OTR_INDEXTTS2_EMO_MASS_CAP -ErrorAction SilentlyContinue }
+  else { $env:OTR_INDEXTTS2_EMO_MASS_CAP = $arm.Cap }
 
   Say 'booting headless server'
   Start-Process -FilePath $LAUNCH -ArgumentList ('"{0}"' -f $srvLog) -WindowStyle Hidden

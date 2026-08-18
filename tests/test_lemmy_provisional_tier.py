@@ -540,9 +540,16 @@ def test_a_provisional_row_re_locked_QUALIFIED_drops_its_old_identity(
     a re-qualified route must promote a provisional row and strip its old
     identity. Copying the real record rather than inventing one keeps the
     original intent: everything except the runtime line is the shipped
-    evidence, so a rotted receipt still fails here. That the SHIPPED record no
-    longer applies is asserted on purpose in
-    `tests/test_voice_identity_fix.py::test_the_shipped_lemmy_route_is_no_longer_selected`.
+    evidence, so a rotted receipt still fails here.
+
+    RE-QUALIFIED 2026-08-18 (`prod-audition-2026-08-18`), so the shipped record
+    now matches the live fingerprint and the assignment below writes the value
+    that is already there. That is deliberate: this test proves the PROMOTION,
+    and it must not start passing or failing for the unrelated reason that the
+    shipped route happens to be qualified this week. The gate itself is
+    asserted in `tests/test_voice_identity_fix.py` --
+    `test_the_shipped_lemmy_route_is_selected_again` for the qualified case and
+    `test_a_stale_record_is_not_selected` for the demotion.
     """
     from nodes import _otr_voice_route as ROUTE
 

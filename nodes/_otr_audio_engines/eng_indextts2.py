@@ -74,16 +74,40 @@ def _default(*parts):
 # --------------------------------------------------------------------------- #
 
 #: Emotion-blend strength when ``OTR_INDEXTTS2_EMO_ALPHA`` is unset or unusable.
-#: Was 1.0 -- full displacement of the speaker's own emotional embedding on any
-#: line the delivery table gave weight to.
-EMO_ALPHA_DEFAULT = 0.4
+#:
+#: PINNED AT 1.0 AND NO LONGER A TUNING KNOB (2026-08-18). It went 1.0 -> 0.4 on
+#: the voice-identity fix, when two knobs shared one job; the ceiling below now
+#: owns that job alone, so alpha is a pass-through on the default path -- at
+#: exactly 1.0 :meth:`IndexTTS2Engine._apply_vendor_alpha` short-circuits and
+#: the vendor's pre-scaling does nothing.
+#:
+#: IT IS KEPT, NOT DELETED, and the distinction is deliberate. It remains a
+#: compatibility and diagnostic override: ``OTR_INDEXTTS2_EMO_ALPHA`` still
+#: resolves per render, still keys the cache, and still reaches the worker, so a
+#: control arm can reproduce a pre-fix blend without a code change. Deleting it
+#: would touch the cache key, the per-line receipt, the profile schema, the
+#: worker payload and the acceptance checker to buy nothing.
+EMO_ALPHA_DEFAULT = 1.0
 
 #: Ceiling on the EFFECTIVE emotion mass -- the sum of the weights the vendor
-#: actually spends, AFTER alpha. It guarantees at least ``1 - 0.4`` of the
-#: character's own embedding survives every line, including lines whose vector
-#: was hand-edited or pre-stamped rather than derived (alpha alone cannot
-#: promise that: a stamped vector summing to 3.0 still clears 1.0 at alpha 0.4).
-EFFECTIVE_EMOTION_MASS_CAP = 0.4
+#: actually spends, AFTER alpha. With alpha pinned at 1.0 this is THE knob: it
+#: alone decides how much of the generic emotion prototype is laid over the
+#: speaker, and ``1 - cap`` is the share of his own embedding that survives.
+#:
+#: 0.560 IS THE OPERATOR'S OWN NUMBER, chosen by ear on
+#: ``otr/episodes/lemmy_emotion_ladder_logodds_2026-08-18/`` -- a ladder that
+#: pinned alpha at 1.0 and varied only this value, spaced evenly in
+#: ``log(mass / (1 - mass))`` because that ratio is what the ear tracks. His
+#: verdict: *"IF I WERE A KID I'D LIKE MORE BUT AS AN ADULT ARM0P560 IS
+#: PERFECT."* Of the uncapped arm: *"its not a real emtion ist coimputer
+#: emoption"* -- at mass 1.0 the vendor residual is 0, none of the speaker's own
+#: emotional embedding survives, and what is left is the generic prototype.
+#:
+#: IT ALSO STILL COVERS VECTORS ALPHA CANNOT. A multiplier can promise nothing
+#: about a vector it did not derive -- a hand-edited or pre-stamped ledger
+#: summing to 8.0 spends all 8.0 at alpha 1.0. The ceiling is measured on what
+#: the vendor actually receives, so that line lands here like any other.
+EFFECTIVE_EMOTION_MASS_CAP = 0.56
 
 #: The highest ceiling worth expressing: eight dimensions each clamped to 1.0,
 #: so a cap at or above this can never bind. ``OTR_INDEXTTS2_EMO_MASS_CAP=8``
@@ -257,11 +281,17 @@ class IndexTTS2Engine:
         :data:`EMO_ALPHA_DEFAULT`. Read per render so a long-running server
         picks up env changes.
 
-        THE DEFAULT MOVED 1.0 -> 0.4 (voice-identity fix 2026-08-18). At 1.0
-        the vendor spends the emotion vector's full sum against the speaker's
-        own embedding, so a line the delivery table weighted heavily kept
-        almost nothing of the reference voice -- which is the half of the
-        defect that alpha owns.
+        THE DEFAULT WENT 1.0 -> 0.4 -> 1.0, AND THAT IS NOT A ROUND TRIP TO
+        WHERE IT STARTED. The voice-identity fix dropped it to 0.4 while alpha
+        and the ceiling shared one job; the ceiling now owns that job alone at
+        0.56, so alpha returns to 1.0 as a pass-through and the emotion budget
+        has exactly one owner. The pre-fix build was alpha 1.0 with NO ceiling,
+        which is a different thing entirely -- it spent the vector's whole sum
+        and left nothing of the speaker.
+
+        So this is a DIAGNOSTIC override now, not a taste control. Turning it
+        down still works and still keys, which is what a control arm needs; it
+        is simply not how the shipped blend is set.
 
         ROUNDED TO THREE DECIMALS, AND THE ROUNDING IS LOAD-BEARING [QA-2].
         ``quantize_params`` keys this value at three decimals
@@ -289,21 +319,26 @@ class IndexTTS2Engine:
         ``0 .. EMOTION_MASS_CAP_DISABLED`` and rounded to three decimals for the
         same cache-key reason alpha is.
 
-        WHY THIS KNOB EXISTS, AND IT IS NOT DECORATION. The ceiling was
-        unconditional in the first cut, and the final structural gate caught
-        what that costs: on a NEUTRAL line -- ``calm=1.0``, sum exactly 1.0,
-        which is the shape of the very beat the operator reported -- alpha 1.0
-        gets rescaled to 0.4 by the cap and alpha 0.4 lands on 0.4 by the
-        vendor's own scaling. Identical effective mass. So the 2x2's alpha axis
-        was DEGENERATE on the defect's own case, no arm reproduced pre-fix
-        emotion behaviour, and the fix could not be attributed between its two
-        causes.
+        THIS IS THE ONE KNOB (2026-08-18). Alpha is pinned at 1.0, so the
+        effective mass of every line is decided here and nowhere else. Raise it
+        for more emotion and less of the speaker; lower it for the reverse.
+        ``OTR_INDEXTTS2_EMO_MASS_CAP=8`` is the disabled sentinel and restores
+        pre-fix intensity for a control arm.
 
-        It is also the operator's rollback. He judges by ear, and the ceiling is
-        the half of this fix most likely to read as flattened performance --
-        every saturated line now lands on exactly the cap. Without an override
-        his only lever was lowering alpha further, which flattens it more. Set
-        the cap to ``8`` to restore the old intensity and hear the difference.
+        IT FLATTENS TOTAL INTENSITY ON PURPOSE, AND THE OPERATOR CHOSE THAT.
+        Across 57 character lines sampled from the six most recent episode
+        ledgers, every derived vector summed above 0.56, so in practice every
+        line lands on this ceiling and the per-line variation in TOTAL emotion
+        budget is gone. What still varies is the vector's SHAPE -- which
+        emotions, in what proportion. The previous 0.4 ceiling already pinned
+        81% of those lines, so this removes the remainder rather than
+        introducing the behaviour. A vector that does sum below the ceiling
+        passes through untouched; that is valid and tested, just not typical.
+
+        The review gate's stated risk was that capping would read as flattened
+        performance. His ear went the other way and called the UNCAPPED arm
+        *"too emotional"* and not *"a real emtion"*, which is why the ceiling is
+        the knob that survived.
         """
         raw = os.getenv("OTR_INDEXTTS2_EMO_MASS_CAP",
                         str(EFFECTIVE_EMOTION_MASS_CAP))
@@ -347,16 +382,26 @@ class IndexTTS2Engine:
 
         THE CEILING IS APPLIED AFTER ALPHA, NEVER BEFORE [QA-3, QA-4 order].
         Capping the raw vector first and letting alpha scale the capped result
-        would soften the delivery twice: a stamped ``calm=1.0`` line would land
-        at ``0.4 * 0.4 == 0.16`` instead of the intended ``0.4``. So the vendor
+        would soften the delivery twice. The order is invisible at the shipped
+        alpha of 1.0 -- scaling by 1.0 commutes with everything -- but it is
+        still load-bearing for any arm that turns alpha down: at alpha 0.4 a
+        stamped ``calm=1.0`` line lands at ``min(0.4, 0.56) == 0.4``, where
+        cap-then-alpha would give ``0.56 * 0.4 == 0.224``. So the vendor
         transform runs first, the mass is measured on ITS output, and only an
         overweight result is scaled back.
 
-        WHY A CEILING AND NOT JUST A SMALLER ALPHA. Alpha is a multiplier, so it
+        WHY A CEILING AND NOT A SMALLER ALPHA. Alpha is a multiplier, so it
         cannot promise anything about a vector it did not derive: a hand-edited
-        or pre-stamped ledger summing to 3.0 still spends 1.2 at alpha 0.4 --
-        more than the whole speaker. The cap is the floor under the character's
-        identity; alpha is the taste knob above it.
+        or pre-stamped ledger summing to 3.0 spends all 3.0 at alpha 1.0 --
+        three times the whole speaker. The ceiling is measured on what the
+        vendor actually receives, so it holds regardless of where the vector
+        came from. That is why it, and not alpha, is the knob that ships.
+
+        THE RETURNED ``effective_mass`` IS THE AUTHORITY, not the arithmetic.
+        ``_apply_vendor_alpha`` truncates to four decimals and the rescale
+        FLOORS to three, so the result lands at or just under an idealised
+        ``min(alpha * sum, cap)`` -- 0.5590 rather than 0.5600 on a real
+        emotional line. Anything asserting a mass reads this field.
         """
         from .._otr_delivery_vector import EMOTIONS
 

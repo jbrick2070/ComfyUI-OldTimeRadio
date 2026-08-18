@@ -91,20 +91,40 @@ profiles:
     commercial_clean: false        # Bilibili license -- non-commercial use gated
     model_path: ""
     model_sha256: ""
-    # emo_alpha re-anchored 1.0 -> 0.4 (voice identity 2026-08-18). At 1.0
-    # the vendor spends the emotion vector's full sum against the speaker's
-    # own embedding, so a weighted line kept almost none of the reference
-    # voice. The adapter caps the EFFECTIVE mass at 0.4 after alpha as well,
-    # which is what covers hand-edited and pre-stamped vectors.
-    default_params: {temperature: 0.8, emo_alpha: 0.4}
+    # THE ADAPTER OWNS THE EMOTION BLEND, NOT THIS FILE. `emo_alpha` below is a
+    # cache-key declaration, not a runtime authority: `emotion_payload` resolves
+    # alpha and the mass ceiling from the environment or from the constants in
+    # `nodes/_otr_audio_engines/eng_indextts2.py`, and `_begin_line_runtime`
+    # merges `render_time_params()` LAST, so whatever is written here is
+    # overwritten before it reaches a render. It is kept truthful rather than
+    # deleted because a reader will look here first.
+    #
+    # There is deliberately NO `emo_mass_cap` key. The ceiling is the knob that
+    # actually governs (EFFECTIVE_EMOTION_MASS_CAP = 0.56), and declaring it
+    # here would create a second apparent source of truth that silently does
+    # nothing -- the evidence-shaped field this repo refuses everywhere else.
+    #
+    # emo_alpha re-anchored 0.4 -> 1.0 (2026-08-18). Alpha and the ceiling used
+    # to share one job; the ceiling now owns it alone, so alpha is a
+    # pass-through and the emotion budget has exactly one owner.
+    default_params: {temperature: 0.8, emo_alpha: 1.0}
     allowed_voice_banks: [default]
     # Voice identity 2026-08-18: one seed per CHARACTER per episode, not
     # one per line -- a cloned character must not change voice between his
     # own beats. engine_impl_version bumped 1 -> 2 in the same change so
     # audio rendered under the per-line seed is never replayed as if it
     # were this one.
+    #
+    # 2 -> 3 (2026-08-18, emotion ceiling): the shipped blend moved from
+    # alpha 0.4 / ceiling 0.4 to alpha 1.0 / ceiling 0.56, which changes what
+    # every character line sounds like. The cache is already correct without
+    # this -- `render_time_params` puts both resolved values in the key, proven
+    # by `tests/test_lemmy_emo_alpha_cache_key.py` -- so the bump buys no
+    # invalidation. It is here because this field is the profile's declared
+    # statement that the engine's behaviour changed, and leaving it at 2 would
+    # make that statement false.
     character_stable_seed: true
-    engine_impl_version: "2"
+    engine_impl_version: "3"
     sample_rate: 22050
     requires_hf_token: false        # weights are downloadable; only commercial USE is gated
     rank: 1                         # char scope default (rank-1)

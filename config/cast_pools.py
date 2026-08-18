@@ -781,12 +781,44 @@ LEMMY_VOICE_POLICY = {
     # moment. Do not hand-edit the value below to silence the warning -- that
     # would re-assert an approval nobody has given, which is the exact
     # evidence-shaped field this module exists to refuse.
+    # ----------------------------------------------------------------------- #
+    # RE-QUALIFIED 2026-08-18 ON THE SHIPPED VOICE-IDENTITY BUILD.
+    #
+    # The 2026-08-10 record is preserved verbatim under
+    # `superseded_native_routes` below -- nothing in it was edited, and its
+    # cited manifest still hashes to the value it claims. It was withdrawn
+    # because the fix changed IndexTTS2's seed handling and emotion blend,
+    # which is exactly what a listener judges, so `select_policy_route` demoted
+    # it on the runtime fingerprint.
+    #
+    # RE-CUT 2026-08-18 ON THE EMOTION-CEILING BUILD. The blend moved from
+    # alpha 0.4 / ceiling 0.4 to alpha 1.0 / ceiling 0.56 -- one knob instead of
+    # two, at the rung the operator chose by ear -- which moved the adapter
+    # fingerprint again and demoted the route again, exactly as designed. The
+    # audition was re-rendered into a NEW directory rather than in place.
+    #
+    # THE FIRST RE-AUDITION ATTEMPT WAS INVALID AND IS NOT CITED HERE.
+    # Re-running `otr_g1_lemmy_audition.py` produced clips BYTE-IDENTICAL to
+    # 2026-08-10: it renders with `emo_vector=None` at a hardcoded RENDER_SEED
+    # passed straight to the adapter, so it bypasses both halves of the fix.
+    # Byte-identical audio cannot qualify a route against new code. The record
+    # below cites `otr_lemmy_production_audition.py`, which drives the REAL
+    # dispatch -- derived delivery vector, shipped alpha and ceiling, character
+    # seed -- because that is the only path that exercises what changed.
+    #
+    # THE SHIPPED ARM NAMES NO EMOTION ENVIRONMENT AT ALL; it inherits the
+    # adapter constants, so this record cannot come to describe settings that
+    # were never shipped. The instrument also pops every arm-controlled variable
+    # before each arm: the arms render sequentially in a SHUFFLED order, and an
+    # arm that inherited the previous arm's ceiling would have been recorded
+    # here as "shipped" while carrying a control's blend.
+    # ----------------------------------------------------------------------- #
     "approved_native_routes": {
         "indextts2": {
-            "route_id": "lemmy-indextts2-algenib-cockney-v1",
+            "route_id": "lemmy-indextts2-algenib-cockney-v2",
             "route_contract_version": 1,
             "qualification_record": {
-                "record_id": "g1-test-a-2026-08-10",
+                "record_id": "prod-audition-2026-08-18",
                 "status": "qualified",
                 "technical_verdict": "pass",
                 "engine": "indextts2",
@@ -807,7 +839,13 @@ LEMMY_VOICE_POLICY = {
                 },
                 "runtime": {
                     "model_id": "IndexTTS-2",
-                    "engine_impl_version": "b965453f355661a3",
+                    # The LIVE adapter+worker+seed-path fingerprint at audition
+                    # time, from `_otr_voice_route.live_engine_impl_version`.
+                    # This is now COMPARED against live code on every selection,
+                    # so an edit to the rendering path demotes the route until
+                    # somebody re-auditions -- which is the point.
+                    "engine_impl_version": "9bee950a7920fd00",
+                    # Unchanged: the weights did not move, only our code.
                     "weight_revision": "6238972345f704ef",
                 },
                 "reference": {
@@ -820,9 +858,11 @@ LEMMY_VOICE_POLICY = {
                         "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
                 },
                 "audition_manifest": {
-                    "path": "otr/episodes/g1_lemmy_test_a/MANIFEST.json",
+                    "path": "otr/episodes/"
+                            "lemmy_production_audition_ceiling_2026-08-18/"
+                            "MANIFEST.json",
                     "sha256":
-                        "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67",
+                        "344ccdf8b798117de724702920c808621e048cb94c95b4fed13496c4610acff1",
                 },
             },
             # The LEGACY receipt shape (QUALIFICATION_RECEIPT_REQUIRED_FIELDS).
@@ -831,26 +871,75 @@ LEMMY_VOICE_POLICY = {
             # a compatibility helper that says "no" where the authority says
             # "yes" is its own support ticket.
             "qualification_receipt": {
-                "artifact_path": "otr/episodes/g1_lemmy_test_a/",
+                "artifact_path":
+                    "otr/episodes/lemmy_production_audition_ceiling_2026-08-18/",
                 "artifact_sha256":
-                    "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67",
+                    "344ccdf8b798117de724702920c808621e048cb94c95b4fed13496c4610acff1",
                 "neutral_line": LEMMY_AUDITION_LINES["neutral_line"],
                 "emotional_line": LEMMY_AUDITION_LINES["emotional_line"],
-                "seed": 20260810,
+                "seed": 20260818,
                 "engine": "indextts2",
-                "engine_impl_version": "b965453f355661a3",
+                "engine_impl_version": "9bee950a7920fd00",
                 "identity_kind": "local_wav",
                 "identity_id": "idx_lemmy_algenib_cockney_v1",
-                "settings": "IndexTTS2 defaults, emo_vector=None, "
-                            "render_seed=20260810, sample_rate=22050, "
-                            "all three arms rendered identically",
+                "settings": "rendered through the PRODUCTION dispatch "
+                            "(OTR_BatchCharacterVoices -> _render_per_line): "
+                            "delivery vector derived from the line text, "
+                            "emo_alpha=1.0 (pinned; a pass-through), effective "
+                            "emotion mass ceiling 0.56 applied after alpha, "
+                            "character-stable engine seed (one seed across all "
+                            "three of his lines), sample_rate=22050. Measured "
+                            "in the manifest: 0.5600 / 0.5590 / 0.5600, so "
+                            "0.4400-0.4410 of his own emotional embedding "
+                            "survives every line. THREE arms, blinded, so the "
+                            "two variables separate: armY shipped, armZ the "
+                            "same seed policy with the ceiling DISABLED "
+                            "(isolates the ceiling), armX the full pre-fix "
+                            "build with a per-line seed (isolates the seed).",
                 "operator_verdict":
-                    "PASS (blinded, 2026-08-10). Best Cockney of the three and "
-                    "the preferred arm; clears the gravelly / Cockney / "
-                    "intelligibility floor; beats the incumbent, which the "
-                    "operator independently heard as Indian rather than Cockney "
-                    "without seeing its label.",
-                "audited_on": "2026-08-10",
+                    "PASS (blinded, 2026-08-18), IN TWO STAGES, and the second "
+                    "stage set the shipped value. STAGE 1 -- BLINDED A/B on the "
+                    "production dispatch. Operator, verbatim across three "
+                    "messages: 'all good lemy cocnkey gerat'; 'ARM X wins ite "
+                    "emotional is mor palatable'; and 'many emotionals are too "
+                    "emotional and ARMY is too emotional ARMX is perfect'. The "
+                    "arm he picked was the CAPPED build; the arm he rejected "
+                    "was uncapped. The review gate's stated risk was that "
+                    "capping emotion mass would FLATTEN performance; his ear "
+                    "went the other way. He volunteered that this is a general "
+                    "complaint, not a quirk of the test. Blind, he also "
+                    "re-identified the incumbent reference as 'Indian though "
+                    "not cockney', matching his independent 2026-08-10 read. "
+                    "WHY THE UNCAPPED ARM FAILS, IN HIS WORDS: 'ARMY emotional "
+                    "soudnbs like a cris situation and fro me its not to good "
+                    "cos its nmot a real emtion ist coimputer emoption' -- the "
+                    "over-spent emotion budget does not read as a person "
+                    "feeling something, it reads as SYNTHETIC affect. That is "
+                    "the mechanism, not a taste preference: at mass 1.0 the "
+                    "vendor residual (1 - sum) is 0, so none of the speaker's "
+                    "own emotional embedding survives and what is left is the "
+                    "generic emotion prototype blend. He is hearing the "
+                    "prototype. "
+                    "STAGE 2 -- THE CEILING VALUE, chosen by ear on "
+                    "otr/episodes/lemmy_emotion_ladder_logodds_2026-08-18/, a "
+                    "ladder that pinned alpha at 1.0 and varied ONLY this "
+                    "ceiling, spaced evenly in log(mass/(1-mass)). Verbatim: "
+                    "'IF I WERE A KID I'D LIKE MORE BUT AS AN ADULT ARM0P560 "
+                    "IS PERFECT.' That is effective mass 0.560, which is what "
+                    "ships. "
+                    "WHAT HE HAS NOT YET HEARD, STATED PLAINLY BECAUSE A "
+                    "RECORD THAT HID IT WOULD BE WORTH LESS THAN NOTHING: the "
+                    "ladder rendered the EMOTIONAL line only, and the "
+                    "re-rendered three-arm audition cited above has not been "
+                    "listened to. That matters because 56 of 57 character "
+                    "lines sampled from the six most recent episode ledgers "
+                    "are calm-dominated, so NEUTRAL delivery is what ordinary "
+                    "dialogue actually sounds like -- and a neutral beat is "
+                    "where the original identity defect lived. The clips are "
+                    "rendered and blinded and waiting; if the neutral lines "
+                    "read wrong to him, the ceiling is one constant away from "
+                    "a different rung and this record is re-cut.",
+                "audited_on": "2026-08-18",
             },
         },
     },
@@ -886,6 +975,34 @@ LEMMY_VOICE_POLICY = {
     # local, no API keys, no paid services. Configuring an identity costs nothing
     # and stops the per-episode redraw; rendering it is not ours to spend.
     # ----------------------------------------------------------------------- #
+    # THE WITHDRAWN 2026-08-10 RECORD, PRESERVED VERBATIM [QA-7]. Nothing reads
+    # this key -- it is evidence, not a route -- and that is deliberate: a
+    # superseded qualification must remain auditable without ever being
+    # selectable. Its cited manifest still hashes to the value below, so the
+    # August audition can still be re-verified byte for byte.
+    "superseded_native_routes": {
+        "indextts2": [{
+            "route_id": "lemmy-indextts2-algenib-cockney-v1",
+            "record_id": "g1-test-a-2026-08-10",
+            "engine_impl_version": "b965453f355661a3",
+            "audition_manifest": {
+                "path": "otr/episodes/g1_lemmy_test_a/MANIFEST.json",
+                "sha256":
+                    "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67",
+            },
+            "operator_verdict":
+                "PASS (blinded, 2026-08-10). Best Cockney of the three and the "
+                "preferred arm; clears the gravelly / Cockney / intelligibility "
+                "floor; beats the incumbent, which the operator independently "
+                "heard as Indian rather than Cockney without seeing its label.",
+            "superseded_on": "2026-08-18",
+            "superseded_because":
+                "the voice-identity fix (PBUG-20260817-09) changed IndexTTS2's "
+                "seed handling and emotion blend, so this audition no longer "
+                "describes what the engine does. Re-qualified as "
+                "prod-audition-2026-08-18.",
+        }],
+    },
     "provisional_native_routes": {
         # HIS OWN SOURCE VOICE. `gt_algenib` is the Google voice the approved
         # clone reference was generated FROM -- gravelly, measured median F0
