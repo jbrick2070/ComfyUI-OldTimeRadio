@@ -109,8 +109,16 @@ fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
 **BASELINES (re-measured 2026-08-18 EVENING, on a settled tree):** suite
-**11046 passed / 110 skipped / 1 xfailed**. Bible **20 / 26 / 3**, Bible holds
-**292** entries (nothing promoted this window -- see the promotion field).
+**11050 passed / 110 skipped / 1 xfailed** -- MEASURED on the settled tree at the
+window close, not derived. Bible **20 / 26 / 3**, Bible holds **293** entries
+(`12.114` promoted this window -- see the promotion field).
+
+> Chain this window: **11028** measured at open -> **11046** with the 18
+> evidence-guard + citation-integrity tests -> **11050** with the 4 Lemmy
+> reservation tests. Each delta equals exactly the tests added; no regressions at
+> any step. **The 11050 was briefly written here as arithmetic before it was
+> run** -- caught and replaced with the measured figure, because predicting this
+> receipt is precisely how it drifted four times.
 
 > **THIS BLOCK SAID `10913`. THE MEASURED PRE-CHANGE NUMBER WAS `11028` -- a
 > 115-test gap, and the FOURTH drift of this "single authority" receipt in three
@@ -2967,8 +2975,20 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
 | **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
 
-**NOTHING WAS PROMOTED 2026-08-18 (evidence-guards window), deliberately, and
-the reasoning is worth keeping.** The window EXECUTED an existing entry's verify
+**PROMOTED 2026-08-18 (evening): Bible `12.114`, survival-guide `b9aada7e`, count
+292 -> 293** (README bumped in all three places, coverage-index row added, Bible
+regression re-run green 20/26/3). Source: **PBUG-20260817-08**, the Lemmy cameo
+voice -- admissible because it surfaced on two live published episodes, and
+promotable now only because the fix is verified. The entry carries TWO reusable
+halves: *a reservation that exists as a convention in one subsystem is invisible
+to another subsystem enumerating the same catalogue*, and the diagnostic trap
+that cost more time than the bug -- ***a post-fix sighting is not proof the fix
+failed; check process age first.*** Its verify section also pins *sweep the
+SELECTOR, not the helper* and *count a corpus by ROLE before concluding anything
+about pool concentration*.
+
+**NOTHING ELSE WAS PROMOTED 2026-08-18, deliberately, and
+the reasoning is worth keeping.** The evidence-guards work EXECUTED an existing entry's verify
 steps rather than discovering a new class: `12.111` verify step 3 is what turned
 up G1's partial guard, and `12.111`'s own `cause` section already describes that
 failure verbatim -- *"Refusing only when a specific file (`MANIFEST.json`) exists

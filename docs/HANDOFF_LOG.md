@@ -3,6 +3,112 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-18 NIGHT -- HEAD fa6dba62 +handoff (v2.0-alpha) -- CODER (Lemmy closed as ALREADY FIXED after the operator said so first; Bible 12.114 promoted; the voice-pool concern measured and CONFIRMED, with the driver's first answer corrected)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit. (The evidence-guards work from earlier the same evening has its own
+entry directly below this one.)
+
+Did: **PBUG-20260817-08 (Lemmy cameo voice) CLOSED as already-fixed. The record
+was stale, not the code.** The operator said it first -- *"i tihni we spent alot
+of tiem fiuxing lemmy and its fixed now"* -- and he was right: the fix shipped
+`8f3c7615` on 2026-08-17 07:21. `reserved_voice_ref_ids()` derives the reserved
+set from the policy (every `local_wav` Lemmy route on any engine) and
+`assign_voice_for_slot` drops those ids from the candidate pool.
+
+**What was missing was proof at the right level, and that gap was real.** Every
+pre-existing test checked the reserved LIST -- that it holds his clones, that it
+does not sweep in borrowed catalogue voices, that reserving cannot starve him.
+**None exercised the SELECTOR, and the pool is where the bug lived.** New
+`tests/test_lemmy_voice_stays_reserved.py` (4 tests): 480 seeded draws across
+both genders and both role values, zero reserved refs reach a slot; plus a
+teeth-check that the reserved row IS in the unfiltered pool, so the sweep cannot
+pass for the wrong reason and keep passing if the guard were deleted.
+
+**THE TRAP WORTH KEEPING, and it cost more time than the bug.** The leak was
+seen SIXTEEN HOURS AFTER the fix commit (`rivers_embrace` 23:30 vs fix 07:21).
+The reservation was already correct at that commit -- rebuilt it from
+`8f3c7615:config/cast_pools.py` to be certain, all three clone ids present. The
+soak harness boots ONE server and never tears it down, so the evening leg still
+ran the module Python imported that morning. **A stale resident process reads
+exactly like a fix that did not work.** Corpus confirms: the only two rows
+putting his voice on a non-Lemmy character are both 08-17; everything from 08-18
+is clean.
+
+**THE 10.2% NEVER MEANT 10.2% WRONG.** It was that reference's share of all cast
+rows over 40 episodes SPANNING the fix date, most of it legitimate cameos.
+
+**BIBLE 12.114 PROMOTED** (survival-guide `b9aada7e`, 292 -> 293; README bumped
+in all three places per the Three-File Contract, coverage-index row added and its
+header count moved, regression re-run green). Admissible because it surfaced on
+two live published episodes and promotable only now the fix is verified. Two
+reusable halves: *a reservation existing as a CONVENTION in one subsystem is
+invisible to another enumerating the same catalogue*, and *a post-fix sighting is
+not proof the fix failed -- check process age first*.
+
+**THE OPERATOR'S REAL CONCERN WAS THE VOICE POOL, AND MEASURING IT PROVED HIM
+RIGHT AND THE DRIVER HASTY.** His words: *"many opioce models wer eblocekd and
+wtsil linmietd to a handful"*. First answer was a synthetic sweep that said the
+pool was flat and blamed the announcer. **That was too quick and is corrected in
+the plan.** Measured properly over **1351 episodes / 2011 voiced rows**:
+* **Nothing is blocked** -- 206 bank entries, ZERO quality-rejects, only the 3
+  reserved Lemmy clones removed (98.5% castable), and no caller requests
+  `require_commercial_clean`.
+* **Announcer rows** (654): 10 distinct, top-5 **99%**, `bm_george` alone
+  **82.3%** -- expected, it has its own pinned path (`announcer_voice_ref`) and
+  never touches the character pool. That half of the theory held.
+* **CHARACTER rows** (1357): 56 distinct but top-5 **66%**, `vz_bill_boerst`
+  23.7% + `vz_caro_davy` 18.8% = **42.5% between two voices**. He has been
+  hearing this and he is right.
+* **CAUSE: the match ladder, not a block.** Swept on gender alone -- on the same
+  `role="char_voice"` production passes -- the selector draws **40/40 at top-5
+  18%**, perfectly flat. Production also passes the writer's voice-fit `timbre`
+  + `age_band` (`cast_lock.py:909-926`), and `g+t+r+age` scoring narrows hard
+  enough that a couple of references win most slots before the ladder drops a
+  term. **The pool is open; the MATCHING concentrates it.** Filed as a queue row,
+  NOT fixed -- loosening timbre weight, spreading within a score tier, and
+  tracking recent use are all defensible and behave differently, so it wants a
+  panel. All of it measures on CPU.
+
+Gates: suite **11050 passed / 110 skipped / 1 xfailed**, MEASURED on the settled
+tree (11028 at open -> 11046 with the guard work -> 11050 with the Lemmy tests;
+every delta equals exactly the tests added). Bible regression **20 / 26 / 3**.
+`build_variants.py --check` **50 variants, 0 failures**, 34 nodes load. Both
+repos verified HEAD == origin. **A predicted 11050 was briefly written into
+BASELINES before being run** -- caught and replaced with the measured figure,
+because predicting that receipt is exactly how it drifted four times.
+
+Box state at handoff: VRAM **2294 MiB** of 16303 (baseline), GPU 7% idle. One
+resident ComfyUI on port **51202** (PID 38728) -- the documented "finished but
+resident" behaviour from the last render leg, carried over from the previous
+handoff, not a crash. A second unrelated server on **8199** is the
+`vram-recipe-lab` and predates this session; untouched.
+
+Current step: queue top is now the **voice-pool concentration** row (measured,
+cause found, wants a panel) alongside **PBUG-04 residue**, **PBUG-20260817-06**
+(Doyle names in a Leacock parody, undiagnosed), and the **24 stale PBUGs** to
+triage-and-close -- that last one is now proven worth doing, since PBUG-08 was
+sitting OPEN while fixed.
+
+Next: **the cheapest thing that puts a fresh episode in `otr/obs/` is the
+`media_archive` coda live-verification leg** -- a shipped fix that is unit-tested
+only. Reset per CLAUDE.md section 4 first (the 51202 server is resident). After
+that, take the voice-pool row with a panel.
+
+Models: Opus 5 drove. Kibitz: **Codex is NOT installed on this box**; Antigravity
+covered **r1 only** then returned `RESOURCE_EXHAUSTED (429)` on r2 -- a real
+provider quota block, not the `KIBITZ_AGY_PRINT_TIMEOUT` failure. Seats filled
+per the 2026-08-17 substitution directive: **Fable** r1 cold (and it REVERSED the
+round's central decision), **Opus + Sonnet** subagents r2, **Sonnet 5** QA on the
+finished diff before the push. **r3/r4 not run** -- r3's wiring question answered
+by direct verification instead (standalone scripts; nothing touches
+`workflows/otr_canonical.json`). **Reported as a scoped campaign, never as a full
+arc.** Real external lane count: **one**.
+
+Commits: OTR `8e7cf2b5` `f3d6a864` `6458825b` `fa6dba62` (4). Bible repo
+`b9aada7e` (1). The handoff commit lands on top and is not listed -- see the
+kickoff line for the real head.
+
 ## 2026-08-18 EVENING -- HEAD 8e7cf2b5 (v2.0-alpha) -- CODER (audition evidence guards: one queue item that verify-step-3 grew into three instruments; the cold Fable lane reversed the round's central decision; QA found a false negative in the guard itself)
 
 Did: **The cross-engine audition overwrite guard, and it was not one script.**
