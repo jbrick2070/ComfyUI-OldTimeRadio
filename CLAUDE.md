@@ -65,6 +65,32 @@
     DESIGN; there is nothing to pressure-test. Sonnet 5 QA on the finished diff before the
     push is the correct and sufficient gate.
   * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
+- **`otr/obs/` IS THE SUCCESS SIGNAL. ALWAYS PUBLISH TO IT (operator directive 2026-08-17 --
+  hard, and it OVERRIDES the tidiness instinct).** Operator, in his words: *"always publish to
+  obs -- a test is not complete unless published to obs (or it's just testing one part). If I
+  see it in obs then it's somewhat a success."* And the failure half: *"if I don't see it in
+  obs and it took more than 5 minutes, it's a fail."*
+  * **A leg that does not reach `otr/obs/` did not pass**, however green its logs are. The
+    published artifact IS the receipt -- that is how HE reads success without reading a log.
+  * **NEVER move, hide, sort or clean harness runs out of `otr/obs/`.** Soak, banksweep,
+    probe, acceptance and bank-gate legs BELONG there; seeing them is the point. **This rule
+    exists because I moved 17 of them into a `_diagnostics/` subfolder the same day, reading
+    them as pollution. They were his proof that the full path worked. Restored within
+    minutes; nothing was deleted.** The narrow, real complaint was only that the harness RUN
+    LABEL becomes the on-screen TITLE CARD -- cosmetic, and not a reason to touch the folder.
+  * **The `_bench_4arm` carve-out is NOT a precedent for this.** That exemption is scoped to
+    isolated stock-node BENCH graphs that never run the canonical workflow. A soak or bank-gate
+    leg DOES run the real canonical path end to end, which is exactly why its publication
+    proves something.
+  * **The 5-minute rule is a real gate:** if a leg has run longer than 5 minutes with nothing
+    in `otr/obs/`, treat it as failing and go read the leg log rather than waiting it out.
+  * **THE PRIORITY ORDER, in his words:** *"long term yeah I want the title right, but for my
+    dailies it keeps me going to see episodes."* So the title-card label IS a real want and it
+    is a LONG-TERM one; the daily stream of published episodes is the thing that must never be
+    interrupted to get it. **Fix the title at the source (stop reusing `episode_title` as the
+    harness's scratch field) -- never by suppressing, relocating or gating the publish.** If a
+    proposed fix would reduce how many episodes he sees in `otr/obs/` tomorrow, it is the wrong
+    fix no matter how tidy it is.
 - **A MISSING REVIEWER NEVER BLOCKS THE ARC -- SUBSTITUTE AND KEEP GOING (operator directive
   2026-08-17 -- hard).** Operator: *"if out of budget then a kibitz reviewer is not needed,
   ask Fable, Sonnet, or Opus, or `/anthropic-skills:roundtable` -- ANY model in lieu."*
