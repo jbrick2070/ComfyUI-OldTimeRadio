@@ -108,10 +108,27 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES (re-measured 2026-08-18 EVENING, on a settled tree):** suite
-**11050 passed / 110 skipped / 1 xfailed** -- MEASURED on the settled tree at the
-window close, not derived. Bible **20 / 26 / 3**, Bible holds **293** entries
-(`12.114` promoted this window -- see the promotion field).
+**BASELINES (re-measured 2026-08-18 LATE NIGHT, on a settled tree at HEAD
+`3a78703e`):** suite **11068 passed / 110 skipped / 1 xfailed** -- MEASURED by a
+full run on the settled tree, not derived from the previous figure. Bible
+**20 / 26 / 3**, Bible holds **293** entries. `build_variants.py --check`
+**50 variants / 0 failures**.
+
+> **`12.114` WAS AMENDED TWICE THIS WINDOW AND MUST NOT BE RE-PROMOTED.** The
+> entry count is UNCHANGED at 293 -- an amendment is not a new entry, so the
+> Three-File Contract owes no README bump for it and the regression stays
+> 20/26/3. Survival-guide: `b9aada7` original -> `e7179a9` (corrects the cause:
+> an uncovered path, not a stale process) -> `1da7cfd` (the third path, an
+> unguarded fallback fed by an empty category), HEAD == origin/main. It now
+> covers all three pools; reference it, do not promote it again.
+
+> **The `11050` in this block was correct when written and is now superseded by
+> `11068`** -- 18 tests added in `3a78703e` (`tests/test_lemmy_reserved_on_hybrid_
+> path.py`), and the delta equals exactly the tests added with no regressions.
+> **This figure was measured twice**: once before the push and once again on the
+> settled tree afterwards, both returning 11068. That is deliberate -- this
+> receipt has drifted four times by being written as arithmetic ahead of a run,
+> so the rule is now that the number goes in only after a run prints it.
 
 > Chain this window: **11028** measured at open -> **11046** with the 18
 > evidence-guard + citation-integrity tests -> **11050** with the 4 Lemmy

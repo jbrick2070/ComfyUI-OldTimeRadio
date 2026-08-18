@@ -3,18 +3,62 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-18 NIGHT -- HEAD fa6dba62 +handoff (v2.0-alpha) -- CODER (Lemmy closed as ALREADY FIXED after the operator said so first; Bible 12.114 promoted; the voice-pool concern measured and CONFIRMED, with the driver's first answer corrected)
+## 2026-08-18 NIGHT -- HEAD fa6dba62 +handoff (v2.0-alpha) -- CODER (~~Lemmy closed as ALREADY FIXED~~ **SEE CORRECTION BELOW -- THE CLOSE WAS HALF RIGHT**; Bible 12.114 promoted; the voice-pool concern measured and CONFIRMED, with the driver's first answer corrected)
+
+> ### CORRECTION FILED 2026-08-18 LATE NIGHT (commit `3a78703e`) -- READ BEFORE THIS ENTRY
+>
+> **This entry's central claim is wrong and the log is append-only, so it is
+> corrected here in place rather than rewritten.** Two things it asserts did not
+> hold up:
+>
+> 1. **"PBUG-20260817-08 ... VERIFIED AND CLOSED" -- it was not closed.** The
+>    reservation was applied in exactly ONE place, `assign_voice_for_slot`, which
+>    carries **~4% of production casting** (measured over 1711 ledgers: 1871 rows
+>    stamped from an accepted LLM proposal against 82 fallbacks). **Two other
+>    pools were unguarded**: the default-ON hybrid LLM voice-fit
+>    (`build_voice_cards` -> `validate_voice_proposal` -> `cast_lock.py:884-906`,
+>    which stamps and `continue`s past the selector entirely), and
+>    `gender_agnostic_fallback_ref` (3 call sites, reached by every `other`-gender
+>    row -- 20% of the roll, zero bank rows for it).
+> 2. **"A stale resident process reads exactly like a fix that did not work" --
+>    the wrong lesson from the right observation.** `rivers_embrace` did not leak
+>    because of a stale import. **It reproduces at HEAD on a freshly imported
+>    module**: `build_voice_cards("indextts2","male")[0]` returned
+>    `idx_lemmy_algenib_cockney_v1` -- Lemmy was **card #1 on every male slot** --
+>    and `validate_voice_proposal` accepted it. Process age was never the
+>    variable.
+>
+> **THE LESSON THAT REPLACES IT, and it is the sharper one:** a stale process and
+> an uncovered code path are **indistinguishable from the outside**. You do not
+> tell them apart by comparing process age to a commit timestamp -- that
+> comparison is available for both and decides neither. You tell them apart by
+> **reproducing through the path production actually takes**, on a fresh import.
+> The corollary that cost the most here: **a green test on the minority path
+> proves nothing about the majority path.** All three of this entry's
+> verifications were individually sound and all three were blind -- the 480
+> seeded draws swept the 4% path, and the clean-corpus window was a ~1% leak rate
+> not firing rather than a leak that could not.
+>
+> Fixed across all three pools in `3a78703e` with 18 tests. Full record:
+> `PROD_BUG_LOG.md` (PBUG-20260817-08) and
+> `docs/2026-08-18-ANCHOR-voice-pool-concentration.md`.
 
 The sha above is the second-to-last on the branch; the last is this handoff
 commit. (The evidence-guards work from earlier the same evening has its own
 entry directly below this one.)
 
-Did: **PBUG-20260817-08 (Lemmy cameo voice) CLOSED as already-fixed. The record
-was stale, not the code.** The operator said it first -- *"i tihni we spent alot
-of tiem fiuxing lemmy and its fixed now"* -- and he was right: the fix shipped
+Did: ~~**PBUG-20260817-08 (Lemmy cameo voice) CLOSED as already-fixed. The record
+was stale, not the code.**~~ **HALF RIGHT -- the code was stale too, in two other
+pools; see the correction at the top.** The operator said it first -- *"i tihni we spent alot
+of tiem fiuxing lemmy and its fixed now"* -- and the fix he meant did ship:
 `8f3c7615` on 2026-08-17 07:21. `reserved_voice_ref_ids()` derives the reserved
 set from the policy (every `local_wav` Lemmy route on any engine) and
 `assign_voice_for_slot` drops those ids from the candidate pool.
+**What was not true is that this closed the defect** -- `assign_voice_for_slot`
+is one of three pools that can hand out a voice, and the other two were still
+offering Lemmy's clone. The operator's instinct that Lemmy work was done was
+reasonable and the driver's job was to check it against the path production
+takes, which is what this entry did not do.
 
 **What was missing was proof at the right level, and that gap was real.** Every
 pre-existing test checked the reserved LIST -- that it holds his clones, that it
@@ -25,15 +69,39 @@ both genders and both role values, zero reserved refs reach a slot; plus a
 teeth-check that the reserved row IS in the unfiltered pool, so the sweep cannot
 pass for the wrong reason and keep passing if the guard were deleted.
 
-**THE TRAP WORTH KEEPING, and it cost more time than the bug.** The leak was
+~~**THE TRAP WORTH KEEPING, and it cost more time than the bug.**~~ **THIS
+PARAGRAPH IS THE WRONG DIAGNOSIS -- struck 2026-08-18 late night, see the
+correction at the top of this entry.** The leak was
 seen SIXTEEN HOURS AFTER the fix commit (`rivers_embrace` 23:30 vs fix 07:21).
 The reservation was already correct at that commit -- rebuilt it from
 `8f3c7615:config/cast_pools.py` to be certain, all three clone ids present. The
 soak harness boots ONE server and never tears it down, so the evening leg still
-ran the module Python imported that morning. **A stale resident process reads
-exactly like a fix that did not work.** Corpus confirms: the only two rows
+ran the module Python imported that morning. ~~**A stale resident process reads
+exactly like a fix that did not work.**~~ Corpus confirms: the only two rows
 putting his voice on a non-Lemmy character are both 08-17; everything from 08-18
 is clean.
+
+> **WHAT WAS ACTUALLY TRUE.** Every sentence above about the resident server is
+> factually correct and describes a real trap -- it simply was not operating
+> here. The reservation WAS correct at `8f3c7615`, and it was correct at HEAD,
+> and `rivers_embrace` leaked anyway, because the row never went through the
+> code the reservation guards. `ED HIBBERT` was cast by the hybrid LLM path,
+> which had never heard of reserved ids and was being handed Lemmy's clone as
+> **card #1**. Re-running the same call today, on a fresh import, reproduces it.
+>
+> The corpus sentence is also true and was also misleading: "everything from
+> 08-18 is clean" was a **~1% leak rate (21 of 1877 proposals) not firing in a
+> narrow window**, read as proof it could not fire. Over the full corpus the
+> hybrid path put his voice on DON PEDRO, MARCELLUS, BANQUO, FLETCHER CORBEN,
+> STARBUCK, FERDINAND, MOE GORDON and Dr. Alexei Petrov -- 20 leaked rows, 18 of
+> them hybrid. **The remaining 2 came from a third pool** nobody had looked at,
+> `gender_agnostic_fallback_ref`, which a QA pass later measured returning his
+> clone in 7-9 of every 200 draws.
+>
+> **The check that would have caught it in minutes:** call the production path
+> directly and see which voice comes back. Not "is the list right" (it was), not
+> "how old is the process" (irrelevant), but "what does the code that actually
+> casts return, right now."
 
 **THE 10.2% NEVER MEANT 10.2% WRONG.** It was that reference's share of all cast
 rows over 40 episodes SPANNING the fix date, most of it legitimate cameos.
@@ -43,8 +111,27 @@ in all three places per the Three-File Contract, coverage-index row added and it
 header count moved, regression re-run green). Admissible because it surfaced on
 two live published episodes and promotable only now the fix is verified. Two
 reusable halves: *a reservation existing as a CONVENTION in one subsystem is
-invisible to another enumerating the same catalogue*, and *a post-fix sighting is
-not proof the fix failed -- check process age first*.
+invisible to another enumerating the same catalogue*, and ~~*a post-fix sighting
+is not proof the fix failed -- check process age first*~~.
+
+> **12.114 HAS SINCE BEEN AMENDED TWICE AND NOW COVERS ALL THREE PATHS. IT WAS
+> NOT RE-PROMOTED -- do not promote it again.** The entry count is unchanged at
+> **293**, so no README bump was owed for the amendments. Survival-guide history:
+> `b9aada7` original -> `e7179a9` *"correct the cause - it was an uncovered path,
+> not a stale process"* -> `1da7cfd` *"the third path - an unguarded fallback fed
+> by an empty category"* (HEAD, == origin/main). Its tags now carry
+> `uncovered-second-path`, `guard-at-one-chokepoint`, `unguarded-fallback-path`
+> and `empty-category-routes-to-fallback`.
+>
+> **The FIRST reusable half stands and is the better one than anyone realised** --
+> *"a reservation existing as a CONVENTION in one subsystem is invisible to
+> another enumerating the same catalogue"* describes `build_voice_cards` exactly,
+> and it was already written down while two subsystems were still blind to it.
+> **The SECOND half was the wrong lesson and is struck.** "Check process age
+> first" is precisely the move that produced this error: process age was
+> available, was checked, and decided nothing. What replaces it is in the
+> correction at the top of this entry -- reproduce through the path production
+> actually takes.
 
 **THE OPERATOR'S REAL CONCERN WAS THE VOICE POOL, AND MEASURING IT PROVED HIM
 RIGHT AND THE DRIVER HASTY.** His words: *"many opioce models wer eblocekd and
@@ -94,6 +181,23 @@ Next: **the cheapest thing that puts a fresh episode in `otr/obs/` is the
 `media_archive` coda live-verification leg** -- a shipped fix that is unit-tested
 only. Reset per CLAUDE.md section 4 first (the 51202 server is resident). After
 that, take the voice-pool row with a panel.
+
+> **BOTH LINES ARE SPENT -- superseded by `3a78703e`, kept as the record.** The
+> `media_archive` leg RAN and published: `signal_lost_the_16mm_ransom_20260818
+> _145217` in `otr/obs/` (RESULT SUCCESS, 1920x1080 h264+aac, 3:11, 30 MB), coda
+> naming the Library of Congress and closing on one reflective thought, with the
+> opening announcer staying pure fiction. The voice-pool row was measured and its
+> **recorded cause corrected** -- the match ladder is flat and the concentrator
+> is the same alphabetical 12-card truncation; it still wants its panel, and the
+> driver anchor is written at
+> `docs/2026-08-18-ANCHOR-voice-pool-concentration.md`.
+>
+> **And the stale-PBUG sentence has it backwards in the more dangerous
+> direction.** PBUG-08 was not "sitting OPEN while fixed" -- it was **CLOSED
+> while two of its three pools were still broken**. A row left open costs a
+> re-read; a row closed early costs the belief that the defect is gone. Triaging
+> the 24 stale PBUGs is still worth doing, but the check is "does the fix cover
+> the path production takes", not "has this been fixed somewhere".
 
 Models: Opus 5 drove. Kibitz: **Codex is NOT installed on this box**; Antigravity
 covered **r1 only** then returned `RESOURCE_EXHAUSTED (429)` on r2 -- a real
