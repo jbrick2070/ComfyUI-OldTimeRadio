@@ -1,0 +1,2 @@
+- 2026-08-17T17:52:12 Antigravity quota/backend exhaustion detected in recent CLI log C:\Users\jeffr\.gemini\antigravity-cli\log\cli-20260817_170647.log:
+- 2026-08-17T17:52:12 Antigravity failed on quota/credit/rate-limit usage. Suggested retry after 1h (2026-08-17T18:52-07:00).
