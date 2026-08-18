@@ -48,8 +48,14 @@ if str(REPO) not in sys.path:
 
 EFFECTIVE_EMOTION_MASS_CAP = 0.4
 
-# One P-OBS line, as `_render_per_line` writes it.
+#: The role that owns the fix. Everything else is a different lane with a
+#: different contract, and mixing them is how a checker cries wolf.
+CHARACTER_LANE = "char_voice"
+
+# One P-OBS line, as `_render_per_line` writes it. The ROLE prefix is captured
+# because the two lanes answer to different contracts.
 _POBS = re.compile(
+    r"(?P<role>[a-z_]+):\s+"
     r"line=(?P<line>\S+)\s+char=(?P<char>\S+)\s*->\s*"
     r"voice_ref_id=(?P<ref_id>\S+)\s+"
     r"ref=(?P<ref>\S+)\s+"
@@ -80,9 +86,12 @@ def parse_pobs(text: str) -> list:
 
 
 def audit_rows(rows: list) -> dict:
-    """The five checks, as counts and named offenders."""
+    """The checks, as counts and named offenders -- PER LANE."""
+    character_rows = [r for r in rows if r["role"] == CHARACTER_LANE]
+    other_rows = [r for r in rows if r["role"] != CHARACTER_LANE]
+
     by_char = collections.defaultdict(list)
-    for row in rows:
+    for row in character_rows:
         if row["char"] != "-":
             by_char[row["char"]].append(row)
 
@@ -102,34 +111,56 @@ def audit_rows(rows: list) -> dict:
 
     over_cap = [
         {"line": r["line"], "char": r["char"], "mass": r["mass"]}
-        for r in rows
+        for r in character_rows
         if r["mass"] is not None and r["mass"] > EFFECTIVE_EMOTION_MASS_CAP
     ]
-    policies = collections.Counter(r["policy"] for r in rows)
-    alphas = collections.Counter(r["alpha"] for r in rows)
+    policies = collections.Counter(r["policy"] for r in character_rows)
+    alphas = collections.Counter(r["alpha"] for r in character_rows)
+
+    # THE INVERSE CHECK [QA-6]. The announcer is not a cloned character and has
+    # no identity to hold steady across beats, so his profile was deliberately
+    # left on the legacy seed. A row on the OTHER lane that turns up on
+    # `char_v1` means the opt-in leaked past its scope.
+    leaked = [
+        {"role": r["role"], "line": r["line"], "policy": r["policy"]}
+        for r in other_rows if r["policy"] != "line_v1"
+    ]
 
     return {
         "voiced_lines": len(rows),
+        "character_lane_lines": len(character_rows),
+        "other_lane_lines": len(other_rows),
         "characters": len(by_char),
         "policies": dict(policies),
         "alphas": dict(alphas),
-        "capped_lines": sum(1 for r in rows if r["capped"]),
+        "capped_lines": sum(1 for r in character_rows if r["capped"]),
         "max_effective_mass": max(
-            (r["mass"] for r in rows if r["mass"] is not None), default=0.0),
-        "rows_without_emotion": sum(1 for r in rows if r["mass"] is None),
+            (r["mass"] for r in character_rows if r["mass"] is not None),
+            default=0.0),
+        "rows_without_emotion": sum(
+            1 for r in character_rows if r["mass"] is None),
         "characters_with_split_seeds": split_characters,
         "characters_with_moving_reference": moving_reference,
         "lines_over_the_cap": over_cap,
+        "other_lane_rows_on_the_character_policy": leaked,
     }
 
 
 def verdict(report: dict, expect_policy: str = "", expect_alpha: str = "") -> list:
     """Human-readable findings. An empty list is a clean arm."""
     findings = []
-    if not report["voiced_lines"]:
-        findings.append("NO VOICE RECEIPTS FOUND -- this log has no char_voice "
-                        "P-OBS lines, so it proves nothing about the fix")
+    if not report["character_lane_lines"]:
+        findings.append("NO CHARACTER-LANE RECEIPTS FOUND -- this log has no "
+                        "char_voice P-OBS lines, so it proves nothing about the "
+                        "fix (%d line(s) on other lanes)"
+                        % report["other_lane_lines"])
         return findings
+
+    if report["other_lane_rows_on_the_character_policy"]:
+        findings.append(
+            "SCOPE LEAK [QA-6]: a non-character lane rendered on the character "
+            "seed policy -- %s"
+            % report["other_lane_rows_on_the_character_policy"][:4])
 
     if report["lines_over_the_cap"]:
         findings.append(
@@ -204,8 +235,10 @@ def main(argv=None) -> int:
         if not args.json:
             print("=" * 72)
             print("ARM %s" % path.name)
-            print("  voiced lines      : %d across %d characters"
-                  % (report["voiced_lines"], report["characters"]))
+            print("  character lines   : %d across %d characters "
+                  "(+%d on other lanes, expected legacy)"
+                  % (report["character_lane_lines"], report["characters"],
+                     report["other_lane_lines"]))
             print("  seed policies     : %s" % report["policies"])
             print("  alphas            : %s" % report["alphas"])
             print("  max emotion mass  : %s (ceiling %s), %d line(s) capped"
