@@ -1,0 +1,7 @@
+﻿[bank-gate] 2026-08-17 17:04:31  BANK shakespeare (profile otr_w45_still_flat) -> _bankgate_shakespeare.log
+
+=========== WRITER BANK GATE (1 acts) ===========
+shakespeare        PASS exit=0      10.6 min   
+1/1 banks passed
+banks registered: 5 | run: 1
+NOT RUN (4): media_archive, original, scifi_news_pro, public_domain

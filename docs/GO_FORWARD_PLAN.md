@@ -717,9 +717,81 @@ and `RealESRGAN_x4plus_anime_6B` (ESRGAN, scale 4, tags `['64nf','6nb']`,
   cache fingerprint folds `declared_sha256`. That is a design fork with more
   than one defensible answer, so it takes an arc; the downloads did not.
 
-**F. The Shakespeare wrong-play frame family** (section D) + assembly-lint.
-**r1 RAN 2026-08-17, BOTH OPERATOR-NAMED LANES, AND IT DISPROVED SECTION D'S OWN
-DIAGNOSIS.** Artifacts: `kibitz-runs/2026-08-17-item-F-wrong-play-frame/`
+**F. THE WRONG-PLAY FRAME IS CODED AND PUSHED (`87dee50d`, 2026-08-17).**
+r1-r3 ran with both operator-named agy lanes, a Fable narrative gate and a
+Sonnet 5 QA pass on the finished diff; **r4 convergence and ONE LIVE LEG are what
+remain**, and Codex is quota-held to 2026-08-19, so this is **not yet a full
+four-round arc**.
+
+**WHAT SHIPPED:** `work_title` threaded to BOTH announcer producers and to
+`OutlineRequest`, rendered as `WORK: a scene from <title>` by a pure `_work_line`
+helper, sourced from `_otr_source_identity.identity_from_meta`, with both
+adaptation pack seams reworded. 18 tests, suite 10842 -> **10860**.
+
+**THE BUILD-BREAKER THE PANEL CAUGHT, and it is the lesson worth keeping.** The
+plan (mine) asserted every non-adaptation lane yields an empty `work_title`.
+**FALSE, and measured:** `identity_from_meta` maps `media_archive`'s
+`source_label` onto the SAME field, and **56 of 98 live media_archive ledgers
+carry one** -- the first example being `"Now See Hear!"`. Ungated, every one
+would have announced *"a scene from Now See Hear!"*, inventing a play on 57% of a
+live lane -- a worse fidelity defect than the one being fixed. **Sonnet CLEARED
+that lane** (it read the producer module and found nothing populating the field);
+**Pro 3.1 CAUGHT it** (it read the consumer's own mapping); **the corpus
+decided.** Now gated on `_otr_source_identity.ADAPTATION_SOURCE_KINDS` with a
+positive control so the gate cannot be satisfied by a predicate false for
+everything.
+> **THE SHAPE, third sighting in one day:** one field carrying TWO MEANINGS --
+> the work PERFORMED vs the publication a post came from. Same as the
+> `_neg_source` lie (H-receipt) and PBUG-20260817-03's two naming authorities.
+> **A consumer meaning "the work this episode performs" gates on the LANE, never
+> on truthiness.**
+
+**TWO INFRASTRUCTURE FACTS FOUND HERE, both cost a retry:**
+* **`kibitz.py --topic` is the lane-isolation lever.** The run folder is
+  `<date>-<--topic>` and `--topic` DEFAULTS to `kibitz`, so two lanes in one
+  round silently overwrite each other -- both return rc=0 and both print
+  "Reviews collected: antigravity: OK". One topic per lane, always.
+* **Pro 3.1 needs `KIBITZ_AGY_PRINT_TIMEOUT` on a long doc.** `kibitz.py
+  --timeout` does NOT reach agy; the CLI flag is built from `AGY_PRINT_TIMEOUT`,
+  default `5m`. Two attempts died with `Error: timeout waiting for response`;
+  `15m` landed first try. **That failure is NOT a quota block** -- `agy models`
+  returned rc=0 throughout.
+
+**AND THE UNTRACKED-ARTIFACT TRAP BIT A THIRD TIME, in a third directory.**
+`tests/test_cross_play_frame_leak.py` -- the only test that drives the real
+composer against the real manifest and pins the literal shipped-defect string --
+was `??` in `git status` and would have been left local-only. Not gitignored,
+just never added. **`scripts/_*.py`, `kibitz-runs/`, and now a plain new test:
+check `git status` before the commit; `git add <dir>` is not enough.**
+
+**PROVEN ON A LIVE LEG 2026-08-17 -- receipt:
+`kibitz-runs/2026-08-17-item-F-wrong-play-frame/live_leg_receipt.md`.**
+`otr_writer_bank_gate.py --banks shakespeare --acts 1` against a fresh headless
+server loading the canonical JSON: **PASS, exit 0, 10.6 min.** The episode drew
+`The Tempest` (Act 1 Sc 2) and the announcer said:
+> *"Good evening, listeners. Tonight, we bring you Shakespeare's 'The Tempest',
+> where Prospero and Miranda brace against a gathering storm."*
+Right play, only the locked cast named, and **no other manifest play's title
+appears anywhere in the episode** (checked over the full spoken text against all
+14 rows). **`meta.announcer_intro_rewrite` = `announcer_intro_rewritten`, so the
+SECOND producer fired and the fix still held** -- the single most likely way for
+this to be silently undone, and the reason r1 insisted both producers change
+together. A leg where the rewrite did not fire would not have tested it.
+
+**WHAT THE LEG DOES NOT PROVE:** one leg, one play, one seed -- a mechanism
+check, not a rate. `public_domain` shares every symbol and had its seam changed
+in the same commit but was **NOT exercised** and remains unproven live. And the
+detector catches CROSS-PLAY leakage only; a wholly invented place belonging to no
+manifest row would pass both the leg and the test.
+
+**STILL OWED: r4 with the CODEX lane.** r4 converged on both agy lanes (zero
+must-fix, one `__all__` should-fix taken), but Codex was quota-held to
+2026-08-19 and never participated in ANY round. **If a full arc requires the
+Codex lane, this is a four-round campaign one reviewer short and must be
+described that way.**
+
+**The r1 detail below is kept for its rulings.** r1 DISPROVED SECTION D'S OWN
+DIAGNOSIS. Artifacts: `kibitz-runs/2026-08-17-item-F-wrong-play-frame/`
 (`driver_anchor.md`, `r1_antigravity_flash37.md`, `r1_judgment.md`,
 `r1_final.md`) + `kibitz-runs/2026-08-17-item-F-pro31/r1/`. **r1 ONLY -- Codex is
 quota-held to 2026-08-19 20:31, so this is NOT a full arc and must not be

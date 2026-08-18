@@ -3,6 +3,94 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-17 (item F window) -- HEAD 87dee50d +this (v2.0-alpha) -- CODER (Bible 11.61 promoted; item E step a; item F coded, four-round arc, Fable gate, Sonnet QA, and PROVEN ON A LIVE LEG; three driver errors caught by the panel, two of them build-breakers)
+
+**THE WRONG-PLAY FRAME IS FIXED AND PROVEN ON PIXELS, and the plan's own
+diagnosis of it was wrong in both halves.** GO_FORWARD section D said the frame
+was *"sampled independently of the selected excerpt"*. Nothing samples a play --
+the only draws pick the SCENE (correctly) and a style slug (deterministic hash),
+and no constant on that path contains "Verona"; the wrong place is a free-text
+LLM field. And it is not generated from a different record: the record is NEVER
+HANDED to it. `source_meta_from_scene` builds a complete record, the writer
+stamps it, and it then dies three times -- the interpreter call passes
+`source_meta` only in its `except` branch, `OutlineRequest` had no play field,
+and `SafeOpenBrief` had exactly five. A THREADING defect, not a consumption one.
+
+**THE LIVE LEG IS THE RECEIPT.** `otr_writer_bank_gate.py --banks shakespeare`,
+PASS in 10.6 min, drew The Tempest, and the announcer said *"Tonight, we bring
+you Shakespeare's 'The Tempest', where Prospero and Miranda brace against a
+gathering storm."* Right play, only the locked cast, no other manifest title
+anywhere in the episode -- and `announcer_intro_rewrite` fired, so the SECOND
+producer overwrote the first frame and STILL named the right work. That was the
+likeliest silent undo and the reason both producers were changed together.
+
+**THREE OF THE FOUR THINGS THE ARC CAUGHT WERE THE DRIVER'S OWN ERRORS, AND TWO
+WERE BUILD-BREAKERS.**
+* **r1 -- Shape C was a category error.** I tabled `_otr_passage_selector` as a
+  candidate fix because its docstring contains the word "Verona". It is a
+  verbatim dialogue-window slicer that touches no announcer symbol. *A docstring
+  naming your symptom is not evidence the module solves your defect* -- item A's
+  name-matching ruling from a new direction.
+* **r2 -- an `UnboundLocalError` on four of six banks.** My diff plan read
+  `_otr_source_identity`, which was imported INSIDE the `provenance_normalize`
+  branch. `SafeOpenBrief` is built on the bank-agnostic path, so every original /
+  media_archive / news episode would have died, and any adaptation-only test
+  would have passed.
+* **r3 -- the media_archive build-breaker, and the corpus settled a reviewer
+  disagreement.** I asserted every non-adaptation lane yields an empty
+  `work_title`. FALSE: `identity_from_meta` maps media_archive's `source_label`
+  onto the same field, and **56 of 98 live ledgers carry one** -- first example
+  `"Now See Hear!"`. Ungated it would have announced *"a scene from Now See
+  Hear!"* on 57% of a live lane, inventing a play -- worse than the defect being
+  fixed. **Sonnet CLEARED that lane** (read the producer, found nothing writing
+  the field); **Pro 3.1 CAUGHT it** (read the consumer's own mapping). Neither
+  reading beat the artifact. Now gated on `ADAPTATION_SOURCE_KINDS` with a
+  positive control.
+* **Fable killed an adopted row and found a defect nobody had.** Pro's "assert
+  the setting contains no proper name outside the cast" rejects the CORRECT
+  setting on 5 of 14 scenes -- Elsinore, Capulet's garden, Ephesus, Arden, the
+  wood near Athens, all from the manifest's own synopses. And a bare title makes
+  the announcer promise a whole play while delivering one scene -- systematic,
+  where the wrong-play bug was intermittent. Hence `a scene from`.
+
+**THE SHAPE THAT KEEPS RECURRING, third sighting in one day:** ONE FIELD CARRYING
+TWO MEANINGS. `work_title` = the work PERFORMED vs the publication a post came
+from; `_neg_source` = composition vs engine behaviour (H-receipt); and
+PBUG-20260817-03's two naming authorities. **A consumer meaning one of them must
+gate on the LANE, never on truthiness.**
+
+**AND THE PROMPT-ONLY FIX IS DEAD ON EVIDENCE, not principle.** The seam ALREADY
+said *"Use ONLY the proper names in the cast list below; invent none."* Verona,
+Capulet and Montague are proper names. That instruction already forbade the
+shipped defect and did not hold -- Bible 12.103's lesson with the artifact to
+prove it on this exact prompt. So the rendered `WORK:` label is the guarantee and
+the seam wording is belt-and-braces.
+
+**TOOLING FACTS THAT EACH COST A RETRY:**
+* **`kibitz.py --topic` is the lane-isolation lever.** The run folder is
+  `<date>-<--topic>`, default `kibitz`, so two lanes in one round silently
+  overwrite each other while BOTH return rc=0 and print "Reviews collected:
+  antigravity: OK". The first Pro r1 review was lost this way.
+* **Pro 3.1 needs `KIBITZ_AGY_PRINT_TIMEOUT=15m` on a long doc.** `--timeout`
+  does not reach agy. Two runs died on `Error: timeout waiting for response`,
+  which is NOT a quota block -- `agy models` returned rc=0 throughout.
+* **The untracked-artifact trap bit a THIRD time, in a third directory.**
+  `tests/test_cross_play_frame_leak.py` -- the sharpest pin in the change -- was
+  `??` and would have been left local-only. Sonnet caught it. Not ignored, just
+  never added: check `git status` before the commit.
+
+**ALSO THIS WINDOW:** Bible **11.61** promoted for PBUG-20260817-03 (two naming
+authorities leak an upstream plan's name into an assigned record; 287 -> 288,
+README bumped in all three citations, index row appended, survival-guide
+`ff0eb13`), with that bug diagnosed at the files and queued as item **I** -- the
+code fix is NOT built and takes an arc. Item **E step (a)** shipped: two
+BSD-3-Clause ESRGAN candidates on disk, each identity-proven through spandrel
+rather than trusted from the download, wired to nothing. And the BASELINES block
+was re-measured: it claimed 10824, the tree said 10842.
+
+**Suite 10842 -> 10860 passed / 110 skipped / 1 xfailed**, the +18 exactly the
+new tests. Bible regression 20/26/3.
+
 ## 2026-08-17 (item C + H-receipt window) -- HEAD 9804f7a2 +this (v2.0-alpha) -- CODER (item C DONE both halves; H split and its receipt half shipped; a matrix-scraper regression root-fixed; 8 of 21 cited line numbers proven wrong; the panel corrected the driver on execution order TWICE)
 
 **THE RESEARCH HALF THEN RAN, AND IT PAID FOR ITSELF IN TRAPS RATHER THAN TIPS.**

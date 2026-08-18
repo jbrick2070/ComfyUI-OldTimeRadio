@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping
 
 __all__ = [
+    "ADAPTATION_SOURCE_KINDS",
     "SOURCE_IDENTITY_VERSION",
     "SourceIdentity",
     "identity_from_meta",
