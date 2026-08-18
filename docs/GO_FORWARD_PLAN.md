@@ -310,15 +310,16 @@ shipping the ceiling alone would have delivered 0.400 on a neutral line and
 0.374 on the emotional one -- not the rung he approved. Measured on the shipped
 build: **0.5600 / 0.5590 / 0.5600**, speaker retained 0.4400-0.4410.
 
-**OUTSTANDING, AND IT IS A LISTEN, NOT A BUILD.** The ladder rendered the
-EMOTIONAL line only. 56 of 57 character lines sampled from the six most recent
-ledgers are calm-dominated, so NEUTRAL delivery is what ordinary dialogue
-actually sounds like -- and a neutral beat is where the original identity defect
-lived. A blinded three-arm audition is rendered and waiting at
-`otr/episodes/lemmy_production_audition_ceiling_2026-08-18/` (armY = shipped,
-armZ = same seed policy with the ceiling disabled, armX = full pre-fix). If the
-neutral lines read wrong to him, the ceiling is one constant away from a
-different rung and the qualification record is re-cut.
+**CLOSED 2026-08-18 ON A BLINDED LISTEN. DO NOT RE-OPEN IT.** The neutral-line
+question was the one real gap, and it was answered: three arms, blinded, at
+`otr/episodes/lemmy_production_audition_ceiling_2026-08-18/`. He picked armZ /
+armY / armY. **The seed fix won 3-0 cleanly** -- armX and armZ carry identical
+emotion blends, so the only variable between them is the seed policy and armX
+lost every line. **The ceiling won 2-1**, and he settled the odd line himself:
+*"we dont need to make it six sigma you know I dont like the real emo ones"* --
+armZ is the uncapped arm, so line 1 was noise. **0.560 is final.** No further
+ladder, no tie-break, no per-line-shape ceiling. This is a settled taste call,
+not an open measurement.
 
 | item | state |
 |---|---|
