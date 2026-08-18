@@ -105,6 +105,18 @@ and the operator still needs to tell those runs apart at a glance.
    what actually ships -- which is the entire reason these runs exist. If your
    proposal makes an automated run behave *differently* from a real episode
    anywhere except the label it carries, say so explicitly and justify it.
+
+   **AND DO NOT PROPOSE SAVING A HARNESS GRAPH.** Operator, same session: *"I'm
+   very wary of saving harnesses -- I feel like each run should be regenerated
+   from the canonical json."* So the graph for every automated run is **built
+   fresh from `workflows/otr_canonical.json` at run time**. No saved harness
+   workflow, no committed `.gen.json`, no cached or pre-baked variant, no
+   "golden" copy kept alongside for speed. A stored graph is a snapshot, and a
+   snapshot silently stops matching production the moment the canonical file
+   moves -- at which point the run is testing history. **Any proposal that
+   introduces a saved graph, or that depends on one already existing, is
+   disqualified.** A fix may add a PARAMETER passed at run time; it may not add
+   a stored workflow.
 4. **The human override must survive.** A person typing a real title into that
    box is a wanted feature. Do not remove it.
 5. **An audit may never FAIL an episode** for length, language, style or
