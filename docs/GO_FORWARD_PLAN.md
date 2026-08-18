@@ -324,7 +324,8 @@ not an open measurement.
 | item | state |
 |---|---|
 | **voice identity fix (PBUG-20260817-09)** | **DONE -- shipped, re-qualified as `prod-audition-2026-08-18`, route `...-cockney-v2`, fingerprint `9bee950a7920fd00`** |
-| **emotion ceiling 0.560** | **SHIPPED -- awaiting his listen on the NEUTRAL lines of the three-arm audition** |
+| **emotion ceiling 0.560** | **DONE AND CLOSED** -- neutral lines heard blind 2026-08-18; seed fix 3-0, ceiling 2-1, he settled the odd line (*"I dont like the real emo ones"*). Do not re-open |
+| **live episode on the new voice build** | **NEXT** -- nothing has rendered a FULL episode through the changed adapter yet. Audition-proven is not obs-proven |
 | cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
 | PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |
