@@ -68,6 +68,63 @@ by a two-agent backsweep (git history + handoff/smoke docs), prod-only bar appli
 cross-checked against BUG_BIBLE.yaml (BUG-11.26 family, 12.47, 07.16 excluded as
 already promoted). Confidence tags preserved from the sweep.
 
+## PBUG-20260818-01 -- the news CODA read like a wire-service article, not a wire-desk close
+
+- surfaced: 2026-08-18, from a published episode the operator watched --
+  `signal_lost_the_searing_relay_20260818_094723`. Live artifact, not a review.
+  Operator, verbatim: "i thin it went way oevrboard in anaoucning teh coda teh
+  coda shoudl eb abreif sumamry opf tyeh enws not teh whoel new story."
+- symptom, read straight from the episode's own treatment file: the closing
+  CODA line ran 114 words / roughly seven sentences -- a dense paragraph citing
+  the Union of Concerned Scientists and a named 2024 Florida law, stacked
+  alongside four separate health claims. One CODA, not several: the episode ran
+  3 acts and the operator's first theory was three stacked codas, but the
+  ledger shows exactly one CODA beat (`shot_004_b3`); it was simply long on its
+  own.
+- root cause, verified at the file: `nodes/story_packs/scifi_news_pro/
+  scifi_news_pro.json`, seam `scifi_news_pro_script_system`. The grammar line
+  `CODA: <spoken coda>` carried NO length or scope instruction -- nothing told
+  the writer model the coda should be short. Every sibling pack that closes on
+  a source note (`public_domain`, `shakespeare`, `original`, `media_archive`)
+  uses a DIFFERENT architecture: a dedicated `coda_system` seam that explicitly
+  says "Write ONE short bridge clause... whatever follows is added AFTER your
+  clause by the producer -- you do NOT write it," with the real attribution
+  appended deterministically by code. `scifi_news_pro` has no such split -- the
+  writer model free-generates the entire CODA inside one big script-writing
+  call, with the full source digest sitting right there in context and nothing
+  bounding how much of it gets pulled in.
+- the pack's own P2c pass (`scifi_news_pro_news_read_system`, producing
+  `treatment.news_close_read`) is structurally the RIGHT shape for this -- a
+  short, separately-generated factual line -- but it is a different beat from
+  the script-writer's CODA and was not what rendered in this episode. Its
+  Python docstring (`NewsCloseRead`, `_otr_scifi_news_pro.py:429-433`) claims
+  "the seam still asks for 1-2 wire-desk sentences," which is FALSE against the
+  live prompt text on disk: `scifi_news_pro_news_read_system` carries no such
+  instruction either. Noted, not fixed here -- it did not produce today's
+  observed defect and folding it in would have widened this change past the
+  admitted bug.
+- fix: added an explicit brevity clause to `scifi_news_pro_script_system`
+  directly after the grammar block: "CODA MUST STAY BRIEF: one to three short
+  sentences, stating only the single most load-bearing real-world fact this
+  story is grounded in. It is a wire-desk close, not an explainer -- never
+  stack more than one supporting statistic or source, and never write a
+  paragraph." Length settled with the operator directly (offered one-to-two,
+  he raised it to one-to-three).
+- verify: `tests/test_scifi_news_pro_prompt_snapshots.py::
+  test_script_seam_owns_complete_plain_text_grammar` asserts substrings only
+  (`CODA: <spoken coda>`, `END.`, etc.), all of which survive the edit
+  untouched; 84/84 scifi_news_pro tests green, full suite unaffected.
+- gates: 84 scifi_news_pro tests passed; full suite run in the same session.
+- Bible: not promoted. The generalisable shape -- an LLM asked to write a
+  factual close with the full source digest in context and no length bound
+  will use it -- is close to existing prompt-craft lessons and this fix is a
+  single-pack prompt edit with a live root cause, not yet checked against the
+  coverage index for a genuinely uncovered angle. Candidate for the next
+  delta-scrape rather than promoted inline.
+- status: FIXED and live root-caused; NOT yet re-proven on a live render (the
+  fix landed after this session's episode leg). Next live leg on this pack is
+  the verification artifact.
+
 ## PBUG-20260817-09 -- a character's VOICE DRIFTS BETWEEN HIS OWN LINES: the synthesis seed is re-rolled per line
 - surfaced: operator listening to `signal_lost_mongooses_stand_20260817_234050` in `otr/obs/`, 2026-08-17. In his words: *"Nag's first voice was [fine], the second Nag drifted to a voice that I often hear but doesn't line up with Nag's first speech."* Live published artifact -> admission rule satisfied. **Found by ear before it was found in data.**
 - symptom: within ONE episode, the same character sounds like two different people across his two speeches. Not intermittent -- it is the normal behaviour of every multi-line character.
