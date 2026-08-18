@@ -108,8 +108,18 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES (re-measured 2026-08-18):** suite
-**10913 passed / 110 skipped / 1 xfailed**.
+**BASELINES (re-measured 2026-08-18 EVENING, on a settled tree):** suite
+**11046 passed / 110 skipped / 1 xfailed**. Bible **20 / 26 / 3**, Bible holds
+**292** entries (nothing promoted this window -- see the promotion field).
+
+> **THIS BLOCK SAID `10913`. THE MEASURED PRE-CHANGE NUMBER WAS `11028` -- a
+> 115-test gap, and the FOURTH drift of this "single authority" receipt in three
+> days.** The `11028` figure also appears in the `HANDOFF_LOG.md` entry written
+> at the same close, so the log was right and this block was stale. The evidence
+> -guards window then measured `11046` after adding exactly 18 tests
+> (15 guard + 3 citation-integrity), so the delta is accounted for to the test.
+> **Re-measure before trusting this line**, and never read the trailing `1` as a
+> failure -- it is an xfail.
 
 > **THIS BLOCK SAID `10824` AND THE MEASURED NUMBER IS `10842` -- an 18-test gap
 > this file cannot account for.** Measured on a settled tree with a docs-and-
@@ -336,7 +346,10 @@ not an open measurement.
   a small local model does not reliably resist a fact sitting in its own context. Fixed by
   excluding `news_close_read` from that one prompt-build call. `media_archive` got the same
   "who found it + end on a thought" shape but is NOT yet live-verified |
-| cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal. A spawned task chip already scopes this fully -- check for it before writing a fresh brief |
+| cross-engine audition overwrite guard | **DONE 2026-08-18** -- and verify step 3 grew it from one script to three. Shared guard `scripts/_otr_evidence_citations.py` walks the LIVE `LEMMY_VOICE_POLICY` for every sha256 and refuses to overwrite any file the ledger cites; no flag can override it. `--out-dir` on the cross-engine audition, the same guard on G1 with `--overwrite` REMOVED (zero callers) and its manifest/KEY writes made atomic, `--campaign-dir` on the listen page. **The unit of immutability is the cited BYTES, not the directory** -- the campaign dir is a shared workspace (the listen page writes `LISTEN.html` into it every run), so the production audition's blanket non-empty refusal would have been wrong here. Proven live: `--render` against the cited dir exits 2 naming all seven files with zero mtimes touched, and `--engine bark` alone still refuses on the shared manifest |
+| **evidence citation ROT DETECTION** | **DONE 2026-08-18, and it was the highest-value half.** Detection existed where stakes were LOWEST and was absent where highest: the provisional routes had a byte-level check, the **QUALIFIED** route's manifest had NO on-disk check anywhere, and the superseded G1 record had only a config-literal assertion while its docstring claimed the file still hashed. `tests/test_evidence_citation_integrity.py` now re-hashes every cited artifact across all three tiers, with a coverage tripwire that fails if a new citation shape appears unenumerated. **A resolved episodes tree with a missing cited artifact now FAILS instead of silently skipping** |
+| the four missing fingerprint recipes | **OPEN, filed out of the guards window.** `RUNTIME_FINGERPRINT_SOURCES` (`nodes/_otr_voice_route.py:158-165`) has a recipe for `indextts2` ONLY, and **no adapter in `nodes/_otr_audio_engines/` defines `impl_version` at all** -- so every row of the cited cross-engine manifest carries `engine_impl_version: ""`, an evidence-shaped field that has never been fillable. The guards window made it honest (records the real fingerprint when a recipe exists, an explicit "no fingerprint recipe registered" when not) rather than silently blank. Writing recipes for bark/kokoro/chatterbox/dia is a real design call -- which source files constitute each engine's build -- and deserves its own consideration, not a ride on a guard change |
+| listen page marks a resumed engine `settled` forever | **OPEN, filed out of the guards window.** `scripts/otr_lemmy_listen_page.py:173` sets state `missing` with no clips, `:180` sets `decidable: bool(clips)`, `:354` writes `decision: settled` when not decidable, and `write_decisions` (`:335-337`) never overwrites. So an engine rendered AFTER a page build stays `settled` and is never listened to. Real, confirmed, and deliberately not folded into the guard commit |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
 | PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |
 | PBUG-20260817-08 | Lemmy cameo voice on 10.2% of all cast rows |
@@ -2952,6 +2965,19 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 | historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
 | **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
+
+**NOTHING WAS PROMOTED 2026-08-18 (evidence-guards window), deliberately, and
+the reasoning is worth keeping.** The window EXECUTED an existing entry's verify
+steps rather than discovering a new class: `12.111` verify step 3 is what turned
+up G1's partial guard, and `12.111`'s own `cause` section already describes that
+failure verbatim -- *"Refusing only when a specific file (`MANIFEST.json`) exists
+leaves every sibling artifact unprotected ... the separate `_KEY` directory"*. An
+entry that predicts the defect you then find does not need a second entry.
+The window's other finding -- `engine_impl_version` structurally unfillable
+because no adapter defines `impl_version` -- is **static-audit only**, so the
+admission rule bars it regardless of how real it is. And nothing had actually
+rotted: all eleven cited artifacts re-hashed clean, so there is no live artifact
+to admit. **Preventive work with no live failure produces no Bible row.**
 
 **NOTHING WAS PROMOTED 2026-08-17 (item B window), deliberately.** The window's
 findings are all static-audit -- the positive-prose ban, the seven-call-site

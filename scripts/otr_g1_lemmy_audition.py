@@ -47,6 +47,8 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 
+from scripts._otr_evidence_citations import refuse_if_cited  # noqa: E402
+
 #: The audition assets, frozen 2026-08-08. Paths are absolute because these are
 #: fixed evidence, not configuration.
 _AUDITION_DIR = os.path.join(
@@ -148,6 +150,39 @@ def preflight() -> dict:
     return resolved
 
 
+def paths_this_run_would_write() -> list:
+    """Every file a `--render` would replace, across BOTH directories.
+
+    The arm labels are fixed (`arm1`..`arm3`) and the render always writes all
+    six clips, so this does not depend on the shuffle -- the shuffle decides which
+    ARM lands under which label, not which filenames exist. `KEY.json` is included
+    because it is the only statement of which blinded arm the operator approved:
+    the old guard never looked at the key directory at all.
+    """
+    paths = [os.path.join(_OUT_DIR, "MANIFEST.json"),
+             os.path.join(_KEY_DIR, "KEY.json")]
+    for label in ("arm1", "arm2", "arm3"):
+        for kind in ("neutral", "emotional"):
+            paths.append(os.path.join(_OUT_DIR, "%s_%s.wav" % (label, kind)))
+    return paths
+
+
+def _write_json_atomically(path: str, payload) -> None:
+    """Write via `.part` + `os.replace` so a crash cannot truncate the record.
+
+    Both files this writes are archival: MANIFEST.json is cited by sha256 in the
+    superseded qualification, and KEY.json is the only statement of which blinded
+    arm the operator approved. A plain `open(..., "w")` that dies mid-dump leaves
+    a truncated file where evidence was -- a different road to the same outage the
+    citation guard exists to prevent. The cross-engine sibling already writes this
+    way; this brings G1 into line.
+    """
+    part = path + ".part"
+    with open(part, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=1)
+    os.replace(part, path)
+
+
 def render(resolved: dict) -> int:
     from config.cast_pools import LEMMY_AUDITION_LINES as LINES
     from nodes._otr_audio_engines import get_engine
@@ -207,8 +242,7 @@ def render(resolved: dict) -> int:
         if callable(unload):
             unload()
 
-    with open(os.path.join(_OUT_DIR, "MANIFEST.json"), "w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, indent=1)
+    _write_json_atomically(os.path.join(_OUT_DIR, "MANIFEST.json"), manifest)
 
     key = {
         "WARNING": "Do not open until after listening. This reveals the arms.",
@@ -218,8 +252,7 @@ def render(resolved: dict) -> int:
         "reference_sha256": {a: resolved[a]["sha256"] for a in ("A", "B", "C")},
         "shuffle_seed": SHUFFLE_SEED,
     }
-    with open(os.path.join(_KEY_DIR, "KEY.json"), "w", encoding="utf-8") as fh:
-        json.dump(key, fh, indent=1)
+    _write_json_atomically(os.path.join(_KEY_DIR, "KEY.json"), key)
 
     print("\nclips  -> %s" % _OUT_DIR)
     print("KEY    -> %s  (do not open until after listening)" % _KEY_DIR)
@@ -234,10 +267,14 @@ def main(argv=None) -> int:
                          "referenced by sha256 in the qualified route, so a NEW "
                          "audition must name a NEW directory (a bare name is "
                          "resolved under otr/episodes/).")
-    ap.add_argument("--overwrite", action="store_true",
-                    help="permit rendering into a directory that already holds "
-                         "a MANIFEST.json. Off by default: losing evidence must "
-                         "be loud.")
+    # `--overwrite` WAS REMOVED 2026-08-18 AND MUST NOT COME BACK. It had zero
+    # callers anywhere in the tree, and its only function was to overwrite output
+    # this script's own help text calls cited evidence. Worse, its message asked
+    # the operator to be "certain this one is not cited" -- asking a human to hold
+    # a fact the program can simply check, which is what the citation guard below
+    # now does. `--out-dir` already serves every legitimate use. An old command
+    # line carrying the flag now dies with `unrecognized arguments` and exit 2,
+    # which is loud, and loud is the point.
     ap.add_argument("--render", action="store_true",
                     help="actually load IndexTTS2 and render (default: preflight only)")
     args = ap.parse_args(argv)
@@ -250,17 +287,16 @@ def main(argv=None) -> int:
         _OUT_DIR = chosen
         _KEY_DIR = chosen + "_KEY"
 
-    existing = os.path.join(_OUT_DIR, "MANIFEST.json")
-    if args.render and os.path.exists(existing) and not args.overwrite:
-        print("REFUSING TO RENDER: %s already exists.\n"
-              "  That manifest may be the evidence a qualification record cites "
-              "by sha256 --\n"
-              "  overwriting it would leave the record pointing at a hash "
-              "nothing matches.\n"
-              "  Pass --out-dir <new-name> for a new audition, or --overwrite "
-              "if you are\n"
-              "  certain this one is not cited." % existing)
-        return 2
+    # THE OLD GUARD CHECKED ONE FILENAME, WHICH TAUGHT READERS THE HAZARD WAS
+    # HANDLED. It refused only when MANIFEST.json existed, so a directory holding
+    # the six arm clips and no manifest sailed through, and `_KEY_DIR` -- created
+    # `exist_ok=True` below and holding the only record of which arm the operator
+    # approved -- was never checked at all. The shared guard hashes every file
+    # this run would replace and refuses on the ones the ledger actually cites.
+    if args.render:
+        refusal = refuse_if_cited(paths_this_run_would_write(), "this audition")
+        if refusal:
+            return refusal
 
     print("G1 Test A preflight -- proving the three frozen references")
     resolved = preflight()

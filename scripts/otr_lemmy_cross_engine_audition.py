@@ -32,8 +32,17 @@ BOTH:
     voice. Every result here goes through canonical_audio/mono_safe first.
 
     python scripts/otr_lemmy_cross_engine_audition.py                 # preflight
-    python scripts/otr_lemmy_cross_engine_audition.py --render
-    python scripts/otr_lemmy_cross_engine_audition.py --render --engine dia
+    python scripts/otr_lemmy_cross_engine_audition.py --render --out-dir lemmy_cross_engine_2026-09-01
+    python scripts/otr_lemmy_cross_engine_audition.py --render --out-dir lemmy_cross_engine_2026-09-01 --engine dia
+
+THE DEFAULT DIRECTORY IS CITED EVIDENCE, so `--render` without `--out-dir` now
+REFUSES. `lemmy_cross_engine/MANIFEST.json` and six of its clips are named by
+sha256 inside three provisional records in `config/cast_pools.py`; re-rendering
+over them would leave those records citing hashes nothing matches, silently. A
+NEW audition names a NEW directory -- see `scripts/_otr_evidence_citations.py`.
+Resuming a half-finished run is unaffected: `--engine dia` into a directory
+nothing cites still works exactly as before, which is what the INCOMPLETE message
+at the end of a partial batch is telling you to do.
 
 Background it and poll the log -- eight clips across four engines, two of which
 spawn sidecar worker processes, exceeds the MCP call ceiling comfortably.
@@ -50,11 +59,19 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 
+from scripts._otr_evidence_citations import refuse_if_cited  # noqa: E402
+
 #: Named output root. A rendered asset is a deliverable and goes to its canonical
 #: path the FIRST time -- never staged in tmp to be moved later.
+#:
+#: THE DEFAULT IS CITED EVIDENCE, WHICH IS WHY --out-dir EXISTS. Three provisional
+#: records in `config/cast_pools.py` name this directory's MANIFEST.json and six
+#: of its clips by sha256. `main()` rebinds `_OUT_DIR` when --out-dir is given;
+#: the citation guard refuses either way if the resolved directory holds cited
+#: bytes, so the default cannot be overwritten by forgetting the flag.
 CAMPAIGN = "lemmy_cross_engine"
-_OUT_DIR = os.path.join(
-    r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes", CAMPAIGN)
+_EPISODES = r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes"
+_OUT_DIR = os.path.join(_EPISODES, CAMPAIGN)
 
 #: One seed for every clip, so the arms differ only in the engine.
 RENDER_SEED = 20260816
@@ -203,6 +220,49 @@ def preflight(engines) -> dict:
     return resolved
 
 
+#: What the manifest says when an engine has no fingerprint recipe. It is a
+#: sentence rather than an empty string on purpose -- see `_build_fingerprint`.
+NO_FINGERPRINT_RECIPE = "no fingerprint recipe registered for this engine"
+
+
+def _build_fingerprint(engine: str, adapter) -> str:
+    """Which build made this clip -- or an explicit statement that we cannot say.
+
+    THIS FIELD USED TO BE STRUCTURALLY UNFILLABLE, AND IT READ AS FILLED. It was
+    `getattr(adapter, "impl_version", "")`, and no adapter in
+    `nodes/_otr_audio_engines/` defines `impl_version` -- so every row of the
+    cited manifest carries `engine_impl_version: ""`. An empty string reads as
+    "we recorded it and there was nothing", which is a different and much weaker
+    claim than "this engine has no way to say". Bible `12.111` asks that a
+    manifest a record cites by hash carry the facts the record claims, and an
+    evidence-shaped field that can never hold evidence is exactly what this repo
+    refuses everywhere else.
+
+    So: ask the real authority, and when it has nothing, SAY that rather than
+    leaving a blank. `RUNTIME_FINGERPRINT_SOURCES` currently has a recipe for
+    `indextts2` only; `live_engine_impl_version` returns "" for the rest by
+    design ("silence, not a guess"), and that silence is what this turns into a
+    sentence a reader can act on.
+
+    Writing the recipes for bark/kokoro/chatterbox/dia is real design work -- it
+    means deciding which source files constitute each engine's build -- and it is
+    queued separately rather than smuggled into a guard change.
+    """
+    try:
+        from nodes._otr_voice_route import live_engine_impl_version
+        fingerprint = live_engine_impl_version(engine)
+    except Exception:                                   # noqa: BLE001
+        # A missing fingerprint must never cost the audition its clips; the
+        # manifest just has to be honest about the gap.
+        fingerprint = ""
+    if fingerprint:
+        return str(fingerprint)
+    # Fall back to the adapter's own declaration if one ever appears, so this
+    # keeps working the day an engine starts publishing it.
+    declared = str(getattr(adapter, "impl_version", "") or "")
+    return declared or NO_FINGERPRINT_RECIPE
+
+
 def _write_clip(audio, path: str) -> dict:
     """Normalize, then write ONE clip atomically. Returns its manifest row.
 
@@ -289,7 +349,7 @@ def render(engines, resolved) -> int:
         row = {
             "identity_kind": identity["identity_kind"],
             "identity_id": identity["identity_id"],
-            "engine_impl_version": str(getattr(adapter, "impl_version", "") or ""),
+            "engine_impl_version": _build_fingerprint(engine, adapter),
             "declared_sample_rate": int(getattr(adapter, "sample_rate", 0) or 0),
             "clips": {},
             "complete": False,
@@ -362,17 +422,66 @@ def _resident_server_warning() -> bool:
         return sock.connect_ex(("127.0.0.1", 8000)) == 0
 
 
+def paths_this_run_would_write(engines) -> list:
+    """Every file a `--render` of ``engines`` would replace, manifest FIRST.
+
+    THE MANIFEST IS ALWAYS IN THIS LIST, whichever engines were requested, and
+    that is the whole reason the list exists rather than being inferred from the
+    engine rows. `_save_manifest` restamps `generated_utc` and rewrites the file
+    on every save, so a run touching ONE engine still changes the manifest's
+    bytes -- and the manifest is the artifact all three provisional records cite.
+    Rendering only `bark`, which has no route row at all and therefore looks like
+    the one guaranteed-harmless act available, would still rot the manifest hash
+    on kokoro, chatterbox and dia while all six clip hashes kept verifying.
+
+    Listing it first also means the refusal names it first, which is the file the
+    reader most needs to see.
+    """
+    paths = [os.path.join(_OUT_DIR, "MANIFEST.json")]
+    for engine in engines:
+        for kind in ("neutral", "emotional"):
+            paths.append(os.path.join(_OUT_DIR, "%s_%s.wav" % (engine, kind)))
+    return paths
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--render", action="store_true",
                     help="load the engines and render (default: preflight only)")
     ap.add_argument("--engine", action="append", choices=ENGINE_ORDER,
                     help="render only this engine; repeatable. Default: all four")
+    ap.add_argument("--out-dir", default=None,
+                    help="where the clips and MANIFEST.json land. THE DEFAULT IS "
+                         "CITED EVIDENCE -- lemmy_cross_engine/MANIFEST.json and "
+                         "six of its clips are named by sha256 in three "
+                         "provisional records, so a NEW audition must name a NEW "
+                         "directory (a bare name resolves under otr/episodes/).")
     ap.add_argument("--allow-resident-server", action="store_true",
                     help="render even though something is listening on :8000")
     args = ap.parse_args(argv)
 
+    global _OUT_DIR
+    if args.out_dir:
+        chosen = args.out_dir
+        if not os.path.isabs(chosen):
+            chosen = os.path.join(_EPISODES, chosen)
+        _OUT_DIR = chosen
+
     engines = [e for e in ENGINE_ORDER if not args.engine or e in args.engine]
+
+    # THE GUARD RUNS BEFORE PREFLIGHT, AND THAT ORDERING IS THE POINT.
+    # `preflight()` calls `adapter.load()` for every engine -- it spawns the
+    # sidecar workers, opens the venvs and reads the weights. Guarding inside
+    # `render()` would make the operator sit through four engine loads only to be
+    # told the directory is protected. Both sibling instruments already refuse
+    # before their expensive work, and doing the same here is also what lets the
+    # guard be tested without loading a single engine.
+    if args.render:
+        refusal = refuse_if_cited(paths_this_run_would_write(engines),
+                                  "this audition")
+        if refusal:
+            return refusal
+
     print("Lemmy cross-engine audition -- preflight (%s)" % ", ".join(engines))
     resolved = preflight(engines)
 

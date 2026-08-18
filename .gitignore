@@ -77,6 +77,10 @@ scripts/yoga_watchdog.py
 !scripts/_otr_indextts2_worker.py
 !scripts/_otr_indextts2_install.ps1
 !scripts/_otr_idx_download_weights.py
+# The evidence-citation guard is imported at MODULE SCOPE by both audition
+# instruments, so leaving it machine-local would make them crash on ImportError
+# the first time anyone else checked the repo out. It ships.
+!scripts/_otr_evidence_citations.py
 
 # Retired v1.x soak operator artifacts
 workflows/soak_target_api.json

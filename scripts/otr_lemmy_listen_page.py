@@ -337,7 +337,13 @@ def write_decisions(rows):
         return path
     payload = {
         "schema_version": 1,
-        "campaign": "lemmy_cross_engine",
+        # NAMED FROM THE DIRECTORY, NOT HARDCODED. This was the literal
+        # "lemmy_cross_engine", which was correct by construction only while
+        # `_CAMPAIGN_DIR` was a true constant. Now that --campaign-dir can rebind
+        # it, a hardcoded name would stamp every future campaign's decisions file
+        # with the name of the FIRST one -- a silent mislabel in the one artifact
+        # whose whole job is to be the durable record of what was listened to.
+        "campaign": os.path.basename(os.path.normpath(_CAMPAIGN_DIR)),
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "how_to_use": "Set each decision to keep_provisional or demote. "
                       "`qualify` is NOT available here: a qualified route needs "
@@ -365,7 +371,26 @@ def write_decisions(rows):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.parse_args(argv)
+    # WHY THIS FLAG EXISTS AT ALL. The audition that fills this directory grew an
+    # `--out-dir` so a new campaign can be rendered without overwriting evidence
+    # the ledger cites by sha256. Without a matching flag here, a new campaign
+    # would render fine and then be impossible to listen to, because this page
+    # could only ever look at `lemmy_cross_engine`. It is named --campaign-dir
+    # rather than --out-dir because this script does not create the directory: it
+    # refuses when the directory is missing, and only writes the page and the
+    # decisions file BESIDE clips somebody else rendered.
+    ap.add_argument("--campaign-dir", default=None,
+                    help="the audition directory to build a listen page for "
+                         "(a bare name resolves under otr/episodes/). Default: "
+                         "the original lemmy_cross_engine campaign.")
+    args = ap.parse_args(argv)
+
+    global _CAMPAIGN_DIR
+    if args.campaign_dir:
+        chosen = args.campaign_dir
+        if not os.path.isabs(chosen):
+            chosen = os.path.join(_EPISODES, chosen)
+        _CAMPAIGN_DIR = chosen
     if not os.path.isdir(_CAMPAIGN_DIR):
         raise SystemExit("no campaign directory at %s -- run the audition first"
                          % _CAMPAIGN_DIR)
