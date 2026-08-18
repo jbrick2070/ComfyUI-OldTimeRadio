@@ -6507,6 +6507,111 @@ class OTR_LedgerScriptWriter:
         # LLM-regenerated runs without inspecting widget state.
         meta["episode_title"] = final_title
         meta["title_source"] = title_source
+
+        # --- J.7. The announcer's WORK phrase becomes Python-owned ---------
+        # (J.6 is a TOMBSTONE -- the retired post-hoc title-substitution
+        # section, pinned removed by test_post_hoc_title_substitution_is_
+        # removed. Do not revive that label for new work.)
+        # PBUG-20260817-04. The model was handed `WORK: a scene from Nonsense
+        # Novels` -- by a seam that literally says "Use ONLY the WORK title
+        # ...; invent none" -- and announced "The Adventure of the Purloined
+        # Paper", a work that does not exist. The closing coda in the SAME
+        # episode named the source correctly, because the coda is a TEMPLATE.
+        # So the work-title half stops being composed and becomes rendered,
+        # exactly as `compose_news_coda` already does with its fact.
+        #
+        # HERE, AND NOT AT EITHER COMPOSE SITE, because the subtitle form
+        # needs `meta["episode_title"]`, which binds directly above at J.5 --
+        # AFTER both the in-loop intro and the rewrite. A splice at either
+        # call site ships the subtitle branch reading a title that does not
+        # exist yet.
+        #
+        # `_work_title` is the LANE-GATED value (ADAPTATION_SOURCE_KINDS); a
+        # fresh `identity_from_meta` read here would reopen the media_archive
+        # collision, where `work_title` holds the PUBLICATION and 56 of 98
+        # live ledgers carry one. Empty work title -> no phrase, untouched line.
+        # The lane gate is RE-APPLIED here, not bypassed. `run()`'s
+        # `_work_title` local is not in the tail's scope, and the one thing
+        # this recompute may not do is drop the gate: `identity_from_meta`
+        # maps media_archive's `source_label` onto the SAME field, so an
+        # ungated read announces "a scene from Now See Hear!" on 57% of that
+        # lane -- a worse fidelity defect than the one being fixed.
+        # THE WHOLE BLOCK IS GUARDED, identity read included. An earlier
+        # version computed the identity OUTSIDE the try and took ten tail
+        # tests red: a synthetic or partial `meta` makes `identity_from_meta`
+        # raise, and an unprotected read there kills the writer tail on lanes
+        # that were never going to get a frame at all. Nothing about naming
+        # the work may ever be able to fail an episode.
+        try:
+            # BOTH imports are local because `_run_writer_tail` is a SEPARATE
+            # METHOD, not a closure over run() -- its docstring says it
+            # consumes only `ctx`. `_OTRLC` is bound inside run(), so reaching
+            # for it here raised NameError on EVERY episode, and this block's
+            # own `except Exception` swallowed it: the fix was dead code that
+            # logged a warning and left the invented title standing. Green
+            # tests proved only that it failed safely, which is not the same
+            # as working.
+            try:
+                from . import _otr_line_composer as _OTRLC_TAIL
+                from . import _otr_source_identity as _OTRSID_TAIL
+            except ImportError:  # pragma: no cover -- flat/standalone load
+                import _otr_line_composer as _OTRLC_TAIL  # type: ignore
+                import _otr_source_identity as _OTRSID_TAIL  # type: ignore
+            _tail_identity = _OTRSID_TAIL.identity_from_meta(meta)
+            _tail_work_title = (
+                _tail_identity.work_title
+                if _tail_identity.source_kind
+                in _OTRSID_TAIL.ADAPTATION_SOURCE_KINDS
+                else ""
+            )
+            _src_meta = meta.get("source_meta") or {}
+            if not isinstance(_src_meta, dict):
+                _src_meta = {}
+            _work_frame = _OTRLC_TAIL.build_work_frame(
+                work_title=_tail_work_title,
+                author=str(_tail_identity.author or ""),
+                act=_src_meta.get("act"),
+                scene=_src_meta.get("scene"),
+                episode_title=final_title,
+            )
+            # The intro row is found HERE rather than threaded: the tail does
+            # not carry `first_announcer_id` (it is a compose-loop local), and
+            # reaching for it raises NameError on every adaptation episode.
+            # The FIRST announcer row is the opening by construction -- music
+            # rows speak as RADIO, and the outro is the LAST announcer row.
+            _intro_row = next(
+                (r for r in (led.data.get("lines") or [])
+                 if isinstance(r, dict)
+                 and str(r.get("speaker") or "").upper() == "ANNOUNCER"),
+                None,
+            ) if _work_frame else None
+            if _intro_row is not None and _intro_row.get("line_id"):
+                _intro_id = _intro_row["line_id"]
+                _spliced = _OTRLC_TAIL.splice_work_frame(
+                    str(_intro_row.get("text") or ""), _work_frame,
+                )
+                if _spliced:
+                    # PROTECTED_FACT_COMPONENT_FLAG or the clean stage
+                    # rewrites the span we just fixed -- the shipped row
+                    # already carries `unclean_spoken_text`, and an
+                    # unprotected Python-owned span is how PBUG-20260815-01
+                    # deleted the coda attribution on 9 of 14 voiced rows.
+                    _apply_intro_rewrite_result(
+                        led, _intro_id, _spliced,
+                        "announcer_work_frame_rendered",
+                        (_OTRLC_TAIL.PROTECTED_FACT_COMPONENT_FLAG,),
+                    )
+                    led.save()
+                    meta["announcer_work_frame"] = _work_frame
+        except Exception:
+                # THE LAW: an audit may never fail an episode. A frame that
+                # cannot be spliced leaves the composed opening standing --
+                # that is the pre-fix behaviour, not a broken render.
+                log.warning(
+                    "[OTR_LedgerScriptWriter] work-frame splice failed; "
+                    "keeping the composed announcer opening (LOUD).",
+                    exc_info=True,
+                )
         # Sprint 3E (2026-05-25): meta.title_substitution is retired.
         # Late title binding means dialogue never carried a provisional
         # title, so there is no post-hoc substitution to record. The

@@ -51,6 +51,10 @@ __all__ = [
     "AnnouncerBriefStarvedError",
     "safe_open_viability",
     "cleaned_cast_names",
+    # PBUG-20260817-04: the WORK phrase is Python-owned, never composed.
+    "build_work_frame",
+    "splice_work_frame",
+    "WORK_FRAME_SENTENCE",
 ]
 
 
@@ -1499,6 +1503,156 @@ def validate_news_coda_bridge(text) -> tuple[bool, str]:
 
 def _clean_news_coda_fact(text) -> str:
     return clean_one_line(text)
+
+
+#: Spoken ordinals for act/scene numbers. Words, never numerals: TTS reads
+#: "Act I" as "act eye" and renders digits inconsistently, so the locator is
+#: authored the way an announcer says it. Shakespeare tops out well inside
+#: this range; anything beyond it falls back to the bare work title rather
+#: than speaking a digit.
+_SPOKEN_ORDINALS = (
+    "", "One", "Two", "Three", "Four", "Five",
+    "Six", "Seven", "Eight", "Nine", "Ten",
+)
+
+
+def _spoken_ordinal(value) -> str:
+    """"Two" for 2, or "" for anything not a small positive int."""
+    try:
+        index = int(value)
+    except (TypeError, ValueError):
+        return ""
+    if 1 <= index < len(_SPOKEN_ORDINALS):
+        return _SPOKEN_ORDINALS[index]
+    return ""
+
+
+def build_work_frame(
+    *, work_title: str, author: str = "", act=None, scene=None,
+    episode_title: str = "",
+) -> str:
+    """The announcer's WORK phrase, assembled in Python and never composed.
+
+    PBUG-20260817-04: the model was handed `WORK: a scene from Nonsense
+    Novels` and announced "The Adventure of the Purloined Paper", a work that
+    does not exist -- while the closing coda in the SAME episode named the
+    source correctly, because the coda is a template and this was not. So the
+    work-title half stops being the model's to write. Operator ruling
+    2026-08-17: name the real work plus its own locator, or the work plus the
+    episode's own subtitle.
+
+    Three forms, in precedence order:
+
+    * **work + locator** -- ``The Tempest, Act One, Scene Two``. Built from
+      the `act`/`scene` INTS, which is why only the shakespeare lane reaches
+      it today. public_domain's `unit_label` is deliberately NOT used: about
+      half the corpus holds curator scene DESCRIPTORS ("The night camp")
+      rather than piece titles the work actually contains, and speaking one
+      would make the deterministic half invent a chapter on the lane whose
+      whole contract is that it invents nothing.
+    * **work + our subtitle** -- ``Nonsense Novels, an episode we call "The
+      Blackwood Enigma"``. The ownership clause is load-bearing: a bare colon
+      puts an LLM-authored title in exactly the slot where radio announced
+      real chapters, so a listener hears a chapter that does not exist. Saying
+      whose title it is defuses that.
+    * **the work alone** -- when there is no locator and no distinct subtitle.
+
+    Returns "" when there is no work title, which is the signal to leave the
+    announcer's own opening untouched. A lane that adapts nothing must not
+    gain a WORK phrase, so callers pass a work_title already gated on
+    `ADAPTATION_SOURCE_KINDS` -- `work_title` means the PUBLICATION on
+    media_archive, and 56 of 98 live ledgers carry one.
+    """
+    work = clean_one_line(work_title)
+    if not work:
+        return ""
+    frame = work
+    named_author = clean_one_line(author)
+    if named_author:
+        # "Nonsense Novels" alone means nothing to a modern listener; the
+        # author is what makes it a real book rather than a phrase.
+        frame = f"{frame}, by {named_author}"
+
+    act_word = _spoken_ordinal(act)
+    scene_word = _spoken_ordinal(scene)
+    if act_word and scene_word:
+        return f"{frame}, Act {act_word}, Scene {scene_word}"
+    if act_word:
+        return f"{frame}, Act {act_word}"
+
+    subtitle = clean_one_line(episode_title)
+    # A subtitle that merely restates the work is noise ("The Canterville
+    # Ghost, an episode we call The Canterville Ghost"), and the comparison is
+    # case- and punctuation-insensitive because the two fields are authored by
+    # different producers.
+    if subtitle and _loose_key(subtitle) != _loose_key(work):
+        return f'{frame}, an episode we call "{subtitle}"'
+    return frame
+
+
+def _loose_key(text: str) -> str:
+    """Comparison key: case-folded, punctuation-stripped, space-collapsed."""
+    return " ".join(
+        "".join(ch for ch in str(text or "").lower() if ch.isalnum() or ch.isspace())
+        .split()
+    )
+
+
+#: How the deterministic WORK phrase enters the spoken line.
+WORK_FRAME_SENTENCE = "Tonight, a scene from {frame}."
+
+#: Words whose trailing period ends an ABBREVIATION, not a sentence. Without
+#: these the split fires inside "Tonight, Mr. Holmes enters the office and we
+#: gather for 'The Adventure of the Purloined Paper'." -- keeping everything
+#: after "Mr." as the remainder, so THE INVENTED TITLE SURVIVES THE FIX. An
+#: announcer opening naming a period character is the common case, not an edge
+#: one, which is why this list is not optional.
+_SENTENCE_SAFE_ABBREVIATIONS = frozenset({
+    "Mr", "Mrs", "Ms", "Dr", "Prof", "St", "Capt", "Sgt", "Lt", "Col",
+    "Gen", "Rev", "Hon", "Jr", "Sr", "Mme", "Mlle", "Messrs",
+})
+
+
+def _first_sentence_end(text: str):
+    """Index just past the first real sentence terminator, or None.
+
+    Walks the candidates instead of taking the first match so an abbreviation
+    can be skipped: `re.split` on `[.!?]\\s+` cannot tell "Mr. Holmes" from the
+    end of a sentence, and getting that wrong leaves the model's invented title
+    in the line this function exists to remove.
+    """
+    for match in re.finditer(r"[.!?]\s+", text):
+        head = text[:match.start()]
+        last_word = re.search(r"([A-Za-z]+)$", head)
+        if last_word and last_word.group(1) in _SENTENCE_SAFE_ABBREVIATIONS:
+            continue
+        return match.end()
+    return None
+
+
+def splice_work_frame(intro_text: str, frame: str) -> str:
+    """Put the Python-owned WORK sentence in front of the announcer's opening.
+
+    REPLACES THE FIRST SENTENCE rather than prepending to it. The pack seam
+    (`announcer_intro_safe_system`) already defines sentence 1 as the one that
+    "names tonight's work from the WORK line" and sentence 2 as the intrigue,
+    so swapping sentence 1 takes exactly the span the model was getting wrong
+    and keeps the atmosphere it gets right. Prepending instead would ship the
+    doubled "Tonight, ... Tonight, ..." opening, and appending would leave the
+    invented title standing in front of the correction.
+
+    Degrades to the model's own text whenever there is no frame -- this is a
+    spoken line, and an audit may never fail an episode.
+    """
+    text = clean_one_line(intro_text)
+    if not frame:
+        return text
+    sentence = WORK_FRAME_SENTENCE.format(frame=frame)
+    if not text:
+        return sentence
+    cut = _first_sentence_end(text)
+    remainder = text[cut:].strip() if cut is not None else ""
+    return f"{sentence} {remainder}".strip() if remainder else sentence
 
 
 def _assemble_news_coda_surface(bridge: str, fact: str) -> str:
