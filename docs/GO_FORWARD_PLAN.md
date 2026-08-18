@@ -328,11 +328,14 @@ not an open measurement.
 | **live episode on the new voice build** | **DONE** -- `signal_lost_the_searing_relay_20260818_094723`
   in `otr/obs/`. 20/21 character lines through indextts2, alpha 1.0, mass 0.556-0.560
   every time; both characters held ONE seed across all their lines, zero drift |
-| **PBUG-20260818-01: scifi_news_pro CODA ran long** | **FIXED, not yet re-proven live** --
-  operator caught it on the same episode ("brief summary of the news, not the whole new
-  story"). Root cause: `scifi_news_pro_script_system`'s CODA line carried no length bound,
-  unlike every sibling pack's "one short bridge clause" pattern. Fixed to one-to-three
-  sentences, one supporting stat max. **NEXT LIVE LEG ON THIS PACK IS THE PROOF** |
+| **PBUG-20260818-01: scifi_news_pro closing segment** | **FIXED AND LIVE-VERIFIED**
+  (`signal_lost_the_last_reading_20260818_122159`, published). Took 4 render iterations,
+  2 of which disproved the diagnosis before it -- full story in PROD_BUG_LOG. Root cause
+  (found by a scoped kibitz round, not solo): the script writer's own prompt dumped the
+  already-generated real-world fact into its context while telling it never to state one --
+  a small local model does not reliably resist a fact sitting in its own context. Fixed by
+  excluding `news_close_read` from that one prompt-build call. `media_archive` got the same
+  "who found it + end on a thought" shape but is NOT yet live-verified |
 | cross-engine audition overwrite guard | OPEN -- `otr_lemmy_cross_engine_audition.py` has no guard and its manifest is cited by sha256 in THREE provisional records. Bible 12.111 verify step 3. Needs an `--out-dir` flag plus a citation check; it is deliberately resumable, so do NOT copy the production audition's blanket refusal |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
 | PBUG-20260817-06 | Doyle names spoken in a Leacock parody; undiagnosed |

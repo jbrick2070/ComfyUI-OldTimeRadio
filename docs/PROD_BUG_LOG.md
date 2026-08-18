@@ -68,62 +68,97 @@ by a two-agent backsweep (git history + handoff/smoke docs), prod-only bar appli
 cross-checked against BUG_BIBLE.yaml (BUG-11.26 family, 12.47, 07.16 excluded as
 already promoted). Confidence tags preserved from the sweep.
 
-## PBUG-20260818-01 -- the news CODA read like a wire-service article, not a wire-desk close
+## PBUG-20260818-01 -- the news close leaked into the fiction, and the fiction leaked into the news close
 
 - surfaced: 2026-08-18, from a published episode the operator watched --
   `signal_lost_the_searing_relay_20260818_094723`. Live artifact, not a review.
   Operator, verbatim: "i thin it went way oevrboard in anaoucning teh coda teh
   coda shoudl eb abreif sumamry opf tyeh enws not teh whoel new story."
-- symptom, read straight from the episode's own treatment file: the closing
-  CODA line ran 114 words / roughly seven sentences -- a dense paragraph citing
-  the Union of Concerned Scientists and a named 2024 Florida law, stacked
-  alongside four separate health claims. One CODA, not several: the episode ran
-  3 acts and the operator's first theory was three stacked codas, but the
-  ledger shows exactly one CODA beat (`shot_004_b3`); it was simply long on its
-  own.
-- root cause, verified at the file: `nodes/story_packs/scifi_news_pro/
-  scifi_news_pro.json`, seam `scifi_news_pro_script_system`. The grammar line
-  `CODA: <spoken coda>` carried NO length or scope instruction -- nothing told
-  the writer model the coda should be short. Every sibling pack that closes on
-  a source note (`public_domain`, `shakespeare`, `original`, `media_archive`)
-  uses a DIFFERENT architecture: a dedicated `coda_system` seam that explicitly
-  says "Write ONE short bridge clause... whatever follows is added AFTER your
-  clause by the producer -- you do NOT write it," with the real attribution
-  appended deterministically by code. `scifi_news_pro` has no such split -- the
-  writer model free-generates the entire CODA inside one big script-writing
-  call, with the full source digest sitting right there in context and nothing
-  bounding how much of it gets pulled in.
-- the pack's own P2c pass (`scifi_news_pro_news_read_system`, producing
-  `treatment.news_close_read`) is structurally the RIGHT shape for this -- a
-  short, separately-generated factual line -- but it is a different beat from
-  the script-writer's CODA and was not what rendered in this episode. Its
-  Python docstring (`NewsCloseRead`, `_otr_scifi_news_pro.py:429-433`) claims
-  "the seam still asks for 1-2 wire-desk sentences," which is FALSE against the
-  live prompt text on disk: `scifi_news_pro_news_read_system` carries no such
-  instruction either. Noted, not fixed here -- it did not produce today's
-  observed defect and folding it in would have widened this change past the
-  admitted bug.
-- fix: added an explicit brevity clause to `scifi_news_pro_script_system`
-  directly after the grammar block: "CODA MUST STAY BRIEF: one to three short
-  sentences, stating only the single most load-bearing real-world fact this
-  story is grounded in. It is a wire-desk close, not an explainer -- never
-  stack more than one supporting statistic or source, and never write a
-  paragraph." Length settled with the operator directly (offered one-to-two,
-  he raised it to one-to-three).
-- verify: `tests/test_scifi_news_pro_prompt_snapshots.py::
-  test_script_seam_owns_complete_plain_text_grammar` asserts substrings only
-  (`CODA: <spoken coda>`, `END.`, etc.), all of which survive the edit
-  untouched; 84/84 scifi_news_pro tests green, full suite unaffected.
-- gates: 84 scifi_news_pro tests passed; full suite run in the same session.
-- Bible: not promoted. The generalisable shape -- an LLM asked to write a
-  factual close with the full source digest in context and no length bound
-  will use it -- is close to existing prompt-craft lessons and this fix is a
-  single-pack prompt edit with a live root cause, not yet checked against the
-  coverage index for a genuinely uncovered angle. Candidate for the next
-  delta-scrape rather than promoted inline.
-- status: FIXED and live root-caused; NOT yet re-proven on a live render (the
-  fix landed after this session's episode leg). Next live leg on this pack is
-  the verification artifact.
+- **FOUR ITERATIONS, EACH ONE A REAL LIVE RENDER, AND THE RECORD KEEPS ALL
+  FOUR RATHER THAN ONLY THE LAST.** Two of them disproved the diagnosis or
+  fix that preceded them; the log says so plainly rather than presenting a
+  clean, retroactively-tidied story.
+  1. **Symptom.** The closing segment ran 114 words / seven sentences --
+     dense, citing an advocacy group and a named 2024 law.
+  2. **First fix (wrong target).** `scifi_news_pro_script_system`'s
+     `CODA: <spoken coda>` line was given a brevity cap, on the theory that
+     the long block WAS the CODA. Disproven by re-render within the hour:
+     `parsed.coda` was already short (12-19 words) before any fix. The long
+     block is a SEPARATE, code-appended row -- `treatment.news_close_read`.
+     The CODA fix is harmless and stays; it did not address the complaint.
+  3. **Second fix (right target, exposed a worse problem).** Added the same
+     brevity clause to `scifi_news_pro_news_read_system`
+     (`news_close_read`'s own seam). Re-render (`signal_lost_the_
+     recession_of_room_4_20260818_112039`) showed the read was now short
+     (149 -> still long that run, but the NEXT verification render's read
+     dropped to 45-67 words) -- but exposed FACT/FICTION OSCILLATION: the
+     ANNOUNCER outro had already drifted into real astronomy facts before the
+     CODA cut back to pure fiction, then the news read hit facts a third
+     time. Operator: "if you start with news you already forgot about the
+     story... just a bit of story end, then news."
+  4. **Third fix (sequencing).** Instructed outro+CODA to stay strictly
+     in-fiction -- no real-world statistic, date, institution, or named real
+     person -- with the factual read appended separately, "the story closes
+     before the facts do, once, not back and forth." Also added attribution +
+     closing-thought shape to `news_close_read` (name who found it, end on
+     one reflective thought; same shape applied to `media_archive`'s
+     `news_close_brief` per operator: "for media archive and scifi news it
+     should summarize the source... researcher discovered... and leave with
+     a thought at the end").
+  5. **ROOT CAUSE, FOUND BY A KIBITZ REVIEW (antigravity, r3, scoped single
+     round -- CONFIRMED against the real files before landing), NOT BY ME.**
+     A re-render under fix #4 alone (`signal_lost_the_borrowed_voice_
+     20260818_115506`) still leaked: the CODA read "UCLA researchers are
+     currently using generative AI to design proteins never before seen in
+     nature for drug testing" -- nearly VERBATIM the news read's own opening
+     clause. Antigravity traced why: `run_scifi_news_pro_episode` runs
+     `_pass_news_read` BEFORE `_pass_script` and copies the result onto
+     `treatment.news_close_read` (`_otr_scifi_news_pro.py:3616-3618`), and
+     `_script_user_prompt` dumps the WHOLE treatment -- fact included -- into
+     the script writer's own context (line ~1821), while the system prompt
+     simultaneously told it never to state that fact. Telling a small local
+     model (`google/gemma-4-12b-it`) not to repeat a fact sitting in its own
+     context is a much weaker ask than not showing it the fact at all.
+  6. **Final fix.** `_script_user_prompt` now excludes `news_close_read` from
+     the treatment dump (`treatment.model_dump(exclude={"news_close_read"})`)
+     -- the field stays live for every OTHER consumer (ledger assembly,
+     receipts), only this one prompt-building call blinds itself to it. Added
+     a format-reminder restating the in-fiction constraint at point of use.
+- **LIVE-VERIFIED CLEAN on the next render**
+  (`signal_lost_the_last_reading_20260818_122159`, published to `otr/obs/`).
+  Outro: "The graph reached its zenith in the silence of the observation
+  suite." CODA: "The data was perfect. The man was gone." -- both pure
+  fiction, zero leaked facts. News close, 67 words / 3 sentences: names UCLA
+  and the journal PLOS One, states the finding, closes on a contrast rather
+  than a fourth stacked statistic. Exactly the shape requested: story ends,
+  then one clean pivot to news.
+- **NOT re-verified live:** the `media_archive` half of fix #4
+  (`nodes/_otr_media_archive_interpreter.py`, `news_close_brief`'s schema
+  description). Unit-tested and schema-verified; no live `media_archive`
+  render this session.
+- **A SEPARATE, STILL-OPEN DEFECT, NOT FOLDED IN.** One render this session
+  (before the final fix) hit `NewsProTreatmentError`: the news-read pass
+  invented fictional character names ("Dr. Sharon Hame", "Laura Goodkind")
+  inside what must be a pure factual report, and the 2-attempt retry ladder
+  didn't recover. The final successful render did NOT reproduce this, but one
+  clean run is not proof either way for a stochastic local-model failure.
+  Tracked separately (task chip), not claimed fixed here.
+- gates: pack suite 84/84 -> 104/104 (added `media_archive` interpreter tests)
+  -> 108/108 (added 4 new regression tests proving the context exclusion).
+  Full suite 11024 -> 11028 passed (the 4 new tests), zero regressions, run
+  twice across the session. `tests/test_scifi_news_pro_script_prompt_
+  excludes_the_read.py` is the new file: proves a populated `news_close_read`
+  never appears in the script writer's own prompt, proves every other
+  Treatment field still does, proves the empty-read case is unaffected.
+- Bible: not promoted. The generalisable shape -- "a downstream generation
+  step's finished OUTPUT gets fed back as CONTEXT to an earlier-labelled step
+  that was explicitly told not to produce that content" -- is a real,
+  reusable defect class (prompt contamination via pipeline ordering) worth a
+  future delta-scrape entry, but not yet checked against the coverage index
+  for whether it is genuinely uncovered.
+- status: FIXED and live-verified on `scifi_news_pro`. The `media_archive`
+  half is FIXED but not live-verified. The character-hallucination finding is
+  a SEPARATE open item.
 
 ## PBUG-20260817-09 -- a character's VOICE DRIFTS BETWEEN HIS OWN LINES: the synthesis seed is re-rolled per line
 - surfaced: operator listening to `signal_lost_mongooses_stand_20260817_234050` in `otr/obs/`, 2026-08-17. In his words: *"Nag's first voice was [fine], the second Nag drifted to a voice that I often hear but doesn't line up with Nag's first speech."* Live published artifact -> admission rule satisfied. **Found by ear before it was found in data.**

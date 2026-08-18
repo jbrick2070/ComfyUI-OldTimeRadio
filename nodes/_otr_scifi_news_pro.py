@@ -426,10 +426,18 @@ class CastVoice(BaseModel):
 
 
 class NewsCloseRead(BaseModel):
-    """P2c: the 1-2 sentence factual close (read-split, S1b). Floor 40,
+    """P2c: the 1-3 sentence factual close (read-split, S1b). Floor 40,
     not the doc's 80 -- the 27th live smoke killed a perfectly factual
     78-char read; brevity is a style preference, never a correctness
-    gate (the seam still asks for 1-2 wire-desk sentences)."""
+    gate.
+
+    THE COMMENT HERE USED TO CLAIM "the seam still asks for 1-2 wire-desk
+    sentences" -- FALSE against the live prompt on disk (2026-08-18): the
+    `scifi_news_pro_news_read_system` seam carried NO length instruction at
+    all, and a real episode's read ran 149 words citing three named
+    scientists and a cosmology model. Fixed at the prompt, not here -- this
+    Field has no `max_length` on purpose (brevity is not a correctness
+    gate), so the bound lives in the seam text the model actually reads."""
 
     news_close_read: str = Field(min_length=1)
 
@@ -1812,8 +1820,19 @@ def _script_user_prompt(
     )
     return (
         "TREATMENT:\n"
+        # `news_close_read` is EXCLUDED on purpose (2026-08-18). By the time
+        # this prompt is built, `treatment.news_close_read` already holds the
+        # real factual close -- see `run_scifi_news_pro_episode`, which runs
+        # `_pass_news_read` and copies its result onto `treatment` BEFORE
+        # calling `_pass_script`. Dumping it here would put the finished
+        # real-world fact directly in the script writer's own context while
+        # the system prompt simultaneously tells it never to state one in the
+        # outro or CODA -- a distractor a small local model does not reliably
+        # resist. It stays a live field on `Treatment` for every OTHER
+        # consumer (ledger assembly, receipts); only this one dump excludes it.
         + json.dumps(
-            treatment.model_dump(), ensure_ascii=False, indent=2
+            treatment.model_dump(exclude={"news_close_read"}),
+            ensure_ascii=False, indent=2,
         )
         + "\n\nCAST (the only legal speakers besides ANNOUNCER; use these "
         + f"canonical roster labels):\n{cast_block}\n\n"
@@ -1828,7 +1847,11 @@ def _script_user_prompt(
         + "Spoken text may use ordinary punctuation, including quotation marks, "
         + "parentheses, brackets, and internal colons. Add no unlabelled stage-"
         + "direction rows. ANNOUNCER speaks only in the intro and outro. End in "
-        + "this order: ANNOUNCER outro, CODA, closing MUSIC, END.\n\n"
+        + "this order: ANNOUNCER outro, CODA, closing MUSIC, END. The ANNOUNCER "
+        + "outro and CODA both stay strictly in-story -- no real-world "
+        + "statistic, date, named institution, or named real person in either "
+        + "one; the factual close is a separate row the producer appends "
+        + "after your CODA line.\n\n"
         + "Write the complete episode now."
     )
 
