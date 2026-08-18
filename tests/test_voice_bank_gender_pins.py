@@ -35,7 +35,22 @@ OPERATOR_SETTLED_GENDERS = {
     "vz_donor_glenn": "male",
     "cb_donor_glenn": "male",
     "dia_donor_glenn": "male",
+    # Operator ruling 2026-08-18: "if we [don't] have real gender info use the
+    # name not some pitch". Both handles are unambiguously male; both were
+    # imported female by the F0 bucket. NOT yet heard -- these are settled by
+    # the naming RULE, not by ear, and he may still revise them on a listen.
+    "vz_donor_james": "male",
+    "cb_donor_james": "male",
+    "dia_donor_james": "male",
+    "vz_donor_hillbilly_jim": "male",
+    "cb_donor_hillbilly_jim": "male",
+    "dia_donor_hillbilly_jim": "male",
 }
+
+#: Deliberately NOT pinned. `rup` reads male to some ears and not to others, so
+#: the naming rule does not decide it and pinning a coin-flip would turn a guess
+#: into a contract. It stays as the bank has it until he listens.
+UNRESOLVED_BY_NAME = ("vz_donor_rup", "cb_donor_rup", "dia_donor_rup")
 
 
 def _bank_by_id():
@@ -65,3 +80,41 @@ def test_the_pin_list_is_not_empty():
     """TEETH. An empty pin list would make every assertion above vacuous while
     the file still reported green."""
     assert OPERATOR_SETTLED_GENDERS, "nothing pinned -- this file proves nothing"
+
+
+def test_no_bank_row_contradicts_its_own_handle():
+    """TRIPWIRE. A donor row whose handle names a gender must not be stamped the
+    other way -- that combination is exactly the glenn defect, and it shipped for
+    two and a half months because nothing looked for it.
+
+    This is the operator's rule enforced as a gate rather than a convention:
+    *"if we [don't] have real gender info use the name not some pitch"*. An
+    unrecognised or ambiguous handle yields no opinion and is skipped, so the
+    check can only fire on a genuine contradiction.
+    """
+    from scripts.otr_dl_indextts2_refs import gender_from_handle
+
+    conflicts = []
+    for entry in load_voice_bank()[0]:
+        stem = entry.voice_ref_id.split("_donor_")[-1] if "_donor_" in entry.voice_ref_id else ""
+        if not stem:
+            continue
+        named = gender_from_handle(stem)
+        if named and entry.gender != named:
+            conflicts.append(f"{entry.voice_ref_id}: stamped {entry.gender}, handle says {named}")
+    assert not conflicts, (
+        "voice rows contradict their own handle -- this is the glenn defect:\n  "
+        + "\n  ".join(conflicts)
+        + "\nThe name is the authority when no real gender metadata exists."
+    )
+
+
+def test_the_unresolved_rows_are_not_silently_pinned():
+    """TEETH on the honesty of the pin list. `rup` is genuinely ambiguous, so it
+    must stay OUT of the settled map -- if someone adds it, they have converted a
+    guess into a contract and this fails to say so."""
+    overlap = sorted(set(UNRESOLVED_BY_NAME) & set(OPERATOR_SETTLED_GENDERS))
+    assert not overlap, (
+        f"{overlap} are pinned as settled but the naming rule does not decide "
+        f"them; they need the operator's ear first"
+    )

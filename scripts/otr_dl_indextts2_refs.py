@@ -47,6 +47,60 @@ def _to_mono(wav):
     return wav.astype("float32")
 
 
+# --------------------------------------------------------------------------- #
+# GENDER: THE NAME BEATS THE PITCH (operator ruling 2026-08-18 -- hard).
+#
+# His words: *"so if we [don't] have real gender info use the name not some
+# pitch"*, and *"common sense too, glenn as a name would probably be male"*.
+#
+# THIS IS NOT A PREFERENCE, IT IS A MEASURED CORRECTION. `vz_donor_glenn` was
+# imported FEMALE, cast on 115 female slots for two and a half months, and
+# corrected to MALE only when the operator heard it (`e1c84cf6`). The audit
+# measures that clip at **median F0 = 261.5 Hz** -- not marginal, not near the
+# 165 Hz line, but confidently inside the female range. So the pitch signal was
+# not merely badly thresholded, it was WRONG WITH CONFIDENCE, and no threshold
+# tuning would have saved it. A donor's own chosen handle is weak evidence, but
+# it is evidence about a PERSON rather than about a waveform, and on the one
+# case where the two disagreed and a human adjudicated, the handle was right.
+#
+# SCOPE, deliberately narrow: this reads a self-chosen donation HANDLE to bucket
+# a synthetic voice reference for casting. It is not identification, it is not
+# applied to any human being, and an unrecognised handle yields no opinion at
+# all rather than a guess.
+# --------------------------------------------------------------------------- #
+#: Handles whose given name is unambiguous enough to overrule the pitch bucket.
+#: Add only names that are decisive; an ambiguous one belongs in neither list
+#: (`rup` is the standing example -- left unresolved on purpose 2026-08-18).
+_HANDLE_MALE = frozenset({
+    "james", "jim", "hillbilly_jim", "glenn", "bill", "mark", "phil", "peter",
+    "stuart", "hugo", "daniel", "john", "tom", "sam", "bob", "frank", "carl",
+})
+_HANDLE_FEMALE = frozenset({
+    "hannah", "kathleen", "kerstin", "linda", "caro", "andrea", "emma", "lily",
+    "clara", "sarah", "mary", "anna",
+})
+
+
+def gender_from_handle(handle):
+    """The donor handle's gender, or '' when the handle says nothing.
+
+    Returns '' for hex handles (`0a67`, `1410`) and for genuinely ambiguous
+    names -- the caller then falls back to the pitch bucket AND should flag the
+    row for a listen. Never guesses.
+    """
+    stem = str(handle or "").strip().lower().replace("-", "_")
+    if stem in _HANDLE_MALE:
+        return "male"
+    if stem in _HANDLE_FEMALE:
+        return "female"
+    for token in stem.split("_"):
+        if token in _HANDLE_MALE:
+            return "male"
+        if token in _HANDLE_FEMALE:
+            return "female"
+    return ""
+
+
 def classify_and_trim(path, seg_seconds=12.0):
     """Return (gender, median_f0, voiced_frac, trimmed_mono_at_OUT_RATE) or None.
 
@@ -71,6 +125,10 @@ def classify_and_trim(path, seg_seconds=12.0):
     med_f0 = float(np.nanmedian(f0[vmask]))
     voiced_frac = float(vmask.mean())
     gender = "female" if med_f0 >= FEMALE_F0_HZ else "male"
+    # NOTE: this pitch bucket is now only a FALLBACK. `gender_from_handle`
+    # overrides it whenever the donor's own handle names a person -- see the
+    # operator ruling there. Kept because a hex-handled donation has no name to
+    # read, and some bucket is better than none for an unnamed clip.
 
     # longest contiguous voiced run -> a clean span, capped at seg_seconds
     hop = 256
@@ -375,6 +433,18 @@ def main():
             print(f"  skip {handle}: unclassifiable")
             continue
         gender, med_f0, vfrac, span = res
+        # THE NAME BEATS THE PITCH (operator ruling 2026-08-18). An unnamed or
+        # ambiguous handle returns '' and the pitch bucket stands, but it is
+        # announced as UNCONFIRMED so the row can be listened to rather than
+        # trusted -- pitch was confidently wrong on glenn at 261.5 Hz.
+        named_gender = gender_from_handle(handle)
+        if named_gender and named_gender != gender:
+            print(f"  NAME OVERRIDES PITCH for {handle}: "
+                  f"f0={med_f0:.0f}Hz said {gender}, handle says {named_gender}")
+            gender = named_gender
+        elif not named_gender:
+            print(f"  unconfirmed gender for {handle}: pitch bucket {gender} "
+                  f"(f0={med_f0:.0f}Hz), handle gives no signal -- needs a listen")
         if len(picked[gender]) >= (args.want_female if gender == "female" else args.want_male):
             print(f"  pass {handle}: {gender} f0={med_f0:.0f} (quota full)")
             continue

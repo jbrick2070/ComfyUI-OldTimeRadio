@@ -380,7 +380,7 @@
     {
       "voice_ref_id": "vz_donor_hillbilly_jim",
       "engine": "indextts2",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
@@ -556,7 +556,7 @@
     {
       "voice_ref_id": "vz_donor_james",
       "engine": "indextts2",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
@@ -957,7 +957,7 @@
     {
       "voice_ref_id": "cb_donor_hillbilly_jim",
       "engine": "chatterbox",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
@@ -1133,7 +1133,7 @@
     {
       "voice_ref_id": "cb_donor_james",
       "engine": "chatterbox",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
@@ -1574,7 +1574,7 @@
     {
       "voice_ref_id": "dia_donor_hillbilly_jim",
       "engine": "dia",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
@@ -1750,7 +1750,7 @@
     {
       "voice_ref_id": "dia_donor_james",
       "engine": "dia",
-      "gender": "female",
+      "gender": "male",
       "timbre": [
         "donated",
         "bright"
