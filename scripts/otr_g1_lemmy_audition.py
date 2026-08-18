@@ -54,10 +54,18 @@ _AUDITION_DIR = os.path.join(
 
 #: Where the deliverable lands. Rendered assets are deliverables and go to their
 #: canonical path the FIRST time -- never staged in tmp to be moved later.
-_OUT_DIR = os.path.join(
-    r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes", "g1_lemmy_test_a")
-_KEY_DIR = os.path.join(
-    r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes", "g1_lemmy_test_a_KEY")
+#:
+#: THE DEFAULT IS ALSO CITED EVIDENCE, WHICH IS WHY --out-dir EXISTS.
+#: `g1_lemmy_test_a/MANIFEST.json` is referenced BY SHA256 inside the qualified
+#: route in `config/cast_pools.py`, and the voice-identity fix (2026-08-18,
+#: QA-7) requires that record be PRESERVED while Lemmy is re-auditioned. So
+#: re-running this instrument in place would destroy the very evidence the
+#: preserved record depends on and leave it citing a hash nothing matches.
+#: Point a NEW audition at a NEW directory; a fresh qualification should cite
+#: fresh artifacts rather than overwrite the ones that proved a different build.
+_EPISODES = r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes"
+_OUT_DIR = os.path.join(_EPISODES, "g1_lemmy_test_a")
+_KEY_DIR = os.path.join(_EPISODES, "g1_lemmy_test_a_KEY")
 
 #: One seed for the render (so every arm is generated under identical
 #: conditions) and one for the label shuffle (so the blinding is reproducible).
@@ -220,9 +228,39 @@ def render(resolved: dict) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--out-dir", default=None,
+                    help="where the clips and MANIFEST.json land. DEFAULT IS "
+                         "CITED EVIDENCE -- g1_lemmy_test_a/MANIFEST.json is "
+                         "referenced by sha256 in the qualified route, so a NEW "
+                         "audition must name a NEW directory (a bare name is "
+                         "resolved under otr/episodes/).")
+    ap.add_argument("--overwrite", action="store_true",
+                    help="permit rendering into a directory that already holds "
+                         "a MANIFEST.json. Off by default: losing evidence must "
+                         "be loud.")
     ap.add_argument("--render", action="store_true",
                     help="actually load IndexTTS2 and render (default: preflight only)")
     args = ap.parse_args(argv)
+
+    global _OUT_DIR, _KEY_DIR
+    if args.out_dir:
+        chosen = args.out_dir
+        if not os.path.isabs(chosen):
+            chosen = os.path.join(_EPISODES, chosen)
+        _OUT_DIR = chosen
+        _KEY_DIR = chosen + "_KEY"
+
+    existing = os.path.join(_OUT_DIR, "MANIFEST.json")
+    if args.render and os.path.exists(existing) and not args.overwrite:
+        print("REFUSING TO RENDER: %s already exists.\n"
+              "  That manifest may be the evidence a qualification record cites "
+              "by sha256 --\n"
+              "  overwriting it would leave the record pointing at a hash "
+              "nothing matches.\n"
+              "  Pass --out-dir <new-name> for a new audition, or --overwrite "
+              "if you are\n"
+              "  certain this one is not cited." % existing)
+        return 2
 
     print("G1 Test A preflight -- proving the three frozen references")
     resolved = preflight()
