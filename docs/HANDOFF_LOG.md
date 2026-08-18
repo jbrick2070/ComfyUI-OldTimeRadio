@@ -3,6 +3,108 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-18 EVENING -- HEAD 8e7cf2b5 (v2.0-alpha) -- CODER (audition evidence guards: one queue item that verify-step-3 grew into three instruments; the cold Fable lane reversed the round's central decision; QA found a false negative in the guard itself)
+
+Did: **The cross-engine audition overwrite guard, and it was not one script.**
+Bible `12.111` verify step 3 -- *"grep the repo for every writer of the cited
+filename"* -- turned a one-script item into three: the cross-engine audition was
+**unguarded**, G1 guarded **only `MANIFEST.json`** and never looked at its `_KEY`
+directory at all, and only the production audition was correct. Shared guard
+`scripts/_otr_evidence_citations.py` walks the LIVE `LEMMY_VOICE_POLICY` for
+every sha256 and refuses to overwrite any file the ledger cites. **No flag
+overrides it.**
+
+**Proven live, not argued:** `--render` against the cited directory exits 2
+naming all seven cited files with **zero mtimes touched** (hashed before and
+after), and it refuses **before `preflight()`**, so no engine loads. The subtle
+case works too: `--engine bark` alone still refuses -- bark has no route row, so
+re-cutting its clips looks harmless, but the manifest it rewrites is cited three
+times, and `generated_utc` moves on every save.
+
+**THE COLD FABLE LANE REVERSED THE ROUND'S CENTRAL DECISION, which is the whole
+argument for running it cold.** r1 (antigravity) argued to drop the `cast_pools`
+import as "inverted coupling" and the driver ACCEPTED it. Fable's cold read
+refuted the premise on facts antigravity did not have, all four verified before
+the flip: the writer **already imports** `cast_pools` (`:279`, inside `render()`);
+the campaign directory is a **shared workspace** (`otr_lemmy_listen_page.py:374`
+writes `LISTEN.html` there every run), so sealing the directory is semantically
+wrong; a **recursive hex64 walk of the loaded object** is schema-agnostic, which
+killed the driver's own objection that four citation shapes would become five;
+and G1 is a **deprecated** requalification instrument (`cast_pools.py:800-807`).
+
+**The highest-value half was detection, not the guard.** Detection existed where
+the stakes were LOWEST and was absent where they were HIGHEST: the provisional
+routes had a byte-level check, the **QUALIFIED** route's manifest had **none
+anywhere** (`grep 344ccdf8 tests/` returned nothing), and the superseded record
+had only an assertion that the number was still typed in the config while its
+docstring claimed the file still hashed -- a comment doing a test's job. All
+three tiers now verify from disk; a resolved episodes tree with a **missing**
+cited artifact now **FAILS instead of silently skipping**; a new citation shape
+trips a coverage tripwire.
+
+**THREE DEFECTS I INTRODUCED AND CAUGHT, recorded because the catch is the
+lesson:**
+* **A false negative in the guard itself, found by Sonnet QA.** The digest
+  pattern was `[0-9a-f]` matched BEFORE lowercasing, so an **uppercase** citation
+  would be dropped and its file reported uncited -- the exact outcome the module
+  exists to prevent. **Live path, not theoretical:** `otr_g1_lemmy_audition.py`
+  computes `hexdigest().upper()`. Worse, the test that should have caught it
+  declared an uppercase fixture and a docstring promising case would not narrow
+  the guard, **then never asserted on it** -- a test shaped like coverage.
+* **My first root-probe reported all eleven cited files missing.** It probed for
+  the episodes DIRECTORY; the pytest conftest stubs `folder_paths` to return
+  `cwd`, and this repo has its own untracked `otr/episodes`. That is precisely
+  what the original helper's comment warned about. Now artifact-first.
+* **`.gitignore`'s blanket `scripts/_*.py` silently ignored the new shared
+  helper.** Both instruments import it at MODULE SCOPE, so the commit would have
+  passed every test here and thrown `ImportError` on any fresh checkout. Added to
+  the existing exception list; verified present on origin after the push.
+
+Also: G1 loses `--overwrite` (**zero callers**, verified twice; it asked the
+operator to be "certain this one is not cited" -- a fact the program can check)
+and its manifest/KEY writes are atomic. Listen page takes `--campaign-dir` and
+names its decisions file from that directory instead of stamping every future
+campaign with the first one's name. `engine_impl_version` was **structurally
+unfillable** -- no adapter defines `impl_version`, so all four rows of the cited
+manifest carry `""` -- now records the real fingerprint where a recipe exists and
+says plainly when none is registered.
+
+**Nothing had rotted.** All eleven cited artifacts re-hashed clean. This is
+preventive work and is written up that way.
+
+Gates: suite **11046 passed / 110 skipped / 1 xfailed** from a measured **11028**
+baseline -- delta exactly the 18 tests added. Bible regression **20 / 26 / 3**.
+Lockstep verified: HEAD == origin, no 0-byte files, no BOM, AST parse on all six
+committed `.py`, and the shared helper confirmed present in `origin/v2.0-alpha`.
+
+**Bible: NOTHING PROMOTED, deliberately.** This EXECUTED an existing entry's
+verify steps rather than finding a new class -- `12.111`'s own `cause` section
+already describes G1's partial guard verbatim, `_KEY` directory included. The
+other finding (unfillable `engine_impl_version`) is static-audit only, and
+nothing rotted, so there is no live artifact to admit. Bible stays **292**.
+
+**Filed, not folded in:** the four missing fingerprint recipes
+(`RUNTIME_FINGERPRINT_SOURCES` covers `indextts2` only -- deciding which source
+files constitute each engine's build is real design work), and a confirmed
+listen-page bug where an engine rendered AFTER a page build stays marked
+`settled` and is never listened to.
+
+**REVIEW PROVENANCE, STATED HONESTLY: THIS WAS NOT A FULL FOUR-ROUND ARC.**
+Codex is **not installed on this box**. Antigravity covered **r1 only**, then
+returned `RESOURCE_EXHAUSTED (429)` on r2 -- a confirmed provider quota block,
+not the `KIBITZ_AGY_PRINT_TIMEOUT` failure mode. Per the 2026-08-17 substitution
+directive the seats were filled rather than the item deferred: **Fable** ran r1
+cold, **Opus and Sonnet** subagents ran r2, and **Sonnet 5** did the QA pass on
+the finished diff before the push. **r3 and r4 were not run** -- r3's wiring
+question was answered by direct verification instead (these are standalone
+scripts; nothing here touches `workflows/otr_canonical.json`). Real external
+lane count: **one** (antigravity, r1).
+
+Current step: this row is CLOSED and pushed. Queue top is now
+PBUG-20260817-08 (Lemmy cameo voice on 10.2% of all cast rows), with the
+media_archive coda live-verification still owing a single render leg -- the
+cheapest way to put a fresh episode in `otr/obs/`.
+
 ## 2026-08-18 LATE -- HEAD 49a90266 +handoff (v2.0-alpha) -- CODER (emotion ceiling 0.560 shipped and closed; a 4-iteration scifi_news_pro closing-segment defect found and fixed, kibitz caught the real root cause after two solo misses; Bible +3; plan cleaned up)
 
 The sha above is the second-to-last on the branch; the last is this handoff
