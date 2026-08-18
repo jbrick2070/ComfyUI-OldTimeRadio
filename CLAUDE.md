@@ -65,6 +65,35 @@
     DESIGN; there is nothing to pressure-test. Sonnet 5 QA on the finished diff before the
     push is the correct and sufficient gate.
   * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
+- **A MISSING REVIEWER NEVER BLOCKS THE ARC -- SUBSTITUTE AND KEEP GOING (operator directive
+  2026-08-17 -- hard).** Operator: *"if out of budget then a kibitz reviewer is not needed,
+  ask Fable, Sonnet, or Opus, or `/anthropic-skills:roundtable` -- ANY model in lieu."*
+  **A quota-held, timed-out, or unavailable lane is NOT a reason to stop, to defer the item,
+  or to park a finished diff waiting for a lane to come back.** Fill the seat and run the
+  round.
+  * **Eligible substitutes, freely interchangeable:** Fable, Sonnet, Opus (as Cowork
+    subagents), the other `agy` model lanes (Gemini 3.1 Pro / 3.7 Flash are different
+    reviewers, not one), and `/anthropic-skills:roundtable` for a cloud panel. Any model in
+    lieu of any other.
+  * **WHAT STILL DOES NOT CHANGE:** you write the code-grounded `driver_anchor.md` FIRST and
+    you remain the sole judge; every panel claim is verified against the real Windows files
+    before it is folded in; and **the PROVENANCE is stated exactly** -- name which lanes
+    actually reviewed which rounds. A campaign a reviewer short is described as a campaign a
+    reviewer short, never as a full arc. Substituting is honest; misreporting the roster is
+    not.
+  * **This was written because it cost real time on 2026-08-17 (item F).** Codex was
+    quota-held to 08-19 and the driver treated that as a hard gate on the whole item --
+    "F is not secretly cheap ... it wants the whole arc once Codex is back". The operator's
+    correction: run it with who is available. Item F then ran r1-r4 on two agy lanes plus a
+    Fable gate and a Sonnet QA pass, caught three driver errors (two of them build-breakers:
+    an `UnboundLocalError` on four of six banks, and a lane collision that would have
+    announced an invented play on 57% of `media_archive`), and shipped proven on a live leg
+    -- **with Codex never participating in a single round.** The seat mattered; which model
+    sat in it did not.
+  * **A TIMEOUT IS NOT A QUOTA BLOCK.** `agy` failing with `Error: timeout waiting for
+    response` means the print timeout, not exhaustion -- `kibitz.py --timeout` does NOT reach
+    agy; the knob is **`KIBITZ_AGY_PRINT_TIMEOUT`** (default `5m`; `15m` fixed it first try).
+    Check `agy models` returns rc=0 before calling a lane dead.
   **THE TWO-STRIKES FLOOR BELOW IS UNTOUCHED AND NEVER LAPSES.** A bug that survived two of
   your fixes gets a panel on the third attempt no matter how mechanical it looks -- two failed
   fixes IS the evidence that your model of the problem is wrong, which is a design problem
