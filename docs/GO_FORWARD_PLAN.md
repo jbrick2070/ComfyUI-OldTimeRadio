@@ -778,11 +778,24 @@ SECOND producer fired and the fix still held** -- the single most likely way for
 this to be silently undone, and the reason r1 insisted both producers change
 together. A leg where the rewrite did not fire would not have tested it.
 
-**WHAT THE LEG DOES NOT PROVE:** one leg, one play, one seed -- a mechanism
-check, not a rate. `public_domain` shares every symbol and had its seam changed
-in the same commit but was **NOT exercised** and remains unproven live. And the
-detector catches CROSS-PLAY leakage only; a wholly invented place belonging to no
-manifest row would pass both the leg and the test.
+**THE SECOND LEG FAILED, AND IT SPLITS THE VERDICT.** `public_domain`, run on
+`b45c5577`: the announcer opened with *"we gather for 'The Adventure of the
+Purloined Paper'"* -- a work that **does not exist**. The source was `Nonsense
+Novels` by Stephen Leacock; the episode title was `The Blackwood Enigma`; the
+announcer named a THIRD string. The coda was correct.
+**THE FIX WORKED AND THE MODEL IGNORED IT** -- replaying the shipped ledger
+through the real code shows `work_title == "Nonsense Novels"`, the lane gate
+passing, and `WORK: a scene from Nonsense Novels` rendered into the prompt, with
+the rewrite producer active. **Logged as `PBUG-20260817-04`, unfixed on purpose:
+the seam has said "invent none" the whole time, so guessing at wording is the
+mechanism this item already proved unreliable.**
+
+**SO ITEM F IS SPLIT: shakespeare PASSES live, public_domain FAILS live, same
+commit.** The threading defect is fixed and proven; the *invented-title* class is
+open and is a DIFFERENT root -- supplying the fact is necessary and not
+sufficient. `tests/test_cross_play_frame_leak.py` cannot catch it by
+construction: it detects other manifest rows' names, and an invented title
+belongs to none. That is the residue the receipt predicted one leg earlier.
 
 **STILL OWED: r4 with the CODEX lane.** r4 converged on both agy lanes (zero
 must-fix, one `__all__` should-fix taken), but Codex was quota-held to

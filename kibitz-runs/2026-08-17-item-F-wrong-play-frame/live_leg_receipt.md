@@ -51,5 +51,38 @@ leg and that test. The honest claim is **"the announcer named the work it
 performed, on a live leg, with the rewrite producer active"**, not "the class is
 eliminated".
 
-`public_domain` shares every symbol on this path and its seam was updated in the
-same change, but **it was not exercised by this leg** and remains unproven live.
+## SECOND LEG -- `public_domain`, AND IT DID NOT PASS
+
+Run at the operator's instruction on `b45c5577`:
+`otr_writer_bank_gate.py --banks public_domain --acts 1`, RESULT SUCCESS,
+episode `signal_lost_the_blackwood_enigma_20260817_172553`, source
+**`Nonsense Novels` by Stephen Leacock**.
+
+> **Tonight, from the cluttered confines of an office, we gather for 'The
+> Adventure of the Purloined Paper', starring THE GREAT DETECTIVE and his
+> reluctant confidant, the SECRETARY.**
+
+**That work does not exist.** It is neither the source (`Nonsense Novels`) nor
+the episode title (`The Blackwood Enigma`) -- a third invented string. The
+closing coda was correct: *"Tonight's tale was adapted from Nonsense Novels, by
+Stephen Leacock."*
+
+**THE FIX WORKED AND THE MODEL IGNORED IT.** Replayed the shipped ledger through
+the real code: `identity_from_meta(meta).work_title == "Nonsense Novels"`,
+`source_kind == "public_domain"` (in `ADAPTATION_SOURCE_KINDS`), so the writer
+passed it and `_work_line` rendered **`WORK: a scene from Nonsense Novels`** into
+the prompt. `announcer_intro_rewrite == "announcer_intro_rewritten"`, so the
+second producer wrote the line and it receives the title too. The fact was
+delivered; the model named something else.
+
+**So the honest verdict on item F is SPLIT:** shakespeare PASSES live,
+public_domain FAILS live, on the same commit. Logged as **PBUG-20260817-04**, no
+fix attempted -- the seam has said *"invent none"* the entire time, so guessing
+at wording is the mechanism this item already proved unreliable.
+
+**And it is the residue this receipt predicted.** The section above says the
+detector catches cross-play leakage only and "a wholly invented place belonging
+to no play would still pass both this leg and that test". An invented WORK title
+is exactly that residue, found one leg later. **The two legs together are the
+argument for the live-leg rule: one lane passing proved the mechanism, the other
+failing proved the mechanism is not the whole defect.**

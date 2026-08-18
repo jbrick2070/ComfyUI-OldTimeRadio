@@ -1,0 +1,7 @@
+﻿[bank-gate] 2026-08-17 17:20:06  BANK public_domain (profile otr_w45_still_flat) -> _bankgate_public_domain.log
+
+=========== WRITER BANK GATE (1 acts) ===========
+public_domain      PASS exit=0      10.9 min   
+1/1 banks passed
+banks registered: 5 | run: 1
+NOT RUN (4): media_archive, original, scifi_news_pro, shakespeare
