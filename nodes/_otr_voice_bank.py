@@ -114,6 +114,17 @@ def reserved_voice_ref_ids() -> frozenset:
     Fail-SOFT: an unimportable pack reserves nothing and casting behaves exactly
     as it did before this existed. The strictness lives where a route is claimed,
     not in a helper that would otherwise break every render on an import error.
+
+    FAIL-SOFT ON ANY EXCEPTION, not just ImportError (widened 2026-08-18 after a
+    QA pass). This helper now has four callers -- ``assign_voice_for_slot``,
+    ``build_voice_cards``, ``validate_voice_proposal`` and
+    ``gender_agnostic_fallback_ref`` -- and two of them promise in their own
+    docstrings to be pure and never raise. A malformed policy (say
+    ``LEMMY_VOICE_POLICY`` set to a truthy non-dict, so ``.get`` raises
+    ``AttributeError``) would otherwise propagate straight through those
+    promises and out of ``cast_lock.py``, turning a cosmetic config error into a
+    dead render. Reserving nothing is the correct degradation: it restores
+    exactly the pre-reservation behaviour rather than failing an episode.
     """
     try:
         from ..config import cast_pools as _POOLS  # type: ignore
@@ -122,7 +133,18 @@ def reserved_voice_ref_ids() -> frozenset:
             from config import cast_pools as _POOLS  # type: ignore
         except ImportError:
             return frozenset()
-    policy = getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
+    try:
+        policy = getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
+        return _reserved_ids_from_policy(policy)
+    except Exception:  # noqa: BLE001 -- a broken policy reserves nothing
+        log.warning("[OTR voice] reserved-id policy unreadable; reserving none",
+                    exc_info=True)
+        return frozenset()
+
+
+def _reserved_ids_from_policy(policy) -> frozenset:
+    """The reserved-id walk itself, split out so the fail-soft wrapper above
+    covers every step of it rather than only the import."""
     ids = set()
 
     # ONLY A CLONE OF HIS OWN RECORDING IS HIS. The first cut of this reserved
@@ -656,7 +678,24 @@ def build_voice_cards(
     capped at ``max_cards``. Each card: ``voice_ref_id`` / ``age_band`` /
     ``timbre`` / ``roles`` / ``style_tags`` / ``commercial_clean`` + a compact
     human-readable ``descriptor`` (the bank has no curated prose field, so it is
-    synthesized from age/timbre/style). NO ref_path, NO character name (I-9)."""
+    synthesized from age/timbre/style). NO ref_path, NO character name (I-9).
+
+    A RESERVED IDENTITY IS NOT ON THE CARD LIST, for the same reason it is not in
+    the selector pool (see ``assign_voice_for_slot``). The reservation added
+    2026-08-17 filtered the DETERMINISTIC caster only, and this is the path that
+    actually runs: measured over 1711 ledgers, 1871 character rows were stamped
+    from an accepted LLM proposal against 82 fallbacks, so the selector handled
+    roughly 4% of casting. ``idx_lemmy_algenib_cockney_v1`` sorts first among
+    indextts2 male ids and was therefore offered as CARD #1 on every male slot;
+    the corpus shows the LLM proposing a reserved id 21 times, accepted every
+    time, putting Lemmy's qualified Cockney on DON PEDRO, MARCELLUS, BANQUO,
+    MOE GORDON and others.
+
+    THE POLICY PATH IS UNAFFECTED, which is what makes this safe -- a qualified
+    or provisional route stamps its bank entry DIRECTLY in CastLock from
+    ``LEMMY_VOICE_POLICY`` and never reads these cards, so reserving these ids
+    cannot starve Lemmy of his own voice. It only stops everyone else borrowing
+    it."""
     gnorm = (gender or "").strip().lower()
     if not engine or not gnorm:
         return []
@@ -664,10 +703,12 @@ def build_voice_cards(
         entries = bank if bank is not None else load_voice_bank()[0]
     except Exception:  # noqa: BLE001 -- no bank -> no cards -> caller falls closed
         return []
+    reserved = reserved_voice_ref_ids()
     pool = sorted(
         (e for e in entries
          if e.engine == engine and e.gender == gnorm
-         and getattr(e, "quality_tier", "") != "reject"),
+         and getattr(e, "quality_tier", "") != "reject"
+         and e.voice_ref_id not in reserved),
         key=lambda e: e.voice_ref_id,
     )[: max(0, int(max_cards))]
     cards: List[dict] = []
@@ -733,11 +774,19 @@ def validate_voice_proposal(
 ) -> str:
     """Validate an LLM-proposed ``voice_ref_id`` for one slot. Returns the id iff
     it is in-library + engine-correct + gender-consistent + not a reject + not
-    already used (no-collision); else '' (the caller falls closed to the
-    deterministic scorer). Pure; never raises."""
+    RESERVED + not already used (no-collision); else '' (the caller falls closed
+    to the deterministic scorer). Pure; never raises.
+
+    The reserved check is deliberately here as well as in ``build_voice_cards``
+    and is not redundant belt-and-braces: a proposal is free text from a model
+    and does not have to name a card it was shown, so filtering the card list
+    alone would still let a hallucinated or remembered reserved id through --
+    and this function is the last gate before CastLock stamps the row."""
     pid = str(proposed_id or "").strip()
     gnorm = (gender or "").strip().lower()
     if not pid or not engine or not gnorm:
+        return ""
+    if pid in reserved_voice_ref_ids():
         return ""
     used = set(used_ids or ())
     entry = voice_ref_entry(pid, engine, bank)
@@ -854,10 +903,31 @@ def gender_agnostic_fallback_ref(
     used-set; the render-time resolver has no cross-character state and passes
     nothing, which is harmless -- once the caster stamps an id, the resolver
     matches on that id and never reaches this draw at all.
+
+    RESERVED AND REJECTED REFERENCES ARE NOT IN THIS POOL EITHER, and this was
+    the THIRD place the reservation had to be taught (2026-08-18). It is the
+    easiest one to miss because it is not a "caster" by name -- but it draws a
+    real voice that both the ledger stamp and the render path use, so a reserved
+    id reached from here is heard exactly like one reached from the selector.
+    It is not a rare branch: `other` is 20% of every gender roll and the bank
+    carries zero rows for it, so every such row lands here, and a uniform draw
+    over the engine's refs handed out Lemmy's clone at roughly the same odds as
+    any other voice (measured: 7-9 of 200 draws per engine before this filter).
+    The reject filter matches ``assign_voice_for_slot``'s pool pre-filter; it is
+    a no-op against the shipped bank (zero rows are tiered `reject` today) and
+    exists so an audited reject cannot be rendered by the one path that used to
+    skip the audit.
     """
-    role_cands = [e for e in bank if e.engine == engine and role in e.roles]
+    reserved = reserved_voice_ref_ids()
+
+    def _eligible(entry) -> bool:
+        return (entry.engine == engine
+                and entry.voice_ref_id not in reserved
+                and getattr(entry, "quality_tier", "") != "reject")
+
+    role_cands = [e for e in bank if _eligible(e) and role in e.roles]
     cands = sorted(
-        role_cands or [e for e in bank if e.engine == engine],
+        role_cands or [e for e in bank if _eligible(e)],
         key=lambda e: e.voice_ref_id,
     )
     if not cands:

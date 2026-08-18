@@ -12,16 +12,31 @@ his own voice. **None of those exercise the selector.** They prove the LIST is
 right; nothing proved the POOL obeys it, and the pool is where the bug lived.
 
 That distinction is not academic here. The leak was seen AGAIN sixteen hours
-AFTER the fix commit, in `signal_lost_rivers_embrace_20260817_233013`, because
-the soak harness boots one server and never tears it down -- so an evening leg
-was still executing the module loaded into memory that morning. A stale process
-is not a code defect, but it is exactly the situation where "we fixed it" and "it
-cannot happen" drift apart, and only a selector-level test closes that gap.
+AFTER the fix commit, in `signal_lost_rivers_embrace_20260817_233013`.
+
+**CORRECTED 2026-08-18 -- THE EXPLANATION THAT STOOD HERE WAS WRONG.** This
+docstring attributed that sighting to the resident-server trap: the soak harness
+boots one server and never tears it down, so an evening leg was still executing
+the module loaded that morning. That trap is real and worth remembering, but it
+is NOT what produced this row. The reservation was only ever applied inside
+`assign_voice_for_slot`, and production casting does not normally go through it:
+the default-ON hybrid LLM voice-fit proposes an id, `validate_voice_proposal`
+checks it, and `cast_lock.py:884-906` stamps it and skips the selector entirely
+(measured: 1871 accepted proposals against 82 fallbacks across 1711 ledgers).
+Neither the card builder nor the validator knew reserved ids existed, so
+`rivers_embrace` leaked through an UNCOVERED PATH, not a stale import -- a live
+call on a freshly imported module reproduced it at HEAD.
+
+The lesson worth keeping is sharper than the one first written: **a stale process
+and an uncovered code path look identical from the outside**, and the way to tell
+them apart is to test the path production actually takes. The hybrid-path guard
+and its tests are `tests/test_lemmy_reserved_on_hybrid_path.py`.
 
 Corpus check at the time of writing: across the 15 most recent episodes with a
 cast ledger, the two rows carrying a Lemmy-owned reference on a non-Lemmy
 character are `kinetic_motion_clause_live_test` (05:01) and `rivers_embrace`
-(23:30), both on 2026-08-17. Every episode from 2026-08-18 onward is clean.
+(23:30), both on 2026-08-17. Episodes from 2026-08-18 onward are clean -- but
+that is a 1.1% leak rate not firing, not proof it could not.
 """
 from __future__ import annotations
 

@@ -186,10 +186,23 @@ def test_lock_cast_hybrid_off_is_empty(monkeypatch):
 # CastLock honours / falls closed on the decision
 # --------------------------------------------------------------------------- #
 def _real_male_indextts2_id():
+    """A real, CASTABLE male indextts2 id for use as an ordinary proposal.
+
+    Reserved ids are excluded, and that exclusion is load-bearing rather than
+    tidiness: sorted alphabetically the first male indextts2 entry is
+    `idx_lemmy_algenib_cockney_v1`, Lemmy's qualified clone. Until 2026-08-18
+    this helper returned exactly that, so the tests below asserted that CastLock
+    stamps the recurring cameo's voice onto a character called BOB -- the defect
+    PBUG-20260817-08 describes, encoded as an expectation. A reserved voice was
+    never what "a real male indextts2 id" meant here.
+    """
     bank, _ = VB.load_voice_bank()
+    reserved = VB.reserved_voice_ref_ids()
     cands = sorted(
         e.voice_ref_id for e in bank
-        if e.engine == "indextts2" and e.gender == "male")
+        if e.engine == "indextts2" and e.gender == "male"
+        and e.voice_ref_id not in reserved)
+    assert cands, "no castable male indextts2 voice -- fixture cannot be built"
     return cands[0]
 
 
