@@ -68,7 +68,13 @@ profiles:
     # selecting it routes _resolve_char_engine to chatterbox (MIT) -- the release-
     # safe char cloner -- because indextts2 is excluded from default_clean.
     allowed_voice_banks: [default, default_clean]
-    engine_impl_version: "1"
+    # Voice identity 2026-08-18: one seed per CHARACTER per episode, not
+    # one per line -- a cloned character must not change voice between his
+    # own beats. engine_impl_version bumped 1 -> 2 in the same change so
+    # audio rendered under the per-line seed is never replayed as if it
+    # were this one.
+    character_stable_seed: true
+    engine_impl_version: "2"
     sample_rate: 24000
     requires_hf_token: false
     rank: 2                         # char rank-2 fallback (opt-in)
@@ -85,9 +91,20 @@ profiles:
     commercial_clean: false        # Bilibili license -- non-commercial use gated
     model_path: ""
     model_sha256: ""
-    default_params: {temperature: 0.8, emo_alpha: 1.0}
+    # emo_alpha re-anchored 1.0 -> 0.4 (voice identity 2026-08-18). At 1.0
+    # the vendor spends the emotion vector's full sum against the speaker's
+    # own embedding, so a weighted line kept almost none of the reference
+    # voice. The adapter caps the EFFECTIVE mass at 0.4 after alpha as well,
+    # which is what covers hand-edited and pre-stamped vectors.
+    default_params: {temperature: 0.8, emo_alpha: 0.4}
     allowed_voice_banks: [default]
-    engine_impl_version: "1"
+    # Voice identity 2026-08-18: one seed per CHARACTER per episode, not
+    # one per line -- a cloned character must not change voice between his
+    # own beats. engine_impl_version bumped 1 -> 2 in the same change so
+    # audio rendered under the per-line seed is never replayed as if it
+    # were this one.
+    character_stable_seed: true
+    engine_impl_version: "2"
     sample_rate: 22050
     requires_hf_token: false        # weights are downloadable; only commercial USE is gated
     rank: 1                         # char scope default (rank-1)
@@ -109,7 +126,13 @@ profiles:
     # legacy-first order (chatterbox before dia) means chatterbox wins, dia is the
     # commercial-clean fallback if chatterbox has no usable ref.
     allowed_voice_banks: [default, default_clean]
-    engine_impl_version: "1"
+    # Voice identity 2026-08-18: one seed per CHARACTER per episode, not
+    # one per line -- a cloned character must not change voice between his
+    # own beats. engine_impl_version bumped 1 -> 2 in the same change so
+    # audio rendered under the per-line seed is never replayed as if it
+    # were this one.
+    character_stable_seed: true
+    engine_impl_version: "2"
     sample_rate: 44100             # Descript Audio Codec
     requires_hf_token: false        # nari-labs/Dia-1.6B-0626 weights are ungated
     rank: 2                         # char rank-2 (opt-in; peer of chatterbox)

@@ -130,6 +130,21 @@ class EngineProfile(BaseModel):
     # in. Read at nodes/_otr_voice_node_common._render_per_line. ---
     use_cache: bool = False
 
+    # --- Voice identity 2026-08-18 (PBUG-20260817-09): character-stable engine
+    # seeding. The per-engine external seed is normally reduced from
+    # `stable_line_seed`, which includes `line_id` -- so a CLONE engine drew a
+    # different seed for every line one character speaks, and the operator heard
+    # a character change voice between two of his own beats. A profile that sets
+    # this True seeds on the CHARACTER and his resolved reference instead, so his
+    # identity survives his own dialogue.
+    #
+    # DEFAULT False, AND THAT IS THE SAFETY. Every profile that does not opt in
+    # keeps the legacy formula byte for byte -- announcer profiles included,
+    # which are deliberately left alone: an announcer is not a cloned character
+    # and has no identity to hold steady across beats. Opted in today: the three
+    # char_* CLONE profiles (indextts2, chatterbox, dia).
+    character_stable_seed: bool = False
+
     @model_validator(mode="after")
     def _validate_metadata(self):
         if self.runtime not in _VALID_RUNTIMES:

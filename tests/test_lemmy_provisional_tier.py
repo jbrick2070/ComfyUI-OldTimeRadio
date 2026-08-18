@@ -524,13 +524,38 @@ def test_stale_engine_specific_identity_is_cleared(pin_provisional, stale_field,
 
 
 @pytest.mark.parametrize("policy_mode", ["auto_registry", "preserve_ledger"])
-def test_a_provisional_row_re_locked_QUALIFIED_drops_its_old_identity(policy_mode):
+def test_a_provisional_row_re_locked_QUALIFIED_drops_its_old_identity(
+        policy_mode, monkeypatch):
     """THE OTHER DIRECTION, which the sprint contract names explicitly and an
     earlier cut proved in only one branch: provisional -> qualified.
 
-    Uses the REAL shipped policy -- the qualified IndexTTS2 route -- so this
-    fails if the live receipt ever stops applying, not merely if a fixture rots.
+    Uses the REAL shipped record, RE-QUALIFIED onto the current runtime
+    (voice identity 2026-08-18, [QA-7]). The shipped record is deliberately not
+    selectable any more: this fix changed IndexTTS2's seed handling and its
+    emotion blend, so `select_policy_route` demotes a route whose stored
+    adapter/worker fingerprint no longer matches the code that would render it,
+    and Lemmy stays unqualified until somebody re-auditions him.
+
+    THE TRANSITION ITSELF STILL HAS TO WORK, and that is what this proves --
+    a re-qualified route must promote a provisional row and strip its old
+    identity. Copying the real record rather than inventing one keeps the
+    original intent: everything except the runtime line is the shipped
+    evidence, so a rotted receipt still fails here. That the SHIPPED record no
+    longer applies is asserted on purpose in
+    `tests/test_voice_identity_fix.py::test_the_shipped_lemmy_route_is_no_longer_selected`.
     """
+    from nodes import _otr_voice_route as ROUTE
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+    requalified = json.loads(json.dumps(
+        POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"]))
+    requalified["qualification_record"]["runtime"]["engine_impl_version"] = (
+        ROUTE.live_engine_impl_version("indextts2"))
+    monkeypatch.setattr(
+        "nodes.cast_lock._lemmy_voice_policy",
+        lambda: dict(POOLS.LEMMY_VOICE_POLICY,
+                     approved_native_routes={"indextts2": requalified}))
+
     cast = json.loads(json.dumps(CAST))
     cast[1].update({
         "voice_ref_id": PROVIDER_REF,

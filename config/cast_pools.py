@@ -752,6 +752,35 @@ LEMMY_VOICE_POLICY = {
     # NOTE FOR THE NEXT READER: this dict is NOT empty and has not been since
     # 2026-08-10. Comments elsewhere in the tree that still call it empty are
     # stale -- what is written here is the truth.
+    #
+    # AND THE INDEXTTS2 ROUTE BELOW IS CURRENTLY UNQUALIFIED IN PRACTICE
+    # (voice-identity fix 2026-08-18, PBUG-20260817-09, [QA-7]). The record is
+    # preserved here EXACTLY as the G1 audition wrote it -- nothing in it has
+    # been edited -- but `select_policy_route` now compares its stored
+    # `runtime.engine_impl_version` against a LIVE fingerprint of the adapter
+    # plus its worker script, and they no longer agree, so the route is not
+    # selected and the cast row takes the ordinary draw. The episode still
+    # renders and still publishes; only the CLAIM is withdrawn.
+    #
+    # TWO HONEST REASONS IT DOES NOT MATCH, and both point the same way:
+    #   1. THE CODE REALLY CHANGED. The voice-identity fix altered IndexTTS2's
+    #      seed handling and its emotion blend -- precisely the two things the
+    #      operator judged by ear -- so the August audition no longer describes
+    #      what this engine does.
+    #   2. THE RECIPE WAS NEVER IMPLEMENTED UNTIL NOW. The paragraph above has
+    #      described `engine_impl_version` as "the sha256 of the adapter plus
+    #      its worker script" since the day it was written, but nothing in the
+    #      tree ever COMPUTED that value, so nothing ever compared it. The
+    #      stored `b965453f...` cannot be reproduced from any live code path.
+    #      Do not read the mismatch as a measurement of how much the adapter
+    #      moved; read it as "this claim has never been checked and now is".
+    #
+    # TO RESTORE THE ROUTE: re-audition against the current build, then write a
+    # NEW qualification record whose `runtime.engine_impl_version` is whatever
+    # `_otr_voice_route.live_engine_impl_version("indextts2")` returns at that
+    # moment. Do not hand-edit the value below to silence the warning -- that
+    # would re-assert an approval nobody has given, which is the exact
+    # evidence-shaped field this module exists to refuse.
     "approved_native_routes": {
         "indextts2": {
             "route_id": "lemmy-indextts2-algenib-cockney-v1",

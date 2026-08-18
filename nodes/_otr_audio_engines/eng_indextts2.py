@@ -24,6 +24,7 @@ worker is spawned lazily in ``load`` / ``generate_voice``, never at import.
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import tempfile
@@ -45,6 +46,85 @@ _COMFY_ROOT = os.path.dirname(os.path.dirname(_REPO_ROOT))              # ...\Co
 
 def _default(*parts):
     return os.path.join(_COMFY_ROOT, "index-tts", *parts)
+
+
+# --------------------------------------------------------------------------- #
+# VOICE IDENTITY (2026-08-18, PBUG-20260817-09) -- the two emotion constants.
+#
+# WHAT THE OPERATOR HEARD: "Nag 1 sounded good, Nag beat 2 was another voice."
+# One character, two of his own lines, the same reference WAV -- and a different
+# voice each time. Two causes, and they compound.
+#
+# HOW THE VENDOR ACTUALLY SPENDS THIS VECTOR (read from the installed
+# `indextts/infer_v2.py`, not assumed). The emotion vector is not a tone knob
+# laid over the speaker; its SUM is a budget spent AGAINST him:
+#
+#     emovec = emovec_mat + (1 - sum(weight_vector)) * emovec
+#
+# `emovec_mat` is a blend of generic emotion prototypes and the right-hand term
+# is the speaker's OWN emotional embedding. So a vector summing to 1.0 leaves
+# `1 - 1.0 == 0.0` of him in the result -- the identity the reference WAV was
+# chosen for is fully displaced, and what survives is whatever the sampler drew
+# under that line's seed. A neutral line stamped `calm=1.0` is the WORST case,
+# not the safest one, which is exactly why the quiet beat is the one that
+# stopped sounding like him.
+#
+# CARRY THE OPERATOR'S CAVEAT VERBATIM: that is the EMOTION-LATENT BLEND, not
+# "26% of his vocal tract".
+# --------------------------------------------------------------------------- #
+
+#: Emotion-blend strength when ``OTR_INDEXTTS2_EMO_ALPHA`` is unset or unusable.
+#: Was 1.0 -- full displacement of the speaker's own emotional embedding on any
+#: line the delivery table gave weight to.
+EMO_ALPHA_DEFAULT = 0.4
+
+#: Ceiling on the EFFECTIVE emotion mass -- the sum of the weights the vendor
+#: actually spends, AFTER alpha. It guarantees at least ``1 - 0.4`` of the
+#: character's own embedding survives every line, including lines whose vector
+#: was hand-edited or pre-stamped rather than derived (alpha alone cannot
+#: promise that: a stamped vector summing to 3.0 still clears 1.0 at alpha 0.4).
+EFFECTIVE_EMOTION_MASS_CAP = 0.4
+
+#: The highest ceiling worth expressing: eight dimensions each clamped to 1.0,
+#: so a cap at or above this can never bind. ``OTR_INDEXTTS2_EMO_MASS_CAP=8``
+#: is therefore "no ceiling", which is what the pre-fix control arm needs.
+EMOTION_MASS_CAP_DISABLED = 8.0
+
+
+def sanitize_delivery_vector(delivery_vector) -> dict:
+    """Any object -> a complete 8-key ``{emotion: 0.0..1.0}`` dict. Never raises.
+
+    THE ONE SAFE VECTOR PREPARATION HELPER (QA-4). A delivery vector is
+    HAND-EDITABLE -- it is stamped onto the ledger as ordinary JSON -- so a
+    value can legitimately arrive as a string, a ``None``, a NaN or a number
+    outside 0..1. Everything that reads a vector on this lane reads it through
+    here: the outbound worker payload, the cap metrics, and the voice
+    dispatch's per-line observability line, which used to call ``float(...)``
+    on the RAW stamped values and would raise ``ValueError`` on a ledger
+    carrying ``{"happy": "very"}``. THE LAW is that a render degrades, never
+    raises, so there is exactly one sanitizer and every reader shares it.
+
+    A non-dict yields the flat all-zero vector; one bad value zeroes or clamps
+    THAT emotion only, leaving the rest intact. Values are rounded to three
+    decimals -- the resolution the cache-key quantizer keeps -- so what is
+    measured is what is sent.
+
+    The emotion ORDER is imported from the delivery module, which owns that
+    mapping and is not modified from here.
+    """
+    from .._otr_delivery_vector import EMOTIONS
+
+    dv = delivery_vector if isinstance(delivery_vector, dict) else {}
+    out = {}
+    for emotion in EMOTIONS:
+        try:
+            value = float(dv.get(emotion, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        if value != value:  # NaN
+            value = 0.0
+        out[emotion] = round(min(1.0, max(0.0, value)), 3)
+    return out
 
 
 @register
@@ -154,19 +234,14 @@ class IndexTTS2Engine:
         """8-dim delivery vector -> IndexTTS2 Emo-Vector order list. Robust to a
         malformed (hand-editable) stamped vector: a non-dict or non-numeric value
         -> 0.0, every value clamped to 0..1, so an out-of-contract ledger never
-        crashes the render or sends bad values to the worker (PD1)."""
+        crashes the render or sends bad values to the worker (PD1).
+
+        This is the PRE-ALPHA, PRE-CAP projection. The list that actually
+        reaches the worker comes from :meth:`emotion_payload`, which applies the
+        effective-mass ceiling on top."""
         from .._otr_delivery_vector import EMOTIONS
-        dv = delivery_vector if isinstance(delivery_vector, dict) else {}
-        out = []
-        for e in EMOTIONS:
-            try:
-                val = float(dv.get(e, 0.0))
-            except (TypeError, ValueError):
-                val = 0.0
-            if val != val:  # NaN
-                val = 0.0
-            out.append(round(min(1.0, max(0.0, val)), 3))
-        return out
+        safe = sanitize_delivery_vector(delivery_vector)
+        return [safe[e] for e in EMOTIONS]
 
     def prepare_text(self, text, delivery_vector=None):
         """Engine-neutral clean spoken text; audio direction rides the emo-vector,
@@ -178,19 +253,162 @@ class IndexTTS2Engine:
     def current_emo_alpha() -> float:
         """The active emotion-blend strength (whiny-fix P1.2).
 
-        ``OTR_INDEXTTS2_EMO_ALPHA`` env, clamped to 0..1, default 1.0 (today's
-        shipped behavior). The worker already accepts a per-request value (G7)
-        -- this is the cheapest dominant lever; the default is re-anchored from
-        the operator's P0 audition matrix when it lands. Read per render so a
-        long-running server picks up env changes."""
-        raw = os.getenv("OTR_INDEXTTS2_EMO_ALPHA", "1.0")
+        ``OTR_INDEXTTS2_EMO_ALPHA`` env, clamped to 0..1, default
+        :data:`EMO_ALPHA_DEFAULT`. Read per render so a long-running server
+        picks up env changes.
+
+        THE DEFAULT MOVED 1.0 -> 0.4 (voice-identity fix 2026-08-18). At 1.0
+        the vendor spends the emotion vector's full sum against the speaker's
+        own embedding, so a line the delivery table weighted heavily kept
+        almost nothing of the reference voice -- which is the half of the
+        defect that alpha owns.
+
+        ROUNDED TO THREE DECIMALS, AND THE ROUNDING IS LOAD-BEARING [QA-2].
+        ``quantize_params`` keys this value at three decimals
+        (``round(v * 1000)``), so an env value of ``0.4001`` would key
+        identically to ``0.4`` while RENDERING differently -- the next
+        identical line would replay the wrong blend from cache. Clamp first,
+        then round, so the value the forward uses and the value the key
+        records are the same number by construction.
+        """
+        raw = os.getenv("OTR_INDEXTTS2_EMO_ALPHA", str(EMO_ALPHA_DEFAULT))
         try:
             a = float(raw)
         except (TypeError, ValueError):
-            return 1.0
+            return EMO_ALPHA_DEFAULT
         if a != a:  # NaN
-            return 1.0
-        return min(1.0, max(0.0, a))
+            return EMO_ALPHA_DEFAULT
+        return round(min(1.0, max(0.0, a)), 3)
+
+    @staticmethod
+    def current_emo_mass_cap() -> float:
+        """The active ceiling on effective emotion mass.
+
+        ``OTR_INDEXTTS2_EMO_MASS_CAP`` env, default
+        :data:`EFFECTIVE_EMOTION_MASS_CAP`, clamped to
+        ``0 .. EMOTION_MASS_CAP_DISABLED`` and rounded to three decimals for the
+        same cache-key reason alpha is.
+
+        WHY THIS KNOB EXISTS, AND IT IS NOT DECORATION. The ceiling was
+        unconditional in the first cut, and the final structural gate caught
+        what that costs: on a NEUTRAL line -- ``calm=1.0``, sum exactly 1.0,
+        which is the shape of the very beat the operator reported -- alpha 1.0
+        gets rescaled to 0.4 by the cap and alpha 0.4 lands on 0.4 by the
+        vendor's own scaling. Identical effective mass. So the 2x2's alpha axis
+        was DEGENERATE on the defect's own case, no arm reproduced pre-fix
+        emotion behaviour, and the fix could not be attributed between its two
+        causes.
+
+        It is also the operator's rollback. He judges by ear, and the ceiling is
+        the half of this fix most likely to read as flattened performance --
+        every saturated line now lands on exactly the cap. Without an override
+        his only lever was lowering alpha further, which flattens it more. Set
+        the cap to ``8`` to restore the old intensity and hear the difference.
+        """
+        raw = os.getenv("OTR_INDEXTTS2_EMO_MASS_CAP",
+                        str(EFFECTIVE_EMOTION_MASS_CAP))
+        try:
+            cap = float(raw)
+        except (TypeError, ValueError):
+            return EFFECTIVE_EMOTION_MASS_CAP
+        if cap != cap:  # NaN
+            return EFFECTIVE_EMOTION_MASS_CAP
+        return round(min(EMOTION_MASS_CAP_DISABLED, max(0.0, cap)), 3)
+
+    @staticmethod
+    def _apply_vendor_alpha(emo_vector, alpha):
+        """Mirror of the vendor's OWN post-alpha transform. Read, not assumed.
+
+        ``indextts/infer_v2.py`` pre-scales the emotion vector by alpha itself
+        -- emotion vectors cannot be alpha-blended later in its pipeline -- and
+        then, because OTR never supplies a separate emotion reference clip,
+        forces ``emo_alpha = 1.0`` for the rest of the forward. So alpha's ONE
+        effect is this scaling, and the weights below are literally what gets
+        summed into ``1 - sum(weight_vector)``.
+
+        Two details are copied deliberately: the scale is only applied when it
+        is not exactly 1.0, and the result is TRUNCATED to four decimals
+        (``int(x * scale * 10000) / 10000``), never rounded. Measuring an
+        idealised ``alpha * sum`` instead of this would describe a blend the
+        vendor does not use [QA-3].
+        """
+        scale = max(0.0, min(1.0, float(alpha)))
+        if scale != 1.0:
+            return [int(x * scale * 10000) / 10000 for x in emo_vector]
+        return [float(x) for x in emo_vector]
+
+    def emotion_payload(self, delivery_vector, alpha=None, mass_cap=None) -> dict:
+        """The EXACT emotion arguments this adapter will hand the worker.
+
+        Returns ``{"emo_vector", "emo_alpha", "effective_mass", "mass_capped",
+        "vector_state"}``. Pure and deterministic in its inputs, so the voice
+        dispatch can call it for the per-line receipt and get the same numbers
+        the forward sends -- one resolution, not two that can drift [QA-2].
+
+        THE CEILING IS APPLIED AFTER ALPHA, NEVER BEFORE [QA-3, QA-4 order].
+        Capping the raw vector first and letting alpha scale the capped result
+        would soften the delivery twice: a stamped ``calm=1.0`` line would land
+        at ``0.4 * 0.4 == 0.16`` instead of the intended ``0.4``. So the vendor
+        transform runs first, the mass is measured on ITS output, and only an
+        overweight result is scaled back.
+
+        WHY A CEILING AND NOT JUST A SMALLER ALPHA. Alpha is a multiplier, so it
+        cannot promise anything about a vector it did not derive: a hand-edited
+        or pre-stamped ledger summing to 3.0 still spends 1.2 at alpha 0.4 --
+        more than the whole speaker. The cap is the floor under the character's
+        identity; alpha is the taste knob above it.
+        """
+        from .._otr_delivery_vector import EMOTIONS
+
+        emo_alpha = self.current_emo_alpha() if alpha is None else round(
+            min(1.0, max(0.0, float(alpha))), 3)
+        cap = self.current_emo_mass_cap() if mass_cap is None else round(
+            min(EMOTION_MASS_CAP_DISABLED, max(0.0, float(mass_cap))), 3)
+        safe = sanitize_delivery_vector(delivery_vector)
+        vector = [safe[e] for e in EMOTIONS]
+        state = "omitted" if delivery_vector is None else (
+            "nonzero" if any(v > 0.0 for v in vector) else "zero")
+
+        applied = self._apply_vendor_alpha(vector, emo_alpha)
+        mass = sum(applied)
+        capped = False
+        if mass > cap:
+            capped = True
+            factor = cap / mass
+            # FLOOR, not round. Rounding a rescaled weight up is precisely how
+            # an enforced 0.4 comes back as 0.401 [QA-3]; flooring can only
+            # ever land at or under the ceiling.
+            vector = [math.floor(v * factor * 1000) / 1000 for v in vector]
+
+        # MEASURED AFTER SERIALIZATION, on the values the worker will actually
+        # parse [QA-3]. The round-trip is what makes "the exact outbound list"
+        # a fact rather than an intention; `generate_voice` then serializes
+        # these same numbers.
+        vector = json.loads(json.dumps(vector))
+        applied = self._apply_vendor_alpha(vector, emo_alpha)
+        mass = sum(applied)
+
+        # Bounded, deterministic shave. Unreachable with the floor above -- it
+        # is here because an unenforced ceiling is a comment, not a ceiling,
+        # and because THE LAW forbids raising over it mid-render.
+        for _ in range(len(vector)):
+            if mass <= cap:
+                break
+            capped = True
+            heaviest = max(range(len(vector)), key=lambda i: (vector[i], -i))
+            vector[heaviest] = max(0.0, round(vector[heaviest] - 0.001, 3))
+            vector = json.loads(json.dumps(vector))
+            applied = self._apply_vendor_alpha(vector, emo_alpha)
+            mass = sum(applied)
+
+        return {
+            "emo_vector": vector,
+            "emo_alpha": emo_alpha,
+            "emo_mass_cap": cap,
+            "effective_mass": round(mass, 4),
+            "mass_capped": capped,
+            "vector_state": state,
+        }
 
     def render_time_params(self) -> dict:
         """``emo_alpha`` MUST key -- it is resolved per render, from the env.
@@ -209,7 +427,8 @@ class IndexTTS2Engine:
         built per line per render, so a changed env still takes effect on the
         next render. It now also takes effect on the KEY.
         """
-        return {"emo_alpha": self.current_emo_alpha()}
+        return {"emo_alpha": self.current_emo_alpha(),
+                "emo_mass_cap": self.current_emo_mass_cap()}
 
     # ---- one dialogue line -> mono AUDIO {"waveform","sample_rate"} ----
     def _resolve_ref(self, ref):
@@ -227,11 +446,16 @@ class IndexTTS2Engine:
         self.load()
         ref_clip_path = self._resolve_ref(ref_clip_path)
         out_path = tempfile.mktemp(suffix=".wav", prefix="otr_idx2_")
+        # ONE resolution of the emotion arguments, shared with the per-line
+        # receipt the dispatch writes [QA-2]. The vector here is already capped
+        # to EFFECTIVE_EMOTION_MASS_CAP measured AFTER alpha, so the speaker's
+        # own embedding always keeps its share of the blend.
+        emotion = self.emotion_payload(delivery_vector)
         req = {
             "text": text,
             "ref_clip": ref_clip_path,
-            "emo_vector": self.emo_list(delivery_vector),
-            "emo_alpha": self.current_emo_alpha(),
+            "emo_vector": emotion["emo_vector"],
+            "emo_alpha": emotion["emo_alpha"],
             "seed": int(seed),
             "out_path": out_path,
             "verbose": False,

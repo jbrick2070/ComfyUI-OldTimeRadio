@@ -29,6 +29,14 @@ def _wav(tmp_path, body=b"RIFF....WAVEfmt the-pinned-reference-bytes"):
     return p, hashlib.sha256(body).hexdigest()
 
 
+def _live_runtime(engine):
+    """The adapter/worker fingerprint this build would actually render on."""
+    from nodes import _otr_voice_route as ROUTE
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+    return ROUTE.live_engine_impl_version(engine)
+
+
 def _route(tmp_path, **over):
     path, digest = _wav(tmp_path)
     route = {
@@ -43,7 +51,15 @@ def _route(tmp_path, **over):
         "qualification_record_id": "qr-lemmy-0001",
         "runtime": {
             "model_id": "IndexTTS-2",
-            "engine_impl_version": "1.0.0",
+            # THE LIVE FINGERPRINT, NOT A LITERAL (voice identity 2026-08-18).
+            # `resolve_and_verify_reference` now degrades a route whose stored
+            # adapter/worker runtime no longer matches the code that would
+            # render it, so a ledger locked under old code cannot re-assert a
+            # withdrawn qualification in its per-line receipts. These fixtures
+            # exercise a route that IS current, so they have to say so -- and
+            # the staleness path has its own coverage in
+            # tests/test_voice_identity_fix.py.
+            "engine_impl_version": _live_runtime("indextts2"),
             "weight_revision": "abc123",
         },
     }

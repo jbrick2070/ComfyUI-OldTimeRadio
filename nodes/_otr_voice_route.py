@@ -28,6 +28,7 @@ both call it without dragging a model into a cold path.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -104,6 +105,144 @@ def sha256_of_file(path: str) -> Optional[str]:
         return h.hexdigest()
     except Exception:                     # noqa: BLE001 -- see docstring
         return None
+
+
+# --------------------------------------------------------------------------- #
+# LIVE RUNTIME FINGERPRINT (voice-identity fix 2026-08-18, PBUG-20260817-09,
+# [QA-7])
+#
+# THE GAP THIS CLOSES. A qualification record stores the runtime it was proved
+# under -- `qualification_record.runtime.engine_impl_version`, documented in
+# `config/cast_pools.py` as "the sha256 of the adapter plus its worker script",
+# the whole point being that CHANGING THE RENDERING CODE CHANGES IT. Nothing
+# ever computed the live value, so nothing ever compared them: the field was
+# stored, described, and never read. A route qualified by ear in August stayed
+# "qualified" through every subsequent edit to the code that produced the sound
+# the operator actually approved.
+#
+# That is not a hypothetical. The voice-identity fix changes the IndexTTS2
+# adapter's seed handling and its emotion blend -- exactly the two things a
+# listener judges -- so the audition that qualified Lemmy no longer describes
+# what this engine does. His record is PRESERVED, unedited; it simply stops
+# being SELECTED until a new audition re-qualifies it against the new code.
+#
+# A MISMATCH DEMOTES, IT NEVER RAISES. THE LAW: an audit may never fail an
+# episode; a render degrades. A route that is not selected is the module's own
+# established "nothing was selected, so nothing failed" outcome -- the cast row
+# takes the ordinary draw and the episode still publishes to `otr/obs/`. Making
+# this a validation FAILURE instead would have raised `VoiceRouteError` out of
+# CastLock and killed every episode that casts the character.
+# --------------------------------------------------------------------------- #
+
+#: Engine -> the repo-relative source files that DEFINE how it renders. Order is
+#: part of the recipe. An engine absent from this map has no live fingerprint,
+#: so its routes are never demoted on this ground -- silence, not a guess.
+#: THE SEED PATH IS PART OF THE RENDERING CODE. The first cut hashed only the
+#: adapter and its worker, which left the file that DECIDES WHICH SEED a
+#: character draws outside the net -- so a future change to
+#: `_resolve_engine_seed` (or to the `_seed_to_int64` reduction it calls) would
+#: shift the rendered voice without moving the fingerprint, and a route
+#: re-approved today would keep validating through it. That is the exact drift
+#: this mechanism exists to catch, so both files are in.
+#:
+#: THE COST IS REAL AND IT IS ACCEPTED. The dispatch is a shared file that
+#: changes for unrelated reasons, so a qualified route will be demoted more
+#: often than the strictly-audible minimum. The failure mode is safe and loud --
+#: a warning plus the ordinary draw, never a raise and never a lost episode --
+#: and re-qualification is one re-audition. A fingerprint that under-reports is
+#: a false claim of proof; one that over-reports is an inconvenience.
+#:
+#: KNOWN BLIND SPOT: ``OTR_INDEXTTS2_WORKER`` can point the adapter at a worker
+#: script this map does not name, in which case the gate hashes the wrong file
+#: and fails OPEN. Nothing in production sets it.
+RUNTIME_FINGERPRINT_SOURCES = {
+    "indextts2": (
+        "nodes/_otr_audio_engines/eng_indextts2.py",
+        "scripts/_otr_indextts2_worker.py",
+        "nodes/_otr_voice_node_common.py",
+        "nodes/_otr_resolved_request.py",
+    ),
+}
+
+#: Hex characters kept from the reduction. Matches the width of the values
+#: already stored in the qualification records.
+_FINGERPRINT_WIDTH = 16
+
+_LIVE_FINGERPRINT_CACHE: dict = {}
+
+
+def _repo_root_for_routes() -> str:
+    """This repo's root, derived from this module's own location."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def live_engine_impl_version(engine: str,
+                             repo_root: Optional[str] = None) -> str:
+    """Fingerprint of the code that would render ``engine`` RIGHT NOW.
+
+    THE RECIPE, stated so a re-qualification can reproduce it: for each source
+    file in :data:`RUNTIME_FINGERPRINT_SOURCES` order, read the bytes, normalize
+    CRLF and lone CR to LF, and sha256 them; then sha256 the joined
+    ``<repo-relative path>:<digest>`` lines and keep the first
+    :data:`_FINGERPRINT_WIDTH` hex characters.
+
+    LINE ENDINGS ARE NORMALIZED ON PURPOSE. Git can hand two clones the same
+    source with different newlines, and a fingerprint that moved on checkout
+    would demote a perfectly good route for a reason nobody could hear.
+
+    Returns ``""`` when the engine has no recipe or a source file cannot be
+    read -- an unknown fingerprint is not evidence of a changed one, so the
+    caller declines to judge rather than guessing.
+    """
+    key = (str(engine or ""), str(repo_root or ""))
+    if key in _LIVE_FINGERPRINT_CACHE:
+        return _LIVE_FINGERPRINT_CACHE[key]
+
+    paths = RUNTIME_FINGERPRINT_SOURCES.get(str(engine or ""))
+    result = ""
+    if paths:
+        root = repo_root or _repo_root_for_routes()
+        lines = []
+        for rel in paths:
+            try:
+                with open(os.path.join(root, rel), "rb") as fh:
+                    raw = fh.read()
+            except Exception:             # noqa: BLE001 -- see docstring
+                lines = []
+                break
+            normalized = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            lines.append("%s:%s" % (rel, hashlib.sha256(normalized).hexdigest()))
+        if lines:
+            joined = "\n".join(lines).encode("utf-8")
+            result = hashlib.sha256(joined).hexdigest()[:_FINGERPRINT_WIDTH]
+
+    _LIVE_FINGERPRINT_CACHE[key] = result
+    return result
+
+
+def stale_runtime_fingerprint(record: Any, engine: str,
+                              repo_root: Optional[str] = None):
+    """``(stored, live)`` when a route's runtime no longer matches the code.
+
+    ``None`` means there is nothing to object to: no live recipe for this
+    engine, no stored claim, or the two agree. Only a record that CLAIMS a
+    runtime fingerprint can contradict one.
+    """
+    if not isinstance(record, dict):
+        return None
+    qual = record.get("qualification_record")
+    if not isinstance(qual, dict):
+        return None
+    runtime = qual.get("runtime")
+    if not isinstance(runtime, dict):
+        return None
+    stored = str(runtime.get("engine_impl_version") or "").strip()
+    if not stored:
+        return None
+    live = live_engine_impl_version(engine, repo_root)
+    if not live or stored.lower() == live.lower():
+        return None
+    return (stored, live)
 
 
 def _default_path_resolver(ref_path: str, repo_root: Optional[str]) -> str:
@@ -379,6 +518,13 @@ def select_policy_route(policy: Any, active_engine: Optional[str]) -> Optional[d
       This is the case worth being loud about: we cannot prove agreement, and
       silently skipping a qualified route is the very floor-evidence failure this
       module exists to end.
+    * **A route exists for the engine but its stored runtime fingerprint no
+      longer matches the live code** -> ``None``, loudly logged [QA-7]. The
+      audition proved a sound the current adapter no longer makes, so the record
+      is not evidence about this build. It is DEMOTED, not failed: the row takes
+      the ordinary draw and the episode still renders and publishes. Restore it
+      by re-auditioning and writing a NEW qualification whose runtime matches
+      :func:`live_engine_impl_version`.
     """
     if not isinstance(policy, dict):
         return None
@@ -395,7 +541,22 @@ def select_policy_route(policy: Any, active_engine: Optional[str]) -> Optional[d
             % (policy.get("policy_version"), len(routes)))
 
     record = routes.get(engine)
-    return record if isinstance(record, dict) else None
+    if not isinstance(record, dict):
+        return None
+
+    stale = stale_runtime_fingerprint(record, engine)
+    if stale is not None:
+        stored, live = stale
+        logging.getLogger("OTR").warning(
+            "[OTR voice route] route %r on engine %r is NOT SELECTED: it was "
+            "qualified against adapter/worker fingerprint %s and this build "
+            "renders %s. The record is preserved; re-audition and write a new "
+            "qualification whose runtime.engine_impl_version is %s. The cast "
+            "row takes the ordinary draw -- the episode still renders.",
+            record.get("route_id") or "<unnamed route>", engine, stored, live,
+            live)
+        return None
+    return record
 
 
 @dataclass(frozen=True)
@@ -981,6 +1142,38 @@ def resolve_and_verify_reference(
         ref_path = ""
 
     runtime = route.get("runtime") or {}
+
+    # LAST GATE: A LEDGER LOCKED UNDER THE OLD CODE MUST NOT RE-ASSERT A
+    # WITHDRAWN CLAIM. `select_policy_route` only runs at CastLock time, so a
+    # ledger frozen while the route was still qualified carries the route dict
+    # on its own cast row, and this path used to trust it outright. Re-rendering
+    # that ledger under changed engine code would stamp `voice_route_id` and the
+    # old `qualification_record_id` into per-line receipts describing audio the
+    # audition never heard -- the evidence-shaped field this contract exists to
+    # refuse, re-asserted automatically.
+    #
+    # DELIBERATELY LAST, AFTER EVERY STRUCTURAL PROOF ABOVE. A MALFORMED route
+    # must still RAISE: "an unproved route raises rather than rendering" is the
+    # existing contract, and a broken route dict is a real ledger defect worth
+    # being loud about. Only a route that proved everything it can, and is
+    # merely no longer CURRENT, degrades here.
+    #
+    # Degrade, never raise: the row keeps its declared bank reference and
+    # renders normally -- it simply stops claiming a proof. THE LAW.
+    stale = stale_runtime_fingerprint(
+        {"qualification_record": {"runtime": runtime}},
+        engine or active, repo_root)
+    if stale is not None:
+        stored, live = stale
+        logging.getLogger("OTR").warning(
+            "[OTR voice route] cast row %r carries voice_route %r qualified "
+            "against runtime %s, but this build renders %s -- rendering as an "
+            "ordinary bank reference and stamping NO route receipt. Re-audition "
+            "to restore the claim.",
+            cast_row.get("char_id") or cast_row.get("name"), route_id,
+            stored, live)
+        return LEGACY_REFERENCE
+
     return ResolvedReference(
         is_policy_route=True,
         route_id=str(route.get("route_id") or ""),
@@ -998,6 +1191,8 @@ __all__ = [
     "SELECTABLE_ROUTE_STATUS", "SELECTABLE_TECHNICAL_VERDICT",
     "SELECTABLE_RIGHTS_STATUS", "SUPPORTED_ROUTE_CONTRACT_VERSIONS",
     "REFERENCE_KINDS", "RouteValidation", "parse_utc", "sha256_of_file",
+    "RUNTIME_FINGERPRINT_SOURCES", "live_engine_impl_version",
+    "stale_runtime_fingerprint",
     "validate_qualified_voice_route",
     "VoiceRouteError", "PolicyRouteClaim", "policy_character_key",
     "cast_row_matches_policy", "select_policy_route", "resolve_policy_route_claim",

@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import _otr_voice_route as _ROUTE
@@ -414,6 +415,208 @@ def _resolve_voice_ref_early(adapter, engine, cast, episode_seed, role, voice_re
         voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=role)
     id_for_key = str(voice_ref or (cast or {}).get("voice_ref_id") or "")
     return voice_ref, id_for_key
+
+
+# --------------------------------------------------------------------------- #
+# ONE PER-LINE RUNTIME CONTEXT (voice-identity fix 2026-08-18, PBUG-20260817-09)
+#
+# WHY THIS EXISTS [QA-2]. Six surfaces describe one line's render: the cache-key
+# params, the engine seed, the outbound worker payload, the P-OBS receipt, the
+# cap metrics and the ledger stamp. Each used to resolve its own values from its
+# own source at its own moment -- and every defect this fix closes is two of
+# those surfaces disagreeing. The alpha keyed at request-build time while the
+# forward read the env again at generate time; the receipt described a vector
+# the adapter had not yet sanitized; the seed was derived before the reference
+# it should depend on had been resolved. One object, resolved once per line and
+# read by all of them, cannot drift.
+#
+# TWO PHASES, ON PURPOSE. `begin` runs BEFORE the request is built, because the
+# cache key needs the params. `resolve_seed` runs AFTER reference resolution,
+# because the character seed must key on the reference the adapter will actually
+# clone -- not on the blank the request may have carried [QA-5].
+# --------------------------------------------------------------------------- #
+
+#: Seed policies. ``line_v1`` is the legacy formula, preserved EXACTLY as
+#: ``_seed_to_int64(engine, request.stable_line_seed)``, so every profile that
+#: does not opt in renders byte-identically [QA-1]. ``char_v1`` is the new
+#: character-stable derivation the char_* clone profiles opt into [QA-6].
+SEED_POLICY_LINE = "line_v1"
+SEED_POLICY_CHARACTER = "char_v1"
+
+
+@dataclass
+class _LineRuntime:
+    """Every resolved per-line value that more than one surface reads."""
+
+    params: dict = field(default_factory=dict)
+    alpha: object = None
+    emotion: object = None
+    vector_state: str = "omitted"
+    ref_identity: str = ""
+    seed_policy: str = SEED_POLICY_LINE
+    character_seed_enabled: bool = False
+    engine_seed: int = 0
+
+    @property
+    def effective_mass(self):
+        """Emotion mass the vendor will actually spend, or None if it has none."""
+        return None if not self.emotion else self.emotion.get("effective_mass")
+
+    @property
+    def mass_capped(self) -> bool:
+        return bool(self.emotion and self.emotion.get("mass_capped"))
+
+
+def _safe_vector_state(delivery_vector) -> str:
+    """``omitted`` / ``zero`` / ``nonzero`` without trusting the stamped values.
+
+    The engine-agnostic floor for adapters that expose no emotion payload of
+    their own. A delivery vector is hand-editable JSON, so this must survive a
+    string, a ``None`` or a NaN where a number belongs -- the previous inline
+    ``float(v or 0.0)`` did not, and raised out of the observability line on an
+    out-of-contract ledger [QA-4]. THE LAW: a render degrades, never raises.
+    """
+    if delivery_vector is None:
+        return "omitted"
+    if not isinstance(delivery_vector, dict):
+        return "zero"
+    for value in delivery_vector.values():
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if number == number and number > 0.0:
+            return "nonzero"
+    return "zero"
+
+
+def _begin_line_runtime(adapter, profile, delivery_vector) -> _LineRuntime:
+    """Phase one: resolve the params, the alpha and the emotion payload ONCE.
+
+    CALL-TIME NUMERIC PARAMS JOIN THE KEY (Lemmy chunk A1). ``default_params``
+    is captured at request-BUILD time, so an adapter resolving a knob at
+    GENERATE time moved the render without moving the key. ``render_time_params``
+    is merged last so the live value beats a stale profile default of the same
+    name. Engines with no such knob contribute ``{}`` and key exactly as before.
+    """
+    params = dict(getattr(profile, "default_params", None) or {})
+    try:
+        params.update(adapter.render_time_params() or {})
+    except Exception:  # noqa: BLE001 -- a duck-typed adapter without the hook
+        pass           # keys exactly as it did before the hook existed
+
+    runtime = _LineRuntime(params=params)
+
+    # THE SEED POLICY IS RESOLVED HERE, WITH THE PARAMS, SO IT KEYS.
+    # `OTR_VOICE_CHARACTER_SEED=0` forces the legacy per-line seed on a profile
+    # that opted in -- the control arm of the 2x2 proof, and the operator's
+    # one-line rollback. It mirrors `OTR_DELIVERY_VECTOR=0` above, which this
+    # dispatch already documents as "a TRUE old path".
+    #
+    # FOLDED INTO THE REQUEST PARAMS ON PURPOSE. A knob that changes the RENDER
+    # and not the KEY is the Lemmy chunk A1 defect: the next identical line
+    # replays audio made under the other setting while its receipt describes
+    # this one. Only profiles that opted into character seeding contribute the
+    # param at all, so every other engine keys byte-identically to before.
+    if bool(getattr(profile, "character_stable_seed", False)):
+        runtime.character_seed_enabled = (
+            os.getenv("OTR_VOICE_CHARACTER_SEED", "1") != "0")
+        runtime.params["voice_seed_policy"] = (
+            SEED_POLICY_CHARACTER if runtime.character_seed_enabled
+            else SEED_POLICY_LINE)
+
+    # The adapter that owns an emotion blend hands back the EXACT arguments it
+    # will send, so the receipt below cannot describe a blend the worker never
+    # got. Adapters without the hook keep the engine-agnostic state only.
+    payload_fn = getattr(adapter, "emotion_payload", None)
+    if callable(payload_fn):
+        try:
+            runtime.emotion = payload_fn(delivery_vector)
+        except Exception as exc:  # noqa: BLE001 -- observability is never fatal
+            log.debug("[OTR] emotion payload unavailable: %s", exc)
+    if runtime.emotion:
+        runtime.alpha = runtime.emotion.get("emo_alpha")
+        runtime.vector_state = runtime.emotion.get("vector_state") or "omitted"
+        # The context is the single authority: the KEY records the same alpha
+        # the forward spends, by construction rather than by coincidence [QA-2].
+        if "emo_alpha" in runtime.params:
+            runtime.params["emo_alpha"] = runtime.alpha
+        if "emo_mass_cap" in runtime.params:
+            runtime.params["emo_mass_cap"] = runtime.emotion.get("emo_mass_cap")
+    else:
+        alpha_fn = getattr(adapter, "current_emo_alpha", None)
+        if callable(alpha_fn):
+            try:
+                runtime.alpha = alpha_fn()
+            except Exception:  # noqa: BLE001
+                runtime.alpha = None
+        runtime.vector_state = _safe_vector_state(delivery_vector)
+    return runtime
+
+
+def _durable_reference_identity(voice_ref_id, voice_ref) -> str:
+    """The character's reference identity, stable across boxes and renders.
+
+    Prefers the bank's ``voice_ref_id``; falls back to the resolved file's BASE
+    NAME. Never the absolute path -- the models root differs per machine (it is
+    ``C:/ComfyUI-Models`` on this box, not the repo tree), and a seed derived
+    from an absolute path would render one character two ways on two boxes,
+    which is the very defect this seed exists to end.
+    """
+    identity = str(voice_ref_id or "").strip()
+    if identity:
+        return identity
+    if voice_ref:
+        return os.path.basename(str(voice_ref))
+    return ""
+
+
+def _resolve_engine_seed(runtime, seed_reduce, profile, engine, request,
+                         char_id, episode_seed, cast_lock_revision,
+                         voice_ref_id, voice_ref) -> None:
+    """Phase two: the per-engine external seed, AFTER reference resolution.
+
+    THE DEFECT, IN ONE LINE. ``stable_line_seed`` includes ``line_id``, so every
+    line of one character drew a DIFFERENT engine seed. On a clone engine with a
+    live emotion blend that is audible: the operator heard NAG's second beat as
+    a different actor from his first. A character's identity must survive his
+    own dialogue.
+
+    ``char_v1`` keys the seed on WHO IS SPEAKING and WHAT VOICE HE WAS CAST
+    WITH -- episode, cast revision, char_id, resolved reference -- so every line
+    he speaks is drawn from one voice, while a different character, a re-cast or
+    a different episode still moves it.
+
+    ``line_v1`` IS PRESERVED EXACTLY [QA-1]: it is the whole legacy expression
+    ``_seed_to_int64(engine, request.stable_line_seed)``, not the raw
+    ``stable_line_seed``, and it is still what every profile that has not opted
+    in -- every blank ``char_id``, and every leg booted with
+    ``OTR_VOICE_CHARACTER_SEED=0`` -- receives, byte for byte.
+
+    The opt-in decision itself was resolved in phase one, with the params, so
+    the value that moved the render also moved the key. This reads it rather
+    than asking the environment a second question that could answer differently.
+    """
+    legacy_seed = seed_reduce(engine, request.stable_line_seed)
+    runtime.ref_identity = _durable_reference_identity(voice_ref_id, voice_ref)
+
+    if not runtime.character_seed_enabled:
+        runtime.seed_policy = SEED_POLICY_LINE
+        runtime.engine_seed = legacy_seed
+        return
+    if not str(char_id or "").strip():
+        # A line with no character cannot have a character-stable seed. The
+        # legacy formula keeps it renderable AND keeps it honest -- seeding
+        # every anonymous line alike would collapse them onto one voice.
+        runtime.seed_policy = SEED_POLICY_LINE
+        runtime.engine_seed = legacy_seed
+        return
+
+    runtime.seed_policy = SEED_POLICY_CHARACTER
+    runtime.engine_seed = seed_reduce(
+        "char_voice_seed_v1", engine, int(episode_seed),
+        int(cast_lock_revision), str(char_id), runtime.ref_identity,
+    )
 
 
 def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
@@ -884,20 +1087,14 @@ class OTRVoiceNodeBase:
                 # stable_line_seed because params are not in the seed.
                 provider_model_id_stamp = ""
                 provider_voice_stamp = ""
-                # CALL-TIME NUMERIC PARAMS JOIN THE KEY (Lemmy chunk A1).
-                # `profile.default_params` is captured at request-BUILD time; an
-                # adapter that resolves a knob at GENERATE time (indextts2 reads
-                # OTR_INDEXTTS2_EMO_ALPHA from the env per render) therefore
-                # moved the render without moving the key, and the next identical
-                # line replayed audio made under the old value. Merged FIRST so
-                # the adapter's live value wins over a stale profile default of
-                # the same name rather than the other way round. Empty for every
-                # engine that has no such knob, which keeps them byte-identical.
-                line_params = dict(profile.default_params or {})
-                try:
-                    line_params.update(adapter.render_time_params() or {})
-                except Exception:  # noqa: BLE001 -- a duck-typed adapter
-                    pass           # without the hook keys exactly as before
+                # PHASE ONE of the ONE per-line runtime context [QA-2]: the
+                # cache-key params, the emotion alpha and the exact outbound
+                # emotion payload, resolved ONCE. Everything downstream -- the
+                # request, the P-OBS receipt, the cap metrics and the seed --
+                # reads this object rather than re-deriving its own answer.
+                # See `_begin_line_runtime` for the call-time-params rationale.
+                line_rt = _begin_line_runtime(adapter, profile, delivery_vector)
+                line_params = line_rt.params
                 if cache_enabled:
                     voice_ref, id_for_key = _resolve_voice_ref_early(
                         adapter, engine, cast, episode_seed, self.ROLE, voice_ref,
@@ -946,8 +1143,12 @@ class OTRVoiceNodeBase:
                         commercial_clean=profile.commercial_clean,
                         **route_fields,
                     )
-                # G1: per-engine external seed reduced from the stable line seed.
-                engine_seed = _seed_to_int64(engine, request.stable_line_seed)
+                # THE SEED IS DERIVED BELOW, NOT HERE [QA-5]. It used to be
+                # computed at this point, before the block that resolves a
+                # fallback reference -- so a character-stable seed keyed here
+                # would key on the BLANK the request carried rather than on the
+                # voice the adapter actually clones. Reference first, seed after.
+                #
                 # Ref-clip resolution (no-fallback rip 2026-07-03): a voice-CLONING char
                 # engine (voice_ref_field == "voice_ref_path", e.g. indextts2 /
                 # chatterbox) cannot synthesize without a per-character reference WAV.
@@ -987,19 +1188,36 @@ class OTRVoiceNodeBase:
                     # still fails loud (no silent inherit of another voice).
                     if getattr(adapter, "voice_ref_field", "") == "provider_voice_id" and not voice_ref:
                         voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=self.ROLE)
+                # PHASE TWO of the per-line context: G1's per-engine external
+                # seed, now that the reference this character will actually be
+                # cloned from is resolved on BOTH paths [QA-5]. Profiles that
+                # have not opted into character-stable seeding keep the legacy
+                # `_seed_to_int64(engine, request.stable_line_seed)` byte for
+                # byte [QA-1]; the char_* clone profiles get one seed per
+                # character per episode, so a character stops changing voice
+                # between his own lines.
+                _resolve_engine_seed(
+                    line_rt, _seed_to_int64, profile, engine, request,
+                    char_id, episode_seed, cast_lock_revision,
+                    voice_ref_id, voice_ref,
+                )
+                engine_seed = line_rt.engine_seed
                 # ---- P-OBS (whiny-fix v3.1): per-line attribution, ALWAYS -------
                 # char -> voice_ref_id -> ref basename -> engine -> alpha ->
                 # delivery version/state/source -> seed. Render_log line + runtime
                 # log mirror; this is the observability floor every later step
                 # (P0-zero, the audit, P3a durable stamping) builds on.
-                _alpha_fn = getattr(adapter, "current_emo_alpha", None)
-                _alpha = _alpha_fn() if callable(_alpha_fn) else None
-                if delivery_vector is None:
-                    _vec_state = "omitted"
-                elif not any(float(v or 0.0) > 0.0 for v in delivery_vector.values()):
-                    _vec_state = "zero"
-                else:
-                    _vec_state = "nonzero"
+                # BOTH READ THE CONTEXT [QA-4]. `_vec_state` used to call
+                # float() on the RAW stamped values -- before the adapter's own
+                # sanitation -- so a hand-edited ledger carrying a string where
+                # a number belongs raised ValueError out of the observability
+                # line and killed the render. THE LAW: a render degrades, never
+                # raises. The alpha and the emotion mass come from the same
+                # resolution the worker payload is built from, so the receipt
+                # can no longer describe a blend the engine did not use.
+                _alpha = line_rt.alpha
+                _vec_state = line_rt.vector_state
+                _mass = line_rt.effective_mass
                 try:
                     from ._otr_delivery_vector import DELIVERY_TABLE_VERSION as _DTV
                 except Exception:  # noqa: BLE001
@@ -1010,7 +1228,11 @@ class OTRVoiceNodeBase:
                     f"ref={os.path.basename(voice_ref) if voice_ref else '-'} "
                     f"engine={engine} "
                     f"alpha={'n/a' if _alpha is None else _alpha} "
-                    f"delivery={_DTV}:{_vec_state}({_dv_source}) seed={engine_seed}"
+                    f"delivery={_DTV}:{_vec_state}({_dv_source}) "
+                    f"emo_mass={'n/a' if _mass is None else _mass}"
+                    f"{'(capped)' if line_rt.mass_capped else ''} "
+                    f"seed={engine_seed} policy={line_rt.seed_policy} "
+                    f"seed_ref={line_rt.ref_identity or '-'}"
                 )
                 # Cloud-audio-cache chunk 2 (2026-08-08): when cache is enabled,
                 # a SECOND P-OBS emit happens further down with the terminal

@@ -85,7 +85,20 @@ def _receipt(tmp_path, *, engine="indextts2", voice_ref_id=PINNED_REF,
             },
             "runtime": {
                 "model_id": "IndexTTS-2",
-                "engine_impl_version": "1.0.0",
+                # THE LIVE FINGERPRINT, NOT A LITERAL (voice identity
+                # 2026-08-18, [QA-7]). `select_policy_route` now compares a
+                # route's stored `engine_impl_version` against a fingerprint of
+                # the adapter plus its worker script, and a route that no longer
+                # matches the code that would render it is NOT SELECTED. This
+                # fixture exists to exercise the route MACHINERY on a properly
+                # qualified route, so it has to carry a runtime that is actually
+                # current -- pinning the old literal "1.0.0" would test a route
+                # the shipped selector correctly refuses.
+                #
+                # It also removes an anti-pattern this repo argues against in
+                # `config/cast_pools.py`: "writing 1.0.0 would be precisely the
+                # evidence-shaped field this module exists to refuse."
+                "engine_impl_version": _live_indextts2_runtime(),
                 "weight_revision": "abc123",
             },
             "reference": {
@@ -99,6 +112,37 @@ def _receipt(tmp_path, *, engine="indextts2", voice_ref_id=PINNED_REF,
             },
         },
     }
+
+
+def _live_indextts2_runtime() -> str:
+    """The adapter/worker fingerprint this build would actually render on."""
+    from nodes import _otr_voice_route as ROUTE
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+    return ROUTE.live_engine_impl_version("indextts2")
+
+
+def _requalified_shipped_policy():
+    """The SHIPPED policy with the indextts2 record re-qualified onto this build.
+
+    Everything except the one runtime line is the real shipped evidence, so a
+    rotted receipt still fails the tests that use this -- but the route is
+    selectable again, which is what lets them go on proving the MACHINERY
+    rather than the staleness.
+    """
+    import json as _json
+
+    from config.cast_pools import LEMMY_VOICE_POLICY as SHIPPED
+
+    record = _json.loads(_json.dumps(SHIPPED["approved_native_routes"]["indextts2"]))
+    record["qualification_record"]["runtime"]["engine_impl_version"] = \
+        _live_indextts2_runtime()
+    return dict(SHIPPED, approved_native_routes={"indextts2": record})
+
+
+def _pin_requalified(monkeypatch):
+    monkeypatch.setattr("nodes.cast_lock._lemmy_voice_policy",
+                        _requalified_shipped_policy)
 
 
 def _policy(record, *, engine="indextts2", character_key="lemmy"):
@@ -152,16 +196,67 @@ def test_the_shipped_policy_now_carries_a_REAL_qualified_route():
         assert re.fullmatch(r"[0-9a-f]{16}", value), (field, value)
 
 
-def test_the_live_route_actually_validates_against_the_real_bank_and_disk():
+def test_the_shipped_receipt_is_still_VALID_evidence():
     """The end-to-end proof: the shipped receipt survives the real validator,
-    against the real bank, with the reference bytes re-hashed off disk."""
+    against the real bank, with the reference bytes re-hashed off disk.
+
+    THIS STAYS TRUE THROUGH THE VOICE-IDENTITY FIX, and the distinction matters.
+    Nothing is wrong with the evidence -- the rights are approved, the bank
+    agrees, the reference on disk still hashes to what the receipt claims. What
+    changed is that the receipt describes a sound the CURRENT adapter no longer
+    makes, which is a staleness question and not a validity one. The validator
+    is deliberately left to answer only the question it can answer.
+    """
     from datetime import datetime, timezone
     from config.cast_pools import LEMMY_VOICE_POLICY as P
     from nodes._otr_voice_bank import load_voice_bank
     from nodes._otr_voice_node_common import _resolve_ref_to_disk
 
+    record = P["approved_native_routes"]["indextts2"]
+    result = ROUTE.validate_qualified_voice_route(
+        record, datetime.now(timezone.utc), active_engine="indextts2",
+        bank_lookup=lambda vid: next(
+            (e for e in load_voice_bank()[0]
+             if e.voice_ref_id == vid and e.engine == "indextts2"), None),
+        path_resolver=_resolve_ref_to_disk)
+
+    assert result.ok, result.summary
+
+
+def test_the_shipped_receipt_is_no_longer_SELECTED():
+    """...and the staleness is enforced where it belongs [QA-7].
+
+    `resolve_policy_route_claim` RAISES on a SELECTED route that fails, so the
+    demotion has to happen at SELECTION or every episode casting Lemmy would
+    die. `None` here is the module's own "nothing was selected, so nothing
+    failed" outcome: the row takes the ordinary draw and the episode still
+    renders and publishes. THE LAW -- a render degrades, never raises.
+    """
+    from datetime import datetime, timezone
+    from config.cast_pools import LEMMY_VOICE_POLICY as P
+    from nodes._otr_voice_bank import load_voice_bank
+    from nodes._otr_voice_node_common import _resolve_ref_to_disk
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
     claim = ROUTE.resolve_policy_route_claim(
         P, "indextts2", datetime.now(timezone.utc),
+        bank_entries=load_voice_bank()[0],
+        path_resolver=_resolve_ref_to_disk)
+
+    assert claim is None
+
+
+def test_a_re_qualified_shipped_route_proves_end_to_end():
+    """The machinery the sentinel above used to cover: once somebody
+    re-auditions and writes the current runtime, the real record proves against
+    the real bank with the reference bytes re-hashed off disk."""
+    from datetime import datetime, timezone
+    from nodes._otr_voice_bank import load_voice_bank
+    from nodes._otr_voice_node_common import _resolve_ref_to_disk
+
+    claim = ROUTE.resolve_policy_route_claim(
+        _requalified_shipped_policy(), "indextts2",
+        datetime.now(timezone.utc),
         bank_entries=load_voice_bank()[0],
         path_resolver=_resolve_ref_to_disk)
     assert claim is not None
@@ -195,9 +290,11 @@ def test_the_route_survives_the_DURABLE_stamp(monkeypatch):
     regression detector. This is the cheap one.
 
     Deliberately does NOT use the `pin` fixture: it exercises the REAL shipped
-    policy and the REAL qualified route, so it fails if the receipt in
-    `cast_pools.py` stops reaching the durable record.
+    record -- re-qualified onto the current runtime, because the shipped one is
+    correctly not selectable after the voice-identity fix [QA-7] -- so it still
+    fails if the receipt in `cast_pools.py` stops reaching the durable record.
     """
+    _pin_requalified(monkeypatch)
     captured = {}
 
     import nodes.production_ledger as pl
@@ -418,7 +515,11 @@ def test_a_dormant_policy_still_costs_nothing(monkeypatch):
     assert CastLock()._resolve_policy_claim("default", None) is None
 
 
-def test_auto_registry_is_deterministic_with_the_live_route():
+def test_auto_registry_is_deterministic_with_the_live_route(monkeypatch):
+    """Re-qualified onto the current runtime [QA-7] -- the shipped record is
+    deliberately not selectable until somebody re-auditions Lemmy, and this
+    test is about DETERMINISM of the pin, not about the staleness."""
+    _pin_requalified(monkeypatch)
     a = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     b = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     assert a == b

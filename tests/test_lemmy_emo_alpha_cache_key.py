@@ -71,10 +71,11 @@ def test_the_alpha_survives_quantization_at_three_decimals():
 # ---------------------------------------------------------------------------
 def test_indextts2_declares_the_alpha_as_a_render_time_param(monkeypatch):
     engine = get_engine("indextts2")
+    monkeypatch.delenv("OTR_INDEXTTS2_EMO_MASS_CAP", raising=False)
     monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "0.4")
-    assert engine.render_time_params() == {"emo_alpha": 0.4}
+    assert engine.render_time_params()["emo_alpha"] == 0.4
     monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "1.0")
-    assert engine.render_time_params() == {"emo_alpha": 1.0}
+    assert engine.render_time_params()["emo_alpha"] == 1.0
 
 
 def test_the_key_and_the_forward_read_the_SAME_resolver(monkeypatch):
@@ -100,15 +101,59 @@ def test_the_key_and_the_forward_read_the_SAME_resolver(monkeypatch):
 
 def test_a_malformed_env_value_keys_as_the_clamped_default(monkeypatch):
     """`current_emo_alpha` clamps and falls back; the key must reflect what the
-    forward will ACTUALLY use, not the raw string."""
+    forward will ACTUALLY use, not the raw string.
+
+    THE DEFAULT IS 0.4, NOT 1.0, SINCE THE VOICE-IDENTITY FIX (2026-08-18).
+    At 1.0 the vendor spends the emotion vector's whole sum against the
+    speaker's own embedding, so a weighted line kept almost nothing of the
+    reference voice -- the half of PBUG-20260817-09 that alpha owns. The
+    unusable-value fallback is asserted against the module constant rather than
+    a literal so a future re-anchor cannot leave this test quietly describing an
+    alpha nobody renders.
+    """
+    from nodes._otr_audio_engines.eng_indextts2 import EMO_ALPHA_DEFAULT
+
     engine = get_engine("indextts2")
     for raw in ("not-a-number", "", "nan"):
         monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", raw)
-        assert engine.render_time_params() == {"emo_alpha": 1.0}
+        assert engine.render_time_params()["emo_alpha"] == EMO_ALPHA_DEFAULT
     monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "5.0")
-    assert engine.render_time_params() == {"emo_alpha": 1.0}   # clamped high
+    assert engine.render_time_params()["emo_alpha"] == 1.0   # clamped high
     monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "-2")
-    assert engine.render_time_params() == {"emo_alpha": 0.0}   # clamped low
+    assert engine.render_time_params()["emo_alpha"] == 0.0   # clamped low
+
+
+def test_the_unset_env_default_is_the_re_anchored_alpha(monkeypatch):
+    """The SHIPPED default, asserted where a reader will look for it.
+
+    The test above proves the fallback for unusable input; this one proves the
+    ordinary case -- no env var set at all, which is how every production render
+    runs -- so a regression to 1.0 cannot hide behind the malformed-value path.
+    """
+    from nodes._otr_audio_engines.eng_indextts2 import EMO_ALPHA_DEFAULT
+
+    monkeypatch.delenv("OTR_INDEXTTS2_EMO_ALPHA", raising=False)
+    assert EMO_ALPHA_DEFAULT == 0.4
+    assert get_engine("indextts2").current_emo_alpha() == 0.4
+
+
+def test_the_alpha_is_normalized_to_the_resolution_the_key_keeps(monkeypatch):
+    """QA-2: clamp THEN round to three decimals, because the key quantizes there.
+
+    `quantize_params` stores `round(value * 1000)`, so 0.4001 and 0.4 record the
+    SAME tick. If the forward were allowed to use the raw float, two renders
+    that sound different would share one cache key and the second line would
+    replay the first one's blend. Rounding at the source makes the key and the
+    render the same number by construction.
+    """
+    engine = get_engine("indextts2")
+    monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "0.4001")
+    assert engine.current_emo_alpha() == 0.4
+    monkeypatch.setenv("OTR_INDEXTTS2_EMO_ALPHA", "0.85049")
+    assert engine.current_emo_alpha() == 0.85
+    # The value the forward uses and the value the key records must agree.
+    alpha = engine.current_emo_alpha()
+    assert dict(_request({"emo_alpha": alpha}).quantized_params)["emo_alpha"] == 850
 
 
 # ---------------------------------------------------------------------------
