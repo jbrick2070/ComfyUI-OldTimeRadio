@@ -97,8 +97,22 @@ def test_emotion_mass_over_the_ceiling_is_still_reported():
     report = _audit(CHARACTER_LINES.replace("emo_mass=0.4 ", "emo_mass=0.97 ", 1))
 
     assert report["lines_over_the_cap"]
-    assert any("OVER THE CEILING" in f
+    assert any("OVER THIS ARM'S CEILING" in f
                for f in ACC.verdict(report, "char_v1", "0.4"))
+
+
+def test_a_control_arm_without_a_ceiling_is_not_reported_as_failing():
+    """THE ARM DECLARES ITS OWN CONTRACT. An arm booted with
+    OTR_INDEXTTS2_EMO_MASS_CAP=8 is SUPPOSED to exceed 0.4 -- that is the
+    pre-fix blend it exists to reproduce. Reporting it as a failure would read
+    as "half the arms failed" when half the arms are controls doing exactly
+    what they were booted to do, and a crying-wolf instrument gets ignored."""
+    report = _audit(CHARACTER_LINES.replace("emo_mass=0.4 ", "emo_mass=1.333 ", 1))
+
+    assert report["lines_over_the_cap"], "the raw rows still record the mass"
+    assert ACC.verdict(report, "char_v1", "0.4", expect_mass_cap=8.0) == []
+    assert any("OVER THIS ARM'S CEILING" in f
+               for f in ACC.verdict(report, "char_v1", "0.4", expect_mass_cap=0.4))
 
 
 def test_a_scope_leak_onto_the_announcer_is_reported():

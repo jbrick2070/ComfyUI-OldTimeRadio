@@ -146,7 +146,8 @@ def audit_rows(rows: list) -> dict:
     }
 
 
-def verdict(report: dict, expect_policy: str = "", expect_alpha: str = "") -> list:
+def verdict(report: dict, expect_policy: str = "", expect_alpha: str = "",
+            expect_mass_cap: float = EFFECTIVE_EMOTION_MASS_CAP) -> list:
     """Human-readable findings. An empty list is a clean arm."""
     findings = []
     if not report["character_lane_lines"]:
@@ -162,11 +163,16 @@ def verdict(report: dict, expect_policy: str = "", expect_alpha: str = "") -> li
             "seed policy -- %s"
             % report["other_lane_rows_on_the_character_policy"][:4])
 
-    if report["lines_over_the_cap"]:
+    # THE ARM DECLARES ITS OWN CEILING. A control arm booted with
+    # OTR_INDEXTTS2_EMO_MASS_CAP=8 is SUPPOSED to exceed 0.4 -- reporting that
+    # as a failure would read as "half the arms failed" when half the arms are
+    # controls doing exactly what they were booted to do.
+    over = [row for row in report["lines_over_the_cap"]
+            if row["mass"] > expect_mass_cap]
+    if over:
         findings.append(
-            "EMOTION MASS OVER THE CEILING on %d line(s): %s"
-            % (len(report["lines_over_the_cap"]),
-               report["lines_over_the_cap"][:4]))
+            "EMOTION MASS OVER THIS ARM'S CEILING (%s) on %d line(s): %s"
+            % (expect_mass_cap, len(over), over[:4]))
 
     if expect_policy:
         wrong = {p: n for p, n in report["policies"].items() if p != expect_policy}
@@ -210,6 +216,10 @@ def main(argv=None) -> int:
                     help="char_v1 or line_v1 -- what this arm booted with")
     ap.add_argument("--expect-alpha", default="",
                     help="the alpha this arm exported, e.g. 0.4")
+    ap.add_argument("--expect-mass-cap", type=float,
+                    default=EFFECTIVE_EMOTION_MASS_CAP,
+                    help="the emotion ceiling this arm booted with; pass 8 for "
+                         "a control arm that deliberately runs without one")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     args = ap.parse_args(argv)
 
@@ -227,7 +237,8 @@ def main(argv=None) -> int:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         report = audit_rows(parse_pobs(text))
-        findings = verdict(report, args.expect_policy, args.expect_alpha)
+        findings = verdict(report, args.expect_policy, args.expect_alpha,
+                           args.expect_mass_cap)
         report["log"] = path.name
         report["findings"] = findings
         overall.append(report)
@@ -241,9 +252,14 @@ def main(argv=None) -> int:
                      report["other_lane_lines"]))
             print("  seed policies     : %s" % report["policies"])
             print("  alphas            : %s" % report["alphas"])
-            print("  max emotion mass  : %s (ceiling %s), %d line(s) capped"
-                  % (report["max_effective_mass"], EFFECTIVE_EMOTION_MASS_CAP,
+            print("  max emotion mass  : %s (this arm's ceiling %s), "
+                  "%d line(s) capped"
+                  % (report["max_effective_mass"], args.expect_mass_cap,
                      report["capped_lines"]))
+            if report["max_effective_mass"] > 1.0:
+                print("  NOTE: mass above 1.0 makes the vendor's "
+                      "(1 - sum) residual NEGATIVE -- the speaker's own "
+                      "emotional embedding is subtracted, not merely replaced.")
             print("  split-seed chars  : %s"
                   % (sorted(report["characters_with_split_seeds"]) or "none"))
             if findings:
