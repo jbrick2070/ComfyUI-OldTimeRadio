@@ -145,8 +145,43 @@ already promoted). Confidence tags preserved from the sweep.
   WILL go red** -- it is a golden-hash gate and any master-algorithm change
   moves every byte; it needs a deliberate `--capture-baseline` re-run, which is
   expected rather than a surprise.
-- status: **OPEN -- the ANSWER is settled and measured; the build is not done.
-  Do NOT wire `normalize_dbfs` as a peak ceiling.**
+- **BUILT 2026-08-19 on the operator''s go** (*"yes lets buidl taht nomraled best
+  practcei lufts for yoiutube"*). `_master_loudness` now MEASURES integrated
+  LUFS (pyloudnorm), applies ONE linear gain to `-14.0` LUFS, then applies the
+  `-1.0` dBFS peak as a safety rail only. The call site passes `ceiling_dbfs`
+  AND `sample_rate` explicitly -- the old one passed neither, which is how the
+  ceiling became invisible. Target overridable via `OTR_MASTER_TARGET_LUFS`.
+  The legacy tanh path survives ONLY as a fallback for audio too short to
+  measure (< 400 ms) or a missing pyloudnorm, so a render never fails for want
+  of a reading.
+- **PROVEN ON FIVE REAL MASTERS, not on synthetic tone.** Feeding the shipped
+  masters through the new function: `-9.63 -> -14.00`, `-9.69 -> -14.00`,
+  `-10.56 -> -14.00`, `-10.60 -> -14.00`, `-9.52 -> -14.00`. Every one lands on
+  target; output peaks sit at `-4.4` to `-5.5` dBFS, so the safety rail never
+  fires -- exactly as predicted.
+- **THE OPERATOR''S OWN QUESTION, ANSWERED AND PINNED.** He asked whether
+  normalisation should be per-clip or at the end: *"i tink we nee dtsoi start
+  wthj clip level rights o teh clisp pabalcne out"*. He is right and it already
+  exists -- `_level_dialogue_clip` levels every spoken line to `-16` dBFS
+  active RMS on BOTH the announcer and character buses (`scene_sequencer.py`
+  `:967`, `:974`); music passes through untouched by design. This stage runs
+  after it and applies a SINGLE LINEAR GAIN, so it mathematically cannot change
+  any clip-to-clip ratio. Measured on a real master: the ratio between two
+  segments was `1.033572` before and `1.033572` after. Pinned by
+  `test_a_single_linear_gain_preserves_the_clip_balance`.
+- **THE GOLDEN-HASH GATE DID NOT NEED A RE-BASELINE.** Sonnet flagged
+  `tests/test_audio_byte_identical.py` as a likely casualty; in practice its
+  byte-identity test SKIPS (it needs a live candidate render) and its seven
+  fixture/contract tests pass unchanged. Recorded because the warning was
+  reasonable and the reality is cheaper -- but a future live-render comparison
+  WILL need `--capture-baseline`.
+- **WHAT IT STILL OWES: a live leg.** Unit-proven and proven against real
+  masters, but not yet through a full canonical render published to `otr/obs/`.
+  Deliberately not run: the operator has LTX 2.5 in the recipe lab and the GPU
+  is his. The crest-factor improvement in particular CANNOT be seen in the
+  offline proof -- those masters were already squashed by the old +4 dB tanh,
+  and only a live render exercises the new path with unsquashed input.
+- status: **BUILT AND UNIT-PROVEN 2026-08-19; OWES A LIVE LEG.**
 
 ## PBUG-20260819-02 -- `audio_revision` is dead at BOTH ends, so ShotLock cannot detect a stale audio binding
 

@@ -168,24 +168,116 @@ def _normalize_clip(clip_np, target_peak=0.85):
     return (clip_np * (target_peak / peak)).astype(np.float32)
 
 
-def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None):
-    """Final episode loudness master: makeup gain + tanh soft limiter + peak.
+#: Delivery loudness target. YouTube normalises playback to about -14 LUFS and
+#: the normalisation is DOWN-ONLY: content louder than target is attenuated,
+#: content quieter is played as-is and never boosted. Mastering hot therefore
+#: buys nothing (the loudness is removed at playback while the limiting used to
+#: obtain it stays in the audio), and mastering quiet is a permanent handicap.
+_MASTER_TARGET_LUFS = -14.0
 
-    The legacy master stage peak-normalized to -1.0 dBFS only. Speech has a
-    high crest factor, so peak-only leaves the episode perceptually quiet.
-    This lifts perceived loudness a touch above the streaming norm and is
-    peak-SAFE: a tanh soft-knee limiter rounds the gained peaks, then the true
-    peak is trimmed back to ``ceiling_dbfs``. Fully deterministic (no RNG).
+#: pyloudnorm needs at least one 400 ms block for a valid integrated reading.
+_LUFS_MIN_SECONDS = 0.4
 
-    ``makeup_db`` (default env OTR_MASTER_MAKEUP_DB, else 4.0; clamped 0..12)
-    sets the boost. 0 disables the limiter -> pure peak-normalize to the
-    ceiling (legacy behavior). Returns ``(waveform, makeup_db_used)``.
+
+def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
+                     target_lufs=None, sample_rate: int = 48000):
+    """Final episode loudness master: measure LUFS, gain to target, peak-safe.
+
+    THIS STAGE SETS THE DELIVERY LEVEL. It does NOT balance the mix -- that
+    already happened per clip, upstream, where every spoken line is levelled to
+    ``OTR_SEGMENT_TARGET_RMS_DBFS`` (-16 dBFS active RMS) by
+    ``_level_dialogue_clip`` on both the announcer and character buses. **The
+    two do different jobs and must not be confused:** per-clip levelling makes
+    one character sit correctly against another; this stage moves the finished
+    mix as a whole. Because it applies a SINGLE LINEAR GAIN it cannot disturb
+    the clip-to-clip balance established upstream -- every relative level
+    survives untouched.
+
+    WHY THIS REPLACED PEAK NORMALISATION (2026-08-19, PBUG-20260819-01,
+    panelled by Fable + Sonnet on the operator's instruction to confirm best
+    practice for YouTube). The old stage applied a fixed +4 dB makeup into a
+    tanh soft knee, then trimmed the PEAK to ``ceiling_dbfs``. Peak is the
+    wrong control for a platform that normalises by loudness: two files can
+    share a -1.0 dBFS peak and differ by 10 dB in LUFS. Measured across 8 real
+    masters spanning two months, that stage delivered a mean of **-9.87 LUFS
+    (std 0.41)**, roughly 4 dB hotter than target -- so every episode was
+    attenuated at playback while the limiting that bought the loudness stayed
+    in the audio.
+
+    A TRAP RECORDED SO NOBODY REPEATS IT. Peak ceiling and delivered loudness
+    are NOT linearly related in the old algorithm, because it renormalised to
+    the ceiling BEFORE the tanh saturated: at ceiling -1.0 the limiter sits deep
+    in its knee; at -9.0 it barely engages. Measured on the real function, an
+    8 dB ceiling move produced a **10.3 dB** loudness move (-13.26 -> -23.58
+    LUFS). A blind fader A/B on this stage cannot predict its own delivered
+    level, so ``ceiling_dbfs`` must never be "tuned by ear".
+
+    Fully deterministic (no RNG). Returns ``(waveform, info)``; ``info`` carries
+    the measurement for the caller's log and any receipt.
+
+    ``makeup_db`` is retained ONLY for the fallback path below. It is no longer
+    the loudness engine.
     """
     import os
     ceiling = 10.0 ** (ceiling_dbfs / 20.0)
     peak = waveform.abs().max()
     if float(peak) < 1e-8:
-        return waveform, 0.0
+        return waveform, {"mode": "silent", "makeup_db": 0.0}
+
+    if target_lufs is None:
+        try:
+            target_lufs = float(
+                os.environ.get("OTR_MASTER_TARGET_LUFS", _MASTER_TARGET_LUFS))
+        except (TypeError, ValueError):
+            target_lufs = _MASTER_TARGET_LUFS
+
+    # --- LUFS path: measure, then ONE linear gain, then a peak safety rail --
+    measured = None
+    if target_lufs is not None:
+        try:
+            import numpy as _np
+            import pyloudnorm as _pln
+
+            arr = (waveform.detach().cpu().numpy()
+                   if hasattr(waveform, "detach") else _np.asarray(waveform))
+            while arr.ndim > 2:          # (1, ch, n) -> (ch, n)
+                arr = arr[0]
+            if arr.ndim == 2:            # (ch, n) -> (n, ch): what the meter wants
+                arr = arr.T
+            if arr.shape[0] >= int(_LUFS_MIN_SECONDS * sample_rate):
+                measured = float(
+                    _pln.Meter(sample_rate).integrated_loudness(
+                        _np.ascontiguousarray(arr, dtype=_np.float64)))
+        except Exception as exc:  # noqa: BLE001 -- never fail an episode on this
+            log.warning("[EpisodeAssembler] LUFS measurement unavailable (%s); "
+                        "falling back to the legacy peak master", exc)
+            measured = None
+
+    # -70 rejects the -inf pyloudnorm returns for effectively silent input.
+    if measured is not None and measured > -70.0:
+        gain_db = float(target_lufs) - measured
+        waveform = waveform * (10.0 ** (gain_db / 20.0))
+        new_peak = float(waveform.abs().max())
+        limited = new_peak > ceiling
+        if limited:
+            # Safety rail only. On real episodes the gain is NEGATIVE -- we now
+            # master quieter than before -- so this does not fire; but a very
+            # peaky mix must never leave here above the ceiling.
+            waveform = waveform * (ceiling / new_peak)
+        return waveform, {
+            "mode": "lufs",
+            "measured_lufs": round(measured, 2),
+            "target_lufs": float(target_lufs),
+            "gain_db": round(gain_db, 2),
+            "ceiling_dbfs": float(ceiling_dbfs),
+            "peak_limited": bool(limited),
+            "makeup_db": 0.0,
+        }
+
+    # --- Fallback: the legacy tanh master, unchanged ------------------------
+    # Reached only when measurement is impossible (pyloudnorm missing, or audio
+    # shorter than one 400 ms block). Kept so a render never fails for want of
+    # a loudness reading.
     # Normalize to the ceiling first so the limiter sees a known full scale.
     waveform = waveform * (ceiling / peak)
     if makeup_db is None:
@@ -204,7 +296,11 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None):
         peak2 = waveform.abs().max()
         if float(peak2) > 1e-8:
             waveform = waveform * (ceiling / peak2)
-    return waveform, makeup_db
+    return waveform, {
+        "mode": "legacy_peak",
+        "ceiling_dbfs": float(ceiling_dbfs),
+        "makeup_db": makeup_db,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1353,15 +1449,28 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Assembled %d segments with %dms crossfades",
                  len(matched), crossfade_ms)
 
-        # Final loudness master (post-crossfade): makeup gain + tanh soft
-        # limiter + -1.0 dBFS true-peak ceiling. Peak-normalizing alone left
-        # dialogue perceptually quiet (speech has a high crest factor), so we
-        # lift the episode a touch above the streaming norm WITHOUT ever
-        # hard-clipping. Deterministic; tune/disable via OTR_MASTER_MAKEUP_DB
-        # (0 = legacy peak-normalize to -1.0 dBFS). Jeffrey 2026-06-06.
-        episode_waveform, _makeup_db = _master_loudness(episode_waveform)
-        log.info("[EpisodeAssembler] Final loudness master: +%.1f dB makeup, "
-                 "-1.0 dBFS ceiling (post-crossfade)", _makeup_db)
+        # Final loudness master (post-crossfade): measure integrated LUFS, apply
+        # ONE linear gain to the delivery target, then a true-peak safety rail.
+        # `sample_rate` is passed because the meter needs it, and `ceiling_dbfs`
+        # is passed EXPLICITLY rather than left to the silent default -- the old
+        # call site passed neither, which is how the ceiling became invisible.
+        # Deterministic. Override the target with OTR_MASTER_TARGET_LUFS.
+        episode_waveform, _loud = _master_loudness(
+            episode_waveform, ceiling_dbfs=-1.0, sample_rate=sample_rate)
+        if _loud.get("mode") == "lufs":
+            log.info(
+                "[EpisodeAssembler] Final loudness master: measured %.2f LUFS "
+                "-> target %.1f LUFS (gain %+.2f dB), true-peak ceiling "
+                "%.1f dBFS%s (post-crossfade)",
+                _loud["measured_lufs"], _loud["target_lufs"], _loud["gain_db"],
+                _loud["ceiling_dbfs"],
+                " [peak-limited]" if _loud.get("peak_limited") else "")
+        else:
+            log.info(
+                "[EpisodeAssembler] Final loudness master: %s path, makeup %s, "
+                "ceiling %s dBFS (post-crossfade)",
+                _loud.get("mode"), _loud.get("makeup_db"),
+                _loud.get("ceiling_dbfs"))
 
         # Chunk-E GATE 1: write the frozen master mix to a standalone WAV
         # so OTR_MasterAudioMux can source audio from the audio pipeline
