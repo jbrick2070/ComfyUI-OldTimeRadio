@@ -108,6 +108,53 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
+### THE CODEX LANE IS BACK -- VERIFIED LIVE 2026-08-19, and here is how to call it
+
+Operator: *"CODEX 5.6 SOL READY FOR NEXT TEST WEEK, UNBLOCKED."* Verified
+rather than taken on trust: `gpt-5.6-sol` answered rc=0 and self-identified as
+**GPT-5.6 Codex**. The premium lane is genuinely available again, not merely
+past its quota date.
+
+**WHAT IT ACTUALLY UNBLOCKS: nothing -- and that is the point.** Per the
+`CLAUDE.md` directive of 2026-08-17, *a missing reviewer never blocks the arc;
+you substitute and keep going*. Item F -- the one thing this file still said
+"wants the whole [arc] once Codex is back 2026-08-19" -- **already shipped on
+2026-08-17** (Bible `12.110`), having run r1-r4 on two agy lanes plus a Fable
+gate and a Sonnet QA pass, with Codex never sitting a single round. So Codex
+returning restores the PREFERRED roster for the next full arc; it does not
+release a backlog, because nothing was permitted to accumulate behind it. The
+next arc that wants it is the **VIDEO SPRINT**, once the operator names its
+scope.
+
+**THREE GOTCHAS, each of which cost a window, none of them obvious:**
+
+1. **`codex` is installed but NOT on PATH.** The executable lives at
+   `C:\Users\jeffr\AppData\Local\OpenAI\Codex\bin\<hash>\codex.exe` -- the hash
+   directory changes across updates, so glob for `codex.exe` under
+   `AppData\Local\OpenAI\Codex\bin` rather than pinning it. `where codex`
+   returns nothing, and that is NOT evidence it is missing.
+2. **The installed kibitz plugin BLOCKLISTS the cheap spark model and silently
+   overrides an explicit pin to `gpt-5.6-sol`.** Pinning
+   `gpt-5.3-codex-spark` through the plugin does not get you the cheap lane --
+   it gets you the expensive one without saying so. **Call `codex exec`
+   DIRECTLY** when which lane runs actually matters:
+
+       codex.exe exec -m gpt-5.3-codex-spark -s read-only --skip-git-repo-check -C <repo> - < prompt.md
+       codex.exe exec -m gpt-5.6-sol -s read-only --skip-git-repo-check -C <repo> - < prompt.md
+
+   `-s read-only` earns its place: it lets a review lane run CONCURRENTLY with
+   the test suite with no risk of a mid-run edit (the torn-read rule).
+3. **Export `KIBITZ_QUOTA_BLOCK_ON_RECENT=0`** -- the quota preflight
+   false-blocks on a stale log. Related but SEPARATE: **a timeout is not a
+   quota block.** `agy`'s print-timeout knob is `KIBITZ_AGY_PRINT_TIMEOUT`
+   (default `5m`; `15m` fixes it), and `kibitz.py --timeout` does NOT reach agy.
+
+**AND THE STANDING CHECK STILL APPLIES:** a lane can exit 0 having written an
+empty review. Judge it by log size and whether it actually read files, never by
+the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
+ranges -- that is what a working lane looks like, and on that run it caught two
+of the driver's own tests being tautologies.
+
 **BASELINES (re-measured 2026-08-19, on a settled tree after the title-anchor
 fix and the durable-headline stamp):** suite **11104 passed / 110 skipped /
 1 xfailed** -- MEASURED by a full run, never derived. Chain this window, each
@@ -313,9 +360,11 @@ degrade-not-raise, and **node 89 gets no classifier**. Only its ACCEPTANCE needs
 pixels (a live leg plus a re-run of `scripts/audit_voice_gender_consistency.py`;
 34 portrait conflicts is the BEFORE number), and that batches into the operator's
 declared GPU session. **`E`'s candidate downloads can run in the BACKGROUND under
-anything** -- the queue already says so. **`F` is not secretly cheap:** its root is
+anything** -- the queue already says so. ~~**`F` is not secretly cheap:** its root is
 diagnosed by shape only and it wants tracing plus a panel, ideally the whole one
-once Codex is back 2026-08-19. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are
+once Codex is back 2026-08-19.~~ **STRUCK 2026-08-19: F SHIPPED ON 08-17**
+(Bible `12.110`), having run r1-r4 without Codex at all. See the Codex-lane
+block near the top of this file. **D is BLOCKED** and **D-BIS 2-5 + D-TER** are
 static-audit findings awaiting a live observation. B-OPEN is CLOSED. **`I` IS NEW
 (2026-08-17 late) and it is a live production defect, not an audit finding** --
 the wrong-person `character_description`, diagnosed at the files, promoted as
