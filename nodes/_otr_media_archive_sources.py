@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import html
+import logging
 import os
 import re
 from typing import Any
+
+log = logging.getLogger("OTR")
 
 DEFAULT_MEDIA_ARCHIVE_FEEDS: tuple[str, ...] = (
     "https://blogs.loc.gov/now-see-hear/feed/",
@@ -196,14 +199,93 @@ def _configured_index() -> int:
         return 0
 
 
+def _explicit_index():
+    """The operator's index if they set a USABLE one, else None.
+
+    Distinct from `_configured_index()` on purpose. That helper answers "which
+    index should I use", defaulting to 0 and swallowing a bad value -- correct
+    for its own callers, and exactly wrong as an "did the operator choose?"
+    test. A non-empty but unparseable value must NOT be read as a choice, or the
+    override branch fires, the index collapses to 0, and the lane is back to
+    adapting the newest post forever with no sign anything went wrong.
+    """
+    raw = os.environ.get("OTR_MEDIA_ARCHIVE_ITEM_INDEX", "").strip()
+    if not raw:
+        return None
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        log.warning("[media_archive] OTR_MEDIA_ARCHIVE_ITEM_INDEX=%r is not an "
+                    "integer; ignoring it and selecting by recent history", raw)
+        return None
+
+
+def _recently_used_urls() -> set:
+    """URLs this box has adapted recently, from the SHARED news history.
+
+    THIS IS THE SCIENCE LANE'S MECHANISM, REUSED ON PURPOSE -- not a second
+    implementation. `story_orchestrator` already keeps
+    `<output>/otr/state/news_history.json`: article URLs with a rolling cap and
+    a 5-day TTL, so a headline recycles once it has aged out. It keys on URL and
+    nothing about it is science-specific, which is exactly why a second history
+    for this lane would be a second thing to drift.
+
+    Best-effort by contract, like the science lane's own use of it: any failure
+    returns an empty set and the caller simply selects as it did before. A feed
+    lane must never fail an episode because a dedup file was unreadable.
+    """
+    try:
+        try:
+            from . import story_orchestrator as _so
+        except ImportError:  # pragma: no cover -- flat-import test harnesses
+            import story_orchestrator as _so  # type: ignore
+        return set(_so._load_news_history() or ())
+    except Exception:  # noqa: BLE001 -- dedup is advisory, never a gate
+        log.debug("[media_archive] news history unavailable; no dedup",
+                  exc_info=True)
+        return set()
+
+
+def _record_used(payload: dict) -> None:
+    """Record the selected post in the shared history so the NEXT run skips it.
+
+    Without this the filter above can never do anything -- reading a history
+    nothing writes to is a no-op that looks like a feature.
+    """
+    url = str((payload or {}).get("url") or (payload or {}).get("link") or "")
+    if not url:
+        return
+    try:
+        try:
+            from . import story_orchestrator as _so
+        except ImportError:  # pragma: no cover
+            import story_orchestrator as _so  # type: ignore
+        _so._record_news_usage(url, str((payload or {}).get("headline") or ""))
+    except Exception:  # noqa: BLE001 -- advisory
+        log.debug("[media_archive] could not record news usage", exc_info=True)
+
+
 def fetch_media_archive_rss(*, bank: Any, technical_model: str = "",
                             source_ref: str = "") -> dict:
     """Registered fetcher body for ``media_archive_rss``.
 
     ``bank``, ``technical_model``, and ``source_ref`` are accepted for the
-    shared fetcher contract. RSS feeds ignore ``source_ref``; the feed choice
-    itself is deterministic: gather usable entries from configured feeds and
-    select ``OTR_MEDIA_ARCHIVE_ITEM_INDEX`` modulo the entry count.
+    shared fetcher contract; RSS feeds ignore ``source_ref``.
+
+    SELECTION, AND WHY IT IS NOT JUST INDEX 0 ANY MORE (PBUG-20260815-06).
+    Feed entries arrive newest-first and this returned
+    `payloads[_configured_index() % len(payloads)]` with the index defaulting to
+    `"0"`, so absent an operator-set env var the lane adapted THE NEWEST POST
+    EVERY TIME -- forever, with no dedup, ranking or history anywhere in the
+    module. The science lane never had that problem because it filters against a
+    shared news history; this lane now uses the SAME one.
+
+    Order of precedence, deliberately:
+      1. An explicitly set ``OTR_MEDIA_ARCHIVE_ITEM_INDEX`` still wins outright.
+         It is an operator override and dedup must not fight it.
+      2. Otherwise prefer entries not in the recent history.
+      3. If every entry has been used, fall back to the full list rather than
+         failing -- a repeat is worse than nothing, but nothing is worse still.
     """
     del bank, technical_model, source_ref
     payloads: list[dict] = []
@@ -218,7 +300,33 @@ def fetch_media_archive_rss(*, bank: Any, technical_model: str = "",
             "media_archive_rss found no usable feed entries; "
             + "; ".join(errors)
         )
-    return payloads[_configured_index() % len(payloads)]
+
+    # AN OVERRIDE ONLY COUNTS IF IT PARSES. A non-empty but unparseable value
+    # ("abc", "2.5", "-") is NOT an operator choice, and treating it as one
+    # would take this branch, let `_configured_index()` swallow the ValueError,
+    # return 0, and silently restore the always-newest behaviour this function
+    # exists to end. Caught by review; the first cut tested only for non-empty.
+    override = _explicit_index()
+    if override is not None:
+        chosen = payloads[override % len(payloads)]
+        # NOT recorded. An explicit index is a deliberate repeat -- a re-run of
+        # one post for testing or for the operator's own reasons -- so writing it
+        # to the shared history would let a debugging run consume a headline for
+        # the automatic path (and, since the history is shared, for the science
+        # lane's TTL window too).
+        return chosen
+
+    used = _recently_used_urls()
+    fresh = [p for p in payloads
+             if str(p.get("url") or p.get("link") or "") not in used]
+    pool = fresh or payloads
+    if not fresh:
+        log.info("[media_archive] every feed entry (%d) is in the recent "
+                 "history; re-using the newest rather than failing",
+                 len(payloads))
+    chosen = pool[_configured_index() % len(pool)]
+    _record_used(chosen)
+    return chosen
 
 
 __all__ = [
