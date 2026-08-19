@@ -362,7 +362,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: soak launcher preflights daemon health before queuing legs
 - bible-worthy: maybe -- precondition-check class, though root cause was environmental
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The Ollama daemon architecture no longer exists: `grep -rn ollama nodes/*.py` returns ZERO hits, and the surviving references are negative statements (`_otr_model_catalog.py` -- "No Ollama, no sidecar, no port"). Replaced by the local OpenAI lane in `bde057f7`. A daemon that cannot be started cannot go down.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, the subsystem is gone**
 
 ## PBUG-20260704-01 -- Sonilo cloud music rejected 422 provider_rejected
 - surfaced: live cloud-audio proving run, 2026-07-04 (8f146394 "FIXED+PROVEN live")
@@ -530,7 +532,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: fixture with wrong field and offset rehomes to the unique literal field; fixture with absent or duplicate quote returns no repair
 - bible-worthy: yes -- live source-evidence metadata failure, cross-lane helper
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`55f3cf17`) lived only in `nodes/_otr_scifi_source_repair.py`, deleted whole by the scifi_news rip `dae1fb3c` (2026-08-16).
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, module deleted**
 
 ## PBUG-20260711-05 -- JSON parser salvaged a nested fact from a broken outer artifact
 - promotion: BUG-11.47
@@ -541,7 +545,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: malformed outer-with-valid-child fixture raises a top-level parse error; valid leading prose plus a valid object still parses normally
 - bible-worthy: yes -- shared structured-call integrity defect across source packs
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). **Do not bulk-close this with its 711-series siblings.** The fix (`5489baa8`) did NOT die with the scifi module: `extract_first_json_block` lives in `nodes/_otr_json.py` and is imported today by `_otr_casting.py`, `_otr_outline.py`, `_otr_story_brief.py`, `_otr_structured_call.py` and `news_interpreter.py`. It became shared infrastructure.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- FIXED, and the fix GENERALIZED**
 
 ## PBUG-20260711-06 -- Codex P3 omitted required nested scene graph fields
 - promotion: BUG-11.48
@@ -552,7 +558,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: assert `scenes[*].shots[*].scene_id` and equivalent nested paths appear in generated prompts; live smoke must pass P3 graph validation
 - bible-worthy: yes -- live nested-schema contract failure, same family as PBUG-20260711-03
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). **Do not bulk-close this with its 711-series siblings.** `schema_required_paths` / `schema_shape_instruction` (`b9cfc508`) now live in `nodes/_otr_structured_call.py` wired into `invoke_structured_slot`, called from `OTR_LedgerScriptWriter.py` and `_otr_openrouter_backend.py` -- a generic mechanism, no longer scifi-specific.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- FIXED, and the fix GENERALIZED**
 
 ## PBUG-20260711-07 -- Codex P0 overclaimed beyond the supplied RSS payload
 - promotion: BUG-11.46
@@ -563,7 +571,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: mixed fixture keeps literal facts and drops paraphrased facts; all-paraphrase fixture remains invalid
 - bible-worthy: yes -- live grounding overclaim, same evidence-contract family as PBUG-20260711-01/02/04
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`6e6ff57b`) lived only in `nodes/_otr_scifi_source_repair.py`, deleted by `dae1fb3c`.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, module deleted**
 
 ## PBUG-20260711-08 -- Codex P3 generic repair repeated an incomplete graph
 - promotion: BUG-11.48
@@ -574,7 +584,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: force a nested graph validation failure and assert the repair prompt includes the failed artifact, exact validation error, schema paths, and context-preservation rule
 - bible-worthy: yes -- live repair-contract failure, cross-lane by construction
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`a27206df`) touched only `_otr_scifi_gemini.py` (deleted `3312aec7`) and `_otr_scifi_sonnet.py` (deleted `c507acff`).
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, modules deleted**
 
 ## PBUG-20260711-09 -- Codex P3 repair omitted cast-locked speaker fields
 - promotion: BUG-11.48
@@ -585,7 +597,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: force missing beat speakers and assert the repair prompt requires cast-row lookup by `char_id`; live Codex P3 must clear
 - bible-worthy: yes -- live cast/graph integrity contract failure, cross-lane prevention
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`fca99a5a`) touched only the gemini/sonnet modules, both deleted.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, modules deleted**
 
 ## PBUG-20260711-10 -- Codex P5 repair omitted ScriptLine boundary metadata
 - promotion: BUG-11.48
@@ -596,7 +610,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: force missing boundaries and assert the repair instruction contains the three-way derivation rule; live P5 must clear
 - bible-worthy: yes -- live script graph metadata failure
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`94331eb2`) touched only `_otr_scifi_codex.py`, deleted whole by `dae1fb3c`.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, module deleted**
 
 ## PBUG-20260711-11 -- Canonical RSS selector delivered a thin science payload
 - promotion: BUG-11.49
@@ -607,7 +623,9 @@ already promoted). Confidence tags preserved from the sweep.
 - verify idea: canonical RSS fetch should either return a payload meeting the 80/12 floor or fail before queueing the sci-fi lane with a clear source-selection reason
 - bible-worthy: yes -- live shared source-precondition failure
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`d01cf8bc`) gates on `strict_v4_banks = {scifi_codex, scifi_gemini, scifi_sonnet}`. VERIFIED: none of those ids are in `nodes/story_packs/banks.json`, whose live roster is media_archive / original / scifi_news_pro / public_domain / shakespeare / custom_source_bank. Dead code guarding banks that cannot be selected.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, the banks no longer exist**
 
 ## FAN-OUT RECORD -- 2026-07-11 (operator-triggered)
 23 entries promoted to the Bible (156 -> 179) @ survival-guide commit d50d773;
@@ -625,7 +643,9 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: 30w P5 prompt is not truncated, required ScriptArtifactV4 paths remain in the effective prompt, and canonical Codex reaches publish
 - bible-worthy: yes -- live context-budget/structured-output contract failure
 - confidence: HIGH
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The fix (`fdc413ed`) touched only `_otr_scifi_codex.py`, deleted whole by `dae1fb3c`.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- OBSOLETE, module deleted**
 
 ## PBUG-20260711-13 -- Codex P5 typed repair retained two forbidden legacy metadata values
 - promotion: BUG-11.48
@@ -690,7 +710,9 @@ root cause), PBUG-20260703-01 (environmental). Mapping stamped per entry above.
 - verify idea: measure the real P7 prompt+output cost at 720w; whichever option lands, P5/P7/P9 should fail loud rather than silently truncate
 - bible-worthy: yes -- silent context truncation of a provenance-bearing prompt
 - confidence: HIGH (arithmetic), UNPROVEN (not yet observed live)
-- status: OPEN -- gates the 720w bake-off
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). The Codex P7/P9 module it warned about is deleted. The successor `_otr_scifi_news_pro.py` carries its own turn-budget guard (`_draft_fits_repair_turn`), and the structural ceiling near 1,520 spoken words fits the 8192 cap.
+- previous status: OPEN -- gates the 720w bake-off
+- status: **CLOSED 2026-08-18 -- OBSOLETE, superseded by an independent guard**
 
 ## PBUG-20260712-01 -- Gemma packed three owned items into suffixed fields
 - promotion: BUG-11.45
@@ -2038,7 +2060,9 @@ out until they independently meet the same production-only admission rule.
 - bible-worthy: yes -- generic rule: a model-picker that scans the HF cache must (a) resolve the cache the LOADER uses (honor HF_HUB_CACHE, not just HF_HOME/legacy alias), (b) gate "downloaded" on a materialized weight blob, not a bare snapshot dir, and (c) keep UI state badges mutually exclusive. Hits any custom node that labels a model dropdown from a cache walk
 - operator env note (NOT code-fixable): on this box the ComfyUI process resolves to `~/.cache/huggingface/hub` because it has no HF_* var set; the User-registry `HF_HUB_CACHE=C:\ComfyUI-Models\huggingface` points at the CONFIG-ONLY parent (weights live in `...\huggingface\hub`). For the dropdown to show the real weights, launch ComfyUI with `HF_HOME=C:\ComfyUI-Models\huggingface` (yields `/hub`) or `HF_HUB_CACHE=C:\ComfyUI-Models\huggingface\hub`. The code fix makes the label HONEST for whatever cache the process actually uses
 - follow-up (operator directive 2026-07-16, same day): after seeing the corrected labels the operator observed the download-state STILL depends on each user's HF cache layout ("has to work out of the box for every user regardless of where they store their files"), which no scanner can guarantee. Per that directive the download-state badges were REMOVED entirely: `build_dropdown_choices` now emits the bare repo id / handle with NO `[LOCAL HF]`/`[NOT DOWNLOADED]`/`[LOCAL GGUF]` badge (the dead `_display_label_for_local_row` + `_is_google_gemma_local_row` helpers were ripped). `on_disk` is still tracked internally (recovery hint + auto-download short-circuit) and the HF_HUB_CACHE + weight-completeness fixes are retained; the SUFFIX CONSTANTS + `_strip_label_suffix` stay so a value saved by an older badge-bearing workflow still normalizes. Selection is never gated -- a not-cached model is fetched by `auto_download_if_missing` on first Queue
-- status: OPEN (badge-label surface removed; underlying cache-resolution/completeness fix stands)
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `build_dropdown_choices` (`nodes/_otr_model_catalog.py`) emits a bare `repo_id` with no badge-suffix logic at all (`aaaf660a` + `0ae59ed4`). There is no code path that can print `[NOT DOWNLOADED]`.
+- previous status: OPEN (badge-label surface removed; underlying cache-resolution/completeness fix stands)
+- status: **CLOSED 2026-08-18 -- FIXED, symptom structurally unreachable**
 
 ## PBUG-20260717-01 -- codex P0 FactIndex literal-span rejects a whitespace-polluted RSS source
 - surfaced: live 30w headless `scifi_codex_v4` leg, 2026-07-17, canonical prompt `ac027c36-4aab-412b-9844-6239cf561d4f` (RESULT FAIL at node 1 OTR_LedgerScriptWriter, pass P0)
@@ -3057,7 +3081,9 @@ out until they independently meet the same production-only admission rule.
   RuntimeError inside one rung of a retry ladder silently cancels the rungs
   below it.** Any bounded-retry design has to classify its own terminal errors
   explicitly, or the budget it advertises is not the budget it spends.
-- status: **OPEN -- diagnosed, not fixed. Live: 2 occurrences in 13 legs
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `41683fc9` made a capacity failure advance the ladder instead of dying on attempt one of three, and `tests/test_a4_capacity_phase_advances_the_ladder.py` cites this PBUG number in its own docstring as the behaviour it pins.
+- previous status: **OPEN -- diagnosed, not fixed. Live: 2 occurrences in 13 legs
+- status: **CLOSED 2026-08-18 -- FIXED, with a regression test that names this PBUG**
   (`ltx_audio_in` 1450s, `still_word` 1420s -- both ~24 minutes of GPU time
   spent inside a single P5 base call before the refusal).** Both ran to the
   full remaining provider capacity (14697 and 14359 output tokens), which is
@@ -3385,7 +3411,9 @@ symptom.
   records" is a reusable defect class, and the fix shape (join, abstain
   honestly, override in place rather than re-allocating) is portable.
 - confidence: HIGH -- measured across every published adaptation ledger.
-- status: OPEN (fix landed 2026-08-05; live proof leg pending)
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `nodes/_otr_roster_gender.py` pins the source's own genders. Live proof in a published ledger: `signal_lost_the_stewards_soliloquy_of_vanity_20260805_061415` carries `meta._adaptation_character_genders.MALVOLIO.gender == "male"` at tier `exact` -- the exact character the entry cites as shipping female.
+- previous status: OPEN (fix landed 2026-08-05; live proof leg pending)
+- status: **CLOSED 2026-08-18 -- FIXED AND LIVE-PROVEN**
 
 ## PBUG-20260805-02 -- LATENT: the bark voice replay rebuilds a different ensemble than the writer cast
 - surfaced: NOT a production failure. Reproduced by probe against the shipped
@@ -3974,7 +4002,9 @@ injection by construction.
 - bible-worthy: likely yes as a class -- "a pipeline silently bypassed the one
   function that records a decision, so the ledger cannot distinguish 'declined'
   from 'never asked'". That shape is portable well beyond this cameo.
-- status: OPEN
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `da44f642` + `7faf3bf7` stamp `cast_contract` on both content-owned runners. Live proof: `signal_lost_chunkb_accept_forced_lemmy_scifi_news_pr_20260816_185234` shows `cast_contract.lemmy_hit=True`, and every `scifi_news_pro` ledger through 2026-08-18 carries a populated contract.
+- previous status: OPEN
+- status: **CLOSED 2026-08-18 -- FIXED AND LIVE-PROVEN on a forced-cameo leg**
 
 **Ranking note.** Of the three defects the sweep found this is the one that has
 been shipping longest and most invisibly: nothing failed, nothing logged, and
@@ -4613,7 +4643,9 @@ only visible because the cameo was FORCED and then did not appear.
   is empty (flag `news_coda_fact_only`).
 - bible-worthy: yes -- "a model-owned rewrite pass was given authority over a
   field another owner writes deterministically". Generalizes well beyond OTR.
-- status: OPEN -- diagnosed, fix specified in
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `e7e10148` wired `PROTECTED_FACT_COMPONENT_FLAG` producer (`OTR_LedgerScriptWriter.py`) to consumer (`_otr_ledger_clean.py`). Live proof from an episode published the same day: `signal_lost_the_16mm_ransom_20260818_145217` line `b016` carries `['news_coda_bridge', 'protected_fact_component']`.
+- previous status: OPEN -- diagnosed, fix specified in
+- status: **CLOSED 2026-08-18 -- FIXED AND FIRING TODAY**
   `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`, not yet landed.
 
 ## PBUG-20260815-02 -- `scifi_news` dies at the pre-tail audit on the first row the clean stage repairs
@@ -4786,7 +4818,9 @@ only visible because the cameo was FORCED and then did not appear.
   content-bearing variants still fail LOUD.
 - bible-worthy: yes -- "a repair loop whose diagnostic names the offence but
   never the required shape, so the model cannot converge".
-- status: OPEN -- diagnosed, fix specified, not yet landed. Ordering note: this
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `c8735ed1`. VERIFIED at HEAD: `_otr_scifi_news_pro_markup.py:60` reads `_RE_END = re.compile(r"^(?:END\.?|\[END\.?\])\s*$", re.IGNORECASE)` -- a bare `END` terminal is accepted.
+- previous status: OPEN -- diagnosed, fix specified, not yet landed. Ordering note: this
+- status: **CLOSED 2026-08-18 -- FIXED**
   must NOT land before PBUG-20260815-02's reseal, or the lane clears the ladder
   and then dies at the freeze cascade instead.
 
@@ -4850,7 +4884,9 @@ only visible because the cameo was FORCED and then did not appear.
   cannot populate an absent sidecar, and web search would add a cloud dependency
   against the standing 100%-local rule to fetch a fact the source already
   states. The gap is plumbing, not knowledge.
-- status: OPEN -- diagnosed, three live instances across three sources. Fix is
+- **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `5194ab90` gave all 65/65 `public_domain` units a committed `.provenance.json` (was 16/65), including both units the entry names (`gertrude_governess`, `moby_dick_quarterdeck`). Live ledgers now carry a non-empty `gender_by_name`.
+- previous status: OPEN -- diagnosed, three live instances across three sources. Fix is
+- status: **CLOSED 2026-08-18 -- FIXED AND LIVE-PROVEN**
   the vendor-time stamper already specified in
   `docs/2026-08-05-character-gender-ladder-SPEC.md`, never built; it is chunk
   0.75 / the D4 vendor gate in the current sprint.
