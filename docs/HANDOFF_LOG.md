@@ -3,6 +3,169 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-19 -- HEAD 741a0e11 +handoff (v2.0-alpha) -- CODER (the voice-pool arc closed end to end: flip, live proof, rip; media_archive stopped repeating itself; 18 stale bug rows closed; Bible 12.115)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit. A commit cannot contain its own hash, so the heading records the last
+CODE head -- the authoritative post-handoff sha is in the kickoff line.
+
+Did: **THE VOICE-POOL CONCENTRATION ITEM IS CLOSED, ALL THREE STEPS.** A full
+four-round arc ran BEFORE any code, and it earned its keep in a way worth
+recording precisely, because each round found a hidden gate one layer further
+out than the last.
+
+* **r1 reversed the design.** Fable, run COLD and deliberately not shown the
+  driver anchor, refuted the plan on a fact the driver and antigravity both
+  missed: `_build_voice_fit_prompt` hands the model the character's gender /
+  timbre / role / age and each card's age_band + timbre + style_tags -- exactly
+  the four dimensions `_score()` already weights -- and per I-9 no character name
+  and no description. **The LLM had no information the scorer lacks**, so every
+  ordering fix would only have made it a randomizer, and a seeded weighted
+  lottery already existed one function away. Measured: LLM-decided rows used 13
+  distinct voices at 96% top-5 against the scorer's 43 at 25%; 62% of accepted
+  proposals were card #0 of an alphabetically ordered list. Verdict: REMOVE, do
+  not tune. The driver's own lean (rank by scorer + raise the cap) was withdrawn.
+* **r2 found the flip is not one line.** With the default flipped, the existing
+  `!= "0"` test reads `OTR_HYBRID_VOICE_FIT=""` and `="false"` as ENABLED. It
+  also found that NO published episode could prove which caster ran:
+  `cast_report` is node 80 slot 2 with `links = []` (computed every render, wired
+  to nothing), `voice_cast_fallback` is `""` on both paths, and
+  `voice_cast_decision == {}` is produced BOTH by "disabled" and by "enabled but
+  no engine resolved".
+* **r3 found a BUILD-BREAKER in r2's own fix.** The `voice_cast_mode` marker
+  would never have reached the ledger: `OTR_LedgerScriptWriter` copies
+  lock_cast's meta KEY BY KEY and states the invariant in its own comment --
+  "a key stamped in lock_cast and not named on this line never reaches the
+  ledger". Two independent lanes (Sonnet and agy) found this separately, which is
+  the strongest signal in the campaign. The fix for undetectability would itself
+  have failed undetectably.
+* **r4 (Fable, final gate) found the fix was FAIL-OPEN.** `cast_meta.get(...) or
+  "scorer"` would fabricate the marker if the upstream stamp were ever dropped --
+  the gate stays green while the thing it asserts is dead. Now
+  `.get("voice_cast_mode", "")`, fail-closed. r4 also pinned four replay
+  parameters without which the live leg throws FALSE FAILS.
+
+**Step 1 shipped `429b73aa`:** explicit opt-in parse, the positive marker stamped
+unconditionally, the writer copy line, 17 tests.
+**Step 2 proved it on pixels:** `signal_lost_the_bite_of_the_iron_chain_20260818_210937`,
+RESULT SUCCESS, 1920x1080 h264+aac, 2:48, published to `otr/obs/`. All three
+gates green via the new `scripts/otr_verify_voice_cast_mode.py`, including a
+scorer replay matching **2/2** character rows. **THE RESULT WORTH KEEPING: both
+voices drawn -- `vz_pd_librivox_mark_f_smith` and `vz_donor_sujan_daikoawaj` --
+were STRUCTURALLY UNREACHABLE before**, never offered on the 12-card alphabetical
+list. The 42%-unreachable finding appeared on the FIRST post-flip episode. The
+gate also has a negative control: it correctly FAILS the pre-flip
+`signal_lost_the_16mm_ransom`, where the replay disagrees with what was stamped
+(hybrid took `vz_bill_boerst` and `vz_donor_andrea`, the #1 and #4 most
+concentrated voices; the scorer would have taken two rare ones).
+**Step 3 ripped it `eb264989`** on the operator's call: 385 net lines removed
+across three production files, including CastLock's OWN local import of
+`validate_voice_proposal` (a second independent caller that would have left a
+dangling ImportError). `default_char_engine` was deliberately KEPT despite a
+panel lane listing it -- `test_google_tts_voice_pool.py` uses it independently.
+
+**MEDIA_ARCHIVE CODA LIVE-VERIFIED** (`signal_lost_the_16mm_ransom_20260818_145217`,
+published): the coda named the Library of Congress, closed on one reflective
+thought, and the opening announcer stayed pure fiction -- so the scifi twin's
+fact/fiction/fact sandwich is absent.
+
+**MEDIA_ARCHIVE STOPPED RETELLING THE NEWEST POST FOREVER** (`3be1c1e1`,
+PBUG-20260815-06, Bible **12.115**). The operator's question shaped the fix --
+*"since scifi news seems to always choose a news story, should they have the same
+RSS logic generally?"* They should, and science already had the missing half: a
+shared used-URL history with a 5-day TTL. This lane reuses it rather than growing
+a second one. **Codex spark (the cheap lane) then caught a real hole:** the
+override branch tested only that the env var was NON-EMPTY, and
+`_configured_index()` swallows a ValueError and returns 0 -- so
+`OTR_MEDIA_ARCHIVE_ITEM_INDEX=abc` would have silently restored the exact
+always-newest behaviour the fix removes. Split into `_explicit_index()`, five junk
+values pinned. **Only HALF the PBUG is fixed and the row says so:** the selected
+headline is still not stamped in durable episode meta, so an episode cannot yet
+NAME what it adapted.
+
+**PBUG-20260817-08 CLOSED ACROSS ALL THREE POOLS** (`3a78703e`). Yesterday it was
+closed while two of three pools still leaked: the 08-17 fix guarded only
+`assign_voice_for_slot` (~4% of casting), while the hybrid card list offered
+Lemmy's clone as CARD #1 on every male slot (proposed 21 times, accepted 21) and
+`gender_agnostic_fallback_ref` returned it in 7-9 of every 200 draws. **The
+`rivers_embrace` "stale resident process" diagnosis was WRONG** and is struck in
+both the log and PROD_BUG_LOG -- the path was simply unguarded, reproducible at
+HEAD on a fresh import. A pre-existing test had the defect encoded as an
+EXPECTATION: `_real_male_indextts2_id` returned the alphabetically-first male id,
+which IS Lemmy's, so the suite asserted CastLock stamps his Cockney onto a
+character named BOB, and passed.
+
+**18 STALE BUG ROWS CLOSED, 35 open -> 18**, each with citable evidence and
+previous status preserved. Eight already fixed, ten obsolete (the scifi_news rip
+deleted the modules nine July-11 rows describe; Ollama has zero hits in
+`nodes/`). **The trap worth keeping: two of that block were NOT bulk-closed** --
+`PBUG-20260711-05`/`-06` look like siblings but their fixes GENERALIZED into
+shared infrastructure every live lane still calls.
+
+**DONOR GENDER: THE NAME BEATS THE PITCH** (operator ruling, `af8787e0`).
+`otr_dl_indextts2_refs.py` inferred gender from median F0 at a 165 Hz threshold
+sitting inside the male/female overlap. The audit settles why that is
+unfixable-by-tuning: **glenn measures 261.5 Hz** -- confidently female by pitch,
+male by ear. `gender_from_handle()` now overrides the pitch bucket;
+`james`/`hillbilly_jim` trios flipped and pinned; **`rup` left unresolved** since
+the name decides nothing. `tests/test_voice_bank_gender_pins.py` pins every
+settled row and tripwires any handle/gender contradiction. **Never auto-flip a
+bank gender.**
+
+Also: `otr/obs/LISTEN.html` (78 episodes, relative paths so it works from the
+4060's mapped drive, fully offline, regenerated by
+`scripts/otr_build_obs_listen_page.py`). And a fix pushed to the operator's own
+`jbrick2070/kibitz` (`c7a0226`): a CLI-log quota marker now WARNS instead of
+blocking, because agy hits 429s internally, retries and succeeds -- a run that
+returned a complete 7.6 KB review left a log carrying 5x RESOURCE_EXHAUSTED, and
+blocking on that cost r3 a reviewer for nothing.
+
+Gates: OTR suite **11080 passed / 110 skipped / 1 xfailed** (measured; 11066
+after the rip + exactly the 14 media_archive tests). Bible regression
+**20 / 26 / 3**, Bible **294** entries. `build_variants.py --check` **50 variants,
+0 failures**. Both repos verified HEAD == origin.
+
+Box state at handoff: VRAM **2328 MiB** of 16303, **no ComfyUI servers running**
+(the leg's server was stopped so the operator could use the GPU; the
+`vram-recipe-lab` server on 8199 also finished and exited). Clean box -- the next
+window still resets per CLAUDE.md section 4 before any leg.
+
+Current step: the queue's live rows are **PBUG-20260815-05** (episode title names
+a different play -- fix specified, NOT landed), **PBUG-20260729-03** (a repair
+refuses instead of degrading, confirmed at HEAD), **PBUG-20260815-06's second
+half** (stamp the selected headline durably), **PBUG-20260817-06** (Doyle names in
+a Leacock parody, undiagnosed), and the **9 donor-gender rows awaiting the
+operator's ear**.
+
+Next: **the VIDEO SPRINT is blocked only on the operator NAMING its first
+scope** -- the plan explicitly forbids inventing it. He wants to see LTX 2.5
+lip-sync first and is running that himself with agy. A probe recipe is waiting at
+`vram-recipe-lab/recipes/ltx_2_5_a2v_gguf_lipsync.json` (person-led prompt,
+modality_scale 6.0 vs the parent's 3.0). **Context for that decision:** LTX 2.5
+a2v passed cold at **10.47 GB** where three H3 i2v cells FAIL at 15.1-15.4, and
+production video today is still stills+procgen. Its audio is the operator's own
+voice ref round-tripped, NOT generated -- and its first run rendered a coastal
+road because the prompt led with a landscape and put "speaking into the camera"
+last with no subject. So VRAM feasibility is proven; lip-sync is NOT.
+
+Models: Opus 5 drove. **Codex is now INSTALLED and working** (found at
+`%LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\codex.exe`, not on PATH) -- it filled
+the seat that had been empty all session. Two caveats for the next window: the
+installed kibitz plugin (1.2.1) BLOCKLISTS `spark`/`mini`/`fast`/`nano`, so
+`KIBITZ_CODEX_MODEL=gpt-5.3-codex-spark` is silently overridden to `gpt-5.6-sol`
+-- call codex directly with `-m` for the cheap lane; and the quota preflight
+false-blocks on a stale log, so pass `KIBITZ_QUOTA_BLOCK_ON_RECENT=0`. Both are
+fixed in the operator's kibitz REPO but the installed plugin is an older lineage.
+**Arc provenance, stated exactly:** r1 agy (Gemini 3.5 Flash High) + Fable cold;
+r2 agy (3.1 Pro rubber-stamped and was REJECTED, re-run on 3.7 Flash) + Sonnet;
+r3 agy 3.7 Flash + Sonnet; r4 Fable as the final gate. Codex participated in the
+media_archive review only, on spark. Sonnet ran the stale-PBUG triage.
+
+Commits: OTR `3a78703e` `ccd5a4f5` `7a4e7005` `834ddeeb` `af8787e0` `429b73aa`
+`6e62c645` `fb2cb56f` `eb264989` `6f03f3c3` `3be1c1e1` `741a0e11` (12).
+Survival-guide `25a2aff8` (1). Operator's kibitz repo `c7a0226` (1). The handoff
+commit lands on top and is not listed -- see the kickoff line for the real head.
+
 ## 2026-08-18 NIGHT -- HEAD fa6dba62 +handoff (v2.0-alpha) -- CODER (~~Lemmy closed as ALREADY FIXED~~ **SEE CORRECTION BELOW -- THE CLOSE WAS HALF RIGHT**; Bible 12.114 promoted; the voice-pool concern measured and CONFIRMED, with the driver's first answer corrected)
 
 > ### CORRECTION FILED 2026-08-18 LATE NIGHT (commit `3a78703e`) -- READ BEFORE THIS ENTRY
