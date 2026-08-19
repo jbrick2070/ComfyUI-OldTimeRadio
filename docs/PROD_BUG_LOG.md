@@ -68,6 +68,71 @@ by a two-agent backsweep (git history + handoff/smoke docs), prod-only bar appli
 cross-checked against BUG_BIBLE.yaml (BUG-11.26 family, 12.47, 07.16 excluded as
 already promoted). Confidence tags preserved from the sweep.
 
+## PBUG-20260819-01 -- the `normalize_dbfs` widget in the canonical workflow does nothing
+
+- surfaced: re-QA sweep 2026-08-19 (gpt-5.6-sol partial-wiring hunt), then
+  LIVE-VERIFIED against the same night's headless run.
+- symptom: `OTR_AudioEnhance` exposes a `normalize_dbfs` FLOAT widget --
+  `min -12.0, max 0.0, step 0.5`, tooltip *"Peak normalization target dBFS
+  (-1.0 = broadcast)"* (`nodes/audio_enhance.py:317-320`). **Moving it changes
+  nothing.** `enhance()` accepts the parameter (`:325-326`) and its body never
+  uses it: step 7 is a comment reading *"Peak normalize skipped - moved to
+  EpisodeAssembler"* (`:404-407`). The real pass is the Assembler's, at a
+  HARDCODED `-1.0 dBFS` (`nodes/scene_sequencer.py:171,1362-1364`).
+- **live evidence, 2026-08-19 bank-gate run:** the server log carries
+  `[OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)`
+  and then `[EpisodeAssembler] Final loudness master: +4.0 dB makeup, -1.0 dBFS
+  ceiling (post-crossfade)` -- the widget's value never enters the calculation.
+- **WHY IT HID FOR SO LONG:** the canonical workflow's saved value is `-1`
+  (`workflows/otr_canonical.json`, node 4 `widgets_values` last slot), which
+  happens to EQUAL the Assembler's hardcode. So the control is inert AND
+  currently indistinguishable from working. The signature even carries a
+  comment rationalising the unused parameter as *"consumed by ComfyUI graph
+  runtime not the body"* -- the graph runtime does not normalise audio either.
+- consequence: an operator-facing knob in the canonical graph that silently
+  ignores every non-default value. Not a story defect; a lying control.
+- **NOT YET FIXED, and it is a genuine fork -- do not fix it blind.** Two
+  defensible answers: (a) WIRE it through to the Assembler's target, which is
+  byte-identical at the canonical `-1.0` and makes the knob honest; or
+  (b) REMOVE the widget as a lie. **(b) is dangerous**: `widgets_values` is
+  POSITIONAL, and `normalize_dbfs` is the LAST slot -- removing it is the one
+  safe deletion position, but it still changes the node contract. (a) touches
+  the audio recipe path, and *"the recipes are not on the table"*. This wants
+  the operator's call or a panel, not a unilateral edit.
+- bible-worthy: probably -- **"an exposed control whose default coincides with
+  the hardcode it is ignored in favour of"** is a very portable trap: the one
+  configuration where the defect is invisible is the shipped one.
+- status: **OPEN -- diagnosed, live-verified, fix deliberately not chosen.**
+
+## PBUG-20260819-02 -- `audio_revision` is dead at BOTH ends, so ShotLock cannot detect a stale audio binding
+
+- surfaced: same re-QA sweep, then verified against 12 live published ledgers.
+- symptom: `nodes/otr_shot_lock.py:1909` stamps
+  `"locked_against_audio_rev": str(meta.get("audio_revision") or "")` into the
+  video plan. **Nothing in production ever writes `meta.audio_revision`** --
+  the only occurrence outside that read is a fabricated test fixture
+  (`tests/test_route_freeze_wiring.py:214`). And the field it produces,
+  `locked_against_audio_rev` (`nodes/_otr_video_engines/schemas.py:165,400`),
+  has **zero production readers**. Dead producer, dead consumer, live stamp.
+- **live evidence:** 12 of 12 recent published `signal_lost_*` ledgers have
+  `meta.audio_revision` ABSENT and `locked_against_audio_rev` empty. It is not
+  intermittent -- it is every episode, always.
+- consequence: the mechanism that is supposed to catch a video plan bound to
+  STALE audio cannot fire. A re-rendered audio track under a frozen shot plan
+  would go undetected by the one field named for detecting it. No live
+  mis-render is attributed to this yet, which is exactly what a dormant guard
+  looks like until the day it is needed.
+- **fix is a real decision, not a one-liner:** either give `audio_revision` a
+  producer (who owns it -- the Assembler, at master-WAV write, keyed on the
+  master sha256 that already exists in the log?) and give
+  `locked_against_audio_rev` a reader that actually compares, or delete both
+  and stop advertising a protection that does not exist. **Per the ledger rule
+  in `CLAUDE.md`, deleting is only allowed once every field has an owner.**
+  Half-wiring it again would be the third instance of this bug's own class.
+- bible-worthy: yes -- **"a guard field stamped from a key nothing writes"**;
+  the stamp makes the ledger LOOK protected.
+- status: **OPEN -- diagnosed, live-verified, fix not chosen.**
+
 ## PBUG-20260818-01 -- the news close leaked into the fiction, and the fiction leaked into the news close
 
 - surfaced: 2026-08-18, from a published episode the operator watched --
