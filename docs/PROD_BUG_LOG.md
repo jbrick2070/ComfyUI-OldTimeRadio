@@ -102,7 +102,51 @@ already promoted). Confidence tags preserved from the sweep.
 - bible-worthy: probably -- **"an exposed control whose default coincides with
   the hardcode it is ignored in favour of"** is a very portable trap: the one
   configuration where the defect is invisible is the shipped one.
-- status: **OPEN -- diagnosed, live-verified, fix deliberately not chosen.**
+- **ANSWERED 2026-08-19 BY FABLE + SONNET, AND THE ANSWER IS "DO NOT WIRE THIS
+  WIDGET AS A PEAK CEILING AT ALL".** The operator asked for exactly this check:
+  *"if you can confirm our normalization path is accurate w/ fabel and sonet to
+  agree best practice for youtiube i agree"*. Both lanes agreed, independently.
+- **MEASURED, not asserted.** The shipped master reads **-9.62 LUFS integrated,
+  -1.00 dBTP, LRA 9.90**. Sonnet measured 8 real masters spanning two months:
+  mean **-9.87 LUFS, std 0.41 LU** -- tight, but ~4 dB HOTTER than YouTube's
+  **-14 LUFS** target. YouTube attenuates louder content and **does not boost
+  quieter content**, so the extra loudness is discarded at playback while the
+  limiting used to buy it is kept. Paying distortion for nothing.
+- **PEAK IS THE WRONG CONTROL.** Two files can share a -1.0 peak and differ by
+  10 dB in loudness; a peak knob steers nothing on a LUFS-normalised platform.
+  Fable: peak ceiling is a seatbelt, not a steering wheel.
+- **THE DRIVER''S OWN A/B WAS NOT EQUIVALENT TO WIRING THE KNOB, and this is the
+  correction that matters.** The four arms were built by applying FLAT GAIN to a
+  finished master, so they measured -9.44 / -11.44 / -14.44 / -17.43 LUFS.
+  Sonnet ran the REAL `_master_loudness` verbatim instead and found the
+  relationship is sharply NONLINEAR: `ceiling_dbfs=-1.0` yields **-13.26 LUFS**
+  but `ceiling_dbfs=-9.0` yields **-23.58 LUFS**. An 8 dB ceiling move produces
+  a **10.3 dB** loudness move, because the tanh stage renormalises to the
+  ceiling BEFORE saturating -- at -9.0 the limiter barely engages, so the makeup
+  gain stops doing its work. **So the operator''s picked arm would have shipped
+  ~-23.6 LUFS, roughly 10 dB under target, not the -17.4 he actually heard.**
+  A blind fader test on this algorithm cannot predict its own result.
+- **WHAT BOTH LANES SAY TO SHIP:** integrated **-14.0 LUFS** as the real
+  control, **-1.0 dBTP** true-peak as a fixed safety rail (not a creative knob),
+  **dynamics untouched** (LRA 9.9 is right for radio drama and is the healthy
+  part). Retire the fixed +4 dB makeup as the loudness engine; loudness comes
+  from measured clean gain instead.
+- **HOW THE OPERATOR''S EAR IS STILL HONOURED:** -14 LUFS is already ~4 dB
+  quieter than today AND less limited, which is most of what he reached for; the
+  remaining few dB belong on his monitor volume, which costs the audience
+  nothing. Note the accident worth keeping: his arm C (-6.0 peak, flat-gain
+  equivalent) measured **-14.44 LUFS** -- essentially YouTube-correct. He heard
+  the right level; it was one click above his pick.
+- **IMPLEMENTATION NOTE FOR WHOEVER BUILDS IT:** the change belongs in
+  `_master_loudness` (`scene_sequencer.py:171`) with the call site at `:1362`
+  passing `ceiling_dbfs` explicitly instead of relying on the silent default,
+  and the widget must land on `EpisodeAssembler.INPUT_TYPES` APPENDED to node
+  7''s `widgets_values` (positional). **`tests/test_audio_byte_identical.py`
+  WILL go red** -- it is a golden-hash gate and any master-algorithm change
+  moves every byte; it needs a deliberate `--capture-baseline` re-run, which is
+  expected rather than a surprise.
+- status: **OPEN -- the ANSWER is settled and measured; the build is not done.
+  Do NOT wire `normalize_dbfs` as a peak ceiling.**
 
 ## PBUG-20260819-02 -- `audio_revision` is dead at BOTH ends, so ShotLock cannot detect a stale audio binding
 
