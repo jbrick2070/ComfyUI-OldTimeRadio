@@ -145,12 +145,43 @@ def sha256_of_file(path: str) -> Optional[str]:
 #: re-approved today would keep validating through it. That is the exact drift
 #: this mechanism exists to catch, so both files are in.
 #:
-#: THE COST IS REAL AND IT IS ACCEPTED. The dispatch is a shared file that
-#: changes for unrelated reasons, so a qualified route will be demoted more
-#: often than the strictly-audible minimum. The failure mode is safe and loud --
-#: a warning plus the ordinary draw, never a raise and never a lost episode --
-#: and re-qualification is one re-audition. A fingerprint that under-reports is
-#: a false claim of proof; one that over-reports is an inconvenience.
+#: THE COST WAS ACCEPTED BEFORE IT WAS MEASURED, AND THE MEASUREMENT REVERSED
+#: THE CALL (2026-08-19). The paragraph below is kept because its PRINCIPLE
+#: still governs -- "a fingerprint that under-reports is a false claim of
+#: proof; one that over-reports is an inconvenience" -- but the shared
+#: dispatch file it was written to justify is no longer in the recipe:
+#:
+#:   ORIGINAL RULING (kept for the record): "THE COST IS REAL AND IT IS
+#:   ACCEPTED. The dispatch is a shared file that changes for unrelated
+#:   reasons, so a qualified route will be demoted more often than the
+#:   strictly-audible minimum. The failure mode is safe and loud -- a warning
+#:   plus the ordinary draw, never a raise and never a lost episode -- and
+#:   re-qualification is one re-audition."
+#:
+#: WHAT THE MEASUREMENT FOUND. `_otr_voice_node_common.py` took **19 commits
+#: in 60 days** (union across all four files: 22; without it: 8). Of those 19,
+#: exactly **ONE** touched the seed path this recipe named as its reason --
+#: `62fb6a1f`, the voice-identity fix. So the whole-file hash produced
+#: **18 false demotions and 1 true one**, and "more often than the
+#: strictly-audible minimum" turned out to mean 19x.
+#:
+#: AND THE ONE TRUE DEMOTION IS STILL CAUGHT. `62fb6a1f` also edited
+#: `eng_indextts2.py`, which remains in the recipe -- so narrowing loses
+#: nothing on the only real event in 60 days of history. That is the
+#: measurement that decided this, not a preference for convenience.
+#:
+#: THE RESIDUAL RISK, STATED PLAINLY RATHER THAN MINIMISED: a change to
+#: `_resolve_engine_seed` (or the `seed_reduce` it calls) that touches NO
+#: engine-specific file would now shift the rendered voice without moving this
+#: fingerprint. That is possible and it is exactly what the original ruling
+#: feared. It did not occur once in 60 days, because seed work IS voice work
+#: and voice work touches the adapter. `weight_revision` and
+#: `reference.source_ref_sha256` still gate independently, so a swapped
+#: checkpoint or reference wav is caught regardless of this recipe.
+#:
+#: The cost of the old setting was not theoretical: it de-qualified the shipped
+#: Lemmy route when a COMMENT was added, and a legitimate logging fix was
+#: reverted rather than pay a GPU re-audition to keep it.
 #:
 #: KNOWN BLIND SPOT: ``OTR_INDEXTTS2_WORKER`` can point the adapter at a worker
 #: script this map does not name, in which case the gate hashes the wrong file
@@ -159,7 +190,10 @@ RUNTIME_FINGERPRINT_SOURCES = {
     "indextts2": (
         "nodes/_otr_audio_engines/eng_indextts2.py",
         "scripts/_otr_indextts2_worker.py",
-        "nodes/_otr_voice_node_common.py",
+        # nodes/_otr_voice_node_common.py -- REMOVED 2026-08-19, see above.
+        # 19 commits/60d, 18 of them false demotions. Its seed path is the
+        # stated reason it was here; the one commit that changed that path
+        # also touched the adapter above, so the net is still caught.
         "nodes/_otr_resolved_request.py",
     ),
 }

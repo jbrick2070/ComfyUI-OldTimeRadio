@@ -1,0 +1,14 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "monkeys_paw",
+  "unit": null,
+  "work_title": "The Monkey's Paw",
+  "author": "W. W. Jacobs",
+  "license_label": "Public domain (US, 1902)",
+  "source_url": "https://www.gutenberg.org/cache/epub/12122/pg12122.txt",
+  "fetched_utc": "2026-08-04T16:45:40Z",
+  "body_sha256": "df13c3999e1ef2c347e7e53b585838dba5873a64921cca4c9f80cd0bbbdf3acf",
+  "body_bytes": 22823,
+  "body_words": 3954,
+  "text_path": "config/source_banks/_corpus/monkeys_paw.txt"
+}

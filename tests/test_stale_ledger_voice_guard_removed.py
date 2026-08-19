@@ -107,25 +107,71 @@ def test_no_production_code_CALLS_OR_IMPORTS_the_deleted_guard():
 # The constraint that blocked the replacement -- pinned so it is discoverable
 # --------------------------------------------------------------------------
 
-def test_the_voice_resolver_is_inside_the_indextts2_fingerprint():
-    """The landmine, made visible.
+def test_the_voice_resolver_is_OUT_of_the_indextts2_fingerprint():
+    """INVERTED 2026-08-19, and the inversion is the story.
 
-    `_otr_voice_node_common.py` holds the voice-resolution fallbacks, so it is
-    a natural place to want a log line -- and it is hashed into the indextts2
-    route fingerprint, so ANY edit to it (a comment counts) de-qualifies the
-    shipped route until a re-audition.
+    This test was written earlier the same day asserting the OPPOSITE -- that
+    `_otr_voice_node_common.py` IS inside the fingerprint -- with a failure
+    message reading: *"either the protection was weakened, or this constraint
+    is finally lifted and the stale-ledger warning can now be added; check
+    which."* It then fired on the recipe change and forced exactly that
+    check. It is the answer, so it is now pinned the other way.
 
-    This test exists to fail loudly if someone ever removes that file from the
-    fingerprint without noticing they have also removed the protection.
+    WHY THE FILE LEFT THE RECIPE, measured rather than argued:
+      * 19 commits in 60 days, because it is shared dispatch code.
+      * Of those 19, exactly ONE touched the seed path that was the stated
+        reason for including it (`62fb6a1f`, the voice-identity fix).
+      * So the whole-file hash produced 18 false demotions and 1 true one.
+      * And `62fb6a1f` ALSO edited `eng_indextts2.py`, which stays in the
+        recipe -- so narrowing loses nothing on the only real event in the
+        window.
+
+    THE RESIDUAL RISK IS REAL AND IS ACCEPTED: a seed-path change touching no
+    engine-specific file would now escape this fingerprint. It did not happen
+    once in 60 days. `weight_revision` and `reference.source_ref_sha256` still
+    gate independently.
     """
     from nodes import _otr_voice_route as ROUTE
 
     sources = ROUTE.RUNTIME_FINGERPRINT_SOURCES["indextts2"]
-    assert "nodes/_otr_voice_node_common.py" in sources, (
-        "the voice resolver left the indextts2 fingerprint -- either the "
-        "protection was weakened, or this constraint is finally lifted and "
-        "the stale-ledger warning can now be added; check which"
+    assert "nodes/_otr_voice_node_common.py" not in sources, (
+        "the shared dispatcher is back in the fingerprint -- that reinstates "
+        "18-in-19 false demotions; if it was restored deliberately, say why "
+        "here and invert this test again"
     )
+    # The engine-SPECIFIC files must stay, or the gate proves nothing at all.
+    assert "nodes/_otr_audio_engines/eng_indextts2.py" in sources
+    assert "scripts/_otr_indextts2_worker.py" in sources
+
+
+def test_editing_the_shared_dispatcher_no_longer_costs_the_voice():
+    """The product test for the recipe change.
+
+    Proves the thing that actually matters: the exact edit that de-qualified
+    Lemmy earlier today -- appending a comment to the shared dispatcher -- now
+    leaves the route selected. Asserted against the REAL shipped policy.
+    """
+    from config import cast_pools as POOLS
+    from nodes import _otr_voice_route as ROUTE
+
+    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+    before = ROUTE.live_engine_impl_version("indextts2")
+
+    path = REPO_ROOT / "nodes" / "_otr_voice_node_common.py"
+    original = path.read_bytes()
+    try:
+        path.write_bytes(original + b"\n# transient probe comment\n")
+        ROUTE._LIVE_FINGERPRINT_CACHE.clear()
+        assert ROUTE.live_engine_impl_version("indextts2") == before, (
+            "a comment in the shared dispatcher still moves the fingerprint"
+        )
+        assert ROUTE.select_policy_route(
+            POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None, (
+            "a comment in the shared dispatcher still withholds the voice"
+        )
+    finally:
+        path.write_bytes(original)
+        ROUTE._LIVE_FINGERPRINT_CACHE.clear()
 
 
 def test_every_fingerprinted_source_actually_exists():

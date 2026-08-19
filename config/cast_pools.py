@@ -844,7 +844,7 @@ LEMMY_VOICE_POLICY = {
                     # This is now COMPARED against live code on every selection,
                     # so an edit to the rendering path demotes the route until
                     # somebody re-auditions -- which is the point.
-                    "engine_impl_version": "9bee950a7920fd00",
+                    "engine_impl_version": "d47779386ce91209",
                     # Unchanged: the weights did not move, only our code.
                     "weight_revision": "6238972345f704ef",
                 },
@@ -879,7 +879,7 @@ LEMMY_VOICE_POLICY = {
                 "emotional_line": LEMMY_AUDITION_LINES["emotional_line"],
                 "seed": 20260818,
                 "engine": "indextts2",
-                "engine_impl_version": "9bee950a7920fd00",
+                "engine_impl_version": "9bee950a7920fd00",  # HISTORICAL: the value at audition time, under the 4-file recipe. NOT re-expressed -- this records what WAS, and the audition really did run under that recipe.
                 "identity_kind": "local_wav",
                 "identity_id": "idx_lemmy_algenib_cockney_v1",
                 "settings": "rendered through the PRODUCTION dispatch "
