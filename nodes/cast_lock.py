@@ -867,9 +867,9 @@ class CastLock:
             # id and never reach their own gender fallback. Fixing only those
             # left the real defect live -- a row recorded `woman` raised
             # VoiceCastingError here, was caught below, and took the
-            # gender-agnostic draw. The same value also feeds
-            # validate_voice_proposal on the hybrid voice-fit branch, so this
-            # one line closes both.
+            # gender-agnostic draw. (It also fed the hybrid voice-fit branch's
+            # validation until that branch was ripped on 2026-08-18; the scorer
+            # is now the only consumer.)
             from ._otr_roster_gender import canonical_bank_gender
             gender = canonical_bank_gender(entry.get("gender"))
             if not gender:
@@ -880,30 +880,17 @@ class CastLock:
                         f"NO FALLBACK.")
                 report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
                 continue
-            # VC chunk 4: honour the HYBRID LLM voice-fit when this engine matches
-            # the one the proposal was built for AND it re-validates (no stale
-            # bank / no collision). Else fall closed to the deterministic scorer.
-            decision = voice_decisions.get(char_id) or {}
-            accepted = str(decision.get("accepted_id") or "").strip()
-            if accepted and decision.get("engine") == target_engine:
-                from ._otr_voice_bank import (
-                    validate_voice_proposal, voice_ref_entry,
-                )
-                if validate_voice_proposal(
-                    accepted, target_engine, gender,
-                    bank=bank_entries, used_ids=used,
-                ):
-                    hybrid_ref = voice_ref_entry(accepted, target_engine, bank_entries)
-                    if hybrid_ref is not None:
-                        _stamp_row(entry, hybrid_ref)
-                        _mark_used(hybrid_ref)
-                        gated += 0 if hybrid_ref.commercial_clean else 1
-                        report.append(
-                            f"  {char_id}: {hybrid_ref.voice_ref_id} "
-                            f"({hybrid_ref.engine}, hybrid LLM voice-fit, "
-                            f"clean={hybrid_ref.commercial_clean})"
-                        )
-                        continue
+            # THE HYBRID LLM VOICE-FIT BRANCH WAS HERE AND IS GONE (2026-08-18).
+            # It read meta.voice_cast_decision, re-validated the LLM's proposed
+            # voice_ref_id, and on success stamped it and `continue`d -- skipping
+            # the deterministic scorer below entirely. That is why the scorer
+            # handled only ~4% of production casting.
+            #
+            # `voice_decisions` is still read above and is still stamped (empty)
+            # by the writer, so a legacy ledger carrying real decisions loads
+            # without complaint -- its proposals are simply ignored now, and the
+            # scorer casts the row. That is the intended behaviour, not a
+            # fallback: the LLM had no information the scorer lacks.
 
             # Prefer the writer's voice-fit slot (timbre/age_band); fall back to
             # any entry-level fields for legacy ledgers without the stamp.

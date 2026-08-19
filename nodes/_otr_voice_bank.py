@@ -62,11 +62,10 @@ def _min_tier_pool() -> int:
     except (TypeError, ValueError):
         return _MIN_TIER_POOL_DEFAULT
 VOICE_BANK_SCHEMA_VERSION = "1"
-# VC chunk 4 (2026-06-22): the HYBRID LLM voice-fit. The LLM PROPOSES a
-# voice_ref_id from the engine's gender-slot cards; Python VALIDATES it and
-# falls closed to the deterministic assign_voice_for_slot scorer. Version-bump
-# this when the card schema or validation contract changes (re-baseline trigger).
-VOICE_FIT_POLICY_VERSION = "1"
+# VOICE_FIT_POLICY_VERSION IS RETIRED (2026-08-18). It versioned the hybrid LLM
+# voice-fit's card schema and validation contract, and both were ripped along
+# with the pass -- a constant that versions nothing is worse than no constant,
+# because the next reader assumes something still honours it.
 
 # Engines whose announcer comes from a CURATED pool and is drawn per episode
 # rather than pinned to the lowest voice_ref_id. kokoro joined 2026-08-05: it
@@ -116,10 +115,11 @@ def reserved_voice_ref_ids() -> frozenset:
     not in a helper that would otherwise break every render on an import error.
 
     FAIL-SOFT ON ANY EXCEPTION, not just ImportError (widened 2026-08-18 after a
-    QA pass). This helper now has four callers -- ``assign_voice_for_slot``,
-    ``build_voice_cards``, ``validate_voice_proposal`` and
-    ``gender_agnostic_fallback_ref`` -- and two of them promise in their own
-    docstrings to be pure and never raise. A malformed policy (say
+    QA pass). Its callers are ``assign_voice_for_slot`` and
+    ``gender_agnostic_fallback_ref`` -- the latter promises in its own docstring
+    to be pure and never raise. (It had four callers until the hybrid LLM
+    voice-fit was ripped the same day; ``build_voice_cards`` and
+    ``validate_voice_proposal`` went with it.) A malformed policy (say
     ``LEMMY_VOICE_POLICY`` set to a truthy non-dict, so ``.get`` raises
     ``AttributeError``) would otherwise propagate straight through those
     promises and out of ``cast_lock.py``, turning a cosmetic config error into a
@@ -658,76 +658,6 @@ def filter_by_quality_tier(entries, *, lead: bool = False):
         lead_safe = [e for e in tier_a if "lead_safe" in getattr(e, "style_tags", ())]
         return lead_safe or tier_a
     return pool
-
-
-# --------------------------------------------------------------------------- #
-# VC chunk 4 (2026-06-22) -- HYBRID LLM voice-fit support: build the engine's
-# gender-slot voice CARDS for the LLM, validate its proposal, look an entry up.
-# All pure + fail-soft. Identity is voice_ref_id (I-9); cards carry NO ref_path
-# and NO character name.
-# --------------------------------------------------------------------------- #
-def build_voice_cards(
-    engine: str,
-    gender: str,
-    *,
-    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-    max_cards: int = 12,
-) -> List[dict]:
-    """The voice CARDS the LLM picks from for one character's PRECOMPUTED gender
-    slot. Deterministically ordered (by ``voice_ref_id``), reject-filtered,
-    capped at ``max_cards``. Each card: ``voice_ref_id`` / ``age_band`` /
-    ``timbre`` / ``roles`` / ``style_tags`` / ``commercial_clean`` + a compact
-    human-readable ``descriptor`` (the bank has no curated prose field, so it is
-    synthesized from age/timbre/style). NO ref_path, NO character name (I-9).
-
-    A RESERVED IDENTITY IS NOT ON THE CARD LIST, for the same reason it is not in
-    the selector pool (see ``assign_voice_for_slot``). The reservation added
-    2026-08-17 filtered the DETERMINISTIC caster only, and this is the path that
-    actually runs: measured over 1711 ledgers, 1871 character rows were stamped
-    from an accepted LLM proposal against 82 fallbacks, so the selector handled
-    roughly 4% of casting. ``idx_lemmy_algenib_cockney_v1`` sorts first among
-    indextts2 male ids and was therefore offered as CARD #1 on every male slot;
-    the corpus shows the LLM proposing a reserved id 21 times, accepted every
-    time, putting Lemmy's qualified Cockney on DON PEDRO, MARCELLUS, BANQUO,
-    MOE GORDON and others.
-
-    THE POLICY PATH IS UNAFFECTED, which is what makes this safe -- a qualified
-    or provisional route stamps its bank entry DIRECTLY in CastLock from
-    ``LEMMY_VOICE_POLICY`` and never reads these cards, so reserving these ids
-    cannot starve Lemmy of his own voice. It only stops everyone else borrowing
-    it."""
-    gnorm = (gender or "").strip().lower()
-    if not engine or not gnorm:
-        return []
-    try:
-        entries = bank if bank is not None else load_voice_bank()[0]
-    except Exception:  # noqa: BLE001 -- no bank -> no cards -> caller falls closed
-        return []
-    reserved = reserved_voice_ref_ids()
-    pool = sorted(
-        (e for e in entries
-         if e.engine == engine and e.gender == gnorm
-         and getattr(e, "quality_tier", "") != "reject"
-         and e.voice_ref_id not in reserved),
-        key=lambda e: e.voice_ref_id,
-    )[: max(0, int(max_cards))]
-    cards: List[dict] = []
-    for e in pool:
-        descriptor = ", ".join(
-            x for x in ([e.age_band] + list(e.timbre) + list(e.style_tags)) if x
-        )
-        cards.append({
-            "voice_ref_id": e.voice_ref_id,
-            "age_band": e.age_band,
-            "timbre": list(e.timbre),
-            "roles": list(e.roles),
-            "style_tags": list(e.style_tags),
-            "commercial_clean": bool(e.commercial_clean),
-            "descriptor": descriptor,
-        })
-    return cards
-
-
 def default_char_engine(
     bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
 ) -> str:
@@ -762,53 +692,6 @@ def voice_ref_entry(
         (e for e in entries
          if e.voice_ref_id == voice_ref_id and e.engine == engine), None
     )
-
-
-def validate_voice_proposal(
-    proposed_id: str,
-    engine: str,
-    gender: str,
-    *,
-    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-    used_ids=(),
-) -> str:
-    """Validate an LLM-proposed ``voice_ref_id`` for one slot. Returns the id iff
-    it is in-library + engine-correct + gender-consistent + not a reject + not
-    RESERVED + not already used (no-collision); else '' (the caller falls closed
-    to the deterministic scorer). Pure; never raises.
-
-    The reserved check is deliberately here as well as in ``build_voice_cards``
-    and is not redundant belt-and-braces: a proposal is free text from a model
-    and does not have to name a card it was shown, so filtering the card list
-    alone would still let a hallucinated or remembered reserved id through --
-    and this function is the last gate before CastLock stamps the row."""
-    pid = str(proposed_id or "").strip()
-    gnorm = (gender or "").strip().lower()
-    if not pid or not engine or not gnorm:
-        return ""
-    if pid in reserved_voice_ref_ids():
-        return ""
-    used = set(used_ids or ())
-    entry = voice_ref_entry(pid, engine, bank)
-    if entry is None:
-        return ""
-    if voice_ref_usage_keys(entry) & used:
-        return ""
-    if entry.gender != gnorm or getattr(entry, "quality_tier", "") == "reject":
-        return ""
-    return pid
-
-
-# --------------------------------------------------------------------------- #
-# VC chunk 2 (2026-06-22) -- two-lane identity: deterministic bark v2/* preset
-# <-> same-gender clone voice_ref_id map.
-#
-# voice_preset (bark v2/en_speaker_*) is the UNIVERSAL fallback identity; a
-# cloner engine (indextts2 / chatterbox / dia / kokoro) wants a real bank
-# voice_ref_id. This map lets a bark-cast identity resolve to a SAME-GENDER
-# clone reference at the contract level so the fallback never silently degrades
-# a cloner render to bark. Pure + fail-soft (no bank / unknown preset -> "").
-# --------------------------------------------------------------------------- #
 def bark_preset_gender(preset: str) -> str:
     """Gender of a bark ``v2/en_speaker_*`` preset, read from
     ``config/cast_pools.VOICE_PROFILES`` (the single source of truth -- never a

@@ -876,102 +876,6 @@ def llm_write_description(
         ) from exc
 
     return response
-
-
-# ---------------------------------------------------------------------------
-# VC chunk 4 (2026-06-22) -- HYBRID LLM voice-fit: the LLM PROPOSES a
-# voice_ref_id from the engine's gender-slot cards; Python validates + falls
-# closed. This is a SEPARATE bounded call (NOT folded into
-# llm_write_description) on purpose: character_description feeds the line
-# composer's voice card -> the dialogue -> the AUDIO, so perturbing that
-# prompt would re-baseline dialogue audio as collateral. Isolating the
-# voice-fit keeps character_description / dialogue byte-identical; only the
-# voice_ref_id (the operator's intended lever) changes. Identity = voice_ref_id
-# (I-9): the prompt carries gender/timbre/role/age + the cards, NEVER the
-# character name. Gated by OTR_HYBRID_VOICE_FIT (DEFAULT OFF since 2026-08-18;
-# =1 opts back in).
-# ---------------------------------------------------------------------------
-
-
-def hybrid_voice_fit_enabled() -> bool:
-    """True only on an explicit opt-in. DEFAULT OFF since 2026-08-18.
-
-    WHY IT IS OFF: the prompt this pass builds (`_build_voice_fit_prompt`) hands
-    the model the character's gender / timbre / role / age and each card's
-    age_band + timbre + style_tags -- which are EXACTLY the four dimensions
-    `_score()` already weights -- and per I-9 it carries no character name and no
-    description. The model therefore has no information the deterministic scorer
-    lacks, and no judgment is available to it. Measured over 1711 ledgers, the
-    rows it decided used 13 distinct voices at 96% top-5, against 43 distinct at
-    25% for the rows the scorer decided; 62% of its accepted proposals were
-    card #0 of an alphabetically-ordered list. It was also the one unseeded step
-    in a pipeline whose contract is seed-determinism (`make_generate_fn` samples
-    with no per-call seed, and `seed_all_rngs` has no caller in `nodes/`).
-
-    EXPLICIT OPT-IN PARSE, not `!= "0"`. With the default flipped, a truthiness
-    test would read `OTR_HYBRID_VOICE_FIT=""` or `="false"` as ENABLED -- the
-    opposite of what anyone setting those means. The old form was safe only
-    because it agreed with an on-by-default.
-    """
-    return os.environ.get("OTR_HYBRID_VOICE_FIT", "0").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
-
-
-def _build_voice_fit_prompt(slot: "EnsembleSlot", cards: List[dict]) -> str:
-    """Lean, name-free voice-fit prompt (I-9: no character name). The LLM ranks
-    the engine's same-gender cards and returns ONE voice_ref_id."""
-    lines = [
-        "Pick the single best-fitting voice for a radio-drama character.",
-        f"Character: gender={slot.gender}, voice timbre={slot.timbre}, "
-        f"role={slot.role}, age={slot.age_band}.",
-        "",
-        "Voices (id: description):",
-    ]
-    for c in cards:
-        lines.append(f"- {c.get('voice_ref_id')}: {c.get('descriptor') or ''}")
-    lines += [
-        "",
-        "Return ONLY JSON with the chosen id from the list above:",
-        '{"voice_ref_id":"<one id>"}',
-    ]
-    return "\n".join(lines)
-
-
-def llm_propose_voice_ref(
-    generate_fn: Callable[..., str],
-    *,
-    slot: "EnsembleSlot",
-    cards: List[dict],
-    max_new_tokens: int = 60,
-    temperature: float = 0.2,
-) -> str:
-    """Ask the LLM for a best-fit voice_ref_id from ``cards``. Returns the RAW
-    proposed id (UNvalidated -- the caller validates + falls closed) or '' on any
-    failure / empty cards. Bounded + fail-soft; NEVER raises (audio is king)."""
-    if not cards:
-        return ""
-    prompt = _build_voice_fit_prompt(slot, cards)
-    # LLM slot: creative -- voice-fit is a casting/creative judgment (ranking
-    # voices to a character), so it rides the writer's creative_fn, same plane as
-    # llm_write_description. No new model_id widget (PD6); fail-soft.
-    try:
-        raw = generate_fn(
-            [{"role": "user", "content": prompt}],
-            temperature=float(temperature),
-            max_new_tokens=int(max_new_tokens),
-        )
-    except Exception:  # noqa: BLE001 -- loader/LLM varies; fall closed
-        return ""
-    try:
-        obj = _otr_json.parse_first_json_object(raw)
-        if isinstance(obj, dict):
-            return str(obj.get("voice_ref_id") or "").strip()
-    except Exception:  # noqa: BLE001 -- unparseable -> fall closed
-        return ""
-    return ""
-
-
 # ---------------------------------------------------------------------------
 # Sprint 3D Stage 3 -- python_assign_voice_preset (PURE PYTHON)
 #
@@ -1993,84 +1897,25 @@ def lock_cast(
     # replays it byte-identically after the freeze), so asserting v2/* here would
     # fail on the now-empty rows. _assert_unique_bark_voices +
     # _assert_voice_preset_invariant run in OTR_CastLock after it stamps voices.
-    # VC chunk 4 (2026-06-22): HYBRID LLM voice-fit. Per open character, the LLM
-    # PROPOSES a voice_ref_id from the default cloner engine's same-gender cards;
-    # Python VALIDATES it (in-library + engine + gender + no-collision) and the
-    # decision (proposed/accepted/fallback_reason + reproducibility keys) rides
-    # meta.voice_cast_decision. CastLock consumes the accepted_id when its
-    # resolved engine matches; otherwise it falls closed to the deterministic
-    # scorer. SEPARATE bounded call -> character_description / dialogue stay
-    # byte-identical (see hybrid_voice_fit_enabled). Uses generate_fn, NOT the
-    # cast rng, so the bark replay sequence is unperturbed (replay-parity holds).
+    # THE HYBRID LLM VOICE-FIT IS GONE (ripped 2026-08-18). The deterministic
+    # scorer in `_otr_voice_bank.assign_voice_for_slot` is the caster.
+    #
+    # It was removed rather than tuned because it had no information the scorer
+    # lacks: its prompt carried the character's gender / timbre / role / age and
+    # each card's age_band + timbre + style_tags -- exactly the four dimensions
+    # `_score()` already weights -- and per I-9 no character name and no
+    # description. Measured over 1711 ledgers it cast with 13 distinct voices at
+    # 96% top-5 where the scorer used 43 at 25%, chose card #0 of an
+    # alphabetically ordered list 62% of the time, and was the one unseeded step
+    # in a pipeline whose contract is seed-determinism.
+    #
+    # `voice_cast_decision` is KEPT and stamped empty, deliberately. CastLock
+    # still reads `meta.get("voice_cast_decision") or {}`, and every published
+    # ledger keeps one stable shape rather than gaining and losing a key.
     voice_cast_decision: dict = {}
-    # WHICH CASTER RAN, STAMPED POSITIVELY AND UNCONDITIONALLY.
-    #
-    # `voice_cast_decision == {}` cannot answer this and never could: it is
-    # produced by "the pass is disabled" AND by "the pass was enabled but the
-    # bank failed to load" (the `vf_engine == ""` branch below, which does not
-    # even log). One field, two meanings -- the shape this repo has been bitten
-    # by four times. The adjacent `cast_source_contract` already obeys the rule
-    # this now follows: stamp ONE stable shape on every lane so a downstream
-    # reader never has to distinguish "off" from "never written".
-    #
-    # Assert on THIS, never on the absence of a decision.
-    voice_cast_mode = "hybrid" if hybrid_voice_fit_enabled() else "scorer"
-    if hybrid_voice_fit_enabled():
-        try:
-            from ._otr_voice_bank import (
-                VOICE_FIT_POLICY_VERSION, build_voice_cards,
-                default_char_engine, load_voice_bank, validate_voice_proposal,
-                voice_ref_entry, voice_ref_usage_keys,
-            )
-
-            vf_bank, vf_sha = load_voice_bank()
-            vf_engine = default_char_engine(vf_bank)
-        except Exception as exc:  # noqa: BLE001 -- no bank -> skip hybrid
-            log.warning("[OTR_Casting] hybrid voice-fit unavailable: %r", exc)
-            vf_engine = ""
-            vf_bank, vf_sha = (), ""
-        if not vf_engine:
-            # ASKED FOR, COULD NOT RUN. Distinct from both "off" and "ran": the
-            # caller opted in and got the scorer anyway, which is a
-            # misconfiguration worth seeing in the ledger rather than a silent
-            # empty dict. This branch is reachable without any exception being
-            # raised, so the log line above does not always fire.
-            voice_cast_mode = "hybrid_unavailable"
-            log.warning("[OTR_Casting] hybrid voice-fit requested but no char "
-                        "voice engine resolved; the deterministic scorer casts")
-        if vf_engine:
-            used_ref_ids: set = set()
-            for ens in ensemble_slots:
-                cards = build_voice_cards(vf_engine, ens.gender, bank=vf_bank)
-                proposed = llm_propose_voice_ref(
-                    generate_fn, slot=ens, cards=cards,
-                ) if cards else ""
-                accepted = validate_voice_proposal(
-                    proposed, vf_engine, ens.gender,
-                    bank=vf_bank, used_ids=used_ref_ids,
-                )
-                if accepted:
-                    accepted_entry = voice_ref_entry(accepted, vf_engine, vf_bank)
-                    if accepted_entry is not None:
-                        used_ref_ids.update(voice_ref_usage_keys(accepted_entry))
-                    else:
-                        used_ref_ids.add(accepted)
-                    reason = ""
-                elif not proposed:
-                    reason = "no_proposal" if cards else "no_cards"
-                else:
-                    reason = "invalid_or_collision"
-                voice_cast_decision[ens.char_id] = {
-                    "policy_version":  VOICE_FIT_POLICY_VERSION,
-                    "bank_sha":        vf_sha,
-                    "engine":          vf_engine,
-                    "prompt_version":  "voicefit-v1",
-                    "seed":            (int(cast_seed) if cast_seed is not None else None),
-                    "candidate_ids":   [c["voice_ref_id"] for c in cards],
-                    "proposed_id":     proposed,
-                    "accepted_id":     accepted,
-                    "fallback_reason": reason,
-                }
+    # WHICH CASTER RAN, stamped positively so a published episode can say so
+    # rather than leaving a reader to infer it from an absent field.
+    voice_cast_mode = "scorer"
 
     # VC chunk 3 (2026-06-22): stamp meta.cast_voice_slots so OTR_CastLock can
     # match a bank voice on timbre / age_band (not just gender). The cast ROW
