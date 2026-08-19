@@ -108,11 +108,19 @@ Sonnet and Haiku covered r1. Cloud spend $0.36 total.
 fix, then Sonnet/Flash QA on the finished diff -- because the design is already
 panelled. Open a fresh arc only for a chunk that departs from the contract.
 
-**BASELINES (re-measured 2026-08-18 LATE NIGHT, on a settled tree at HEAD
-`3a78703e`):** suite **11068 passed / 110 skipped / 1 xfailed** -- MEASURED by a
-full run on the settled tree, not derived from the previous figure. Bible
-**20 / 26 / 3**, Bible holds **293** entries. `build_variants.py --check`
-**50 variants / 0 failures**.
+**BASELINES (re-measured 2026-08-18 NIGHT, on a settled tree after the
+hybrid-voice-fit rip, HEAD `eb264989`):** suite **11066 passed / 110 skipped /
+1 xfailed** -- MEASURED by a full run, never derived. Bible **20 / 26 / 3**,
+Bible holds **293** entries. `build_variants.py --check` **50 variants /
+0 failures**.
+
+> **THE COUNT WENT DOWN, AND THAT IS CORRECT.** 11097 -> 11066 is **-31**, and
+> every one is accounted for: **11** from retiring `tests/test_hybrid_voice_fit.py`
+> (the pass it tested no longer exists), **8** from the four hybrid-path tests
+> dropped out of the reserved-voice file, and **12** from the marker file's gate
+> tests (they exercised `hybrid_voice_fit_enabled`, which was deleted). No test
+> was lost to a regression. A shrinking suite is only healthy when the delta is
+> itemised like this -- otherwise it is indistinguishable from coverage rot.
 
 > **`12.114` WAS AMENDED TWICE THIS WINDOW AND MUST NOT BE RE-PROMOTED.** The
 > entry count is UNCHANGED at 293 -- an amendment is not a new entry, so the
@@ -393,10 +401,23 @@ were STRUCTURALLY UNREACHABLE before**, never offered on the 12-card alphabetica
 list. The 42%-unreachable finding appeared on the FIRST post-flip episode. The
 gate also has a negative control: it correctly FAILS the pre-flip
 `signal_lost_the_16mm_ransom`, where the replay disagrees with what was stamped.
-**STILL OPEN: step 3, the rip** -- fully inventoried in
-`kibitz-runs/2026-08-18-voice-pool-concentration/r4/final.md`, parked until step 1
-soaks so the reserved-voice guard never vanishes while its path is live. **One leg
-proves MECHANISM; the concentration claim stays a corpus measurement.**
+**STEP 3 IS DONE TOO (`eb264989`, operator called it: "rip the dead code now").**
+The pass is deleted from `_otr_casting.py`, `_otr_voice_bank.py` and
+`cast_lock.py` -- including CastLock's OWN local import of
+`validate_voice_proposal`, the easy miss that would have left a dangling
+`ImportError`. `default_char_engine` was deliberately kept (a review lane listed
+it for deletion; `test_google_tts_voice_pool.py` uses it independently).
+`test_lemmy_reserved_on_hybrid_path.py` got a surgical edit and is renamed
+`test_lemmy_reserved_voice_pools.py` -- it guards the unrelated reserved-voice
+fix, and two of its four guard sites went with the ripped code, leaving the two
+pools that can still draw. `voice_cast_decision` is kept and stamped EMPTY so
+CastLock's `or {}` keeps one stable shape and legacy ledgers still load.
+**New guard against reintroduction:** `test_the_hybrid_voice_fit_is_gone_and_stays_gone`
+fails if any of the six ripped symbols returns. 385 net lines removed.
+**THE ONE CLAIM THAT IS STILL NOT PROVEN: the concentration itself.** One leg
+proves MECHANISM. Top-2 42% -> ~9% stays a CORPUS measurement until post-flip
+episodes accumulate -- re-run the distribution over `output/otr/episodes` once
+there are enough, and do not report the single leg as if it settled it.
 ~~**STILL A DESIGN FORK, STILL WANTS THE PANEL**~~ -- rank cards by the scorer instead of alphabet, raise/remove `max_cards`, seed-rotate the shortlist, track recent use, or drop the hybrid pass (that last one is governed by the `CLAUDE.md` ledger rule: `meta.voice_cast_decision` has nine fields consumed at `cast_lock.py:688`). All CPU-measurable |
 | **donor voice GENDER was guessed from PITCH -- root cause found 2026-08-18, 9 rows await the operator's ear** | **OPEN, and it is NOT one bad row.** `scripts/otr_dl_indextts2_refs.py:73` sets `gender = "female" if med_f0 >= FEMALE_F0_HZ else "male"` with `FEMALE_F0_HZ = 165.0` (`:38`). **That threshold sits INSIDE the male/female F0 overlap** (adult male ~85-180 Hz, female ~165-255), so mislabelling a high-voiced man is not bad luck, it is the designed behaviour. `:387` then derives timbre FROM the guess (`"bright" if female else "warm"`), which is why `vz_donor_glenn` still carries the female-pattern `bright` after its gender was corrected -- **a fossil of the wrong inference, and the tell for finding others.** **WAS GOOD SOURCE DATA IGNORED? No, and this was checked at the source rather than assumed:** the donations come from `kyutai/tts-voices/voice-donations` (Unmute Voice Donation Project, 228 CC0 volunteer voices), the clips are anonymous handles, there is no metadata file, and the repo README documents licensing only. Pitch was the only signal that source carried. **BUT labelled data DOES exist in the same repo we already pull from** -- `vctk/` (CC BY 4.0, commercially usable) ships per-speaker gender, and `ears/` labels speakers explicitly. Importing from there would give correct genders for free instead of guessing. **THE CHEAPEST CHECK IS THE OPERATOR'S OWN: the handle itself.** His words -- *"common sense too, glenn as a name would probably be male"* -- and the repo half-knew it already: `_SUSPECT_FEMALE_TAGS = ("vz_donor_james", "vz_donor_hillbilly_jim")` (`:147`) plus an `--audit` mode with a `gender_ambiguous_f0` flag. A name-vs-stamped-gender sweep independently surfaces **9 rows, all stamped female**: the `hillbilly_jim`, `rup` and `james` trios across indextts2/chatterbox/dia. **NOTHING WAS CHANGED.** Operator ruling 2026-08-18: *"we [spent] so much time fixing glenn please [don't] break it again but if you can look for other fixes fine but i may need to confirm"* -- so a bank gender is an EAR call and these 9 are candidates awaiting his listen, never an auto-fix. The settled glenn trio is pinned by `tests/test_voice_bank_gender_pins.py` so it cannot silently regress. **Admission rule: these 9 are a static-audit finding and create NO PBUG on their own** -- glenn itself is the live-verified one (115 female slots, heard on published episodes, fixed `e1c84cf6`) |
 | PBUG-04 residue | HALF closed -- announcer names the real work, can still embellish in sentence 2 |
