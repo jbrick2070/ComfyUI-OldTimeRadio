@@ -139,6 +139,39 @@ test and be absent from every ledger. Three carry tests now walk fetcher ->
 `normalize_fetch_result` -> receipt-pop -> `identity_from_meta` with nothing
 hand-built. 10 tests total.
 
+**BOTH FIXES ARE PROVEN ON PIXELS, AND BOTH EPISODES ARE IN `otr/obs/`.**
+`scripts/otr_writer_bank_gate.py --banks shakespeare,media_archive --acts 1`,
+profile `otr_w45_still_flat`, on a box reset per CLAUDE.md section 4 and booted
+per section 5 (server up in 15s). **2/2 banks PASS**, 10.9 and 9.4 minutes.
+
+* **shakespeare -- `signal_lost_under_the_enchanted_moon_20260819_062006`.**
+  Adapted `folger-midsummer:act3-scene1-bottom-titania`,
+  `play_title "A Midsummer Night's Dream"`. The ledger carries
+  `title_work_anchor == "A Midsummer Night's Dream"` -- **the anchor reached
+  the title pass on a live render**, which is precisely what a green suite
+  could not prove. The title it produced: **"Under the Enchanted Moon"**. All
+  three acceptance reads pass -- it names no other play, the anchor equals the
+  play actually adapted, and **it did not collapse into the play name**. That
+  last one is the one worth celebrating: it is the failure mode the whole
+  anchor-not-material design exists to prevent (a model told "this is Macbeth"
+  answering "The Macbeth Prophecy"), and it held on the very first live
+  episode.
+* **media_archive -- `signal_lost_reel_of_shadows_20260819_061004`, and it is
+  the NEGATIVE CONTROL.** `title_work_anchor == ""` with the KEY PRESENT: the
+  read succeeded, and the lane gate correctly refused to anchor the title to
+  `source_label "Now See Hear!"`. Gated on truthiness rather than the lane,
+  this episode's title pass would have been told it was adapting a magazine --
+  the worse-than-the-original-defect outcome the gate exists for. The
+  present-but-empty vs absent convention also reads correctly off the frozen
+  ledger. Same episode carries
+  `source_meta.post_headline == "This Thursday (7:00 PM August 20) at the Mary
+  Pickford Theater (Washington, DC)"` -- **PBUG-20260815-06's durable half,
+  discharged: an episode can now name the post it adapted from its own
+  ledger.**
+
+Box left clean: server killed selectively by CommandLine, port 8000 free, VRAM
+back to 543 MiB.
+
 Review provenance, stated exactly: **NO four-round arc ran** -- the operator's
 2026-08-17 amendment routes work with one verifiable right answer away from
 the arc, and his 2026-08-19 ruling removed the design fork that would have

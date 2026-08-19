@@ -4961,7 +4961,27 @@ only visible because the cameo was FORCED and then did not appear.
   11092/110/1 (+12, exactly the tests added). The behaviour that matters is a
   model's output, so this owes a live shakespeare leg published to `otr/obs/`
   before it can be called closed on evidence rather than on construction.
-- status: **FIXED 2026-08-19, unit-proven, AWAITING A LIVE LEG.**
+- **PROVEN ON PIXELS 2026-08-19.** Bank gate `scripts/otr_writer_bank_gate.py
+  --banks shakespeare,media_archive --acts 1`, profile `otr_w45_still_flat`:
+  **2/2 banks PASS**, both published to `otr/obs/`.
+  * **shakespeare -- `signal_lost_under_the_enchanted_moon_20260819_062006`**
+    (9.4 min). Adapted `folger-midsummer:act3-scene1-bottom-titania`,
+    `play_title "A Midsummer Night's Dream"`. Ledger:
+    `title_work_anchor == "A Midsummer Night's Dream"` -- **the anchor reached
+    the title pass on a live render**, which is the thing a green suite could
+    not prove. Title: **"Under the Enchanted Moon"**. All three acceptance
+    reads pass: it names NO other play; the anchor equals the play actually
+    adapted; and it did NOT collapse into the play name. That last one is the
+    check that matters -- it is the failure mode the anchor design was shaped
+    to avoid, and it held on the first live episode.
+  * **media_archive -- `signal_lost_reel_of_shadows_20260819_061004`**
+    (10.9 min), the NEGATIVE control. `title_work_anchor == ""` with the KEY
+    PRESENT: the read succeeded and the lane gate correctly refused to anchor
+    the title to `source_label "Now See Hear!"`. Gated on truthiness instead
+    of the lane, this episode's title pass would have been told it was
+    adapting a magazine. The present-but-empty vs absent distinction also
+    reads correctly off a frozen ledger, exactly as designed.
+- status: **FIXED AND PROVEN ON PIXELS 2026-08-19.**
 
 ## PBUG-20260815-06 -- `media_archive` retells the newest feed post forever
 
@@ -5068,9 +5088,14 @@ only visible because the cameo was FORCED and then did not appear.
   that fate would look perfect in every producer test and be absent from every
   ledger. Three carry tests now walk fetcher -> `normalize_fetch_result` ->
   receipt-pop -> `identity_from_meta`, with nothing hand-built.
-- status: **CLOSED 2026-08-19 -- both halves fixed and tested (selection
-  `3be1c1e1`, durable headline this commit). Unit-proven; a live
-  media_archive leg would confirm it end to end but nothing is unknown.**
+- **PROVEN ON PIXELS 2026-08-19.** Same bank-gate run.
+  `signal_lost_reel_of_shadows_20260819_061004` (media_archive, PASS,
+  published to `otr/obs/`) carries in durable ledger meta:
+  `source_meta.post_headline == "This Thursday (7:00 PM August 20) at the Mary
+  Pickford Theater (Washington, DC)"`. **An episode can now name the post it
+  adapted, from its own frozen ledger, with no re-run and no dedup file.**
+  That is this row's stated prerequisite, discharged.
+- status: **CLOSED AND PROVEN ON PIXELS 2026-08-19 -- both halves.**
 - status: OPEN -- diagnosed, fix specified, not yet landed.
 
 ## PBUG-20260815-07 -- the `original`-lane voice-gender report, INVESTIGATED AND NOT REPRODUCED
