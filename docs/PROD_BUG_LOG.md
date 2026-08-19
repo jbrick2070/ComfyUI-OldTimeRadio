@@ -4936,8 +4936,54 @@ only visible because the cameo was FORCED and then did not appear.
   be built from today's meta; the headline must be stamped at SELECTION time.
 - verify idea: two consecutive runs with a stable feed must not select the same
   post; the selected headline must be present in durable meta.
+- **SELECTION FIXED 2026-08-19 (`3be1c1e1`). THE DURABLE-HEADLINE HALF IS NOT
+  DONE -- this row stays OPEN for it.** Be precise about which half: the lane no
+  longer retells the newest post, and that is tested; "name the post it adapted"
+  in the episode's own meta is still unbuilt.
+- **What landed.** `fetch_media_archive_rss` now reuses the SCIENCE lane's
+  existing history rather than growing a second one -- the operator's own
+  framing: *"since scifi news seems to always choose a news story, should they
+  have the same RSS logic generally?"* They should, and science already had the
+  half this lane lacked. `story_orchestrator` keeps
+  `<output>/otr/.../news_history.json` (article URLs, rolling cap,
+  `_NEWS_HISTORY_FILTER_DAYS = 5` TTL so headlines recycle) via
+  `_load_news_history()` / `_record_news_usage()`; it keys on URL and nothing in
+  it is science-specific. Precedence: an explicit `OTR_MEDIA_ARCHIVE_ITEM_INDEX`
+  wins, else prefer unused entries, else fall back to the full list rather than
+  raising. Dedup is advisory end to end -- a failure selects exactly as before,
+  because a feed lane must never fail a render over a JSON file. 14 tests where
+  the PBUG recorded ZERO.
+- **REVIEW CAUGHT A HOLE THAT WOULD HAVE BEEN INVISIBLE (codex spark).** The
+  first cut took the override branch on a merely NON-EMPTY env var, and
+  `_configured_index()` swallows a `ValueError` and returns `0` -- so
+  `OTR_MEDIA_ARCHIVE_ITEM_INDEX=abc` would have taken the override, collapsed to
+  index 0, and **silently restored the exact always-newest behaviour this fix
+  exists to end**, with no error and no log line. `_explicit_index()` now
+  separates "did the operator choose" from "which index should I use", warns on
+  an unusable value, and lets dedup proceed. Five junk values are pinned. Same
+  review also moved the override off the shared history: an explicit index is a
+  deliberate repeat, and recording it would let a debugging run consume a
+  headline for the automatic path and for the science lane's TTL window.
+- **THE CROSS-LANE COUPLING IS SAFE, AND IT WAS MEASURED RATHER THAN ASSUMED.**
+  Review flagged that a shared history means one lane can consume a URL out from
+  under the other. The feed sets are disjoint by domain -- Library of Congress +
+  filmpreservation.org against sciencedaily / eurekalert / nasa / nih / nsf /
+  ucla -- so a URL from one can never appear in the other's feed. A test pins
+  that and FAILS if the feed lists ever start to overlap, because that is the
+  moment the shared history stops being free.
+- **STILL OPEN, and the PBUG's own prerequisite:** the selected post's headline
+  is not stamped in durable episode meta. `_otr_source_payload.py` builds
+  `source_meta` as feed label / url / date only, and `news_seed_receipt` is never
+  passed for this lane, so `_stamp_news_seed_receipt` early-returns. Recording
+  the headline into the shared news history (which this fix does) is NOT the same
+  thing -- that file is dedup state, not the episode's record. Until the headline
+  is stamped at selection time, an episode still cannot name what it adapted.
 - bible-worthy: probably -- "a live feed consumed by a constant index", a cheap
-  and very portable check.
+  and very portable check. A second, sharper candidate from the review: **an
+  override branch gated on "is the value non-empty" rather than "does the value
+  parse" silently reinstates the default it was meant to escape.**
+- status: **SELECTION FIXED AND TESTED 2026-08-19 (`3be1c1e1`); OPEN for the
+  durable-headline stamp.**
 - status: OPEN -- diagnosed, fix specified, not yet landed.
 
 ## PBUG-20260815-07 -- the `original`-lane voice-gender report, INVESTIGATED AND NOT REPRODUCED
