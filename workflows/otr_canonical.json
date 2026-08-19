@@ -936,13 +936,6 @@
           "link": 15
         },
         {
-          "localized_name": "closing_audio",
-          "name": "closing_audio",
-          "shape": 7,
-          "type": "AUDIO",
-          "link": null
-        },
-        {
           "localized_name": "script_json",
           "name": "script_json",
           "type": "STRING",
@@ -3071,7 +3064,7 @@
       62,
       1,
       12,
-      2,
+      1,
       "STRING"
     ],
     [
@@ -3103,7 +3096,7 @@
       62,
       2,
       12,
-      3,
+      2,
       "STRING"
     ],
     [

@@ -246,8 +246,16 @@ def test_music_cue_fanout_by_name(by_id, links_by_id):
     cue_audio_clips fans out to SceneSequencer + EpisodeAssembler
     (music_cue_audio); cue_manifest_json fans out to both
     (music_cue_manifest_json). The legacy opening/closing theme links
-    (241/242/243) are GONE, and node 7's opening/closing + node 12's
-    closing_audio inputs stay DECLARED but unlinked (BUG-LOCAL-097)."""
+    (241/242/243) are GONE, and node 7's opening/closing theme inputs stay
+    DECLARED but unlinked (BUG-LOCAL-097).
+
+    NODE 12's `closing_audio` IS NO LONGER DECLARED AT ALL (2026-08-19).
+    It was removed on the operator's ruling: the node accepted that AUDIO
+    socket and then discarded it, so connecting it would have produced
+    silence with no explanation. Removing it also meant renumbering two links
+    in the canonical graph -- it sat at input slot 1 with `script_json` and
+    `news_used` after it -- which is the same positional hazard BUG-LOCAL-097
+    names for widgets, applied to input slots."""
     theme = by_id[83]
     names = [o.get("name") for o in theme.get("outputs") or []]
     assert names == ["cue_audio_clips", "cue_manifest_json", "render_log", "done"]
@@ -264,7 +272,12 @@ def test_music_cue_fanout_by_name(by_id, links_by_id):
     assert 243 not in links_by_id
     assert _in_link(by_id[7], "opening_theme_audio") is None
     assert _in_link(by_id[7], "closing_theme_audio") is None
-    assert _in_link(by_id[12], "closing_audio") is None
+    # Stronger than "unlinked": the socket must be ABSENT. `_in_link` returns
+    # None for a missing input too, so asserting only that would keep passing
+    # if the socket came back unwired -- which is exactly the state we removed.
+    assert "closing_audio" not in [
+        i.get("name") for i in (by_id[12].get("inputs") or [])
+    ], "node 12's closing_audio socket is back; it accepts audio and discards it"
 
 
 def test_scene_sequencer_audio_inputs(by_id, links_by_id):

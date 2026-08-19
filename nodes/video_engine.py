@@ -2247,9 +2247,6 @@ class SignalLostVideoRenderer:
                     "default": "",
                     "tooltip": "Episode title for the title bar. Normally resolved from the script_json title token; widget acts as a last-resort override."
                 }),
-                "closing_audio": ("AUDIO", {
-                    "tooltip": "Unique closing music from MusicGen for the credits post-roll. If not connected, a gentle decay from the episode audio is used instead of looping."
-                }),
                 # APPENDED LAST (widgets_values is positional -- only ever
                 # append). v2 scene-aware path sets this False so the floor's
                 # in-frame scopes {2,3,5,6} (centre ring / particles /
@@ -2269,7 +2266,7 @@ class SignalLostVideoRenderer:
 
     def render_video(self, audio, script_json, news_used,
                      fps=24, resolution="1920x1080",
-                     episode_title="", closing_audio=None, draw_scopes=True):
+                     episode_title="", draw_scopes=True):
 
         from .story_orchestrator import _runtime_log
 
@@ -2426,8 +2423,21 @@ class SignalLostVideoRenderer:
         # credits music by the operator's silent-tail decision). The HUD
         # post-roll frames still render (the reduced dossier / transcript
         # easter egg); its audio is simply silence so this base mp4's own audio
-        # length matches its video length. The `closing_audio` input is now
-        # unused (dead-but-harmless, like `genre`).
+        # length matches its video length.
+        #
+        # THE `closing_audio` INPUT IS GONE (operator ruling 2026-08-19). It was
+        # an "AUDIO" socket this node accepted and then discarded -- so wiring
+        # it up, expecting a closing sting under the credits, would have got
+        # silence and no explanation. Removing it also required renumbering two
+        # links in `workflows/otr_canonical.json`: it sat at input slot 1, and
+        # `script_json` / `news_used` followed it, so a naive deletion would
+        # have shifted both onto the wrong sockets.
+        #
+        # THE ENDING AUDIO IS UNAFFECTED and that was checked before removal:
+        # the credits tail is SILENT by the operator's own silent-tail ruling,
+        # and the real closing music is `closing_theme_audio` on the sequencer
+        # (a different input on a different node), while the delivered episode
+        # audio is the frozen master muxed on last.
         if _hud_frames > 0:
             hud_samples = int(_hud_frames / fps * sr)
             pcm_out = np.concatenate(
