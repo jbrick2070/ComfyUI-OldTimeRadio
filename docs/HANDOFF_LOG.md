@@ -3,6 +3,110 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-19 -- HEAD 48f339ba +this (v2.0-alpha) -- CODER (the episode title stops naming a different play; one queue row's reachability claim corrected as stale)
+
+Did: **PBUG-20260815-05 FIXED.** A Macbeth episode had shipped as
+`signal_lost_tempests_midnight_revelations_20260815_034337` -- correct scene,
+correct cast, correct `source_ref`, wrong play in the title. Root cause was not
+subtle once read: `_generate_title_from_script` had NO parameter carrying the
+work being adapted. It saw dialogue excerpts, `outline.premise`, an empty
+`arc_verdict` and a GENERIC bank label, so nothing in its context ever said
+"Macbeth" -- and "The Tempest" is a sibling row in the same curated manifest,
+a plausible free association off the scene's genuine storm sound-world.
+
+**THE OPERATOR CHANGED THE SHAPE OF THIS FIX MID-WINDOW, and it was the right
+call.** He went to bed with: *"dont waste too much time overengineering for
+hard to replicate bugs im accepting some level of story quirks since a new
+story is gen every time"*. The driver had a full four-round arc queued and a
+code-side guard designed (reject any title containing another configured work
+title, per the PBUG's own `verify idea`). **Both were dropped.** The guard had
+no sound matching rule -- substring containment rejects legitimate titles and
+nothing better was available -- so it would have been an unsound mechanism
+built for a rare, hard-to-replicate quirk. The anchor alone is the ROOT fix:
+the pass was blind, so it is no longer blind.
+
+**What landed.** Keyword-only `work_title: str = ""` on
+`_generate_title_from_script`, threaded from the J.5 call site in
+`_run_writer_tail`, resolved through the EXISTING single bibliographic
+authority `_otr_source_identity.identity_from_meta` -- no second reader grown,
+which is the same instinct the media_archive fix shipped on one day earlier.
+Lane-gated on `ADAPTATION_SOURCE_KINDS`: `work_title` holds the PUBLICATION on
+media_archive (56 of 98 live ledgers carry a `source_label`), so an ungated
+read would have anchored a feed post's title to "Now See Hear!" -- inventing a
+work rather than naming one, worse than the defect being fixed.
+
+**THE ANCHOR IS NOT TITLE MATERIAL, AND THAT IS THE WHOLE DESIGN.** Told only
+"this is Macbeth", a small local model answers "The Macbeth Prophecy" on every
+adaptation episode -- trading a rare fidelity defect for a constant blandness
+one, which THE LAW does not license either. So the anchor ships with the rule
+that keeps the name OUT of the title. No sibling title ever enters the model's
+context, so the craft rule the PBUG cites is respected: the model is told what
+it IS adapting, never what it must not say. Verified byte-for-byte that the
+`work_title=""` prompt is IDENTICAL to the pre-fix prompt -- the `original`
+lane and every legacy caller are untouched.
+
+**THE QA LANE EARNED ITS KEEP, AND IT CAUGHT THE DRIVER'S OWN TESTS.** codex
+spark (called directly at `-m gpt-5.3-codex-spark`, since the installed kibitz
+plugin silently overrides that pin) read the real files and found that TWO OF
+THREE call-site tests were tautologies. `_run_writer_tail` contains a SECOND,
+pre-existing `identity_from_meta` read -- the announcer work-frame splice --
+which is itself method-local, guarded by a `try` and lane-gated. Measured on
+the real file: **4 matching imports and 2 qualifying `try` blocks in that one
+method.** An unscoped AST walk therefore passed on the OLD block and would
+have stayed green **with this entire fix deleted**. Now scoped to the block
+that binds `_title_identity`, plus a fifth test guarding the scoping helper
+itself, and mutation-checked: deleting the 1484-byte anchor block turns them
+red. Verdict SHIP. Its third finding (add a parser-level reject when the title
+contains the anchored name) was DECLINED with reason: a title naming the RIGHT
+play is bland, not wrong, and THE LAW forbids rejecting on quality.
+
+**Live receipt so this is provable without a re-run:** the block stamps
+`meta["title_work_anchor"]` on a successful read and leaves the key ABSENT
+when the read raised -- the present/absent convention `meta["bank_roll"]`
+already uses in this file. That distinction exists because
+`voice_cast_decision == {}` was produced by two different causes and cost a
+whole arc to disambiguate.
+
+**WHAT THIS DOES NOT YET HAVE: PIXELS.** Unit-proven only. The behaviour that
+matters is a model's output, and a green suite proves construction, not
+output. **It owes one live shakespeare leg published to `otr/obs/`** before
+anyone calls it closed on evidence. Do not report it as proven until then.
+
+**A SECOND QUEUE ROW WAS CORRECTED RATHER THAN WORKED: PBUG-20260729-03.** The
+plan said its two raise sites are "both reachable through the live
+`_otr_scifi_news_pro.py`". At HEAD they are not. Measured across the whole
+tree, excluding tests, `tmp/` and the stale `.claude/worktrees/` copies:
+**zero production callers pass `repair_slot_fn` / `repair_ledger_builder`**
+(only `tests/test_structured_call.py` does), and **`compact_p0_repair_context`
+has zero callers anywhere** but its own definition. The `_otr_scifi_codex.py`
+rip took the only production caller of both with it; `news_pro` imports just
+`MAX_QUOTE_CHARS` + `p0_source_chunks` and passes `repair_prompt_factory`, the
+PRIMARY ladder, never the alternate owner. The defect is real and still worth
+fixing -- `structured_call` is a public API whose contract is
+`StructuredCallFailedError`, and a bare `ValueError` escaping it is a landmine
+for the next lane that passes a repair owner -- but it is **shared-
+infrastructure hardening, not a live production bug**, and the row now says so.
+This is the same trap the 08-18 stale sweep flagged from the other side: a
+reachability claim that was true when written and quietly stopped being true.
+
+Suite: **11094 passed / 110 skipped / 1 xfailed** -- measured by a full run,
++14 on the 11080 baseline, exactly the 14 tests added, no regressions. Measured
+twice: 11092 / 12 tests on the intermediate tree, then 11094 / 14 after the QA
+pass added the two rescoped call-site tests. The final tree's number is the one
+recorded, never the arithmetic.
+Bible untouched at **294** entries (nothing promoted -- this defect is already
+covered in shape by the naming-pass family, and the admission rule wants a
+live artifact for a new entry, which this fix does not yet have).
+
+Review provenance, stated exactly: **NO four-round arc ran** -- the operator's
+2026-08-17 amendment routes work with one verifiable right answer away from
+the arc, and his 2026-08-19 ruling removed the design fork that would have
+justified one. The driver wrote the code-grounded `driver_anchor.md` FIRST
+(`kibitz-runs/2026-08-19-episode-title-names-wrong-play/`), which records all
+four forks and which were deliberately NOT built. **One reviewer lane ran:
+codex spark, on the finished diff.** Antigravity was not called; no Sonnet or
+Fable subagent was spawned. That is a one-lane QA pass and is described as one.
+
 ## 2026-08-19 -- HEAD 741a0e11 +handoff (v2.0-alpha) -- CODER (the voice-pool arc closed end to end: flip, live proof, rip; media_archive stopped repeating itself; 18 stale bug rows closed; Bible 12.115)
 
 The sha above is the second-to-last on the branch; the last is this handoff

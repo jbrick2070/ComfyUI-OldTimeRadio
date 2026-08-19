@@ -4914,7 +4914,54 @@ only visible because the cameo was FORCED and then did not appear.
   prompt, so no forbidden example may enter the model's context.
 - bible-worthy: yes -- "a naming pass blind to the identity it is naming, in a
   catalog where a sibling's name is a plausible free association".
-- status: OPEN -- diagnosed, fix specified, not yet landed.
+- **FIXED 2026-08-19. The fix is an ANCHOR, not a guard, and the difference was
+  an operator ruling made mid-window:** *"dont waste too much time
+  overengineering for hard to replicate bugs im accepting some level of story
+  quirks since a new story is gen every time"*. So the code-side "reject a
+  title containing another configured work title" check specified in the
+  `verify idea` above was deliberately NOT built. It had no sound matching
+  rule -- substring containment rejects legitimate titles, and no better rule
+  was available -- and building an unsound guard for a rare, hard-to-replicate
+  quirk is the over-engineering the ruling names.
+- **What landed.** `_generate_title_from_script` grew a keyword-only
+  `work_title: str = ""`, threaded from the J.5 call site in
+  `_run_writer_tail` and resolved through the EXISTING single bibliographic
+  authority `_otr_source_identity.identity_from_meta` -- no second reader was
+  grown. The pass is no longer blind: it is told what it is adapting.
+- **THE ANCHOR IS NOT TITLE MATERIAL, AND THAT IS THE DESIGN.** Told only
+  "this is Macbeth", a small local model answers "The Macbeth Prophecy" on
+  every adaptation episode -- trading a rare fidelity defect for a constant
+  blandness one, which THE LAW does not license either. So the anchor ships
+  with the rule that keeps the name OUT of the title. No sibling title ever
+  enters the model's context, so the craft rule cited in this entry is
+  respected: the model is told what it IS adapting, never what it must not say.
+- **The lane gate is applied, and it is the reason this is not a one-liner.**
+  `work_title` holds the PUBLICATION on media_archive (56 of 98 live ledgers
+  carry a `source_label` like "Now See Hear!"), so an ungated read would
+  anchor a feed post's title pass to a magazine name -- inventing a work
+  instead of naming one, which is worse than the defect being fixed. Gated on
+  `ADAPTATION_SOURCE_KINDS`, never on truthiness.
+- **QA CAUGHT TWO TAUTOLOGICAL TESTS (codex spark, on the finished diff).**
+  `_run_writer_tail` contains a SECOND, pre-existing `identity_from_meta` read
+  -- the announcer work-frame splice -- which is itself method-local, guarded
+  and lane-gated. Measured on the real file: **4 matching imports and 2
+  qualifying `try` blocks in that one method.** Two of the three call-site
+  tests walked the whole method, so they passed on the OLD block and would
+  have stayed green with this entire fix deleted. Now scoped to the block that
+  binds `_title_identity`, with a fifth test guarding the scoping helper
+  itself, and mutation-checked: removing the 1484-byte anchor block turns them
+  red.
+- **Live receipt:** the anchor block stamps `meta["title_work_anchor"]` on a
+  successful read, ABSENT when the read raised -- the same present/absent
+  convention `meta["bank_roll"]` already uses in this file, chosen so a frozen
+  ledger can distinguish "the lane adapts nothing" from "the anchor failed"
+  without a re-run. That ambiguity is the `voice_cast_decision == {}` trap
+  that cost a whole arc to diagnose.
+- **NOT PROVEN ON PIXELS.** Unit-proven only: 14 tests, full suite
+  11092/110/1 (+12, exactly the tests added). The behaviour that matters is a
+  model's output, so this owes a live shakespeare leg published to `otr/obs/`
+  before it can be called closed on evidence rather than on construction.
+- status: **FIXED 2026-08-19, unit-proven, AWAITING A LIVE LEG.**
 
 ## PBUG-20260815-06 -- `media_archive` retells the newest feed post forever
 

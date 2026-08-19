@@ -1367,6 +1367,11 @@ def _generate_title_from_script(
     # bank's banks.json `title_form_label` (first live consumer of that
     # field). Default keeps legacy callers/self-tests byte-identical.
     title_form_label: str = "sci-fi radio drama",
+    # PBUG-20260815-05 (2026-08-19): the work this episode adapts, already
+    # lane-gated by the caller. Default "" keeps every legacy caller and
+    # self-test byte-identical, and the original lane (which adapts nothing)
+    # renders exactly the prompt it always did.
+    work_title: str = "",
 ) -> str:
     """Generate an episode title via a forced scratchpad pass.
 
@@ -1436,6 +1441,37 @@ def _generate_title_from_script(
         parts.append(f"ARC:\n{arc_str[:300]}")
     story_block = "\n\n".join(parts)
 
+    # PBUG-20260815-05: this pass saw dialogue excerpts and a generic bank
+    # label, and nothing anywhere in its context named the work it was
+    # adapting. A Macbeth scene therefore titled itself after The Tempest --
+    # a SIBLING PLAY in the same curated manifest -- free-associated off the
+    # scene's genuine storm sound-world.
+    #
+    # The work title enters as a DISAMBIGUATING ANCHOR, never as title
+    # material, and that distinction is the whole design. Told only "this is
+    # Macbeth", a model happily answers "The Macbeth Prophecy" on every
+    # adaptation episode -- trading a rare fidelity defect for a constant
+    # blandness one, which THE LAW does not license either. So the anchor
+    # comes with the rule that keeps the name OUT of the title.
+    #
+    # No sibling title is ever named. The craft rule this bug's own log entry
+    # cites -- never put the feared failure in the model's context -- is
+    # respected: the model is told what it IS adapting, never what it must
+    # not say.
+    #
+    # Capped like every other field in this prompt (excerpts 1200, premise
+    # 600, arc 300). A manifest row is DATA, and an uncapped field is how a
+    # malformed one reaches the composer's token budget. The longest title in
+    # the shipped corpus is 45 chars ("The Surprising Adventures of Baron
+    # Munchausen"), so this never binds in practice -- it is a floor under a
+    # bad row, not a policy about titles.
+    work_str = (work_title or "").strip()[:120].strip()
+    anchor_block = f"THIS EPISODE ADAPTS: {work_str}\n\n" if work_str else ""
+    anchor_rule = (
+        f" - this episode adapts {work_str}; keep that name OUT of the "
+        "title, and never name a different work\n"
+    ) if work_str else ""
+
     _form = (title_form_label or "").strip() or "sci-fi radio drama"
     sys_msg = (
         f"You are titling a single episode of a {_form}. "
@@ -1445,6 +1481,7 @@ def _generate_title_from_script(
     )
     user_msg = (
         f"{story_block}\n\n"
+        f"{anchor_block}"
         "Title this episode. Work through these steps in order:\n\n"
         "DETAILS: list 3 concrete physical details actually present "
         "in the story above -- a specific object, place, sound, or "
@@ -1459,7 +1496,9 @@ def _generate_title_from_script(
         "thematic tension actually present in the story\n"
         " - feel specific and memorable, not generic\n"
         " - avoid cliches like \"The Beginning\", \"Final Chapter\", "
-        "\"Untitled\", or \"Episode X\"\n\n"
+        "\"Untitled\", or \"Episode X\"\n"
+        f"{anchor_rule}"
+        "\n"
         "Output the DETAILS, CANDIDATES, and TITLE sections. The final "
         "line MUST begin with \"TITLE:\" followed by the chosen title "
         "and nothing else."
@@ -6405,6 +6444,55 @@ class OTR_LedgerScriptWriter:
             # I.4.9 intro rewrite. Same authority the slot-0 output uses
             # (section L below); script_text_parts stays diagnostic-only.
             assembled_script = _PL.assemble_script_text_from_ledger(led.data)
+            # PBUG-20260815-05: anchor the title pass to the work it is
+            # actually adapting. `identity_from_meta` is the SINGLE
+            # bibliographic authority -- it reads `play_title` for shakespeare
+            # and `title` for public_domain -- so no per-lane branch is needed
+            # here and no second reader is grown.
+            #
+            # THREE INVARIANTS, each one a defect that already shipped once at
+            # the sibling identity read further down this same method:
+            #  - the import is METHOD-LOCAL. `_run_writer_tail` is a separate
+            #    METHOD, not a closure over run(), so a name bound in run()
+            #    raises NameError here on EVERY episode -- and an enclosing
+            #    `except Exception` swallows it, leaving a fix that is dead
+            #    code while the suite stays green.
+            #  - the read is INSIDE the try. A synthetic or partial `meta`
+            #    makes `identity_from_meta` raise, and nothing about naming
+            #    the work may ever be able to fail an episode.
+            #  - the LANE GATE is applied, never truthiness. `work_title`
+            #    holds the PUBLICATION on media_archive (56 of 98 live ledgers
+            #    carry a `source_label` like "Now See Hear!"), so an ungated
+            #    read would anchor a feed post's title to a magazine name --
+            #    inventing a work instead of naming one, which is a worse
+            #    fidelity defect than the wrong-play title being fixed.
+            _title_work = ""
+            try:
+                try:
+                    from . import _otr_source_identity as _OTRSID_TITLE
+                except ImportError:  # pragma: no cover -- flat/standalone load
+                    import _otr_source_identity as _OTRSID_TITLE  # type: ignore
+                _title_identity = _OTRSID_TITLE.identity_from_meta(meta)
+                if (
+                    _title_identity.source_kind
+                    in _OTRSID_TITLE.ADAPTATION_SOURCE_KINDS
+                ):
+                    _title_work = str(_title_identity.work_title or "")
+                # A positive receipt, so a PUBLISHED episode can prove which
+                # way this went without a re-run. Stamped ONLY on a successful
+                # read -- the same convention `meta["bank_roll"]` uses a few
+                # hundred lines up: an ABSENT key means the read raised, an
+                # empty string means the read succeeded and the lane
+                # legitimately adapts nothing. Collapsing those two into one
+                # falsy value is the `voice_cast_decision == {}` ambiguity
+                # that cost a whole arc to diagnose.
+                meta["title_work_anchor"] = _title_work
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_LedgerScriptWriter] title work-anchor unavailable "
+                    "(%s); titling without it",
+                    exc,
+                )
             # LLM slot: creative -- title regen is a narrative pass
             # (scratchpad: extract physical details, draft candidates,
             # commit a final title). One LLM call produces the whole
@@ -6424,6 +6512,7 @@ class OTR_LedgerScriptWriter:
                         (getattr(_source_bank_row, "defaults", {}) or {})
                         .get("title_form_label") or "sci-fi radio drama"
                     ),
+                    work_title=_title_work,
                 )
             if regen_title:
                 final_title = regen_title
