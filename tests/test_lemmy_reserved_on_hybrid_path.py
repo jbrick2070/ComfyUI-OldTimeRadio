@@ -13,10 +13,14 @@ PBUG-20260817-08, re-opened 2026-08-18. The 2026-08-17 fix (`8f3c7615`) filtered
 `tests/test_lemmy_voice_stays_reserved.py` proved that selector obeys it across
 480 seeded draws. **Both were correct and both were measuring the wrong path.**
 
-`_otr_casting.py:896` -- `hybrid_voice_fit_enabled()` is default-ON. So per
-character the LLM is shown `build_voice_cards()` and proposes one id,
-`validate_voice_proposal()` checks it, and `cast_lock.py:884-906` stamps the
-accepted id and `continue`s -- never reaching the deterministic selector at all.
+`hybrid_voice_fit_enabled()` was **default-ON when this leak happened** (it went
+default-OFF on 2026-08-18, after these tests were written). While it was on, the
+LLM was shown `build_voice_cards()` and proposed one id per character,
+`validate_voice_proposal()` checked it, and `cast_lock.py:884-906` stamped the
+accepted id and `continue`d -- never reaching the deterministic selector at all.
+**These tests still matter with the pass off**: it remains reachable by explicit
+opt-in until the code is ripped, and a reserved voice must not leak on a lane
+merely because that lane is not the default today.
 Measured over 1711 ledgers in the episodes tree: **1871 character rows came from
 an accepted proposal against 82 fallbacks**, so the path those 480 draws
 exercised carries roughly 4% of production casting.

@@ -4720,6 +4720,16 @@ class OTR_LedgerScriptWriter:
         # ledger meta so OTR_CastLock can honour the accepted proposal (and fall
         # closed to the deterministic scorer otherwise). Free-form meta.
         meta["voice_cast_decision"] = cast_meta.get("voice_cast_decision") or {}
+        # WHICH CASTER RAN -- "scorer" | "hybrid" | "hybrid_unavailable".
+        # This copy is exactly as REQUIRED as the ones around it: without the
+        # line, `lock_cast` stamps the marker and the writer drops it, so no
+        # published episode can say which caster produced its voices.
+        #
+        # FAIL-CLOSED ON PURPOSE -- `.get(key, "")`, never `or "scorer"`. A
+        # default here would FABRICATE the marker if the upstream stamp were ever
+        # dropped, leaving every acceptance check green while the thing it
+        # asserts is dead. An empty value must fail the gate loudly instead.
+        meta["voice_cast_mode"] = str(cast_meta.get("voice_cast_mode", ""))
         # The gender pin's receipt: which source names were pinned, to what, and
         # on what evidence. This copy is REQUIRED -- lock_cast's meta is not
         # merged wholesale, it is copied key by key right here, so a key stamped

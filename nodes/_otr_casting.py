@@ -888,15 +888,34 @@ def llm_write_description(
 # voice-fit keeps character_description / dialogue byte-identical; only the
 # voice_ref_id (the operator's intended lever) changes. Identity = voice_ref_id
 # (I-9): the prompt carries gender/timbre/role/age + the cards, NEVER the
-# character name. Gated by OTR_HYBRID_VOICE_FIT (default on; =0 -> no call,
-# byte-identical to pre-chunk-4).
+# character name. Gated by OTR_HYBRID_VOICE_FIT (DEFAULT OFF since 2026-08-18;
+# =1 opts back in).
 # ---------------------------------------------------------------------------
 
 
 def hybrid_voice_fit_enabled() -> bool:
-    """True unless OTR_HYBRID_VOICE_FIT=0. Default-on per the converged plan;
-    =0 is the byte-identical A/B escape (no extra LLM call)."""
-    return os.environ.get("OTR_HYBRID_VOICE_FIT", "1") != "0"
+    """True only on an explicit opt-in. DEFAULT OFF since 2026-08-18.
+
+    WHY IT IS OFF: the prompt this pass builds (`_build_voice_fit_prompt`) hands
+    the model the character's gender / timbre / role / age and each card's
+    age_band + timbre + style_tags -- which are EXACTLY the four dimensions
+    `_score()` already weights -- and per I-9 it carries no character name and no
+    description. The model therefore has no information the deterministic scorer
+    lacks, and no judgment is available to it. Measured over 1711 ledgers, the
+    rows it decided used 13 distinct voices at 96% top-5, against 43 distinct at
+    25% for the rows the scorer decided; 62% of its accepted proposals were
+    card #0 of an alphabetically-ordered list. It was also the one unseeded step
+    in a pipeline whose contract is seed-determinism (`make_generate_fn` samples
+    with no per-call seed, and `seed_all_rngs` has no caller in `nodes/`).
+
+    EXPLICIT OPT-IN PARSE, not `!= "0"`. With the default flipped, a truthiness
+    test would read `OTR_HYBRID_VOICE_FIT=""` or `="false"` as ENABLED -- the
+    opposite of what anyone setting those means. The old form was safe only
+    because it agreed with an on-by-default.
+    """
+    return os.environ.get("OTR_HYBRID_VOICE_FIT", "0").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
 
 
 def _build_voice_fit_prompt(slot: "EnsembleSlot", cards: List[dict]) -> str:
@@ -1984,6 +2003,18 @@ def lock_cast(
     # byte-identical (see hybrid_voice_fit_enabled). Uses generate_fn, NOT the
     # cast rng, so the bark replay sequence is unperturbed (replay-parity holds).
     voice_cast_decision: dict = {}
+    # WHICH CASTER RAN, STAMPED POSITIVELY AND UNCONDITIONALLY.
+    #
+    # `voice_cast_decision == {}` cannot answer this and never could: it is
+    # produced by "the pass is disabled" AND by "the pass was enabled but the
+    # bank failed to load" (the `vf_engine == ""` branch below, which does not
+    # even log). One field, two meanings -- the shape this repo has been bitten
+    # by four times. The adjacent `cast_source_contract` already obeys the rule
+    # this now follows: stamp ONE stable shape on every lane so a downstream
+    # reader never has to distinguish "off" from "never written".
+    #
+    # Assert on THIS, never on the absence of a decision.
+    voice_cast_mode = "hybrid" if hybrid_voice_fit_enabled() else "scorer"
     if hybrid_voice_fit_enabled():
         try:
             from ._otr_voice_bank import (
@@ -1998,6 +2029,15 @@ def lock_cast(
             log.warning("[OTR_Casting] hybrid voice-fit unavailable: %r", exc)
             vf_engine = ""
             vf_bank, vf_sha = (), ""
+        if not vf_engine:
+            # ASKED FOR, COULD NOT RUN. Distinct from both "off" and "ran": the
+            # caller opted in and got the scorer anyway, which is a
+            # misconfiguration worth seeing in the ledger rather than a silent
+            # empty dict. This branch is reachable without any exception being
+            # raised, so the log line above does not always fire.
+            voice_cast_mode = "hybrid_unavailable"
+            log.warning("[OTR_Casting] hybrid voice-fit requested but no char "
+                        "voice engine resolved; the deterministic scorer casts")
         if vf_engine:
             used_ref_ids: set = set()
             for ens in ensemble_slots:
@@ -2076,6 +2116,10 @@ def lock_cast(
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
         "cast_voice_slots":       cast_voice_slots,
         "voice_cast_decision":    voice_cast_decision,
+        # Which caster actually ran: "scorer" | "hybrid" | "hybrid_unavailable".
+        # MUST also be copied at OTR_LedgerScriptWriter's key-by-key meta copy or
+        # it never reaches the ledger -- see the invariant stated there.
+        "voice_cast_mode":        voice_cast_mode,
         # ONE stable shape on EVERY lane -- the invention lanes stamp an empty
         # contract rather than omitting the key, so a downstream reader never has
         # to distinguish "no source" from "field never written".
