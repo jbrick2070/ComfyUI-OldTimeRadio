@@ -190,10 +190,6 @@ from ._otr_resolved_request import REQUEST_SCHEMA_VERSION  # noqa: E402
 LEDGER_SCHEMA_VERSION_TARGET = "2"
 
 
-class CacheMigrationError(RuntimeError):
-    """Raised when a stale ledger cannot be replayed through the registry path."""
-
-
 def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEMA_VERSION) -> bool:
     """True iff a cached record's request schema differs from the build target.
 
@@ -211,30 +207,6 @@ def detect_ledger_schema_version(ledger: dict) -> str:
         or meta.get("schema_version")
         or "1"
     )
-
-
-def assert_registry_ledger_has_voice_ref_id(ledger: dict) -> None:
-    """Reject a cast-locked (registry-path) ledger whose cast lacks voice_ref_id.
-
-    A ledger that has been through CastLock carries ``meta.cast_lock_revision``;
-    every cast entry on that path must carry a ``voice_ref_id`` (I-9). An OLD
-    registry ledger that predates the field is rejected so it is re-cast rather
-    than rendered with a missing identity. A LEGACY-path ledger (no
-    cast_lock_revision) is left alone -- it keys on ``voice_preset``, not on a
-    reference id. READ-ONLY: never rewrites the ledger (the legacy raw-delegation
-    script is untouched).
-    """
-    meta = (ledger or {}).get("meta") or {}
-    if not meta.get("cast_lock_revision"):
-        return  # legacy / pre-cast-lock path: nothing to enforce
-    for entry in (ledger.get("cast") or []):
-        if not isinstance(entry, dict):
-            continue
-        if not entry.get("voice_ref_id"):
-            raise CacheMigrationError(
-                f"cast-locked ledger missing voice_ref_id for char_id "
-                f"{entry.get('char_id')!r}; re-cast required (old registry ledger)"
-            )
 
 
 class FileAudioCache:

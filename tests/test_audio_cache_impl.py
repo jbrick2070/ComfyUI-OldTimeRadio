@@ -15,9 +15,7 @@ import torch
 
 from nodes._otr_audio_cache import (
     AudioCacheRecord,
-    CacheMigrationError,
     FileAudioCache,
-    assert_registry_ledger_has_voice_ref_id,
     cache_key_for,
     detect_ledger_schema_version,
     needs_rerender,
@@ -133,26 +131,14 @@ def test_iter_records_on_missing_dir_is_empty(tmp_path):
 # ----------------------------------------------------------------------------
 # Ledger migration checks (read-only)
 # ----------------------------------------------------------------------------
-def test_old_registry_ledger_missing_voice_ref_id_fails():
-    ledger = {
-        "meta": {"cast_lock_revision": 1},
-        "cast": [{"char_id": "c1", "voice_preset": "v2/en_speaker_3"}],
-    }
-    with pytest.raises(CacheMigrationError):
-        assert_registry_ledger_has_voice_ref_id(ledger)
-
-
-def test_cast_locked_ledger_with_voice_ref_id_passes():
-    ledger = {
-        "meta": {"cast_lock_revision": 2},
-        "cast": [{"char_id": "c1", "voice_ref_id": "cc_male_warm"}],
-    }
-    assert_registry_ledger_has_voice_ref_id(ledger)  # no raise
-
-
-def test_legacy_ledger_without_cast_lock_is_left_alone():
-    ledger = {"meta": {}, "cast": [{"char_id": "c1", "voice_preset": "v2/en_speaker_3"}]}
-    assert_registry_ledger_has_voice_ref_id(ledger)  # legacy path: no enforcement
+# THE THREE `assert_registry_ledger_has_voice_ref_id` TESTS WERE REMOVED
+# 2026-08-19 with the guard itself (operator ruling). The guard RAISED on a
+# stale ledger -- it refused the render -- and THE LAW is that an audit may
+# never fail a story. It also had zero production callers, so it had never
+# protected anything. What replaced it is a WARNING on the real fallback path
+# (`_otr_voice_node_common`), because the actual defect was that a stale
+# ledger silently got voices reassigned by gender. See
+# tests/test_stale_ledger_voice_degrade_is_audible.py.
 
 
 def test_detect_ledger_schema_version():
@@ -170,7 +156,6 @@ def test_migration_does_not_rewrite_legacy_raw_script():
     }
     snapshot = copy.deepcopy(ledger)
     detect_ledger_schema_version(ledger)
-    assert_registry_ledger_has_voice_ref_id(ledger)
     assert ledger == snapshot  # read-only: no mutation of the delegated script
 
 
