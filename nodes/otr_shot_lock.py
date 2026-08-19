@@ -1906,7 +1906,6 @@ class OTRShotLock:
                 "h": int(canvas.get("h") or 480),
             },
             "fps": fps,
-            "locked_against_audio_rev": str(meta.get("audio_revision") or ""),
             "execution_groups": groups,
             "roles": policy.get("video_models") or {},
             # BOTH maps ride the ledger (2026-07-25, chunk 1b). ``roles`` stays

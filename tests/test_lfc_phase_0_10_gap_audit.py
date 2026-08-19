@@ -421,7 +421,17 @@ class TestPerCastInvariants:
             _LFC.phase_10_gap_audit_post_and_freeze(data)
         assert any("duplicated" in e for e in ei.value.errors)
 
-    def test_announcer_only_fallback_allows_empty_cast(self):
+    def test_an_empty_cast_always_fails_the_freeze(self):
+        """INVERTED 2026-08-19 (operator ruling). This used to pin the
+        ``announcer_only_fallback`` escape hatch: set the flag, and an empty
+        cast was allowed through.
+
+        The hatch was removed because it could never open -- NOTHING in
+        production ever wrote that meta key, so the branch guarding it was
+        unreachable and an empty cast has always failed here in practice. The
+        flag is now inert data: setting it must NOT rescue an empty cast, and
+        this test fails if the hatch is ever quietly restored.
+        """
         data = _clean_ledger_data()
         data["cast"] = []
         data["lines"] = [
@@ -436,12 +446,10 @@ class TestPerCastInvariants:
                 "skip": False,
             },
         ]
-        data["meta"]["announcer_only_fallback"] = True
-        # Should not raise -- but the line still has a char_id, so it's
-        # still gap-clean. (We only suppress the empty-cast critical.)
-        rep = _LFC.phase_10_gap_audit_post_and_freeze(data)
-        assert rep.is_clean or not rep.errors
-        assert data["meta"]["cleanup_locked"] is True
+        data["meta"]["announcer_only_fallback"] = True   # inert; must not rescue
+        with pytest.raises(_LFC.FreezeAssertionError) as ei:
+            _LFC.phase_10_gap_audit_post_and_freeze(data)
+        assert any("cast is empty" in e for e in ei.value.errors)
 
     def test_unreferenced_char_id_now_BLOCKS_the_freeze(self):
         """INVERTED 2026-08-02 (operator ruling, PBUG-20260802-02). This test

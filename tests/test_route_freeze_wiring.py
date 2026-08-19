@@ -211,7 +211,7 @@ def test_a_policy_without_the_freeze_falls_back_to_the_picked_map():
 def _lock_with(policy, monkeypatch=None):
     ledger = {
         "episode_id": "ep_guard",
-        "meta": {"episode_title": "T", "audio_revision": "1"},
+        "meta": {"episode_title": "T"},
         "script": {"lines": []},
     }
     return sl.OTRShotLock().lock(json.dumps(ledger),

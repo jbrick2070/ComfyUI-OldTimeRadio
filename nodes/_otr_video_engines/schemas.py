@@ -162,7 +162,6 @@ class VideoRequest(_Forbid):
     seed_bundle: SeedBundle = Field(default_factory=SeedBundle)
     quality: Quality = Field(default_factory=Quality)
     policy: Policy = Field(default_factory=Policy)
-    locked_against_audio_rev: Optional[str] = None
     #: Trace-only observability stamps (round-5 F2 prompt provenance +
     #: still-spine ST-4 init provenance). NEVER conditioning, never hashed
     #: into request identity; ``run_episode`` copies these onto trace rows.
@@ -397,7 +396,6 @@ class VideoLedgerSection(_Forbid):
     video_revision: int = 1
     canonical_canvas: dict = Field(default_factory=dict)
     fps: int = 25
-    locked_against_audio_rev: Optional[str] = None
     execution_groups: list[ExecutionGroup] = Field(default_factory=list)
     roles: dict = Field(default_factory=dict)
     shots: list[ShotRow] = Field(default_factory=list)

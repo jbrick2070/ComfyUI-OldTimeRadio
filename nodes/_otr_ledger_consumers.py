@@ -219,14 +219,22 @@ _OPTIONAL_STRING_FIELDS = (
     "music_cache_key",
     "video_clip_path",
     "tts_skip_reason",
-    # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field; walker enforces
-    # its own enum (ALLOWED_MUSIC_RENDER_STATUS) below in addition to
-    # the string-shape-not-None check.
+    # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field. The enum below
+    # documents its legal values; NOTHING enforces them at runtime since
+    # the post-freeze writeback auditor was deleted 2026-08-19.
     "music_render_status",
 )
 
 
 # S25/MG-3 (BUG-LOCAL-213). Enum the music writeback may stamp.
+#
+# DOCUMENTATION ONLY SINCE 2026-08-19. Its sole consumer was
+# ``audit_post_freeze_writeback``, deleted on the operator's ruling because it
+# was exported, documented and never called by a single production consumer --
+# its own docstring described a "soft rollout" that reached nobody. The values
+# below are still the truth about what the music writeback stamps, so the
+# frozenset is kept as the written-down contract; it is simply no longer
+# checked by anything. Do not read its presence as enforcement.
 #   ""                       -- unrendered / pre-render state
 #   "ok"                     -- fresh generate, save confirmed
 #   "ok_cache"               -- cache hit at resolve
@@ -243,63 +251,6 @@ ALLOWED_MUSIC_RENDER_STATUS: frozenset = frozenset({
 })
 
 
-def audit_post_freeze_writeback(
-    ledger: dict,
-    *,
-    strict: bool = False,
-) -> list[str]:
-    """Re-check §6.16 null-rejection over fields a consumer may have
-    stamped after freeze. Returns a list of violations; raises
-    ValueError if ``strict=True`` and violations exist.
-
-    Optional string fields per ``_otr_ledger_freeze.py`` lines 37-39:
-    must be ``""`` when unset, never null. The §6.16 invariant is
-    enforced at freeze time; consumers stamp after freeze and the
-    convention has historically drifted (a consumer wrote None on
-    disk-write failure until S18.1).
-
-    For the ``music_render_status`` field the walker also enforces
-    membership in ``ALLOWED_MUSIC_RENDER_STATUS``. A typo like
-    ``"fallback_silnce"`` lands as a violation. Other fields stay
-    string-shape-only -- only None is rejected; arbitrary string
-    values are accepted because the producer-side enum hasn't been
-    audited for them.
-
-    Use ``strict=False`` (the default) for the soft-rollout phase --
-    consumers log violations to batch_log so live runs surface
-    drift without halting. Flip to ``strict=True`` per consumer
-    once the audit holds clean for two full pipeline runs.
-    """
-    violations: list[str] = []
-    for line in ledger.get("lines") or []:
-        if not isinstance(line, dict):
-            continue
-        lid = line.get("line_id", "<no-id>")
-        for field in _OPTIONAL_STRING_FIELDS:
-            if field not in line:
-                continue
-            val = line[field]
-            if val is None:
-                violations.append(
-                    f"line_id={lid!r} field {field!r} is None; "
-                    f"§6.16 requires \"\" (empty string)."
-                )
-            elif field == "music_render_status" and val not in ALLOWED_MUSIC_RENDER_STATUS:
-                # S25/MG-3 (BUG-LOCAL-213): MusicGen parity enum. A
-                # typo lands here instead of silently passing.
-                violations.append(
-                    f"line_id={lid!r} field {field!r} = {val!r} is "
-                    f"not in ALLOWED_MUSIC_RENDER_STATUS "
-                    f"({sorted(ALLOWED_MUSIC_RENDER_STATUS)!r})."
-                )
-    if strict and violations:
-        raise ValueError(
-            f"Post-freeze writeback violations ({len(violations)}):\n"
-            + "\n".join(violations[:10])
-        )
-    return violations
-
-
 __all__ = [
     "load_ledger",
     "iter_lines",
@@ -307,6 +258,5 @@ __all__ = [
     "speaker_name",
     "voice_preset",
     "voice_assignments_from_cast",
-    "audit_post_freeze_writeback",
     "ALLOWED_MUSIC_RENDER_STATUS",
 ]

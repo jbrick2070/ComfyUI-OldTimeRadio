@@ -428,22 +428,19 @@ def _check_per_cast_invariants(
     """ADR §7 per-cast-entry invariants.
 
     char_id / name / traits / voice_preset present and non-empty;
-    each char_id is referenced by ≥ 1 non-skipped line (unless
-    announcer-only-fallback flag set in meta).
+    each char_id is referenced by ≥ 1 non-skipped line.
+
+    THE ANNOUNCER-ONLY ESCAPE HATCH IS GONE (operator ruling 2026-08-19).
+    This checked ``meta.announcer_only_fallback`` to let an empty cast through
+    -- but nothing in production ever wrote that key, so the hatch could never
+    open and an empty cast has always failed here. Removing it changes no
+    behaviour; it removes a branch that read as a supported path and was not.
     """
     cast = ledger_data.get("cast")
     if not isinstance(cast, list):
         return  # null-rejection already errored
-    meta = ledger_data.get("meta") or {}
-    announcer_only_fallback = (
-        isinstance(meta, dict)
-        and bool(meta.get("announcer_only_fallback"))
-    )
     if not cast:
-        if not announcer_only_fallback:
-            errors.append(
-                "cast is empty (and meta.announcer_only_fallback not set)"
-            )
+        errors.append("cast is empty")
         return
 
     seen_char_ids: set[str] = set()
@@ -525,10 +522,7 @@ def _check_per_cast_invariants(
                     f"(Bark requires v2/* presets on non-ANNOUNCER rows)"
                 )
 
-    # Each char_id must be referenced by >= 1 non-skipped line (unless
-    # announcer-only-fallback).
-    if announcer_only_fallback:
-        return
+    # Each char_id must be referenced by >= 1 non-skipped line.
     lines = ledger_data.get("lines") or []
     referenced: set[str] = set()
     for ln in lines:

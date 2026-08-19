@@ -121,17 +121,28 @@ def test_g6_uses_canonical_announcer_char_id_with_authored_display_name():
     assert not [e for e in report.errors if "voice_preset" in e.lower()]
 
 
-def test_g6_skipped_when_cast_empty_and_announcer_only_fallback():
-    """announcer_only_fallback is the documented escape hatch -- G6 stays silent."""
+def test_g6_stays_silent_on_an_empty_cast_without_any_escape_hatch():
+    """G6 is about voice_preset on cast rows, so an EMPTY cast gives it nothing
+    to complain about -- that was true before and after the 2026-08-19 removal
+    of ``announcer_only_fallback``.
+
+    The flag is kept in this fixture deliberately, as inert data: it proves G6
+    silence comes from having no cast rows, not from an escape hatch. The
+    empty cast itself is still reported (by the per-cast invariant check), and
+    ``test_an_empty_cast_always_fails_the_freeze`` pins that.
+    """
     led = {
         "schema_version": "l3-2026-05-14",
         "cast": [],
         "lines": [],
-        "meta": {"announcer_only_fallback": True},
+        "meta": {"announcer_only_fallback": True},   # inert; no longer a hatch
     }
     report = _LFC.run_gap_audit(led, label="test")
     g6_errors = [e for e in report.errors if "voice_preset" in e.lower()]
     assert not g6_errors
+    assert any("cast is empty" in e for e in report.errors), (
+        "the empty cast must still be reported now the hatch is gone"
+    )
 
 
 def test_phase_10_hard_fails_on_g6_violation():
