@@ -3,7 +3,7 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
-## 2026-08-19 -- HEAD 48f339ba +this (v2.0-alpha) -- CODER (the episode title stops naming a different play; one queue row's reachability claim corrected as stale)
+## 2026-08-19 -- HEAD 48f339ba +this (v2.0-alpha) -- CODER (the episode title stops naming a different play; media_archive can finally name the post it adapted; one queue row's reachability claim corrected as stale)
 
 Did: **PBUG-20260815-05 FIXED.** A Macbeth episode had shipped as
 `signal_lost_tempests_midnight_revelations_20260815_034337` -- correct scene,
@@ -89,14 +89,55 @@ infrastructure hardening, not a live production bug**, and the row now says so.
 This is the same trap the 08-18 stale sweep flagged from the other side: a
 reachability claim that was true when written and quietly stopped being true.
 
-Suite: **11094 passed / 110 skipped / 1 xfailed** -- measured by a full run,
-+14 on the 11080 baseline, exactly the 14 tests added, no regressions. Measured
-twice: 11092 / 12 tests on the intermediate tree, then 11094 / 14 after the QA
-pass added the two rescoped call-site tests. The final tree's number is the one
-recorded, never the arithmetic.
+Suite: **11104 passed / 110 skipped / 1 xfailed** -- measured by a full run.
+Chain this window, each delta exactly the tests added and no regressions at any
+step: **11080** at open -> **11094** with the 14 title-anchor tests -> **11104**
+with the 10 durable-headline tests. The 11094 was itself measured twice (11092 /
+12 tests on an intermediate tree, then 11094 / 14 after the QA pass added the
+two rescoped call-site tests) -- every figure here is what a run printed, never
+arithmetic written ahead of one.
 Bible untouched at **294** entries (nothing promoted -- this defect is already
 covered in shape by the naming-pass family, and the admission rule wants a
 live artifact for a new entry, which this fix does not yet have).
+
+**SECOND ITEM THIS WINDOW: PBUG-20260815-06's DURABLE-HEADLINE HALF IS DONE,
+so that row is now CLOSED, both halves.** One line of production code, and the
+reason it sat open is worth more than the fix: **the CONSUMER was built first
+and the PRODUCER was never wired.** `identity_from_meta` has always read
+`source_meta["post_headline"]` for media_archive, and
+`SourceIdentity.is_degraded` returns True for that lane exactly when the
+headline is missing -- while `_rss_source_fetch_result` built `source_meta` as
+kind / source_ref / source_url / source_label / source_date and never the
+headline. Measured at HEAD on the exact shape the fetcher produces:
+`is_degraded` -> **True**. Every media_archive episode ever rendered carried a
+degraded identity, silently. **The intent was even written down and still did
+not match the code**: `tests/test_source_identity_coda.py:148-159` builds its
+fixture WITH `post_headline` and calls itself a *"verified key set"*. A fixture
+is not a contract.
+
+Stamped at selection time (the helper wraps the CHOSEN item, not the widget
+request) for BOTH RSS lanes rather than branching on `fetcher_kind` -- the
+phrase means the same thing on science and media_archive, so there is no
+one-field-two-meanings hazard and no reason to grow a per-lane branch inside a
+shared helper. Same instinct that made the selection half reuse science's news
+history instead of growing a second one.
+
+**THE FULL SUITE CAUGHT A REGRESSION THE REVIEW LANE MISSED, and that is the
+lesson to keep.** `tests/test_source_payload_chunk3.py:421-440` pins the
+science lane's `source_meta` by EXACT DICT EQUALITY, so the new key turned it
+red. The QA lane had explicitly checked for this and reported *"no source_meta
+key whitelist/diff schema was found"* -- true as worded, and wrong in effect,
+because the pin is an equality assertion rather than a schema. Expectation
+updated, NOT loosened to a subset check: an exact pin that catches a contract
+change is doing its job. A green review is not a green suite.
+
+**What the QA lane DID get right:** every test stopped at the helper. Producing
+a field is not the same as it ARRIVING -- the writer copies `source_meta`
+wholesale into durable meta but POPS `_news_seed_receipt` out of that same dict
+as transient, so a field sharing that fate would look perfect in every producer
+test and be absent from every ledger. Three carry tests now walk fetcher ->
+`normalize_fetch_result` -> receipt-pop -> `identity_from_meta` with nothing
+hand-built. 10 tests total.
 
 Review provenance, stated exactly: **NO four-round arc ran** -- the operator's
 2026-08-17 amendment routes work with one verifiable right answer away from

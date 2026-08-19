@@ -424,6 +424,12 @@ def test_science_rss_wrapper_forwards_runtime_policy(
         "source_url": "l",
         "source_label": "src",
         "source_date": "2026-07-05",
+        # PBUG-20260815-06 (durable-headline half, 2026-08-19): the SELECTED
+        # post's headline is now stamped at selection time, for both RSS
+        # lanes. This exact-equality pin is doing its job -- it is what caught
+        # the new key on the full suite -- so the expectation moves with the
+        # contract rather than the assertion being loosened to a subset check.
+        "post_headline": "h",
         "_news_seed_receipt": {
             "headline": "h",
             "source": "src",

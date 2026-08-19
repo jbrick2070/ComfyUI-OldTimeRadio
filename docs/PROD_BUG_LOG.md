@@ -5029,8 +5029,48 @@ only visible because the cameo was FORCED and then did not appear.
   and very portable check. A second, sharper candidate from the review: **an
   override branch gated on "is the value non-empty" rather than "does the value
   parse" silently reinstates the default it was meant to escape.**
-- status: **SELECTION FIXED AND TESTED 2026-08-19 (`3be1c1e1`); OPEN for the
-  durable-headline stamp.**
+- **DURABLE-HEADLINE HALF FIXED 2026-08-19. THE ROW IS NOW CLOSED, BOTH
+  HALVES.** The fix is one line of production code, and the reason it sat open
+  is worth more than the fix: **the CONSUMER was built first and the PRODUCER
+  was never wired.** `_otr_source_identity.identity_from_meta` has always read
+  `source_meta["post_headline"]` for this lane, and
+  `SourceIdentity.is_degraded` returns True for media_archive *exactly* when
+  that headline is missing -- while `_rss_source_fetch_result`
+  (`nodes/_otr_source_payload.py`) built `source_meta` as kind / source_ref /
+  source_url / source_label / source_date and never the headline. Measured at
+  HEAD before the fix, on the exact meta shape the fetcher produces:
+  `identity_from_meta(...).is_degraded` -> **True**. So every media_archive
+  episode ever rendered has carried a degraded identity, silently.
+- **The intent was even written down and still did not match the code.**
+  `tests/test_source_identity_coda.py:148-159` builds its media_archive
+  fixture with `post_headline` present and documents itself as a *"verified
+  key set"*. The test encoded the shape the producer was supposed to emit; the
+  producer never emitted it. A fixture is not a contract.
+- **What landed:** `post_headline` stamped from the already-validated
+  seven-key payload's `headline` key, at SELECTION time (the helper wraps the
+  chosen item, not the widget request that asked for one), for BOTH RSS lanes
+  rather than branching on `fetcher_kind` -- the phrase means the same thing on
+  science and media_archive, so there is no one-field-two-meanings hazard and
+  no reason to grow a per-lane branch in a shared helper. 10 tests.
+- **THE FULL SUITE CAUGHT A REGRESSION THE REVIEW LANE MISSED.**
+  `tests/test_source_payload_chunk3.py:421-440` asserts the science lane's
+  `source_meta` by EXACT dict equality, so the new key turned it red. The QA
+  lane had reported "no source_meta key whitelist/diff schema was found" --
+  true as stated, and still wrong in effect, because the pin was an equality
+  assertion rather than a schema. The expectation was updated rather than the
+  assertion loosened to a subset check: an exact pin that catches a contract
+  change is doing its job. **This is why the suite runs even when a review
+  says ship.**
+- **What the QA lane DID get right** was that every test stopped at the
+  helper. Producing the field is not the same as it ARRIVING: the writer
+  copies `source_meta` wholesale into durable `meta["source_meta"]` but POPS
+  `_news_seed_receipt` out of that same dict as transient, so a field sharing
+  that fate would look perfect in every producer test and be absent from every
+  ledger. Three carry tests now walk fetcher -> `normalize_fetch_result` ->
+  receipt-pop -> `identity_from_meta`, with nothing hand-built.
+- status: **CLOSED 2026-08-19 -- both halves fixed and tested (selection
+  `3be1c1e1`, durable headline this commit). Unit-proven; a live
+  media_archive leg would confirm it end to end but nothing is unknown.**
 - status: OPEN -- diagnosed, fix specified, not yet landed.
 
 ## PBUG-20260815-07 -- the `original`-lane voice-gender report, INVESTIGATED AND NOT REPRODUCED

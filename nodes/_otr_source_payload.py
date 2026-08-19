@@ -601,12 +601,35 @@ def _rss_source_fetch_result(
     link = str(clean_payload.get("link") or "").strip()
     label = str(clean_payload.get("source") or "").strip()
     date = str(clean_payload.get("date") or "").strip()
+    # PBUG-20260815-06 (durable-headline half): the SELECTED post's own
+    # headline, stamped HERE because here is selection time -- this helper
+    # wraps the item that was chosen, not the widget request that asked for
+    # one. Without it an episode cannot name what it adapted.
+    #
+    # THIS FIELD WAS ALREADY BEING READ AND NEVER WRITTEN.
+    # `_otr_source_identity.identity_from_meta` reads
+    # `source_meta["post_headline"]` for the media_archive lane, and
+    # `SourceIdentity.is_degraded` returns True for that lane precisely when
+    # the headline is missing -- so EVERY media_archive episode has carried a
+    # degraded identity since that module was written. The consumer was built
+    # first and the producer was never wired; this is the missing half.
+    #
+    # Stamped for BOTH RSS lanes rather than branching on `fetcher_kind`.
+    # "the selected post's headline" means exactly the same thing on science
+    # and on media_archive, so there is no ONE-FIELD-TWO-MEANINGS hazard here
+    # and no reason to grow a per-lane branch inside a shared helper. The
+    # media_archive lane is the only one whose identity currently reads it;
+    # science stamping a true field it does not yet consume costs nothing and
+    # keeps the two lanes on one shape -- the same instinct that made the
+    # selection fix reuse science's news history instead of growing a second.
+    headline = str(clean_payload.get("headline") or "").strip()
     source_meta = {
         "kind": str(fetcher_kind),
         "source_ref": link,
         "source_url": link,
         "source_label": label,
         "source_date": date,
+        "post_headline": headline,
     }
     if news_seed_receipt:
         source_meta["_news_seed_receipt"] = dict(news_seed_receipt)
