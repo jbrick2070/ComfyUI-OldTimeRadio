@@ -149,9 +149,38 @@ def test_the_DiT_histogram_is_not_counted_as_the_encoder(tmp_path):
     assert c["reads"] == 1, "the DiT histogram leaked into the encoder count"
 
 
-@pytest.mark.parametrize("episodes,expected", [(1, 1), (2, 0)])
-def test_expect_episodes_scales_the_allowance(tmp_path, episodes, expected):
-    """Two episodes in one log legitimately read the encoder twice."""
+@pytest.mark.parametrize("episodes", [1, 2, 5])
+def test_expect_episodes_is_a_FLOOR_not_the_allowance(tmp_path, episodes):
+    """Two scope openings allow two reads no matter what the flag says.
+
+    THIS TEST USED TO ASSERT THE OPPOSITE and it was encoding a bug. It
+    demanded that two episodes under ``--expect-episodes 1`` FAIL -- but two
+    openings legitimately read the encoder twice, so that was the gate failing
+    a healthy run. The flag is a floor for the degenerate single-scope case;
+    the observed opening count is the real allowance.
+    """
     lines = _cached_episode() + _cached_episode()
     assert audit_mod.main(
-        [_log(tmp_path, lines), "--expect-episodes", str(episodes)]) == expected
+        [_log(tmp_path, lines), "--expect-episodes", str(episodes)]) == 0
+
+
+def test_a_MIXED_ENGINE_leg_that_reopens_is_not_failed(tmp_path):
+    """A checker that fails a HEALTHY run is worse than no checker, because the
+    next real failure gets ignored along with it.
+
+    An episode crossing engines (ltx25 -> other -> ltx25) closes the scope at
+    the hand-off and opens a fresh one coming back, so it reads the encoder
+    twice and that is CORRECT. Gating on ``--expect-episodes 1`` would have
+    failed it; the allowance is the observed scope-opening count.
+    """
+    lines = _cached_episode(shots=3) + _cached_episode(shots=3)
+    assert audit_mod.main([_log(tmp_path, lines)]) == 0
+
+
+def test_but_an_extra_read_WITHOUT_an_extra_scope_still_fails(tmp_path):
+    """The allowance follows scope openings, so it cannot be gamed by a stray
+    reload inside one scope."""
+    lines = _cached_episode(shots=3)
+    lines.insert(-1, READ)
+    lines.insert(-1, PINNED)
+    assert audit_mod.main([_log(tmp_path, lines)]) == 1
