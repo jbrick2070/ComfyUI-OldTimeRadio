@@ -3975,8 +3975,10 @@ def run_episode(ledger, *, oom_shot_id=None,
             end = getattr(eng, "end_encoder_scope", None)
             if not (callable(begin) and callable(end)):
                 return
-            _scoped_engines[engine_id] = eng
-            begin()
+            # THE TOKEN IS RETAINED so this run closes ITS OWN ownership and
+            # not whatever scope happens to be open later. Adapters that
+            # return nothing still work -- the token is simply None.
+            _scoped_engines[engine_id] = (eng, begin())
         except Exception as _exc:  # noqa: BLE001 -- residency is best-effort
             _LOG.warning("[OTR video] episode scope not opened for %r: %s",
                          engine_id, _exc)
@@ -3985,27 +3987,29 @@ def run_episode(ledger, *, oom_shot_id=None,
         """Close ONE adapter's episode scope. Never raises.
 
         OWNERSHIP IS POPPED FIRST, so the `finally` sweep cannot double-close
-        and cannot spin retrying a hook that keeps failing. The cost of that
-        ordering is that a raising close has no second chance from the sweep --
-        so it gets one here: a hard release, which is the whole point of the
-        mechanism and must not be lost to an exception in the polite path.
+        and cannot spin retrying a hook that keeps failing.
+
+        A FAILED CLOSE IS LOGGED, NOT ESCALATED TO A GLOBAL RELEASE. An earlier
+        version reached for ``release_encoder_cache()`` here as a belt-and-
+        braces cure, and the r4 panel showed the cure was worse: that call
+        drops the cache for EVERY owner, so one run's failing close would
+        destroy a concurrent run's live cache. Losing this run's share of a
+        cache is a slow render; taking someone else's is a broken one.
         """
-        eng = _scoped_engines.pop(engine_id, None)
-        if eng is None:
+        entry = _scoped_engines.pop(engine_id, None)
+        if entry is None:
             return
+        eng, token = entry
         try:
-            eng.end_encoder_scope()
+            try:
+                eng.end_encoder_scope(token)
+            except TypeError:      # adapter predates the token argument
+                eng.end_encoder_scope()
         except Exception as _exc:  # noqa: BLE001 -- runs from cleanup paths
             _LOG.warning("[OTR video] episode scope not closed for %r: %s -- "
-                         "forcing a hard release", engine_id, _exc)
-            try:
-                release = getattr(eng, "release_encoder_cache", None)
-                if callable(release):
-                    release()
-            except Exception as _exc2:  # noqa: BLE001 -- last resort
-                _LOG.warning("[OTR video] hard release ALSO failed for %r: %s "
-                             "-- this engine is holding its cache until the "
-                             "process exits", engine_id, _exc2)
+                         "this run's claim is leaked rather than forcing a "
+                         "release that would evict other owners too",
+                         engine_id, _exc)
 
     try:
         for shot in section["shots"]:

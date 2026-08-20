@@ -54,6 +54,8 @@ class _ScopeStubBase:
     def __init__(self):
         self.events = []
         self.open_scopes = 0
+        self.generation = 0
+        self.tokens_seen = []
 
     def load(self):
         pass
@@ -78,16 +80,23 @@ class _ScopeStubBase:
         self.events.append("begin")
         _EPISODE_EVENTS.append(("begin", self.name))
         self.open_scopes += 1
+        self.generation += 1
+        return self.generation
 
-    def end_encoder_scope(self):
+    def end_encoder_scope(self, token=None):
+        """Mirrors the real adapter: a stale token is a no-op."""
+        self.tokens_seen.append(token)
+        if token is not None and token != self.generation:
+            return
         self.events.append("end")
         _EPISODE_EVENTS.append(("end", self.name))
         self.open_scopes -= 1
 
     def release_encoder_cache(self):
-        """The hard-release fallback. Present on the stub because the real
-        adapter has it and the driver reaches for it when the polite close
-        raises -- a stub that omits it cannot exercise that path."""
+        """The kill-switch path. Present on the stub because the real adapter
+        has it, and because one test asserts the driver does NOT reach for it
+        on a failing close -- an assertion that would be vacuous if the stub
+        could not offer it in the first place."""
         self.events.append("release")
         _EPISODE_EVENTS.append(("release", self.name))
         self.open_scopes = 0
@@ -322,7 +331,7 @@ def test_a_raising_end_hook_never_fails_the_episode(stub_registry,
                                                     monkeypatch):
     eng = stub_registry["scope_ok"]
 
-    def _boom():
+    def _boom(token=None):
         raise RuntimeError("release refused")
 
     monkeypatch.setattr(eng, "end_encoder_scope", _boom)
@@ -330,28 +339,32 @@ def test_a_raising_end_hook_never_fails_the_episode(stub_registry,
     assert out["trace"][0]["final_engine"] == "scope_ok"
 
 
-def test_a_raising_end_hook_still_gets_a_HARD_RELEASE(stub_registry,
-                                                      monkeypatch):
-    """A review lane caught that this case LEAKED and no test noticed.
+def test_a_raising_end_hook_does_NOT_globally_release(stub_registry,
+                                                     monkeypatch):
+    """THIS TEST ASSERTED THE OPPOSITE ONE ROUND AGO, and the r4 panel showed
+    the old behaviour was the more dangerous one.
 
-    The driver pops ownership BEFORE invoking the hook -- deliberately, so the
-    `finally` sweep cannot double-close or spin on a hook that keeps failing.
-    The cost is that a raising close gets no second chance from the sweep, so
-    the engine would keep its 8.86 GiB for the life of the process. The fix is
-    a hard release on the failure path; this proves it fires.
+    An earlier fix reached for ``release_encoder_cache()`` when the polite
+    close raised -- belt and braces. But that call drops the cache for EVERY
+    owner, so one run's failing close would destroy a CONCURRENT run's live
+    cache. Losing this run's share of a cache is a slow render; taking someone
+    else's is a broken one.
+
+    So a failed close now leaks this run's claim and says so, and must NOT
+    reach for the global release.
     """
     eng = stub_registry["scope_ok"]
     released = []
 
-    def _boom():
+    def _boom(token=None):
         raise RuntimeError("release refused")
 
     monkeypatch.setattr(eng, "end_encoder_scope", _boom)
     monkeypatch.setattr(eng, "release_encoder_cache",
                         lambda: released.append(True))
     rd.run_episode(_ledger("scope_ok"))
-    assert released == [True], (
-        "the polite close raised and nothing forced the cache out")
+    assert released == [], (
+        "a failing close evicted every other owner's cache as well")
 
 
 def test_a_raising_end_AND_a_raising_release_still_finish_the_episode(
@@ -360,7 +373,7 @@ def test_a_raising_end_AND_a_raising_release_still_finish_the_episode(
     a residency failure may never destroy them."""
     eng = stub_registry["scope_ok"]
 
-    def _boom():
+    def _boom(token=None):
         raise RuntimeError("refused")
 
     monkeypatch.setattr(eng, "end_encoder_scope", _boom)

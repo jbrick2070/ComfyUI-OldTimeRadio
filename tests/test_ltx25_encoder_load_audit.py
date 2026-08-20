@@ -141,6 +141,17 @@ def test_the_counts_are_what_they_claim(tmp_path):
     assert c["drops"] == 0
 
 
+def test_events_are_attributed_to_THEIR_OWN_scope(tmp_path):
+    """The correlation the whole instrument turns on."""
+    lines = _cached_episode(shots=3) + _cached_episode(shots=5)
+    scopes, unscoped = audit_mod.parse_scopes(_log(tmp_path, lines))
+    assert len(scopes) == 2
+    assert [s["renders"] for s in scopes] == [3, 5]
+    assert [s["reads"] for s in scopes] == [1, 1]
+    assert all(s["closed"] for s in scopes)
+    assert unscoped["renders"] == 0
+
+
 def test_the_DiT_histogram_is_not_counted_as_the_encoder(tmp_path):
     """The transformer prints its own qtype line. Matching it would count the
     10.7 GiB DiT as an encoder read and make every leg look broken."""
@@ -149,19 +160,21 @@ def test_the_DiT_histogram_is_not_counted_as_the_encoder(tmp_path):
     assert c["reads"] == 1, "the DiT histogram leaked into the encoder count"
 
 
-@pytest.mark.parametrize("episodes", [1, 2, 5])
-def test_expect_episodes_is_a_FLOOR_not_the_allowance(tmp_path, episodes):
-    """Two scope openings allow two reads no matter what the flag says.
+@pytest.mark.parametrize("episodes,expected", [(1, 0), (2, 0), (5, 1)])
+def test_expect_episodes_is_a_MINIMUM_SCOPE_COUNT(tmp_path, episodes, expected):
+    """The flag's meaning has now changed TWICE, and both changes were fixes.
 
-    THIS TEST USED TO ASSERT THE OPPOSITE and it was encoding a bug. It
-    demanded that two episodes under ``--expect-episodes 1`` FAIL -- but two
-    openings legitimately read the encoder twice, so that was the gate failing
-    a healthy run. The flag is a floor for the degenerate single-scope case;
-    the observed opening count is the real allowance.
+    v1 it was the read allowance -- which failed a healthy mixed-engine leg,
+    because crossing engines legitimately reopens a scope. v2 it became a floor
+    on that allowance. v3 (here) the allowance is gone entirely: each scope is
+    gated on its OWN reads, so the only thing left for a flag to say is HOW MANY
+    SCOPES MUST EXIST. Asking for five and finding two is now a failure, and
+    that is right -- it is the difference between "I saw what I expected" and
+    "I saw something".
     """
     lines = _cached_episode() + _cached_episode()
     assert audit_mod.main(
-        [_log(tmp_path, lines), "--expect-episodes", str(episodes)]) == 0
+        [_log(tmp_path, lines), "--expect-episodes", str(episodes)]) == expected
 
 
 def test_a_MIXED_ENGINE_leg_that_reopens_is_not_failed(tmp_path):
@@ -183,4 +196,41 @@ def test_but_an_extra_read_WITHOUT_an_extra_scope_still_fails(tmp_path):
     lines = _cached_episode(shots=3)
     lines.insert(-1, READ)
     lines.insert(-1, PINNED)
+    assert audit_mod.main([_log(tmp_path, lines)]) == 1
+
+
+# --- per-scope correlation: the r4 findings -------------------------------- #
+def test_a_GOOD_scope_cannot_subsidise_a_BAD_one(tmp_path):
+    """THE AGGREGATION HOLE. Summing every line into one counter set let a
+    scope that reloaded twice pass, because a second EMPTY scope had raised the
+    global allowance. Each scope is now judged on its own events."""
+    bad = [OPEN, RENDER, MISS, READ, PINNED,
+           RENDER, DROP, MISS, READ, PINNED,
+           RENDER, HIT, CLOSE]
+    empty = [OPEN, CLOSE]
+    assert audit_mod.main([_log(tmp_path, bad + empty)]) == 1
+
+
+def test_an_EMPTY_scope_grants_no_allowance(tmp_path):
+    """Reachable for real: the driver opens the scope before building the
+    request, so a request-building failure closes an empty one."""
+    lines = [OPEN, CLOSE] + _cached_episode(shots=3)
+    assert audit_mod.main([_log(tmp_path, lines)]) == 0
+    lines_bad = [OPEN, CLOSE, OPEN, RENDER, MISS, READ, PINNED,
+                 RENDER, MISS, READ, PINNED, CLOSE]
+    assert audit_mod.main([_log(tmp_path, lines_bad)]) == 1
+
+
+def test_an_UNSCOPED_diagnostic_render_does_not_fail_a_good_episode(tmp_path):
+    """A perfect episode must not be failed because the same server log also
+    contains the supported unscoped ``render_single`` path, whose load is
+    deliberately uncached (`eng_ltx25` documents that)."""
+    diagnostic = [RENDER, MISS, READ, PINNED]
+    assert audit_mod.main(
+        [_log(tmp_path, diagnostic + _cached_episode(shots=4))]) == 0
+
+
+def test_a_scope_that_never_closes_still_fails(tmp_path):
+    lines = _cached_episode(shots=3)
+    lines.remove(CLOSE)
     assert audit_mod.main([_log(tmp_path, lines)]) == 1

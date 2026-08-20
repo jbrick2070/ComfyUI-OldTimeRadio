@@ -1,23 +1,32 @@
-"""Count LTX 2.5 text-encoder disk loads against shot renders in a server log.
+"""Prove the LTX 2.5 episode-scoped text-encoder cache actually held, per scope.
 
-THE ACCEPTANCE INSTRUMENT for the episode-scoped encoder cache. Before the
-cache, a live canonical leg read the 8.86 GiB Gemma-4 12B Q5 GGUF encoder once
-per shot -- 13 loads for 13 renders, a 1:1 ratio counted in
-``tmp/ltx25_g8_server.log`` on 2026-08-20. After it, an episode should read the
-encoder ONCE and hit the cache for every later shot.
+THE ACCEPTANCE INSTRUMENT. Before the cache, a live canonical leg read the
+8.86 GiB Gemma-4 12B Q5 GGUF encoder once per shot -- **31 loads for 31 renders**
+on 2026-08-20, ratio 1.00. After it, ONE cache scope should read the encoder
+ONCE and hit for every later shot in that scope.
 
-It counts the LOADER'S OWN log line, not the adapter's claim about itself. The
-GGUF text-encoder read prints a distinctive qtype histogram, and the CLIP-side
-placement line prints once per constructed CLIP, so either is evidence the file
-was reopened -- whereas a "cache HIT" line the adapter writes about itself
-proves only that the adapter believes it.
+IT COUNTS THE LOADER'S OWN LOG LINE, never the adapter's claim about itself. The
+GGUF text-encoder read prints a distinctive qtype histogram and the CLIP-side
+placement line prints once per constructed CLIP; a "cache HIT" line the adapter
+writes about itself proves only that the adapter believes it.
+
+**IT CORRELATES PER SCOPE, and that is the whole design.** An earlier version
+summed every matching line into one counter set, which let a good scope subsidise
+a bad one: a scope that reloaded twice passed because a second, EMPTY scope had
+raised the global allowance. The same aggregation failed the opposite way -- a
+perfect episode failed if the same server log also contained the legitimate
+unscoped `render_single` diagnostic, whose load counted against the episode's
+budget. Both were found by the r4 review lane.
+
+So: events are attributed to the scope interval they occur in, unscoped events
+are REPORTED BUT NEVER GATED, and an empty scope grants nobody an allowance.
 
 Usage::
 
-    python scripts/otr_ltx25_encoder_load_audit.py <server.log> [--expect-episodes N]
+    python scripts/otr_ltx25_encoder_load_audit.py <server.log>
 
-Exit 0 when the ratio is at or below one load per episode, 1 otherwise, so it
-can gate a leg rather than merely describe one.
+Exit 0 only on positive evidence of reuse; 1 otherwise, so it can gate a leg
+rather than merely describe one.
 """
 
 from __future__ import annotations
@@ -39,134 +48,168 @@ CACHE_HIT = re.compile(r"encoder cache HIT")
 CACHE_MISS = re.compile(r"encoder cache MISS")
 SCOPE_OPEN = re.compile(r"encoder cache scope OPEN")
 SCOPE_CLOSED = re.compile(r"encoder cache scope CLOSED")
-#: THE SILENT-DEGRADATION SIGNAL, and the reason this pattern is in the audit
-#: rather than only in the log. ``render_clip``'s ``finally`` runs
+#: THE SILENT-DEGRADATION SIGNAL. ``render_clip``'s ``finally`` runs
 #: ``reclaim_idle_models`` on EVERY shot, which detaches every resident patcher
 #: -- the cached CLIP included. ``_cached_clip_is_live`` catches a patcher left
-#: unusable by that and degrades to a full reload, which is SAFE but silent:
-#: the render is correct, the wall clock is exactly the pre-cache behaviour, and
-#: nothing fails. So the audit names it explicitly instead of letting a
-#: never-hitting cache read as a working one.
+#: unusable and degrades to a full reload, which is SAFE but silent: the render
+#: is correct and the wall clock is exactly the pre-cache behaviour. Named here
+#: so a never-hitting cache cannot read as a working one.
 PLACEMENT_DROP = re.compile(r"dropping the cached text encoder")
+
+_FIELDS = ("reads", "pinned", "renders", "hits", "misses", "drops")
+
+
+def _blank(**extra):
+    d = dict.fromkeys(_FIELDS, 0)
+    d.update(extra)
+    return d
+
+
+def parse_scopes(path):
+    """Split a server log into cache-scope intervals plus the unscoped rest.
+
+    Returns ``(scopes, unscoped)``. Each scope carries its own counters and a
+    ``closed`` flag; ``unscoped`` collects everything outside any interval,
+    which is the legitimate ``render_single`` diagnostic path and is reported
+    rather than gated.
+    """
+    scopes, unscoped, cur = [], _blank(), None
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if SCOPE_OPEN.search(line):
+                if cur is not None:          # an open with no matching close
+                    scopes.append(cur)
+                cur = _blank(closed=False)
+                continue
+            if SCOPE_CLOSED.search(line):
+                if cur is not None:
+                    cur["closed"] = True
+                    scopes.append(cur)
+                    cur = None
+                continue
+            bucket = cur if cur is not None else unscoped
+            if TEXT_ENCODER_READ.search(line):
+                bucket["reads"] += 1
+            if ENCODER_PINNED.search(line):
+                bucket["pinned"] += 1
+            if SHOT_RENDER.search(line):
+                bucket["renders"] += 1
+            if CACHE_HIT.search(line):
+                bucket["hits"] += 1
+            if CACHE_MISS.search(line):
+                bucket["misses"] += 1
+            if PLACEMENT_DROP.search(line):
+                bucket["drops"] += 1
+    if cur is not None:
+        scopes.append(cur)
+    return scopes, unscoped
 
 
 def audit(path):
-    counts = dict.fromkeys(
-        ("reads", "pinned", "renders", "hits", "misses", "opens", "closes",
-         "drops"), 0)
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            if TEXT_ENCODER_READ.search(line):
-                counts["reads"] += 1
-            if ENCODER_PINNED.search(line):
-                counts["pinned"] += 1
-            if SHOT_RENDER.search(line):
-                counts["renders"] += 1
-            if CACHE_HIT.search(line):
-                counts["hits"] += 1
-            if CACHE_MISS.search(line):
-                counts["misses"] += 1
-            if SCOPE_OPEN.search(line):
-                counts["opens"] += 1
-            if SCOPE_CLOSED.search(line):
-                counts["closes"] += 1
-            if PLACEMENT_DROP.search(line):
-                counts["drops"] += 1
-    return counts
+    """Aggregate totals across the whole log. Descriptive only.
+
+    KEPT FOR REPORTING, NOT FOR GATING -- summing across scopes is exactly the
+    bug this instrument was fixed for. :func:`main` gates on
+    :func:`parse_scopes`.
+    """
+    scopes, unscoped = parse_scopes(path)
+    total = _blank()
+    for part in list(scopes) + [unscoped]:
+        for f in _FIELDS:
+            total[f] += part[f]
+    total["opens"] = len(scopes)
+    total["closes"] = sum(1 for s in scopes if s.get("closed"))
+    return total
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("log")
     ap.add_argument("--expect-episodes", type=int, default=1,
-                    help=("FLOOR for how many encoder loads are allowed "
-                          "(default 1). The real allowance is the number of "
-                          "cache scopes actually OPENED, because an episode "
-                          "that crosses engines legitimately reopens one."))
+                    help=("Minimum number of cache scopes that must appear "
+                          "(default 1). Each scope is then gated on its OWN "
+                          "events; scopes never share an allowance."))
     args = ap.parse_args(argv)
 
-    c = audit(args.log)
-    print("shot renders started      : %d" % c["renders"])
-    print("text-encoder DISK reads   : %d" % c["reads"])
-    print("encoder CLIPs constructed : %d" % c["pinned"])
-    print("adapter says HIT / MISS   : %d / %d" % (c["hits"], c["misses"]))
-    print("scopes OPENED / CLOSED    : %d / %d" % (c["opens"], c["closes"]))
-    print("cached encoder DROPPED    : %d" % c["drops"])
-
-    if not c["renders"]:
-        print("\nNO SHOT RENDERS IN THIS LOG -- nothing to audit.")
-        return 1
-
-    print("\nratio: %.2f encoder reads per shot render"
-          % (c["reads"] / float(c["renders"])))
+    scopes, unscoped = parse_scopes(args.log)
+    print("cache scopes found        : %d" % len(scopes))
+    for i, s in enumerate(scopes):
+        print("  scope %d: renders=%d reads=%d pinned=%d hits=%d misses=%d "
+              "drops=%d closed=%s" % (i, s["renders"], s["reads"], s["pinned"],
+                                      s["hits"], s["misses"], s["drops"],
+                                      s.get("closed")))
+    print("unscoped (diagnostic)     : renders=%d reads=%d"
+          % (unscoped["renders"], unscoped["reads"]))
 
     ok = True
-    # POSITIVE EVIDENCE FIRST -- THIS GATE USED TO FAIL OPEN AND THE r3 PANEL
-    # CAUGHT IT. The only check was ``reads > expected``, so a log with zero
-    # matched lines PASSED: regex drift against a renamed loader line, a
-    # truncated log, or the wrong file entirely all read as a clean run. An
-    # acceptance gate that cannot tell "proved good" from "saw nothing" is
-    # worse than no gate, because it is quoted as a receipt.
-    if c["reads"] == 0:
-        print("FAIL: zero text-encoder reads matched in a log with %d render(s)"
-              " -- the pattern did not match anything, so this proves NOTHING."
-              " Check the loader line format before trusting this file."
-              % c["renders"])
+
+    # POSITIVE EVIDENCE FIRST. This gate used to FAIL OPEN: its only check was
+    # ``reads > expected``, so a log with zero matched lines passed -- regex
+    # drift, a truncated log, or the wrong file entirely all read as clean and
+    # would have been quoted as a receipt. A gate that cannot tell "proved
+    # good" from "saw nothing" is worse than no gate.
+    if len(scopes) < max(1, args.expect_episodes):
+        print("\nFAIL: %d cache scope(s) found, expected at least %d -- the "
+              "driver never reached the adapter's hooks, so nothing was "
+              "exercised" % (len(scopes), max(1, args.expect_episodes)))
+        return 1
+
+    proved_reuse = False
+    for i, s in enumerate(scopes):
+        if not s.get("closed"):
+            # THE ONE CHECK THAT CANNOT DISTINGUISH "leaked" FROM "still
+            # running", because a log has no end-of-file marker. On a COMPLETED
+            # leg this is the 8.86 GiB leak and it is invisible in any ratio;
+            # on a leg still rendering it is simply the current scope. Say both,
+            # so nobody reads a mid-flight audit as a failure -- this instrument
+            # is for finished legs.
+            print("FAIL: scope %d opened and never closed. On a FINISHED leg "
+                  "that is the 8.86 GiB leak. If this leg is still rendering, "
+                  "this is the live scope and the audit is premature -- re-run "
+                  "it once the episode publishes." % i)
+            ok = False
+        if s["renders"] == 0:
+            # Reachable: the driver opens the scope before building the
+            # request, so a request-building failure closes an empty one.
+            # Harmless in itself, but it must never grant an allowance.
+            print("NOTE: scope %d rendered nothing (it grants no allowance)" % i)
+            continue
+        if s["reads"] > 1:
+            print("FAIL: scope %d read the encoder %d times -- one scope, one "
+                  "load" % (i, s["reads"]))
+            ok = False
+        if s["reads"] != s["pinned"]:
+            print("FAIL: scope %d has %d GGUF read(s) but %d CLIP(s) "
+                  "constructed -- a pattern has drifted and neither count can "
+                  "be trusted" % (i, s["reads"], s["pinned"]))
+            ok = False
+        if s["reads"] == 0:
+            print("FAIL: scope %d rendered %d shot(s) with no encoder read at "
+                  "all -- the pattern matched nothing, so this proves NOTHING"
+                  % (i, s["renders"]))
+            ok = False
+        if s["renders"] >= 2:
+            if s["hits"] == 0:
+                print("FAIL: scope %d ran %d renders and not one cache HIT -- "
+                      "it is loading every shot" % (i, s["renders"]))
+                ok = False
+            else:
+                proved_reuse = True
+        if s["drops"] and s["drops"] >= s["renders"] - 1:
+            print("FAIL: scope %d dropped its cached encoder %d time(s) across "
+                  "%d render(s) -- correct renders, zero benefit, and silent"
+                  % (i, s["drops"], s["renders"]))
+            ok = False
+
+    # ONE SHOT PROVES NO REUSE, and reuse is the entire claim.
+    if not proved_reuse:
+        print("FAIL: no scope rendered 2+ shots with a cache HIT -- nothing "
+              "here demonstrates reuse")
         ok = False
-    if c["opens"] == 0:
-        print("FAIL: no encoder cache scope was ever opened -- the driver never "
-              "reached the adapter's hooks, so the cache was not exercised")
-        ok = False
-    # ONE SHOT PROVES NO REUSE. Reuse is the whole claim, so the log has to
-    # contain at least one render that could have reused and did.
-    if c["renders"] < 2:
-        print("FAIL: %d render(s) in this log -- a single shot cannot "
-              "demonstrate reuse" % c["renders"])
-        ok = False
-    elif c["hits"] == 0:
-        print("FAIL: %d render(s) and not one cache HIT -- the cache is "
-              "loading every shot" % c["renders"])
-        ok = False
-    # The loader's two independent signals must agree; if they diverge, one of
-    # the patterns has drifted and neither count can be trusted.
-    if c["reads"] != c["pinned"]:
-        print("FAIL: %d GGUF read(s) but %d CLIP(s) constructed -- these must "
-              "match; a pattern has drifted" % (c["reads"], c["pinned"]))
-        ok = False
-    # THE REAL GATE, and the allowance is ONE READ PER SCOPE OPENING -- not per
-    # episode.
-    #
-    # WHY THE DISTINCTION IS NOT PEDANTRY: an episode that crosses engines
-    # (ltx25 -> humo -> ltx25) legitimately CLOSES the scope at the hand-off and
-    # opens a fresh one on the way back, so a perfectly healthy mixed-engine leg
-    # reads the encoder twice. Gating on ``--expect-episodes 1`` would fail it.
-    # That is the failure mode where an acceptance checker reports clean runs as
-    # broken and gets ignored -- which is worse than not having one, because the
-    # next real failure is ignored with it.
-    #
-    # ``--expect-episodes`` remains a FLOOR so a log with a single opening still
-    # gets checked; the observed opening count is the real allowance.
-    allowance = max(c["opens"], args.expect_episodes)
-    if c["reads"] > allowance:
-        print("FAIL: %d disk reads against %d scope opening(s) -- the cache is "
-              "not holding across beats" % (c["reads"], allowance))
-        ok = False
-    # A SCOPE THAT OPENS AND NEVER CLOSES IS THE LEAK THIS DESIGN EXISTS TO
-    # PREVENT, and it is invisible in the ratio.
-    if c["opens"] != c["closes"]:
-        print("FAIL: %d scope(s) opened but %d closed -- an episode leaked its "
-              "8.86 GiB encoder" % (c["opens"], c["closes"]))
-        ok = False
-    # A cache that is dropped every shot renders CORRECTLY and buys NOTHING.
-    # It must not read as a pass.
-    if c["drops"] and c["drops"] >= max(1, c["renders"] - args.expect_episodes):
-        print("FAIL: the cached encoder was dropped %d time(s) across %d "
-              "render(s) -- the cache is silently degrading to a full reload "
-              "every shot" % (c["drops"], c["renders"]))
-        ok = False
+
     if ok:
-        print("PASS: %d disk read(s) across %d shot render(s)"
-              % (c["reads"], c["renders"]))
+        print("\nPASS: every scope loaded the encoder at most once and reused "
+              "it thereafter")
     return 0 if ok else 1
 
 

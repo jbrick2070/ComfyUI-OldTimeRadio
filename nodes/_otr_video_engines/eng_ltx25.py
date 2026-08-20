@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_shared.role_compat import ROLES
@@ -649,6 +650,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: this refcount does not attempt to make it safe, only to stop the cache
     #: from being stranded or released out from under a live owner.)
     _encoder_scope_owners = 0
+    #: Bumped on every OPEN and on every hard RELEASE, so a close owed by a
+    #: previous owner can be recognised as stale instead of landing on the
+    #: current scope.
+    _encoder_generation = 0
+    #: The lifecycle is read-modify-write on shared state and the shipped
+    #: `/otr/video_render_*` routes run in UNGUARDED DAEMON THREADS
+    #: (``__init__.py:493-515``), so `owners += 1` across two threads can lose
+    #: an update. Class-level because the registry holds exactly one instance.
+    _encoder_lock = threading.Lock()
 
     def begin_encoder_scope(self):
         """Claim the encoder cache for ONE episode. Never raises.
@@ -657,28 +667,54 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         run are absorbed by the driver's own ownership map; repeated calls from
         DIFFERENT overlapping runs each take a reference, and the cache lives
         until the last one lets go.
+
+        RETURNS AN OPAQUE TOKEN the caller must hand back to
+        :meth:`end_encoder_scope`. ``None`` means no scope was taken.
         """
         if not _encoder_cache_enabled():
-            return
-        if self._encoder_scope is None:
-            self._encoder_scope = {}
-            _LOG.info("[%s] encoder cache scope OPEN (episode-owned)",
-                      self.name)
-        self._encoder_scope_owners = int(self._encoder_scope_owners) + 1
+            return None
+        with type(self)._encoder_lock:
+            if self._encoder_scope is None:
+                self._encoder_scope = {}
+                self._encoder_generation = int(self._encoder_generation) + 1
+                _LOG.info("[%s] encoder cache scope OPEN (episode-owned, "
+                          "generation %d)", self.name, self._encoder_generation)
+            self._encoder_scope_owners = int(self._encoder_scope_owners) + 1
+            return self._encoder_generation
 
-    def end_encoder_scope(self):
+    def end_encoder_scope(self, token=None):
         """Drop ONE owner's claim; release the cache when the last one goes.
 
         NEVER raises -- it runs from a ``finally``. This is the only thing
         standing between "one 8.86 GiB load per episode" and "8.86 GiB resident
         until the server restarts".
+
+        ``token`` IS WHAT MAKES A STALE CLOSE HARMLESS, and it exists because
+        the r4 panel found a failure needing no thread race at all::
+
+            begin(A)                  # generation 1, owners 1
+            release_encoder_cache()   # kill switch: scope gone, owners 0
+            begin(B)                  # a NEW scope
+            end(A)                    # ...closed B's scope, not A's
+
+        Nothing distinguished A's outstanding close from B's live ownership.
+        Now a release BUMPS THE GENERATION, so A's token no longer matches and
+        its close is a logged no-op. ``token=None`` keeps the old unconditional
+        behaviour for any caller that does not carry one.
         """
-        self._encoder_scope_owners = max(
-            0, int(self._encoder_scope_owners) - 1)
-        if self._encoder_scope_owners == 0 and self._encoder_scope is not None:
-            self._encoder_scope = None
-            _LOG.info("[%s] encoder cache scope CLOSED; the episode's text "
-                      "encoder is released", self.name)
+        with type(self)._encoder_lock:
+            if token is not None and token != self._encoder_generation:
+                _LOG.info("[%s] ignoring a stale encoder-scope close "
+                          "(token %s, current generation %s)",
+                          self.name, token, self._encoder_generation)
+                return
+            self._encoder_scope_owners = max(
+                0, int(self._encoder_scope_owners) - 1)
+            if (self._encoder_scope_owners == 0
+                    and self._encoder_scope is not None):
+                self._encoder_scope = None
+                _LOG.info("[%s] encoder cache scope CLOSED; the episode's text "
+                          "encoder is released", self.name)
 
     def release_encoder_cache(self):
         """Drop the cache NOW regardless of owners. Never raises.
@@ -690,11 +726,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         decrement would merely have taken one reference off a scope that
         several owners still hold open.
         """
-        had = self._encoder_scope is not None
-        self._encoder_scope = None
-        self._encoder_scope_owners = 0
-        if had:
-            _LOG.info("[%s] encoder cache RELEASED by kill switch", self.name)
+        with type(self)._encoder_lock:
+            had = self._encoder_scope is not None
+            self._encoder_scope = None
+            self._encoder_scope_owners = 0
+            # BUMP THE GENERATION so every outstanding token is now stale and
+            # the closes still owed by live owners cannot land on whatever
+            # scope opens next. Without this the kill switch is itself the ABA
+            # bug it was meant to be an escape hatch from.
+            self._encoder_generation = int(self._encoder_generation) + 1
+            if had:
+                _LOG.info("[%s] encoder cache RELEASED by kill switch "
+                          "(generation now %d)", self.name,
+                          self._encoder_generation)
 
     def _encoder_cache_key(self):
         """Identity of the LOADED encoder, or ``None`` to force a MISS.

@@ -322,6 +322,48 @@ def test_the_kill_switch_RELEASES_rather_than_decrements(eng):
     assert eng._encoder_scope_owners == 0
 
 
+def test_a_stale_close_after_a_kill_switch_release_cannot_shut_the_NEXT_scope(eng):
+    """THE ABA FAILURE THE r4 PANEL FOUND, and it needs NO thread race::
+
+        begin(A)                  # owners 1
+        release_encoder_cache()   # kill switch: scope gone, owners 0
+        begin(B)                  # a brand-new scope
+        end(A)                    # ...used to close B's scope, not A's
+
+    Nothing distinguished A's outstanding close from B's live ownership, so the
+    documented mid-run escape hatch was itself a way to strand the next
+    episode cold. A release now bumps the GENERATION, so A's token is stale and
+    its close is a logged no-op.
+    """
+    token_a = eng.begin_encoder_scope()
+    eng.release_encoder_cache()
+    token_b = eng.begin_encoder_scope()
+    assert token_b != token_a, "a new scope must not reuse the old generation"
+    eng._encoder_scope["clip"] = "B's encoder"
+
+    eng.end_encoder_scope(token_a)          # A's late, stale close
+    assert eng._encoder_scope is not None, "a stale close shut the new scope"
+    assert eng._encoder_scope.get("clip") == "B's encoder"
+
+    eng.end_encoder_scope(token_b)          # B's own close still works
+    assert eng._encoder_scope is None
+
+
+def test_a_token_from_a_still_valid_generation_closes_normally(eng):
+    """The guard must not break the ordinary path it is protecting."""
+    token = eng.begin_encoder_scope()
+    eng.end_encoder_scope(token)
+    assert eng._encoder_scope is None
+
+
+def test_a_tokenless_close_keeps_the_old_unconditional_behaviour(eng):
+    """``token=None`` is the compatibility path for any caller that does not
+    carry one; it must still decrement."""
+    eng.begin_encoder_scope()
+    eng.end_encoder_scope()
+    assert eng._encoder_scope is None
+
+
 def test_the_scope_is_per_instance_not_shared_by_the_class(eng):
     """The class-level default keeps the registry's zero-arg construction
     cheap, but a write must land on the INSTANCE or every engine in the
