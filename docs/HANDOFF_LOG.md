@@ -151,6 +151,16 @@ is already in PROD_BUG_LOG (lines 3450, 3500, 3946). Re-rolled and the second
 attempt is the proof above. **The audit refused to call that null run a pass** --
 "NO SHOT RENDERS -- nothing to audit", exit 1 -- which is the fail-open hole
 Codex found in r3 doing its job the first time it could have lied.
+**BIBLE: NOTHING PROMOTED, AND THAT IS A DECISION, NOT AN OMISSION.** The
+session's strongest portable lesson -- an acceptance gate that passes on ABSENT
+evidence -- was checked against the Bible before writing anything. Entry
+`12.87` (`gate-reports-success-from-its-own-error-path`) already owns the class:
+*"converts 'I could not check' into 'I checked and it was fine'"*. The
+fail-CLOSED half (a gate failing a healthy mixed-engine leg) is owned by
+`12.110`. Both are near-duplicates of what I would have written, so per the
+delta-scrape discipline nothing was promoted: Bible stays at **295**, regression
+**20/26/3**, and no README bump is owed.
+
 Suite **11237 / 114 / 1** on a settled tree (11146 baseline + exactly the 91
 tests added: 45 cache helpers, 14 driver wiring, 10 render_clip paths, 22 audit
 gate). Bible **20/26/3** at 295 entries, survival-guide HEAD `70cefcd` ==
