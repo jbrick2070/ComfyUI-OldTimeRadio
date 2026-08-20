@@ -140,8 +140,22 @@ cleanly. Worth knowing that the "one coder window" rule was not being observed,
 and that it only worked because the other window announced its scope in its
 commit message.
 
-Commits: `854dad53` (the cache), `4f5a7235` (audit allowance follows scope
-openings), `c18c0f12` (generation-token ownership + per-scope audit).
+Commits (OTR): `854dad53` the cache, `4f5a7235` audit allowance follows scope
+openings, `c18c0f12` generation-token ownership + per-scope audit, `89aceecf`
+the live proof, `61e92952` bible-decision note (superseded by the promotion
+above), `6f319394` the live queue. Survival-guide: `9a08b08` (12.117),
+`ceb8b55` (index header). The handoff commit lands ON TOP -- see the kickoff
+line for the real head.
+Next: **item I, and r4 is owed before any code.** Read
+`kibitz-runs/2026-08-20-item-I-wrong-person/r3/judgment.md` FIRST -- the
+design was overturned there and the item body in GO_FORWARD will send you
+down the path Bible `11.61` forbids.
+Box: idle. Server RESIDENT on :8000 (pid 42552, the post-proof boot), GPU at
+~1.7 GB desktop baseline, no leg running. **One ORPHANED `codex` process
+(pid 38788, started 01:47, output collected 02:45, idle since)** -- left
+alive deliberately rather than killed, because it could not be distinguished
+with certainty from an operator-launched Codex session. Reset per CLAUDE.md
+section 4 before any new GPU work.
 Box: reset per section 4 twice (VRAM -> 1117 MiB, port clear), server up in 16 s
 both times. The FIRST proof attempt died in the WRITER at 3 minutes --
 `scifi_news_pro` markup ladder exhausted on "JAMES GRIMMLEMANN" vs cast member
@@ -151,15 +165,35 @@ is already in PROD_BUG_LOG (lines 3450, 3500, 3946). Re-rolled and the second
 attempt is the proof above. **The audit refused to call that null run a pass** --
 "NO SHOT RENDERS -- nothing to audit", exit 1 -- which is the fail-open hole
 Codex found in r3 doing its job the first time it could have lied.
-**BIBLE: NOTHING PROMOTED, AND THAT IS A DECISION, NOT AN OMISSION.** The
-session's strongest portable lesson -- an acceptance gate that passes on ABSENT
-evidence -- was checked against the Bible before writing anything. Entry
-`12.87` (`gate-reports-success-from-its-own-error-path`) already owns the class:
-*"converts 'I could not check' into 'I checked and it was fine'"*. The
-fail-CLOSED half (a gate failing a healthy mixed-engine leg) is owned by
-`12.110`. Both are near-duplicates of what I would have written, so per the
-delta-scrape discipline nothing was promoted: Bible stays at **295**, regression
-**20/26/3**, and no README bump is owed.
+**BIBLE: `12.117` PROMOTED -- AND MY FIRST ANSWER HERE WAS WRONG.** I initially
+wrote that nothing was promoted, on the grounds that `12.87` already owns the
+"gate passes on absent evidence" class. That was true but I stopped there. On a
+second look prompted by the operator, the OWNERSHIP lesson -- the one that
+actually cost the session -- had **zero** Bible coverage: nothing on cache
+lifetime versus release-point, nothing on stale-token/ABA. Promoted as
+**`12.117`**, *"a cached handle outlives its owner because the release hook
+fires more often than the lifetime"*: the cache goes where the LIFETIME is, not
+where the object is; a registry singleton means "cache it on self" never ends;
+every per-unit hook fires too often and releasing on one is invisible because a
+missing cache degrades to the correct pre-cache path. Includes the ABA variant
+(no concurrency needed) and the rule that a failed close must not escalate to a
+global release. Its `verify` block carries the three ways the acceptance gate
+lied before it was right.
+Three-File Contract honoured: **295 -> 296**, README bumped in all three sites,
+regression **20/26/3**, index row appended. Survival-guide HEAD `ceb8b55` ==
+origin/main. **Also fixed there: the coverage index header said `294` while the
+Bible held 295** -- the `12.116` promotion appended its record and left the
+header behind, the exact drift that file exists to prevent.
+
+**GO_FORWARD_PLAN: a real live queue, and the archive split REFUSED with a
+reason.** The file opened with "forward-only... if a thing is DONE it does not
+belong here" and then ran 3,400 lines with the live list buried at line 462
+under a heading calling itself "lean". THE LIVE QUEUE is now the first thing
+after the operator block. **The 08-16 audit's archive split was attempted and
+rejected on inspection:** the bulk of the length is NOT receipts, it is sections
+already compressed to "What still binds:" rulings -- archiving them would move
+the RULES, not the history. That refusal is written into the file so it is not
+re-attempted blind.
 
 Suite **11237 / 114 / 1** on a settled tree (11146 baseline + exactly the 91
 tests added: 45 cache helpers, 14 driver wiring, 10 render_clip paths, 22 audit
