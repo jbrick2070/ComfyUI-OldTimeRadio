@@ -188,6 +188,54 @@ def _cpu_pinned_clip_loader(base_cls):
     return _CpuPinnedGgufClipLoader
 
 
+#: Kill switch for the episode-scoped encoder residency below. It is an
+#: opt-OUT flag, so the parse is the MIRROR of the ``voice_cast_mode`` opt-IN
+#: parse and the reasoning is inverted with it: that one had to reject ``""``
+#: and ``"false"`` as ENABLED once its default flipped, whereas here an unset
+#: or empty value correctly means "keep the default", and only an explicit
+#: disable token turns the cache off.
+_ENCODER_CACHE_ENV = "OTR_LTX25_ENCODER_CACHE"
+_CACHE_DISABLE_TOKENS = frozenset({"0", "false", "no", "off"})
+
+
+def _encoder_cache_enabled():
+    """ON unless explicitly disabled. Unset and empty both keep the default."""
+    return (os.environ.get(_ENCODER_CACHE_ENV, "") or "").strip().lower() \
+        not in _CACHE_DISABLE_TOKENS
+
+
+def _copy_conditioning(out):
+    """Hand out a PRIVATE outer list and metadata dicts; share the tensor.
+
+    Verified during the 2026-08-20 arc: nothing on this graph mutates a
+    conditioning in place -- ``LTXVConditioning`` goes through
+    ``node_helpers.conditioning_set_values`` (``node_helpers.py:9-23``,
+    ``n = [t[0], t[1].copy()]``), ``process_conds`` re-lists with
+    ``conds[k][:]`` (``samplers.py:1040``), and both
+    ``calculate_start_end_timesteps`` and
+    ``resolve_areas_and_cond_masks_multidim`` are copy-on-write.
+
+    So this is INSURANCE, not a fix, and it is taken anyway: the guarantee
+    depends on upstream ComfyUI internals nobody here controls, the copy is a
+    handful of dicts, and the failure it insures against is a silently wrong
+    render on every beat after the first rather than a crash.
+    """
+    if not (isinstance(out, (tuple, list)) and out):
+        return out
+    cond = out[0]
+    # ACCEPT A TUPLE HERE, NOT JUST A LIST. ComfyUI hands back a list today, but
+    # a narrower check would SILENTLY SKIP THE COPY if any upstream wrapper ever
+    # returned a tuple -- and a guard that quietly stops guarding is worse than
+    # no guard, because the receipts still say it is on.
+    if not isinstance(cond, (list, tuple)):
+        return out
+    cloned = [[e[0], dict(e[1])]
+              if isinstance(e, (list, tuple)) and len(e) >= 2
+              and isinstance(e[1], dict) else e
+              for e in cond]
+    return (type(cond)(cloned),) + tuple(out[1:])
+
+
 def _resolve(folder, name):
     """Resolve a model filename to a full path via ComfyUI ``folder_paths``.
 
@@ -547,6 +595,155 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             return (os.path.basename(path), -1, -1)
         return (os.path.basename(path), int(st.st_size), int(st.st_mtime_ns))
 
+    # ---- episode-scoped text-encoder residency -------------------------
+    #
+    # THE PROBLEM, COUNTED ON A LIVE LEG (2026-08-20): 15 shot renders, 13
+    # reads of the 8.86 GiB Gemma-4 12B Q5 GGUF text encoder. A ratio of 1:1 --
+    # every shot re-read the whole encoder off disk, ~63 s each, on top of a
+    # 54.2 s CPU encode. That wall clock is what decides how many episodes
+    # reach ``otr/obs/`` in a night.
+    #
+    # OWNERSHIP IS THE DESIGN, AND IT IS NOT THE OBVIOUS ONE. The cache is
+    # STORED on the engine instance but OWNED by an EPISODE, and the reason is
+    # that the engine instance is a process-lifetime SINGLETON: the registry
+    # builds one adapter at import (``engine_registry_base.py:148-150``) and
+    # ``get_engine`` hands back that same object forever. A cache that merely
+    # lived on ``self`` would therefore never end.
+    #
+    # EVERY ENGINE-LEVEL HOOK WAS MEASURED AND ALL OF THEM RUN TOO OFTEN:
+    # ``free_otr_pipeline_residue`` is this method's OWN per-shot preflight,
+    # ``teardown`` and ``unload`` run once per BEAT via ``BeatSession.close``,
+    # and the gpu_residency lease is acquired per beat. Evicting on any of
+    # them would drop the cache immediately before the thing that needed it.
+    # The real boundary is one layer up in the DRIVER -- ``run_episode`` --
+    # which is why ``begin_encoder_scope`` / ``end_encoder_scope`` exist and
+    # why they are called from there rather than from any engine hook.
+    #
+    # NO SCOPE OPEN == TODAY'S BEHAVIOUR, EXACTLY. ``_encoder_scope is None``
+    # means every shot loads its own encoder, which is what a direct
+    # ``render_single`` diagnostic or a unit test gets. Caching is a property
+    # of running an EPISODE, not of being this engine.
+    #: ``None`` = no episode owns the cache. A dict = an episode has claimed it
+    #: and is responsible for releasing it. Class-level default so the
+    #: registry's zero-arg construction stays cheap and no ``__init__``
+    #: override is needed; every write assigns on the INSTANCE.
+    _encoder_scope = None
+    #: HOW MANY OWNERS HOLD THE SCOPE OPEN. This is a REFCOUNT, not a flag, and
+    #: the reason is that the engine is a process-wide singleton while each
+    #: ``run_episode`` keeps its OWN private ownership map.
+    #:
+    #: THE BUG THIS PREVENTS, caught by the r3 panel: the shipped
+    #: `/otr/video_render_single` and `/otr/video_render_soak` routes start
+    #: UNGUARDED DAEMON THREADS (``__init__.py:493-515``), and the soak route
+    #: reaches ``run_episode``. With a bare flag, two overlapping runs both see
+    #: "already open", and whichever finishes FIRST sets the scope to ``None``
+    #: -- so the survivor's remaining beats run cold AND its private map still
+    #: records the engine as opened, so it never reopens. Silent, and it
+    #: restores one 8.86 GiB reload per beat for the rest of that episode.
+    #:
+    #: Sharing one cached encoder between overlapping episodes is safe on its
+    #: own terms -- the key is the weight file, so both runs want the same
+    #: CLIP. What was never safe was the LIFETIME, and that is what the count
+    #: fixes. (Concurrent heavy rendering is separately governed by the
+    #: cross-process gpu_residency lease and the sequential-execution rule;
+    #: this refcount does not attempt to make it safe, only to stop the cache
+    #: from being stranded or released out from under a live owner.)
+    _encoder_scope_owners = 0
+
+    def begin_encoder_scope(self):
+        """Claim the encoder cache for ONE episode. Never raises.
+
+        Called by ``render_driver.run_episode``. Repeated calls from the SAME
+        run are absorbed by the driver's own ownership map; repeated calls from
+        DIFFERENT overlapping runs each take a reference, and the cache lives
+        until the last one lets go.
+        """
+        if not _encoder_cache_enabled():
+            return
+        if self._encoder_scope is None:
+            self._encoder_scope = {}
+            _LOG.info("[%s] encoder cache scope OPEN (episode-owned)",
+                      self.name)
+        self._encoder_scope_owners = int(self._encoder_scope_owners) + 1
+
+    def end_encoder_scope(self):
+        """Drop ONE owner's claim; release the cache when the last one goes.
+
+        NEVER raises -- it runs from a ``finally``. This is the only thing
+        standing between "one 8.86 GiB load per episode" and "8.86 GiB resident
+        until the server restarts".
+        """
+        self._encoder_scope_owners = max(
+            0, int(self._encoder_scope_owners) - 1)
+        if self._encoder_scope_owners == 0 and self._encoder_scope is not None:
+            self._encoder_scope = None
+            _LOG.info("[%s] encoder cache scope CLOSED; the episode's text "
+                      "encoder is released", self.name)
+
+    def release_encoder_cache(self):
+        """Drop the cache NOW regardless of owners. Never raises.
+
+        Separate from :meth:`end_encoder_scope` on purpose: that one is a
+        refcount decrement and must not be used to mean "off". This is the
+        kill-switch path -- when the operator sets
+        ``OTR_LTX25_ENCODER_CACHE=0`` mid-run, the 8.86 GiB goes, and a
+        decrement would merely have taken one reference off a scope that
+        several owners still hold open.
+        """
+        had = self._encoder_scope is not None
+        self._encoder_scope = None
+        self._encoder_scope_owners = 0
+        if had:
+            _LOG.info("[%s] encoder cache RELEASED by kill switch", self.name)
+
+    def _encoder_cache_key(self):
+        """Identity of the LOADED encoder, or ``None`` to force a MISS.
+
+        ``None`` IS A REAL RETURN VALUE AND IT CLOSES A COLLISION. The obvious
+        key is ``_weight_receipt``, but that returns ``("<unresolved>", -1, -1)``
+        for an unresolvable path and ``(basename, -1, -1)`` on ``OSError`` --
+        so two DIFFERENT broken states can compare EQUAL and produce a false
+        HIT against a cache entry that has nothing to do with the weight now on
+        disk. A broken stat is not an identity; it is the absence of one, and
+        it is answered with a guaranteed miss.
+
+        Carries ``st_dev``/``st_ino`` and the real path on top of size and
+        mtime because this key now spans a whole episode rather than one
+        segment: a swapped symlink target or a same-size same-mtime file at a
+        different inode is exactly the case a longer-lived cache has to notice
+        and the per-segment receipt never had to.
+        """
+        name = str(self._text_encoder_name())
+        path = _resolve("text_encoders", name)
+        if not path:
+            return None
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return (os.path.realpath(path), st.st_dev, st.st_ino, st.st_size,
+                st.st_mtime_ns, name, "ltxv", ("cpu", "cpu"))
+
+    @staticmethod
+    def _cached_clip_is_live(out):
+        """Re-assert the CPU-pinned invariant on the CACHED handle.
+
+        Structural only -- no tensor work. A False here does NOT raise: it
+        drops the cache and falls through to a full load, and THAT load runs
+        the pinned loader, which raises :class:`CpuPinnedEncoderPlacementError`
+        if placement is genuinely broken. The loud refusal still happens, at
+        the site that already owns it, instead of being duplicated here.
+        """
+        clip = out[0] if isinstance(out, (tuple, list)) and out else None
+        patcher = getattr(clip, "patcher", None)
+        if clip is None or patcher is None:
+            return False
+        if getattr(patcher, "model", None) is None:
+            return False
+        load_dev = str(getattr(patcher, "load_device", None) or "")
+        off_dev = str(getattr(patcher, "offload_device", None) or "")
+        return "cpu" in load_dev and "cpu" in off_dev
+
     def session_identity(self):
         """What this adapter's resident handles ARE -- engine plus weights.
 
@@ -585,10 +782,21 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     def load(self):
         """Resolve the installed node CLASSES. No weights load here.
 
-        The DiT, the encoder and both VAEs are loaded by their loader nodes
-        inside the graph, which is precisely what lets ``free_after_use`` drop
-        the 8.9 GiB text encoder before the sampler runs -- the single biggest
-        reason this stack fits at all.
+        The DiT and both VAEs are loaded by their loader nodes inside the
+        graph, so ``free_after_use`` can drop each one after its last consumer.
+
+        THE TEXT ENCODER IS NO LONGER ALWAYS ONE OF THEM, and this docstring
+        said it was. Since the episode-scoped cache (2026-08-20) the ``te``
+        loader runs only on a cache MISS -- once per EPISODE rather than once
+        per shot. On a HIT the handle arrives as an ``external_results`` entry
+        and no loader node exists in the graph at all.
+
+        **What did NOT change is the VRAM story**, which is the part worth not
+        re-deriving: the encoder is pinned to CPU and the lab's own peak
+        decomposition puts it at 0.0 GiB at the sampling peak, so keeping it
+        resident costs system RAM (mmap-backed page cache), never headroom on
+        the card. This lane fits because the DiT is 9.80 GiB of a 14.48 GiB
+        peak, not because the encoder is evicted.
         """
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
@@ -891,14 +1099,93 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             _LOG.warning("[%s] pre-load residue free failed (non-fatal): %s",
                          self.name, exc)
 
+        # RESIDENCY: reuse this episode's text encoder and its empty negative.
+        # Both ride ``run_graph``'s existing ``external_results`` contract --
+        # ids that are legal Wire sources, are never re-executed, and are added
+        # to ``keep`` so ``free_after_use`` cannot evict them. That transport is
+        # already proven by the 25 tests in
+        # ``tests/test_video_wrapper_bridge_external_results.py``; what is new
+        # here is only WHO owns the handles and for how long.
+        #
+        # THE KILL SWITCH ALSO EVICTS. Flipping OTR_LTX25_ENCODER_CACHE=0 in a
+        # long-running server must not leave 8.86 GiB pinned by a scope opened
+        # before the flip, so a disabled cache closes any open scope rather
+        # than merely declining to read it.
+        external = {}
+        cache_on = _encoder_cache_enabled()
+        if not cache_on:
+            # HARD release, not a refcount decrement -- see
+            # ``release_encoder_cache``. "Off" means the memory goes, not that
+            # one of several owners lets go.
+            self.release_encoder_cache()
+        key = self._encoder_cache_key() if cache_on else None
+        scope = self._encoder_scope
+        # ``"clip" in scope`` RATHER THAN BARE TRUTHINESS. An open-but-empty
+        # scope is the normal state on beat 0 and after an invalidation, and
+        # ``if scope:`` reads that correctly only because the dict happens to be
+        # empty. The moment anything ever stores a bookkeeping key at open time,
+        # bare truthiness would walk an entry that has no encoder in it. Ask the
+        # question actually being asked: is there a cached CLIP here?
+        if scope and "clip" in scope:
+            # A MISS MUST *RELEASE*, NOT MERELY DECLINE TO READ. Leaving a
+            # keyed entry in place while its replacement loads holds TWO
+            # 8.86 GiB encoders at once, and if this graph then fails the stale
+            # one survives to the end of the episode. So an unusable entry is
+            # dropped the moment it is known to be unusable -- the SCOPE stays
+            # open (the episode still owns it), only its contents go.
+            stale = None
+            if key is None:
+                stale = "the encoder weight is unresolvable or unstattable"
+            elif scope.get("key") != key:
+                stale = "the encoder weight changed under the episode"
+            elif not self._cached_clip_is_live(scope.get("clip")):
+                stale = "the cached encoder failed its CPU-placement check"
+            if stale and scope.get("clip") is not None:
+                _LOG.warning("[%s] dropping the cached text encoder -- %s",
+                             self.name, stale)
+            if stale:
+                scope.clear()
+            else:
+                external["te"] = scope["clip"]
+                graph.pop("te", None)
+                if scope.get("neg") is not None:
+                    external["neg"] = _copy_conditioning(scope["neg"])
+                    graph.pop("neg", None)
+        _LOG.info("[%s] encoder cache %s / negative %s (scope %s)", self.name,
+                  "HIT" if "te" in external else "MISS",
+                  "HIT" if "neg" in external else "MISS",
+                  "open" if self._encoder_scope is not None else "none")
+
         # ``keep`` holds the two MODEL nodes (retained for V-4 teardown) and the
-        # terminal. Everything else -- crucially the text encoder -- is dropped
-        # by its last consumer.
+        # terminal.
+        #
+        # THE TEXT ENCODER'S FATE NOW DEPENDS ON THE CACHE, and this comment
+        # used to say flatly that it "is dropped by its last consumer" -- true
+        # before the episode cache and false after. On a MISS the ``te`` node is
+        # in the graph and IS dropped from ``results`` once ``pos`` and ``neg``
+        # have consumed it, exactly as before -- but ``_harvest`` has already
+        # taken a reference, so the object survives to be published. On a HIT
+        # the node is not in the graph at all; the handle arrives as an
+        # external, and ``run_graph`` adds every external to ``keep``, so
+        # ``free_after_use`` cannot touch it.
         results = images = None
+        #: Harvested DURING the graph, published only if it finishes. ``te`` is
+        #: dropped from ``results`` by ``free_after_use`` the moment ``pos`` and
+        #: ``neg`` have consumed it, so catching it as it lands is the only way
+        #: to hold it at all -- but see the publish block for why landing here
+        #: is not the same as being kept.
+        pending = {}
+
+        def _harvest(node_id, out):
+            if node_id in ("te", "neg"):
+                pending[node_id] = out
+
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
-            results = _wb.run_graph(graph, classes, free_after_use=True,
-                                    keep={"unet", "modality", self._TERMINAL})
+            results = _wb.run_graph(
+                graph, classes, free_after_use=True,
+                keep={"unet", "modality", self._TERMINAL},
+                external_results=external, on_result=_harvest)
             images = results[self._TERMINAL][0]
         finally:
             peak = probe.stop()
@@ -908,6 +1195,36 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         if images is None:
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)
+
+        # PUBLISH ON GRAPH SUCCESS, and only whole.
+        #
+        # THE BOUNDARY IS NAMED PRECISELY BECAUSE A REVIEW LANE CORRECTED AN
+        # EARLIER, LOOSER CLAIM HERE. This point is "the graph produced a
+        # terminal image" -- NOT "the render completed": the frame-count
+        # invariant, the tail trim and the ffprobe silent-clip proof all still
+        # lie below. Publishing here means the CONDITIONING and the ENCODER are
+        # known good, which is all this cache holds; a later ffprobe failure
+        # says nothing about either.
+        #
+        # NOT from inside ``on_result``, which is where it wants to go. That
+        # hook fires the instant each node lands, so publishing there commits a
+        # PARTIAL transaction -- state harvested from a graph that then died.
+        # (An earlier version of this comment justified that with "holding
+        # 8.86 GiB into the retry"; there IS no retry -- ``render_shot``
+        # classifies and re-raises, ``render_driver.py:3435-3447``. The real
+        # cost of publishing early is committing state from an unsuccessful
+        # graph; the real cost of publishing late is one extra load after a
+        # failure. The second is the cheaper mistake.)
+        #
+        # WHOLE, TOO: a scope that published ``te`` without ``neg`` would take
+        # the encoder reload off the clock while still paying the negative
+        # encode every shot -- a half-cache whose logs read like a working one.
+        scope = self._encoder_scope
+        if key is not None and scope is not None:
+            clip_out = pending.get("te") or external.get("te")
+            neg_out = pending.get("neg") or scope.get("neg")
+            if clip_out is not None and neg_out is not None:
+                scope.update({"key": key, "clip": clip_out, "neg": neg_out})
 
         frames = _wb.images_to_uint8(images)
         # THE PIPELINE INVARIANT, before any trim. The graph was asked for

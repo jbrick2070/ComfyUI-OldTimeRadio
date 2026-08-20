@@ -127,8 +127,20 @@ def test_sampler_and_steps_match():
 
 
 def test_every_cfg_is_exactly_one():
-    """Above 1.0 forces batch size 2 (positive + negative) and OOMs past the
-    clamp. This is a memory contract; do not 'tune' it."""
+    """CFG stays at 1.0. This is a memory contract; do not 'tune' it.
+
+    THE REASON GIVEN HERE USED TO BE FALSE. It said 1.0 keeps batch size 1 and
+    that anything above "forces batch size 2 (positive + negative)". Under the
+    locked sampler ``euler_ancestral_cfg_pp`` that is wrong: CFG++ forces
+    ``disable_cfg1_optimization=True``, so the unconditional branch is
+    evaluated at 1.0 TOO. The saving from staying at 1.0 is not a halved batch.
+
+    The lock still stands and is still a memory contract -- raising CFG raises
+    the peak and this stack has ~150 MiB of headroom on a clean box -- but a
+    window that trusts the old wording will mis-predict VRAM and will also
+    conclude the negative encode is free to delete. It is not: the negative is
+    LIVE and steers every step.
+    """
     _doc, g = _graph()
     _k, guider = _node(g, "LTXVDualCFGGuider")
     assert guider["inputs"]["video_cfg"] == R.LTX25_CFG_VIDEO == 1.0
@@ -138,7 +150,23 @@ def test_every_cfg_is_exactly_one():
 
 
 def test_the_negative_prompt_is_empty():
-    """Inert at CFG 1.0, so it is removed rather than carried."""
+    """The negative TEXT is empty. The negative CONDITIONING is not inert.
+
+    THIS DOCSTRING USED TO SAY *"Inert at CFG 1.0, so it is removed rather than
+    carried"* AND THAT WAS FALSE -- the fourth surviving copy of a premise the
+    2026-08-19 window believed it had corrected in three places, found by the
+    Codex lane on 2026-08-20. The ordinary ComfyUI rule (cfg 1.0 elides the
+    uncond) does NOT hold here: the locked sampler ``euler_ancestral_cfg_pp``
+    forces ``disable_cfg1_optimization=True`` and consumes ``uncond_denoised``
+    in its own step derivative, so the unconditional branch is computed every
+    step and steers the output.
+
+    The distinction matters because it is load-bearing twice over: it is why
+    the ``neg`` encode may never be wired from ``pos`` as a free optimisation,
+    and it is why the empty negative is worth CACHING per episode rather than
+    deleting. What this test asserts is unchanged -- the recipe carries an
+    empty negative STRING -- only the reason was wrong.
+    """
     _doc, g = _graph()
     texts = [v["inputs"].get("text") for v in g.values()
              if v.get("class_type") == "CLIPTextEncode"]

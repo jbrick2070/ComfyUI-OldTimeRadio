@@ -275,9 +275,23 @@ def test_every_weight_resolves_through_folder_paths():
 # --------------------------------------------------------------------------
 
 def test_the_locked_sampling_values_reach_the_graph(graph):
-    """No CFG above 1.0 (that doubles the batch and OOMs), 8 steps, the
-    ancestral sampler, and an EMPTY negative because a negative is inert at
-    CFG 1.0 anyway."""
+    """CFG 1.0 on all three, 8 steps, the ancestral sampler, empty negative.
+
+    TWO REASONS IN THE OLD WORDING WERE FALSE and both are corrected here,
+    because both invite a specific wrong "optimisation":
+
+    * *"that doubles the batch"* -- the locked ``euler_ancestral_cfg_pp``
+      forces ``disable_cfg1_optimization=True``, so the uncond is evaluated at
+      CFG 1.0 as well. The lock is still right; the arithmetic behind it was
+      not.
+    * *"a negative is inert at CFG 1.0 anyway"* -- it is NOT inert. CFG++
+      consumes ``uncond_denoised`` in its own step derivative, so the empty
+      negative steers every step. Wiring ``neg`` from ``pos`` to save a 12B
+      encode would silently change every render, and that exact proposal was
+      made and killed during the 2026-08-19 OOM panel.
+
+    The EMPTY negative is a recipe value, not an absent one.
+    """
     assert graph["guider"]["inputs"]["video_cfg"] == 1.0
     assert graph["guider"]["inputs"]["audio_cfg"] == 1.0
     assert graph["modality"]["inputs"]["modality_scale"] == 1.0

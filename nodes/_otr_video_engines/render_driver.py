@@ -3936,92 +3936,192 @@ def run_episode(ledger, *, oom_shot_id=None,
         _LOG.info("[OTR video] pre-render VRAM reclaim skipped: all selected "
                   "video engines are Partner/cloud")
     _last_engine = None
-    for shot in section["shots"]:
-        # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
-        # DIFFERENT engine than the one the prior beat left resident, drain the
-        # prior engine's residue and FLUSH the allocator, so two heavy engines
-        # never co-reside on the 16GB card -- the cause of the 29s/it edge
-        # page-thrash (ltx 12.5GB + humo 7GB -> 19.5GB). The per-beat teardown
-        # already DETACHES + waits, but it does not return the freed-but-cached
-        # blocks to the driver; the surgical Lever-1 freer's cuda flush does.
-        # SELECTIVE: same-engine consecutive beats SKIP this (no reload churn --
-        # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
-        # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
-        _this_engine = str(shot.get("engine_id") or "")
-        if _should_reclaim_between_engines(_last_engine, _this_engine):
-            try:
-                from .._otr_vram_levers import (
-                    free_otr_pipeline_residue as _free_residue)
-                _ir = _free_residue(
-                    reason="inter-beat %s->%s" % (_last_engine, _this_engine))
-                _LOG.warning(
-                    "[OTR video] inter-beat reclaim %s->%s: free_gb_after=%s",
-                    _last_engine, _this_engine, _ir.get("free_gb_after"))
-            except Exception as _exc:  # noqa: BLE001 -- best-effort, never fatal
-                _LOG.warning(
-                    "[OTR video] inter-beat reclaim skipped: %s", _exc)
-        if request_builder is not None:
-            request = request_builder(shot, ledger, canvas=canvas)
-        else:
-            request = build_request(shot, assets, frame_count, canvas)
-        # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
-        # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
-        # a collection hiccup must never perturb the render.
+    # EPISODE-SCOPED ENGINE RESIDENCY (2026-08-20). Some adapters can reuse a
+    # heavy handle across the beats of ONE episode -- LTX 2.5 re-read its
+    # 8.86 GiB text encoder on every shot, 13 loads for 13 renders on a live
+    # leg -- but they cannot own that decision themselves: the registry builds
+    # each adapter ONCE at import and hands back the same instance forever
+    # (``engine_registry_base.py:148-155``), so a cache kept on the adapter
+    # would never end. Every engine-level hook runs too often to be the
+    # release point (``teardown``/``unload`` are per BEAT), so the boundary is
+    # HERE, where an episode actually begins and ends.
+    #
+    # DUCK-TYPED, like ``session_identity`` and the optional ``frame_contract``.
+    # NOT like ``prepare``, which IS declared on the ``VideoEngine`` protocol
+    # (``registry.py:109``) -- an earlier version of this comment cited it as
+    # the precedent and was wrong. An adapter that declares nothing here is
+    # untouched and behaves exactly as it always has.
+    _scoped_engines = {}
+
+    def _begin_engine_scope(engine_id):
+        """Open an adapter's episode scope once. Never raises.
+
+        BOTH HALVES ARE REQUIRED BEFORE EITHER IS CALLED. An adapter with a
+        ``begin`` and no ``end`` would open a scope nothing can close, which is
+        the exact leak this whole mechanism exists to prevent -- so the pair is
+        checked up front rather than discovered at cleanup time.
+
+        The engine is recorded BEFORE ``begin()`` runs, so a hook that raises
+        part-way through still has an owner registered for the ``finally`` to
+        close.
+        """
+        if not engine_id or engine_id in _scoped_engines:
+            return
         try:
-            _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
-            _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
-            if _amp_wav:
-                amp_rows.append({
-                    "id": str(shot.get("shot_id") or ""),
-                    "start_s": float(shot.get("start_s") or 0.0),
-                    "dur_s": float(shot.get("dur_s") or 0.0),
-                    "_wav": str(_amp_wav),
-                })
-        except Exception:  # noqa: BLE001 -- profiling collection is never fatal
-            pass
-        # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
-        # A shot with no coverage plan or a single-clip one goes straight to
-        # render_shot with the request already built above -- unchanged. A
-        # multi-segment plan opens ONE beat session, renders each segment from
-        # its own request, chains terminal frames inside the loop, and assembles
-        # the result before it comes back.
-        clip, out_shot, attempts, used = render_beat_coverage(
-            shot, ledger, request=request, request_builder=request_builder,
-            canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
-            host_caps=_episode_host_caps, profile=_episode_profile)
-        # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
-        # raises RenderError; there are no runtime fallback decisions and no
-        # AS-2 family-change group prune (the family can never change here).
-        clips[out_shot["shot_id"]] = clip
-        new_shots.append(out_shot)
-        row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
-               "final_engine": out_shot["engine_id"]}
-        # Round 5 F2: prompt observability rides the trace (durable in the
-        # node-92 /history report) -- the diversity gate + the operator's
-        # "did the prompts actually differ" check read these. The stamps live
-        # on the request's schema-real ``observability`` dict (W7-pre builder
-        # migration; the legacy top-level ``_<key>`` spelling is still read
-        # for hand-built requests).
-        obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
-        for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
-                    "prompt_chars", "init_source", "init_image",
-                    "i2v_still_missing", "video_seed",
-                    "visual_style", "prompt_field_source",
-                    # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
-                    # -- without these the keys never reach the node-92 report.
-                    "banana_route", "banana_table_version",
-                    "banana_substitutions", "banana_sha256_before",
-                    "banana_sha256_after", "banana_varieties"):
-            if key in obs:
-                row[key] = obs[key]
-            elif isinstance(request, dict) and ("_" + key) in request:
-                row[key] = request["_" + key]
-        trace.append(row)
-        if used:
-            vram_peak = max(vram_peak, int(used))
-        # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
-        # the next beat reclaims only when it crosses to a different engine.
-        _last_engine = str(out_shot.get("engine_id") or "")
+            if not _vreg.is_registered(engine_id):
+                return
+            eng = _vreg.get_engine(engine_id)
+            begin = getattr(eng, "begin_encoder_scope", None)
+            end = getattr(eng, "end_encoder_scope", None)
+            if not (callable(begin) and callable(end)):
+                return
+            _scoped_engines[engine_id] = eng
+            begin()
+        except Exception as _exc:  # noqa: BLE001 -- residency is best-effort
+            _LOG.warning("[OTR video] episode scope not opened for %r: %s",
+                         engine_id, _exc)
+
+    def _end_engine_scope(engine_id):
+        """Close ONE adapter's episode scope. Never raises.
+
+        OWNERSHIP IS POPPED FIRST, so the `finally` sweep cannot double-close
+        and cannot spin retrying a hook that keeps failing. The cost of that
+        ordering is that a raising close has no second chance from the sweep --
+        so it gets one here: a hard release, which is the whole point of the
+        mechanism and must not be lost to an exception in the polite path.
+        """
+        eng = _scoped_engines.pop(engine_id, None)
+        if eng is None:
+            return
+        try:
+            eng.end_encoder_scope()
+        except Exception as _exc:  # noqa: BLE001 -- runs from cleanup paths
+            _LOG.warning("[OTR video] episode scope not closed for %r: %s -- "
+                         "forcing a hard release", engine_id, _exc)
+            try:
+                release = getattr(eng, "release_encoder_cache", None)
+                if callable(release):
+                    release()
+            except Exception as _exc2:  # noqa: BLE001 -- last resort
+                _LOG.warning("[OTR video] hard release ALSO failed for %r: %s "
+                             "-- this engine is holding its cache until the "
+                             "process exits", engine_id, _exc2)
+
+    try:
+        for shot in section["shots"]:
+            # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
+            # DIFFERENT engine than the one the prior beat left resident, drain the
+            # prior engine's residue and FLUSH the allocator, so two heavy engines
+            # never co-reside on the 16GB card -- the cause of the 29s/it edge
+            # page-thrash (ltx 12.5GB + humo 7GB -> 19.5GB). The per-beat teardown
+            # already DETACHES + waits, but it does not return the freed-but-cached
+            # blocks to the driver; the surgical Lever-1 freer's cuda flush does.
+            # SELECTIVE: same-engine consecutive beats SKIP this (no reload churn --
+            # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
+            # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
+            _this_engine = str(shot.get("engine_id") or "")
+            # CLOSE THE OUTGOING ENGINE'S SCOPE ON *ANY* ENGINE CHANGE, and on
+            # its own condition -- NOT inside the reclaim gate below.
+            #
+            # THIS WAS A REAL BUG AND THE PANEL CAUGHT IT.
+            # ``_should_reclaim_between_engines`` ends in
+            # ``and not _is_cloud_video_engine(this)`` (:1885-1888), because a
+            # VRAM reclaim only matters before a LOCAL engine loads. Nesting
+            # the scope release inside it meant a local -> CLOUD hand-off never
+            # released the local engine's 8.86 GiB: the predicate is about
+            # whether to drain VRAM, and ownership is a different question that
+            # happens to have shared a line.
+            #
+            # Ordering still matters: the release runs BEFORE the reclaim, so
+            # the reclaim is not draining around the largest thing in the room.
+            if _last_engine and _this_engine and _this_engine != _last_engine:
+                _end_engine_scope(_last_engine)
+            if _should_reclaim_between_engines(_last_engine, _this_engine):
+                try:
+                    from .._otr_vram_levers import (
+                        free_otr_pipeline_residue as _free_residue)
+                    _ir = _free_residue(
+                        reason="inter-beat %s->%s" % (_last_engine, _this_engine))
+                    _LOG.warning(
+                        "[OTR video] inter-beat reclaim %s->%s: free_gb_after=%s",
+                        _last_engine, _this_engine, _ir.get("free_gb_after"))
+                except Exception as _exc:  # noqa: BLE001 -- best-effort, never fatal
+                    _LOG.warning(
+                        "[OTR video] inter-beat reclaim skipped: %s", _exc)
+            # OPEN THIS ENGINE'S EPISODE SCOPE. After the reclaim above, so a
+            # scope is never opened into memory that is about to be drained,
+            # and idempotent, so the 2nd..Nth beat on the same engine is free.
+            _begin_engine_scope(_this_engine)
+            if request_builder is not None:
+                request = request_builder(shot, ledger, canvas=canvas)
+            else:
+                request = build_request(shot, assets, frame_count, canvas)
+            # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
+            # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
+            # a collection hiccup must never perturb the render.
+            try:
+                _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
+                _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
+                if _amp_wav:
+                    amp_rows.append({
+                        "id": str(shot.get("shot_id") or ""),
+                        "start_s": float(shot.get("start_s") or 0.0),
+                        "dur_s": float(shot.get("dur_s") or 0.0),
+                        "_wav": str(_amp_wav),
+                    })
+            except Exception:  # noqa: BLE001 -- profiling collection is never fatal
+                pass
+            # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
+            # A shot with no coverage plan or a single-clip one goes straight to
+            # render_shot with the request already built above -- unchanged. A
+            # multi-segment plan opens ONE beat session, renders each segment from
+            # its own request, chains terminal frames inside the loop, and assembles
+            # the result before it comes back.
+            clip, out_shot, attempts, used = render_beat_coverage(
+                shot, ledger, request=request, request_builder=request_builder,
+                canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+                host_caps=_episode_host_caps, profile=_episode_profile)
+            # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
+            # raises RenderError; there are no runtime fallback decisions and no
+            # AS-2 family-change group prune (the family can never change here).
+            clips[out_shot["shot_id"]] = clip
+            new_shots.append(out_shot)
+            row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
+                   "final_engine": out_shot["engine_id"]}
+            # Round 5 F2: prompt observability rides the trace (durable in the
+            # node-92 /history report) -- the diversity gate + the operator's
+            # "did the prompts actually differ" check read these. The stamps live
+            # on the request's schema-real ``observability`` dict (W7-pre builder
+            # migration; the legacy top-level ``_<key>`` spelling is still read
+            # for hand-built requests).
+            obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
+            for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
+                        "prompt_chars", "init_source", "init_image",
+                        "i2v_still_missing", "video_seed",
+                        "visual_style", "prompt_field_source",
+                        # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
+                        # -- without these the keys never reach the node-92 report.
+                        "banana_route", "banana_table_version",
+                        "banana_substitutions", "banana_sha256_before",
+                        "banana_sha256_after", "banana_varieties"):
+                if key in obs:
+                    row[key] = obs[key]
+                elif isinstance(request, dict) and ("_" + key) in request:
+                    row[key] = request["_" + key]
+            trace.append(row)
+            if used:
+                vram_peak = max(vram_peak, int(used))
+            # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
+            # the next beat reclaims only when it crosses to a different engine.
+            _last_engine = str(out_shot.get("engine_id") or "")
+    finally:
+        # THE SCOPES CLOSE EVEN WHEN THE EPISODE DOES NOT FINISH. A raise
+        # anywhere in the loop -- an OOM, a refused beat, a bad ledger row --
+        # must still release the episode's heavy handles, or a failed render
+        # leaves 8.86 GiB pinned for the life of the server and the NEXT
+        # episode pays for this one's crash.
+        for _scoped_id in list(_scoped_engines):
+            _end_engine_scope(_scoped_id)
     section["shots"] = new_shots
     ledger["video"] = section
     return {"ledger": ledger, "clips": clips, "trace": trace,
