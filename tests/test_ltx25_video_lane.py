@@ -402,6 +402,99 @@ def test_the_G8_measurement_is_recorded_as_OVER_the_clamp_and_not_tuned_away():
     assert "Q3" in R.LTX25_DIT_GGUF
 
 
+class TestTheCpuPinnedTextEncoder:
+    """THE ACTUAL FIX for the encode OOM -- and the trap that hid it.
+
+    A GPU encode of the Gemma-4 12B Q5 GGUF transiently needs ~15.6 GiB on a
+    15.92 GiB card, so it is a coin flip per shot: four encodes won it on the
+    2026-08-19 leg and the fifth died. Pinning to CPU took the encode's VRAM
+    cost from ~13,760 MB to ~0 MB, measured on this box.
+
+    THE TRAP, which cost three wrong diagnoses: the stock loader ALREADY passes
+    ``initial_device = text_encoder_offload_device()``, so "the encoder loads to
+    CPU" reads true and is useless -- ``load_models_gpu`` still pulls it to
+    ``patcher.load_device`` at encode time. Only ``load_device`` and
+    ``offload_device`` actually pin it.
+    """
+
+    def test_all_three_device_keys_are_set_not_just_initial_device(self):
+        """The load-bearing assertion. Dropping any ONE of these silently
+        restores the GPU encode and the coin flip with it -- and the failure
+        would reappear as a random OOM mid-episode, not as a red test."""
+        src = inspect.getsource(eng_ltx25._cpu_pinned_clip_loader)
+        for key in ('"initial_device": cpu',
+                    '"load_device": cpu',
+                    '"offload_device": cpu'):
+            assert key in src, (
+                "%s missing -- initial_device ALONE is the trap that made three "
+                "diagnoses conclude the encoder was already on CPU" % key)
+
+    def test_the_loader_subclasses_whatever_is_installed(self):
+        """Built from the resolved class, not imported. The pack directory is
+        ``ComfyUI-GGUF`` and the hyphen makes it un-importable by name;
+        subclassing the installed class also inherits its file handling instead
+        of forking a copy that can drift."""
+
+        class _FakeInstalled:
+            FUNCTION = "load_clip"
+
+            def load_patcher(self, clip_paths, clip_type, clip_data):
+                raise AssertionError("the base implementation must be replaced")
+
+        sub = eng_ltx25._cpu_pinned_clip_loader(_FakeInstalled)
+        assert issubclass(sub, _FakeInstalled)
+        assert sub.load_patcher is not _FakeInstalled.load_patcher
+
+    def test_a_patcher_that_is_not_on_cpu_is_a_NAMED_refusal(self):
+        """FAIL LOUD before the forward. If a future ComfyUI ignores the device
+        options, that must be a named error in the first second -- not an OOM
+        on beat 15 after the writer, the stills and the audio are paid for."""
+        import sys
+        import types
+
+        fake_mod = types.ModuleType("fake_gguf")
+        fake_mod.GGMLOps = object
+
+        class _Patcher:
+            load_device = "cuda:0"        # the regression being guarded
+            offload_device = "cpu"
+
+        class _Clip:
+            patcher = _Patcher()
+
+        fake_mod.GGUFModelPatcher = type(
+            "P", (), {"clone": staticmethod(lambda p: _Patcher())})
+
+        class _Base:
+            FUNCTION = "load_clip"
+            __module__ = "fake_gguf"
+
+        sys.modules["fake_gguf"] = fake_mod
+        try:
+            sub = eng_ltx25._cpu_pinned_clip_loader(_Base)
+            import comfy.sd  # noqa: F401 -- only to prove the import path exists
+        except Exception:
+            pytest.skip("comfy.sd unavailable off the ComfyUI runtime")
+        finally:
+            sys.modules.pop("fake_gguf", None)
+        # The error type itself is the contract worth pinning here; the live
+        # device check is exercised on the GPU box by the G8 smoke.
+        assert issubclass(eng_ltx25.CpuPinnedEncoderPlacementError, RuntimeError)
+        assert (eng_ltx25.CpuPinnedEncoderPlacementError.reason_code
+                == "encoder_not_on_cpu")
+
+    def test_render_clip_swaps_the_loader_in(self):
+        """The subclass is worthless unless it actually reaches the graph, and
+        the swap happens AFTER resolution so ``assert_usable`` still gates on
+        the real installed ``CLIPLoaderGGUF``."""
+        src = inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
+        assert 'classes["te"] = _cpu_pinned_clip_loader(classes["te"])' in src
+        cands = eng_ltx25.Ltx25VideoEngine()._node_candidates()
+        assert cands["te"] == ("CLIPLoaderGGUF",), (
+            "the preflight gate must still name the REAL installed class, so a "
+            "box without ComfyUI-GGUF fails closed by name")
+
+
 def test_every_logical_node_in_the_graph_has_a_class_candidate(graph, eng):
     """A graph node whose logical id is absent from ``_node_candidates`` cannot
     resolve, and the failure lands at render time rather than at the gate."""

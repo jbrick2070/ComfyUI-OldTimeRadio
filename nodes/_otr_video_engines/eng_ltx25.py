@@ -101,6 +101,93 @@ _FLOOR_VIDEO_VAE = int(0.5 * _GiB)
 _FLOOR_AUDIO_VAE = int(0.1 * _GiB)
 
 
+class CpuPinnedEncoderPlacementError(RuntimeError):
+    """The text encoder did not end up on the CPU. FAIL LOUD, before any forward.
+
+    A RuntimeError rather than ``EngineUnusable``: the engine and the weights
+    are both fine. What is wrong is WHERE the encoder landed, and the cost of
+    not noticing is a random OOM twenty minutes into an episode rather than a
+    named refusal in the first second.
+    """
+
+    reason_code = "encoder_not_on_cpu"
+
+
+def _cpu_pinned_clip_loader(base_cls):
+    """Build a ``CLIPLoaderGGUF`` subclass that keeps the text encoder on CPU.
+
+    WHY THIS EXISTS -- the whole reason this lane crashed. A GPU-side encode of
+    the Gemma-4 12B Q5 GGUF transiently demands ~15.6 GiB: the quantised
+    weights move to the card and GGML dequant scratch lands on top. Against a
+    15.92 GiB limit with 1.5-2.2 GiB of Windows baseline, that is a COIN FLIP
+    per shot, and on the 2026-08-19 canonical leg four encodes won it and the
+    fifth did not (``node 'neg' (encode) raised OutOfMemoryError``).
+
+    MEASURED ON THIS BOX, not argued: pinning to CPU takes the encode's VRAM
+    cost from **~13,760 MB to ~0 MB**, at 26.6 s for the empty negative and
+    27.5 s for the positive. It does not mitigate the spike; it deletes it.
+
+    ``initial_device`` ALONE IS NOT ENOUGH, and that trap is why this is a
+    subclass rather than a one-line option. The stock loader already passes
+    ``initial_device = text_encoder_offload_device()``, which is why the
+    driver's first three diagnoses wrongly concluded the encoder was "already
+    on CPU" -- that key governs INITIAL placement only, and ``load_models_gpu``
+    still pulls the patcher to ``patcher.load_device`` when the encode runs.
+    Pinning requires ``load_device`` and ``offload_device`` too. ComfyUI's own
+    LTX loader uses exactly that pair.
+
+    Built DYNAMICALLY from the installed class rather than imported: the pack
+    directory is ``ComfyUI-GGUF``, whose hyphen makes it un-importable by name,
+    and subclassing whatever ``NODE_CLASS_MAPPINGS`` actually resolved means we
+    inherit the installed version's file handling instead of copying it.
+    """
+    ggml_module = __import__("sys").modules.get(base_cls.__module__)
+
+    class _CpuPinnedGgufClipLoader(base_cls):  # type: ignore[misc, valid-type]
+        """The stock loader with one method replaced."""
+
+        def load_patcher(self, clip_paths, clip_type, clip_data):
+            import torch
+            import comfy.sd
+            import folder_paths as _fp
+
+            cpu = torch.device("cpu")
+            clip = comfy.sd.load_text_encoder_state_dicts(
+                clip_type=clip_type,
+                state_dicts=clip_data,
+                model_options={
+                    "custom_operations": ggml_module.GGMLOps,
+                    # ALL THREE. Dropping any one of them silently restores the
+                    # GPU encode and the coin flip with it.
+                    "initial_device": cpu,
+                    "load_device": cpu,
+                    "offload_device": cpu,
+                },
+                embedding_directory=_fp.get_folder_paths("embeddings"),
+            )
+            clip.patcher = ggml_module.GGUFModelPatcher.clone(clip.patcher)
+
+            # FAIL LOUD, HERE, BEFORE THE FIRST FORWARD. A future ComfyUI that
+            # ignores these options must be a named refusal, not a mysterious
+            # OOM on beat 15 of somebody's episode.
+            load_dev = str(getattr(clip.patcher, "load_device", "?"))
+            off_dev = str(getattr(clip.patcher, "offload_device", "?"))
+            if "cpu" not in load_dev or "cpu" not in off_dev:
+                raise CpuPinnedEncoderPlacementError(
+                    "ltx25_video pins the Gemma text encoder to CPU because a "
+                    "GPU encode of this 12B Q5 GGUF transiently needs ~15.6 "
+                    "GiB and OOMs at random -- but the patcher came back with "
+                    "load_device=%s offload_device=%s. Refusing before the "
+                    "forward rather than rolling the dice."
+                    % (load_dev, off_dev))
+            _LOG.info("[ltx25_video] text encoder pinned to CPU "
+                      "(load=%s offload=%s); GPU encode spike avoided",
+                      load_dev, off_dev)
+            return clip
+
+    return _CpuPinnedGgufClipLoader
+
+
 def _resolve(folder, name):
     """Resolve a model filename to a full path via ComfyUI ``folder_paths``.
 
@@ -771,6 +858,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         classes = dict(getattr(self, "_classes", None)
                        or _wb.resolve_graph_classes(self._node_candidates()))
+        # SWAP THE TEXT-ENCODER LOADER FOR THE CPU-PINNED SUBCLASS.
+        #
+        # Done HERE, after resolution, deliberately -- the same shape
+        # ``eng_ltx_av`` uses to inject its in-adapter sigmas node. Keeping
+        # ``CLIPLoaderGGUF`` in ``_node_candidates`` means ``assert_usable``
+        # still gates on the real installed class, so a box without
+        # ComfyUI-GGUF fails closed BY NAME at preflight; the resolver never
+        # has to know this subclass exists.
+        classes["te"] = _cpu_pinned_clip_loader(classes["te"])
         image_name = _wb.stage_into_comfy_input(plan["init_image"])
         graph = self._build_graph(plan, image_name, length, width, height)
 
