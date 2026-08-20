@@ -372,6 +372,36 @@ def test_the_render_path_stamps_native_equal_to_delivered():
         "the pre-trim bookkeeping is gone; reintroducing it is the bug")
 
 
+def test_the_G8_measurement_is_recorded_as_OVER_the_clamp_and_not_tuned_away():
+    """THE G8 RECEIPT, pinned as arithmetic so it cannot soften into folklore.
+
+    Two renders, two instruments, one answer: this lane peaks at ~99% of the
+    card and 1324 MiB above what the lab reported. The point of pinning it is
+    that the temptation on a number like this is to make it smaller by moving
+    the canvas, and the operator's standing rule is the opposite -- a wrong
+    value is a finding to REPORT.
+
+    So this test asserts the uncomfortable facts stay stated: the measurement
+    is over the clamp, the independent sampler corroborates it, and the locked
+    recipe values are untouched.
+    """
+    over_clamp_mib = R.LTX25_OTR_MEASURED_PEAK_MIB - int(
+        R.LTX25_LAB_CLAMP_GIB * 1024)
+    assert over_clamp_mib > 0, (
+        "the measured peak is no longer over the clamp -- if that is a real "
+        "re-measurement, update the manifest narrative too")
+    assert R.LTX25_OTR_MEASURED_PEAK_MIB > int(
+        R.LTX25_LAB_OBSERVED_PEAK_GIB * 1024)
+    # the independent sampler is a FLOOR, not a competing answer
+    assert (R.LTX25_OTR_MEASURED_PEAK_FLOOR_MIB
+            <= R.LTX25_OTR_MEASURED_PEAK_MIB
+            <= R.LTX25_OTR_CARD_TOTAL_MIB)
+    # and the recipe was NOT tuned in response
+    assert (R.LTX25_CANVAS_W, R.LTX25_CANVAS_H) == (832, 480)
+    assert R.LTX25_FRAMES == 97 and R.LTX25_STEPS == 8
+    assert "Q3" in R.LTX25_DIT_GGUF
+
+
 def test_every_logical_node_in_the_graph_has_a_class_candidate(graph, eng):
     """A graph node whose logical id is absent from ``_node_candidates`` cannot
     resolve, and the failure lands at render time rather than at the gate."""
