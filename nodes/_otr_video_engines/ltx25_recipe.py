@@ -84,18 +84,50 @@ LTX25_SAMPLER = "euler_ancestral_cfg_pp"
 LTX25_STEPS = 8
 
 #: ALL THREE CFGs ARE 1.0 AND THAT IS A VRAM CONTRACT, NOT A TASTE SETTING.
-#: CFG 1.0 evaluates batch size 1. Any value above 1.0 forces batch size 2
-#: (positive + negative evaluated together) and the lab measured that pushing
-#: past 16 GiB -- an instant OOM against the 14.5 GiB clamp. So "turn the CFG up
-#: a little" is not a small change here; it doubles the batch.
+#: Raising any of them is measured by the lab to push past 16 GiB -- an instant
+#: OOM against the 14.5 GiB clamp. So "turn the CFG up a little" is not a small
+#: change here. Leave them.
+#:
+#: **THE MECHANISM ORIGINALLY GIVEN FOR THAT WAS WRONG -- CORRECTED 2026-08-19.**
+#: This note used to say "CFG 1.0 evaluates batch size 1; any value above 1.0
+#: forces batch size 2". That is the ordinary ComfyUI behaviour
+#: (``comfy/samplers.py``: ``sampling_function`` sets ``uncond_ = None`` when
+#: ``cond_scale`` is close to 1.0) -- but **it does not apply to this recipe**,
+#: because the locked sampler is CFG++:
+#: ``sample_euler_ancestral_cfg_pp`` explicitly passes
+#: ``disable_cfg1_optimization=True`` (``comfy/k_diffusion/sampling.py:1284``)
+#: and then CONSUMES ``uncond_denoised`` in its own derivative (``:1297``).
+#: So the unconditional branch is evaluated at CFG 1.0 on this lane, every step.
+#:
+#: THE NUMBER IS UNAFFECTED, THE REASONING IS NOT. The lab measured 14.48 GiB
+#: running THIS sampler, so whatever the true batching, the measurement already
+#: includes it. What was wrong was the explanation -- and it mattered, because
+#: it made an empty negative prompt look free (see ``LTX25_NEGATIVE_PROMPT``).
 LTX25_CFG_VIDEO = 1.0
 LTX25_CFG_AUDIO = 1.0
 LTX25_CFG_MODALITY = 1.0
 
-#: No negative prompt. Not a style choice: negative conditioning is INERT at
-#: CFG 1.0, so carrying one buys nothing and costs memory. This is also why
-#: "just add a negative to suppress X" is not available on this lane -- the
-#: only steering channel is the positive prompt.
+#: The negative prompt TEXT is empty. That is the recipe and it is locked.
+#:
+#: **BUT THE NEGATIVE CONDITIONING IS NOT INERT, AND THIS NOTE USED TO SAY IT
+#: WAS -- CORRECTED 2026-08-19.** The old wording ("negative conditioning is
+#: INERT at CFG 1.0, so carrying one buys nothing and costs memory") is the
+#: ordinary ComfyUI rule, and it is FALSE for this recipe: the locked sampler
+#: ``euler_ancestral_cfg_pp`` forces ``disable_cfg1_optimization=True``
+#: (``comfy/k_diffusion/sampling.py:1284``) and uses ``uncond_denoised`` in its
+#: step derivative (``:1297``). The unconditional branch really is computed,
+#: every step, and it really does steer the result.
+#:
+#: WHY THE ERROR WAS EXPENSIVE. Believing the negative was inert made an
+#: obvious-looking optimisation available -- feed the POSITIVE conditioning
+#: into both guider slots and skip a whole 12B encode. It would have silently
+#: changed every render on this lane. It was proposed during the 2026-08-19
+#: OOM panel, survived one reviewer, and was killed by another that checked
+#: which sampler was actually selected. Do not re-propose it.
+#:
+#: WHAT REMAINS TRUE: the empty STRING is the locked recipe value, and "just
+#: add a negative to suppress X" is still unavailable -- not because the
+#: channel is dead, but because the text is a locked recipe value.
 LTX25_NEGATIVE_PROMPT = ""
 
 # ---------------------------------------------------------------------------
@@ -266,11 +298,33 @@ LTX25_STAGING_REDUCES_PEAK = False
 #: Take 16152 as the peak and 15848 as its independent floor.
 #:
 #: **THAT IS 1324 MiB ABOVE THE LAB'S 14.48 GiB AND 1304 MiB OVER THE 14.5 GiB
-#: CLAMP -- roughly 99% of the card.** It is exactly the failure mode this
-#: family already has on record: in-pipeline peaks read HIGHER than isolation
-#: probes, which is how the sibling LTX lane breached the same ceiling at
-#: 14,716 MB after passing its own isolation bench. The 0.02 GiB of lab margin
-#: was, as this module's own note predicted, far too tight to inherit on trust.
+#: CLAMP -- roughly 99% of the card.**
+#:
+#: **WHAT THIS NUMBER IS, CORRECTED 2026-08-19 (r4/r5 panel).** This block first
+#: read the 16152 as in-pipeline SAMPLING pressure, on the family precedent that
+#: pipeline peaks exceed isolation probes. That reading is now believed WRONG and
+#: it matters, because it points debugging at the wrong phase.
+#:
+#: The peak is almost certainly the **TEXT ENCODE**, not the sampler. Evidence,
+#: from the canonical leg that OOM'd:
+#:   * the failure is ``node 'neg' (encode)``, a ``CLIPTextEncode`` on the EMPTY
+#:     string -- 13.76 GiB allocated, 1.88 GiB requested, 15.92 GiB limit;
+#:   * the residue-freer logged ``allocated 97 MB ... free=14669`` FIFTEEN
+#:     SECONDS earlier, so the card was nearly empty and the 13.76 GiB was built
+#:     entirely inside that one encode (Gemma-4 12B Q5 moving to GPU plus GGML
+#:     dequant transients);
+#:   * every loader in the graph is innocent: ``CLIPLoaderGGUF`` loads with
+#:     ``initial_device = text_encoder_offload_device()`` (CPU), the audio VAE is
+#:     never executed by ``LTXVEmptyLatentAudio``, and the video VAE's first use
+#:     is ``i2v`` -- which runs AFTER the failing node.
+#:
+#: **AND IT IS A RACE, NOT A CEILING.** In one episode log four encode phases
+#: succeeded and the fifth died under identical preflight state. A solo smoke
+#: that passes at 16152 is one coin-flip that landed, not a qualification --
+#: which is exactly how this lane came to be described as "proven".
+#:
+#: So the lab's 14.48 GiB SAMPLING decomposition above is not contradicted by
+#: this number; the two describe different phases. Do not reconcile them.
 #:
 #: **THIS IS A FINDING, NOT A KNOB** (operator, standing: a wrong value is
 #: reported, never tuned). Nothing here is adjusted in response to it: Q3,

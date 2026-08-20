@@ -582,11 +582,20 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                          "inputs": {"vae_name": self._audio_vae_name()}},
 
             # --- conditioning ---
-            # The negative is EMPTY and that is not a style choice: negative
-            # conditioning is INERT at CFG 1.0, so carrying one buys nothing and
-            # costs memory. It is also why "just add a negative to suppress X"
-            # is not available on this lane -- the positive prompt is the only
-            # steering channel there is.
+            # The negative TEXT is empty; that is the locked recipe value.
+            #
+            # THE NEGATIVE CONDITIONING IS *NOT* INERT, and this comment used to
+            # claim it was (corrected 2026-08-19). The ordinary ComfyUI rule --
+            # cfg 1.0 elides the uncond -- does NOT hold here, because the
+            # locked sampler `euler_ancestral_cfg_pp` forces
+            # `disable_cfg1_optimization=True` and consumes `uncond_denoised`
+            # in its own step derivative. The unconditional branch is computed
+            # every step and steers the output.
+            #
+            # SO DO NOT "OPTIMISE" THIS BY WIRING `neg` FROM `pos`. It looks
+            # free, it deletes a whole 12B encode, and it would silently change
+            # every render. That exact proposal was made during the OOM panel
+            # and killed by reading which sampler is selected.
             "pos": {"class": "pos",
                     "inputs": {"clip": W("te", 0), "text": positive}},
             "neg": {"class": "neg",
@@ -653,10 +662,14 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "modality_scale": R.LTX25_CFG_MODALITY,
                 "start_percent": 0.0, "end_percent": 1.0}},
             # ALL THREE CFGs ARE 1.0 AND THAT IS A VRAM CONTRACT, NOT TASTE.
-            # CFG 1.0 evaluates batch size 1; anything above forces batch size 2
-            # (positive and negative together) and the lab measured that past
-            # 16 GiB -- an instant OOM against the 14.5 GiB clamp. "Turn the CFG
-            # up a little" is not a small change here; it doubles the batch.
+            # The lab measured any higher value pushing past 16 GiB -- an
+            # instant OOM against the 14.5 GiB clamp. Leave them.
+            #
+            # The "cfg 1.0 means batch size 1" reasoning this comment used to
+            # give is WRONG for this recipe (corrected 2026-08-19): the CFG++
+            # sampler evaluates the uncond branch anyway. The measured 14.48 GiB
+            # already includes whatever that costs; it was the EXPLANATION that
+            # was wrong, not the number. See ltx25_recipe.LTX25_CFG_VIDEO.
             "guider": {"class": "guider", "inputs": {
                 "model": W("modality", 0),
                 "positive": W("cond", 0), "negative": W("cond", 1),
