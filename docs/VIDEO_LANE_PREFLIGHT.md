@@ -46,6 +46,26 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   *Origin: default CONTINUITY_NONE refuses chaining silently.*
 - G3.4 Multi-clip partition literals for the lane's menu are pinned as test
   literals derived by running the real `partition_beat`.
+- G3.5 **Any claim that depends on the SAMPLER is verified against the sampler
+  this lane actually selects** - never against ComfyUI's general behaviour, and
+  never inherited from a sibling lane or a vendor's notes. Every model is
+  different; that is the point of the gate. The check is one grep: find the
+  lane's `sampler_name`, open its implementation, and read what it does before
+  writing down what it costs.
+  *Origin: `ltx25_video`, 2026-08-19/20. Three comments - two in the adapter,
+  one in the locked recipe, inherited from the lab - stated that negative
+  conditioning is INERT at CFG 1.0 and that CFG 1.0 evaluates batch size 1.
+  Both are true of ordinary ComfyUI (`comfy/samplers.py`: `sampling_function`
+  sets `uncond_ = None` near cfg 1.0) and both are FALSE for that lane, because
+  its locked sampler is `euler_ancestral_cfg_pp` - a CFG++ variant that passes
+  `disable_cfg1_optimization=True` (`comfy/k_diffusion/sampling.py:1284`) and
+  consumes `uncond_denoised` in its own step derivative (`:1297`). The lane had
+  been running BOTH passes at CFG 1.0 the whole time.*
+  *Why it is a gate and not a note: the false premise made an optimisation look
+  free - feed the positive conditioning into both guider slots and skip a whole
+  12B encode per shot - which would have silently changed every render. It was
+  proposed during a panel, SURVIVED one reviewer, and died only because another
+  checked which sampler was selected. Full write-up: `docs/CFG_PROBLEM_STATEMENT.md`.*
 
 ## Gate 4 -- Admission honesty
 
