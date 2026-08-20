@@ -115,15 +115,21 @@ cached CLIP included. `_cached_clip_is_live` catches an unusable patcher and
 degrades to a full reload -- correct, safe, and indistinguishable from success.
 A cache that never hits would look exactly like a working one.
 
-It fails on any of: more disk reads than episodes; scopes opened != closed; or
-the cached encoder dropped every shot.
+It correlates PER SCOPE -- each OPEN..CLOSE interval is judged on its own
+events, unscoped diagnostic renders are reported but never gated, and an empty
+scope grants nobody an allowance. **This instrument has been wrong three
+separate ways** and each was caught by a review round: failing OPEN on a log
+with no matched lines (r3 Codex), failing CLOSED on a healthy mixed-engine leg
+(r4 agy), and letting one good scope subsidise a bad one (r4 Codex). It now
+carries 22 tests to the feature's 69 -- the gate turned out to be harder to get
+right than the thing it guards.
 
 **Proven non-tautological against the pre-cache leg: 31 renders, 31 reads,
 ratio 1.00, exit 1 on three separate counts.**
 
 ## TESTS
 
-**80 new**, across four files, plus corrections to two existing ones.
+**91 new**, across four files, plus corrections to two existing ones.
 
 Two claims were proved rather than asserted, by breaking the code and watching
 the tests fail, then restoring the file and verifying it byte-identical:
@@ -133,14 +139,55 @@ the tests fail, then restoring the file and verifying it byte-identical:
 * neutering the episode `finally`'s release to `pass` -> both failure-path
   tests FAIL (`FF`, rc=2).
 
-**Full suite on a settled tree: 11226 passed / 114 skipped / 1 xfailed, exit 0.**
-The baseline was 11146 / 114 / 1, so the delta is **+80 -- exactly the tests
-added**, itemised: 42 cache helpers + ownership, 14 driver wiring, 10
-`render_clip` paths, 14 audit gate. No regressions at any step. Bible regression
+**Full suite on a settled tree: 11237 passed / 114 skipped / 1 xfailed, exit 0.**
+The baseline was 11146 / 114 / 1, so the delta is **+91 -- exactly the tests
+added**, itemised: 45 cache helpers + ownership, 14 driver wiring, 10
+`render_clip` paths, 22 audit gate. No regressions at any step. Bible regression
 **20 / 26 / 3** unchanged at 295 entries; `build_variants.py --check`
 **51 variants / 0 failures**, both baselines held.
 
-## WHAT IS PROVEN, AND WHAT IS NOT
+## THE CACHE IS PROVEN ON A PUBLISHED EPISODE
+
+Measured by `otr_ltx25_encoder_load_audit.py` on the real leg, not claimed:
+
+```
+cache scopes found        : 1
+  scope 0: renders=34 reads=1 pinned=1 hits=33 misses=1 drops=0 closed=True
+unscoped (diagnostic)     : renders=0 reads=0
+PASS: every scope loaded the encoder at most once and reused it thereafter
+```
+
+| | before | after |
+|---|---|---|
+| shot renders | 31 | **34** |
+| encoder disk reads | **31** | **1** |
+| cache hits | n/a | **33** |
+| cached encoder dropped | n/a | **0** |
+| out of memory | 0 | **0** |
+| leg wall clock | 7674 s | **5599 s** |
+| per render | 247.5 s | **164.7 s** |
+
+**33.5% faster per render, and the leg finished 2075 seconds sooner while
+rendering THREE MORE shots.** Published:
+`signal_lost_a_midsummer_nights_quarrel_20260820_024524` -- 1920x1080, h264 +
+aac, 109.4 s, 51 MB. `RESULT SUCCESS`. `otr/obs/` 81 -> 82.
+
+**WHAT THIS SETTLES, and it was the one real risk.** The r4 Codex lane objected
+that a structurally-live-but-unusable cached CLIP would take the HIT path and
+then raise inside `run_graph` -- a dead render, not a slow one -- and that the
+whole design rested on `detach(unpatch_all=True)` leaving a CPU-pinned GGUF CLIP
+re-encodable, which three code reads asserted and **no GPU had confirmed**.
+33 consecutive hits with zero placement drops confirms it. That objection is
+now answered by measurement rather than by reading.
+
+**Caveat stated precisely:** the leg booted BEFORE the r4 ownership fixes
+(generation token, lock, per-scope audit). It therefore proves the CORE
+mechanism -- a reclaimed CLIP survives and is reused across an entire episode --
+and not the ownership edge cases, which are concurrency and kill-switch paths a
+single sequential episode cannot exercise. That is the right priority: the core
+mechanism is the part no CPU test can reach.
+
+## WHAT WAS PROVEN EARLIER IN THE SAME SESSION
 
 **PROVEN -- the CPU-encoder fix from the previous window, end to end.** The
 canonical leg that was mid-render when this session opened completed and
@@ -152,16 +199,11 @@ published:
 * ffprobe on the published bytes: 1920x1080, h264 + aac, 25 fps, 100.52 s,
   61 MB. `otr/obs/` went 80 -> 81.
 
-**NOT PROVEN -- the cache itself.** Everything above is code, review and CPU
-tests. The cache has never run on a GPU. Its acceptance is one leg where
-`otr_ltx25_encoder_load_audit.py` reports **one disk read for one episode** and
-the episode reaches `otr/obs/`. Until that exists this item is OPEN, and the
-plan says so in those words.
-
-**Why it is safe to push before that proof:** every cache miss falls through to
-exactly today's code path -- the `te` loader node runs, the encoder loads, the
-render proceeds. The failure mode is "no faster than before", not "wrong".
-`OTR_LTX25_ENCODER_CACHE=0` turns the whole mechanism off without a code change.
+**Both halves are now proven on published episodes.** The safety argument that
+justified pushing ahead of the proof still holds and is worth keeping: every
+cache miss falls through to exactly the pre-cache path, so the failure mode was
+always "no faster than before", never "wrong" -- and
+`OTR_LTX25_ENCODER_CACHE=0` disables the mechanism without a code change.
 
 ## A PROCESS LESSON WORTH KEEPING
 

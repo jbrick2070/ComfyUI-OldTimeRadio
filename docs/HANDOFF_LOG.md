@@ -3,6 +3,160 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-20 -- HEAD c18c0f12 +handoff (v2.0-alpha) -- CODER (the LTX 2.5 encoder reload fixed and owned by the EPISODE; a four-round arc that overturned the driver twice; three more false CFG premises found)
+
+The sha above is the last CODE head -- the second-to-last on the branch once
+this handoff commit lands. A commit cannot contain its own hash. The
+authoritative post-handoff sha is in the kickoff line.
+
+Did: THREE pushed commits, each verified against origin by `git ls-remote`.
+
+**THE ENCODER RELOAD IS FIXED, AND THE MEASUREMENT CAME FIRST.** A canonical
+leg was audited mid-render: **31 shot renders, 31 text-encoder GGUF disk reads** -- ratio 1.00, the 8.86 GiB Gemma re-read from disk on every single
+shot at ~63 s a time, on top of a 54.2 s CPU encode. The lane now caches the
+loaded CLIP and the empty negative conditioning for the length of an EPISODE,
+injected through `run_graph`'s pre-existing `external_results` contract with the
+node dropped from the graph.
+
+**OWNERSHIP IS IN THE DRIVER AND THAT IS THE DESIGN, NOT AN IMPLEMENTATION
+DETAIL.** The registry builds each adapter ONCE at import and returns that same
+instance forever (`engine_registry_base.py:148-155`), so a cache kept on the
+adapter would never end. Every engine-level hook was measured and all run too
+often to be the release point -- `free_otr_pipeline_residue` is the per-SHOT
+preflight, `teardown`/`unload` are per-BEAT via `BeatSession.close`, the
+gpu_residency lease is per-beat. `run_episode` is the only boundary that matches
+the lifetime, so `begin_encoder_scope`/`end_encoder_scope` are called from there,
+duck-typed, with the release in a `finally`.
+
+**THE PANEL OVERTURNED THE DRIVER TWICE AND CAUGHT TWO BUGS IN SHIPPED CODE.**
+* **Codex killed the driver's own r1 judgment.** I concluded "there is no
+  per-episode hook, accept process-lifetime residency" -- FALSE. I had searched
+  only ENGINE-level hooks and never looked one layer up at the driver.
+* **A local -> cloud hand-off leaked the whole 8.86 GiB.** I had nested the scope
+  release inside `_should_reclaim_between_engines`, which ends in
+  `and not _is_cloud_video_engine(this)` because a VRAM reclaim only matters
+  before a LOCAL load. Whether to drain VRAM and who owns a handle are different
+  questions that happened to share a line.
+* **A proposed drift checksum would have crashed on EVERY cache hit.** Two lanes
+  proposed `neg[0][0].sum()`; that reaches the `[tensor, dict]` ENTRY, a list.
+  The tensor is at `out[0][0][0]`. Caught by a second reviewer inside a fix a
+  first reviewer proposed and I had already decided to adopt.
+* **Sonnet caught a test proving the wrong mechanism.**
+  `test_a_FAILED_episode_still_closes_the_scope` used two engines, so the ENGINE
+  SWITCH closed the scope at the hand-off and the test never exercised the
+  `finally` it was named for. Green either way.
+
+**THE DIGEST WAS ADOPTED IN R2 AND CUT IN R3**, on Codex's argument: a
+whole-tensor reduction cannot catch cancelling mutations, it re-ran twice a shot
+to guard a hazard three code reads had ruled out, and it silently degraded to
+"no guard" whenever it returned `None` -- `None == None` compares equal. A guard
+that quietly stops guarding is worse than none, because the receipts still claim
+protection.
+
+**THREE MORE FALSE CFG PREMISES, found by Codex.** The 2026-08-19 window
+corrected "the negative is inert at CFG 1.0" in three places and believed it was
+done; three further copies survived, in
+`test_ltx25_recipe_matches_lab_golden.py` (twice, including *"Above 1.0 forces
+batch size 2"*) and `test_ltx25_video_lane.py`. All false under
+`euler_ancestral_cfg_pp`, which forces `disable_cfg1_optimization=True`. Both
+wordings invite the same wrong optimisation -- wiring `neg` from `pos`.
+
+**THE ACCEPTANCE INSTRUMENT EXISTS BECAUSE THE FAILURE MODE IS SILENT.**
+`reclaim_idle_models` runs in `render_clip`'s `finally` every shot and detaches
+the cached CLIP; the liveness check then degrades to a full reload -- correct,
+safe, and indistinguishable from success. A cache that never hits looks exactly
+like one that works. `scripts/otr_ltx25_encoder_load_audit.py` counts the
+LOADER's own GGUF line, never the adapter's claim, and fails on excess reads,
+unbalanced scopes, or per-shot drops. **Proven non-tautological: it FAILS the
+pre-cache leg at 31/31, exit 1 on three counts.**
+
+**TWO CLAIMS WERE PROVED BY BREAKING THE CODE, not asserted.** Re-nesting the
+scope release inside the reclaim predicate makes both local->cloud tests FAIL
+(`FF`, rc=2); neutering the episode `finally` makes both failure-path tests FAIL
+(`FF`, rc=2). Both files restored and verified byte-identical afterwards.
+
+**ITEM G IS CLOSED AND THE QUEUE HEADER WAS STALE ABOUT IT.** The 08-15 header
+says "G IS NEXT"; G's own 08-17 body says the re-ask should NOT be built --
+`audit_voice_gender_consistency.py` reports `VIOLATIONS: 0` across 1,710
+ledgers, the operator's own criterion, and the "34/35" is a portrait-prose count
+the audit refuses to total. The next real coding item is **I**.
+
+**THE CACHE IS PROVEN ON A PUBLISHED EPISODE.** The acceptance instrument, on
+the real leg: **34 shot renders, 1 encoder disk read, 33 cache HITs, 0 drops,
+scope closed**, `PASS`. Published
+`signal_lost_a_midsummer_nights_quarrel_20260820_024524` (1920x1080, h264+aac,
+109.4 s, 51 MB), `RESULT SUCCESS`, `otr/obs/` 81 -> 82. **33.5% faster per
+render** -- the leg finished **2075 seconds sooner while rendering THREE MORE
+shots** (7674 s / 31 -> 5599 s / 34).
+
+**That measurement also settles the one r4 objection that mattered.** Codex
+argued a structurally-live-but-unusable cached CLIP would take the HIT path and
+raise inside `run_graph` -- a dead render, not a slow one -- and that the design
+rested on `detach(unpatch_all=True)` leaving a CPU-pinned GGUF CLIP
+re-encodable, asserted by three code reads and confirmed by no GPU. **33
+consecutive hits, zero placement drops.** Answered by measurement.
+
+**Caveat, stated precisely:** that leg booted BEFORE the r4 ownership fixes, so
+it proves the CORE mechanism and not the concurrency / kill-switch edge cases,
+which one sequential episode cannot exercise.
+
+Current step: item 1 CLOSED. **Item I is the next coding item and its design was
+OVERTURNED in r3 -- read `kibitz-runs/2026-08-20-item-I-wrong-person/r3/
+judgment.md` before writing any of it.** The short version: Bible entry `11.61`,
+promoted FROM this bug, says *"enforce it at the boundary, not in the prompt"*
+and *"DO NOT fix it by instructing the model harder"* -- and my anchor plus two
+agy rounds all spent themselves arguing for exactly that forbidden fix, because
+I read the plan's paraphrase of 11.61 instead of the entry. A Fable seat opened
+the entry and also measured the corpus (3,792 rows): the subject-head detector
+as specified would have fired on **1,734 rows, 46% of them healthy**. It also
+found the census script has a normalisation defect, and contamination more
+recent than the item records (08-17). r4 is owed.
+Models: Opus 5 driving. Panel on the encoder cache -- FOUR ROUNDS, roster stated precisely:
+Antigravity Gemini 3.7 Flash (r1-r4), a second Antigravity lane on Gemini 3.1
+Pro run BY THE OPERATOR by hand (r1), Codex gpt-5.6-sol called directly
+(r1-r4), Sonnet 5 post-coding QA on the finished diff. Item I: agy r1, agy r2,
+Fable r3 (substituted for Codex under the 08-17 directive) -- THREE rounds, ONE
+seat each, NOT an arc, r4 owed. Local, $0.
+**r4 SPLIT AND THE PESSIMIST WON:** agy said build-ready, Codex said
+"convergence has not been reached" and was right on three counts -- an ABA
+failure needing no thread race, a hard-release fallback that would evict a
+concurrent run's cache, and an audit that let one scope subsidise another.
+A PROCESS NOTE WORTH KEEPING: Sonnet reported files changing under it mid-review
+-- that was ME applying r2 fixes during its pass, not a second window. Snapshot
+the diff and FREEZE edits before a QA pass, or it spends its budget on a moving
+target and reports findings already fixed.
+
+**THE CPU-ENCODER FIX FROM THE LAST WINDOW IS PROVEN END TO END.** The leg that
+was mid-render at session open completed and published:
+`signal_lost_beneath_the_silvery_boughs_20260820_002734` -- **31 shot renders
+across 18 beats, ZERO out-of-memory**, where the two legs before it died at beat
+15 and beat 1. ffprobe on the published bytes: 1920x1080, h264+aac, 25 fps,
+100.52 s, 61 MB. `otr/obs/` 80 -> 81.
+
+**A NOTE ON CONCURRENCY:** a SECOND window was active on this repo tonight. It
+committed `4ec1c94d` (a HANDOFF_LOG correction) and explicitly left this
+window's four files alone; no collision occurred and the pushes fast-forwarded
+cleanly. Worth knowing that the "one coder window" rule was not being observed,
+and that it only worked because the other window announced its scope in its
+commit message.
+
+Commits: `854dad53` (the cache), `4f5a7235` (audit allowance follows scope
+openings), `c18c0f12` (generation-token ownership + per-scope audit).
+Box: reset per section 4 twice (VRAM -> 1117 MiB, port clear), server up in 16 s
+both times. The FIRST proof attempt died in the WRITER at 3 minutes --
+`scifi_news_pro` markup ladder exhausted on "JAMES GRIMMLEMANN" vs cast member
+"James Grimmelmann" (`UNKNOWN_SPEAKER` x5 + `CAST_MEMBER_SILENT`). Verified
+unrelated: zero references to the changed files in that leg's log, and the class
+is already in PROD_BUG_LOG (lines 3450, 3500, 3946). Re-rolled and the second
+attempt is the proof above. **The audit refused to call that null run a pass** --
+"NO SHOT RENDERS -- nothing to audit", exit 1 -- which is the fail-open hole
+Codex found in r3 doing its job the first time it could have lied.
+Suite **11237 / 114 / 1** on a settled tree (11146 baseline + exactly the 91
+tests added: 45 cache helpers, 14 driver wiring, 10 render_clip paths, 22 audit
+gate). Bible **20/26/3** at 295 entries, survival-guide HEAD `70cefcd` ==
+origin/main (the owed 07.17 amendment from the last handoff is PUSHED).
+Variants **51 / 0**.
+
 ## 2026-08-20 -- HEAD d9de9fc5 +handoff (v2.0-alpha) -- CODER (LTX 2.5 Chunk A shipped; an OOM diagnosed wrong three times and fixed on the fourth; 21 donor voices retired by ear)
 
 The sha above is the last CODE head -- the second-to-last on the branch once

@@ -409,12 +409,20 @@ first:
 
 ### QUEUE STATE AT THE 2026-08-20 CLOSE -- read this before the older blocks below
 
-**THE LTX 2.5 ENCODER RELOAD -- CODE COMPLETE AND PANELLED, LIVE PROOF STILL
-OWED.** Say it that way and not "fixed": the cache is written, reviewed across
-four rounds and green on 75 new tests, but **nothing has yet demonstrated it on
-a real leg**, and this lane's failure mode is silent (see the audit note below).
-Until `otr_ltx25_encoder_load_audit.py` reports one disk read for one episode on
-a published leg, this item is OPEN.
+**THE LTX 2.5 ENCODER RELOAD IS FIXED AND PROVEN ON A PUBLISHED EPISODE
+(2026-08-20). CLOSED.** Measured by the acceptance instrument on the real leg:
+**34 shot renders, 1 encoder disk read, 33 cache hits, 0 drops, scope closed**,
+`PASS`. Published as `signal_lost_a_midsummer_nights_quarrel_20260820_024524`
+(1920x1080, h264+aac, 109.4 s), `RESULT SUCCESS`, `otr/obs/` 81 -> 82.
+**33.5% faster per render** than the pre-cache baseline -- the leg finished 2075
+seconds sooner while rendering THREE MORE shots (7674 s / 31 renders ->
+5599 s / 34).
+* **It also settles the r4 objection that mattered:** a structurally-live but
+  unusable cached CLIP would have taken the HIT path and raised inside
+  `run_graph` -- a dead render, not a slow one -- and the whole design rested on
+  `detach(unpatch_all=True)` leaving a CPU-pinned GGUF CLIP re-encodable, which
+  three code reads asserted and no GPU had confirmed. 33 consecutive hits with
+  zero placement drops confirms it by measurement.
 
 The lane re-read the 8.86 GiB Gemma text encoder ONCE PER SHOT -- measured on a
 live canonical leg at **25 renders / 25 disk reads, ratio 1.00**. It is now
@@ -431,8 +439,17 @@ cached for the length of an EPISODE, owned by `run_episode` and released in a
   full reload -- correct, safe, and indistinguishable from success. The audit
   counts the LOADER's own GGUF line, never the adapter's claim about itself.
   Proven non-tautological: it FAILS the pre-cache leg (25/25, exit 1).
-* **STILL OWED: the live proof.** One leg reporting 1 disk read for 1 episode,
-  published to `otr/obs/`. Nothing else closes this item.
+* **The leg that proved it booted BEFORE the r4 ownership fixes** (generation
+  token, lock, per-scope audit). So it proves the CORE mechanism -- a reclaimed
+  CLIP survives and is reused for a whole episode -- and NOT the concurrency and
+  kill-switch edge cases, which one sequential episode cannot exercise. Those
+  rest on unit coverage.
+* **FILED, NOT FIXED (r4 Codex, pre-existing and unrelated):** a second request
+  can run the destructive global reclaim while the first holds the gpu_residency
+  lease and is sampling -- the lease is taken inside `prepare()`, after
+  `run_episode`'s pre-render reclaim. It exists today with no cache at all, and
+  the obvious patch (take the lease inside reclaim) would DEADLOCK because
+  `render_clip` calls reclaim while already holding it. Own item.
 
 **`G` IS CLOSED -- DO NOT BUILD THE RE-ASK, and the QUEUE HEADER ABOVE IS STALE
 ABOUT IT.** The 2026-08-15 header says "G IS NEXT"; G's own body (2026-08-17,
