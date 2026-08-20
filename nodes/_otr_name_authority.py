@@ -87,7 +87,7 @@ _STRIP_EDGE = ".,;:!?()[]{}'\"`"
 
 #: Titles and honorifics are ROLE words, not identity. They must never be
 #: redacted on their own ("Captain" is legitimate colour) and must never be
-#: treated as a name token, or "Professor & Lab Director" yields a false
+#: treated as a name token, or "Professor & Lab Supervisor" yields a false
 #: "Professor Lab" -- an honorific-adjacency class measured on this corpus.
 _TITLE_WORDS = frozenset({
     "dr", "mr", "mrs", "ms", "miss", "sir", "lady", "lord", "professor",

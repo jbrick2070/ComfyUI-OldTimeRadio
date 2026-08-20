@@ -102,9 +102,29 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   template is TWO-STAGE: 768x512 base -> `LTXVLatentUpsampler` x2 ->
   `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
   `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
-  only** and stretch 2.31x in ffmpeg afterwards. A feasibility probe is queued
-  in the lab; if it fits under the ceiling it earns a full arc, if it OOMs the
-  item closes.
+  only** and stretch 2.31x in ffmpeg afterwards.
+* **THE FEASIBILITY PROBE RAN 2026-08-20 16:27 AND IT ANSWERED NEITHER HALF OF
+  THE GATE. DO NOT READ ITS `FAIL` AS "DOES NOT FIT".**
+  `vram-recipe-lab/results/ltx_2_5_two_stage.json` reads
+  `status: FAIL (no artifact output)`, `blocked: false`, `duration_s: 99.3`,
+  `absolute_peak_vram_gb: 15.464`. **It was not an OOM.** It died at the FIRST
+  node of stage two -- `LTXVLatentUpsampler` -- so that 15.464 GiB is stage one
+  plus an upsampler load, and the refine and the 1536x1024 decode never ran.
+  **Root cause, read out of the shipped ComfyUI source, not guessed:** the
+  stage-one latent on this lane is a JOINT AUDIO+VIDEO nested latent
+  (`comfy_extras/nodes_lt.py:817` packs
+  `NestedTensor((video_samples, audio_samples))`; the recipe under probe is
+  `ltx_2_5_golden_i2v_foley.json`, the foley lane), and `LTXVLatentUpsampler`
+  feeds `samples["samples"]` straight into the video VAE's `un_normalize`,
+  which `TypeError`s on a nested tensor. It would have failed identically at
+  2 GiB. The fix is two nodes that already exist and are registered
+  (`nodes_lt.py:1191-1192`): `LTXVSeparateAVLatent` before the upsampler and
+  `LTXVConcatAVLatent` after the re-anchor, because the refine guider
+  (`LTXVDualCFGGuider`) wants the joint latent back. Re-run request with the
+  exact chain and the report-back list:
+  `vram-recipe-lab/LAB_MINI_REQ_ltx25_two_stage_rerun.md`. **The ceiling
+  question is still open** -- if the re-run OOMs on the real path the item
+  closes, if it fits it earns a full arc.
 * **Separately real:** the composite's `unsharp=0.4` was calibrated for a
   1472x832 canvas and now runs at 1920x1080 (2.31x), amplifying whatever
   texture reaches it by ~32%. Delivery-side, cheap, reversible -- an operator
@@ -169,8 +189,17 @@ down the path the Bible forbids.
   (`as_the_hands_of_midnight_approach_20260803_015353`), and `DALE SPENDER` reads
   *"30s, passionate film archivist Dr. Amelia Hartfield"*
   (`banksweep_media_archive_20260810_234726`). Both verified at the ledger.
-  So layer 1 (redaction) cannot reach `media_archive`, and layer 2 is its only
-  cover. **Corrected lower bound: >= 68 row occurrences / 40 ledger files, >= 65
+  **AND LAYER 2 DOES NOT COVER IT EITHER -- this line used to say layer 2 was
+  "its only cover" and that is FALSE, corrected 2026-08-20 by reading the
+  shipped code.** Both layers hang off the same input.
+  `_upstream_identity_names` (`OTR_LedgerScriptWriter.py:1726`) reads
+  `meta.source_meta.selected_concept.cast[].name` and NOTHING else, so it
+  returns `[]` on `media_archive`; `superseded_identities([])` is `[]`; and
+  `_enforce_name_authority` (`_otr_casting.py:1712`) opens with
+  `if not superseded_names: return response, None`. Layer 3 lives inside layer
+  2, so it is inert too. **`media_archive` has NO cover at all today**, and
+  scoping its item as "layer 2 already half-covers it" would be scoping it
+  against a guard that never runs. **Corrected lower bound: >= 68 row occurrences / 40 ledger files, >= 65
   copied into portraits, Aug 1-17 >= 21/37 dirty -- plus an unmeasured
   media_archive population.** The 40-rows/26-episodes figure came from a throwaway
   script, is NOT reproducible from the instrument, and must not be quoted.
@@ -344,9 +373,30 @@ the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
 ranges -- that is what a working lane looks like, and on that run it caught two
 of the driver's own tests being tautologies.
 
-**BASELINES (re-measured 2026-08-20, settled tree, after LTX 2.5 Chunk A, the CPU-encoder fix, the upscaler weight-path fix and the 21-donor voice retirement):** suite
-**11146 passed / 114 skipped / 1 xfailed** -- MEASURED by a full run (415 s,
-EXIT=0) on a settled tree, never derived. Previous: **11100 / 110 / 1** at
+**BASELINES (re-measured 2026-08-20 EVENING, settled tree, after item I and the
+`Director`-comment regression fix):** suite
+**11270 passed / 114 skipped / 1 xfailed** -- MEASURED by a full run (400.90 s,
+EXIT=0, known-fail guard silent), never derived. Bible **20 / 26 / 3**,
+survival-guide HEAD `adfad04` == origin/main. `build_variants.py --check`
+**51 variants / 0 failures**. All three measured this session, not carried
+forward.
+
+**THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
+`55ddf234` the suite exited **2**, with
+`tests/test_legacy_audit_clean.py::test_no_unclassified_legacy_references`
+FAILING. Item I's new `nodes/_otr_name_authority.py:90` used *"Professor & Lab
+Director"* as an example job title in a comment, and the standing legacy audit
+forbids a bare `Director` in `*.py`/`*.json` outside a forensic context --
+it cannot tell an example from a surviving Director-era symbol. **Why four QA
+rounds missed it:** the `[KNOWN-FAIL-GUARD]` line prints AFTER the 100% line and
+the conftest suppresses pytest's own summary on a failing run, so the log ends
+in a wall of dots with the complaint below the fold and no counts to contradict
+it. Read the exit code, not the dots. Fixed by rewording the comment to *"Lab
+Supervisor"* -- a comment, so nothing the pipeline emits changes, and it does
+not widen the audit's blind spot the way a `GENERIC_ENGLISH_LINES` entry would.
+
+**PREVIOUS, and its itemisation is kept because the discipline is the point:**
+**11146 / 114 / 1** (415 s, EXIT=0). Before that: **11100 / 110 / 1** at
 2026-08-19. **THE +46 IS ITEMISED:** 51 tests ADDED -- 29 in
 `test_ltx25_video_lane.py`, 2 in the LTX 2.5 recipe drift gate, 4 in the new
 `test_upscale_weight_resolution_gate.py`, and 16 registry-walk instances that
@@ -354,11 +404,10 @@ existing parametrized tests gain simply by a new engine registering -- MINUS
 about 5 parametrized instances LOST to the deliberate voice-bank shrink (the
 gender pins alone went from 9 rows to 6 when glenn and james were retired).
 A shrinking component is only healthy when it is itemised like this.
-Bible **20 / 26 / 3**, **295** entries, survival-guide HEAD `55d4eaf` ==
-origin/main -- entry `07.17` was AMENDED this session, not promoted, and an
-amendment owes no README bump. `build_variants.py --check` **51 variants / 0
-failures** -- 50 -> 51 deliberately, `otr_ltx25_high_video` is a shipping
-platform target rather than a soak instrument so it is correctly ABSENT from
+At that step: Bible **295** entries at HEAD `55d4eaf` -- entry `07.17` was
+AMENDED, not promoted, and an amendment owes no README bump. Variants went
+50 -> 51 deliberately: `otr_ltx25_high_video` is a shipping platform target
+rather than a soak instrument, so it is correctly ABSENT from
 `build_variants.LANE_PRESETS`.
 
 **THAT LAST STEP IS -34 AND EVERY ONE IS ACCOUNTED FOR:** 15 tests from
