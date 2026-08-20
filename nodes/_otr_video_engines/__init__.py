@@ -126,6 +126,31 @@ except Exception:  # noqa: BLE001
     pass
 
 
+# ltx25_video (LTX 2.5 Chunk A, 2026-08-19): the LTX 2.5 Distilled I2V lane,
+# rendered SILENT -- the model's audio latent is computed and dropped at
+# LTXVSeparateAVLatent, exactly as the three sibling LTX/H3 lanes already do.
+# A NORMAL selectable row (requires_flag=None, empty default_roles); it fails
+# CLOSED until the Q3 DiT, the Gemma-4 encoder and BOTH VAEs are on disk.
+#
+# ONE registration out of eng_ltx25, and unlike lane 19's case that is not a
+# sequencing choice -- the other two lanes DO NOT EXIST YET. `ltx25_mime` and
+# `ltx25_foley_plus` need the model's own audio to enter the master BEFORE the
+# master freezes, and video renders four topological stages after that freeze
+# (OTR_EpisodeAssembler order 12 vs OTR_VideoRenderBatch order 16). That is
+# Chunk B: an execution-order change with its own arc. Their ids are RESERVED
+# in eng_ltx25.LTX25_RESERVED_SIBLING_IDS so nobody spends them, and they are
+# deliberately absent from the menu, per the operator (2026-08-19): a dropdown
+# row that cannot make an episode is worse than a missing one.
+#
+# Cold-import clean (V-12: torch and every LTX node class are lazy inside
+# load/render_clip). Guarded so a packaging quirk never breaks the namespace
+# import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ltx25 as _eng_ltx25  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # UNREGISTERED 2026-06-30 (still_parallax rip-out, item 2 -- "registry IS the
 # menu"): the 0-E easy on-ramp 2.5D depth-parallax engine (DepthAnythingV2-SMALL)
 # is no longer imported here and is NOT selectable. The SOURCE file stays on

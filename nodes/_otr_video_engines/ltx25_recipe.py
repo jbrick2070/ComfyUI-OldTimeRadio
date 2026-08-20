@@ -99,6 +99,30 @@ LTX25_CFG_MODALITY = 1.0
 LTX25_NEGATIVE_PROMPT = ""
 
 # ---------------------------------------------------------------------------
+# Decode -- the tiled VAE knobs are RECIPE VALUES, not house defaults
+# ---------------------------------------------------------------------------
+
+#: ``VAEDecodeTiled`` (golden JSON node 33), verbatim. These live HERE rather
+#: than as literals in the adapter for one specific reason: the sibling
+#: ``eng_ltx_av`` decodes through an ENV-DRIVEN helper whose default is
+#: **4096 / 8** -- whole-clip, no temporal tiling -- and its comment praises
+#: that default for having no inter-tile seam. Copying that helper into this
+#: lane, which is the natural thing to do when modelling one adapter on
+#: another, would silently replace a measured recipe value with a different
+#: one on a lane that has 0.02 GiB of headroom. Whole-clip decode of 97 frames
+#: is exactly the kind of allocation that spends headroom this lane does not
+#: have.
+#:
+#: So: 33 frames per temporal tile with a 4-frame overlap, 512-pixel spatial
+#: tiles with 64 overlap, as measured. NOT env-overridable, because there is no
+#: number here an environment is entitled to move (the recipe is locked), and a
+#: knob that reaches nothing is worse than no knob.
+LTX25_DECODE_TILE_SIZE = 512
+LTX25_DECODE_OVERLAP = 64
+LTX25_DECODE_TEMPORAL_SIZE = 33
+LTX25_DECODE_TEMPORAL_OVERLAP = 4
+
+# ---------------------------------------------------------------------------
 # Conditioning -- the first-frame anchor
 # ---------------------------------------------------------------------------
 
@@ -119,11 +143,26 @@ LTX25_NEGATIVE_PROMPT = ""
 #: lane deliberately uses **0.7, a SOFT anchor** (`eng_ltx_av.py:972`: "a SOFT
 #: anchor so the audio can..."), and this file's own note at `:423` records why
 #: -- "strength 1.0 hard-pins the still". So 1.0 here is a HARDER anchor than
-#: the sibling lane uses on purpose. It holds identity firmly at frame 0 and
-#: leaves frames 1..96 free, which is a different trade from a soft anchor
-#: applied across the clip (`eng_ltx_video.py`'s "i2v-anchor doctrine").
-#: Adopted as the lab measured it, and flagged for the operator's eye rather
-#: than silently reconciled.
+#: the sibling lane uses. It holds identity firmly at frame 0 and leaves frames
+#: 1..96 free, which is a different trade from a soft anchor applied across the
+#: clip (`eng_ltx_video.py`'s "i2v-anchor doctrine").
+#:
+#: **CORRECTED 2026-08-19: 1.0 IS THE NODE'S UNTOUCHED DEFAULT, NOT A
+#: MEASUREMENT.** This note previously said "adopted as the lab measured it",
+#: and the lab has since confirmed it measured nothing of the kind --
+#: ``LTXVImgToVideoInplace`` ships ``strength`` defaulting to 1.0 and the
+#: recipe never touched the widget. So the difference from the sibling lane's
+#: 0.7 is NOT a deliberate opposing choice by two teams; it is one deliberate
+#: choice (0.7, ours, with a written reason) and one default nobody set. Read
+#: it that way before treating 1.0 as evidence of anything.
+#:
+#: IT IS STILL WHAT SHIPS, and that is not laziness. A hard pin at frame 0 is
+#: the correct default for OTR's actual problem -- "a character's face changing
+#: between beats" is a live CORRECTNESS defect in `CLAUDE.md`, and the harder
+#: anchor is the one that fights it. Changing it would be a recipe change, and
+#: recipes are not on the table. If it ever wants revisiting, the honest
+#: framing is "0.7 vs 1.0 has never been A/B'd on this model", not "the lab
+#: chose 1.0".
 LTX25_I2V_ANCHOR_STRENGTH = 1.0
 LTX25_I2V_ANCHOR_NODE = "LTXVImgToVideoInplace"
 
@@ -164,7 +203,44 @@ LTX25_SCHEDULER_LATENT_MUST_BE_CONNECTED = True
 #: result may never be worded as qualification, and this figure sits 0.02 GiB
 #: under the 14.5 clamp, which is far too tight to inherit on trust. OUR figure
 #: comes from the G8 solo smoke on OUR boot lane, and it is that figure -- not
-#: this one -- that fills the G4 envelope key and picks `low` vs `high` in the
-#: public id (G7.4 requires a measurement, never a guess).
+#: this one -- that fills the G4 envelope key.
+#:
+#: **THE PUBLIC TOKEN NO LONGER WAITS ON THIS (2026-08-19).** It used to, and
+#: the note said so. The operator then ruled the 4060 out entirely, which
+#: settles the naming by deleting the question rather than answering it: the
+#: lane is 5080-only, so `high` is what the token means and
+#: `ltx25_high_video` is registered. The envelope key still waits on the smoke.
 LTX25_LAB_OBSERVED_PEAK_GIB = 14.48
 LTX25_LAB_CLAMP_GIB = 14.5
+
+#: **WHERE THE 14.48 GiB ACTUALLY GOES, and why staging cannot shrink it**
+#: (lab correction, 2026-08-19 -- it overturned the driver's own framing).
+#:
+#: The peak decomposes as **9.80 GiB DiT weights + 3.20 GiB activations +
+#: 1.48 GiB allocator context**, with the text encoder and both VAEs at
+#: **ZERO**. It was measured with Gemma ALREADY evicted -- ComfyUI spills the
+#: encoder to system RAM before sampling on its own.
+#:
+#: SO THE OBVIOUS INFERENCE IS WRONG. "Load the encoder, free it, then load the
+#: transformer" does not buy headroom here, because at the moment of the peak
+#: the encoder was never resident in the first place. The adapter still runs
+#: `free_after_use` and still calls the canonical residue-freer, and both are
+#: worth keeping -- but as HYGIENE against residue from the writer LLM and the
+#: TTS stages EARLIER IN THE SAME PROCESS, not as the thing that makes this
+#: lane fit. It does not make it fit; the DiT and its activations do that on
+#: their own, with 0.02 GiB to spare.
+#:
+#: THE CONSEQUENCE FOR ANYONE READING A FAILING SMOKE: if this lane OOMs, the
+#: cause is upstream residue or allocator fragmentation, NOT a staging bug in
+#: the adapter, and the fix is not to add another free() call. Report it.
+LTX25_PEAK_DECOMPOSITION_GIB = {
+    "dit_weights": 9.80,
+    "activations": 3.20,
+    "allocator_context": 1.48,
+    "text_encoder": 0.0,
+    "vaes": 0.0,
+}
+
+#: Staging is hygiene, not headroom. Pinned as a constant so the claim has one
+#: home and a test can hold the adapter's comments to it.
+LTX25_STAGING_REDUCES_PEAK = False

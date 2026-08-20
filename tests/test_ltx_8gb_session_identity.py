@@ -186,6 +186,22 @@ _ENGINES_WITH_A_SESSION = {
     # from `_weight_rows()`: this lane's names a different DiT and one more
     # weight, so the two lanes can never be mistaken for one session.
     "minimax_h3_audio_in",     # 2026-08-12, lane 20
+    # LTX 2.5 CHUNK A, 2026-08-19. The SECOND engine to join by ARRIVING rather
+    # than by being repaired, and like lane 19 it did not get the choice: its
+    # contract declares `discrete_frames=(97,)`, so `can_split` is True, so
+    # test_multiclip_session_identity_roster refused it the moment it
+    # registered. Worth recording that the refusal came from the roster gate on
+    # a lane that had never rendered -- which is the whole point of that gate.
+    # The 2026-07-29 note above describes what it cost to learn the same thing
+    # from a live leg: 730 seconds in, after the script, the stills and the
+    # audio were already paid for.
+    #
+    # Its identity is engine + a re-stat of all FOUR weights, with no recipe
+    # token -- unlike the LTX 2.3 lanes there is exactly one locked recipe
+    # here, so the weights ARE the identity. The audio VAE is one of the four
+    # even though the lane emits no audio, so a swapped audio VAE correctly
+    # opens a new session.
+    "ltx25_video",             # 2026-08-19, Chunk A
 }
 
 

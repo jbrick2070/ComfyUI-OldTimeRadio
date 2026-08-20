@@ -73,6 +73,19 @@ _TIER = {
     # only one adapter -- two public ids on one internal id collapses
     # _INTERNAL_TO_PUBLIC and trips the bijection assert at IMPORT time.
     "h3_low_audio_in": "minimax_h3_audio_in",
+    # LTX 2.5 Chunk A, 2026-08-19: an ADD, no alias to move -- this lane has
+    # never shipped under another id. `high` is the one token in this table
+    # settled by a RULING rather than by the measurement that was planned: the
+    # clamp test that would have decided low-vs-high was a 4060 test, and the
+    # operator ruled the 4060 out entirely, which answers the naming by
+    # deleting the question. It agrees with the only figure in evidence anyway
+    # -- 14.48 GiB lab-measured against a 14.5 GiB clamp is the most expensive
+    # local lane in the roster.
+    #
+    # ONE row, though the lane has two named siblings coming. `ltx25_high_mime`
+    # and `ltx25_high_foley_plus` are Chunk B, they map to their OWN internal
+    # engines when they exist, and they are absent here until they can render.
+    "ltx25_high_video": "ltx25_video",
 }
 
 

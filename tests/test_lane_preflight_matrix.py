@@ -58,8 +58,14 @@ CANVAS_FPS = 25
 #: render noise. LTX 0.9.8/2.3 is the family BUG-070 was written for; MiniMax H3
 #: joins this set with its adapters (Comfy-Org/ComfyUI#15263, and the per-model
 #: KJ probe FAILED on sm_120).
+#: `ltx25_video` joins on FAMILY, not on a probe of its own (2026-08-19). BUG-070
+#: is an LTX-family defect -- int8-PV Sage process-ABORTS an LTX render with no
+#: traceback -- and this lane is LTX 2.5 through the same sampler path as the
+#: three LTX lanes above it. Waiting for a per-model probe before demanding the
+#: gate would mean the FIRST evidence is a dead process on a real leg, which is
+#: the cost `ltx_8gb` already paid (S8b-13: the one LTX lane with no gate).
 SAGE_SENSITIVE = frozenset({
-    "ltx_video", "ltx_audio_in", "ltx_8gb",
+    "ltx_video", "ltx_audio_in", "ltx_8gb", "ltx25_video",
     "minimax_h3_video", "minimax_h3_audio_in",
 })
 

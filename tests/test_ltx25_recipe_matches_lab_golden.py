@@ -194,6 +194,37 @@ def test_no_multishot_and_no_in_graph_upscaler():
     )
 
 
+def test_the_tiled_decode_knobs_match_the_lab_and_are_not_the_siblings():
+    """The decode knobs are RECIPE values and drift silently if left as
+    literals. The sibling ``eng_ltx_av`` decodes whole-clip at 4096/8 by
+    default; inheriting that by resemblance would change a measured recipe on
+    a lane with 0.02 GiB of headroom, and nothing would say so."""
+    _doc, g = _graph()
+    _k, dec = _node(g, "VAEDecodeTiled")
+    assert dec["inputs"]["tile_size"] == R.LTX25_DECODE_TILE_SIZE
+    assert dec["inputs"]["overlap"] == R.LTX25_DECODE_OVERLAP
+    assert dec["inputs"]["temporal_size"] == R.LTX25_DECODE_TEMPORAL_SIZE
+    assert dec["inputs"]["temporal_overlap"] == R.LTX25_DECODE_TEMPORAL_OVERLAP
+    assert R.LTX25_DECODE_TEMPORAL_SIZE != 4096, (
+        "4096 is eng_ltx_av's whole-clip default, not this lane's recipe")
+
+
+def test_the_peak_decomposition_sums_to_the_observed_peak():
+    """The lab's correction, pinned: the 14.48 GiB peak is DiT weights plus
+    activations plus allocator context, with the encoder and VAEs at ZERO.
+
+    This is what makes 'aggressive staging will bring the peak down' false --
+    at the moment of the peak the encoder is not resident to free. Pinned as
+    arithmetic so the claim cannot rot into folklore."""
+    parts = R.LTX25_PEAK_DECOMPOSITION_GIB
+    assert parts["text_encoder"] == 0.0
+    assert parts["vaes"] == 0.0
+    assert abs(sum(parts.values()) - R.LTX25_LAB_OBSERVED_PEAK_GIB) < 0.005, (
+        "decomposition %r does not sum to the observed %r"
+        % (parts, R.LTX25_LAB_OBSERVED_PEAK_GIB))
+    assert R.LTX25_STAGING_REDUCES_PEAK is False
+
+
 def test_the_lab_vram_figure_is_recorded_but_not_used_as_qualification():
     """CLAUDE.md 0A: a bench result may never be worded as qualification. The
     number is kept for traceability; OUR envelope comes from our own smoke."""

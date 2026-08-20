@@ -138,6 +138,34 @@ _PUBLIC_ENGINES = {
     # at 864x480 model f124 measures 7.20 GiB, and the seed-43 lip-sync leg at
     # 832x480 f192 measured 6.88 GiB cold.
     "h3_low_audio_in": "minimax_h3_audio_in",
+    # LTX 2.5 Chunk A, 2026-08-19. An ADD with no alias to move: this lane has
+    # never shipped under any other id.
+    #
+    # `high` IS DECIDED BY A RULING, NOT BY A MEASUREMENT THAT NEVER RAN, and
+    # the distinction is worth stating because G7.4 demands a measured token.
+    # The token was held UNSET for most of a day precisely so it would not be
+    # guessed -- the open question was whether the lane fits a smaller card, and
+    # the operator was going to clamp-test on the 4060. He then ruled the 4060
+    # OUT ENTIRELY, which settles the naming by removing the question: the lane
+    # is 5080-only, and `high` is exactly what that means. No clamp test, no
+    # reserve-vram experiment, no lab question -- all three existed only to ask
+    # whether it would fit a smaller card.
+    #
+    # It is also true on the numbers we do have. The lab measured 14.48 GiB for
+    # the locked Q3 recipe at 832x480x97 against a 14.5 GiB clamp, which is the
+    # most expensive local lane in the roster by some distance -- `low` would
+    # have been false in the same way `wan_8gb` was false, which is the mistake
+    # that retired the `<vramtier>gb` token in the first place.
+    #
+    # `video` and not `audio_in`, matching `h3_low_video`: LTX 2.5 natively
+    # produces audio and this lane deliberately does not decode it. The
+    # audio-carrying routes are `ltx25_high_mime` and `ltx25_high_foley_plus`,
+    # each of which will map to its OWN internal engine when Chunk B builds
+    # them -- three public ids on three internal ids, never one id with a
+    # switch, because two public ids on one internal id collapses
+    # _INTERNAL_TO_PUBLIC and trips the bijection assert below AT IMPORT
+    # (lesson L5). They are deliberately absent until they can render.
+    "ltx25_high_video": "ltx25_video",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -254,6 +282,15 @@ _PUBLIC_LABEL = {
         "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; reference "
         "portrait + the beat's own audio; needs the sage-free h3 boot, and it "
         "is as slow as its silent sibling)"),
+    # The label states the LAB's figure and says it is the lab's, because this
+    # lane has no receipt of its own yet -- the evidence manifest records it as
+    # admission-unenforced in words for the same reason. It also states the one
+    # thing a user has to know before picking it: 14.48 against a 14.5 ceiling
+    # is the tightest fit in the roster, and it is a 5080-only lane.
+    "ltx25_high_video": (
+        "LTX 2.5 Distilled Q3 silent video - high VRAM (14.48 GiB lab-measured "
+        "at 832x480x97 against a 14.5 GiB ceiling; the tightest fit in the "
+        "roster, 5080-only, one 3.88 s rung)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),
