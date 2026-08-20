@@ -2,12 +2,31 @@
 
 WHY THIS SHAPE. The operator asked for continuous test episodes while he is
 remote -- "1 act across random local banks, styles and local video/still
-models". Banks and styles ARE rotated here. Engines are NOT, and that is a
-design constraint rather than an omission: the video/image engine widgets are
-MANAGED, so `patch_creative` refuses them (the BUG-08.06 stranded-COMBO
-class) and the sanctioned surface is a capability profile's `role_overrides`.
-Authoring soak profiles is its own change with its own emit/ratify gate. Every
-leg therefore runs the canonical engines -- still_flat + z_image_turbo.
+models". Banks, styles AND engines are all rotated here.
+
+**THIS PARAGRAPH USED TO SAY ENGINES WERE NOT ROTATED, AND IT WAS STALE
+(corrected 2026-08-19).** It read "Engines are NOT [rotated] ... Every leg
+therefore runs the canonical engines -- still_flat + z_image_turbo", which
+stopped being true the day `PROFILES` was added: `main()` prints "banks x
+styles x engine profiles" and the leg loop calls `rng.choice(PROFILES)`. A
+docstring that describes a constraint the code no longer has is worse than
+none -- it is exactly what a reader consults before deciding whether the
+harness can answer their question, and this one said "no" to a question the
+code answers "yes".
+
+WHAT IS STILL TRUE, and it is the part worth keeping: engine rotation goes
+through CAPABILITY PROFILES because the video/image engine widgets are MANAGED
+and `patch_creative` refuses them outright (the BUG-08.06 stranded-COMBO
+class). A profile's `role_overrides` is the only sanctioned lever, so widening
+the rotation means authoring profiles, not adding a `--set`.
+
+WHAT THE ROTATION DOES NOT YET COVER, stated so nobody infers coverage from
+the word "engines": every profile in `PROFILES` today is a CHEAP still/procgen
+lane. No heavy local video model (ltx25_video, ltx_video, ltx_8gb, wan_ti2v,
+humo*, minimax_h3_*) is in the rotation, and no profile carries an
+`upscale_stage` section, so the two upscale engines (`off` and
+`spandrel_esrgan`) are not exercised here either. Those are additions waiting
+on their own profiles; the harness needs no change to accept them.
 
 SEQUENTIAL BY DESIGN. One GPU, one render at a time (CLAUDE.md scope rule:
 no async CUDA streams, no queue refactor). Each leg runs to a terminal state

@@ -23,7 +23,25 @@ comfyui_desktop:
                 C:/ComfyUI-Models/unet
   embeddings: C:/ComfyUI-Models/embeddings/
   loras: C:/ComfyUI-Models/loras/
-  upscale_models: C:/ComfyUI-Models/upscale_models/
+  # TWO ROOTS ON PURPOSE (2026-08-19), and the second one is where the weights
+  # actually are. This key used to name ONLY C:/ComfyUI-Models/upscale_models/,
+  # which on this box contains a `.cache` directory and nothing else -- so the
+  # headless server's upscale model list was EMPTY (`/object_info`
+  # UpscaleModelLoader reported `options: []`, verified live), and the
+  # `spandrel_esrgan` upscale engine could never load the `real-esrgan-x2plus`
+  # its CAPABILITIES row requires. A lane that preflights clean and can never
+  # load its model is the wan_i2v killer, lesson L1, and it had gone unnoticed
+  # because nothing probes an upscaler's weights the way the video gates probe
+  # theirs.
+  #
+  # The three RealESRGAN weights live under the Documents models root -- the
+  # Desktop app's default location, which the C:/ComfyUI-Models migration moved
+  # every OTHER key away from and this one never followed. Listing both is
+  # additive: it can only turn a false negative into the truth, and it matches
+  # what `text_encoders` above already does with two roots.
+  upscale_models: |
+       C:/ComfyUI-Models/upscale_models/
+       C:/Users/jeffr/Documents/ComfyUI/models/upscale_models/
   # canonical IA2V two-stage (2026-07-02): core LatentUpscaleModelLoader reads
   # folder key latent_upscale_models (nodes_hunyuan.py); without this mapping
   # the LTX spatial upscaler enum is EMPTY on headless boots.
