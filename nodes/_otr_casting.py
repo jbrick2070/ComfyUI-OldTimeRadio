@@ -115,6 +115,14 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_cast_env  # type: ignore
 
+# ONE naming authority, enforced at the boundary (Bug Bible 11.61). Shared with
+# the offline archive sweep so the sweep can never certify a different rule than
+# the one runtime enforces.
+try:
+    from . import _otr_name_authority as _NAMES
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_name_authority as _NAMES  # type: ignore
+
 # CastPlanner (S4) + Pass-1 validator (S7). Only consulted on the llm_slot_fill
 # path; pool mode never imports-uses them at runtime.
 try:
@@ -1670,6 +1678,141 @@ def _apply_llm_slot_fill(
 # ---------------------------------------------------------------------------
 
 
+def _deterministic_identity_floor(slot: "EnsembleSlot") -> str:
+    """A valid, on-format description built from Python-owned slot facts only.
+
+    THE LAST RUNG, and it exists because no mechanism in this item may fail an
+    episode. It is deliberately NOT a fixed string: BUG-098 was one generic
+    fallback producing ONE portrait for a whole cast, so the age band, role and
+    the role's own face pressure are woven in to keep rows distinguishable.
+    It names an occupation, never a person -- occupations are demonstrably what
+    the model writes when it gets this right.
+    """
+    role = (getattr(slot, "role", "") or "featured player").strip()
+    timbre = (getattr(slot, "timbre", "") or "clear").strip()
+    pressure = _FACE_PRESSURE_BY_ROLE.get(role.lower(), "steady, unhurried features")
+    return (
+        f"Adult, the story's {role}. Face: {pressure}. "
+        f"Presence: carries the episode's pressure without flourish. "
+        f"Voice: {timbre}, plainly spoken."
+    )
+
+
+def _enforce_name_authority(
+    response: "CastingResponse",
+    *,
+    generate_fn: Callable[..., str],
+    slot: "EnsembleSlot",
+    news_seed: str,
+    style: str,
+    casting_brief: str,
+    superseded_names: List[str],
+    roster_names: List[str],
+) -> "tuple[CastingResponse, Optional[dict]]":
+    """Bug Bible 11.61 layers 2+3. TOTAL: never raises, never fails an episode.
+
+    Returns ``(response, event_or_None)``. A clean row returns the response
+    untouched and ``None``, so every lane without superseded identities is
+    byte-identical.
+
+    The contaminated response is DISCARDED WHOLE and regenerated from trusted
+    slot facts -- never name-swapped in place. 11.61 is explicit that the reflex
+    repair is actively harmful: it rewrites the foreign name to the record's own
+    and leaves that other person's face, bearing and delivery prose sitting
+    there, so the record still describes the wrong human and nothing points at
+    it any more.
+
+    The regeneration is a CLEAN ROOM: no story, no brief, no prior cast, no
+    rejected prose, and ``max_attempts=1``. Re-running the same reconciled
+    prompt would be mere resampling and can repeat verbatim, so it would not be
+    an independent second chance.
+    """
+    if not superseded_names:
+        return response, None
+
+    fields = {
+        "character_description": response.character_description,
+        "speech_signature": getattr(response, "speech_signature", "") or "",
+    }
+    hits = _NAMES.find_foreign_identities(fields, superseded_names, roster_names)
+    # The model can also copy the neutral LABEL out of the reconciled brief --
+    # "30s, CHARACTER A." is not a wrong-person description but it is broken
+    # text that would be spoken, printed in the credits and painted into a
+    # portrait. The identity detector cannot see it, because the label is the
+    # thing that replaced the identity.
+    labels = [_NAMES.default_label(i) for i in range(len(superseded_names))]
+    leaked = _NAMES.find_leaked_labels(fields, labels)
+    if not hits and not leaked:
+        return response, None
+
+    event = {
+        "rung": "detected",
+        "matched": sorted({h.matched for h in hits} | set(leaked)),
+        "surfaces": sorted({h.field for h in hits}) or sorted(
+            k for k, v in fields.items() if v),
+        "identities": sorted({h.identity for h in hits}),
+        "leaked_labels": sorted(leaked),
+    }
+    log.warning(
+        "[OTR_Casting] name-authority guard fired on %s: %s in %s "
+        "-- discarding the response and regenerating clean-room",
+        slot.name, event["matched"], event["surfaces"],
+    )
+
+    try:
+        clean = llm_write_description(
+            generate_fn,
+            slot=slot,
+            # THE RETRY KEEPS THE RECONCILED STORY CONTEXT. An earlier version
+            # stripped everything, and that was the wrong trade: the row was
+            # regenerated with no premise, no world and no plot, so the model
+            # could only invent generic filler -- which is then copied verbatim
+            # into the FLUX portrait prompt. It swapped a row that was wrong
+            # about WHO for a row that is about NOTHING, and permanently
+            # detached that character from the episode.
+            #
+            # The context is safe to keep because it is the reconciled text:
+            # the superseded names are already gone from it. What is dropped is
+            # `prior_cast`, and that IS the genuinely different lever -- rows
+            # written earlier may themselves be contaminated, and
+            # `_format_prior_entry` echoes their lead sentence back as
+            # authoritative "Cast so far" context, which is a live path for
+            # reintroducing the very person being removed.
+            news_seed=news_seed,
+            style=style,
+            prior_cast=[],
+            max_attempts=1,
+            casting_brief=casting_brief,
+        )
+        retry_fields = {
+            "character_description": clean.character_description,
+            "speech_signature": getattr(clean, "speech_signature", "") or "",
+        }
+        if not _NAMES.find_foreign_identities(
+                retry_fields, superseded_names, roster_names)                 and not _NAMES.find_leaked_labels(retry_fields, labels):
+            event["rung"] = "regenerated"
+            return response.model_copy(update={
+                "character_description": clean.character_description,
+                "speech_signature": (
+                    getattr(clean, "speech_signature", "") or ""
+                ).strip(),
+            }), event
+        event["retry_also_contaminated"] = True
+    except Exception as exc:  # noqa: BLE001 -- the floor exists for exactly this
+        event["retry_error"] = f"{type(exc).__name__}: {exc}"
+
+    event["rung"] = "floor"
+    log.warning(
+        "[OTR_Casting] name-authority guard: %s fell to the deterministic "
+        "floor (%s)", slot.name,
+        event.get("retry_error") or "regeneration was also contaminated",
+    )
+    return response.model_copy(update={
+        "character_description": _deterministic_identity_floor(slot),
+        "speech_signature": "plain spoken",
+    }), event
+
+
 def lock_cast(
     *,
     creative_fn: Callable[..., str],
@@ -1684,6 +1827,7 @@ def lock_cast(
     source_character_names: Optional[List[str]] = None,
     source_bank_id: str | None = None,
     source_character_genders: Optional[Mapping[str, Mapping[str, str]]] = None,
+    upstream_identity_names: Optional[List[str]] = None,
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -1698,7 +1842,29 @@ def lock_cast(
       }
 
     meta dict has: lemmy_hit, casting_attempts (list of attempt
-    counts per open slot, for telemetry).
+    counts per open slot, for telemetry), and name_authority (the
+    Bug Bible 11.61 guard's structured events -- see below).
+
+    `upstream_identity_names` is LANE-NEUTRAL by design (Bug Bible 11.61).
+    It is "names an earlier pass invented for the people in this story,
+    which this cast is about to override" -- pitch cast, treatment
+    characters, article subjects. Nothing here knows which lane produced
+    them. Every name the assembled roster OWNS is dropped from the set,
+    so an adaptation lane whose roster IS the source's cast supplies its
+    names harmlessly and its fidelity is never attacked. Omit it (None)
+    and this whole mechanism is inert: prompts stay byte-identical.
+
+    The guard runs in three layers, and NONE of them can fail an episode
+    (operator rule 2026-08-20: no mechanism in this item may block,
+    reject, retire or fail an episode):
+      1. the brief is RECONCILED before it reaches any prompt, so the
+         conflicting name is simply not in the context;
+      2. every generated row is CHECKED (both prose fields) before it is
+         appended or exposed as prior-cast context, and a contaminated
+         response is discarded whole -- never rewritten in place, which
+         11.61 calls actively harmful;
+      3. a contaminated row is regenerated ONCE from trusted slot facts
+         only, then falls to a deterministic floor.
 
     Sprint 3D: lock_cast runs the three-stage fill -- it precomputes the
     WHOLE ensemble's gender/timbre/role distribution ONCE
@@ -1799,6 +1965,57 @@ def lock_cast(
         gender_by_name=gender_by_name or None,
     )
 
+    # ---------------------------------------------------------------
+    # Bug Bible 11.61 -- LAYER 1: reconcile the brief at the boundary.
+    #
+    # THIS IS THE ONLY POINT WHERE IT CAN BE DONE, and that is a fact
+    # about the code rather than a preference. The redaction set is
+    # "upstream identities the assembled roster does not own", so it
+    # needs the roster; and the roster does not exist until BOTH
+    # assemble_pre_locked_rows (ANNOUNCER/LEMMY + open-slot names) and
+    # precompute_ensemble_slots (ens.name) have run, which is here. The
+    # writer never sees open_slots or ensemble_slots, so it structurally
+    # cannot compute this set -- and redacting every upstream name
+    # unconditionally would strip MACBETH from a Macbeth adaptation.
+    roster_names_for_authority = (
+        [str(r.get("name") or "") for r in pre_locked]
+        + [ens.name for ens in ensemble_slots]
+    )
+    superseded_names = _NAMES.superseded_identities(
+        upstream_identity_names or [], roster_names_for_authority,
+    )
+    reconciled_brief, _identity_labels = _NAMES.reconcile_text(
+        casting_brief, superseded_names, roster_names_for_authority,
+    )
+    # RECONCILE THE SEED TOO. `_build_user_prompt` falls back to a slice of
+    # news_seed whenever the brief is empty, so leaving the seed raw would keep
+    # a second door open into the same `Story:` line. Measured today: across all
+    # 125 annotated-cohort ledgers, ZERO carry an upstream identity in the seed
+    # (on this lane the seed is the spark digest, fixed before the concept pass
+    # invents any name) -- so this is inert in practice and costs nothing. It is
+    # here so the guarantee holds by construction rather than by that
+    # coincidence continuing to be true on some future lane.
+    reconciled_seed, _seed_labels = _NAMES.reconcile_text(
+        news_seed, superseded_names, roster_names_for_authority,
+    )
+    # THE EMPTY-CONTEXT TRAP: _build_user_prompt falls back to the raw
+    # news_seed slice when the brief is empty. If reconciliation ever
+    # emptied a brief that HAD content, that fallback could reinstate the
+    # very names just removed on a lane whose seed carries them. Keep the
+    # reconciled brief non-empty by preferring the original's shape; an
+    # already-empty brief is left empty and the legacy fallback stands.
+    if casting_brief.strip() and not reconciled_brief.strip():
+        # NEVER `or casting_brief` here. Reaching this branch means
+        # reconciliation emptied a brief that HAD content, which can only
+        # happen with superseded names present -- so falling back to the
+        # original would restore exactly the names this guard exists to
+        # remove, turning the safety net into the injection path. A bare
+        # label is the safe floor: non-empty, and naming nobody.
+        reconciled_brief = " ".join(
+            _NAMES.default_label(i) for i in range(len(superseded_names))
+        ) or _NAMES.default_label(0)
+    name_authority_events: list[dict] = []
+
     casting_attempts: list[int] = []
     for i, (slot, ens) in enumerate(zip(open_slots, ensemble_slots)):
         # Age axis (S5) is active ONLY in llm_slot_fill mode; pool mode passes
@@ -1819,12 +2036,17 @@ def lock_cast(
             response = cast_one_character(
                 generate_fn,
                 name=ens.name,
-                news_seed=news_seed,
+                # RECONCILED seed, matching the reconciled brief: the prompt
+                # builder falls back to this slice whenever the brief is empty.
+                news_seed=reconciled_seed,
                 style=style,
                 prior_cast=prior_cast_for_llm,
                 available_voices=available_voices,
                 max_attempts=max_attempts_per_call,
-                casting_brief=casting_brief,
+                # RECONCILED, never the raw brief. Bug Bible 11.61 verify (6)
+                # asserts this call site statically, so a later refactor cannot
+                # quietly restore the two-authority prompt.
+                casting_brief=reconciled_brief,
                 ensemble_slot=ens,
                 rng=cast_rng,
                 age_band=age_band,
@@ -1849,6 +2071,37 @@ def lock_cast(
                     name=exc.name,
                 ) from exc
             raise
+
+        # -----------------------------------------------------------
+        # Bug Bible 11.61 -- LAYERS 2 and 3: check, then regenerate.
+        #
+        # This runs AFTER a successful response and BEFORE the row is
+        # appended or exposed via prior_cast_for_llm, which is what cuts
+        # the amplifier: _format_prior_entry echoes the lead sentence
+        # into every later slot's prompt in the same episode, so a
+        # contaminated row left here re-injects the wrong person as
+        # "Cast so far" context for the rest of the cast.
+        #
+        # It is deliberately NOT a structured_call post_validator:
+        # validator exhaustion raises StructuredCallFailedError, which
+        # llm_write_description converts to CastingFailedError and
+        # lock_cast re-raises -- i.e. it could FAIL AN EPISODE, which the
+        # operator forbids for this mechanism.
+        response, guard_event = _enforce_name_authority(
+            response,
+            generate_fn=generate_fn,
+            slot=ens,
+            news_seed=reconciled_seed,
+            style=style,
+            casting_brief=reconciled_brief,
+            superseded_names=superseded_names,
+            roster_names=roster_names_for_authority,
+        )
+        if guard_event:
+            guard_event["char_id"] = slot.char_id
+            guard_event["name"] = ens.name
+            name_authority_events.append(guard_event)
+
         new_row = {
             "char_id":               slot.char_id,
             "name":                  ens.name,
@@ -1882,9 +2135,33 @@ def lock_cast(
         casting_attempts.append(1)
 
     meta: dict = {}
+    # Bug Bible 11.61: the guard's structured events. lock_cast has no episode
+    # identity, so it cannot satisfy "always log the episode and row" alone --
+    # it reports rows and the WRITER attaches the episode and persists them.
+    # Always present (empty list when clean) so a consumer can distinguish
+    # "checked, nothing found" from "never ran".
+    meta["name_authority"] = {
+        "upstream_identities": list(superseded_names),
+        "events": name_authority_events,
+    }
     # llm_slot_fill Pass-1 (S6): overlay LLM names + texture onto the
     # finished, already-coherent deterministic cast. Names are accepted as
     # authored strings; Python does not classify them by vocabulary.
+    #
+    # 11.61 FENCE: this is a SECOND naming authority and it acts AFTER every
+    # description is written, so the reconciliation above -- which was computed
+    # against the pre-fill roster -- does not describe the names this cast ends
+    # up with. The guarantee genuinely does not hold in this mode, so it is
+    # recorded rather than quietly assumed. Pool mode is the production default
+    # and is unaffected.
+    if name_mode == "llm_slot_fill" and superseded_names:
+        meta["name_authority"]["unfenced_mode"] = "llm_slot_fill"
+        log.warning(
+            "[OTR_Casting] OTR_NAME_MODE=llm_slot_fill renames rows AFTER "
+            "their descriptions are written, so the 11.61 boundary guarantee "
+            "does not hold for this cast (%d upstream identities reconciled "
+            "against the pre-fill roster).", len(superseded_names),
+        )
     if name_mode == "llm_slot_fill":
         cast = _apply_llm_slot_fill(
             cast, ensemble_slots, voice_by_char_id, age_by_char_id,

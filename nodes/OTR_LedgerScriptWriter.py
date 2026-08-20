@@ -1723,6 +1723,34 @@ def _fetch_rss_seed_or_die(
         ) from exc
 
 
+def _upstream_identity_names(meta: dict) -> list:
+    """Names an upstream creative pass invented for this episode's people.
+
+    Bug Bible 11.61: the cast assigner is about to override these, so they are
+    SUPERSEDED and must not reach a per-record prompt. Read from the structured
+    surface only -- ``meta.source_meta.selected_concept.cast[].name`` -- because
+    a free-text brief cannot be mined for identities without firing on healthy
+    Title-Case occupation heads ("Film Historian", "Space Force Liaison"), which
+    is a measured false-positive class on this corpus.
+
+    Returns [] on every lane that records no structured cast, which makes the
+    whole mechanism inert there and keeps those prompts byte-identical.
+
+    **KNOWN GAP, filed not hidden:** ``media_archive`` exhibits this same defect
+    (verified: ``ADRIAN CARRUTHERS`` carrying "Dr. Amelia Hartley") but names its
+    people only in free-text prose, so it has no structured surface to read and
+    is NOT covered by this call. Giving it one is its own item.
+    """
+    concept = ((meta or {}).get("source_meta") or {}).get("selected_concept") or {}
+    out: list = []
+    for entry in (concept.get("cast") or []):
+        if isinstance(entry, dict):
+            name = str(entry.get("name") or "").strip()
+            if name:
+                out.append(name)
+    return out
+
+
 def _stamp_news_seed_receipt(
     meta: dict[str, Any],
     resolved: Mapping[str, Any],
@@ -4726,6 +4754,15 @@ class OTR_LedgerScriptWriter:
                 # evidence that justified it. Empty on every invention lane.
                 source_character_genders=meta.get(
                     "_adaptation_character_genders"),
+                # Bug Bible 11.61: names an EARLIER pass invented for the people
+                # in this story, which this cast is about to override. lock_cast
+                # drops any the assembled roster owns, so handing it the
+                # adaptation lanes' source names would be harmless -- but only
+                # the original lane records a structured list today, and a free-
+                # text brief cannot be mined for identities without inventing
+                # findings on healthy Title-Case occupation heads. So this is
+                # the structured surface, and only that.
+                upstream_identity_names=_upstream_identity_names(meta),
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
@@ -4749,6 +4786,34 @@ class OTR_LedgerScriptWriter:
             "cast_seed":              int(cast_seed),
             "cast_seed_source":       str(cast_seed_source),
         }
+        # Bug Bible 11.61: persist the name-authority guard's findings WITH the
+        # episode identity. `lock_cast` reports rows and cannot do this itself --
+        # it has no episode id -- and 11.61's verify clause wants the episode AND
+        # the row, because a detector that only says "this episode is dirty"
+        # cannot be used to repair. Always stamped, so "checked and clean" is
+        # distinguishable from "never ran".
+        # NO `episode_id` COPY HERE, DELIBERATELY. `lock_cast` cannot name the
+        # episode, so the writer persists these events INTO the episode's own
+        # ledger -- which already carries `episode_id` at the top level. A second
+        # copy would be an episode-local durable pointer that `rename_episode`
+        # does not rebase (it rebases publication_eligibility by name), so it
+        # would still read `pending_<ts>` after the real slug is assigned. That
+        # exact staleness cost two published episodes on 2026-08-15: the terminal
+        # mux compared a receipt's `pending_...` against the live slug, read it as
+        # a stale singleton, and withheld the OBS copy on EVERY episode. One
+        # authority for the episode id; the events carry the row.
+        _name_authority = cast_meta.get("name_authority") or {}
+        meta["name_authority"] = {
+            "upstream_identities": list(_name_authority.get("upstream_identities") or []),
+            "events": list(_name_authority.get("events") or []),
+            "unfenced_mode": _name_authority.get("unfenced_mode", ""),
+        }
+        if meta["name_authority"]["events"]:
+            log.warning(
+                "[OTR_LedgerScriptWriter] name-authority guard fired on %d cast "
+                "row(s); see meta.name_authority for the row-level detail",
+                len(meta["name_authority"]["events"]),
+            )
         # VC chunk 3 (2026-06-22): carry the per-character voice-fit slots
         # (gender/timbre/role/age_band/speech_signature/description_digest) into
         # the frozen ledger meta so OTR_CastLock's bank caster can match on

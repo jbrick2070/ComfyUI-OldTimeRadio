@@ -85,9 +85,65 @@ down the path the Bible forbids.
 * **Measured, so do not re-derive:** a subject-head detector anchored on
   capitalisation fires on **1,734 of 3,792 rows** -- the healthy head style is a
   Title-Case occupation. A tiered detector gives ~20 hits, ~13 true.
-* Also filed there: the census script has a normalisation defect (it reported a
-  miss on an episode whose pitch field is present), and contamination is more
-  recent than this file's body says (2026-08-17, not 08-16).
+* **THE CENSUS DEFECT IS FIXED AND THE NUMBERS MOVED (2026-08-20).** Root cause:
+  the comparison was CASE-SENSITIVE -- `wax_cylinders` pitched
+  `ELIZABETH 'LIZZIE' WALSH` and the row reads `Elizabeth 'Lizzie' Walsh`, so an
+  episode with BOTH dramatic rows contaminated scored clean. The instrument now
+  exists as `scripts/audit_wrong_person_census.py` (NFKC -> quote/dash unify ->
+  whitespace collapse -> casefold; exit 0/1/2, 2 = incomplete scan).
+  **Corrected measurement: 64 hit-rows in 38 ledger files = 40 unique rows in 26
+  unique episodes, against an annotated cohort of 125 files / 250 non-announcer
+  rows. 61 of 64 also contaminated `portrait_prompt`.** The item's old 28/20 was
+  less than half. **A token-level tier finds 4 MORE true rows (~44 total)** that
+  full-string matching misses -- `"40s, EDWARDM PINCH"`, `"18-20s, 'Eddie'"` --
+  plus exactly one correct relational mention (`"foil to Hiram's meticulous
+  obsession"`) which must NOT be flagged, per 11.61.
+* **"EVERY hit is on the `original` family" WAS WRITTEN HERE AND IT IS FALSE --
+  CORRECTED BY r4 (Codex), 2026-08-20.** It is a COHORT-SELECTION ARTIFACT of the
+  census, not a production fact: the instrument only considers ledgers carrying
+  `selected_concept.cast`, which only the `original` family writes, so it could
+  not have found a hit elsewhere however much existed. **`media_archive` has the
+  identical defect with NO structured list at all** -- `ADRIAN CARRUTHERS` reads
+  *"50s, Dr. Amelia Hartley, Film Historian..."* from a brief that names her
+  (`as_the_hands_of_midnight_approach_20260803_015353`), and `DALE SPENDER` reads
+  *"30s, passionate film archivist Dr. Amelia Hartfield"*
+  (`banksweep_media_archive_20260810_234726`). Both verified at the ledger.
+  So layer 1 (redaction) cannot reach `media_archive`, and layer 2 is its only
+  cover. **Corrected lower bound: >= 68 row occurrences / 40 ledger files, >= 65
+  copied into portraits, Aug 1-17 >= 21/37 dirty -- plus an unmeasured
+  media_archive population.** The 40-rows/26-episodes figure came from a throwaway
+  script, is NOT reproducible from the instrument, and must not be quoted.
+* **`speech_signature` is a SECOND contaminated prose field** and it is persisted
+  (`DALE SPENDER`: *"Amelia speaks in measured, deliberate tones..."*). Any guard
+  that checks only `character_description` certifies half a row.
+* **The roster is NOT final at the description boundary in every mode.**
+  `_apply_llm_slot_fill` (`_otr_casting.py:1888`) runs AFTER the description loop
+  and reassigns `row["name"]` (1656-1660). Pool mode is the default and is safe;
+  `OTR_NAME_MODE=llm_slot_fill` must be explicitly fenced or the guarantee does
+  not hold there.
+* **The Bug Bible is WAITING for this item's test.**
+  `bug_bible_regression.py:869` records that `11.61` *"has no executable assertion
+  YET, deliberately"* and names verify step (6) -- the prompt builder receives
+  RECONCILED text -- as the one statically checkable half, blocked until the guard
+  exists. Promote it with the fix.
+* **IT IS LIVE, NOT A RETIRED REGIME (operator asked 2026-08-20).** The most
+  recent episode on the lane -- `rivers_embrace`, 08-17 23:30 -- has BOTH dramatic
+  rows wrong. Rate ROSE: July 5/74 (7%), Aug 1-17 19/37 (51%). No commit since
+  08-01 touched the two-authority prompt. **The briefs from both eras name the
+  pitch cast identically**, so the July-clean episodes were clean by luck under a
+  byte-identical prompt -- which is why the guarantee cannot be a prompt.
+* **`casting_brief` has exactly ONE consumer** (`OTR_LedgerScriptWriter.py:4715`
+  -> `lock_cast`), so redaction there is fully contained and the ledger keeps the
+  unredacted brief for forensics. **But `script_brief` carries the same people in
+  SHORT form** ("Jonas", "Lizzie") into the OUTLINE -- a second surface, filed
+  here, not fixed by this item.
+* **11.61's preferred "rewrite to the assigned names" is NOT safely available**:
+  it needs a pitch->slot mapping and the only candidate is position, which shifts
+  whenever LEMMY is cast (`assemble_pre_locked_rows` sets
+  `remaining_open = num_characters - 1`), silently mispairing on his ~11% roll.
+  So: removal or a neutral DISTINCT placeholder. A single shared token
+  ("this character") is wrong -- it collapses several people into one and invites
+  blended descriptions.
 
 ### OPEN, not yet scheduled
 
@@ -101,6 +157,7 @@ down the path the Bible forbids.
 | PBUG-20260729-03 | STILL OPEN; this file's reachability claim for it was corrected 2026-08-19. |
 | scifi_news_pro `news_read` invented names | OPEN -- retry-ladder exhaustion on a factual pass. Related in spirit to item I but a DIFFERENT mechanism (invention, not paste). |
 | the five STATIC findings | OPEN, awaiting live observation. **Do NOT promote to PBUGs on the audit alone.** |
+| **LTX 2.5 delivery mesh / "tiled"** | **NEW 2026-08-20, operator-reported, LOCALISED not fixed.** He saw tiling at 00:37 of `beneath_the_silvery_boughs` and asked whether the graph drifted from the lab or the untested resolution was to blame -- **it is the second.** The raw 832x480 render is CLEAN; the mesh appears in the 1920x1080 composite; the procgen/CRT blend is innocent. Recipe drift is ruled out (the lab-golden gate passes; Q3 is the deliberate lock, not drift). Which downstream op adds it -- Real-ESRGAN x2plus, the bicubic landing resize, or the 5.18 Mbit/s encode -- is NOT pinned, and **the ledger never records which upscale engine ran**, so it cannot be answered from the artifact. Next step is a two-way re-composite of shots already on disk; no LTX re-render needed. Receipt: `docs/2026-08-20-ltx25-tiled-mesh-artifact-FINDING.md`. NOT a recipe change -- the recipe is exonerated. |
 | **GPU reclaim race** | **NEW 2026-08-20, pre-existing, filed not fixed.** A second request can run the destructive global reclaim while the first holds the gpu_residency lease and is sampling -- the lease is taken inside `prepare()`, after `run_episode`'s pre-render reclaim. Exists today with no cache at all. The obvious patch (take the lease inside reclaim) **DEADLOCKS**, because `render_clip` calls reclaim while already holding it and the lease is non-reentrant. Root fix is process-wide serialisation of local render/reclaim entrypoints. Own item. |
 
 ### CLOSED THIS SESSION -- do not reopen
