@@ -31,26 +31,57 @@ from nodes._otr_voice_bank import load_voice_bank
 #: voice_ref_id -> gender the operator settled by ear, with the ruling's commit.
 #: Only add a row here AFTER he has confirmed it.
 OPERATOR_SETTLED_GENDERS = {
-    # e1c84cf6, 2026-08-17 -- heard as male after months cast as female.
-    "vz_donor_glenn": "male",
-    "cb_donor_glenn": "male",
-    "dia_donor_glenn": "male",
     # Operator ruling 2026-08-18: "if we [don't] have real gender info use the
-    # name not some pitch". Both handles are unambiguously male; both were
-    # imported female by the F0 bucket. NOT yet heard -- these are settled by
-    # the naming RULE, not by ear, and he may still revise them on a listen.
-    "vz_donor_james": "male",
-    "cb_donor_james": "male",
-    "dia_donor_james": "male",
+    # name not some pitch". The handle is unambiguously male; the trio was
+    # imported female by the F0 bucket. Settled by the naming RULE and CONFIRMED
+    # BY EAR on 2026-08-20 in the donor audition page.
     "vz_donor_hillbilly_jim": "male",
     "cb_donor_hillbilly_jim": "male",
     "dia_donor_hillbilly_jim": "male",
+    # Heard male on 2026-08-20; the bank had it female from the same F0 bucket.
+    # This is the ONLY gender the audition changed -- every other voice he
+    # judged already matched the bank, which is the receipt that the naming-rule
+    # repair had substantially worked.
+    "vz_donor_selfie": "male",
+    "cb_donor_selfie": "male",
+    "dia_donor_selfie": "male",
 }
 
-#: Deliberately NOT pinned. `rup` reads male to some ears and not to others, so
-#: the naming rule does not decide it and pinning a coin-flip would turn a guess
-#: into a contract. It stays as the bank has it until he listens.
-UNRESOLVED_BY_NAME = ("vz_donor_rup", "cb_donor_rup", "dia_donor_rup")
+#: RETIRED 2026-08-20 BY THE OPERATOR'S EAR -- and glenn's absence needs the
+#: explanation, because this file exists BECAUSE of glenn.
+#:
+#: **GLENN AND JAMES ARE GONE FROM THE BANK, AND THAT IS NOT THE OLD BUG COMING
+#: BACK.** Read this before concluding the 2026-08-17 fix was reverted.
+#:
+#: glenn was imported FEMALE on 2026-06-05, cast on 115 female slots, became the
+#: #2 female voice in the corpus, and was flipped to MALE in `e1c84cf6` after the
+#: operator heard it. His instruction then was *"We [spent] so much time fixing
+#: glenn please [don't] break it again"*, and this file was the "don't break it
+#: again" half.
+#:
+#: On 2026-08-20 he auditioned all 63 donor references and marked 21 of them
+#: DUPE-OR-UNWANTED -- glenn and james among them. The driver STOPPED and asked
+#: rather than acting, precisely because retiring glenn looked like undoing his
+#: own hard-won fix; he confirmed: retire all 21, glenn and james included.
+#:
+#: So the gender ruling was never reversed. The VOICE was retired, which is a
+#: different axis and his call alone. Their pins left this table with the bank
+#: rows in the same change, because a pin naming a row that no longer exists is
+#: a test asserting nothing.
+RETIRED_BY_OPERATOR_EAR_20260820 = (
+    "glenn", "james", "awais_shah", "bijay", "blake", "1410", "2181", "3973",
+    "9a66", "erihppas", "f179", "hkl", "kditz", "rup", "andrea",
+    "andrea_spanish", "darya_khan", "marshal_indian", "sirajo_x",
+    "sujan_daikoawaj", "kerstin",
+)
+
+#: EMPTY, and it emptied by being ANSWERED rather than by being dropped. `rup`
+#: was the last row the naming rule could not decide -- it reads male to some
+#: ears and not others -- so it sat here unpinned rather than becoming a
+#: contract built on a coin flip. He listened on 2026-08-20 and retired it (see
+#: RETIRED_BY_OPERATOR_EAR_20260820), which settles it: a voice that is not in
+#: the bank needs no gender.
+UNRESOLVED_BY_NAME = ()
 
 
 def _bank_by_id():

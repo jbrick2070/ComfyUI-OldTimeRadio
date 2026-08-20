@@ -133,10 +133,29 @@ def test_bank_has_chatterbox_and_dia_pools():
     bank, _ = load_voice_bank()
     cbx = [e for e in bank if e.engine == "chatterbox" and "char_voice" in e.roles]
     dia = [e for e in bank if e.engine == "dia" and "char_voice" in e.roles]
-    # FLOOR, not an exact count: the bank GROWS as public-domain voices are added
-    # (scripts/otr_ingest_pd_voices.py). The original mirrored pools were 36 each.
-    assert len(cbx) >= 36
-    assert len(dia) >= 36
+    # FLOOR, not an exact count: the bank GROWS as public-domain voices are
+    # added (scripts/otr_ingest_pd_voices.py). The original mirrored pools were
+    # 36 each.
+    #
+    # LOWERED 36 -> 20 ON 2026-08-20, and only because the OPERATOR SHRANK THE
+    # BANK ON PURPOSE. He auditioned all 63 donor references and retired 21 of
+    # them as dupes or voices he does not want, which removed 63 rows (21 refs
+    # x indextts2/chatterbox/dia) and took every char_voice pool from 41 to 20.
+    # The mirrored-pool INVARIANT is untouched and is what this test actually
+    # guards: all three engines still carry the same 20, so a cast that works on
+    # one engine works on all three.
+    #
+    # THE FLOOR IS NOT A TARGET. If a future change drops a pool below 20
+    # without a matching operator ruling, that is a regression and this is where
+    # it surfaces. Raise it again when public-domain ingestion grows the bank.
+    #
+    # WORTH KNOWING FOR CASTING: the surviving split is 13 male / 7 female per
+    # engine. Seven female char voices is thin for an episode that casts several
+    # women, and repeats will be audible before male repeats are.
+    assert len(cbx) >= 20
+    assert len(dia) >= 20
+    assert len(cbx) == len(dia), (
+        "the pools must stay MIRRORED -- chatterbox %d vs dia %d" % (len(cbx), len(dia)))
     assert all(e.roles == ("char_voice",) for e in dia)
 
 
