@@ -3,6 +3,93 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-20 -- HEAD 0adb1252 +handoff (v2.0-alpha) -- CODER (item I shipped after four QA rounds; then a day-long grid hunt whose detector turned out to be inverted)
+
+The sha above is the LAST CODE HEAD -- the second-to-last on the branch once
+this handoff commit lands. A commit cannot contain its own hash. The
+authoritative post-handoff sha is in the kickoff line.
+
+**Did: two pushed commits, both verified against origin by `git ls-remote`,
+plus one to the Bible repo.**
+
+**ITEM I IS DONE AND PUSHED (`0645839b`).** Bug Bible `11.61`: two naming
+authorities were handed to one prompt, so a cast row described SOMEBODY ELSE and
+that string was copied verbatim into the portrait prompt. Measured live at 40
+rows across 26 real episodes, 65 of 68 occurrences also contaminating the
+portrait. The fix reconciles the brief at the `lock_cast` boundary -- the only
+point where the roster exists -- checks BOTH prose fields after generation,
+discards a contaminated response whole rather than name-swapping it, regenerates
+once from reconciled context, then falls to a deterministic floor. **Nothing in
+it can raise.** New: `nodes/_otr_name_authority.py`,
+`scripts/audit_wrong_person_census.py`, `tests/test_name_authority_boundary.py`.
+Suite **11237 -> 11270**, delta exactly the 33 tests added, zero regressions.
+
+**FOUR QA ROUNDS RAN AND EVERY ONE FOUND SOMETHING REAL** -- Sonnet 4.6,
+Codex/Sol twice, Antigravity. Between them: the guard was discarding legitimate
+relational prose (*"foil to Hiram's meticulous obsession"* -- the exact class
+11.61 warns must not be flagged); the census reported its own blind spot as a
+clean bill of health; a possessive check contained **a literal backspace byte**
+from a shell heredoc and had never once executed; and the clean-room retry
+traded a wrong-person row for a story-detached one. Dispositions are in
+`kibitz-runs/2026-08-20-item-I-wrong-person/r4/` (gitignored, local only).
+
+**THE GRID HUNT: SIX CANDIDATES ELIMINATED, THEN THE DETECTOR TURNED OUT TO BE
+INVERTED.** `score_full_frame` read 2.2-2.3 on every arm of every test including
+every control. Pointed at two images the operator can tell apart by eye, it
+scored the CLEAN one HIGHER -- 7.2 against 4.8. Five renders had been spent on
+it. Replaced by `vram-recipe-lab/ltx25_gridscore.py` (2-D, ABSOLUTE, ranks the
+known degrid ladder monotonically 3.156 -> 1.567, ships `--selftest` that
+refuses to pass if the ordering breaks). **Promoted as Bible `12.118`**,
+survival-guide `adfad04` == origin/main, 296 -> 297 entries, regression 20/26/3.
+
+**WHAT THE LAB AND THE agy/DIFFOMATIC LANES ALREADY ANSWERED -- DO NOT RE-ASK:**
+
+* **eta 0 vs 1.0** -- seeded A/B on the production I2V lane. No change.
+* **negative prompt, `img_compression` 18, official `ManualSigmas`, decode
+  temporal 64/16** -- four single-variable renders. All re-scored on the FIXED
+  detector: **3.28-3.82 against a 3.821 control**, every one still "grid
+  clearly visible".
+* **canvas 1024x576** -- seeded A/B: **+3 MB VRAM for 48% more pixels**, but
+  worse grid, halved sharpness, **+44% wall clock**. Closed.
+* **decode tiling and the VAE itself** -- VAE-only round trip, identical scores;
+  latent confirmed `13x15x26`.
+* **`img_compression 0` IS DOCUMENTED** (`eng_ltx25.py:967`) -- the driver
+  called it undocumented drift and was wrong; agy caught it.
+* **agy fabricated one "documented" reason** (quoted temporal 64/8 when our
+  constants are 33/4). Every DOCUMENTED verdict must now print the `file:line`
+  it was quoted from.
+
+**Current step:** the grid item. Everything knob-level is eliminated. What
+remains is ARCHITECTURE: the official ComfyUI I2V template is TWO-STAGE --
+768x512 base -> `LTXVLatentUpsampler` x2 -> a 3-step refine on sigmas
+`[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024 -- and **we run stage one
+only**, stretching 2.31x in ffmpeg afterwards. Full inventory:
+`vram-recipe-lab/LTX25_FULL_DIFF_vs_official.md`.
+
+**Next:** a lab FEASIBILITY PROBE only -- does the second stage fit under the
+ceiling today? The OOM ban that removed it predates the CPU-pinned text encoder
+and the episode-scoped encoder cache, and canvas has since been measured as
+nearly free. **If it OOMs the item closes; if it fits it earns a full arc**, and
+it is a design decision for the operator either way, not a knob. Also queued in
+the lab: the FLF2V continuity probe (`LAB_MINI_REQ_ltx25_flf2v.md`).
+
+**Also real, separate from the grid:** the composite's `unsharp=0.4` was
+calibrated for a 1472x832 canvas and now runs at 1920x1080 (2.31x), amplifying
+whatever texture reaches it by ~32%. Operator eyeball call.
+
+**Models:** cheapest-competent local triage throughout; Codex `gpt-5.6-sol`
+(driven directly, not through the plugin), Antigravity `gemini-3.1-pro-high` and
+`claude-sonnet-4-6` for QA rounds. **Item I got a genuine four-round arc**;
+every other decision this session was measurement, not design, so none was
+panelled.
+
+**Box:** port 8000 has no listener, GPU at 990 MiB (near desktop baseline). The
+operator's lab runs in a separate window on its own port -- do not assume 8000
+is free to claim without checking.
+
+**Commits:** `0645839b` (item I), `0adb1252` (queue + provenance + Diffomatic
+audit), and `adfad04` on the survival guide. The handoff commit lands on top.
+
 ## 2026-08-20 -- HEAD c18c0f12 +handoff (v2.0-alpha) -- CODER (the LTX 2.5 encoder reload fixed and owned by the EPISODE; a four-round arc that overturned the driver twice; three more false CFG premises found)
 
 The sha above is the last CODE head -- the second-to-last on the branch once
