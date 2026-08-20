@@ -47,11 +47,82 @@ exists, take it and report it. Escalate only genuine forks. Blanket approvals ar
 DURABLE -- *"yes I agree lets move forward"* licenses working the queue without
 re-asking per item.
 
+## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
+
+**This block is the only forward-looking list in this file.** Everything below
+it is either a standing RULING you must not violate or a receipt explaining why
+a ruling exists. If you are picking up work, you need this block and nothing
+else until you have chosen an item.
+
+**WHY THE FILE IS STILL 3,400 LINES, and why that is not a bug to fix.** The
+2026-08-16 audit called for an archive split and it was attempted again on
+2026-08-20. **It was rejected on inspection:** the bulk of the length is NOT
+receipt narrative, it is sections that have ALREADY been compressed to
+"What still binds:" rulings -- item A's body is four rulings and one pointer to
+`HANDOFF_LOG.md` for the receipts. Moving those to an archive would move the
+RULES, not the history. The length is the price of not re-deriving them.
+So: the file is LONG on purpose, and it is made forward-only by this block
+existing, not by deleting the rest.
+
+### NEXT CODING ITEM: `I` -- the wrong-person character description
+
+**PBUG-20260817-03, Bible `11.61`. Diagnosed, panelled three rounds, NO CODE
+WRITTEN. r4 is owed before any is.**
+**READ `kibitz-runs/2026-08-20-item-I-wrong-person/r3/judgment.md` FIRST** -- the
+design was OVERTURNED there and starting from the item body below will send you
+down the path the Bible forbids.
+* The short version: Bible `11.61`, promoted FROM this bug, says *"enforce it at
+  the boundary, not in the prompt"* and *"DO NOT fix it by instructing the model
+  harder"*. The driver's own anchor and two review rounds all argued for exactly
+  that forbidden fix, because the plan's paraphrase was read instead of the
+  entry. **Open the entry.**
+* Adopted shape, in order: (1) input REDACTION of known pitch names from the
+  brief before `_build_user_prompt` -- `selected_concept.cast[].name` carries the
+  intruder strings verbatim, and this is 11.61's own first prescription, NOT the
+  banned fuzzy repair (that ban is about the OUTPUT); (2) a SOFT post-generation
+  check that can never raise into `lock_cast`; (3) prompt hardening last, as
+  rate reduction only.
+* **Measured, so do not re-derive:** a subject-head detector anchored on
+  capitalisation fires on **1,734 of 3,792 rows** -- the healthy head style is a
+  Title-Case occupation. A tiered detector gives ~20 hits, ~13 true.
+* Also filed there: the census script has a normalisation defect (it reported a
+  miss on an episode whose pitch field is present), and contamination is more
+  recent than this file's body says (2026-08-17, not 08-16).
+
+### OPEN, not yet scheduled
+
+| item | state |
+|---|---|
+| **H-FLOOR** | **OPERATOR'S CALL, not a driver's.** Changes conditioning at cfg 4.0 and owes a render. Body below. |
+| **donor voice gender -- 9 rows** | **OPERATOR'S EAR.** Root cause fixed; the rows await his listen. Never auto-flip a bank gender. |
+| the four missing fingerprint recipes | OPEN. `RUNTIME_FINGERPRINT_SOURCES` has a recipe for `indextts2` only; no adapter defines `impl_version`. A real design call per engine. |
+| listen page marks a resumed engine `settled` forever | OPEN. `scripts/otr_lemmy_listen_page.py:173/180/354`; `write_decisions` never overwrites. |
+| PBUG-20260815-06 media_archive | Selection FIXED `3be1c1e1`; **the durable-headline half is OPEN.** |
+| PBUG-20260729-03 | STILL OPEN; this file's reachability claim for it was corrected 2026-08-19. |
+| scifi_news_pro `news_read` invented names | OPEN -- retry-ladder exhaustion on a factual pass. Related in spirit to item I but a DIFFERENT mechanism (invention, not paste). |
+| the five STATIC findings | OPEN, awaiting live observation. **Do NOT promote to PBUGs on the audit alone.** |
+| **GPU reclaim race** | **NEW 2026-08-20, pre-existing, filed not fixed.** A second request can run the destructive global reclaim while the first holds the gpu_residency lease and is sampling -- the lease is taken inside `prepare()`, after `run_episode`'s pre-render reclaim. Exists today with no cache at all. The obvious patch (take the lease inside reclaim) **DEADLOCKS**, because `render_clip` calls reclaim while already holding it and the lease is non-reentrant. Root fix is process-wide serialisation of local render/reclaim entrypoints. Own item. |
+
+### CLOSED THIS SESSION -- do not reopen
+
+* **LTX 2.5 encoder reload.** Episode-scoped cache, proven live: 34 renders,
+  **1 encoder disk read**, 33 hits, 0 drops, 33.5% faster per render. Published.
+  Bible `12.117`. Full record: `docs/2026-08-20-ltx25-encoder-cache-ARC.md`.
+* **The CPU-encoder OOM fix** from the previous window -- proven end to end,
+  31 renders, zero OOM, published.
+* **Item `G`.** Closed by its own newer body, which the 08-15 queue header
+  contradicted. `audit_voice_gender_consistency.py` reports `VIOLATIONS: 0`
+  across 1,710 ledgers -- the operator's own criterion. The "34/35" it was named
+  for is a portrait-prose count the audit explicitly refuses to total.
+
 ## HOW TO READ THIS FILE (lean pass 2026-08-16 evening)
 
-**Start at THE QUEUE. Everything below it is reference.** The queue is the only
-authority on ORDER; the numbered bodies further down are detail you read when
-you pick an item up, not a second to-do list.
+**Start at THE LIVE QUEUE, at the top of this file (2026-08-20).** It is the
+only authority on what is OPEN and in what order; the numbered bodies further
+down are detail you read when you pick an item up, not a second to-do list.
+The older "THE QUEUE, DRIVER-SET 2026-08-17" block below is SUPERSEDED as an
+ordering authority -- it still says "G IS NEXT", and G was closed by its own
+newer body. Keep it for its rulings, not its order.
 
 The file was audited end to end on 2026-08-16 and it had drifted badly from its
 own forward-only rule. What the audit found, so the next reader is not misled:
@@ -459,7 +530,9 @@ newer, around line 1169) says the re-ask **should not be built** --
 the item was named for is a portrait-prose count the audit explicitly refuses to
 total. Believe the newer statement. **The next real coding item is `I`.**
 
-### QUEUE STATE AT THE 2026-08-18 CLOSE -- lean; this is the whole live list
+### RULINGS LEDGER FROM THE 2026-08-18 CLOSE -- NOT a live list, despite what
+### this heading used to say. 928 lines of standing rulings and the receipts
+### that justify them. The live list is THE LIVE QUEUE at the top of this file.
 
 **THE TITLE/IDENTITY FAMILY IS CLOSED AND PROVEN ON PIXELS.** PBUG-05 fixed,
 item I bisected, PBUG-04 built, title-provenance spec answered, and the GPU
