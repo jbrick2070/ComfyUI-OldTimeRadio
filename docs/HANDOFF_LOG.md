@@ -3,6 +3,115 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-19 -- HEAD 3e2d03dd +handoff (v2.0-alpha) -- CODER (two title/identity bugs proven on pixels, five operator-voted deletes, a fingerprint landmine defused, the master moved to -14 LUFS, and the LTX 2.5 arc ruled)
+
+The sha above is the last CODE head -- the second-to-last on the branch once
+this handoff commit lands. A commit cannot contain its own hash. The
+authoritative post-handoff sha is in the kickoff line.
+
+Did: a long session, seven pushed commits, every one green.
+
+**PBUG-20260815-05 FIXED AND PROVEN ON PIXELS.** `_generate_title_from_script`
+had no parameter carrying the work it was adapting, so a Macbeth scene titled
+itself after The Tempest -- a sibling play in the same manifest. Now takes
+`work_title`, threaded through the EXISTING `_otr_source_identity` authority,
+lane-gated on `ADAPTATION_SOURCE_KINDS`. **The fix is an ANCHOR, not a guard**,
+per the operator's mid-window ruling against over-engineering hard-to-replicate
+bugs: the code-side sibling-title reject the PBUG specified was deliberately NOT
+built (no sound matching rule existed). Proven live: bank gate 2/2 PASS, both
+published to `otr/obs/` -- shakespeare `signal_lost_under_the_enchanted_moon_
+20260819_062006` adapted A Midsummer Night's Dream, stamped
+`title_work_anchor == "A Midsummer Night's Dream"`, titled **"Under the
+Enchanted Moon"**, named no other play and did NOT collapse into the play name.
+media_archive `signal_lost_reel_of_shadows_20260819_061004` is the negative
+control: anchor `""` with the key PRESENT, the lane gate correctly refusing to
+anchor a title to the publication "Now See Hear!".
+
+**PBUG-20260815-06 CLOSED, BOTH HALVES.** The durable-headline half was one
+line, and the reason it sat open is the lesson: **the consumer was built first
+and the producer was never wired.** `identity_from_meta` has always read
+`source_meta["post_headline"]` and `is_degraded` is True exactly when it is
+missing -- while `_rss_source_fetch_result` never stamped it. Every
+media_archive episode carried a degraded identity, silently. A test fixture even
+documented the intended key set including that field. **The full suite caught a
+regression the QA lane missed** -- an EXACT-equality `source_meta` pin; the lane
+had checked for a "schema" and correctly found none, because the pin was an
+equality assertion. A green review is not a green suite.
+
+**FIVE OPERATOR-VOTED DELETES**, decided from a listen-and-vote artifact:
+`audio_revision` (dead at both ends), the post-freeze writeback auditor
+(exported, documented, zero callers -- its own docstring described a soft
+rollout that reached nobody), the announcer-only escape hatch (unreachable --
+nothing ever set the flag), the cloud media cache (zero production callers), and
+the stale-ledger voice guard. Two went AGAINST the driver's recommendation and
+were taken as given. **Traps caught by measuring rather than assuming:** the
+schema base is `extra="forbid"` so deleting a field could have broken every
+ledger -- measured 0 of 1,713 carry it, so the delete was safe; and deleting the
+auditor orphaned two constants, one of which turned out LIVE (imported and
+asserted elsewhere) so it stayed.
+
+**THE FINGERPRINT LANDMINE, and it cost a real fix before it was found.**
+Adding ONE comment plus ONE log line to `_otr_voice_node_common.py` de-qualified
+Lemmy's shipped voice route and turned four tests red -- that file is hashed
+whole-bytes into `RUNTIME_FINGERPRINT_SOURCES["indextts2"]`. **The fix was
+neither the driver's idea nor the panel majority.** Measured over all 44 commits
+that ever touched the four hashed files: raw-byte changed 44/44, AST-normalised
+43/44 -- so hashing the AST buys ONE commit in forty-four and would not have
+prevented the incident (a log call is a new AST statement). The codex-spark lane
+found the real answer: **the problem was the RECIPE, not the mechanism.** The
+shared dispatcher (19 commits in 60 days) is out of the recipe; of those 19,
+exactly ONE touched the seed path that justified its inclusion, and that commit
+ALSO edited the adapter which stays in. So 18 false demotions removed, nothing
+real lost. **Proven on the product:** the exact edit that broke it now leaves
+the route selected.
+
+**THE MASTER TARGETS -14 LUFS.** The operator asked for Fable and Sonnet to
+agree best practice for YouTube before he would accept it; both did,
+independently. Shipped master measured **-9.62 LUFS** -- ~4 dB hotter than
+YouTube's target, and YouTube attenuates loud content while never boosting
+quiet, so the loudness was discarded at playback while the limiting that bought
+it stayed in the audio. **The driver's own blind A/B was wrong and is recorded
+as wrong:** the four arms were flat gain on a finished master, but running the
+REAL `_master_loudness` shows the peak-to-loudness relation is sharply
+nonlinear (ceiling -1.0 -> -13.26 LUFS, -9.0 -> -23.58), so the operator's
+picked arm would have shipped ~10 dB under target, not what he heard. Now
+measures LUFS, applies ONE linear gain to -14.0, keeps -1.0 dBTP as a rail.
+Proven on five real masters: all land on -14.00. **And the property he
+specifically worried about is pinned** -- one linear gain cannot change any
+clip-to-clip ratio; measured 1.033572 before and after.
+
+**LTX 2.5: r1+r2 RUN, SPLIT RULED, FIRST CODE LANDED.** See the three
+GO_FORWARD rows. Ruling: build the silent video lane now; the foley bed needs an
+execution-order change (video renders 4 stages after the master freezes) shared
+with the deferred mime work. Fable's condition adopted: **Chunk B gets a named
+trigger and the row stays OPEN**, because two deferrals pointing at each other
+is how a thing stays unbuilt forever -- plus an offline audition mux so the
+operator HEARS the foley before anyone does sacred-path surgery.
+
+Also: `closing_audio` socket removed (his vote) -- not a one-liner, it sat at
+input slot 1 with two live links past it, so both were renumbered; 50 variants
+regenerated, four hand-kept `*.env.json` master hashes re-synced after two tests
+went red on the drift.
+
+Current step: LTX 2.5 Chunk A -- build `eng_ltx25.py`. Everything it needs is
+staged: weights confirmed on disk, golden JSON pinned by tests, names settled,
+graph fully known.
+Next: write the adapter. Blocked on nothing. The `low`/`high` public token
+waits on the operator's 4060 clamp test and does NOT block the adapter, which
+builds against internal ids.
+Models: Opus 5 driving. LTX 2.5 arc r1 = Fable (cold) + Sonnet (grounded);
+r2 = Fable + agy/Gemini-3.1-pro. **Both Codex lanes quota-exhausted** (sol to
+20:31, spark to 2026-08-20 10:57) and contributed NOTHING to r1/r2 -- a
+three-family arc without the grounded CLI seat, **not a full-roster arc**.
+Earlier in the session codex spark DID review two diffs and found real defects
+(two tautological tests; the recipe-narrowing answer). Loudness panelled by
+Fable + Sonnet. Bible 12.116 promoted, README 294->295, regression 20/26/3.
+Suite 11100/110/1. Box left clean: no resident server, port 8000 free, VRAM at
+desktop baseline.
+Commits: `780fd60a`, `c5e41d49`, `e2d4c28e`, `d8ca5bbe`, `dc320240`,
+`6ae86b85`, `3ecb0133`, `a6302fa2`, `6f509b16`, `a9f47f00`, `0fc6f9de`,
+`89b370ab`, `3e2d03dd`; survival-guide `55d4eaf3`.
+
 ## 2026-08-19 -- HEAD 48f339ba +this (v2.0-alpha) -- CODER (the episode title stops naming a different play; media_archive can finally name the post it adapted; one queue row's reachability claim corrected as stale)
 
 Did: **PBUG-20260815-05 FIXED.** A Macbeth episode had shipped as
