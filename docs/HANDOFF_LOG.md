@@ -111,10 +111,16 @@ amendment scopes the disproof and names the one-line distinguishing test: read
 WHICH NODE raised. Entries unchanged at **295**, so no README bump owed;
 regression **20/26/3**; survival-guide HEAD `55d4eaf` == origin/main.
 
-Current step: LTX 2.5 Chunk A is code-complete and live-proven at the shot
-level. **A canonical episode leg was STILL RUNNING when this handoff was
-written** -- the operator explicitly waived the no-handoff-while-running rule.
-Next: the encoder-reload fix (below), then read the leg.
+Current step: **CHUNK A IS PROVEN END TO END. The leg finished while this
+handoff was being written: `RESULT SUCCESS`, 31 beats, ZERO OOM, and it
+PUBLISHED** --
+`otr/obs/signal_lost_beneath_the_silvery_boughs_20260820_002734_silent_procgen_blended_captioned_with_credits_final.mp4`,
+61,038,868 bytes on disk. The two earlier legs died at beat 15 and beat 1 on
+`node 'neg' (encode)`; this one ran all 31 clean. That is the CPU-encoder fix
+qualified at the EPISODE level, not just the shot level, and it is the receipt
+the whole day was for.
+Next: the encoder-reload fix (queue item 1) -- the lane still re-reads 8.86 GiB
+per beat, which is throughput, not correctness.
 Models: Opus 5 driving. Panel this session: agy (r3 + r4), Fable (structural
 gate), Codex gpt-5.6-sol (r5 adjudication, called DIRECTLY -- the plugin
 silently overrides a model pin), Sonnet 5 (post-coding QA on the two-phase
