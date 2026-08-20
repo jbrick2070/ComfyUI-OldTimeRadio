@@ -64,7 +64,68 @@ RULES, not the history. The length is the price of not re-deriving them.
 So: the file is LONG on purpose, and it is made forward-only by this block
 existing, not by deleting the rest.
 
-### NEXT CODING ITEM: `I` -- the wrong-person character description
+### ITEM `I` IS DONE AND PUSHED -- `0645839b`, 2026-08-20
+
+Reconciliation at the `lock_cast` boundary, a soft never-raising post-check on
+BOTH prose fields, clean-room regeneration, deterministic floor, guard events
+persisted with episode identity. Suite **11237 -> 11270**, delta exactly the 33
+tests added, zero regressions. Four QA rounds (Sonnet 4.6, Codex/Sol x2,
+Antigravity) each found something real. Instrument:
+`scripts/audit_wrong_person_census.py`. Provenance and the re-promotion
+procedure: `docs/2026-08-20-ltx25-recipe-provenance-and-repromotion.md`.
+
+**Still open from that item, filed not fixed:** `media_archive` shows the same
+defect with no structured identity list (its own item); `scifi_news_pro` never
+calls `lock_cast`; the ~44 historical rows are not back-repaired;
+`OTR_NAME_MODE=llm_slot_fill` renames rows after descriptions and is RECORDED
+as unfenced rather than fixed.
+
+### NEXT: THE LTX 2.5 DELIVERED-VIDEO GRID -- operator-visible, lab-driven
+
+**Six candidates eliminated by measurement, all on a detector that has now been
+validated.** Full state: `vram-recipe-lab/LTX25_GRID_PROBLEM_STATEMENT_v2.md`
+and `LTX25_FULL_DIFF_vs_official.md`.
+
+* **Eliminated:** decode tiling (VAE-only round trip, identical), the VAE
+  itself, the pre-VAE resampler, delivery-side filtering (7 ffmpeg chains +
+  Real-ESRGAN), canvas size, sampler eta, negative prompt, `img_compression`,
+  the official sigma list, decode temporal 64/16. Re-scored on the fixed
+  detector: every arm sits at **3.28-3.82** against a 3.821 control -- all
+  firmly in "grid clearly visible".
+* **THE DETECTOR WAS INVERTED AND FIVE RENDERS WERE SPENT ON IT.**
+  `ltx25_notch.py::score_full_frame` scored the CLEAN image higher than the
+  gridded one (7.2 vs 4.8). Replaced by `vram-recipe-lab/ltx25_gridscore.py`,
+  which is 2-D and ABSOLUTE, ranks the known degrid ladder monotonically
+  3.156 -> 1.567, and ships `--selftest` that refuses to pass if the ordering
+  breaks. **Run the self-test before trusting any number from it.**
+* **WHAT IS LEFT IS ARCHITECTURE, NOT A KNOB.** The official ComfyUI I2V
+  template is TWO-STAGE: 768x512 base -> `LTXVLatentUpsampler` x2 ->
+  `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
+  `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
+  only** and stretch 2.31x in ffmpeg afterwards. A feasibility probe is queued
+  in the lab; if it fits under the ceiling it earns a full arc, if it OOMs the
+  item closes.
+* **Separately real:** the composite's `unsharp=0.4` was calibrated for a
+  1472x832 canvas and now runs at 1920x1080 (2.31x), amplifying whatever
+  texture reaches it by ~32%. Delivery-side, cheap, reversible -- an operator
+  eyeball call, not a defect fix.
+
+### ALSO QUEUED IN THE LAB
+
+* **FLF2V feasibility probe** -- first-and-last-frame conditioning for
+  continuity across per-beat renders (operator's idea).
+  `vram-recipe-lab/LAB_MINI_REQ_ltx25_flf2v.md`. Deciding WHEN to chain beats
+  is deliberately out of scope: that is a design arc.
+* **Diffomatic** -- `vram-recipe-lab/diffomatic.py` + `diffomatic_map.py` +
+  `DIFFOMATIC_README.md`. Diffs any engine against its shipped ComfyUI
+  reference template; 9 engines mapped, 13 correctly classified as having no
+  upstream reference. **Known gap: a reviewer lane produced a FABRICATED
+  "documented" reason** (quoted temporal 64/8 when our constants are 33/4), so
+  every DOCUMENTED verdict must print the `file:line` it was quoted from.
+
+### OLD ITEM I BODY (superseded, kept for the receipts)
+
+### PREVIOUSLY: `I` -- the wrong-person character description
 
 **PBUG-20260817-03, Bible `11.61`. Diagnosed, panelled three rounds, NO CODE
 WRITTEN. r4 is owed before any is.**
