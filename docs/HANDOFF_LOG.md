@@ -3,6 +3,134 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-20 -- HEAD d9de9fc5 +handoff (v2.0-alpha) -- CODER (LTX 2.5 Chunk A shipped; an OOM diagnosed wrong three times and fixed on the fourth; 21 donor voices retired by ear)
+
+The sha above is the last CODE head -- the second-to-last on the branch once
+this handoff commit lands. A commit cannot contain its own hash. The
+authoritative post-handoff sha is in the kickoff line.
+
+Did: a long session, eight pushed commits.
+
+**LTX 2.5 CHUNK A SHIPPED.** `nodes/_otr_video_engines/eng_ltx25.py` --
+internal `ltx25_video`, public `ltx25_high_video`, 23 declarative nodes
+translated from the lab's 26-node golden recipe, plus
+`config/profiles/otr_ltx25_high_video.json` (which is what actually WIRES the
+lane: engine picks are managed widgets, so a lane with no profile cannot be
+driven by the canonical graph at all). Variants 50 -> 51 deliberately. G8 solo
+smoke PASSED twice -- lab still and a real 1472x832 OTR still, the latter
+exercising the resize/centre-crop path the lab confirmed never ran in any of
+their tests. ffprobe on the emitted file, not the adapter's own claim:
+832x480, nb_frames 97 exact, h264/yuv420p/bt709 at 25 fps, stream list `video`
+ALONE.
+
+**SEVEN DEFECTS CAUGHT BEFORE A PIXEL RENDERED, none by the preflight
+checklist, which passed 17/17 throughout.** `ResizeImageMaskNode` is a V3
+DynamicCombo whose API-format dotted keys cannot bind through `run_graph`'s
+`fn(**kwargs)` (proved both ways against the installed class); the decode knobs
+were bare literals and are now drift-gated in `ltx25_recipe.py`;
+`session_identity()` was missing on a splittable lane (the gap that once
+refused a live leg 730s in); `_clip_from_raw` was inlined where the
+frame-receipt registry walk could not reach it; `native_frame_count` stamped
+the pre-trim RUNG, an over-claim invisible to the conformance stub; and a
+`docs/` path in a comment was scraped by `engine_matrix.py` as this lane's
+FRAME-CAP evidence, twice.
+
+**THE OOM: WRONG THREE TIMES, AND THE WORST ERROR WAS A MISREAD LOG LINE.**
+A canonical leg died at `node 'neg' (encode)` -- 13.76 GiB allocated, 1.88
+requested, 15.92 limit. Attempt 1 (`free_after_use` + residue preflight) and
+attempt 2 (a two-phase encode/sample split, now in `stash@{0}`) both failed
+because the model was wrong: the driver truncated a log line with `cut -c1-260`
+and read `free=1466` where it said **`free=14669`**, concluded ~14.8 GB was held
+by something invisible, and went hunting for phantom second servers. The card
+was nearly EMPTY 15 s before the crash.
+
+**THE REAL CAUSE**: the whole 13.76 GiB is built INSIDE one encode -- Gemma-4
+12B Q5 GGUF weights to the card plus GGML dequant scratch, ~15.6 GiB transient
+against 15.92 with 1.5-2.2 GiB of Windows baseline. **A RACE, not a ceiling**:
+four encode phases succeeded and the fifth died under identical preflight
+state. Every loader is innocent -- `CLIPLoaderGGUF` loads to CPU,
+`LTXVEmptyLatentAudio` never executes the audio VAE, and the video VAE's first
+use is `i2v`, AFTER the failing node.
+
+**THE FIX**: pin the encoder to CPU via a subclass of the INSTALLED loader
+passing `load_device` AND `offload_device`, swapped in after class resolution
+so `assert_usable` still gates on the real class. **`initial_device` alone is
+theatre** -- the stock loader already passes it, which is exactly why three
+diagnoses concluded "already on CPU". Measured: encode VRAM ~13,760 MB -> ~0
+MB. Live smoke peak 16197 -> 15423 MB. Named refusal
+(`CpuPinnedEncoderPlacementError`) if a future ComfyUI ignores the options.
+
+**THE PANEL EARNED ITS KEEP AND TAUGHT SOMETHING ABOUT PANELS.** agy CONFIRMED
+the driver's wrong model and produced arithmetic matching to 0.04 GiB -- because
+the anchor handed it that framing. Fable, told explicitly to assume the driver
+was wrong a third time, found the dropped digit and overturned both. Codex
+5.6-sol then overturned FABLE on the fix, catching that the locked sampler
+`euler_ancestral_cfg_pp` forces `disable_cfg1_optimization=True` and consumes
+`uncond_denoised` -- so the "inert" empty negative is LIVE and deleting its
+encode would have silently changed every render. A seat that agrees with your
+framing may just be inheriting your error.
+
+**THREE FALSE PREMISES CORRECTED IN COMMITTED FILES**, all inherited from the
+lab: "negative conditioning is INERT at CFG 1.0" (x2) and "CFG 1.0 evaluates
+batch size 1". True of ordinary ComfyUI, false under CFG++. Plus
+`docs/CFG_PROBLEM_STATEMENT.md` at the operator's request and a new **G3.5**
+gate in `VIDEO_LANE_PREFLIGHT.md`: verify sampler-dependent claims against the
+sampler the lane SELECTS -- every model is different, so the gate is "check
+YOUR sampler", never a rule to memorise.
+
+**UPSCALER BUG, FOUND AND FIXED LIVE.** The headless yaml mapped
+`upscale_models` only at `C:/ComfyUI-Models/upscale_models/`, which holds a
+`.cache` dir and nothing else, so the running server's `UpscaleModelLoader`
+offered `options: []`. `spandrel_esrgan` survived ONLY on a repo-relative
+fallback -- a safety net silently carrying a lane, which is worse than a clean
+break. Both roots now mapped; verified live (three RealESRGAN weights now
+listed). `tests/test_upscale_weight_resolution_gate.py` is the gate that was
+missing -- the upscale namespace had 13 test files and none asked whether the
+checkpoint was reachable. Proved non-tautological against the pre-fix mapping.
+
+**VOICE BANK: 63 DONORS AUDITIONED BY EAR, 21 RETIRED.** Built the operator a
+local audition page with play buttons (`tmp/donor_voices.html`, embedded audio,
+nothing uploaded). His semantic: *"THE ONES I MARKED NOT SURE WERE DUPES OR
+THINGS I DONT WANT"*. ONE gender flip (`selfie` female -> male) -- every other
+judged voice already matched, which is the receipt that the naming-rule repair
+had substantially worked. Bank 206 -> 143 rows; 84 male / 58 female / 1
+neutral; announcer keeps all 14. **glenn and james went too, and the driver
+STOPPED to ask first** because retiring glenn looked like undoing his own
+hard-won fix (imported female, 115 female slots, flipped in `e1c84cf6` with
+"please don't break it again"). He confirmed. `RETIRED_BY_OPERATOR_EAR_20260820`
+in the pin test explains WHY glenn is absent, because that file exists BECAUSE
+of glenn and its silent disappearance would read as the old bug returning. The
+21 wavs were quarantined, then deleted by the operator himself.
+`test_bank_has_chatterbox_and_dia_pools` floor 36 -> 20 with the ruling
+recorded, plus the assertion it was really about: pools must stay MIRRORED.
+
+Bible: entry **07.17 AMENDED**, not promoted -- it already warned that moving a
+text encoder to CPU has NO effect, measured and reverted on LTX-AV. True there
+(the peak was in sampling), false here (the OOM is AT the encode). The
+amendment scopes the disproof and names the one-line distinguishing test: read
+WHICH NODE raised. Entries unchanged at **295**, so no README bump owed;
+regression **20/26/3**; survival-guide HEAD `55d4eaf` == origin/main.
+
+Current step: LTX 2.5 Chunk A is code-complete and live-proven at the shot
+level. **A canonical episode leg was STILL RUNNING when this handoff was
+written** -- the operator explicitly waived the no-handoff-while-running rule.
+Next: the encoder-reload fix (below), then read the leg.
+Models: Opus 5 driving. Panel this session: agy (r3 + r4), Fable (structural
+gate), Codex gpt-5.6-sol (r5 adjudication, called DIRECTLY -- the plugin
+silently overrides a model pin), Sonnet 5 (post-coding QA on the two-phase
+diff), and a 3-model OpenRouter roundtable R1 (Grok 4.3 + Gemini 3.1 Pro;
+DeepSeek returned empty on hidden reasoning), ~$0.11. **NOT a full four-round
+roundtable arc** -- R1 only, and reported as such.
+
+Commits: `6f418aed`, `a247ee21`, `3fc80b95`, `3d56aa4d`, `861f095f`,
+`b96a90f5`, `76ddcfec`, `d9de9fc5`; survival-guide `07.17` amendment (uncommitted
+in that repo at handoff -- next window pushes it). The handoff commit lands ON
+TOP of these; see the kickoff line for the real head.
+Box: server RESIDENT on :8000 (the LTX Sage-free boot) with a canonical leg
+mid-render -- NOT clean, deliberately. Reset per CLAUDE.md section 4 before any
+new GPU work.
+Suite 11146/114/1 (415 s, EXIT=0). Bible 20/26/3 at 295 entries. Variants 51/0.
+
 ## 2026-08-19 -- HEAD 3e2d03dd +handoff (v2.0-alpha) -- CODER (two title/identity bugs proven on pixels, five operator-voted deletes, a fingerprint landmine defused, the master moved to -14 LUFS, and the LTX 2.5 arc ruled)
 
 The sha above is the last CODE head -- the second-to-last on the branch once
