@@ -207,6 +207,37 @@ impacted video role, positive executor evidence rather than adapter claims, a
 fresh timestamped file in the live `otr/obs`, and master-audio identity. The LTX
 ultra-smoke is no longer future work; the mixed episode above covered it.
 
+## QUALITY PROGRAM RULINGS -- OPERATOR, 2026-08-21 MORNING
+
+* **NO VRAM CEREMONY ON QUALITY A/Bs.** His words: *"we arent going to spend
+  tokens to make this an exact vram measurement gated exercise, we will do our
+  best and admit OOM faults as they come."* Best-effort runs, no clamp lanes,
+  no absolute-vs-net gating, no OOM forensics on this program. An OOM is
+  reported as a plain fault and the arm is marked infeasible or retried once.
+  **Production ceilings and shipped-recipe discipline are unchanged** -- this
+  covers the QUALITY MEASUREMENT program only.
+* **Z-IMAGE 2K UTILITY: DECLINED for now** (*"maybe for 2.5 we can get a 2k
+  upgrade"*). Z-Image stays done; revisit only on a 2.5-era utility.
+* **THE FLEET DIFF RAN GROUNDED (2026-08-21) AND THE FLEET IS LARGELY CLEAN** --
+  receipts in `vram-recipe-lab/template_sweep/2026-08-21-grounded/` (migrating
+  to baseline-models): 11 exact byte-hashed references, 2 qualified stand-ins,
+  17 no-reference-by-design, 0 errors. Deltas are overwhelmingly documented
+  VRAM discipline (GGUF loaders, tiling, CPU pins; the 2.3 lanes run a
+  FULL-PRECISION text encoder where the template ships fp8). **Live quality
+  candidates, in order: (1) wan_ti2v `uni_pc`/20 vs our `euler`/30 -- free,
+  pre-authorized by the ROI ruling the moment the static diff surfaced it;
+  (2) ltx25 stage-1 anchor 0.7 vs our 1.0 -- the one hero-lane knob never
+  tested (not among the six eliminated, all of which were grid-scored while the
+  grid rode in on the stills); (3) ltx_video LoRA strength 0.5 vs 0.7.**
+  Download-gated, operator authorization list only: the official 1.1 dynamic
+  rank-111 LoRA (not on disk), alongside the frozen wan high-noise expert.
+* **baseline-models IS THE CLEAN HOME** (operator: it *"becomes our new
+  diffomatic with the principle Codex taught us"*). The grounded differ and its
+  receipts move there; the corpus's remaining fix is byte-true refetch with
+  pinned revisions. The old false-green sweep outputs are archived at
+  `vram-recipe-lab/template_sweep/_invalid_false_green_20260820/`, never
+  quotable.
+
 ## RECENT DECISIONS AND OPEN FOLLOW-UPS -- CURRENT STEP ABOVE IS AUTHORITATIVE
 
 Everything below is a standing ruling, an open follow-up, or a receipt explaining
