@@ -258,6 +258,9 @@ def validate_interpreter_result(result, origin: str) -> dict:
         key_terms is list[str] (ledger freeze expects a list);
       - dual-surface coherence: dump casting_brief/script_brief EQUAL the
         direct attrs; dump key_terms == list(direct key_terms).
+      - optional lane-neutral ``upstream_identity_names``: absent on both
+        surfaces remains valid for frozen/older interpreters; when present it
+        must be a coherent list of non-empty strings on both surfaces.
 
     Returns the validated dump dict -- the writer assigns THAT object to
     meta["news"] (single validation point; model_dump() is called exactly
@@ -328,6 +331,38 @@ def validate_interpreter_result(result, origin: str) -> dict:
             f"{origin}: interpreter dump key_terms differs from the direct "
             f"attribute -- split-brain interpreter output"
         )
+
+    # Optional protects frozen interpreter contracts. Presence on only one
+    # surface is still a contract bug: downstream persists the dump but reads
+    # direct attributes elsewhere, so accepting a split surface would make the
+    # identity boundary silently disappear again.
+    identity_key = "upstream_identity_names"
+    has_direct_identities = hasattr(result, identity_key)
+    has_dump_identities = identity_key in dump
+    if has_direct_identities != has_dump_identities:
+        raise SourcePayloadContractError(
+            f"{origin}: interpreter optional {identity_key!r} must be present "
+            f"on both the direct and dump surfaces, or absent from both"
+        )
+    if has_direct_identities:
+        direct_identities = getattr(result, identity_key)
+        dump_identities = dump[identity_key]
+        for surface, identities in (
+            ("direct", direct_identities), ("dump", dump_identities),
+        ):
+            if not isinstance(identities, list) or any(
+                not isinstance(name, str) or not name.strip()
+                for name in identities
+            ):
+                raise SourcePayloadContractError(
+                    f"{origin}: interpreter {surface} {identity_key} must be "
+                    f"list[str] containing only non-empty strings"
+                )
+        if dump_identities != direct_identities:
+            raise SourcePayloadContractError(
+                f"{origin}: interpreter dump {identity_key} differs from the "
+                f"direct attribute -- split-brain interpreter output"
+            )
     return dump
 
 

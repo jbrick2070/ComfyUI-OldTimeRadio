@@ -275,6 +275,75 @@ def test_no_upstream_identities_leaves_the_prompt_untouched():
     )
 
 
+def test_writer_merges_structured_identity_surfaces_and_dedupes_in_order():
+    """The lane-neutral media surface joins, but never mines, legacy cast data."""
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    meta = {
+        "source_meta": {
+            "selected_concept": {
+                "cast": [
+                    {"name": "Marta Vale"},
+                    {"name": "Gil Neri"},
+                    {"role": "unnamed archivist"},
+                ],
+            },
+        },
+        "news": {
+            "casting_brief": "Dr. Amelia Hartley consults a Film Historian.",
+            "upstream_identity_names": [
+                " marta vale ", "Dr. Amelia Hartley", "GIL NERI",
+            ],
+        },
+    }
+    assert writer._upstream_identity_names(meta) == [
+        "Marta Vale", "Gil Neri", "Dr. Amelia Hartley",
+    ]
+
+    # Structured-only is load-bearing: a title-cased occupation in prose must
+    # not become a guessed person when the optional list is absent.
+    assert writer._upstream_identity_names({
+        "news": {
+            "casting_brief": (
+                "Dr. Amelia Hartley consults a Film Historian at Film Archive."
+            ),
+        },
+    }) == []
+
+
+def test_media_archive_meta_identities_are_reconciled_before_cast_prompts():
+    """The known media-archive wrong person cannot reach a record prompt."""
+    from nodes import OTR_LedgerScriptWriter as writer
+
+    media_meta = {
+        "news": {
+            "upstream_identity_names": [
+                "Dr. Amelia Hartley", "Professor Elias Venn",
+            ],
+        },
+    }
+    identities = writer._upstream_identity_names(media_meta)
+    brief = (
+        "Dr. Amelia Hartley is a meticulous preservationist with a warm "
+        "contralto. Professor Elias Venn is a skeptical film historian with "
+        "clipped delivery."
+    )
+    stub = PromptCapturingStub()
+    _cast, cast_meta = _lock(stub, upstream=identities, brief=brief)
+
+    assert cast_meta["name_authority"]["upstream_identities"] == identities
+    assert stub.prompts, "no prompt was captured -- the test proved nothing"
+    joined = "\n".join(stub.prompts)
+    assert "CHARACTER A" in joined and "CHARACTER B" in joined
+    for identity in identities:
+        for surface_form in _NA.identity_aliases(identity, []):
+            if len(surface_form) >= 4:
+                assert surface_form.casefold() not in joined.casefold(), (
+                    f"media-archive identity {surface_form!r} reached a "
+                    "per-record cast prompt"
+                )
+
+
 def test_adaptation_names_are_never_redacted():
     """A roster that IS the source's cast supplies its names harmlessly.
 

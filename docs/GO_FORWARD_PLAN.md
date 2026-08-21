@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 EARLY MORNING -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 PRE-DAWN -- READ THIS FIRST
 
 **DRIVER IS CODEX (`gpt-5.6-sol`).** The operator explicitly waived the LTX
 Kibitz arc and asked for internal grounding plus one finished-diff review. The
@@ -91,52 +91,31 @@ durable review rule is now: one clean review ends review; another is owed only
 when the first finds something, conflicts with another lane, or cannot verify a
 material claim. Do not launch a duplicate Codex CLI lane against the driver.
 
-**ITEM `A`, THE LTX 2.5 TWO-STAGE, IS DONE AND PROVEN ON A REAL PUBLISHED
-EPISODE.** The executor-owned audit counted **21/21** shots with the required
-order: stage-one sampler, `LTXVLatentUpsampler`, stage-two sampler, then the only
-video decode at **1664x960**. The encoder audit independently counted one pinned
-load, one disk read, 20 cache hits, zero drops and a closed episode scope. The
-fresh live publish is
-`signal_lost_ltx_25_two_stage_acceptance_20260820_212719_silent_procgen_blended_captioned_with_credits_final.mp4`
-(43,085,678 bytes, written 2026-08-20 23:11:55; H.264 1920x1080/25 fps + AAC
-48 kHz stereo; 85.360 s).
-
-**BOTH BINDING GATES PASSED.** Production cost was 2.120x the accepted warm
-one-stage baseline on average; the slowest shot was 2.466x and the cold shot was
-1.905x, all inside the operator's 2.6x approval. The positive executor evidence
-above closes the no-op gate; the adapter's own success claim was not used.
-
-**THE SAVED CANONICAL WORKFLOW DID NOT CHANGE.** Its Git blob/hash remains
-`c27dff3690030e78d88c3a2607a9ac54fd3935d9`; all three saved video dropdowns
-remain `still_flat (16:9)`. Only the acceptance API prompt overrode those three
-runtime slots to `ltx25_high_video (16:9)`, exactly as the operator directed.
-
-**Z-IMAGE TURBO'S CHARACTER-STILL GRID IS CLOSED, LIVE-PROVEN AND PUBLISHED.**
-The matched fresh-boot A/B changed only the generic reference branch: OFF was
-clean; ON recreated the square grid. Production now rejects that unapproved
-semantic path, keeps the portrait-derived identity seed, and uses engine version
-2 to invalidate old gridded caches. The one-character canonical `still_flat`
-proof produced four character scenes `b002`-`b005`; all four record engine v2,
-`portrait_anchor_mode=seed` and one common portrait hash. Direct inspection of
-all four plus the unreferenced scenes found no grid. All eight episode stills
-are native 1472x832. Fresh live publish:
-`signal_lost_zimage_reference_grid_fix_acceptance_20260820_234828_silent_procgen_blended_captioned_with_credits_final.mp4`
-(12,708,177 bytes, written 2026-08-20 23:53:50; H.264 1920x1080/25 fps + AAC
-48 kHz stereo; 83.160 s). Saved canonical blob remains
+**THE CLOSED RUN IS `A`, Z-IMAGE, `B`, `D`, THEN THE `media_archive`
+WRONG-PERSON EXTENSION.** Product and test receipts are in the newest entries of
+`docs/HANDOFF_LOG.md`; lab `B+D` is pushed separately at `vram-recipe-lab`
+`38d4ae0`. The saved canonical workflow remains byte-identical at Git blob
 `c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
 
-**NEXT ITEM:** `B` (lab encoder CPU-pin conformance, then repair the differ),
-then `D` (fleet template sweep, which MUST NOT precede the differ repair), then
-`C` (media_archive wrong-person). A future LTX ultra-smoke is specified but not
-built: two deliberately short story beats plus opening and closing music equals
-exactly four real 97-frame clips while covering all three video roles.
+**NEXT: QUALIFY THE GROUNDED LOCAL-MODEL TEMPLATE DIFFS ONE MODEL AT A TIME.**
+The fleet inventory now covers all 30 registered video engines: 11 exact
+official-template relations, 2 qualified baselines, and 17 lanes correctly
+classified as having no applicable local-model template. Start with
+`ltx_audio_in`, because the operator explicitly prioritised the sound-first lane
+and last-to-first continuity for multi-clip beats; then work the other local
+engines from the grounded receipts. A paper diff is not permission to transplant
+a node: classify each candidate IN / ADAPT / OUT, run a matched live comparison,
+and require a fresh published episode before changing production.
 
-## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
+The future LTX ultra-smoke remains deliberately small: opening music, two short
+story beats, closing music -- exactly four real 97-frame clips while covering
+all three video roles.
 
-**This block is the only forward-looking list in this file.** Everything below
-it is either a standing RULING you must not violate or a receipt explaining why
-a ruling exists. If you are picking up work, you need this block and nothing
-else until you have chosen an item.
+## RECENT DECISIONS AND OPEN FOLLOW-UPS -- CURRENT STEP ABOVE IS AUTHORITATIVE
+
+Everything below is a standing ruling, an open follow-up, or a receipt explaining
+why a ruling exists. Do not mistake an older `NEXT` label below for the active
+queue; the current-step block above owns execution order.
 
 **WHY THE FILE IS STILL 3,400 LINES, and why that is not a bug to fix.** The
 2026-08-16 audit called for an archive split and it was attempted again on
@@ -158,13 +137,24 @@ Antigravity) each found something real. Instrument:
 `scripts/audit_wrong_person_census.py`. Provenance and the re-promotion
 procedure: `docs/2026-08-20-ltx25-recipe-provenance-and-repromotion.md`.
 
-**Still open from that item, filed not fixed:** `media_archive` shows the same
-defect with no structured identity list (its own item); `scifi_news_pro` never
-calls `lock_cast`; the ~44 historical rows are not back-repaired;
+**THE `media_archive` EXTENSION IS NOW CLOSED AND LIVE-PROVEN (2026-08-21).**
+Its interpreter emits a structured `upstream_identity_names` list, the shared
+payload contract validates it, and the writer feeds it into the existing
+name-authority boundary without mining prose. A conservative census found five
+dirty rows in five of 104 `media_archive` ledgers; four of those five episodes
+were published. Historical artifacts remain frozen and are not back-repaired.
+
+**Still open from the broader name-authority family:** `scifi_news_pro` never
+calls `lock_cast`; the original-family ~44 historical rows are not back-repaired;
 `OTR_NAME_MODE=llm_slot_fill` renames rows after descriptions and is RECORDED
 as unfenced rather than fixed.
 
-### NEXT: THE LTX 2.5 DELIVERED-VIDEO GRID -- operator-visible, lab-driven
+### COMPLETED RECEIPT: THE LTX 2.5 DELIVERED-VIDEO GRID
+
+**FINAL RULING OVERRIDES THE INSTRUMENT HISTORY BELOW:** gridscore was rejected
+because it counted resolved detail as grid. No gridscore number is quotable as
+evidence. The operator's matched-frame judgment and the live executor/publish
+receipts in `docs/HANDOFF_LOG.md` own the shipped result.
 
 **Six candidates eliminated by measurement, all on a detector that has now been
 validated.** Full state: `vram-recipe-lab/LTX25_GRID_PROBLEM_STATEMENT_v2.md`
@@ -395,7 +385,7 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   texture reaches it by ~32%. Delivery-side, cheap, reversible -- an operator
   eyeball call, not a defect fix.
 
-### ORDER OF WORK -- SETTLED 2026-08-20 BY FABLE + CODEX, UNANIMOUS
+### COMPLETED ORDER OF WORK -- SETTLED 2026-08-20 BY FABLE + CODEX, UNANIMOUS
 
 Operator asked for the call rather than making it: *"ask fabel what is best and
 haev codex confirm."* Both lanes got ONE identical briefing carrying the four
@@ -436,14 +426,13 @@ they are DIFFERENT objections, which is why both lanes earned their seat.**
    ran dormant because it was never wired -- and it is now the exact hazard
    three false-green instruments say to expect.
 
-**Order after A: B (both halves -- the lab encoder CPU-pin, then finish the
-differ), then D, then C.** The pin is a conformance edit with one right answer,
-so no arc (08-17 amendment); it also ends the ~50% lab OOM tax immediately.
-**D must not run before B**, because D's entire output is the differ's word.
-C starts by MEASURING `media_archive`'s own infection rate rather than quoting
-the sibling bank's.
+**This order was executed: A, B (both halves), D, then C.** The pin was a
+conformance edit with one right answer and ended the lab's false GPU-heavy text
+encoder posture. D ran only after the differ became fail-closed and grounded.
+C measured `media_archive` separately rather than borrowing the sibling bank's
+rate; its conservative result is five dirty rows in five of 104 ledgers.
 
-### THE ALL-VIDEO-MODELS TEMPLATE SWEEP -- STARTED, AND NOT YET QUOTABLE
+### THE ALL-VIDEO-MODELS TEMPLATE SWEEP -- GROUNDED INVENTORY DONE
 
 **Operator's ask (2026-08-20): pull the shipped ComfyUI reference template for
 every video model, diff it against what we run, A/B the differences, and let the
@@ -452,47 +441,17 @@ on the table and people get my repo and say why do you have all these [mutant]
 video gens."* Diffomatic's own docstring makes the same argument -- *"If it was
 true for the engine we scrutinise most, it is unchecked everywhere else."*
 
-**WHAT IS TRUE SO FAR:**
-* **The method validates.** Pointed at `video_ltx2_5_i2v.json`, Diffomatic
-  independently rediscovers `LatentUpscaleModelLoader` and the
-  `0.85, 0.725, 0.4219` refine sigmas -- i.e. it finds the two-stage answer
-  without being told. 522 templates ship in
-  `comfyui_workflow_templates_json/templates/`; `engine_template_map.json`
-  already maps 12 engines with 20 correctly classified as having no upstream
-  reference.
-* **A SILENT DEFECT WAS FOUND AND FIXED, and it is the same failure class as the
-  two grid detectors.** `load_nodes` hardcoded exactly two engines and returned
-  an EMPTY graph for everything else. An empty OURS side reports
-  **"0 parameters identical, 0 differ"** -- which reads as a clean bill of
-  health for an engine that was never examined at all. It also hardcoded
-  `WanI2vVideoEngine` when the class is `WanI2VEngine`, so that lane crashed.
-  **An instrument that reports success while doing nothing: three for three on
-  this item.** Replaced with signature introspection that binds `_build_graph`
-  arguments BY NAME, because every engine has a different parameter order
-  (`eng_ltx25(plan, image_name, ...)` vs `eng_humo(image_name, audio_name,
-  plan, ...)` vs `eng_wan_i2v(request, image_name, plan, ...)`). **Engines that
-  parse: 1 -> 7 of 8.**
+**DONE IN LAB COMMIT `38d4ae0`:** realistic per-engine fixtures, private-base
+resolution, fail-closed graph completeness, value-versus-wiring separation, and
+source-bound reasons. The grounded run covered every registered video engine:
+30 total, 11 exact-template comparisons, 2 explicitly qualified baselines, 17
+no-reference-by-design, zero errors. Each receipt binds the installed template
+package/version and SHA-256 plus the OTR engine source bytes and topology.
 
-**WHY IT IS STILL NOT QUOTABLE, and no sweep number may be cited yet:**
-* `eng_humo`, `eng_ltx_8gb`, `eng_wan_i2v` and `eng_wan_ti2v` each return only
-  **2 significant nodes** -- implausible for a full video pipeline. The
-  permissive `request` stub short-circuits their branching, so those graphs are
-  TRUNCATED, not clean. A truncated graph produces the same false "no
-  differences" as an empty one.
-* `eng_ltx_av` still fails to build (its builder lives on the private
-  `_LtxAvBase`).
-* **The parameter half is separately unreliable** and this is visible in its own
-  output: it compares WIRING against VALUES (`ours: ["cond", 1]` against
-  `reference: 1`, `ours: ["loadimage", 0]` against a resize mode) and it
-  attaches MISMATCHED reasons -- a `RandomNoise.noise_seed` delta "explained" by
-  a comment about CFG values. That is the same fabricated-provenance class the
-  differ lane was already told to fix.
-
-**NEXT, in order:** give each engine a realistic request fixture instead of a
-stub; fix `_LtxAvBase`; make the parameter comparator drop wiring and bind each
-reason to the constant it actually annotates. **Only then does a sweep result
-mean anything** -- and the operator's question deserves a real answer, not a
-table of zeros that looks like reassurance.
+**WHAT THE INVENTORY DOES NOT CLAIM:** a difference is not automatically a
+quality improvement, and a clean comparison is not a live render. The next work
+is per-model IN / ADAPT / OUT judgment followed by matched GPU evidence and a
+fresh `otr/obs` publication. Start with `ltx_audio_in`.
 
 ### ALSO QUEUED IN THE LAB
 
@@ -500,19 +459,17 @@ table of zeros that looks like reassurance.
   continuity across per-beat renders (operator's idea).
   `vram-recipe-lab/LAB_MINI_REQ_ltx25_flf2v.md`. Deciding WHEN to chain beats
   is deliberately out of scope: that is a design arc.
-* **Diffomatic** -- `vram-recipe-lab/diffomatic.py` + `diffomatic_map.py` +
-  `DIFFOMATIC_README.md`. Diffs any engine against its shipped ComfyUI
-  reference template; 9 engines mapped, 13 correctly classified as having no
-  upstream reference. **Known gap: a reviewer lane produced a FABRICATED
-  "documented" reason** (quoted temporal 64/8 when our constants are 33/4), so
-  every DOCUMENTED verdict must print the `file:line` it was quoted from.
+* **Diffomatic qualification** -- inventory is grounded and pushed at lab
+  `38d4ae0`; the remaining work is the per-model live qualification described
+  above, not another census.
 
 ### OLD ITEM I BODY (superseded, kept for the receipts)
 
 ### PREVIOUSLY: `I` -- the wrong-person character description
 
-**PBUG-20260817-03, Bible `11.61`. Diagnosed, panelled three rounds, NO CODE
-WRITTEN. r4 is owed before any is.**
+**SUPERSEDED HISTORICAL STATE. Item I shipped 2026-08-20 and its
+`media_archive` extension closed live on 2026-08-21. Present-tense claims below
+describe the pre-fix tree; they are receipts, not open instructions.**
 **READ `kibitz-runs/2026-08-20-item-I-wrong-person/r3/judgment.md` FIRST** -- the
 design was OVERTURNED there and starting from the item body below will send you
 down the path the Bible forbids.
@@ -620,7 +577,7 @@ down the path the Bible forbids.
 | **donor voice gender -- 9 rows** | **OPERATOR'S EAR.** Root cause fixed; the rows await his listen. Never auto-flip a bank gender. |
 | the four missing fingerprint recipes | OPEN. `RUNTIME_FINGERPRINT_SOURCES` has a recipe for `indextts2` only; no adapter defines `impl_version`. A real design call per engine. |
 | listen page marks a resumed engine `settled` forever | OPEN. `scripts/otr_lemmy_listen_page.py:173/180/354`; `write_decisions` never overwrites. |
-| PBUG-20260815-06 media_archive | Selection FIXED `3be1c1e1`; **the durable-headline half is OPEN.** |
+| PBUG-20260815-06 media_archive | **CLOSED 2026-08-19.** Selection fixed at `3be1c1e1`; the durable-headline producer wiring and live proof landed later that day. Historical receipt below. |
 | PBUG-20260729-03 | STILL OPEN; this file's reachability claim for it was corrected 2026-08-19. |
 | scifi_news_pro `news_read` invented names | OPEN -- retry-ladder exhaustion on a factual pass. Related in spirit to item I but a DIFFERENT mechanism (invention, not paste). |
 | the five STATIC findings | OPEN, awaiting live observation. **Do NOT promote to PBUGs on the audit alone.** |
@@ -1778,9 +1735,11 @@ where they disagree.
   Pro 3.1 review was lost this way. **`--topic` is the isolation lever: one topic
   per lane, always.**
 
-**I. THE WRONG-PERSON CHARACTER DESCRIPTION -- DIAGNOSED, PROMOTED, NOT FIXED
-(PBUG-20260817-03, Bible `11.61`, 2026-08-17). This is the "different bug hiding
-in those rows" item G called out, and it is bigger than item G was.**
+**I. HISTORICAL WRONG-PERSON RECEIPT -- FIXED 2026-08-20; `media_archive`
+EXTENSION LIVE-CLOSED 2026-08-21 (PBUG-20260817-03, Bible `11.61`).** The
+present-tense diagnosis below records the pre-fix tree and is not an open queue
+item. This is the "different bug hiding in those rows" item G called out, and it
+was bigger than item G was.
 
 **MEASURED, read-only over all 1,710 published ledgers:** cast rows carry a
 `character_description` about a DIFFERENT person, and the contaminated string is
@@ -1888,7 +1847,8 @@ carrying LUCILLE PENNY's description, OYA SATO carrying Hank Griswold's. That is
 WRONG-CHARACTER PASTE, not a gender defect, and laundering it through a gender fix
 would hide it. **-> THAT IS NOW ITEM I, and both instances are CONFIRMED.** Root
 cause proven (two naming authorities arbitrated inside the description prompt),
-promoted as Bible `11.61`, code fix still open. Read item I before re-deriving
+promoted as Bible `11.61`, code fix shipped with the `media_archive` extension
+live-closed 2026-08-21. Read item I before re-deriving
 this item's portrait numbers -- several of its hits are gender-crossed and were
 never gender defects at all.
 

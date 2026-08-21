@@ -21,6 +21,7 @@ suite red -- that would punish the wrong person for the wrong reason.
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
@@ -106,9 +107,18 @@ def test_the_dit_is_the_q3_the_operator_locked():
 
 
 def test_the_text_encoder_matches():
+    """The lab now names its CPU-pinned loader explicitly.
+
+    Production resolves the installed ``CLIPLoaderGGUF`` first and swaps in
+    ``_cpu_pinned_clip_loader`` immediately before execution; the two paths use
+    different transport class names but share the same required placement.
+    """
     _doc, g = _graph()
-    _k, n = _node(g, "CLIPLoaderGGUF")
+    _k, n = _node(g, "CLIPLoaderGGUFCPU")
     assert n["inputs"]["clip_name"] == R.LTX25_TEXT_ENCODER_GGUF
+    assert 'classes["te"] = _cpu_pinned_clip_loader(classes["te"])' in (
+        inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
+    )
 
 
 def test_both_vaes_match_and_the_audio_vae_really_is_loaded():

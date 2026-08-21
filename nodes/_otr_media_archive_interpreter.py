@@ -21,8 +21,8 @@ except ImportError:  # pragma: no cover - flat test imports
     from _otr_structured_call import StructuredCallFailedError, structured_call  # type: ignore
 
 
-PROMPT_VERSION = "media_archive_interpreter_v1"
-SCHEMA_VERSION = "media_archive_briefs_v1"
+PROMPT_VERSION = "media_archive_interpreter_v2"
+SCHEMA_VERSION = "media_archive_briefs_v2"
 DRAMA_SEED_SCHEMA_VERSION = "media_archive_drama_seeds_v1"
 
 _DRAMA_SEEDS_PATH = (
@@ -51,6 +51,9 @@ class MediaArchiveBriefs(BaseModel):
     script_brief: str
     news_close_brief: str
     key_terms: list[str] = Field(default_factory=list)
+    # Optional protects frozen v1 results while giving the shared cast boundary
+    # a structured (never prose-mined) account of people named by this pass.
+    upstream_identity_names: list[str] = Field(default_factory=list)
 
     source_hash: str = ""
     prompt_version: str = PROMPT_VERSION
@@ -185,7 +188,7 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
         "Source-truth rule: RSS/source material remains the source of truth. "
         "The dramatic seed is only a fictional lens; the seed is not source "
         "fact and must not create source facts.\n\n"
-        "Return ONE JSON object only with exactly these keys:\n"
+        "Return ONE JSON object only with exactly these five keys:\n"
         "{\n"
         "  \"casting_brief\": \"source-grounded human roles and voices\",\n"
         "  \"script_brief\": \"fictional radio story premise grounded in the archive source\",\n"
@@ -194,8 +197,12 @@ def _build_prompt(payload: dict) -> list[dict[str, str]]:
         "(a person, archive, or institution), stated briefly, then end on "
         "one short reflective thought. One to three sentences total, never "
         "a written explainer.\",\n"
-        "  \"key_terms\": [\"optional concise archive/source terms\"]\n"
+        "  \"key_terms\": [\"optional concise archive/source terms\"],\n"
+        "  \"upstream_identity_names\": [\"personal names actually used in casting_brief\"]\n"
         "}\n\n"
+        "For upstream_identity_names, copy only personal names actually used "
+        "in casting_brief. Return [] when casting_brief names roles only. "
+        "Never include occupations, archives, collections, or institutions.\n\n"
         "The story may be fictional, but the archive object, collection, "
         "preservation labor, or media-history hook must clearly come from the "
         "source material.\n\n"
@@ -228,6 +235,18 @@ def build_media_archive_briefs(
         )
 
     def _content_validator(brief: MediaArchiveBriefs) -> str | None:
+        # The field is defaulted on the model solely so frozen/older brief
+        # objects remain loadable. A fresh v2 model response must state it
+        # explicitly; otherwise a model can keep returning the old four-key
+        # shape and silently leave the name-authority boundary dormant.
+        fields_set = getattr(brief, "model_fields_set", None)
+        if fields_set is None:  # pragma: no cover - pydantic v1 compatibility
+            fields_set = getattr(brief, "__fields_set__", set())
+        if "upstream_identity_names" not in fields_set:
+            return (
+                "upstream_identity_names must be explicitly present; use [] "
+                "when casting_brief names roles only"
+            )
         return None
 
     try:
@@ -257,6 +276,12 @@ def build_media_archive_briefs(
     # backend errors) propagates HARD -- matching the science wrapper's
     # non-NewsInterpreterError path in _otr_source_payload.py.
 
+    # Provenance is owned by this code, never by model-authored JSON. The
+    # structured schema exposes these defaulted fields for the persisted
+    # contract, so a model can still echo/spoof them despite the five-key
+    # prompt unless we overwrite them at the trust boundary.
+    brief.prompt_version = PROMPT_VERSION
+    brief.schema_version = SCHEMA_VERSION
     brief.source_hash = _source_hash(payload)
     brief.model_id = model_id
     brief.attempts = slot_calls

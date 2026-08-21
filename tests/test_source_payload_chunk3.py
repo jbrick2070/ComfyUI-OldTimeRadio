@@ -792,6 +792,95 @@ def test_interpreter_result_contract_good():
     dump = osp.validate_interpreter_result(_GoodBriefs(), origin="t")
     assert dump["news_close_brief"] == "ncb"
     assert dump["key_terms"] == ["ALPHA", "BETA"]
+    assert "upstream_identity_names" not in dump, (
+        "the optional identity surface must not rewrite frozen four-key "
+        "interpreter dumps"
+    )
+
+
+class _IdentityBriefs(_GoodBriefs):
+    upstream_identity_names = ["Marta Vale", "Gil Neri"]
+
+    def model_dump(self):
+        dump = super().model_dump()
+        dump["upstream_identity_names"] = list(self.upstream_identity_names)
+        return dump
+
+
+def test_interpreter_result_optional_identity_names_round_trip():
+    brief = _IdentityBriefs()
+    dump = osp.validate_interpreter_result(brief, origin="identity-test")
+    assert dump["upstream_identity_names"] == ["Marta Vale", "Gil Neri"]
+
+
+@pytest.mark.parametrize(
+    "bad_names",
+    [
+        "Marta Vale",
+        b"Marta Vale",
+        ("Marta Vale",),
+        [""],
+        ["   "],
+        ["Marta Vale", 42],
+    ],
+)
+def test_interpreter_result_optional_identity_direct_surface_rejects_malformed(
+        bad_names):
+    brief = _IdentityBriefs()
+    brief.upstream_identity_names = bad_names
+    with pytest.raises(
+        osp.SourcePayloadContractError, match="upstream_identity_names",
+    ):
+        osp.validate_interpreter_result(brief, origin="identity-test")
+
+
+@pytest.mark.parametrize(
+    "bad_names",
+    ["Marta Vale", ("Marta Vale",), [""], ["Marta Vale", None]],
+)
+def test_interpreter_result_optional_identity_dump_surface_rejects_malformed(
+        bad_names):
+    class _BadDump(_IdentityBriefs):
+        def model_dump(self):
+            dump = super().model_dump()
+            dump["upstream_identity_names"] = bad_names
+            return dump
+
+    with pytest.raises(
+        osp.SourcePayloadContractError, match="upstream_identity_names",
+    ):
+        osp.validate_interpreter_result(_BadDump(), origin="identity-test")
+
+
+def test_interpreter_result_optional_identity_split_brain_rejected():
+    class _SplitIdentity(_IdentityBriefs):
+        def model_dump(self):
+            dump = super().model_dump()
+            dump["upstream_identity_names"] = ["Someone Else"]
+            return dump
+
+    with pytest.raises(osp.SourcePayloadContractError, match="split-brain"):
+        osp.validate_interpreter_result(_SplitIdentity(), origin="identity-test")
+
+
+@pytest.mark.parametrize("direct_only", [True, False])
+def test_interpreter_result_optional_identity_must_exist_on_both_surfaces(
+        direct_only):
+    if direct_only:
+        class _OneSurface(_IdentityBriefs):
+            def model_dump(self):
+                return _GoodBriefs.model_dump(self)
+    else:
+        class _OneSurface(_GoodBriefs):
+            def model_dump(self):
+                dump = super().model_dump()
+                dump["upstream_identity_names"] = ["Marta Vale"]
+                return dump
+
+    with pytest.raises(
+        osp.SourcePayloadContractError, match="upstream_identity_names",
+    ):
+        osp.validate_interpreter_result(_OneSurface(), origin="identity-test")
 
 
 @pytest.mark.parametrize("attr", ["model_dump", "casting_brief",

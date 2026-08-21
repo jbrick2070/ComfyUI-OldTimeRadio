@@ -1723,31 +1723,44 @@ def _fetch_rss_seed_or_die(
         ) from exc
 
 
-def _upstream_identity_names(meta: dict) -> list:
+def _upstream_identity_names(meta: dict) -> list[str]:
     """Names an upstream creative pass invented for this episode's people.
 
     Bug Bible 11.61: the cast assigner is about to override these, so they are
-    SUPERSEDED and must not reach a per-record prompt. Read from the structured
-    surface only -- ``meta.source_meta.selected_concept.cast[].name`` -- because
-    a free-text brief cannot be mined for identities without firing on healthy
-    Title-Case occupation heads ("Film Historian", "Space Force Liaison"), which
-    is a measured false-positive class on this corpus.
+    SUPERSEDED and must not reach a per-record prompt. Read only from the two
+    lane-neutral structured surfaces: the original lane's
+    ``meta.source_meta.selected_concept.cast[].name`` and a source interpreter's
+    optional ``meta.news.upstream_identity_names``. A free-text brief cannot be
+    mined for identities without firing on healthy Title-Case occupation heads
+    ("Film Historian", "Space Force Liaison"), a measured false-positive class.
 
-    Returns [] on every lane that records no structured cast, which makes the
-    whole mechanism inert there and keeps those prompts byte-identical.
-
-    **KNOWN GAP, filed not hidden:** ``media_archive`` exhibits this same defect
-    (verified: ``ADRIAN CARRUTHERS`` carrying "Dr. Amelia Hartley") but names its
-    people only in free-text prose, so it has no structured surface to read and
-    is NOT covered by this call. Giving it one is its own item.
+    Returns [] on every lane that records neither surface, which makes the whole
+    mechanism inert there and keeps those prompts byte-identical. Names are
+    de-duplicated case-insensitively while preserving first-seen order.
     """
     concept = ((meta or {}).get("source_meta") or {}).get("selected_concept") or {}
-    out: list = []
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _append(value: object) -> None:
+        name = str(value or "").strip()
+        folded = name.casefold()
+        if name and folded not in seen:
+            seen.add(folded)
+            out.append(name)
+
     for entry in (concept.get("cast") or []):
         if isinstance(entry, dict):
-            name = str(entry.get("name") or "").strip()
-            if name:
-                out.append(name)
+            _append(entry.get("name"))
+
+    news = (meta or {}).get("news") or {}
+    identities = (
+        news.get("upstream_identity_names") if isinstance(news, dict) else []
+    )
+    if isinstance(identities, list):
+        for identity in identities:
+            if isinstance(identity, str):
+                _append(identity)
     return out
 
 
@@ -4756,12 +4769,9 @@ class OTR_LedgerScriptWriter:
                     "_adaptation_character_genders"),
                 # Bug Bible 11.61: names an EARLIER pass invented for the people
                 # in this story, which this cast is about to override. lock_cast
-                # drops any the assembled roster owns, so handing it the
-                # adaptation lanes' source names would be harmless -- but only
-                # the original lane records a structured list today, and a free-
-                # text brief cannot be mined for identities without inventing
-                # findings on healthy Title-Case occupation heads. So this is
-                # the structured surface, and only that.
+                # drops any the assembled roster owns. The helper reads only
+                # lane-neutral structured identity surfaces; it never mines a
+                # free-text brief for Title-Case guesses.
                 upstream_identity_names=_upstream_identity_names(meta),
             )
         led.set_cast(cast_rows)

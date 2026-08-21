@@ -3,6 +3,82 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 PRE-DAWN -- HEAD ce120aa +this (v2.0-alpha) -- CODEX DRIVER (media_archive wrong-person boundary closed and live-published; lab B+D already pushed)
+
+The sha above is the last CODE head before this commit. A commit cannot contain
+its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**PBUG-20260817-03: THE `media_archive` EXTENSION IS CLOSED.** The lane now records
+the personal names its interpreter actually used in a structured
+`meta.news.upstream_identity_names` list. The shared source-payload boundary
+requires a coherent `list[str]` on both object and dump surfaces when the field
+is present, while frozen v1 results may still omit it. The writer merges that
+list with the original lane's structured pitch names, de-duplicates by case,
+and hands only those structured names to the already-shipped `lock_cast`
+authority. It never guesses names from prose, and cast-first architecture is
+unchanged.
+
+**THE NO-OP SHAPE IS PINNED.** A fresh v2 interpreter response must explicitly
+emit `upstream_identity_names`, including `[]` for roles-only briefs. The field
+is defaulted only so old frozen results remain loadable. Code also overwrites
+`prompt_version` and `schema_version` after the model call, because the live
+model returned its own `"1.0"` values despite the exact-five-key prompt. Those
+stamps are code-owned provenance, not model-authored facts.
+
+**THE BANK WAS MEASURED SEPARATELY.** All 1,736 ledger JSONs parsed; 104 are
+`media_archive`. The conservative confirmed floor is **five dirty rows in five
+of 104 ledgers**; four of those five episodes were published. The five-row set
+includes description and portrait contamination, and one row also contaminated
+`speech_signature`. This is not merged with item I's original-family census.
+Historical artifacts remain frozen; no backrepair was attempted.
+
+**LIVE CANONICAL ACCEPTANCE PASSED.** The saved workflow was loaded normally and
+the API request overrode only `source_bank=media_archive`, one character and one
+act; its three saved video slots remained `still_flat (16:9)`. Episode
+`signal_lost_the_ink_still_wet_20260821_014318` completed and published:
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_the_ink_still_wet_20260821_014318_silent_procgen_blended_captioned_with_credits_final.mp4`,
+19,181,017 bytes, written 2026-08-21 01:49:00. Independent `ffprobe`: H.264
+1920x1080 at 25 fps, AAC 48 kHz stereo, 126.520 seconds.
+
+**THE GUARD POSITIVELY EXECUTED.** The interpreter emitted `Elias Thorne`,
+`Clara Vance`, and `Julian Vane`; `meta.name_authority.upstream_identities`
+records the same three. The assigned dramatic character is `DANIEL WELLS`.
+Exact full-name checks found zero upstream-name hits in the final
+`character_description`, `speech_signature`, or image-prompt surfaces. Empty
+guard events are correct here: input reconciliation succeeded, so no
+post-generation repair was needed. All 8/8 still clips and all three portraits
+persisted. Direct inspection of the opening, `b001`, and `b006` found clean
+single compositions with no tile grid.
+
+**REVIEW RECEIPT:** exactly one internal finished-diff review ran, per the
+operator's credit rule. It found one real P1: the defaulted new field allowed a
+fresh model to return the old four-key shape and silently disable the guard.
+The explicit-key requirement fixed it; the narrow follow-up passed **105/105**,
+so review stopped. No duplicate CLI, Kibitz arc, or paid roundtable ran.
+
+**LAB `B+D` IS ALSO CLOSED AND PUSHED SEPARATELY:** `vram-recipe-lab`
+`38d4ae0`. The LTX lab now uses its explicit CPU-pinned GGUF loader, and the
+repaired fleet differ grounded all 30 registered video engines: 11 exact
+official-template relations, 2 qualified baselines, 17 no-reference-by-design,
+zero errors. The receipts are an evidence inventory, not permission to copy
+every official node into production.
+
+**FINAL GATES:** focused **269 passed**; full suite **11325 passed / 114 skipped
+/ 1 xfailed** in 338.87 seconds, EXIT=0; `build_variants.py --check` **51 / 0**;
+Bug Bible **22 / 26 / 3**; py_compile, UTF-8/no-BOM/nonzero and
+`git diff --check` clean. The saved canonical blob remains
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
+
+**NEXT:** qualify the grounded model-template differences one model at a time,
+starting with OTR's `ltx_audio_in` sound-first lane because the operator
+explicitly prioritised its audio conditioning and last-to-first continuity.
+Every adopted difference still owes a matched GPU result and fresh `otr/obs`
+publication.
+
+**BOX AT CLOSE:** the acceptance server was stopped by exact PID; its port is
+free and the 5080 returned to baseline. The RTX 4060 stream was untouched.
+
 ## 2026-08-21 EARLY MORNING -- HEAD 9cc5df4 +this (v2.0-alpha) -- CODEX DRIVER (Z-Image grid isolated, fixed, live-published; generic reference OUT)
 
 The sha above is the last CODE head before this commit. A commit cannot contain

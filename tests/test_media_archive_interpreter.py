@@ -94,6 +94,73 @@ class TestBriefsContract:
         for t in dump["key_terms"]:
             assert isinstance(t, str) and t.strip()
 
+    def test_upstream_identity_names_default_is_optional_and_empty(self):
+        brief = _good_briefs()
+        assert brief.upstream_identity_names == []
+        assert brief.model_dump()["upstream_identity_names"] == []
+
+    def test_upstream_identity_names_round_trip_through_shared_contract(self):
+        names = ["Marta Vale", "Gil Neri"]
+        brief = _good_briefs(upstream_identity_names=names)
+        dump = validate_interpreter_result(brief, origin="media-test")
+        assert brief.upstream_identity_names == names
+        assert dump["upstream_identity_names"] == names
+
+    def test_fresh_v2_response_must_explicitly_include_identity_names(self):
+        four_key = {
+            "casting_brief": "An unnamed archivist and projectionist.",
+            "script_brief": "They identify a lost reel.",
+            "news_close_brief": "The county archive preserved the reel.",
+            "key_terms": ["lost reel"],
+        }
+
+        with pytest.raises(
+            MediaArchiveInterpreterError, match="upstream_identity_names",
+        ):
+            build_media_archive_briefs(
+                technical_fn=lambda *a, **kw: json.dumps(four_key),
+                payload=_sample_payload(),
+                model_id="test",
+                max_attempts=1,
+            )
+
+    def test_fresh_v2_response_accepts_explicit_empty_identity_list(self):
+        five_key = {
+            "casting_brief": "An unnamed archivist and projectionist.",
+            "script_brief": "They identify a lost reel.",
+            "news_close_brief": "The county archive preserved the reel.",
+            "key_terms": ["lost reel"],
+            "upstream_identity_names": [],
+        }
+        brief = build_media_archive_briefs(
+            technical_fn=lambda *a, **kw: json.dumps(five_key),
+            payload=_sample_payload(),
+            model_id="test",
+            max_attempts=1,
+        )
+        assert brief.upstream_identity_names == []
+        assert "upstream_identity_names" in brief.model_fields_set
+
+    def test_model_cannot_spoof_code_owned_contract_versions(self):
+        response = {
+            "casting_brief": "An archivist named Marta Vale.",
+            "script_brief": "Marta identifies a lost reel.",
+            "news_close_brief": "The county archive preserved the reel.",
+            "key_terms": ["lost reel"],
+            "upstream_identity_names": ["Marta Vale"],
+            "prompt_version": "model-invented-1.0",
+            "schema_version": "model-invented-1.0",
+        }
+        brief = build_media_archive_briefs(
+            technical_fn=lambda *a, **kw: json.dumps(response),
+            payload=_sample_payload(),
+            model_id="test-model",
+            max_attempts=1,
+        )
+        assert brief.prompt_version == PROMPT_VERSION
+        assert brief.schema_version == SCHEMA_VERSION
+        assert brief.model_id == "test-model"
+
 
 # ---------------------------------------------------------------------------
 # (2) MediaArchiveInterpreterError translates to SourceInterpretError
@@ -256,6 +323,31 @@ class TestDramaSeedDeck:
         prompt = _build_prompt(_sample_payload())[0]["content"]
         assert "RSS/source material remains the source of truth" in prompt
         assert "seed is not source fact" in prompt
+
+    def test_prompt_contract_has_exactly_five_keys_and_structured_name_rules(self):
+        prompt = _build_prompt(_sample_payload())[0]["content"]
+        contract = prompt.split("{", 1)[1].split("}", 1)[0]
+        keys = [
+            line.strip().split('"', 2)[1]
+            for line in contract.splitlines()
+            if line.strip().startswith('"')
+        ]
+        assert keys == [
+            "casting_brief",
+            "script_brief",
+            "news_close_brief",
+            "key_terms",
+            "upstream_identity_names",
+        ]
+
+        lower = prompt.lower()
+        assert "personal names actually used" in lower
+        assert "casting_brief" in lower
+        assert "return []" in lower and "roles only" in lower
+        for excluded_class in (
+            "occupations", "archives", "collections", "institutions",
+        ):
+            assert excluded_class in lower
 
 
 # ---------------------------------------------------------------------------
