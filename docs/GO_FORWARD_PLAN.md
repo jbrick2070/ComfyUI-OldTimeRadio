@@ -67,7 +67,7 @@ outputs ... land in the REAL output folder the operator watches"*:
     main.py ... --output-directory %OTR_REAL_OUTPUT%   <- ComfyUI folder_paths
 
 * **LIVE (operator-confirmed):** `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs`
-  -- 86 MP4 files, newest `2026-08-21 03:22`.
+  -- 88 MP4 files, newest `2026-08-21 05:58`.
 * **ComfyUI's DEFAULT, and it is stale:**
   `C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs` -- 58 files,
   newest `2026-06-13 07:56`. Those 58 are real episodes. **Do not delete or
@@ -83,40 +83,51 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 04:05 -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 07:10 -- READ THIS FIRST
 
-**DRIVER IS CODEX (`gpt-5.6-sol`).** The operator explicitly waived the LTX
-Kibitz arc and asked for internal grounding plus one finished-diff review. The
-durable review rule is now: one clean review ends review; another is owed only
-when the first finds something, conflicts with another lane, or cannot verify a
-material claim. Do not launch a duplicate Codex CLI lane against the driver.
+**POST-CODE QA IS CLOSED; DO NOT RUN IT AGAIN.** The prior Codex driver finished
+at `eca57cb1`, and the later scoped finished-diff review, full suite and mixed
+one-act / one-character canonical episode all passed without another production
+code change. The mixed route published `Shadows of the Vault` with two LTX 2.5
+music clips, two silent-HQ LTX announcer clips and four Z-Image-backed still
+character clips; 8/8 graded, stage two positively executed, master audio stayed
+authoritative, and the saved canonical workflow remained byte-identical. The
+newest entry in `docs/HANDOFF_LOG.md` is the durable receipt.
 
-**NEXT: `wan_i2v`, BLOCKED ON ONE NAMED-MODEL AUTHORIZATION.** The silent
-`ltx_video` lane is closed with a matched three-arm lab qualification, a proven
-plain-Euler improvement, and a fresh eight-clip live production acceptance; the
-full receipt is the newest entry in `docs/HANDOFF_LOG.md`.
+**THE SETTLED `wan_i2v` ITEM IS FROZEN ON ONE NAMED AUTHORIZATION, NOT A REASON
+TO DOWNLOAD SOMETHING ELSE.** OTR has the official low-noise 14B UNET, UMT5
+encoder and Wan VAE, but not
+`wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors`. That high-noise expert is
+required for an honest continuous-noise high-to-low handoff. Do not duplicate
+the low-noise weight, alias another installed model or LoRA, fetch the optional
+four-step LoRAs, or call a low-only run an official-template qualification.
+Only an explicit operator authorization for that exact filename reopens this
+lane.
 
-The installed-state audit positively confirmed that OTR has the official
-low-noise 14B UNET, UMT5 encoder and Wan 2.1 VAE, but does **not** have
-`wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors`. That missing high-noise
-expert is required for the official 20-step high-to-low handoff, so no honest
-official-template comparison can run without the operator authorizing that
-download. Do not duplicate the low-noise weight, alias a different installed
-LoRA, or call a low-only sampler test an official-template qualification.
+**EXECUTABLE NEXT WITHOUT A DOWNLOAD: `wan_ti2v`.** The grounded fleet report
+maps it exactly to `video_wan2_2_5B_ti2v.json`, and the shipping Q5 GGUF UNET and
+UMT5 GGUF encoder are already installed. Use those installed weights and a
+fixed still/prompt/seed/canvas/delivery path; do not chase the absent native
+FP16 transport. Test the material recipe axes one at a time: UniPC vs Euler,
+20 vs 30 steps, shift 8 vs 5, and plain vs tiled decode. This is an adapted
+recipe-axis qualification on the installed OTR transport, not permission to
+call it the native FP16 template. A visible improvement owns adoption; paper
+topology does not. Before production code, apply the `CLAUDE.md` design-choice
+test; after code, one clean independent finished-diff review is enough.
 
-The two official four-step LoRAs are also absent, but the template's default
-quality path disables them; they are not required for the first honest
-comparison. Once the high-noise checkpoint is authorized and installed, test
-the native high-to-low expert handoff with continuous noise as the material
-topology change. Keep Euler-vs-UniPC and shift 5-vs-8 as separate one-variable
-arms, and keep OTR's deterministic seed, canvas, silent delivery and master-audio
-authority. A paper diff is never permission to transplant a node: classify each
-candidate IN / ADAPT / OUT, run a matched live comparison, and adopt only a
-visible improvement.
+**Z-IMAGE CORRECTION: GRID CLOSED; MULTI-BEAT IDENTITY OPEN.** The mixed QA
+showed no square tiles, so engine version 2 and the generic `ReferenceLatent`
+ban remain correct. But `b002`-`b005` visibly change face/costume despite the
+same derived portrait hash. The seed is deterministic, not an identity proof.
+Do not re-enable `ReferenceLatent`; any replacement identity mechanism has more
+than one defensible design and therefore needs a full four-round arc before
+code. This visual-face issue is distinct from the older F2 content-attribution
+limitation.
 
-The future LTX ultra-smoke remains deliberately small: opening music, two short
-story beats, closing music -- exactly four real 97-frame clips while covering
-all three video roles.
+**THE LIVE ACCEPTANCE SHAPE IS NOW SETTLED:** one act, one character, every
+impacted video role, positive executor evidence rather than adapter claims, a
+fresh timestamped file in the live `otr/obs`, and master-audio identity. The LTX
+ultra-smoke is no longer future work; the mixed episode above covered it.
 
 ## RECENT DECISIONS AND OPEN FOLLOW-UPS -- CURRENT STEP ABOVE IS AUTHORITATIVE
 
@@ -714,16 +725,16 @@ the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
 ranges -- that is what a working lane looks like, and on that run it caught two
 of the driver's own tests being tautologies.
 
-**BASELINES (re-measured 2026-08-21 EARLY MORNING, settled tree, after the
-Z-Image grid fix):** suite **11303 passed / 114 skipped / 1 xfailed** -- MEASURED
-by a full run (346.31 s, EXIT=0, known-fail guard silent), never derived. The
-delta from the LTX baseline is exactly +12: ten permanent A/B harness tests, one
-identity-seed test and one direct-adapter rejection test. Bible
-**22 / 26 / 3**, **299** entries, survival-guide HEAD `5c37d238` == origin/main;
-entry `12.120` / `PBUG-20260820-01` requires model-specific approved evidence
-before any generic reference capability can ship. `build_variants.py --check`
-**51 variants / 0 failures**.
-All three measured this session, not carried forward.
+**BASELINES (re-measured 2026-08-21 MORNING at settled HEAD `eca57cb1`, after the
+mixed canonical QA):** suite **11326 passed / 114 skipped / 1 xfailed** --
+MEASURED by a full run (347.95 s, EXIT=0, known-fail guard silent), never
+derived. Focused/canonical tests **435 passed / 1 skipped**; Bible
+**22 / 26 / 3**; `build_variants.py --check` **51 variants / 0 failures**;
+canonical validator **23 nodes / 57 links**. The saved canonical Git blob remains
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`. No production code changed during
+this re-measurement. Entry `12.120` / `PBUG-20260820-01` still requires
+model-specific approved evidence before any generic reference capability can
+ship.
 
 **THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
 `55ddf234` the suite exited **2**, with
@@ -2295,10 +2306,13 @@ a by-eye pixel verdict; no gridscore number is evidence.
 installed Z-Image Turbo checkpoint and is OUT of production. A node accepting a
 graph proves structural compatibility, not training compatibility. The engine
 now advertises `accepts_reference_image=False`; `engine_version` is `2` so every
-possibly gridded v1 still misses cache. The already-proven portrait-derived
-identity seed remains enabled, so character scenes stamp
-`portrait_anchor_mode='seed'`, never blank. The diagnostic graph remains only so
-future weights can be retested against the same single-variable harness.
+possibly gridded v1 still misses cache. The portrait-derived deterministic seed
+remains enabled, so character scenes stamp `portrait_anchor_mode='seed'`, never
+blank. **Correction from the 2026-08-21 mixed canonical QA:** that seed prevents
+random anchor selection but does not guarantee face/costume identity across
+beats; the open visual-identity item is in THE CURRENT STEP. The diagnostic
+graph remains only so future weights can be retested against the same
+single-variable harness; it is not a production fallback.
 
 ### 2-PRE. OPERATOR CALLS ALREADY MADE -- do not re-open, do not re-panel
 
@@ -3694,7 +3708,7 @@ the same green push that closes a row.
 
 | Window | Scope | Rung | Gate | Size |
 |---|---|---|---|---|
-| **CODER** (the default) | Take THE QUEUE from the top: item 1 is now the VIDEO SPRINT, whose plan doc is written but whose kibitz arc has NOT run -- so it takes a full arc before code. One green pushed chunk at a time | cheapest competent local triage; Sonnet 5 post-code QA on the finished diff; kibitz local panel for a full arc | none | evidence-driven |
+| **CODER** (the default) | Take THE CURRENT STEP from the top; ignore older `NEXT` labels below it. Use the `CLAUDE.md` design-choice test before code, then one clean independent finished-diff review; one green pushed chunk at a time | cheapest competent local triage; full local arc only for a real design fork | none | evidence-driven |
 | RENDER | GPU legs only: acceptance legs for whatever the coder just landed, and the soak. Reset per CLAUDE.md section 4 before every leg; the soak restarts ONLY in its `--profile` form | local production + Codex-app monitor | a coder chunk needing live proof | GPU hours |
 | PLANNER | The archive split this file still owes; Bug Bible operator fan-out; the `check_compatibility` fork | rungs 2-4 | parallel with any coder window | docs |
 
@@ -3708,13 +3722,13 @@ worse than none: it is the one line a fresh window pastes without checking.
 
 > resume the OTR build as a CODER window. Repo:
 > `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`, branch
-> `v2.0-alpha`, HEAD `<sha>` == origin. Read `docs/GO_FORWARD_PLAN.md` --
-> "HOW TO READ THIS FILE", the REVIEW ROUTING block, BASELINES, then THE QUEUE
-> -- and the top entry of `docs/HANDOFF_LOG.md`. Work THE QUEUE in order.
-> State your MODEL & CREDIT BUDGET rung first (say plainly that the table is
-> empty and cite the per-window mapping), and state the dated REVIEW ROUTING
-> you actually read. New coding items take a full `kibitz-plugin:kibitz` arc
-> BEFORE code; Sonnet 5 QA on the finished diff BEFORE the push.
+> `v2.0-alpha`, HEAD `<sha>` == origin. Read `CLAUDE.md`, then
+> `docs/GO_FORWARD_PLAN.md` from THE CURRENT STEP and BASELINES, then the top
+> entry of `docs/HANDOFF_LOG.md`. Work THE CURRENT STEP in order. Do not download
+> any model without an explicit exact-name authorization. Use the `CLAUDE.md`
+> design-choice test to decide whether an arc is owed; after code, one clean
+> independent finished-diff review is enough. Test, publish to live `otr/obs`,
+> then commit and push the green chunk together.
 
 ### If the window is a REMOTE / cloud Cowork session -- READ THIS FIRST
 

@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 07:10 -- HEAD eca57cb1 +this (v2.0-alpha) -- CODEX DRIVER (post-code QA closed; mixed canonical path published; no model download)
+
+The sha above is the last CODE head before this docs-only closeout. A commit
+cannot contain its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**DECISION: THE PRIOR CODEX DRIVER'S VIDEO CHUNK IS GREEN; DO NOT REPEAT ITS
+QA.** OTR remained at `eca57cb1`: silent `ltx_video` HQ uses plain Euler on
+both stages and engine version `2`; `ltx_audio_in`, LTX single-pass, public
+nodes, widgets, links, schemas and the saved canonical workflow remain
+unchanged. No production code changed during this closeout.
+
+**ONE FINISHED-DIFF REVIEW RAN, THEN REVIEW STOPPED.** This was a scoped R4
+receipt, not a four-round arc. Claude Code Sonnet completed its review;
+Antigravity wrote a complete review before its wrapper hit a print-timeout.
+The Codex driver grounded both against the Windows tree and no production-code
+blocker survived. Per the operator's one-clean-review rule, no duplicate Codex
+CLI or additional reviewer was launched.
+
+**THE FULL STATIC/TEST GATE PASSED AGAIN:** focused/canonical tests **435 passed
+/ 1 skipped**; full suite **11,326 passed / 114 skipped / 1 xfailed** in
+347.95 seconds; Bug Bible **22 / 26 / 3**; `build_variants.py --check` **51 / 0**;
+13 changed Python files compiled; canonical validator **23 nodes / 57 links**;
+and `git diff --check` passed. The saved canonical Git blob remains
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
+
+**A MIXED ONE-ACT / ONE-CHARACTER CANONICAL EPISODE PASSED END TO END.** Profile
+`otr_ltx25_high_video`, source `media_archive`, and the runtime-only force map
+`announcer_visual=ltx_video,character_video=still_flat` delivered exactly eight
+clips: two `ltx25_video` music clips, two silent-HQ `ltx_video` announcer clips,
+and four `still_flat` character clips. The durable grader accepted **8/8**.
+The official two-stage audit proved all six LTX 2.5 render segments actually ran
+the latent upsampler and refine sampler and decoded at 1664x960; the silent LTX
+clips delivered at 1024x576 and the stills at 1472x832. This is mixed-route
+integration proof, not a new recipe qualification; the LTX 2.5 leg peaked at
+15,633 MB, above the lab's formal 14.5-GiB line.
+
+**THE LIVE OBS FILE EXISTS AND IS CURRENT:**
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_shadows_of_the_vault_20260821_052105_silent_procgen_blended_captioned_with_credits_final.mp4`,
+34,448,244 bytes, written 2026-08-21 05:58:40. Independent probe: H.264 High
+1920x1080 at 25 fps, AAC-LC 48-kHz stereo, 85.6 seconds. The mux logged
+`audio_byte_identical OK (47a69591f17d)` and `obs_publish OK`; the 20.2-second
+silent credits tail is expected.
+
+**THERE IS NO CANONICAL TITLE HIJACK.** The older
+`Z-Image Reference Grid Fix Acceptance` title in the operator's screenshot was
+an intentional API-only acceptance title, and that episode also exists in the
+live OBS tree. The later canonical QA generated and persisted `Shadows of the
+Vault`. Neither title appears in the saved canonical workflow, whose Git blob
+is unchanged.
+
+**Z-IMAGE'S GRID FIX HELD, BUT ITS SEED-ONLY ANCHOR IS NOT IDENTITY PROOF.** All
+inspected stills were clean of the square grid/noise tiles. The four character
+stills `b002`-`b005` nevertheless show visible face/costume drift despite the
+same derived portrait hash and `portrait_anchor_mode=seed`. This is a separate
+visual-identity follow-up; it does not reopen generic `ReferenceLatent`, whose
+matched A/B proved grid corruption.
+
+**THE `media_archive` NAME-AUTHORITY BOUNDARY ALSO HELD.** The four upstream
+names exactly matched `name_authority.upstream_identities`, and none appeared
+as an exact full name in cast descriptions, speech signatures or emitted image
+prompt surfaces.
+
+**WAN I2V REMAINS FROZEN, NOT FAILED.** The exact official high-noise expert
+`wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors` is absent from every declared
+model root; the low-noise expert, UMT5 encoder and Wan VAE are present. No model
+was downloaded, aliased or substituted. Until the operator explicitly
+authorizes that exact file, continue only with installed-model work; the active
+fallback is the `wan_ti2v` no-download recipe-axis qualification in the current
+step of `GO_FORWARD_PLAN.md`.
+
+**BOX AT CLOSE:** the owned production server processes were stopped, port 8000
+is free, the RTX 5080 returned to desktop baseline, and the RTX 4060 was
+untouched. All unrelated untracked 4060/H3/runtime files were preserved.
+
 ## 2026-08-21 04:15 -- HEAD 805d56fa +this (v2.0-alpha) -- CODEX DRIVER (`ltx_video` official-template qualification closed; plain Euler adopted; fresh live publish)
 
 The sha above is the last OTR head before this green chunk. A commit cannot
