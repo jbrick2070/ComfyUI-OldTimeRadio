@@ -344,8 +344,11 @@ subclass taking two constructor arguments, so it inherits
 `tuple.__getnewargs__` and a deep copy rebuilds it as `Wire(('pos', 0))` --
 the whole wire slides into the src slot and returns nested. The copy still
 walks, indexes and serialises like a wire, so it stays silent until submit
-time. Any OTR path that deep-copies an engine graph is exposed. Verify before
-fixing; it is production code and wants the design test.
+time. **It is LATENT, not live: the only `deepcopy` in `_otr_video_engines` is
+`render_driver.py:3889` on a LEDGER, not a graph**, so no shipping path is
+currently exposed. It is a trap for the next person who copies a graph rather
+than a bug to chase now. Re-verify that grep before fixing; it is production
+code and wants the design test.
 
 **NEXT: LANE 2 -- `ltx25` stage-1 anchor 0.7 vs 1.0.** Lane 1's fixtures,
 purity gate, judge-set builder and A/A control are reusable as-is; carry the
