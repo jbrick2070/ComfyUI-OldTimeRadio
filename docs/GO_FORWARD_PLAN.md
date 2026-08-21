@@ -735,7 +735,10 @@ of the driver's own tests being tautologies.
 `Director`-comment regression fix):** suite
 **11270 passed / 114 skipped / 1 xfailed** -- MEASURED by a full run (400.90 s,
 EXIT=0, known-fail guard silent), never derived. Bible **20 / 26 / 3**,
-survival-guide HEAD `adfad04` == origin/main. `build_variants.py --check`
+**298** entries, survival-guide HEAD `3b00512` == origin/main -- `12.119`
+promoted this session (a validation set with one direction of change cannot
+validate a metric; three false-green instruments), README bumped in the same
+commit. `build_variants.py --check`
 **51 variants / 0 failures**. All three measured this session, not carried
 forward.
 
