@@ -388,12 +388,34 @@ permutation count pasted into lane 2); corrected in place, `seat_plan` now
 hashes lane+fixture+seed+seat, and the panel prompts are archived beside
 PANEL.json so its numbers can be re-derived.
 
-**NEXT: LANE 3 -- `ltx_video` LoRA strength 0.5 vs 0.7.** Before any staging:
-run the census receipt against the engine, stage the ManualSigmas ADAPT the
-same way the CPU-pin ADAPT was staged (registered class, both arms, cited in
-STAGING.json), crop-region overlay check per fixture, and carry the motion
-lesson: if the knob under test is expected to change MOTION, at least one
-fixture must ask for motion.
+**LANE 3 IS CLOSED: NO WIN. The shipped `_LTX_DISTILLED_LORA_STRENGTH = 0.70`
+stands** (2026-08-21 afternoon, workbench `68ce4c5`, verdict
+`verdicts/lane3_ltx_video.md`). Panel dead heat (9 half / 8 ours / 1 TIE, no
+fixture decisive; "clear" margins pointed in OPPOSITE directions within the
+same cells -- on a t2v lane the arms compose different scenes from one seed,
+so seat margins are substantially scene luck, anticipated in the pre-declared
+matrix). What is directional favors the shipped value: the 0.5 arm moves
+25-38% LESS on every cell, and the march fixture -- the first
+motion-DEMANDING fixture in the programme, added because lane 2's critic
+proved a motion claim cannot come from stillness prompts -- shows ours playing
+its instruments where half carries them. A/A null 97/97 byte-identical,
+overlay check ran before the panel, the ManualSigmas ADAPT worked first try
+off the census flag. Bound: same-file-only (rank-111 LoRA stays
+download-gated). **The lane 3 completeness critic has NOT yet run** -- it is
+the next window's FIRST act, and the verdict may gain a corrections section
+from it, as lane 2's did.
+
+**ALL THREE VOTED LANES ARE NOW CLOSED, ALL NO WIN, ALL SHIPPED RECIPES
+CONFIRMED WITH RECEIPTS.** Per the standing ROI ruling ("If no rendered
+candidate wins materially, stop the program and retain the corpus"), the
+assembly line has NO further authorized lanes: the remaining candidates on the
+list are download-gated (rank-111 LoRA; wan high-noise expert) and open only
+on explicit operator authorization. **The programme's next step is therefore a
+decision, not a render:** the operator either authorizes a download-gated
+lane, names a new candidate, or accepts the programme's conclusion -- three
+lanes, three nulls, the shipped recipes are the best of what was tested and
+the corpus + method (purity gate, A/A null, temporal receipts, overlay check,
+blind panels, refutation discipline) are retained for 2.5-era re-use.
 
 **Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the

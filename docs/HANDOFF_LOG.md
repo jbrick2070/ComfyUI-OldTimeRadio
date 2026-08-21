@@ -3,6 +3,50 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 LATE -- HEAD ca11a2c5 +this (v2.0-alpha) -- LANE-3 WINDOW (ltx_video LoRA strength: NO WIN; assembly line complete, 3/3 nulls)
+
+**Scope: measurement only.** No OTR production code, no model download,
+nothing in `otr/obs`. Workbench `68ce4c5` (HEAD == origin), Bible unchanged at
+`36d0f02` (301 entries -- lane 3 produced no NEW portable bug class; 12.122
+already covers the ADAPT pattern it exercised). Verdict:
+`basline-models/verdicts/lane3_ltx_video.md`.
+
+**RESULT: LoRA strength 0.5 does NOT beat the shipped 0.70** on our installed
+file (the official 0.5 pairs with the download-gated rank-111 LoRA -- untested,
+and says so). Panel 9/8/1 dead heat with opposite-direction "clear" calls
+inside single cells (t2v scene luck, pre-anticipated); the DIRECTIONAL
+evidence favors 0.70: half moves 25-38% less everywhere, and on the march --
+the programme's first motion-demanding fixture -- ours plays its instruments
+while half carries them. A/A null 97/97 byte-identical, receipted at creation.
+Overlay check preceded the panel. ManualSigmas ADAPT (off the census flag)
+worked first try. **Session crashed mid-panel and resumed losslessly** from the
+17-seat journal via Workflow resumeFromRunId; the 18th seat ran live.
+
+**THE ASSEMBLY LINE IS COMPLETE: three lanes, three NO WINs, every shipped
+recipe confirmed with receipts rather than merely unchallenged.** Remaining
+candidates are download-gated. The next step is an OPERATOR DECISION, not a
+render (see the plan's closing block).
+
+**Owed to the next window, in order:** (1) lane 3 completeness critic (one
+agent, at lane close per the ultracode routing; the verdict may gain a
+corrections section as lane 2's did); (2) fold any critic corrections and
+push; (3) present the operator the programme-close decision. Also parked:
+`spawn_task` chip for the `wrapper_bridge.Wire` deepcopy hardening (latent,
+not live).
+
+**Model routing for the next window (operator asked this be recorded):**
+* **Opus = the driver.** Lane closes, critic orchestration, doc pushes,
+  mechanical verification -- this whole programme ran on Opus as driver and
+  that remains correct.
+* **Fable = the scalpel, two uses only:** cold FIRST opinion on any r1 design
+  round (standing 08-06 rule), and the final grounded gate before any
+  high-stakes, hard-to-unwind production-touching change (section 9 reality
+  exception). No such change is currently queued -- do not spend Fable on the
+  critic or docs.
+* **Sonnet 5 = post-coding QA** on any frozen diff (standing 08-05 rule), and
+  a valid substitute reviewer seat whenever a kibitz lane is quota-held.
+* Blind judge seats inherit the session model; record which in PANEL_META.
+
 ## 2026-08-21 EVENING -- HEAD 24360d5e +this (v2.0-alpha) -- LANE-2 WINDOW (ltx25 anchor screened: NO WIN, identity gate held; Bible 12.122)
 
 **Scope: measurement only.** No OTR production code, no workflow JSON, no model
