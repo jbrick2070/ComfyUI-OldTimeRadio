@@ -359,9 +359,41 @@ exactly (0.995 raw and normalized), and official STILL marginally less stable
 with a faint hallucinated streak in its final frame. NO WIN holds at both
 operating points; no bound remains on the null.
 
-**NEXT: LANE 2 -- `ltx25` stage-1 anchor 0.7 vs 1.0.** Lane 1's fixtures,
-purity gate, judge-set builder, A/A control and temporal receipts are reusable
-as-is; carry the four bindings above into it.
+**LANE 2 IS CLOSED: NO WIN. The shipped ltx25 anchor 1.0 stands** (2026-08-21
+evening, `basline-models` `dc63ab0`, verdict `verdicts/lane2_ltx25.md`).
+Decided by a verdict matrix pre-declared BEFORE rendering: the identity gate
+held 6/6 blinded seats (the soft anchor does NOT lose likeness within a clip),
+and no material gain -- 18 seats split 6 marginal-soft / 4 ours / 8 TIE with
+directions flipping between seats and seeds, the only CLEAR call going to
+OURS. A/A null passed 97/97 byte-identical (ltx25 is bit-exact; receipted in
+AA_CONTROL.json). Key bounds, all recorded in the verdict: within-clip
+identity only (the between-beats identity question is its own lane); the
+MOTION axis was structurally untested (every prompt demanded stillness, seats
+judged stills) -- if soft is ever re-argued it takes one motion-demanding
+fixture, 4 legs on the existing harness.
+
+**WHAT LANE 2 ADDED TO THE METHOD (all pushed):** the r1 kibitz (Codex +
+Antigravity, scoped r1, reported as such) resolved the arm shape -- ONE
+constant drives BOTH anchors, so an i2v-only arm is not shippable -- and
+caught the runtime CPU-pin blocker, closed by the registered
+`CLIPLoaderGGUFCPU` as a documented shared ADAPT in both arms. Bible `12.122`
+promoted (301 entries, suite green): an in-process graph authoring form is not
+the HTTP prompt form -- V3 dynamic inputs dot-flatten, runtime class swaps
+re-declare, local classes fail closed. `tools/dynamic_input_census.py` sweeps
+this BEFORE a lane renders; it already flagged that **lane 3's `ltx_video` is
+unbuildable over the API** (local `_SigmasFromValues` class; the ADAPT path is
+the registered `ManualSigmas`, exactly as ltx25 uses). The completeness critic
+then caught a false receipt line in the lane 2 verdict itself (a lane-1
+permutation count pasted into lane 2); corrected in place, `seat_plan` now
+hashes lane+fixture+seed+seat, and the panel prompts are archived beside
+PANEL.json so its numbers can be re-derived.
+
+**NEXT: LANE 3 -- `ltx_video` LoRA strength 0.5 vs 0.7.** Before any staging:
+run the census receipt against the engine, stage the ManualSigmas ADAPT the
+same way the CPU-pin ADAPT was staged (registered class, both arms, cited in
+STAGING.json), crop-region overlay check per fixture, and carry the motion
+lesson: if the knob under test is expected to change MOTION, at least one
+fixture must ask for motion.
 
 **Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the

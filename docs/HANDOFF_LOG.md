@@ -3,6 +3,51 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 EVENING -- HEAD 24360d5e +this (v2.0-alpha) -- LANE-2 WINDOW (ltx25 anchor screened: NO WIN, identity gate held; Bible 12.122)
+
+**Scope: measurement only.** No OTR production code, no workflow JSON, no model
+download, nothing in `otr/obs` (bench lane). Work in `basline-models`
+(`dc63ab0`, HEAD == origin) and the survival guide (`36d0f02`, 301 entries,
+suite 22/26/3). Verdict: `basline-models/verdicts/lane2_ltx25.md`.
+
+**RESULT: soft anchor 0.7 does NOT beat the shipped 1.0.** Identity gate held
+6/6 blinded seats -- softening does not lose likeness within a clip -- but no
+material gain anywhere: 18 seats, 6 marginal-soft / 4 ours / 8 TIE, directions
+flipping, only CLEAR call to OURS. A/A null 97/97 byte-identical. Bounds
+recorded: within-clip only; the MOTION axis was structurally untested (all
+prompts demanded stillness) -- that admission is in the verdict because the
+completeness critic caught it, along with a false receipt line (a lane-1
+permutation count pasted into lane 2) now corrected in place.
+
+**The r1 kibitz earned its keep before any render:** both LTX anchors read ONE
+constant (`LTX25_I2V_ANCHOR_STRENGTH`), so the voted "stage-1 only" arm is not
+a shippable configuration; and production swaps in a CPU-pinned encoder at
+runtime (`eng_ltx25.py:1188`), invisible in graph JSON -- an API arm would have
+silently run the stock loader and its ~13.7 GB spike. Closed by the registered
+`CLIPLoaderGGUFCPU` (identical three-device pin) as a documented shared ADAPT.
+
+**The day's portable lesson, promoted as Bible `12.122`:** an in-process graph
+authoring form is not the HTTP prompt form. All 12 first-attempt legs died on a
+nested `COMFY_DYNAMICCOMBO_V3` dict (`ResizeImageMaskNode.resize_type`) that
+validates, queues, then leaves the argument unmapped; the fix dot-flattens per
+`finalize_prefix`. The census (`tools/dynamic_input_census.py`) then swept all
+buildable engines and flagged lane 3's wall a lane early: `ltx_video` carries a
+local sigma class and is unbuildable over the API (ADAPT path: registered
+`ManualSigmas`). **Operator's byte-diff rule is now memory + method:** two of my
+string patches failed against a runner because I patched from memory of the
+file; reading actual bytes settled it in one look, and a byte-diff caught a
+one-word drift between the two runners' copies.
+
+**Roster honesty:** kibitz = scoped r1 only (Codex + Antigravity), stopped
+deliberately because r1's blocker invalidated r2-r4 planning; Sonnet QA on the
+frozen diff (no urgent findings; two hardening notes applied); 18-seat blind
+panel + 1 completeness critic under the ultracode routing; no refutation panel
+because the driver believed NO WIN, and losses are not refuted.
+
+**Next window: lane 3 (`ltx_video` LoRA 0.5 vs 0.7)** -- census first, stage
+the ManualSigmas ADAPT like the CPU-pin ADAPT, overlay-check crop regions, and
+give the knob a motion-demanding fixture if motion is what it should change.
+
 ## 2026-08-21 MIDDAY -- HEAD 76ced5a9 +this (v2.0-alpha) -- OPUS LANE-1 WINDOW (wan_ti2v recipe screened: NO WIN, shipped recipe stands)
 
 **Scope: measurement only.** No OTR production code, no workflow JSON, no model
