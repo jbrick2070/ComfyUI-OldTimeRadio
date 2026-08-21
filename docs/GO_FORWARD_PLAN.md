@@ -347,6 +347,54 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   texture reaches it by ~32%. Delivery-side, cheap, reversible -- an operator
   eyeball call, not a defect fix.
 
+### ORDER OF WORK -- SETTLED 2026-08-20 BY FABLE + CODEX, UNANIMOUS
+
+Operator asked for the call rather than making it: *"ask fabel what is best and
+haev codex confirm."* Both lanes got ONE identical briefing carrying the four
+candidates, the operator's constraints, the driver's own recommendation AND the
+strongest argument against it, so neither was handed a leading question.
+
+**BOTH PICKED `A` -- SHIP THE TWO-STAGE. BOTH PICKED `B` SECOND.**
+
+The shared reasoning, and it is the load-bearing point: **the instrument
+scandal does not touch A's evidence chain.** The broken tools (lab encoder
+pinning, the template differ) underwrite B and D. A rests on matched pixels,
+three independent perceptual judges, and a closed identity-drift test -- none of
+which came from a scalar. Codex: *"The lab error is conservative for
+production."* Fable named the risk of NOT shipping: *"an approved-but-unwired
+decision is exactly where this project loses work -- the tree keeps moving and
+the re-prove gets costlier every week the wire-in waits."*
+
+**TWO ACCEPTANCE GATES WERE ADOPTED FROM THEIR OBJECTIONS. Both are binding and
+they are DIFFERENT objections, which is why both lanes earned their seat.**
+
+1. **FABLE'S COST STOP.** The `+0.037 GiB` and the `2.619x` came from the same
+   lab now proven to have been measuring a machine 10.9 GiB heavier than
+   production. *"'The error cuts the safe way' is an argument, not a
+   measurement; broken instruments rarely have exactly one confound."*
+   **If the real production cost lands materially above 2.6x, the operator's
+   approval no longer covers what shipped -- STOP and return to him.** Do not
+   absorb the difference silently.
+2. **CODEX'S NO-OP GATE, and this one is the sharper of the two.**
+   *"Three false-green tools reveal a systemic no-op-detection weakness; A could
+   appear successfully wired while the refine path remains dormant or
+   incomplete."* So **acceptance requires a canonical published episode in
+   `otr/obs/` AND POSITIVE EVIDENCE THAT STAGE TWO EXECUTED -- never merely a
+   green validator.** Count the real thing the way
+   `otr_ltx25_encoder_load_audit.py` does: the LOADER'S OWN log line, never the
+   adapter's claim. At minimum assert `LTXVLatentUpsampler` actually ran per
+   shot and the decode happened at the upscaled canvas rather than 832x480.
+   This is the section 0 `4D` failure -- a node that shipped, tested green, and
+   ran dormant because it was never wired -- and it is now the exact hazard
+   three false-green instruments say to expect.
+
+**Order after A: B (both halves -- the lab encoder CPU-pin, then finish the
+differ), then D, then C.** The pin is a conformance edit with one right answer,
+so no arc (08-17 amendment); it also ends the ~50% lab OOM tax immediately.
+**D must not run before B**, because D's entire output is the differ's word.
+C starts by MEASURING `media_archive`'s own infection rate rather than quoting
+the sibling bank's.
+
 ### THE ALL-VIDEO-MODELS TEMPLATE SWEEP -- STARTED, AND NOT YET QUOTABLE
 
 **Operator's ask (2026-08-20): pull the shipped ComfyUI reference template for
