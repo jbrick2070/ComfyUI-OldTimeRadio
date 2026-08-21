@@ -67,7 +67,7 @@ outputs ... land in the REAL output folder the operator watches"*:
     main.py ... --output-directory %OTR_REAL_OUTPUT%   <- ComfyUI folder_paths
 
 * **LIVE (operator-confirmed):** `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs`
-  -- 83 files, newest `2026-08-20 04:10`.
+  -- 86 MP4 files, newest `2026-08-21 03:22`.
 * **ComfyUI's DEFAULT, and it is stale:**
   `C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs` -- 58 files,
   newest `2026-06-13 07:56`. Those 58 are real episodes. **Do not delete or
@@ -91,21 +91,23 @@ durable review rule is now: one clean review ends review; another is owed only
 when the first finds something, conflicts with another lane, or cannot verify a
 material claim. Do not launch a duplicate Codex CLI lane against the driver.
 
-**THE CLOSED RUN IS `A`, Z-IMAGE, `B`, `D`, THEN THE `media_archive`
-WRONG-PERSON EXTENSION.** Product and test receipts are in the newest entries of
-`docs/HANDOFF_LOG.md`; lab `B+D` is pushed separately at `vram-recipe-lab`
-`38d4ae0`. The saved canonical workflow remains byte-identical at Git blob
-`c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
+**NEXT: QUALIFY `ltx_video` AGAINST THE INSTALLED OFFICIAL LTX 2.3 T2V
+TEMPLATE.** The sound-first `ltx_audio_in` lane is closed with a matched three-arm
+lab qualification and a fresh eight-clip live production acceptance; the full
+receipt is the newest entry in `docs/HANDOFF_LOG.md`. Current `ltx_video` already
+has OTR's HQ two-stage path, so test only the same isolated official-template
+differences: exact current control, plain `euler` on both stages, and decoder
+`768/64/4096/4`. Keep the test silent and use the fixed lab scene still. Do not
+carry over audio nodes, prompt enhancement, FP8 transport, or generated audio.
+The newer dynamic rank-111 LoRA is absent and must not be downloaded without the
+operator's explicit authorization.
 
-**NEXT: QUALIFY THE GROUNDED LOCAL-MODEL TEMPLATE DIFFS ONE MODEL AT A TIME.**
-The fleet inventory now covers all 30 registered video engines: 11 exact
-official-template relations, 2 qualified baselines, and 17 lanes correctly
-classified as having no applicable local-model template. Start with
-`ltx_audio_in`, because the operator explicitly prioritised the sound-first lane
-and last-to-first continuity for multi-clip beats; then work the other local
-engines from the grounded receipts. A paper diff is not permission to transplant
-a node: classify each candidate IN / ADAPT / OUT, run a matched live comparison,
-and require a fresh published episode before changing production.
+After `ltx_video`, continue in grounded fleet order. `wan_i2v` is next but its
+official dual-model comparison is download-blocked by absent named weights;
+stop there only if the installed-state audit still confirms no honest comparison
+can run. A paper diff is not permission to transplant a node: classify each
+candidate IN / ADAPT / OUT, run a matched live comparison, and adopt only a
+visible improvement.
 
 The future LTX ultra-smoke remains deliberately small: opening music, two short
 story beats, closing music -- exactly four real 97-frame clips while covering

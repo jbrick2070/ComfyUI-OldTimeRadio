@@ -3,6 +3,91 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 03:23 -- HEAD 37425ae +this (v2.0-alpha) -- CODEX DRIVER (`ltx_audio_in` official-template qualification closed; current OTR recipe retained; fresh live publish)
+
+The sha above is the last OTR head before this docs-only closeout. A commit cannot
+contain its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**DECISION: KEEP OTR'S CURRENT `ltx_audio_in` SAMPLERS AND DECODER.** Three new
+no-op-proof API recipes held the fixed lab still, 3.88-second dialogue fixture,
+prompt, seed, sigmas, weights, old original LoRA, guide preparation, topology and
+source-audio delivery constant. A was the exact current two-stage control; B
+changed only both sampler selectors to plain `euler`; C changed only tiled decode
+to `768/64/4096/4`. Live `/object_info` validation passed every class and input in
+all three 41-node graphs before submission.
+
+**THE VISIBLE RESULT OWNED THE CHOICE.** A took 193.4 seconds and kept strong
+still/identity fidelity, a visible talking mouth and clean texture without seams
+or tiles. B took 157.9 seconds and steadied the camera, but turned the speaker
+toward the monitor and progressively hid the mouth, so it is worse for the
+sound-first lane. C took 164.6 seconds and was visually indistinguishable from A
+in matched full-frame and face crops; it added no detail, texture, seam or tile
+improvement. All three completed and are valid measurements, although their
+14.609--15.078 GiB absolute peaks exceed the lab's formal 14.5-GiB gate. Cost did
+not decide the quality verdict.
+
+**STAGE TWO POSITIVELY EXECUTED IN EVERY ARM.** Each fresh port-8199 run logged
+the complete eight-step base sampler, `LTXVLatentUpsampler`, the complete
+three-step refine sampler and final Video VAE load. Independent receipts report
+1024x576, 97 frames and 25 fps, not the 512x288 base canvas. The fixed source WAV
+was wired directly to `CreateVideo`; no decoded model-audio path existed. Lab
+recipes, receipts and the matched visual report are pushed on `main` at
+`fc6048551dc0d004fb3c4351acf07a6e87cf4bef`. No lab artifact entered OTR's
+episode or OBS trees.
+
+**OFFICIAL MACHINERY KEPT OUT:** no FP8 checkpoint transport, prompt enhancer,
+generated/reconstructed delivery audio or unrelated template nodes were copied.
+The newer dynamic rank-111 LoRA is not installed and was not downloaded. No OTR
+recipe code, node schema, wiring, widgets or saved workflow JSON changed.
+
+**LIVE CANONICAL ACCEPTANCE PASSED ON THE RTX 5080.** The real saved workflow ran
+profile `otr_16gb_ltx_audio_in` for one act and one character. All eight beats
+used `ltx_audio_in`; every beat logged the base pass, latent upsampler, refine
+pass and full-canvas decode. Delivered clip lengths were 250, 184, 156, 187,
+144, 166, 152 and 200 frames; render-window peaks were 12.902--12.966 GB. The
+eight clips persisted into episode
+`signal_lost_the_windows_secret_20260821_024608`, and the 1920x1080 compositor
+reconciled exactly to the 1,415-frame master-audio budget before the declared
+credits tail. Total prompt time was 41:32.
+
+**THE FILE THE OPERATOR WATCHES IS FRESH:**
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_the_windows_secret_20260821_024608_silent_procgen_blended_captioned_with_credits_final.mp4`,
+46,911,164 bytes, written 2026-08-21 03:22:40. Independent `ffprobe`: H.264
+1920x1080 at 25 fps, AAC 48-kHz stereo, 76.480 seconds; the authoritative audio
+is 56.567 seconds and the remainder is the declared silent credits tail.
+
+**MASTER AUDIO AUTHORITY IS PROVED, NOT ASSUMED.** The ledger is frozen with raw
+master-WAV SHA-256
+`25a4921947eb1e5627266597be0f1b74b9771873f806880a3c21be170e177f24` and stamps
+the existing master, archival final and live OBS paths. The mux logged
+`audio_mode=master_copy`, `audio_byte_identical OK` and `obs_publish OK`. An
+independent decode of the master WAV and archival final produced the same PCM
+SHA-256,
+`173c06d454559442c09b2e3b8bdae8938c76795df6ad2e96096da93c957dca47`.
+
+**VISUAL ACCEPTANCE:** contact sheets from the delivered final show the same
+human identity across every dialogue beat, clear changing mouth shapes on both
+the human and radio grille, readable captions, stable still fidelity, resolved
+skin/fabric/radio texture and no visible seams or tiles. Canonical production
+stills were not edited. Acceptance sheets live under the episode's
+`acceptance/` directory, outside OBS.
+
+**FINAL GATES:** focused OTR gate **12/12 passed** in 5.44 seconds; canonical
+workflow Git blob remains `c27dff3690030e78d88c3a2607a9ac54fd3935d9`
+(SHA-256 `89B8DF59438A1644416D376FFED66BF9D44AB5B6DC181156DA7D3436DF3A4912`).
+No production code changed, so the full suite was correctly not rerun.
+
+**NEXT:** qualify the silent `ltx_video` HQ two-stage lane with exact current
+control, both samplers plain `euler`, and decoder `768/64/4096/4`, one variable
+per arm. Use the fixed lab scene still, preserve the production-correct default
+encoder device, exclude every audio node and continue automatically after the
+result.
+
+**BOX AT CLOSE:** the acceptance server and launcher were stopped by exact PID;
+ports 8000, 8199 and 8188 are free, and the RTX 5080 returned to a 572-MiB
+desktop baseline. The RTX 4060 and its live stream were untouched.
+
 ## 2026-08-21 PRE-DAWN -- HEAD ce120aa +this (v2.0-alpha) -- CODEX DRIVER (media_archive wrong-person boundary closed and live-published; lab B+D already pushed)
 
 The sha above is the last CODE head before this commit. A commit cannot contain
