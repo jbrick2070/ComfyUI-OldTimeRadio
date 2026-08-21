@@ -265,17 +265,22 @@ class ZImageTurboEngine:
     commercial_clean = True          # Apache-2.0
     requires_flag = None             # vestigial (registry IS the menu; no flag gate)
     required_inputs = ("text_prompt",)
-    engine_version = "1"
-    #: This adapter can condition a mint on the character's canonical portrait,
-    #: so the dispatcher may hand it a reference_image. Lumina2/Z-Image carries
-    #: the ref_latents path (model_base.Lumina2.extra_conds), and the installed
-    #: checkpoint's header shows cap_pad_token and x_pad_token present with no
-    #: siglip module, so the reference embeds through the shared x_embedder with
-    #: no missing weights. Whether the TURBO checkpoint was trained to attend to
-    #: it is a separate question that only the live A/B answers.
-    accepts_reference_image = True
+    # v2 invalidates every cached v1 still that may contain the square-grid
+    # corruption from the unapproved generic ReferenceLatent path below.
+    engine_version = "2"
+    #: DISABLED BY MATCHED LIVE PIXEL A/B, 2026-08-20.  Same installed weights,
+    #: prompt, negative, seed and 1472x832 canvas on separate fresh boots:
+    #: reference OFF was clean; reference ON reproduced the square grid across
+    #: the walls and clothing.  A generic node accepting the graph proves only
+    #: structural compatibility, not that this Turbo checkpoint was trained for
+    #: that conditioning.  The dispatcher therefore keeps the proven
+    #: portrait-derived identity SEED and never hands this engine a reference.
+    #: Permanent instrument: scripts/otr_zimage_reference_ab.py.
+    accepts_reference_image = False
 
-    #: Resolved SEPARATELY from _node_candidates and merged per call. These must
+    #: DIAGNOSTIC-ONLY map retained for the permanent matched A/B harness; the
+    #: production dispatcher cannot reach it while accepts_reference_image is
+    #: false. Resolved SEPARATELY from _node_candidates and merged per call. These must
     #: never join the main candidate map: render_image caches the resolved map on
     #: the registry SINGLETON, and the episode's first mint is an unreferenced
     #: portrait -- so a params-gated map would be cached WITHOUT these keys and
@@ -338,11 +343,30 @@ class ZImageTurboEngine:
             # no-request default. Honor dims EXACTLY -- no snapping/upscale here.
             "width": int(get("width") or get("w") or _eint("OTR_ZIMAGE_WIDTH", 1024)),
             "height": int(get("height") or get("h") or _eint("OTR_ZIMAGE_HEIGHT", 1024)),
-            "reference_image": str(get("reference_image") or ""),
+            # Production admission is enforced here at the adapter boundary,
+            # not only by the dispatcher capability bit. A direct caller that
+            # supplies reference_image therefore still gets the proven base
+            # graph and can never revive the corrupt generic latent path.
+            "reference_image": "",
             # Capped well under the portrait's native 1216 so the reference
             # costs roughly 1.5k latent tokens instead of 4k on an 8-step mint.
             "reference_height": _eint("OTR_PORTRAIT_REF_HEIGHT", 768),
         }
+
+    def _diagnostic_zimage_params(self, request):
+        """Build params for the permanent rejected-reference A/B only.
+
+        The production ``render_image`` path never calls this method. Keeping
+        the opt-in on a separately named private diagnostic boundary prevents a
+        direct render request from bypassing ``accepts_reference_image=False``.
+        """
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        params = self._zimage_params(request)
+        return dict(
+            params,
+            reference_image=str(get("reference_image") or ""),
+        )
 
     def _node_candidates(self, params=None):
         """Ordered ComfyUI node-class candidates per graph node. The latent node
@@ -491,21 +515,6 @@ class ZImageTurboEngine:
         classes = getattr(self, "_classes", None) \
             or _wb.resolve_graph_classes(self._node_candidates(params))
         self._classes = classes
-        if params.get("reference_image"):
-            # Stage the PNG into ComfyUI's input dir OUTSIDE the graph builder,
-            # which stays pure -- LoadImage resolves the returned basename.
-            params = dict(
-                params,
-                reference_image=_wb.stage_into_comfy_input(
-                    params["reference_image"]),
-            )
-            ref_classes = getattr(self, "_ref_classes", None) \
-                or _wb.resolve_graph_classes(self._REF_CANDIDATES)
-            self._ref_classes = ref_classes
-            # Merged into a LOCAL map for this call only, so the cached
-            # self._classes never gains reference keys and an unreferenced mint
-            # keeps resolving exactly what it always did.
-            classes = {**classes, **ref_classes}
         graph = self._build_zimage_graph(params, _wb.Wire)
         try:
             images = _wb.run_graph(graph, classes, terminal=self._TERMINAL)[0]

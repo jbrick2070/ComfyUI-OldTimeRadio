@@ -176,16 +176,20 @@ def _zimage():
     return ireg.get_engine("z_image_turbo")
 
 
-def test_only_migrated_engines_declare_the_reference_capability():
-    """An adapter that never opts in must be a hard no-op: the dispatcher reads
-    this through getattr(..., False) before it will resolve a reference at all.
+def test_no_shipping_image_engine_advertises_unproven_reference_conditioning():
+    """A generic installed node is not evidence that a checkpoint was trained
+    for that semantic path. Z-Image's matched A/B reproduced square-grid
+    corruption, so every shipping image adapter is reference-OFF today.
     """
     from nodes._otr_image_engines import registry as ireg
 
     for name in ireg.all_engine_names():
         eng = ireg.get_engine(name)
         declared = bool(getattr(eng, "accepts_reference_image", False))
-        assert declared is (name == "z_image_turbo"), name
+        assert declared is False, name
+
+    zimage = ireg.get_engine("z_image_turbo")
+    assert zimage.engine_version == "2", "old gridded cache entries must miss"
 
 
 def test_google_image_rejects_the_singular_reference_key():
@@ -216,14 +220,61 @@ def test_unreferenced_zimage_graph_is_byte_identical_to_the_shipped_nine():
     }
 
 
+def test_direct_render_request_cannot_reactivate_reference_graph(monkeypatch):
+    """The adapter boundary owns the ban too; bypassing the dispatcher with a
+    direct reference_image request must still execute the nine-node base graph.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+
+    captured = {}
+    monkeypatch.setattr(
+        _wb, "resolve_graph_classes",
+        lambda candidates: {key: object() for key in candidates},
+    )
+
+    def _run(graph, classes, terminal):
+        captured["graph"] = graph
+        captured["classes"] = classes
+        captured["terminal"] = terminal
+        return (object(),)
+
+    monkeypatch.setattr(_wb, "run_graph", _run)
+    monkeypatch.setattr(_wb, "images_to_uint8", lambda images: ["frame"])
+    monkeypatch.setattr(_wb, "reclaim_idle_models", lambda **kwargs: None)
+    monkeypatch.setattr(
+        _wb, "stage_into_comfy_input",
+        lambda *_args, **_kwargs: pytest.fail("production staged a banned reference"),
+    )
+
+    eng = zit.ZImageTurboEngine()
+    result = eng.render_image({
+        "prompt": "a stern man",
+        "seed": 7,
+        "reference_image": "portrait.png",
+    })
+    assert result == "frame"
+    assert set(captured["graph"]) == {
+        "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
+        "ksampler", "decode",
+    }
+    assert "ReferenceLatent" not in {
+        node["class"] for node in captured["graph"].values()
+    }
+    assert set(captured["classes"]) == {
+        "unet", "clip", "vae", "sampling", "pos", "neg", "latent",
+        "ksampler", "decode",
+    }
+
+
 def test_referenced_zimage_graph_adds_the_chain_AND_rewires_the_sampler():
-    """A graph that builds the chain and forgets to consume it passes a node
-    count check and renders nothing different -- so assert the rewire.
+    """Diagnostic-only graph retained for the permanent rejection A/B. A graph
+    that builds the chain and forgets to consume it passes a node-count check
+    and renders nothing different -- so assert the rewire.
     """
     from nodes._otr_video_engines import wrapper_bridge as _wb
 
     eng = _zimage()
-    params = eng._zimage_params(
+    params = eng._diagnostic_zimage_params(
         {"prompt": "a stern man", "seed": 7, "reference_image": "portrait.png"})
     graph = eng._build_zimage_graph(params, _wb.Wire)
     assert set(graph) == {
@@ -245,7 +296,7 @@ def test_the_scaler_is_spelled_with_every_argument_ImageScale_requires():
     from nodes._otr_video_engines import wrapper_bridge as _wb
 
     eng = _zimage()
-    params = eng._zimage_params(
+    params = eng._diagnostic_zimage_params(
         {"prompt": "x", "seed": 1, "reference_image": "p.png"})
     scale = eng._build_zimage_graph(params, _wb.Wire)["scale_ref"]
     assert set(scale["inputs"]) == {

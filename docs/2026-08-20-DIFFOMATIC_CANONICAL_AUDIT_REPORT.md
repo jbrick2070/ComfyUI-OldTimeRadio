@@ -215,30 +215,42 @@
 
 ### Engine: `z_image_turbo (Z-Image-Turbo 8-Step)`
 - **Implementation File:** [`nodes/_otr_image_engines/z_image_turbo.py`](file:///C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio/nodes/_otr_image_engines/z_image_turbo.py)
-- **Matched Reference Template:** `image_z_image_turbo_int8.json (also: utility_z_image_turbo_2k_upscaler.app.json)`
+- **Corrected Reference Template:** ComfyUI package `0.1.50` Z-Image base workflow
 
 #### Upstream Reference Pipeline Stages:
-  * Loaders: CheckpointLoaderSimple (`z_image_turbo_int8.safetensors`), VAE (`ae.safetensors`)
-  * Conditioning: CLIPTextEncode (positive only; negative empty)
-  * Sampling: KSampler (dpmpp_sde, trailing sigmas, steps=8, cfg=1.0-1.5, denoise=1.0)
+  * Loaders: split BF16 UNET, Qwen3/Lumina2 text encoder, and `ae.safetensors`
+  * Conditioning: text positive plus `ConditioningZeroOut` negative; **no image reference path**
+  * Sampling: AuraFlow shift 3, 8 steps, cfg 1, `res_multistep` / `simple`
+  * Latent: `EmptySD3LatentImage`, 1024x1024
   * Decoding: VAEDecode -> SaveImage
 
 #### Our Pipeline Stages:
-  * Loaders: unet (`z_image_turbo_int8.safetensors` or Q8 GGUF), clip, vae (`ae.safetensors`)
-  * Conditioning: prompt text encoder with style decorator expansion
-  * Sampling: ksampler (steps=8, cfg=1.0, sampler=dpmpp_sde)
-  * Decoding: vae_decode -> RGBA tensor -> canvas conformance (aspect padding/cropping)
+  * Loaders: installed `z_image_turbo_nvfp4.safetensors`, Qwen FP8 encoder with
+    `qwen_image` type, and `ae.safetensors`
+  * Conditioning: composed OTR positive plus a live safety/style negative
+  * Sampling: AuraFlow shift 3, 8 steps, cfg 2, `euler` / `normal`
+  * Latent: `EmptySD3LatentImage` at the request canvas (normally wide 16:9)
+  * Decoding: plain `VAEDecode`; no tiled decode and no in-graph upscaler
 
 #### Missing / Divergent Stages:
-  * ℹ️ `utility_z_image_turbo_2k_upscaler.app.json` reference includes a **2K post-upscaler pass** (`ESRGAN / SPANDREL` 2x upsampler).
-  * ℹ️ Our still engine delivers native generation; upscaling is decoupled into `_otr_upscale_engines` (`eng_spandrel_esrgan.py`).
+  * **CORRECTION, LIVE-PROVEN 2026-08-20:** the generic dual
+    `ReferenceLatent` branch previously added by OTR is not present in the
+    official base workflow and was not semantic parity. A matched fresh-boot
+    A/B changed only that branch: OFF was clean; ON reproduced the operator's
+    square grid. The production capability is now disabled and old caches are
+    invalidated with engine version 2.
+  * The separate utility 2K workflow is not the base generation recipe. OTR
+    delivers the native mint here; any downstream upscaling remains a separate
+    pipeline choice.
 
 #### Parameter & Widget Deltas:
 | Parameter | Reference Template | Our Recipe | Classification |
 |---|---|---|---|
 | **Steps** | Reference: 8 steps | Ours: 8 steps | **MATCH** |
-| **CFG** | Reference: 1.0 - 1.5 | Ours: 1.0 | **DOCUMENTED** (Turbo model trained for CFG 1.0 guidance). |
-| **Upscaling** | Reference: Integrated 2K upscaler node in graph | Ours: Decoupled into separate upscale engine tier | **DOCUMENTED** (Preserves modular pipeline stages and low-VRAM memory bounds). |
+| **CFG / sampler / scheduler** | 1 / res_multistep / simple | 2 / euler / normal | **ADAPT** -- OTR keeps its negative live; this remains a recipe divergence, not claimed parity. |
+| **Canvas** | 1024x1024 | request-owned wide canvas | **ADAPT** -- canonical downstream contract is 16:9. |
+| **Image reference** | absent | absent in production | **OUT** -- generic `ReferenceLatent` caused the grid in a matched live A/B. |
+| **Upscaling** | absent from base workflow | absent from still graph | **MATCH** -- utility upscaling is a different workflow. |
 
 ---
 
@@ -409,7 +421,7 @@
 
 | Domain | OTR Engine ID | Reference Template | Key Structural Delta | Status |
 |---|---|---|---|---|
-| Video | `eng_ltx25` | `video_ltx2_5_i2v.json` | Omitted 2x Latent Upsampler + Refine; Omitted AudioVAEDecode | **VERIFIED / DOCUMENTED** |
+| Video | `eng_ltx25` | `video_ltx2_5_i2v.json` | Production now ships the proven two-stage latent upsample + refine; audio-in remains the separate `eng_ltx_av` lane | **CORRECTED / LIVE-PROVEN 2026-08-20** |
 | Video | `eng_wan_i2v` | `video_wan2_2_14B_i2v.json` | Added `WanVideoVAETileDecode` to prevent VRAM explosion | **VERIFIED / DOCUMENTED** |
 | Video | `eng_wan_ti2v` | `video_wan2_2_5B_ti2v.json` | 1:1 structural parity; GGUF quantization on 8GB tier | **VERIFIED / DOCUMENTED** |
 | Video | `eng_fastwan_8gb` | `video_wan2.1_fun_camera_v1.1_1.3B.json` | 1:1 structural parity with lightweight camera lane | **VERIFIED / DOCUMENTED** |
@@ -418,7 +430,7 @@
 | Video | `eng_ltx_8gb` | `ltxv_text_to_video.json` | Declared canvas clamped to 512x288 | **VERIFIED / DOCUMENTED** |
 | Video | `eng_ltx_av` | `template_image_speech_to_video.json` | Audio-conditioned video routing | **VERIFIED / DOCUMENTED** |
 | Video | `eng_minimax_h3` | `video_minimax_h3_i2v.json` | API/wrapper bridge parity | **VERIFIED / DOCUMENTED** |
-| Image | `z_image_turbo` | `image_z_image_turbo_int8.json` | 8-step turbo parity; 2K upscaler decoupled | **VERIFIED / DOCUMENTED** |
+| Image | `z_image_turbo` | ComfyUI package 0.1.50 base workflow | Installed-quant and OTR-conditioning adaptations; generic reference branch removed after matched grid A/B | **CORRECTED / REFERENCE OUT / LIVE-PROVEN** |
 | Image | `flux_gen1` | `flux_dev_full_text_to_image.json` | Dual-CLIP CPU pinning + model patcher detachment | **VERIFIED / DOCUMENTED** |
 | Image | `flux2_klein` | `image_flux2_klein_text_to_image.json` | 4-step distilled / 20-step base parity | **VERIFIED / DOCUMENTED** |
 | Image | `sd35_large` | `sd3.5_simple_example.json` | 1:1 parity on SD3.5 Large 8B generation | **VERIFIED / DOCUMENTED** |
@@ -430,4 +442,10 @@
 
 ## Conclusion
 Every single video, image, and audio engine in OTR has been audited against its official ComfyUI reference template.
-All structural and parameter divergences are accounted for and documented under explicit project operating constraints (VRAM caps, headless execution, CPU memory pinning, and the V-1 frozen audio contract). No accidental or unproven parameter drift was identified.
+This report is a historical snapshot, not blanket authority to copy a template
+stage into production. Its former Z-Image parity claim and LTX upsampler status
+were disproved by later byte-level grounding and live execution and are corrected
+above. `docs/COMFY_TEMPLATE_DIFF_PROTOCOL.md` is the binding method: classify
+each difference IN / ADAPT / OUT, require approved artifacts and installed-node
+evidence, and then demand executor or live-pixel proof. Any uncorrected
+Diffomatic row is provisional until it survives that protocol.

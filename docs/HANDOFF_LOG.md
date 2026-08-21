@@ -3,6 +3,73 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 EARLY MORNING -- HEAD 9cc5df4 +this (v2.0-alpha) -- CODEX DRIVER (Z-Image grid isolated, fixed, live-published; generic reference OUT)
+
+The sha above is the last CODE head before this commit. A commit cannot contain
+its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**THE Z-IMAGE TILE/GRID WAS NOT A CANVAS OR UPSCALER FAILURE.** In the prior
+LTX acceptance episode, portraits, music cards and unreferenced scenes were
+clean while all four character scenes gridded. The Z engine uses plain
+`VAEDecode`, not tiled decode. A permanent matched harness then ran OFF and ON
+on separate fresh boots with identical installed NVFP4/Qwen-FP8/AE weights,
+prompt, negative, seed 7, eight-step recipe and 1472x832 canvas. OFF was clean;
+ON reproduced the square grid across walls and clothing. Artifacts:
+`output/otr/episodes/zimage_reference_ab_20260820/stills/{off,on}`. No gridscore
+number is evidence.
+
+**THE FIX IS AT BOTH BOUNDARIES.** `accepts_reference_image=False` stops the
+dispatcher, and `_zimage_params()` independently clears any direct caller's
+`reference_image`, so the adapter itself cannot stage, resolve or execute the
+generic `ReferenceLatent` path. The separately named private diagnostic builder
+is used only by the persistent A/B harness. `engine_version` is `2`, invalidating
+every possibly gridded v1 cache entry. The independent portrait-derived identity
+seed remains enabled.
+
+**THE INSTRUMENT CANNOT CLAIM SUCCESS FROM ITS ARM LABEL.** It uploads through
+the active server's `/upload/image` endpoint and records the returned
+`subfolder/name`; the first wrong-input-root failure is preserved rather than
+hidden. Structural evidence is derived from the actual raw/API graph topology.
+History success plus a fresh output is a separate evidence bit, and each output
+records bytes and SHA-256. Mutation tests prove that removing a sampler rewire or
+changing a reference node class withdraws the structural claim.
+
+**PRODUCT CLOSURE:** canonical one-character `still_flat` episode
+`signal_lost_zimage_reference_grid_fix_acceptance_20260820_234828`. All four
+character scenes `b002`-`b005` record engine version 2,
+`portrait_anchor_mode=seed` and the same derived portrait hash. Direct inspection
+of all four plus `b001`/`b006` found no grid; all eight scene stills are native
+1472x832. Fresh live OBS file:
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_zimage_reference_grid_fix_acceptance_20260820_234828_silent_procgen_blended_captioned_with_credits_final.mp4`,
+12,708,177 bytes, written 2026-08-20 23:53:50. Independent `ffprobe`: H.264
+1920x1080 at 25 fps, AAC 48 kHz stereo, 83.160 seconds.
+
+**THE SAVED CANONICAL WORKFLOW IS STILL BYTE-IDENTICAL:** Git blob/hash
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`; the QA request changed only API
+inputs and left all three saved video slots at `still_flat (16:9)`.
+
+**BUG BIBLE:** new `12.120` / `PBUG-20260820-01` requires model-specific
+approved evidence before any generic reference capability can ship. Separate
+survival-guide final HEAD `5c37d238` is pushed and equals origin/main; 299 Bible
+entries, 414 coverage records, regression **22 passed / 26 skipped / 3 xfailed**.
+
+**REVIEW RECEIPT:** the operator requested one internal finished-diff review.
+It found two real issues: the ban was dispatcher-only, and receipt structural
+evidence was derived from `--arm`. Both were fixed. The required targeted
+follow-up passed both closures, so review stopped; no duplicate CLI or paid
+roundtable lane was launched.
+
+**FINAL GATES:** focused **110/110**; full suite **11303 passed / 114 skipped /
+1 xfailed** in 346.31 seconds; `build_variants.py --check` **51 / 0**; Bug
+Bible **22 / 26 / 3**; py_compile, BOM/zero-length and `git diff --check` clean;
+canonical blob unchanged. Exact server PID 36320 and launcher PID 47228 were
+stopped; port 8000 is free. The 4060 stream was untouched.
+
+**NEXT:** item `B` in `GO_FORWARD_PLAN.md`: make the lab's LTX text encoder use
+the same CPU-pinned loader as production, then repair Diffomatic before any
+fleet template sweep.
+
 ## 2026-08-20 NIGHT -- HEAD d74ced6d +this (v2.0-alpha) -- CODEX DRIVER (LTX 2.5 HQ two-stage shipped; 21 real clips proved; canonical saved workflow untouched)
 
 The sha above is the last CODE head before this commit. A commit cannot contain

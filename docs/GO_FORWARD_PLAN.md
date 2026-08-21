@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-20 NIGHT -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 EARLY MORNING -- READ THIS FIRST
 
 **DRIVER IS CODEX (`gpt-5.6-sol`).** The operator explicitly waived the LTX
 Kibitz arc and asked for internal grounding plus one finished-diff review. The
@@ -111,19 +111,21 @@ above closes the no-op gate; the adapter's own success claim was not used.
 remain `still_flat (16:9)`. Only the acceptance API prompt overrode those three
 runtime slots to `ltx25_high_video (16:9)`, exactly as the operator directed.
 
-**NEXT ITEM: Z-IMAGE TURBO'S CHARACTER-STILL GRID, before the lab work.** In the
-accepted episode, the four character scenes `b002` through `b005` all show the
-same square/noise texture; the unreferenced `b001` and `b006`, portraits, and
-music cards are clean. The four bad rows share the same clean `c02` portrait and
-`portrait_anchor_mode=reference_latent`. This OTR graph uses plain `VAEDecode`,
-not tiled sampling or tiled decode, so the next action is one matched by-eye A/B:
-same installed weights, prompt, negative, seed and 1472x832 canvas, changing only
-the reference-latent branch OFF versus ON. If OFF is clean and ON grids, disable
-that unproven capability, retain deterministic portrait-derived identity seed,
-bump the engine version so old cached grids cannot survive, and prove it with a
-one-character `still_flat` episode published to live OBS.
+**Z-IMAGE TURBO'S CHARACTER-STILL GRID IS CLOSED, LIVE-PROVEN AND PUBLISHED.**
+The matched fresh-boot A/B changed only the generic reference branch: OFF was
+clean; ON recreated the square grid. Production now rejects that unapproved
+semantic path, keeps the portrait-derived identity seed, and uses engine version
+2 to invalidate old gridded caches. The one-character canonical `still_flat`
+proof produced four character scenes `b002`-`b005`; all four record engine v2,
+`portrait_anchor_mode=seed` and one common portrait hash. Direct inspection of
+all four plus the unreferenced scenes found no grid. All eight episode stills
+are native 1472x832. Fresh live publish:
+`signal_lost_zimage_reference_grid_fix_acceptance_20260820_234828_silent_procgen_blended_captioned_with_credits_final.mp4`
+(12,708,177 bytes, written 2026-08-20 23:53:50; H.264 1920x1080/25 fps + AAC
+48 kHz stereo; 83.160 s). Saved canonical blob remains
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
 
-**AFTER THAT:** `B` (lab encoder CPU-pin conformance, then repair the differ),
+**NEXT ITEM:** `B` (lab encoder CPU-pin conformance, then repair the differ),
 then `D` (fleet template sweep, which MUST NOT precede the differ repair), then
 `C` (media_archive wrong-person). A future LTX ultra-smoke is specified but not
 built: two deliberately short story beats plus opening and closing music equals
@@ -748,12 +750,15 @@ the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
 ranges -- that is what a working lane looks like, and on that run it caught two
 of the driver's own tests being tautologies.
 
-**BASELINES (re-measured 2026-08-20 NIGHT, settled tree, after the LTX 2.5
-two-stage):** suite **11291 passed / 114 skipped / 1 xfailed** -- MEASURED by a
-full run (332.39 s, EXIT=0, known-fail guard silent), never derived. Bible
-**20 / 26 / 3**, **298** entries, survival-guide HEAD `7df66016` == origin/main;
-that commit synchronises the already-promoted `12.119` coverage-index row and
-does not add an entry. `build_variants.py --check` **51 variants / 0 failures**.
+**BASELINES (re-measured 2026-08-21 EARLY MORNING, settled tree, after the
+Z-Image grid fix):** suite **11303 passed / 114 skipped / 1 xfailed** -- MEASURED
+by a full run (346.31 s, EXIT=0, known-fail guard silent), never derived. The
+delta from the LTX baseline is exactly +12: ten permanent A/B harness tests, one
+identity-seed test and one direct-adapter rejection test. Bible
+**22 / 26 / 3**, **299** entries, survival-guide HEAD `5c37d238` == origin/main;
+entry `12.120` / `PBUG-20260820-01` requires model-specific approved evidence
+before any generic reference capability can ship. `build_variants.py --check`
+**51 variants / 0 failures**.
 All three measured this session, not carried forward.
 
 **THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
@@ -2306,29 +2311,27 @@ as its own row, and leave this section as the standing context.
   refines PATHS -- routing, canvas negotiation, admission, extension -- never
   the shipped render recipe.
 
-### 1. The reference A/B still owes a verdict (the one real open item)
+### 1. Z-Image generic reference conditioning is CLOSED and OUT
 
-The reference path is PROVEN WIRED, not proven EFFECTIVE. Live leg
-`signal_lost_lute_strings_fools_tongue_20260805_021040` shows three `scene_character`
-rows stamped `portrait_anchor_mode='reference_latent'`, and the two rows sharing char
-`c03` share one anchor -- so the engine declared the capability, the portrait row
-resolved, the file was on disk, and the anchor entered the cache key.
+The permanent matched harness is `scripts/otr_zimage_reference_ab.py`; its live
+artifacts are under
+`output/otr/episodes/zimage_reference_ab_20260820/stills/{off,on}`. Each arm used
+the same installed NVFP4 UNET, Qwen FP8 encoder, VAE, prompt, negative, seed 7,
+1472x832 canvas and eight-step recipe on a separate fresh server boot. The OFF
+arm was clean. The ON `graph.json` structurally proves the exact dual
+`ReferenceLatent` chain reaches both sampler conditionings; its separate
+`SUCCESS` receipt and fresh output prove that submitted graph executed. The ON
+pixel output reproduced the square grid across the walls and clothing. This is
+a by-eye pixel verdict; no gridscore number is evidence.
 
-**What nobody has answered: does `z_image_turbo_nvfp4` actually ATTEND to the prepended
-reference, or does it accept and ignore it?** The architecture takes it with no missing
-weights (header probe: `cap_pad_token` and `x_pad_token` present, `siglip_embedder`
-absent), but graph shape cannot prove three faces became one. That needs:
-- a control arm with **`OTR_PORTRAIT_REFERENCE=0`**, on its own fresh server boot --
-  env vars cannot reach a resident ComfyUI process, and `OTRImageGenDispatcher` has no
-  `IS_CHANGED` to notice the flag, so the arms MUST NOT share a boot;
-- the control asserts `portrait_anchor_mode == 'seed'`, NOT `''`. The seed pin is still
-  enabled in that arm. Only setting BOTH `OTR_PORTRAIT_REFERENCE=0` and
-  `OTR_PORTRAIT_IDENTITY_SEED=0` yields `''`;
-- an operator eyeball on the two arms, which is the actual verdict.
-
-If the reference turns out to be a no-op, **Track 2 Step 8 (flux2_klein)** is the built
-answer -- klein is genuinely reference-trained and its weights are on disk. It is
-deliberately NOT built yet. Switching to it is a Director widget pick, not code.
+**DECISION:** generic `ReferenceLatent` is not an approved semantic path for the
+installed Z-Image Turbo checkpoint and is OUT of production. A node accepting a
+graph proves structural compatibility, not training compatibility. The engine
+now advertises `accepts_reference_image=False`; `engine_version` is `2` so every
+possibly gridded v1 still misses cache. The already-proven portrait-derived
+identity seed remains enabled, so character scenes stamp
+`portrait_anchor_mode='seed'`, never blank. The diagnostic graph remains only so
+future weights can be retested against the same single-variable harness.
 
 ### 2-PRE. OPERATOR CALLS ALREADY MADE -- do not re-open, do not re-panel
 

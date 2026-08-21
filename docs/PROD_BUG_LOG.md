@@ -5830,7 +5830,7 @@ EXPECTED result, not a regression signal.
 - audit scope + result (only engines in the canonical workflow):
   | engine | dedicated node that EXISTS | used | verdict |
   |---|---|---|---|
-  | `z_image_turbo` | `TextEncodeZImageOmni` | no | CONFORMANT -- tokenizer self-wraps; the Omni node's extra value is image refs, already reached via `ReferenceLatent` |
+  | `z_image_turbo` | `TextEncodeZImageOmni` | no | TEXT-ONLY CONFORMANT -- tokenizer self-wraps. The Omni node's model-specific image-reference semantics are **not** reproduced by generic `ReferenceLatent`; a matched live A/B proved that generic path corrupts the installed Turbo checkpoint, so production reference conditioning is disabled. |
   | `flux_gen1` | `CLIPTextEncodeFlux` | no | CONFORMANT -- that node is `CLIPTextEncode`+`FluxGuidance` fused; its only unique power is different `clip_l`/`t5xxl` text. `FluxGuidance` IS wired (`flux_gen1.py:142`, the BUG-411 restore) |
   | `lumina_image` | `CLIPTextEncodeLumina2` | no | **DEFECT (this entry)** |
 - fix APPLIED, engine-side and zero-LLM: module constants copied verbatim from
@@ -5897,3 +5897,63 @@ EXPECTED result, not a regression signal.
   is therefore an operator/recipe decision owing a render, not a driver fix. No new
   PBUG is opened for either half: the mislabel was a static-audit finding and the
   floor has no live observation yet.
+
+## PBUG-20260820-01 -- generic Z-Image reference conditioning executed successfully while corrupting every character scene
+
+- surfaced: 2026-08-20 in the real published LTX 2.5 acceptance episode. Its
+  portraits, music cards and unreferenced scenes were clean, while all four
+  character scenes `b002`-`b005` carried the same square/noise grid. Those four
+  rows alone shared a clean `c02` portrait and
+  `portrait_anchor_mode=reference_latent`.
+- false lead ruled out: the Z-Image graph uses plain `VAEDecode`, not tiled
+  sampling, tiled decode or an in-graph upscaler. The artifact therefore was
+  not evidence that the still canvas or downstream video dimensions were too
+  large.
+- admission evidence: permanent harness `scripts/otr_zimage_reference_ab.py`;
+  live artifacts at
+  `output/otr/episodes/zimage_reference_ab_20260820/stills/{off,on}`. Separate
+  fresh boots used the same installed NVFP4 UNET, Qwen FP8 encoder, VAE,
+  prompt, negative, seed 7, 1472x832 canvas and eight-step recipe. OFF had the
+  exact nine-node base graph and was visually clean. ON `graph.json` proves the
+  exact `LoadImage -> ImageScale -> VAEEncode -> dual ReferenceLatent` path and
+  both sampler conditioning rewires; its separate `SUCCESS` receipt and fresh
+  output prove that submitted graph executed and visibly recreated the square
+  grid across walls and clothing. Both arms returned `SUCCESS`; that is
+  precisely why executor success alone could not admit this semantic path. No
+  gridscore number is used.
+- root cause: OTR treated a generic node accepting the installed checkpoint as
+  evidence that the checkpoint was trained for that conditioning. That proves
+  structural compatibility only. The official ComfyUI Z-Image base workflow
+  has no image reference, and its dedicated Omni path carries model-specific
+  vision-token / `reference_latents_text_embeds` semantics that generic
+  `ReferenceLatent` does not reproduce. Injecting the generic latent into both
+  positive and negative conditioning therefore placed this Turbo checkpoint
+  outside its approved input distribution.
+- fix: `ZImageTurboEngine.accepts_reference_image=False`; the diagnostic graph
+  remains reachable only by the permanent A/B harness. `engine_version` is
+  bumped `1 -> 2` so old gridded cache entries cannot survive a resume. The
+  independent portrait-derived identity seed remains enabled and is pinned by
+  regression coverage, so character rows resolve to `portrait_anchor_mode=seed`
+  rather than losing identity anchoring entirely.
+- harness finding caught before the valid ON arm: the first standalone client
+  copied the portrait into the Documents-side input tree while the active
+  server read the ComfyUI-Installs tree. The failed graph and receipt are
+  preserved as `on/graph.failed_wrong_input_root.json` and
+  `on/receipt.failed_wrong_input_root.json`. The harness now uploads through the
+  active server's `/upload/image` endpoint and records the server-returned
+  `subfolder/name`; it never infers an input root.
+- durable prevention: Bug Bible `12.120`, legacy id `PBUG-20260820-01`, in
+  survival-guide commits `3ca17600` and coverage-sync `5c37d238`. The executable
+  rule rejects any reference-capability opt-in without model-specific approved
+  evidence, matched successful OFF/ON signatures, real graph/native-pixel
+  hashes, branch-execution proof and an attributed APPROVED pixel verdict.
+  Regression is **22 passed / 26 skipped / 3 xfailed**; Bible count is **299**.
+- product closure: canonical one-character `still_flat` episode
+  `signal_lost_zimage_reference_grid_fix_acceptance_20260820_234828` minted
+  eight 1472x832 scene stills. All four character rows `b002`-`b005` record
+  engine version `2`, `portrait_anchor_mode=seed` and the same derived portrait
+  hash. Direct inspection of all four plus `b001`/`b006` found no grid. Fresh
+  live OBS publish written 2026-08-20 23:53:50 is H.264 1920x1080/25 fps + AAC
+  48 kHz stereo, 83.160 s, 12,708,177 bytes. Canonical workflow blob remains
+  `c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
+- status: FIXED, matched-A/B live-proven and production-published.

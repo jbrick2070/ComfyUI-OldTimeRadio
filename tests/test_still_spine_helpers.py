@@ -1167,6 +1167,20 @@ class TestPortraitIdentitySeed:
                 char_id="c01", portrait_prompt_hash="pp_portrait",
             ) == (portrait, "seed")
 
+    def test_zimage_reference_rejection_keeps_the_identity_seed(self):
+        """The 2026-08-20 grid fix disables only the corrupt generic latent.
+        It must not also remove the already-proven portrait-derived seed.
+        """
+        from nodes import otr_image_gen_dispatcher as disp
+        from nodes._otr_image_engines import registry as ireg
+
+        assert ireg.get_engine("z_image_turbo").accepts_reference_image is False
+        portrait = disp.resolve_object_seed(self.RH, "c01", "pp_portrait")
+        assert disp.resolve_seed_and_mode(
+            self.RH, "still_b002", "ph_scene", kind="scene_character",
+            char_id="c01", portrait_prompt_hash="pp_portrait",
+        ) == (portrait, "seed")
+
     def test_placement_after_the_mode_gate_keeps_the_fixed_contract(self):
         """Placed before the gate this returns a hashed seed instead of 7, and
         placed before `base` is assigned it raises UnboundLocalError inside a
