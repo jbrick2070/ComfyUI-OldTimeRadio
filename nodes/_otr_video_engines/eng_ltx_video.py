@@ -511,8 +511,8 @@ _LTX_DISTILLED_LORA_STRENGTH = 0.7
 # Image Audio to Video") with the ENTIRE audio lane removed (no audio VAE /
 # encode / concat / separate / zero-mask -- clips here are silent by contract,
 # V-1 mux-LAST). TWO-STAGE: motion at half canvas (Inplace i2v @0.7 soft
-# anchor + euler_ancestral_cfg_pp over the front-loaded 8-step ladder) ->
-# latent-upsample x2 -> re-anchor @1.0 -> 3-step euler_cfg_pp refine with
+# anchor + plain Euler over the front-loaded 8-step ladder) -> latent-upsample
+# x2 -> re-anchor @1.0 -> 3-step plain-Euler refine with
 # LTXVCropGuides. Selection: env OTR_LTX_VIDEO_RECIPE
 # (auto|hq_two_stage|single_pass), default auto -> derived from the
 # OTR_LTX_VIDEO_UNET basename family, mirroring eng_ltx_av._detect_recipe
@@ -537,8 +537,13 @@ _LTX_HQ_LORA_DEFAULT = os.path.join(
 _LTX_HQ_LORA_STRENGTH = 0.5
 _LTX_HQ_I2V_BASE_STRENGTH = 0.7      # motion pass: the still is a soft anchor
 _LTX_HQ_I2V_REFINE_STRENGTH = 1.0    # detail pass: hard re-anchor
-_LTX_HQ_BASE_SAMPLER = "euler_ancestral_cfg_pp"  # ancestral keeps motion alive
-_LTX_HQ_REFINE_SAMPLER = "euler_cfg_pp"
+# 2026-08-21 matched official-template qualification: plain Euler on BOTH HQ
+# stages visibly kept the requested locked camera while preserving the subject's
+# turn/reach and native-resolution detail. Scoped to hq_two_stage: the silent
+# single-pass recipe and the separate audio-in engine retain their frozen
+# samplers. Decoder 768/64/4096/4 was visually identical and stays OUT.
+_LTX_HQ_BASE_SAMPLER = "euler"
+_LTX_HQ_REFINE_SAMPLER = "euler"
 #: Guide-image conditioning chain (canonical texture prep) -- CANVAS-
 #: INDEPENDENT fixed numbers (the lips-dont-talk kibitz catch): scale the
 #: guide to 1920x1088 then cap the longer edge at 1536, at ANY render canvas.
@@ -769,7 +774,9 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     render_canvas = (1024, 576)
     commercial_clean = True             # Apache GGUF + LTX-2 Community model (no AGPL/GPL)
     requires_flag = None  # vestigial (registry IS the menu; no flag gate)
-    engine_version = "1"
+    # v2 invalidates cached HQ clips rendered with the pre-qualification
+    # ancestral/CFG++ sampler pair. The saved workflow surface is unchanged.
+    engine_version = "2"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = 25
     #: BUG-LOCAL-117d: this adapter used to LOOP by default -- render half a beat
@@ -1253,12 +1260,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         STAGE A -- MOTION (half canvas): guide still -> ImageScale(1920x1088)
         -> ResizeImagesByLongerEdge(1536) -> LTXVPreprocess(18); planted
         IN-PLACE (strength 0.7, SOFT anchor) into an EmptyLTXVLatentVideo at
-        width/2 x height/2; denoised by euler_ancestral_cfg_pp over the
-        front-loaded 8-step ladder. The latent is PURE VIDEO -- no AV concat,
+        width/2 x height/2; denoised by plain Euler over the front-loaded
+        8-step ladder. The latent is PURE VIDEO -- no AV concat,
         no separate, no zero-masked audio latent.
 
         STAGE B -- DETAIL (full canvas): LTXVLatentUpsampler x2 -> re-anchor
-        the SAME preprocessed still at strength 1.0 -> 3-step euler_cfg_pp
+        the SAME preprocessed still at strength 1.0 -> 3-step plain-Euler
         refine (0.85 -> 0) with conditioning routed through
         LTXVCropGuides(base latent) -> tiled decode. Silent by contract (V-1).
 

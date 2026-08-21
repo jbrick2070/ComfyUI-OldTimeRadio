@@ -9,9 +9,10 @@ ltx_video; 2 LTX rows, NO ltx_lowvram). These tests pin:
     distilled unet RAISES);
   * TWO-STAGE topology: base motion at HALF canvas -> LTXVLatentUpsampler x2
     -> hard re-anchor -> 3-step refine -> decode; NO audio nodes anywhere;
-  * Inplace anchors 0.7 base / 1.0 refine; ancestral base + plain refine
-    samplers; front-loaded base ladder + 0.85->0 refine ladder; CropGuides on
-    the refine only, anchored on the BASE latent; seed/seed+1 noise streams;
+  * Inplace anchors 0.7 base / 1.0 refine; plain Euler on both stages after the
+    official-template A/B; front-loaded base ladder + 0.85->0 refine ladder;
+    CropGuides on the refine only, anchored on the BASE latent; seed/seed+1
+    noise streams;
   * distilled-lora-384 (original, non-1.1) @ 0.5;
   * guide chain ImageScale(1920x1088) -> ResizeImagesByLongerEdge(1536) ->
     LTXVPreprocess(18) -- canvas-independent fixed numbers;
@@ -131,9 +132,9 @@ def test_two_stage_topology(hq_env):
 
 def test_samplers_and_ladders(hq_env):
     g = _graph(hq_env)
-    assert g["ksel"]["inputs"]["sampler_name"] == "euler_ancestral_cfg_pp"
+    assert g["ksel"]["inputs"]["sampler_name"] == "euler"
     assert g["sigmas"]["inputs"]["values"] == list(LTX_DISTILLED_SIGMAS)
-    assert g["ksel_refine"]["inputs"]["sampler_name"] == "euler_cfg_pp"
+    assert g["ksel_refine"]["inputs"]["sampler_name"] == "euler"
     assert g["sigmas_refine"]["inputs"]["values"] == list(LTX_HQ_REFINE_SIGMAS)
     # two INDEPENDENT deterministic noise streams per beat
     assert g["noise"]["inputs"]["noise_seed"] == 7
@@ -198,8 +199,13 @@ def test_single_pass_graph_unchanged(hq_env, monkeypatch):
     assert g["lora"]["inputs"]["strength_model"] == 0.7
     assert g["lora"]["inputs"]["lora_name"].endswith(
         "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
+    assert g["samplersel"]["inputs"]["sampler_name"] == "euler_cfg_pp"
     assert g["sampleradv"]["inputs"]["latent_image"] == W("latent", 0)
     assert "upscaler" not in g and "inplace_base" not in g
+
+
+def test_hq_sampler_change_invalidates_old_clip_cache(hq_env):
+    assert hq_env.engine_version == "2"
 
 
 def test_weight_paths_recipe_aware(hq_env, monkeypatch):

@@ -3,6 +3,107 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 04:15 -- HEAD 805d56fa +this (v2.0-alpha) -- CODEX DRIVER (`ltx_video` official-template qualification closed; plain Euler adopted; fresh live publish)
+
+The sha above is the last OTR head before this green chunk. A commit cannot
+contain its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**DECISION: PLAIN `EULER` WINS ON BOTH STAGES OF SILENT `ltx_video` HQ.** Three
+new no-op-proof API recipes held the fixed lab still, prompt, seed, sigmas,
+weights, LoRA, two-stage topology and silent delivery constant. A was the exact
+current HQ control; B changed only the base and refine sampler selectors to
+plain `euler`; C changed only tiled decode to `768/64/4096/4`. All graphs passed
+JSON and live port-8199 `/object_info` class/input validation before submission.
+
+**THE VISIBLE RESULT OWNED THE CHOICE.** A took 74.8 seconds, peaked at 14.915
+GiB and produced 928,767 bytes. B took 56.5 seconds, peaked at 15.071 GiB and
+produced 456,206 bytes. C took 75.6 seconds, peaked at 14.228 GiB and produced
+930,216 bytes. A and C were visually equivalent and both introduced a pronounced
+unrequested camera push. B materially steadied the framing while preserving the
+requested turn/reach, stable subjects and native detail, with no seams, tile grid
+or decode defect. C added no visible texture or detail, so the decoder remains
+`512/64/4096/8`.
+
+**STAGE TWO POSITIVELY EXECUTED IN EVERY LAB ARM.** Each receipt records the
+complete eight-step base sampler, `LTXVLatentUpsampler`, complete three-step
+refine sampler and final decode at 1024x576 rather than the 512x288 base canvas.
+Every artifact is 97 frames at 25 fps and silent. Lab recipes, six execution
+receipts and the visual report are pushed on `main` at
+`0e109541c1432acb768cd49720bf1e5a3b2552f3`. No lab artifact entered OTR's
+episode or OBS trees.
+
+**THE OTR CHANGE IS DELIBERATELY NARROW.** Only the HQ two-stage constants in
+`eng_ltx_video.py` now select plain Euler. The silent single-pass sampler remains
+`euler_cfg_pp`; the separate `ltx_audio_in` engine remains untouched. Engine
+version advances to `2` so pre-qualification cached clips cannot masquerade as
+the new recipe. No public node, input, widget, link, profile, schema or saved
+workflow value changed.
+
+**LIVE CANONICAL ACCEPTANCE PASSED ON THE RTX 5080.** The real saved workflow ran
+profile `otr_16gb_ltx_video` for one act and one character. Episode
+`signal_lost_masquerade_of_love_20260821_034824` delivered eight persisted
+`ltx_video` clips across every required role: two music, two announcer and four
+character clips. Opening and closing each used two continuity-linked segments,
+so the server logged exactly ten `S5 HQ two-stage` plans and ten latent-upscaler
+loads. Delivered clip lengths were 250, 117, 65, 49, 57, 72, 160 and 200 frames;
+independent `ffprobe` found every native clip at 1024x576. Peak VRAM was 15,470
+MB and total prompt time was 19:55. The durable grader accepted all eight shots.
+
+**THE FILE THE OPERATOR WATCHES IS FRESH:**
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_masquerade_of_love_20260821_034824_silent_procgen_blended_captioned_with_credits_final.mp4`,
+36,442,207 bytes, written 2026-08-21 04:04:35. Independent `ffprobe`: H.264
+1920x1080 at 25 fps, AAC 48-kHz stereo, 57.120 seconds.
+
+**MASTER AUDIO AUTHORITY IS PROVED, NOT ASSUMED.** The final ledger is frozen
+with raw master-WAV SHA-256
+`4493e341348eaaebad916acf7d7682d548e409039aebb410d9bf558dc520995b` and stamps
+the existing master, archival final and live OBS paths. The mux logged
+`audio_mode=master_copy`, `audio_byte_identical OK` and `obs_publish OK`. An
+independent decode of the master WAV and archival final produced the same PCM
+SHA-256,
+`c5c82c89c863585a0d07eab629cf30399f1a57e5f275a1b623bbbce64886b7a8`.
+Every native LTX clip is explicitly silent, so generated/model audio had no path
+to delivery.
+
+**VISUAL ACCEPTANCE:** within each supplied production still, faces, wardrobe
+and props held through the full clip; gestures and expressions remained clean.
+The long opening/closing last-to-first boundaries are continuous with no visible
+jump, seam or tile grid. Production supplied different still styling across
+some character beats, so this receipt makes no false cross-beat identity claim;
+the canonical still workflow and its saved values remain unchanged. Acceptance
+sheets live under the episode's `acceptance/` directory, outside OBS.
+
+**A REAL TEST-HARNESS DEFECT WAS CLOSED AT ITS SOURCE.** The LTX 2.5 profile
+contract had read `scripts/_otr_canonical_api_prompt.json`, a mutable diagnostic
+dump from whichever profile ran last. This legitimate LTX 2.3 production run
+therefore exposed the false coupling. The test now applies
+`otr_ltx25_high_video` to the immutable canonical workflow in memory and converts
+that result with offline production schemas. The full LTX 2.5 module is green
+(32 passed, one expected skip). This static harness defect was not admitted as a
+production bug or promoted to the Bug Bible.
+
+**FINAL GATES:** full suite **11,326 passed / 114 skipped / 1 xfailed** in
+328.60 seconds, EXIT=0. Focused production contracts **297 passed**;
+`build_variants.py --check` **51 / 0**; Bug Bible **22 passed / 26 skipped / 3
+xfailed**; py_compile and `git diff --check` passed. The canonical workflow Git
+blob remains `c27dff3690030e78d88c3a2607a9ac54fd3935d9` (SHA-256
+`89B8DF59438A1644416D376FFED66BF9D44AB5B6DC181156DA7D3436DF3A4912`).
+
+**NEXT: `wan_i2v`, BLOCKED ON NAMED-MODEL AUTHORIZATION.** The official quality
+path requires `wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors` for the first
+half of its continuous-noise high-to-low expert handoff. OTR already has the
+official low-noise UNET, UMT5 encoder and Wan 2.1 VAE, but the high-noise expert
+is absent. Do not download it without explicit operator authorization, duplicate
+the low-noise model, or substitute the unrelated installed rank-64 LoRA. Once
+authorized, test the dual-expert handoff first; keep Euler-vs-UniPC and shift
+5-vs-8 as separate one-variable arms. The optional four-step LoRAs remain OUT of
+the quality-first comparison.
+
+**BOX AT CLOSE:** the production server and launcher were stopped by positively
+owned exact PIDs; port 8000 is free and the RTX 5080 returned to an 839-MiB
+desktop baseline. The RTX 4060 and its live stream were untouched.
+
 ## 2026-08-21 03:23 -- HEAD 37425ae +this (v2.0-alpha) -- CODEX DRIVER (`ltx_audio_in` official-template qualification closed; current OTR recipe retained; fresh live publish)
 
 The sha above is the last OTR head before this docs-only closeout. A commit cannot

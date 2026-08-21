@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 PRE-DAWN -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 04:05 -- READ THIS FIRST
 
 **DRIVER IS CODEX (`gpt-5.6-sol`).** The operator explicitly waived the LTX
 Kibitz arc and asked for internal grounding plus one finished-diff review. The
@@ -91,21 +91,26 @@ durable review rule is now: one clean review ends review; another is owed only
 when the first finds something, conflicts with another lane, or cannot verify a
 material claim. Do not launch a duplicate Codex CLI lane against the driver.
 
-**NEXT: QUALIFY `ltx_video` AGAINST THE INSTALLED OFFICIAL LTX 2.3 T2V
-TEMPLATE.** The sound-first `ltx_audio_in` lane is closed with a matched three-arm
-lab qualification and a fresh eight-clip live production acceptance; the full
-receipt is the newest entry in `docs/HANDOFF_LOG.md`. Current `ltx_video` already
-has OTR's HQ two-stage path, so test only the same isolated official-template
-differences: exact current control, plain `euler` on both stages, and decoder
-`768/64/4096/4`. Keep the test silent and use the fixed lab scene still. Do not
-carry over audio nodes, prompt enhancement, FP8 transport, or generated audio.
-The newer dynamic rank-111 LoRA is absent and must not be downloaded without the
-operator's explicit authorization.
+**NEXT: `wan_i2v`, BLOCKED ON ONE NAMED-MODEL AUTHORIZATION.** The silent
+`ltx_video` lane is closed with a matched three-arm lab qualification, a proven
+plain-Euler improvement, and a fresh eight-clip live production acceptance; the
+full receipt is the newest entry in `docs/HANDOFF_LOG.md`.
 
-After `ltx_video`, continue in grounded fleet order. `wan_i2v` is next but its
-official dual-model comparison is download-blocked by absent named weights;
-stop there only if the installed-state audit still confirms no honest comparison
-can run. A paper diff is not permission to transplant a node: classify each
+The installed-state audit positively confirmed that OTR has the official
+low-noise 14B UNET, UMT5 encoder and Wan 2.1 VAE, but does **not** have
+`wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors`. That missing high-noise
+expert is required for the official 20-step high-to-low handoff, so no honest
+official-template comparison can run without the operator authorizing that
+download. Do not duplicate the low-noise weight, alias a different installed
+LoRA, or call a low-only sampler test an official-template qualification.
+
+The two official four-step LoRAs are also absent, but the template's default
+quality path disables them; they are not required for the first honest
+comparison. Once the high-noise checkpoint is authorized and installed, test
+the native high-to-low expert handoff with continuous noise as the material
+topology change. Keep Euler-vs-UniPC and shift 5-vs-8 as separate one-variable
+arms, and keep OTR's deterministic seed, canvas, silent delivery and master-audio
+authority. A paper diff is never permission to transplant a node: classify each
 candidate IN / ADAPT / OUT, run a matched live comparison, and adopt only a
 visible improvement.
 

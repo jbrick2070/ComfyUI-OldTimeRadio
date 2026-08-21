@@ -26,6 +26,11 @@ import pytest
 
 import nodes._otr_video_engines  # noqa: F401 -- populate the registry
 from nodes._otr_shared import public_engines as pub
+from nodes._otr_workflow_apply import (
+    apply_profile,
+    build_offline_schemas,
+    workflow_to_api_prompt,
+)
 from nodes._otr_video_engines import eng_ltx25
 from nodes._otr_video_engines import ltx25_recipe as R
 from nodes._otr_video_engines import frame_contract as fc
@@ -79,8 +84,11 @@ def test_the_public_id_is_ltx25_high_video_and_the_bijection_holds():
 
 
 def test_acceptance_API_places_HQ_in_all_three_role_slots():
-    path = Path(__file__).parents[1] / "scripts" / "_otr_canonical_api_prompt.json"
-    doc = json.loads(path.read_text(encoding="utf-8"))
+    path = Path(__file__).parents[1] / "workflows" / "otr_canonical.json"
+    workflow = json.loads(path.read_text(encoding="utf-8"))
+    schemas = build_offline_schemas()
+    applied = apply_profile(workflow, "otr_ltx25_high_video", schemas=schemas)
+    doc = workflow_to_api_prompt(applied, schemas)
     director = next(spec for spec in doc.values()
                     if spec.get("class_type") == "OTR_VideoDirector")
     inputs = director["inputs"]
