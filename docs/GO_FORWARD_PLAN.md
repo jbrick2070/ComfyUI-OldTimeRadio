@@ -47,23 +47,41 @@ exists, take it and report it. Escalate only genuine forks. Blanket approvals ar
 DURABLE -- *"yes I agree lets move forward"* licenses working the queue without
 re-asking per item.
 
-## THERE ARE TWO `otr/obs` DIRECTORIES AND ONE OF THEM IS DEAD (found 2026-08-20)
+## THE obs PATH IS AN OVERRIDE, NOT A DEFAULT -- and the launcher is right
+## (found 2026-08-20; this CORRECTS the first framing, which said "two obs
+## directories" as though it were a config mess to clean up)
 
 **This protects the operator's #1 success signal, so it sits above the queue.**
-`obs` does not resolve from the repo root -- it resolves from a ComfyUI output
-base, and there are TWO on this box:
+There is only ONE ComfyUI on this box --
+`C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI` -- and BOTH the OTR harness
+(`scripts/_otr_soak_server_launch.cmd:179`) and the lab
+(`vram-recipe-lab/run_recipe.py:56`) boot that same `main.py`. **Its DEFAULT
+output tree is the stale one.** The live tree exists because the OTR launcher
+deliberately overrides it, three times over (`:60-66`), under an operator
+directive of 2026-06-09 quoted in the file itself -- *"even headless, ALL
+outputs ... land in the REAL output folder the operator watches"*:
 
-* **LIVE, publish here:** `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs`
-  -- 83 files, newest `2026-08-20 04:10`. This is what he looks at.
-* **STALE, do NOT publish here:** `C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs`
-  -- 58 files, frozen at `2026-06-13 07:56`.
+    set OTR_REAL_OUTPUT=C:/Users/jeffr/Documents/ComfyUI/output
+    set OTR_OUTPUT_DIR=%OTR_REAL_OUTPUT%          <- the OTR writers
+    set OTR_OBS_DIR=%OTR_REAL_OUTPUT%/otr/obs     <- obs explicitly
+    main.py ... --output-directory %OTR_REAL_OUTPUT%   <- ComfyUI folder_paths
 
-Nothing is broken today (08-20 published correctly). The hazard is silent: a
-window that resolves the INSTALL base publishes a perfect episode into a folder
-he never opens, and his own rule is *"if I don't see it in obs and it took more
-than 5 minutes, it's a fail."* **Verify the path by timestamp before believing
-an `obs_publish OK`.** A third `obs` exists under
-`vram-recipe-lab/outputs/UVNN/obs` and is lab scratch, not a publish target.
+* **LIVE (operator-confirmed):** `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs`
+  -- 83 files, newest `2026-08-20 04:10`.
+* **ComfyUI's DEFAULT, and it is stale:**
+  `C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs` -- 58 files,
+  newest `2026-06-13 07:56`. Those 58 are real episodes. **Do not delete or
+  move them** (the never-clean-obs rule), and note they postdate the 06-09
+  directive, so something published there through a NON-launcher boot.
+
+**THE ACTUAL HAZARD, stated correctly: the harness is DEFENDED; anything that
+bypasses it is not.** A Desktop-app run, a hand-rolled `main.py`, a new script,
+or the lab's own server all inherit the DEFAULT tree and would publish a perfect
+episode where he never looks -- and his rule is *"if I don't see it in obs and it
+took more than 5 minutes, it's a fail."* So: **any new boot path MUST carry all
+three pins**, and after any publish, verify the file by TIMESTAMP in the live
+tree rather than trusting an `obs_publish OK`. A third `obs` under
+`vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
 ## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
 
