@@ -3,6 +3,65 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 07:42 -- HEAD e2d97b89 +this (v2.0-alpha) -- CODEX DRIVER (`baseline-models` material lane recorded; corpus yes, fleet campaign gated)
+
+The sha above is the last OTR head before this docs-only handoff. A commit cannot
+contain its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**DECISION: THE MATERIAL COLLECTION IS WORTH FINISHING; THE EXPENSIVE QUALITY
+CAMPAIGN IS NOT YET AUTHORIZED.** A reusable corpus prevents repeated template
+fetches and rediscovery. It does not justify exhaustive AI review and rendering
+across every model. The operator explicitly wants a discussion before that token
+spend, so no fleet fan-out, GPU pilot, re-blend, or production edit starts from
+this entry.
+
+**ANTIGRAVITY OWNS THE SEPARATE MATERIAL LANE.** It is actively building
+`C:/Users/jeffr/Documents/ComfyUI/custom_nodes/basline-models` (local spelling)
+for `https://github.com/jbrick2070/baseline-models`. Its `AGENTS.md` correctly
+forbids every model-weight download and all OTR edits while permitting workflow,
+custom-node and compatibility material. OTR agents must not duplicate, modify,
+commit, or push Antigravity's in-flight work.
+
+**LIVE SNAPSHOT, SO THE PASTED REPORT IS NOT MISTAKEN FOR A FINAL RECEIPT.** At
+07:38 the lane had 19 adapted graphs and 19 metadata rows but only 10
+`source_original` files. Local, tracking and live GitHub were still initial HEAD
+`37cb5d2`; README was modified and the corpus/scripts were untracked. The pasted
+"17 pristine upstream sources, all-tested working graphs" list is a useful
+progress report while the lane is changing, not current acceptance evidence.
+
+**WHY IT IS NOT YET DIFF AUTHORITY:** the fetcher parses and pretty-prints JSON
+instead of retaining raw response bytes; URLs float on branch heads; no raw-byte
+SHA/byte count/immutable revision/license or adapted parent hash is recorded;
+validation ignores nested subgraph topology, does not prove endpoint/slot/widget
+contracts or live `/object_info`, and missing nodes/models do not fail the run.
+At that snapshot, one concrete mismatch demonstrated the risk: LTX distilled
+metadata claimed Q3 GGUF/`UnetLoaderGGUF`, while the adapted graph still named
+the full dev checkpoint through `CheckpointLoaderSimple`. Let Antigravity
+correct and push its own lane; consume only after the corpus-admission gate in
+`docs/COMFY_TEMPLATE_DIFF_PROTOCOL.md` passes.
+
+**RECOMMENDED DISCUSSION UNIT: A TWO-CASE ROI PILOT, NOT THE FLEET.** Case one is
+the optional quality-only Z-Image 2K utility: two fixtures, current versus
+utility, four stills total. **This does not reopen the solved grid defect:**
+engine v2, the generic `ReferenceLatent` ban, and the published clean acceptance
+remain binding. The utility is only a cheap candidate for additional sharpness;
+the operator may decline it and call Z-Image done. Case two is `wan_ti2v`, chosen
+as a near-parity control: finish the static diff and render only if it exposes a
+quality-bearing candidate. Use one AI vision judge in both presentation orders.
+The gates are independent: Z-Image's visual result decides whether high-delta
+utility/topology work pays; Wan's static result decides whether near-parity
+engines can be excluded cheaply. Wan gets a visual verdict only if its complete
+diff exposes a genuine candidate. Continue beyond the pilot only if at least one
+rendered candidate produces a material visible win; otherwise stop and retain
+the corpus. A clean no-candidate Wan diff is a successful filter, not a lost
+visual arm. No or marginal payoff always closes that candidate.
+
+**SCOPE:** OTR documentation only. Neither repository's code, workflows, models,
+renders, outputs, servers, or episodes changed. No baseline-models file was
+edited. No model was downloaded. Wan I2V remains frozen on the previously named
+high-noise authorization.
+
 ## 2026-08-21 07:23 -- HEAD 7a0aa7c6 +this (v2.0-alpha) -- CODEX DRIVER (Z-Image/LTX similarity found: official 2K refine restored to the candidate set)
 
 The sha above is the last repository head before this docs-only correction. A

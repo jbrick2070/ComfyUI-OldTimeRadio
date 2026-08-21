@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 07:23 -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 07:42 -- READ THIS FIRST
 
 **POST-CODE QA IS CLOSED; DO NOT RUN IT AGAIN.** The prior Codex driver finished
 at `eca57cb1`, and the later scoped finished-diff review, full suite and mixed
@@ -104,16 +104,55 @@ four-step LoRAs, or call a low-only run an official-template qualification.
 Only an explicit operator authorization for that exact filename reopens this
 lane.
 
-**EXECUTABLE NEXT WITHOUT A DOWNLOAD: COMPLETE THE HASH-BOUND TEMPLATE DIFF,
-STARTING WITH THE MISSED Z-IMAGE 2K UTILITY, THEN THE NEXT INSTALLED RUNNABLE
-ENGINE (`wan_ti2v`).** Lab commit `38d4ae0` is the grounded source census; it is
-not the completed decision diff. Before choosing render arms, freeze the exact
-reference bytes and OTR source/topology hashes, then exhaustively compare every
-executed class, input literal, output slot, and wire. Normalize only
-serialization noise. Until that enumeration is complete, every material
-difference remains on the table as UNCLASSIFIED -- do not preselect
-UniPC/Euler, step count, shift, decoder, or any other shortlist and quietly
-discard the rest.
+**EXTERNAL MATERIAL LANE: ANTIGRAVITY OWNS `baseline-models`; OTR MUST NOT
+DUPLICATE OR EDIT ITS IN-FLIGHT WORK.** Local path:
+`C:/Users/jeffr/Documents/ComfyUI/custom_nodes/basline-models` (the local folder
+really is missing the second `e`); remote:
+`https://github.com/jbrick2070/baseline-models`. Its boundary is correct: collect
+official graphs, adaptations and compatibility material; never download model
+weights and never edit OTR. Let that lane finish and push before consuming it.
+
+**THE CURRENT SNAPSHOT IS A CANDIDATE LIBRARY, NOT YET HASH-GRADE EVIDENCE.** At
+07:38 it was actively changing: 19 adapted graphs and metadata rows, only 10
+`source_original` files, and all substantive work still uncommitted while local,
+tracking and GitHub remained at initial commit `37cb5d2`. The fetcher currently
+loads JSON and pretty-prints it, so `source_original` does not preserve upstream
+bytes; sources float on `main`/`master`; metadata lacks immutable revision and
+raw/adapted hashes; validation is top-level/subgraph-blind and does not fail on
+missing nodes/models or query live `/object_info`. Antigravity's pasted "17
+pristine, all-tested" inventory is a useful progress report, not an acceptance
+receipt. Do not criticize or redo its active work; require the corpus-admission
+gate in `docs/COMFY_TEMPLATE_DIFF_PROTOCOL.md` when it hands off.
+
+**ROI RULING: FINISHING THE CORPUS IS WORTH IT; A FLEET-WIDE AI/RENDER CAMPAIGN
+IS NOT YET AUTHORIZED.** The corpus is cheap reusable insurance against repeated
+fetching and rediscovery. The expensive re-blend program gets a discussion and
+a two-case yield pilot first -- no autonomous fleet fan-out. Proposed pilot:
+(1) the optional, quality-only Z-Image 2K utility, two fixtures (identity/face
+and fine-detail/text), current versus utility = four stills total; (2)
+`wan_ti2v` as the near-parity control, complete static diff first and render
+nothing unless it exposes a genuine quality-bearing candidate. **This does not
+reopen the solved Z-Image grid defect:** engine v2 and the generic
+`ReferenceLatent` ban remain closed and accepted. The utility is merely a cheap
+candidate for "sharper than current," and the operator may decline it and treat
+Z-Image as done. One AI vision judge sees both presentation orders. **The gates
+are orthogonal:** Z-Image's visual verdict tests whether high-delta
+utility/topology work pays; Wan's static verdict tests whether near-parity cases
+can be excluded without renders. Wan gets an A/B only if its complete diff
+exposes a genuine quality-bearing candidate. Continue beyond the pilot only if
+at least one rendered candidate produces a material visible win. If no rendered
+candidate wins materially, stop the program and retain the corpus. A clean
+no-candidate Wan diff is a successful cheap filter, not a lost visual arm. Any
+no/marginal visual result stops its candidate. The operator asked for discussion
+before this spend, so do not start the pilot until he explicitly approves it.
+
+**WHEN AUTHORIZED, COMPLETE THE HASH-BOUND TEMPLATE DIFF BEFORE EACH PILOT
+RENDER.** Lab commit `38d4ae0` is a grounded source census, not the completed
+decision diff. Freeze exact reference bytes and OTR source/topology hashes, then
+exhaustively compare every executed class, input literal, output slot, and wire.
+Normalize only serialization noise. Until enumeration is complete, every
+material difference remains UNCLASSIFIED -- do not preselect UniPC/Euler, step
+count, shift, decoder, or any other shortlist and quietly discard the rest.
 
 **THE LTX 2.5 LOGIC HASH IS A PRECEDENT, NOT A UNIVERSAL MODEL ALGORITHM.** The
 source SHA proves which exact graph was reviewed. The durable rule `NO APPROVED
@@ -127,7 +166,7 @@ this repo: LTX's model-native same-still re-anchor was admitted, while Z-Image's
 generic reference-latent injection was rejected after it visibly created the
 grid. The shared method produced opposite, correct model-local rulings.
 
-**THE FIRST CENSUS OMISSION IS NOW IDENTIFIED: Z-IMAGE'S OFFICIAL 2K UTILITY IS
+**QUALITY-ONLY DISCOVERY, NOT A REOPENED Z-IMAGE BUG: THE OFFICIAL 2K UTILITY IS
 A REAL TWO-PASS REFINE, NOT JUST ESRGAN.** Comfy package `0.1.50` template
 `utility_z_image_turbo_2k_upscaler.app.json`, SHA-256
 `558882D2E81563A131DE99C4ED425F56EEEA3F56C37B1E5D0400260BA20D1EE1`, runs

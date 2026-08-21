@@ -91,6 +91,35 @@ These are method rules, not model recipes:
 8. Visible payoff is evaluated before integration complexity and cost are
    accepted. A plausible graph earns a candidate slot, not production authority.
 
+## Candidate-corpus admission
+
+A separate graph library is useful input, but it is candidate material rather
+than diff authority until every source has:
+
+- the exact raw response bytes, byte count, SHA-256, license, retrieval time,
+  and an immutable source revision or package version;
+- a separate normalized semantic form, so normalization never destroys the raw
+  byte evidence;
+- an adapted-graph hash, parent source hash, and complete machine-readable
+  transformation record;
+- recursive subgraph, node-endpoint, link-slot, widget, and live `/object_info`
+  validation that fails closed, followed by a staging-load status; and
+- required model/transport identity, companion-file requirements, and installed
+  state. When installed, record exact filenames, byte counts, and hashes. When
+  absent, stamp `NOT_INSTALLED` / `REFERENCE_ONLY` without downloading weights
+  into the corpus repository.
+
+A file fetched from mutable `main`/`master`, parsed, and re-serialized is not a
+pristine byte source. A graph with zero dangling top-level links is not thereby
+runnable. Use honest evidence levels such as `SOURCE_CAPTURED`, `STATIC_VALID`,
+`SERVER_LOAD_VALID`, and `RENDER_PROVEN` rather than collapsing them into one
+`RUNNABLE` label.
+
+Completing a corpus does not authorize an exhaustive quality campaign. First
+run a bounded yield pilot chosen to include one likely positive and one likely
+negative/control case. Continue only if the visible return justifies another
+small batch; retain the corpus even if the campaign stops.
+
 ## Visual-payoff gate
 
 Only after the complete diff may GPU time be spent on candidate differences
@@ -149,6 +178,9 @@ downscale by 0.5 for net 2x, VAE-encode, run a five-step Z-Image refine at CFG
 or tested that exact path. Its broad "upscale then short refine" shape resembles
 LTX 2.5, but its pixel/re-encode mechanism, prompt/negative, model transport,
 sampler, and denoise semantics need their own complete diff and matched A/B.
+This is an optional quality candidate, not a reopened Z-Image defect: the square
+grid root cause remains fixed, generic `ReferenceLatent` remains OUT, and engine
+version 2 remains the accepted production base.
 
 Both cases froze inputs, grounded the real graph, used native pixels rather than
 success labels or a broken scalar, invalidated old caches, and closed with a live
