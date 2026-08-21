@@ -350,9 +350,18 @@ currently exposed. It is a trap for the next person who copies a graph rather
 than a bug to chase now. Re-verify that grep before fixing; it is production
 code and wants the design test.
 
+**THE LANE 1 TAIL IS ALSO CLOSED (2026-08-21 afternoon, workbench `18fe7e6`):**
+the temporal metric is now a standard receipt field (`tools/temporal_stats.py`,
+wired into `render_arms.py`, all 16 legs backfilled), and the shift transplant
+objection is dead -- the refcanvas retest (crowd at 1280x704 x 121, both arms)
+shows the scene divergence disappearing (NCC 0.9698 vs 0.6269), detail tying
+exactly (0.995 raw and normalized), and official STILL marginally less stable
+with a faint hallucinated streak in its final frame. NO WIN holds at both
+operating points; no bound remains on the null.
+
 **NEXT: LANE 2 -- `ltx25` stage-1 anchor 0.7 vs 1.0.** Lane 1's fixtures,
-purity gate, judge-set builder and A/A control are reusable as-is; carry the
-four bindings above into it.
+purity gate, judge-set builder, A/A control and temporal receipts are reusable
+as-is; carry the four bindings above into it.
 
 **Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the
