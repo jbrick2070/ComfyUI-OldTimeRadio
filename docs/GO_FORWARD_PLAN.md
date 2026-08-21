@@ -139,6 +139,47 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
   `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
   only** and stretch 2.31x in ffmpeg afterwards.
+* **THE IDENTITY-DRIFT PROBE WAS CONFOUNDED AND THE TWO-STAGE IS EXONERATED
+  (driver ran the lab directly, 2026-08-20 evening).** The v1 derivatives swapped
+  the conditioning still to a close-up of a uniformed officer
+  (`fixtures/portrait_16_9.png`) but **kept the golden recipe's TEXT PROMPT**:
+  *"1950s cinematic shot of the detective standing by the rainy window, turning
+  abruptly and slamming his fist on the desk ... rain drumming steadily against
+  the glass."* The model was shown one thing and told another.
+  * Two-stage seed 42: **frame 0 renders the still faithfully and with far more
+    detail than the reference** (skin texture, eyelids, individual hair) --
+    identity perfectly held. **Frame 96 is a different man at a desk by a
+    rain-streaked window** -- i.e. the PROMPT, executed correctly.
+  * **PROVED, not assumed: the CONTROL arm does exactly the same thing.**
+    `drift_control_43` frame 96 is also a man from behind at a desk by a
+    rain-streaked window. **Both arms abandon the portrait identically, so the
+    drift is prompt obedience, not refine damage.**
+  * **Scoring v1 as-is would have condemned the two-stage for doing its job** --
+    and it would have looked damning, because the refine adds three extra guided
+    steps and therefore follows the text FURTHER by construction. v1 measured
+    prompt-following strength and would have reported it as identity loss.
+  * **v2 exists and is the real test:**
+    `scratch/ltx25_two_stage_identity_drift_v2/` -- prompt matched to the still
+    (locked-off close-up of the officer, no cut, no scene change), built by
+    `build_drift_v2_matched_prompt.py` with invariants asserting that NOTHING
+    but the prompt and the naming changed. v1 artifacts are retained as the
+    evidence for this finding.
+* **TWO OPERATIONAL LESSONS FROM DRIVING THE LAB DIRECTLY, both non-obvious:**
+  * **The runner's GPU idle gate refuses any start above 3.0 GiB baseline, and
+    the two-stage leaves ~10.9 GiB resident when it finishes.** So a back-to-back
+    batch silently aborts every run after the first two-stage -- four of six on
+    the first attempt, `rc=1` in under two seconds each, which reads like a crash
+    and is not one. **Pass `--shutdown` per run.** The gate is correct; the
+    harness just has to reset between runs (`CLAUDE.md` section 4).
+  * **The lab loads the LTX text encoder FULLY onto the GPU --
+    `LTXAVTEModel_`, 10,917.81 MB, "full load: True"** -- then needs 1.88 GiB
+    more on top of ~13.7 already allocated, which is the `CLIPTextEncode` OOM
+    that blocked the control arm. It is a KNIFE EDGE, not a wall: the same
+    recipe SUCCEEDED at 15.479 GiB earlier the same day. Production keeps this
+    encoder CPU-pinned with an episode-scoped cache; **the lab does not, so the
+    lab is measuring a heavier configuration than production runs.** Worth
+    closing, because a bench that is harder than production distorts every
+    verdict it produces.
 * **OPERATOR VERDICT 2026-08-20: THE TWO-STAGE WINS ON PICTURE, AND THE 2.6x IS
   ACCEPTED.** Shown the same frame from both arms through the SHIPPED delivery
   chain at 1920x1080 (`lanczos` -> `unsharp=0.4` -> `pad`, built from
