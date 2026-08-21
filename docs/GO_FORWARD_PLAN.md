@@ -47,6 +47,24 @@ exists, take it and report it. Escalate only genuine forks. Blanket approvals ar
 DURABLE -- *"yes I agree lets move forward"* licenses working the queue without
 re-asking per item.
 
+## THERE ARE TWO `otr/obs` DIRECTORIES AND ONE OF THEM IS DEAD (found 2026-08-20)
+
+**This protects the operator's #1 success signal, so it sits above the queue.**
+`obs` does not resolve from the repo root -- it resolves from a ComfyUI output
+base, and there are TWO on this box:
+
+* **LIVE, publish here:** `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs`
+  -- 83 files, newest `2026-08-20 04:10`. This is what he looks at.
+* **STALE, do NOT publish here:** `C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs`
+  -- 58 files, frozen at `2026-06-13 07:56`.
+
+Nothing is broken today (08-20 published correctly). The hazard is silent: a
+window that resolves the INSTALL base publishes a perfect episode into a folder
+he never opens, and his own rule is *"if I don't see it in obs and it took more
+than 5 minutes, it's a fail."* **Verify the path by timestamp before believing
+an `obs_publish OK`.** A third `obs` exists under
+`vram-recipe-lab/outputs/UVNN/obs` and is lab scratch, not a publish target.
+
 ## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
 
 **This block is the only forward-looking list in this file.** Everything below
@@ -103,6 +121,54 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
   `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
   only** and stretch 2.31x in ffmpeg afterwards.
+* **OPERATOR VERDICT 2026-08-20: THE TWO-STAGE WINS ON PICTURE, AND THE 2.6x IS
+  ACCEPTED.** Shown the same frame from both arms through the SHIPPED delivery
+  chain at 1920x1080 (`lanczos` -> `unsharp=0.4` -> `pad`, built from
+  `otr_silent_composite._scale_filter`, nothing tuned for the test), his call
+  was immediate: **"2 its no brainer"** and, decisively, **"you can almost read
+  the faux text."** On the cost: **"2x6, eh kinda yes"** then **"i mean yeah
+  peoel wnat quality."** **So the two-stage EARNS ITS FULL ARC** -- it did not
+  OOM, it is better by the only authority that has never been wrong on this
+  item, and the operator has accepted 2.619x on the video stage. Frames kept at
+  `vram-recipe-lab/outputs/EYEBALL_{1_control_onestage,2_twostage}_1920x1080.png`.
+  **What is NOT yet decided:** adoption still owes a full arc, a canonical
+  workflow re-proof and his eyeball on a real episode. The picture question is
+  closed; the shipping question is not.
+* **THE REPLACEMENT DETECTOR IS ALSO WRONG, AND THIS IS ITS SECOND STRIKE ON THE
+  SAME PROBLEM.** Run on the two EYEBALL frames -- **identical 1920x1080,
+  identical chain, so resolution is NOT the excuse** -- `ltx25_gridscore.py`
+  scored control **6.260** and two-stage **6.724** (higher = more grid), i.e. it
+  called the near-readable frame WORSE. **Its `--selftest` passes anyway, and
+  that is the real defect:** the ladder is five rungs of progressive SMOOTHING,
+  so grid and detail fall together on every rung and the metric cannot be caught
+  conflating them. The two-stage arm is the first sample where they move in
+  OPPOSITE directions -- more detail, less grid -- and the metric fails on it.
+  **A validation set that only contains one direction of change cannot validate
+  a metric.** Do NOT quote a gridscore number as evidence until this is fixed,
+  and per the two-strikes rule a THIRD instrument gets the panel before code.
+* **THE OPERATOR'S INSTRUMENT DESIGN -- an AI-purposed eye chart, and it is the
+  right shape because every region carries its own ground truth.** His words:
+  an eye chart with *"some text mayeb blobs that look lie mneys or abargham
+  linocon"*, plus *"its emji render and an OCR tect emojiu"*. **The chart goes
+  IN as the conditioning still, so this is a PRESERVATION test, not a generation
+  test** -- known image in, degraded image out, per-region delta against an exact
+  reference. That structurally forecloses the failure that killed both previous
+  detectors, because a blurred frame scores worse on every region and there is
+  no "smooth everything and the number improves" path.
+
+  | region | catches | scorer |
+  |---|---|---|
+  | shrinking letter rows | glyph acuity (Snellen threshold) | OCR per row -> "readable to row N" |
+  | Lincoln (public domain) | face drift, a standing bug class | face-detect confidence + landmark drift vs reference |
+  | engraved money-style texture | fine repeating detail turning to mush | local contrast / MTF vs the same patch in the reference |
+  | emoji | **CHROMA** -- color bleed and desaturation, which a black-on-white chart cannot see | template correlation vs the exact font glyph (OCR cannot read emoji) |
+  | flat gradient panel | banding / posterization | step count vs the reference ramp |
+
+  Use SYNTHETIC guilloche rather than real currency -- same fine-texture test,
+  and reproducing banknotes carries real legal restrictions. No OCR is installed
+  on the box; `easyocr` is the fit (torch already present, offline after the
+  first model fetch), with deterministic per-glyph correlation as the
+  cross-check so no single instrument is unauditable again.
 * **THE CORRECTED TWO-STAGE PROBE RAN AND IT IS NOT A VRAM PROBLEM (lab/Codex,
   2026-08-20 evening -- SUPERSEDES the failed 16:27 attempt below).** Wiring
   fixed as specified, all `/object_info` checks live, detector `--selftest`
