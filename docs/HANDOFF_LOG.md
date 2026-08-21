@@ -3,6 +3,48 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 07:17 -- HEAD 7fb50411 +this (v2.0-alpha) -- CODEX DRIVER (operator correction: complete per-engine logic hash before candidate renders)
+
+The sha above is the last repository head before this docs-only correction. A
+commit cannot contain its own hash; verify the authoritative post-handoff sha
+against `origin/v2.0-alpha`.
+
+**DECISION: THE FULL TEMPLATE DIFF PRECEDES CANDIDATE SHORTLISTING.** The prior
+current-step fallback named four `wan_ti2v` axes before the complete per-engine
+diff existed. That order was too early and is superseded. Lab commit `38d4ae0`
+is a grounded source census, not the finished re-blend decision. Starting with
+the next installed runnable engine, freeze exact source hashes and compare every
+executed class, literal, output slot, and wire before pruning anything material.
+
+**THE HASH AND THE GUIDANCE ARE SEPARATE EVIDENCE.** A SHA-256 binds the exact
+reference graph. `NO APPROVED ARTIFACT -> NO AUTHORITY TO ENTER THE SHIPPING
+GRAPH` remains the shared admission boundary. But LTX 2.5's specific IN / ADAPT
+/ OUT rulings came from one model, transport, and approved use case; they are not
+a universal algorithm. Every engine/model/transport combination now owes its
+own complete decision receipt, including exact graph hashes, installed
+transport, differ version, complete normalized differences, and evidence for
+what is IN, ADAPT, or OUT. Until enumeration closes, a material difference is
+UNCLASSIFIED rather than silently discarded.
+
+**THE TWO COMPLETED CASES PROVE THE DISTINCTION.** LTX 2.5 had omitted a
+model-native same-still two-stage path; matched evidence made that path IN.
+Z-Image had added a generic `ReferenceLatent` path absent from its official base
+graph; matched evidence showed that path caused the grid and made it OUT. Both
+used the same source-grounded method and reached opposite recipe rulings. That
+is the intended behavior, not an inconsistency.
+
+**THE AI VISUAL PASS IS THE PAYOFF GATE, NOT A SUBSTITUTE FOR THE DIFF.** After
+the complete comparison exposes honest candidates, run matched one-variable or
+irreducible-topology arms. Give an AI judge native-pixel stills/crops in both
+orders with countable questions, and weigh visible gain against render time,
+VRAM, integration complexity, and judging cost. No or marginal gain stops that
+candidate. Material gain still requires operator acceptance, executor-owned
+proof, and a fresh live `otr/obs` publication before production adoption.
+
+**SCOPE OF THIS CLOSEOUT:** documentation only. No code, workflow, model,
+download, render, output, server, or canonical file changed. The exact Wan I2V
+high-noise download remains frozen pending explicit authorization.
+
 ## 2026-08-21 07:10 -- HEAD eca57cb1 +this (v2.0-alpha) -- CODEX DRIVER (post-code QA closed; mixed canonical path published; no model download)
 
 The sha above is the last CODE head before this docs-only closeout. A commit

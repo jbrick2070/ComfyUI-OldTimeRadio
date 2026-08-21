@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 07:10 -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 07:17 -- READ THIS FIRST
 
 **POST-CODE QA IS CLOSED; DO NOT RUN IT AGAIN.** The prior Codex driver finished
 at `eca57cb1`, and the later scoped finished-diff review, full suite and mixed
@@ -104,16 +104,38 @@ four-step LoRAs, or call a low-only run an official-template qualification.
 Only an explicit operator authorization for that exact filename reopens this
 lane.
 
-**EXECUTABLE NEXT WITHOUT A DOWNLOAD: `wan_ti2v`.** The grounded fleet report
-maps it exactly to `video_wan2_2_5B_ti2v.json`, and the shipping Q5 GGUF UNET and
-UMT5 GGUF encoder are already installed. Use those installed weights and a
-fixed still/prompt/seed/canvas/delivery path; do not chase the absent native
-FP16 transport. Test the material recipe axes one at a time: UniPC vs Euler,
-20 vs 30 steps, shift 8 vs 5, and plain vs tiled decode. This is an adapted
-recipe-axis qualification on the installed OTR transport, not permission to
-call it the native FP16 template. A visible improvement owns adoption; paper
-topology does not. Before production code, apply the `CLAUDE.md` design-choice
-test; after code, one clean independent finished-diff review is enough.
+**EXECUTABLE NEXT WITHOUT A DOWNLOAD: COMPLETE THE HASH-BOUND TEMPLATE DIFF,
+STARTING WITH THE NEXT INSTALLED RUNNABLE ENGINE (`wan_ti2v`).** Lab commit
+`38d4ae0` is the grounded source census; it is not the completed decision diff.
+Before choosing render arms, freeze the exact reference bytes and OTR
+source/topology hashes, then exhaustively compare every executed class, input
+literal, output slot, and wire. Normalize only serialization noise. Until that
+enumeration is complete, every material difference remains on the table as
+UNCLASSIFIED -- do not preselect UniPC/Euler, step count, shift, decoder, or any
+other shortlist and quietly discard the rest.
+
+**THE LTX 2.5 LOGIC HASH IS A PRECEDENT, NOT A UNIVERSAL MODEL ALGORITHM.** The
+source SHA proves which exact graph was reviewed. The durable rule `NO APPROVED
+ARTIFACT -> NO AUTHORITY TO ENTER THE SHIPPING GRAPH` is the shared admission
+boundary, but the IN / ADAPT / OUT guidance must be re-derived for each
+engine/model/transport combination. Produce an engine-local decision receipt
+that binds both graph hashes, installed transport, complete normalized diff,
+and evidence-backed ruling for every difference. A similarly named node or
+setting does not inherit LTX's ruling. The worked counterexample is already in
+this repo: LTX's model-native same-still re-anchor was admitted, while Z-Image's
+generic reference-latent injection was rejected after it visibly created the
+grid. The shared method produced opposite, correct model-local rulings.
+
+**ONLY THEN SPEND GPU TIME ON THE CANDIDATES THE COMPLETE DIFF EXPOSES.** Use
+matched inputs and change one difference, or one irreducible topology, at a
+time. Give an AI vision judge native-pixel stills/crops in both presentation
+orders with countable questions, then record visible payoff against render
+time, VRAM, integration complexity, and judging cost. No or marginal visible
+payoff ends the chase; material payoff makes the candidate eligible for
+operator acceptance, executor proof, and a fresh live `otr/obs` episode. A
+paper diff alone never enters production. Before production code, apply the
+`CLAUDE.md` design-choice test; after code, one clean independent finished-diff
+review is enough.
 
 **Z-IMAGE CORRECTION: GRID CLOSED; MULTI-BEAT IDENTITY OPEN.** The mixed QA
 showed no square tiles, so engine version 2 and the generic `ReferenceLatent`
@@ -467,9 +489,14 @@ no-reference-by-design, zero errors. Each receipt binds the installed template
 package/version and SHA-256 plus the OTR engine source bytes and topology.
 
 **WHAT THE INVENTORY DOES NOT CLAIM:** a difference is not automatically a
-quality improvement, and a clean comparison is not a live render. The next work
-is per-model IN / ADAPT / OUT judgment followed by matched GPU evidence and a
-fresh `otr/obs` publication. Start with `ltx_audio_in`.
+quality improvement, and a clean source census is not the complete byte-level
+decision diff or a live render. The operator's 2026-08-21 correction is binding:
+finish each engine's exhaustive normalized diff before narrowing candidates;
+derive an engine-local IN / ADAPT / OUT receipt rather than copying LTX 2.5's
+logic; then use matched GPU evidence and native-pixel AI visual judging to decide
+whether the visible payoff is worth chasing. Adoption still requires executor
+evidence and a fresh `otr/obs` publication. The completed LTX lanes are not the
+start point; the current-step block names the next installed runnable engine.
 
 ### ALSO QUEUED IN THE LAB
 
