@@ -47,6 +47,17 @@ class _Boom:
         raise RuntimeError("segment blew up")
 
 
+class _Shaped:
+    shape = (97, 960, 1664, 3)
+
+
+class _ShapeNode:
+    FUNCTION = "run"
+
+    def run(self, x):
+        return (_Shaped(),)
+
+
 # --- the source is legal, and never executed ------------------------------- #
 def test_external_result_is_a_legal_wire_source_and_is_never_executed():
     # "ckpt" is NOT in the graph and has no class -- if the executor tried to
@@ -191,6 +202,42 @@ def test_CONTROL_no_externals_behaves_exactly_as_before():
     assert wb.run_graph(graph, terminal="d") == (10,)
     assert wb.run_graph(graph, external_results=None, on_result=None,
                         terminal="d") == (10,)
+
+
+# --- executor-owned positive execution evidence --------------------------- #
+def test_audited_executed_node_records_class_order_and_output_shape(caplog):
+    graph = {"decode": {"class": _ShapeNode, "inputs": {"x": 1}}}
+    records = []
+    with caplog.at_level("INFO", logger="OTR.video.wrapper_bridge"):
+        wb.run_graph(graph, audit_node_ids={"decode"},
+                     execution_records=records)
+    assert records == [{
+        "class_name": "_ShapeNode", "node_id": "decode", "ordinal": 1,
+        "output_shapes": [[97, 960, 1664, 3]],
+    }]
+    assert "[OTR graph-exec]" in caplog.text
+    assert '"node_id":"decode"' in caplog.text
+
+
+def test_an_external_can_never_masquerade_as_execution_evidence():
+    graph = {"d": {"class": _Double, "inputs": {"x": W("ext", 0)}}}
+    records = []
+    wb.run_graph(graph, external_results={"ext": (3,)},
+                 audit_node_ids={"ext", "d"}, execution_records=records)
+    assert [r["node_id"] for r in records] == ["d"]
+
+
+def test_prefilled_execution_records_are_refused():
+    graph = {"d": {"class": _Double, "inputs": {"x": 1}}}
+    with pytest.raises(wb.GraphExecutionError, match="must be empty"):
+        wb.run_graph(graph, audit_node_ids={"d"},
+                     execution_records=[{"node_id": "d"}])
+
+
+def test_execution_records_without_audit_ids_are_refused():
+    graph = {"d": {"class": _Double, "inputs": {"x": 1}}}
+    with pytest.raises(wb.GraphExecutionError, match="without audit_node_ids"):
+        wb.run_graph(graph, execution_records=[])
 
 
 # =========================================================================== #

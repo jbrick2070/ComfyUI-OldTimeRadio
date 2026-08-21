@@ -27,6 +27,7 @@ imported LAZILY inside the functions that need them. UTF-8, no BOM, ASCII-only.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -263,6 +264,33 @@ def _soft_free():
         pass
 
 
+def _execution_shape(value):
+    """JSON-safe tensor-shape tree for executor evidence, without torch.
+
+    Comfy node outputs normalize to tuples. IMAGE nodes put a tensor directly
+    in that tuple; LATENT nodes put one under ``{"samples": tensor}``. Only
+    shape-bearing descendants are retained, so logging proof never walks or
+    stringifies MODEL/CLIP objects.
+    """
+    shape = getattr(value, "shape", None)
+    if shape is not None:
+        try:
+            return [int(v) for v in tuple(shape)]
+        except (TypeError, ValueError):
+            return None
+    if isinstance(value, dict):
+        out = {}
+        for key, child in value.items():
+            shaped = _execution_shape(child)
+            if shaped is not None:
+                out[str(key)] = shaped
+        return out or None
+    if isinstance(value, (tuple, list)):
+        out = [_execution_shape(child) for child in value]
+        return out if any(child is not None for child in out) else None
+    return None
+
+
 def reclaim_idle_models(reason=""):
     """Evict every currently-loaded ComfyUI model's weights off the GPU, the
     proven HuMo VRAM discipline the in-process refactor dropped.
@@ -320,7 +348,8 @@ def reclaim_idle_models(reason=""):
 
 
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
-              keep=None, external_results=None, on_result=None):
+              keep=None, external_results=None, on_result=None,
+              audit_node_ids=None, execution_records=None):
     """Execute a declarative node graph in dependency order; return the results.
 
     ``graph`` maps ``node_id -> {"class": <class|name>, "inputs": {name: literal |
@@ -354,8 +383,27 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
     node's output is normalised (never for an external), so a caller can
     register a detachable handle the moment it exists. A raising callback is
     surfaced NAMED and aborts the graph -- the caller is telling us it cannot
-    take ownership, which is a reason to unwind, not to continue."""
+    take ownership, which is a reason to unwind, not to continue.
+
+    ``audit_node_ids`` opts named nodes into executor-owned positive evidence.
+    After the real FUNCTION returns, the executor appends one structured record
+    to the caller's EMPTY ``execution_records`` list and writes the same record
+    as a compact ``[OTR graph-exec]`` JSON log line. Externals never count.
+    The adapter chooses what it needs proved; only this executor can say the
+    node actually returned and what shape it returned."""
     classes = classes or {}
+    audit_ids = set(audit_node_ids or ())
+    if execution_records is not None:
+        if not isinstance(execution_records, list):
+            raise GraphExecutionError("execution_records must be a list")
+        if execution_records:
+            raise GraphExecutionError(
+                "execution_records must be empty at graph start -- prefilled "
+                "records are not execution proof")
+    if execution_records is not None and not audit_ids:
+        raise GraphExecutionError(
+            "execution_records was supplied without audit_node_ids")
+    audit_ordinal = 0
     keep = set(keep or ())
     if terminal is not None:
         keep.add(terminal)
@@ -407,6 +455,18 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
                 "node %r (%s) raised %s: %s"
                 % (nid, fn_name, type(exc).__name__, exc))
         results[nid] = out if isinstance(out, tuple) else (out,)
+        if nid in audit_ids:
+            audit_ordinal += 1
+            record = {
+                "class_name": getattr(cls, "__name__", type(cls).__name__),
+                "node_id": str(nid),
+                "ordinal": audit_ordinal,
+                "output_shapes": _execution_shape(results[nid]),
+            }
+            if execution_records is not None:
+                execution_records.append(record)
+            _LOG.info("[OTR graph-exec] %s", json.dumps(
+                record, sort_keys=True, separators=(",", ":")))
         if on_result is not None:
             try:
                 on_result(nid, results[nid])

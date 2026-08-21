@@ -183,6 +183,10 @@ def test_scene_open_motion_and_budget(monkeypatch):
         "lines": [{"line_id": "b001", "char_id": "announcer",
                    "speaker_role": "announcer", "text": "Tonight...",
                    "start_s": 0.0, "dur_s": 5.0}],
+        "images": {"images": [
+            {"object_id": "still_b001", "kind": "scene_open",
+             "beat_id": "b001", "path": "X:/img/still_b001.png"},
+        ]},
     }
     shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
             "role": "announcer_visual", "engine_id": "ltx_video",
@@ -204,6 +208,33 @@ def test_scene_open_motion_and_budget(monkeypatch):
     monkeypatch.setenv("OTR_LTX_RADIO_PROMPT", "OPERATOR SAYS EXACTLY THIS")
     req2 = rd.build_request_from_shot(shot, ledger)
     assert req2["text_prompt"] == "OPERATOR SAYS EXACTLY THIS"
+
+
+def test_ltx25_HQ_open_keeps_the_role_motion_prompt(monkeypatch):
+    """The HQ engine shares OTR's role authoring; it must not collapse an
+    announcer or music still into the generic radio-studio fallback."""
+    from nodes._otr_video_engines import render_driver as rd
+    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
+    ledger = {
+        "meta": _OK_META,
+        "lines": [{"line_id": "b001", "char_id": "announcer",
+                   "speaker_role": "announcer", "text": "Tonight...",
+                   "start_s": 0.0, "dur_s": 5.0}],
+        "images": {"images": [
+            {"object_id": "still_b001", "kind": "scene_open",
+             "beat_id": "b001", "path": "X:/img/still_b001.png"},
+        ]},
+    }
+    shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
+            "role": "announcer_visual", "engine_id": "ltx25_video",
+            "group_id": "grp_announcer_visual", "target_frame_count": 50,
+            "creative": {}}
+    req = rd.build_request_from_shot(shot, ledger)
+    assert req["observability"]["prompt_source"] == "motion_role"
+    assert req["observability"]["prompt_field_source"] == \
+        "motion_registers:announcer"
+    assert req["text_prompt"].startswith("Continuous shot, same console")
+    assert "a 1940s radio studio" not in req["text_prompt"]
 
 
 # --------------------------------------------------------------------------- #

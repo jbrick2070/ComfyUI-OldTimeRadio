@@ -19,6 +19,8 @@ argument for the declarative graph format.
 from __future__ import annotations
 
 import inspect
+import json
+from pathlib import Path
 
 import pytest
 
@@ -74,6 +76,17 @@ def test_the_public_id_is_ltx25_high_video_and_the_bijection_holds():
     assert pub._INTERNAL_TO_PUBLIC[ENGINE] == "ltx25_high_video"
     assert len(pub._PUBLIC_ENGINES) == len(pub._INTERNAL_TO_PUBLIC)
     assert pub.resolve_engine_id("ltx25_high_video (16:9)") == ENGINE
+
+
+def test_acceptance_API_places_HQ_in_all_three_role_slots():
+    path = Path(__file__).parents[1] / "scripts" / "_otr_canonical_api_prompt.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    director = next(spec for spec in doc.values()
+                    if spec.get("class_type") == "OTR_VideoDirector")
+    inputs = director["inputs"]
+    assert [inputs[k] for k in (
+        "announcer_video_model", "music_video_model",
+        "character_video_model")] == ["ltx25_high_video (16:9)"] * 3
 
 
 def test_the_two_sibling_lanes_are_reserved_but_NOT_registered():
@@ -191,7 +204,7 @@ def test_the_scheduler_latent_comes_from_the_ANCHOR_not_the_empty_latent(graph):
 # V-1: the audio law
 # --------------------------------------------------------------------------
 
-def test_the_audio_latent_is_minted_paid_for_and_then_DROPPED(graph):
+def test_the_audio_latent_crosses_stage_two_and_is_then_DROPPED(graph):
     """The silent lane still loads the audio VAE and still computes the audio
     side through all 8 steps -- ``LTXVEmptyLatentAudio`` mints the latent and
     ``LTXVConcatAVLatent`` needs it. What it skips is the DECODE.
@@ -207,13 +220,16 @@ def test_the_audio_latent_is_minted_paid_for_and_then_DROPPED(graph):
     flat = {c for cands in candidates.values() for c in cands}
     assert "LTXVAudioVAEDecode" not in flat, (
         "V-1: the audio decoder must not even be RESOLVED by this lane")
-    # The terminal decodes slot 0 (video). Slot 1 is the audio latent and
-    # nothing reads it -- that single unwired slot IS this lane's silence.
-    assert graph["decode"]["inputs"]["samples"].src == "separate"
+    # Stage two must carry the stage-one audio latent through the AV sampler,
+    # but the final slot 1 remains unwired. Silence is decided at the final
+    # decode boundary, not by deleting the latent between the two stages.
+    assert graph["refine_concat"]["inputs"]["audio_latent"].src == "separate"
+    assert graph["refine_concat"]["inputs"]["audio_latent"].slot == 1
+    assert graph["decode"]["inputs"]["samples"].src == "refine_separate"
     assert graph["decode"]["inputs"]["samples"].slot == 0
     consumers = [nid for nid, spec in graph.items()
                  for v in spec["inputs"].values()
-                 if getattr(v, "src", None) == "separate"
+                 if getattr(v, "src", None) == "refine_separate"
                  and getattr(v, "slot", None) == 1]
     assert not consumers, "something consumed the audio latent: %r" % consumers
 
@@ -257,7 +273,19 @@ def test_the_weight_list_includes_the_audio_vae(eng):
     move the failure from the gate to the middle of the graph."""
     labels = [label for label, _p, _f in eng._weight_paths()]
     assert any("audio VAE" in label for label in labels), labels
-    assert len(labels) == 4
+    assert any("upscaler" in label.lower() for label in labels), labels
+    assert len(labels) == 5
+
+
+def test_capability_row_declares_every_shipping_weight():
+    reqs = vreg.CAPABILITIES[ENGINE]["model_requirements"]
+    assert reqs == [
+        "ltx-2.5-distilled-q3-gguf",
+        "gemma4-12b-ltx-2.5-proj-gguf",
+        "ltx-2.5-video-vae",
+        "ltx-2.5-audio-vae",
+        "ltx-2.5-latent-spatial-upscaler-x2",
+    ]
 
 
 def test_every_weight_resolves_through_folder_paths():
@@ -267,7 +295,7 @@ def test_every_weight_resolves_through_folder_paths():
     src = inspect.getsource(eng_ltx25)
     assert "folder_paths" in src
     resolver = inspect.getsource(eng_ltx25.Ltx25VideoEngine._weight_paths)
-    assert resolver.count("_resolve(") == 4
+    assert resolver.count("_resolve(") == 5
 
 
 # --------------------------------------------------------------------------
@@ -306,10 +334,40 @@ def test_the_decode_knobs_come_from_the_recipe_not_the_sibling(graph):
     that by resemblance would swap a measured recipe value for a different one
     on a lane with 0.02 GiB of headroom, and nothing would say so."""
     dec = graph["decode"]["inputs"]
-    assert dec["temporal_size"] == R.LTX25_DECODE_TEMPORAL_SIZE == 33
-    assert dec["temporal_overlap"] == R.LTX25_DECODE_TEMPORAL_OVERLAP == 4
+    assert dec["temporal_size"] == R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE == 64
+    assert (dec["temporal_overlap"]
+            == R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP == 16)
     assert dec["tile_size"] == 512 and dec["overlap"] == 64
     assert dec["temporal_size"] != 4096
+
+
+def test_the_selected_HQ_second_stage_is_wired_exactly(graph):
+    """The three roles supply different stills/prompts; this shared topology
+    must refine each role's own first-stage result without replacing either."""
+    assert R.LTX25_INGRAPH_UPSCALE_ALLOWED is True
+    assert graph["upscale_loader"]["inputs"]["model_name"] == R.LTX25_UPSCALER_MODEL
+    assert graph["latent_upscale"]["inputs"]["samples"].src == "separate"
+    assert graph["refine_i2v"]["inputs"]["image"].src == "preprocess"
+    assert graph["refine_i2v"]["inputs"]["latent"].src == "latent_upscale"
+    assert graph["refine_i2v"]["inputs"]["strength"] == 1.0
+    assert graph["refine_sigmas"]["inputs"] == {
+        "sigmas": "0.85, 0.7250, 0.4219, 0.0"}
+    rs = graph["refine_sampler"]["inputs"]
+    assert rs["noise"].src == "noise"
+    assert rs["guider"].src == "guider"
+    assert rs["sampler"].src == "ksel"
+    assert rs["sigmas"].src == "refine_sigmas"
+    assert rs["latent_image"].src == "refine_concat"
+
+
+def test_stage_one_and_delivered_canvases_are_both_honest(eng):
+    assert tuple(eng.render_canvas) == (832, 480)
+    assert (R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H) == (1664, 960)
+    clip = eng._clip_from_raw(
+        {"canvas": "1664x960", "recipe": R.LTX25_TWO_STAGE_RECIPE_ID},
+        {"shot_id": "s"})
+    assert clip["render_canvas"] == "1664x960"
+    assert clip["recipe"] == "ltx_2_5_two_stage"
 
 
 def test_the_video_vae_is_ONE_loader_matching_the_golden_recipe(graph):
@@ -329,6 +387,8 @@ def test_the_video_vae_is_ONE_loader_matching_the_golden_recipe(graph):
     """
     assert graph["videovae"]["inputs"]["vae_name"] == R.LTX25_VIDEO_VAE
     assert graph["i2v"]["inputs"]["vae"].src == "videovae"
+    assert graph["latent_upscale"]["inputs"]["vae"].src == "videovae"
+    assert graph["refine_i2v"]["inputs"]["vae"].src == "videovae"
     assert graph["decode"]["inputs"]["vae"].src == "videovae"
     loaders = [nid for nid, spec in graph.items()
                if spec["inputs"].get("vae_name") == R.LTX25_VIDEO_VAE]
@@ -345,6 +405,10 @@ def test_the_graph_is_acyclic_and_every_wire_resolves(graph):
     assert len(order) == len(graph)
     assert order.index("unet") < order.index("modality") < order.index("guider")
     assert order.index("i2v") < order.index("sched")
+    assert (order.index("sampler") < order.index("separate")
+            < order.index("latent_upscale") < order.index("refine_i2v")
+            < order.index("refine_sampler") < order.index("refine_separate")
+            < order.index("decode"))
     assert order[-1] == "decode" or "decode" in order
 
 

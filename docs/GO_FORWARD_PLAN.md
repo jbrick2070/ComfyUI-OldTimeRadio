@@ -83,34 +83,51 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-20 EVENING -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-20 NIGHT -- READ THIS FIRST
 
-**DRIVER IS NOW CODEX (`gpt-5.6-sol`).** Claude ran out of weekly usage; the
-operator moved the wheel to Codex and put Claude in the kibitz reviewer seat.
-That is the skill's own `Codex driving -> Antigravity + Claude Code review`
-shape. **Codex must NOT launch the Codex CLI as a reviewer against itself.**
+**DRIVER IS CODEX (`gpt-5.6-sol`).** The operator explicitly waived the LTX
+Kibitz arc and asked for internal grounding plus one finished-diff review. The
+durable review rule is now: one clean review ends review; another is owed only
+when the first finds something, conflicts with another lane, or cannot verify a
+material claim. Do not launch a duplicate Codex CLI lane against the driver.
 
-**NEXT ITEM: `A` -- ship the LTX 2.5 two-stage. Unanimous (Fable + Codex).**
-Nothing is mid-flight; no background task is running; HEAD is clean and pushed.
+**ITEM `A`, THE LTX 2.5 TWO-STAGE, IS DONE AND PROVEN ON A REAL PUBLISHED
+EPISODE.** The executor-owned audit counted **21/21** shots with the required
+order: stage-one sampler, `LTXVLatentUpsampler`, stage-two sampler, then the only
+video decode at **1664x960**. The encoder audit independently counted one pinned
+load, one disk read, 20 cache hits, zero drops and a closed episode scope. The
+fresh live publish is
+`signal_lost_ltx_25_two_stage_acceptance_20260820_212719_silent_procgen_blended_captioned_with_credits_final.mp4`
+(43,085,678 bytes, written 2026-08-20 23:11:55; H.264 1920x1080/25 fps + AAC
+48 kHz stereo; 85.360 s).
 
-**START HERE, in this order:**
-1. Read `kibitz-runs/2026-08-20-ltx25-two-stage/plan.md` (code-grounded, every
-   claim carries `file:line`). The four open forks are its section 6.
-2. Run the FULL four-round kibitz arc BEFORE writing code -- this changes the
-   canonical workflow, so the 08-17 amendment says arc, not a scoped tail.
-   `python scripts/kibitz.py --doc kibitz-runs/2026-08-20-ltx25-two-stage/plan.md
-   --round r1 --topic ltx25-two-stage --driver codex`
-3. Then code, then Sonnet/Claude QA on the finished diff, then the suite, then
-   push.
+**BOTH BINDING GATES PASSED.** Production cost was 2.120x the accepted warm
+one-stage baseline on average; the slowest shot was 2.466x and the cold shot was
+1.905x, all inside the operator's 2.6x approval. The positive executor evidence
+above closes the no-op gate; the adapter's own success claim was not used.
 
-**THE TWO ACCEPTANCE GATES ARE BINDING AND ARE NOT OPEN FOR DEBATE** -- see
-"ORDER OF WORK -- SETTLED 2026-08-20" below for both, in full.
+**THE SAVED CANONICAL WORKFLOW DID NOT CHANGE.** Its Git blob/hash remains
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`; all three saved video dropdowns
+remain `still_flat (16:9)`. Only the acceptance API prompt overrode those three
+runtime slots to `ltx25_high_video (16:9)`, exactly as the operator directed.
 
-**AFTER A:** `B` (lab encoder CPU-pin -- conformance, no arc -- then finish the
-differ), then `D` (fleet sweep, MUST NOT precede B), then `C` (media_archive
-wrong-person; its anchor is already written at
-`kibitz-runs/2026-08-20-media-archive-identity/driver_anchor.md`, and the
-operator's cast-first ruling already closed its expensive option).
+**NEXT ITEM: Z-IMAGE TURBO'S CHARACTER-STILL GRID, before the lab work.** In the
+accepted episode, the four character scenes `b002` through `b005` all show the
+same square/noise texture; the unreferenced `b001` and `b006`, portraits, and
+music cards are clean. The four bad rows share the same clean `c02` portrait and
+`portrait_anchor_mode=reference_latent`. This OTR graph uses plain `VAEDecode`,
+not tiled sampling or tiled decode, so the next action is one matched by-eye A/B:
+same installed weights, prompt, negative, seed and 1472x832 canvas, changing only
+the reference-latent branch OFF versus ON. If OFF is clean and ON grids, disable
+that unproven capability, retain deterministic portrait-derived identity seed,
+bump the engine version so old cached grids cannot survive, and prove it with a
+one-character `still_flat` episode published to live OBS.
+
+**AFTER THAT:** `B` (lab encoder CPU-pin conformance, then repair the differ),
+then `D` (fleet template sweep, which MUST NOT precede the differ repair), then
+`C` (media_archive wrong-person). A future LTX ultra-smoke is specified but not
+built: two deliberately short story beats plus opening and closing music equals
+exactly four real 97-frame clips while covering all three video roles.
 
 ## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
 
@@ -731,16 +748,13 @@ the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
 ranges -- that is what a working lane looks like, and on that run it caught two
 of the driver's own tests being tautologies.
 
-**BASELINES (re-measured 2026-08-20 EVENING, settled tree, after item I and the
-`Director`-comment regression fix):** suite
-**11270 passed / 114 skipped / 1 xfailed** -- MEASURED by a full run (400.90 s,
-EXIT=0, known-fail guard silent), never derived. Bible **20 / 26 / 3**,
-**298** entries, survival-guide HEAD `3b00512` == origin/main -- `12.119`
-promoted this session (a validation set with one direction of change cannot
-validate a metric; three false-green instruments), README bumped in the same
-commit. `build_variants.py --check`
-**51 variants / 0 failures**. All three measured this session, not carried
-forward.
+**BASELINES (re-measured 2026-08-20 NIGHT, settled tree, after the LTX 2.5
+two-stage):** suite **11291 passed / 114 skipped / 1 xfailed** -- MEASURED by a
+full run (332.39 s, EXIT=0, known-fail guard silent), never derived. Bible
+**20 / 26 / 3**, **298** entries, survival-guide HEAD `7df66016` == origin/main;
+that commit synchronises the already-promoted `12.119` coverage-index row and
+does not add an entry. `build_variants.py --check` **51 variants / 0 failures**.
+All three measured this session, not carried forward.
 
 **THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
 `55ddf234` the suite exited **2**, with

@@ -1,10 +1,11 @@
 """LTX 2.5 Distilled -- the SILENT video lane (Chunk A of the 2026-08-19 split).
 
-ONE lane, one class, one graph: the beat's wide scene still is pinned to frame 0
-and 97 frames are rendered from it at 832x480. The model's audio side is
-computed and then DISCARDED at ``LTXVSeparateAVLatent`` -- ``LTXVAudioVAEDecode``
-is never wired -- so the clip is always silent and only ``OTR_MasterAudioMux``
-ever adds audio (invariant V-1).
+ONE lane, one class, one graph: the beat's own wide scene still drives a
+97-frame first stage at 832x480, the selected HQ stage doubles that latent and
+re-anchors the same still, and the only decode is 1664x960. The final model audio
+side is DISCARDED at ``LTXVSeparateAVLatent`` -- ``LTXVAudioVAEDecode`` is never
+wired -- so the clip is always silent and only ``OTR_MasterAudioMux`` ever adds
+audio (invariant V-1).
 
 WHY THIS IS ONE FLAT CLASS AND NOT A BASE WITH A SEAM. The operator's ruling,
 in his words, is that this is a construction site: *"you gotta close it until
@@ -66,6 +67,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_shared.role_compat import ROLES
@@ -100,6 +102,7 @@ _FLOOR_DIT = 6 * _GiB
 _FLOOR_TEXT_ENCODER = 4 * _GiB
 _FLOOR_VIDEO_VAE = int(0.5 * _GiB)
 _FLOOR_AUDIO_VAE = int(0.1 * _GiB)
+_FLOOR_UPSCALER = int(0.5 * _GiB)
 
 
 class CpuPinnedEncoderPlacementError(RuntimeError):
@@ -267,6 +270,40 @@ def _resolve(folder, name):
             os.path.dirname(os.path.dirname(here))))), "models", folder, name)
 
 
+def _assert_two_stage_execution(records, frame_count):
+    """Require executor-owned proof that the HQ second stage really ran."""
+    expected = (
+        ("latent_upscale", "LTXVLatentUpsampler"),
+        ("refine_sampler", "SamplerCustomAdvanced"),
+        ("decode", "VAEDecodeTiled"),
+    )
+    if not isinstance(records, list) or len(records) != len(expected):
+        raise RuntimeError(
+            "ltx25 two-stage execution proof expected 3 node records, got %r"
+            % (len(records) if isinstance(records, list) else type(records).__name__,))
+    for ordinal, (record, wanted) in enumerate(zip(records, expected), 1):
+        node_id, class_name = wanted
+        if (record.get("node_id"), record.get("class_name"),
+                record.get("ordinal")) != (node_id, class_name, ordinal):
+            raise RuntimeError(
+                "ltx25 two-stage execution proof mismatch at ordinal %d: %r"
+                % (ordinal, record))
+
+    shapes = records[-1].get("output_shapes")
+    shape = shapes[0] if isinstance(shapes, list) and shapes else None
+    legal = (isinstance(shape, list) and len(shape) == 4
+             and shape[0] == int(frame_count)
+             and shape[1:3] == [R.LTX25_RENDER_CANVAS_H,
+                                R.LTX25_RENDER_CANVAS_W]
+             and shape[3] in (3, 4))
+    if not legal:
+        raise RuntimeError(
+            "ltx25 two-stage decode returned %r; expected [%d,%d,%d,3|4]"
+            % (shape, int(frame_count), R.LTX25_RENDER_CANVAS_H,
+               R.LTX25_RENDER_CANVAS_W))
+    return True
+
+
 #: S1 per-model still plan (G7.4). This lane is I2V and the still is NOT
 #: optional -- ``LTXVImgToVideoInplace`` at strength 1.0 IS the conditioning, so
 #: a beat with no still has no graph. Hence ``required="always"`` on all three
@@ -305,12 +342,11 @@ _LTX25_STILL_PLAN = (
 class Ltx25VideoEngine(_MC.MotionEngineBase):
     """LTX 2.5 Distilled, silent video. I2V on the beat's wide scene still.
 
-    The graph is the lab's golden recipe
-    (``vram-recipe-lab/recipes/ltx_2_5_golden_i2v_foley.json``) translated node
-    for node, minus the four nodes OTR owns itself: ``FloatConstant`` becomes a
-    literal, ``LTXVAudioVAEDecode`` is never wired (V-1), and ``CreateVideo`` /
-    ``SaveVideo`` are replaced by this repo's own silent-mp4 encoder so the
-    emitted file can be PROVED silent rather than declared so.
+    Stage one follows the lab golden; stage two follows the accepted
+    ``ltx_2_5_two_stage.json`` chain. OTR replaces UI-only constants and save
+    nodes, leaves the final audio output unwired (V-1), and uses its own
+    silent-mp4 encoder so the emitted file is proved silent rather than merely
+    declared so.
     """
 
     name = "ltx25_video"
@@ -333,7 +369,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     accepts_still = True
     render_aspect = "wide"
     requires_flag = None                 # registry IS the menu; no flag gate
-    engine_version = "1"
+    engine_version = "2"
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = R.LTX25_FPS
 
@@ -443,6 +479,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     def _audio_vae_name(self):
         return os.environ.get("OTR_LTX25_AUDIO_VAE", R.LTX25_AUDIO_VAE)
 
+    def _upscaler_name(self):
+        return os.environ.get("OTR_LTX25_UPSCALER", R.LTX25_UPSCALER_MODEL)
+
     def _weight_paths(self):
         """``(label, full_path, floor_bytes)`` for every required artifact.
 
@@ -465,6 +504,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
              _FLOOR_VIDEO_VAE),
             ("LTX 2.5 audio VAE", _resolve("vae", self._audio_vae_name()),
              _FLOOR_AUDIO_VAE),
+            ("LTX 2.5 latent spatial upscaler",
+             _resolve("latent_upscale_models", self._upscaler_name()),
+             _FLOOR_UPSCALER),
         ]
 
     def _quant_label(self):
@@ -479,9 +521,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     def _node_candidates(self):
         """Every ComfyUI class this graph needs, by logical node id.
 
-        Two graph nodes share the ``VAELoader`` class on purpose -- see
-        ``_build_graph`` for why the video VAE is split into an encode-side and
-        a decode-side node.
+        Several logical nodes intentionally share installed classes (the two
+        I2V anchors, AV concat/separate pairs, and samplers). The graph keeps
+        their roles distinct while the resolver verifies each installed class.
         """
         return {
             "unet": ("UnetLoaderGGUF",),
@@ -505,6 +547,13 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "sched": ("LTXVScheduler",),
             "sampler": ("SamplerCustomAdvanced",),
             "separate": ("LTXVSeparateAVLatent",),
+            "upscale_loader": ("LatentUpscaleModelLoader",),
+            "latent_upscale": ("LTXVLatentUpsampler",),
+            "refine_i2v": ("LTXVImgToVideoInplace",),
+            "refine_sigmas": ("ManualSigmas",),
+            "refine_concat": ("LTXVConcatAVLatent",),
+            "refine_sampler": ("SamplerCustomAdvanced",),
+            "refine_separate": ("LTXVSeparateAVLatent",),
             "decode": ("VAEDecodeTiled",),
         }
 
@@ -848,11 +897,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
     # ---- the graph ----
     def _build_graph(self, plan, image_name, length, width, height):
-        """The golden recipe as a declarative graph. Pure: no GPU, no weights.
+        """The selected HQ recipe as a declarative graph. Pure: no GPU, no weights.
 
-        Node-for-node against ``ltx_2_5_golden_i2v_foley.json``, with four
-        deliberate departures, each of which is an OTR contract rather than a
-        recipe change:
+        Stage one is node-for-node against
+        ``ltx_2_5_golden_i2v_foley.json``; the terminal chain is node-for-node
+        against ``ltx_2_5_two_stage.json``. The deliberate OTR departures are:
 
         * ``FloatConstant`` (lab node 18) is a LITERAL here. It existed only to
           fan 25.0 out to three consumers; a node that carries a constant is a
@@ -863,9 +912,12 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
           repo's own encoder, so the emitted file can be PROVED silent by
           ffprobe instead of declared silent by a literal (G5.1, lesson L4).
 
-        THERE IS NO STRUCTURAL ADDITION. Every remaining node maps 1:1 to the
-        golden recipe, including ONE ``VAELoader`` for the video VAE feeding
-        both the i2v encode and the final decode (lab node 2).
+        The HQ structural addition is exactly the accepted lab chain: separate
+        the first AV sample, 2x latent upscale, plant the SAME role-specific
+        still at full strength, reuse the same noise/guider/sampler with the
+        three-step refine schedule, separate again, then perform the graph's
+        ONLY video decode at 1664x960. ONE ``VAELoader`` feeds both anchors,
+        the upscaler, and the final decode (lab node 2).
 
         A DRAFT OF THIS ADAPTER SPLIT THAT LOADER IN TWO AND IT WAS CUT, which
         is worth recording because the split looks obviously right and is not.
@@ -919,6 +971,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                          "inputs": {"vae_name": self._video_vae_name()}},
             "audiovae": {"class": "audiovae",
                          "inputs": {"vae_name": self._audio_vae_name()}},
+            "upscale_loader": {"class": "upscale_loader", "inputs": {
+                "model_name": self._upscaler_name()}},
 
             # --- conditioning ---
             # The negative TEXT is empty; that is the locked recipe value.
@@ -1028,31 +1082,44 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "sampler": W("ksel", 0), "sigmas": W("sched", 0),
                 "latent_image": W("concat", 0)}},
 
-            # --- terminate on VIDEO ONLY (V-1) ---
-            # ``separate`` slot 1 is the AUDIO latent and nothing consumes it.
-            # That single unwired slot is the whole of this lane's silence, and
-            # it is the seam Chunk B opens.
-            #
-            # NOTE THE DIRECTION, because it is the opposite of the natural
-            # assumption: the golden recipe ALREADY WIRES ``LTXVAudioVAEDecode``
-            # to this slot (lab node 34). Chunk A SUBTRACTS it. Chunk B is
-            # therefore not "add a decoder" -- the decoder is trivial and the
-            # lab has run it. Chunk B is getting the decoded audio into the
-            # master BEFORE the master freezes, four topological stages earlier
-            # than video renders. Nothing here is what makes that hard.
+            # --- selected HQ stage two ---
             "separate": {"class": "separate",
                          "inputs": {"av_latent": W("sampler", 0)}},
-            # The decode knobs come from the RECIPE MODULE, not from literals
-            # here and emphatically not from ``eng_ltx_av._decode_temporal_knobs``
-            # -- that helper's env-driven 4096/8 whole-clip default is a
-            # different recipe, and inheriting it by resemblance would spend
-            # headroom this lane does not have.
+            "latent_upscale": {"class": "latent_upscale", "inputs": {
+                "samples": W("separate", 0),
+                "upscale_model": W("upscale_loader", 0),
+                "vae": W("videovae", 0)}},
+            # LTXVLatentUpsampler deliberately drops noise_mask. The full-
+            # strength second anchor recreates it while planting the same still
+            # into the doubled latent, matching the lab graph that made the HQ
+            # acceptance video.
+            "refine_i2v": {"class": "refine_i2v", "inputs": {
+                "vae": W("videovae", 0), "image": W("preprocess", 0),
+                "latent": W("latent_upscale", 0), "bypass": False,
+                "strength": R.LTX25_I2V_ANCHOR_STRENGTH}},
+            # Comfy registers core's V3 ManualSigmas before external custom
+            # nodes and protects that name from duplicate replacement. Its
+            # direct Python parameter is therefore `sigmas`.
+            "refine_sigmas": {"class": "refine_sigmas", "inputs": {
+                "sigmas": R.LTX25_REFINE_SIGMAS}},
+            "refine_concat": {"class": "refine_concat", "inputs": {
+                "video_latent": W("refine_i2v", 0),
+                "audio_latent": W("separate", 1)}},
+            "refine_sampler": {"class": "refine_sampler", "inputs": {
+                "noise": W("noise", 0), "guider": W("guider", 0),
+                "sampler": W("ksel", 0), "sigmas": W("refine_sigmas", 0),
+                "latent_image": W("refine_concat", 0)}},
+            "refine_separate": {"class": "refine_separate", "inputs": {
+                "av_latent": W("refine_sampler", 0)}},
+            # Decode VIDEO ONLY. refine_separate slot 1 is the audio latent and
+            # stays unwired, preserving V-1 while stage two sharpens the video.
             "decode": {"class": "decode", "inputs": {
-                "samples": W("separate", 0), "vae": W("videovae", 0),
-                "tile_size": R.LTX25_DECODE_TILE_SIZE,
-                "overlap": R.LTX25_DECODE_OVERLAP,
-                "temporal_size": R.LTX25_DECODE_TEMPORAL_SIZE,
-                "temporal_overlap": R.LTX25_DECODE_TEMPORAL_OVERLAP}},
+                "samples": W("refine_separate", 0),
+                "vae": W("videovae", 0),
+                "tile_size": R.LTX25_STAGE2_DECODE_TILE_SIZE,
+                "overlap": R.LTX25_STAGE2_DECODE_OVERLAP,
+                "temporal_size": R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE,
+                "temporal_overlap": R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP}},
         }
 
     # ---- render ----
@@ -1123,10 +1190,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         graph = self._build_graph(plan, image_name, length, width, height)
 
         _LOG.info(
-            "[OTR video] %s PLAN dit=%s quant=%s canvas=%dx%d frames=%d "
+            "[OTR video] %s PLAN dit=%s quant=%s source=%dx%d output=%dx%d frames=%d "
             "steps=%d sampler=%s cfg=%.1f/%.1f/%.1f anchor=%.1f",
             self.name, os.path.basename(str(self._dit_name())),
-            self._quant_label(), width, height, length, R.LTX25_STEPS,
+            self._quant_label(), width, height, R.LTX25_RENDER_CANVAS_W,
+            R.LTX25_RENDER_CANVAS_H, length, R.LTX25_STEPS,
             R.LTX25_SAMPLER, R.LTX25_CFG_VIDEO, R.LTX25_CFG_AUDIO,
             R.LTX25_CFG_MODALITY, R.LTX25_I2V_ANCHOR_STRENGTH)
 
@@ -1224,14 +1292,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             if node_id in ("te", "neg"):
                 pending[node_id] = out
 
+        execution_records = []
+        graph_started = time.perf_counter()
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(
                 graph, classes, free_after_use=True,
                 keep={"unet", "modality", self._TERMINAL},
-                external_results=external, on_result=_harvest)
+                external_results=external, on_result=_harvest,
+                audit_node_ids={"latent_upscale", "refine_sampler", "decode"},
+                execution_records=execution_records)
             images = results[self._TERMINAL][0]
         finally:
+            render_elapsed_s = time.perf_counter() - graph_started
             peak = probe.stop()
             if results is not None:
                 self._retain_model_patchers(results, prepared)
@@ -1239,6 +1312,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         if images is None:
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)
+        try:
+            _assert_two_stage_execution(execution_records, length)
+        except RuntimeError as exc:
+            raise _wb.GraphExecutionError(str(exc)) from exc
+        _LOG.info(
+            "[OTR video] %s TWO-STAGE PASS nodes=3 decode=%dx%d "
+            "render_elapsed_s=%.3f",
+            self.name, R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H,
+            render_elapsed_s)
 
         # PUBLISH ON GRAPH SUCCESS, and only whole.
         #
@@ -1290,7 +1372,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             _LOG.info(
                 "[OTR video] %s tail trim: delivered %d of %d frame(s) "
                 "(ratio %.3f) @ %dx%d", self.name, len(frames), length,
-                len(frames) / float(length), width, height)
+                len(frames) / float(length), R.LTX25_RENDER_CANVAS_W,
+                R.LTX25_RENDER_CANVAS_H)
 
         out_path = otr_engine_tmp_mp4("otr_%s_" % self.name)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
@@ -1307,10 +1390,12 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         return {
             "out_path": path, "frame_count": n, "vram_peak_mb": peak,
-            "recipe": "ltx_2_5_golden_i2v_foley",
+            "render_elapsed_s": render_elapsed_s,
+            "recipe": R.LTX25_TWO_STAGE_RECIPE_ID,
             "unet": os.path.basename(str(self._dit_name())),
             "quant": self._quant_label(), "use_lora": False,
-            "canvas": "%dx%d" % (width, height),
+            "canvas": "%dx%d" % (R.LTX25_RENDER_CANVAS_W,
+                                     R.LTX25_RENDER_CANVAS_H),
             # THE HONESTY RECEIPTS, and ``native_frame_count`` is EQUAL to the
             # delivered count on this lane -- always, trimmed or not.
             #
@@ -1381,6 +1466,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "recipe": raw.get("recipe"), "unet": raw.get("unet"),
             "quant": raw.get("quant"), "use_lora": raw.get("use_lora"),
             "render_canvas": raw.get("canvas"),
+            "render_elapsed_s": raw.get("render_elapsed_s"),
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
         }

@@ -2853,7 +2853,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
-    if ((_engine_id in ("ltx_video", "wan_i2v", "ltx_audio_in")
+    if ((_engine_id in ("ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in")
             or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat):
@@ -4662,9 +4662,10 @@ def apply_engine_override(ledger):
 
 
 #: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
-#: the prompt-only ltx_video + the additive LTX-AV audio lanes.
+#: the prompt-only ltx_video, the LTX 2.5 HQ I2V lane, and the additive LTX-AV
+#: audio lane.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx_audio_in"})
+    {"ltx_video", "ltx25_video", "ltx_audio_in"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})

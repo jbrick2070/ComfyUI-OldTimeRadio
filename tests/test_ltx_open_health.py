@@ -30,6 +30,12 @@ def test_ltx_av_open_also_healthy():
     assert rd.check_ltx_open_health(m) == []
 
 
+def test_ltx25_HQ_open_also_healthy():
+    m = _manifest([_row("b001", "announcer_visual", "ltx25_video"),
+                   _row("b000_music_open", "music_visual", "ltx25_video")])
+    assert rd.check_ltx_open_health(m, strict=True) == []
+
+
 def test_procgen_fallback_open_flagged():
     # the 6/15 failure: the announcer/music open rendered on the still floor
     m = _manifest([

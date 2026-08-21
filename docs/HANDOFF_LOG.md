@@ -3,6 +3,81 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-20 NIGHT -- HEAD d74ced6d +this (v2.0-alpha) -- CODEX DRIVER (LTX 2.5 HQ two-stage shipped; 21 real clips proved; canonical saved workflow untouched)
+
+The sha above is the last CODE head before this commit. A commit cannot contain
+its own hash; verify the authoritative post-handoff sha against
+`origin/v2.0-alpha`.
+
+**LTX 2.5 TWO-STAGE IS SHIPPED AND BOTH BINDING GATES PASSED.** The real
+one-character acceptance episode rendered **21** 97-frame clips across all eight
+beats (3+2+2+2+1+2+6+3). `scripts/otr_ltx25_two_stage_audit.py` counted 21/21
+executor-owned paths in exact order -- stage-one sampler,
+`LTXVLatentUpsampler`, stage-two sampler, then final decode at 1664x960 -- and
+refused adapter claims or prefilled results as proof. The separate encoder audit
+counted one pinned load, one disk read, 20 hits, zero drops and a closed scope.
+
+**THE OPERATOR'S COST APPROVAL HELD IN PRODUCTION.** Against the accepted
+one-stage baseline, the 20 warm shots averaged 2.120x, the slowest was 2.466x,
+and the cold shot was 1.905x. The 2.6x stop never triggered.
+
+**THE FILE HE ACTUALLY WATCHES IS FRESH:**
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/signal_lost_ltx_25_two_stage_acceptance_20260820_212719_silent_procgen_blended_captioned_with_credits_final.mp4`,
+43,085,678 bytes, written 2026-08-20 23:11:55. Independent `ffprobe`: H.264
+1920x1080 at 25 fps, AAC 48 kHz stereo, 85.360 seconds. The outer Comfy history
+also closed `success/completed`; neither that status nor `obs_publish OK` was
+used in place of the executor audit and timestamp check.
+
+**THE SAVED CANONICAL WORKFLOW IS BYTE-IDENTICAL TO HEAD.** Git blob/hash
+`c27dff3690030e78d88c3a2607a9ac54fd3935d9`; all three saved video slots still
+say `still_flat (16:9)`. For this acceptance only, the submitted API prompt
+changed the three runtime video slots to `ltx25_high_video (16:9)`. This is the
+operator's requested split: canonical saved dropdown untouched, test override
+live only.
+
+**WHAT LANDED:** the accepted two-stage recipe and graph; CPU-pinned text
+encoder; executor-owned per-node audit evidence; a permanent fail-closed audit
+CLI and tests; exact loader/model capability pins; LTX role prompt/open-health
+coverage; public upscaler registration; and
+`docs/COMFY_TEMPLATE_DIFF_PROTOCOL.md`. Its durable logic hash is **NO APPROVED
+ARTIFACT -> NO AUTHORITY TO ENTER THE SHIPPING GRAPH**: classify each template
+difference IN / ADAPT / OUT, prove real nodes and wires, validate installed
+classes, then demand executor and live-publish evidence.
+
+**REVIEW RECEIPT:** the operator explicitly waived the planned Kibitz arc and
+asked for internal agents, not a duplicate Codex CLI or paid roundtable. Three
+code-grounding lanes caught and fixed the core `ManualSigmas` socket collision,
+missing LTX role/open-health wiring, and missing public upscaler registry entry.
+The finished-diff QA found no MUST/SHOULD code defect. A separate audit-focused
+read found three SHOULD-level coverage holes; all three were fixed and its
+targeted follow-up passed 51/51 with one expected skip. A local Claude batch
+hung without a finding and was stopped; no OpenRouter roundtable was called or
+charged. `CLAUDE.md` now records the operator's one-clean-review rule.
+
+**FINAL GATES:** full suite **11291 passed / 114 skipped / 1 xfailed** in
+332.39 seconds, EXIT=0; `build_variants.py --check` **51 / 0**; Bug Bible
+regression **20 / 26 / 3**; canonical blob unchanged; `git diff --check` clean.
+
+**BUG BIBLE:** no new LTX entry was warranted because existing entries already
+cover the no-op, collision and canvas failure classes. The missing 12.119 index
+bookkeeping was fixed in the separate survival-guide repo and pushed as
+`7df66016`; regression remained 20 passed / 26 skipped / 3 xfailed.
+
+**NEXT, BY OPERATOR ORDER: Z-IMAGE TURBO.** Four character scenes in this same
+episode (`b002`-`b005`) show the noisy square grid; unreferenced scenes `b001`
+and `b006` are clean. The bad four share the same clean portrait and
+`portrait_anchor_mode=reference_latent`; the engine uses plain `VAEDecode`, so
+this is not a tiled-decode graph. Run a matched reference OFF/ON A/B before any
+more model sweep. If that isolates the cause, disable the unproven generic
+reference-latent capability, preserve deterministic portrait-derived seeding,
+invalidate its old cache, and publish a one-character `still_flat` proof.
+Afterward: lab CPU pin + repaired Diffomatic, then the official-template fleet
+sweep. The future LTX ultra-smoke is intentionally only four clips: opening
+music, two short story beats, closing music; it is specified, not built.
+
+**BOX AT CLOSE:** exact LTX server PID 43600 was stopped; port 8000 has no
+listener. The 4060 stream and the lab's other ports were untouched.
+
 ## 2026-08-20 EVENING -- HEAD ade463f1 +handoff (v2.0-alpha) -- CODER/LAB (drove the lab directly; the two-stage won on pixels and the instruments lost)
 
 The sha above is the LAST CODE HEAD. A commit cannot contain its own hash; the

@@ -282,15 +282,12 @@ _PUBLIC_LABEL = {
         "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; reference "
         "portrait + the beat's own audio; needs the sage-free h3 boot, and it "
         "is as slow as its silent sibling)"),
-    # The label states the LAB's figure and says it is the lab's, because this
-    # lane has no receipt of its own yet -- the evidence manifest records it as
-    # admission-unenforced in words for the same reason. It also states the one
-    # thing a user has to know before picking it: 14.48 against a 14.5 ceiling
-    # is the tightest fit in the roster, and it is a 5080-only lane.
+    # Do not print the old one-stage lab peak as if it measured this selected
+    # HQ graph. State the output-changing facts the operator needs instead.
     "ltx25_high_video": (
-        "LTX 2.5 Distilled Q3 silent video - high VRAM (14.48 GiB lab-measured "
-        "at 832x480x97 against a 14.5 GiB ceiling; the tightest fit in the "
-        "roster, 5080-only, one 3.88 s rung)"),
+        "LTX 2.5 Distilled Q3 HQ two-stage silent video - high VRAM "
+        "(832x480 first stage, 1664x960 refined decode, 5080-only, one "
+        "3.88 s rung)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

@@ -45,6 +45,12 @@ LTX25_TEXT_ENCODER_GGUF = "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf"
 LTX25_VIDEO_VAE = "ltx-2.5-video-vae-bf16.safetensors"
 LTX25_AUDIO_VAE = "ltx-2.5-audio-vae-bf16.safetensors"
 
+#: The official LTX 2.5 latent spatial upscaler used by the selected HQ
+#: two-stage graph. The lab's executable recipe and Comfy's downloadable I2V
+#: workflow use this exact filename.
+LTX25_UPSCALER_MODEL = (
+    "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors")
+
 #: THE AUDIO VAE IS REQUIRED EVEN BY THE SILENT LANE, and this surprises people.
 #: ``LTXVEmptyLatentAudio`` (golden JSON node 12) takes ``audio_vae`` to MINT the
 #: audio latent, and ``LTXVConcatAVLatent`` (node 30) needs that latent to build
@@ -66,6 +72,12 @@ LTX25_AUDIO_VAE_REQUIRED_EVEN_WHEN_SILENT = True
 #: matches the canvas the rest of the OTR video fleet already renders.
 LTX25_CANVAS_W = 832
 LTX25_CANVAS_H = 480
+
+#: Stage one stays at the model's locked 832x480 canvas. The accepted HQ path
+#: doubles the LATENT and decodes exactly 1664x960; it does not ask the first
+#: sampler to run above its native envelope.
+LTX25_RENDER_CANVAS_W = LTX25_CANVAS_W * 2
+LTX25_RENDER_CANVAS_H = LTX25_CANVAS_H * 2
 
 #: 97 frames at 25 fps = 3.88 s, the standard OTR shot length. The temporal
 #: contract is `(97 - 1) % 8 == 0`, which the model's temporal downsampling
@@ -154,6 +166,19 @@ LTX25_DECODE_OVERLAP = 64
 LTX25_DECODE_TEMPORAL_SIZE = 33
 LTX25_DECODE_TEMPORAL_OVERLAP = 4
 
+#: Terminal decode geometry from the executable two-stage recipe. There is one
+#: decode: after the refinement sampler, at the doubled canvas.
+LTX25_STAGE2_DECODE_TILE_SIZE = 512
+LTX25_STAGE2_DECODE_OVERLAP = 64
+LTX25_STAGE2_DECODE_TEMPORAL_SIZE = 64
+LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP = 16
+
+#: The exact three-step refinement schedule. Production resolves core's V3
+#: ``ManualSigmas`` (registered before duplicate custom nodes), whose direct
+#: Python input is ``sigmas``. The value is byte-identical to the lab recipe.
+LTX25_REFINE_SIGMAS = "0.85, 0.7250, 0.4219, 0.0"
+LTX25_TWO_STAGE_RECIPE_ID = "ltx_2_5_two_stage"
+
 # ---------------------------------------------------------------------------
 # Conditioning -- the first-frame anchor
 # ---------------------------------------------------------------------------
@@ -214,11 +239,11 @@ LTX25_SCHEDULER_LATENT_SOURCE = "LTXVImgToVideoInplace"
 #: replacement for multi-shot continuity is the first-frame anchor above.
 LTX25_MULTISHOT_ALLOWED = False
 
-#: In-graph 2x latent upscaling: BANNED from this graph. It forces the video
-#: VAE to decode 1664x960x97 and hard-OOMs. The upscaler weight IS on this box
-#: (`latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0`) and may
-#: be used as a SEPARATE offline pass -- never inside this lane's graph.
-LTX25_INGRAPH_UPSCALE_ALLOWED = False
+#: In-graph 2x latent upscaling: SELECTED for the shipping HQ path. The former
+#: ban said decoding 1664x960x97 hard-OOMed; the lab subsequently ran exactly
+#: that graph and produced the accepted HQ video. Keep it in one graph so a
+#: canonical OTR render cannot publish while silently skipping refinement.
+LTX25_INGRAPH_UPSCALE_ALLOWED = True
 
 #: The scheduler's `latent` port MUST be connected to the empty/init latent.
 #: Left dangling it silently defaults to a 4096-token curve and ruins the motion

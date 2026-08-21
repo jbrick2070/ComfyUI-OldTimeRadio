@@ -37,6 +37,10 @@ class _FakeTensor:
         return 1.5
 
 
+class _ImageTensor:
+    shape = (97, 960, 1664, 3)
+
+
 def _cond():
     return ([[_FakeTensor(), {"pooled": 1}]],)
 
@@ -113,6 +117,8 @@ def run_graph_spy(monkeypatch):
 
     def _fake(graph, classes=None, **kw):
         calls.append({"graph": dict(graph), "kwargs": dict(kw)})
+        assert kw.get("audit_node_ids") == {
+            "latent_upscale", "refine_sampler", "decode"}
         on_result = kw.get("on_result")
         external = kw.get("external_results") or {}
         results = dict(external)
@@ -124,7 +130,21 @@ def run_graph_spy(monkeypatch):
             results["neg"] = _cond()
             if on_result:
                 on_result("neg", results["neg"])
-        results[eng_ltx25.Ltx25VideoEngine._TERMINAL] = (object(),)
+        records = kw.get("execution_records")
+        if records is not None:
+            assert records == [], "only the real executor may mint evidence"
+            records.extend([
+                {"class_name": "LTXVLatentUpsampler",
+                 "node_id": "latent_upscale", "ordinal": 1,
+                 "output_shapes": [[1, 128, 13, 30, 52]]},
+                {"class_name": "SamplerCustomAdvanced",
+                 "node_id": "refine_sampler", "ordinal": 2,
+                 "output_shapes": [[1, 128, 13, 30, 52]]},
+                {"class_name": "VAEDecodeTiled",
+                 "node_id": "decode", "ordinal": 3,
+                 "output_shapes": [[97, 960, 1664, 3]]},
+            ])
+        results[eng_ltx25.Ltx25VideoEngine._TERMINAL] = (_ImageTensor(),)
         return results
 
     monkeypatch.setattr(wb, "run_graph", _fake)

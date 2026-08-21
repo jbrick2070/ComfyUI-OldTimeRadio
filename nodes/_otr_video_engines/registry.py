@@ -496,7 +496,7 @@ CAPABILITIES = {
     # describes this stack -- GGUF k-quants are their own thing and neither
     # flag's tier filter is the right question to ask about them.
     #
-    # FOUR model_requirements, and the AUDIO VAE IS ONE OF THEM even though
+    # FIVE model_requirements, and the AUDIO VAE IS ONE OF THEM even though
     # this lane emits no audio. LTXVEmptyLatentAudio mints the audio latent
     # with it and LTXVConcatAVLatent needs that latent to build the joint AV
     # tensor the sampler consumes, so preflight must fail CLOSED without it --
@@ -510,7 +510,8 @@ CAPABILITIES = {
         "model_requirements": ["ltx-2.5-distilled-q3-gguf",
                                "gemma4-12b-ltx-2.5-proj-gguf",
                                "ltx-2.5-video-vae",
-                               "ltx-2.5-audio-vae"]},
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

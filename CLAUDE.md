@@ -64,6 +64,13 @@
     a rename, an `/object_info` check, a deterministic edit** -> NO arc. An arc pressure-tests
     DESIGN; there is nothing to pressure-test. Sonnet 5 QA on the finished diff before the
     push is the correct and sufficient gate.
+  * **ONE CLEAN FINISHED-DIFF REVIEW IS ENOUGH (operator directive 2026-08-20).** Run one
+    independent reviewer after code. If it returns clean and the driver grounds that result
+    against the real files, STOP reviewing and move to tests/live proof. Add another reviewer
+    only when the first reports a blocker, two reviewers disagree, a material claim remains
+    unverifiable, or the two-strikes rule below fires. An available internal subagent is a
+    valid reviewer; do not wait on or multiply CLI/cloud lanes merely to increase the count.
+    Save the real roster and result in the handoff receipt.
   * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
 - **`otr/obs/` IS THE SUCCESS SIGNAL. ALWAYS PUBLISH TO IT (operator directive 2026-08-17 --
   hard, and it OVERRIDES the tidiness instinct).** Operator, in his words: *"always publish to

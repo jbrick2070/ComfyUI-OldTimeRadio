@@ -27,11 +27,17 @@ from pathlib import Path
 import pytest
 
 from nodes._otr_video_engines import ltx25_recipe as R
+from nodes._otr_video_engines import eng_ltx25
+from nodes._otr_video_engines.wrapper_bridge import Wire
 
 
 GOLDEN = Path(
     r"C:/Users/jeffr/Documents/ComfyUI/vram-recipe-lab/recipes"
     r"/ltx_2_5_golden_i2v_foley.json"
+)
+TWO_STAGE = Path(
+    r"C:/Users/jeffr/Documents/ComfyUI/vram-recipe-lab/recipes"
+    r"/ltx_2_5_two_stage.json"
 )
 
 
@@ -39,6 +45,13 @@ def _graph():
     if not GOLDEN.is_file():
         pytest.skip("lab golden recipe not present at %s" % GOLDEN)
     doc = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    return doc, doc.get("prompt") or {}
+
+
+def _two_stage_graph():
+    if not TWO_STAGE.is_file():
+        pytest.skip("lab two-stage recipe not present at %s" % TWO_STAGE)
+    doc = json.loads(TWO_STAGE.read_text(encoding="utf-8"))
     return doc, doc.get("prompt") or {}
 
 
@@ -207,12 +220,12 @@ def test_the_scheduler_latent_comes_from_the_anchor_not_the_empty_latent():
 # Closed options stay closed
 # --------------------------------------------------------------------------
 
-def test_no_multishot_and_no_in_graph_upscaler():
-    """Both were measured to blow the clamp and are banned from this graph.
-    The upscaler weight exists on this box and may run as an OFFLINE pass."""
+def test_the_original_golden_remains_one_stage_but_production_selects_two_stage():
+    """The old golden stays useful as stage-one evidence; it no longer bans
+    the selected production refinement that the operator approved by eye."""
     _doc, g = _graph()
     assert R.LTX25_MULTISHOT_ALLOWED is False
-    assert R.LTX25_INGRAPH_UPSCALE_ALLOWED is False
+    assert R.LTX25_INGRAPH_UPSCALE_ALLOWED is True
     classes = {v.get("class_type") for v in g.values()}
     upscalers = {c for c in classes if "Upscale" in c or "upscale" in c}
     assert not upscalers, "the golden graph grew an upscaler: %s" % upscalers
@@ -220,6 +233,73 @@ def test_no_multishot_and_no_in_graph_upscaler():
     assert empty["inputs"]["length"] == R.LTX25_FRAMES == 97, (
         "161-frame multishot is banned; length must stay at the 97 rung"
     )
+
+
+def test_the_selected_two_stage_lab_recipe_matches_production_constants():
+    doc, g = _two_stage_graph()
+    assert doc["name"] == R.LTX25_TWO_STAGE_RECIPE_ID
+    assert (doc["contract"]["width"], doc["contract"]["height"]) == (832, 480)
+    _k, loader = _node(g, "LatentUpscaleModelLoader")
+    assert loader["inputs"]["model_name"] == R.LTX25_UPSCALER_MODEL
+    _k, manual = _node(g, "ManualSigmas")
+    lab_sigmas = manual["inputs"].get("sigmas_string", manual["inputs"].get("sigmas"))
+    assert lab_sigmas == R.LTX25_REFINE_SIGMAS
+    decodes = [v for v in g.values() if v.get("class_type") == "VAEDecodeTiled"]
+    assert len(decodes) == 1
+    dec = decodes[0]["inputs"]
+    assert dec["tile_size"] == R.LTX25_STAGE2_DECODE_TILE_SIZE
+    assert dec["overlap"] == R.LTX25_STAGE2_DECODE_OVERLAP
+    assert dec["temporal_size"] == R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE
+    assert dec["temporal_overlap"] == R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP
+
+
+def test_the_entire_selected_stage_two_matches_the_lab_byte_for_byte_semantically():
+    """Normalize numeric node ids, then compare every class, literal, wire
+    endpoint, and output slot in stage two.
+
+    Raw JSON bytes cannot match because the lab uses Comfy API ids while OTR
+    uses named direct-call nodes. This is the stricter useful comparison: all
+    bytes that can alter execution are equal after that transport translation.
+    """
+    _doc, lab = _two_stage_graph()
+    engine = eng_ltx25.Ltx25VideoEngine()
+    prod = engine._build_graph(
+        {"text_prompt": "probe", "seed": 42}, "still.png", 97, 832, 480)
+
+    ids = {
+        "2": "videovae", "8": "ksel", "9": "noise", "10": "guider",
+        "15": "preprocess", "32": "separate", "33": "decode",
+        "100": "upscale_loader", "101": "latent_upscale",
+        "102": "refine_i2v", "103": "refine_sigmas",
+        "104": "refine_sampler", "105": "refine_concat",
+        "106": "refine_separate",
+    }
+    stage = ("upscale_loader", "latent_upscale", "refine_i2v",
+             "refine_sigmas", "refine_concat", "refine_sampler",
+             "refine_separate", "decode")
+    candidates = engine._node_candidates()
+
+    def normalize_value(value, *, production):
+        if production and isinstance(value, Wire):
+            return [value.src, value.slot]
+        if not production and isinstance(value, list) and len(value) == 2 \
+                and str(value[0]) in ids and isinstance(value[1], int):
+            return [ids[str(value[0])], value[1]]
+        if isinstance(value, dict):
+            return {k: normalize_value(v, production=production)
+                    for k, v in sorted(value.items())}
+        return value
+
+    lab_by_name = {ids[node_id]: spec for node_id, spec in lab.items()
+                   if node_id in ids and ids[node_id] in stage}
+    for name in stage:
+        lab_spec = lab_by_name[name]
+        prod_spec = prod[name]
+        assert candidates[prod_spec["class"]][0] == lab_spec["class_type"], name
+        lab_inputs = dict(lab_spec["inputs"])
+        prod_inputs = dict(prod_spec["inputs"])
+        assert normalize_value(prod_inputs, production=True) == normalize_value(
+            lab_inputs, production=False), name
 
 
 def test_the_tiled_decode_knobs_match_the_lab_and_are_not_the_siblings():
