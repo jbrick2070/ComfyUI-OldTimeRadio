@@ -164,6 +164,39 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   **A validation set that only contains one direction of change cannot validate
   a metric.** Do NOT quote a gridscore number as evidence until this is fixed,
   and per the two-strikes rule a THIRD instrument gets the panel before code.
+* **THREE INDEPENDENT JUDGES AGREE AND THE SCALAR IS THE LONE DISSENTER
+  (2026-08-20). THIS RETIRES `ltx25_gridscore.py` AS AN EVIDENCE SOURCE.**
+  On matched 768x432 NATIVE-PIXEL crops
+  (`vram-recipe-lab/outputs/CROP_EYEBALL_*.png` -- cropped precisely because
+  full frames get downscaled on the way into any chat window, which erases the
+  acuity being measured):
+
+  | judge | pick | evidence it volunteered |
+  |---|---|---|
+  | operator's eye | **2** | *"you can almost read the faux text"* |
+  | Claude (vision) | **2** | resolved face (eye/nose/mouth/ear), epaulettes + tie, countable console switches, legible letterforms |
+  | Gemini (separate window, drag-and-drop) | **2** | *"sharper face"*, *"officer uniform"*; calls arm 1 *"blurrier, slightly melted-looking"* |
+  | `ltx25_gridscore.py` | 1 | none available -- a scalar cannot show its reasoning |
+
+  Gemini reached "sharper face" and "officer uniform" UNPROMPTED, from a
+  different model family with no sight of the other judges' reasoning. **Three
+  judges, three methods, unanimous.** Caveat kept honest: the Gemini run was one
+  pass in one order, so position bias is not formally excluded -- but the odds of
+  three independent judges erring in the same direction are low enough to act on.
+  **No `gridscore` number may be cited as evidence until the replacement
+  instrument exists.**
+* **NO PAID API IS NEEDED FOR VLM JUDGING, and a suggestion to build one was
+  declined.** A `google-generativeai` + API-key script was proposed and rejected:
+  it violates the offline-first scope rule, it named the stale `gemini-1.5-pro`,
+  and its prompt asked for *"aesthetic quality, lighting, composition"* -- an
+  active CONFOUND here, because the two arms differ in CONTENT (a shirt became a
+  uniform), so an aesthetic judgment can flip on wardrobe rather than on
+  resolution. **What works instead, at $0:** matched native-pixel CROPS, dropped
+  into a vision window, with COUNTABLE questions (how many switches, which
+  facial features resolve, is any text resolvable as letterforms) rather than
+  "which looks better" -- a countable answer is checkable, an opinion is not --
+  and the pair sent in BOTH orders, trusting only a self-consistent answer,
+  because VLMs carry a systematic position bias.
 * **THE OPERATOR'S INSTRUMENT DESIGN -- an AI-purposed eye chart, and it is the
   right shape because every region carries its own ground truth.** His words:
   an eye chart with *"some text mayeb blobs that look lie mneys or abargham
