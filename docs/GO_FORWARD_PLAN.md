@@ -139,6 +139,34 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
   `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
   only** and stretch 2.31x in ffmpeg afterwards.
+* **FACE-DRIFT RISK: CLOSED, AND IT CLOSES FOR THE TWO-STAGE (v2, matched
+  prompt, 2026-08-20 evening).** Matched pair at **seed 44**, both arms, prompt
+  aligned to the still, final frame of 97:
+  * **Control** holds the officer's identity to the end -- soft, 832x480.
+  * **Two-stage holds the SAME identity, same uniform, same pose**, at far
+    higher fidelity: individual hair strands, cheek skin texture, the mole,
+    defined eyelids, fabric weave on the lapel.
+  * **Neither arm drifts. The refine does not move the face -- it resolves it.**
+    The v1 "identity collapse" was entirely the mismatched prompt, now confirmed
+    twice: once by the control reproducing it, once by it vanishing when the
+    prompt was fixed. Frames: `outputs/V2_{control,two_stage}_s44_{f000,flast}.png`.
+  **This was the last open technical risk on the two-stage item.**
+* **THE LAB OOMs ~50% OF LTX 2.5 RUNS AND THE ROOT CAUSE IS FOUND: THE LAB DOES
+  NOT CPU-PIN THE TEXT ENCODER AND PRODUCTION DOES.** Across v1+v2, 6 of 12 runs
+  died in `CLIPTextEncode` at ~14.2 GiB with `LTXAVTEModel_` reporting
+  **10,917.81 MB loaded, "full load: True"**. Production ships
+  `_cpu_pinned_clip_loader` (`eng_ltx25.py:117`), a `CLIPLoaderGGUF` subclass
+  that pins the Gemma encoder to CPU -- and its own comment records the trap:
+  *"``initial_device`` ALONE IS NOT ENOUGH"*, you must set `load_device` and
+  `offload_device` too (`:131-137`), with a fail-loud `encoder_not_on_cpu`
+  guard. **The lab submits stock API graphs and cannot inject that subclass, so
+  it has been measuring a configuration ~10.9 GiB heavier than production ever
+  runs.** Consequences, both real: the lab's coin-flip OOM rate is an artifact
+  and is fixable, and **every lab VRAM verdict on this lane -- including "both
+  arms fail the 14.5 gate" -- is suspect until the lab pins the encoder the way
+  production does.** A bench harder than production distorts every number it
+  produces. Closing this is prerequisite to trusting any further LTX 2.5 VRAM
+  claim.
 * **THE IDENTITY-DRIFT PROBE WAS CONFOUNDED AND THE TWO-STAGE IS EXONERATED
   (driver ran the lab directly, 2026-08-20 evening).** The v1 derivatives swapped
   the conditioning still to a close-up of a uniformed officer
