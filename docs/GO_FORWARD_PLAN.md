@@ -255,6 +255,41 @@ declared contrast set exactly (Bible `12.121`). Model seats that remain: ONE
 Sonnet QA pass on a WINNING lane's diff before integration, and vision judging
 of frames.
 
+**ULTRACODE ROUTING FOR THE ASSEMBLY LINE (operator, 2026-08-21) -- where
+orchestration PAYS and where it is banned.** The lane window may run with
+ultracode on. That is a license to orchestrate where independent judgment adds
+CORRECTNESS, not to re-inflate the Sonnet army the operator already declined.
+Exactly three sanctioned fan-outs, everything else stays a script or the solo
+driver:
+
+1. **THE JUDGE PANEL (per A/B, the main event).** Three blind vision agents per
+   frame pair, launched in parallel: agent 1 sees A-then-B, agent 2 sees
+   B-then-A, agent 3 sees native-pixel CROPS only. Countable questions ONLY
+   (which features resolve, how many switches, is text legible) -- never
+   "which is prettier"; the arms may differ in content and aesthetics flips on
+   wardrobe (Bible `12.121` territory). No agent sees another's output.
+   Majority + the driver's own grounded read = the panel verdict; the operator's
+   eye remains final. This replaces the single-VLM-both-orders protocol with
+   something strictly stronger at ~3 calls.
+2. **THE REFUTATION PANEL (only when the driver believes WIN).** Before any WIN
+   verdict is committed, 2-3 skeptics each try to REFUTE it from the receipts:
+   purity-gate delta set, seeds actually differing per render, ARMS.sha256
+   matching what rendered, frames pulled from the right mp4s. Default to
+   refuted-if-uncertain. A win that survives is committed; a win that does not
+   was about to waste an integration cycle and operator attention. LOSSES are
+   not refuted -- a loss costs nothing downstream.
+3. **THE COMPLETENESS CRITIC (one agent, at lane close).** "What was not run,
+   not checked, or silently capped in this lane?" Its findings open follow-ups;
+   they do not reopen the lane.
+
+**STILL BANNED UNDER ULTRACODE, no exceptions:** model fan-out on byte/JSON
+diffs (deterministic script, full stop); parallel LANES (assembly line is
+voted -- one lane at a time); render fan-out (sequential execution only, one
+server, per scope discipline); reviewer multiplication on integration (the
+08-20 one-clean-review ruling stands -- ONE Sonnet QA pass on a winning diff,
+more only on a blocker or disagreement). Ultracode changes HOW MANY EYES look
+at pixels and at a claimed win; it changes nothing else about the method.
+
 **Lane order:** (1) `wan_ti2v` sampling recipe -- contrast set exactly
 {KSampler.sampler_name uni_pc-vs-euler, KSampler.steps 20-vs-30,
 ModelSamplingSD3.shift 8-vs-5}, bundled as a SCREEN, decompose only on a win;
