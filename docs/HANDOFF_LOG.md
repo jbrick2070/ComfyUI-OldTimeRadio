@@ -3,6 +3,78 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 MIDDAY -- HEAD 76ced5a9 +this (v2.0-alpha) -- OPUS LANE-1 WINDOW (wan_ti2v recipe screened: NO WIN, shipped recipe stands)
+
+**Scope: measurement only.** No OTR production code, no workflow JSON, no model
+download, nothing published to `otr/obs` (correct -- this is the bench lane, not
+an episode). All work landed in `basline-models`, pushed, HEAD == origin at
+`23c77a5`. Verdict: `basline-models/verdicts/lane1_wan_ti2v.md`.
+
+**RESULT: the official sampling recipe (`uni_pc` / 20 / shift 8) does NOT beat
+ours (`euler` / 30 / shift 5). Nothing is queued as an OTR item.** And it is not
+merely a tie -- two measurements on known ground truth put official BEHIND:
+temporal stability is worse in 7 of 8 cells (+11% to +60% mean frame-to-frame
+change, larger spikes), and on the test card's neutral grey wedge official
+drifts to channel spread 11.50 against ours at 2.42 from an identical 1.36.
+
+**Staging is unblocked and the blocker was worth the read.** `LoadedGraph`'s
+`.graph_nodes` is a tuple of frozen `GraphNode(node_id, class_type, params,
+order, boundary)` -- but rebuilding an arm from it is WRONG regardless of shape:
+`_flatten_params` dots nested dicts, `_without_wires` drops empty containers,
+and wires are lifted into `.edges`. `diffomatic.build_api_graph` now returns the
+executable form from the raw builder instead. **Found on the way:
+`copy.deepcopy` silently corrupts `wrapper_bridge.Wire`** -- it is a 2-tuple
+subclass taking two constructor args, so it inherits `tuple.__getnewargs__` and
+a deep copy rebuilds it as `Wire(('pos', 0))`, nesting the whole wire into the
+src slot. It still walks and serialises like a wire, so the corruption is silent
+until submit. NOT fixed (production code, out of scope this window) -- flagged.
+
+**The operator's mid-window correction shaped the lane and was right.** The
+original single fixture was a B&W officer close-up on a flat background; he
+called it as too easy to discriminate anything. The panel then proved him right
+-- every countable question tied on every seat for that fixture. Three more
+fixtures were added: a photoreal control room, an illustrated ~40-face crowd,
+and, at his suggestion, a purpose-built **radio-drama test card** (colour bars,
+16-step grey wedge, shape rows, line gratings 16px-3px, Sloan eye-chart rows,
+every instrument on both a light and a dark field, authored at exactly 832x480
+so the latent node's resize is a no-op). The card is what made the answers
+countable instead of impressionistic.
+
+**Three sanctioned fan-outs ran, and each earned its keep.** The judge panel
+(12 seats seed 42, 9 seats seed 20260821) surfaced one unanimous clear call for
+official on crowd/seed20260821. The refutation panel then killed it 3/3 at high
+confidence, and the two decisive findings were re-derived by the driver against
+the real frames: the edge advantage is contrast (raw ratio 1.222 at f097, but
+0.980 after identical autocontrast), and the winning cell is the one where the
+arms stopped rendering the same scene (arm-to-arm NCC 0.627 against 0.89-0.999
+everywhere else; correlation between arm similarity and decided votes -0.821).
+The completeness critic then found the unmeasured temporal axis above.
+
+**The refutation caught a real defect of mine.** With two arms there are only
+two read orders, so three blinded seats can never each have their own -- yet
+`make_judge_set.py` claimed they did and hard-coded one map where seats 2 and 3
+both read official first, identical across all eight cells. Fixed: odd seat and
+leading arm now derive per (fixture, seed), 5 configurations across 8 cells.
+The existing judge sets were NOT rebuilt -- they are the evidence the panels
+cited -- and the verdict states that both panels ran under the flawed map.
+
+**The A/A null now exists and the method has a noise floor.** Re-submitting a
+byte-identical graph reproduces all 97 frames by sha256 (NCC 1.0000), and three
+seats on those identical frames returned TIE/none. So there is no run-to-run
+nondeterminism, the crowd divergence is real rather than noise, and the judges
+do not fabricate winners. `tools/run_aa_control.py`; run it once per lane.
+
+**Corrections I owe the record:** my zoom-confound estimate was an order of
+magnitude too large (~1%, not ~10%); the seed-2 tally I first reported omitted
+the officer fixture and flattered the result; and I deleted the officer pass-1
+render receipts while restructuring, then rebuilt them from ComfyUI `/history`
+with each re-derived graph compared against the server's record of what
+executed (digests match the original run log).
+
+**Next: lane 2 (`ltx25` stage-1 anchor 0.7 vs 1.0)**, with the method carrying
+an NCC admission threshold, contrast matching, per-leg temporal metrics and the
+fixed seat permutation. Lane 1's fixtures and tooling are reusable as-is.
+
 ## 2026-08-21 MORNING -- HEAD 7ec5b229 +handoff (v2.0-alpha) -- FABLE audit window (corpus audited, fleet diffed grounded, assembly line voted, lane 1 staged)
 
 **Did (all pushed, all verified == origin):** OTR `7ec5b229` + this handoff;

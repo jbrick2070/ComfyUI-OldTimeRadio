@@ -297,13 +297,59 @@ ModelSamplingSD3.shift 8-vs-5}, bundled as a SCREEN, decompose only on a win;
 0.5-vs-0.7. Download-gated (operator authorization only): official 1.1
 dynamic rank-111 LoRA; wan high-noise expert (already frozen).
 
-**Lane 1 state:** `basline-models/staging/lane1_wan_ti2v/build_arms.py` is ONE
-step from staging both arms: `diffomatic._build_engine_graph` returns a
-`LoadedGraph` whose `.graph_nodes` is a TUPLE (not a dict) -- inspect one
-element, finish `to_api`, write `arm_ours.json` / `arm_official.json` +
-`ARMS.sha256`. Prompt/fixture already matched to the still per `12.121`
-(officer close-up + `portrait_16_9.png`). Two failed shape-guesses already
-spent; the next window READS the structure first.
+**LANE 1 IS CLOSED: NO WIN. The shipped `wan_ti2v` recipe stands and nothing
+was queued as an OTR item** (2026-08-21 midday, `basline-models` `23c77a5`,
+verdict `basline-models/verdicts/lane1_wan_ti2v.md`). It is not a bare tie --
+two measurements on known ground truth put the official recipe BEHIND: temporal
+stability worse in 7 of 8 cells (+11% to +60% mean frame-to-frame change), and
+the test card's neutral grey wedge drifting to channel spread 11.50 against
+ours at 2.42. The one unanimous panel call for official was refuted 3/3 and the
+refutation was re-derived by the driver: the edge advantage is CONTRAST (raw
+ratio 1.222 at f097, 0.980 after identical autocontrast), and that cell is the
+one where the arms stopped rendering the same scene (NCC 0.627 vs 0.89-0.999
+elsewhere).
+
+**FOUR THINGS FROM LANE 1 THAT BIND THE REST OF THE PROGRAMME:**
+* **ONE EASY FIXTURE CANNOT CLOSE A LANE.** The officer close-up tied on every
+  seat; the operator called it before any judging and the panel confirmed it.
+  Every lane carries hard content AND the authored **test card**
+  (`staging/lane1_wan_ti2v/make_testcard.py`: colour bars, 16-step grey wedge,
+  shape rows, gratings 16px-3px, Sloan eye-chart rows, both polarities, drawn at
+  the exact render canvas so the latent resize is a no-op). Countable beats
+  impressionistic.
+* **THE A/A NULL IS NOW MANDATORY, ONCE PER LANE** (`tools/run_aa_control.py`).
+  The pipeline is bit-exact -- an identical graph reproduces all 97 frames by
+  sha256 -- and the panel returns TIE on identical pixels. That is the noise
+  floor every margin is read against.
+* **ADMIT A CELL ONLY IF THE ARMS STILL RENDER THE SAME SCENE.** Arm-to-arm NCC
+  at the final frame under ~0.90 means "which is better" is the wrong question.
+  Across lane 1's cells, correlation between arm similarity and decided votes
+  was -0.821: the panel ties when renders look alike and picks a winner when
+  they diverge.
+* **TONE FEEDS THE COUNTS.** Judges told to ignore contrast cannot. Contrast-match
+  before judging, or ask a tonal question outright.
+
+**WHAT LANE 1 DID NOT SCREEN, so it is not re-derived as new:** the fleet diff
+lists nine official-vs-ours differences; lane 1 screened the three sampler
+parameters and held the rest at ours in BOTH arms -- fp16 vs Q5_K_M GGUF
+weights, fp8-scaled vs GGUF text encoder, untiled vs tiled VAE decode, and the
+reference 1280x704 x 121 @ 24fps canvas. Each is its own candidate lane; the
+precision deltas are the interesting ones. Note also that `shift 8` was tested
+at an operating point it was not authored for (the engine documents 5.0 as the
+5B value), which bounds the null without rescuing it.
+
+**A PRODUCTION HAZARD FOUND IN PASSING, NOT FIXED (out of scope that window):**
+`copy.deepcopy` silently corrupts `wrapper_bridge.Wire`. It is a 2-tuple
+subclass taking two constructor arguments, so it inherits
+`tuple.__getnewargs__` and a deep copy rebuilds it as `Wire(('pos', 0))` --
+the whole wire slides into the src slot and returns nested. The copy still
+walks, indexes and serialises like a wire, so it stays silent until submit
+time. Any OTR path that deep-copies an engine graph is exposed. Verify before
+fixing; it is production code and wants the design test.
+
+**NEXT: LANE 2 -- `ltx25` stage-1 anchor 0.7 vs 1.0.** Lane 1's fixtures,
+purity gate, judge-set builder and A/A control are reusable as-is; carry the
+four bindings above into it.
 
 **Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the
