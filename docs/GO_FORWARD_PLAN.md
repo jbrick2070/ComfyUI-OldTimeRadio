@@ -83,6 +83,35 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
+## THE CURRENT STEP, 2026-08-20 EVENING -- READ THIS FIRST
+
+**DRIVER IS NOW CODEX (`gpt-5.6-sol`).** Claude ran out of weekly usage; the
+operator moved the wheel to Codex and put Claude in the kibitz reviewer seat.
+That is the skill's own `Codex driving -> Antigravity + Claude Code review`
+shape. **Codex must NOT launch the Codex CLI as a reviewer against itself.**
+
+**NEXT ITEM: `A` -- ship the LTX 2.5 two-stage. Unanimous (Fable + Codex).**
+Nothing is mid-flight; no background task is running; HEAD is clean and pushed.
+
+**START HERE, in this order:**
+1. Read `kibitz-runs/2026-08-20-ltx25-two-stage/plan.md` (code-grounded, every
+   claim carries `file:line`). The four open forks are its section 6.
+2. Run the FULL four-round kibitz arc BEFORE writing code -- this changes the
+   canonical workflow, so the 08-17 amendment says arc, not a scoped tail.
+   `python scripts/kibitz.py --doc kibitz-runs/2026-08-20-ltx25-two-stage/plan.md
+   --round r1 --topic ltx25-two-stage --driver codex`
+3. Then code, then Sonnet/Claude QA on the finished diff, then the suite, then
+   push.
+
+**THE TWO ACCEPTANCE GATES ARE BINDING AND ARE NOT OPEN FOR DEBATE** -- see
+"ORDER OF WORK -- SETTLED 2026-08-20" below for both, in full.
+
+**AFTER A:** `B` (lab encoder CPU-pin -- conformance, no arc -- then finish the
+differ), then `D` (fleet sweep, MUST NOT precede B), then `C` (media_archive
+wrong-person; its anchor is already written at
+`kibitz-runs/2026-08-20-media-archive-identity/driver_anchor.md`, and the
+operator's cast-first ruling already closed its expensive option).
+
 ## THE LIVE QUEUE -- 2026-08-20. START HERE. EVERYTHING ELSE IS REFERENCE.
 
 **This block is the only forward-looking list in this file.** Everything below

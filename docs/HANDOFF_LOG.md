@@ -3,6 +3,91 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-20 EVENING -- HEAD ade463f1 +handoff (v2.0-alpha) -- CODER/LAB (drove the lab directly; the two-stage won on pixels and the instruments lost)
+
+The sha above is the LAST CODE HEAD. A commit cannot contain its own hash; the
+authoritative post-handoff sha is in the kickoff line.
+
+**DRIVER HANDS OVER TO CODEX AT THE OPERATOR'S SUGGESTION.** Claude was at ~3%
+weekly usage; the operator proposed Codex drive and Claude sit as a kibitz
+reviewer lane instead, which is exactly the skill's `Codex driving -> Antigravity
++ Claude Code review` shape. **Nothing is mid-flight. No background task is
+running.** Six pushed commits, each verified against origin by `git ls-remote`.
+
+**THE NEXT ITEM IS DECIDED AND UNANIMOUS: `A`, SHIP THE LTX 2.5 TWO-STAGE.**
+Fable and Codex were each given one identical briefing (four candidates, the
+driver's own recommendation AND the strongest argument against it) and both
+picked A first, B second. Full reasoning + both binding gates:
+`docs/GO_FORWARD_PLAN.md`, section "ORDER OF WORK -- SETTLED 2026-08-20".
+
+**WHAT IS SETTLED ABOUT THE TWO-STAGE -- do not re-measure any of it:**
+* **The operator picked it by eye** on matched delivery-chain frames at
+  1920x1080: *"2 its no brainer"*, *"you can almost read the faux text"*, and on
+  the 2.619x cost *"i mean yeah peoel wnat quality."*
+* **Three judges, unanimous** -- his eye, Claude vision, Gemini in a separate
+  window -- all volunteering the same evidence. `ltx25_gridscore.py` dissented
+  and is WRONG; it counts detail as grid. **No gridscore number is quotable.**
+* **VRAM does not separate the arms** (+0.037 GiB) and **face drift is CLOSED**:
+  matched prompt, matched seed, both arms hold identity across all 97 frames and
+  the two-stage holds it far sharper.
+* **The ban blocking it is refuted.** `ltx25_recipe.py:217-221` says in-graph
+  upscale *"forces the video VAE to decode 1664x960x97 and hard-OOMs"*. It was
+  done today at exactly that size and did not OOM.
+
+**TWO BINDING ACCEPTANCE GATES, from the two lanes' DIFFERENT objections:**
+1. **Cost stop (Fable):** if real production cost lands materially above 2.6x,
+   the operator's approval no longer covers what shipped -- STOP and ask him.
+2. **No-op gate (Codex), the sharper one:** acceptance needs a published episode
+   in `otr/obs/` **AND positive evidence stage two EXECUTED** -- count the
+   loader's own log line the way `scripts/otr_ltx25_encoder_load_audit.py` does,
+   never the adapter's claim. Three instruments on this item have reported
+   success while doing nothing.
+
+**READY TO GO:** code-grounded plan + anchor at
+`kibitz-runs/2026-08-20-ltx25-two-stage/{plan.md,driver_anchor.md}` (gitignored,
+local only). Four open forks are in section 6. The arc was NOT started -- the
+operator's usage ran out first, and an 8-call campaign begun now would have died
+mid-flight and could never be reported as a full arc.
+
+**THE BIGGEST FINDING OF THE SESSION IS ABOUT THE LAB, NOT THE VIDEO.** The lab
+does **not** CPU-pin the LTX text encoder and production **does**
+(`_cpu_pinned_clip_loader`, `eng_ltx25.py:117`). The lab has been loading a
+10.9 GiB Gemma encoder onto the card that production keeps on CPU, so **it has
+been benchmarking a machine ~10.9 GiB heavier than the one that ships**, and
+~50% of lab LTX runs OOM in `CLIPTextEncode` as a result. **Every lab VRAM
+verdict on this lane is suspect until that is fixed** -- including "both arms
+fail the 14.5 gate". That is item B and it is a conformance edit, no arc needed.
+
+**A THIRD FALSE-GREEN INSTRUMENT WAS FOUND AND PARTLY FIXED.** Diffomatic's
+`load_nodes` hardcoded two engines and returned an EMPTY graph for the rest,
+printing "0 differ" -- a clean bill of health for engines it never examined --
+and hardcoded a class name (`WanI2vVideoEngine`) that does not exist. Replaced
+with signature introspection binding `_build_graph` args BY NAME; engines that
+parse went 1 -> 7 of 8. **Still not quotable:** four engines return truncated
+2-node graphs because the request stub short-circuits them, `eng_ltx_av` still
+fails, and the parameter comparator compares wiring against values and attaches
+mismatched reasons.
+
+**ALSO FOUND:** there are TWO `otr/obs` trees. Live is
+`Documents/ComfyUI/output/otr/obs` (83 files, current). ComfyUI's DEFAULT under
+`ComfyUI-Installs/...` is frozen at 2026-06-13 and holds 58 real episodes. The
+OTR launcher overrides correctly with three pins; anything bypassing it publishes
+where he never looks. Do not move or delete either.
+
+**A DRIFT PROBE WAS CONFOUNDED AND THE CATCH MATTERS:** v1 swapped the still to a
+portrait but kept a prompt about a detective at a rainy window, so BOTH arms
+walked to the rainy window. Scoring it as written would have condemned the
+two-stage for obeying its prompt.
+
+**Baselines, all measured this session on a settled tree:** suite
+**11270 / 114 / 1** EXIT=0 (400.90 s), Bible **20 / 26 / 3** at survival-guide
+`adfad04` == origin/main, `build_variants.py --check` **51 / 0**. One regression
+was found and fixed: item I shipped with `test_no_unclassified_legacy_references`
+failing on a comment using the word "Director".
+
+**Commits:** `c5ee6d9d`, `98b01d81`, `495fdc24`, `75903540`, `ba8d3912`,
+`f020c841`, `da1696d2`, `47a0aded`, `ade463f1`. Handoff lands on top.
+
 ## 2026-08-20 -- HEAD 0adb1252 +handoff (v2.0-alpha) -- CODER (item I shipped after four QA rounds; then a day-long grid hunt whose detector turned out to be inverted)
 
 The sha above is the LAST CODE HEAD -- the second-to-last on the branch once
