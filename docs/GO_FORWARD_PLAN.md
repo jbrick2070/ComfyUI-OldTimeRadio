@@ -394,16 +394,36 @@ stands** (2026-08-21 afternoon, workbench `68ce4c5`, verdict
 fixture decisive; "clear" margins pointed in OPPOSITE directions within the
 same cells -- on a t2v lane the arms compose different scenes from one seed,
 so seat margins are substantially scene luck, anticipated in the pre-declared
-matrix). What is directional favors the shipped value: the 0.5 arm moves
-25-38% LESS on every cell, and the march fixture -- the first
-motion-DEMANDING fixture in the programme, added because lane 2's critic
-proved a motion claim cannot come from stillness prompts -- shows ours playing
-its instruments where half carries them. A/A null 97/97 byte-identical,
-overlay check ran before the panel, the ManualSigmas ADAPT worked first try
-off the census flag. Bound: same-file-only (rank-111 LoRA stays
-download-gated). **The lane 3 completeness critic has NOT yet run** -- it is
-the next window's FIRST act, and the verdict may gain a corrections section
-from it, as lane 2's did.
+matrix). A/A null 97/97 byte-identical, overlay check ran before the panel,
+the ManualSigmas ADAPT worked first try off the census flag.
+
+**THE LANE 3 COMPLETENESS CRITIC HAS NOW RUN (2026-08-21), AND IT CORRECTED
+THIS ENTRY. Every item below was re-verified by the driver against the real
+files before being folded into `verdicts/lane3_ltx_video.md`:**
+* The panel margin count was **10 clear**, not 9 (9 was the half-column total
+  pasted into the margin sentence).
+* The 0.5 arm does move less in 6 of 6 cells, but the range is **-6.4% to
+  -37.9%, median -26.3%** -- NOT the "25-38% on every cell" this entry used to
+  claim. March at seed 20260821 is only -6.4%.
+* **The "ours plays its instruments" read is WITHDRAWN.** Two of three seats at
+  march/seed42 record the opposite: half delivers the prompt's five brass
+  players while ours decays to 3-4 with deformations. Only the half-dressed
+  figure at f097 survives. NO WIN still stands, but on the BURDEN OF PROOF --
+  the candidate showed no material gain -- not on ours being visibly better.
+* **New bound, and it is the material one: the knob was screened on the
+  TEXT-ONLY path while `OTR_ENABLE_LTX_I2V` defaults to `"1"`**
+  (`eng_ltx_video.py:931`). Production conditions on an image by default, so
+  the null is bounded to t2v and the i2v question is a genuinely open NEW lane.
+* Arm-to-arm NCC, never computed during the lane, is **0.14-0.74 across all six
+  cells** -- every one under lane 1's ~0.90 admission line. That CONFIRMS the
+  scene-luck reasoning and explains why 9-8 carries no signal.
+* `seat1_full` and `seat2_full` were **byte-identical image sets** in all six
+  cells, and disagreed in 3 of 6. That is the judge noise floor, measured free.
+* Read order landed **14 candidate-first / 4 ours-first**; `seat_plan` has no
+  balance constraint, so lane 2's defect moved from seat1 to seats 2 and 3.
+* `PANEL_META.json` / `PANEL_PROMPTS` were **not archived** for lane 3, so its
+  judge model and questions are permanently unrecorded. Enforce in the harness.
+Bound unchanged: same-file-only (rank-111 LoRA stays download-gated).
 
 **ALL THREE VOTED LANES ARE NOW CLOSED, ALL NO WIN, ALL SHIPPED RECIPES
 CONFIRMED WITH RECEIPTS.** Per the standing ROI ruling ("If no rendered
