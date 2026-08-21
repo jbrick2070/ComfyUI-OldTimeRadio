@@ -239,9 +239,14 @@
     A/B changed only that branch: OFF was clean; ON reproduced the operator's
     square grid. The production capability is now disabled and old caches are
     invalidated with engine version 2.
-  * The separate utility 2K workflow is not the base generation recipe. OTR
-    delivers the native mint here; any downstream upscaling remains a separate
-    pipeline choice.
+  * **CORRECTION, 2026-08-21:** the separate utility 2K workflow is not the base
+    generation recipe, but it is also not a pixel-only ESRGAN finish. Template
+    `utility_z_image_turbo_2k_upscaler.app.json` from package `0.1.50`, SHA-256
+    `558882D2E81563A131DE99C4ED425F56EEEA3F56C37B1E5D0400260BA20D1EE1`, runs
+    input normalization -> RealESRGAN x4 -> 0.5 downscale -> VAE re-encode -> a
+    five-step Z-Image refine at CFG 1 / `dpmpp_2m_sde` / `beta` / denoise 0.33
+    -> decode. OTR has not implemented or tested that exact topology. It remains
+    an UNCLASSIFIED separate candidate, not authority to change the base graph.
 
 #### Parameter & Widget Deltas:
 | Parameter | Reference Template | Our Recipe | Classification |
@@ -251,6 +256,7 @@
 | **Canvas** | 1024x1024 | request-owned wide canvas | **ADAPT** -- canonical downstream contract is 16:9. |
 | **Image reference** | absent | absent in production | **OUT** -- generic `ReferenceLatent` caused the grid in a matched live A/B. |
 | **Upscaling** | absent from base workflow | absent from still graph | **MATCH** -- utility upscaling is a different workflow. |
+| **2K utility refine** | x4 ESRGAN -> net x2 -> VAE re-encode -> five-step diffusion refine | optional pixel-only x2plus Spandrel lane | **UNCLASSIFIED** -- exact utility topology has not been implemented or A/B-qualified. |
 
 ---
 

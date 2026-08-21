@@ -67,6 +67,30 @@ normalizer/differ version, the complete difference set, each IN/ADAPT/OUT ruling
 and any accepted artifact hashes. Never inherit a ruling solely from the LTX 2.5
 precedent or from a matching class name.
 
+## Fleet-wide lessons that do transfer
+
+These are method rules, not model recipes:
+
+1. A hash proves exact identity, not quality, compatibility, or causation.
+2. Template presence and template absence are both evidence. Neither is an
+   automatic command to add or remove a stage.
+3. A registered node, a valid graph, and `SUCCESS` prove structural execution;
+   they do not prove clean pixels, useful conditioning, or a non-dormant effect.
+4. Base generation, reference conditioning, audio conditioning, and utility
+   upscale/refine workflows are separate recipe families. Hash and compare all
+   relevant official graphs; never let a base-workflow match hide a utility.
+5. Matched inputs and native-pixel evidence outrank a clever scalar. The prompt
+   must describe the supplied still, the non-target variables must stay fixed,
+   and any automated scorer must survive cases where detail and defects move in
+   opposite directions.
+6. Preserve OTR's product contracts while adapting graph representation: role
+   assets and prompts, identity/continuity, master-audio authority, frame and
+   delivery geometry, executor receipts, and the live publish boundary.
+7. Semantic graph changes require a cache/engine-version break, positive proof
+   that the changed branch ran, and a fresh product artifact.
+8. Visible payoff is evaluated before integration complexity and cost are
+   accepted. A plausible graph earns a candidate slot, not production authority.
+
 ## Visual-payoff gate
 
 Only after the complete diff may GPU time be spent on candidate differences
@@ -115,6 +139,16 @@ Turbo transport:
   ReferenceLatent` branch and both sampler rewires. The official base graph did
   not use that semantic path, and a matched fresh-boot OFF/ON A/B proved that ON
   recreated the square grid even though both arms executed successfully.
+
+**UNCLASSIFIED separate candidate:** Comfy package `0.1.50` also ships
+`utility_z_image_turbo_2k_upscaler.app.json` (SHA-256
+`558882D2E81563A131DE99C4ED425F56EEEA3F56C37B1E5D0400260BA20D1EE1`). It is
+not a pixel-only ESRGAN finish: normalize the input to 1 MP, RealESRGAN x4,
+downscale by 0.5 for net 2x, VAE-encode, run a five-step Z-Image refine at CFG
+1 / `dpmpp_2m_sde` / `beta` / denoise 0.33, then decode. OTR has not implemented
+or tested that exact path. Its broad "upscale then short refine" shape resembles
+LTX 2.5, but its pixel/re-encode mechanism, prompt/negative, model transport,
+sampler, and denoise semantics need their own complete diff and matched A/B.
 
 Both cases froze inputs, grounded the real graph, used native pixels rather than
 success labels or a broken scalar, invalidated old caches, and closed with a live

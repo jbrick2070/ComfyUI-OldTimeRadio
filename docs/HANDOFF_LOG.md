@@ -3,6 +3,57 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 07:23 -- HEAD 7a0aa7c6 +this (v2.0-alpha) -- CODEX DRIVER (Z-Image/LTX similarity found: official 2K refine restored to the candidate set)
+
+The sha above is the last repository head before this docs-only correction. A
+commit cannot contain its own hash; verify the authoritative post-handoff sha
+against `origin/v2.0-alpha`.
+
+**NEW GROUNDED FINDING: Z-IMAGE ALSO HAS AN OFFICIAL TWO-PASS HQ SHAPE.** The
+package `0.1.50` base workflow and 2K utility are separate hashed sources: base
+SHA-256 `307904F13211CFA5405B308E748EF8035C68991B5BB4CFD4733DAED9BC511B77`;
+utility SHA-256 `558882D2E81563A131DE99C4ED425F56EEEA3F56C37B1E5D0400260BA20D1EE1`.
+The utility normalizes the input to 1 MP, runs RealESRGAN x4, downsizes 0.5 for
+net x2, VAE-encodes that image, performs a five-step Z-Image refine at CFG 1 /
+`dpmpp_2m_sde` / `beta` / denoise 0.33, then decodes.
+
+**THIS IS THE REAL HIGH-LEVEL SIMILARITY TO LTX 2.5:** both official HQ shapes
+upscale and then spend a short diffusion pass restoring/resolving detail. The
+mechanics are not interchangeable: Z works in pixels, re-encodes and denoises;
+LTX upscales the model latent, re-anchors the same still and refines on explicit
+sigmas. The resemblance earns Z's utility an UNCLASSIFIED candidate slot, not
+an inherited IN ruling.
+
+**THE EARLIER CENSUS DESCRIPTION WAS INCOMPLETE.** Calling the Z utility merely
+separate downstream upscaling hid its second diffusion pass. OTR's current
+optional Spandrel route uses x2plus pixels only and has never implemented or
+tested the exact official Z utility. A hash-pinned RealESRGAN_x4plus `.pth`
+transport is already installed while the template names `.safetensors`; that is
+an ADAPT question, not a reason to download. A complete byte/semantic diff must
+also decide what to do with the utility's generic `masterpiece, 8k` prompt,
+empty negative, `lumina2` loader type and CFG 1 without surrendering OTR's
+story/style authority.
+
+**GENERIC LESSONS THAT SURVIVE BOTH CASES:** hashes prove identity, not quality;
+template presence and absence are evidence, not commands; graph `SUCCESS` does
+not prove clean or useful pixels; base and utility graphs need separate receipts;
+matched native-pixel evidence beats an unvalidated scalar; OTR product contracts
+remain ADAPT boundaries; semantic graph changes invalidate caches; and a visible
+gain must exist before cost or integration complexity is accepted.
+
+**Z A/B RECEIPT CAVEAT:** the historical OFF/ON JSON files predate the finished
+harness schema. They contain graph hashes, matched parameters, the shared input
+portrait hash and `SUCCESS`, but not the later `history_success_with_output` or
+`output_artifacts` fields. The two PNGs exist and their bytes/hashes can be
+independently recomputed; the later canonical OBS episode separately closes the
+production fix. Do not claim the newer fields are present in the old receipts.
+
+**SCOPE:** documentation and queue correction only. No code, workflow, model,
+render, output, server, or episode changed. The rejected generic Z-Image
+`ReferenceLatent` path remains OUT. The separate official 2K refine is now first
+in the complete-diff queue, followed by `wan_ti2v`; Wan I2V's exact high-noise
+download remains frozen pending explicit authorization.
+
 ## 2026-08-21 07:17 -- HEAD 7fb50411 +this (v2.0-alpha) -- CODEX DRIVER (operator correction: complete per-engine logic hash before candidate renders)
 
 The sha above is the last repository head before this docs-only correction. A

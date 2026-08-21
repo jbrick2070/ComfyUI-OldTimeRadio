@@ -83,7 +83,7 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 07:17 -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 07:23 -- READ THIS FIRST
 
 **POST-CODE QA IS CLOSED; DO NOT RUN IT AGAIN.** The prior Codex driver finished
 at `eca57cb1`, and the later scoped finished-diff review, full suite and mixed
@@ -105,14 +105,15 @@ Only an explicit operator authorization for that exact filename reopens this
 lane.
 
 **EXECUTABLE NEXT WITHOUT A DOWNLOAD: COMPLETE THE HASH-BOUND TEMPLATE DIFF,
-STARTING WITH THE NEXT INSTALLED RUNNABLE ENGINE (`wan_ti2v`).** Lab commit
-`38d4ae0` is the grounded source census; it is not the completed decision diff.
-Before choosing render arms, freeze the exact reference bytes and OTR
-source/topology hashes, then exhaustively compare every executed class, input
-literal, output slot, and wire. Normalize only serialization noise. Until that
-enumeration is complete, every material difference remains on the table as
-UNCLASSIFIED -- do not preselect UniPC/Euler, step count, shift, decoder, or any
-other shortlist and quietly discard the rest.
+STARTING WITH THE MISSED Z-IMAGE 2K UTILITY, THEN THE NEXT INSTALLED RUNNABLE
+ENGINE (`wan_ti2v`).** Lab commit `38d4ae0` is the grounded source census; it is
+not the completed decision diff. Before choosing render arms, freeze the exact
+reference bytes and OTR source/topology hashes, then exhaustively compare every
+executed class, input literal, output slot, and wire. Normalize only
+serialization noise. Until that enumeration is complete, every material
+difference remains on the table as UNCLASSIFIED -- do not preselect
+UniPC/Euler, step count, shift, decoder, or any other shortlist and quietly
+discard the rest.
 
 **THE LTX 2.5 LOGIC HASH IS A PRECEDENT, NOT A UNIVERSAL MODEL ALGORITHM.** The
 source SHA proves which exact graph was reviewed. The durable rule `NO APPROVED
@@ -125,6 +126,22 @@ setting does not inherit LTX's ruling. The worked counterexample is already in
 this repo: LTX's model-native same-still re-anchor was admitted, while Z-Image's
 generic reference-latent injection was rejected after it visibly created the
 grid. The shared method produced opposite, correct model-local rulings.
+
+**THE FIRST CENSUS OMISSION IS NOW IDENTIFIED: Z-IMAGE'S OFFICIAL 2K UTILITY IS
+A REAL TWO-PASS REFINE, NOT JUST ESRGAN.** Comfy package `0.1.50` template
+`utility_z_image_turbo_2k_upscaler.app.json`, SHA-256
+`558882D2E81563A131DE99C4ED425F56EEEA3F56C37B1E5D0400260BA20D1EE1`, runs
+input normalization -> RealESRGAN x4 -> 0.5 downscale -> VAE re-encode -> a
+five-step Z-Image refine at CFG 1 / `dpmpp_2m_sde` / `beta` / denoise 0.33 ->
+decode. OTR's current optional Spandrel lane is pixel-only x2plus and does not
+qualify this graph. A hash-pinned RealESRGAN_x4plus `.pth` transport is already
+installed; the template names a `.safetensors` package, so that packaging delta
+must be classified, but no download is authorized or currently needed. Keep the
+corrupt generic `ReferenceLatent` path OUT; keep this separate HQ utility
+UNCLASSIFIED until its full graph diff, matched still A/B, native-pixel AI
+judgment, cost, and identity/content preservation are recorded. Do not blindly
+copy its generic `masterpiece, 8k` prompt, empty negative, `lumina2` loader type,
+or CFG 1 over OTR's story/style authority.
 
 **ONLY THEN SPEND GPU TIME ON THE CANDIDATES THE COMPLETE DIFF EXPOSES.** Use
 matched inputs and change one difference, or one irreducible topology, at a
@@ -496,7 +513,8 @@ derive an engine-local IN / ADAPT / OUT receipt rather than copying LTX 2.5's
 logic; then use matched GPU evidence and native-pixel AI visual judging to decide
 whether the visible payoff is worth chasing. Adoption still requires executor
 evidence and a fresh `otr/obs` publication. The completed LTX lanes are not the
-start point; the current-step block names the next installed runnable engine.
+start point; the current-step block names the missed Z utility first and the next
+installed runnable video engine after it.
 
 ### ALSO QUEUED IN THE LAB
 
