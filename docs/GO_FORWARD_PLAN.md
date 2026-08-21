@@ -103,6 +103,37 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   `LTXVImgToVideoInplace` 1.0 re-anchor -> a 3-step refine on sigmas
   `[0.85, 0.725, 0.4219, 0]` -> decode once at 1536x1024. **We run stage one
   only** and stretch 2.31x in ffmpeg afterwards.
+* **THE CORRECTED TWO-STAGE PROBE RAN AND IT IS NOT A VRAM PROBLEM (lab/Codex,
+  2026-08-20 evening -- SUPERSEDES the failed 16:27 attempt below).** Wiring
+  fixed as specified, all `/object_info` checks live, detector `--selftest`
+  PASSED before scoring, artifact independently `ffprobe`d: **h264, 1664x960,
+  97 frames, 25 fps**. Receipts reconcile (`net + baseline == absolute`).
+
+  | | absolute | net | baseline | wall clock |
+  |---|---|---|---|---|
+  | one-stage control | 15.479 | 14.493 | 0.986 | 97.5 s |
+  | two-stage | 15.516 | 13.879 | 1.637 | 255.4 s |
+
+  **THE GATE IS ABSOLUTE PEAK** (lab's call, accepted -- absolute is what OOMs a
+  16 GB card; `run_recipe.py:9508`). **The consequence must be read honestly:
+  BOTH ARMS FAIL IT.** Control is over by 0.979, two-stage by 1.016 -- the
+  two-stage is **37 MB worse than the path we ship every day**, and the two runs
+  started **651 MB apart in baseline residue** (the receipt notes baseline
+  *"includes owned lab server and desktop load"*). **So VRAM does not
+  distinguish the arms and never did. It did not OOM.**
+* **THE REAL COST IS TIME: 255.4 s vs 97.5 s = 2.619x per shot**, multiplied
+  across every shot by per-segment rendering.
+* **AND THE GRID IS STILL UNMEASURED, which is the only thing that decides the
+  item.** The delivered frame scored **5.961 against a 3.821 control**, but it
+  is a 2x output and the latent upsample doubles the grid's PERIOD, so the
+  detector may be reading the wrong spatial frequency. "Much worse" and "not
+  measured properly" are both live and point opposite ways. **The one
+  outstanding measurement: score BOTH arms through the SHIPPED delivery chain at
+  1920x1080** (control stretches 2.31x, two-stage ~1.15x), `unsharp` untouched,
+  same seed and frame. Request:
+  `vram-recipe-lab/LAB_MINI_REQ_ltx25_two_stage_grid_comparable.md`.
+  **Grid visibly better -> operator call on 2.6x render time. Same or worse ->
+  the item closes on evidence.**
 * **THE FEASIBILITY PROBE RAN 2026-08-20 16:27 AND IT ANSWERED NEITHER HALF OF
   THE GATE. DO NOT READ ITS `FAIL` AS "DOES NOT FIT".**
   `vram-recipe-lab/results/ltx_2_5_two_stage.json` reads
@@ -199,7 +230,20 @@ down the path the Bible forbids.
   `if not superseded_names: return response, None`. Layer 3 lives inside layer
   2, so it is inert too. **`media_archive` has NO cover at all today**, and
   scoping its item as "layer 2 already half-covers it" would be scoping it
-  against a guard that never runs. **Corrected lower bound: >= 68 row occurrences / 40 ledger files, >= 65
+  against a guard that never runs.
+* **CAST-FIRST IS A STANDING OPERATOR RULING (2026-08-20): "no cast first, cast
+  must be first."** Raised because the operator himself proposed deriving
+  `media_archive`'s cast from the finished script the way `scifi_news_pro` does
+  -- which would make the wrong-person defect impossible by construction rather
+  than caught. **Priced and then REFUSED BY HIM, and the refusal is what
+  binds.** The price was small in fields (Lemmy cameo and voice-uniqueness are
+  already handled on that path; the row delta is exactly ONE field,
+  `speech_signature`, plus two meta stamps) but large in shape: it inverts the
+  deliberate 2026-05-10 **"LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER"** order
+  (`OTR_LedgerScriptWriter.py:4095-4106`), where `generate_outline` CONSUMES the
+  locked cast. **Do not re-propose script-derived casting for any lane that runs
+  the writer, and do not let a panel round reopen it.** The remaining fork is a
+  lane-specific identity key vs a lane-neutral one on the shared source payload. **Corrected lower bound: >= 68 row occurrences / 40 ledger files, >= 65
   copied into portraits, Aug 1-17 >= 21/37 dirty -- plus an unmeasured
   media_archive population.** The 40-rows/26-episodes figure came from a throwaway
   script, is NOT reproducible from the instrument, and must not be quoted.
