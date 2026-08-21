@@ -3,6 +3,49 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 MORNING -- HEAD 7ec5b229 +handoff (v2.0-alpha) -- FABLE audit window (corpus audited, fleet diffed grounded, assembly line voted, lane 1 staged)
+
+**Did (all pushed, all verified == origin):** OTR `7ec5b229` + this handoff;
+baseline-models `9d1ab97` (corpus snapshot -- it was ONE git clean from
+oblivion), `ba6bdb7` (grounded differ + receipts adopted as that repo's tool),
+lane-1 staging; survival-guide `3ac4d9b` (**12.121**, 300 entries, suite
+22/26/3 green after I caught my own masked count failure).
+
+**The fleet verdict the operator asked for: largely clean.** 11 exact
+byte-hashed references, 2 qualified stand-ins, 17 no-reference-by-design, 0
+errors. Deltas are overwhelmingly documented VRAM discipline; the 2.3 lanes
+run a FULL-PRECISION text encoder where the template ships fp8. Live
+candidates + method + lane order: GO_FORWARD "ASSEMBLY LINE" section.
+
+**Operator rulings this window:** no VRAM ceremony on quality A/Bs (OOM = a
+plain admitted fault); Z-Image 2K utility DECLINED for now; baseline-models is
+the clean home for the differ; option 1 (assembly line) voted; no Sonnet army
+for byte-diffs -- deterministic purity script instead.
+
+**His lesson, promoted as `12.121` and saved to memory:** the grid rode in on
+the z_image_turbo stills, so six video-lane eliminations could never have
+worked; and the drift probe's prompt contradicted its still, so both arms
+obeyed the prompt. An uncontrolled shared variable voids every arm.
+
+**Corpus audit (his six criteria):** filenames real (spot-checked on disk),
+Reference rows honest, adaptations recorded as prose -- but fetcher destroys
+upstream bytes (json.loads->dumps), refs float on main, no hashes/licenses,
+validator is subgraph-blind (4 graphs with UUID subgraph types reported clean,
+node_count~3) and never touches /object_info, and 9 of 19 adapted graphs have
+NO upstream source (reconstructions -- minimax_h3 among them, unusable as a
+diff reference). All recorded in the plan; fixes are Antigravity's lane.
+
+**Next window (Opus): lane 1.** Finish `build_arms.py` (LoadedGraph.graph_nodes
+is a TUPLE -- read one element first; two shape-guesses already spent), run the
+deterministic purity gate, render 2 seeds x 2 arms best-effort on a fresh
+server (section 4 reset; the OTR launcher, WAN lane), frames to the operator's
+eye + one VLM both orders. Measurement only -- adoption goes through the OTR
+gates.
+
+**No OTR production code touched this window -- docs only**, so the CURRENT
+STEP's own baselines stand. Bible re-measured: **300 entries, 22/26/3,
+`3ac4d9b` == origin/main.**
+
 ## 2026-08-21 07:42 -- HEAD e2d97b89 +this (v2.0-alpha) -- CODEX DRIVER (`baseline-models` material lane recorded; corpus yes, fleet campaign gated)
 
 The sha above is the last OTR head before this docs-only handoff. A commit cannot

@@ -238,6 +238,43 @@ ultra-smoke is no longer future work; the mixed episode above covered it.
   `vram-recipe-lab/template_sweep/_invalid_false_green_20260820/`, never
   quotable.
 
+### THE ASSEMBLY LINE IS VOTED AND LANE 1 IS STAGED (operator vote "1", 2026-08-21)
+
+**Method, fixed:** one lane at a time in `basline-models` (the workbench); OTR
+is untouched until a verdict says WIN. Per lane: STAGE two arm graphs generated
+FROM THE SHIPPING ENGINE (identical by construction) -> PURITY GATE -> RENDER
+best-effort (no VRAM ceremony; an OOM is a plain fault) -> JUDGE (operator eye
++ one VLM, both orders, countable questions) -> commit a verdict file -> only a
+WIN becomes an OTR item (knob = Sonnet QA on the diff; design = arc), wired
+into `otr_canonical.json` in the same change, suite, live episode in obs.
+
+**THE PURITY GATE IS A DETERMINISTIC SCRIPT, NOT A MODEL FANOUT (operator
+asked; answered 2026-08-21).** "Sonnet army" for byte-diffs = credits doing a
+script's job. The gate asserts the two arms' changed-parameter set equals the
+declared contrast set exactly (Bible `12.121`). Model seats that remain: ONE
+Sonnet QA pass on a WINNING lane's diff before integration, and vision judging
+of frames.
+
+**Lane order:** (1) `wan_ti2v` sampling recipe -- contrast set exactly
+{KSampler.sampler_name uni_pc-vs-euler, KSampler.steps 20-vs-30,
+ModelSamplingSD3.shift 8-vs-5}, bundled as a SCREEN, decompose only on a win;
+(2) `ltx25` stage-1 anchor 0.7-vs-1.0; (3) `ltx_video` LoRA strength
+0.5-vs-0.7. Download-gated (operator authorization only): official 1.1
+dynamic rank-111 LoRA; wan high-noise expert (already frozen).
+
+**Lane 1 state:** `basline-models/staging/lane1_wan_ti2v/build_arms.py` is ONE
+step from staging both arms: `diffomatic._build_engine_graph` returns a
+`LoadedGraph` whose `.graph_nodes` is a TUPLE (not a dict) -- inspect one
+element, finish `to_api`, write `arm_ours.json` / `arm_official.json` +
+`ARMS.sha256`. Prompt/fixture already matched to the still per `12.121`
+(officer close-up + `portrait_16_9.png`). Two failed shape-guesses already
+spent; the next window READS the structure first.
+
+**Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
+morning: an uncontrolled second variable voids every arm of a visual A/B (the
+grid rode in on the stills; the drift probe obeyed its prompt). Another window
+independently promoted `12.120` overnight; both stand.
+
 ## RECENT DECISIONS AND OPEN FOLLOW-UPS -- CURRENT STEP ABOVE IS AUTHORITATIVE
 
 Everything below is a standing ruling, an open follow-up, or a receipt explaining
