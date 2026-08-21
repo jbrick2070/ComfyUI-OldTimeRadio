@@ -347,6 +347,57 @@ and `LTX25_FULL_DIFF_vs_official.md`.
   texture reaches it by ~32%. Delivery-side, cheap, reversible -- an operator
   eyeball call, not a defect fix.
 
+### THE ALL-VIDEO-MODELS TEMPLATE SWEEP -- STARTED, AND NOT YET QUOTABLE
+
+**Operator's ask (2026-08-20): pull the shipped ComfyUI reference template for
+every video model, diff it against what we run, A/B the differences, and let the
+models judge.** His reason is the right one: *"im worried we're leaving quality
+on the table and people get my repo and say why do you have all these [mutant]
+video gens."* Diffomatic's own docstring makes the same argument -- *"If it was
+true for the engine we scrutinise most, it is unchecked everywhere else."*
+
+**WHAT IS TRUE SO FAR:**
+* **The method validates.** Pointed at `video_ltx2_5_i2v.json`, Diffomatic
+  independently rediscovers `LatentUpscaleModelLoader` and the
+  `0.85, 0.725, 0.4219` refine sigmas -- i.e. it finds the two-stage answer
+  without being told. 522 templates ship in
+  `comfyui_workflow_templates_json/templates/`; `engine_template_map.json`
+  already maps 12 engines with 20 correctly classified as having no upstream
+  reference.
+* **A SILENT DEFECT WAS FOUND AND FIXED, and it is the same failure class as the
+  two grid detectors.** `load_nodes` hardcoded exactly two engines and returned
+  an EMPTY graph for everything else. An empty OURS side reports
+  **"0 parameters identical, 0 differ"** -- which reads as a clean bill of
+  health for an engine that was never examined at all. It also hardcoded
+  `WanI2vVideoEngine` when the class is `WanI2VEngine`, so that lane crashed.
+  **An instrument that reports success while doing nothing: three for three on
+  this item.** Replaced with signature introspection that binds `_build_graph`
+  arguments BY NAME, because every engine has a different parameter order
+  (`eng_ltx25(plan, image_name, ...)` vs `eng_humo(image_name, audio_name,
+  plan, ...)` vs `eng_wan_i2v(request, image_name, plan, ...)`). **Engines that
+  parse: 1 -> 7 of 8.**
+
+**WHY IT IS STILL NOT QUOTABLE, and no sweep number may be cited yet:**
+* `eng_humo`, `eng_ltx_8gb`, `eng_wan_i2v` and `eng_wan_ti2v` each return only
+  **2 significant nodes** -- implausible for a full video pipeline. The
+  permissive `request` stub short-circuits their branching, so those graphs are
+  TRUNCATED, not clean. A truncated graph produces the same false "no
+  differences" as an empty one.
+* `eng_ltx_av` still fails to build (its builder lives on the private
+  `_LtxAvBase`).
+* **The parameter half is separately unreliable** and this is visible in its own
+  output: it compares WIRING against VALUES (`ours: ["cond", 1]` against
+  `reference: 1`, `ours: ["loadimage", 0]` against a resize mode) and it
+  attaches MISMATCHED reasons -- a `RandomNoise.noise_seed` delta "explained" by
+  a comment about CFG values. That is the same fabricated-provenance class the
+  differ lane was already told to fix.
+
+**NEXT, in order:** give each engine a realistic request fixture instead of a
+stub; fix `_LtxAvBase`; make the parameter comparator drop wiring and bind each
+reason to the constant it actually annotates. **Only then does a sweep result
+mean anything** -- and the operator's question deserves a real answer, not a
+table of zeros that looks like reassurance.
+
 ### ALSO QUEUED IN THE LAB
 
 * **FLF2V feasibility probe** -- first-and-last-frame conditioning for
