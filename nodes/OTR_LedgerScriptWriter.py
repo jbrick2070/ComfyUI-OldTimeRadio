@@ -1621,6 +1621,23 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
     import random
     env = os.environ.get("OTR_CAST_SEED", "").strip()
     if env:
+        # OTR_CAST_SEED WITHOUT OTR_C7 IS ALMOST ALWAYS A LEAK, not a choice.
+        # The soak launcher only ever sets this variable inside its C7 branch,
+        # and it sets OTR_STYLE_SEED alongside it. A lone CAST_SEED therefore
+        # means an inherited value from some earlier shell -- which is exactly
+        # what happened on 2026-08-22, when all four legs of a motion-module
+        # bake-off cast GULLIVER REEVES and the operator caught it by watching
+        # the episodes rather than by reading a log. Say so at WARNING, name
+        # the cast it will produce, and name the variable to clear.
+        if not os.environ.get("OTR_C7", "").strip():
+            log.warning(
+                "CAST SEED IS PINNED TO %s BUT OTR_C7 IS NOT SET. Every "
+                "episode from this server will open with the SAME cast (seed "
+                "42 rolls HAYES VANCE / GULLIVER REEVES / JIMBO BLACK). This "
+                "is a leaked environment variable unless you meant it -- a "
+                "real byte-identity run sets OTR_C7=1 as well. Clear it with "
+                "`set OTR_CAST_SEED=` and reboot the server to get fresh "
+                "per-episode casting back (BUG-LOCAL-269).", env)
         return int(env), "OTR_CAST_SEED override"
     return random.SystemRandom().getrandbits(32), "OS entropy"
 

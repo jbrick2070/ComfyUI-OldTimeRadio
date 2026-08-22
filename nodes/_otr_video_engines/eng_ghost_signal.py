@@ -884,6 +884,16 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "out_path": out_path,
             "frame_count": int(proven),
             "recipe": self._recipe_receipt(),
+            # THE DIAL'S POSITION IS PART OF THE RECORD, not an implementation
+            # detail. Without it a strength-0 render is bit-for-bit the clean
+            # lane -- ComfyUI's LoraLoader returns the model UNPATCHED at 0 and
+            # never even opens the adapter -- while stamping a haunted recipe,
+            # and nothing downstream could tell the two apart. The recipe id is
+            # a constant, so it can only say WHICH lane ran, never WHAT it
+            # applied.
+            "domain_adapter": self.lora_name,
+            "domain_adapter_strength": (
+                float(self.lora_strength) if self.lora_name else None),
             "render_canvas": "%dx%d" % (GHOST_CANVAS_W, GHOST_CANVAS_H),
             "vram_peak_mb": None,        # no measurement campaign was authorized
         }
@@ -896,6 +906,24 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             plan["source_request"], decoded, raw["cadence_tail_trim"],
             GHOST_CANVAS_W, GHOST_CANVAS_H, GHOST_DELIVERY_W,
             GHOST_DELIVERY_H, GHOST_DELIVERY_SCALE_MODE)
+        if self.lora_name:
+            applied = float(self.lora_strength)
+            # Stated on EVERY haunted beat, because the operator reads the leg
+            # log to know what he is looking at and the recipe id cannot tell
+            # him which strength produced the picture.
+            _LOG.info("%s: domain adapter %s at strength %.4f",
+                      self.name, self.lora_name, applied)
+            if applied == 0.0:
+                # Not refused -- this is the legitimate adapter-off control arm
+                # of a strength sweep. But it is INDISTINGUISHABLE from the
+                # clean lane by eye, so it says so out loud rather than letting
+                # a published episode quietly imply the adapter did something.
+                _LOG.warning(
+                    "%s: strength is 0.0, so ComfyUI returns the base model "
+                    "UNPATCHED -- this beat is the clean %s picture under a "
+                    "haunted receipt. That is the adapter-off control arm; if "
+                    "it was not meant, %s was not read.",
+                    self.name, "animatediff15_v3", "OTR_GHOST_HAUNTED_LORA_STRENGTH")
         return raw
 
     def _release_sampling_patchers_before_decode(self, owners):
@@ -960,6 +988,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                         del tracked[index]
 
         owners.pop("ade_model", None)
+        # The adapter patcher is released beside the other two and must be
+        # dropped beside them as well. ModelPatcher.clone() SHARES the
+        # underlying module, so a retained adapter handle keeps the whole base
+        # model family reachable and quietly defeats the base release it sits
+        # next to.
+        owners.pop("lora_model", None)
         owners.pop("base_model", None)
 
     # ---- canonicalize ---------------------------------------------------- #
@@ -1015,6 +1049,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "engine_id": self.name, "family": self.family,
             "vram_peak_mb": raw.get("vram_peak_mb"),
             "recipe": raw.get("recipe"),
+            "domain_adapter": raw.get("domain_adapter"),
+            "domain_adapter_strength": raw.get("domain_adapter_strength"),
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
             "render_canvas": raw.get("render_canvas"),

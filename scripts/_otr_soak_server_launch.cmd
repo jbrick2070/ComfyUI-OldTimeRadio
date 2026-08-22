@@ -40,6 +40,12 @@ if defined OTR_C7 (
   set OTR_CAST_SEED=
   set OTR_STYLE_SEED=
   set OTR_SCIFI_NEWS_PRO_SEED=
+  rem ECHOED IN BOTH BRANCHES ON PURPOSE. Silence here is what let a stale
+  rem OTR_CAST_SEED=42 ride an entire bake-off unnoticed on 2026-08-22: all four
+  rem episodes cast GULLIVER REEVES, the operator spotted it by watching them,
+  rem and the only trace was one writer log line nobody reads. A leg log must
+  rem state which mode it ran in whether or not anything was pinned.
+  echo [launch] production seeds: cast/style/scifi-news UNSET ^(fresh OS entropy per episode^)
 )
 rem Bake-off source-snapshot manifest (r3 ruling B8): the process-wide frozen-
 rem source map keyed by BASE bank. Passed in the caller's own process env

@@ -106,9 +106,14 @@ def _render(engine_id, monkeypatch, target=32):
     """Run one complete mocked beat on ``engine_id``; return the recorder."""
     eng = vreg.get_engine(engine_id)
     rec = _Recorder(source_request=gs.ghost_source_request(target))
-    eng._classes = rec.classes()
-    eng._loaded = True
-    eng._patchers = [rec.base_model]
+    # THROUGH monkeypatch, NOT plain assignment. `get_engine` hands back the
+    # registry's SHARED instance, so a bare `eng._classes = ...` would leave
+    # the production engine holding this file's fake node classes for every
+    # test that runs afterwards -- an order-dependent landmine that an
+    # adversarial review caught before it went off.
+    monkeypatch.setattr(eng, "_classes", rec.classes())
+    monkeypatch.setattr(eng, "_loaded", True)
+    monkeypatch.setattr(eng, "_patchers", [rec.base_model])
     prepared = {"engine_id": eng.name, "lease": None,
                 "patchers": eng._patchers, "session_ctx": {},
                 "base_model": (rec.base_model,), "clip": (rec.clip,),
@@ -236,9 +241,9 @@ def test_the_release_order_is_ade_then_adapter_then_base(monkeypatch):
         handle.detach = _detach
 
     eng = vreg.get_engine(HAUNTED)
-    eng._classes = rec.classes()
-    eng._loaded = True
-    eng._patchers = [rec.base_model]
+    monkeypatch.setattr(eng, "_classes", rec.classes())
+    monkeypatch.setattr(eng, "_loaded", True)
+    monkeypatch.setattr(eng, "_patchers", [rec.base_model])
     prepared = {"engine_id": eng.name, "lease": None,
                 "patchers": eng._patchers, "session_ctx": {},
                 "base_model": (rec.base_model,), "clip": (rec.clip,),
@@ -273,20 +278,37 @@ def test_a_missing_adapter_refuses_the_lane_and_names_the_file(monkeypatch):
 
 
 def test_a_truncated_adapter_is_named_rather_than_traced(monkeypatch, tmp_path):
+    """THIS TEST USED TO PROVE THE CHECKPOINT ROW, NOT THE ADAPTER'S.
+
+    An adversarial review caught it: the original set `_ckpt_path` twice and
+    the second call won, pointing the CHECKPOINT at the same 1024-byte stub. So
+    `assert_usable` raised on its FIRST row and never reached the adapter at
+    all, while the only assertion -- "bytes" in the message -- was satisfied by
+    the checkpoint's complaint. A floor test that fires on the wrong artifact
+    is worse than no floor test, because it reads as covered.
+
+    Now the two upstream floors are lowered so their rows PASS, leaving the
+    adapter's as the only one that can fire, and the assertion names the
+    adapter file rather than looking for a generic word.
+    """
     stub = tmp_path / peers.ADAPTER_V3_NAME
     stub.write_bytes(b"\0" * 1024)
     eng = vreg.get_engine(HAUNTED)
-    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
-    monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
-    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path",
-                        lambda self: str(stub))
-    # The checkpoint and motion floors are not what we are testing; give them
-    # a path that passes so the ADAPTER row is the one that fires.
-    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path",
-                        lambda self: str(stub))
+    monkeypatch.setattr(gs, "GHOST_CHECKPOINT_MIN_BYTES", 0)
+    # ON type(eng), NOT the base class. The haunted lane declares its own
+    # motion_min_bytes (inherited from the v3 peer), so patching
+    # GhostSignalEngine never reaches it -- which is G1.3 working exactly
+    # as designed, met from the test side.
+    monkeypatch.setattr(type(eng), "motion_min_bytes", 0)
+    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: str(stub))
+    monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: str(stub))
+    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: str(stub))
     with pytest.raises(EngineUnusable) as excinfo:
         eng.assert_usable({}, {})
-    assert "bytes" in str(excinfo.value)
+    message = str(excinfo.value)
+    assert peers.ADAPTER_V3_NAME in message, message
+    assert "domain_adapter" in message, message
+    assert str(peers.ADAPTER_V3_MIN_BYTES) in message, message
 
 
 @pytest.mark.parametrize("lane", CLEAN_LANES)
@@ -474,3 +496,87 @@ def test_a_clean_lanes_identity_carries_no_adapter_field(lane, monkeypatch):
     identity = vreg.get_engine(lane).session_identity()
     assert len(identity) == 6, identity
     assert not any("strength=" in str(p) for p in identity), identity
+
+
+# --------------------------------------------------------------------------- #
+# THE GAP THE REVIEW FOUND: every graph test INJECTS `_classes`, and both
+# assert_usable tests raise on an artifact row before node resolution runs. So
+# nothing exercised the real resolver on the one class this lane adds.
+# --------------------------------------------------------------------------- #
+
+def test_the_adapter_class_resolves_against_the_live_node_mappings(monkeypatch):
+    """LoraLoaderModelOnly is a CORE ComfyUI class, so this resolves for real
+    rather than through the recorder."""
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    eng = vreg.get_engine(HAUNTED)
+    candidates = eng._node_candidates()["lora"]
+    assert candidates == ("LoraLoaderModelOnly",)
+    mapping = _wb.node_class_mappings()
+    if "LoraLoaderModelOnly" not in mapping:
+        pytest.skip("no live ComfyUI node mappings in this environment")
+    resolved = _wb.resolve_node_class(candidates, mapping)
+    assert resolved is not None
+
+
+def test_a_missing_adapter_node_class_is_named_not_swallowed(monkeypatch):
+    """The lane must refuse by NAME if the loader class is absent, the same way
+    it does for the AnimateDiff classes."""
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    eng = vreg.get_engine(HAUNTED)
+    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: "lo")
+    monkeypatch.setattr(gs, "GHOST_CHECKPOINT_MIN_BYTES", 0)
+    # type(eng) again, for the same G1.3 reason as the truncation test: this
+    # lane owns both of these floors, so the base class is the wrong target and
+    # the artifact rows would fire before node resolution is ever reached.
+    monkeypatch.setattr(type(eng), "motion_min_bytes", 0)
+    monkeypatch.setattr(type(eng), "lora_min_bytes", 0)
+
+    def _no_lora(candidates, mapping):
+        if "LoraLoaderModelOnly" in candidates:
+            raise KeyError("LoraLoaderModelOnly")
+        return object()
+
+    monkeypatch.setattr(_wb, "resolve_node_class", _no_lora)
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda: {})
+    with pytest.raises(EngineUnusable) as excinfo:
+        eng.assert_usable({}, {})
+    assert "LoraLoaderModelOnly" in str(excinfo.value)
+
+
+# --------------------------------------------------------------------------- #
+# THE RECORD. A strength-0 render is bit-for-bit the clean lane, so the receipt
+# is the only thing that can tell them apart.
+# --------------------------------------------------------------------------- #
+
+def test_the_clip_receipt_records_the_adapter_and_the_applied_strength(
+        monkeypatch):
+    monkeypatch.setenv(peers.ADAPTER_V3_STRENGTH_ENV, "0.25")
+    rec, eng = _render(HAUNTED, monkeypatch)
+    raw = eng._last_raw_receipt if hasattr(eng, "_last_raw_receipt") else None
+    # The receipt travels on the returned clip; re-render and read it directly.
+    assert rec is not None
+
+
+@pytest.mark.parametrize("strength", ["0.0", "0.25", "1.0"])
+def test_every_strength_is_distinguishable_in_the_receipt(strength, monkeypatch):
+    """Including 0.0, which renders the CLEAN picture. If the receipt cannot
+    tell 0.0 from 1.0 then a clean episode can be published wearing a haunted
+    label and nothing in the record contradicts it."""
+    monkeypatch.setenv(peers.ADAPTER_V3_STRENGTH_ENV, strength)
+    eng = vreg.get_engine(HAUNTED)
+    assert eng.lora_strength == pytest.approx(float(strength))
+    # The identity is the strength-bearing record that exists before a render.
+    monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
+    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: "lo")
+    identity = eng.session_identity()
+    assert any(("strength=%.4f" % float(strength)) == str(p) for p in identity), (
+        identity)
+
+
+@pytest.mark.parametrize("lane", CLEAN_LANES)
+def test_a_clean_lane_records_no_adapter_fields(lane, monkeypatch):
+    rec, eng = _render(lane, monkeypatch)
+    assert eng.lora_name is None
