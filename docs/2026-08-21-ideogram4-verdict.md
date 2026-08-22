@@ -243,6 +243,28 @@ nothing has to be unwound.**
   attention"*, so r2's SageAttention verify-at-build item is still open. Any
   reopening must run the canonical profile's attention backend and record it.
 
+## A DEFECT IN MY OWN PROBE, and why it does not rescue the verdict
+
+**The operator spotted it: the official template ships PORTRAIT.** Its
+`ResolutionSelector` defaults to `'9:16 (Portrait Widescreen)'`, so anyone
+adopting Ideogram has to request landscape deliberately.
+
+**And my `aspect_ratio` field was malformed.** I sent
+`f"{CANVAS_W}:{CANVAS_H}"` -> `"1472:832"`, i.e. literal pixel dimensions, where
+the caption schema wants a RATIO (`"W:H"`, e.g. `"16:9"`). That is wrong and it
+is recorded here rather than quietly fixed.
+
+**It cannot be the cause of the refusals, for two independent reasons.**
+1. **The renders WERE landscape.** The canvas comes from
+   `EmptyFlux2LatentImage` at 1472x832, not from the text field, and every
+   returned frame is a wide card. Orientation was never portrait in this test.
+2. **The prose arm carried no `aspect_ratio` field at all** and still blocked
+   3 of 3 real production lines. A field that is absent cannot trigger a filter.
+
+**So the NO stands, and this becomes a condition on any reopening:** send a
+proper ratio, request landscape explicitly, and do not inherit the template's
+portrait default.
+
 ## The single reopening condition
 
 **Prose prompts on `announcer_visual` cards only**, and only with:
