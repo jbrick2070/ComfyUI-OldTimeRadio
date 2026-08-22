@@ -107,6 +107,10 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # 16 in its context options is a sliding WINDOW, not a clip ceiling, so
         # there is nothing for the partitioner to split on either way.
         "animatediff15_video",
+        # The two official-module PEERS inherit the same unbounded contract --
+        # they differ only in which motion module they load.
+        "animatediff15_v2_video",
+        "animatediff15_v3_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

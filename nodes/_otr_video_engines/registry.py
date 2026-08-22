@@ -536,6 +536,27 @@ CAPABILITIES = {
     # campaign, so it is recorded admission-unenforced in the evidence manifest
     # and makes no VRAM-fit claim -- see docs/2026-08-22-ghost-signal-
     # dependency-lock.json.
+    # The two OFFICIAL-module peers (2026-08-22). Identical capability shape to
+    # animatediff15_video -- same stack, same FP16 artifacts, same absence of a
+    # cost row. They differ ONLY in which motion module they load, which is the
+    # whole point: a comparison where anything else moved would prove nothing.
+    #
+    # model_requirements names each lane's OWN module so the S5 wizard asks for
+    # the file that lane actually loads.
+    "animatediff15_v3_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "v3_sd15_mm.ckpt"]},
+    "animatediff15_v2_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "mm_sd_v15_v2.ckpt"]},
     "animatediff15_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

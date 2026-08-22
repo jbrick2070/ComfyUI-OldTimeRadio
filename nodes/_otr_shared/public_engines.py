@@ -299,6 +299,20 @@ _PUBLIC_LABEL = {
     # was run for this lane. "very-low-VRAM-targeted" is a design target, so the
     # label says targeted and nothing stronger.
     "animatediff15_video": "AnimateDiff -- Ghost Signal",
+    # THE OFFICIAL-MODULE PEERS. The label names the MODULE, because that is the
+    # only thing that differs and it is what a chooser needs to know. No
+    # low/high token on either: G7.4 says that marker comes from a measurement
+    # receipt, and neither lane has one.
+    #
+    # "Apache-2.0" is IN the label deliberately. The golden lane's module has no
+    # licence at all, and for anyone deciding what to build on, that is the most
+    # load-bearing fact about these two.
+    "animatediff15_v3_video": (
+        "AnimateDiff v3 -- Ghost Signal (official v3 module, Apache-2.0; "
+        "smoother motion, less flicker)"),
+    "animatediff15_v2_video": (
+        "AnimateDiff v2 -- Ghost Signal (official v2 module, Apache-2.0; "
+        "the licensed relative of the default module)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

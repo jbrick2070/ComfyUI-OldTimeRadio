@@ -300,6 +300,20 @@ except Exception:  # noqa: BLE001
     pass
 
 
+# The two OFFICIAL-module Ghost peers (2026-08-22). ADDITIVE: they sit beside
+# animatediff15_video, which is unchanged and remains the lane that rendered the
+# published episode. They exist because the default module ships with NO LICENCE
+# GRANT -- the one blocker to submitting this lane anywhere -- and because the
+# spec's own Phase-0 inventory of v2/v3 was never carried out.
+#
+# Imported AFTER the golden lane because they subclass it. Guarded like every
+# sibling so a packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ghost_signal_official as _eng_ghost_signal_official  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.
 # ---------------------------------------------------------------------------

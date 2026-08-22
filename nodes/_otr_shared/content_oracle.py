@@ -70,6 +70,8 @@ _FAMILY_FALLBACK: dict = {
     # Ghost Signal (2026-08-22). Registry coherence for the bare-script case --
     # NOT an instruction to run the luma/motion oracle on this lane.
     "animatediff15_video": "text_to_video",
+    "animatediff15_v3_video": "text_to_video",
+    "animatediff15_v2_video": "text_to_video",
 }
 
 #: Default mean-luma floor (0..255). A clip whose mean YAVG is at/below this reads

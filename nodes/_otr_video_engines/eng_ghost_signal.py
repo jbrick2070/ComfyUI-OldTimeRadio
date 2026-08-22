@@ -245,6 +245,19 @@ class GhostSignalEngine(_MC.MotionEngineBase):
 
     name = "animatediff15_video"
     family = "text_to_video"
+
+    #: THE PEER-LANE SEAM (2026-08-22). CLASS attributes, not module constants
+    #: read from inside methods, and the distinction is the whole point:
+    #: `eng_fastwan_8gb` records that a parent reading module-level constants
+    #: means "a subclass declaring its own recipe would have SILENTLY rendered
+    #: with the parent's and stamped its own receipt on the result". A peer lane
+    #: on a different motion module must actually LOAD that module, and its
+    #: receipt must actually NAME it.
+    #:
+    #: The module-level constants remain the default and the frozen artifact;
+    #: only the read path moved, so this lane is byte-identical.
+    motion_module_name = GHOST_MOTION_MODULE_NAME
+    recipe_receipt_id = GHOST_RECIPE_RECEIPT
     required_inputs = ("text_prompt",)
     optional_inputs = ()
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -311,7 +324,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
 
     # ---- identity ------------------------------------------------------ #
     def _recipe_receipt(self):
-        return GHOST_RECIPE_RECEIPT
+        return self.recipe_receipt_id
 
     @staticmethod
     def _file_receipt(path):
@@ -337,7 +350,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         parts = [self.name, self._recipe_receipt()]
         for token, path in (
                 (GHOST_CHECKPOINT_NAME, self._ckpt_path()),
-                (GHOST_MOTION_MODULE_NAME, self._motion_path())):
+                (self.motion_module_name, self._motion_path())):
             parts.append(token)
             parts.append(repr(self._file_receipt(path or "")))
         return tuple(parts)
@@ -360,7 +373,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             int(plan["unique_source_count"]),
             "%dx%d" % (GHOST_CANVAS_W, GHOST_CANVAS_H),
             GHOST_CHECKPOINT_NAME,
-            GHOST_MOTION_MODULE_NAME,
+            self.motion_module_name,
             _sha8(plan["text_prompt"]),
             _sha8(plan["negative_prompt"]),
         )
@@ -403,7 +416,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     def _motion_path(self):
         """The v2 motion module, by the loader's own resolution."""
         return self._resolve_model_file_by_token(
-            (GHOST_MOTION_CATEGORY,), GHOST_MOTION_MODULE_NAME)
+            (GHOST_MOTION_CATEGORY,), self.motion_module_name)
 
     def _installed(self):
         """A PREDICATE -- it answers, it never raises."""
@@ -433,7 +446,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         rows = (
             ("checkpoint", GHOST_CHECKPOINT_NAME, GHOST_CHECKPOINT_CATEGORY,
              self._ckpt_path(), GHOST_CHECKPOINT_MIN_BYTES),
-            ("motion_module", GHOST_MOTION_MODULE_NAME, GHOST_MOTION_CATEGORY,
+            ("motion_module", self.motion_module_name, GHOST_MOTION_CATEGORY,
              self._motion_path(), GHOST_MOTION_MIN_BYTES),
         )
         missing = ["%s=%s (folder_paths category %r)" % (label, token, category)
@@ -490,7 +503,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             missing = ", ".join(
                 token for token, path in (
                     (GHOST_CHECKPOINT_NAME, self._ckpt_path()),
-                    (GHOST_MOTION_MODULE_NAME, self._motion_path()))
+                    (self.motion_module_name, self._motion_path()))
                 if not path)
             raise RuntimeError(
                 "%s not installed: missing %s" % (self.name, missing))
@@ -498,7 +511,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._artifacts = {
             "checkpoint": GHOST_CHECKPOINT_NAME,
-            "motion_module": GHOST_MOTION_MODULE_NAME,
+            "motion_module": self.motion_module_name,
         }
         self._loaded = True
 
@@ -679,7 +692,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 # normal full-strength behaviour.
                 "inputs": {
                     "model": _wb.Wire("base_model", 0),
-                    "model_name": GHOST_MOTION_MODULE_NAME,
+                    "model_name": self.motion_module_name,
                     "beta_schedule": GHOST_BETA_SCHEDULE,
                     "context_options": _wb.Wire(NODE_CONTEXT, 0),
                 }},

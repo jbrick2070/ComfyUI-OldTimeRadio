@@ -158,6 +158,10 @@ _ENGINES_WITH_A_SESSION = {
     # prepare -> render_clip, and an identity that exists before it is needed
     # costs nothing, while the reverse was learned at 730s into a live leg.
     "animatediff15_video",
+    # Its two official-module peers inherit session_identity() unchanged; each
+    # reports its OWN module, so a session can never span two lanes.
+    "animatediff15_v2_video",
+    "animatediff15_v3_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

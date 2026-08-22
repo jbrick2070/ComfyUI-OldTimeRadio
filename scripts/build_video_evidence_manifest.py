@@ -293,6 +293,14 @@ manifest = {
         # nothing owed and nothing pending. Saying so plainly is the whole
         # point of this table: the lane may fail OOM, and no receipt anywhere in
         # this repo implies otherwise.
+        "animatediff15_v3_video": (
+            "Admission is NOT enforced: the operator declined a measurement "
+            "campaign; no qualified cost row exists, so this lane may fail OOM "
+            "and makes no VRAM-fit claim."),
+        "animatediff15_v2_video": (
+            "Admission is NOT enforced: the operator declined a measurement "
+            "campaign; no qualified cost row exists, so this lane may fail OOM "
+            "and makes no VRAM-fit claim."),
         "animatediff15_video": (
             "Admission is NOT enforced: the operator declined a measurement "
             "campaign; no qualified cost row exists, so this lane may fail OOM "
