@@ -79,19 +79,45 @@ blank verdict means nobody has measured it -- that is recorded as unknown rather
 than guessed, because a guessed VRAM number is the one thing a user cannot
 recover from.
 
-**Read the 8 GB column as CANDIDATES, not promises.** Every measurement below was
-taken on a 16 GB card. An allocator behaves differently with half the room, so a
-lane measured at 7.3 GiB here is a lane worth trying on 8 GB -- not a lane proven
-on 8 GB. The 8 GB column is settled by running it on an 8 GB card, and where that
-has happened it says so.
+**Read the 8 GB column as CANDIDATES, not promises**, and here is exactly how
+far the evidence goes.
+
+The strongest 8 GB evidence is a **CLAMPED SIMULATION**, not a run on an 8 GB
+card. `MiniMax H3 MIME I2V` was rendered on the 16 GB card under a
+`--reserve-vram 12` clamp, which forces ComfyUI to operate inside roughly an
+8 GB budget:
+
+| | measured |
+|---|---|
+| peak VRAM | **7.28 GiB** (baseline 2.52) |
+| peak host RAM | **27.56 GiB** (baseline 17.35) |
+| boot lane | `sage-free, no-pinned, reserve-12gb` |
+| duration | 178.9 s |
+| verdict | `PASS (cold)`, output visually approved |
+
+**The host RAM number is the one people miss.** 27.56 GiB peak against an
+8 GB laptop's typical 32 GiB of system memory is a tighter margin than the VRAM
+is. A machine with 16 GiB of RAM will struggle with this pipeline regardless of
+its GPU, and no VRAM table will warn you.
+
+**Two limits, stated so nobody reads more into this than it carries.** The lab's
+own rule is that a recipe is only `PASS` when a **second consecutive warm run**
+records it, and both H3 MIME receipts are `run_number 1`, cold -- so this is a
+cold pass, not a completed gate. And the physical 8 GB laptop has had its
+hardware inventoried (**8,188 MiB VRAM, 31.7 GiB host RAM**) and has rendered
+**nothing**: its own report says `HARDWARE_OBSERVED_NOT_ENROLLED`.
+
+For contrast, `ltx25_high_video` measured **14.48 GiB** on the 16 GB card --
+roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
+5080-only rather than "high VRAM".
 
 ### Local video models
 
 | Dropdown name | Measured VRAM | 8 GB | 12 GB | 16 GB |
 |---|---|:--:|:--:|:--:|
 | `ltx098_low_video (16:9)` | 6.8 GiB @ 512x288x161 | maybe | yes | yes |
-| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | maybe | yes | yes |
-| `h3_low_video (16:9)` | 7.3 GiB @ 864x480 | maybe | yes | yes |
+| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | **likely** | yes | yes |
+| `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | **likely** | yes | yes |
 | `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
 | `animatediff15_video (16:9)` | not measured (3.9 GB of weights) | ? | ? | yes |
 | `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
@@ -101,7 +127,7 @@ has happened it says so.
 | `ltx23_high_video (16:9)` | 13.3 GiB @ 1024x576x169 | no | no | yes |
 | `wan22_high_fast (16:9)` | 12.8 GiB measured 2026-08-22 | no | maybe | yes |
 | `wan22_high_i2v (16:9)` | 13.9 GiB @ f33 | no | no | yes |
-| `ltx25_high_video (16:9)` | two-stage 832x480 -> 1664x960 | no | no | **5080-only** |
+| `ltx25_high_video (16:9)` | **14.48 GiB measured** | no | no | **5080-only** |
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |
 
