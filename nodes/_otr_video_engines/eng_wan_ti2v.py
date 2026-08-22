@@ -182,7 +182,7 @@ _TI2V_COST_REF_H = 832
 #: WAN clip stamped ``recipe: None`` -- there was not even a wrong receipt to
 #: catch a drift with. A bare version constant that never reached this string
 #: would leave the recipe invisible to every consumer that matters.
-RECIPE_WAN_TI2V = "wan22_ti2v_5b_i2v_single_pass_v1"
+RECIPE_WAN_TI2V = "wan22_ti2v_5b_i2v_single_pass_v2"
 
 #: THE CONSENT ACT that re-opens this adapter's recipe knobs. PER ADAPTER, not
 #: shared with ``wan_i2v``: one switch for both tiers would stamp a
@@ -233,9 +233,59 @@ WAN_TI2V_RECIPE_V1 = {
     "vae_temporal_overlap": 8,
 }
 
+#: THE MEASURED wan_ti2v RECIPE, v2 (LANE 6, 2026-08-21). Operator: "ship the
+#: quality."
+#:
+#: v1 froze ``tiled_vae`` ON as a VRAM COMPROMISE, and said so in its own words:
+#: the tiling comment cited the ltx tier's numbers and called them "context for a
+#: future WAN sweep and not a claim about these numbers". Lane 6 IS that sweep,
+#: and it is the first time this adapter's tiling has been measured.
+#:
+#: WHAT IT MEASURED. Both arms from the shipping engine, purity gate clean, the
+#: contrast exactly ``vaedecode`` VAEDecodeTiled -> VAEDecode. Arm-to-arm NCC
+#: 0.9931-0.9999 across 12 frames, so the arms render the same scene and every
+#: difference is the decoder's.
+#:
+#:   * NO SEAM. The classic tiling artifact is absent -- strongest tile-lattice
+#:     concentration 1.093 against a 1.15 threshold; the arms are 98% identical
+#:     spatially.
+#:   * FLICKER. On the authored test card, whose prompt demands a rigid static
+#:     card, the TILED arm churns 4.3x and 4.9x more at the median than untiled,
+#:     at both seeds (2.83 vs 0.66; 2.83 vs 0.58). p95 and max are close between
+#:     arms, so it is the BASELINE that differs -- constant low-level motion,
+#:     not a few events. Ordinary crowd content narrows to 1.2-1.4x.
+#:   * NOT a frozen clip: both arms travel the same frame-1-to-97 distance within
+#:     6%. Same trajectory, smoother path.
+#:   * COST, measured one leg per arm on separate fresh servers so neither could
+#:     inherit the other's cache: peak 12,734 MiB tiled vs 14,526 MiB untiled.
+#:     Removing tiling costs +1,792 MiB and saves ~20s on a ~196s leg.
+#:
+#: THE TRADE THE OPERATOR TOOK. Untiled lands 322 MiB under the 14.5 GiB target
+#: instead of 2,114 MiB under it, and buys 4-5x less flicker on flat graphic
+#: content. His standing "recipes are not on the table" directive exempts VRAM
+#: and speed findings; this is a QUALITY finding, which it does not cover, so it
+#: went to him and he ruled.
+#:
+#: THE TILE GEOMETRY IS RETAINED AND UNREAD, DELIBERATELY. ``_vaedecode_inputs``
+#: returns early when tiling is off, so these four values reach nothing. They
+#: stay because ``_resolve_render_config`` spells out a FIXED key set for both
+#: consent legs on purpose (see its comment): a recipe whose key set varied by
+#: version would hand ``_tile_geometry`` and ``_recipe_departures`` a KeyError
+#: that only reproduces under the consent act. They also remain the values a
+#: revert would restore.
+#:
+#: MEASUREMENT BOUND, so a later reader does not over-read this: the cost figure
+#: is ONE leg per arm on ONE fixture at ONE seed. It prices the trade; it does
+#: not bound the worst case. Full receipts:
+#: ``basline-models/verdicts/lane6_wan_tiled_decode.md``.
+WAN_TI2V_RECIPE_V2 = dict(
+    WAN_TI2V_RECIPE_V1,
+    tiled_vae=False,
+)
+
 #: THE ONE NAME EVERY CONSUMER READS. Bumping a recipe is repointing this and
 #: the version inside ``RECIPE_WAN_TI2V`` -- never editing a versioned dict.
-WAN_TI2V_RECIPE = WAN_TI2V_RECIPE_V1
+WAN_TI2V_RECIPE = WAN_TI2V_RECIPE_V2
 
 #: The env var each frozen field was read from, kept so the demotion can NAME
 #: what it is ignoring. Presence is all this map is used for outside the consent
@@ -643,8 +693,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 else "safetensors")
 
     def _tiled_vae(self):
-        """Whether to decode through ``VAEDecodeTiled`` (FROZEN ON: the video-VAE
-        decode is a top VRAM-peak driver at 8GB).
+        """Whether to decode through ``VAEDecodeTiled`` (FROZEN OFF since v2:
+        lane 6 measured tiling costing 4-5x more frame-to-frame churn on flat
+        graphic content, and the operator confirmed it by eye -- blind, he
+        picked the tiled arm's animated colour bar out of a side-by-side).
 
         Under the consent act ``OTR_WAN_TI2V_TILED_VAE`` binds again and an
         unrecognised value fails CLOSED rather than collapsing to False -- a
@@ -1113,8 +1165,18 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if not plan["init_image"]:
             raise _wb.GraphExecutionError(
                 "%s requires init_image (got %r)" % (self.name, plan["init_image"]))
-        classes = getattr(self, "_classes", None) \
-            or _wb.resolve_graph_classes(self._node_candidates())
+        # The decode CLASS depends on `_tiled_vae()`, which the consent act
+        # can flip after `load()` cached `_classes`. Reusing the cache across
+        # such a flip executes the previous decoder against the new input set --
+        # VAEDecode handed tile_size, or VAEDecodeTiled handed none -- which is
+        # a TypeError deep inside ComfyUI rather than a named failure. Only a
+        # measurement run can move the knob, so only a measurement run pays the
+        # re-resolve.
+        if _WR.prequalification_active(self.prequalification_env):
+            classes = _wb.resolve_graph_classes(self._node_candidates())
+        else:
+            classes = getattr(self, "_classes", None) \
+                or _wb.resolve_graph_classes(self._node_candidates())
         width, height = self._dims(request)
         session = (prepared or {}) if isinstance(prepared, dict) else {}
         multi_clip = bool((session.get("session_ctx") or {}).get("multi_clip"))

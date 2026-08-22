@@ -29,6 +29,7 @@ import re
 
 import pytest
 
+from nodes._otr_video_engines import eng_wan_ti2v as _WT
 from nodes._otr_video_engines import wan_recipe as wr
 from nodes._otr_video_engines.eng_wan_ti2v import (
     PREQUALIFICATION_ENV, RECIPE_WAN_TI2V, WAN_TI2V_RECIPE, WanTi2vEngine,
@@ -259,18 +260,81 @@ def test_the_environment_can_NOT_author_the_negative_on_a_production_leg(
 # --------------------------------------------------------------------------- #
 # the tiled-decode geometry -- it used to be the ONE knob that failed OPEN
 # --------------------------------------------------------------------------- #
-def test_the_tile_geometry_is_frozen_on_a_production_leg(monkeypatch):
+#: Turning tiling ON is now a DEPARTURE, so every geometry test has to ask for
+#: it. Before lane 6 the geometry was reachable on a bare production leg because
+#: the frozen recipe was tiled; v2 decodes untiled, so `_vaedecode_inputs`
+#: returns early and none of these knobs reach a node unless tiling is enabled.
+_TILED_ON = "1"
+
+
+def _enable_tiling(monkeypatch):
+    """Put the engine on the TILED path, which only the consent act can do."""
+    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", _TILED_ON)
+
+
+def test_the_two_recipe_versions_are_pinned_literally():
+    """The versions are asserted by VALUE, not derived from the active pointer.
+
+    Every other test in this file reads `WAN_TI2V_RECIPE`, which is exactly what
+    makes them survive a bump -- and also what would let a WRONG bump validate
+    itself. This is the one place that says out loud which decode mode each
+    version means, so flipping a version by accident fails here.
+    """
+    assert _WT.WAN_TI2V_RECIPE_V1["tiled_vae"] is True
+    assert _WT.WAN_TI2V_RECIPE_V2["tiled_vae"] is False
+    assert _WT.WAN_TI2V_RECIPE is _WT.WAN_TI2V_RECIPE_V2
+    assert RECIPE_WAN_TI2V.endswith("_v2")
+    # v2 is v1 plus exactly one flipped key -- nothing else rode along.
+    assert set(_WT.WAN_TI2V_RECIPE_V1) == set(_WT.WAN_TI2V_RECIPE_V2)
+    assert {k for k in _WT.WAN_TI2V_RECIPE_V1
+            if _WT.WAN_TI2V_RECIPE_V1[k] != _WT.WAN_TI2V_RECIPE_V2[k]} == {
+                "tiled_vae"}
+def test_a_production_leg_carries_NO_tile_geometry(monkeypatch):
+    """v2 decodes untiled, so the four knobs reach nothing -- and an exported
+    override still cannot put them back. Same 'frozen' property as before the
+    bump, now expressed as absence rather than as a pinned value."""
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "1024")
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TEMPORAL", "64")
-    assert WAN_TI2V_RECIPE["vae_tile"] != 1024      # the override OPPOSES
-    assert WAN_TI2V_RECIPE["vae_temporal"] != 64
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", _TILED_ON)   # OPPOSES v2
+    vd = _graph()["vaedecode"]["inputs"]
+    assert sorted(vd) == ["samples", "vae"]
+    assert not any(k in vd for k in
+                   ("tile_size", "overlap", "temporal_size", "temporal_overlap"))
+
+
+def test_tiling_back_ON_under_consent_does_not_KeyError(monkeypatch):
+    """The retained-keys question, answered by execution rather than by reading.
+
+    v2 keeps the four tile keys so the recipe's key set is version-independent.
+    The r3 panel traced WHY that is required -- `_tile_geometry` reads
+    `recipe_data[key]` and `recipe_departures` refuses a resolved key absent
+    from frozen -- so dropping them would KeyError the moment a sweep turned
+    tiling back on. This is that moment, executed.
+    """
+    _enable_tiling(monkeypatch)
+    eng = WanTi2vEngine()
+    assert eng._tiled_vae() is True
     vd = _graph()["vaedecode"]["inputs"]
     assert vd["tile_size"] == WAN_TI2V_RECIPE["vae_tile"]
     assert vd["temporal_size"] == WAN_TI2V_RECIPE["vae_temporal"]
+    # Turning tiling ON is the ONLY departure; the geometry rode along at its
+    # frozen values and must not be reported as moved.
+    assert eng._recipe_departures() == {"tiled_vae": True}
+    assert eng._recipe_receipt() ==         RECIPE_WAN_TI2V + "+prequalification[tiled_vae=on]"
+
+
+def test_the_retained_geometry_is_still_the_frozen_value(monkeypatch):
+    """v2 KEEPS the four keys so the recipe's key set is version-independent.
+    They must still hold v1's values -- retained, not silently zeroed."""
+    assert WAN_TI2V_RECIPE["vae_tile"] == 256
+    assert WAN_TI2V_RECIPE["vae_overlap"] == 64
+    assert WAN_TI2V_RECIPE["vae_temporal"] == 16
+    assert WAN_TI2V_RECIPE["vae_temporal_overlap"] == 8
 
 
 def test_the_tile_geometry_binds_under_the_consent_act(monkeypatch):
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "1024")
     assert WAN_TI2V_RECIPE["vae_tile"] != 1024
     assert _graph()["vaedecode"]["inputs"]["tile_size"] == 1024
@@ -282,7 +346,7 @@ def test_a_mistyped_tile_value_now_fails_CLOSED(monkeypatch):
     That made these four the only knobs on this adapter that failed OPEN: a
     sweep could mistype the value it was measuring, render at something else,
     and stamp a receipt saying it had measured it."""
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "not-a-number")
     with pytest.raises(EngineUnusable) as exc:
         _graph()
@@ -294,7 +358,7 @@ def test_a_tile_value_under_the_NODES_OWN_floor_is_refused_by_name(monkeypatch):
     # VAEDecodeTiled declares tile_size min 64 (live /object_info capture). A
     # value under the node's own floor is a render that dies inside ComfyUI, so
     # it is refused here by name instead of failing late.
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "16")
     with pytest.raises(EngineUnusable) as exc:
         _graph()
@@ -319,8 +383,9 @@ def test_an_exported_empty_tiled_vae_does_not_force_the_knob_off(monkeypatch):
     # this build treats empty as unset.
     monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
     monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "")
-    assert WAN_TI2V_RECIPE["tiled_vae"] is True
-    assert WanTi2vEngine()._tiled_vae() is True
+    # The property is "empty reads as UNSET", which holds whichever way the
+    # recipe is frozen; pinning the literal here would just re-pin the version.
+    assert WanTi2vEngine()._tiled_vae() is WAN_TI2V_RECIPE["tiled_vae"]
 
 
 # --------------------------------------------------------------------------- #
@@ -432,7 +497,7 @@ def test_each_tile_knob_maps_to_its_OWN_env_name(monkeypatch, key, env,
     # Proves the key -> env -> graph-input correspondence one knob at a time.
     # A set-vs-set check over _RECIPE_ENV_KEYS cannot see a permutation; this
     # can, because each case names all three ends of the mapping.
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv(env, str(opposing))
     assert WAN_TI2V_RECIPE[key] != opposing
     vd = _graph()["vaedecode"]["inputs"]
@@ -844,13 +909,13 @@ def test_the_production_path_does_not_even_REACH_the_resolver(
 
 def test_ti2v_a_sweep_cell_NAMES_the_knobs_it_moved(monkeypatch):
     monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
-    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")     # OPPOSES frozen True
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", _TILED_ON)  # OPPOSES frozen False
     monkeypatch.setenv("OTR_WAN_TI2V_STEPS", "11")
-    assert WAN_TI2V_RECIPE["tiled_vae"] is True and WAN_TI2V_RECIPE["steps"] != 11
+    assert WAN_TI2V_RECIPE["tiled_vae"] is False and WAN_TI2V_RECIPE["steps"] != 11
     eng = WanTi2vEngine()
-    assert eng._recipe_departures() == {"steps": 11, "tiled_vae": False}
+    assert eng._recipe_departures() == {"steps": 11, "tiled_vae": True}
     assert eng._recipe_receipt() == \
-        RECIPE_WAN_TI2V + "+prequalification[steps=11,tiled_vae=off]"
+        RECIPE_WAN_TI2V + "+prequalification[steps=11,tiled_vae=on]"
 
 
 def test_i2v_a_sweep_cell_NAMES_the_knobs_it_moved(monkeypatch):
@@ -893,13 +958,15 @@ def test_a_cell_that_moved_NOTHING_still_marks_itself(monkeypatch, engine_name):
 
 def test_ti2v_the_tile_geometry_is_reported_only_when_tiled_decode_RAN(
         monkeypatch):
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_VAE_TILE", "1024")
     assert WAN_TI2V_RECIPE["vae_tile"] != 1024
     eng = WanTi2vEngine()
     assert eng._recipe_departures()["vae_tile"] == 1024
+    # Drop back to the frozen (untiled) mode: the geometry stops being reported
+    # because it no longer ran, leaving tiling itself as the only departure.
     monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
-    assert eng._recipe_departures() == {"tiled_vae": False}
+    assert eng._recipe_departures() == {}
 
 
 @pytest.mark.parametrize("key,env,graph_input,opposing", _TILE_CASES)
@@ -907,7 +974,7 @@ def test_ti2v_the_GRAPH_and_the_RECEIPT_read_the_same_tile_value(
         monkeypatch, key, env, graph_input, opposing):
     # All four, because _vaedecode_inputs hand-lists its four calls while
     # _recipe_departures loops -- the graph side is independently regressable.
-    monkeypatch.setenv(PREQUALIFICATION_ENV, "1")
+    _enable_tiling(monkeypatch)
     monkeypatch.setenv(env, str(opposing))
     assert WAN_TI2V_RECIPE[key] != opposing
     assert _graph()["vaedecode"]["inputs"][graph_input] == opposing

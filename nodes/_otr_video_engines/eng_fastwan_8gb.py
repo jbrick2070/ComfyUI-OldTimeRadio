@@ -159,8 +159,13 @@ FASTWAN_8GB_RECIPE_V1 = {
     "scheduler": "manual_sigmas",
     "sigmas": FASTWAN_SIGMAS,
     "lora_strength": 1.0,
-    #: Frozen negative, inherited verbatim from the incumbent's default.
-    "negative": _WT.WAN_TI2V_RECIPE["negative"],
+    #: Frozen negative, inherited verbatim from the incumbent's v1 default.
+    #: Bound to the VERSIONED dict, not the mutable `WAN_TI2V_RECIPE` alias: a
+    #: future WAN bump that touched `negative` would otherwise silently rewrite
+    #: THIS frozen recipe while FastWan's own receipt still claimed v1 (r3
+    #: wiring panel, codex). Lane 6 bumped that alias to v2 and did not move
+    #: `negative`, so this pin is behaviour-preserving today.
+    "negative": _WT.WAN_TI2V_RECIPE_V1["negative"],
     #: Tiled decode ON: the video-VAE decode is a top VRAM-peak driver at 8GB, and
     #: it is why peak stays FLAT across clip length on this tier.
     "tiled_vae": True,

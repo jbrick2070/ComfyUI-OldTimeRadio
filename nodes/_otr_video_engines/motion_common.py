@@ -261,6 +261,43 @@ _FRAME_COST_REF_PIXELS = 1472 * 832
 #: ``per_frame`` is the activation/decode cost that scales with pixel area. Refine
 #: from observed peaks; a new engine without a row uses :data:`_DEFAULT_FRAME_COST`.
 #: Globally env-overridable via OTR_VIDEO_COST_OVERHEAD_MB / OTR_VIDEO_COST_PER_FRAME_MB.
+#: FITTED FOR TILED DECODE, AND wan_ti2v NO LONGER DECODES TILED (lane 6,
+#: 2026-08-21). Four points, same fixture and seed, crowd @ 832x480, each on its
+#: own freshly booted server so nothing inherited a cache or residency:
+#:
+#:              17 frames      97 frames     slope
+#:   tiled      12,555 MiB     12,734 MiB    +179  -- FLAT
+#:   untiled    14,699 MiB     14,526 MiB    -173  -- FLAT
+#:
+#: THREE THINGS FOLLOW, and none of them was expected.
+#:
+#: 1. BOTH MODES ARE FLAT WITH CLIP LENGTH. The v1 recipe froze tiling ON citing
+#:    "tiled holds the peak FLAT across clip length where untiled climbs with
+#:    it". That was the ltx tier's measurement -- the v1 comment says so -- and
+#:    on THIS adapter untiled does not climb either. Tiling buys a flat
+#:    ~1.8-2.1 GB at every length, not a slope.
+#:
+#: 2. THE ``per_frame`` TERM IS FICTION HERE. 185 at the reference resolution is
+#:    ~60 MB/frame at 832x480, i.e. +5,849 MB across 97 frames. The measured
+#:    slope is ~0 in BOTH modes. The model's good fit at 97 frames (predicted
+#:    12,849 vs measured 12,734) was arithmetic coincidence: a 7,000 overhead
+#:    plus a fictional slope happened to land on a flat 12,700.
+#:
+#: 3. SO THIS ROW NOW UNDER-PREDICTS THE SHIPPED MODE at long lengths and
+#:    OVER-predicts it at short ones. It is left as-is rather than re-fitted
+#:    because :data:`QUALIFIED_COST_ROWS` is empty, so ``cost_row_may_refuse``
+#:    is False for every engine and this row cannot refuse anything today --
+#:    re-fitting an inert gate on four points at one canvas would be inventing
+#:    precision. A real re-fit wants points across canvases AND the row
+#:    qualified at the same time, which is the "zero-slope hole" note below.
+#:
+#: FOR THE LOW-VRAM PROFILES, stated plainly because it looks alarming and is
+#: not: ``otr_8gb_wan`` / ``otr_nv40_12gb`` / ``otr_amd8_rocm`` all select
+#: wan_ti2v, and untiled needs 14.5 GB. But TILED already needed 12.5 GB, so
+#: none of those envelopes could run this engine before lane 6 either. The bump
+#: makes an already-impossible configuration slightly more impossible; it does
+#: not break a working one. Receipts:
+#: `basline-models/staging/lane6_wan_tiled_decode/VRAM_PROBE.json`.
 FRAME_COST_MODEL = {
     "wan_ti2v": (7000.0, 185.0),
 }

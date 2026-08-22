@@ -15,6 +15,7 @@ import pytest
 
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import wrapper_bridge as wb
+from nodes._otr_video_engines import eng_wan_ti2v as _WT
 from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
 from nodes._otr_video_engines.registry import (
     EngineUnusable, EngineUsabilityReason,
@@ -385,44 +386,70 @@ def test_graph_safetensors_clip_keeps_device(monkeypatch):
     assert g["clip"]["inputs"]["device"] == "default"
 
 
-def test_tiled_vae_default_on(monkeypatch):
+#: The frozen value these four tests are written AGAINST, read from the recipe
+#: rather than hardcoded. LANE 6 (2026-08-21) flipped it True -> False, and two
+#: of these tests worked by setting an env value that OPPOSES the frozen one --
+#: so a hardcoded opposing literal silently stops opposing anything the moment
+#: the recipe is bumped. `test_tiled_vae_can_be_disabled_under_the_consent_act`
+#: did exactly that: it kept PASSING while no longer discriminating between the
+#: environment and the recipe. Deriving both the expectation and its opposite
+#: keeps all four live across every future bump.
+_FROZEN_TILED = _WT.WAN_TI2V_RECIPE["tiled_vae"]
+_OPPOSING_ENV = "0" if _FROZEN_TILED else "1"
+_FROZEN_DECODE = ("VAEDecodeTiled",) if _FROZEN_TILED else ("VAEDecode",)
+
+
+def test_tiled_vae_matches_the_frozen_recipe(monkeypatch):
+    """The shipped default IS the recipe's value -- currently OFF (lane 6)."""
     _clear_clip_vae_env(monkeypatch)
     eng = WanTi2vEngine()
-    assert eng._tiled_vae() is True
-    assert eng._node_candidates()["vaedecode"] == ("VAEDecodeTiled",)
+    assert eng._tiled_vae() is _FROZEN_TILED
+    assert eng._node_candidates()["vaedecode"] == _FROZEN_DECODE
 
 
-def test_tiled_vae_inputs_have_temporal_knobs(monkeypatch):
+def test_decode_inputs_match_the_frozen_decode_mode(monkeypatch):
+    """Tiled decode carries the geometry; untiled carries NONE of it.
+
+    The untiled half is the one that matters after lane 6: the recipe still
+    RETAINS vae_tile / vae_overlap / vae_temporal / vae_temporal_overlap so the
+    key set stays version-independent, and this proves none of them leak into a
+    graph that has no tiled decoder to receive them.
+    """
     _clear_clip_vae_env(monkeypatch)
-    g = _graph(monkeypatch)
-    vd = g["vaedecode"]["inputs"]
-    assert vd["tile_size"] == 256
-    assert vd["temporal_size"] == 16          # the video-VAE peak lever
-    assert "temporal_overlap" in vd and "overlap" in vd
+    vd = _graph(monkeypatch)["vaedecode"]["inputs"]
+    geometry = ("tile_size", "overlap", "temporal_size", "temporal_overlap")
+    if _FROZEN_TILED:
+        assert vd["tile_size"] == 256
+        assert vd["temporal_size"] == 16      # the video-VAE peak lever
+        assert all(k in vd for k in geometry)
+    else:
+        assert sorted(vd) == ["samples", "vae"]
+        assert not any(k in vd for k in geometry)
 
 
-def test_tiled_vae_can_be_disabled_under_the_consent_act(monkeypatch):
-    # "0" OPPOSES the frozen True, so this test can still tell whether the
-    # environment or the recipe won. Before the freeze it read the env on every
-    # leg; now that channel exists only inside a measurement run.
+def test_tiled_vae_can_be_flipped_under_the_consent_act(monkeypatch):
+    # The env value OPPOSES the frozen one, so this can still tell whether the
+    # environment or the recipe won. That channel exists only inside a
+    # measurement run.
     _clear_clip_vae_env(monkeypatch)
     monkeypatch.setenv("OTR_WAN_TI2V_PREQUALIFICATION", "1")
-    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", _OPPOSING_ENV)
     eng = WanTi2vEngine()
-    assert eng._tiled_vae() is False
-    assert eng._node_candidates()["vaedecode"] == ("VAEDecode",)
-    g = _graph(monkeypatch)
-    assert "tile_size" not in g["vaedecode"]["inputs"]
+    assert eng._tiled_vae() is (not _FROZEN_TILED)
+    assert eng._node_candidates()["vaedecode"] != _FROZEN_DECODE
+    vd = _graph(monkeypatch)["vaedecode"]["inputs"]
+    # Flipping AWAY from the frozen mode must also flip the geometry.
+    assert ("tile_size" in vd) is (not _FROZEN_TILED)
 
 
-def test_tiled_vae_can_NOT_be_disabled_on_a_production_leg(monkeypatch):
+def test_tiled_vae_can_NOT_be_flipped_on_a_production_leg(monkeypatch):
     # The control for the test above: same OPPOSING value, no consent act. The
-    # frozen recipe wins and the tiled decode node stays.
+    # frozen recipe wins and the shipped decode node stays.
     _clear_clip_vae_env(monkeypatch)
-    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", "0")
+    monkeypatch.setenv("OTR_WAN_TI2V_TILED_VAE", _OPPOSING_ENV)
     eng = WanTi2vEngine()
-    assert eng._tiled_vae() is True
-    assert eng._node_candidates()["vaedecode"] == ("VAEDecodeTiled",)
+    assert eng._tiled_vae() is _FROZEN_TILED
+    assert eng._node_candidates()["vaedecode"] == _FROZEN_DECODE
 
 
 # --------------------------------------------------------------------------- #

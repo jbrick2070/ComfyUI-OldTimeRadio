@@ -181,7 +181,12 @@ def test_recipe_is_fastwans_not_the_incumbents(monkeypatch):
 def test_receipt_is_its_own_frozen_string(monkeypatch):
     receipt = _engine(monkeypatch)._recipe_receipt()
     assert receipt.startswith("fastwan22_ti2v_5b_dmd3_i2v_v1")
-    assert "wan22_ti2v_5b_i2v_single_pass_v1" not in receipt
+    # Guard the incumbent's CURRENT id, not a hardcoded one. This assertion used
+    # to pin "..._v1"; when lane 6 bumped the incumbent to v2 it kept passing
+    # while silently guarding a string nobody stamps any more -- a test that
+    # cannot fail is worse than no test. Reading the constant keeps the guard
+    # live across every future recipe bump.
+    assert _WT.RECIPE_WAN_TI2V not in receipt
 
 
 def test_consent_act_is_not_shared_with_the_incumbent():
