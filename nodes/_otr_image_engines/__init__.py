@@ -105,6 +105,17 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# Ideogram 4 (LOCAL weights, 2026-08-22) -- the typography-first still engine for
+# the still_word card. OPT-IN (default_roles=()); z_image_turbo stays the shipped
+# default. commercial_clean=False (non-commercial model agreement -- the code
+# ships, the weights never do; docs/IDEOGRAM4_LICENSE_ATTESTATION.md). Greyed by
+# assert_usable until all four artifacts are installed. Cold-import clean: the
+# module imports only the registry, the role vocabulary and stdlib. Own guard.
+try:  # pragma: no cover - trivial guard
+    from . import ideogram4_local as _ideogram4_local  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Cloud partner STILLS adapters (S1 stills lane, 2026-07-03): flux_pro
 # / nano_banana_2 / seedream_2 -- the model-agnostic layer's first CLOUD image
 # engines. Register unconditionally with EMPTY default_roles (selectable, never

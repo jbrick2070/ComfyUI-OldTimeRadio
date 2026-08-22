@@ -143,6 +143,16 @@ CAPABILITIES = {
     # MEASURED 2026-06-18 on the 5080 (nvfp4 + qwen3-4b fp8 TE): the nvfp4
     # diffusion steady residency is ~4.3-5 GB (TE offloaded before sampling); the
     # transient TE+diffusion LOAD peak hit ~10 GB but ComfyUI manages it down.
+    # Ideogram 4 LOCAL (2026-08-22): dual-expert nvfp4 -- two 5.49 GB experts plus
+    # a 6.31 GB qwen3-vl encoder, the HEAVIEST image engine here. 16 GB-class
+    # only; it will never be the 8 GB box's still engine. needs_fp4_te True (the
+    # encoder is the nvfp4 artifact).
+    "ideogram4_local": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": "nvidia",
+        "needs_fp8_te": False, "needs_fp4_te": True,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ideogram-4-nvfp4", "ideogram-4-uncond-nvfp4",
+                               "qwen3vl-8b-nvfp4", "flux2-vae"]},
     "z_image_turbo": {"required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,

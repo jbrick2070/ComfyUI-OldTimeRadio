@@ -372,6 +372,10 @@ ENGINE_COVERAGE = {
     # --- image: local ---------------------------------------------------------
     "z_image_turbo": "local", "flux_gen1": "local", "flux2_klein": "local",
     "lumina_image": "local",
+    # ideogram4_local (2026-08-22): LOCAL weights on disk, no provider slug to
+    # collect -- the four artifacts are resolved through folder_paths exactly
+    # like the other local image engines.
+    "ideogram4_local": "local",
     # --- image: cloud ---------------------------------------------------------
     "google_image": "collected", "cloud_nano_banana_2": "collected",
     "cloud_seedream_2": "collected", "cloud_krea_2_turbo": "collected",
