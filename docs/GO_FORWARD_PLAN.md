@@ -531,13 +531,46 @@ workbench HEAD; the handoff log stops at `ae441eb`). Two parts:
   engine is a design change and would owe a full arc before code, not a Sonnet
   QA pass.
 
+**LANE 6 IS CLOSED: NO WIN on its matrix -- BUT IT FOUND FLICKER, AND THAT NEEDS
+THE OPERATOR** (2026-08-21, workbench `f71b24e`, verdict
+`verdicts/lane6_wan_tiled_decode.md`). `wan_ti2v` tiled-vs-untiled VAE decode,
+8/8 legs, purity gate clean, shipped recipe untouched.
+* **No tile seam.** The classic tiling artifact is absent -- highest lattice
+  concentration 1.093 against a declared 1.15 threshold, arms 98% identical
+  spatially. That was the pre-declared win condition, so on the matrix this is
+  a NO WIN and `VAEDecodeTiled` stands.
+* **THE UNANTICIPATED FINDING: the TILED arm churns 4.3x and 4.9x more at the
+  median on the test card, at both seeds** (2.83 vs 0.66; 2.83 vs 0.58), on a
+  fixture whose prompt demands a rigid static card -- so that change is
+  flicker. p95 and max are close between arms, so it is the BASELINE that
+  differs, not a few events. On real crowd content the gap collapses to
+  1.2-1.4x. Frozen-clip ruled out: both arms travel the same frame-1-to-97
+  distance within 6%, i.e. same trajectory, smoother path.
+* **NOT cashed as a win, deliberately.** Promoting a temporal result after
+  declaring a seam matrix would be the goalpost move lane 5 refused. It earns a
+  follow-up lane with a temporal matrix declared up front.
+* **What is still missing is the whole cost side:** decode time was confounded
+  by ComfyUI caching the shared latent (the `ours` leg paid for sampling, so the
+  180s-vs-18s split is NOT "untiled is 9x faster"), and no per-arm VRAM peak was
+  measured. Tiling exists for VRAM; nobody has priced removing it.
+* **This is a QUALITY finding, which is the one class the "recipes are not on
+  the table" directive does not cover** -- that directive exempts VRAM and speed
+  findings. So it is the operator's call, and he needs the cost half first.
+
+**LANE 7 IS STAGED AND RENDERING** (workbench `8922eba`): the `ltx25` MOTION
+fixture lane 2 said it owed, same anchor contrast (1.0 vs 0.7, both leaves),
+two i2v fixtures that demand traversal and head rotation, purity gate clean.
+**A motion gate is declared before rendering and fails closed on the lane's own
+premise** -- lane 4's `testcard_motion` produced 0.0 px translation in both arms,
+so if neither arm moves here the cell is NOT judged and the verdict is "the
+fixture failed", not "soft ties on motion".
+
 **THE PROGRAMME'S NEXT STEP IS A DECISION, NOT A RENDER.** Per the standing ROI
 ruling ("if no rendered candidate wins materially, stop the program and retain
-the corpus"), five nulls is that condition. Remaining candidates: the
+the corpus"), the nulls are that condition. Remaining candidate: the
 full-precision wan UNET (~10 GB, coin-flip on fit, the LARGEST untested 16 GB
-compromise), `wan_ti2v` tiled-vs-untiled VAE decode (free, 8 legs), and the
-`ltx25` motion fixture (free, 4 legs). **The operator's 16 GB rule governs
-downloads: "if the model can run under 16gb that's fine we download."**
+compromise). **The operator's 16 GB rule governs downloads: "if the model can
+run under 16gb that's fine we download."**
 
 **A BOUND THAT MUST BE WRITTEN INTO ANY CLOSING STATEMENT:** five lanes tested
 KNOBS. The single biggest 16 GB COMPROMISE -- the Q5_K_M UNET -- was never
