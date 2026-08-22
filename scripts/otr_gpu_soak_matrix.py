@@ -339,7 +339,15 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--legs", type=int, default=12,
                     help="0 = run until stopped")
-    ap.add_argument("--timeout", type=int, default=3600)
+    #: DEFAULT IS LANE-AWARE, and it is measured, not guessed. The first live
+    #: `otr_g4_wan_ti2v` leg took 72m07s (4327 s) -- past the historical 3600 s
+    #: default. A video soak on that default would kill its own legs at 60
+    #: minutes and record them as FAILURES, manufacturing the one result nobody
+    #: can act on. An explicit --timeout still wins.
+    ap.add_argument("--timeout", type=int, default=None,
+                    help="per-leg seconds (default: 3600 for --lanes still, "
+                         "7200 for video/all -- a measured wan_ti2v leg ran "
+                         "4327 s)")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--lanes", choices=sorted(PROFILE_SETS), default="still",
                     help="which profile rotation (default: still, the "
@@ -352,6 +360,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     profiles = PROFILE_SETS[args.lanes]
+    if args.timeout is None:
+        args.timeout = 3600 if args.lanes == "still" else 7200
     rng = random.Random(args.seed)
     deadline = (time.time() + args.hours * 3600.0) if args.hours else None
     print(f"[soak] rotating {len(BANKS)} banks x {len(STYLES)} styles x "
