@@ -259,6 +259,17 @@ class GoogleImageEngine:
     required_inputs = ("text_prompt",)
     native = False
 
+    #: DECLARED, not inherited from the dispatcher's fallback. The still cache
+    #: key is (role, object_id, prompt_hash, seed, engine_id, engine_version)
+    #: and the dispatcher reads this attribute as
+    #: ``getattr(engine, "engine_version", "1")`` -- so an engine that stays
+    #: silent gets "1" anyway and has no way to ever invalidate its cached
+    #: stills. That matters most on a PARTNER row, where the provider can move
+    #: the model behind a stable id and nothing in this repo changes. "1" is the
+    #: value the fallback was already producing, so declaring it is byte-identical
+    #: today; bump it deliberately when a row's output should stop being reused.
+    engine_version = "1"
+
     def load(self) -> None:
         return None
 

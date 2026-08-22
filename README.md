@@ -162,6 +162,27 @@ than filling. The single sanctioned exception is the closing-theme backdrop that
 holds the last drama clip under the closing theme; the credits roll itself
 freezes a frame and never loops.
 
+### Preflight guides -- the checklists that gate a change
+
+Each subsystem has a preflight document: a gate-by-gate checklist run whenever
+that subsystem is added to or materially changed, each backed by an enforcement
+suite so the doc cannot drift from the code.
+
+| subsystem | guide | enforced by |
+|---|---|---|
+| video models | [`docs/VIDEO_LANE_PREFLIGHT.md`](docs/VIDEO_LANE_PREFLIGHT.md) | `tests/test_lane_preflight_matrix.py` |
+| image models | [`docs/IMAGE_GEN_PREFLIGHT.md`](docs/IMAGE_GEN_PREFLIGHT.md) | `tests/test_image_gen_preflight_matrix.py` |
+| TTS voices | [`docs/TTS_VOICE_PREFLIGHT.md`](docs/TTS_VOICE_PREFLIGHT.md) | `tests/test_tts_voice_preflight_matrix.py` |
+| source banks / story | [`docs/SOURCE_BANK_PREFLIGHT.md`](docs/SOURCE_BANK_PREFLIGHT.md) | the roster/bijection suites it names |
+
+The rule that binds them (operator, 2026-08-21): **every video lane obeys the
+per-role image-model dropdowns** -- the picture a `still_*` or motion lane holds
+is minted by whichever image engine the operator selected for that role. The
+only exemption is the `viz_*` visualizer family, which is procedural and mints
+no still -- and each of those lanes declares that exemption out loud
+(`accepts_still = False`); staying silent is a test failure. Adding your own
+engine? Start at `docs/EXTENDING_OTR.md`, then run the matching preflight.
+
 ### Headless canonical path
 
 Agents and API tests use exactly one workflow file: `workflows/otr_canonical.json`.

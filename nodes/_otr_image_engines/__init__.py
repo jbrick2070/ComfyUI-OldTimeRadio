@@ -18,6 +18,47 @@ Import-time is cold-import-clean (invariant V-12): importing this package +
 ``load`` / ``render_image``, never at module scope. The Flux gen-1 adapter is
 imported here (guarded) so it self-registers on package import while staying
 cold-import clean.
+
+---------------------------------------------------------------------------
+HOW TO ADD YOUR OWN IMAGE ENGINE (same shape as the other three namespaces):
+---------------------------------------------------------------------------
+
+1. Copy an adapter close to your model's shape -- ``z_image_turbo.py`` for a
+   local diffusion checkpoint, ``eng_cloud_image.py``'s ``_CloudImageBase``
+   for a partner-API row -- to ``<yourname>.py``, rename the class and its
+   ``name`` field, decorate with ``@register`` from :mod:`registry`. There is
+   no validated-subset filter: registering IS joining the dropdown (C4).
+
+2. DECLARE, never inherit-by-silence (docs/IMAGE_GEN_PREFLIGHT.md, Gate IG1):
+     name              -- the dropdown id, permanent once shipped.
+     engine_version    -- str. Part of the still cache key
+                          (role, object_id, prompt_hash, seed, engine_id,
+                          engine_version). The dispatcher falls back to "1"
+                          for a silent engine, which means you could never
+                          invalidate your own cached stills; declare it and
+                          bump it whenever output should stop being reused.
+     commercial_clean  -- a real bool. flux_gen1 is False (BFL
+                          non-commercial); the Apache locals are True.
+     roles             -- all three ("announcer_visual", "music_visual",
+                          "character_video"): the dropdown offers every
+                          engine in every slot, so serving fewer would fail
+                          at render after the episode is written and voiced.
+     required_inputs   -- ("text_prompt",), the reduced prompt->image
+                          contract every still composer writes against.
+
+3. Implement the lifecycle: ``assert_usable`` (raise a NAMED error when your
+   weights/key are absent -- never let render discover it), ``prepare``,
+   ``render_image`` (lazy-import torch/comfy INSIDE it), ``teardown``.
+
+4. Add a CAPABILITIES row in :mod:`registry` (one row per engine and vice
+   versa -- tests/test_capability_profiles.py holds the bijection).
+
+5. Run the preflight: docs/IMAGE_GEN_PREFLIGHT.md, enforced by
+   tests/test_image_gen_preflight_matrix.py, which sweeps the LIVE registry --
+   your engine is covered the moment it registers, no test edits needed.
+   If your provider can REFUSE a prompt, read Gate IG4 first: a refusal can
+   arrive as a normal SUCCESS with a valid PNG (measured on Ideogram 4,
+   2026-08-21), so classify it in the adapter rather than trusting status.
 """
 from __future__ import annotations
 

@@ -190,3 +190,46 @@ def test_talking_capability_is_read_through_the_hook_not_truthiness():
     # A visualizer defines no hook at all -> False, never a truthy method object.
     assert resolved == {"announcer_visual": False, "music_visual": False,
                         "character_video": False}
+
+
+def test_no_video_engine_is_silently_exempt_from_the_image_dropdown():
+    """Operator invariant, 2026-08-21: *"All video dropdowns should obey the
+    image gen dropdowns unless of course viz -- there is no image gen for
+    visualization video models."*
+
+    Obedience itself is not the fragile part: `engine_consumes_still` reads one
+    capability, `resolve_engine_for_role` reads the operator's per-role pick,
+    and `MotionEngineBase.accepts_still = True` means a new motion lane inherits
+    obedience for free. The fragile part is SILENCE. `engine_consumes_still`
+    falls back to `required_inputs` when the flag is absent, so an engine that
+    subclasses no motion base AND forgets the flag AND does not list
+    `init_image` resolves to False -- it mints no still, the operator's chosen
+    image model is never invoked for that role, and nothing anywhere says so.
+    The episode renders; it just quietly stops obeying the dropdown.
+
+    So the rule pinned here is not "which engines consume a still" -- that is a
+    per-engine decision and the parametrized pins above already own it. It is
+    that refusing the dropdown must always be a DECLARED choice: every engine
+    that mints no still says `accepts_still = False` out loud. Derived from the
+    live registry, never a whitelist, so a new engine is covered the day it
+    registers (this file's founding rule) and cannot be exempted by omission.
+    """
+    from nodes._otr_video_engines import registry as vreg
+
+    obeys, exempt, silent = [], [], []
+    for name in sorted(vreg.all_engine_names()):
+        engine = vreg.get_engine(name)
+        if disp.engine_consumes_still(engine):
+            obeys.append(name)
+        elif getattr(engine, "accepts_still", None) is False:
+            exempt.append(name)
+        else:
+            silent.append(name)
+
+    assert silent == [], (
+        "these video engines mint no still yet never declared "
+        "accepts_still=False, so they refuse the operator's image-gen dropdown "
+        f"silently -- declare the flag either way: {silent}")
+    # Both buckets stay populated, or the sweep above would pass vacuously.
+    assert obeys, "no engine consumes the selected still -- the sweep is broken"
+    assert exempt, "no engine is exempt -- the viz lanes should be"

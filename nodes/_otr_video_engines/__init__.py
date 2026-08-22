@@ -11,6 +11,27 @@ Import-time is cold-import-clean (invariant V-12): importing this package +
 transformers / diffusers) -- a ``test_cold_import_no_heavy_libs`` asserts it.
 Adapters lazy-import their frameworks inside ``load`` / ``render_clip``, never at
 module scope, so registering them here stays cold-import clean.
+
+---------------------------------------------------------------------------
+HOW TO ADD YOUR OWN VIDEO ENGINE (same shape as the other three namespaces):
+---------------------------------------------------------------------------
+
+The full checklist is docs/VIDEO_LANE_PREFLIGHT.md (enforced by
+tests/test_lane_preflight_matrix.py); EXTENDING_OTR.md gives the adapter
+walkthrough. One declaration deserves calling out here because silence about
+it is invisible until an episode quietly stops obeying the operator:
+
+  accepts_still -- DECLARE IT EXPLICITLY, True or False (preflight G3.6).
+  Every video lane is expected to render the still minted by whichever IMAGE
+  engine the operator selected for that role (the image-gen dropdowns beside
+  the video dropdowns on OTR_VideoDirector). Motion lanes inherit True from
+  MotionEngineBase; the procedural viz_* family declares False out loud
+  (no image gen exists for a visualizer). An engine that declares NEITHER
+  and lists no ``init_image`` resolves to False through a getattr fallback:
+  it mints no still, the operator's chosen image model is never invoked for
+  that role, and the episode renders anyway -- nothing reports it.
+  tests/test_still_spine_engine_coverage.py sweeps the live registry and
+  fails any engine that stays silent.
 """
 
 # CW-4: register the cheap radio-floor families on package import so the platform

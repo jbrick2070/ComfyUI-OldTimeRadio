@@ -67,6 +67,28 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   proposed during a panel, SURVIVED one reviewer, and died only because another
   checked which sampler was selected. Full write-up: `docs/CFG_PROBLEM_STATEMENT.md`.*
 
+- G3.6 **`accepts_still` declared explicitly on every adapter, never left to
+  the `required_inputs` fallback.** The operator picks a video model and an
+  image model in two separate dropdowns (`OTR_VideoDirector` node 87), and the
+  video lane is expected to render the still that the SELECTED image engine
+  mints -- per role, independently. That join is one capability read:
+  `otr_image_gen_dispatcher.engine_consumes_still` returns `accepts_still` when
+  the lane declares it, and only otherwise falls back to looking for
+  `init_image` in `required_inputs`. A lane that declares NEITHER resolves to
+  False, mints no still, and never invokes the operator's chosen image model --
+  the episode still renders, so nothing reports it. Visualization lanes are the
+  legitimate exemption (`viz_camera`, `viz_green`, `viz_mxc_cpu`,
+  `viz_mxc_mandala` declare `accepts_still = False`: procedural, no image gen
+  at all) -- but they are exempt because they SAY so, not because they stayed
+  quiet. Swept over the live registry by
+  `tests/test_still_spine_engine_coverage.py::
+  test_no_video_engine_is_silently_exempt_from_the_image_dropdown`, so a new
+  lane is covered the day it registers.
+  *Origin: operator invariant, 2026-08-21 -- "all video dropdowns should obey
+  the image gen dropdowns unless of course viz, there is no image gen for
+  visualization video models." Audited clean at that date (27 lanes obey, the
+  4 viz lanes exempt, 0 silent); the gate keeps it that way.*
+
 ## Gate 4 -- Admission honesty
 
 - G4.1 The lane has a QUALIFIED cost row / envelope key, OR its receipts say
