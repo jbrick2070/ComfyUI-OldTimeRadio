@@ -457,3 +457,71 @@ IG5.1 -- the ENGINE owns its shape), (2) arms both measured detectors (refusal:
 `min > 50 AND std < 15`; footer: bottom-margin bright mass > ~500), and
 (3) re-rolls the seed on a footer hit. That is an operator decision to spend a
 build, not a screening question -- the screening is complete.
+
+
+---
+
+# ROUND 6 -- the golden rule, and the first production cards
+
+**Operator directive:** *"THE GOLDEN RULE: every video lane should work in any 3
+slots"*, and the correction that forced it -- *"all the dialogue is on char
+beats so you can't switch it. what good is it if the char beats are our CORE
+DIALOGUE and it's not on ideo?"*
+
+## The blocker was never the engine
+
+A live leg with all three image slots on `ideogram4_local` failed on `c02` -- a
+character PORTRAIT, not a word card. The first fix attempted here was to move
+`character_image` to `z_image_turbo`; the operator rejected it correctly, because
+the character beats ARE the dialogue and that dodge would have produced a green
+run proving nothing.
+
+The real defect was upstream and had been shipping for months:
+**`still_word` has ALWAYS declared `StillPlanRow(kind="portrait",
+required="never")`, and nothing read it.** `still_plan_helpers` says so in its
+own docstring -- *"Nothing in this module reads the plan for production"*. So
+every still_word episode minted a portrait per cast member that no consumer on
+that lane loads. Free on any engine that draws faces, which is why it hid; fatal
+on the first engine that refuses a person close-up.
+
+Fix: `_portrait_free_roles_from_policy`, the fifth member of the lane-derived
+role-set family that already carries aspect / kind / framing / composer into the
+image phase. It reads each lane's OWN declaration rather than naming engines, so
+a future lane is covered the day it declares its plan. Verified against real
+render behaviour: `wan_ti2v` declares portrait `never` and truly does not use one
+(the scene still overrides its init); `humo` declares `always` and correctly
+keeps its portrait to drive a mouth. `docs/VIDEO_LANE_PREFLIGHT.md` G3.7.
+
+## The result: 7 of 8 stills rendered, every dialogue card among them
+
+Episode *"The Weight of the Grain"*, all three image slots on
+`ideogram4_local`, all three video slots on `still_word`, gemma-4-12b, kokoro,
+musicgen, no upscaler, 1 act, 2 characters, bank and style rolled.
+
+* **6 of 6 dialogue word cards RENDERED**, plus the music opening card.
+* The cards are genuinely good: elegant serif typography, correctly spelled,
+  composited over real photographic scenes.
+* **One refusal remains: `still_music_closing_001`** (min=78.0, std=10.6).
+
+**That refusal is SEED-DEPENDENT, not content-dependent.** The music OPENING
+card rendered from the same composer, the same episode title and the same prompt
+shape; only the closing one refused. This is the same stochastic pattern the
+footer showed in rounds 4-5, where one seed footered and three others did not.
+
+## What remains
+
+1. **The music-card refusal.** One card in eight, on a wordless abstract. Since
+   the operator's standing ruling forbids re-rolls (*"I accept some errors, I
+   don't want it burning extra GPU cycles"*), the honest options are to
+   root-cause it in the prompt as every other refusal in this campaign was, or
+   to accept it and let the episode fail loudly when it fires. **It currently
+   fails the whole episode**, which is worse than the blemish the ruling was
+   about -- that asymmetry is the open decision.
+2. **The truncated card line.** `still_b001` reads *"...of a subterranean"* and
+   stops. That is `_still_word_fit_card`'s deterministic reduction, working as
+   designed and unrelated to Ideogram -- but on a card whose whole job is the
+   words, a sentence cut mid-clause is worth a second look.
+3. **The footer detector is not usable as an acceptance gate on production
+   cards.** It flagged 5 of these 7 real stills; calibrated on dark test cards
+   it cannot read pack-styled photographic backdrops. The operator's eye remains
+   the gate, exactly as the engine's own docstring says.
