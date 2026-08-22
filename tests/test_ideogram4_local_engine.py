@@ -296,3 +296,34 @@ def test_it_is_opt_in_and_does_not_displace_the_shipped_default():
     engine = _engine()
     assert engine.default_roles == ()
     assert ireg.get_engine("z_image_turbo").name == "z_image_turbo"
+
+
+def test_an_empty_atmosphere_leaves_no_dangling_separator():
+    """The degenerate case: prose that is ONLY the card clause. The composed
+    sentence must not open with "; " or close with "," -- every token here is
+    positive conditioning, so stray punctuation is noise the encoder reads.
+
+    Production cannot reach this (the composer always splices style, era and
+    grade tails after the card clause), so this is defence in depth for a direct
+    caller and for any future composer that trims its tails.
+    """
+    cap = ideo.build_caption('a title card displaying the words "Hi."', 1472, 832)
+    hld = cap["high_level_description"]
+    background = cap["compositional_deconstruction"]["background"]
+    assert not hld.rstrip().endswith((",", ";", ":")), hld
+    assert not background.lstrip().startswith((",", ";", ":")), background
+    # ...and the card itself is untouched by the tidying.
+    assert cap["compositional_deconstruction"]["elements"][0]["text"] == "Hi."
+
+
+def test_the_artifact_list_is_resolved_once_per_params_build(monkeypatch):
+    """`_params` used to call `resolve_all_artifacts()` once per NAME, and each
+    call re-probes all four artifacts through folder_paths -- 16 filesystem
+    probes to read four basenames."""
+    calls = []
+    real = ideo.resolve_all_artifacts
+    monkeypatch.setattr(ideo, "resolve_all_artifacts",
+                        lambda: (calls.append(1), real())[1])
+    _engine()._params({"prompt": 'a title card displaying the words "Hi."',
+                       "seed": 1, "w": 1472, "h": 832, "object_id": "o"})
+    assert len(calls) == 1, f"resolved {len(calls)} times"

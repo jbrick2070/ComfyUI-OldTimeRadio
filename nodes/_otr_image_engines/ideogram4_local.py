@@ -52,6 +52,7 @@ vocabulary and stdlib only. torch / comfy / the weights are reached lazily insid
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -204,7 +205,9 @@ def _tidy(text: str) -> str:
     text = re.sub(r"([.;:])\s*,", r"", text)     # "style. ," -> "style."
     text = re.sub(r",\s*,+", ",", text)            # ", ,"       -> ","
     text = re.sub(r"\s+([,.;:])", r"", text)     # " ,"        -> ","
-    return text.strip().strip(",").strip()
+    # Strip dangling separators at BOTH ends: an empty atmosphere leaves the
+    # composed sentence opening with "; " or closing with ",".
+    return text.strip().strip(",;:").strip()
 
 
 def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
@@ -237,13 +240,14 @@ def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
         atmosphere = _atmosphere(word)
         return {
             "aspect_ratio": aspect,
-            "high_level_description": (
+            "high_level_description": _tidy(
                 f"A title card showing one block of lettering reading "
                 f"'{card}', set as large as the frame allows, above an "
                 f"unbroken bare strip of ground, {atmosphere}"),
             "compositional_deconstruction": {
-                "background": (f"{atmosphere}; the lower part of the frame is "
-                               f"the same continuous featureless ground"),
+                "background": _tidy(
+                    f"{atmosphere}; the lower part of the frame is "
+                    f"the same continuous featureless ground"),
                 "elements": [{
                     "type": "text",
                     "bbox": list(TEXT_BBOX),
@@ -260,7 +264,7 @@ def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
             "aspect_ratio": aspect,
             # The captured title is the SUBJECT. Dropping it would render an
             # unrelated abstract image.
-            "high_level_description": (
+            "high_level_description": _tidy(
                 f"An abstract picture evoking '{evoked}', a purely pictorial "
                 f"composition of shape, colour and texture, {atmosphere}"),
             "compositional_deconstruction": {
@@ -335,7 +339,7 @@ class Ideogram4LocalEngine:
         yesterday's images forever.
         """
         names = "|".join(name for name, _verified, _cat in resolve_all_artifacts())
-        digest = __import__("hashlib").sha256(names.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(names.encode("utf-8")).hexdigest()
         return f"{self.base_engine_version}.{digest[:8]}"
 
     # ---- residency (classes resolve lazily; loader nodes own the weights) ----
@@ -377,10 +381,10 @@ class Ideogram4LocalEngine:
         # width/height may be None; w/h carry the raw values.
         width = _snap(get("width") or get("w") or 1472)
         height = _snap(get("height") or get("h") or 832)
-        cond, _c_ok, _c_cat = resolve_all_artifacts()[0]
-        uncond, _u_ok, _u_cat = resolve_all_artifacts()[1]
-        clip, _k_ok, _k_cat = resolve_all_artifacts()[2]
-        vae, _v_ok, _v_cat = resolve_all_artifacts()[3]
+        # ONE resolution pass: each call re-probes all four artifacts through
+        # folder_paths, so calling it per-name meant 16 filesystem probes to read
+        # four basenames.
+        cond, uncond, clip, vae = (a[0] for a in resolve_all_artifacts())
         return {
             "cond_unet": cond, "uncond_unet": uncond,
             "clip_name": clip, "vae_name": vae,
