@@ -5,3 +5,11 @@ tests/
 kibitz-runs/
 .github/
 .claude/
+
+# 2026-08-22: throwaway probe/smoke scripts, never shipped node functionality.
+# comfy-cli's security scan flagged exec() calls and semicolon-statements here
+# (2.0.0-alpha.1 publish log) -- not user-facing, not documented in README, and
+# not needed by anyone installing via the registry.
+scripts/_otr_b_spikes/
+scripts/otr_ltx_motion_smoke.py
+scripts/otr_wan_smoke.py
