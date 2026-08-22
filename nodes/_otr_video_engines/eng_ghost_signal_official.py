@@ -46,11 +46,21 @@ from .registry import register
 #: recipe problem, never a prompt problem.
 MM_V3_NAME = "v3_sd15_mm.ckpt"
 
+#: Its real size, 1,673,262,583 bytes. The floor sits just under it, because a
+#: floor inherited from a DIFFERENT artifact is a false accusation -- this lane's
+#: first live leg died on exactly that, refused for being "truncated" while the
+#: file was byte-perfect.
+MM_V3_MIN_BYTES = 1_600_000_000
+
 #: The official v2 module. Balanced, and the only one of the three with
 #: MotionLoRA support (eight camera moves). Ghost wires no Motion LoRA today --
 #: that is excluded by the coding plan -- so this is a future capability, not a
 #: current one, and it is recorded rather than claimed.
 MM_V2_NAME = "mm_sd_v15_v2.ckpt"
+
+#: 1,817,888,431 bytes -- within 6 KB of mm-p_0.5, which is the clearest single
+#: piece of evidence that mm-p_0.5 is a v2 derivative.
+MM_V2_MIN_BYTES = 1_700_000_000
 
 
 @register
@@ -60,6 +70,7 @@ class GhostSignalV3Engine(GhostSignalEngine):
     name = "animatediff15_v3_video"
 
     motion_module_name = MM_V3_NAME
+    motion_min_bytes = MM_V3_MIN_BYTES
     recipe_receipt_id = "animatediff_sd15_v3_static16_512x288_v1"
 
     #: APACHE-2.0, AND THAT IS THE POINT OF THIS LANE. The code is Apache-2.0
@@ -82,6 +93,7 @@ class GhostSignalV2Engine(GhostSignalEngine):
     name = "animatediff15_v2_video"
 
     motion_module_name = MM_V2_NAME
+    motion_min_bytes = MM_V2_MIN_BYTES
     recipe_receipt_id = "animatediff_sd15_v2_static16_512x288_v1"
 
     #: See the v3 note above -- same reasoning, same conservative declaration.
@@ -96,4 +108,5 @@ class GhostSignalV2Engine(GhostSignalEngine):
 
 
 __all__ = ["GhostSignalV3Engine", "GhostSignalV2Engine",
-           "MM_V3_NAME", "MM_V2_NAME"]
+           "MM_V3_NAME", "MM_V2_NAME",
+           "MM_V3_MIN_BYTES", "MM_V2_MIN_BYTES"]

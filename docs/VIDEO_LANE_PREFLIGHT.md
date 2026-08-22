@@ -21,6 +21,26 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
 - G1.2 A missing weight produces a NAMED `EngineUnusable` from
   `assert_usable`, never a swallowed import.
   *Origin: registry imports swallow exceptions; a lane can vanish silently.*
+- G1.3 **A GUARD CALIBRATED FOR ONE ARTIFACT IS A FALSE ACCUSATION AGAINST
+  EVERY OTHER.** Any per-artifact constant -- byte floors, model filenames,
+  recipe receipts, quant tokens -- must be a CLASS attribute a sibling lane can
+  override, never a module-level constant read from inside a method. Two
+  separate failures of this one class, and the second cost a live leg:
+  * `eng_fastwan_8gb` records the first. Its parent's recipe accessors read
+    module-level constants, so "a subclass declaring its own recipe would have
+    SILENTLY rendered with `wan_ti2v`'s and stamped a FastWan receipt on the
+    result" -- wrong pixels under a confident label.
+  * The Ghost v3 peer hit the second on 2026-08-22. The module NAME had been
+    moved to a class attribute; the BYTE FLOOR beside it had not. v3's official
+    module is 1,673,262,583 bytes -- 144 MB smaller than the golden lane's
+    `mm-p_0.5.pth` -- so a byte-perfect download was refused as *"only
+    1673262583 bytes (< the 1700000000 floor) ... truncated or wrong file"*.
+    Six minutes and a full leg to learn that a guard had inherited the wrong
+    number.
+  **The floor must sit BELOW its own artifact (or it refuses a perfect file)
+  and within ~15% of it (or a badly truncated fetch slips through).** Both
+  directions are pinned by test; a floor of 1 byte passes everything and guards
+  nothing. When you add a sibling lane, ask what ELSE was sized for the parent.
 
 ## Gate 2 -- Canvas truth
 

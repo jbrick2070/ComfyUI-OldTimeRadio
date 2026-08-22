@@ -258,6 +258,16 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: only the read path moved, so this lane is byte-identical.
     motion_module_name = GHOST_MOTION_MODULE_NAME
     recipe_receipt_id = GHOST_RECIPE_RECEIPT
+
+    #: THE BYTE FLOOR TRAVELS WITH THE MODULE, and it has to. The floor exists
+    #: to name a truncated fetch instead of letting it fail deep in a loader --
+    #: but a floor sized for ONE artifact is a false accusation against every
+    #: other. The official v3 module is 1,673,262,583 bytes, legitimately
+    #: smaller than mm-p_0.5's 1,817,894,327, and it tripped this guard on its
+    #: first live leg: "only 1673262583 bytes (< the 1700000000 floor) -- that
+    #: is a truncated or wrong file". The file was perfect; the floor was
+    #: inherited. Same defect class as the module name itself.
+    motion_min_bytes = GHOST_MOTION_MIN_BYTES
     required_inputs = ("text_prompt",)
     optional_inputs = ()
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -447,7 +457,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             ("checkpoint", GHOST_CHECKPOINT_NAME, GHOST_CHECKPOINT_CATEGORY,
              self._ckpt_path(), GHOST_CHECKPOINT_MIN_BYTES),
             ("motion_module", self.motion_module_name, GHOST_MOTION_CATEGORY,
-             self._motion_path(), GHOST_MOTION_MIN_BYTES),
+             self._motion_path(), self.motion_min_bytes),
         )
         missing = ["%s=%s (folder_paths category %r)" % (label, token, category)
                    for label, token, category, path, _floor in rows if not path]

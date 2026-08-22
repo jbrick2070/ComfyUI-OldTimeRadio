@@ -177,3 +177,53 @@ def test_the_peer_declares_commercial_clean_false(name):
 def test_the_module_constants_are_the_official_filenames():
     assert peers.MM_V3_NAME == "v3_sd15_mm.ckpt"
     assert peers.MM_V2_NAME == "mm_sd_v15_v2.ckpt"
+
+
+# --------------------------------------------------------------------------- #
+# THE BYTE FLOOR TRAVELS WITH THE MODULE.
+#
+# Caught by the first live v3 leg, which died in 6 minutes with:
+#   "motion_module 'v3_sd15_mm.ckpt' is only 1673262583 bytes
+#    (< the 1700000000 floor) -- that is a truncated or wrong file"
+# The file was byte-perfect. The FLOOR was inherited from mm-p_0.5, which is
+# 144 MB larger. A floor sized for one artifact is a false accusation against
+# every other -- the same defect class as the module name itself, missed in the
+# same way, and it cost a full leg to find.
+# --------------------------------------------------------------------------- #
+
+EXPECTED_FLOOR_UNDER = {
+    GOLDEN: 1_817_894_327,   # mm-p_0.5.pth
+    V3: 1_673_262_583,       # v3_sd15_mm.ckpt -- the smallest of the three
+    V2: 1_817_888_431,       # mm_sd_v15_v2.ckpt
+}
+
+
+@pytest.mark.parametrize("name", ALL_THREE)
+def test_each_lane_declares_a_floor_below_its_own_artifact(name):
+    """A floor ABOVE the real file size refuses a perfect download by name."""
+    eng = vreg.get_engine(name)
+    real = EXPECTED_FLOOR_UNDER[name]
+    assert eng.motion_min_bytes < real, (
+        "%s: floor %d is at or above its module's real size %d -- this lane "
+        "would refuse a byte-perfect file as truncated"
+        % (name, eng.motion_min_bytes, real))
+
+
+@pytest.mark.parametrize("name", ALL_THREE)
+def test_the_floor_is_still_tight_enough_to_catch_a_truncated_fetch(name):
+    """A floor of 1 byte would pass this file and every broken one. The guard
+    only earns its place if a materially short file still fails."""
+    eng = vreg.get_engine(name)
+    real = EXPECTED_FLOOR_UNDER[name]
+    assert eng.motion_min_bytes > real * 0.85, (
+        "%s: floor %d is more than 15%% below the real size %d -- a badly "
+        "truncated fetch would slip through"
+        % (name, eng.motion_min_bytes, real))
+
+
+def test_the_v3_floor_is_genuinely_lower_because_the_file_is_smaller():
+    """Not a copy-paste of the golden floor. v3 is 144 MB smaller and its floor
+    has to reflect that, or the lane cannot run at all."""
+    v3 = vreg.get_engine(V3)
+    gold = vreg.get_engine(GOLDEN)
+    assert v3.motion_min_bytes < gold.motion_min_bytes

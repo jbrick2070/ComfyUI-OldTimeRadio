@@ -32,6 +32,19 @@ it is invisible until an episode quietly stops obeying the operator:
   that role, and the episode renders anyway -- nothing reports it.
   tests/test_still_spine_engine_coverage.py sweeps the live registry and
   fails any engine that stays silent.
+
+And one more, if you build your lane as a SIBLING of an existing one:
+
+  EVERY PER-ARTIFACT CONSTANT MUST TRAVEL WITH THE LANE (preflight G1.3).
+  Model filename, byte floor, recipe receipt, quant token -- make each a CLASS
+  attribute your sibling can override, never a module-level constant read from
+  inside a method. A method reading the module constant means your lane loads
+  the PARENT's weights while stamping its own receipt, which is wrong pixels
+  under a confident label. This has now bitten twice here: once on the WAN
+  recipe accessors (see eng_fastwan_8gb) and once on Ghost, where the module
+  name had been made overridable and the byte floor beside it had not -- so a
+  byte-perfect 1.67 GB module was refused as "truncated" against a floor sized
+  for a 1.82 GB one. When you subclass, ask what ELSE was sized for the PARENT.
 """
 
 # CW-4: register the cheap radio-floor families on package import so the platform
