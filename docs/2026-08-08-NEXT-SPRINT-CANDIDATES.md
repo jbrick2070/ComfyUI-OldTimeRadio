@@ -13,7 +13,8 @@ the lean-mean plan." This doc is the input the panel picks from (or improves).
 * Immediate push after every green commit (07-10). One-atomic-commit
   scope preferred.
 * No touching operator-dirty paths.
-* Lean-mean is the STRATEGIC goal (`docs/2026-07-10-lean-mean-rip-final.md`);
+* Lean-mean is the STRATEGIC goal (current authority:
+  `docs/LEAN_MEAN_CLEANUP.md`);
   the operator's actual language is "closer to the lean-mean plan."
 
 ## State of the field (verified live at HEAD 3ebadbf1)
@@ -28,9 +29,11 @@ Unblocked candidates (rank + why):
 
 ### CANDIDATE A -- Lean-mean re-ground + W0 (the STRATEGIC pick)
 
-**Scope:** the operator has pinned `docs/2026-07-10-lean-mean-rip-final.md`'s
-`W0 -> W1 -> ... -> W8` execution order as the shippability campaign. D-2
-(RTXUpscale rip) was the codicil discharged in item 8. W0 is now unblocked.
+**Historical scope note:** this candidate referred to the retired dated plan's
+`W0 -> W1 -> ... -> W8` chain. Do not execute that stale chain. Its current
+successor is `docs/LEAN_MEAN_CLEANUP.md`, whose newly grounded matrix and
+numbered coding order control. D-2 (RTXUpscale rip) was the codicil discharged
+in item 8. W0 was then considered unblocked.
 The 07-15 drift-check header lists 5 stale areas that must be re-grounded
 BEFORE any deletion, per the operator's r2-first pin: "The arc is the window's
 first job, not a formality: if r2 says the kill list is wrong, the window's

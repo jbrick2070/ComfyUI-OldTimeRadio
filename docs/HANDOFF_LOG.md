@@ -12394,8 +12394,8 @@ ONE item survived the quick-wins cut as a LEAN-MEAN W6 SUB-STEP, not a
 standalone chunk: `docs/ENGINE_MATRIX.md`. Worth recording WHY, because I got
 this wrong first and had to correct it in front of the operator: GO_FORWARD
 called it a "PRECONDITION for Lean-Mean W6", and I repeated that as a hard
-blocker. The source doc (`docs/2026-07-10-lean-mean-rip-final.md:301-304`)
-says only that W6's README policy line "should link it" and that it lands
+blocker. The retired 2026-07-10 source plan (archived in git; current successor:
+`docs/LEAN_MEAN_CLEANUP.md`) said only that W6's README policy line "should link it" and that it lands
 before the campaign -- an ORDERING PREFERENCE the operator set on 2026-07-10,
 not a technical dependency. W6 executes without it. The class: GO_FORWARD's
 one-line summary of a source doc can be STRONGER than the doc; when a

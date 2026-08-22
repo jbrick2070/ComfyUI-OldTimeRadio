@@ -15,8 +15,9 @@ plan; r3 is the wiring; r4 is convergence.
   item 8, after the 23-episode disposition. The constraint travels with
   it: built against the profile and registry contracts, NEVER a
   resurrection of the retired NVIDIA-only node".
-* `docs/2026-07-10-lean-mean-rip-final.md` Decision D-2 (operator ratified
-  2026-07-10) codicil -- the authoritative constraints for the campaign:
+* Historical Decision D-2 from the retired 2026-07-10 cleanup plan (preserved
+  in git history; current cleanup authority: `docs/LEAN_MEAN_CLEANUP.md`) -- the
+  operator-ratified codicil that supplied these campaign constraints:
 
   > rip NOW; a FUTURE system-agnostic multi-GPU upscale campaign is
   > planned for after this rip lands. Design constraints recorded for

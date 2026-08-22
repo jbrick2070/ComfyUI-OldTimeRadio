@@ -1080,7 +1080,7 @@ queue in the same push.
 | 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
 | 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
 | 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
-| 5 | **Release runway** | `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. |
+| 5 | **Handoff after executable rows 1-4** | Continue in `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. This row is a pointer, not work that precedes lean-mean. Lean-mean scope and coding order live only in `docs/LEAN_MEAN_CLEANUP.md`. |
 
 ### THE STORY LAB IS RETIRED -- two guardrails survive it
 
@@ -1766,82 +1766,28 @@ passes that ALL published).
 Record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
 `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
 
-## AFTER THIS SPRINT -- the standing block order
+## After this queue
 
 One coder window at a time; every chunk = focused tests + full suite + Bug Bible
 + commit AND push + `HEAD == origin/v2.0-alpha`.
 
-```text
-  -> WAN 8-GB low-VRAM launch contract  (CODE-COMPLETE; blocked on ONE operator
-                                         decision -- see OPEN BUGS)
-  -> [r3+r4] Randomizer A
-  -> [r3+r4] dynamic_story           (wiring only -- rev-5 DESIGN stays FINAL)
-  -> re-observe the PARKED story bugs on the next real render legs;
-     batch-triage whatever is left
-  -> THEN, and only then, ROADMAP.md -- OFF THIS PLAN
-       (its order after the SFX park: product expansion -> LEAN-MEAN ->
-        RunPod -> release)
-```
-
-**LEAN-MEAN IS NOT IN THIS QUEUE and must not be re-added.** Operator direction
-2026-07-29 moved FRONT and TAIL both to the Lean-mean campaign section of
-`ROADMAP.md`, with their chunk chains, the W2 migration-first mandate, the
-ENGINE_MATRIX W6 sub-step and the full `r2 -> r3 -> r4` pin carried over intact.
-It runs after the randomizer and `dynamic_story` (the SFX step that used to sit
-between them is PARKED). A window that wants to rip dead code is on the wrong
-document.
-
-**Block detail:**
-
-1. **Randomizer Rolls Design A** -- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md`.
-   NOT gated any more: extensibility landed and absorbed its `_otr_lane_specs`
-   authority, so this shrinks to `_otr_bank_roll` + eligibility. Its r3 brief must
-   carry two deltas -- the absorbed authority, and that the bank list is a LIVE
-   registry read (`list_bank_ids()` can return a CLIENT bank; eligibility must
-   treat one as an ordinary peer) rather than a six-row literal. 1-2 d + 1 GPU day.
-2. **`dynamic_story` visual direction** -- rev-5 FINAL; roster-agnostic; re-derive
-   IDs at build. After the randomizer. The "do not rerun the design panels" rule
-   and the r3+r4 requirement are NOT in conflict: the rule protects the DESIGN,
-   r3 asks whether that design still wires to the code that exists today, and the
-   roster, the routing authority and the writer tail have all moved since rev-5.
-   5-9 coder-days + 2-4 GPU days.
-3. **SFX campaign -- SUPERSEDED 2026-08-06. It is not parked any more; it is
-   being RIPPED.** The 2026-08-04 park (operator doubt + an 8-15 coder-day lift)
-   became a deletion when the operator ruled *"I do really want to rip out SFX
-   100%, that's my aim."* **The live work is section 0-TER of this document**;
-   this entry survives only so a reader who remembers "parked" finds out here
-   that it expired.
-   Nothing spends against a REVIVAL, and now nothing preserves one either: the
-   Timeline Cue Ledger and generated-SFX designs are slated for retirement with
-   the code. What the rip does NOT touch is the b-roll role tombstones (they
-   still fail loud on stale ledgers) or the `[ENV|SFX|MUSIC:]` text sanitizers
-   (defence against a model hallucinating a tag, not an SFX feature).
+When the executable rows in the authoritative table above are exhausted,
+continue with `ROADMAP.md`.
+Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md` is its sole
+current scope, blast-radius, coding-order, and verification authority.
 
 Open judgment question (render-window, not a coder slot): the LOCAL mistral/gemma
 writer matrix. The Sonnet arm of the creative-writer question is answered
 (`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
 never ran.
 
-### STANDING RE-GROUND GATE -- r3/r4 before ANY block above (operator 2026-07-24)
+### Re-ground gate for active work
 
-Every remaining block was planned against a tree that no longer exists. Since
-those docs were written the LLM vetoes were ripped, THE LAW landed, six banks were
-renamed onto new packs, word-fit ceilings were retired, the whole extensibility
-build shipped, and the suite grew past 8,000. Line cites, seam names and file
-inventories are the first things to rot, and every one of these blocks is a rip or
-a rewire that acts on exactly those.
-
-- **Default entry point is `r3` (wiring).** These plans already have an r1 and an
-  r2 on record, so the cheap re-ground is wiring against CURRENT code, then `r4`.
-- **Drop to `r2` when r3 finds the CODING PLAN wrong**, not just the line numbers.
-  Stale cites are an r3 fix. A seam that no longer exists, an authority that moved,
-  a precondition another build already satisfied or destroyed -- that invalidates
-  the coding plan itself, and patching an r2 from inside an r3 produces a plan
-  nobody reviewed.
-- **If in doubt, start at r2.** A wasted r2 costs one panel round; executing a
-  stale coding plan costs a day of rips against the wrong file list.
-- **No block executes without an r4 convergence at current HEAD.** Record the run
-  under `kibitz-runs/<date>-<block>-r<N>/` and cite it in the block entry.
+Re-ground each active table item against current committed HEAD before coding.
+The normal entry is `r3 -> r4`; drop to r2 when the coding plan, authority, or
+precondition is wrong rather than merely line-stale. No item executes without
+current r4 convergence and recorded round artifacts. Lean-mean has the stronger
+full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
 
 ## SCOPE FOR v2.0 (operator -- read before picking up fidelity work)
 
@@ -2797,15 +2743,13 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
   a live receipt yet.
 - No code lands mid-sweep of an active qualification campaign (the 420-rung
   uniform-code-confound lesson).
-- `dynamic_story` touches the writer, the visual-style authority and the canonical
-  workflow; it re-derives the live JSON at build. It is the only claimant on those
-  surfaces.
-- Generated-SFX R4 stays local/ignored evidence of a RETIRED campaign (the
-  2026-08-06 rip, `9eb6ede1`); no R4.1 refit exists to run, and reviving SFX
-  is a new design against the post-rip tree.
-- Lean-mean front/tail drift: the constraint holds wherever it runs -- the tail's SW-1
-  re-survey is mandatory against the then-current writer, and the two campaigns never
-  share a window.
+- There is no standalone SFX provider layer to rebuild. Current video clips are
+  silent and the terminal mux uses the frozen upstream master audio. The future
+  direction in `ROADMAP.md` is to retain and mix selected video-generation audio
+  as inexpensive ambience; do not revive the fast-moving provider/bed stack or
+  claim that future path is already wired.
+- Lean-mean has one current ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.
+  The retired FRONT/TAIL and SW-1 execution model must not be revived.
 
 ## Tombstones -- the only three a window might wrongly revive
 
@@ -2817,13 +2761,14 @@ here because each has been re-proposed at least once:
 * **v4 improvement campaign banks #2-#5** -- PARKED, superseded by the keep-6
   rename + THE LAW. Revive only by operator decision
   (`docs/2026-07-17-v4-campaign/final.md`).
-* **LEAN-MEAN** -- lives in `ROADMAP.md`, not this file. A window that wants to
-  rip dead code is on the wrong document.
+* **LEAN-MEAN** -- scheduled in `ROADMAP.md`; executable scope and order live in
+  `docs/LEAN_MEAN_CLEANUP.md`, not this file.
 
 ## Pointers
 
 - `CLAUDE.md` -- hard operator rules; wins over this file wherever they disagree
-- `ROADMAP.md` (later runway: product expansion -> lean-mean -> RunPod -> release; SFX RETIRED + ripped 2026-08-06)
+- `ROADMAP.md` (later-runway schedule)
+- `docs/LEAN_MEAN_CLEANUP.md` (current lean-mean scope, loss matrix, and coding order)
 - `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 11 pointer-not-proof; 24 lost-anchor; 25 bank-teardown)
 - `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate + the Teardown protocol

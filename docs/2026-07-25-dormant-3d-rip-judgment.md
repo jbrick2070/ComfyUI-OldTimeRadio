@@ -5,6 +5,10 @@
 pin verified). Baseline HEAD `0bc863f4`. Claude is anchor and judge.
 Brief: `docs/2026-07-25-dormant-3d-rip-brief.md`.
 
+**Historical evidence only.** The current target boundary, blast radius, and
+execution order live in `docs/LEAN_MEAN_CLEANUP.md`. Literal conclusions below
+describe the 2026-07-25 tree and must not be used as a current kill list.
+
 **VERDICT: RIP. The operator's instinct is right and is ALREADY RATIFIED --
 this is lean-mean W2, not a new decision. But it must NOT happen in this
 window, and it must NOT be a straight delete: a LIVE fail-closed guard is
@@ -12,8 +16,9 @@ hiding inside the "dormant" code and has to move first.**
 
 ## 1. The decision was already made, in writing, on 2026-07-10
 
-`docs/2026-07-10-lean-mean-rip-final.md:136-144`, W2 "Dark engine scaffolds +
-their tests (~1.8k LOC)", says it plainly: **"Delete files (NOT keep-dark):
+The retired 2026-07-10 plan (available in git history; successor:
+`docs/LEAN_MEAN_CLEANUP.md`), W2 "Dark engine scaffolds + their tests", said:
+**"Delete files (NOT keep-dark):
 nodes/_otr_video_engines/{eng_character_3d.py (441), eng_still_parallax.py
 (300), eng_triposr.py (159)} ... tests test_video_character_3d (385),
 test_video_still_parallax (261), test_video_triposr (43)."** Its stated
