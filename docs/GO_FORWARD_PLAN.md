@@ -425,17 +425,75 @@ files before being folded into `verdicts/lane3_ltx_video.md`:**
   judge model and questions are permanently unrecorded. Enforce in the harness.
 Bound unchanged: same-file-only (rank-111 LoRA stays download-gated).
 
-**ALL THREE VOTED LANES ARE NOW CLOSED, ALL NO WIN, ALL SHIPPED RECIPES
-CONFIRMED WITH RECEIPTS.** Per the standing ROI ruling ("If no rendered
-candidate wins materially, stop the program and retain the corpus"), the
-assembly line has NO further authorized lanes: the remaining candidates on the
-list are download-gated (rank-111 LoRA; wan high-noise expert) and open only
-on explicit operator authorization. **The programme's next step is therefore a
-decision, not a render:** the operator either authorizes a download-gated
-lane, names a new candidate, or accepts the programme's conclusion -- three
-lanes, three nulls, the shipped recipes are the best of what was tested and
-the corpus + method (purity gate, A/A null, temporal receipts, overlay check,
-blind panels, refutation discipline) are retained for 2.5-era re-use.
+**FIVE LANES ARE NOW CLOSED, ALL NO WIN, EVERY SHIPPED RECIPE CONFIRMED WITH
+RECEIPTS** (2026-08-21). Lanes 1-3 as recorded above; then:
+
+**LANE 4 -- `wan_ti2v` TEXT ENCODER PRECISION: NO WIN** (workbench
+`e545404`..`2388fb5`). Our Q5_K_M umt5 against the fp8-scaled file the official
+template names; both were already on disk. **This was the first lane aimed at a
+COMPROMISE rather than a deliberate quality choice** -- the GGUF encoder exists
+for the 16 GB ceiling and its cost had never been measured. 8 legs, no OOM at
+14.4 GB. The decisive instrument was NOT the panel: `tools/encoder_delta.py`
+loads both encoders on CPU and compares the conditioning tensors directly.
+**They are NOT output-equivalent** -- cosine 0.9904-0.9959 but relative RMS
+0.355-1.041 -- yet the rendered video lands within ~1% on three of four cells.
+The input moves materially and the output barely does. On the test card both
+arms reproduce the SAME failure modes in the same places, including the same
+`TI2V`->`TIZV` corruption and the same artifact.
+**`testcard_motion` FAILED as a motion fixture:** prompted camera drift over a
+flat graphic still produces 0.0 px translation in both arms at both seeds
+(`tools/drift_stats.py`). It survives only as a STATIC acuity card.
+
+**LANE 5 -- THE OFFICIAL `ltx_video` PAIRING ON THE i2v PATH: NO WIN**
+(workbench `d90d747`, verdict `verdicts/lane5_ltx_i2v_official.md`). Closes
+BOTH bounds lane 3 left open: staged through `_build_graph_i2v` (the path
+production defaults to), against the official rank-111 dynamic LoRA at 0.5
+(2.74 GB, downloaded on operator authorization, byte-verified). Bundled screen,
+declared as such. **The pre-declared NCC admission gate rejected all four cells
+(0.40-0.69 against a 0.90 floor), so NO PANEL WAS RUN** -- and the A/A null
+(97/97 byte-identical, NCC exactly 1.000000) proves that gate measures the arms
+rather than engine noise. What decided it was the operator's eye: *"they all
+look good"*, *"the differences are minute."*
+
+**THE OPERATOR EYE SEAT WAS FINALLY EXERCISED** (`verdicts/OPERATOR_EYE.md`).
+24 blind pairs in one 93-second reel: **15 SAME, 5 decided, 4 skipped**, and no
+lane drew a consistent preference across both its seeds. It overturned nothing
+-- and on lane 3 march/seed42 it independently landed on the same side as two
+blinded seats, confirming the driver's withdrawn strip read was wrong at BOTH
+seeds. He then returned to a SKIPPED segment and pointed out an **orphan drum
+in the SHIPPED arm**, verified at native pixels.
+
+**STILL-CANVAS REVIEW (workbench `ae441eb`) -- NOT ADOPTED, NOT REJECTED.**
+Production stills are already minted ABOVE every video canvas (1472x832
+dominates an 80-still sample), so supersampling already happens. At native size
+1080p is clearly more detailed; but the prompted test card shows the
+over-resolution artifact -- **a DUPLICATED eye-chart row at both seeds**, and
+fused circles at one -- consistent with 1080p sitting ~97% above the engine's
+documented 1024x1024 design point against 1472x832's 16%. The
+downscale-to-1024x576 measurement is CONFOUNDED (changing canvas changes
+composition, so there is no matched-content comparison) and cannot decide it.
+**True-1080p fact:** `z_image_turbo` renders exactly 1920x1080; `flux2_klein`
+snaps to /16 and yields 1920x1072.
+
+**WHAT CANNOT BE DIFFED AT ALL** (`receipts/image_fleet_probe.json`): the audio
+engines are not graph-based -- `eng_kokoro`, `eng_bark`, `eng_chatterbox`,
+`eng_musicgen`, `eng_stable_audio*` import their model and run it in Python, so
+there is no ComfyUI graph to compare against a template. Image engines COULD be
+diffed but all four block on the same gate: no declared `render_canvas`, and
+the differ correctly refuses to invent a fixture.
+
+**THE PROGRAMME'S NEXT STEP IS A DECISION, NOT A RENDER.** Per the standing ROI
+ruling ("if no rendered candidate wins materially, stop the program and retain
+the corpus"), five nulls is that condition. Remaining candidates: the
+full-precision wan UNET (~10 GB, coin-flip on fit, the LARGEST untested 16 GB
+compromise), `wan_ti2v` tiled-vs-untiled VAE decode (free, 8 legs), and the
+`ltx25` motion fixture (free, 4 legs). **The operator's 16 GB rule governs
+downloads: "if the model can run under 16gb that's fine we download."**
+
+**A BOUND THAT MUST BE WRITTEN INTO ANY CLOSING STATEMENT:** five lanes tested
+KNOBS. The single biggest 16 GB COMPROMISE -- the Q5_K_M UNET -- was never
+challenged, because the official full-precision counterpart is not on disk.
+Five nulls must NOT be read as "the compromises are validated."
 
 **Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the

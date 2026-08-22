@@ -3,6 +3,75 @@
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
 
+## 2026-08-21 EVENING -- HEAD 8f7592b0 +handoff (v2.0-alpha) -- QUALITY-PROGRAMME WINDOW (lanes 4 and 5 closed NO WIN; operator eye exercised at last; still-canvas review opened)
+
+**Scope: measurement only, and it held.** `workflows/otr_canonical.json` is
+byte-identical to HEAD (`89b8df59...` both sides, verified at wrap-up); `nodes/`
+and `workflows/` show zero modifications. Everything landed in `basline-models`
+(HEAD == origin at `ae441eb`), including changes to `diffomatic.py`, the purity
+gate and four lane runners -- any of which could have reached sideways and did
+not. Nothing published to `otr/obs` (bench lane, correct).
+
+**Did.** Ran the lane 3 completeness critic and folded its VERIFIED corrections
+into the verdict and the plan: 10 clear margins not 9; the driver's march strip
+read WITHDRAWN (the seats contradicted it); the census citation corrected (the
+flag reproduces but is not in the receipt it cited); and the material new bound
+-- lane 3 screened the TEXT-ONLY path while `OTR_ENABLE_LTX_I2V` defaults to
+`"1"`. Then two new lanes:
+
+* **Lane 4, `wan_ti2v` text-encoder precision: NO WIN.** First lane aimed at a
+  COMPROMISE rather than a quality choice. The decisive instrument was not the
+  panel but `tools/encoder_delta.py`, which compares the conditioning tensors
+  directly: the encoders are NOT output-equivalent (rel RMS 0.355-1.041) yet the
+  video lands within ~1% on three of four cells. Both arms reproduce the same
+  `TI2V`->`TIZV` corruption in the same place.
+* **Lane 5, the official rank-111 pairing on the i2v path: NO WIN.** Closes both
+  of lane 3's bounds. The pre-declared NCC gate rejected all four cells so NO
+  PANEL RAN; the A/A null (97/97 byte-identical, NCC exactly 1.000000) proves
+  the gate measures arms rather than engine noise.
+
+**The operator eye seat, empty for four lanes, was exercised.** One 93-second
+reel of all 24 blind pairs: 15 SAME, 5 decided, 4 skipped, nothing overturned.
+It independently confirmed the driver's withdrawn strip read was wrong at BOTH
+seeds, and he then found an ORPHAN DRUM in the shipped arm on a segment he had
+skipped -- verified at native pixels.
+
+**Three things that cannot be done, established with evidence rather than
+assumed:** audio engines cannot be graph-diffed at all (not graph-based); image
+engines cannot yet be diffed (no declared `render_canvas`, and the differ
+rightly refuses to invent one); and `flux2_klein` cannot render true 1080p (it
+snaps to /16, giving 1072). `z_image_turbo` can.
+
+**Current step.** The programme is at its close decision. Five lanes, five
+nulls. Remaining: full-precision wan UNET (~10 GB, coin-flip on fit, the
+LARGEST untested compromise), tiled-vs-untiled VAE decode (free), `ltx25`
+motion fixture (free). The still-canvas review is OPEN, not decided: 1080p is
+more detailed natively but duplicates an eye-chart row at both seeds, and the
+downscale measurement is confounded.
+
+**Next.** Read `verdicts/OPERATOR_EYE.md` and `lane5_ltx_i2v_official.md`
+first. Do NOT let five nulls be written up as "the 16 GB compromises are
+validated" -- five lanes tested KNOBS and the biggest COMPROMISE was never
+challenged. Operator's download rule: "if the model can run under 16gb that's
+fine we download."
+
+**Models.** Opus drove throughout. Lane 4 took a genuine four-lane review
+before commit -- kibitz r2 on codex (`gpt-5.6-sol` high) and agy (Gemini 3.5
+Flash High), plus Fable on design judgment and Sonnet 5 on the finished diff;
+every claim was re-verified against the real files and one reviewer conflict
+was adjudicated against codex on measured evidence. Lane 5 ran no panel because
+its admission gate rejected every cell. **Reported honestly: lane 4's kibitz was
+r2 only, a scoped round, NOT a four-round arc.**
+
+**Commits (workbench `basline-models`).** `54fe68e` lane 3 corrections,
+`e545404` lane 4 staged+reviewed, `10e8252` encoder-delta and drift
+instruments, `2388fb5` testcard re-render + operator reel, `8083310` operator
+eye verdict, `0a8b0bf` orphan drum, `2e1954b` image/audio diff probe + lane 5
+staging, `d90d747` lane 5 verdict, `ae441eb` still-canvas review. OTR repo:
+`8f7592b0` (plan correction) -- the handoff commit lands on top and is not
+listed here. The sha above is the second-to-last on the branch; the last is
+this handoff commit.
+
 ## 2026-08-21 LATE -- HEAD ca11a2c5 +this (v2.0-alpha) -- LANE-3 WINDOW (ltx_video LoRA strength: NO WIN; assembly line complete, 3/3 nulls)
 
 **Scope: measurement only.** No OTR production code, no model download,
