@@ -83,7 +83,69 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
-## THE CURRENT STEP, 2026-08-21 07:42 -- READ THIS FIRST
+## THE CURRENT STEP, 2026-08-21 EVENING -- READ THIS FIRST
+
+**THE QUALITY PROGRAMME IS CLOSED. SEVEN LANES, ONE WIN, AND IT SHIPPED.**
+
+**LANE 6 SHIPPED: `wan_ti2v` recipe v2, tiled decode OFF** (OTR `30a38fa9`,
+workbench `0e2c5b7`). Operator: *"yes ship the quality"*.
+* **The reason is a VISIBLE DEFECT, not a statistic.** Tiled decode painted a
+  transient blue blob into every `wan_ti2v` clip the show has ever produced.
+  The operator found it BLIND in a side-by-side, unprompted, after the lane had
+  already closed NO WIN on a seam matrix. Sweep: lane 1 both arms 4-9 blob
+  frames of 13, lane 4 both arms 8-10, lane 6 tiled 1-3, **lane 6 untiled ZERO
+  at both seeds**, ltx25 zero. Tiling was frozen ON for the life of v1, so
+  every prior render was tiled -- the defect sat in BOTH arms of every earlier
+  A/B and lanes 1 and 4 were scored over it.
+* **v1 is untouched**; v2 is a new versioned dict, the alias repointed, the id
+  bumped, per the procedure the file documents. The four tile-geometry keys are
+  RETAINED and unread -- dropping them KeyErrors the moment a sweep turns tiling
+  back on.
+* Suite 11326 -> **11329**, Bible **304** (`12.124`, `12.125` promoted), live
+  canonical leg RESULT SUCCESS, published to `otr/obs` (88 -> 89,
+  `The Phonograph's Secret`), ledger stamps `..._v2` with no prequalification
+  suffix.
+* **Both decode modes are FLAT with clip length**, retiring v1's stated
+  justification (borrowed from the ltx tier, as its own comment admitted).
+
+**LANE 7 CLOSED: NO WIN.** The `ltx25` motion fixture lane 2 said it owed. The
+motion gate passed decisively (excursion 39-50 against a floor of 6), and the
+admission gate then rejected all four cells, so no panel ran. The substantive
+finding: **the anchor stops governing departure once the clip really moves** --
+soft departs further in only 2 of 4 cells and every value sits near zero, so
+both settings end up essentially uncorrelated with the conditioning still.
+Lane 2's bound is discharged; do not reopen it as "untested".
+
+**IDEOGRAM 4 CLOSED: NO** (`docs/2026-08-21-ideogram4-verdict.md`, tracked
+receipt `docs/2026-08-21-ideogram4-probe-receipt.json`). Six of six REAL
+production card lines were refused by its built-in filter, in BOTH prompt
+shapes, including ordinary `scifi_news_pro` narration. The refusal returns a
+valid non-black PNG at correct dimensions with status SUCCESS, so every generic
+guard passes it. Weights stay on disk. **Reopening condition, and only this:**
+prose on `announcer_visual` only, with a matched `z_image_turbo` comparison, the
+refusal detector armed, and the attention backend recorded.
+
+**OPERATOR RULING ON VRAM, 2026-08-21 evening (hard):** *"don't chase numbers
+please, fail OOM only."* The only VRAM criterion is whether a render OOMed. No
+margin arithmetic, no cost-model fitting, no headroom reporting. This sharpens
+the standing no-VRAM-ceremony rule -- an OOM is a plain recorded fault and
+everything else is noise.
+
+**OWED, AND NOT STARTED:**
+1. **A regression pass over ALL shipped video profiles** (operator asked for it).
+   Tonight proved ONE of the three shipping `wan_ti2v` profiles
+   (`otr_w45_wan_ti2v`). `otr_g4_wan_ti2v` and especially `otr_upscale_ship`
+   -- which stacks a spandrel stage on the same engine -- are unexercised
+   against untiled decode. The sweep should also cover the ltx25, humo, minimax
+   and fastwan lanes, none of which this session touched.
+2. **`QUALIFIED_COST_ROWS` is an empty frozenset**, so `cost_row_may_refuse()`
+   returns False for every engine and the VRAM budget gate **cannot refuse
+   anything**. Pre-existing and orthogonal to tiling, but it means a correct
+   recipe is the only thing between a too-large render and an OOM.
+3. **The still-canvas review remains OPEN** (1080p vs the 1472x832 default) --
+   unchanged by this session.
+
+## THE PRIOR CURRENT STEP, 2026-08-21 07:42
 
 **POST-CODE QA IS CLOSED; DO NOT RUN IT AGAIN.** The prior Codex driver finished
 at `eca57cb1`, and the later scoped finished-diff review, full suite and mixed
