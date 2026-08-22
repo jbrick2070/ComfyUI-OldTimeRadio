@@ -37,7 +37,60 @@ its weights", that it "deterministically refuses Shakespeare", and that a
 blocked card "would ship into a published episode". All three overstated the
 evidence -- see "What this verdict does NOT establish" below.)*
 
-## What was measured -- 8 live stills, two seeds, two prompt shapes
+## ROUND 3 -- the operator challenged the test, and the corrected test is far worse for Ideogram
+
+**He was right that rounds 1-2 were unfair.** In his words: *"Your prompt should
+be different for IDO. The IDO prompts are more of a text variety"* and
+*"preferably pulled from the dialogue itself."* Both criticisms landed:
+
+* Rounds 1-2 used an **invented** line, `"THE SIGNAL DIED AT MIDNIGHT"`, which
+  is not what a card carries.
+* Both shapes there were OTR's **scene** prompt -- backdrop, era tail, film
+  grade, a full described background -- the wrong idiom for a typography model,
+  and the obvious suspect for both the invented furniture and the refusal.
+
+So round 3 re-ran it his way: **real card strings pulled from shipped episode
+ledgers** and passed through the production reducer `_still_word_fit_card`, each
+rendered in **two shapes** -- OTR's composed prompt (byte-identical to what the
+**remote `ideo` arm** receives, since its `_prompt()` passes the composed prompt
+through and the safety clause it once appended was retired 2026-08-05) and a
+stripped **text-variety** prompt: the words, the letterform, a plain ground,
+no scene at all.
+
+| real card line (from a shipped episode) | composed | text-variety |
+| :-- | :-: | :-: |
+| "I've seen the weird sisters. Their prophecy unnerves me." | **BLOCKED** | **BLOCKED** |
+| "Treason! My noble friends, see this man's intent!" | **BLOCKED** | **BLOCKED** |
+| "Tonight we descend into the suffocating twilight of Pompeii." | **BLOCKED** | **BLOCKED** |
+
+**6 of 6 blocked.** Classified by the measured signature, not by eye -- every
+blocked frame sits at min 69-80 / std 10.1-10.7 against min 0 / std 22-41 for a
+render.
+
+**Three things this settles that rounds 1-2 could not:**
+
+1. **The prompt shape is not the cause.** Stripping the scene entirely changed
+   nothing. The text-variety idea was worth testing and it does not rescue this.
+2. **It is not about extreme content.** The invented Macbeth line I used in
+   round 1 was far more violent than anything OTR actually puts on a card. The
+   real lines are mild -- witches, a prophecy, a warning, a documentary
+   voiceover about Pompeii -- and they blocked anyway.
+3. **It is not confined to the Shakespeare lanes.** The `scifi_news_pro`
+   announcer line blocked in both shapes. This is not an adaptation-lane
+   problem; it reaches ordinary narration.
+
+**And it inverts the reading of rounds 1-2.** My invented line was the ONLY card
+text that ever rendered. Every line drawn from the actual show was refused. The
+original test was not too harsh on Ideogram -- **it was far too generous**, and
+the real refusal rate on production text is much higher than the verdict first
+implied. The NO stands, and it now stands on production content instead of on a
+line I made up.
+
+**Trigger still not isolated, and this is the remaining honest gap.** Six real
+lines blocked and one synthetic line did not; that is not enough to say what the
+filter keys on. It is enough to say Ideogram cannot be handed OTR's card text.
+
+## What was measured in rounds 1-2 -- 8 live stills, two seeds, two prompt shapes
 
 | shape | card | seed | outcome |
 | :-- | :-- | --: | :-- |
