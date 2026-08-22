@@ -2,9 +2,10 @@ name: Publish to Comfy registry
 on:
   workflow_dispatch:
   push:
+    # Publish rides the v2.0-alpha branch for now. When v2 is promoted,
+    # switch this to main-only so releases publish from main.
     branches:
       - v2.0-alpha
-      - main
     paths:
       - "pyproject.toml"
 
