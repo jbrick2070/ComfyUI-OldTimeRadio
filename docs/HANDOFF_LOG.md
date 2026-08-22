@@ -1,3 +1,82 @@
+## 2026-08-22 -- HEAD d0b3a65b +receipt (v2.0-alpha) -- CODER (Ghost Signal is BUILT, PROVEN and SHIPPING; the first prompt-owned lane)
+
+Did: BUILT `animatediff15_video` ("AnimateDiff -- Ghost Signal") end to end from
+  the frozen r4 plan, in the plan's own three green chunks:
+  * `01317eec` -- dependency + schema lock. ADE pinned at
+    `9257651221002dcba0a12f9cff37e1944e58fb60` (v1.6.0, zero declared python
+    deps); both artifacts fetched and HASHED BEFORE BOOT and both match the plan
+    exactly (`v1-5-pruned-emaonly-fp16.safetensors` 2132696762 /`e9476a13...`,
+    `mm-p_0.5.pth` 1817894327 / `d779ab78...`). `/object_info` captured from a
+    POST-INSTALL clean boot -- a server started before the install cannot
+    register ADE's classes and is never schema evidence. All seven classes match
+    the section-4.3 ledger; every Phase-0 stop condition passed.
+  * `d0b3a65b` -- the wired implementation slice. Adapter (four bounded
+    `run_graph` stages, `on_result` patcher registration, ADE-then-base detach
+    and identity-removal BEFORE decode, no `unload_all_models`), the pure
+    composer + durable four-cue heraldic sigil, the `lanczos_clean_full_frame`
+    delivery mode with `_has_model_eligible_clips`, registry/profile/public
+    label/oracle/G4, the scoped-and-ENFORCED G3.7 gate, and 353 focused tests.
+  * The publish receipt + `draft` -> `shipping` promotion.
+
+  LIVE PROOF: `signal_lost_the_constables_knock_20260822_050116` -- 8/8 beats on
+  `animatediff15_video`, `RESULT SUCCESS` + `obs_publish OK` in 21:33, 1920x1080
+  @ 25 fps, 126 MB, in the LIVE `otr/obs`. Every section-10 pass condition
+  verified (`docs/2026-08-22-ghost-signal-publish-receipt.md`). Suite 11,820
+  passed / 0 failed; Bug Bible clean; canonical source untouched at 23/57/140.
+
+Learned: **THE FIRST LIVE LEG FAILED, AND IT FOUND WHAT 349 UNIT TESTS COULD
+  NOT.** An announcer beat composed to 344 chars against the 320 ceiling and the
+  composer REFUSED at cast-time preflight, before a weight loaded. Cause: every
+  budget test had handed the composer an AUTHORED motion clause, which
+  short-circuits the visual-style pack's own register entirely. A real bookend
+  with the motion pass OFF pulls the pack's `announcer_subject_face` (163-178
+  chars) AND its `motion_registers` value (130-209) -- ~474 on `recur_frac`.
+  `_trim_to` could not shrink either, because both are largely COMMA-FREE prose
+  and a comma-phrase trimmer is a NO-OP on them.
+  **The portable lesson is about test design, not about Ghost:** a fixture that
+  supplies the OPTIONAL input tests only the path where the option is present.
+  The pack-derived path is the one production takes by default.
+
+Learned: **A SOURCE GREP CANNOT TELL A PROMISE FROM A BREACH.** Three separate
+  checks fired on the code's own docstrings -- the G3.7 negative-binding gate on
+  `eng_ghost_signal`'s note explaining it does NOT use the forbidden idiom, and
+  two Ghost tests on the module docstring naming the forbidden node classes and
+  `unload_all_models`. All three now read CODE: AST docstring-stripping for the
+  gate, AST Call-node walks for the tests, and the resolver map itself for the
+  class check. Punishing a lane for documenting itself teaches authors to delete
+  the documentation.
+
+Learned: **AN EMPTY `still_plan` IS NOT A PORTRAIT-NEVER ROW.**
+  `_portrait_free_roles_from_policy` looks for a row declaring
+  `kind=portrait required=never`, so it is INERT for a lane whose plan is EMPTY
+  and returns nothing for Ghost. That is correct -- it exempts a lane that
+  consumes SOME stills but never a portrait. A lane consuming none is covered by
+  the stronger `accepts_still = False` gate at the image dispatcher. Adding a
+  portrait/never row to make the role set light up would be a declaration the
+  lane cannot honour, i.e. the exact unread-declaration defect G3.7 exists to
+  end. Pinned by a test that says which seam owns this lane and why.
+
+Learned: **MY OWN SIGIL HASH HAD A 1-IN-6 COLLISION, caught by a test.** All four
+  cue buckets were selected as `(one shared seed + a per-bucket offset) % 6`, so
+  two characters whose seeds were congruent mod 6 got an IDENTICAL sigil in all
+  four buckets at once -- 1/6, not (1/6)^4. Hashing the salt WITH the seed makes
+  the four selections independent. On a lane whose whole identity mechanism is
+  those four cues, that was a real defect.
+
+Operator ruling (2026-08-22): **THE FAST MOTION IS ACCEPTED -- DO NOT CHASE IT.**
+  Watching the published episode: *"i was expecting experimental vj"* and
+  *"its perfect"*. 12.5 fps of AnimateDiff motion held to 25 reads fast; that is
+  the recipe, not a defect.
+
+OWED, stated honestly rather than implied covered: the independent finished-diff
+  review seat went UNFILLED. The Agent tool was disabled for the session; the
+  substituted Codex CLI lane thrashed in a PowerShell error loop (1.4 MB of tool
+  errors, no report) and was killed. The live leg is stronger evidence and it
+  caught the real blocker -- but a live leg is not a review.
+
+Next: queue head is now **B** (the Ideogram music-card refusal and the
+  whole-episode-fails asymmetry it exposed).
+
 ## 2026-08-22 -- HEAD cc9b4767 +handoff (v2.0-alpha) -- CODER (ideogram4_local shipped; the golden rule satisfied by reading a declaration that had never been read)
 
 Did: SHIPPED `ideogram4_local`, the typography-first still engine -- adapter,

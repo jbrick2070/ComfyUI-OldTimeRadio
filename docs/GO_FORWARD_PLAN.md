@@ -126,7 +126,48 @@ reading `NO MISCOS` was that guard, painted on.
 
 ### OPEN, IN PRIORITY ORDER
 
-**A. GHOST SIGNAL (AnimateDiff) -- CODE-AND-WIRE-READY, r4 COMPLETE, NOT BUILT.**
+**QUEUE HEAD IS NOW B. Item A is DONE -- see the closed block directly below.**
+
+**A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
+Three green chunks, all pushed on `v2.0-alpha`:
+* `01317eec` -- dependency + schema lock (ADE pinned at
+  `9257651221002dcba0a12f9cff37e1944e58fb60`, both artifacts hash-verified
+  before boot, `/object_info` captured from a post-install clean boot).
+* `d0b3a65b` -- the wired implementation slice (adapter, pure composer, durable
+  subject sigil, clean-Lanczos delivery mode, registry/profile/G4/G3.7, 353
+  focused tests).
+* The publish receipt + `shipping` promotion (this session's third chunk).
+**Live proof:** episode `signal_lost_the_constables_knock_20260822_050116`,
+8/8 beats on `animatediff15_video`, `RESULT SUCCESS` + `obs_publish OK`, 21:33,
+1920x1080 @ 25 fps in the LIVE `otr/obs`. Every section-10 pass condition
+verified -- receipt at `docs/2026-08-22-ghost-signal-publish-receipt.md`.
+* **The first leg FAILED and it was worth it.** A bookend beat with the motion
+  pass off pulls the pack's own subject (163-178 chars) AND its motion register
+  (130-209); on `recur_frac` that composes to ~474 against a 320 ceiling, and
+  `_trim_to` could not shrink either because both are comma-free prose. The
+  composer refused at cast-time preflight before a weight loaded. Root-fixed:
+  word-boundary fallback, no dangling function words, and step 4 of the trim
+  order now shrinks pack surfaces. **Every unit budget test had handed the
+  composer an authored clause, which short-circuits the pack register entirely
+  -- that is the test-design lesson, not a Ghost-specific one.**
+* **THE LOOK IS ACCEPTED, DO NOT CHASE IT.** The motion reads fast (12.5 fps of
+  AnimateDiff held to 25). Operator, watching the published episode: *"i was
+  expecting experimental vj"* and *"its perfect"*. Not an open defect.
+* **NO VRAM CLAIM.** Admission stays unenforced; the lane may OOM. A single
+  5872 MiB / 100% reading was observed and is NOT a qualified cost row.
+* **G3.7 note worth keeping:** `_portrait_free_roles_from_policy` is INERT for a
+  lane with an EMPTY `still_plan` -- it looks for a portrait row saying "never".
+  A no-still lane is covered by the stronger `accepts_still = False` gate at the
+  image dispatcher instead. Adding a portrait/never row to make the role set
+  light up would be a declaration the lane cannot honour.
+* **OWED, and honestly stated:** the independent finished-diff review seat went
+  UNFILLED. The Agent tool was disabled for the session and the substituted
+  Codex CLI lane thrashed in a PowerShell error loop (1.4 MB of tool errors, no
+  report) and was killed. The live leg is stronger evidence and it caught the
+  real blocker -- but it is not a review, and this line says so rather than
+  implying coverage.
+
+**A-ORIGINAL (superseded, kept for the receipts). GHOST SIGNAL (AnimateDiff) -- CODE-AND-WIRE-READY, r4 COMPLETE, NOT BUILT.**
 The operator's ultra-low-VRAM video lane. A separate session took it through a
 full four-round Kibitz arc; **no code, dependency, workflow, render, test,
 measurement, commit or push has been performed.** This is the next build.

@@ -1,7 +1,7 @@
 {
   "id": "otr_ghost_signal",
   "display_name": "Ghost Signal (AnimateDiff SD1.5)",
-  "status": "draft",
+  "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",
   "gpu_vendor": "nvidia",
