@@ -82,7 +82,7 @@ is gated at `VIDEO_LANE_PREFLIGHT.md` G3.6; the image half is Gate IG3 below.
   video side by `VIDEO_LANE_PREFLIGHT.md` G3.6 (`accepts_still` declared
   explicitly) and swept by
   `tests/test_still_spine_engine_coverage.py::test_no_video_engine_is_silently_exempt_from_the_image_dropdown`.
-  Audited clean 2026-08-21: 27 video lanes obey, the 4 `viz_*` lanes are
+  Audited clean 2026-08-21: 26 video lanes obey, the 4 `viz_*` lanes are
   declared exempt, 0 silent.
 
 ## Gate IG4 - A refusal is not a render

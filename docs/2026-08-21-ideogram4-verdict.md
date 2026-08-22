@@ -393,3 +393,67 @@ the operator's call, not mine:
    `still_word` wants and is not free elsewhere.
 
 Until that probe runs and comes back clean on 3 of 3, the answer stays NO.
+
+---
+
+# ROUND 5 -- the official schema found inside the template, run, and measured
+
+The canonical template itself settled the shape question. Its visible top level
+is two SUBGRAPHS, and the second -- "Ideogram4 Caption Prompt Template", node
+114 -- carries the vendor's own magic-prompt system text: the authoritative
+schema. **Exactly three top-level keys in order (`aspect_ratio`,
+`high_level_description`, `compositional_deconstruction`), single-line minified
+output, bbox normalized 0-1000 as `[y1, x1, y2, x2]`.** Our `json_card_v2` had
+violated all three (five keys, `indent=2`, pixel bboxes with x2=1382 out of
+range) -- and its foreign `negative_instruction` key is what the model painted
+onto the card. The vendored reference is byte-identical to the installed
+package copy (sha256 `87dba0e3...`), so this is the schema the checkpoint
+actually ships with.
+
+Two arms were run on the three real lines at 1920x1088, seed 42, dual-expert
+(`--stage official`, `--stage restraint`):
+
+| line | official schema | + restraint vocabulary |
+|---|---|---|
+| mb_treason | **CLEAN -- zero invented text** | **CLEAN** |
+| mb_witches | 1 small period footer | 1 small period footer |
+| sf_pompeii | 1 small period footer | 1 footer + a copyright mark |
+
+Zero refusals in either arm. Main-line spelling perfect in all six; the
+lettering fills the frame (the generous normalized bbox [240, 60, 760, 940] is
+the operator's "take up more room" ask, delivered). The invented text is now
+confined to small period-styled furniture (fake catalog numbers, a fake
+copyright) in the BOTTOM MARGIN -- and the restraint arm proves the schema's
+own populate off-switch ("minimal", "sparse", "the only text in the image")
+does NOT remove it. It is line-dependent and stable per seed: treason renders
+clean every time, the other two footer every time.
+
+## The footer is trivially detectable -- measured, total separation
+
+Bright-pixel mass in the bottom margin (luminance > 120, rows below y=0.82,
+2% side crop), on all six cards:
+
+| card | bright px | truth |
+|---|---|---|
+| official/restraint treason | **0 / 0** | clean |
+| official/restraint witches | 1582 / 1228 | footer |
+| official/restraint pompeii | 1090 / 1010 | footer |
+
+Clean max = 0; defective min = 1010. The separation is total on this sample --
+a footer detector in the adapter would be the same measured-statistics pattern
+Bible 12.125 mandates for the refusal card, and a clean output demonstrably
+exists for at least one line, so detect-and-reroll converges. A bottom-crop is
+the cruder alternative; both are build choices.
+
+## Where this leaves the verdict
+
+NO still stands, but the entire residual case is ONE defect: a small invented
+bottom-margin footer on a fraction of cards, detectable at zero cost with total
+separation, in exchange for card typography that is plainly better than what
+ships (perfect spelling, frame-filling type, real display faces). The build
+that would flip it: an `ideogram4_local` adapter that (1) composes the official
+three-key schema from the still_word card (legal under IMAGE_GEN_PREFLIGHT
+IG5.1 -- the ENGINE owns its shape), (2) arms both measured detectors (refusal:
+`min > 50 AND std < 15`; footer: bottom-margin bright mass > ~500), and
+(3) re-rolls the seed on a footer hit. That is an operator decision to spend a
+build, not a screening question -- the screening is complete.

@@ -86,7 +86,7 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   lane is covered the day it registers.
   *Origin: operator invariant, 2026-08-21 -- "all video dropdowns should obey
   the image gen dropdowns unless of course viz, there is no image gen for
-  visualization video models." Audited clean at that date (27 lanes obey, the
+  visualization video models." Audited clean at that date (26 lanes obey, the
   4 viz lanes exempt, 0 silent); the gate keeps it that way.*
 
 ## Gate 4 -- Admission honesty

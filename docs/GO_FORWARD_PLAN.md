@@ -129,9 +129,12 @@ foreign `negative_instruction` key was being PAINTED ONTO THE CARD ("NO
 MISCOS" = "no logos"). Rebuilt in the official schema at 1920x1088: zero
 refusals, perfect spelling, frame-filling type, invented text down from six
 gibberish lines to small period footers. The remaining single defect is that
-populate footer (a fake catalog number) on a fraction of cards; the restraint
-arm (`--stage restraint`) measures whether the schema's own off-switch kills
-it. **This is now an operator build decision** -- a per-engine prompt adapter is
+populate footer (a fake catalog number) on a fraction of cards. The restraint
+arm measured the schema's own off-switch and it does NOT remove the footer
+(treason clean both arms, witches/pompeii footer both arms). The footer IS
+trivially detectable -- bottom-margin bright-pixel mass separates clean (0)
+from defective (>= 1010) with total separation on all six cards -- so a
+detect-and-reroll adapter converges (verdict ROUND 5). **This is now an operator build decision** -- a per-engine prompt adapter is
 legal under `docs/IMAGE_GEN_PREFLIGHT.md` IG5.1 -- not a screening rejection.
 Weights stay on disk; `z_image_turbo` still ships.
 
