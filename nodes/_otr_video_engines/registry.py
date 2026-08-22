@@ -522,6 +522,27 @@ CAPABILITIES = {
     # and preflight fails CLOSED on any one of them; the audio VAE is NOT listed,
     # because listing an asset this lane never loads would make the S5 wizard ask
     # for 0.6 GB nobody needs (it belongs to lane 20).
+    # animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2
+    # motion module through AnimateDiff-Evolved's non-looped Standard Static
+    # context. cuda, no vendor gate, no sidecar, no toolchain. BOTH fp rows are
+    # False and that is the point: the artifacts are FP16 and the profile pins
+    # dtype_policy="no_fp8_no_fp4" so nothing silently opts them into ComfyUI's
+    # optional FP8/FP4 transformations. Two model_requirements because preflight
+    # fails CLOSED on either; the VAE is deliberately absent from the list --
+    # it is the checkpoint's own output slot 2, not a separate fetch, and
+    # listing it would make the S5 wizard ask for a file nobody needs.
+    #
+    # NO COST ROW EXISTS FOR THIS LANE. The operator declined a measurement
+    # campaign, so it is recorded admission-unenforced in the evidence manifest
+    # and makes no VRAM-fit claim -- see docs/2026-08-22-ghost-signal-
+    # dependency-lock.json.
+    "animatediff15_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "mm-p_0.5.pth"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

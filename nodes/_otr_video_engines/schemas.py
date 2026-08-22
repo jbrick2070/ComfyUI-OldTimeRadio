@@ -260,6 +260,32 @@ class CanonicalClip(_Forbid):
     #: would otherwise fire far from its cause.
     native_frame_count: Optional[int] = None
     extension_mode: Optional[str] = None
+    #: THE CADENCE AND DELIVERY RECEIPTS (Ghost Signal, 2026-08-22). Declared
+    #: here for the same reason the two above are: this model is extra="forbid",
+    #: so the day anything validates an adapter's return through it, an enriched
+    #: clip carrying these keys would be REJECTED as unknown fields -- the
+    #: receipts would be dropped by the schema that exists to protect them.
+    #:
+    #: ALL SIX ARE OPTIONAL AND ABSENCE IS LOAD-BEARING. A legacy row that never
+    #: carried them must keep behaving byte-for-byte, so every projection copies
+    #: them present-key-only rather than stamping six nulls onto history.
+    #:
+    #: `delivery_scale_mode` is how a lane DECLARES the enlargement it needs, so
+    #: the composite never has to ask which engine produced a row.
+    #: `cadence_mode` plus the three counts are the honest accounting of a RATE
+    #: CONVERSION: `model_frame_count` is every frame actually requested from and
+    #: decoded by the model, `cadence_source_frame_count` is the unique prefix
+    #: the selector retained, and their difference exposes source frames
+    #: generated only to satisfy a node's structural minimum. `cadence_tail_trim`
+    #: covers ONLY the final hold-2 surplus. Keeping the scopes apart is what
+    #: stops `native_frame_count` being misread as "N distinct diffusion
+    #: samples" -- on a hold-2 lane it is not.
+    delivery_scale_mode: Optional[str] = None
+    cadence_mode: Optional[str] = None
+    cadence_source_frame_count: Optional[int] = None
+    cadence_delivered_frame_count: Optional[int] = None
+    cadence_tail_trim: Optional[int] = None
+    model_frame_count: Optional[int] = None
 
 
 class AdapterDescriptor(_Forbid):
@@ -388,6 +414,14 @@ class ShotRow(_Forbid):
     #: collapsing it into ``True`` would indict every legacy episode for
     #: missing a receipt that did not exist when it rendered.
     frame_bounded: Optional[bool] = None
+    #: THE DURABLE GHOST IDENTITY (2026-08-22), stamped once by
+    #: `otr_shot_lock.build_execution_plan` for a `character_video` beat whose
+    #: resolved engine is a prompt-owned lane, and read by the pure composer.
+    #:
+    #: Optional, and None means "this beat never needed one" -- a non-Ghost
+    #: episode must not acquire a new seed or style requirement just because
+    #: this field exists.
+    subject_sigil: Optional[str] = None
 
 
 class VideoLedgerSection(_Forbid):

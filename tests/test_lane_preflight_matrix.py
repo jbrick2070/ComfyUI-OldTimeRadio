@@ -964,6 +964,130 @@ def gate_g7_surface(name, eng):
     return bad
 
 
+def _code_only(src: str) -> str:
+    """``src`` with every comment and string literal removed.
+
+    A gate that greps SOURCE for a forbidden idiom will otherwise fire on the
+    docstring that WARNS about the idiom -- which is exactly what happened the
+    first time this ran: `eng_ghost_signal` documents "there is deliberately no
+    `request.get('negative_prompt') or <engine constant>` here", and the gate
+    read its own warning as the violation. Punishing a lane for explaining
+    itself teaches authors to delete the explanation.
+
+    AST round-trip, NOT token stripping. Dropping every STRING token would take
+    the argument with it -- ``get("negative_prompt")`` becomes ``get()`` and the
+    check could never match anything again, which is the quiet way to turn a
+    gate into decoration. Removing DOCSTRINGS specifically keeps every real
+    string literal, and ``ast`` discards comments for free.
+
+    Falls back to the raw source if the module will not parse, because a gate
+    that silently passes on a syntax error is worse than one that is
+    occasionally over-broad.
+    """
+    import ast as _ast
+    try:
+        tree = _ast.parse(src)
+    except Exception:  # noqa: BLE001 -- never let the gate die on a parse edge
+        return src
+    for node in _ast.walk(tree):
+        if not isinstance(node, (_ast.Module, _ast.ClassDef,
+                                 _ast.FunctionDef, _ast.AsyncFunctionDef)):
+            continue
+        body = getattr(node, "body", None)
+        if (body and isinstance(body[0], _ast.Expr)
+                and isinstance(body[0].value, _ast.Constant)
+                and isinstance(body[0].value.value, str)):
+            node.body = body[1:] or [_ast.Pass()]
+    try:
+        return _ast.unparse(tree)
+    except Exception:  # noqa: BLE001
+        return src
+
+
+def gate_g3_7(name, eng):
+    """G3.7 -- A PROMPT-OWNED, STILL-FREE LANE MUST DECLARE WHAT IT OWNS.
+
+    SCOPED, and the scope is the whole design. The helper returns NOTHING unless
+    the lane is `text_to_video` AND declares `accepts_still is False`. That
+    predicate keeps every older still-owned text-to-video lane out -- they
+    legitimately inherit their subject from a minted still and owe none of this
+    -- while ensuring a lane that says "I take no still" cannot then stay silent
+    about where its subject, its look, its motion and its negative come from.
+
+    WHY IT EXISTS. `still_word` declared `kind="portrait" required="never"` from
+    the day it was written and nothing read it, so every still_word episode
+    minted a portrait per cast member that no consumer on that lane ever loads:
+    free on an engine that draws a face, fatal on the first that refuses. The
+    fix made the declaration load-bearing. This gate is the other half -- it
+    makes the declaration COMPLETE, so a future Ghost-class lane that forgets
+    `subject_ownership` or `prompt_profile` fails here rather than escaping its
+    own contract and rendering a generic seed nobody notices.
+
+    Deliberately NOT folded into `gate_g3_contract` (that one is about frame
+    contracts and applies to every lane) and deliberately NOT a new G8/G9 column:
+    the live matrix is G1-G7 and the docs already use Gate 8 for the solo smoke.
+    """
+    if str(getattr(eng, "family", "")) != "text_to_video":
+        return []
+    if getattr(eng, "accepts_still", True) is not False:
+        return []
+
+    bad = []
+    if str(getattr(eng, "subject_ownership", "") or "") != "prompt":
+        bad.append(
+            "takes no still but does not declare subject_ownership='prompt' -- "
+            "if the still does not own the subject, the lane must say what does")
+    if not str(getattr(eng, "prompt_profile", "") or ""):
+        bad.append("declares no prompt_profile, so no composer can be selected "
+                   "for it by capability and the driver would fall through to a "
+                   "generic seed")
+    try:
+        budget = int(getattr(eng, "prompt_budget_chars", 0) or 0)
+    except (TypeError, ValueError):
+        budget = 0
+    if budget <= 0:
+        bad.append("declares no positive prompt_budget_chars")
+    join = str(getattr(eng, "style_join", "") or "")
+    if not join:
+        bad.append("declares no style_join, so nothing says how the visual-style "
+                   "pack reaches its prompt")
+    elif join not in ("compose", "override") and not join.startswith("pack:"):
+        bad.append("declares style_join=%r, which is neither 'compose', "
+                   "'override', nor a named owned pack ('pack:<id>')" % join)
+    if not str(getattr(eng, "motion_source", "") or ""):
+        bad.append("declares no motion_source -- a lane with no still has no "
+                   "movement to inherit, so it must name its motion authority")
+
+    binding = str(getattr(eng, "negative_prompt_binding", "") or "")
+    if not binding:
+        bad.append("declares no negative_prompt_binding")
+    else:
+        # A DECLARATION CHECKING A DECLARATION PROVES NOTHING (lesson L4), so the
+        # CODE is checked too: the adapter must read the request's negative by
+        # name, and must not carry the `or <engine constant>` idiom that lets a
+        # blank request render under a negative the composer never authored.
+        src = _code_only(_defining_module_source(eng, "render_clip"))
+        if "negative_prompt" not in src:
+            bad.append("declares negative_prompt_binding=%r but its render "
+                       "module never reads negative_prompt" % binding)
+        # `or ""` IS NOT THE DEFECT and must not be flagged as one. Coercing a
+        # missing negative to the empty string leaves it FALSY, so the adapter's
+        # own required-input refusal still fires and nothing renders under an
+        # invented negative -- it is normalization, not substitution. What this
+        # forbids is a fallback to a non-empty value, which is the idiom that
+        # would let a blank request render under lane-side text no receipt
+        # describes. The negative lookahead is the whole distinction.
+        if re.search(
+                r"""get\(\s*['"]negative_prompt['"]\s*\)\s*or\s+(?!['"]{2})""",
+                src):
+            bad.append(
+                "falls back from a missing request negative to an engine-side "
+                "value (`get('negative_prompt') or ...`). The negative is the "
+                "composer's to author; a lane-side substitute renders under a "
+                "negative no receipt describes")
+    return bad
+
+
 GATE_FUNCS = {
     "G1": gate_g1_weights,
     "G2": gate_g2_canvas,
@@ -997,6 +1121,53 @@ def evaluate(gate: str, name: str) -> tuple:
 # The seven gate tests. One per gate, over the whole live roster, so a failure
 # names every lane the gate caught rather than stopping at the first.
 # ---------------------------------------------------------------------------
+def test_g3_7_prompt_owned_lanes_declare_what_they_own():
+    """G3.7 over the WHOLE live roster, in one failure that names every lane.
+
+    Invoked for every registry name rather than added as a matrix column: the
+    matrix is G1-G7 and this predicate is scoped, so most rows would be blank
+    exemptions carrying no information.
+    """
+    reds = []
+    applicable = []
+    for name in ENGINE_NAMES:
+        eng = vreg.get_engine(name)
+        if (str(getattr(eng, "family", "")) == "text_to_video"
+                and getattr(eng, "accepts_still", True) is False):
+            applicable.append(name)
+        failures = gate_g3_7(name, eng)
+        if failures:
+            reds.append("  %-24s %s" % (name, "; ".join(failures)))
+    assert not reds, "G3.7 RED:\n" + "\n".join(reds)
+    # NOT VACUOUS. A scoped gate that currently applies to nothing is a gate
+    # nobody would notice breaking, so the roster must contain at least one lane
+    # it actually judges.
+    assert applicable, (
+        "G3.7 applies to NO registered lane, so this test proves nothing. A "
+        "prompt-owned still-free lane (family=text_to_video, "
+        "accepts_still=False) must exist for this gate to mean anything.")
+
+
+def test_g3_7_does_not_reach_still_owning_lanes():
+    """The scope predicate is the gate's whole safety: a lane that legitimately
+    consumes a still owes none of these declarations, and G3.7 must stay silent
+    about it rather than demanding a contract written for a different design."""
+    judged = [n for n in ENGINE_NAMES
+              if gate_g3_7(n, vreg.get_engine(n)) is not None
+              and (str(getattr(vreg.get_engine(n), "family", ""))
+                   == "text_to_video")
+              and getattr(vreg.get_engine(n), "accepts_still", True) is False]
+    for name in ENGINE_NAMES:
+        eng = vreg.get_engine(name)
+        if name in judged:
+            continue
+        assert gate_g3_7(name, eng) == [], (
+            "%s is out of G3.7's scope (family=%r accepts_still=%r) but the "
+            "gate returned findings for it"
+            % (name, getattr(eng, "family", None),
+               getattr(eng, "accepts_still", None)))
+
+
 def _run_gate(gate: str):
     reds, unexpected_passes = [], []
     for name in ENGINE_NAMES:

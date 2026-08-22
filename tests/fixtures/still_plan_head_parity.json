@@ -43,6 +43,7 @@
   }
  ],
  "engines": [
+  "animatediff15_video",
   "cloud_kling_avatar",
   "cloud_seedance_2",
   "cloud_vidu_q2_pro_fast_720p",
@@ -76,6 +77,69 @@
  ],
  "matrix": {
   "default": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [],
+     "required_target_ids": [],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "effective_engine": {
+      "announcer_visual": "animatediff15_video",
+      "character_video": "animatediff15_video",
+      "music_visual": "animatediff15_video"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": []
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -2514,6 +2578,91 @@
    }
   },
   "force_all_ltx_audio_in": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [
+      "announcer|portrait|832x480",
+      "c01|portrait|832x480",
+      "still_announcer_visual_radio_face_169|portrait|832x480",
+      "still_b000_music_open|scene_open|1472x832",
+      "still_b001|scene_beat|1472x832",
+      "still_b002|scene_character|1472x832",
+      "still_b005|scene_beat|1472x832",
+      "still_music_closing_001|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832",
+      "still_music_visual_radio_face_169|portrait|832x480"
+     ],
+     "required_target_ids": [
+      "still_b000_music_open",
+      "still_b001",
+      "still_b002",
+      "still_b005",
+      "still_music_closing_001",
+      "still_music_opening_001"
+     ],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": true,
+      "character_video": true,
+      "music_visual": true
+     },
+     "effective_engine": {
+      "announcer_visual": "ltx_audio_in",
+      "character_video": "ltx_audio_in",
+      "music_visual": "ltx_audio_in"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": [
+      "announcer_visual",
+      "character_video",
+      "music_visual"
+     ]
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "ltx_audio_in",
+      "family": "audio_conditioned_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": true,
+      "requires_mesh_fodder": false,
+      "requires_scene": true
+     },
+     "character_video": {
+      "effective_engine": "ltx_audio_in",
+      "family": "audio_conditioned_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": true,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": true
+     },
+     "music_visual": {
+      "effective_engine": "ltx_audio_in",
+      "family": "audio_conditioned_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": true,
+      "requires_mesh_fodder": false,
+      "requires_scene": true
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -5066,6 +5215,69 @@
    }
   },
   "force_all_viz_camera": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [],
+     "required_target_ids": [],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "effective_engine": {
+      "announcer_visual": "viz_camera",
+      "character_video": "viz_camera",
+      "music_visual": "viz_camera"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": []
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "viz_camera",
+      "family": "abstract",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "viz_camera",
+      "family": "abstract",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "viz_camera",
+      "family": "abstract",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -6958,6 +7170,85 @@
    }
   },
   "force_bookends_cloud_kling": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [
+      "announcer|portrait|832x480",
+      "still_b000_music_open|scene_open|1472x832",
+      "still_b001|scene_beat|1472x832",
+      "still_b005|scene_beat|1472x832",
+      "still_music_closing_001|scene_beat|1472x832",
+      "still_music_opening_001|scene_beat|1472x832"
+     ],
+     "required_target_ids": [
+      "still_b000_music_open",
+      "still_b001",
+      "still_b005",
+      "still_music_closing_001",
+      "still_music_opening_001"
+     ],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": true,
+      "character_video": false,
+      "music_visual": true
+     },
+     "effective_engine": {
+      "announcer_visual": "cloud_kling_avatar",
+      "character_video": "animatediff15_video",
+      "music_visual": "cloud_kling_avatar"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": [
+      "announcer_visual",
+      "music_visual"
+     ]
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "cloud_kling_avatar",
+      "family": "audio_driven_face",
+      "family_is_audio_driven_face": true,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "cloud_kling_avatar",
+      "family": "audio_driven_face",
+      "family_is_audio_driven_face": true,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -9440,6 +9731,69 @@
    }
   },
   "hosts_on": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [],
+     "required_target_ids": [],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "effective_engine": {
+      "announcer_visual": "animatediff15_video",
+      "character_video": "animatediff15_video",
+      "music_visual": "animatediff15_video"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": []
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -11875,6 +12229,69 @@
    }
   },
   "ia2v_non_talking": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [],
+     "required_target_ids": [],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "effective_engine": {
+      "announcer_visual": "animatediff15_video",
+      "character_video": "animatediff15_video",
+      "music_visual": "animatediff15_video"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": []
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -14303,6 +14720,69 @@
    }
   },
   "ltx_i2v_off": {
+   "animatediff15_video": {
+    "authored": {
+     "aspects": {
+      "announcer_visual": "wide",
+      "character_video": "wide",
+      "music_visual": "wide"
+     },
+     "objects": [],
+     "required_target_ids": [],
+     "talking": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "warnings": []
+    },
+    "materialized": {
+     "capabilities": {
+      "announcer_visual": false,
+      "character_video": false,
+      "music_visual": false
+     },
+     "effective_engine": {
+      "announcer_visual": "animatediff15_video",
+      "character_video": "animatediff15_video",
+      "music_visual": "animatediff15_video"
+     },
+     "mesh_fodder_roles": [],
+     "roles_requiring_stills": []
+    },
+    "render_decisions": {
+     "announcer_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "character_video": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     },
+     "music_visual": {
+      "effective_engine": "animatediff15_video",
+      "family": "text_to_video",
+      "family_is_audio_driven_face": false,
+      "ia2v_portrait_gate": false,
+      "ltx_i2v_gate": false,
+      "ltx_radio_face_gate": false,
+      "requires_mesh_fodder": false,
+      "requires_scene": false
+     }
+    }
+   },
    "cloud_kling_avatar": {
     "authored": {
      "aspects": {
@@ -16742,6 +17222,7 @@
   }
  },
  "required_scene_targets_by_engine": {
+  "animatediff15_video": [],
   "cloud_kling_avatar": [
    {
     "beat_id": "b000_music_open",

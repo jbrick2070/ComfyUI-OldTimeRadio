@@ -169,8 +169,46 @@ def _unsharp_amount() -> float:
         return _UNSHARP_AMOUNT_DEFAULT
 
 
-def _scale_filter(w, h, fps, *, sharpen, pad=True, in_label=None,
-                  out_label=None, pre="", post=""):
+#: THE DECLARED DELIVERY MODES. A lane DECLARES how its rows must be enlarged
+#: and the composite obeys the declaration -- it never asks which engine made a
+#: row. ``None`` is the legacy state and means "the historical real-clip or
+#: floor/gap behaviour", which is why absence has to stay distinguishable from
+#: every explicit value.
+DELIVERY_SCALE_MODE_CLEAN = "lanczos_clean_full_frame"
+DELIVERY_SCALE_MODES = frozenset({DELIVERY_SCALE_MODE_CLEAN})
+
+
+def _has_model_eligible_clips(manifest):
+    """PURE: does this manifest contain a row the upscale MODEL could act on?
+
+    True only for a real on-disk video clip (``exists``, a non-empty path, not a
+    directory handoff) whose ``delivery_scale_mode`` is ``None`` -- the exact
+    legacy state. A row that DECLARES an explicit delivery mode has told us how
+    it must be enlarged, and every declared mode today is model-ineligible.
+
+    THIS IS WHAT LETS A PROMPT-OWNED EPISODE IGNORE A STALE ESRGAN SELECTION.
+    Without it, an all-Ghost manifest would still resolve, assert and LOAD a
+    model none of its rows can use -- and a load-time failure (missing weights,
+    no spandrel, CUDA OOM) would kill a render that never needed the model at
+    all. A MIXED manifest still loads it once, for the legacy rows that earn it.
+    """
+    for row in ((manifest or {}).get("clips") or []):
+        if not isinstance(row, dict):
+            continue
+        if not row.get("exists"):
+            continue
+        if not str(row.get("path") or "").strip():
+            continue
+        if str(row.get("type") or "") == "directory":
+            continue
+        if row.get("delivery_scale_mode") is not None:
+            continue
+        return True
+    return False
+
+
+def _scale_filter(w, h, fps, *, sharpen=None, pad=True, in_label=None,
+                  out_label=None, pre="", post="", mode=None):
     """The ONE shared composite scale chain (LTX-AV quality wire, 2026-06-27).
 
     Emits, IN ORDER: ``scale=w:h:force_original_aspect_ratio=decrease`` (with
@@ -193,7 +231,42 @@ def _scale_filter(w, h, fps, *, sharpen, pad=True, in_label=None,
     ``-filter_complex`` graph when BOTH labels are given. ``pre`` is inserted
     immediately after the input label (e.g. ``format=rgba,`` for the fg, or the
     floor ``trim=...,setpts=...,`` prefix); ``post`` is appended before the output
-    label (e.g. the floor ``,tpad=stop_mode=clone:...`` hold)."""
+    label (e.g. the floor ``,tpad=stop_mode=clone:...`` hold).
+
+    ``mode`` (Ghost Signal, 2026-08-22) is a lane's DECLARED enlargement.
+    ``mode=None`` is every historical caller and every emitted filter string is
+    byte-identical to before. ``mode`` together with an explicitly conflicting
+    ``sharpen`` FAILS LOUD rather than silently letting one win: they are two
+    answers to the same question and a render should not have to guess.
+
+    ``lanczos_clean_full_frame`` replaces only the SPATIAL portion -- it emits
+    ``scale=<w>:<h>:flags=lanczos,fps=<fps>`` with no aspect pad, no crop and no
+    unsharp. ``pre`` and ``post`` are preserved verbatim, so ``_seg_vf`` still
+    contributes its ``trim,setpts`` prefix and its ``tpad`` safety suffix."""
+    if mode is not None:
+        if mode not in DELIVERY_SCALE_MODES:
+            raise ValueError(
+                "OTR_SilentComposite: unknown delivery_scale_mode %r (known: "
+                "%s). An unrecognised explicit mode fails loud -- it must never "
+                "fall through to the legacy chain, because that would silently "
+                "deliver a lane something other than what it declared."
+                % (mode, sorted(DELIVERY_SCALE_MODES)))
+        if sharpen is not None:
+            raise ValueError(
+                "OTR_SilentComposite: delivery_scale_mode=%r was passed "
+                "together with sharpen=%r. Those are two conflicting answers to "
+                "the same question; pass one." % (mode, sharpen))
+        chain = pre + ",".join([
+            "scale=%d:%d:flags=lanczos" % (int(w), int(h)),
+            "fps=%d" % int(fps),
+        ]) + post
+        if in_label is not None and out_label is not None:
+            return "[%s]%s[%s]" % (in_label, chain, out_label)
+        return chain
+    if sharpen is None:
+        raise ValueError(
+            "OTR_SilentComposite: _scale_filter needs either sharpen= or "
+            "mode=; neither was given.")
     scale = "scale=%d:%d:force_original_aspect_ratio=decrease" % (int(w), int(h))
     parts = [scale]
     if sharpen:
@@ -481,13 +554,17 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
     cursor = 0
 
     def emit(source, path, n, src_start, shot_id=None, engine_id=None, loop=False,
-             bg_still_path=""):
+             bg_still_path="", delivery_scale_mode=None):
         if int(n) <= 0:
             return
         segments.append({
             "order": len(segments), "shot_id": shot_id, "source": source,
             "path": path or "", "src_start_frame": int(src_start),
             "n_frames": int(n), "engine_id": engine_id, "loop": bool(loop),
+            # THE LANE'S DECLARED ENLARGEMENT (2026-08-22), carried from the
+            # manifest row to the encoder. None for floor/black rows, which have
+            # no lane to declare anything, and None for every legacy clip.
+            "delivery_scale_mode": delivery_scale_mode,
             # C1 (textured-hero 3D PoC): a per-clip generated background plate
             # for a directory-alpha clip (mesh_stage). Empty for every other
             # beat -> the legacy floor/black background is byte-identical.
@@ -544,7 +621,8 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 _warn_clip_underrun(r, n, will_loop=_fill)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
                      r.get("engine_id"), loop=_fill,
-                     bg_still_path=r.get("bg_still_path"))
+                     bg_still_path=r.get("bg_still_path"),
+                     delivery_scale_mode=r.get("delivery_scale_mode"))
             else:
                 emit(gap_src, "", n, _floor_aligned(cursor, n),
                      r.get("shot_id"), r.get("engine_id"))
@@ -557,7 +635,8 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
                 _warn_clip_underrun(r, n, will_loop=_fill)
                 emit("clip", r.get("path"), n, 0, r.get("shot_id"),
                      r.get("engine_id"), loop=_fill,
-                     bg_still_path=r.get("bg_still_path"))
+                     bg_still_path=r.get("bg_still_path"),
+                     delivery_scale_mode=r.get("delivery_scale_mode"))
             elif floor_available:
                 start = min(cursor, max(0, ff - n)) if ff else cursor
                 emit("floor", "", n, start, r.get("shot_id"), r.get("engine_id"))
@@ -593,9 +672,16 @@ def plan_timeline_segments(manifest, *, floor_available=False, floor_frames=0,
         # look like "the video ended before the audio did".
         if _last_clip is not None and closing_window_authorizes_loop(
                 manifest, cursor, target_total_frames):
+            # The closing tail REUSES the last real row, so it must reuse that
+            # row's declared enlargement too or the shared projection is lossy.
+            # A successful all-Ghost episode never reaches here -- its coverage
+            # is exact and leaves no tail -- but a MIXED manifest can, and a
+            # projection that is only correct for the lanes we happened to test
+            # is not a projection.
             emit("clip", _last_clip.get("path"), tail_n, 0,
                  _last_clip.get("shot_id"), _last_clip.get("engine_id"), loop=True,
-                 bg_still_path=_last_clip.get("bg_still_path"))
+                 bg_still_path=_last_clip.get("bg_still_path"),
+                 delivery_scale_mode=_last_clip.get("delivery_scale_mode"))
         else:
             if _last_clip is not None:
                 # LOUD, because this is the case that used to loop and no longer
@@ -712,7 +798,7 @@ def freezedetect_silent(video_path, *, ffmpeg="ffmpeg", noise_db=-60, dur_s=2.0)
     return parse_freezedetect((p.stderr or "") + (p.stdout or ""))
 
 
-def _seg_vf(w, h, fps, start_frame, sharpen=True):
+def _seg_vf(w, h, fps, start_frame, sharpen=True, mode=None):
     """The per-segment ``-vf`` chain: an optional source trim, then the SHARED
     scale chain (lanczos+unsharp when ``sharpen``), then the tpad last-frame hold.
     PRESERVES the ``trim -> scale/unsharp/pad/fps -> tpad`` ordering. ``sharpen``
@@ -720,6 +806,13 @@ def _seg_vf(w, h, fps, start_frame, sharpen=True):
     slice (byte-identical to the legacy chain)."""
     trim = ("trim=start_frame=%d,setpts=PTS-STARTPTS," % int(start_frame)) \
         if int(start_frame) > 0 else ""
+    # A DECLARED mode owns the spatial chain outright, so `sharpen` is not
+    # forwarded alongside it -- passing both is the conflict `_scale_filter`
+    # refuses by name. The trim prefix and the tpad suffix survive either way.
+    if mode is not None:
+        return _scale_filter(
+            w, h, fps, mode=mode, pre=trim,
+            post=",tpad=stop_mode=clone:stop_duration=3600")
     return _scale_filter(
         w, h, fps, sharpen=sharpen, pre=trim,
         post=",tpad=stop_mode=clone:stop_duration=3600")
@@ -733,7 +826,8 @@ def _color_args(out_path):
 
 
 def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
-                    loop=False, sharpen=True, engine=None):
+                    loop=False, sharpen=True, engine=None,
+                    delivery_scale_mode=None):
     """One canonical silent segment of EXACTLY ``n_frames`` from ``src`` (a clip,
     or the floor sliced at ``start_frame``): truncates a long source, holds the
     last frame (tpad clone) for a short one. FAIL CLOSED on ffmpeg error.
@@ -753,6 +847,24 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
     is a sentinel that flows through the SAME lines as today, so directory/floor/
     black paths remain byte-identical whether a profile picks ``off`` or a real
     engine."""
+    # A DECLARED DELIVERY MODE WINS, AND IT IS CHECKED FIRST -- before any
+    # source-size probe, before any engine branch. A mixed manifest may well
+    # have loaded a model for its legacy rows, and this row must not touch it:
+    # the lane declared clean full-frame Lanczos and a model pass is neither
+    # clean nor full-frame. Explicitly first, so no later branch can reach
+    # `_run_model_pipeline` with a declared row.
+    if delivery_scale_mode is not None:
+        loop_args = ["-stream_loop", "-1"] if loop else []
+        cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
+               "-vf", _seg_vf(w, h, fps, start_frame,
+                              mode=delivery_scale_mode),
+               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+        p = _run(cmd)
+        if p.returncode != 0:
+            raise ValueError(
+                "OTR_SilentComposite: segment encode failed (%s) :: %s"
+                % (os.path.basename(seg_path), p.stderr.strip()[:200]))
+        return
     if engine is None or engine.name == "off" or not sharpen:
         # OBSERVABILITY (2026-08-09). A completed render used to say NOTHING
         # about whether the upscale stage engaged: neither this branch nor the
@@ -1214,7 +1326,9 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
                 _encode_segment(fb, seg["path"], seg["n_frames"], seg_path,
                                 w=w, h=h, fps=fps, start_frame=0,
                                 loop=bool(seg.get("loop")), sharpen=True,
-                                engine=engine)
+                                engine=engine,
+                                delivery_scale_mode=seg.get(
+                                    "delivery_scale_mode"))
             elif kind == "floor":
                 # The procgen floor slice -> NOT sharpened (byte-identical chain).
                 _encode_segment(fb, base_video_path, seg["n_frames"], seg_path,
@@ -1394,9 +1508,35 @@ class OTRSilentComposite:
                                     pass
                     except OSError:
                         pass
+            # 3b. THE ORDERED DELIVERY-MODE VECTOR (2026-08-22). Changing only
+            # a row's declared enlargement changes the output pixels and nothing
+            # else in this fingerprint would notice, so the vector goes in on
+            # its own. The cadence COUNTS deliberately stay out: they vary per
+            # beat and are already implied by the frame counts.
+            # SCOPED TO A MANIFEST THAT HAS CLIPS, and the scope is the fix
+            # for a real over-reach. `_has_model_eligible_clips({})` is False
+            # for an EMPTY manifest too -- but an empty manifest is the
+            # single-base normalize path, whose historical contract includes
+            # BUG-06.07's fail-open: a raising fingerprint must return a bare
+            # nan. Skipping the fingerprint there would have quietly replaced
+            # that nan with a stable key. The Ghost case is specifically "there
+            # ARE clips and every one of them declares its own enlargement".
+            _rows = [r for r in ((manifest or {}).get("clips") or [])
+                     if isinstance(r, dict)]
+            _model_eligible = (not _rows) or _has_model_eligible_clips(manifest)
+            parts.append(("delivery_modes", tuple(
+                str(r.get("delivery_scale_mode") or "")
+                for r in ((manifest or {}).get("clips") or [])
+                if isinstance(r, dict))))
             # 4. Environment values that affect output pixels (Codex r4 MF-6).
+            #
+            # The unsharp amount is EXCLUDED when no row is model-eligible: the
+            # clean full-frame chain emits no unsharp at all, so folding the env
+            # var in there would invalidate a cached composite for a knob that
+            # cannot reach a single pixel of it.
             parts.append(("env",
-                          os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT", ""),
+                          (os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT", "")
+                           if _model_eligible else ""),
                           os.environ.get("OTR_MESH_COMPOSITE_STYLE", "")))
             # 5. Engine identity + whatever model state that engine declares.
             #
@@ -1407,6 +1547,12 @@ class OTRSilentComposite:
             # cache key -- and it resolved the file differently from the loader
             # besides. Both go away by asking the owner of the fact.
             parts.append(("engine", str(upscale_engine), str(upscale_device)))
+            # ...but its MODEL BYTES only when the model can actually run. An
+            # inactive stale engine must not become a dependency of a composite
+            # it cannot touch -- otherwise a Ghost-only episode fails its
+            # fingerprint on missing weights it never needed.
+            if not _model_eligible:
+                return repr(parts)
             try:
                 engine = _get_upscale_engine(upscale_engine)
                 parts.extend(engine.model_fingerprint_parts())
@@ -1463,8 +1609,25 @@ class OTRSilentComposite:
         #   waste AND -- worse -- a load-time failure (missing model file, no
         #   spandrel, CUDA OOM) would break a render that never needed the
         #   model at all (Sonnet 5 QA-on-diff MF-2).
-        _assert_upscale_usable(upscale_engine, "upscale_stage")
-        engine = _get_upscale_engine(upscale_engine)
+        # * A manifest with NO model-eligible row (2026-08-22): every clip
+        #   DECLARED its own enlargement, so a selected upscaler cannot act on
+        #   anything here. Resolving/asserting/loading it anyway would let a
+        #   STALE selection -- a profile that once picked ESRGAN -- fail a
+        #   render that has no use for the model. Fall back to the existing
+        #   "off" sentinel WITHOUT resolving the stale choice, which is the same
+        #   byte-identical path an explicitly-off profile already takes. A MIXED
+        #   manifest still loads it once, for the legacy rows that earn it.
+        _model_eligible = _has_model_eligible_clips(manifest)
+        if assemble and not _model_eligible:
+            log.info(
+                "[OTR_SilentComposite] upscale SKIPPED: no model-eligible clip "
+                "in this manifest (every real row declares its own "
+                "delivery_scale_mode), so the selected engine %r is not "
+                "resolved or loaded.", upscale_engine)
+            engine = _get_upscale_engine("off")
+        else:
+            _assert_upscale_usable(upscale_engine, "upscale_stage")
+            engine = _get_upscale_engine(upscale_engine)
         _engine_active = (engine.name != "off") and assemble
         if _engine_active:
             device = _resolve_upscale_device(upscale_device)

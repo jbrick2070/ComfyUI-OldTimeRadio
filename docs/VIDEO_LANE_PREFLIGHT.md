@@ -119,6 +119,43 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   portrait is minted at all). Swept by `tests/test_portrait_free_roles.py`;
   a new lane is covered the day it declares its plan, with no edit anywhere.*
 
+- G3.7-SCOPED **A PROMPT-OWNED, STILL-FREE LANE MUST DECLARE WHAT IT OWNS.**
+  Added 2026-08-22 with Ghost Signal (`animatediff15_video`), the first lane
+  that takes NO still at all. The check applies **only** when `family ==
+  "text_to_video"` AND `accepts_still is False`; every older still-owned
+  text-to-video lane legitimately inherits its subject from a minted image and
+  owes none of this. Once it applies, the lane must declare:
+  * `subject_ownership = "prompt"` -- if the still does not own the subject,
+    say what does;
+  * a `prompt_profile` and a positive `prompt_budget_chars` -- so a composer is
+    selected BY CAPABILITY and the driver cannot fall through to a generic seed;
+  * a `style_join` (`compose`, `override`, or `pack:<id>`) -- how the visual
+    style pack reaches the prompt;
+  * a `motion_source` -- a lane with no still has no movement to inherit, so it
+    must name its motion authority;
+  * a `negative_prompt_binding`, **and the CODE is checked against it**: the
+    render module must read the request's negative by name and must not carry
+    the `get("negative_prompt") or <engine constant>` idiom. A declaration
+    checking a declaration proves nothing (lesson L4).
+
+  Enforced by `gate_g3_7` in `tests/test_lane_preflight_matrix.py`, invoked over
+  the whole live roster. It is deliberately NOT a new matrix column -- the live
+  matrix is G1-G7 and the docs already use Gate 8 for the solo smoke -- and
+  deliberately not folded into `gate_g3_contract`, which is about frame
+  contracts and applies to every lane.
+
+  **WHICH SEAM ACTUALLY COVERS A NO-STILL LANE, stated exactly, because the two
+  look alike.** `_portrait_free_roles_from_policy` looks for a plan ROW saying
+  `kind=portrait required=never`, so it is INERT for a lane whose `still_plan`
+  is EMPTY and it returns nothing for Ghost. That is correct: it exists to
+  exempt a lane that consumes SOME stills but never a portrait (`still_word`).
+  A lane that consumes none is covered by the stronger `accepts_still = False`
+  gate at the image dispatcher, which mints nothing of any kind. Adding a
+  portrait/never row to an empty plan to make the role set light up would be a
+  declaration the lane cannot honour -- the exact unread-declaration defect
+  G3.7 exists to end. Pinned by
+  `tests/test_ghost_signal_lane.py::test_which_g3_7_seam_actually_covers_ghost_and_which_does_not`.
+
 ## Gate 4 -- Admission honesty
 
 - G4.1 The lane has a QUALIFIED cost row / envelope key, OR its receipts say

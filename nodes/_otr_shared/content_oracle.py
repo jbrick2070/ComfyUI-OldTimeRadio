@@ -67,6 +67,9 @@ _FAMILY_FALLBACK: dict = {
     "fastwan_8gb": "image_to_video",
     "still_word": "static_image_gen",
     "minimax_h3_video": "image_to_video",
+    # Ghost Signal (2026-08-22). Registry coherence for the bare-script case --
+    # NOT an instruction to run the luma/motion oracle on this lane.
+    "animatediff15_video": "text_to_video",
 }
 
 #: Default mean-luma floor (0..255). A clip whose mean YAVG is at/below this reads

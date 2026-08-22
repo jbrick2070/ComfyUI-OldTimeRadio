@@ -100,6 +100,13 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
     assert unbounded, "no engine is unbounded -- the sweep is vacuous"
     # The unbounded set is exactly the lanes that synthesise frames on demand.
     assert set(unbounded) == {
+        # Ghost Signal (2026-08-22). Unbounded for a DIFFERENT reason than its
+        # neighbours here, and the distinction is worth keeping: the others
+        # synthesise frames from a still on demand, while this one generates a
+        # fresh AnimateDiff timeline spanning the beat's whole audio budget. The
+        # 16 in its context options is a sliding WINDOW, not a clip ceiling, so
+        # there is nothing for the partitioner to split on either way.
+        "animatediff15_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

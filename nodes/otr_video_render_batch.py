@@ -59,8 +59,14 @@ def _legacy_receipt_bypass_allowed(ledger):
 # delivered agrees. Ordered as they appear in the per-clip receipt so the two
 # read side by side in the ledger. ``vram_peak_mb`` is deliberately NOT here --
 # it is a measurement, not an identity (see _roll_up_engine_receipts).
+#: ``delivery_scale_mode`` and ``cadence_mode`` join the identity set because
+#: each is a statement about WHAT THE ENGINE DID that is constant across every
+#: clip that engine delivered. The cadence COUNTS deliberately do not:
+#: ``model_frame_count`` and the source/delivered counts and the tail trim vary
+#: beat by beat with the beat's own length, so they are per-clip facts and
+#: rolling them up could only produce a number no clip actually carries.
 _ROLLUP_IDENTITY_FIELDS = ("recipe", "quant", "use_lora", "render_canvas",
-                           "family")
+                           "family", "delivery_scale_mode", "cadence_mode")
 
 
 def _roll_up_engine_receipts(receipts):
@@ -156,6 +162,16 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # 2026-07-28 against render_driver.build_clip_manifest). Either way
             # the absence IS the receipt, never a fallback.
             "family": clip.get("family"),
+            # THE CADENCE / DELIVERY RECEIPTS (Ghost Signal, 2026-08-22),
+            # PRESENT-KEY-ONLY. ``per_clip`` is the LOSSLESS half of this
+            # summary -- the roll-up beside it is allowed to say "no single
+            # value", this is not allowed to drop one -- and it is an
+            # independent hand-written projection, so schema-real data reaching
+            # the manifest can still go missing here unless it is copied.
+            **{k: clip[k] for k in (
+                "model_frame_count", "cadence_mode",
+                "cadence_source_frame_count", "cadence_delivered_frame_count",
+                "cadence_tail_trim", "delivery_scale_mode") if k in clip},
         }
         per_clip.append({"shot_id": clip.get("shot_id"), "role": role,
                          "delivered_engine": eng, **receipt})

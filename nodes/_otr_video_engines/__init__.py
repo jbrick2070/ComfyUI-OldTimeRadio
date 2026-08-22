@@ -280,6 +280,26 @@ except Exception:  # noqa: BLE001
 # module -- the SFX-bed lane is retired, ids guarded via RETIRED_ENGINE_IDS.)
 
 
+# animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2 motion
+# module through AnimateDiff-Evolved's NON-LOOPED Standard Static context, at a
+# fixed 512x288 delivered by clean Lanczos to 1920x1080.
+#
+# THE PROMPT-ONLY LANE, and the first one that declares it. `accepts_still` is
+# False and `still_plan` is EMPTY, so the image phase mints nothing for it --
+# not a portrait, not a scene still, nothing -- and G3.7's lane-derived role set
+# reads that declaration rather than an engine name. It is a NORMAL selectable
+# row (requires_flag=None, empty default_roles) and it fails CLOSED until both
+# pinned artifacts are on disk and the ADE pack is installed.
+#
+# Cold-import clean (V-12: torch, numpy and every ComfyUI class are lazy inside
+# load/render_clip; ghost_signal_prompt imports only hashlib/re). Guarded so a
+# packaging quirk never breaks the namespace import.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ghost_signal as _eng_ghost_signal  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
+
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.
 # ---------------------------------------------------------------------------

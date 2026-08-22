@@ -288,6 +288,17 @@ _PUBLIC_LABEL = {
         "LTX 2.5 Distilled Q3 HQ two-stage silent video - high VRAM "
         "(832x480 first stage, 1664x960 refined decode, 5080-only, one "
         "3.88 s rung)"),
+    # GHOST SIGNAL (2026-08-22). A LABEL ONLY -- there is deliberately no
+    # `_PUBLIC_ENGINES` self-alias, because the resolver already passes a bare
+    # internal id through unchanged (the existing identity-engine precedent) and
+    # a self-alias would put a duplicate in the bijection for no gain.
+    #
+    # NO `low` OR `high` TOKEN, and that is the whole naming decision. Those
+    # tokens carry MEASURED cost semantics in this repo -- every one of the
+    # labels above names a real measured bucket -- and no measurement campaign
+    # was run for this lane. "very-low-VRAM-targeted" is a design target, so the
+    # label says targeted and nothing stronger.
+    "animatediff15_video": "AnimateDiff -- Ghost Signal",
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

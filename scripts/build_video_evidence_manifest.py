@@ -287,6 +287,16 @@ manifest = {
     # in the same commit that qualifies its cost row through OTR's real
     # prepare() + render_clip() lifecycle -- never from lab numbers alone.
     "admission_unenforced": {
+        # GHOST SIGNAL (2026-08-22). Unlike every row below it, this lane is not
+        # unenforced because a measurement is MISSING and owed -- it is
+        # unenforced because the operator DECLINED the campaign, so there is
+        # nothing owed and nothing pending. Saying so plainly is the whole
+        # point of this table: the lane may fail OOM, and no receipt anywhere in
+        # this repo implies otherwise.
+        "animatediff15_video": (
+            "Admission is NOT enforced: the operator declined a measurement "
+            "campaign; no qualified cost row exists, so this lane may fail OOM "
+            "and makes no VRAM-fit claim."),
         "wan_ti2v": (
             "admission NOT enforced: BOTH paths are inert because "
             "QUALIFIED_COST_ROWS is empty. Corrected 2026-08-13 -- the STATIC "

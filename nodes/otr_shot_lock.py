@@ -1011,7 +1011,8 @@ def _resolve_writer_llm(meta: dict, warnings: list):
 # ---------------------------------------------------------------------------
 
 
-def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, policy):
+def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
+                                               policy, subject_sigils=None):
     import os
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
@@ -1086,6 +1087,12 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger, polic
     if beat.get("_synthetic_open"):
         shot["start_s"] = beat.get("_start_s", 0.0)
         shot["dur_s"] = beat.get("dur_s")
+    # The temporary shot carries the SAME durable identity the row will (Ghost
+    # Signal, 2026-08-22). Default None keeps every existing caller -- fixtures
+    # and the flat-import tests among them -- working unchanged.
+    _cast_sigil = (subject_sigils or {}).get(str(beat.get("char_id") or "").strip())
+    if _cast_sigil:
+        shot["subject_sigil"] = _cast_sigil
 
     # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
     #
@@ -1502,6 +1509,105 @@ def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
         shot["jump_still_requests"] = [dict(row) for row in requests]
 
 
+def _prompt_owned_lane(engine_id):
+    """True when ``engine_id`` is a registered lane that OWNS ITS OWN SUBJECT.
+
+    A CAPABILITY TEST, NOT AN ENGINE-NAME TEST, and deliberately so: the coding
+    plan's own law is that "engine-id string tests must not substitute for a
+    declared capability at any downstream boundary" (section 3), and the same
+    plan describes this filter loosely as "engine is exactly animatediff15_video"
+    in section 6.1. The capability reading is the one that survives: it selects
+    exactly the same single lane today, it satisfies the stated rationale
+    verbatim -- a non-Ghost episode must not acquire a new seed/style
+    requirement -- and a second prompt-owned lane is covered the day it declares
+    itself rather than the day someone remembers this function exists.
+
+    Answers False rather than raising for an unregistered id: a frozen ledger
+    may name an engine this build no longer ships, and plan-building is not the
+    seam that should die of it.
+    """
+    if not engine_id:
+        return False
+    try:
+        from ._otr_video_engines import registry as _vreg  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import registry as _vreg  # type: ignore
+    try:
+        if not _vreg.is_registered(engine_id):
+            return False
+        eng = _vreg.get_engine(engine_id)
+    except Exception:  # noqa: BLE001 -- a predicate answers, never raises
+        return False
+    return (str(getattr(eng, "subject_ownership", "") or "") == "prompt"
+            and bool(getattr(eng, "prompt_profile", None)))
+
+
+def _build_subject_sigils(beats, ledger, engine_for):
+    """One durable heraldic identity per character on a prompt-owned lane.
+
+    Built ONCE per episode, here, because a subject that changes between the
+    cast-time preflight and the durable row is not an identity at all -- and
+    because the composer must be able to refuse a character beat that has none.
+
+    THE RAW CAST ROW, NEVER ``_appearance_for_char``. That helper may invoke the
+    optional wardrobe writer, which would turn a deterministic identity READ
+    into a hidden mutation and a credit spend on every episode that happens to
+    contain a Ghost beat.
+
+    ``ledger is None`` yields an empty map: that fixture path already skips the
+    cast-time preflight and must stay valid. A missing cast row yields ``{}`` and
+    the distiller falls to its checked-in neutral pools -- it never reaches for
+    the wardrobe or any other author.
+    """
+    sigils = {}
+    if ledger is None:
+        return sigils
+
+    wanted = []
+    for b in beats:
+        if str(b.get("role") or "") != "character_video":
+            continue
+        if not _prompt_owned_lane(engine_for(b["role"])):
+            continue
+        char_id = str(b.get("char_id") or "").strip()
+        if char_id and char_id not in wanted:
+            wanted.append(char_id)
+    if not wanted:
+        return sigils
+
+    try:
+        from ._otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
+        from ._otr_ledger_consumers import cast_lookup as _cast_lookup  # type: ignore
+        from ._otr_visual_styles import get_visual_style as _get_visual_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
+        from _otr_ledger_consumers import cast_lookup as _cast_lookup  # type: ignore
+        from _otr_visual_styles import get_visual_style as _get_visual_style  # type: ignore
+
+    meta = (ledger or {}).get("meta") or {}
+    # FAIL LOUD BY NAME. Collapsing a missing seed to 0 or "" would silently give
+    # every character in the episode a sigil drawn from the same degenerate hash
+    # domain -- deterministic, reproducible, and wrong in a way no receipt would
+    # ever show.
+    if "episode_seed" not in meta or meta.get("episode_seed") in (None, ""):
+        raise ValueError(
+            "[OTR_ShotLock] a prompt-owned video lane has character beat(s) "
+            "(%s) but ledger meta carries no episode_seed. The durable subject "
+            "sigil is keyed on it; there is no safe default and it must not "
+            "collapse to 0." % ", ".join(wanted))
+    episode_seed = meta["episode_seed"]
+    style = _get_visual_style(meta)
+    style_id = str(getattr(style, "style_id", "") or "")
+
+    for char_id in wanted:
+        sigils[char_id] = _gsp.distill_subject_sigil(
+            _cast_lookup(ledger, char_id) or {},
+            episode_seed=episode_seed, char_id=char_id, style_id=style_id)
+    log.info("[OTR_ShotLock] prompt-owned lane: %d durable subject sigil(s) "
+             "stamped (%s)", len(sigils), ", ".join(sorted(sigils)))
+    return sigils
+
+
 def build_execution_plan(beats, budget, creative, policy, ledger=None):
     """Build DAG-validated ``execution_groups`` + per-shot rows.
 
@@ -1558,12 +1664,21 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     } for role in roles_present]
     groups = _resolver.validate_execution_groups(groups)
 
+    # THE DURABLE SUBJECT SIGILS (2026-08-22), built AFTER engine_for exists and
+    # BEFORE the cast-time preflight -- because the preflight builds a request
+    # per beat through the same builder the render path uses, and a Ghost
+    # character shot reaching that builder without its identity is refused BY
+    # NAME. Deriving the sigil only inside the durable-row loop below would
+    # leave the temporary shot without one and force that refusal at plan time.
+    subject_sigils = _build_subject_sigils(beats, ledger, engine_for)
+
     # Preflight family compatibility gate (F2):
     if ledger is not None:
         for b in beats:
             engine_id = engine_for(b["role"])
             if engine_id:
-                _assert_family_inputs_satisfiable_cast_time(engine_id, b, ledger, policy)
+                _assert_family_inputs_satisfiable_cast_time(
+                    engine_id, b, ledger, policy, subject_sigils)
 
     # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
     # the retired_role_a / retired_role_b roles -- every beat renders
@@ -1634,6 +1749,15 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         # zero-length beat -- and a beat that renders nothing still has a
         # perfectly knowable engine. Sharing those early returns would leave the
         # stamp missing on shots whose engine is not in doubt at all.
+        # THE IDENTICAL VALUE the cast-time preflight already validated against
+        # (2026-08-22). Stamped BEFORE the two calls below so a durable row is
+        # never observed mid-way through acquiring its identity. Absent for
+        # every beat that is not a prompt-owned character shot, and absence is
+        # the honest state there -- the field is Optional precisely so a
+        # non-Ghost episode carries no trace of a decision it never made.
+        _row_sigil = subject_sigils.get(str(b.get("char_id") or "").strip())
+        if _row_sigil:
+            shots[-1]["subject_sigil"] = _row_sigil
         _stamp_frame_bounded(shots[-1])
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)

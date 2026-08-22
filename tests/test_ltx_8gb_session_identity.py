@@ -151,6 +151,13 @@ def test_an_identity_read_that_cannot_resolve_its_weights_RAISES(eng, monkeypatc
 #: identity -- what its handles are, and which of them it hoists -- written and
 #: measured for that adapter. So the list grows one ratified chunk at a time.
 _ENGINES_WITH_A_SESSION = {
+    # Ghost Signal (2026-08-22). The first member that is NOT REQUIRED to be
+    # here: it declares `max_frames=0`, so the partitioner never splits it and
+    # `test_multiclip_session_identity_roster` would not have caught its
+    # absence. It declares one anyway because it DOES hold local handles across
+    # prepare -> render_clip, and an identity that exists before it is needed
+    # costs nothing, while the reverse was learned at 730s into a live leg.
+    "animatediff15_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

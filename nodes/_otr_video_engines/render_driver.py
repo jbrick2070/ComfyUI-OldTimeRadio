@@ -39,6 +39,10 @@ from .._otr_speaker_role import (
     SPEAKER_ROLE_MUSIC_OPEN as _SPEAKER_ROLE_MUSIC_OPEN,
     is_never_humo_role as _is_never_humo_role,
 )
+# The PURE Ghost Signal composer. Safe to import at module scope: it
+# imports only hashlib/re/typing and nothing from this package, so it
+# adds no cold-import weight and cannot create a cycle back to here.
+from . import ghost_signal_prompt as _gsp
 from . import motion_common as _mc
 from . import registry as _vreg
 
@@ -2733,7 +2737,125 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # never authored.
     _prompt_char_budget = None
     _prompt_protected_clause = None
-    if text_prompt:
+    # THE GHOST SIGNAL BRANCH (2026-08-22), and it runs BEFORE the M4 wall.
+    #
+    # CAPABILITY, NEVER AN ENGINE NAME. The branch fires on the engine's declared
+    # `prompt_profile`, resolved without assuming every id on a shot is
+    # registered -- a frozen ledger can carry an engine this build no longer
+    # ships, and `get_engine` on it would raise here rather than at the seam
+    # that actually cares.
+    #
+    # WHY IT OUTRANKS M4. Ghost owns its whole subject: it declares
+    # `accepts_still = False`, so nothing was minted for this beat and there is
+    # no still carrying the look. The ~900-char M4 identity/scene wall is a
+    # prompt written for a lane that HAS a still, and handing it to a 512x288
+    # SD1.5 sampler is how you get murk. The composer reads the same authorities
+    # M4 does -- the pack, the ledger motion clause, the beat's own mood and arc
+    # -- and states them in the order this model can act on.
+    #
+    # It also has to work for the CAST-TIME TEMPORARY SHOT, which is why it sits
+    # before every branch rather than inside one: ShotLock builds a request per
+    # beat through this same function long before the durable rows are minted.
+    _ghost_composed = False
+    _ghost_profile = (
+        getattr(_vreg.get_engine(_eng_id), "prompt_profile", None)
+        if _eng_id and _vreg.is_registered(_eng_id) else None)
+    if _ghost_profile == _gsp.GHOST_PROMPT_PROFILE:
+        # The DRIVER resolves the live authorities; the composer stays pure and
+        # cycle-free. Deliberate: `_ltx_motion_role_key` and the exact-key
+        # `motion_registers` lookup already live here, and a second role-to-
+        # register table in the pure module is a table that drifts once.
+        _g_sids = shot.get("source_line_ids")
+        _g_synthetic = (
+            str(shot.get("shot_id") or "").endswith(_OPENING_MUSIC_SUFFIX)
+            or (isinstance(_g_sids, list) and not _g_sids
+                and _shot_role in ("announcer_visual", "music_visual")))
+        _g_motion_key = _ltx_motion_role_key(
+            _shot_role, shot.get("shot_id"), _g_synthetic)
+        _g_pack_register = (_vstyle.motion_registers[_g_motion_key]
+                            if _g_motion_key else "")
+        _g_clause = _motion_clause_override(shot)
+        _g_sigil = str(shot.get("subject_sigil") or "")
+        # A CHARACTER BEAT WITHOUT ITS DURABLE SIGIL IS A GAP, NOT A DEFAULT.
+        # `build_request` seeds every request with a generic 1940s-studio prompt,
+        # so required-input PRESENCE cannot prove this branch ran -- which is
+        # exactly why the miss is raised by name instead of being papered over by
+        # a seed that would render a lane-wrong picture and look fine doing it.
+        if _shot_role == "character_video" and not _g_sigil:
+            raise FamilyInputGap(
+                "Ghost Signal beat %s is a character_video shot with no "
+                "subject_sigil. The durable identity is stamped by "
+                "otr_shot_lock.build_execution_plan and this lane cannot "
+                "compose a character without it -- the generic request seed is "
+                "NOT acceptable evidence that a Ghost prompt was built."
+                % (shot.get("shot_id"),))
+        _g_open_subject = ""
+        if _shot_role == "music_visual":
+            try:
+                from .._otr_story_brief_helpers import (  # type: ignore
+                    get_open_subject as _g_open)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from _otr_story_brief_helpers import (  # type: ignore
+                    get_open_subject as _g_open)
+            _g_open_subject = _g_open(
+                _shot_role, _g_synthetic, (ledger or {}).get("meta") or {},
+                _vstyle)
+        _g_out = _gsp.compose_ghost_prompt(
+            role=_shot_role, style=_vstyle, subject_sigil=_g_sigil,
+            motion_clause=_g_clause, pack_motion_fallback=_g_pack_register,
+            beat_intent=str(line.get("beat_intent") or ""),
+            emotion=str(line.get("traits") or ""),
+            story_accent=str(line.get("arc_phase") or ""),
+            open_subject=_g_open_subject,
+            sigil_seed=_seed_from_hash(
+                str(shot.get("render_request_hash") or ""),
+                str(shot.get("shot_id") or "")))
+        _g_positive = str(_g_out.get("positive") or "").strip()
+        _g_negative = str(_g_out.get("negative") or "").strip()
+        if not _g_positive or not _g_negative:
+            raise FamilyInputGap(
+                "Ghost Signal beat %s composed an empty %s prompt -- this lane "
+                "owns its entire subject, so an empty composition is a blank "
+                "picture, not a default to fall through from."
+                % (shot.get("shot_id"),
+                   "positive" if not _g_positive else "negative"))
+        req["text_prompt"] = _g_positive
+        req["negative_prompt"] = _g_negative
+        # Published for the common banana funnel below: the number this branch
+        # capped to, and the clause it expects to survive. THE PROTECTED CLAUSE
+        # IS THE SUBJECT IDENTITY, not the trailing shot law -- the shot law is a
+        # constant this composer can always re-emit, while the subject is the one
+        # phrase that makes the figure the same figure beat to beat.
+        _prompt_char_budget = _gsp.GHOST_PROMPT_MAX_CHARS
+        _prompt_protected_clause = (
+            _g_sigil or _g_positive.split(",")[0].strip())
+        _stamp_prompt_meta(req, _gsp.GHOST_PROMPT_SOURCE, _g_positive,
+                           beat=_beat_id_for_shot(shot))
+        _g_obs = req.setdefault("observability", {})
+        _g_obs["prompt_version"] = _gsp.GHOST_PROMPT_VERSION
+        _g_obs["negative_sha8"] = hashlib.sha256(
+            _g_negative.encode("utf-8")).hexdigest()[:8]
+        _g_obs["negative_chars"] = len(_g_negative)
+        _g_obs["prompt_slots"] = list(_g_out.get("slots") or ())
+        if _g_sigil:
+            _g_obs["subject_sigil_sha8"] = hashlib.sha256(
+                _g_sigil.encode("utf-8")).hexdigest()[:8]
+        # TRUE ONLY NOW -- after a non-empty positive, a non-empty negative and
+        # the ghost_signal prompt_source are all really installed.
+        _ghost_composed = (
+            bool(req.get("text_prompt")) and bool(req.get("negative_prompt"))
+            and _g_obs.get("prompt_source") == _gsp.GHOST_PROMPT_SOURCE)
+        if not _ghost_composed:
+            raise FamilyInputGap(
+                "Ghost Signal beat %s did not install a complete composed "
+                "request (positive/negative/prompt_source) -- refusing rather "
+                "than letting the generic seed render as if it were Ghost."
+                % (shot.get("shot_id"),))
+        _LOG.warning(
+            "[OTR.render_driver] GHOST SIGNAL: %s beat %s composed %d chars, "
+            "negative %d chars, slots=%s", _shot_role, shot.get("shot_id"),
+            len(_g_positive), len(_g_negative), ",".join(_g_obs["prompt_slots"]))
+    if text_prompt and not _ghost_composed:
         # Authored M4 visual vocabulary is not a publication gate. Preserve it
         # verbatim; framing/style composition below may add context but never
         # deletes story-world objects by means of a Python word list.
@@ -2807,7 +2929,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _stamp_prompt_meta(req, "m4", text_prompt,
                            subsource=str(creative.get("source") or ""),
                            beat=_beat_id_for_shot(shot))
-    elif _is_char_face_beat or _fam == "audio_driven_face":
+    elif not _ghost_composed and (_is_char_face_beat
+                                 or _fam == "audio_driven_face"):
         # HuMo-seam ticket Part C: a FACE beat with NO M4 creative prompt is
         # the proven microphone re-introduction path -- the build_request
         # generic studio default is inappropriate for a character beat. Use a
@@ -2856,7 +2979,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if ((_engine_id in ("ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in")
             or _google_prompt_provider
             or _strict_text_only)
-            and not text_prompt and not _is_char_face_beat):
+            and not text_prompt and not _is_char_face_beat
+            # Ghost already composed this shot's positive AND negative from
+            # the same authorities; letting the scene branch run would
+            # overwrite the positive and silently orphan the negative.
+            and not _ghost_composed):
         # Round 5 F2: synthetic-open detection by STRUCTURE -- the ShotLock
         # beat-id suffix is definitive; empty source_line_ids counts only
         # for OPEN roles (a hypothetical provider/b-roll shot without source
@@ -4107,11 +4234,27 @@ def run_episode(ledger, *, oom_shot_id=None,
                         # -- without these the keys never reach the node-92 report.
                         "banana_route", "banana_table_version",
                         "banana_substitutions", "banana_sha256_before",
-                        "banana_sha256_after", "banana_varieties"):
+                        "banana_sha256_after", "banana_varieties",
+                        # GHOST SIGNAL PROMPT RECEIPTS (2026-08-22). These live
+                        # on the REQUEST's observability, which is why they
+                        # belong in this loop and the cadence keys below do not.
+                        "prompt_version", "negative_sha8", "negative_chars",
+                        "prompt_slots", "subject_sigil_sha8"):
                 if key in obs:
                     row[key] = obs[key]
                 elif isinstance(request, dict) and ("_" + key) in request:
                     row[key] = request["_" + key]
+            # THE CADENCE / DELIVERY KEYS COME FROM THE CLIP, NOT THE REQUEST.
+            # Appending them to the loop above would have been the natural-
+            # looking mistake and they would ALL have been silently absent: they
+            # are stamped by the adapter on what it RETURNED, never on what was
+            # asked for -- which is the point, since a receipt sourced from
+            # request intent could describe a render that did not happen.
+            # Without this, node 92's /history report drops them entirely.
+            if isinstance(clip, dict):
+                for key in _CADENCE_DELIVERY_RECEIPT_KEYS:
+                    if key in clip:
+                        row[key] = clip[key]
             trace.append(row)
             if used:
                 vram_peak = max(vram_peak, int(used))
@@ -5048,6 +5191,19 @@ def closing_theme_frame_window(lines, fps):
     return {"start": start_frame, "end": end_frame}
 
 
+#: THE CADENCE / DELIVERY RECEIPT KEYS (Ghost Signal, 2026-08-22). ONE tuple,
+#: because these travel through four INDEPENDENT hand-written projections --
+#: the clip manifest, `_clip_summary`, the strict run trace, and the render
+#: batch's lossless `per_clip` -- and a key list written four times is a key
+#: list that drifts once. Every projection copies PRESENT-KEY-ONLY, so a legacy
+#: row keeps its exact historical shape.
+_CADENCE_DELIVERY_RECEIPT_KEYS = (
+    "model_frame_count", "cadence_mode", "cadence_source_frame_count",
+    "cadence_delivered_frame_count", "cadence_tail_trim",
+    "delivery_scale_mode",
+)
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -5156,6 +5312,17 @@ def build_clip_manifest(result, *, episode_id=""):
             # reported every honest multi-segment beat as padded.
             "native_frame_count": clip.get("native_frame_count"),
             "extension_mode": clip.get("extension_mode"),
+            # THE CADENCE AND DELIVERY RECEIPTS (Ghost Signal, 2026-08-22).
+            # PRESENT-KEY-ONLY, and that is the whole care in this block: a
+            # legacy row that never carried these must not acquire six null
+            # keys, because absence is what tells a reader "this lane made no
+            # such declaration" and a null would read as "it declared nothing",
+            # which is a different and false claim. Copied here beside
+            # native_frame_count for the same reason those are: the engine
+            # stamps them on the canonical clip and they die there unless the
+            # manifest carries them.
+            **{k: clip[k] for k in _CADENCE_DELIVERY_RECEIPT_KEYS
+               if k in clip},
             # PRESENT ONLY WHEN THE COVERAGE ASSEMBLER MINTED THIS BEAT, and
             # that absence is information rather than noise: a beat with no
             # plan, or a plan owing no head/tail work, takes the historical
@@ -5269,6 +5436,12 @@ def _clip_summary(clip):
             "family": (clip or {}).get("family"),
             "frame_count": (clip or {}).get("frame_count"),
             "path": path, "exists": exists, "size": size,
+            # Ghost Signal cadence/delivery, present-key-only. This projection
+            # is independent of the manifest above -- it is what reaches the
+            # episode manifest and the single-clip path -- so it must copy them
+            # too or the receipts silently vanish on exactly one of the routes.
+            **{k: (clip or {})[k] for k in _CADENCE_DELIVERY_RECEIPT_KEYS
+               if k in (clip or {})},
             # THE TELEMETRY WAS BEING DROPPED HERE (relayed from the concurrent
             # coder window, 2026-08-11; folded into lane 7 because this lane's
             # solo smoke is what qualifies its new 1024x576 declaration, and a
