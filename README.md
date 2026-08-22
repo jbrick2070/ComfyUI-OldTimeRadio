@@ -5,9 +5,10 @@ finished **radio-drama video** — script, voices, music, and CRT-style video �
 inside ComfyUI. Drop it in, queue one workflow, walk away, and a complete episode lands in
 your output folder.
 
-**Pipeline:** story source → LLM script → character voices (IndexTTS2) + announcer (Kokoro) +
-themes (Stable Audio) → 48 kHz master mix → model-agnostic video (HuMo / LTX / Wan / CRT
-visualizer) → final MP4.
+**Pipeline:** story source → LLM script → character voices + announcer + music themes (a
+swappable 7-voice / 5-music engine roster; IndexTTS2 + Kokoro + Stable Audio 3 ship as the
+defaults) → 48 kHz master mix → model-agnostic video (procedural CRT floor by default, or
+HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) → final MP4.
 
 100% local by default. No API keys required. Optional hosted LLM and all-cloud
 routes exist; they stay off unless you turn them on.
@@ -54,26 +55,35 @@ Then restart ComfyUI so it loads the nodes.
 
 ### 3. Install the models
 
-OTR downloads most assets on first run, but the heavy diffusion checkpoints (HuMo, LTX, Wan,
-Flux) and the TTS/music weights must be present in your ComfyUI models tree (`diffusion_models/`,
-`vae/`, etc.). If a model is missing, the engine fails **loudly** and the pipeline falls back to
-a guaranteed CRT floor — it never silently produces garbage. Watch the console on the first run;
-it names any missing weight and where it expects it.
+The shipped canonical workflow is lighter than you'd expect: its video-role dropdowns default
+to the **procedural still/CRT floor** (no GPU video checkpoint required at all), and its image
+role defaults to **Z-Image-Turbo** (Apache-2.0, no license friction). So a first run needs only:
+the local writer LLM (Gemma or your own choice), Z-Image-Turbo, and the default voice/music
+weights (IndexTTS2, Kokoro, Stable Audio 3). The heavier local video checkpoints — HuMo, LTX,
+Wan, AnimateDiff, MiniMax H3 — are **optional upgrades** you dial in later via the
+`OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
+before downloading any of them. If a model is missing, the engine fails **loudly** and the
+pipeline falls back to the guaranteed CRT floor — it never silently produces garbage. Watch the
+console on the first run; it names any missing weight and where it expects it.
 
 ### 4. Run it
 
 1. Drag **`workflows/otr_canonical.json`** into the ComfyUI canvas.
 2. Hit **Queue Prompt**.
-3. Walk away. Script, voices, music, mastering, and video all run automatically.
+3. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
+   graph rolls a random story bank each run and renders through the procedural still/CRT floor
+   — the fast, guaranteed-to-complete path. Swap dropdowns once you're ready for a specific bank
+   or a GPU video engine.
 4. Find the finished episode in **`output/otr/obs/`**.
 
 ---
 
 ## Requirements
 
-- **GPU:** an NVIDIA card is recommended for the local video engines. The shipped
-  canonical workflow is the quick 30-word smoke canvas; heavier/local/cloud
-  routing is handled by explicit profile overrides.
+- **GPU:** an NVIDIA card is recommended for the local video engines. The shipped canonical
+  workflow renders through the procedural still/CRT floor by default (no GPU video model
+  required); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
+  explicit profile overrides. Episode length is set by act count, not a word target.
 - **OS:** Windows or Linux. Tested heavily on Windows + RTX (Blackwell/sm_120).
 - **Other setups:** per-platform workflow variants + recipes ship in-repo (16 GB NVIDIA
   canonical, cloud-lane variant, Mac ~10 GB ceiling, AMD). The Mac/AMD variants are
@@ -134,6 +144,8 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | **likely** | yes | yes |
 | `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
 | `animatediff15_video (16:9)` | not measured (3.9 GB of weights) | ? | ? | yes |
+| `animatediff15_h3_video (16:9)` | same weights as `animatediff15_video`, hold-3 cadence | ? | ? | yes |
+| `animatediff15_h5_video (16:9)` | same weights as `animatediff15_video`, hold-5 cadence | ? | ? | yes |
 | `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
 | `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB @ 480x832x129 | no | maybe | yes |
 | `humo14_high_audio_in_wide (16:9)` | 13.06 GiB @ 832x480x97 | no | no | yes |
@@ -145,23 +157,43 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |
 
+`animatediff15_h3_video` and `animatediff15_h5_video` are peers of the golden
+`animatediff15_video` lane, differing only in how many delivered frames each
+generated frame fills (hold-3 / hold-5 vs. the golden hold-2) — same weights,
+same VRAM class. Three other AnimateDiff lanes (`animatediff15_v2_video`,
+`animatediff15_v3_video`, `animatediff15_v3_haunted_video`) exist in the
+registry but have not yet rendered a proving episode; they are not listed here
+until they ship.
+
+**Licensing note on this table:** most engines here are open weights, but two
+are not. `h3_low_video` / `h3_low_audio_in` (MiniMax H3) run under a personal,
+non-transferable authorization the maintainer obtained directly from MiniMax —
+it does not transfer to your install; treat H3 as off unless you have your own
+agreement with MiniMax. `animatediff15_video` and its two cadence peers load a
+motion module with **no published license grant** (`commercial_clean = False`
+in the adapter) — fine for personal/hobby use, not cleared for commercial
+redistribution. See [License & Credits](#license--credits) for the full list.
+
 ### Procedural and still lanes -- these run anywhere
 
 `still_flat (16:9)`, `still_motion (16:9)`, `still_pan (16:9)`,
-`still_word (16:9)`, `word_razzle (16:9)`, `viz_camera (16:9)`,
-`viz_green (16:9)`, `viz_mxc_cpu (16:9)`, `viz_mxc_mandala (16:9)`.
+`still_word (16:9)`, `viz_camera (16:9)`, `viz_green (16:9)`,
+`viz_mxc_cpu (16:9)`, `viz_mxc_mandala (16:9)`.
 
 The four `viz_*` lanes are pure numpy/PIL/ffmpeg with no model at all and no GPU
-requirement. The `still_*` and `word_razzle` lanes cost whatever your chosen
-IMAGE model costs, since the video side is a pan or a hold over a still.
+requirement. The `still_*` lanes cost whatever your chosen IMAGE model costs,
+since the video side is a pan or a hold over a still. `still_flat` is the
+canonical workflow's shipped default for every video role.
 
 ### Cloud lanes -- no local VRAM, but they are paid services
 
 `cloud_kling_avatar (16:9)`, `cloud_seedance_2 (16:9)`,
 `cloud_vidu_q2_pro_fast_720p (16:9)`, `cloud_wan_i2v (16:9)`,
 `cloud_wan_i2v_audio (16:9)`, `google_omni_video (16:9)`,
-`google_veo_video (16:9)`. All are OFF by default; this project is
-offline-first and nothing here is required to make an episode.
+`google_veo_video (16:9)`, `word_razzle (16:9)` (a Comfy Cloud partner lane
+despite the name — it renders provider-side via Pixverse). All are OFF by
+default; this project is offline-first and nothing here is required to make
+an episode.
 
 ### Two lanes need their own boot
 
@@ -177,32 +209,41 @@ local lanes by a wide margin.
 **Audio is the source of truth.** The writer produces a script, the voice/music engines render
 it, and everything is assembled into a single **frozen 48 kHz master mix**. That master defines
 the episode timeline and the per-beat clip budget. Video is rendered to fit the audio and is
-**muxed in last, byte-identical** — the audio is never re-encoded or altered by the video stage.
+**muxed in last, byte-identical, in the archival copy** written to `otr/episodes/` — the audio
+there is never re-encoded or altered by the video stage. The published copy in `otr/obs/` (the
+one you actually watch) re-encodes that same audio to AAC 320 kbps for player compatibility;
+the PCM content is unchanged, only the container codec differs.
 
 ```
-News → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
-     → IndexTTS2 (characters) + Kokoro (announcer) + Stable Audio (themes)
+Story bank → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
+     → character voices + announcer + music themes (per-role engine roster)
      → SceneSequencer → AudioEnhance → EpisodeAssembler  ==> 48 kHz MASTER (frozen)
      → VideoDirector / ShotLock (per-role engine + per-beat prompts)
      → VideoRenderBatch (render each beat through its engine)
-     → SilentComposite → CaptionBurn → MasterAudioMux  ==> final MP4 in otr/obs
+     → SilentComposite → CaptionBurn → CreditsRoll → MasterAudioMux  ==> final MP4 in otr/obs
 ```
+
+Only two of the five story banks (`scifi_news_pro`, `media_archive`) actually pull from a news
+or archive feed — `public_domain` and `shakespeare` adapt a fixed source text, and `original` is
+entropy-seeded with no external input at all. "Story bank" above covers all five; see
+[Story sources](#story-sources-source-banks) for what each one actually consumes.
 
 ---
 
 ## Story sources (source banks)
 
-The writer's `source_bank` dropdown selects where each episode's story comes from.
-Default: `scifi_news_pro` (the local, offline-first sci-fi lane). Every lane is an
-INDEPENDENT bank (its own story pack + story_rules) with no dependency on any
-other lane.
+The writer's `source_bank` dropdown selects where each episode's story comes from. The
+shipped canonical workflow rolls randomly across every eligible bank each run
+(`scifi_news_pro` is only the code-level fallback for a freshly-dropped, unconfigured node —
+pin the dropdown to one bank if you want a fixed lane). Every lane is an INDEPENDENT bank (its
+own story pack + story_rules) with no dependency on any other lane.
 
 | Bank | What it does |
 |------|--------------|
-| `scifi_news_pro` | sci-fi radio drawn from a live science feed; the local default, an LLM-first multipass writer using the configured model slots |
+| `scifi_news_pro` | sci-fi radio drawn from a live science feed; an LLM-first multipass writer using the configured model slots |
 | `media_archive` | media RSS / archive items → restoration-adventure episodes |
 | `public_domain` | faithful radio adaptation of a public-domain source |
-| `shakespeare` | Folger scene adaptation |
+| `shakespeare` | Folger scene adaptation. **The Folger Digital Texts are CC BY-NC 3.0 (noncommercial)** — episodes from this bank inherit that restriction on the source text. |
 | `original` | no-source original fiction seeded from an entropy spark draw |
 
 A typed `custom_premise` rides along as an operator hint on the original lanes and as a
@@ -229,19 +270,20 @@ beat; every chain ends at a guaranteed CRT "radio-floor" clip, so a missing or O
 
 | Role | What it is | Canonical default |
 |------|------------|-------------------------------|
-| `announcer_visual` | the announcer bookends | procedural visualizer |
-| `music_visual` | opening/closing theme bookends | procedural visualizer |
-| `character_video` | character dialogue beats | procedural visualizer / still floor |
+| `announcer_visual` | the announcer bookends | `still_flat` (image-model still, no video model) |
+| `music_visual` | opening/closing theme bookends | `still_flat` (image-model still, no video model) |
+| `character_video` | character dialogue beats | `still_flat` (image-model still, no video model) |
 
 (The former `sfx` speaker role and `scene_broll` / `background_abstract` video roles were
 removed in the 2026-07-01 cleanbreak — old ledgers using them fail loud by design.)
 
 **Engines available:** HuMo (audio-driven face, 14B + 1.7B tiers), LTX (text/image→video and
-audio-in), Wan (TI2V / I2V), and the cheap CPU floors (CRT **visualizer**, Ken-Burns, flat
-still, station card). Audio-driven engines are offered only where audio exists; engines load
-one at a time with explicit VRAM reclaim between stages, and renders are request-hash
-deterministic. The old VRAM tier system is gone — per-platform workflow variants are the
-sizing mechanism now.
+audio-in), Wan (TI2V / I2V), AnimateDiff (Ghost Signal, three shipped cadence peers), MiniMax
+H3 (personal license only, see the licensing note above), `mesh_stage`, and the cheap CPU
+floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are offered only where
+audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
+renders are request-hash deterministic. The old VRAM tier system is gone — per-platform
+workflow variants are the sizing mechanism now.
 
 ### The video model reference — read these two before adding or changing an engine
 
@@ -287,12 +329,35 @@ no still -- and each of those lanes declares that exemption out loud
 (`accepts_still = False`); staying silent is a test failure. Adding your own
 engine? Start at `docs/EXTENDING_OTR.md`, then run the matching preflight.
 
+### Image models
+
+The picture behind every still/motion lane and video role comes from a per-role image-model
+dropdown (`announcer_image_model`, `music_image_model`, `character_image_model`), independent
+of which video engine you picked. **`z_image_turbo` (Apache-2.0) is the shipped canonical
+default for all three roles.** Same open-set "registry IS the menu" story as video: drop in an
+adapter, no other edits, and it's selectable everywhere.
+
+| Engine | License | Notes |
+|---|---|---|
+| `z_image_turbo` | Apache-2.0 | shipped default, all three roles |
+| `lumina_image` | Apache-2.0 | ~7-12 GB measured |
+| `flux2_klein` | Apache-2.0 | FLUX.2 Klein 4B |
+| `flux_gen1` (Flux.1-dev) | **BFL non-commercial** | coded as the in-stack "gen-1" default; the canonical workflow does not select it |
+| `ideogram4_local` | **non-commercial weights, opt-in** | heaviest local image engine, 16 GB-class only; typography-first for the `still_word` title card |
+
+Six more engines run through the Comfy Cloud partner bridge (`cloud_flux_pro`,
+`cloud_nano_banana_2`, `cloud_seedream_2`, `cloud_krea_2_turbo`,
+`cloud_luma_photon_flash`, `ideo`) plus a direct Google Gemini/Nano-Banana adapter
+(`google_image`, BYO API key). All are OFF by default — same "the dropdown pick is the
+enable" pattern as the cloud video lanes, no local VRAM, budget-estimated per call, fail
+loud without credentials. Full contract: [`docs/IMAGE_GEN_PREFLIGHT.md`](docs/IMAGE_GEN_PREFLIGHT.md).
+
 ### Headless canonical path
 
 Agents and API tests use exactly one workflow file: `workflows/otr_canonical.json`.
 By default, the headless wrapper applies no profile and leaves the saved dropdowns
 alone. Explicit profiles are still available for deliberate route testing, such as
-`cloud_all` for the hosted Partner API path.
+`otr_cloud_lanes` for the hosted Partner API path.
 
 Headless/API smoke runs must use the canonical workflow wrapper:
 
@@ -309,7 +374,7 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_canonical_
 Cloud route example:
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile cloud_all -Acts 3
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile otr_cloud_lanes -Acts 3
 ```
 
 `--words` no longer exists anywhere on this path. It went with the `target_words`
@@ -321,10 +386,12 @@ widgets.
 
 ### Optional: hosted LLM via OpenRouter (off by default)
 
-The writer runs locally (Mistral-Nemo) out of the box. You can optionally route the creative
-and/or technical slot to a hosted frontier model via OpenRouter — it only activates when you
-set both `OPENROUTER_API_KEY` and `OTR_ENABLE_OPENROUTER=1`, is cost-guarded, and fails closed.
-Full walkthrough: [`docs/openrouter-setup.md`](docs/openrouter-setup.md).
+The writer runs locally out of the box — the shipped canonical workflow pins Gemma-4-12B for
+both the creative and technical slots (Mistral-Nemo is only the code-level fallback for a
+freshly-dropped, unconfigured node). You can optionally route either slot to a hosted frontier
+model via OpenRouter — it activates as soon as `OPENROUTER_API_KEY` is set (no separate opt-in
+flag anymore), is cost-guarded, and fails closed. Full walkthrough:
+[`docs/openrouter-setup.md`](docs/openrouter-setup.md).
 The docs index is [`docs/README.md`](docs/README.md).
 
 ---
@@ -362,7 +429,7 @@ appear there as they render.
 
 Development runs under a sibling QA harness — the
 [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a 197-entry machine-readable Bug Bible distilled from this project's live production
+a 306-entry machine-readable Bug Bible distilled from this project's live production
 incidents, plus a static regression suite that runs against this pack after every change.
 Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
@@ -428,12 +495,32 @@ project's generations. Born of the machine, still raising hell on the airwaves. 
 
 ## Changelog
 
-The current line is **v2.0-alpha** (Open Video Model Platform; per-role engines; ten story
-source banks including four independent multipass sci-fi writer lanes and an original
-fair-play mystery lane; per-platform workflow variants; frozen byte-identical audio master).
-Full per-version history is in the git log and the GitHub Releases page.
+The current line is **v2.0-alpha** (Open Video Model Platform; per-role video AND image
+engines; five independent story source banks; per-platform workflow variants; frozen 48 kHz
+audio master, byte-identical in the archival copy). Full per-version history is in the git log
+and the GitHub Releases page.
 
 ## License & Credits
 
-See [`LICENSE`](LICENSE). Built on ComfyUI and the open-source HuMo / LTX / Wan / Flux /
-IndexTTS2 / Kokoro / Stable Audio ecosystems — thanks to all of their authors.
+See [`LICENSE`](LICENSE). Built on ComfyUI and the open-source HuMo / LTX / Wan / AnimateDiff /
+Z-Image-Turbo / Lumina / FLUX.2 Klein / IndexTTS2 / Kokoro / Stable Audio ecosystems, plus
+several optional engines (Chatterbox, Dia, Bark, MusicGen, and others) — thanks to all of
+their authors.
+
+**A few optional, off-by-default pieces carry restricted terms, not open licenses:**
+
+- `flux_gen1` (Flux.1-dev) — BFL non-commercial license.
+- `ideogram4_local` — non-commercial model agreement; code ships, weights don't.
+- `h3_low_video` / `h3_low_audio_in` (MiniMax H3) — a personal, non-transferable
+  authorization the maintainer obtained directly from MiniMax; it does not carry over to
+  your install.
+- `animatediff15_video` and its cadence peers — the shipped motion module publishes no
+  license grant at all (`commercial_clean = False`); fine for personal use, not cleared for
+  commercial redistribution.
+- The `shakespeare` story bank adapts Folger Digital Texts, which are CC BY-NC 3.0
+  (noncommercial).
+
+None of these are required for a first run — the canonical workflow's shipped defaults
+(Gemma writer, Z-Image-Turbo, IndexTTS2/Kokoro/Stable Audio, procedural video floor) are all
+open and commercial-friendly. Check each engine's own license before commercial use of the
+others.
