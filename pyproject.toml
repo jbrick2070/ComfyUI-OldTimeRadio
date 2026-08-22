@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.2"
+version = "2.0.0"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
