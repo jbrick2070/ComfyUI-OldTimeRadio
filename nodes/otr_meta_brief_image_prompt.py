@@ -720,6 +720,79 @@ def _mesh_fodder_roles_from_policy(policy_json):
     return set()
 
 
+def _portrait_free_roles_from_policy(policy_json):
+    """Roles whose paired VIDEO engine DECLARES it never needs a portrait.
+
+    The fifth member of the lane-derived role-set family
+    (``_still_aspects_from_policy`` / ``_mesh_fodder_roles_from_policy`` /
+    ``_talking_roles_from_policy`` / ``_still_word_roles_from_policy``): the
+    VIDEO lane already tells the image phase the aspect, the kind, the framing
+    and which composer to use, and this is the one thing it could not say --
+    "do not mint a portrait for this role at all".
+
+    THE TRUTH IS THE LANE'S OWN DECLARATION, never a hardcoded engine name.
+    Every adapter ships a ``still_plan`` of ``StillPlanRow``; the cheap family
+    (``still_flat`` / ``still_pan`` / ``still_motion`` / ``still_word``) already
+    declares ``kind="portrait" ... required="never"``. That row has been correct
+    and unread since it was written -- ``still_plan_helpers`` says so in terms
+    ("Nothing in this module reads the plan for production"), which is why a
+    still_word episode has always minted a portrait per cast member that nothing
+    on the lane ever reads. Free on an engine that will draw a face; FATAL on
+    one that refuses (Ideogram 4 returns a safety placeholder for a person
+    close-up, which is what killed the 2026-08-22 live leg).
+
+    Reading the declaration rather than naming ``still_word`` means every future
+    lane -- an ultra-low-VRAM animatediff, anything -- is covered the day it
+    declares its plan, with no edit here.
+
+    Resolves each role through the SAME force-map / radio-host redirect the
+    render phase uses (``_effective_prompt_engine_for_role``), so a run that
+    FORCES or redirects a role is judged on the engine that will actually
+    render. A missing/malformed policy, an unregistered engine, or an adapter
+    with no plan yields NO exemption -- the portrait is minted, which is the
+    pre-existing behaviour and the safe direction. Pure, tolerant.
+    """
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return set()
+    if not isinstance(pol, dict):
+        return set()
+    vm = pol.get("video_models")
+    if not isinstance(vm, dict):
+        return set()
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+            from ._otr_shared import still_plan_helpers as _sp  # type: ignore
+            from ._otr_video_engines import registry as _vreg  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+            from _otr_shared import still_plan_helpers as _sp  # type: ignore
+            from _otr_video_engines import registry as _vreg  # type: ignore
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return set()
+    roles = set()
+    for role in _rs.ROLE_TO_VIDEO_SLOT:
+        try:
+            eng_id = _effective_prompt_engine_for_role(vm, role)
+            if not eng_id or not _vreg.is_registered(eng_id):
+                continue
+            plan = getattr(_vreg.get_engine(eng_id), "still_plan", None) or ()
+            for row in plan:
+                if (str(getattr(row, "kind", "")) == _sp.KIND_PORTRAIT
+                        and str(getattr(row, "required", "")) == _sp.REQUIRED_NEVER):
+                    roles.add(role)
+                    break
+        except _RouteFreezeError:
+            # A MALFORMED ROUTING ENVIRONMENT IS TERMINAL (2026-07-25 QA) --
+            # the same rule the still_word role resolver above follows.
+            raise
+        except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
+            continue
+    return roles
+
+
 def _still_word_roles_from_policy(policy_json):
     """The set of image-prompt roles whose paired VIDEO engine is ``still_word``.
 
@@ -1699,7 +1772,8 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                          consistency_gate_warn_only: bool = False, lines=None,
                          fps: int = 25, still_aspects=None,
                          mesh_fodder_roles=None, talking_roles=None,
-                         still_word_roles=None, video_models=None):
+                         still_word_roles=None, video_models=None,
+                         portrait_free_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -1902,8 +1976,17 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     from ._otr_shared.aspect import still_dims_for_aspect
     _role_aspects = still_aspects or {}
     objects: list = []
+    _portrait_free = set(portrait_free_roles or ())
     for cid, pinfo in out.items():
         _role = pinfo.pop("_role", "character_video")
+        # The VIDEO lane declared it never needs a portrait (StillPlanRow
+        # kind=portrait required=never), so do not mint one. This is the same
+        # lane-drives-the-image-phase seam as still_aspects / mesh_fodder_roles
+        # / talking_roles / still_word_roles -- portraits were simply the one
+        # kind minted unconditionally, which every engine tolerated until one
+        # refused to draw a face.
+        if _role in _portrait_free:
+            continue
         _pw, _ph = still_dims_for_aspect(
             _role_aspects.get(_role, "portrait"), PORTRAIT_W, PORTRAIT_H)
         _pobj = {
@@ -2309,6 +2392,8 @@ class OTRMetaBriefImagePromptGen:
             talking_roles=_talking_roles_from_policy(image_policy_json),
             still_word_roles=_still_word_roles_from_policy(image_policy_json),
             video_models=video_models,
+            portrait_free_roles=_portrait_free_roles_from_policy(
+                image_policy_json),
         )  # aspects + mesh-fodder + talking + still_word roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 

@@ -89,6 +89,36 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   visualization video models." Audited clean at that date (26 lanes obey, the
   4 viz lanes exempt, 0 silent); the gate keeps it that way.*
 
+- G3.7 **The lane's `still_plan` is DECLARED and TRUE -- it is what tells the
+  image phase what to mint.** The video lane is the authority on the image
+  assets it needs, and it says so through a `still_plan` of `StillPlanRow`:
+  `kind` (portrait / scene_open / scene_beat / scene_character / mesh_fodder /
+  background_plate), `cardinality` (how MANY -- per_beat / per_subject /
+  per_recurring_subject / per_bookend_role), `aspect` (the dimensions --
+  wide / portrait / inherit_engine), `required` (always / never / conditional),
+  `framing_geometry` and `style_tail_policy`. That declaration must match what
+  the lane's renderer ACTUALLY consumes: `wan_ti2v` declares portrait `never`
+  and is family `image_to_video`, so `render_driver` overrides its init with the
+  per-beat scene still; `humo` declares portrait `always` and is
+  `audio_driven_face`, so it keeps `init_image = portrait` and drives a mouth
+  from it. **Check the declaration against `_SCENE_INIT_FAMILIES` and the lane's
+  own render path, not against intuition** -- "it's an i2v lane so it needs a
+  portrait" is exactly the wrong inference.
+  *Origin: 2026-08-22. `still_word` had declared `kind="portrait"
+  required="never"` since it was written, and nothing read it -- the module
+  says so in terms: "Nothing in this module reads the plan for production."
+  So every still_word episode minted a portrait per cast member that no
+  consumer on that lane ever loads. FREE on an engine that will draw a face,
+  which is why it hid for months; FATAL on `ideogram4_local`, which returns a
+  safety placeholder for a person close-up and killed a live leg. The lane was
+  right, the enumerator was not asking.*
+  *The seam is the lane-derived role-set family that already carries the other
+  four decisions into the image phase -- `still_aspects` (dimensions),
+  `mesh_fodder_roles` (kind), `talking_roles` (framing), `still_word_roles`
+  (which composer) and now `_portrait_free_roles_from_policy` (whether a
+  portrait is minted at all). Swept by `tests/test_portrait_free_roles.py`;
+  a new lane is covered the day it declares its plan, with no edit anywhere.*
+
 ## Gate 4 -- Admission honesty
 
 - G4.1 The lane has a QUALIFIED cost row / envelope key, OR its receipts say
