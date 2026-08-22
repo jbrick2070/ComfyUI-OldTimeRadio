@@ -1,0 +1,589 @@
+{
+  "animatediff_evolved_commit": "9257651221002dcba0a12f9cff37e1944e58fb60",
+  "animatediff_evolved_version": "1.6.0",
+  "captured_at_utc_note": "written by the Phase-0 capture after the ADE install boot",
+  "captured_for": "animatediff15_video (Ghost Signal)",
+  "classes": {
+    "ADE_AnimateDiffLoaderGen1": {
+      "api_node": false,
+      "category": "Animate Diff \ud83c\udfad\ud83c\udd50\ud83c\udd53/\u2460 Gen1 nodes \u2460",
+      "class_name": "ADE_AnimateDiffLoaderGen1",
+      "deprecated": false,
+      "display_name": "AnimateDiff Loader \ud83c\udfad\ud83c\udd50\ud83c\udd53\u2460",
+      "input": {
+        "optional": {
+          "ad_keyframes": [
+            "AD_KEYFRAMES",
+            {}
+          ],
+          "ad_settings": [
+            "AD_SETTINGS",
+            {}
+          ],
+          "context_options": [
+            "CONTEXT_OPTIONS",
+            {}
+          ],
+          "effect_multival": [
+            "MULTIVAL",
+            {}
+          ],
+          "motion_lora": [
+            "MOTION_LORA",
+            {}
+          ],
+          "per_block": [
+            "PER_BLOCK",
+            {}
+          ],
+          "sample_settings": [
+            "SAMPLE_SETTINGS",
+            {}
+          ],
+          "scale_multival": [
+            "MULTIVAL",
+            {}
+          ]
+        },
+        "required": {
+          "beta_schedule": [
+            "COMBO",
+            {
+              "default": "autoselect",
+              "multiselect": false,
+              "options": [
+                "autoselect",
+                "use existing",
+                "sqrt_linear (AnimateDiff)",
+                "linear (AnimateDiff-SDXL)",
+                "linear (HotshotXL/default)",
+                "avg(sqrt_linear,linear)",
+                "lcm avg(sqrt_linear,linear)",
+                "lcm",
+                "lcm[100_ots]",
+                "lcm >> sqrt_linear",
+                "sqrt",
+                "cosine",
+                "squaredcos_cap_v2"
+              ]
+            }
+          ],
+          "model": [
+            "MODEL",
+            {}
+          ],
+          "model_name": [
+            "COMBO",
+            {
+              "multiselect": false,
+              "options": [
+                "mm-p_0.5.pth"
+              ]
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "optional": [
+          "context_options",
+          "motion_lora",
+          "ad_settings",
+          "ad_keyframes",
+          "sample_settings",
+          "scale_multival",
+          "effect_multival",
+          "per_block"
+        ],
+        "required": [
+          "model",
+          "model_name",
+          "beta_schedule"
+        ]
+      },
+      "output": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "python_module": "custom_nodes.ComfyUI-AnimateDiff-Evolved"
+    },
+    "ADE_StandardStaticContextOptions": {
+      "api_node": false,
+      "category": "Animate Diff \ud83c\udfad\ud83c\udd50\ud83c\udd53/context opts",
+      "class_name": "ADE_StandardStaticContextOptions",
+      "deprecated": false,
+      "display_name": "Context Options\u25c6Standard Static \ud83c\udfad\ud83c\udd50\ud83c\udd53",
+      "input": {
+        "optional": {
+          "fuse_method": [
+            "COMBO",
+            {
+              "multiselect": false,
+              "options": [
+                "pyramid",
+                "relative",
+                "flat",
+                "overlap-linear",
+                "\ud83d\udd2cdelayed reverse sawtooth",
+                "\ud83d\udd2cpyramid-sigma",
+                "\ud83d\udd2cpyramid-sigma inverse",
+                "\ud83d\udd2cgauss-sigma",
+                "\ud83d\udd2cgauss-sigma inverse",
+                "\ud83d\udd2crandom"
+              ]
+            }
+          ],
+          "guarantee_steps": [
+            "INT",
+            {
+              "default": 1,
+              "max": 9007199254740991,
+              "min": 0
+            }
+          ],
+          "prev_context": [
+            "CONTEXT_OPTIONS",
+            {}
+          ],
+          "start_percent": [
+            "FLOAT",
+            {
+              "default": 0.0,
+              "max": 1.0,
+              "min": 0.0,
+              "step": 0.001
+            }
+          ],
+          "use_on_equal_length": [
+            "BOOLEAN",
+            {
+              "default": false
+            }
+          ],
+          "view_opts": [
+            "VIEW_OPTS",
+            {}
+          ]
+        },
+        "required": {
+          "context_length": [
+            "INT",
+            {
+              "default": 16,
+              "max": 128,
+              "min": 1
+            }
+          ],
+          "context_overlap": [
+            "INT",
+            {
+              "default": 4,
+              "max": 128,
+              "min": 0
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "optional": [
+          "fuse_method",
+          "use_on_equal_length",
+          "start_percent",
+          "guarantee_steps",
+          "prev_context",
+          "view_opts"
+        ],
+        "required": [
+          "context_length",
+          "context_overlap"
+        ]
+      },
+      "output": [
+        "CONTEXT_OPTIONS"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "CONTEXT_OPTS"
+      ],
+      "python_module": "custom_nodes.ComfyUI-AnimateDiff-Evolved"
+    },
+    "CLIPTextEncode": {
+      "api_node": null,
+      "category": "model/conditioning",
+      "class_name": "CLIPTextEncode",
+      "deprecated": null,
+      "display_name": "CLIP Text Encode (Prompt)",
+      "input": {
+        "required": {
+          "clip": [
+            "CLIP",
+            {
+              "tooltip": "The CLIP model used for encoding the text."
+            }
+          ],
+          "text": [
+            "STRING",
+            {
+              "dynamicPrompts": true,
+              "multiline": true,
+              "tooltip": "The text to be encoded."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "text",
+          "clip"
+        ]
+      },
+      "output": [
+        "CONDITIONING"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "CONDITIONING"
+      ],
+      "python_module": "nodes"
+    },
+    "CheckpointLoaderSimple": {
+      "api_node": null,
+      "category": "model/loaders",
+      "class_name": "CheckpointLoaderSimple",
+      "deprecated": null,
+      "display_name": "Load Checkpoint",
+      "input": {
+        "required": {
+          "ckpt_name": [
+            [
+              "flux1-dev-fp8.safetensors",
+              "hunyuan3d-dit-v2-mv.safetensors",
+              "ltx-2.3-22b-dev.safetensors",
+              "ltx-video-2b-v0.9.safetensors",
+              "ltxv-2b-0.9.8-distilled.safetensors",
+              "stable-audio-open-1.0.safetensors",
+              "stable_audio_3_small_music.safetensors",
+              "v1-5-pruned-emaonly-fp16.safetensors"
+            ],
+            {
+              "tooltip": "The name of the checkpoint (model) to load."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "ckpt_name"
+        ]
+      },
+      "output": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "python_module": "nodes"
+    },
+    "EmptyLatentImage": {
+      "api_node": null,
+      "category": "model/latent",
+      "class_name": "EmptyLatentImage",
+      "deprecated": null,
+      "display_name": "Empty Latent Image",
+      "input": {
+        "required": {
+          "batch_size": [
+            "INT",
+            {
+              "default": 1,
+              "max": 4096,
+              "min": 1,
+              "tooltip": "The number of latent images in the batch."
+            }
+          ],
+          "height": [
+            "INT",
+            {
+              "default": 512,
+              "max": 16384,
+              "min": 16,
+              "step": 8,
+              "tooltip": "The height of the latent images in pixels."
+            }
+          ],
+          "width": [
+            "INT",
+            {
+              "default": 512,
+              "max": 16384,
+              "min": 16,
+              "step": 8,
+              "tooltip": "The width of the latent images in pixels."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "width",
+          "height",
+          "batch_size"
+        ]
+      },
+      "output": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "python_module": "nodes"
+    },
+    "KSampler": {
+      "api_node": null,
+      "category": "model/sampling",
+      "class_name": "KSampler",
+      "deprecated": null,
+      "display_name": "KSampler",
+      "input": {
+        "required": {
+          "cfg": [
+            "FLOAT",
+            {
+              "default": 8.0,
+              "max": 100.0,
+              "min": 0.0,
+              "round": 0.01,
+              "step": 0.1,
+              "tooltip": "The Classifier-Free Guidance scale balances creativity and adherence to the prompt. Higher values result in images more closely matching the prompt however too high values will negatively impact quality."
+            }
+          ],
+          "denoise": [
+            "FLOAT",
+            {
+              "default": 1.0,
+              "max": 1.0,
+              "min": 0.0,
+              "step": 0.01,
+              "tooltip": "The amount of denoising applied, lower values will maintain the structure of the initial image allowing for image to image sampling."
+            }
+          ],
+          "latent_image": [
+            "LATENT",
+            {
+              "tooltip": "The latent image to denoise."
+            }
+          ],
+          "model": [
+            "MODEL",
+            {
+              "tooltip": "The model used for denoising the input latent."
+            }
+          ],
+          "negative": [
+            "CONDITIONING",
+            {
+              "tooltip": "The conditioning describing the attributes you want to exclude from the image."
+            }
+          ],
+          "positive": [
+            "CONDITIONING",
+            {
+              "tooltip": "The conditioning describing the attributes you want to include in the image."
+            }
+          ],
+          "sampler_name": [
+            [
+              "euler",
+              "euler_cfg_pp",
+              "euler_ancestral",
+              "euler_ancestral_cfg_pp",
+              "heun",
+              "heunpp2",
+              "exp_heun_2_x0",
+              "exp_heun_2_x0_sde",
+              "dpm_2",
+              "dpm_2_ancestral",
+              "lms",
+              "dpm_fast",
+              "dpm_adaptive",
+              "dpmpp_2s_ancestral",
+              "dpmpp_2s_ancestral_cfg_pp",
+              "dpmpp_sde",
+              "dpmpp_sde_gpu",
+              "dpmpp_2m",
+              "dpmpp_2m_cfg_pp",
+              "dpmpp_2m_sde",
+              "dpmpp_2m_sde_gpu",
+              "dpmpp_2m_sde_heun",
+              "dpmpp_2m_sde_heun_gpu",
+              "dpmpp_3m_sde",
+              "dpmpp_3m_sde_gpu",
+              "ddpm",
+              "lcm",
+              "ipndm",
+              "ipndm_v",
+              "deis",
+              "res_multistep",
+              "res_multistep_cfg_pp",
+              "res_multistep_ancestral",
+              "res_multistep_ancestral_cfg_pp",
+              "gradient_estimation",
+              "gradient_estimation_cfg_pp",
+              "er_sde",
+              "seeds_2",
+              "seeds_3",
+              "sa_solver",
+              "sa_solver_pece",
+              "ddim",
+              "uni_pc",
+              "uni_pc_bh2",
+              "legacy_rk",
+              "rk",
+              "rk_beta",
+              "deis_3m_ode",
+              "deis_2m_ode",
+              "deis_3m",
+              "deis_2m",
+              "res_6s_ode",
+              "res_5s_ode",
+              "res_3s_ode",
+              "res_2s_ode",
+              "res_3m_ode",
+              "res_2m_ode",
+              "res_6s",
+              "res_5s",
+              "res_3s",
+              "res_2s",
+              "res_3m",
+              "res_2m"
+            ],
+            {
+              "tooltip": "The algorithm used when sampling, this can affect the quality, speed, and style of the generated output."
+            }
+          ],
+          "scheduler": [
+            [
+              "simple",
+              "sgm_uniform",
+              "karras",
+              "exponential",
+              "ddim_uniform",
+              "beta",
+              "normal",
+              "linear_quadratic",
+              "kl_optimal",
+              "bong_tangent",
+              "beta57"
+            ],
+            {
+              "tooltip": "The scheduler controls how noise is gradually removed to form the image."
+            }
+          ],
+          "seed": [
+            "INT",
+            {
+              "control_after_generate": true,
+              "default": 0,
+              "max": 18446744073709551615,
+              "min": 0,
+              "tooltip": "The random seed used for creating the noise."
+            }
+          ],
+          "steps": [
+            "INT",
+            {
+              "default": 20,
+              "max": 10000,
+              "min": 1,
+              "tooltip": "The number of steps used in the denoising process."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "seed",
+          "steps",
+          "cfg",
+          "sampler_name",
+          "scheduler",
+          "positive",
+          "negative",
+          "latent_image",
+          "denoise"
+        ]
+      },
+      "output": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "python_module": "nodes"
+    },
+    "VAEDecode": {
+      "api_node": null,
+      "category": "model/latent",
+      "class_name": "VAEDecode",
+      "deprecated": null,
+      "display_name": "VAE Decode",
+      "input": {
+        "required": {
+          "samples": [
+            "LATENT",
+            {
+              "tooltip": "The latent to be decoded."
+            }
+          ],
+          "vae": [
+            "VAE",
+            {
+              "tooltip": "The VAE model used for decoding the latent."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "samples",
+          "vae"
+        ]
+      },
+      "output": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "IMAGE"
+      ],
+      "python_module": "nodes"
+    }
+  },
+  "comfyui_commit": "4da9e2dbead52fc1e68beae33fe3d7ad63b63241"
+}

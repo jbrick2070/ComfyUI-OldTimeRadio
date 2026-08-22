@@ -1,0 +1,82 @@
+{
+  "lane": "animatediff15_video",
+  "label": "AnimateDiff -- Ghost Signal",
+  "plan": "docs/2026-08-22-GHOST-SIGNAL-CODING-PLAN.md",
+  "plan_sha256": "06104e911e599f7630563eaab5ae5cb5aa92c40e0331d3d0e253ba6c4150e81b",
+  "upstream": {
+    "url": "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved.git",
+    "commit": "9257651221002dcba0a12f9cff37e1944e58fb60",
+    "package_version": "1.6.0",
+    "declared_python_dependencies": [],
+    "requires_comfyui": ">=0.3.68",
+    "custom_node_directory": "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-AnimateDiff-Evolved"
+  },
+  "comfyui": {
+    "source_commit": "4da9e2dbead52fc1e68beae33fe3d7ad63b63241",
+    "install_root": "C:/Users/jeffr/ComfyUI-Installs/ComfyUI/ComfyUI",
+    "node_api_surface": "V3 io.ComfyNode via FUNCTION=EXECUTE_NORMALIZED",
+    "otr_unwrap_seam": "wrapper_bridge.normalize_node_output already unwraps NodeOutput; no ADE-specific executor or compatibility shim is added"
+  },
+  "artifacts": [
+    {
+      "role": "checkpoint",
+      "filename": "v1-5-pruned-emaonly-fp16.safetensors",
+      "folder_paths_category": "checkpoints",
+      "installed_path": "C:/ComfyUI-Models/checkpoints/v1-5-pruned-emaonly-fp16.safetensors",
+      "bytes": 2132696762,
+      "sha256": "e9476a13728cd75d8279f6ec8bad753a66a1957ca375a1464dc63b37db6e3916",
+      "url": "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/blob/4b97aa05c15972d2628d6f6db8fb2b0a68d9241e/v1-5-pruned-emaonly-fp16.safetensors",
+      "source_revision": "4b97aa05c15972d2628d6f6db8fb2b0a68d9241e",
+      "verified_on_disk": true
+    },
+    {
+      "role": "motion_module",
+      "filename": "mm-p_0.5.pth",
+      "folder_paths_category": "animatediff_models",
+      "installed_path": "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-AnimateDiff-Evolved/models/mm-p_0.5.pth",
+      "bytes": 1817894327,
+      "sha256": "d779ab78b3f18e2dc2342a9beecf4af3365fbee63fd83a12c8c94c50dd87b4ed",
+      "url": "https://huggingface.co/manshoety/beta_testing_models/blob/816cfda7c7193a5705b39f94fc317a4465442654/mm-p_0.5.pth",
+      "source_revision": "816cfda7c7193a5705b39f94fc317a4465442654",
+      "verified_on_disk": true
+    }
+  ],
+  "vae_source": "checkpoint_output_2",
+  "vae_note": "CheckpointLoaderSimple supplies the checkpoint's embedded VAE at output slot 2. No separate VAE file is added or downloaded.",
+  "registered_folder_paths_categories": {
+    "checkpoints": [
+      "C:/ComfyUI-Models/checkpoints/"
+    ],
+    "animatediff_models": [
+      "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-AnimateDiff-Evolved/models",
+      "<folder_paths.models_dir>/animatediff_models"
+    ],
+    "registration_note": "ADE registers animatediff_models itself in animatediff/utils_model.py:343-344. The pinned motion module lives in the pack's own models/ dir, which is the upstream-documented placement and the one the live /object_info combo resolved."
+  },
+  "license": {
+    "animatediff_evolved_code": "Apache-2.0",
+    "checkpoint": "CreativeML Open RAIL-M",
+    "motion_module_mm_p_0_5": "NO MODEL LICENSE GRANT PROVIDED BY THE HOST",
+    "commercial_clean": false,
+    "note": "commercial_clean is FALSE and the reason is the motion module, not the code or the checkpoint. manshoety/beta_testing_models publishes no license for mm-p_0.5.pth, so the lane may not claim commercial cleanliness. A future licensed replacement motion module may change this declaration only in a separately reviewed artifact-lock change."
+  },
+  "admission": {
+    "measurement_campaign": "declined by the operator",
+    "vram_claim": "none -- 'under 4 GB' is an unverified design target, never a product claim or an acceptance gate",
+    "qualified_cost_row": false,
+    "admission_unenforced": true
+  },
+  "phase0_stop_conditions": {
+    "all_pass": true,
+    "object_info_capture": "docs/2026-08-22-ghost-signal-object-info.json",
+    "checkpoint_resolvable": true,
+    "motion_module_resolvable": true,
+    "context_node_surface_matches_plan_4_3": true,
+    "context_node_has_no_closed_loop_input": true,
+    "checkpoint_exposes_model_clip_vae": true,
+    "ade_gen1_returns_single_model": true,
+    "empty_latent_batch_size_accepts_source_request": true,
+    "ade_optional_sockets_are_all_optional": true,
+    "benchmarks_run": "none -- Phase 0 is a schema lock, not a measurement campaign"
+  }
+}
