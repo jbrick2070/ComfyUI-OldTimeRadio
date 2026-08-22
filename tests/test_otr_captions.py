@@ -92,7 +92,9 @@ def test_build_ass_structure_and_accessibility(tmp_path):
     style_line = next(l for l in text.splitlines() if l.startswith("Style: SDH,"))
     fields = style_line.split(",")
     # fields[0]="Style: SDH"; BorderStyle=15, Outline=16, Shadow=17, Align=18.
-    assert fields[2].strip() == "36", "standard captions must stay ~40% larger than the old 26"
+    # 2026-08-22: 36 -> 42, the operator's chosen accessibility size. Pinned so a
+    # drive-by edit is a test failure rather than a silent restyle of every episode.
+    assert fields[2].strip() == "42", "standard captions are the 42 px accessibility size"
     assert fields[15].strip() == "3", "BorderStyle must be 3 (opaque box)"
     assert int(fields[16]) > 0, "Outline must be >0 or libass draws no box"
     assert fields[19].strip() == "40"

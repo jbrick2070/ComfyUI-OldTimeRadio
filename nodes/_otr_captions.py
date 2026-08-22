@@ -108,7 +108,15 @@ STYLES = {
     # Accessibility master. White text, ~55%-opaque black box (BorderStyle=3).
     "sdh_standard": {
         "font": "Arial",
-        "size": 36,
+        # 36 -> 42 (2026-08-22): an accessibility READABILITY bump, operator's
+        # chosen value ("I'd like to get 42 px for captions"). It moves toward
+        # his 1080p caption spec (which asks 48-60 px) without meeting it, which
+        # was the explicit scope -- "we don't need to meet all requirements ...
+        # I don't want to make it complex". SIZE ONLY: wrapping, timing,
+        # placement, colour and the box are untouched.
+        # Width is safe: PlayResX 1920 with MarginL/R 40 leaves 1840 px, and 44
+        # chars of 42 px Arial is roughly 960 px.
+        "size": 42,
         "primary": "&H00FFFFFF",   # opaque white
         "outline_col": "&H00000000",
         "back": "&H70000000",      # alpha 0x70 -> ~56% opaque black box (lighter)

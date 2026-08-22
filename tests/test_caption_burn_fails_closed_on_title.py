@@ -221,8 +221,11 @@ def test_the_sdh_style_line_is_untouched(plan, tmp_path):
                           out_path=str(out))
     text = out.read_text(encoding="utf-8")
     sdh = [ln for ln in text.splitlines() if ln.startswith("Style: SDH,")]
+    # The size moved 36 -> 42 on 2026-08-22 (the operator's chosen accessibility
+    # size). Everything ELSE in this line must still be byte-identical: adding
+    # the TITLE style must not perturb the accessibility master.
     assert sdh == [
-        "Style: SDH,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,"
+        "Style: SDH,Arial,42,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,"
         "0,0,0,0,100,100,0,0,3,5,0,2,40,40,90,1"
     ], sdh
 
