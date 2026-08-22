@@ -487,6 +487,31 @@ there is no ComfyUI graph to compare against a template. Image engines COULD be
 diffed but all four block on the same gate: no declared `render_canvas`, and
 the differ correctly refuses to invent a fixture.
 
+**ONE FINDING LANDED AFTER THE LAST HANDOFF WAS WRITTEN AND IS RECORDED ONLY IN
+A WORKBENCH COMMIT MESSAGE UNTIL NOW** (`basline-models` `ff59d2f`, the current
+workbench HEAD; the handoff log stops at `ae441eb`). Two parts:
+
+* **`flux2_klein` minted the same prompted test card, and neither still engine
+  wins outright.** Klein DRAWS better -- 6-7 colour bars against Z-Image's 4,
+  crisp well-formed letterforms, very fine clean gratings, a round circle -- but
+  OBEYS the structured spec less literally (one circle where three were asked,
+  eye-chart rows scrambled). Confirmed and accepted by the operator: klein snaps
+  to multiples of 16, so 1920x1080 becomes 1920x1072; `z_image_turbo` renders
+  exactly 1920x1080.
+* **IDEOGRAM 4 IS OPEN-WEIGHTS AND FITS, and it is the strongest remaining
+  candidate in the whole programme.** `ideogram-ai/ideogram-4-fp8` shipped
+  2026-05-30 and `Comfy-Org/Ideogram-4` packages it for ComfyUI. The nvfp4 set
+  is diffusion 5.49 GB + Qwen3-VL-8B encoder 6.31 GB + flux2-vae 0.34 GB =
+  **12.14 GB**, which clears the operator's 16 GB rule with headroom, in the
+  format this Blackwell box already prefers (z_image ranks nvfp4 > fp8 > bf16),
+  on a VAE `flux2_klein` already uses. **Why it matters: Ideogram is
+  best-in-class at TEXT, and text is the one defect this programme actually
+  surfaced** -- the lane 4 card rendered `TI2V` as `TIZV` in BOTH arms, and the
+  1080p Z-Image card duplicated an eye-chart row at both seeds. **NOT
+  downloaded, NOT authorized.** It is also not a knob: adopting a new still
+  engine is a design change and would owe a full arc before code, not a Sonnet
+  QA pass.
+
 **THE PROGRAMME'S NEXT STEP IS A DECISION, NOT A RENDER.** Per the standing ROI
 ruling ("if no rendered candidate wins materially, stop the program and retain
 the corpus"), five nulls is that condition. Remaining candidates: the
@@ -1279,12 +1304,12 @@ tests AST-parse `nodes/*.py` off disk, so a mid-run edit produces a torn read
 that looks exactly like a real break and costs a full re-run to disprove. Start
 the suite, then keep your hands off the tree until it reports.
 
-**THE MODEL & CREDIT BUDGET LADDER IS EMPTY.** The table at the "MODEL & CREDIT
-BUDGET" heading below has a header row and a separator and **no rows under
-them**, so the rungs every window is asked to cite do not exist in this
-document. Windows are currently answering from the per-window mapping paragraph
-beneath it. Either restore the rungs or retire the instruction; asking each
-window to state a rung from an empty table is a question with no answer.
+**THE MODEL & CREDIT BUDGET LADDER WAS EMPTY; IT IS NOW RESTORED (2026-08-21).**
+The table at the "MODEL & CREDIT BUDGET" heading below had a header row and a
+separator and no rows under them, so the rungs every window is asked to cite did
+not exist in this document and windows answered from the prose paragraph beneath
+it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
+current fact; see the note directly under that table for exactly what changed.
 
 ## THE 08-15 BUG-FIX SPRINT IS CLOSED -- receipts live elsewhere, rulings live here
 
@@ -4026,6 +4051,23 @@ the credit week; late-week, drop to the $0 rungs instead of grinding a paid pool
 
 | Rung | Model / tool | Cost | Use for | Never for |
 |---:|---|---|---|---|
+| 1 | Local Qwen on the 4060 (`10.55.0.2:1234`, LM Studio; the `4060` skill drives it) | $0 | Read-only FIRST-PASS triage of failures, logs and diffs before any credit spend | Final diagnosis, patches, tests, live qualification; NEVER loaded on the 5080 (that GPU renders only) |
+| 2 | agy / Antigravity (`KIBITZ_AGY_MODEL` set to the DISPLAY name exactly -- a wrong id silently kills the lane and the arc runs codex-only) | $0 | Default grounded reviewer for mechanical review; second panelist on every kibitz | -- (if it times out, raise `KIBITZ_AGY_PRINT_TIMEOUT`, do not call it dead) |
+| 3 | Codex CLI `gpt-5.6-sol` (high) | weekly credits | The second opinion of record: the two-strikes third-attempt panel, pre-execution grounding of big blocks, live-failure kibitz | Mechanical review agy can do alone. Verify the selected model every arc -- a stale skill cache once drifted mid-arc unnoticed |
+| 4 | Sonnet 5 (Cowork subagent) | weekly credits | Post-coding QA on a FROZEN diff (standing 08-05 rule); a valid substitute reviewer seat when a kibitz lane is quota-held | Driving a window; multiplying reviewers on an already-clean diff (the 08-20 one-clean-review ruling) |
+| 5 | Claude Opus (Cowork, this window) | weekly credits | The actual work: planner and coder windows, anchor and sole judge on every panel, live-run drive, lane closes | Babysitting renders; single-small-item windows (batch per Window packing) |
+| 6 | Cloud roundtable (OpenRouter) | real $ | Genuine R1 ideas passes only; the <$20 autonomy rule applies | Mechanical or grounding review -- that is rungs 2-3 |
+| 7 | Fable | scarce | Exactly two uses: the cold FIRST opinion on an r1 design round, and the final grounded gate before a high-stakes, hard-to-unwind production change | Anything mechanical. Do not burn a scalpel on a screw |
+
+**RESTORED 2026-08-21 (this window).** The table had a header, a separator and
+NO ROWS for an unknown stretch, so every window was asked to cite a rung from an
+empty ladder and answered from the prose paragraph below instead. The rungs are
+recovered from `ed8d5a6d` (where the operator wrote them) and refreshed to what
+is actually true now: Sonnet 5's post-QA seat is added because the 08-05 rule
+made it standing, Fable's row is narrowed to the two uses the 08-21 handoff
+recorded, and the stale per-model version pins and the frozen "reset state
+2026-07-24" line are dropped rather than re-asserted. Review ROUTING still lives
+in the dated REVIEW ROUTING block at the top of this file, not here.
 
 Production (in-pipeline, all $0/local, offline-first): writers = Mistral-Nemo (ctx cap
 16384) + `gemma-4-12b` (saved runtime-qualified local default); stills/video-init =
