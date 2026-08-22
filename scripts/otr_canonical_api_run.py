@@ -156,6 +156,11 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     if args.profile and args.profile.lower() != "none":
         workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
         applied.append(f"profile={args.profile}")
+        checked = _assert_profile_models_present(args.profile, schemas)
+        if checked:
+            print("[canonical-api] preflight: %d required model(s) visible to "
+                  "the server: %s" % (len(checked), ", ".join(checked)),
+                  flush=True)
 
     applied.extend(_apply_writer_shortcuts(workflow, schemas, args))
     for patch in args.set:
@@ -163,6 +168,71 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
 
     prompt = workflow_to_api_prompt(workflow, schemas)
     return prompt, applied
+
+
+def _server_visible_model_names(schemas) -> set:
+    """Every filename the SERVER offers in any node's combo, from /object_info.
+
+    Deliberately not folder_paths: this asks the running server what it can
+    actually see, which is the only authority that matters, and it needs no
+    knowledge of extra_model_paths.yaml or of which category a weight lives in.
+    """
+    names = set()
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for value in node.values():
+                _walk(value)
+        elif isinstance(node, (list, tuple)):
+            # A ComfyUI combo is a list whose FIRST element is the option list.
+            for value in node:
+                if isinstance(value, str):
+                    names.add(value)
+                else:
+                    _walk(value)
+
+    _walk(schemas)
+    return names
+
+
+def _assert_profile_models_present(profile_name, schemas) -> list:
+    """Refuse in SECONDS what would otherwise fail seven minutes into a render.
+
+    On 2026-08-22 a Ghost domain-adapter leg ran the script pass, the whole
+    voice pass and part of the video pass before ``assert_usable`` reported
+    ``v3_sd15_adapter.ckpt`` missing -- the weight was on disk but under a root
+    the headless model-paths config does not name. The engine guard did its job
+    and failed closed; it simply could not do it until the first video beat.
+    The bench runners already confirm every model filename in /object_info
+    before submit (SPEC G1/O6); the canonical runner did not, so it does now.
+
+    Returns the checked names. A profile with no ``preflight.required_models``
+    is not an error -- most profiles do not declare any.
+    """
+    import json as _json
+
+    path = REPO_ROOT / "config" / "profiles" / ("%s.json" % profile_name)
+    if not path.is_file():
+        return []
+    try:
+        profile = _json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 -- a malformed profile fails later, louder
+        return []
+    required = ((profile.get("preflight") or {}).get("required_models") or [])
+    if not required:
+        return []
+    visible = _server_visible_model_names(schemas)
+    missing = [name for name in required if name not in visible]
+    if missing:
+        raise SystemExit(
+            "[canonical-api] PREFLIGHT FAIL: profile %r requires model file(s) "
+            "the running server cannot see: %s.\nThe weight may be on disk "
+            "under a root this server was not started with -- check "
+            "scripts/_otr_headless_model_paths.yaml, drop the file under a "
+            "named root, and RESTART the server (folder_paths caches its "
+            "listing at boot). Refusing now rather than failing part-way "
+            "through a render." % (profile_name, ", ".join(missing)))
+    return list(required)
 
 
 def main(argv: list[str] | None = None) -> int:

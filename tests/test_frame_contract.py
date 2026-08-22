@@ -114,6 +114,10 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # The domain-adapter sibling: same unbounded contract again. The
         # adapter patches the image model and touches no timing at all.
         "animatediff15_v3_haunted_video",
+        # The cadence peers change how many frames are GENERATED, never
+        # how many are delivered, so the unbounded contract is untouched.
+        "animatediff15_h3_video",
+        "animatediff15_h5_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

@@ -114,8 +114,21 @@ GHOST_CONTEXT_GUARANTEE_STEPS = 1
 #: model directly; anything longer activates the static sliding context.
 GHOST_SOURCE_FLOOR = 16
 
+#: THE DEFAULT HOLD. Every delivered frame count T is filled by
+#: ``U = ceil(T / hold)`` freshly generated frames, each shown ``hold`` times.
+#: 2 is what the golden lane shipped and what the published episode rendered at;
+#: it is a CLASS attribute on the engine so a cadence peer can differ without
+#: this constant moving (preflight G1.3).
+#:
+#: THE HOLD DOES NOT TOUCH DURATION. T comes from the beat's audio and nothing
+#: here can change it, so the beat/audio sync survives every value -- what
+#: changes is how much of the model's motion is traversed inside that fixed
+#: window, and how finely.
+GHOST_DEFAULT_HOLD = 2
+
 #: The source rate. 12.5 into 25 is exactly hold-2, which is why this lane can
-#: promise an EXACT duration with no resampling arithmetic at all.
+#: promise an EXACT duration with no resampling arithmetic at all. A lane at a
+#: different hold reports ``target_fps / hold`` instead -- see ``source_fps``.
 GHOST_SOURCE_FPS = 12.5
 GHOST_TARGET_FPS = 25
 
@@ -167,8 +180,9 @@ class GhostCadenceError(ValueError):
 # Cadence. PURE, module-level, and CPU-testable with nothing installed.
 # --------------------------------------------------------------------------- #
 
-def ghost_unique_source_count(target_frame_count) -> int:
-    """``U = ceil(T / 2)`` -- how many FRESH source positions a beat needs.
+def ghost_unique_source_count(target_frame_count,
+                              hold=GHOST_DEFAULT_HOLD) -> int:
+    """``U = ceil(T / hold)`` -- how many FRESH source positions a beat needs.
 
     Derived from the integer target, never from a float duration: the two
     disagree at half-second banker's-rounding boundaries and the delivered count
@@ -180,10 +194,12 @@ def ghost_unique_source_count(target_frame_count) -> int:
             "Ghost Signal cadence needs a delivered target of at least 1 "
             "frame, got %r -- a 0-frame beat is a planning bug, not something "
             "to paper over here" % (target_frame_count,))
-    return (target + 1) // 2
+    hold = max(1, int(hold))
+    return (target + hold - 1) // hold
 
 
-def ghost_source_request(target_frame_count) -> int:
+def ghost_source_request(target_frame_count,
+                         hold=GHOST_DEFAULT_HOLD) -> int:
     """How many source frames to actually ASK the model for.
 
     ``max(U, 16)``: the structural floor is the pinned context length, so a very
@@ -191,26 +207,45 @@ def ghost_source_request(target_frame_count) -> int:
     BEFORE cadence conversion and is reported separately -- it is model work that
     happened, not a delivered frame.
     """
-    return max(ghost_unique_source_count(target_frame_count), GHOST_SOURCE_FLOOR)
+    return max(ghost_unique_source_count(target_frame_count, hold),
+               GHOST_SOURCE_FLOOR)
 
 
-def ghost_hold2_selector(target_frame_count) -> list:
-    """The delivered-index -> source-index map: ``[0, 0, 1, 1, ...][:T]``.
+def ghost_hold_selector(target_frame_count, hold=GHOST_DEFAULT_HOLD) -> list:
+    """The delivered-index -> source-index map: ``[0]*hold + [1]*hold ...[:T]``.
 
-    Source frames ``0..U-2`` appear exactly twice. Source frame ``U-1`` appears
-    twice when ``T`` is even and once when ``T`` is odd. Monotonically
+    Source frames ``0..U-2`` appear exactly ``hold`` times. The last source
+    frame appears however many delivered slots remain. Monotonically
     nondecreasing, every entry in ``[0, U)``, and exactly ``T`` long.
     """
     target = int(target_frame_count or 0)
-    unique = ghost_unique_source_count(target)
+    hold = max(1, int(hold))
+    unique = ghost_unique_source_count(target, hold)
     selector = []
     for index in range(unique):
-        selector.append(index)
-        selector.append(index)
+        selector.extend([index] * hold)
     return selector[:target]
 
 
-def ghost_cadence_receipts(target_frame_count, source_request=None) -> dict:
+def ghost_hold2_selector(target_frame_count) -> list:
+    """The hold-2 cadence by name -- the golden lane's, and the default.
+
+    Kept as its own function because callers and tests refer to hold-2
+    explicitly and a generic name would hide which cadence they assert.
+    """
+    return ghost_hold_selector(target_frame_count, 2)
+
+
+def _ghost_cadence_receipts_for(engine, target_frame_count,
+                                source_request=None) -> dict:
+    """``ghost_cadence_receipts`` bound to a lane's own hold factor."""
+    return ghost_cadence_receipts(target_frame_count, source_request,
+                                  getattr(engine, "hold_factor",
+                                          GHOST_DEFAULT_HOLD))
+
+
+def ghost_cadence_receipts(target_frame_count, source_request=None,
+                           hold=GHOST_DEFAULT_HOLD) -> dict:
     """The MiniMax-H3-precedent rate-conversion accounting, as plain data.
 
     The scopes are separate on purpose. ``native_frame_count`` is the EMITTED
@@ -226,17 +261,20 @@ def ghost_cadence_receipts(target_frame_count, source_request=None) -> dict:
     "T distinct diffusion samples". It is not.
     """
     target = int(target_frame_count or 0)
-    unique = ghost_unique_source_count(target)
+    hold = max(1, int(hold))
+    unique = ghost_unique_source_count(target, hold)
     requested = int(source_request if source_request is not None
-                    else ghost_source_request(target))
+                    else ghost_source_request(target, hold))
     return {
         "native_frame_count": target,
         "extension_mode": "none",
         "model_frame_count": requested,
-        "cadence_mode": "hold_2",
+        # NAMES THE CADENCE THAT ACTUALLY RAN. A constant "hold_2" here would
+        # have made every cadence peer's receipt claim the golden lane's rate.
+        "cadence_mode": "hold_%d" % hold,
         "cadence_source_frame_count": unique,
         "cadence_delivered_frame_count": target,
-        "cadence_tail_trim": (2 * unique) - target,
+        "cadence_tail_trim": (hold * unique) - target,
         "delivery_scale_mode": GHOST_DELIVERY_SCALE_MODE,
     }
 
@@ -285,6 +323,11 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     lora_name = None
     lora_strength = 0.0
     lora_min_bytes = 0
+
+    #: THE CADENCE SEAM. How many delivered frames each generated frame fills.
+    #: A peer overrides this alone; the render path reads it through ``self`` so
+    #: a declared value cannot be ignored while its receipt claims otherwise.
+    hold_factor = GHOST_DEFAULT_HOLD
     required_inputs = ("text_prompt",)
     optional_inputs = ()
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -663,7 +706,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         target = int(t_get("target_frame_count", 0) or 0)
         text_prompt = str(get("text_prompt") or "").strip()
         negative_prompt = str(get("negative_prompt") or "").strip()
-        unique = ghost_unique_source_count(target)
+        unique = ghost_unique_source_count(target, self.hold_factor)
         return {
             "shot_id": str(get("shot_id") or get("request_id") or ""),
             "text_prompt": text_prompt,
@@ -671,7 +714,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "seed": int(s_get("request_seed", 0) or 0),
             "target_frame_count": target,
             "unique_source_count": unique,
-            "source_request": ghost_source_request(target),
+            "source_request": ghost_source_request(target,
+                                                   self.hold_factor),
             "fps": int(self.target_fps),
         }
 
@@ -868,7 +912,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         # ---- CADENCE ---------------------------------------------------- #
         # Retain the first U source frames in order; the rest is the structural
         # surplus and is discarded BEFORE conversion, never delivered.
-        selector = ghost_hold2_selector(plan["target_frame_count"])
+        selector = ghost_hold_selector(plan["target_frame_count"],
+                                       self.hold_factor)
         unique = plan["unique_source_count"]
         delivered = frames[[min(i, unique - 1) for i in selector]]
 
@@ -897,7 +942,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "render_canvas": "%dx%d" % (GHOST_CANVAS_W, GHOST_CANVAS_H),
             "vram_peak_mb": None,        # no measurement campaign was authorized
         }
-        raw.update(ghost_cadence_receipts(
+        raw.update(_ghost_cadence_receipts_for(self,
             plan["target_frame_count"], plan["source_request"]))
         _LOG.info(
             "[OTR video] %s beat %s: T=%d U=%d requested=%d decoded=%d "
@@ -1079,5 +1124,6 @@ __all__ = [
     "NODE_CKPT", "NODE_POSITIVE", "NODE_NEGATIVE", "NODE_CONTEXT", "NODE_ADE",
     "NODE_LATENT", "NODE_SAMPLER", "NODE_DECODE",
     "ghost_unique_source_count", "ghost_source_request",
-    "ghost_hold2_selector", "ghost_cadence_receipts",
+    "ghost_hold2_selector", "ghost_hold_selector", "ghost_cadence_receipts",
+    "GHOST_DEFAULT_HOLD",
 ]

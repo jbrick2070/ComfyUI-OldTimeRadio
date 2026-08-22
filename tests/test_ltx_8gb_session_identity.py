@@ -166,6 +166,10 @@ _ENGINES_WITH_A_SESSION = {
     # adapter file and the STRENGTH applied, so a sweep across strengths
     # can never let one arm reuse another arm's patched model.
     "animatediff15_v3_haunted_video",
+    # Cadence peers inherit session_identity() unchanged; each reports
+    # its own recipe, so a session cannot span two cadences.
+    "animatediff15_h3_video",
+    "animatediff15_h5_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

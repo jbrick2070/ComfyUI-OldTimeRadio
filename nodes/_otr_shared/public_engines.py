@@ -318,6 +318,13 @@ _PUBLIC_LABEL = {
     "animatediff15_v3_haunted_video": (
         "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
         "removable domain adapter, Apache-2.0; degraded transmission look)"),
+    # The labels state the FRESH frame rate, which is the thing that changes.
+    # No low/high marker: G7.4 wants a measurement receipt for those and no
+    # cadence value has been qualified by eye yet.
+    "animatediff15_h3_video": (
+        "Ghost Signal hold-3 (8.3 fresh fps; calmer motion, cheaper render)"),
+    "animatediff15_h5_video": (
+        "Ghost Signal hold-5 (5 fresh fps; deliberate stop-action)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

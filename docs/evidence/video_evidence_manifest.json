@@ -28,7 +28,9 @@
     "animatediff15_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
     "animatediff15_v3_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
     "animatediff15_v2_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
-    "animatediff15_v3_haunted_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim. It carries a THIRD artifact (the 97 MB v3 domain adapter) on top of its parent's two, which is a real but unmeasured addition to resident weights."
+    "animatediff15_v3_haunted_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim. It carries a THIRD artifact (the 97 MB v3 domain adapter) on top of its parent's two, which is a real but unmeasured addition to resident weights.",
+    "animatediff15_h3_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim. It generates FEWER frames per beat than the golden lane, which lowers render cost, but no cost row has been measured and none is claimed.",
+    "animatediff15_h5_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim. It generates FEWER frames per beat than the golden lane, which lowers render cost, but no cost row has been measured and none is claimed."
   },
   "narratives": [
     {

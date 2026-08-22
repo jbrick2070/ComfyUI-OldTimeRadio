@@ -72,6 +72,8 @@ _FAMILY_FALLBACK: dict = {
     "animatediff15_video": "text_to_video",
     "animatediff15_v3_video": "text_to_video",
     "animatediff15_v3_haunted_video": "text_to_video",
+    "animatediff15_h3_video": "text_to_video",
+    "animatediff15_h5_video": "text_to_video",
     "animatediff15_v2_video": "text_to_video",
 }
 

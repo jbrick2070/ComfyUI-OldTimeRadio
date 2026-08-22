@@ -575,6 +575,23 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
                                "mm-p_0.5.pth"]},
+    # CADENCE PEERS. Same two artifacts as the golden lane -- they differ only
+    # in how many delivered frames each generated frame fills, so they are
+    # golden at a calmer rate rather than a different model.
+    "animatediff15_h3_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "mm-p_0.5.pth"]},
+    "animatediff15_h5_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "mm-p_0.5.pth"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

@@ -57,6 +57,8 @@ without that map would play ~4% short.
 
 | engine | side | family | aspect | resolution | clip frames | clip seconds | fps | continuity | tail trim |
 |---|---|---|---|---|---|---|---|---|---|
+| animatediff15_h3_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
+| animatediff15_h5_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_v2_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_v3_haunted_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_v3_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
@@ -96,6 +98,8 @@ without that map would play ~4% short.
 
 | engine | required inputs | prompt contract |
 |---|---|---|
+| animatediff15_h3_video | text_prompt | text_prompt REQUIRED |
+| animatediff15_h5_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_v2_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_v3_haunted_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_v3_video | text_prompt | text_prompt REQUIRED |
@@ -139,6 +143,8 @@ the engine's own `aspect` column above.
 
 | engine | stills |
 |---|---|
+| animatediff15_h3_video | none |
+| animatediff15_h5_video | none |
 | animatediff15_v2_video | none |
 | animatediff15_v3_haunted_video | none |
 | animatediff15_v3_video | none |
@@ -184,6 +190,8 @@ means the adapter sizes itself and IGNORES the request canvas.
 
 | engine | effective canvas | decided by |
 |---|---|---|
+| animatediff15_h3_video | 512x288 | declared |
+| animatediff15_h5_video | 512x288 | declared |
 | animatediff15_v2_video | 512x288 | declared |
 | animatediff15_v3_haunted_video | 512x288 | declared |
 | animatediff15_v3_video | 512x288 | declared |
@@ -233,6 +241,8 @@ JUMP plan on a still-consuming lane ever re-mints.
 
 | engine | join | segments (render frames) | render | visible | re-mints |
 |---|---|---|---|---|---|
+| animatediff15_h3_video | single | 1: 442 | 442 | 442 | 0 |
+| animatediff15_h5_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_v2_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_v3_haunted_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_v3_video | single | 1: 442 | 442 | 442 | 0 |
@@ -279,6 +289,8 @@ and it read exactly like a measured number until someone looked.
 
 | engine | cap | set by | evidence |
 |---|---|---|---|
+| animatediff15_h3_video | - | contract max | docs/2026-08-22-GHOST-CADENCE-PROBLEM-STATEMENT.md |
+| animatediff15_h5_video | - | contract max | docs/2026-08-22-GHOST-CADENCE-PROBLEM-STATEMENT.md |
 | animatediff15_v2_video | - | contract max | none cited |
 | animatediff15_v3_haunted_video | - | contract max | none cited |
 | animatediff15_v3_video | - | contract max | none cited |
@@ -316,7 +328,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **34**
+* registered engine names: **36**
 * provider-side: **8**
-* local: **26**
+* local: **28**
 * can chain (strict_first_frame): **7**
