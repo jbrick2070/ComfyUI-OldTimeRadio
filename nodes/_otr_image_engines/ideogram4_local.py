@@ -148,6 +148,26 @@ class Ideogram4RefusalError(RuntimeError):
     exception into a named ``ImageRenderError`` already.
     """
 
+    #: A MODEL VERDICT IS NOT AN ENGINE FAULT, and this flag is how the
+    #: dispatcher tells the two apart WITHOUT importing this class (see above --
+    #: the import would be a cycle, swallowed by a guarded import, and the
+    #: engine would silently fail to register). The attribute travels on the
+    #: exception instance instead.
+    #:
+    #: An OOM, a missing wrapper node or a decode failure means the engine is
+    #: BROKEN and must hard-fail the episode (NO FALLBACKS, operator
+    #: 2026-06-18). A safety refusal means the engine worked perfectly and the
+    #: model declined this one card: it returned valid decoded pixels at the
+    #: exact requested dimensions with the graph completing. Killing eight
+    #: finished beats over one declined card is the asymmetry the operator
+    #: named on 2026-08-22 -- *"why is refusing card killing the episode, i
+    #: dont think thats good feature"*, *"its an experimental stack its not
+    #: perfect"*, and *"i didnt want any fail on this or that"*.
+    #:
+    #: DECLARED, so a future engine opts in by SAYING so rather than by being
+    #: recognised from its class name.
+    is_model_refusal = True
+
 
 def _snap(value: int) -> int:
     """/16-legal with a 256 floor -- the template's own canvas arithmetic."""

@@ -1576,14 +1576,51 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 f"NO FALLBACK.") from exc
         except ImageRenderError:
             raise
-        except Exception as exc:  # noqa: BLE001 -- any render failure -> HARD FAIL
-            # NO FALLBACKS (operator 2026-06-18): a wrapper-node-missing /
-            # CUDA-OOM / decode failure HARD-FAILS the episode LOUD -- no skip,
-            # no radio-floor degrade, no silent flux substitution.
-            raise ImageRenderError(
-                f"{oid}: image render with '{engine_id}' failed "
-                f"({type(exc).__name__}: {exc}). NO FALLBACK -- fix the engine "
-                f"or select a usable one.") from exc
+        except Exception as exc:  # noqa: BLE001 -- split by KIND, just below
+            if not getattr(exc, "is_model_refusal", False):
+                # NO FALLBACKS (operator 2026-06-18): a wrapper-node-missing /
+                # CUDA-OOM / decode failure HARD-FAILS the episode LOUD -- no
+                # skip, no radio-floor degrade, no silent flux substitution.
+                raise ImageRenderError(
+                    f"{oid}: image render with '{engine_id}' failed "
+                    f"({type(exc).__name__}: {exc}). NO FALLBACK -- fix the "
+                    f"engine or select a usable one.") from exc
+            # A MODEL REFUSAL IS NOT AN ENGINE FAILURE (operator 2026-08-22:
+            # "why is refusing card killing the episode, i dont think thats
+            # good feature" / "i didnt want any fail on this or that").
+            #
+            # The engine worked: it returned valid decoded pixels at the exact
+            # requested dimensions and the graph completed. The MODEL declined
+            # this one card. Hard-failing here destroyed an entire episode over
+            # one blemish -- and destroyed the evidence with it, because the
+            # refused card's prompt was never persisted anywhere, which is why
+            # the 2026-08-21 refusal still cannot be diagnosed as seed-vs-
+            # content. So this degrades LOUD and RECORDS THE PROMPT.
+            #
+            # This is NOT a fallback and does not weaken the 2026-06-18 rule:
+            # no engine is substituted, nothing is silent, and every real
+            # engine fault still hard-fails through the branch below. The beat
+            # simply has no still, which is a state the pipeline already has.
+            # RECORDED, not just logged. The completeness gate below reads this
+            # map: without an entry the target reports "no_row, no skip evidence
+            # recorded" and hard-fails the episode anyway -- which is how the
+            # first version of this fix was only HALF a fix.
+            skip_evidence_by_oid[oid] = {
+                "reason": "model_refusal", "role": role, "engine_id": engine_id,
+                "prompt": prompt, "seed": seed, "detail": str(exc),
+            }
+            warnings.append(
+                f"{oid}: '{engine_id}' MODEL REFUSAL -- no still for this "
+                f"object; the episode continues (operator 2026-08-22). "
+                f"prompt={prompt!r} seed={seed} ({exc})")
+            log.warning(
+                "[OTR_ImageGenDispatcher] MODEL REFUSAL on %s via '%s': %s\n"
+                "  prompt: %s\n  negative: %s\n  seed: %s\n"
+                "  The episode CONTINUES with no still for this object. This "
+                "prompt is recorded so the refusal can be diagnosed as seed- "
+                "or content-driven -- the previous hard-fail erased it.",
+                oid, engine_id, exc, prompt, _effective_neg, seed)
+            continue
         finally:
             if lease is not None:
                 _lease.release(lease)
@@ -1708,6 +1745,31 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 "content_hash": row.get("content_hash") or row.get(
                     "portrait_content_hash"),
             })
+        # A MODEL REFUSAL IS A SANCTIONED GAP, NOT A MISSING TARGET (operator
+        # 2026-08-22). The engine ran, the model declined one card, and the
+        # refusal was recorded with its prompt and seed above. Failing the
+        # episode here would reinstate exactly the behaviour the operator ruled
+        # against -- one blemish destroying every finished beat around it.
+        #
+        # NARROW ON PURPOSE: only `reason == "model_refusal"` is tolerated. A
+        # dead path, a historical-row-only target, a no-engine skip and every
+        # other absence still raise, so the gate keeps its whole job for real
+        # gaps. This does not soften the 2026-06-18 NO FALLBACKS rule: nothing
+        # is substituted and nothing is silent.
+        refused_targets = [
+            m for m in missing_targets
+            if str(((m.get("evidence") or {}).get("reason") or "")) == "model_refusal"]
+        if refused_targets:
+            missing_targets = [m for m in missing_targets
+                               if m not in refused_targets]
+            for miss in refused_targets:
+                ev = miss.get("evidence") or {}
+                log.warning(
+                    "[OTR_ImageGenDispatcher] TOLERATED REFUSAL %s: the model "
+                    "declined this card and the episode continues WITHOUT it "
+                    "(engine=%s seed=%s). prompt=%r",
+                    miss.get("object_id"), ev.get("engine_id"), ev.get("seed"),
+                    ev.get("prompt"))
         if missing_targets:
             # THE RAISE CARRIES ITS OWN EVIDENCE (2026-08-04). It used to report
             # only the object ids, while the reason sat in ``warnings`` -- which
