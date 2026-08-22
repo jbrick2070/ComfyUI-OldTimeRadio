@@ -67,6 +67,10 @@ GHOST_MOTION_MODULE_NAME = "mm-p_0.5.pth"
 GHOST_CHECKPOINT_CATEGORY = "checkpoints"
 GHOST_MOTION_CATEGORY = "animatediff_models"
 
+#: The optional AnimateDiff v3 DOMAIN ADAPTER is an ordinary LoRA and lives
+#: with them. Only a lane that declares ``lora_name`` ever looks here.
+GHOST_LORA_CATEGORY = "loras"
+
 #: Byte floors, so a truncated fetch is NAMED rather than traced through a
 #: loader stack. These are the exact sizes in the dependency lock, minus a
 #: small margin -- a file materially under them is not the pinned artifact.
@@ -125,6 +129,8 @@ NODE_ADE = "ade"
 NODE_LATENT = "latent"
 NODE_SAMPLER = "sampler"
 NODE_DECODE = "decode"
+#: Built ONLY on a lane that declares ``lora_name`` -- see the seam below.
+NODE_LORA = "lora"
 
 #: The SEVEN unique class ids the eight instances resolve to (the repeated text
 #: class is resolved once). ONE NAME PER ALIAS -- never alternative spellings.
@@ -268,6 +274,17 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: is a truncated or wrong file". The file was perfect; the floor was
     #: inherited. Same defect class as the module name itself.
     motion_min_bytes = GHOST_MOTION_MIN_BYTES
+
+    #: THE DOMAIN-ADAPTER SEAM. ``None`` on every clean lane, and that is
+    #: precisely what keeps the golden lane the graph that rendered the
+    #: published episode: with no name there is no loader node, no class to
+    #: resolve, no artifact to require and no third patcher to release.
+    #: A haunted sibling sets all three together (G1.3 -- a per-artifact
+    #: constant travels WITH the lane that owns it, never as a module
+    #: constant a sibling silently inherits).
+    lora_name = None
+    lora_strength = 0.0
+    lora_min_bytes = 0
     required_inputs = ("text_prompt",)
     optional_inputs = ()
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -363,6 +380,14 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 (self.motion_module_name, self._motion_path())):
             parts.append(token)
             parts.append(repr(self._file_receipt(path or "")))
+        # THE ADAPTER IS A HANDLE TOO, and its STRENGTH decides what the
+        # patched model actually is -- two strengths are two different
+        # sessions, not one session used twice. Absent entirely on the clean
+        # lanes, so their identity is byte-identical to what it always was.
+        if self.lora_name:
+            parts.append(self.lora_name)
+            parts.append(repr(self._file_receipt(self._lora_path() or "")))
+            parts.append("strength=%.4f" % float(self.lora_strength))
         return tuple(parts)
 
     def shot_cache_identity(self, request):
@@ -428,6 +453,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         return self._resolve_model_file_by_token(
             (GHOST_MOTION_CATEGORY,), self.motion_module_name)
 
+    def _lora_path(self):
+        """The optional domain adapter, or ``None`` when this lane has none.
+
+        Returning None for a lane that declares no adapter is the whole
+        point: every caller below treats "no name" and "not found" as
+        different states, so a clean lane is never asked for a file and a
+        haunted lane never renders without one."""
+        if not self.lora_name:
+            return None
+        return self._resolve_model_file_by_token(
+            (GHOST_LORA_CATEGORY,), self.lora_name)
+
     def _installed(self):
         """A PREDICATE -- it answers, it never raises."""
         try:
@@ -436,7 +473,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             return False
 
     def _node_candidates(self):
-        return dict(GHOST_NODE_CANDIDATES)
+        candidates = dict(GHOST_NODE_CANDIDATES)
+        if self.lora_name:
+            candidates["lora"] = ("LoraLoaderModelOnly",)
+        return candidates
 
     # ---- preflight ------------------------------------------------------ #
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -453,12 +493,20 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         """
         _MC.assert_sage_not_patched(self.name, self.family)
 
-        rows = (
+        rows = [
             ("checkpoint", GHOST_CHECKPOINT_NAME, GHOST_CHECKPOINT_CATEGORY,
              self._ckpt_path(), GHOST_CHECKPOINT_MIN_BYTES),
             ("motion_module", self.motion_module_name, GHOST_MOTION_CATEGORY,
              self._motion_path(), self.motion_min_bytes),
-        )
+        ]
+        # FAIL CLOSED, never fall back to the clean lane. A receipt that
+        # says "haunted" over clean output is a hole in the record, and the
+        # receipt is how the operator knows what he is looking at.
+        if self.lora_name:
+            rows.append(("domain_adapter", self.lora_name,
+                         GHOST_LORA_CATEGORY, self._lora_path(),
+                         self.lora_min_bytes))
+        rows = tuple(rows)
         missing = ["%s=%s (folder_paths category %r)" % (label, token, category)
                    for label, token, category, path, _floor in rows if not path]
         if missing:
@@ -523,6 +571,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "checkpoint": GHOST_CHECKPOINT_NAME,
             "motion_module": self.motion_module_name,
         }
+        if self.lora_name:
+            self._artifacts["domain_adapter"] = self.lora_name
+            self._artifacts["domain_adapter_strength"] = float(
+                self.lora_strength)
         self._loaded = True
 
     def unload(self):
@@ -727,21 +779,51 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 }},
         }
 
-        def _register_ade(node_id, out_tuple):
-            """Register the PATCHED model immediately -- before the executor
-            can evict it."""
-            if node_id != NODE_ADE:
+        # THE DOMAIN ADAPTER, on a lane that declares one. MODEL PATH ONLY.
+        # The artifact is 256 UNet attention tensors with ZERO text-encoder
+        # weights -- read off the checkpoint's own key list rather than taken
+        # from its documentation -- so CLIP has nothing to receive and keeps its
+        # existing direct path from the checkpoint. ComfyUI maps these legacy
+        # diffusers attn-processor keys natively (comfy/lora.py builds the
+        # ".processor.to_q" key; comfy/weight_adapter/lora.py appends
+        # "_lora.up.weight"), which is exactly the artifact's own spelling, so
+        # this is the stock loader with no conversion step and no custom code.
+        if self.lora_name:
+            sample_graph[NODE_LORA] = {
+                "class": classes["lora"],
+                "inputs": {
+                    "model": _wb.Wire("base_model", 0),
+                    "lora_name": self.lora_name,
+                    "strength_model": float(self.lora_strength),
+                }}
+            sample_graph[NODE_ADE]["inputs"]["model"] = _wb.Wire(NODE_LORA, 0)
+
+        def _register_patched(node_id, out_tuple):
+            """Register a PATCHED model immediately -- before the executor can
+            evict it.
+
+            BOTH patch stages register here, and that is not tidiness. The
+            adapter clones a patcher of its own, so a haunted lane holds THREE
+            model identities -- base, adapter-patched, ADE-patched -- and every
+            one of them must be detached before decode or it stays resident on
+            the card for the rest of the episode.
+            """
+            if node_id == NODE_LORA:
+                owner_key = "lora_model"
+            elif node_id == NODE_ADE:
+                owner_key = "ade_model"
+            else:
                 return
             if not out_tuple:
                 raise RuntimeError(
-                    "%s: the ADE loader returned no MODEL" % self.name)
+                    "%s: the %s loader returned no MODEL" % (self.name, node_id))
             patched = out_tuple[0]
             if not callable(getattr(patched, "detach", None)):
                 raise RuntimeError(
-                    "%s: the patched ADE MODEL has no callable detach() -- "
+                    "%s: the patched %s MODEL has no callable detach() -- "
                     "this adapter cannot take ownership of a patcher it cannot "
-                    "release" % self.name)
-            owners["ade_model"] = patched
+                    "release" % (self.name, node_id))
+            owners[owner_key] = patched
             self._patchers.append(patched)
 
         sampled = _wb.run_graph(
@@ -749,7 +831,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             external_results={"base_model": owners["base_model"],
                               "positive_cond": positive_cond,
                               "negative_cond": negative_cond},
-            terminal=NODE_SAMPLER, on_result=_register_ade)
+            terminal=NODE_SAMPLER, on_result=_register_patched)
         sampled_latent = (sampled[0],)
 
         # BOTH SAMPLING PATCHERS GO BEFORE DECODE, in ADE-then-base order.
@@ -817,7 +899,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         return raw
 
     def _release_sampling_patchers_before_decode(self, owners):
-        """Detach and identity-remove the ADE then base patchers, in that order.
+        """Detach and identity-remove the sampling patchers, outermost first.
+
+        Order is ADE, then the domain adapter (absent on every clean lane),
+        then base -- each patch is undone before the thing it was layered onto.
 
         A GENERIC COMFY ``ModelPatcher`` CONTRACT, not copied LTX/Wan loader
         behaviour: ``detach(unpatch_all=True)`` is what actually moves weights to
@@ -837,6 +922,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         candidates = []
         seen = set()
         for candidate in (owners.get("ade_model"),
+                          owners.get("lora_model"),
                           (owners.get("base_model") or (None,))[0]):
             if candidate is None or id(candidate) in seen:
                 continue

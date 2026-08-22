@@ -162,6 +162,10 @@ _ENGINES_WITH_A_SESSION = {
     # reports its OWN module, so a session can never span two lanes.
     "animatediff15_v2_video",
     "animatediff15_v3_video",
+    # The domain-adapter sibling. Its identity additionally carries the
+    # adapter file and the STRENGTH applied, so a sweep across strengths
+    # can never let one arm reuse another arm's patched model.
+    "animatediff15_v3_haunted_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

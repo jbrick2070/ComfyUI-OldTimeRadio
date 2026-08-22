@@ -27,7 +27,8 @@
     "minimax_h3_video": "admission NOT enforced: no cost row and no envelope key. What DOES gate this lane is its boot -- it requires the named h3 contract (sage-free, pinned memory off, --reserve-vram 12) and refuses by name at preflight when the running server was started without it. That is where the 14.5 GiB outcome is actually decided here: every passing H3 leg on this box held the reserve clamp, and the one leg without it peaked 15.39 GiB on a SMALLER canvas. A boot refusal is not a per-beat admission check, so nothing on this lane refuses an over-budget PLAN and its receipts must not imply one.",
     "animatediff15_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
     "animatediff15_v3_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
-    "animatediff15_v2_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim."
+    "animatediff15_v2_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim.",
+    "animatediff15_v3_haunted_video": "Admission is NOT enforced: the operator declined a measurement campaign; no qualified cost row exists, so this lane may fail OOM and makes no VRAM-fit claim. It carries a THIRD artifact (the 97 MB v3 domain adapter) on top of its parent's two, which is a real but unmeasured addition to resident weights."
   },
   "narratives": [
     {

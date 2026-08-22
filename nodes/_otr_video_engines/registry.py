@@ -557,6 +557,17 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
                                "mm_sd_v15_v2.ckpt"]},
+    # THREE artifacts -- the only Ghost lane with more than two. The adapter is
+    # named here so the S5 wizard asks for it; a haunted lane without it
+    # refuses to render rather than quietly producing clean output.
+    "animatediff15_v3_haunted_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "v3_sd15_mm.ckpt",
+                               "v3_sd15_adapter.ckpt"]},
     "animatediff15_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

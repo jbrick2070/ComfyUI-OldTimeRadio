@@ -313,6 +313,11 @@ _PUBLIC_LABEL = {
     "animatediff15_v2_video": (
         "AnimateDiff v2 -- Ghost Signal (official v2 module, Apache-2.0; "
         "the licensed relative of the default module)"),
+    # The adapter IS this lane's identity, so the label says so plainly rather
+    # than hiding it behind the word "experimental".
+    "animatediff15_v3_haunted_video": (
+        "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
+        "removable domain adapter, Apache-2.0; degraded transmission look)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),

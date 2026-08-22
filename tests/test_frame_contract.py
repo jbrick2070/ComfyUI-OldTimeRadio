@@ -111,6 +111,9 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # they differ only in which motion module they load.
         "animatediff15_v2_video",
         "animatediff15_v3_video",
+        # The domain-adapter sibling: same unbounded contract again. The
+        # adapter patches the image model and touches no timing at all.
+        "animatediff15_v3_haunted_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

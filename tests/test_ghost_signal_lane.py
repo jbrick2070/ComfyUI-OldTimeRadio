@@ -515,9 +515,14 @@ def test_the_wire_ledger_uses_only_slot_zero_aliases():
     wires = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute) and n.func.attr == "Wire"]
-    assert len(wires) == 10, (
-        "render_clip builds %d Wire(s); the executable ledger is exactly ten "
-        "(2 encode + 6 sample + 2 decode)" % len(wires))
+    assert len(wires) == 12, (
+        "render_clip builds %d Wire(s); the SOURCE ledger is exactly twelve "
+        "(2 encode + 6 sample + 2 decode, plus the 2 that exist only inside "
+        "the domain-adapter branch). The number a lane EXECUTES is a different "
+        "and stronger claim -- ten on a clean lane, twelve on a haunted one -- "
+        "and tests/test_ghost_signal_haunted.py proves that behaviourally. "
+        "This test owns the slot-0 law below, which must hold for every Wire "
+        "in the file whether its branch runs or not." % len(wires))
     for call in wires:
         assert len(call.args) == 2, "every Wire must state its slot explicitly"
         slot = call.args[1]

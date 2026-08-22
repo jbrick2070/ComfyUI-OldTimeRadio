@@ -38,6 +38,8 @@ conditioning (coding plan, section 4.1 item 5).
 """
 from __future__ import annotations
 
+import os
+
 from .eng_ghost_signal import GhostSignalEngine
 from .registry import register
 
@@ -107,6 +109,92 @@ class GhostSignalV2Engine(GhostSignalEngine):
     commercial_clean = False
 
 
+#: The v3 DOMAIN ADAPTER -- a LoRA on the IMAGE model, not the motion module.
+#: 102,134,097 bytes, and the smallest artifact in this lane by two orders of
+#: magnitude.
+ADAPTER_V3_NAME = "v3_sd15_adapter.ckpt"
+
+#: G1.3: below its own artifact, and within 15% of it so a truncated fetch is
+#: still caught. 95 MB against a real 97.4 MB.
+ADAPTER_V3_MIN_BYTES = 95_000_000
+
+#: THE DIAL'S DIRECTION, and it is the opposite of what "adapter" suggests.
+#: Upstream trains this LoRA to ABSORB the video training set's own defects so
+#: they can be taken back out at inference: remove it, or scale it down, to get
+#: LESS of the dataset's grime. So 0.0 is the pristine image-model domain and
+#: 1.0 is the full video-dataset domain -- which is exactly the haunted end.
+#:
+#: 1.0 is the adapter's own full scale and therefore the honest default for a
+#: lane whose entire purpose is to be haunted. IT IS UNMEASURED: no strength
+#: has been qualified by eye yet, which is what the environment override below
+#: is for. Sweep it, look at the output, then freeze the number here.
+ADAPTER_V3_STRENGTH = 1.0
+
+#: The sweep knob, following the eng_fastwan_8gb recipe-override pattern.
+ADAPTER_V3_STRENGTH_ENV = "OTR_GHOST_HAUNTED_LORA_STRENGTH"
+
+
+@register
+class GhostSignalV3HauntedEngine(GhostSignalV3Engine):
+    """``animatediff15_v3_haunted_video`` -- v3 plus the removable adapter.
+
+    A THIRD peer, additive exactly as v3 and v2 were. It inherits everything
+    from the clean v3 lane and adds one thing: the domain adapter on the MODEL
+    path. The clean v3 lane sits beside it as the reference and the golden lane
+    is untouched, so a comparison between them is a one-variable comparison.
+
+    WHY THE ADAPTER IS INTERESTING HERE. Ghost's worst tendency is lettering --
+    SD1.5 volunteers text into anything resembling a sign, a poster or a radio
+    dial, which is most of this show, and the lane fights that with
+    negative-prompt tokens on every single beat. The adapter is a different
+    mechanism aimed at the same class of defect: rather than arguing with the
+    model at inference, upstream parks the training set's learned artifacts in
+    a removable component. Turned DOWN it should mean less learned grime;
+    turned UP, more of it, deliberately, as a look.
+
+    IT LOADS ON THE STOCK NODE. The artifact carries 256 UNet attention tensors
+    and ZERO text-encoder tensors -- read off the checkpoint's own key list,
+    not its documentation -- which is why this is ``LoraLoaderModelOnly`` and
+    why CLIP keeps its untouched path. The keys are the legacy diffusers
+    attn-processor spelling, which ComfyUI maps natively, so there is no
+    conversion step and no custom loader anywhere in this lane.
+
+    WHAT IS NOT HERE YET: nothing schedules the strength across an episode. The
+    dial is one frozen number per render. Driving it from the ledger's arc so
+    the picture degrades as the story tightens needs a declared field on
+    ``VideoRequest`` -- that model is ``extra="forbid"`` and its one open dict
+    is documented "NEVER conditioning" -- and a schema change is a design item,
+    not a mechanical one. Prove the dial does something first.
+    """
+
+    name = "animatediff15_v3_haunted_video"
+
+    lora_name = ADAPTER_V3_NAME
+    lora_min_bytes = ADAPTER_V3_MIN_BYTES
+    recipe_receipt_id = "animatediff_sd15_v3_haunted_static16_512x288_v1"
+
+    @property
+    def lora_strength(self):
+        """Frozen default, overridable for the strength sweep.
+
+        A property rather than a plain constant because the point of the first
+        renders is to try several values without editing code between them.
+        An unreadable or absent value lands on the frozen default rather than
+        on zero: zero would render the CLEAN lane while stamping a haunted
+        receipt, which is the one outcome this lane may never produce.
+        """
+        raw = os.environ.get(ADAPTER_V3_STRENGTH_ENV)
+        if raw is None or not str(raw).strip():
+            return ADAPTER_V3_STRENGTH
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return ADAPTER_V3_STRENGTH
+
+
 __all__ = ["GhostSignalV3Engine", "GhostSignalV2Engine",
+           "GhostSignalV3HauntedEngine",
            "MM_V3_NAME", "MM_V2_NAME",
-           "MM_V3_MIN_BYTES", "MM_V2_MIN_BYTES"]
+           "MM_V3_MIN_BYTES", "MM_V2_MIN_BYTES",
+           "ADAPTER_V3_NAME", "ADAPTER_V3_MIN_BYTES", "ADAPTER_V3_STRENGTH",
+           "ADAPTER_V3_STRENGTH_ENV"]

@@ -58,6 +58,7 @@ without that map would play ~4% short.
 | engine | side | family | aspect | resolution | clip frames | clip seconds | fps | continuity | tail trim |
 |---|---|---|---|---|---|---|---|---|---|
 | animatediff15_v2_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
+| animatediff15_v3_haunted_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_v3_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | cloud_kling_avatar | provider | audio_driven_face | wide | provider default (none sent) | 50-7500 | 2-300 s | 25 | soft_reference | yes |
@@ -96,6 +97,7 @@ without that map would play ~4% short.
 | engine | required inputs | prompt contract |
 |---|---|---|
 | animatediff15_v2_video | text_prompt | text_prompt REQUIRED |
+| animatediff15_v3_haunted_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_v3_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_video | text_prompt | text_prompt REQUIRED |
 | cloud_kling_avatar | init_image, audio_ref | text_prompt OPTIONAL (sent when present) |
@@ -138,6 +140,7 @@ the engine's own `aspect` column above.
 | engine | stills |
 |---|---|
 | animatediff15_v2_video | none |
+| animatediff15_v3_haunted_video | none |
 | animatediff15_v3_video | none |
 | animatediff15_video | none |
 | cloud_kling_avatar | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
@@ -182,6 +185,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | engine | effective canvas | decided by |
 |---|---|---|
 | animatediff15_v2_video | 512x288 | declared |
+| animatediff15_v3_haunted_video | 512x288 | declared |
 | animatediff15_v3_video | 512x288 | declared |
 | animatediff15_video | 512x288 | declared |
 | cloud_kling_avatar | n/a -- renders remotely | see `resolution` column |
@@ -230,6 +234,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 | engine | join | segments (render frames) | render | visible | re-mints |
 |---|---|---|---|---|---|
 | animatediff15_v2_video | single | 1: 442 | 442 | 442 | 0 |
+| animatediff15_v3_haunted_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_v3_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_video | single | 1: 442 | 442 | 442 | 0 |
 | cloud_kling_avatar | single | 1: 442 | 442 | 442 | 0 |
@@ -275,6 +280,7 @@ and it read exactly like a measured number until someone looked.
 | engine | cap | set by | evidence |
 |---|---|---|---|
 | animatediff15_v2_video | - | contract max | none cited |
+| animatediff15_v3_haunted_video | - | contract max | none cited |
 | animatediff15_v3_video | - | contract max | none cited |
 | animatediff15_video | - | contract max | docs/2026-08-22-GHOST-SIGNAL-CODING-PLAN.md, docs/2026-08-22-ghost-signal-object-info.json. |
 | cloud_kling_avatar | - | contract max | none cited |
@@ -310,7 +316,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **33**
+* registered engine names: **34**
 * provider-side: **8**
-* local: **25**
+* local: **26**
 * can chain (strict_first_frame): **7**
