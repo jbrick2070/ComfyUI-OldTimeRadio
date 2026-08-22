@@ -4,6 +4,13 @@
 `z_image_turbo` stands. No production code was written and
 `workflows/otr_canonical.json` is untouched.**
 
+> **ROUND 4 CORRECTION, 2026-08-21 (operator-directed: *"1080p 16x9 ... ideogram
+> make it happen"*). The RESULT is unchanged; the REASON below was WRONG and is
+> superseded. Ideogram 4 does not refuse this content. The refusal tracks the
+> PROMPT SHAPE, and the JSON card shape renders every line that the prose shape
+> refused -- at both canvases. See "ROUND 4" at the end of this file for the
+> corrected finding and the real blocker.**
+
 Decided 2026-08-21 by live measurement on the real box, before any adapter code
 existed. Operator authorized the download ("ideo 4") and delegated the judgment
 ("you judge and put in the workflow the best one ... all autonomously while I
@@ -274,3 +281,115 @@ portrait default.
 3. the active attention backend recorded.
 
 Anything less does not reopen this.
+
+
+---
+
+# ROUND 4 -- the operator was right to push, and the stated reason was wrong
+
+The operator asked for a 1080p 16:9 retest, having noticed that the official
+template ships PORTRAIT (`'9:16 (Portrait Widescreen)'`) and that my
+`aspect_ratio` field was malformed -- it carried literal pixels (`"1472:832"`)
+where the caption schema wants a RATIO. Both observations were correct.
+
+The retest cleared him of the smaller point and overturned the larger one.
+
+## What was run
+
+12 live renders, same weights, same seed 42, same dual-expert topology, on the
+three REAL production ledger lines that had been recorded as refused -- two
+Macbeth (`shakespeare`) and one ordinary `scifi_news_pro` narration. Two prompt
+shapes x two canvases, with `aspect_ratio` correctly formed as `"16:9"`
+throughout:
+
+| prompt shape | 1472x832 | 1920x1088 (true 1080p 16:9) |
+|---|---|---|
+| prose card (`prose_card`) | **3/3 REFUSED** | **3/3 REFUSED** |
+| JSON card (`json_card_v2`) | **3/3 RENDERED** | **3/3 RENDERED** |
+
+Classified with the detector measured in round 1 (`min > 50 AND std < 15`).
+Refusals sit at `min ~= 68-87, std ~= 9.9-10.7`; renders at
+`min = 0.0-1.0, std ~= 27-41`. The separation is not marginal.
+
+Receipts: `probe_out/PROBE_hd.json`, and the frames
+`probe_hd_*` / `probe_hdiso_*` under `output/otr/episodes/_ideogram4_probe/`.
+The `hdiso` arm exists specifically because the first HD run moved TWO variables
+at once (canvas AND shape); it holds the shape at JSON and puts the canvas back
+to 1472x832, which is what isolates the cause.
+
+## The corrected finding
+
+**Canvas and aspect ratio have NO effect on refusal. Prompt shape has a total
+effect.** The prose arm refused at both canvases -- including the innocuous
+`scifi_news_pro` line "Tonight we descend into the suffocating twilight of
+Pompeii", carried over the QUIET art-deco studio backdrop with no castle, no
+blood and no Shakespeare anywhere in the prompt. The JSON arm rendered all three
+lines at both canvases.
+
+So the earlier one-line reason -- that the model refuses this CONTENT -- does not
+survive. It refused a prompt SHAPE. This is the second time this engine's
+evidence has had to be corrected for an uncontrolled variable (Bible `12.121`),
+and it is the reason Gate IG4.2 of `docs/IMAGE_GEN_PREFLIGHT.md` now requires a
+refusal finding to name the single variable it isolated.
+
+## The real blocker, which is structural
+
+The JSON arm renders -- and the main card line is **spelled perfectly**, with
+genuinely excellent typography: correct apostrophes, correct punctuation, clean
+kerning, sensible two-line breaks. On the words themselves this model is better
+than what ships.
+
+But **3 of 3 JSON renders invented gibberish corner text**:
+
+| line | invented text |
+|---|---|
+| "I've seen the weird sisters..." | `Io dhetors` / `Na expacly.` |
+| "Treason! My noble friends..." | `NO MISCOS,` / `PATIO LALLK.` |
+| "Tonight we descend..." | `(s: 16925)` / `PRTOPLEBIX.` |
+
+`NO MISCOS` is a mangled rendering of the guard's own words, *"no logos"*. The
+model is PAINTING THE `negative_instruction` FIELD ONTO THE CARD.
+
+That traces to the topology, not to authoring, and it is why it cannot simply be
+prompted away. The official Ideogram 4 graph wires
+`CLIPTextEncode -> ConditioningZeroOut -> DualModelGuider.negative`: the negative
+branch is the ZEROED POSITIVE. **There is no text-negative input in this
+topology at all.** A "no other writing" guard therefore has nowhere to live
+except inside the positive prompt -- where the prose shape obeys it and the JSON
+shape renders it as decoration.
+
+`json_card_v2` was the pre-registered experiment for exactly this, and its own
+docstring set the criterion in advance: *"If v2 comes back clean, the adapter is
+viable and the fault was mine. If it still invents, the schema itself is the
+problem."* It carried OTR's guard verbatim, LAST, at top level, with the element
+list cut to a single text element. It still invented on 3 of 3. By its own
+stated test, the schema is the problem.
+
+## Why the RESULT is still NO -- and what would change it
+
+Both shapes fail, for different structural reasons:
+
+* **prose** -- obeys the no-other-text guard, but refuses real production card
+  lines (6/6 across two canvases);
+* **JSON** -- renders those same lines beautifully, but paints invented text
+  onto the one audience-readable surface `still_word` exists to produce.
+
+A title card whose whole job is to show the script's words cannot ship with
+invented words beside them. So `z_image_turbo` stands, unchanged.
+
+**This is now a build question rather than a screening rejection**, and it is
+the operator's call, not mine:
+
+1. **A prompt adapter is architecturally legitimate** and he predicted it at the
+   outset (*"may need special adapter"*). `docs/IMAGE_GEN_PREFLIGHT.md` IG5.1
+   says the shared `compose_still_word_prompt` stays model-agnostic and the
+   ENGINE owns its own shape adaptation -- so an Ideogram adapter converting the
+   composed card into a schema of its own is allowed by contract.
+2. **What it would have to solve is the invented text**, not the refusal. The
+   untested lever is a JSON payload carrying NO guard field at all -- since the
+   guard is what gets painted -- and relying on the single-element schema alone
+   to suppress extra text. That is one 3-render probe, not a build.
+3. **The prize is real.** Perfect spelling on a card line is exactly what
+   `still_word` wants and is not free elsewhere.
+
+Until that probe runs and comes back clean on 3 of 3, the answer stays NO.

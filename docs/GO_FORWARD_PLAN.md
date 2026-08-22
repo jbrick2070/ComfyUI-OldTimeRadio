@@ -116,14 +116,24 @@ soft departs further in only 2 of 4 cells and every value sits near zero, so
 both settings end up essentially uncorrelated with the conditioning still.
 Lane 2's bound is discharged; do not reopen it as "untested".
 
-**IDEOGRAM 4 CLOSED: NO** (`docs/2026-08-21-ideogram4-verdict.md`, tracked
-receipt `docs/2026-08-21-ideogram4-probe-receipt.json`). Six of six REAL
-production card lines were refused by its built-in filter, in BOTH prompt
-shapes, including ordinary `scifi_news_pro` narration. The refusal returns a
-valid non-black PNG at correct dimensions with status SUCCESS, so every generic
-guard passes it. Weights stay on disk. **Reopening condition, and only this:**
-prose on `announcer_visual` only, with a matched `z_image_turbo` comparison, the
-refusal detector armed, and the attention backend recorded.
+**IDEOGRAM 4: STILL NO, BUT THE REASON CHANGED AND THE GAP CLOSED TO ONE
+DEFECT** (`docs/2026-08-21-ideogram4-verdict.md`, ROUND 4-5). The operator's
+1080p 16:9 retest overturned the earlier reason: the model does NOT refuse this
+content -- refusal tracks the PROMPT SHAPE (prose refuses 6/6 at both canvases;
+the JSON card schema renders 6/6 at both). The card `aspect_ratio` field was
+also malformed in rounds 1-3 (literal pixels where the schema wants a ratio).
+The canonical template was then found to CARRY the official schema (a hidden
+"Ideogram4 Caption Prompt Template" magic-prompt subgraph, node 114): exactly
+three top-level keys, minified, bbox normalized 0-1000 -- and our v2 payload's
+foreign `negative_instruction` key was being PAINTED ONTO THE CARD ("NO
+MISCOS" = "no logos"). Rebuilt in the official schema at 1920x1088: zero
+refusals, perfect spelling, frame-filling type, invented text down from six
+gibberish lines to small period footers. The remaining single defect is that
+populate footer (a fake catalog number) on a fraction of cards; the restraint
+arm (`--stage restraint`) measures whether the schema's own off-switch kills
+it. **This is now an operator build decision** -- a per-engine prompt adapter is
+legal under `docs/IMAGE_GEN_PREFLIGHT.md` IG5.1 -- not a screening rejection.
+Weights stay on disk; `z_image_turbo` still ships.
 
 **OPERATOR RULING ON VRAM, 2026-08-21 evening (hard):** *"don't chase numbers
 please, fail OOM only."* The only VRAM criterion is whether a render OOMed. No
