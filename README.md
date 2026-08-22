@@ -41,15 +41,16 @@ Registry installs are packaged, versioned snapshots of the current alpha
 ([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)) —
 no branch checkout needed. Restart ComfyUI so it loads the nodes.
 
-**From git (bleeding edge):** in **ComfyUI Manager → Install via Git URL**, paste:
+**From git (bleeding edge):** clone into your `ComfyUI/custom_nodes/` folder and check out
+the active branch:
 
 ```
-https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+cd ComfyUI-OldTimeRadio
+git checkout v2.0-alpha
 ```
 
-Then **check out the `v2.0-alpha` branch** (the active line). Restart ComfyUI so it loads the nodes.
-
-*(Manual alternative: `git clone` into `ComfyUI/custom_nodes/`, `git checkout v2.0-alpha`, restart.)*
+Then restart ComfyUI so it loads the nodes.
 
 ### 3. Install the models
 
