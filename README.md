@@ -13,7 +13,9 @@ visualizer) → final MP4.
 routes exist; they stay off unless you turn them on.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
-> Model Platform below). Check out `v2.0-alpha` to get the current pipeline.
+> Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
+> branch juggling entirely and install the packaged alpha from the
+> [ComfyUI Registry](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio).
 
 ---
 
@@ -28,7 +30,18 @@ manual/portable ComfyUI install. Launch it once to confirm it opens in your brow
 
 ### 2. Install this node pack
 
-In **ComfyUI Manager → Install via Git URL**, paste:
+**Easiest — ComfyUI Registry:** in **ComfyUI Manager**, search for **ComfyUI-OldTimeRadio**
+and click Install. Or from a terminal:
+
+```
+comfy node registry-install comfyui-old-time-radio
+```
+
+Registry installs are packaged, versioned snapshots of the current alpha
+([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)) —
+no branch checkout needed. Restart ComfyUI so it loads the nodes.
+
+**From git (bleeding edge):** in **ComfyUI Manager → Install via Git URL**, paste:
 
 ```
 https://github.com/jbrick2070/ComfyUI-OldTimeRadio
