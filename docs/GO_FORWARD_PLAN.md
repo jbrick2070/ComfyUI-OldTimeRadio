@@ -126,7 +126,30 @@ reading `NO MISCOS` was that guard, painted on.
 
 ### OPEN, IN PRIORITY ORDER
 
-**QUEUE HEAD IS NOW B. Item A is DONE -- see the closed block directly below.**
+**QUEUE HEAD: GHOST PROMPT V2 -- READY FOR OPUS CODING (2026-08-22).**
+
+The shipped Ghost v3 family keeps its accepted look/cadence/frame coverage, but
+its beat content prompts are repetitive, occasionally copy/truncate free-text
+intent, and do not provide one clean drawable idea per clip. The operator chose
+controlled abstraction: one short LLM-authored drawable leaf per existing beat,
+with Python-owned `figure`/`object`/`signal` modes and recurrence motif. Style,
+negative, cadence, frame contract, one-beat/one-clip topology, and video-seed
+identity are frozen controls.
+
+**Plan and baton:**
+`docs/2026-08-22-GHOST-PROMPT-V2-CONTROLLED-ABSTRACTION-PLAN.md` and
+`docs/2026-08-22-GHOST-PROMPT-V2-OPUS-HANDOFF.md`. Production code and the
+canonical workflow are untouched. R1-R3 completed; the operator stopped the
+remaining R4 panel and directed handoff to Opus. Do not restart the panel and do
+not use Cursor. A supplemental full v1 v3-peer artifact is archived at
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_after_hours_encounter_20260822_152909\evidence\ghost_prompt_v1_baseline\`;
+the formal official-v3 same-seed A arm is the first action, then implementation,
+full tests/Bug Bible/workflow audits, fresh-server B, OBS publish, commit/push.
+No workflow JSON change is expected because the new object is internal to the
+durable ShotRow.
+
+**Item A is DONE -- see the closed block directly below. Item B resumes after
+Ghost Prompt v2 ships.**
 
 **A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
 Three green chunks, all pushed on `v2.0-alpha`:
