@@ -1,0 +1,192 @@
+{
+  "attention_backend_during_probe": "pytorch attention (NOT SageAttention)",
+  "canvas": [
+    1472,
+    832
+  ],
+  "comfyui_revision": "4da9e2db",
+  "decided": "2026-08-21",
+  "decision": "NO -- Ideogram 4 not adopted; z_image_turbo stands",
+  "frames_sha256": {
+    "probe_refusal_macbeth_json_00001_.png": {
+      "bytes": 1844085,
+      "sha256": "42ef3dcb0e0d14cfe7de666f36a10d36d51936a32034a85289456a50dabf082b"
+    },
+    "probe_refusal_macbeth_prose_00001_.png": {
+      "bytes": 303353,
+      "sha256": "dbf369033c0f310c581328708a99d1e858f4c3e0e0527cfdec08b3d3583c00af"
+    },
+    "probe_stillword_prose_00001_.png": {
+      "bytes": 1264388,
+      "sha256": "1b7c47ad404a8c5ad49eebfc037ddec37567e2a2027212924d467c04a92b21fc"
+    },
+    "probe_topology_dual_00001_.png": {
+      "bytes": 1861370,
+      "sha256": "e1a3706fd2e7b38b6e501322de36a25329bad58d7a87c0c16b423cc4abff16fb"
+    },
+    "probe_topology_single_00001_.png": {
+      "bytes": 1713563,
+      "sha256": "3e23e96f669f470d498dd6f9554099a49814ecaa3abaaa4a9101f29ab3dad5ed"
+    },
+    "probe_v2_macbeth_json_00001_.png": {
+      "bytes": 327822,
+      "sha256": "d5f7c63310c07d3cb28c5a0720b6aec32af826e97f120ba853b729e0b4ab5996"
+    },
+    "probe_v2_macbeth_prose_seed2_00001_.png": {
+      "bytes": 347203,
+      "sha256": "26eb67f57bb9d3f2e33194608a656c5530205b5dcc0b49f9a8b3597022a6a9a9"
+    },
+    "probe_v2_quiet_json_00001_.png": {
+      "bytes": 1796688,
+      "sha256": "f29ac5e6e133ce3019f672020c9729ed0f23eca60b7618a70bfcbe0662f71148"
+    }
+  },
+  "kind": "pre-build screening rejection; NOT a production qualification (standalone API graphs, not workflows/otr_canonical.json, nothing published to otr/obs)",
+  "probe_script_sha256": "01396e6fb6fdd2588762d618e53e0d3c88acf87ea2cfc35078b82fc8d8875fb0",
+  "reference_template": {
+    "path": "Comfy-Org/workflow_templates templates/image_ideogram4_t2i.json",
+    "sha256": "87dba0e3002b76990836a1ebbe43e0885175d2bcdbcd41e854d5bcd2209ea2dd"
+  },
+  "refusal_signature": {
+    "blocked_frame": {
+      "max": 240,
+      "mean": 108.6,
+      "min": 80,
+      "std": 10.4,
+      "unique_colors": 6012
+    },
+    "detector": "min > 50 AND std < 15",
+    "note": "required before ANY future candidate still from this engine is accepted",
+    "presents_as": "ComfyUI SUCCESS + valid non-black PNG of correct size",
+    "real_frames": {
+      "min": 0,
+      "std_range": [
+        27.1,
+        41.3
+      ],
+      "unique_colors_range": [
+        23679,
+        41496
+      ]
+    }
+  },
+  "runs": [
+    {
+      "dual_expert": false,
+      "label": "topology_single",
+      "prompt_shape": "json",
+      "receipt": "PROBE_all.json",
+      "seconds": 45.2,
+      "seed": 42,
+      "status": "SUCCESS",
+      "target_text": "THE SIGNAL DIED AT MIDNIGHT",
+      "vram_peak_mib": 15230
+    },
+    {
+      "dual_expert": true,
+      "label": "topology_dual",
+      "prompt_shape": "json",
+      "receipt": "PROBE_all.json",
+      "seconds": 45.1,
+      "seed": 42,
+      "status": "SUCCESS",
+      "target_text": "THE SIGNAL DIED AT MIDNIGHT",
+      "vram_peak_mib": 15825
+    },
+    {
+      "dual_expert": true,
+      "label": "stillword_prose",
+      "prompt_shape": "prose",
+      "receipt": "PROBE_all.json",
+      "seconds": 45.2,
+      "seed": 42,
+      "status": "SUCCESS",
+      "target_text": "THE SIGNAL DIED AT MIDNIGHT",
+      "vram_peak_mib": 15843
+    },
+    {
+      "dual_expert": true,
+      "label": "refusal_macbeth_json",
+      "prompt_shape": "json",
+      "receipt": "PROBE_all.json",
+      "seconds": 45.2,
+      "seed": 42,
+      "status": "SUCCESS",
+      "target_text": "OUT, DAMNED SPOT! OUT, I SAY! WHO WOULD HAVE THOUGHT THE OLD MAN TO HAVE HAD SO MUCH BLOOD IN HIM",
+      "vram_peak_mib": 15816
+    },
+    {
+      "dual_expert": true,
+      "label": "refusal_macbeth_prose",
+      "prompt_shape": "prose",
+      "receipt": "PROBE_all.json",
+      "seconds": 50.2,
+      "seed": 42,
+      "status": "SUCCESS",
+      "target_text": "OUT, DAMNED SPOT! OUT, I SAY! WHO WOULD HAVE THOUGHT THE OLD MAN TO HAVE HAD SO MUCH BLOOD IN HIM",
+      "vram_peak_mib": 15843
+    },
+    {
+      "dual_expert": true,
+      "label": "v2_quiet_json",
+      "prompt_shape": "json",
+      "receipt": "PROBE_v2.json",
+      "seconds": 45.1,
+      "seed": 20260821,
+      "status": "SUCCESS",
+      "target_text": "THE SIGNAL DIED AT MIDNIGHT",
+      "vram_peak_mib": 15852
+    },
+    {
+      "dual_expert": true,
+      "label": "v2_macbeth_json",
+      "prompt_shape": "json",
+      "receipt": "PROBE_v2.json",
+      "seconds": 50.1,
+      "seed": 20260821,
+      "status": "SUCCESS",
+      "target_text": "OUT, DAMNED SPOT! OUT, I SAY! WHO WOULD HAVE THOUGHT THE OLD MAN TO HAVE HAD SO MUCH BLOOD IN HIM",
+      "vram_peak_mib": 15868
+    },
+    {
+      "dual_expert": true,
+      "label": "v2_macbeth_prose_seed2",
+      "prompt_shape": "prose",
+      "receipt": "PROBE_v2.json",
+      "seconds": 40.1,
+      "seed": 20260821,
+      "status": "SUCCESS",
+      "target_text": "OUT, DAMNED SPOT! OUT, I SAY! WHO WOULD HAVE THOUGHT THE OLD MAN TO HAVE HAD SO MUCH BLOOD IN HIM",
+      "vram_peak_mib": 15916
+    }
+  ],
+  "steps": 20,
+  "tally": {
+    "json_prompts": {
+      "blocked": 0,
+      "invented_text": 5,
+      "rendered": 5
+    },
+    "prose_prompts": {
+      "blocked": 2,
+      "invented_text": 0,
+      "rendered": 1
+    },
+    "spelling_correct_on_non_blocked_frames": "6 of 6"
+  },
+  "vram": {
+    "card_total_mib": 16303,
+    "min_observed_headroom_mib": 387,
+    "oom_count": 0,
+    "peak_max_mib": 15916,
+    "peak_min_mib": 15230,
+    "project_target_gib": 14.5,
+    "runs": 8
+  },
+  "weights_sha256": {
+    "flux2-vae.safetensors": "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5",
+    "ideogram4_nvfp4_mixed.safetensors": "e7923b4b0a1129ae5afcc09e63046185688c8b09eb9a1a748cccdbde5d381609",
+    "ideogram4_unconditional_nvfp4_mixed.safetensors": "639e37bd1dd7ee35e23c7cfccf93a518ddc7f4587818956ec42b31e659fd6ac0",
+    "qwen3vl_8b_nvfp4.safetensors": "e462e9e0c3b9313ae17f82040d7c77beb92d7aef3e40692d7803228dab7c3b98"
+  }
+}

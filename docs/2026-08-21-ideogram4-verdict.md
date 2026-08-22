@@ -15,12 +15,27 @@ directory) -- `PROBE_FINDINGS.md`, `probe_ideogram4.py`, `probe_out/PROBE_all.js
 `wiring_grounding.md`, `reference/image_ideogram4_t2i.json`.
 Frames: `output/otr/episodes/_ideogram4_probe/` (8 stills, never `otr/obs`).
 
+**THIS IS A PRE-BUILD SCREENING REJECTION, NOT A PRODUCTION DISQUALIFICATION.**
+The probe submitted standalone API graphs
+(`docs/2026-08-21-ideogram4-local-still-engine/probe_ideogram4.py`), **not**
+`workflows/otr_canonical.json`, and published nothing to `otr/obs`. That path is
+outside the two named bench exemptions in `CLAUDE.md` §0/§0A, so **no production
+qualification occurred and none is claimed.** The screen was enough to stop the
+build; it is not enough to make a statement about a shipped episode.
+
 ## The one-line reason
 
-**Ideogram 4 carries a content filter baked into its weights that
-deterministically refuses Shakespeare, and it refuses by returning a grey card
-reading "Image blocked by safety filter" that every guard OTR has would pass as
-a success.**
+**The tested Macbeth card prompt repeatably produced a model-rendered refusal
+card -- a grey frame reading "Image blocked by safety filter" -- at two seeds,
+and no supported ComfyUI runtime control to disable it was found. A refusal
+returns as a normal SUCCESS with a valid, non-black PNG, so it would pass the
+dispatcher's generic pixel handoff unless an adapter added semantic refusal
+detection.**
+
+*(Corrected after the r4 review. An earlier draft said the filter is "baked into
+its weights", that it "deterministically refuses Shakespeare", and that a
+blocked card "would ship into a published episode". All three overstated the
+evidence -- see "What this verdict does NOT establish" below.)*
 
 ## What was measured -- 8 live stills, two seeds, two prompt shapes
 
@@ -40,28 +55,47 @@ a success.**
 
 ## The four findings that decide it
 
-**1. The filter is in the WEIGHTS, and it cannot be turned off.** There is no
-safety-filter code anywhere in the ComfyUI tree -- not in
+**1. No runtime control to disable the refusal was found.** There is no
+safety-filter code in the tracked ComfyUI implementation -- not in
 `comfy_extras/nodes_ideogram4.py` (which contains only the scheduler), not in
-`comfy/`, not anywhere. The model itself paints the refusal card. There is no
-flag, node swap, or config that removes it. **Adopting this engine means
-importing a content guardrail we cannot remove**, which is the precise thing
-`CLAUDE.md` forbids: *"no violence or swearing guardrails, they just cause
-problems."*
+`comfy/`. The refusal card is rendered by the model rather than drawn by a
+wrapper, and no flag, node swap or config exposes an off switch.
+**What that establishes is "no supported disable control was found", not "the
+filter is baked into the weights and cannot be removed"** -- the latter is a
+stronger claim than an absence-of-code search can carry.
 
-**2. It refuses the operator's own source material, deterministically.** The
-blocked line is Macbeth, V.i. Two different seeds, same block. Not seed luck --
-a property of the text. OTR's adaptation lanes carry the author's language as
-written, so this is not an edge case for this pipeline; it is the main case.
+**2. The refusal reproduced at two seeds, but the prompt was not isolated.** The
+blocked card is Macbeth, V.i, and the same prompt blocked at seed 42 and seed
+20260821 -- so it is not seed luck. **But the Macbeth prompt differs from the
+quiet prompt in the LINE, the BACKDROP and the GRADE all at once**
+(`probe_ideogram4.py`, `MACBETH_BACKDROP` / `MACBETH_GRADE`). The probe
+therefore did **not** isolate which of the three the filter reacted to. That is
+the uncontrolled-second-variable trap of Bible `12.121`, and this verdict fell
+into it while citing it elsewhere. A single-variable follow-up -- the Macbeth
+line on the quiet backdrop -- is cheap and is the honest way to make the
+stronger claim.
 
-**3. The refusal is indistinguishable from success by every existing guard.**
+**What survives that correction is still decisive for the build:** a
+production-shaped card carrying the operator's own source material was refused,
+repeatably, with no way found to turn it off. Whatever the exact trigger,
+adopting this engine imports refusal behaviour we do not control onto a lane
+whose operator directive is *"no violence or swearing guardrails, they just
+cause problems."*
+
+**3. The refusal is indistinguishable from success by every generic guard.**
 ComfyUI reports `SUCCESS`. `SaveImage` writes a real 1.2 MB PNG. Dimensions are
 exactly right. The frame is not black, so the all-black detector proposed during
-review would pass it. **A blocked card would ship into a published episode as a
-title card reading "Image blocked by safety filter."** It is detectable -- a
-blocked frame has `min=80` and `std=10.4` against `min=0`, `std=27-41` for a real
-render -- but only by a detector written specifically for it, on a path where a
-missing still is already a hard fail by operator directive.
+review would pass it. `nodes/otr_image_gen_dispatcher.py:504-526` accepts any
+decoded array, so **a blocked card would pass the generic pixel handoff unless
+an adapter added semantic refusal detection** -- stated conditionally because the
+probe never ran the production path.
+
+It IS detectable, and the signature is measured rather than guessed: a blocked
+frame has `min=80` and `std=10.4` against `min=0` and `std=27-41` for a real
+render. **Any future evaluation of this engine must implement that detector
+(`min > 50` AND `std < 15`) before a single candidate still is accepted** -- on
+a path where a missing still is already a hard fail by operator directive, an
+undetected refusal is the worse outcome.
 
 **4. The JSON escape hatch trades one defect for another.** JSON prompting avoids
 every block, and it invents text on every single render -- logos, fake credits,
@@ -75,12 +109,17 @@ exact failure the repo already recorded against the paid cloud arm:
 
 ## What is genuinely good, and should not be lost
 
-**The spelling is excellent -- better than anything OTR has.** Every card that
-rendered spelled its line perfectly, including the full three-line Macbeth
-quotation. Against the defect this programme actually surfaced -- lane 4's card
-rendering `TI2V` as `TIZV` in BOTH arms, and the 1080p Z-Image card duplicating
-an eye-chart row at both seeds -- Ideogram is clearly stronger at the narrow task
-of putting requested words on screen correctly.
+**The spelling is excellent.** The checkable result, stated without superlative:
+**all six non-blocked frames spelled their requested target string correctly**,
+including the full three-line Macbeth quotation, while **all five JSON frames
+added unwanted text**. Against the defect this programme actually surfaced --
+lane 4's card rendering `TI2V` as `TIZV` in BOTH arms, and the 1080p Z-Image card
+duplicating an eye-chart row at both seeds -- that is a materially better result
+at the narrow task of putting requested words on screen.
+
+**It is NOT a claim that Ideogram beats `z_image_turbo`.** No matched comparison
+was run. An earlier draft called one card "the best word card this programme has
+produced"; that is withdrawn as unsupported.
 
 **The one configuration still worth a look, later:** *prose prompts on
 `announcer_visual` cards only.* Announcer cards carry billboard copy rather than
@@ -95,10 +134,15 @@ Nothing in this probe compares Ideogram against the incumbent.
   The `flux2-vae` was already installed and proved tensor-identical to
   Ideogram's copy (251 tensors, 336,185,492 payload bytes both; the 2,264-byte
   file difference is entirely header), so nothing was overwritten.
-* VRAM peak **15,230-15,843 MiB** on a 16,303 MiB card -- **above the 14.5 GiB
-  project target**, ~480 MiB headroom, no OOM in 8 renders. ComfyUI stages these
+* VRAM peak **15,230-15,916 MiB** across all 8 runs on a 16,303 MiB card --
+  **above the 14.5 GiB project target**, minimum observed headroom **387 MiB**,
+  no OOM. (An earlier draft quoted 15,230-15,843 / ~480 MiB; that was the range
+  from the first five runs only and never picked up round 2, whose three cells
+  are the highest at 15,852 / 15,868 / 15,916. Corrected after the r4 review.)
+  ComfyUI stages these
   models dynamically, so the naive 17.29 GB arithmetic never materialises.
-* The second expert costs **+595 MiB and zero time** (45.1s vs 45.2s).
+* The second expert costs **+595 MiB and no measurable time difference in the
+  one pair measured** (45.1s vs 45.2s -- one comparison, not a benchmark).
 * ~45s per 1472x832 still at 20 steps.
 
 ## Licence position, unchanged by this verdict
@@ -109,23 +153,49 @@ on disk** -- they cost nothing idle and the announcer follow-up may want them.
 No `commercial_clean = False` adapter was registered because no adapter was
 written.
 
-## What this cost, and what it bought
+## The review roster, stated exactly
 
-Three review rounds' worth of design work (r1 three lanes, r2 two lanes) plus
-two probe rounds. **The arc caught four real errors before they became code** --
-the driver's fallback design violated a dated no-fallbacks contract; the wiring
-target was the wrong one of two; a missing `CAPABILITIES` row would have failed
-the suite; and `free_after_use` does not evict models the way the driver claimed.
-**Then the probe overturned the plan the arc had agreed on**, which is the case
-for probing before coding rather than after.
+**This was NOT a completed four-round arc and must not be described as one.**
 
-**No production code was written, so nothing has to be unwound.** That is the
-best possible shape for a NO.
+| round | lanes | what it did |
+| :-- | :-- | :-- |
+| r1 | Codex, Antigravity, Cursor | arc / approach |
+| r2 | Codex, Antigravity | coding plan |
+| r3 | **not run** | the rejection probe cancelled the adapter, so there was no wiring to review |
+| r4 | Codex, Antigravity | reviewed this closure record |
 
-## Bounds on this verdict
+The cursor lane returned empty on its first r1 attempt and produced a review on
+the documented single retry. r2 deferred adapter-receipt transport to r3, which
+therefore remains unresolved -- it cannot affect a rejected path.
 
+**Errors caught before they became code:** the driver's fallback design violated
+the dated no-fallbacks contract; the wiring target was the wrong one of two; a
+missing `CAPABILITIES` row would have failed the suite; `free_after_use` does not
+evict models as the driver claimed; and r4 caught a stale VRAM range plus three
+overstatements in this very document. **No production code was written, so
+nothing has to be unwound.**
+
+## What this verdict does NOT establish
+
+* **The trigger was not isolated.** The Macbeth prompt varied line, backdrop and
+  grade together. One single-variable follow-up would settle it.
+* **"Baked into the weights" is not proven** -- only that no supported runtime
+  disable control was found in the tracked ComfyUI implementation.
+* **No production path was exercised.** The probe used standalone API graphs,
+  not `workflows/otr_canonical.json`, and published nothing to `otr/obs`.
 * One Shakespeare line, two seeds. Two blocks is not a refusal *rate*.
-* No A/A null, and **no matched comparison against `z_image_turbo`** -- this
-  says Ideogram misbehaves in two specific ways, not that z_image is better.
-* Word cards only. Nothing here addresses ordinary scene stills.
-* The announcer-only prose configuration is untested and is explicitly left open.
+* No A/A null, and **no matched comparison against `z_image_turbo`**.
+* Word cards only; nothing here addresses ordinary scene stills.
+* **SageAttention was NOT exercised.** The probe server logged *"Using pytorch
+  attention"*, so r2's SageAttention verify-at-build item is still open. Any
+  reopening must run the canonical profile's attention backend and record it.
+
+## The single reopening condition
+
+**Prose prompts on `announcer_visual` cards only**, and only with:
+1. a matched canonical `z_image_turbo` comparison,
+2. the refusal detector (`min > 50` AND `std < 15`) armed before any still is
+   accepted, and
+3. the active attention backend recorded.
+
+Anything less does not reopen this.

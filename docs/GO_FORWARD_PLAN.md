@@ -498,8 +498,27 @@ workbench HEAD; the handoff log stops at `ae441eb`). Two parts:
   eye-chart rows scrambled). Confirmed and accepted by the operator: klein snaps
   to multiples of 16, so 1920x1080 becomes 1920x1072; `z_image_turbo` renders
   exactly 1920x1080.
-* **IDEOGRAM 4 IS OPEN-WEIGHTS AND FITS, and it is the strongest remaining
-  candidate in the whole programme.** `ideogram-ai/ideogram-4-fp8` shipped
+* **IDEOGRAM 4 IS NOW CLOSED: NO. Downloaded on operator authorization, tested
+  live, rejected before any code** (2026-08-21; verdict
+  `docs/2026-08-21-ideogram4-verdict.md`, tracked receipt
+  `docs/2026-08-21-ideogram4-probe-receipt.json`). The tested Macbeth card
+  prompt repeatably produced a model-rendered "Image blocked by safety filter"
+  card at two seeds, with no supported runtime disable control found -- and the
+  refusal presents as a normal `SUCCESS` with a valid non-black PNG, so a
+  generic pixel handoff would not catch it. The JSON prompt shape never blocked
+  but invented text on 5 of 5 renders, including after OTR's own guard was
+  carried verbatim as a trailing instruction. Spelling was excellent (6 of 6
+  non-blocked frames correct). **This was a PRE-BUILD SCREEN, not a production
+  qualification** -- standalone API graphs, nothing published to `otr/obs`, and
+  the trigger was NOT isolated (line, backdrop and grade varied together).
+  Reopening condition, and only this: prose on `announcer_visual` only, with a
+  matched `z_image_turbo` comparison, the refusal detector (`min > 50` AND
+  `std < 15`) armed, and the attention backend recorded (the probe ran pytorch
+  attention, not SageAttention). Weights stay on disk; no adapter, no
+  `CAPABILITIES` row, `otr_canonical.json` untouched. **The original entry
+  below is kept because its FACTS are still true and it is why the lane ran:**
+
+* **IDEOGRAM 4 IS OPEN-WEIGHTS AND FITS** (the pre-test assessment). `ideogram-ai/ideogram-4-fp8` shipped
   2026-05-30 and `Comfy-Org/Ideogram-4` packages it for ComfyUI. The nvfp4 set
   is diffusion 5.49 GB + Qwen3-VL-8B encoder 6.31 GB + flux2-vae 0.34 GB =
   **12.14 GB**, which clears the operator's 16 GB rule with headroom, in the
