@@ -83,6 +83,105 @@ three pins**, and after any publish, verify the file by TIMESTAMP in the live
 tree rather than trusting an `obs_publish OK`. A third `obs` under
 `vram-recipe-lab/outputs/UVNN/obs` is lab scratch, not a publish target.
 
+## THE CURRENT STEP, 2026-08-22 -- READ THIS FIRST
+
+### DONE AND PUSHED THIS SESSION (HEAD e80c6786)
+
+**1. `ideogram4_local` SHIPPED -- the typography-first still engine, opt-in.**
+Adapter + guarded registration + 9-key CAPABILITIES row + 64 focused tests +
+`config/profiles/otr_ideogram4_local_still_word.json`. In the image dropdown for
+everyone, distinct from cloud `ideo`, no flag or gate. Sonnet QA verdict CLEAN
+(no must-fix); its three nits folded with tests.
+
+**2. THE GOLDEN RULE IS SATISFIED: every engine works in any of the 3 slots.**
+Operator: *"every video lane should work in any 3 slots"* and *"still_word never
+needs a portrait, only words"*. The blocker was NEVER the engine: `still_word`
+had ALWAYS declared `StillPlanRow(kind="portrait", required="never")` and
+nothing read it (`still_plan_helpers`: *"Nothing in this module reads the plan
+for production"*). Every still_word episode minted a portrait per cast member no
+consumer loads -- invisible on engines that draw faces, FATAL on the first that
+refuses. Fixed by `_portrait_free_roles_from_policy`, the fifth lane-derived
+role set beside `still_aspects` / `mesh_fodder_roles` / `talking_roles` /
+`still_word_roles`. **It reads each lane's OWN declaration, never an engine
+name, so a NEW LANE IS COVERED THE DAY IT DECLARES ITS PLAN.** Documented as
+`docs/VIDEO_LANE_PREFLIGHT.md` G3.7.
+
+**3. Live proof.** Episode *"The Weight of the Grain"*, all 3 image slots on
+`ideogram4_local`, all 3 video slots on `still_word`: **6 of 6 dialogue word
+cards rendered** plus the music opening -- 7 of 8 stills. Cards are genuinely
+good (elegant serif, correctly spelled, over real photographic scenes).
+
+**4. Captions 36 -> 42 px** (operator's chosen size). Size only; the rest of his
+1080p spec was already met (1920x1080, 44-char wrap, opaque box, centered).
+
+**5. `docs/IMAGE_GEN_PREFLIGHT.md`** + `tests/test_image_gen_preflight_matrix.py`
+(the image-model sibling of the video preflight), and the HOW-TO-ADD-YOUR-OWN
+guides EXTENDING_OTR promised, written into both engine namespace `__init__`s.
+
+**6. Bug Bible 305.** `12.126` broadened from "a foreign key is rendered" to the
+real rule: **on a zeroed-negative topology a prohibition IS positive
+conditioning** -- audit your own upstream prompt before blaming the model. OTR's
+own composer appends *"no logos"* to every word card; the card that came back
+reading `NO MISCOS` was that guard, painted on.
+
+### OPEN, IN PRIORITY ORDER
+
+**A. GHOST SIGNAL (AnimateDiff) -- CODE-AND-WIRE-READY, r4 COMPLETE, NOT BUILT.**
+The operator's ultra-low-VRAM video lane. A separate session took it through a
+full four-round Kibitz arc; **no code, dependency, workflow, render, test,
+measurement, commit or push has been performed.** This is the next build.
+* Plan: `docs/2026-08-22-GHOST-SIGNAL-CODING-PLAN.md`
+* Judgment: `kibitz-runs/2026-08-22-ghost-signal-code-ready-plan/r4/judgment.md`
+* Receipt: `kibitz-runs/2026-08-22-ghost-signal-code-ready-plan/r4/final.md`
+* **The receipt is BYTE-IDENTICAL to the plan -- verified,
+  sha256 `06104e911e599f7630563eaab5ae5cb5aa92c40e0331d3d0e253ba6c4150e81b`.**
+* Upstream: `ComfyUI-AnimateDiff-Evolved` (Kosinkadink) is the canonical repo;
+  the pinned graph uses the verified `ADE_AnimateDiffLoaderGen1` and
+  `ADE_StandardStaticContextOptions`.
+* The plan FREEZES: all eight nodes with every input/output/widget and all ten
+  links; staged executor aliases and low-VRAM release ordering; fresh
+  audio-length source animation per beat at 12.5 fps held twice to 25 fps;
+  ledger motion + the selected visual-style pack as prompt authorities;
+  character sigils where available and strong abstract treatments otherwise;
+  fixed 512x288 generation enlarged directly to 1920x1080 with clean Lanczos;
+  the complete profile, canonical-workflow wiring audit, implementation
+  sequence, tests and one publish smoke.
+* **G3.7 applies from day one:** Ghost Signal must declare its `still_plan`
+  (kind / cardinality / aspect / required / framing), and the portrait-free
+  role set will honour it automatically -- no edit to the image phase.
+
+**B. The Ideogram music-card refusal, and the asymmetry it exposed.** One card
+in eight refused (`still_music_closing_001`, min=78.0 std=10.6). It is
+SEED-dependent, not content: the music OPENING card rendered from the same
+composer, title and prompt shape. **A refusal currently fails the WHOLE
+EPISODE**, which is harsher than the operator's ruling intended -- he agreed to
+accept *blemishes* (*"I accept some errors ... don't want it burning extra GPU
+cycles"*), not dead renders. Decide: root-cause the prompt as every other
+refusal in this campaign was, or let a refusal degrade rather than abort.
+
+**C. `_still_word_fit_card` truncation.** A shipped card read *"...of a
+subterranean"* and stopped. Deterministic reduction working as designed, and
+unrelated to any engine -- but on a card whose whole job is the words, a
+sentence cut mid-clause deserves a second look.
+
+**D. The guides/dialect/recipe refactor (operator's architecture, staged).**
+*"the PROMPT is the LANGUAGE from the video lane; the DIALECT is the
+instructions for prompting the image lane -- double vs single quotes, neg prompt
+vs no neg prompt, temperature, seed, knobs."* Three layers, all existing repo
+vocabulary: **prompt** (lane) / **dialect** (engine phrasing) / **recipe**
+(engine parameters -- the repo already says `recipe`). Today the composer
+PRE-JOINS everything and each engine regexes it back apart; `ideogram4_local`
+already implements a dialect without it being called one. Its own item, its own
+arc -- do NOT bundle it with a small fix. `docs/2026-08-22-golden-rule-any-engine-any-slot/PLAN.md` section 8.
+
+**E. IG2.2 is a paper guarantee.** It asserts an engine *claims* every role, not
+that it *serves* one -- which is exactly how `ideogram4_local` shipped and then
+refused at render. Strengthen to the honest, GPU-free claim.
+
+**F. Regression sweep over shipped video profiles** (carried): only
+`otr_w45_wan_ti2v` is proven; `otr_g4_wan_ti2v` and `otr_upscale_ship` remain
+unexercised.
+
 ## THE CURRENT STEP, 2026-08-21 EVENING -- READ THIS FIRST
 
 **THE QUALITY PROGRAMME IS CLOSED. SEVEN LANES, ONE WIN, AND IT SHIPPED.**
