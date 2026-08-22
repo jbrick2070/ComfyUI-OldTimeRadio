@@ -1,9 +1,9 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "1.0.0"
-description = "AI-powered sci-fi radio drama generator for ComfyUI — Gemma 4 scripts from real science news, Bark TTS voices with emotional cues, 48kHz spatial audio mastering"
+version = "2.0.0-alpha.1"
+description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 requires-python = ">=3.10"
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
@@ -22,6 +22,10 @@ Homepage = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
 Repository = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
 Issues = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues"
 
+[tool.comfy]
+PublisherId = "fluxus"
+DisplayName = "ComfyUI-OldTimeRadio"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
@@ -37,4 +41,4 @@ bug_bible = "Bug Bible regression tests from survival guide"
 
 [build-system]
 requires = ["setuptools>=68.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,7 @@
+# Excluded from the Comfy registry install bundle (dev-only weight).
+# Syntax matches .gitignore; this layers ON TOP of git tracking --
+# untracked files are already excluded by the publisher.
+tests/
+kibitz-runs/
+.github/
+.claude/

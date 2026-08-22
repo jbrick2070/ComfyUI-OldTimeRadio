@@ -298,3 +298,13 @@ scripts/*.prefix_bak
 scripts/otr_qa_page.py
 tests/fixtures/*.bak.*
 workflows/*__ORIGINAL_*.json
+
+# --- 2026-08-22 registry-publish hygiene ---
+# Operator-local corpus and run exhaust: must never be staged, pushed, or
+# swept into a publish bundle. (Registry publishing only packages
+# git-tracked files; these rules also keep git status clean and guard
+# against accidental staging from another window.)
+/otr/
+/kibitz/
+/otr_soak_receipts/
+/scratch_check_server.py
