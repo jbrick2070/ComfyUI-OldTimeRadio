@@ -20,13 +20,21 @@ and `patch_creative` refuses them outright (the BUG-08.06 stranded-COMBO
 class). A profile's `role_overrides` is the only sanctioned lever, so widening
 the rotation means authoring profiles, not adding a `--set`.
 
-WHAT THE ROTATION DOES NOT YET COVER, stated so nobody infers coverage from
-the word "engines": every profile in `PROFILES` today is a CHEAP still/procgen
-lane. No heavy local video model (ltx25_video, ltx_video, ltx_8gb, wan_ti2v,
-humo*, minimax_h3_*) is in the rotation, and no profile carries an
+WHAT THE ROTATION COVERS (2026-08-22). `--lanes still` is the historical
+CHEAP still/procgen rotation and remains the DEFAULT, so every existing
+invocation is byte-identical. `--lanes video` rotates the eight per-engine
+video profiles in `VIDEO_PROFILES` -- ghost_signal, wan_ti2v, ltx_video,
+ltx_8gb, fastwan, humo, ltx_audio_in and ltx25 -- which is the gap this
+paragraph used to name. `--lanes all` runs both.
+
+STILL NOT COVERED, stated so nobody infers it: no profile here carries an
 `upscale_stage` section, so the two upscale engines (`off` and
-`spandrel_esrgan`) are not exercised here either. Those are additions waiting
-on their own profiles; the harness needs no change to accept them.
+`spandrel_esrgan`) are not exercised by this harness. That is an addition
+waiting on its own profile; the harness needs no change to accept one.
+
+`--hours N` gives the run a wall-clock budget for an overnight soak. The leg in
+flight always finishes -- a soak that kills its own last render manufactures a
+failure it then reports, which is the one result nobody can act on.
 
 SEQUENTIAL BY DESIGN. One GPU, one render at a time (CLAUDE.md scope rule:
 no async CUDA streams, no queue refactor). Each leg runs to a terminal state
@@ -55,6 +63,7 @@ import datetime
 import json
 import pathlib
 import random
+import time
 import subprocess
 import sys
 
@@ -127,6 +136,36 @@ PROFILES = [
     "otr_soak_word_razzle_ideo",
     "otr_soak_word_razzle_lumina_image",
 ]
+
+#: THE HEAVY VIDEO LANES -- the gap this harness's own docstring named ("no
+#: heavy local video model is in the rotation"). These are the per-engine
+#: profiles, one video engine each, so a leg's failure names a lane rather than
+#: a mixture.
+#:
+#: A 24-HOUR SOAK IS A DIFFERENT INSTRUMENT FROM A SMOKE, and this list is why
+#: it is worth running. A smoke asks "does this lane render once". A soak asks
+#: what only appears on the tenth consecutive episode: a stranded GPU lease, a
+#: patcher never detached, VRAM that creeps a little per leg, a cache key that
+#: collides on the second episode of the same bank. None of those are visible
+#: in a single green leg.
+VIDEO_PROFILES = [
+    "otr_ghost_signal",
+    "otr_g4_wan_ti2v",
+    "otr_g4_ltx_video",
+    "otr_g4_ltx_8gb",
+    "otr_g4_fastwan",
+    "otr_g4_humo",
+    "otr_g4_ltx_audio_in",
+    "otr_ltx25_high_video",
+]
+
+#: What ``--lanes`` selects. ``still`` is the historical default and keeps every
+#: existing invocation byte-identical.
+PROFILE_SETS = {
+    "still": PROFILES,
+    "video": VIDEO_PROFILES,
+    "all": PROFILES + VIDEO_PROFILES,
+}
 
 
 def ledgers_in_window(started: datetime.datetime,
@@ -302,11 +341,24 @@ def main(argv=None) -> int:
                     help="0 = run until stopped")
     ap.add_argument("--timeout", type=int, default=3600)
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--lanes", choices=sorted(PROFILE_SETS), default="still",
+                    help="which profile rotation (default: still, the "
+                         "historical behaviour)")
+    ap.add_argument("--hours", type=float, default=0.0,
+                    help="wall-clock budget; 0 = no budget. The leg in flight "
+                         "is always allowed to FINISH -- a soak that kills its "
+                         "own last render manufactures a failure it then "
+                         "reports, which is the one result nobody can act on.")
     args = ap.parse_args(argv)
 
+    profiles = PROFILE_SETS[args.lanes]
     rng = random.Random(args.seed)
+    deadline = (time.time() + args.hours * 3600.0) if args.hours else None
     print(f"[soak] rotating {len(BANKS)} banks x {len(STYLES)} styles x "
-          f"{len(PROFILES)} engine profiles, 1 act per leg", flush=True)
+          f"{len(profiles)} {args.lanes} profiles, 1 act per leg", flush=True)
+    if deadline:
+        print("[soak] wall-clock budget %.1f h; the leg in flight always "
+              "finishes" % args.hours, flush=True)
 
     results, index = [], 0
     out_dir = REPO / "otr_soak_receipts"
@@ -315,9 +367,13 @@ def main(argv=None) -> int:
         "soak_%s.json" % datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
     try:
         while args.legs == 0 or index < args.legs:
+            if deadline is not None and time.time() >= deadline:
+                print("[soak] wall-clock budget reached after %d leg(s)"
+                      % index, flush=True)
+                break
             index += 1
             row = leg(index, rng.choice(BANKS), rng.choice(STYLES),
-                      rng.choice(PROFILES), args.timeout)
+                      rng.choice(profiles), args.timeout)
             results.append(row)
             receipt.write_text(json.dumps(results, indent=1), encoding="utf-8")
     except KeyboardInterrupt:
