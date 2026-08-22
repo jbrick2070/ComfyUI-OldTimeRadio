@@ -85,45 +85,6 @@ tree rather than trusting an `obs_publish OK`. A third `obs` under
 
 ## THE CURRENT STEP, 2026-08-22 -- READ THIS FIRST
 
-### DONE AND PUSHED THIS SESSION (HEAD e80c6786)
-
-**1. `ideogram4_local` SHIPPED -- the typography-first still engine, opt-in.**
-Adapter + guarded registration + 9-key CAPABILITIES row + 64 focused tests +
-`config/profiles/otr_ideogram4_local_still_word.json`. In the image dropdown for
-everyone, distinct from cloud `ideo`, no flag or gate. Sonnet QA verdict CLEAN
-(no must-fix); its three nits folded with tests.
-
-**2. THE GOLDEN RULE IS SATISFIED: every engine works in any of the 3 slots.**
-Operator: *"every video lane should work in any 3 slots"* and *"still_word never
-needs a portrait, only words"*. The blocker was NEVER the engine: `still_word`
-had ALWAYS declared `StillPlanRow(kind="portrait", required="never")` and
-nothing read it (`still_plan_helpers`: *"Nothing in this module reads the plan
-for production"*). Every still_word episode minted a portrait per cast member no
-consumer loads -- invisible on engines that draw faces, FATAL on the first that
-refuses. Fixed by `_portrait_free_roles_from_policy`, the fifth lane-derived
-role set beside `still_aspects` / `mesh_fodder_roles` / `talking_roles` /
-`still_word_roles`. **It reads each lane's OWN declaration, never an engine
-name, so a NEW LANE IS COVERED THE DAY IT DECLARES ITS PLAN.** Documented as
-`docs/VIDEO_LANE_PREFLIGHT.md` G3.7.
-
-**3. Live proof.** Episode *"The Weight of the Grain"*, all 3 image slots on
-`ideogram4_local`, all 3 video slots on `still_word`: **6 of 6 dialogue word
-cards rendered** plus the music opening -- 7 of 8 stills. Cards are genuinely
-good (elegant serif, correctly spelled, over real photographic scenes).
-
-**4. Captions 36 -> 42 px** (operator's chosen size). Size only; the rest of his
-1080p spec was already met (1920x1080, 44-char wrap, opaque box, centered).
-
-**5. `docs/IMAGE_GEN_PREFLIGHT.md`** + `tests/test_image_gen_preflight_matrix.py`
-(the image-model sibling of the video preflight), and the HOW-TO-ADD-YOUR-OWN
-guides EXTENDING_OTR promised, written into both engine namespace `__init__`s.
-
-**6. Bug Bible 305.** `12.126` broadened from "a foreign key is rendered" to the
-real rule: **on a zeroed-negative topology a prohibition IS positive
-conditioning** -- audit your own upstream prompt before blaming the model. OTR's
-own composer appends *"no logos"* to every word card; the card that came back
-reading `NO MISCOS` was that guard, painted on.
-
 ### ALSO DONE AND PUSHED 2026-08-22 -- THE VIDEO-LANE SESSION (Opus coder window)
 
 Everything below is committed, pushed, and lockstep-verified. Suite 12,084

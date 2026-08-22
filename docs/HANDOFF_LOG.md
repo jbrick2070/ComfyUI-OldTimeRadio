@@ -1,3 +1,100 @@
+## 2026-08-22 -- HEAD 36187675 +handoff (v2.0-alpha) -- CODER (Ghost video lane: domain adapter shipped and operator-preferred, cadence seam built, four confounded comparisons traced to one missing seed)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit. A commit cannot contain its own hash, so the heading records the last
+CODE head -- paste the sha from the kickoff line, not this one.
+
+Did:
+- **Shipped `animatediff15_v3_haunted_video`** (87bb547d) -- the clean v3 lane
+  plus AnimateDiff v3's optional domain adapter on the MODEL path via stock
+  `LoraLoaderModelOnly`. Two design questions settled by READING THE ARTIFACT
+  rather than its docs: 256 tensors, all UNet attention, ZERO text-encoder
+  (hence model-only, CLIP untouched); keys are the legacy diffusers
+  attn-processor spelling ComfyUI maps natively (no conversion, no custom
+  loader). `LoraLoaderModelOnly`'s INPUT_TYPES were checked against the real
+  `nodes.py` before a single leg ran. **Operator AND Gemini independently
+  preferred its output.** Apache-2.0 end to end -- the first publishable Ghost
+  configuration; the licence blocker is gone.
+- **Adversarial review of that diff** -- 5 lenses, 14 findings, 2 skeptics each.
+  The two skeptics DISAGREED on the blocker, which is why it got my own eyes:
+  ComfyUI's `load_lora` returns the model UNPATCHED at strength 0 and
+  `LoraLoaderModelOnly` hardcodes `strength_clip=0`, so a strength-0 haunted
+  beat is bit-for-bit the clean lane -- and NOTHING recorded which strength ran
+  (`_artifacts` was written in `prepare()` and read by nothing in the tree).
+  Fixed at the root: adapter + applied strength now ride the clip receipt and
+  the log. Also fixed the third patcher never being popped from `owners`, and
+  TWO of my own tests that read as covered and were not (0d4191b2).
+- **Cadence seam + `animatediff15_h3_video` / `h5_video`** (92317a7d). Three
+  module functions were hard-wired to hold-2, so a peer declaring hold-5 would
+  have rendered hold-2 under its own receipt -- **G1.3 for the third time in one
+  day**. Golden's cadence pinned across 16 frame counts against an
+  INDEPENDENTLY RECOMPUTED reference.
+- **`OTR_WRITER_SEED`** (930080d5) -- `do_sample=True` with no seed meant every
+  leg wrote a different episode. Four attempted comparisons collapsed on this
+  and the operator called it: *"its a different story so not a good
+  comparison"*. Opt-in, off in production, keyed on the PROMPT not a call
+  counter.
+- **Cast-seed guard** (0d4191b2) -- operator asked whether GULLIVER REEVES in
+  every episode was random. It was not: four legs ran with a leaked
+  `OTR_CAST_SEED=42`, BUG-LOCAL-269 through a different door. Root guard warns
+  when the seed is set and `OTR_C7` is not; launcher now states its seed mode in
+  BOTH branches; a test sweeps all 37 launcher scripts.
+- **Preflight model gate** (92317a7d) -- a leg spent 428s before reporting the
+  adapter missing (on disk, but under a root the headless model-paths config
+  does not name; `folder_paths` also caches at boot). The runner now asks the
+  RUNNING SERVER via `/object_info` before submitting. Same failure now costs 5s
+  -- verified live on the retry.
+- **Live proof:** eight episodes published to `otr/obs/`, including the complete
+  cadence ladder on ONE module and ONE style (13 -> 8 -> 5 motion windows per
+  beat): `magnifying_the_past` (hold-2, 1676s), `reel_478_extraterrestrial`
+  (hold-3), `feline_fallen_from_the_stars` (hold-5, 825s). Adapter proven
+  applied on a real render: `domain adapter v3_sd15_adapter.ckpt at strength
+  1.0000`, 8 beats, zero strength-0 warnings.
+- **Measured, so nobody re-litigates it:** the adapter does NOT wash out colour
+  -- five ffmpeg SATAVG measurements across two styles, never once below its
+  clean counterpart (archival 2.50 vs 2.07; anime 6.19 and 12.88 vs 5.13).
+- **Three problem statements** (9e75d8b6, d75b5e8f, 74384097): cadence, phase 3,
+  and the Ghost prompt. The phase-3 one was REBUILT around the operator's own
+  idea -- drive contamination from the per-line VOICE AROUSAL
+  `_otr_delivery_vector` already computes -- which needs no LLM and no new
+  ledger field. The prompt one is the source the Ghost Prompt V2 plan cites.
+- **Bible 306 -> 309** (bible repo bd88035): 12.128 a per-artifact constant a
+  sibling silently inherits; 12.129 a weight on disk is not a weight the server
+  can see; 12.130 waiting on process absence reads the gap between jobs as done.
+  README count and `otr_coverage_index.yaml` moved in the same change.
+
+Current step: queue head is **GHOST PROMPT V2**, already batonned in
+GO_FORWARD to a new window with its own plan doc. Video-lane work is closed
+except operator eyeballs: the cadence ladder is in `otr/obs/` awaiting a verdict
+on whether stop-action is the house style. Lean/Mean cleanup
+(`docs/LEAN_MEAN_CLEANUP.md`) is queued AFTER the prompt work by operator
+direction; note its grounding baseline is `ed3ae2c7` and it requires re-checking
+every target against current HEAD.
+
+Next: the new window takes Ghost Prompt V2 per GO_FORWARD's OPEN section. Do NOT
+rebuild the haunted lane, the cadence peers, the writer seed or the guards --
+they are shipped and green. Two things left on the table by choice: the Ghost
+prompt emits a 21-char style cue where the pack authors 262 (marked WONTFIX for
+the prompt sprint, still available after), and the single v2 anime episode
+measured SATAVG 51.97 against 5-13 for every v3 episode -- possible real module
+trait, still n=1, now cheap to settle with a seeded A/B.
+
+Models: Opus coder window throughout. One adversarial review workflow (33
+agents, ~4.3M subagent tokens) on the finished haunted-lane diff -- that is a
+SCOPED finished-diff review, NOT a four-round arc, and no kibitz campaign ran
+this session. The operator later asked that no further agents be spawned
+(credits), and none were. Sonnet/Fable were not used.
+
+Suite: 12,084 passed / 133 skipped / 1 xfailed, 0 failed, 0 known-fail-guard
+regressions, at the last full run (after the writer seed). Bible 309.
+
+Box: CLEAN at handoff -- 0 render legs, 0 queue scripts, 0 ComfyUI servers,
+VRAM 1858 MiB (desktop baseline), port 8000 free.
+
+Commits: ed3ae2c7, 87bb547d, 9e75d8b6, 0d4191b2, 92317a7d, 930080d5, d75b5e8f,
+74384097, 36187675 (this repo); bd88035 (bible repo). The handoff commit lands
+ON TOP of these -- see the kickoff line for the real head.
+
 ## 2026-08-22 -- HEAD d0b3a65b +receipt (v2.0-alpha) -- CODER (Ghost Signal is BUILT, PROVEN and SHIPPING; the first prompt-owned lane)
 
 Did: BUILT `animatediff15_video` ("AnimateDiff -- Ghost Signal") end to end from
@@ -76,7 +173,6 @@ OWED, stated honestly rather than implied covered: the independent finished-diff
 
 Next: queue head is now **B** (the Ideogram music-card refusal and the
   whole-episode-fails asymmetry it exposed).
-
 ## 2026-08-22 -- HEAD cc9b4767 +handoff (v2.0-alpha) -- CODER (ideogram4_local shipped; the golden rule satisfied by reading a declaration that had never been read)
 
 Did: SHIPPED `ideogram4_local`, the typography-first still engine -- adapter,
