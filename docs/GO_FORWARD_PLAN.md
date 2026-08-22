@@ -124,6 +124,83 @@ conditioning** -- audit your own upstream prompt before blaming the model. OTR's
 own composer appends *"no logos"* to every word card; the card that came back
 reading `NO MISCOS` was that guard, painted on.
 
+### ALSO DONE AND PUSHED 2026-08-22 -- THE VIDEO-LANE SESSION (Opus coder window)
+
+Everything below is committed, pushed, and lockstep-verified. Suite 12,084
+passed / 0 failed at the last full run. **A new window does not need to rebuild
+any of it -- read this to know what already exists.**
+
+**1. `animatediff15_v3_haunted_video` -- v3 + the removable domain adapter.**
+The clean v3 lane plus AnimateDiff v3's optional `v3_sd15_adapter.ckpt` (97 MB)
+on the MODEL path via stock `LoraLoaderModelOnly`. Two design questions were
+settled by READING THE ARTIFACT, not its documentation: it carries 256 tensors,
+all UNet attention, ZERO text-encoder -- hence model-only and CLIP untouched --
+and its keys are the legacy diffusers attn-processor spelling that ComfyUI maps
+natively, so no conversion and no custom loader. **The operator and Gemini
+independently preferred its output.** Apache-2.0 end to end: this is the first
+Ghost configuration that could be published.
+
+**2. Two CADENCE peers, `animatediff15_h3_video` / `animatediff15_h5_video`.**
+The hold factor is now a class attribute every call site reads through `self`.
+It was three module functions hard-wired to hold-2, so a peer declaring hold-5
+would have rendered hold-2 under its own receipt -- **G1.3 for the third time in
+one day.** Golden's cadence is pinned across 16 frame counts against an
+INDEPENDENTLY RECOMPUTED reference, not by calling the new code with hold=2.
+
+**3. `OTR_WRITER_SEED` -- the reason four comparisons failed today.**
+`gen_kwargs` carried `do_sample=True` with no seed, so every leg wrote a
+different episode and every impression formed while comparing two legs turned
+out to be about the SCRIPT. Opt-in, off in production, keyed on the PROMPT not a
+call counter (a counter makes seeds order-dependent, so one conditional pass
+shifts everything after it and the reproduction drifts silently).
+
+**4. The cast-seed guard.** The operator asked whether GULLIVER REEVES in every
+episode was random. It was not: four bake-off legs ran with a leaked
+`OTR_CAST_SEED=42` -- BUG-LOCAL-269 through a different door. The resolver now
+warns LOUD when the seed is set and `OTR_C7` is not, naming the cast it will
+produce, and a test sweeps all 37 launcher scripts. **The launcher now states
+its seed mode in BOTH branches; silence in the production branch is what let
+this ride an entire bake-off.**
+
+**5. A preflight model gate on the canonical runner.** A haunted leg ran the
+script pass, the whole voice pass and part of the video pass before
+`assert_usable` reported the adapter missing -- the weight was on disk but under
+a root the headless model-paths config does not name. The runner now asks the
+running server what it can SEE via `/object_info` before submitting. Same
+failure now costs 5 seconds instead of 428.
+
+**6. Preflight G1.3** -- a per-artifact constant (byte floor, filename, recipe
+receipt) must be a CLASS attribute a sibling can override. Both directions are
+pinned: below its own artifact, and within ~15% of it.
+
+**7. Model-refusal degrade** -- a refusing image model no longer kills the
+episode; the beat records skip evidence and the completeness gate tolerates it.
+
+**LIVE ARTIFACTS -- eight episodes in `otr/obs/` from this session**, including
+the complete cadence ladder on ONE module and ONE style (13 -> 8 -> 5 motion
+windows per beat): `magnifying_the_past` (hold-2), `reel_478_extraterrestrial`
+(hold-3), `feline_fallen_from_the_stars` (hold-5). Hold-5 rendered in 825s
+against hold-2's 1676s.
+
+**MEASURED, so nobody re-litigates it:** the domain adapter does NOT wash out
+colour. Five measurements across two styles, never once below its clean
+counterpart (archival 2.50 vs 2.07; anime 6.19 and 12.88 vs 5.13). Separately,
+the single v2 anime episode measured SATAVG 51.97 against 5-13 for every v3
+episode -- a possible real module trait, still n=1, worth one seeded A/B.
+
+**THREE PROBLEM STATEMENTS written for later pickup:**
+* `docs/2026-08-22-GHOST-CADENCE-PROBLEM-STATEMENT.md` -- long beats fuse
+  THIRTEEN sliding motion windows; motion energy per beat is an uncontrolled
+  function of how long the writer's sentence happened to be.
+* `docs/2026-08-22-PHASE3-TRANSMISSION-STATE-PROBLEM-STATEMENT.md` -- rebuilt
+  around the operator's own idea (drive contamination from the per-line VOICE
+  AROUSAL the repo already computes) rather than `arc_phase`. No LLM, no new
+  ledger field; still needs one declared `VideoRequest` field.
+* `docs/2026-08-22-GHOST-PROMPT-PROBLEM-STATEMENT.md` -- the source the Ghost
+  Prompt V2 plan cites. Its finding 1 (Ghost emits a 21-char cue where the style
+  pack authors 262 chars, and the STILL lane uses the rich tails) is marked
+  WONTFIX for the prompt sprint and remains available afterwards.
+
 ### OPEN, IN PRIORITY ORDER
 
 **QUEUE HEAD: GHOST PROMPT V2 -- READY FOR OPUS CODING (2026-08-22).**
