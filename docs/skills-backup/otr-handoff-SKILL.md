@@ -1,0 +1,227 @@
+---
+name: otr-handoff
+description: Bidirectional OTR build baton for ComfyUI-OldTimeRadio -- RESUME at the start of a fresh window, HAND OFF at wrap-up, with anti-drift guardrails. Use for /otr-handoff, $otr-handoff, "resume/continue the OTR build", "pick up where we left off", "what's the current step", "hand off the build", "save the build context", "session handoff", "wrap up for a new chat", GO_FORWARD_PLAN, or HANDOFF_LOG. v2.1 (2026-08-22) -- adds the GO_FORWARD_ARCHIVE split (archive, never delete; the archive is not read to resume). v2 (2026-08-07) replaced the stale 2026-06 skill.
+---
+
+# OTR Handoff v2 -- the build baton
+
+Two modes. Detect which one from the request: a fresh window resuming = RESUME;
+a session wrapping up = HAND OFF. The baton is
+`docs/GO_FORWARD_PLAN.md` (forward-only: queue + open bugs + budget ladder) plus
+`docs/HANDOFF_LOG.md` (append-only history, newest at top). Nothing else is a
+source of truth; `ROADMAP.md` is later-runway only.
+
+Hard context that outranks this skill: `CLAUDE.md` at the ComfyUI root and in the
+repo. If this skill and CLAUDE.md ever disagree, CLAUDE.md wins -- then fix this
+skill in the same session.
+
+## RESUME (fresh window)
+
+Read, in order, before writing anything:
+
+1. `docs/GO_FORWARD_PLAN.md` -- the operator-ordered QUEUE at the top, the
+   MODEL & CREDIT BUDGET ladder, and "Window packing".
+   **`docs/GO_FORWARD_ARCHIVE.md` IS NOT LIVE AND YOU DO NOT READ IT TO RESUME**
+   (split 2026-08-22, when GO_FORWARD went 4,704 -> 2,923 lines). It holds four
+   closed/superseded blocks -- the two stale CURRENT STEP blocks, RECENT
+   DECISIONS, and the closed 08-15 sprint. Every standing ruling that lived
+   inside them was lifted back into GO_FORWARD under "STANDING RULINGS LIFTED
+   OUT OF THE ARCHIVED SECTIONS", so the live file is still complete on rulings.
+   Open the archive only to answer "why was this decided", never to find work.
+2. The top 2-3 entries of `docs/HANDOFF_LOG.md`.
+3. Git reality via Desktop Commander: branch (must be `v2.0-alpha`), local HEAD
+   vs `origin/v2.0-alpha`, dirty/untracked files. If HEAD != origin or there are
+   uncommitted changes from a prior window, REPORT that first -- do not silently
+   build on top of an unpushed or dirty state.
+
+Then state, in the FIRST reply:
+
+- **Which window this session is** (CODER / RENDER / PLANNER per the Window
+  packing table). Never boot by letter alone -- boot by the queue: take the
+  topmost item not blocked on the operator.
+- **The current step** -- the exact queue item, its plan doc if one exists, and
+  what "done" looks like for it (suite baseline, proof leg, or doc).
+- **The MODEL & CREDIT BUDGET rung** and why (mandatory per GO_FORWARD).
+- **Blockers** -- items marked blocked-on-operator are SKIPPED, not guessed at.
+
+Then wait for go unless the kickoff line already said to execute.
+
+Anti-drift on resume:
+
+- **Grep before re-planning a carried-forward task.** A stale note is not a work
+  item -- check the constant/code/doc it references before scheduling anything
+  (the credits-scroll task was already shipped when a note re-surfaced it).
+- **Remote/cloud Cowork session?** Read the "If the window is a REMOTE / cloud
+  Cowork session" section of GO_FORWARD first -- file tools hit the container,
+  and `/mnt/user-data/uploads/` is a lagging snapshot that reports phantom
+  corruption. Route everything through Desktop Commander on the Windows paths.
+- **Review routing is whatever GO_FORWARD says TODAY -- read it, do not assume.**
+  This skill has twice gone stale by naming a specific directive here, so it no
+  longer names one. The routing has swung more than once: the 2026-08-04 full
+  `kibitz-plugin:kibitz` gate (r1-r4) was SUSPENDED by the 2026-08-11 directive
+  (quandary -> Codex CLI, post-coding QA on the finished diff -> Sonnet 5), and
+  then RESTORED by the 2026-08-15 REVIEW ROUTING block at the top of GO_FORWARD
+  for the bug-fix sprint. **Read the REVIEW ROUTING block and state the routing
+  you read, with its date, in the opening statement.** Never repeat a routing
+  from this skill or from memory.
+  Two things survive every swing: a partial campaign is reported as a scoped
+  tail with a scope receipt and is NEVER worded as a full arc; and when a design
+  has already been panelled, the remaining chunks take the diff-level gate
+  rather than a fresh arc.
+- What 08-11 did NOT drop, and no routing change ever does: **Bug Bible
+  regression every turn**, the BOM check on every touched file, the full suite,
+  `build_variants.py --check`, AST parse on touched `.py`, and HEAD == origin
+  after the push. The two-strikes floor also still stands underneath: a bug that
+  survives two fixes gets a consult before the third swing.
+
+## HAND OFF (wrap-up)
+
+Pre-flight -- all three, before touching any doc:
+
+1. **No handoff while background tasks are still running** (operator rule
+   2026-08-06). Finish or explicitly kill/report them first.
+2. State the final suite numbers (e.g. `9092/111/1`) and Bug Bible count as
+   actually run this session -- or say plainly they were not run and why.
+3. State box state: resident server or clean? VRAM back to baseline? The next
+   window inherits the box, so the log entry must say what is running.
+
+Then, in order:
+
+### 1. Refresh GO_FORWARD_PLAN.md (forward-only)
+
+- Remove or tombstone anything this session finished. If it is DONE, it does not
+  belong there -- completed work lives only in the log entry.
+- Update the queue: re-number if items closed, mark newly blocked items with WHO
+  they are blocked on, fold newly surfaced work in where the operator's order
+  puts it (or flag it for the operator if the order is unclear).
+- Carry suite/Bible baselines forward so the next window can detect drift.
+- Coder windows update queue STATE only; plan authorship stays with the planner
+  window per Window packing.
+- **KEEP IT LEAN BY ARCHIVING, NEVER BY DELETING.** When a section is closed or
+  superseded, MOVE IT WHOLE to `docs/GO_FORWARD_ARCHIVE.md` and lift any standing
+  ruling inside it back into the live file verbatim. The 2026-08-16 audit's
+  warning stands and is why this is a rule: roughly a third of these sections are
+  operator rulings phrased as "do not re-open", and losing one costs far more
+  than the length does. Grep the block for `operator directive|operator ruling|
+  do not re-?open|do not re-?propose|WILL-NOT-FIX` BEFORE moving it, and preserve
+  every hit.
+
+### 2. Bible delta-scrape check (added 2026-08-07)
+
+Before appending the log entry, run the Bible check:
+
+- The Bible repo (`C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`)
+  carries `otr_coverage_index.yaml`: all 369 OTR bug records through 2026-08-07
+  are already mapped to Bible ids (261-entry Bible). NEVER re-scrape indexed
+  history -- the full scrape was paid once (~4M tokens); only the delta past the
+  index date ever gets scraped.
+- If this session recorded a NEW bug (a PROD_BUG_LOG/BUG_LOG entry or a
+  confirmed live failure per the admission rule -- review observations and
+  invented fixtures do NOT qualify): check it against the index + BUG_BIBLE.yaml.
+  Genuinely uncovered -> promote it as a Bible entry AND append its index row in
+  the same change (the README entry count moves with it -- Three-File Contract).
+- Never pin or vendor a stale copy of the Bible or its tests; sync to the Bible
+  repo's origin/main before running `tests\bug_bible_regression.py` (cd to the
+  Bible repo root, relative path -- an absolute forward-slash path fails to
+  collect).
+
+### 3. Append the HANDOFF_LOG entry (newest at top)
+
+**THE SHA IN THE HEADING IS ALWAYS ONE COMMIT STALE, AND THAT IS PHYSICS, NOT A
+MISTAKE (operator, 2026-08-16).** A commit cannot contain its own hash. The
+heading sha is written, then committing the entry produces a NEW head -- so the
+number in the log can never be the head that exists after the handoff lands.
+Chasing it is an infinite regress: amend to fix the sha and the amend changes
+the sha again.
+
+So SAY SO rather than pretending, and say it as a POSITION rather than a
+number (operator's phrasing, and it is the better one): the heading records
+**the last CODE head**, which -- when the handoff is a single commit -- is the
+**second-to-last sha** on the branch once the entry lands. A position stays
+true; an absolute sha written into the thing being committed cannot.
+
+State it in the entry in those words: *"the sha above is the second-to-last on
+the branch; the last is this handoff commit."* If the handoff needed more than
+one commit, say how many instead of "second-to-last" -- the count is the honest
+part, and a reader can walk back that many.
+
+**The authoritative post-handoff sha is still the one in the KICKOFF LINE,
+generated in step 5 AFTER the push** -- that is the only sha a fresh window
+should paste. But a reader of the log alone can now locate the head without it.
+
+Format -- match the existing entries exactly:
+
+```
+## YYYY-MM-DD -- HEAD <last-code-sha> +handoff (v2.0-alpha) -- <WINDOW KIND> (<one-line what happened>)
+
+Did: <what the session actually did, with receipts -- commit shas, suite
+  numbers, artifact paths, the one log line that proves a live leg>.
+Current step: <where the queue stands now>.
+Next: <the next window's first concrete action, including what it is blocked on>.
+Models: <which rungs were actually used; whether the kibitz gate applied and
+  what the panel really was -- a partial campaign is reported as a scoped tail
+  with a scope receipt, NEVER worded as a full arc>.
+Commits: <shas pushed, or "docs-only">. The handoff commit itself lands ON TOP
+  of these and is not listed here -- see the kickoff line for the real head.
+```
+
+- The `+handoff` marker is the whole point: it tells the reader the number is
+  the code head and one docs commit follows it. A bare sha invites a window to
+  check out a head that is missing its own handoff.
+- No long logs -- the important line, exit code, hash, or path only.
+- ASCII punctuation throughout (`--`, plain quotes). UTF-8, no BOM.
+
+### 4. Commit AND push the docs -- by pathspec
+
+- `git add` the exact files (`docs/GO_FORWARD_PLAN.md docs/HANDOFF_LOG.md` plus
+  anything else this step touched). NEVER `git add .` or `git add -A` -- other
+  windows may have staged or dirty state in the shared index, and a blanket add
+  once swept three staged deletions to origin.
+- Commit with an ASCII-safe message, push `origin v2.0-alpha` (pushing to
+  v2.0-alpha is always required -- local-only commits are the failure mode).
+- Verify: HEAD == origin, no 0-byte files, no BOM on touched files, AST parse on
+  any touched `.py`.
+- If a stale `.git\index.lock` blocks the commit and `Get-Process git` is empty,
+  remove the lock and retry once.
+
+### 5. Print the next kickoff -- AFTER the push, with the REAL head
+
+**Re-read the sha here. Do not reuse the one from the log heading.** Run
+`git rev-parse HEAD` AFTER the handoff push has landed and HEAD == origin is
+verified, and put THAT sha in the kickoff. It is the only sha in the whole
+handoff that is not stale, because it is the only one read after the last write.
+
+Order matters and it is the whole trick: write the entry -> commit -> push ->
+verify -> THEN read the head -> then print the kickoff.
+
+**THE KICKOFF IS THE LAST THING YOU DO. IF YOU COMMIT AGAIN AFTER PRINTING IT,
+YOU HAVE INVALIDATED IT AND MUST REPRINT** (2026-08-16, learned by doing it:
+the kickoff was printed, then two more docs commits landed while polishing this
+very section, and the next window booted, found HEAD four commits ahead of the
+sha it was handed, and had to correct it in its own first reply).
+
+One commit of staleness is physics -- a commit cannot contain its own hash.
+More than one is just printing the baton before you finished writing it. So:
+if anything at all gets committed after the kickoff goes out, re-read HEAD and
+say plainly "corrected AFTER sha: `<new>`". Better still, do not print it until
+you are certain nothing else is going to be written.
+
+End with the one-line kickoff the next window pastes, in the GO_FORWARD "NEVER
+boot a window by letter" shape: resume + window kind + the real HEAD sha +
+"read GO_FORWARD 'HOW TO READ THIS FILE' and THE QUEUE, execute in stated
+order" + the review-routing gate + "state your MODEL & CREDIT BUDGET rung
+first".
+
+Say the sha out loud to the operator as the AFTER sha, so it is unambiguous
+which of the several shas in the session is the one to boot from.
+
+## Standing guardrails (both modes)
+
+- The handoff is a baton, not a history dump -- compact enough that the next
+  window acts immediately without asking anything.
+- Workflow source of truth is `workflows/otr_canonical.json` (the old
+  `otr_scifi_16gb_full.json` name is dead). Any session that touched it lists
+  the widget/link/schema validation actually run.
+- Preserve user/unrelated changes; never imply a future window should revert
+  them unless Jeffrey explicitly asked.
+- One coder window in the code at a time, serialized through GO_FORWARD.
