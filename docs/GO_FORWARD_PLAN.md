@@ -230,7 +230,9 @@ ultra-smoke is no longer future work; the mixed episode above covered it.
   tested (not among the six eliminated, all of which were grid-scored while the
   grid rode in on the stills); (3) ltx_video LoRA strength 0.5 vs 0.7.**
   Download-gated, operator authorization list only: the official 1.1 dynamic
-  rank-111 LoRA (not on disk), alongside the frozen wan high-noise expert.
+  rank-111 LoRA -- **NO LONGER GATED: downloaded on operator authorization
+  2026-08-21 (2.74 GB, byte-verified), tested in lane 5, closed NO WIN** --
+  alongside the still-frozen wan high-noise expert.
 * **baseline-models IS THE CLEAN HOME** (operator: it *"becomes our new
   diffomatic with the principle Codex taught us"*). The grounded differ and its
   receipts move there; the corpus's remaining fix is byte-true refetch with
@@ -290,12 +292,15 @@ server, per scope discipline); reviewer multiplication on integration (the
 more only on a blocker or disagreement). Ultracode changes HOW MANY EYES look
 at pixels and at a claimed win; it changes nothing else about the method.
 
-**Lane order:** (1) `wan_ti2v` sampling recipe -- contrast set exactly
+**Lane order (ALL THREE CLOSED NO WIN -- kept only so the contrast sets stay
+quotable; do not re-run them):** (1) `wan_ti2v` sampling recipe -- contrast set exactly
 {KSampler.sampler_name uni_pc-vs-euler, KSampler.steps 20-vs-30,
 ModelSamplingSD3.shift 8-vs-5}, bundled as a SCREEN, decompose only on a win;
 (2) `ltx25` stage-1 anchor 0.7-vs-1.0; (3) `ltx_video` LoRA strength
 0.5-vs-0.7. Download-gated (operator authorization only): official 1.1
-dynamic rank-111 LoRA; wan high-noise expert (already frozen).
+dynamic rank-111 LoRA **(DONE -- fetched and closed NO WIN in lane 5)**; wan
+high-noise expert (still frozen, and ruled out by the operator's 16 GB rule:
+14 GB of weights handing off to another 14 GB expert will not fit).
 
 **LANE 1 IS CLOSED: NO WIN. The shipped `wan_ti2v` recipe stands and nothing
 was queued as an OTR item** (2026-08-21 midday, `basline-models` `23c77a5`,
@@ -495,7 +500,7 @@ KNOBS. The single biggest 16 GB COMPROMISE -- the Q5_K_M UNET -- was never
 challenged, because the official full-precision counterpart is not on disk.
 Five nulls must NOT be read as "the compromises are validated."
 
-**Bible now 300 entries (`3ac4d9b`), 22/26/3.** `12.121` promoted this
+**Bible now 302 entries (`8b194d3`), 22/26/3.** `12.123` promoted 2026-08-21 evening: a harness that hardcodes one graph builder measures the path production does not use (lane 3 screened text-only for twelve live legs while `OTR_ENABLE_LTX_I2V` defaults on). `12.122` and `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the
 grid rode in on the stills; the drift probe obeyed its prompt). Another window
 independently promoted `12.120` overnight; both stand.

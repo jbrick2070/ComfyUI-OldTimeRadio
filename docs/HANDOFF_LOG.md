@@ -63,6 +63,18 @@ was adjudicated against codex on measured evidence. Lane 5 ran no panel because
 its admission gate rejected every cell. **Reported honestly: lane 4's kibitz was
 r2 only, a scoped round, NOT a four-round arc.**
 
+**Bible delta-scrape: DONE, and it promoted one.** Checked this session's
+candidates against `otr_coverage_index.yaml` and the 301-entry Bible. Most
+failed the admission rule and are correctly NOT promoted -- the ManualSigmas
+vestige, the temporal `KeyError` and the lane-1-hardcoded `make_clips` were
+all caught by review before they fired, so they are review observations, not
+live failures. **`12.123` WAS promoted** (`8b194d3`, Bible now 302, README
+count moved with it per the Three-File Contract, regression 22/26/3 green):
+a harness that hardcodes one graph builder measures the path production does
+not use -- lane 3 rendered TWELVE live legs on the text-only path while
+`OTR_ENABLE_LTX_I2V` defaults to `"1"`. That clears the bar because it cost
+real renders and had to be re-bounded after the fact.
+
 **Commits (workbench `basline-models`).** `54fe68e` lane 3 corrections,
 `e545404` lane 4 staged+reviewed, `10e8252` encoder-delta and drift
 instruments, `2388fb5` testcard re-render + operator reel, `8083310` operator
