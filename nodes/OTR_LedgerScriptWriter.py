@@ -1058,6 +1058,11 @@ def _build_truncating_generate_fn(
         if _hb is not None:
             gen_kwargs = dict(gen_kwargs, streamer=_hb)
 
+        _applied_seed = _seed_writer_sampling(inputs)
+        if _applied_seed is not None:
+            log.info("[OTR_LedgerScriptWriter] sampling seeded (%s) -- this "
+                     "pass is reproducible", WRITER_SEED_ENV)
+
         with torch.no_grad():
             try:
                 out = model.generate(**inputs, **gen_kwargs)
@@ -1075,6 +1080,10 @@ def _build_truncating_generate_fn(
                     )
                     _min_p_unsupported[0] = True
                     gen_kwargs.pop("min_p", None)
+                    # Re-seed: the failed attempt above already consumed RNG
+                    # state, so without this the retry path would diverge from
+                    # a run that never hit the TypeError.
+                    _seed_writer_sampling(inputs)
                     out = model.generate(**inputs, **gen_kwargs)
                 else:
                     raise
@@ -1600,6 +1609,61 @@ _DEFAULT_ACT_COUNT: int = 3
 _ACT_COUNT_CHOICES: list[str] = [
     str(n) for n in range(_OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT + 1)
 ]
+
+
+#: Set to an integer to make the writer's SAMPLING reproducible. Unset (the
+#: default, and production) leaves generation exactly as it was.
+WRITER_SEED_ENV = "OTR_WRITER_SEED"
+
+
+def _seed_writer_sampling(inputs) -> "int | None":
+    """Seed torch from (OTR_WRITER_SEED, this prompt) before a generate call.
+
+    WHY THIS EXISTS. ``gen_kwargs`` carries ``do_sample=True`` with no seed and
+    no generator, so two runs of the same episode inputs produce DIFFERENT
+    scripts. That is correct for production -- every episode should be its own
+    -- but it makes a controlled comparison impossible: on 2026-08-22 four
+    separate attempts to judge a video change all collapsed because each leg
+    wrote a different story, and the operator called it himself: "its a
+    different story so not a good comparison".
+
+    KEYED ON THE PROMPT, NOT A CALL COUNTER. An episode makes many generate
+    calls; a counter would make the seed depend on call ORDER, so any pass that
+    ran conditionally would shift every later seed and the reproduction would
+    silently drift. Hashing the actual input tokens makes each call's seed a
+    function of what that call is being asked -- order-independent, and equal
+    across two runs whose prompts match.
+
+    Returns the seed applied, or None when the variable is unset or unusable.
+    Never raises: a bake-off convenience may not be able to break a render.
+    """
+    raw = os.environ.get(WRITER_SEED_ENV, "").strip()
+    if not raw:
+        return None
+    try:
+        base = int(raw)
+    except (TypeError, ValueError):
+        log.warning(
+            "[OTR_LedgerScriptWriter] %s=%r is not an integer; sampling stays "
+            "unseeded for this run", WRITER_SEED_ENV, raw)
+        return None
+    try:
+        import zlib
+
+        import torch as _torch
+
+        ids = inputs["input_ids"]
+        digest = zlib.crc32(str(ids.tolist()).encode("utf-8"))
+        seed = (base * 1_000_003 + digest) & 0x7FFF_FFFF
+        _torch.manual_seed(seed)
+        if _torch.cuda.is_available():
+            _torch.cuda.manual_seed_all(seed)
+        return seed
+    except Exception as exc:  # noqa: BLE001 -- never break a render for this
+        log.warning(
+            "[OTR_LedgerScriptWriter] could not seed sampling (%s); the run "
+            "continues UNSEEDED and is not reproducible", exc)
+        return None
 
 
 def _resolve_cast_rng_seed() -> tuple[int, str]:
