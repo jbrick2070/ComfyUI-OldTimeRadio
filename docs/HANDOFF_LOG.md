@@ -1,3 +1,67 @@
+## 2026-08-22 -- HEAD cc9b4767 +handoff (v2.0-alpha) -- CODER (ideogram4_local shipped; the golden rule satisfied by reading a declaration that had never been read)
+
+Did: SHIPPED `ideogram4_local`, the typography-first still engine -- adapter,
+  guarded registration, 9-key CAPABILITIES row, 64 tests, and
+  `config/profiles/otr_ideogram4_local_still_word.json` (a1a85901, 24eeabcb,
+  39b9e76e, c02ce45d, f2d039e6). Opt-in, in the image dropdown for everyone,
+  distinct from cloud `ideo`, no flag or gate.
+  THE GOLDEN RULE ("every video lane should work in any 3 slots") is satisfied,
+  and the blocker was never the engine: `still_word` had ALWAYS declared
+  `StillPlanRow(kind="portrait", required="never")` and NOTHING READ IT --
+  `still_plan_helpers` says so in its own docstring, "Nothing in this module
+  reads the plan for production". So every still_word episode has minted a
+  portrait per cast member that no consumer on that lane loads: invisible on
+  every engine that draws faces, FATAL on the first that refuses one. Fixed by
+  `_portrait_free_roles_from_policy` (a88cede5), the fifth lane-derived role set
+  beside still_aspects / mesh_fodder_roles / talking_roles / still_word_roles.
+  It reads each lane's OWN declaration, never an engine name, so a NEW LANE IS
+  COVERED THE DAY IT DECLARES ITS PLAN. Verified against real render behaviour:
+  wan_ti2v declares portrait never AND is in `_SCENE_INIT_FAMILIES` so its init
+  is overridden by the scene still; humo declares always and correctly KEEPS its
+  portrait to drive a mouth. `VIDEO_LANE_PREFLIGHT.md` G3.7.
+  LIVE PROOF: episode "The Weight of the Grain", all 3 image slots on
+  ideogram4_local + all 3 video slots on still_word -- 6 of 6 dialogue word
+  cards rendered plus the music opening, 7 of 8 stills
+  (`output/otr/episodes/signal_lost_the_weight_of_the_grain_20260822_025251/stills/`).
+  ONE refusal remains, `still_music_closing_001` (min=78.0 std=10.6), and it is
+  SEED-dependent -- the music OPENING card rendered from the same composer,
+  title and prompt shape.
+  Also: captions 36 -> 42 px (b632ad44, operator's chosen size; the rest of his
+  1080p ADA spec was already met). `docs/IMAGE_GEN_PREFLIGHT.md` +
+  `tests/test_image_gen_preflight_matrix.py` (68e4c051). HOW-TO-ADD-YOUR-OWN
+  guides written into both engine namespaces. Bug Bible 304 -> 305 and `12.126`
+  BROADENED from "a foreign key is rendered" to the real rule -- on a
+  zeroed-negative topology a prohibition IS positive conditioning (Bible repo
+  b96e931, 4b839bc5); OTR's own composer appends "no logos" to every word card
+  and the card that came back reading `NO MISCOS` was that guard, painted on.
+Current step: GO_FORWARD rewritten this session. Queue head is A = GHOST SIGNAL
+  (AnimateDiff ultra-low-VRAM video lane): r4 COMPLETE, code-and-wire-ready,
+  and NOTHING built -- no code, dependency, workflow, render, test,
+  measurement, commit or push. Plan
+  `docs/2026-08-22-GHOST-SIGNAL-CODING-PLAN.md`; receipt
+  `kibitz-runs/2026-08-22-ghost-signal-code-ready-plan/r4/final.md`;
+  byte-identity VERIFIED, sha256
+  06104e911e599f7630563eaab5ae5cb5aa92c40e0331d3d0e253ba6c4150e81b.
+Next: BUILD Ghost Signal from that frozen plan. Its `still_plan` declaration is
+  a day-one requirement (G3.7) -- declare kind / cardinality / aspect / required
+  / framing and the portrait-free role set honours it with no edit to the image
+  phase. Blocked on nobody.
+Models: Fable 5 drove. Kibitz r1-r3 on the ideogram4_local adapter
+  (codex gpt-5.6-sol + antigravity Gemini 3.7 Flash High; the CURSOR lane
+  returned an EMPTY 247-byte review in r1 and was substituted by a deep-research
+  agent, then dropped for r2/r3 -- that is a SCOPED campaign, two CLI lanes plus
+  one substitute, and it is NOT a full four-lane arc). A further r1 ran on the
+  golden-rule plan (`docs/2026-08-22-golden-rule-any-engine-any-slot/`) and its
+  StillPlan finding is what redirected the fix. Post-coding QA on the finished
+  adapter diff: Sonnet 5, verdict CLEAN, three nits folded with tests.
+Commits: a1a85901, b632ad44, 24eeabcb, 39b9e76e, c02ce45d, f2d039e6, a88cede5,
+  e80c6786, cc9b4767 (+ Bible repo b96e931, 4b839bc5). Suite 11454 passed /
+  114 skipped / 1 xfailed / 0 FAILED. Bug Bible 22 passed / 26 skipped /
+  3 xfailed, 305 entries. Box: server RESIDENT on :8000 (~9.1 GB, the normal
+  finished-but-resident state), no background tasks running, queue empty.
+  The sha above is the second-to-last on the branch; the last is this handoff
+  commit. The authoritative post-handoff sha is in the kickoff line below.
+
 # OTR Handoff Log
 
 Append-only session log, newest at top. What each session actually did;
