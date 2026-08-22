@@ -68,6 +68,70 @@ it names any missing weight and where it expects it.
 
 ---
 
+## Which video models fit your card
+
+**This table is the profile.** Pick your card, read the column, choose that name
+in the `OTR_VideoDirector` dropdown. Names below are exactly the dropdown
+entries.
+
+Every figure is MEASURED, not estimated, and each says where it came from. A
+blank verdict means nobody has measured it -- that is recorded as unknown rather
+than guessed, because a guessed VRAM number is the one thing a user cannot
+recover from.
+
+**Read the 8 GB column as CANDIDATES, not promises.** Every measurement below was
+taken on a 16 GB card. An allocator behaves differently with half the room, so a
+lane measured at 7.3 GiB here is a lane worth trying on 8 GB -- not a lane proven
+on 8 GB. The 8 GB column is settled by running it on an 8 GB card, and where that
+has happened it says so.
+
+### Local video models
+
+| Dropdown name | Measured VRAM | 8 GB | 12 GB | 16 GB |
+|---|---|:--:|:--:|:--:|
+| `ltx098_low_video (16:9)` | 6.8 GiB @ 512x288x161 | maybe | yes | yes |
+| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | maybe | yes | yes |
+| `h3_low_video (16:9)` | 7.3 GiB @ 864x480 | maybe | yes | yes |
+| `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
+| `animatediff15_video (16:9)` | not measured (3.9 GB of weights) | ? | ? | yes |
+| `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
+| `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB @ 480x832x129 | no | maybe | yes |
+| `humo14_high_audio_in_wide (16:9)` | 13.06 GiB @ 832x480x97 | no | no | yes |
+| `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB @ 480x832x97 | no | no | yes |
+| `ltx23_high_video (16:9)` | 13.3 GiB @ 1024x576x169 | no | no | yes |
+| `wan22_high_fast (16:9)` | 12.8 GiB measured 2026-08-22 | no | maybe | yes |
+| `wan22_high_i2v (16:9)` | 13.9 GiB @ f33 | no | no | yes |
+| `ltx25_high_video (16:9)` | two-stage 832x480 -> 1664x960 | no | no | **5080-only** |
+| `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
+| `mesh_stage (16:9)` | not measured | ? | ? | yes |
+
+### Procedural and still lanes -- these run anywhere
+
+`still_flat (16:9)`, `still_motion (16:9)`, `still_pan (16:9)`,
+`still_word (16:9)`, `word_razzle (16:9)`, `viz_camera (16:9)`,
+`viz_green (16:9)`, `viz_mxc_cpu (16:9)`, `viz_mxc_mandala (16:9)`.
+
+The four `viz_*` lanes are pure numpy/PIL/ffmpeg with no model at all and no GPU
+requirement. The `still_*` and `word_razzle` lanes cost whatever your chosen
+IMAGE model costs, since the video side is a pan or a hold over a still.
+
+### Cloud lanes -- no local VRAM, but they are paid services
+
+`cloud_kling_avatar (16:9)`, `cloud_seedance_2 (16:9)`,
+`cloud_vidu_q2_pro_fast_720p (16:9)`, `cloud_wan_i2v (16:9)`,
+`cloud_wan_i2v_audio (16:9)`, `google_omni_video (16:9)`,
+`google_veo_video (16:9)`. All are OFF by default; this project is
+offline-first and nothing here is required to make an episode.
+
+### Two lanes need their own boot
+
+`h3_low_video` and `h3_low_audio_in` require a sage-free boot with pinned memory
+disabled and VRAM reserved. They will fail preflight on a standard boot -- and
+that is the guard working, not the lane being broken. Both are also the slowest
+local lanes by a wide margin.
+
+---
+
 ## How it works
 
 **Audio is the source of truth.** The writer produces a script, the voice/music engines render
