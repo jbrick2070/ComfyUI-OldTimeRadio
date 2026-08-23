@@ -1020,11 +1020,6 @@ SCIENCE_NEWS_FEEDS = [
 _BODY_SCRAPER_UNAVAILABLE: str = ""
 
 
-def body_scraper_unavailable() -> str:
-    """The reason article-body scraping is off, or "" when it is working."""
-    return _BODY_SCRAPER_UNAVAILABLE
-
-
 def _fetch_full_article(url, timeout=20):
     """Fetch the full text of a science article from its URL.
 
@@ -2006,39 +2001,6 @@ def _normalize_dialogue_names(text):
 # creative LLM emits as a closing-scene marker ('=== SCENE FINAL ==='),
 # inflating scene counts and fooling the FORMAT_NORM skip heuristic.
 # Any '=== SCENE FINAL ===' is promoted to 'END' (terminator) below.
-_RE_SCENE_MARKER = re.compile(
-    r'===\s*SCENE\s+(\d+)(?:\s*:\s*[^=]*?)?\s*===',
-    re.IGNORECASE
-)
-_RE_SCENE_TERMINATOR = re.compile(
-    r'===\s*SCENE\s+FINAL\b[^=]*===',
-    re.IGNORECASE
-)
-
-
-def _scene_inventory(text):
-    """Return the ordered list of scene tokens found in the script.
-
-    Recognizes canonical '=== SCENE N ===' markers (numeric only) and a
-    trailing '=== SCENE FINAL ===' terminator. Returns tokens like
-    ['1', '2', '3'] or ['1', '2', 'END']. Empty list means no scene
-    markers present (valid for short scripts pre-FORMAT_NORM).
-    """
-    if not text:
-        return []
-    tokens = [m.group(1) for m in _RE_SCENE_MARKER.finditer(text)]
-    if _RE_SCENE_TERMINATOR.search(text):
-        tokens.append("END")
-    return tokens
-
-
-def _log_scene_checkpoint(stage, text):
-    """Emit a SCENE_TRACK log line for the given pipeline stage."""
-    tokens = _scene_inventory(text)
-    _runtime_log(
-        f"SCENE_TRACK: {stage} | count={len(tokens)} | tokens={tokens}"
-    )
-    return tokens
 
 
 # ── Name cleanup (fuzzy match against canonical cast) ────────────
@@ -2263,8 +2225,6 @@ def _extract_all_dialogue(text):
         if name.strip() not in _DIALOGUE_FALSE_POSITIVES
     ]
     return bare + voice
-
-
 
 
 # Register the LLM unloader with the VRAM Power Wash system so that
@@ -2746,7 +2706,6 @@ def _load_canon_for_writer(skip: bool = False, compact: bool = False) -> str:
 # multiple sprints) deferred to Sprint G per the no-scope-creep rule.
 # Each candidate gets its own 8-search audit before deletion.
 # ============================================================================
-
 
 
 # ---------------------------------------------------------------------------

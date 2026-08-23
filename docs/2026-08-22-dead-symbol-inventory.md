@@ -67,3 +67,63 @@ same read-in-context treatment before anything is cut.
 searched every symbol against every file with a regex and did not finish in
 twenty minutes. The version that works tokenizes each file's identifiers once
 into a set and does an O(1) membership test per symbol.
+
+---
+
+## Second pass, same day -- and the findings matter more than the deletions
+
+### Removed (5 more, one of them a cascade)
+
+| file | symbol | why |
+|---|---|---|
+| `story_orchestrator.py` | `body_scraper_unavailable()` | its CONSUMER is gone. The docstring says the v4 source-floor failure message reads it so a missing package is never misreported as an exhausted feed pool -- but that message string no longer exists anywhere in the tree. The module variable and the LOUD `log.error` stay; they are the half that still works. |
+| `story_orchestrator.py` | `_log_scene_checkpoint()` | SCENE_TRACK telemetry that never fires |
+| `story_orchestrator.py` | `_scene_inventory()`, `_RE_SCENE_MARKER`, `_RE_SCENE_TERMINATOR` | the cascade: removing the only caller orphaned the helper, and removing the helper orphaned both regexes. Taken out as one self-contained diagnostic cluster rather than left dangling. |
+
+**Cascades are the reason a dead-symbol pass is iterative.** Cutting one
+function turned three more symbols dead in the same file. A single scan run is a
+snapshot, not a fixed point.
+
+### THE FINDING WORTH THE OPERATOR'S ATTENTION
+
+**The BUG-020 character-name repair has not run since 2026-05-10.**
+
+`story_orchestrator._cleanup_character_names()` is the fuzzy pass that collapses
+LLM name variants -- `NEMEO_SIRIKIT` back to `NEMO SIRIKIT`, a rare misspelling
+folded into the dominant spelling. It is **never called**.
+
+Traced, not guessed: `git log -S` puts the call site alive until commit
+`eec4718c` ("L3 ledger consumer rewrite sprint -- Phase 3 writer extraction",
+2026-05-10), whose diff removes the line
+
+    -        script_text = _cleanup_character_names(script_text, _cast_config_path, pre_rolled_cast)
+
+as part of moving `LegacyLLMScriptWriter` out to `_otr_legacy_writer.py`. No
+replacement normalizer exists anywhere in `nodes/`. Its helper
+`_extract_all_dialogue()` is orphaned with it.
+
+**It is NOT deleted, and it is NOT rewired, and both of those are deliberate.**
+It operated on the LEGACY writer's `script_text`; the modern
+`OTR_LedgerScriptWriter` path has its own attribution repair (ShotLock's round-5
+F4 backstop warns when a line opens with its own speaker's name). So this may be
+correctly obsolete rather than a live gap -- but that is a judgement about what
+the current writer actually emits, which the code alone cannot settle.
+
+Deleting a shipped bug fix on a scanner's say-so, or wiring a legacy-shaped pass
+into a modern path it was not written for, are both worse than saying this
+plainly and letting the operator decide. **Name consistency is one of the
+correctness classes he explicitly kept open when story quality closed**, so it is
+his call and not a coder's.
+
+### Still not cleared (12 candidates)
+
+`LEDGER_SCHEMA_VERSION_TARGET`, `VOICE_BANK_SCHEMA_VERSION`,
+`ImageEngineConfig`, `ImageLedgerSection`, `MAX_PROVENANCE_NOTE_CHARS`,
+`P0RepairTrimReceipt`, `content_oracle.check_manifest` / `load_manifest`,
+`role_slots.PER_ROLE_VIDEO_SLOTS` / `NEW_ROUTE_A_VIDEO_SLOTS`,
+`other_name_policy`, `probe_context_visibility` / `_grade_probe`.
+
+These are schema versions, pydantic models, route maps and public-looking
+accessors. An unreferenced name in that set may still be a declared contract
+someone is meant to call, and the cost of being wrong is higher than the few
+lines saved. Each needs reading in context, the same as everything above.
