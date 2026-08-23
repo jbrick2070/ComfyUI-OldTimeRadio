@@ -57,11 +57,27 @@ is gated at `VIDEO_LANE_PREFLIGHT.md` G3.6; the image half is Gate IG3 below.
   So the dropdown must be the registry plus the `+ Add Custom Model` sentinel -
   nothing dropped (an engine that exists but cannot be chosen is dead code the
   operator is never told about) and nothing duplicated.
-- **IG2.2 Every engine serves every role the menu offers it for.** The three
+- **IG2.2 Every engine DECLARES every role the menu offers it for.** The three
   slots are not per-role filtered: one unfiltered list is built and used for the
   announcer, music and character slots alike. An engine declaring only two roles
   would still be selectable in the third and would fail at render - after the
   episode had already been written and voiced.
+
+  **IT SAYS "DECLARES" BECAUSE DECLARES IS ALL IT CHECKS (corrected 2026-08-22).**
+  It used to read "SERVES", which promised render-level coverage this gate has
+  never had, and `ideogram4_local` is the proof: it declares all three roles, it
+  passes IG2.2, and it then REFUSED at render on real card prose. A gate that
+  reads as a guarantee it does not enforce is worse than a narrow gate honestly
+  labelled, because the next reader stops looking.
+
+  **THE GAP, NAMED SO NOBODY RE-DISCOVERS IT:** what would close this is a
+  per-KIND declaration - "every engine serves every request KIND its lane
+  actually asks for" - and no image engine declares a kind surface today.
+  Adding one is a design change with more than one defensible answer (what the
+  kinds are, who owns the role-to-kind map, what a partial declaration means for
+  the menu), so it wants an arc and it belongs with the prompt / dialect /
+  recipe refactor rather than being bolted on here. Until then this gate is a
+  DECLARATION check and says so.
 - **IG2.3 One `CAPABILITIES` row per registered engine and vice versa.**
   *Not re-asserted by this file's matrix on purpose - one invariant, one owner:
   it is enforced in `tests/test_capability_profiles.py` and

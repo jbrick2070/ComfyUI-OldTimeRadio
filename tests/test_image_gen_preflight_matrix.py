@@ -117,14 +117,22 @@ def test_IG2_1_every_registered_engine_is_selectable_exactly_once():
 
 
 @pytest.mark.parametrize("role,slot", sorted(_SLOT_FOR_ROLE.items()))
-def test_IG2_2_every_engine_serves_every_role_the_menu_offers_it_for(role, slot):
+def test_IG2_2_every_engine_declares_every_role_the_menu_offers_it_for(role, slot):
     """IG2.2 The menu offers every engine in all three slots, so every engine
-    must actually SERVE all three roles.
+    must DECLARE all three roles.
 
     The dropdowns are not per-role filtered: one unfiltered list is built and
     used for the announcer, music and character slots alike. An engine that
     declared only two roles would still be selectable in the third and would
     fail at render, after the episode had already been written and voiced.
+
+    DECLARES, NOT SERVES (2026-08-22). This assertion reads `roles` off the
+    registry; it renders nothing and cannot. `ideogram4_local` declares all
+    three, passes this test, and then REFUSED at render on real card prose --
+    so calling this "serves" was a promise the code never kept. The honest
+    strengthening is a per-KIND declaration surface, which no image engine has
+    today and which wants an arc; see the gap note in
+    `docs/IMAGE_GEN_PREFLIGHT.md` under IG2.2.
     """
     assert set(ireg.engines_for_role(role)) == set(_registered()), (role, slot)
 

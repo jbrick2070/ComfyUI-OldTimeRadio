@@ -232,8 +232,10 @@ it walks the AST and refuses the call inside any broad-`except` try.
 `c27dff36`; 54 variants / 0 failures; forbidden sweep 0 runtime hits; BOM /
 0-byte / AST clean. `pyproject.toml` untouched (it is a publish trigger).
 
-**QUEUE HEAD IS NOW ITEM B** (the Ideogram music-card refusal), with items C-F
-behind it.
+**QUEUE HEAD IS NOW ITEM D** (the prompt / dialect / recipe refactor, which
+wants its own full arc and now carries E's enforcement half with it), with
+item F -- the regression sweep over `otr_g4_wan_ti2v` and `otr_upscale_ship`
+-- behind it. B, C and E's doc half closed 2026-08-22.
 
 **A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
 Three green chunks, all pushed on `v2.0-alpha`:
@@ -298,19 +300,51 @@ measurement, commit or push has been performed.** This is the next build.
   (kind / cardinality / aspect / required / framing), and the portrait-free
   role set will honour it automatically -- no edit to the image phase.
 
-**B. The Ideogram music-card refusal, and the asymmetry it exposed.** One card
-in eight refused (`still_music_closing_001`, min=78.0 std=10.6). It is
-SEED-dependent, not content: the music OPENING card rendered from the same
-composer, title and prompt shape. **A refusal currently fails the WHOLE
-EPISODE**, which is harsher than the operator's ruling intended -- he agreed to
-accept *blemishes* (*"I accept some errors ... don't want it burning extra GPU
-cycles"*), not dead renders. Decide: root-cause the prompt as every other
-refusal in this campaign was, or let a refusal degrade rather than abort.
+**B IS CLOSED, AND HALF OF IT WAS ALREADY CLOSED BEFORE THIS WINDOW LOOKED
+(verified 2026-08-22, not assumed).** The asymmetry the item was really about --
+*"a refusal currently fails the WHOLE EPISODE"*, harsher than the operator's
+*"I accept some errors"* ruling -- was fixed in the video-lane session and is
+live in `nodes/otr_image_gen_dispatcher.py`: a refusing engine records
+`reason="model_refusal"` skip evidence (`:1609`) and the completeness gate
+tolerates exactly that reason and no other (`:1754-1761`). The decision the item
+asked for was therefore already made, in favour of DEGRADE. **Grep the code
+before re-planning a carried item; this one was stale in the queue.**
+What remains is optional and low-value under the standing ruling: root-causing
+the SEED-dependent Ideogram music-card refusal. It costs GPU cycles the operator
+explicitly said not to burn on blemishes, so it is not queued.
 
-**C. `_still_word_fit_card` truncation.** A shipped card read *"...of a
-subterranean"* and stopped. Deterministic reduction working as designed, and
-unrelated to any engine -- but on a card whose whole job is the words, a
-sentence cut mid-clause deserves a second look.
+**C IS CLOSED (2026-08-22, `2aa13b35`).** The shipped card that read *"...of a
+subterranean"* and stopped. The reduction was working as designed and the design
+was one stage short: a word-boundary cut is honest about never splitting a word
+and says nothing about landing mid-thought. `_still_word_fit_card` now takes
+whole COMMA CLAUSES before any word cut, then drops dangling function words:
+
+    before: The signal came from the flooded lower levels of a subterranean
+    after:  The signal came from the flooded lower levels
+
+**The clause stage is the one that actually rescues it**, because the trailing
+word there was an ADJECTIVE and no function-word list catches that without a
+parts-of-speech tagger this repo does not ship. **SCOPED TO REDUCTIONS ON
+PURPOSE:** an authored line that ends on "the" is the AUTHOR's line and THE LAW
+forbids rewriting a story for style, so the contract is "a line this function
+shortened comes back a complete thought; a line under both caps comes back
+byte-identical however it ends", and both halves are pinned. The rule now lives
+once in `nodes/_otr_shared/text_tails.py`; the Ghost composer had its own copy
+and imports the shared one instead.
+
+**E IS HALF CLOSED, AND THE HALF THAT IS NOT SAYS SO OUT LOUD (2026-08-22).**
+`docs/IMAGE_GEN_PREFLIGHT.md` IG2.2 read *"Every engine SERVES every role the
+menu offers it for"*. It does not check that and never did -- it reads `roles`
+off the registry, renders nothing, and `ideogram4_local` is the proof: declares
+all three roles, passes IG2.2, refuses at render on real card prose. The gate
+and its test now say **DECLARES**, which is what they check.
+**The enforcement half needs an arc and is DELIBERATELY NOT DONE SOLO.** What
+would close it is a per-KIND declaration -- "every engine serves every request
+KIND its lane asks for" -- and no image engine declares a kind surface today.
+Adding one is a design choice with more than one defensible answer (what the
+kinds are, who owns the role-to-kind map, what a partial declaration does to the
+menu), so by the 2026-08-17 routing rule it wants a full arc, and it belongs
+with item D rather than bolted onto a gate doc.
 
 **D. The guides/dialect/recipe refactor (operator's architecture, staged).**
 *"the PROMPT is the LANGUAGE from the video lane; the DIALECT is the
@@ -321,10 +355,6 @@ vocabulary: **prompt** (lane) / **dialect** (engine phrasing) / **recipe**
 PRE-JOINS everything and each engine regexes it back apart; `ideogram4_local`
 already implements a dialect without it being called one. Its own item, its own
 arc -- do NOT bundle it with a small fix. `docs/2026-08-22-golden-rule-any-engine-any-slot/PLAN.md` section 8.
-
-**E. IG2.2 is a paper guarantee.** It asserts an engine *claims* every role, not
-that it *serves* one -- which is exactly how `ideogram4_local` shipped and then
-refused at render. Strengthen to the honest, GPU-free claim.
 
 **F. Regression sweep over shipped video profiles** (carried): only
 `otr_w45_wan_ti2v` is proven; `otr_g4_wan_ti2v` and `otr_upscale_ship` remain
