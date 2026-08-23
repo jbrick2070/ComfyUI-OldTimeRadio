@@ -24,6 +24,11 @@ import subprocess
 import tempfile
 import logging
 
+try:  # ComfyUI loads these node modules flat as well as packaged
+    from ._otr_shared import ffprobe as _ffp
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared import ffprobe as _ffp  # type: ignore
+
 log = logging.getLogger("OTR")
 
 # Queue item 8 (2026-08-08): upscale-engine namespace for per-clip model
@@ -113,7 +118,15 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
 
 
 def _ffprobe_bin() -> str:
-    return shutil.which("ffprobe") or ""
+    """The ffprobe this box should run, or ``""`` when it has none.
+
+    THE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: every probe here answers
+    ``-1`` / ``0.0`` on an absent tool and the composite carries on, because a
+    finished episode is not thrown away over a missing diagnostic. Only the
+    SEARCH is shared, which is how ``OTR_FFPROBE`` finally reaches the A/V-sync
+    frame count.
+    """
+    return _ffp.resolve_ffprobe() or ""
 
 
 def _run(cmd):

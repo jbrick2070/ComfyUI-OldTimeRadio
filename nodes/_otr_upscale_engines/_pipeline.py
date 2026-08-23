@@ -137,6 +137,25 @@ def _unlink_if_exists(path) -> None:
 # ---------------------------------------------------------------------------
 # Video probe (thin wrapper over nodes/otr_silent_composite.py:probe_video)
 # ---------------------------------------------------------------------------
+def _rate_is_numeric(rate) -> bool:
+    """Both halves of an ffprobe rate are NUMBERS, so a zero is a reported zero.
+
+    This module's own tolerance, and it stays here: ``"0/0"`` is what ffprobe
+    writes for a container that records no rate, and the only caller of
+    :func:`_probe_video_dims` reads width and height. A field that is not a
+    number at all is a different thing and still fails loud.
+    """
+    parts = str(rate).split("/")
+    if len(parts) > 2:
+        return False
+    try:
+        for part in parts:
+            float(part)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _probe_video_dims(ffmpeg: str, src: str):
     """Probe ``src`` and return ``(int(width), int(height), float(fps))``.
 
@@ -144,13 +163,14 @@ def _probe_video_dims(ffmpeg: str, src: str):
     string-valued dict) and converts to concrete types. Sonnet 5 MF-1:
     ``ffprobe``'s ``avg_frame_rate`` / ``r_frame_rate`` come back as rational
     STRINGS like ``"25/1"`` or ``"30000/1001"`` -- ``float()`` on those raises
-    ``ValueError``. Copy the N/D split from
-    ``nodes/_otr_video_engines/wan_shared.py:102`` and
-    ``scripts/run_video_arm_bakeoff.py:1430-1435``.
+    ``ValueError``. That N/D split used to be COPIED here from two other
+    files; lean-mean order 8 moved the rule to
+    ``nodes/_otr_shared/ffprobe.py:parse_rate`` so there is one of it.
 
     Raises :class:`RuntimeError` on missing keys OR unparseable rate.
     """
     # Late import to keep this module cold-import clean.
+    from .._otr_shared import ffprobe as _ffprobe  # noqa: WPS433 - deliberate late import
     from ..otr_silent_composite import probe_video  # noqa: WPS433 - deliberate late import
 
     info = probe_video(str(src))
@@ -168,21 +188,12 @@ def _probe_video_dims(ffmpeg: str, src: str):
     if not rate:
         raise RuntimeError(
             f"ffprobe returned no frame rate for {src!r}: {info!r}")
-    if "/" in rate:
-        try:
-            num_s, den_s = rate.split("/", 1)
-            num = float(num_s)
-            den = float(den_s)
-            fps = (num / den) if den != 0.0 else 0.0
-        except (TypeError, ValueError) as e:
+    fps = _ffprobe.parse_rate(rate)
+    if fps is None:
+        if not _rate_is_numeric(rate):
             raise RuntimeError(
-                f"ffprobe rate {rate!r} for {src!r} is not a valid N/D fraction: {e}")
-    else:
-        try:
-            fps = float(rate)
-        except (TypeError, ValueError) as e:
-            raise RuntimeError(
-                f"ffprobe rate {rate!r} for {src!r} is not a valid float: {e}")
+                f"ffprobe rate {rate!r} for {src!r} is not a valid frame rate")
+        fps = 0.0
     return (w, h, fps)
 
 

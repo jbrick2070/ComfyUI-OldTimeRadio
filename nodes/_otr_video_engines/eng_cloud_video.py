@@ -433,11 +433,18 @@ class _CloudVideoBase:
         # inputs) -- hidden auth only exists in the prompt context, so a
         # resolve-time env check would wrongly block logged-in desktop users.
         import shutil
-        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+
+        from .._otr_shared.ffprobe import resolve_ffprobe
+        # The gate asks the SAME question the canonicalizer will: ffmpeg is
+        # still PATH-only (it runs a literal "ffmpeg"), but ffprobe is now
+        # found the way the probe itself finds it, so an OTR_FFPROBE box is no
+        # longer refused over a tool it has.
+        if not shutil.which("ffmpeg") or not resolve_ffprobe():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "ffmpeg/ffprobe not on PATH -- the cloud video canonicalizer "
-                "strips provider audio via ffmpeg (must_strip_audio)",
+                "ffmpeg not on PATH, or no ffprobe (OTR_FFPROBE / PATH / "
+                "ffmpeg sibling) -- the cloud video canonicalizer strips "
+                "provider audio via ffmpeg (must_strip_audio)",
                 kind="video")
         from .._otr_shared.cloud_media_invoke import partner_rows
         row = partner_rows().get(self.node_key)

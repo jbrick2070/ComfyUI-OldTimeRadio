@@ -60,13 +60,15 @@ def configured_models_root():
 # --------------------------------------------------------------------------- #
 def _parse_fps(rate):
     """An ffprobe ``num/den`` frame-rate string -> rounded int fps (0 if
-    unparseable / zero denominator)."""
-    try:
-        num, den = str(rate).split("/")
-        den = float(den)
-        return int(round(float(num) / den)) if den else 0
-    except (ValueError, ZeroDivisionError, AttributeError):
-        return 0
+    unparseable / zero denominator).
+
+    THE RULE MOVED, THE NAME DID NOT. This repo had grown the same rational
+    parse in at least three places and fixed it three times; it now lives once,
+    at the shared ffprobe boundary. The name stays here because ``eng_wan_i2v``
+    re-exports it and the clip-contract tests import it through that door.
+    """
+    from .._otr_shared.ffprobe import parse_fps_int
+    return parse_fps_int(rate)
 
 
 def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
@@ -75,6 +77,22 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     color_transfer, fps, width, height, nb_frames}``. Raises a NAMED
     GraphExecutionError on an ffprobe failure (a missing ffprobe is a broken
     install, same class as the encoder's missing-ffmpeg).
+
+    EVERY ffprobe failure, and that is now literally true -- a deliberate call,
+    2026-08-23, not a side effect of the order-8 move. This function has always
+    DOCUMENTED the sentence above, and for two shapes it did not honour it: a
+    truncated or garbled JSON body escaped as a raw ``json.JSONDecodeError``,
+    and any ``OSError`` that was not ``FileNotFoundError`` (a permission block,
+    a corrupt binary) escaped raw as well. Both now arrive as
+    GraphExecutionError like every other probe failure. The ONLY observable
+    consequence is the label ``render_driver.classify_failure`` writes into the
+    RenderError text and the log line -- ``invalid_dag`` instead of
+    ``crash_before_load``. It changes no control flow: ``_render_shot`` raises
+    LOUD on any exception under the 2026-06-16 no-fallbacks directive, and
+    nothing on the render path reads the retry taxonomy's ``same_seed_retries``.
+    A function that documents one contract and keeps two exits out of it is a
+    trap for the next reader; consistency with its own docstring is worth more
+    than an accidental label.
 
     ``width``/``height`` joined the query for multi-clip coverage chunk 6
     (2026-07-26). They cost nothing -- they come out of the SAME stream read --
@@ -97,25 +115,22 @@ def ffprobe_clip_fields(path, *, ffprobe="ffprobe"):
     emitted clip, and counting means decoding. Use
     :func:`ffprobe_counted_frames` at the assembly boundary, where the cost is
     paid once and the truth matters."""
-    import json as _json
-    import subprocess as _sp
+    from .._otr_shared import ffprobe as _ffp
 
     from . import wrapper_bridge as _wb
     try:
-        proc = _sp.run(
-            [ffprobe, "-v", "error", "-show_entries",
-             "stream=codec_type,codec_name,pix_fmt,color_primaries,"
-             "color_transfer,color_space,avg_frame_rate,r_frame_rate,"
-             "width,height,nb_frames",
-             "-of", "json", path],
-            stdout=_sp.PIPE, stderr=_sp.PIPE)
-    except FileNotFoundError as exc:
+        data = _ffp.probe_json(
+            path,
+            "stream=codec_type,codec_name,pix_fmt,color_primaries,"
+            "color_transfer,color_space,avg_frame_rate,r_frame_rate,"
+            "width,height,nb_frames",
+            ffprobe=ffprobe)
+    except _ffp.FFprobeMissing as exc:
+        # A missing ffprobe is a broken install, same class as the encoder's
+        # missing ffmpeg -- and this engine still says so in its own voice.
         raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
-    if proc.returncode != 0:
-        raise _wb.GraphExecutionError(
-            "ffprobe failed for %r: %s"
-            % (path, proc.stderr.decode("utf-8", "replace")[:300]))
-    data = _json.loads(proc.stdout.decode("utf-8", "replace") or "{}")
+    except _ffp.FFprobeError as exc:
+        raise _wb.GraphExecutionError("%s" % exc)
     streams = data.get("streams") or []
     vids = [s for s in streams if s.get("codec_type") == "video"]
     v = vids[0] if vids else {}
@@ -159,23 +174,46 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
     Raises a NAMED GraphExecutionError when ffprobe is missing, fails, or
     reports something that is not a frame count. It never guesses: an
     unreadable count is a failed verification, not a zero.
+
+    An ``OSError`` that is not ``FileNotFoundError`` -- a permission block, a
+    corrupt binary -- used to escape this function raw; since 2026-08-23 it
+    arrives as GraphExecutionError like every other probe failure, for the
+    reason set out at length in :func:`ffprobe_clip_fields`.
     """
     import json as _json
-    import subprocess as _sp
+
+    from .._otr_shared import ffprobe as _ffp
 
     from . import wrapper_bridge as _wb
+    # probe_raw rather than probe_json HERE, deliberately: this function names
+    # ``-count_frames`` in every one of its refusals, and reading a nested
+    # boundary message inside its own would blur exactly the distinction the
+    # messages exist to draw -- a header count that lied versus a decode that
+    # could not run.
     try:
-        proc = _sp.run(
-            [ffprobe, "-v", "error", "-count_frames", "-select_streams", "v:0",
+        proc = _ffp.probe_raw(
+            ["-v", "error", "-count_frames", "-select_streams", "v:0",
              "-show_entries", "stream=nb_read_frames", "-of", "json", path],
-            stdout=_sp.PIPE, stderr=_sp.PIPE)
-    except FileNotFoundError as exc:
+            ffprobe=ffprobe)
+    except _ffp.FFprobeMissing as exc:
         raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
+    except _ffp.FFprobeError as exc:
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames failed for %r: %s" % (path, exc))
     if proc.returncode != 0:
         raise _wb.GraphExecutionError(
             "ffprobe -count_frames failed for %r: %s"
-            % (path, proc.stderr.decode("utf-8", "replace")[:300]))
-    data = _json.loads(proc.stdout.decode("utf-8", "replace") or "{}")
+            % (path, (proc.stderr or "")[:300]))
+    try:
+        data = _json.loads(proc.stdout or "{}")
+    except ValueError as exc:
+        # ffprobe exited 0 and wrote something that is not the document. That
+        # is a FAILED VERIFICATION, not a crash to be re-raised as whatever
+        # `json` happens to call it -- this function promises one exit and now
+        # keeps that promise on every path.
+        raise _wb.GraphExecutionError(
+            "ffprobe -count_frames returned unreadable output for %r: %s"
+            % (path, exc))
     streams = data.get("streams") or []
     if not streams:
         raise _wb.GraphExecutionError(

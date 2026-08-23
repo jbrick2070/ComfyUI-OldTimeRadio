@@ -35,6 +35,11 @@ from pathlib import Path
 
 import logging
 
+try:  # ComfyUI loads these node modules flat as well as packaged
+    from ._otr_shared import ffprobe as _ffp
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared import ffprobe as _ffp  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -43,7 +48,14 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
 
 
 def _ffprobe_bin() -> str:
-    return shutil.which("ffprobe") or ""
+    """The ffprobe this box should run, or ``""`` when it has none.
+
+    THE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: an absent probe yields
+    ``-1`` and a duration receipt that says UNPROVEN out loud, never a lost
+    episode. Only the SEARCH is shared -- and sharing it is why ``OTR_FFPROBE``
+    now reaches the duration gate, which it never did before.
+    """
+    return _ffp.resolve_ffprobe() or ""
 
 
 def _run(cmd):

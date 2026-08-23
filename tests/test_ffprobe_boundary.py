@@ -13,6 +13,7 @@ call site in the pack.
 """
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -279,6 +280,172 @@ def test_parse_rate_says_unknown_rather_than_guessing_zero(rate):
 def test_parse_fps_int_matches_the_shipped_clip_contract_values(rate, expected):
     """The four cases `wan_shared._parse_fps` has always been pinned to."""
     assert ffp.parse_fps_int(rate) == expected
+
+
+# --------------------------------------------------------------------------- #
+# THE RATCHET -- the boundary is the only door out of nodes/
+#
+# Not a style rule. Every one of these three patterns is a way a caller found
+# its own ffprobe, and every caller that found its own found a DIFFERENT one:
+# four independent binary-resolution strategies across eleven files, only one
+# of which had ever heard of OTR_FFPROBE. A new caller that copies the nearest
+# example is how that happened, so the nearest example has to stop existing.
+# --------------------------------------------------------------------------- #
+_BOUNDARY = _REPO_ROOT / "nodes" / "_otr_shared" / "ffprobe.py"
+_PROBE_NAMES = {"ffprobe", "ffprobe.exe"}
+
+
+def _module_string_constants(tree):
+    """Module-level ``NAME = "literal"`` bindings, so the scans see one hop.
+
+    The first version of these tests only recognised a string sitting DIRECTLY
+    in the argument position, and a QA pass proved the hole by building a file
+    that does everything the boundary exists to prevent while routing both
+    literals through named module constants. A rule that a rename defeats is
+    not a rule.
+    """
+    found = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    found[target.id] = node.value.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
+                and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str):
+            found[node.target.id] = node.value.value
+    return found
+
+
+def _nodes_sources():
+    for path in sorted((_REPO_ROOT / "nodes").rglob("*.py")):
+        if path == _BOUNDARY or "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        yield path, tree, _module_string_constants(tree)
+
+
+def _constant_str(node, consts=None):
+    """The string this expression IS -- a literal, or a name bound to one."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if consts and isinstance(node, ast.Name):
+        return consts.get(node.id)
+    return None
+
+
+def _searches_path(tree, consts):
+    """``shutil.which("ffprobe")`` -- PATH is one of six places, not the place."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(
+            func, "id", "")
+        if name != "which":
+            continue
+        first = _constant_str(node.args[0], consts)
+        if first and first.lower() in _PROBE_NAMES:
+            yield node.lineno
+
+
+def _reads_the_operator_pin(tree, consts):
+    """``OTR_FFPROBE`` read anywhere but the one reader."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript):
+            if _constant_str(node.slice, consts) == "OTR_FFPROBE":
+                yield node.lineno
+        elif isinstance(node, ast.Call):
+            for arg in node.args:
+                if _constant_str(arg, consts) == "OTR_FFPROBE":
+                    yield node.lineno
+
+
+def _builds_a_bare_argv(tree, consts):
+    """``["ffprobe", ...]`` -- a hope, not a configuration."""
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.List, ast.Tuple)) or not node.elts:
+            continue
+        first = _constant_str(node.elts[0], consts)
+        if first and first.lower() in _PROBE_NAMES:
+            yield node.lineno
+
+
+_SCANS = [
+    ("searches PATH for ffprobe itself", _searches_path),
+    ("reads OTR_FFPROBE itself", _reads_the_operator_pin),
+    ("builds an argv on a bare ffprobe literal", _builds_a_bare_argv),
+]
+_SCAN_IDS = ["which", "pin", "argv"]
+
+
+@pytest.mark.parametrize("label,scan", _SCANS, ids=_SCAN_IDS)
+def test_no_module_outside_the_boundary(label, scan):
+    offenders = []
+    for path, tree, consts in _nodes_sources():
+        offenders += ["%s:%d" % (path.name, line) for line in scan(tree, consts)]
+    assert not offenders, (
+        "a module under nodes/ %s, outside nodes/_otr_shared/ffprobe.py: %s"
+        % (label, ", ".join(offenders)))
+
+
+#: A caller that does everything the boundary exists to prevent, while routing
+#: both literals through named module constants one hop from the call site.
+#: A QA pass built exactly this and walked it past the first version of the
+#: three scans above, all of which came back empty. It is checked in as a
+#: FIXTURE rather than fixed once and forgotten: the scans have to keep
+#: catching it.
+_EVASIVE_CALLER = '''
+import os
+import shutil
+import subprocess
+
+_FFPROBE_ENV = "OTR_FFPROBE"
+_FFPROBE_EXE = "ffprobe"
+
+
+def probe(path):
+    binary = os.environ.get(_FFPROBE_ENV) or shutil.which(_FFPROBE_EXE)
+    return subprocess.run([_FFPROBE_EXE, "-v", "error", str(path)],
+                          capture_output=True, text=True)
+'''
+
+
+@pytest.mark.parametrize("label,scan", _SCANS, ids=_SCAN_IDS)
+def test_the_ratchet_catches_a_caller_that_hides_its_literals(label, scan):
+    tree = ast.parse(_EVASIVE_CALLER)
+    assert list(scan(tree, _module_string_constants(tree))), (
+        "the scan for %r did not see the evasive caller -- a rule a rename "
+        "defeats is not a rule" % label)
+
+
+@pytest.mark.parametrize("relative", [
+    "otr_credits_roll.py",
+    "otr_master_audio_mux.py",
+    "otr_silent_composite.py",
+    "otr_post_upscale_procgen_blend.py",
+    "otr_scene_aware_scopes.py",
+    "_otr_shared/cloud_media_canonical.py",
+    "_otr_video_engines/wan_shared.py",
+    "_otr_video_engines/eng_cloud_video.py",
+    "_otr_video_engines/eng_google_omni_video.py",
+    "_otr_video_engines/eng_google_veo_video.py",
+    "_otr_upscale_engines/_pipeline.py",
+])
+def test_every_migrated_caller_actually_goes_through_the_boundary(relative):
+    """The absence tests above pass just as well on a module that stopped
+    probing. This one says the door is USED.
+
+    It is a FIXED list, and that is a known limit rather than an oversight: a
+    brand-new file is invisible here until someone adds it. The guard against a
+    new file is the three offender scans above, which see every module under
+    ``nodes/`` and need no list at all. This one guards against the OTHER
+    direction -- a migrated caller quietly reverting."""
+    source = (_REPO_ROOT / "nodes" / relative).read_text(encoding="utf-8")
+    assert any(name in source for name in
+               ("resolve_ffprobe", "probe_raw", "probe_json", "parse_rate",
+                "parse_fps_int")), relative
 
 
 # --------------------------------------------------------------------------- #

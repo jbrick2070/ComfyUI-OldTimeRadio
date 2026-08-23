@@ -210,3 +210,98 @@ def test_counted_frames_raises_NAMED_when_ffprobe_fails(monkeypatch):
     monkeypatch.setattr("subprocess.run", lambda *a, **k: _Proc())
     with pytest.raises(_wb_mod.GraphExecutionError, match="count_frames failed"):
         ffprobe_counted_frames("whatever.mp4")
+
+
+# --------------------------------------------------------------------------- #
+# EVERY ffprobe failure is a GraphExecutionError -- the whole contract, pinned
+#
+# Both functions have always DOCUMENTED "a NAMED GraphExecutionError on an
+# ffprobe failure", and until 2026-08-23 two shapes escaped that promise: a
+# truncated JSON body came out as a raw json.JSONDecodeError, and any OSError
+# that was not FileNotFoundError came out raw as well. Lean-mean order 8 closed
+# both, deliberately. These tests exist so the next person to touch the probe
+# boundary cannot reopen them by accident -- a caller that documents one exit
+# and has three is a trap, and the suite was green through it for months.
+# --------------------------------------------------------------------------- #
+from nodes._otr_shared import ffprobe as _ffp_mod  # noqa: E402
+
+
+def _binary(tmp_path):
+    """A file that EXISTS, so binary resolution succeeds and the test is about
+    what happens when it RUNS."""
+    path = tmp_path / "ffprobe.exe"
+    path.write_bytes(b"")
+    return str(path)
+
+
+def _raises_from_run(monkeypatch, exc):
+    def _boom(*a, **k):
+        raise exc
+    monkeypatch.setattr(_ffp_mod.subprocess, "run", _boom)
+
+
+@pytest.mark.parametrize("probe", ["clip_fields", "counted_frames"])
+def test_a_garbled_json_body_is_a_named_refusal_not_a_json_error(
+        monkeypatch, tmp_path, probe):
+    """ffprobe exited 0 and wrote something that is not the document."""
+    class _Proc:
+        returncode = 0
+        stdout = "{not json at all"
+        stderr = ""
+
+    monkeypatch.setattr(_ffp_mod.subprocess, "run", lambda *a, **k: _Proc())
+    call = (ffprobe_clip_fields if probe == "clip_fields"
+            else ffprobe_counted_frames)
+    with pytest.raises(_wb_mod.GraphExecutionError):
+        call("whatever.mp4", ffprobe=_binary(tmp_path))
+
+
+@pytest.mark.parametrize("probe", ["clip_fields", "counted_frames"])
+def test_a_binary_that_cannot_be_launched_is_a_named_refusal(
+        monkeypatch, tmp_path, probe):
+    """A permission block or a corrupt binary -- an OSError that is NOT
+    FileNotFoundError, which used to escape both functions raw."""
+    _raises_from_run(monkeypatch, PermissionError(13, "Permission denied"))
+    call = (ffprobe_clip_fields if probe == "clip_fields"
+            else ffprobe_counted_frames)
+    with pytest.raises(_wb_mod.GraphExecutionError):
+        call("whatever.mp4", ffprobe=_binary(tmp_path))
+
+
+@pytest.mark.parametrize("probe", ["clip_fields", "counted_frames"])
+def test_a_vanished_binary_still_says_not_found_by_name(
+        monkeypatch, tmp_path, probe):
+    """The oldest of the contracts, and it must survive the boundary move: a
+    missing ffprobe is a broken install and says so in those words."""
+    _raises_from_run(monkeypatch, FileNotFoundError(2, "No such file"))
+    call = (ffprobe_clip_fields if probe == "clip_fields"
+            else ffprobe_counted_frames)
+    with pytest.raises(_wb_mod.GraphExecutionError, match="not found"):
+        call("whatever.mp4", ffprobe=_binary(tmp_path))
+
+
+@pytest.mark.parametrize("probe", ["clip_fields", "counted_frames"])
+def test_no_ffprobe_on_the_box_at_all_is_a_named_refusal(
+        monkeypatch, probe):
+    monkeypatch.delenv("OTR_FFPROBE", raising=False)
+    monkeypatch.delenv("OTR_FFMPEG", raising=False)
+    monkeypatch.setattr(_ffp_mod.shutil, "which", lambda name: None)
+    call = (ffprobe_clip_fields if probe == "clip_fields"
+            else ffprobe_counted_frames)
+    with pytest.raises(_wb_mod.GraphExecutionError, match="not found"):
+        call("whatever.mp4")
+
+
+def test_counted_frames_still_names_count_frames_in_its_refusals(
+        monkeypatch, tmp_path):
+    """The two functions must stay TELLABLE APART in a log. `-count_frames`
+    decodes; the cheap probe reads a header. A reader who cannot tell which one
+    refused cannot tell an expensive verification failure from a per-clip one."""
+    class _Proc:
+        returncode = 1
+        stdout = ""
+        stderr = "moov atom not found"
+
+    monkeypatch.setattr(_ffp_mod.subprocess, "run", lambda *a, **k: _Proc())
+    with pytest.raises(_wb_mod.GraphExecutionError, match="count_frames failed"):
+        ffprobe_counted_frames("whatever.mp4", ffprobe=_binary(tmp_path))

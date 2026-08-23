@@ -30,8 +30,6 @@ import hashlib
 import logging
 import math
 import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import time as _time
@@ -42,6 +40,11 @@ from PIL import Image, ImageDraw
 _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
+
+try:  # ComfyUI loads these node modules flat as well as packaged
+    from ._otr_shared import ffprobe as _ffp
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared import ffprobe as _ffp  # type: ignore
 
 log = logging.getLogger("OTR.SceneAwareScopes")
 
@@ -244,17 +247,25 @@ def _bars_geom(out_w, out_h):
 # Aspect probe (memoized; un-probeable -> suppress + log)
 # --------------------------------------------------------------------------- #
 def _probe_is_portrait(path, ffprobe, cache):
+    """``True`` / ``False`` / ``None`` (un-probeable -> the beat is suppressed).
+
+    The POLICY is this node's and does not move: an unreadable clip suppresses
+    its scope rather than guessing an aspect and drawing gutters down the middle
+    of a landscape shot. Only the launch is shared -- and ``ffprobe`` may now
+    arrive as the bare default here, because the boundary reads that as "no
+    preference" and consults OTR_FFPROBE for us."""
     if path in cache:
         return cache[path]
     res = None
     try:
         if path and os.path.isfile(path):
-            out = subprocess.run(
-                [ffprobe, "-v", "error", "-select_streams", "v:0",
-                 "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", path],
-                capture_output=True, text=True, timeout=10)
+            out = _ffp.probe_raw(
+                ["-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x",
+                 path],
+                ffprobe=ffprobe, timeout=10)
             txt = (out.stdout or "").strip().splitlines()
-            if txt:
+            if out.returncode == 0 and txt:
                 w, h = (int(x) for x in txt[0].split("x")[:2])
                 res = h > w
     except Exception as exc:  # noqa: BLE001
@@ -360,12 +371,6 @@ def plan_scope_frames(manifest, out_w, out_h, ffprobe="ffprobe",
 # ``freq_bars_green`` from it. Hardening a third dialect instead would have
 # left three encoders to fix the next time one of them is wrong.
 # --------------------------------------------------------------------------- #
-def _find_ffmpeg(ffmpeg):
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    return shutil.which("ffmpeg")
-
-
 # --------------------------------------------------------------------------- #
 # The node
 # --------------------------------------------------------------------------- #
@@ -424,13 +429,11 @@ class SceneAwareScopes:
 
         out_w, out_h = int(out_w), int(out_h)
         fps = 25  # HARD-LOCK 25 across planner / analysis / encode
-        ffprobe = (_find_ffmpeg(ffmpeg) or "ffmpeg")
-        # ffprobe is colocated with ffmpeg; swap the basename.
-        probe = ffprobe
-        if probe and os.path.basename(probe).lower().startswith("ffmpeg"):
-            cand = os.path.join(os.path.dirname(probe),
-                                os.path.basename(probe).lower().replace("ffmpeg", "ffprobe"))
-            probe = cand if os.path.isfile(cand) else "ffprobe"
+        # The seven lines that used to live here found ffmpeg, LOWER-CASED its
+        # basename, swapped ffmpeg->ffprobe and fell back to a bare literal.
+        # Lower-casing a path is fine on Windows and wrong anywhere else, and
+        # the fallback never consulted OTR_FFPROBE at all.
+        probe = _ffp.resolve_ffprobe(ffmpeg=ffmpeg) or "ffprobe"
 
         plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe,
                                         landscape_bars=landscape_bars)

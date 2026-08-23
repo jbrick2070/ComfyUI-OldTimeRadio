@@ -38,6 +38,11 @@ import os
 import shutil
 import subprocess
 
+try:  # ComfyUI loads these node modules flat as well as packaged
+    from ._otr_shared import ffprobe as _ffp
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared import ffprobe as _ffp  # type: ignore
+
 log = logging.getLogger("OldTimeRadio")
 
 # --------------------------------------------------------------------------- #
@@ -1319,9 +1324,13 @@ def _ffmpeg_bin() -> str:
 
 
 def _ffprobe_bin() -> str:
-    cand = (os.environ.get("OTR_FFPROBE") or "").strip()
-    p = (cand if (cand and (os.path.isfile(cand) or shutil.which(cand)))
-         else shutil.which("ffprobe"))
+    """The credits policy, unchanged: no probe means no credits, said by name.
+
+    This module was the ONLY one in the pack that honoured ``OTR_FFPROBE``;
+    the shared resolver is where that stopped being a local courtesy. What it
+    COSTS to have no probe is still decided right here.
+    """
+    p = _ffp.resolve_ffprobe()
     if not p:
         raise CreditsDataError(
             "ffprobe not found (OTR_FFPROBE / PATH) -- cannot render credits")
@@ -1329,17 +1338,17 @@ def _ffprobe_bin() -> str:
 
 
 def _probe_video(path: str) -> dict:
-    out = subprocess.run(
-        [_ffprobe_bin(), "-v", "error", "-select_streams", "v:0",
-         "-show_entries", "stream=width,height,r_frame_rate",
-         "-show_entries", "format=duration", "-of", "json", path],
-        capture_output=True, text=True)
-    if out.returncode != 0:
-        raise CreditsDataError(f"ffprobe failed on {path!r}: {out.stderr}")
-    data = json.loads(out.stdout or "{}")
+    try:
+        data = _ffp.probe_json(
+            path, ["stream=width,height,r_frame_rate", "format=duration"],
+            select_streams="v:0", ffprobe=_ffprobe_bin())
+    except _ffp.FFprobeError as exc:
+        raise CreditsDataError(f"ffprobe failed on {path!r}: {exc}")
     st = (data.get("streams") or [{}])[0]
-    num, _, den = str(st.get("r_frame_rate") or "25/1").partition("/")
-    fps = float(num) / float(den or 1)
+    # A rate of "0/0" used to raise ZeroDivisionError on this line. The shared
+    # parse answers "unknown" instead, and the canonical 25 stands in -- the
+    # same rate every other credits surface already assumes.
+    fps = _ffp.parse_rate(st.get("r_frame_rate")) or 25.0
     try:
         dur = float((data.get("format") or {}).get("duration") or 0.0)
     except (TypeError, ValueError):

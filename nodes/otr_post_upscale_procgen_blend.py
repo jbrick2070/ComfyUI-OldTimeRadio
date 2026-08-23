@@ -58,6 +58,11 @@ if _NODES_DIR not in sys.path:
 
 from _otr_paths import otr_audio_dir, otr_obs_dir  # noqa: E402
 
+try:  # ComfyUI loads these node modules flat as well as packaged
+    from _otr_shared import ffprobe as _ffp  # type: ignore  # noqa: E402
+except ImportError:  # pragma: no cover -- packaged import
+    from nodes._otr_shared import ffprobe as _ffp  # type: ignore  # noqa: E402
+
 # NOTE: the SDH caption builder import (build_ass_from_ledger) was removed here in
 # the 2026-07-04 widget-audit Batch 3 -- captions migrated to node 86
 # OTR_CaptionBurn. This node no longer builds or burns captions.
@@ -235,20 +240,20 @@ def _stamp_ledger_final_video_path(
 def _probe_dims(path: Path, ffmpeg: str = "ffmpeg") -> "Optional[tuple]":
     """(width, height) of the first video stream via ffprobe, or None.
     Best-effort: a probe failure returns None and the blend falls back to the
-    legacy self-referential scale (the pre-2026-06-09 behavior)."""
-    ffprobe = "ffprobe"
-    if ffmpeg and ffmpeg != "ffmpeg":
-        cand = str(Path(ffmpeg).with_name("ffprobe.exe"))
-        if Path(cand).is_file():
-            ffprobe = cand
+    legacy self-referential scale (the pre-2026-06-09 behavior).
+
+    The blend's ``ffmpeg`` widget still gets first say -- the shared resolver
+    tries its sibling before anything else -- but a box that pins OTR_FFPROBE
+    is now heard too, which the hand-rolled ``ffprobe.exe`` swap never was."""
     try:
-        out = subprocess.run(
-            [ffprobe, "-v", "error", "-select_streams", "v:0",
+        out = _ffp.probe_raw(
+            ["-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0",
              str(path)],
-            capture_output=True, text=True, timeout=30, check=True,
-        ).stdout.strip()
-        w, h = out.split("x")[:2]
+            ffmpeg=ffmpeg, timeout=30)
+        if out.returncode != 0:
+            return None
+        w, h = (out.stdout or "").strip().split("x")[:2]
         return int(w), int(h)
     except Exception:  # noqa: BLE001
         return None
@@ -509,17 +514,22 @@ def _bars_strip_geom(w: int, h: int) -> "tuple[int, int, int, int]":
 
 def _probe_fps(path: Path, ffmpeg: str) -> float:
     """Source video fps via ffprobe (r_frame_rate). Defaults to 25.0 (the OTR
-    canonical) on any failure so the bars layer always has a sane rate."""
-    probe = str(ffmpeg or "ffmpeg").replace("ffmpeg", "ffprobe")
+    canonical) on any failure so the bars layer always has a sane rate.
+
+    The old binary spelling here was ``str(ffmpeg).replace("ffmpeg", "ffprobe")``
+    -- a blind string swap that never checked the result exists, and that
+    rewrote any directory named ``ffmpeg`` along the way. It also parsed the
+    rational rate a THIRD time, in a third dialect. Both jobs are the shared
+    boundary's now; the 25.0 fallback is still this node's own call."""
     try:
-        out = subprocess.run(
-            [probe, "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", str(path)],
-            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        ).stdout.decode("utf-8", "replace").strip()
-        num, _, den = out.partition("/")
-        fps = float(num) / float(den) if den and float(den) else float(num)
-        return fps if fps and fps > 0 else 25.0
+        out = _ffp.probe_raw(
+            ["-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0",
+             str(path)],
+            ffmpeg=ffmpeg, timeout=30)
+        if out.returncode != 0:
+            return 25.0
+        return _ffp.parse_rate((out.stdout or "").strip()) or 25.0
     except Exception:  # noqa: BLE001
         return 25.0
 

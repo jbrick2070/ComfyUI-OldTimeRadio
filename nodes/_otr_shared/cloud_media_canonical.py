@@ -316,20 +316,14 @@ def canonicalize_image(raw: PartnerResult, request: dict, session=None) -> Canon
 def _ffprobe_streams(path: str) -> dict:
     """``{"video": [...], "audio": [...], "duration_s": float}`` via ffprobe.
     Fail-closed CORRUPT_OUTPUT on any probe failure -- partial media never
-    proceeds."""
-    import json as _json
-    import subprocess
+    proceeds. THAT VERDICT IS THIS MODULE'S and does not move; the shared
+    boundary only finds and launches the tool, which is how a provider clip is
+    finally measured with the same ffprobe the local engines use."""
+    from . import ffprobe as _ffp
     try:
-        out = subprocess.run(
-            ["ffprobe", "-v", "error", "-print_format", "json",
-             "-show_streams", "-show_format", str(path)],
-            capture_output=True, text=True, timeout=120)
-        if out.returncode != 0:
-            raise RuntimeError(out.stderr.strip()[-300:])
-        doc = _json.loads(out.stdout or "{}")
-    except CloudMediaError:
-        raise
-    except Exception as exc:
+        doc = _ffp.probe_json(path, extra_args=("-show_streams", "-show_format"),
+                              timeout=120)
+    except _ffp.FFprobeError as exc:
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
                               f"ffprobe failed on {path}: {exc}")
     streams = doc.get("streams") or []

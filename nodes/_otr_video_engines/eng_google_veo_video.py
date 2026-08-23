@@ -549,16 +549,21 @@ class GoogleVeoVideoEngine:
     def assert_usable(self, host_caps, profile, request_template=None):  # noqa: ARG002
         import shutil
 
+        from .._otr_shared.ffprobe import resolve_ffprobe
+
         resolve_api_key()
-        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        # ffmpeg is still PATH-only (the canonicalizer runs a literal
+        # "ffmpeg"); ffprobe is found the way the probe itself finds it.
+        if not shutil.which("ffmpeg") or not resolve_ffprobe():
             from .registry import EngineUnusable, EngineUsabilityReason
 
             raise EngineUnusable(
                 self.name,
                 self.family,
                 EngineUsabilityReason.MALFORMED_CONFIG,
-                "ffmpeg/ffprobe not on PATH -- Google Veo video canonicalizer "
-                "strips provider audio via ffmpeg",
+                "ffmpeg not on PATH, or no ffprobe (OTR_FFPROBE / PATH / "
+                "ffmpeg sibling) -- Google Veo video canonicalizer strips "
+                "provider audio via ffmpeg",
                 kind="video",
             )
         return self.name
