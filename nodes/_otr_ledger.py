@@ -1175,16 +1175,22 @@ def stamp_meta_audit_verdict(
 # l3-2026-05-08: Cast Contract pre-wiring helpers (Phase 0+ §1+§2+§3)
 # ---------------------------------------------------------------------------
 #
-# These helpers EXIST now so the ledger schema is aligned with the
-# cast contract module. The orchestrator hooks at L6423/L640/L920
-# in story_orchestrator.py call them once those wires land.
+# These helpers were pre-wired so the ledger schema would align with a cast
+# contract module. THE WIRES NEVER LANDED: the orchestrator hooks that were to
+# call them do not exist, and `nodes/_otr_cast_contract.py` /
+# `_otr_cast_repair.py` were DELETED as unadopted prototypes (lean-mean,
+# 2026-08-23). The live cast path is `nodes/_otr_casting.lock_cast` via
+# `nodes/cast_lock.py`.
 #
-# IMPORTANT (round-robin C7 caution): the cast_contract version sha
-# is computed by `nodes/_otr_cast_contract.CastContract.stamp_version`
-# from the canonical roster ONLY. It MUST NOT include any of the
-# l3-2026-05-08 telemetry fields (process_runs, audit_verdict,
-# cuda_hard_reset_count, soak_cap, etc.). Otherwise content addressing
-# breaks across otherwise-identical resumes.
+# The helpers below are KEPT because they are harmless ledger-field stampers and
+# removing them is a separate schema decision, not a dead-code one -- but read
+# them as unused pre-wiring, not as an active contract.
+#
+# The rule they were written under is still worth keeping, because it is about
+# CONTENT ADDRESSING and would apply to any future version sha: compute it from
+# the canonical roster ONLY. It must never include the l3-2026-05-08 telemetry
+# fields (process_runs, audit_verdict, cuda_hard_reset_count, soak_cap, ...),
+# or content addressing breaks across otherwise-identical resumes.
 
 
 def stamp_cast_contract_version(ledger: dict, version: Optional[str]) -> None:

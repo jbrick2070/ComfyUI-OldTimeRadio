@@ -2347,28 +2347,11 @@ def _derive_prev_speaker(
     return ""
 
 
-def _build_cast_rows(cast_names) -> tuple:
-    """Build legacy-schema cast rows + a name->char_id index from
-    a list of ALL-CAPS character names.
-
-    Returns ``(cast_rows, char_id_by_name)``. char_id is ``c01``,
-    ``c02``, ... in the order the names appear in ``cast_names``.
-    """
-    cast_rows = []
-    char_id_by_name = {}
-    for i, name in enumerate(cast_names):
-        cid = f"c{i + 1:02d}"
-        cast_rows.append({
-            "char_id":              cid,
-            "name":                 name,
-            "character_description": None,
-            "gender":               None,
-            "voice_preset":         None,
-            "line_count":   0,
-            "word_count":   0,
-        })
-        char_id_by_name[name] = cid
-    return cast_rows, char_id_by_name
+# (lean-mean 2026-08-23) `_build_cast_rows` was here and is DELETED. It built
+# LEGACY-schema cast rows (char_id + seven mostly-None fields) from a list of
+# names and had ZERO callers repo-wide. The live cast path is
+# `nodes/_otr_casting.lock_cast` via `nodes/cast_lock.py`, which builds richer
+# rows and is what every episode actually uses.
 
 
 def _apply_intro_rewrite_result(

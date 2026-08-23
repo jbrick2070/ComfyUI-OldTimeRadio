@@ -493,8 +493,11 @@ def build_voice_card(cast_row) -> str:
         has_sig = "speech_signature" in cast_row
         sig = str(cast_row.get("speech_signature") or "").strip()
     else:
-        # Best-effort attribute access for non-dict shapes (e.g.
-        # CharacterEntry from _otr_cast_contract).
+        # Best-effort attribute access for any non-dict cast row shape. (The
+        # example that used to be named here, CharacterEntry from
+        # _otr_cast_contract, was deleted with that unadopted prototype on
+        # 2026-08-23. This branch is NOT dead: it is shape-agnostic by
+        # construction and still guards any attribute-style row.)
         name = str(getattr(cast_row, "name", "") or "").strip()
         gender = str(getattr(cast_row, "gender", "") or "").strip()
         desc = str(getattr(cast_row, "character_description", "") or "").strip()
