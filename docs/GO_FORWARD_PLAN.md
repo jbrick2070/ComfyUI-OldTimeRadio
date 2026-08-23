@@ -164,30 +164,76 @@ episode -- a possible real module trait, still n=1, worth one seeded A/B.
 
 ### OPEN, IN PRIORITY ORDER
 
-**QUEUE HEAD: GHOST PROMPT V2 -- READY FOR OPUS CODING (2026-08-22).**
+**GHOST PROMPT V2 IS BUILT, PROVEN AND SHIPPED (closed 2026-08-22, Opus coder
+window).** Code + tests: `a8fad82c`, pushed on `v2.0-alpha`, HEAD == origin.
+Receipt: `docs/2026-08-22-ghost-prompt-v2-publish-receipt.md`.
 
-The shipped Ghost v3 family keeps its accepted look/cadence/frame coverage, but
-its beat content prompts are repetitive, occasionally copy/truncate free-text
-intent, and do not provide one clean drawable idea per clip. The operator chose
-controlled abstraction: one short LLM-authored drawable leaf per existing beat,
-with Python-owned `figure`/`object`/`signal` modes and recurrence motif. Style,
-negative, cadence, frame contract, one-beat/one-clip topology, and video-seed
-identity are frozen controls.
+**THE DEFECT IS ON THE RECORD IN ITS OWN BYTES.** The v1 baseline was rendered
+and published FIRST, then all eight of its prompts were reconstructed from the
+pre-change composer (`git show e1265208:...`) and HASH-MATCHED 8/8 against the
+trace. It really did ship cast names inside the picture, ending mid-clause:
 
-**Plan and baton:**
-`docs/2026-08-22-GHOST-PROMPT-V2-CONTROLLED-ABSTRACTION-PLAN.md` and
-`docs/2026-08-22-GHOST-PROMPT-V2-OPUS-HANDOFF.md`. Production code and the
-canonical workflow are untouched. R1-R3 completed; the operator stopped the
-remaining R4 panel and directed handoff to Opus. Do not restart the panel and do
-not use Cursor. A supplemental full v1 v3-peer artifact is archived at
-`C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_after_hours_encounter_20260822_152909\evidence\ghost_prompt_v1_baseline\`;
-the formal official-v3 same-seed A arm is the first action, then implementation,
-full tests/Bug Bible/workflow audits, fresh-server B, OBS publish, commit/push.
-No workflow JSON change is expected because the new object is internal to the
-durable ShotRow.
+    moves with mali vance demands dr sterling hand, Tense mood, scene, ...
+    moves with gulliver reeves forcefully seizes the shredded, ...
 
-**Item A is DONE -- see the closed block directly below. Item B resumes after
-Ghost Prompt v2 ships.**
+and both announcer beats plus both music beats were byte-identical to each
+other. That is what v2 replaces.
+
+**THREE LIVE ARMS, ALL PUBLISHED TO `otr/obs/`:**
+* **A** `signal_lost_disc_of_destiny_20260822_163533` -- v1 prompts, the baseline.
+* **B1** `signal_lost_disc_of_destiny_20260822_171254` -- v2, deterministic leaves.
+* **B2** `signal_lost_turntables_lament_the_last_spin_20260822_174415` -- v2,
+  eight rows `source=writer_llm` on `google/gemma-4-12b-it`, zero fallback,
+  zero replay.
+
+**A vs B1 IS THE SAME-SEED A/B AND IT IS EXACT** -- measured, not assumed: same
+voiced-text SHA, same episode seed, same roles, same frame counts, same eight
+video seeds, same cast, same negative, and **nothing else differs but the
+prompt**. Prompt length fell from 208-317 characters to 164-198, every one
+measured at 32-43 installed SD1 tokens in a single window. **This is the pair to
+eyeball** -- same script, same seeds, one variable.
+
+**A vs B2 is NOT same-script, and the receipt says so rather than implying it.**
+The technical slot also drives the writer's structured passes, so pinning it to
+gemma changed the story. B2 proves the LLM TREATMENT, not a pixel comparison.
+A same-script LLM arm is **not obtainable without reverting code** -- the v1
+content route no longer exists -- which is exactly why the A arm was captured
+before any code changed.
+
+**THE MODEL CHOICE WAS MEASURED, NOT ASSUMED, AND THE FIRST LIVE LEG IS WHY.**
+Mistral-Nemo answered in a perfectly valid envelope but wrote four-word
+abstractions (`signal oscillates, broadcast begins`; `tension builds`), which
+the validator rejected twice and the batch fell to the deterministic pools --
+machinery correct, instruction too thin. The batch template gained worked
+examples AT the target length plus named counter-examples. Then both candidates
+were put to the REAL batch prompt directly, two minutes instead of two renders:
+**gemma-4-12b 8/8 accepted, Mistral-Nemo 4/8** (three rejected for putting a
+hand into `object` mode). A word COUNT is a number a model does not feel; a
+sentence at the target length is one it can match.
+
+**ONE THING IS STILL THE OPERATOR'S CALL AND IS DELIBERATELY NOT DONE:**
+`config/profiles/otr_ghost_signal_v3.json` still pins `technical_model` to
+Mistral-Nemo. B2 pinned gemma PER-LEG via `--set` rather than editing the
+shipped profile, because promoting it would change SCRIPTS on this lane and
+story output is a closed subject. The 8/8-vs-4/8 measurement is the case for
+promoting it; say the word and it is a one-line profile edit.
+
+**A POST-CODING QA PASS CAUGHT A REAL BLOCKER BEFORE THIS LANDED,** and it is
+worth remembering as a class: the writer-release assertion had been written as a
+`finally:` INSIDE node 92's `except Exception -- never break the render`, so a
+writer that failed to release would have been logged as a handled warning and
+the episode would have walked into `run_real_episode` holding writer weights on
+a 16 GB card. **A guard inside the thing that swallows guards is not a guard.**
+The suite was green straight through it, so the replacement test is STRUCTURAL:
+it walks the AST and refuses the call inside any broad-`except` try.
+
+**Gates:** suite **12225 passed / 134 skipped / 1 xfailed**; Bug Bible
+**22/26/3**; canonical validator **23 nodes / 57 links** with the blob still
+`c27dff36`; 54 variants / 0 failures; forbidden sweep 0 runtime hits; BOM /
+0-byte / AST clean. `pyproject.toml` untouched (it is a publish trigger).
+
+**QUEUE HEAD IS NOW ITEM B** (the Ideogram music-card refusal), with items C-F
+behind it.
 
 **A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
 Three green chunks, all pushed on `v2.0-alpha`:
