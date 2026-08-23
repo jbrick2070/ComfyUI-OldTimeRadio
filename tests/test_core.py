@@ -548,61 +548,11 @@ class TestSilenceTrimming:
         assert len(t) == 100
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 13. VRAM GUARDIAN NODE — v1.5 Phase 1
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestVRAMGuardianNode:
-    """Verify OTR_VRAMGuardian node is importable and structurally correct."""
-
-    def test_import(self):
-        from nodes.vram_guardian import VRAMGuardian
-        assert VRAMGuardian is not None
-
-    def test_category(self):
-        from nodes.vram_guardian import VRAMGuardian
-        assert VRAMGuardian.CATEGORY == "OldTimeRadio"
-
-    def test_function_name(self):
-        from nodes.vram_guardian import VRAMGuardian
-        assert VRAMGuardian.FUNCTION == "flush"
-
-    def test_return_types(self):
-        from nodes.vram_guardian import VRAMGuardian
-        assert VRAMGuardian.RETURN_TYPES == ("STRING",)
-
-    def test_input_types_valid(self):
-        from nodes.vram_guardian import VRAMGuardian
-        inputs = VRAMGuardian.INPUT_TYPES()
-        assert "required" in inputs
-        assert "optional" in inputs
-        assert "trigger" in inputs["optional"]
-
-    @requires_torch
-    def test_passthrough_returns_input(self):
-        from nodes.vram_guardian import VRAMGuardian
-        node = VRAMGuardian()
-        result = node.flush(trigger="test_value")
-        assert result == ("test_value",)
-
-    @requires_torch
-    def test_passthrough_empty_default(self):
-        from nodes.vram_guardian import VRAMGuardian
-        node = VRAMGuardian()
-        result = node.flush()
-        assert result == ("",)
-
-    def test_registered_in_init(self):
-        """VRAMGuardian must be in __init__.py NODE_CLASS_MAPPINGS."""
-        init_path = os.path.join(os.path.dirname(__file__), "..", "__init__.py")
-        with open(init_path, encoding="utf-8") as f:
-            src = f.read()
-        assert "OTR_VRAMGuardian" in src
-        assert "vram_guardian" in src
-
-    def test_node_class_mappings(self):
-        from nodes.vram_guardian import NODE_CLASS_MAPPINGS
-        assert "OTR_VRAMGuardian" in NODE_CLASS_MAPPINGS
+# (lean-mean order 5, 2026-08-23) Section 13, TestVRAMGuardianNode, was
+# here. OTR_VRAMGuardian is RETIRED: the manual blanket-unload node
+# conflicted with the targeted-lever VRAM policy, and its id is
+# tombstoned in DELETED_NODE_TYPES so a saved graph naming it fails
+# loudly with a migration message.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

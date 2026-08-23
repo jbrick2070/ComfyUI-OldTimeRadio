@@ -25,7 +25,8 @@ from nodes._otr_shared import role_compat as rc
 from nodes._otr_shared import resolver as rs
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
-from nodes.otr_video_probe import OTRVideoProbe
+# (lean-mean order 5, 2026-08-23) OTR_VideoProbe is retired; the two shells
+# below keep the platform contracts it used to share.
 from nodes.otr_video_director import OTRVideoDirector, ADD_CUSTOM
 from nodes import otr_shot_lock as sl
 from nodes.otr_shot_lock import OTRShotLock
@@ -73,7 +74,7 @@ def test_cold_import_no_heavy_libs():
         "import nodes._otr_shared.engine_registry_base;"
         "import nodes._otr_shared.gpu_residency;"
         "import nodes._otr_shared.portrait_ledger;"
-        "import nodes.otr_video_probe; import nodes.otr_video_director;"
+        "import nodes.otr_video_director;"  # (video_probe retired 2026-08-23)
         "import nodes.otr_shot_lock;"
         "heavy=[m for m in ('torch','transformers','diffusers') if m in sys.modules];"
         "print('HEAVY', heavy);"
@@ -262,7 +263,7 @@ def test_widget_vector_exact():
     assert "seed" not in req  # V-7: no widget literally named 'seed'
 
 
-@pytest.mark.parametrize("cls", [OTRVideoProbe, OTRVideoDirector, OTRShotLock])
+@pytest.mark.parametrize("cls", [OTRVideoDirector, OTRShotLock])
 def test_forceinput_no_widget(cls):
     """No forceInput input may carry a 'widget' sub-key (BUG-LOCAL-258)."""
     it = cls.INPUT_TYPES()
@@ -290,20 +291,17 @@ def test_string_socket_semantic_guard():
 
 def test_no_new_model_id_widget():
     """V-11: none of the new nodes introduce a model_id widget."""
-    for cls in (OTRVideoProbe, OTRVideoDirector, OTRShotLock):
+    for cls in (OTRVideoDirector, OTRShotLock):
         it = cls.INPUT_TYPES()
         names = list(it.get("required", {})) + list(it.get("optional", {}))
         assert "model_id" not in names
 
 
-def test_probe_emits_usable_list(clean_video_registry):
-    host, usable, report = OTRVideoProbe().probe()
-    hc, us = json.loads(host), json.loads(usable)
-    assert "ffmpeg" in hc and "cuda_available" in hc
-    assert us["_all_registered"] == []  # empty registry in CW-1
-    assert "character_video" in us
-    assert "retired_role_b" not in us  # dead role (rip-sfx-broll)
-    assert isinstance(report, str) and "OTR_VideoProbe" in report
+# (lean-mean order 5, 2026-08-23) test_probe_emits_usable_list was here.
+# OTR_VideoProbe is RETIRED with a DELETED_NODE_TYPES tombstone; its
+# usable-engines report is served by /object_info + the canonical runner's
+# preflight gate + render_single. The host-caps facts it surfaced are
+# still pinned by the host_caps tests.
 
 
 def test_director_policy_json_and_clamp(clean_video_registry):

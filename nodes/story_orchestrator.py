@@ -48,8 +48,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
 # Project State (v1.4 Theme C) - series bible for cross-episode consistency.
-# Read-only during generation. See nodes/project_state.py for the write path.
-from .project_state import ProjectState
+# (lean-mean order 5, 2026-08-23) `from .project_state import ProjectState`
+# was here -- imported and never used, the only repo reference to that module.
+# The node and module are retired; the import went with them.
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 

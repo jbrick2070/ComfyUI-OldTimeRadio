@@ -65,6 +65,14 @@ G5_RESERVED_LINK_IDS = frozenset({111, 112})
 # workflow JSON. Listing them here means a stale workflow surfaces
 # at validation time rather than at runtime.
 DELETED_NODE_TYPES = frozenset({
+    # Lean-mean order 5 (2026-08-23): four registered PUBLIC/manual nodes
+    # retired -- none was in the canonical workflow, but a user-saved graph
+    # may name them, and that graph must fail LOUD with a migration message
+    # rather than dying on an unknown node.
+    "OTR_ProjectStateLoader",     # manual series-bible loader
+    "OTR_VRAMGuardian",           # manual blanket unload (targeted levers won)
+    "OTR_SaveToEpisodeWorkspace", # manual FLUX still sink (dispatcher owns stills)
+    "OTR_VideoProbe",             # usable-engines report (/object_info + preflight)
     "OTR_LLMDirector",            # deleted in S2 (commit 249bc06)
     "OTR_BarkTTS",                # legacy single-line node
     "OTR_SFXGenerator",           # legacy single-line node

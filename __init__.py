@@ -170,8 +170,14 @@ _NODE_MODULES = {
     # probes stay OUT of the pack -- they are measurement machinery, and that
     # asymmetry is deliberate.
     "OTR_DMDRestartSamplerSelect": (".nodes._otr_video_engines.dmd_sampler", "OTR_DMDRestartSamplerSelect", " OTR DMD Restart Sampler (predict-x0 + renoise)"),
-    "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      " Project State Loader"),
-    "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            " VRAM Guardian"),
+    # OTR_ProjectStateLoader RETIRED 2026-08-23 (lean-mean order 5): manual
+    # series-bible loader, absent from canonical; its one repo importer was an
+    # UNUSED StoryOrchestrator import. Tombstoned in DELETED_NODE_TYPES.
+    # OTR_VRAMGuardian RETIRED 2026-08-23 (lean-mean order 5): the manual
+    # blanket-unload node conflicted with the targeted-lever VRAM policy (the
+    # model loader owns eviction and now LOGS a failed one by name). The plan
+    # offered retire / debug-gate / rewrite; retire is the only option that
+    # does not preserve a policy exception. Tombstoned in DELETED_NODE_TYPES.
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
     # v2.0 Visual Generation Trio
     # Sidecar-isolated visual (stills/portraits/motion) generation from
@@ -263,7 +269,12 @@ _NODE_MODULES = {
     # couldn't track the in-flight episode_id. Reads the Ledger singleton
     # at runtime and routes images to output/otr/episodes/<ep>/stills/
     # or .../portraits/. Falls back to legacy flat dirs in headless/test.
-    "OTR_SaveToEpisodeWorkspace":  (".nodes.otr_save_to_episode_workspace", "SaveToEpisodeWorkspace", " Save to Episode Workspace (FLUX stills/portraits)"),
+    # OTR_SaveToEpisodeWorkspace RETIRED 2026-08-23 (lean-mean order 5): the
+    # manual FLUX-stills episode sink. Its one known saved consumer,
+    # Documents/ComfyUI/_otr_full_api.json, was VERIFIED GONE from disk before
+    # this retirement -- there is no artifact left to migrate. Production
+    # stills route through OTR_ImageGenDispatcher. Tombstoned in
+    # DELETED_NODE_TYPES.
     # BUG-LOCAL-030 Phase B (2026-05-03 EVENING): post-RTXUpscale procgen
     # visual blend. Overlays 1920x1080 native procgen on the upscaled
     # HuMo + LTX composite at delivery res. Audio passes through with
@@ -288,7 +299,11 @@ _NODE_MODULES = {
     # M4 per-beat creative derivation; supersedes OTR_VideoPlan). Concrete
     # engine adapters + the render path land in later windows.
     # =========================================================================
-    "OTR_VideoProbe":              (".nodes.otr_video_probe",    "OTRVideoProbe",    " Video Probe (usable engines + host caps)"),
+    # OTR_VideoProbe RETIRED 2026-08-23 (lean-mean order 5): the manual
+    # usable-engines/host-caps report, absent from canonical. Its replacements
+    # are named, not implied: /object_info on the running server, the canonical
+    # runner's preflight model gate, and render_single for a one-engine smoke.
+    # Tombstoned in DELETED_NODE_TYPES.
     "OTR_VideoDirector":           (".nodes.otr_video_director", "OTRVideoDirector", " VideoDirector (per-role model select)"),
     "OTR_ShotLock":                (".nodes.otr_shot_lock",      "OTRShotLock",      " Shot Lock (video plan authority)"),
 
