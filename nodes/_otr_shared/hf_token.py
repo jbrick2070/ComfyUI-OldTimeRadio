@@ -1,5 +1,12 @@
 """
-_hf_token.py  --  User-scope HF_TOKEN resolver
+hf_token.py  --  User-scope HF_TOKEN resolver
+=================================================================
+MOVED 2026-08-23 (lean-mean order 6) from visual/_hf_token.py, unchanged in
+behavior: this was the ONE live startup dependency inside the retired visual/
+POC tree -- the package __init__ calls ensure_hf_token() at load so gated
+models (Gemma, Mistral, FLUX-dev) do not 401 on first download. It lives in
+_otr_shared now because it is exactly that: shared, pure-stdlib startup
+infrastructure with no visual anything about it.
 =================================================================
 Reads HF_TOKEN from the Windows user environment (HKCU\\Environment)
 because the running ComfyUI process often does not inherit it.
@@ -19,7 +26,7 @@ Design intent:
       importable on Linux/macOS test environments without errors.
 
 Usage:
-    from otr_v2.visual._hf_token import ensure_hf_token
+    from nodes._otr_shared.hf_token import ensure_hf_token
     token = ensure_hf_token()  # idempotent, safe to call repeatedly
 """
 
@@ -28,7 +35,7 @@ from __future__ import annotations
 import logging
 import os
 
-log = logging.getLogger("OTR.visual._hf_token")
+log = logging.getLogger("OTR.hf_token")
 
 _HF_TOKEN_CACHE: dict[str, str | None] = {"value": None, "resolved": False}
 _REG_KEY = "Environment"

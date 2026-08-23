@@ -75,7 +75,9 @@ warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\
 #    401 on first download.  Pull the token from the user registry now and
 #    export it into os.environ so every downstream loader picks it up.
 try:
-    from .visual._hf_token import ensure_hf_token
+    # (moved from .visual._hf_token 2026-08-23, lean-mean order 6 -- the
+    # one live dependency the retired visual/ POC tree carried)
+    from .nodes._otr_shared.hf_token import ensure_hf_token
     ensure_hf_token()
 except Exception as _hf_err:
     log.debug("[OldTimeRadio] HF_TOKEN bake-in skipped: %s", _hf_err)
@@ -179,24 +181,16 @@ _NODE_MODULES = {
     # offered retire / debug-gate / rewrite; retire is the only option that
     # does not preserve a policy exception. Tombstoned in DELETED_NODE_TYPES.
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
-    # v2.0 Visual Generation Trio
-    # Sidecar-isolated visual (stills/portraits/motion) generation from
-    # the L3 ledger (replaces the legacy OTR Director output the visual
-    # bridge used to read). Audio path NEVER touched. Falls back to
-    # OTR_SignalLostVideo on failure.  See docs/OTR_PIPELINE_EXPLAINER.md
-    "OTR_VisualBridge":         (".visual.bridge",            "VisualBridge",         " Visual Bridge"),
-    "OTR_VisualPoll":           (".visual.poll",              "VisualPoll",           " Visual Poll"),
-    "OTR_VisualRenderer":       (".visual.renderer",          "VisualRenderer",       " Visual Renderer"),
-    "OTR_VisualPromptCoercion": (".visual.prompt_coercion",   "VisualPromptCoercion", " Visual Prompt Coercion"),
-    # S30 B5 (2026-05-14): OTR_VisualLLMSelector node + visual/llm_selector.py
-    # DELETED. The visual-polish path now consumes the writer's broadcast
-    # `creative_writing_model` socket directly (the selector was a
-    # redundant local model picker that duplicated the writer's surface).
-    # visual/llm_polish.py's _POLISH_CACHE module-level dict + _load_model()
-    # function were collapsed into the modern _otr_model_loader.LLM_CACHE
-    # in the same commit (Prime Directive 2: never double-load
-    # Mistral-Nemo on the 16 GB card).
-    "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
+    # The v2.0 "Visual Generation Trio" POC is RETIRED 2026-08-23 (lean-mean
+    # order 6): OTR_VisualBridge / OTR_VisualPoll / OTR_VisualRenderer /
+    # OTR_VisualPromptCoercion / OTR_VisualExtractFluxPrompt, plus the whole
+    # visual/ tree behind them (worker CLI, wedge probe, legacy backends).
+    # All five public ids are tombstoned in DELETED_NODE_TYPES. The one LIVE
+    # thing that tree carried -- the HF_TOKEN startup bake-in above -- was
+    # moved to nodes/_otr_shared/hf_token.py and PROVEN working from its new
+    # home before this deletion. Production visuals are the model-agnostic
+    # platform: OTR_ImageGenDispatcher for stills, OTR_VideoRenderBatch for
+    # motion.
     # OTR_FluxBranchGate -- DELETED in the Chunk E cleanbreak completion
     # (2026-06-09). The Sprint H 3.7 FLUX topology gate only sequenced the
     # legacy FLUX batch chain (deleted in the CW cleanbreak); the platform

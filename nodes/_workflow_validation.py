@@ -73,6 +73,13 @@ DELETED_NODE_TYPES = frozenset({
     "OTR_VRAMGuardian",           # manual blanket unload (targeted levers won)
     "OTR_SaveToEpisodeWorkspace", # manual FLUX still sink (dispatcher owns stills)
     "OTR_VideoProbe",             # usable-engines report (/object_info + preflight)
+    # Lean-mean order 6 (2026-08-23): the five-node visual/ POC retired with
+    # its tree; the HF_TOKEN startup dependency moved to _otr_shared first.
+    "OTR_VisualBridge",
+    "OTR_VisualPoll",
+    "OTR_VisualRenderer",
+    "OTR_VisualPromptCoercion",
+    "OTR_VisualExtractFluxPrompt",
     "OTR_LLMDirector",            # deleted in S2 (commit 249bc06)
     "OTR_BarkTTS",                # legacy single-line node
     "OTR_SFXGenerator",           # legacy single-line node
