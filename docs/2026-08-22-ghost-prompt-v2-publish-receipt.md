@@ -210,6 +210,89 @@ for promoting it; the decision is not a coder's to make silently.
 
 ---
 
+## 4A. THE OPERATOR WATCHED IT AND IT HAD TANKED THE PICTURES
+
+**This section exists because everything above it was true and still added up to
+a worse show.** Sections 1-4 record a clean build: the text defect was real, the
+fix was measured, the control vector was exact, the suite was green and three
+episodes published. Then the operator watched them and said the AnimateDiff
+winners had tanked. He was right, and nothing in the receipt above would have
+told him so -- every gate this sprint passed was a gate on TEXT.
+
+### What the pixels say
+
+Counting recognisable subjects, frame 40 of every beat, all five arms:
+
+| arm | recognisable | what is actually on screen |
+|---|---:|---|
+| v1 prompts, `video_art` (the one he remembers as the winner) | **4 human figures** + 4 vivid abstracts | a man standing in a gallery, a figure in motion, a capped silhouette, a dancer |
+| v1 prompts, `archival` | **4 of 4** | a period radio set, a figure at a lectern, a document, a tuning dial |
+| v2, LLM leaves, `archival` | 2 of 8 | a lantern on a post, a dial -- the rest is texture |
+| v2, deterministic, `archival` | 0 of 4 sampled | stripes, static, black blobs |
+| v2, LLM leaves, `anime` | **0 of 8** | pattern noise, no subject anywhere |
+
+### The mechanism, and it is falsifiable
+
+Legibility tracks **how much concrete noun is in the prompt**, and nothing else.
+The two v2 beats that survived are the only two whose authored leaf named a real
+object -- a lantern and a radio dial. Every mush beat named `emblem`, `signal`,
+`field` or `waveform`.
+
+v1 handed SD1.5 *"a man, a broad steady figure, a charcoal coat, holding a
+folded chart"* and got a man in a coat. v2 handed it *"charcoal ledger emblem"*
+plus *"an abstract signal field filling the composition"*, and a 512x288 SD1.5
+obliged by painting texture. **The mode laws were literally instructions toward
+abstraction.**
+
+### The honest self-assessment
+
+Two changes shipped where only one was needed. Removing the name leak and the
+mid-clause fragment was right and that machinery is untouched. Replacing the
+CONCRETE SUBJECT with an abstract one was a separate, unforced change, and it is
+what broke the pictures. The plan's premise -- *prefer abstract coolness over
+rigid character likeness* -- was the operator's call and remains reasonable; what
+this lane proved is that on THIS model, abstraction without a noun is not cool,
+it is mush.
+
+**No gate in this sprint could have caught it, and that is the transferable
+lesson.** Every check was on the text: token count, character count, name
+absence, dangling tails, component survival. All of them passed. A prompt lane's
+acceptance needs at least one countable question about the PICTURE.
+
+### v2.1 -- what was changed (`f6075592`, `633e68a7`)
+
+* mode laws name a physical thing: an object on a real surface, an object lit
+  against a dark room. No more "abstract field filling the composition".
+* the motif is the prop ITSELF -- `a charcoal lantern`, not
+  `charcoal lantern emblem`. An emblem is not a thing.
+* `figure` says FIGURE and wears a garment. SD1.5 does not know a "silhouette"
+  is meant to be somebody; handed one it drew vertical black shapes.
+* bookends name real radio hardware: a bakelite radio set, a spinning turntable.
+* `GHOST_CHARACTER_CYCLE` is figure/object/figure/signal -- half the character
+  beats show a person again. The even three-mode cycle made two of every three
+  non-figurative and the episode lost its people. This still honours *"do not
+  force the same mediocre person into every clip"*.
+* a leaf naming a texture (static, waveform, gradient, noise, grain) is rejected.
+
+**A second live leg then caught a bug no unit test would have.** `_HUMAN_WORDS`
+carried hand/arm/shoulder, so `object` mode rejected *"the silver ledger sits on
+a desk as a clock hand ticks"* -- a CLOCK hand -- and, because one bad leaf
+rejects the whole batch by design, that killed all eight beats twice and dropped
+the episode to deterministic clauses. Body parts are off the list; a whole figure
+is still refused outside `figure` mode.
+
+### What is proven and what is NOT
+
+* **Proven:** the v2.1 concrete POOLS render subjects again. On `video_art`,
+  roughly 3-4 of 8 beats read as a real thing (a radio set with dial-eyes, a
+  metal object on wood, silhouetted figures) against 0-2 before.
+* **NOT proven at the time of writing:** v2.1 with real LLM leaves. That leg
+  ran `deterministic_fallback=8` because it started before the clock-hand fix.
+  The decisive arm -- v2.1, `writer_llm`, `archival_documentary`, the pack where
+  v1 scored 4 of 4 -- is owed and is not claimed here.
+
+---
+
 ## 5. Admissions
 
 * **No new PBUG and no new Bug Bible entry.** The v1 fragment is reproducible
@@ -218,6 +301,15 @@ for promoting it; the decision is not a coder's to make silently.
   (`BUG_BIBLE.yaml` 12.127 territory); this sprint added executable coverage
   rather than a new portable rule.
 * **NO VRAM CLAIM.** No ceiling was measured or enforced on these legs.
+* **THE RANKING IS THE DRIVER'S OWN EYE, and it is stated as such.** The frames
+  were read directly and counted; that is a judgement, not an instrument. An
+  agy/Antigravity lane was asked to rank the mp4s and **could not watch video
+  at all** -- it returned a critique of the request document and zero ranking,
+  which is reported rather than dressed up. A separate Antigravity review of
+  the CODE did read the frames and independently counted 0 human faces across
+  the v2 samples, agreeing with the driver. One of that review's claims was
+  discarded against the real file: it said the Ghost v3 profile still pinned
+  Mistral-Nemo, and `ab0a7809` had already promoted it to gemma-4-12b.
 * **The boot-time `basline-models` warning is pre-existing and benign** -- ComfyUI
   warns about every sibling directory under `custom_nodes` that is not a node
   pack, and the VRAM workbench is one. It carries a traceback, which cost one
