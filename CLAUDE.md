@@ -311,6 +311,20 @@ swept dir to be moved later.
   "finished but resident" server (section 5) from a real miss. Missing = STOP and report; do not continue.
 - Paths are relative to the repo root (`...\ComfyUI-OldTimeRadio\`). If `otr\` actually resolves to
   ComfyUI's real `output\` base on disk, use that base -- but the episodes/obs split holds either way.
+### 6A. THE MODELS ROOT IS `C:\ComfyUI-Models` -- NOT a folder under the repo or the ComfyUI tree
+**Written 2026-08-22 because this window searched the wrong tree and reported a model MISSING
+that was on disk all along.** The weights do NOT live under
+`C:\Users\jeffr\Documents\ComfyUI\models\` (that tree exists and holds *some* things, which is
+exactly what makes the mistake convincing) and they do NOT live under the ComfyUI-Installs tree.
+- **The authority is `nodes/_otr_gguf_backend.py::_models_root()`** -- read it rather than
+  guessing: `OTR_COMFYUI_MODELS_ROOT` -> `COMFYUI_MODELS_ROOT` -> default **`C:\ComfyUI-Models`**.
+- **GGUF writers resolve to `<models_root>\LLM\converted\<subdir>\<file>`**, e.g.
+  `C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf` (7.12 GB, present).
+  `GEMMA4_12B_GGUF_PATH` is a whole-path escape hatch for the GEMMA row ONLY.
+- **A `find` under the repo or under `Documents\ComfyUI` proves NOTHING about model presence.**
+  Before telling the operator a model is missing -- or proposing a multi-GB download -- resolve
+  the path through the code above and `Test-Path` THAT. A false "missing" costs him a download
+  he does not need and costs you the profile leg you were about to skip.
 ## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
 - ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.

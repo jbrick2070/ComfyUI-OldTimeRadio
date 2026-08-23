@@ -24,22 +24,11 @@ class WordDeliveryError(ValueError):
     """Invalid requested-length metadata supplied by a producer."""
 
 
-def _positive_int(value: Any) -> int | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        number = int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    if number <= 0:
-        return None
-    try:
-        if float(value) != float(number):
-            return None
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return number
-
+# (lean-mean 2026-08-22) ``_positive_int`` was here and is DELETED. It validated
+# a REQUESTED word length -- and since 2026-08-14 nothing is requested up front,
+# so its only caller went with the word authority. The module docstring above
+# already says there is no target to record; this removes the last helper that
+# still existed to police one.
 
 
 def stamp_contract(

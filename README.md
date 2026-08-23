@@ -66,9 +66,11 @@ the local writer LLM (Gemma or your own choice), Z-Image-Turbo, and the default 
 weights (IndexTTS2, Kokoro, Stable Audio 3). The heavier local video checkpoints — HuMo, LTX,
 Wan, AnimateDiff, MiniMax H3 — are **optional upgrades** you dial in later via the
 `OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
-before downloading any of them. If a model is missing, the engine fails **loudly** and the
-pipeline falls back to the guaranteed CRT floor — it never silently produces garbage. Watch the
-console on the first run; it names any missing weight and where it expects it.
+before downloading any of them. If a model is missing, the engine fails **loudly** and stops —
+it never silently substitutes another model or quietly produces garbage. There is no automatic
+fallback: the procedural CRT path is a route you **select** (and the canonical workflow ships
+with it selected), not a net that catches a failed engine. Watch the console on the first run;
+it names any missing weight and where it expects it.
 
 ### 4. Run it
 
@@ -271,8 +273,10 @@ be COMPLETE for every downstream consumer) lives in
 
 The video layer is **model-agnostic**: a registry of pluggable engine adapters, chosen
 **per role**, with no single model treated as "primary." You pick the engine for each kind of
-beat; every chain ends at a guaranteed CRT "radio-floor" clip, so a missing or OOMing engine
-**degrades loudly** and never aborts the episode or touches the frozen audio.
+beat, and that pick is honoured exactly: a missing or OOMing engine **fails loudly** and stops
+the render rather than swapping in a substitute you did not choose. The frozen audio is never
+touched either way. If you want the zero-GPU procedural CRT path, select it — it is the
+canonical workflow's shipped default, not a rescue lane.
 
 **Roles** (each selectable in `OTR_VideoDirector`):
 
@@ -423,7 +427,8 @@ appear there as they render.
   (The shipped launcher `scripts/_otr_soak_server_launch.cmd` already sets both, and a
   regression guard in the sibling survival-guide repo keeps it that way.)
 - **An engine "fails loudly" mid-render** — that's by design; check the log for the missing
-  model/dependency. The beat falls back to a CRT floor so the episode still completes.
+  model/dependency. The render stops there rather than substituting a different engine, so fix
+  the named dependency (or select the procedural CRT path) and run it again.
 - **Out of VRAM on a local video tier** — use the canonical procedural path or an
   explicit lighter/cloud profile.
 - **No audio under the end credits** — known limitation: the credits scroll can outlast the

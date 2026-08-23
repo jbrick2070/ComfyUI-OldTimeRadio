@@ -1977,25 +1977,37 @@ def _write_story_treatment(out_path, episode_title, led,
         # original_radio stamps "STORY ORIGIN"). Legacy default holds.
         _news_raw = (news_used or "").strip()
         _origin_label = "NEWS SEED"
-        if _news_raw.startswith("["):
-            try:
-                _lbl_entries = _json.loads(_news_raw)
-                if _lbl_entries and isinstance(_lbl_entries[0], dict):
-                    _origin_label = str(
-                        _lbl_entries[0].get("origin_label") or "NEWS SEED")
-            except Exception:
-                pass
-        W_(_origin_label)
-        W_(BAR)
+        # PARSED ONCE. This block used to call `_json.loads(_news_raw)` twice on
+        # the identical string -- once for the label, once for the headlines --
+        # so a malformed payload was decoded, discarded and re-decoded, and BOTH
+        # failures were swallowed by a bare `except: pass`. One parse, one
+        # log-continue: the card still renders on the legacy defaults, but the
+        # reason it fell back is now on the record instead of being invisible.
+        _seeds = None
+        _parse_failed = False
         if _news_raw.startswith("["):
             try:
                 _seeds = _json.loads(_news_raw)
-                news_clean = " | ".join(
-                    str(s.get("headline", s) if isinstance(s, dict) else s)[:80]
-                    for s in _seeds[:3]
-                ) if _seeds else ""
-            except Exception:
-                news_clean = _news_raw[:120]
+            except Exception as news_err:  # noqa: BLE001 -- optional metadata
+                _parse_failed = True
+                log.info(
+                    "[OTR.credits] news payload looked like JSON but did not "
+                    "parse (%s: %s); using the raw text and the legacy %r "
+                    "label. The episode is unaffected.",
+                    type(news_err).__name__, news_err, _origin_label)
+            else:
+                if _seeds and isinstance(_seeds[0], dict):
+                    _origin_label = str(
+                        _seeds[0].get("origin_label") or "NEWS SEED")
+        W_(_origin_label)
+        W_(BAR)
+        if _parse_failed:
+            news_clean = _news_raw[:120]
+        elif _seeds is not None:
+            news_clean = " | ".join(
+                str(s.get("headline", s) if isinstance(s, dict) else s)[:80]
+                for s in _seeds[:3]
+            ) if _seeds else ""
         else:
             news_clean = _news_raw.split("\n")[0][:120]
         W_(f"  {news_clean if news_clean else '(no news seed - custom premise used)'}")

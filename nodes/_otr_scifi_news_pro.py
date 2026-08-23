@@ -242,18 +242,15 @@ _DIGEST_DATE_CHAR_CAP = 64
 _DIGEST_SUMMARY_CHAR_CAP = 720
 _DIGEST_FRAME_TRIM_MARK = " [...TRIMMED]"
 
-# RETIRED 2026-08-14: this mapped a WORD TOTAL to a scene count. The scene
-# count follows the act topology now. Kept only as a tombstone reference.
-_RETIRED_SCENE_COUNT_TABLE: "tuple[tuple[int, int], ...]" = (
-    (164, 1),
-    (274, 2),
-    (384, 3),
-    (494, 4),
-    (604, 5),
-    (714, 6),
-    (824, 7),
-    (2_147_483_647, 8),
-)
+# RETIRED 2026-08-14: a table here mapped a WORD TOTAL to a scene count (rising
+# thresholds 164..824 -> 1..8 scenes). The scene count follows the act topology
+# now, and word count is never a gate (operator: "we never chase word count").
+#
+# (lean-mean 2026-08-22) The eight rows themselves are deleted; this note is the
+# tombstone. The knowledge worth keeping is WHY it went -- scene count is a
+# structural property, not a function of length -- and that survives in prose.
+# The data did not: nothing read it, and a retired lookup table sitting in
+# source reads like a live policy to the next person who greps for it.
 
 # The finite P0 source dossier may retain a source-proof reservation. Every
 # prose-bearing pass below uses the provider's remaining output capacity.

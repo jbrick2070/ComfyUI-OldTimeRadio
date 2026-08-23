@@ -22,10 +22,18 @@ from pydantic import BaseModel, ConfigDict, Field
 #: hard-locked to ``per_object`` (per_beat -> mesh-rebuild-per-beat; BANNED).
 GRANULARITY_MODES: tuple = ("per_object", "per_beat")
 
-#: Request-level input tokens an image engine may require (shared vocabulary with
-#: ``role_compat``). An image engine needs ``text_prompt``; an edit/img2img
-#: variant may additionally need ``init_image``.
-IMAGE_INPUT_TOKENS: tuple = ("text_prompt", "init_image")
+# (lean-mean 2026-08-22) ``IMAGE_INPUT_TOKENS`` was here and is DELETED. It
+# advertised itself as "shared vocabulary with role_compat" and was neither:
+# nothing in the repo read it, and the vocabulary it claimed to share was a
+# 2-token subset of the 4-token frozenset that is actually enforced --
+# ``nodes/_otr_shared/role_compat.INPUT_TOKENS`` ({text_prompt, init_image,
+# audio_ref, base_clip_ref}), checked at role_compat.py's
+# ``required_set <= INPUT_TOKENS`` gate.
+#
+# So it was worse than dead: it was a DECOY. An author adding an image engine
+# would have consulted it, seen two legal tokens, and had no way to learn that
+# the real gate accepts four and lives in another module. One vocabulary, one
+# owner -- import from ``role_compat`` if you need the token set.
 
 
 class _Forbid(BaseModel):

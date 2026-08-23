@@ -104,41 +104,19 @@ def _runtime_log(msg):
         log_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "otr_runtime.log")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{ts}] {msg}\n")
-    except: pass
+    except Exception:
+        # STAYS SILENT, DELIBERATELY, AND ONLY THIS ONE DOES. This function IS
+        # the heartbeat logger, so reporting its own failure through itself
+        # recurses, and a monitoring write must never kill an episode.
+        # Narrowed from a bare `except:` so a KeyboardInterrupt / SystemExit
+        # during the write propagates instead of being swallowed by the log.
+        pass
 
-def _truncate_at_sentence_boundary(text: str, max_chars: int) -> str:
-    """Truncate text to max_chars, trying to back up to the nearest sentence boundary."""
-    if len(text) <= max_chars:
-        return text
-    
-    truncated = text[:max_chars]
-    # Look for the last terminal punctuation
-    match = re.search(r'([.!?])(?=\s|$)[^.!?]*$', truncated)
-    if match:
-        return truncated[:match.end()]
-    
-    # If no punctuation found, just back up to last space
-    last_space = truncated.rfind(' ')
-    if last_space > 0:
-        return truncated[:last_space] + '...'
-    return truncated + '...'
-
-def _tail_at_sentence_boundary(text: str, target_chars: int) -> str:
-    """Take the LAST target_chars of text, walking forward to the next sentence start."""
-    if len(text) <= target_chars:
-        return text
-        
-    tail = text[-target_chars:]
-    # Find the FIRST terminal punctuation in the tail
-    match = re.search(r'[.!?]\s+', tail)
-    if match:
-        return tail[match.end():]
-        
-    # If no punctuation, walk forward to first space
-    first_space = tail.find(' ')
-    if first_space > 0:
-        return tail[first_space+1:]
-    return tail
+# (lean-mean 2026-08-22: the FIRST _truncate_at_sentence_boundary /
+# _tail_at_sentence_boundary bodies lived here and were permanently shadowed by
+# a later same-named pair ~2200 lines down -- which was itself uncalled. All
+# four are deleted. tests/test_no_duplicate_top_level_defs.py now refuses the
+# pattern, so it cannot come back silently the way it did here twice.)
 
 # (rip-sfx 2026-08-06: the [SFX:]-emitting _inject_scene_transitions body that
 # lived here was dead code -- permanently shadowed by a later same-named
@@ -2309,42 +2287,20 @@ class GemmaHeartbeatStreamer(BaseStreamer):
 
 
 # -----------------------------------------------------------------------------
-# v1.4 Theme B - Sentence-boundary truncation helpers
+# (lean-mean 2026-08-22) The "v1.4 Theme B sentence-boundary truncation helpers"
+# block lived here: _SENTENCE_END_CHARS, _BOUNDARY_SCAN_WINDOW, and the SECOND
+# _truncate_at_sentence_boundary / _tail_at_sentence_boundary bodies.
 #
-# Replace the old `acts[-1][:3000]` / `acts[-1][-500:]` hard slices with
-# boundary-aware truncation so the chunked context never hands Phase B a
-# half-sentence. Both helpers fall back to hard truncation if no sentence
-# boundary is found within a reasonable scan window - telemetry, not magic.
+# All of it is gone. The pair here won the module-level rebinding against an
+# earlier same-named pair ~2200 lines up, and then had zero callers anywhere in
+# the repo -- so BOTH copies were unreachable, by two different mechanisms, and
+# the two constants existed only to serve them. Removing the functions orphaned
+# the constants in the same pass, which is why a dead-symbol sweep is iterative.
+#
+# The live rule for where a shortened line may end is
+# nodes/_otr_shared/text_tails.py, and the shadowing pattern itself is now
+# refused by tests/test_no_duplicate_top_level_defs.py.
 # -----------------------------------------------------------------------------
-
-# Sentence-ending punctuation recognized by the boundary walkers.
-_SENTENCE_END_CHARS = ".!?"
-# How far to walk looking for a boundary before giving up and hard-cutting.
-_BOUNDARY_SCAN_WINDOW = 300
-
-
-def _truncate_at_sentence_boundary(text, max_chars):
-    """Truncate `text` at the last sentence boundary before `max_chars`.
-
-    Walks backward from the cut point looking for sentence-ending punctuation
-    (`.`, `!`, `?`) followed by whitespace or end-of-string, or a blank-line
-    paragraph break. If nothing is found in the last `_BOUNDARY_SCAN_WINDOW`
-    characters the function falls back to a hard cut so the caller never gets
-    an oversized string.
-    """
-    if not text or len(text) <= max_chars:
-        return text
-    snippet = text[:max_chars]
-    lower_bound = max(0, len(snippet) - _BOUNDARY_SCAN_WINDOW)
-    for i in range(len(snippet) - 1, lower_bound, -1):
-        ch = snippet[i]
-        if ch in _SENTENCE_END_CHARS:
-            next_ch = snippet[i + 1] if i + 1 < len(snippet) else ""
-            if next_ch in ("", " ", "\n", "\r", "\t", '"', "'"):
-                return snippet[: i + 1]
-        if ch == "\n" and i + 1 < len(snippet) and snippet[i + 1] == "\n":
-            return snippet[:i]
-    return snippet
 
 
 # This lets the next phase automatically inherit the exact same model memory
@@ -2360,34 +2316,9 @@ _CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"
 # ============================================================================
 
 
-def _tail_at_sentence_boundary(text, max_chars):
-    """Return the trailing region of `text` starting at a sentence boundary.
-
-    Used for the "last N chars for dialogue continuity" case. Walks forward
-    from `len(text) - max_chars` looking for the start of a fresh sentence so
-    the caller never receives a tail that begins mid-word. If no sentence
-    boundary is found within the scan window, falls back to the next word
-    boundary (space or newline) so the tail still never starts mid-word.
-    """
-    if not text or len(text) <= max_chars:
-        return text
-    start = len(text) - max_chars
-    snippet = text[start:]
-    scan = min(_BOUNDARY_SCAN_WINDOW, len(snippet) - 1)
-    for i in range(scan):
-        ch = snippet[i]
-        if ch in _SENTENCE_END_CHARS:
-            next_ch = snippet[i + 1] if i + 1 < len(snippet) else ""
-            if next_ch in (" ", "\n", "\r", "\t"):
-                return snippet[i + 2 :].lstrip()
-        if ch == "\n" and i + 1 < len(snippet) and snippet[i + 1] == "\n":
-            return snippet[i + 2 :].lstrip()
-    # Word-boundary fallback: no sentence end found in the window, so at least
-    # start from the next whitespace so the tail is not mid-word.
-    for i in range(min(50, len(snippet))):
-        if snippet[i] in (" ", "\n", "\r", "\t"):
-            return snippet[i + 1 :].lstrip()
-    return snippet
+# (lean-mean 2026-08-22: the SECOND, shadowing _tail_at_sentence_boundary body
+# was here -- same story as its sibling above: it won the rebinding and had no
+# caller. Deleted.)
 
 
 # (rip-sfx 2026-08-06: the second, shadowing _inject_scene_transitions body and

@@ -341,7 +341,17 @@ def load_llm(
             comfy.model_management.unload_all_models()
             comfy.model_management.soft_empty_cache()
             _runtime_log("[StoryOrchestrator] Zero-Prime: ComfyUI Models Evicted.")
-        except: pass
+        except Exception as evict_err:  # noqa: BLE001 -- eviction is best-effort
+            # NAMED, never swallowed. A failed global eviction leaves ComfyUI's
+            # models resident, and on a 16 GB card that is the usual cause of an
+            # OOM several stages later -- which used to be undiagnosable because
+            # a failed wash and a successful one produced identical logs.
+            # Still non-fatal: the gc/empty_cache/ipc_collect below reclaim what
+            # they can, and a reset attempt must not abort the episode.
+            _runtime_log(
+                f"[StoryOrchestrator] Zero-Prime: ComfyUI model eviction FAILED "
+                f"({type(evict_err).__name__}: {evict_err}); models may remain "
+                f"resident -- suspect this first if a later stage OOMs.")
 
         import gc
         gc.collect()
