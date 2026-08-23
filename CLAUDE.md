@@ -357,6 +357,28 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   returns 401 "user not found".** Claude cannot delete a listing; the operator clicks it. Deletion
   is also EVENTUALLY consistent: the version list can serve stale reads from different replicas
   for minutes afterward. Read it 2-3 times before concluding anything.
+- **`[project] dependencies` MUST BE A STATIC LIST, and it must be kept in sync with
+  requirements.txt BY HAND.** The registry reads that literal field; it does NOT evaluate
+  setuptools' `dynamic = ["dependencies"]` + `[tool.setuptools.dynamic]`. Proven the hard way on
+  2026-08-22: alpha.3 shipped with the dynamic form and the registry still recorded
+  `dependencies: []`; alpha.4 with a static list recorded all 12. A pack published with `[]`
+  installs its code with NONE of its libraries. Verify after every publish:
+  `curl https://api.comfy.org/nodes/comfyui-old-time-radio/versions` and check the count.
+- **"No nodes found" on a registry node PAGE is NOT a signal that the pack is broken.**
+  Established 2026-08-22 by comparing against working packs: ComfyUI-DramaBox -- Active, correct
+  static deps, a real shipped pack -- displays no nodes either, and `/nodes/<id>/comfy-nodes`
+  returns 404 for EVERY pack sampled (propost, kjnodes, rgthree, dramabox, cache-cleaner). That
+  panel is fed by a separate extraction service that evidently does not populate for most packs.
+  **The only trustworthy test is the LOCAL one: install, restart ComfyUI, and look for the OTR
+  nodes in the node menu / the ComfyUI console for `[OldTimeRadio]` lines.** Do not diagnose from
+  the registry page, and do not send the operator chasing a phantom because of it.
+- **`__init__.py` loads each node in its OWN try/except, and that is deliberate** (partial-install
+  resilience). Consequence for debugging: a missing dependency SKIPS the affected node and prints
+  `[OldTimeRadio] Skipped '<name>': <reason>` -- it does NOT zero out the pack. Proven by loading
+  the real published zip with every requirements.txt dep blocked: 32/34 nodes still registered.
+  So **a TOTAL zero-node outcome is NOT explained by missing dependencies** -- if you ever see a
+  true zero, look for the pack not being loaded at all (wrong dir, prestartup death, ComfyUI never
+  scanning it), not for a missing library.
 ## 8. ROUNDTABLE DEFAULTS (operator directive 2026-06-22)
 Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's stock
 "Claude is judge-only / panel only critiques" and "dry-run estimate first" defaults.
