@@ -1785,7 +1785,8 @@ def _ghost_unload_writer(warnings):
             "writer weights")
 
 
-def _ghost_validate_batch(leaves, specs, style, meta, names):
+def _ghost_validate_batch(leaves, specs, style, meta, names,
+                          already_used=()):
     """Raise unless EVERY leaf in the batch is acceptable.
 
     Whole-batch, deliberately. Salvaging the good rows and re-asking for the
@@ -1793,7 +1794,13 @@ def _ghost_validate_batch(leaves, specs, style, meta, names):
     each row happened to take, which is neither reproducible nor auditable.
     """
     _gsa, _gsp = _ghost_modules()
-    seen = {}
+    # SEEDED WITH THE REPLAYED LEAVES. Uniqueness is a property of the EPISODE
+    # the viewer watches. The deterministic path was given `already_used` and
+    # the authored path was not, so a freshly written leaf could duplicate a
+    # replayed one and nothing would notice. Case-folded so both paths agree on
+    # what "the same" means.
+    seen = {str(leaf).casefold(): "a replayed row"
+            for leaf in (already_used or ())}
     for spec in specs:
         leaf = leaves.get(spec["id"], "")
         ok, reason = _gsa.validate_drawable_beat(
@@ -1801,7 +1808,7 @@ def _ghost_validate_batch(leaves, specs, style, meta, names):
         if not ok:
             raise _gsa.GhostAuthorValidationError(
                 "leaf for %s rejected (%s): %r" % (spec["id"], reason, leaf))
-        key = leaf.lower()
+        key = leaf.casefold()
         if key in seen:
             raise _gsa.GhostAuthorValidationError(
                 "leaf for %s repeats the one written for %s: %r"
@@ -1835,22 +1842,44 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
     ids = [spec["id"] for spec in specs]
     reason = ""
     for attempt in (1, 2):
+        # THE RETRY IS A DIFFERENT QUESTION, NOT THE SAME ONE ASKED TWICE.
+        # Attempt 2 used to re-send byte-identical text at temperature 0.1 --
+        # near greedy -- so a model that wrote a four-word leaf wrote it again
+        # and the batch fell to deterministic clauses having spent two
+        # generations to learn nothing. That is exactly how the clock-hand
+        # false positive cost two live episodes. Now the rejection reasons go
+        # back with the request and the sampler runs warmer.
+        message = prompt
+        temperature = _gsa.GHOST_BATCH_TEMPERATURE
+        if attempt > 1 and reason:
+            message = "%s\n\nYOUR PREVIOUS ANSWER WAS REJECTED: %s\nFix ONLY that and answer again in the same JSON shape." % (prompt, reason)
+            temperature = _gsa.GHOST_BATCH_RETRY_TEMPERATURE
         try:
-            raw = gen([{"role": "user", "content": prompt}],
-                      temperature=_gsa.GHOST_BATCH_TEMPERATURE,
-                      max_new_tokens=budget)
+            raw = gen([{"role": "user", "content": message}],
+                      temperature=temperature, max_new_tokens=budget)
+        except Exception as exc:  # noqa: BLE001 -- the GENERATION call only
+            reason = "attempt %d generation failed: %s" % (attempt, exc)
+            warnings.append("Ghost author %s" % reason)
+            log.warning("[OTR_ShotLock] Ghost author: %s", reason)
+            continue
+        # NARROW ON PURPOSE. A broad `except Exception` around the parse and
+        # the validators laundered a programming error in OUR OWN code into
+        # "the model failed", and the episode quietly took deterministic
+        # clauses instead of failing loud. Only a rejected CANDIDATE is caught
+        # here; anything else is a bug and must surface.
+        try:
             leaves = _gsa.parse_batch_response(raw, ids)
-            _ghost_validate_batch(leaves, specs, style, meta, names)
-            if attempt > 1:
-                log.warning("[OTR_ShotLock] Ghost author: batch accepted on "
-                            "the retry")
-            return leaves, "writer_llm", ""
+            _ghost_validate_batch(leaves, specs, style, meta, names,
+                                  already_used=already_used)
         except _gsa.GhostAuthorError as exc:
             reason = "attempt %d rejected: %s" % (attempt, exc)
-        except Exception as exc:  # noqa: BLE001 -- generation, not a load
-            reason = "attempt %d generation failed: %s" % (attempt, exc)
-        warnings.append("Ghost author %s" % reason)
-        log.warning("[OTR_ShotLock] Ghost author: %s", reason)
+            warnings.append("Ghost author %s" % reason)
+            log.warning("[OTR_ShotLock] Ghost author: %s", reason)
+            continue
+        if attempt > 1:
+            log.warning("[OTR_ShotLock] Ghost author: batch accepted on the "
+                        "informed retry")
+        return leaves, "writer_llm", ""
     return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
                                      already_used=already_used),
             "deterministic_fallback", reason)

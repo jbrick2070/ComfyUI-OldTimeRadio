@@ -231,9 +231,25 @@ Counting recognisable subjects, frame 40 of every beat, all five arms:
 | v2, deterministic, `archival` | 0 of 4 sampled | stripes, static, black blobs |
 | v2, LLM leaves, `anime` | **0 of 8** | pattern noise, no subject anywhere |
 
-### The mechanism, and it is falsifiable
+### The mechanism -- a HYPOTHESIS with strong support, not proven causation
 
-Legibility tracks **how much concrete noun is in the prompt**, and nothing else.
+**Corrected 2026-08-22 after the reviewer panel refused the stronger claim, and
+they were right.** This section first read "legibility tracks concrete nouns,
+and nothing else". That is not established: v2.1 changed motifs, laws, figure
+wording, garments, bookends, the cycle and validation *simultaneously*, and its
+6/8 result came from a DIFFERENT published episode rather than the same-seed
+control the v1-vs-v2 comparison used. Isolating it needs prompt-only ablations
+on a frozen script, style, negative, frame count and seed set -- one variable at
+a time. Until then this is the **concrete-subject hypothesis**.
+
+**One theory is affirmatively dead.** I had wondered whether shortening the
+positive raised the negative's relative weight. It cannot: positive and negative
+are encoded independently and handed to the sampler at a fixed CFG 8.0
+(`eng_ghost_signal.py`), so there is no length-derived weighting mechanism. Two
+reviewer lanes offered that same theory and it is rejected on the same grounds
+-- a wrong mechanism agreed on by two models is still wrong.
+
+**What the evidence does support:**
 The two v2 beats that survived are the only two whose authored leaf named a real
 object -- a lantern and a radio dial. Every mush beat named `emblem`, `signal`,
 `field` or `waveform`.

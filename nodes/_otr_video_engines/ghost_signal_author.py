@@ -66,6 +66,14 @@ GHOST_AUTHOR_SCHEMA_VERSION = 1
 #: it is one of the thirteen hashed request keys, so a bump reauthors.
 GHOST_AUTHOR_VERSION = "ghost_drawable_beat_v1"
 
+#: THE LEAF-ADMISSION CONTRACT, versioned separately from the author version.
+#: It rides `template_sha256`, so tightening or loosening what a leaf may say
+#: reauthors every stored object instead of silently replaying one admitted
+#: under the old rules. Separate from `GHOST_AUTHOR_VERSION` on purpose: that
+#: name also seeds the mode schedule and the fallback pools, so bumping it
+#: would reshuffle pictures that did not need to change.
+GHOST_VALIDATOR_CONTRACT = "leaf_admission_v2_concrete"
+
 #: The three coordinated representations. ``figure`` is the only one that shows
 #: a body, and it shows a body rather than a likeness -- no face is requested
 #: and none is promised.
@@ -83,6 +91,13 @@ GHOST_MODES = ("figure", "object", "signal")
 #: directive -- *"do not force the same mediocre person into every clip"* --
 #: without emptying the episode of people, and it still cannot produce a run of
 #: three because no two adjacent entries are equal.
+#:
+#: **"HALF" IS THE CYCLE'S PROPERTY, NOT EVERY EPISODE'S, and saying otherwise
+#: was a false invariant.** For a character count that is not a multiple of
+#: four the realised share is a floor or a ceiling depending on the hashed
+#: offset: three character beats can yield one figure, and a single character
+#: beat can yield none. The guarantee is exactly `floor(n/2)` at worst, and the
+#: test says so rather than asserting a half that does not hold.
 GHOST_CHARACTER_CYCLE = ("figure", "object", "figure", "signal")
 
 #: The two representations a bookend may take. A radio console is not a person.
@@ -124,6 +139,15 @@ GHOST_DETERMINISTIC_MODEL_ID = "deterministic"
 #: The generation contract. These three values are hashed into
 #: :data:`GHOST_TEMPLATE_SHA256`, so changing any of them reauthors.
 GHOST_BATCH_TEMPERATURE = 0.1
+
+#: THE RETRY TEMPERATURE, and it exists because the first retry could not
+#: possibly work. Attempt 2 re-sent a byte-identical prompt at 0.1 -- near
+#: greedy -- so a model that wrote a four-word leaf once wrote it again, and
+#: the batch fell to deterministic clauses having spent two generations to
+#: learn nothing. Attempt 2 now carries the rejection reasons AND samples
+#: warmer, so it is a different question rather than the same one asked twice.
+GHOST_BATCH_RETRY_TEMPERATURE = 0.45
+
 GHOST_BATCH_BASE_TOKENS = 64
 GHOST_BATCH_PER_SHOT_TOKENS = 48
 
@@ -237,6 +261,13 @@ def _template_identity() -> str:
         "rules": GHOST_BATCH_RULES,
         "schema_version": GHOST_AUTHOR_SCHEMA_VERSION,
         "temperature": GHOST_BATCH_TEMPERATURE,
+        "retry_temperature": GHOST_BATCH_RETRY_TEMPERATURE,
+        # THE VALIDATOR CONTRACT IS PART OF THE GENERATION CONTRACT. v2.1
+        # changed what a leaf is ALLOWED to say without changing any hashed
+        # key, so a leaf admitted under the old permissive rules replayed
+        # untouched under the new ones -- replay does not re-run
+        # validate_drawable_beat. Bumping this invalidates those hashes.
+        "validator_contract": GHOST_VALIDATOR_CONTRACT,
     }, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -273,8 +304,14 @@ _FIELD_LABEL_RE = re.compile(
 _SECOND_PERSON_RE = re.compile(r"\b(you|your|yours|yourself)\b", re.IGNORECASE)
 
 #: Words that make a leaf a lettering instruction rather than a picture.
+#: `letter` and `letters` are DELIBERATELY ABSENT. `letter` is in
+#: :data:`MOTIF_PROP_WORDS`, so "a charcoal letter" is a motif this module can
+#: legally emit -- and a leaf saying "the letter slides across the desk" was
+#: then rejected as a lettering request, killing the whole batch over a prop
+#: the code itself had chosen. `lettering`, `caption`, `text` and `typography`
+#: still cover the real defect.
 _LETTERING_WORDS = frozenset({
-    "text", "texts", "word", "words", "letter", "letters", "lettering",
+    "text", "texts", "word", "words", "lettering",
     "caption", "captions", "subtitle", "subtitles", "title", "titles",
     "typography", "font", "fonts", "writing", "written", "inscription",
     "label", "labels", "signage", "logo", "headline",
@@ -304,10 +341,22 @@ _BOILERPLATE_WORDS = frozenset({
 #: owe a frame with no people in it anywhere, and a word list that cannot tell
 #: a clock hand from a person is a list that costs a live batch to learn that.
 _HUMAN_WORDS = frozenset({
-    "person", "people", "man", "men", "woman", "women", "boy", "girl",
-    "child", "children", "crowd", "figure", "figures", "silhouette",
-    "silhouettes", "face", "faces", "portrait", "someone", "somebody",
+    "person", "people", "human", "humans", "man", "men", "woman", "women",
+    "boy", "girl", "child", "children", "crowd", "figure", "figures",
+    "silhouette", "silhouettes", "portrait", "someone", "somebody",
+    "stranger", "lady", "gentleman", "guy",
+    # PRONOUNS BELONG HERE and were dropped by mistake when the body parts
+    # went. "he turns the dial slowly in darkness" is a person request and was
+    # passing object mode.
+    "he", "she", "they", "him", "her", "them",
 })
+
+#: BARE `face` IS NOT ON THAT LIST, and that is the clock-hand lesson applied a
+#: second time. This show's bookend vocabulary is DIALS -- `a glowing radio
+#: dial`, `a bakelite radio set` -- and v1's own framing constant read "dial
+#: face centered". A whole-word match on `face` rejects "the dial face
+#: brightens" exactly as `hand` rejected "a clock hand ticks", and one bad leaf
+#: kills the batch. `portrait` still guards the actual face request.
 
 #: Words whose SUBJECT is a texture rather than a thing. A 512x288 SD1.5 draws
 #: exactly what it is handed: asked for static it paints static, asked for a
@@ -317,10 +366,16 @@ _HUMAN_WORDS = frozenset({
 #:
 #: NOT a taste judgement. A leaf may still describe light, shadow or movement;
 #: it may not make the ABSENCE OF A SUBJECT its subject.
+#: `grain`, `noise`, `geometry` and `geometric` were REMOVED after the panel
+#: read them: a sack of grain, wood grain on a desk and a sudden noise are all
+#: concrete, and whole-word rejection killed the batch for them. What stays is
+#: the vocabulary actually measured painting mush -- static, waveforms,
+#: gradients, raw texture and pixels -- plus `emblem` and `field`, which the
+#: receipt named as mush-makers and which nothing had been banning.
 _ABSTRACT_SUBJECT_WORDS = frozenset({
     "static", "waveform", "waveforms", "gradient", "gradients", "texture",
-    "textures", "abstraction", "abstract", "pixels", "pixelation", "noise",
-    "geometry", "geometric", "grain", "scanlines", "interference",
+    "textures", "abstraction", "abstract", "pixels", "pixelation",
+    "scanlines", "interference", "emblem", "emblems",
 })
 
 #: Positive-channel negation. The negative prompt is the exclusion authority;
@@ -418,9 +473,14 @@ def schedule_ghost_modes(entries, episode_seed) -> dict:
     because the anti-run rule is a property of the timeline, not of a beat.
 
     CHARACTER BEATS RUN :data:`GHOST_CHARACTER_CYCLE` from a hashed offset --
-    ``figure, object, figure, signal``, so half of them show a person and no two
-    adjacent entries are equal, which means a character can never start a run
-    and never needs correcting.
+    ``figure, object, figure, signal``. No two adjacent entries are equal, so a
+    character can never start a run and never needs correcting.
+
+    THE GUARANTEE IS ``floor(n/2)`` FIGURES, NOT "half", and the difference is
+    not pedantry. The cycle has period four, so for a character count that is
+    not a multiple of four the realised share depends on the hashed offset: one
+    character beat can yield no figure at all, and three can yield one. Half is
+    what the CYCLE contains; floor-half is what an EPISODE is promised.
 
     BOOKENDS alternate ``object``/``signal`` from their own hashed offset. Only
     a bookend may be corrected, and only when it would create a THIRD identical
@@ -529,12 +589,15 @@ def _first_allowlisted(phrases, vocabulary) -> str:
     row's prose -- and its landmarks, its hair, its jaw -- would get back into
     a prompt that is supposed to have left all of that behind.
     """
-    allowed = tuple(vocabulary)
+    allowed = frozenset(vocabulary)
+    # SOURCE ORDER, WHICH IS WHAT THE DOCSTRING PROMISED. The loop used to walk
+    # the VOCABULARY and ask whether the phrase contained each entry, so a
+    # phrase naming two allowed colours returned whichever came first in the
+    # checked-in tuple rather than the one the cast row led with.
     for phrase in phrases:
-        words = _WORD_RE.findall(str(phrase or "").lower())
-        for candidate in allowed:
-            if candidate in words:
-                return candidate
+        for word in _WORD_RE.findall(str(phrase or "").lower()):
+            if word in allowed:
+                return word
     return ""
 
 
@@ -594,8 +657,10 @@ def motif_for_character(components, mode, *, seed_int=0) -> str:
         # does not know that a "silhouette" is supposed to be someone. v1 said
         # "a man, a broad steady figure, a charcoal coat, holding a folded
         # chart" and got a man in a coat. This is that, minus the name leak.
-        return "a %s figure in %s %s %s, carrying %s %s" % (
-            tokens["silhouette"], article, tokens["colour"], tokens["garment"],
+        sil_article = "an" if tokens["silhouette"][:1] in "aeiou" else "a"
+        return "%s %s figure in %s %s %s, carrying %s %s" % (
+            sil_article, tokens["silhouette"], article, tokens["colour"],
+            tokens["garment"],
             "an" if tokens["prop"][:1] in "aeiou" else "a", tokens["prop"])
     if mode in ("object", "signal"):
         # THE PROP AS ITSELF. "charcoal lantern emblem" is not a thing; a
@@ -953,11 +1018,16 @@ def deterministic_leaf(spec, *, episode_seed, used=(), total=0) -> str:
             "no deterministic Ghost clause pool for mode %r" % (mode,))
     start = _hash_int(episode_seed, spec.get("beat_id"), mode,
                       GHOST_AUTHOR_VERSION) % len(pool)
+    lowered = {str(u).casefold() for u in used}
     for step in range(len(pool)):
         candidate = pool[(start + step) % len(pool)]
-        if candidate not in used:
+        if candidate.casefold() not in lowered:
             return candidate
-    return pool[start]
+    raise GhostAuthorError(
+        "the %s fallback pool is exhausted: %d clauses, all already used in "
+        "this episode. The authored path forbids duplicate leaves, so the "
+        "deterministic path may not quietly ship one -- widen the pool."
+        % (mode, len(pool)))
 
 
 def deterministic_batch(specs, *, episode_seed, already_used=()) -> dict:

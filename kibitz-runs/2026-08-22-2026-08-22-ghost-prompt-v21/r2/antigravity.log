@@ -1,0 +1,39 @@
+MODEL: Gemini 3.7 Flash (High)
+ARGV (prompt omitted): ['C:\\Users\\jeffr\\AppData\\Local\\agy\\bin\\agy.EXE', '--model', 'Gemini 3.7 Flash (High)', '--dangerously-skip-permissions', '--print-timeout', '15m', '-p']
+
+STDOUT:
+VERDICT: build-ready as-is? yes-with-fixes. The core v2.1 concrete prompt refactor is proven and sound, but whole-batch rejection with identical-prompt temperature=0.1 retry creates an unnecessary cliff where one flawed leaf drops all 8 beats to deterministic fallback.
+
+MUST-FIX BEFORE BUILD:
+1. [Specific questions - Q2 / nodes/otr_shot_lock.py:1837-1856] Identical-prompt retry at temperature 0.1 causes near-deterministic double-failures.
+   Defect: In `_ghost_generate_batch` (`nodes/otr_shot_lock.py:1839-1841`), attempt 2 re-invokes `gen` with the exact same user prompt (`build_batch_prompt(specs)`) at `temperature=0.1` (`GHOST_BATCH_TEMPERATURE = 0.1` in `nodes/_otr_video_engines/ghost_signal_author.py:126`). At near-greedy temperature 0.1, a model that produced a non-compliant leaf (such as a 4-word phrase or banned token) on attempt 1 has a very high probability of repeating the exact same error on attempt 2, burning generation latency and dropping all 8 beats to deterministic fallback.
+   Fix: On attempt 2, either increase sampling temperature (e.g. 0.4) or append a corrective instruction. If attempt 2 still fails validation, salvage valid leaves as `source="writer_llm"` and apply `deterministic_leaf` fallback ONLY to invalid/missing leaves probed against `already_used`, rather than discarding the entire 8-beat batch.
+
+2. [Specific questions - Q4 / nodes/_otr_video_engines/ghost_signal_author.py:320-324, 863-864] `_ABSTRACT_SUBJECT_WORDS` rejects legitimate concrete physical nouns.
+   Defect: `_ABSTRACT_SUBJECT_WORDS` contains `"grain"`, `"noise"`, and `"static"`. In `validate_drawable_beat` (`ghost_signal_author.py:863-864`), `lowered & _ABSTRACT_SUBJECT_WORDS` performs a whole-word set intersection against every word in the leaf. Valid physical descriptions like `"a sack of grain on the wooden floor"`, `"the fine wood grain on the desk"`, or `"the figure reacts to a sudden noise"` are rejected as `"names a texture instead of a thing"`. In a whole-batch rejection regime, a single such phrase causes a total episode fallback.
+   Fix: Remove polysemous words (`"grain"`, `"noise"`, `"static"`) from `_ABSTRACT_SUBJECT_WORDS`. Let `GHOST_BATCH_RULES` rule 4 and `GHOST_BATCH_EXAMPLES` counter-examples ("banded static tightens", "a waveform pulses") handle texture suppression, or restrict the filter to multi-word patterns (e.g. `"film grain"`, `"white noise"`, `"audio static"`).
+
+SHOULD-FIX:
+1. [Specific questions - Q5 / nodes/_otr_video_engines/ghost_signal_author.py:590-599] Indefinite article mismatch for vowel-initial silhouettes.
+   Defect: In `motif_for_character` (`ghost_signal_author.py:591-599`), the template hardcodes `"a %s figure in..."`. When `tokens["silhouette"]` is `"angular"` (defined in `MOTIF_SILHOUETTE_WORDS` line 485 and `MOTIF_FALLBACK_POOLS["silhouette"]` line 505), it emits `"a angular figure"` instead of `"an angular figure"`. The function already computes an article for colour (`line 590`) and prop (`line 599`), but omitted the leading silhouette article.
+   Fix: In `motif_for_character`, compute `sil_article = "an" if tokens["silhouette"][:1] in "aeiou" else "a"` and format `"%s %s figure in %s %s %s, carrying %s %s" % (sil_article, tokens["silhouette"], article, tokens["garment"], ...)` [ASSUMPTION: 'angular' is the only current vowel-starting silhouette word in `MOTIF_SILHOUETTE_WORDS`].
+
+2. [Specific questions - Q1 / nodes/_otr_video_engines/ghost_signal_author.py:306-310, 872-873] `_HUMAN_WORDS` is missing common third-person nouns and pronouns.
+   Defect: While removing body parts (`hand`, `shoulder`) was proven necessary by live receipt Section 4A Beat 5 (`"a hand grabs the cream rope"`), `_HUMAN_WORDS` currently omits generic person nouns like `"human"`, `"stranger"`, `"lady"`, `"gentleman"`, `"guy"`, and third-person pronouns (`"he"`, `"she"`). If an LLM authors `"a stranger picks up the lantern"` in `object` mode, it bypasses the non-figure validator.
+   Fix: Add `"human"`, `"stranger"`, `"lady"`, `"gentleman"`, `"guy"` to `_HUMAN_WORDS` in `ghost_signal_author.py:306-310`. Keep body parts excluded as settled by the live leg evidence.
+
+3. [The claim I want attacked / nodes/_otr_video_engines/ghost_signal_prompt.py:128-140] Diagnosis of the v2 regression vs alternative mechanisms.
+   Defect: The diagnosis that "legibility tracks concrete nouns" is accurate in identifying why SD1.5 failed (v2 mode laws literally requested "an abstract signal field filling the composition", painting texture). However, the regression was amplified by two coupled mechanisms:
+   (a) Prompt compression: Prompts shrank from 208-317 chars down to 164-203 chars (32-43 CLIP tokens). In CLIP ViT-L/14, shorter active token sequences concentrate softmax attention; when the few active tokens are abstract ("waveform", "emblem"), texture generation dominates.
+   (b) Negative prompt imbalance: The negative prompt (`compose_ghost_negative`, lines 616-646) heavily penalizes human deformities ("bad anatomy, deformed, extra limbs"). With CFG 8.0, when the positive prompt lacked a concrete figurative subject, negative guidance pushed the sampler away from figurative structures into pure geometric abstraction.
+   Fix: No code change required; maintain v2.1's concrete framing laws (`GHOST_MODE_LAWS_V2`) and prop motifs, ensuring front-anchored concrete nouns balance the active negative channels.
+
+OPTIONAL / NICE-TO-HAVE:
+1. [Specific questions - Q3 / nodes/_otr_video_engines/ghost_signal_author.py:414-459] Mathematical verification of mode scheduling.
+   Empirical testing over 100,000 random role timelines and seeds confirms that `schedule_ghost_modes` cannot produce a run of three identical modes (0 violations found). Because `character_video` beats have `fixed = True`, `GHOST_CHARACTER_CYCLE` (`figure, object, figure, signal`) is never mutated by bookend anti-run flipping; `figure` is strictly preserved at 50% for character beats.
+2. [Specific questions - Q5 / nodes/_otr_video_engines/ghost_signal_author.py:686-709, 1115-1130] Hash key set and tokenizer verification.
+   The 13-key set `GHOST_REQUEST_HASH_KEYS`, canonical JSON serialization (`request_sha256`), and SD1Tokenizer CLIP token/window measurement (`measure_clip_tokens` with BOS/EOS padding and `entry[2] != 0` payload filtering) are verified correct against ComfyUI runtime contracts.
+
+CUT THESE (over-engineering):
+1. [Specific questions - Q2 / nodes/_otr_video_engines/ghost_signal_author.py:27-30] Strict atomic batch invalidation across all rows.
+   Why safe to cut: `ShotRow.ghost_prompt` is stored per-beat in `otr_shot_lock.py:2017-2020`. Replay already handles mixed source statuses within an episode (`replay`, `writer_llm`, `deterministic_fallback`), and `deterministic_batch` already receives `already_used` to prevent duplicate clauses. Discarding all 8 beats when 7 are valid provides zero auditability benefit while wasting GPU cycles and degrading visual diversity.

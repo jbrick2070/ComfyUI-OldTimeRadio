@@ -807,3 +807,146 @@ def test_a_whole_person_is_still_refused_outside_figure_mode():
             assert not ok, (mode, leaf)
             assert "person" in why
         assert gsa.validate_drawable_beat(leaf, mode="figure", names=NAMES)[0]
+
+
+# --------------------------------------------------------------------------- #
+# 12. What the three-family panel found (Codex gpt-5.6-sol, Antigravity
+#     Gemini, Cursor grok-4.6). Every one of these was a live batch-killer or a
+#     false invariant, and every one is pinned so it cannot come back.
+# --------------------------------------------------------------------------- #
+
+def test_a_dial_face_is_not_a_person():
+    """The clock-hand bug wearing a different word.
+
+    This show's bookend vocabulary is DIALS -- `a glowing radio dial`, `a
+    bakelite radio set` -- and v1's own framing constant read "dial face
+    centered". Bare `face` in `_HUMAN_WORDS` rejected "the dial face
+    brightens" exactly as `hand` rejected "a clock hand ticks".
+    """
+    for leaf in ("the dial face brightens and settles in the dark",
+                 "the clock face turns slowly above the desk",
+                 "light crosses the watch face on the table"):
+        for mode in gsa.GHOST_NON_FIGURE_MODES:
+            ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
+            assert ok, (mode, leaf, why)
+
+
+def test_a_pronoun_is_still_a_person_outside_figure_mode():
+    """Dropped by mistake when the body parts went."""
+    for leaf in ("he turns the dial slowly in the darkness",
+                 "she lifts the lantern toward the door",
+                 "a stranger picks up the lantern from the desk"):
+        for mode in gsa.GHOST_NON_FIGURE_MODES:
+            ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
+            assert not ok, (mode, leaf)
+            assert "person" in why
+
+
+def test_a_prop_the_motif_can_emit_is_never_rejected_as_lettering():
+    """`letter` is in MOTIF_PROP_WORDS, so "a charcoal letter" is a motif this
+    module can legally choose. A leaf naming it was then rejected as a
+    lettering request -- the code killing a batch over its own prop."""
+    assert "letter" in gsa.MOTIF_PROP_WORDS
+    ok, why = gsa.validate_drawable_beat(
+        "the letter slides across the desk and stops", mode="object",
+        names=NAMES)
+    assert ok, why
+    # The real lettering defect is still caught.
+    assert not gsa.validate_drawable_beat(
+        "bold lettering rises over the desk here", mode="object",
+        names=NAMES)[0]
+
+
+def test_polysemous_words_no_longer_kill_a_concrete_leaf():
+    for leaf in ("a sack of grain spills across the wooden floor",
+                 "the wood grain on the desk catches the light",
+                 "the lantern swings toward a sudden noise outside"):
+        ok, why = gsa.validate_drawable_beat(leaf, mode="object", names=NAMES)
+        assert ok, (leaf, why)
+
+
+def test_the_measured_mush_makers_are_still_refused():
+    for leaf in ("banded static tightens around one bright point",
+                 "a jagged waveform pulses across the dark screen",
+                 "a brass emblem turns slowly in the light"):
+        ok, why = gsa.validate_drawable_beat(leaf, mode="object", names=NAMES)
+        assert not ok, leaf
+        assert "texture" in why
+
+
+def test_the_retry_is_a_different_question_not_the_same_one_twice():
+    """Attempt 2 re-sent byte-identical text at temperature 0.1 -- near greedy
+    -- so a model that failed once failed identically. All three reviewer
+    families called it independently."""
+    import inspect
+    from nodes import otr_shot_lock as _sl
+    src = inspect.getsource(_sl._ghost_generate_batch)
+    assert "GHOST_BATCH_RETRY_TEMPERATURE" in src
+    assert "YOUR PREVIOUS ANSWER WAS REJECTED" in src
+    assert gsa.GHOST_BATCH_RETRY_TEMPERATURE > gsa.GHOST_BATCH_TEMPERATURE
+
+
+def test_a_bug_in_our_own_validator_is_not_laundered_as_a_model_failure():
+    """The broad except used to wrap the parse and the validators, so a
+    programming error became "the model failed" and the episode quietly took
+    deterministic clauses."""
+    import ast
+    import inspect
+    from nodes import otr_shot_lock as _sl
+    tree = ast.parse(inspect.getsource(_sl._ghost_generate_batch))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        broad = any(h.type is None or (isinstance(h.type, ast.Name)
+                                       and h.type.id == "Exception")
+                    for h in node.handlers)
+        if not broad:
+            continue
+        body = ast.dump(ast.Module(body=node.body, type_ignores=[]))
+        assert "parse_batch_response" not in body, \
+            "the parser sits inside a broad except"
+        assert "_ghost_validate_batch" not in body, \
+            "the validator sits inside a broad except"
+
+
+def test_the_validator_contract_rides_the_template_hash():
+    """v2.1 changed what a leaf may SAY without changing any hashed key, so a
+    leaf admitted under the old permissive rules replayed untouched."""
+    original = gsa.GHOST_VALIDATOR_CONTRACT
+    before = gsa._template_identity()
+    try:
+        gsa.GHOST_VALIDATOR_CONTRACT = "something_else"
+        assert gsa._template_identity() != before
+    finally:
+        gsa.GHOST_VALIDATOR_CONTRACT = original
+    assert gsa._template_identity() == before
+
+
+def test_an_exhausted_fallback_pool_raises_instead_of_duplicating():
+    """The authored path forbids duplicate leaves; the deterministic path used
+    to ship one silently once its six-clause pool ran out."""
+    spec = _spec(mode="object")
+    pool = gsa.GHOST_FALLBACK_CLAUSES["object"]
+    with pytest.raises(gsa.GhostAuthorError, match="exhausted"):
+        gsa.deterministic_leaf(spec, episode_seed=7, used=list(pool), total=1)
+
+
+def test_the_figure_share_is_floor_half_and_the_docstring_says_so():
+    """"Half" was a false invariant: a period-four cycle over three character
+    beats can yield one figure, and over one beat can yield none."""
+    import inspect
+    src = inspect.getsource(gsa.schedule_ghost_modes)
+    assert "floor" in src.lower()
+    for n in (1, 2, 3, 4, 5, 6, 7):
+        entries = [("b%03d" % i, "character_video") for i in range(n)]
+        for seed in range(24):
+            modes = gsa.schedule_ghost_modes(entries, seed)
+            figures = sum(1 for b, _r in entries if modes[b] == "figure")
+            assert figures >= n // 2, (n, seed, figures)
+
+
+def test_the_motif_article_agrees_with_a_vowel_silhouette():
+    comp = _components()
+    comp = dict(comp, silhouette="angular restless")
+    motif = gsa.motif_for_character(comp, "figure", seed_int=comp["seed_int"])
+    assert motif.startswith("an angular"), motif

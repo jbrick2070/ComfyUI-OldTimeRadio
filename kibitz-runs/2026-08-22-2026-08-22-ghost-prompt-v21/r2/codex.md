@@ -1,0 +1,37 @@
+VERDICT: no. The retry design is batch-global, masks internal faults, and violates its own per-episode uniqueness and replay-version invariants.
+
+MUST-FIX BEFORE BUILD:
+
+1. [Specific question 5 — error handling] Unexpected implementation errors are misclassified as model failures. The broad `except Exception` encloses generation, parsing, validation, token-fit checks, and duplicate checks, then silently substitutes deterministic output (`nodes/otr_shot_lock.py:1837-1856`). Narrow it to the `gen(...)` call; catch `GhostAuthorError` for expected candidate rejection, and re-raise every unexpected parser/validator/programming exception.
+
+2. [Specific question 2 — whole-batch rejection] The stated reproducibility rationale is false: the current retry discards every valid first-attempt row and regenerates the whole stochastic batch, so results already depend on whether a retry occurred (`nodes/otr_shot_lock.py:1788-1815`, `1818-1856`). Implement row-local salvage: return `{id: {leaf, source, fallback_reason}}`, retain valid rows, retry only rejected IDs once, then deterministically fill only remaining IDs. The stored object is already per-row and supports mixed sources (`nodes/_otr_video_engines/ghost_signal_author.py:997-1013`); only `_ghost_generate_batch` and its caller’s global `(leaves, source, reason)` interface must change (`nodes/otr_shot_lock.py:2007-2020`).
+
+3. [Specific question 5 — collision probing] Episode-wide uniqueness is not enforced for writer output mixed with replay. `_ghost_validate_batch` initializes `seen` empty, while `already_used` reaches only `deterministic_batch`; a newly authored row may duplicate a replayed row (`nodes/otr_shot_lock.py:1796-1809`, `1818-1819`, `1854-1856`, `2010-2013`). Pass replayed leaves into validation and initialize `seen` with their normalized `casefold()` values. Apply the same normalization in `deterministic_batch`, whose current comparison is case-sensitive (`nodes/_otr_video_engines/ghost_signal_author.py:963-979`).
+
+4. [Specific question 1 — human invariant] The interfaces disagree. The LLM rule says object/signal contain “no person,” while the implementation and regression test permit body parts because the intended rule became “no FULL FIGURE” (`nodes/_otr_video_engines/ghost_signal_author.py:208-210`, `292-310`; `tests/test_ghost_signal_author.py:781-797`). The reduced set also omits `he`, `she`, `they`, and `human`, so `"he turns the dial slowly in darkness"` passes object validation through the set-intersection check at `nodes/_otr_video_engines/ghost_signal_author.py:858-873`. Define one invariant. The smallest consistent fix is “no full person/figure”: update rule 7 accordingly, restore unambiguous person references such as personal pronouns and `human(s)`, retain body-part allowance, and add pronoun regressions.
+
+5. [Specific question 5 — replay identity] v2.1 changed leaf-admission semantics without changing their versioned identity. `GHOST_AUTHOR_VERSION` explicitly says it changes when leaf meaning changes, but remains `ghost_drawable_beat_v1`; same-hash prior objects are replayed without rerunning `validate_drawable_beat` (`nodes/_otr_video_engines/ghost_signal_author.py:65-67`, `686-708`; `nodes/otr_shot_lock.py:1979-1991`). Add a dedicated validator-contract version to `_template_identity()` so policy changes invalidate request hashes without reshuffling mode/fallback seeds. Also bump the rendered prompt receipt from `ghost_signal_v2`, which is still stamped for v2.1 (`nodes/_otr_video_engines/ghost_signal_prompt.py:64`; `nodes/_otr_video_engines/render_driver.py:2816`).
+
+6. [The claim I want attacked] “Concrete nouns, and nothing else” is not established. v2.1 simultaneously changed motifs, laws, figure wording, garments, bookends, cycle, and validation (`docs/2026-08-22-ghost-prompt-v2-publish-receipt.md:262-275`), while its 6/8 result came from a separate published episode rather than the exact same-seed v2 control (`docs/2026-08-22-ghost-prompt-v2-publish-receipt.md:289-303`). Freeze script, style, negative, frames, and video seeds; run canonical prompt-only ablations for motif, law, figure wording, and cycle separately. Until then, state “concrete-subject hypothesis” rather than exclusive causation.
+
+SHOULD-FIX:
+
+1. [Specific question 4 — abstract-word reject] `_ABSTRACT_SUBJECT_WORDS` is position-insensitive: any occurrence rejects the leaf, despite the comment claiming only an abstract SUBJECT is forbidden (`nodes/_otr_video_engines/ghost_signal_author.py:312-324`, `858-864`). Thus a concrete leaf containing “film grain” is rejected. Pack-level archival grain is unaffected because only the leaf is checked, but legitimate leaf modifiers are not. Remove unproven modifier-prone entries such as `grain`, `geometry`, and `geometric`, or reject explicit abstract-subject patterns rather than token presence anywhere.
+
+2. [Specific question 3 — figure quota] No run-of-three defect is evident in the scheduler, but “half” is only exact for even character counts. The period-four cycle can yield one figure among three character beats; the test itself permits this with `figures * 2 >= len(chars) - 1` (`nodes/_otr_video_engines/ghost_signal_author.py:414-458`; `tests/test_ghost_signal_author.py:197-205`). [ASSUMPTION] If future topologies may have odd character counts, specify floor-half versus ceiling-half and test varied role sequences rather than only the fixed four-character timeline.
+
+3. [Specific question 5 — motif selection] `_first_allowlisted` claims source-word order but loops vocabulary order inside each phrase, so a phrase containing multiple allowed colors can select the vocabulary’s earlier entry rather than the source’s first word (`nodes/_otr_video_engines/ghost_signal_author.py:525-537`). Iterate source words and test membership in an allowed set.
+
+4. [Specific question 5 — fallback capacity] Collision probing silently gives up and returns a duplicate when a mode’s six-clause pool is exhausted (`nodes/_otr_video_engines/ghost_signal_author.py:950-960`). [ASSUMPTION] If a future episode can exceed six same-mode fallback rows, fail preflight on insufficient capacity or expand deterministically; do not violate the function’s uniqueness claim.
+
+OPTIONAL / NICE-TO-HAVE:
+
+Add a canonical-publish acceptance receipt with a blinded contact sheet and fixed recognisable-subject/figure counts. The current receipt explicitly shows that text-only gates missed the visual regression (`docs/2026-08-22-ghost-prompt-v2-publish-receipt.md:257-260`).
+
+CUT THESE (over-engineering):
+
+1. [The claim I want attacked — negative relative weight] Cut the theory that shortening the positive mechanically increases negative-prompt weight. Positive and negative are encoded independently and passed to the sampler with fixed CFG 8.0 (`nodes/_otr_video_engines/eng_ghost_signal.py:759-771`, `817-822`). Semantic changes remain testable; there is no length-derived CFG weighting mechanism here.
+
+2. [Specific questions 1 and 4] Do not add a general NLP/POS parser or keep expanding open-ended human/abstract dictionaries. Align the narrow mode contract, reject proven lexical failures, and rely on deterministic motif ownership plus row-local retry.
+
+3. [ComfyUI integration] Do not add nodes, sockets, widgets, mappings, or workflow wiring for this repair. The retry and validation changes are internal to ShotLock and the existing per-row `ghost_prompt` object; no ComfyUI node-class interface changes are required.
