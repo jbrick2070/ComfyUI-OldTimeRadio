@@ -363,6 +363,20 @@ RETIRED_ENGINE_IDS = frozenset({
     "google_vid_sfx_veo_fast",
     "google_vid_sfx_veo_lite",
     "google_vid_sfx_veo_pro",
+    # The dormant 3D / dark family, RETIRED 2026-08-23 (lean-mean order 4).
+    # All five were registered/selectable in alpha builds before their
+    # unregister commits (character_3d talkers 2026-06-29, the other two
+    # 2026-06-30), so an alpha-era saved workflow may still name one. NAMED
+    # tombstones rather than the generic unregistered-engine refusal at the
+    # director boundary, because "retired" is the truthful diagnosis for a
+    # graph that was once valid -- "not registered" reads as a broken install.
+    # The adapter FILES are deleted in the same change; resurrection means a
+    # real forward, a fresh registration, AND removing the id from this set.
+    "triposg_talk",
+    "hunyuan3d_talk",
+    "trellis_talk",
+    "triposr",
+    "still_parallax",
 })
 
 

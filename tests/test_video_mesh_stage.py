@@ -107,11 +107,13 @@ def test_mesh_stage_declares_requires_mesh_fodder():
     family / uses_still (those also catch Wan/LTX/still engines)."""
     eng = vreg.get_engine("mesh_stage")
     assert getattr(eng, "requires_mesh_fodder", False) is True
-    # The capability must be specific to subject-meshers -- not leaked onto the
-    # cheap-family base or unrelated still engines.
-    from nodes._otr_video_engines import eng_still_parallax as sp
-    assert getattr(sp.StillParallaxEngine(), "requires_mesh_fodder", False) \
-        is False
+    # The capability must be specific to subject-meshers -- not leaked onto
+    # the cheap-family base or unrelated still engines. Checked against a LIVE
+    # registered still engine (the old negative case, still_parallax, was
+    # deleted with the dormant family on 2026-08-23 -- and a registered engine
+    # is the stronger check anyway, being what routing can actually pick).
+    assert getattr(vreg.get_engine("still_motion"),
+                   "requires_mesh_fodder", False) is False
 
 
 def test_request_mesh_subject_id_subject_then_char_then_uncast():

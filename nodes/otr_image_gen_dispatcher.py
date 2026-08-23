@@ -977,12 +977,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     2026-07-10 -- the old "skipped on CPU" warning let an episode "succeed"
     with missing stills).
 
-    EXCEPTION -- the downstream 3D HALT (3D plan section 3): a policy whose
-    ``locked_3d_slots`` carry ``granularity == per_beat`` RAISES before any
-    object is dispatched. That combination means a requires_mesh_portrait
-    video engine would get a fresh portrait (= a mesh REBUILD) per beat; the
-    ImageDirector already fails closed on it, so reaching here means the
-    policy was hand-crafted or stale -- a malformed POLICY, not a normal miss.
+    (The old downstream 3D HALT -- locked_3d_slots x per_beat -- was removed
+    with the dormant 3D family, lean-mean order 4, 2026-08-23. The director no
+    longer emits the field; a STALE policy that still carries it is simply
+    ignored, because the capability it guarded can no longer be declared.)
     """
     # S4 platform-portability (2026-07-10): a NON-EMPTY policy must be
     # version 2. A v1 policy means a stale OTR_ImageDirector emitted it --
@@ -1002,15 +1000,6 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         "device_policy": str((image_policy or {}).get("device_policy") or "cuda"),
         "dtype_policy": str((image_policy or {}).get("dtype_policy") or "fp8_ok"),
     }
-    locked_3d = set((image_policy or {}).get("locked_3d_slots") or [])
-    gran_by_slot = (image_policy or {}).get("granularity") or {}
-    viol = sorted(s for s in locked_3d if gran_by_slot.get(s) == "per_beat")
-    if viol:
-        raise ValueError(
-            "OTR_ImageGenDispatcher HALT: 3D-locked slot(s) %s carry "
-            "granularity=per_beat (mesh-rebuild-per-beat). The image policy "
-            "is malformed/stale -- re-run OTR_ImageDirector (it fails closed "
-            "on this) instead of hand-editing image_policy_json." % viol)
     warnings: list = []
     report: list = []
     objects = (image_prompts or {}).get("objects") or []

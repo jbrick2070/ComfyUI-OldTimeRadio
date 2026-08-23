@@ -39,14 +39,22 @@ from nodes._otr_video_engines import registry as vreg
 
 _REPO = pathlib.Path(__file__).resolve().parent.parent
 
-#: The five retired engine ids, restated here INDEPENDENTLY of
-#: public_engines so a weakened RETIRED_ENGINE_IDS cannot weaken this guard.
-_RETIRED_FIVE = frozenset({
+#: The retired engine ids, restated here INDEPENDENTLY of public_engines so a
+#: weakened RETIRED_ENGINE_IDS cannot weaken this guard. Five from the
+#: 2026-08-06 SFX-bed rip; five more from the 2026-08-23 dormant-3D retirement
+#: (lean-mean order 4). Growing this set is deliberate and append-only, exactly
+#: like the production set it mirrors.
+_RETIRED_IDS = frozenset({
     "cloud_vidu_q2_pro_fast_720p_sfx",
     "google_vid_sfx_omni",
     "google_vid_sfx_veo_fast",
     "google_vid_sfx_veo_lite",
     "google_vid_sfx_veo_pro",
+    "triposg_talk",
+    "hunyuan3d_talk",
+    "trellis_talk",
+    "triposr",
+    "still_parallax",
 })
 
 #: Deleted symbols per module -- the CLOSED set. A symbol reappearing on its
@@ -104,15 +112,15 @@ def test_no_registered_engine_declares_wants_provider_sfx():
         assert not hasattr(eng, "wants_provider_sfx"), name
 
 
-def test_the_five_retired_ids_are_not_registered_or_aliased():
-    assert RETIRED_ENGINE_IDS == _RETIRED_FIVE
+def test_the_retired_ids_are_not_registered_or_aliased():
+    assert RETIRED_ENGINE_IDS == _RETIRED_IDS
     live = set(vreg.all_engine_names()) | set(vreg.CAPABILITIES)
-    assert not (live & _RETIRED_FIVE), sorted(live & _RETIRED_FIVE)
+    assert not (live & _RETIRED_IDS), sorted(live & _RETIRED_IDS)
     # never ALIASED either: no public menu id and no legacy alias may resolve
     # to (or from) a retired id.
     for table in (_PUBLIC_ENGINES, _LEGACY_ENGINE_ALIASES):
-        assert not (set(table) & _RETIRED_FIVE), table
-        assert not (set(table.values()) & _RETIRED_FIVE), table
+        assert not (set(table) & _RETIRED_IDS), table
+        assert not (set(table.values()) & _RETIRED_IDS), table
 
 
 def test_the_sfx_engine_module_is_gone():

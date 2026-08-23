@@ -14,23 +14,24 @@ Role compatibility of each pick is still filtered at execute time via the SHARED
 ``role_compat.py`` (AS-1) -- a pick that does not fit its role fails closed
 (named error), never a silent Flux swap.
 
-3D granularity LOCK (PASS-IMG MUST-FIX #2, hardened per 3D plan section 3): if
-a role's paired VIDEO engine declares ``requires_mesh_portrait`` (the REAL
-capability field on the adapter -- never a hard-coded family check), that
-role's image granularity is hard-locked to ``per_object`` and ``per_beat``
-RAISES (fail-closed; fresh-per-beat -> mesh-rebuild-per-beat). 3D-awareness is
-CHARACTER-level: ``per_object`` means one clean front-facing portrait per
-character used GLOBALLY -- there is NO "3D-ready image mode" widget anywhere
-(mesh-friendly framing, if ever needed, is an M4 PROMPT change, V-11). Mesh
-retry policy is BOUNDED (one mesh_portrait variant, once per object) and lives
-in the 3D adapter -- never a DAG loop here.
+The 3D granularity LOCK is GONE (lean-mean order 4, 2026-08-23). It hard-locked
+any slot whose paired video engine declared ``requires_mesh_portrait`` to
+``per_object`` -- and its own comment admitted it was DORMANT: the only
+declarers (triposg_talk / hunyuan3d_talk / trellis_talk) were unregistered on
+2026-06-29 and are now retired outright (files deleted, ids in
+RETIRED_ENGINE_IDS), so it returned an empty set on every real run. The
+capability field itself is removed from the video schemas in the same change,
+so nothing can silently re-arm it. Its unregistered-engine rejection half was
+not lost -- it MOVED upstream to OTR_VideoDirector's registry-membership
+boundary (order 3), which fails a stale/unknown id seconds in, with a truthful
+message. A 3D re-forward re-adds a capability + a lock DELIBERATELY, with its
+own arc; nothing here is a scaffold for one.
 
-``video_policy_json`` is REQUIRED + fail-closed (3D plan section 3): the
-OTR_VideoDirector policy must be WIRED provider-before-consumer; an empty or
-malformed policy raises instead of silently disabling the 3D lock. An
-UNREGISTERED video engine in the policy also raises (its capability cannot be
-read -- covers custom_models_json adapters; fail closed, never a silent
-not-3D guess).
+``video_policy_json`` is REQUIRED + fail-closed: the OTR_VideoDirector policy
+must be WIRED provider-before-consumer; an empty or malformed policy raises.
+(A hand-built policy string naming an unknown engine is no longer rejected
+HERE -- the director boundary owns membership now, and an out-of-contract
+graph that bypasses it fails at the render gate's assert_usable instead.)
 
 Determinism (V-7): NO widget named ``seed`` (use ``request_seed``); no
 ``model_id`` widget (V-11). Cold-import clean: module scope imports only
@@ -93,88 +94,10 @@ def _registry_descriptors() -> list:
     return descs
 
 
-def _is_3d_engine(engine_id: str, slot: str = "") -> bool:
-    """True if ``engine_id`` is a VIDEO engine that declares the
-    ``requires_mesh_portrait`` capability (3D plan section 3 -- the REAL
-    schema/adapter field, never a hard-coded family check).
-
-    FAIL CLOSED (never a silent not-3D guess):
-    * a non-empty UNREGISTERED engine raises -- its capability cannot be read
-      (covers custom_models_json adapters that never registered);
-    * a registered ``character_3d``-family engine that does NOT declare the
-      capability raises -- the family says 3D but the lock cannot prove it.
-    An empty engine_id (an unresolved custom slot) is not 3D -- it cannot
-    render at all and the video director already warned LOUDLY.
-    """
-    if not engine_id:
-        return False
-    where = f" (video slot {slot!r})" if slot else ""
-    if not _vreg.is_registered(engine_id):
-        raise ValueError(
-            f"OTR_ImageDirector: video engine '{engine_id}'{where} is not "
-            f"registered, so its requires_mesh_portrait capability cannot be "
-            f"read. The 3D granularity lock FAILS CLOSED on unknown engines "
-            f"-- register the adapter (it must declare requires_mesh_portrait"
-            f"=True/False) before wiring it into the video policy."
-        )
-    eng = _vreg.get_engine(engine_id)
-    cap = getattr(eng, "requires_mesh_portrait", None)
-    if cap is None:
-        if getattr(eng, "family", "") == "character_3d":
-            raise ValueError(
-                f"OTR_ImageDirector: video engine '{engine_id}'{where} is "
-                f"character_3d-family but declares no requires_mesh_portrait "
-                f"capability; the 3D granularity lock FAILS CLOSED -- add "
-                f"requires_mesh_portrait=True to the adapter."
-            )
-        return False
-    return bool(cap)
-
-
-def three_d_locked_slots(video_policy: dict) -> set:
-    """Image slots whose paired VIDEO engine requires a mesh portrait ->
-    per_object lock (CHARACTER-level: one portrait per character, global).
-
-    Reads ``video_policy['video_models'][video_slot].engine_id`` for the video
-    slot that pairs with each image slot. Pure over the policy dict; raises
-    via :func:`_is_3d_engine` when an engine's capability cannot be read
-    (fail-closed, 3D plan section 3)."""
-    vm = (video_policy or {}).get("video_models") or {}
-    # THE EFFECTIVE ROUTE WINS (2026-07-25 QA). This resolved the PICKED engine,
-    # so a force map that routes a role ONTO a mesh-portrait engine left the
-    # slot unlocked and the fail-closed "no per-beat mesh rebuild" guard never
-    # fired -- the identical picked-vs-effective defect class that produced the
-    # decapitation bug in `aspects`. Its sibling
-    # `mesh_fodder_roles_from_video_policy` below already resolved effective;
-    # this one did not.
-    #
-    # HONEST STATUS: DORMANT, not live. No currently registered engine declares
-    # `requires_mesh_portrait` -- the three that do (triposg_talk,
-    # hunyuan3d_talk, trellis_talk in eng_character_3d.py) were UNREGISTERED
-    # 2026-06-29, so this returns an empty set on every real run today and no
-    # force map can trigger it. It is fixed now because the trap re-arms itself
-    # the moment a 3D talker is re-registered, and because a derived value
-    # reading the picked engine is exactly what this build exists to eliminate.
-    effective = (video_policy or {}).get("effective_video_models") or {}
-    # Each IMAGE slot is locked if ANY of its paired ROLES' video engine
-    # requires a mesh portrait. character_image_model pairs with the
-    # character lane (rip-sfx-broll 2026-07-01 removed the retired_role_a /
-    # retired_role_b pairings), resolved via the ONE shared map
-    # (per-role slot only).
-    img_slot_roles = {
-        "announcer_image_model": (_rc.Role.ANNOUNCER_VISUAL.value,),
-        "music_image_model": (_rc.Role.MUSIC_VISUAL.value,),
-        "character_image_model": (_rc.Role.CHARACTER_VIDEO.value,),
-    }
-    locked = set()
-    for img_slot, roles in img_slot_roles.items():
-        for role in roles:
-            engine_id = (str(effective.get(role) or "")
-                         or _role_slots.engine_id_for_role(vm, role))
-            if _is_3d_engine(engine_id, slot=_role_slots.slot_for_role(role)):
-                locked.add(img_slot)
-                break
-    return locked
+# (lean-mean order 4, 2026-08-23) `_is_3d_engine` and `three_d_locked_slots`
+# were here -- the dormant 3D granularity lock. See the module docstring for
+# the retirement record; the mesh-FODDER routing below is a different, LIVE
+# capability (requires_mesh_fodder, mesh_stage) and is untouched.
 
 
 #: Image-prompt ROLE -> the video slot that renders it (the role->engine join the
@@ -222,25 +145,9 @@ def mesh_fodder_roles_from_video_policy(video_policy: dict) -> list:
     return sorted(roles)
 
 
-def enforce_3d_granularity_lock(granularity_by_slot: dict, locked_slots: set,
-                                warnings: list) -> dict:
-    """FAIL CLOSED: every 3D-locked slot must already be ``per_object``;
-    anything else RAISES (PASS-IMG MUST-FIX #2 hardened per 3D plan section 3
-    -- the old coercion-with-a-warning silently hid a mesh-rebuild-per-beat
-    policy; the docstring always said per_beat is BANNED for 3D, now the code
-    matches it). Returns the (unchanged) granularity dict on success."""
-    out = dict(granularity_by_slot)
-    bad = sorted(s for s in locked_slots if out.get(s) != "per_object")
-    if bad:
-        raise ValueError(
-            "OTR_ImageDirector: 3D granularity lock violation -- slot(s) "
-            f"{bad} pair with a requires_mesh_portrait video engine and MUST "
-            f"be per_object (one portrait per character, used globally); "
-            f"per_beat would rebuild the mesh per beat. Set the granularity "
-            f"widget(s) to per_object -- there is no coercion and no "
-            f"'3D-ready mode' widget (fail-closed by design)."
-        )
-    return out
+# (lean-mean order 4, 2026-08-23) `enforce_3d_granularity_lock` was here.
+# Its dispatcher-side twin (the locked_3d_slots HALT) is removed in the same
+# change; the policy field they shared is no longer emitted.
 
 
 class OTRImageDirector:
@@ -298,10 +205,9 @@ class OTRImageDirector:
                     "forceInput": True,
                     "tooltip": (
                         "OTR_VideoDirector policy (REQUIRED; wire the "
-                        "provider before this consumer). Used to detect "
-                        "requires_mesh_portrait video engines for the 3D "
-                        "granularity lock; opaque otherwise. Empty/malformed "
-                        "FAILS CLOSED."
+                        "provider before this consumer). Carries the frozen "
+                        "route, device policy and per-role aspects; "
+                        "empty/malformed FAILS CLOSED."
                     ),
                 }),
             },
@@ -376,9 +282,6 @@ class OTRImageDirector:
             "music_image_model": music_granularity,
             "character_image_model": character_granularity,
         }
-        locked = three_d_locked_slots(video_policy)
-        granularity = enforce_3d_granularity_lock(granularity, locked, warnings)
-
         cap = int(fresh_cap)
         if cap < 1:
             warnings.append(f"fresh_cap {cap} < 1; clamped to 1")
@@ -396,7 +299,6 @@ class OTRImageDirector:
                  if isinstance(video_policy, dict) else None) or "cuda"),
             "image_models": resolved,
             "granularity": granularity,
-            "locked_3d_slots": sorted(locked),
             # Per-role still aspect, forwarded from OTR_VideoDirector so MetaBrief
             # mints each character still to MATCH its selected video engine
             # (portrait vs 16:9) with one dropdown pick. {} -> portrait (legacy).

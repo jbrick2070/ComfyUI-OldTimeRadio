@@ -283,7 +283,7 @@ def test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs():
         """The branch's own condition, evaluated the way the driver does."""
         return (
             "init_image" in rd._required_inputs_for_engine(engine_id, family)
-            and family not in ("audio_driven_face", "character_3d")
+            and family != "audio_driven_face"  # (character_3d token retired 2026-08-23)
             and engine_id not in ("ltx_audio_in", "minimax_h3_audio_in"))
 
     # Neither audio-in lane may have its reference overwritten ...

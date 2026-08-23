@@ -62,18 +62,13 @@ def test_ltx_video_is_wide_the_bug_fix():
     assert _engine("ltx_video").render_aspect == "wide"
 
 
-def test_mesh_portrait_3d_engines_are_portrait():
-    # The 3D talkers were UNREGISTERED 2026-06-29 (C3); their SOURCE classes still
-    # declare requires_mesh_portrait + render_aspect=portrait (they feed the mesher
-    # a PORTRAIT still even though the final video is 16:9). Checked directly since
-    # they are no longer in the registry.
-    from nodes._otr_video_engines.eng_character_3d import (
-        Hunyuan3DTalkEngine, TripoSGTalkEngine, TrellisTalkEngine,
-    )
-    for cls in (TripoSGTalkEngine, Hunyuan3DTalkEngine, TrellisTalkEngine):
-        eng = cls()
-        assert getattr(eng, "requires_mesh_portrait", False) is True
-        assert eng.render_aspect == "portrait"
+# (lean-mean order 4, 2026-08-23) test_mesh_portrait_3d_engines_are_portrait
+# was here. It imported the three eng_character_3d SOURCE classes directly to
+# pin requires_mesh_portrait + portrait aspect on adapters that had been
+# unregistered since 2026-06-29 -- a test whose only subject was dead code
+# proving the dead code still existed. The family is retired outright now
+# (triposg_talk / hunyuan3d_talk / trellis_talk are in RETIRED_ENGINE_IDS, the
+# files are deleted), so the pin went with it.
 
 
 # --------------------------------------------------------------------------- #

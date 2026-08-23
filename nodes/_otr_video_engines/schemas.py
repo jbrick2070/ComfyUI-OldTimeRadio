@@ -26,8 +26,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Single-sourced vocabularies
 # ---------------------------------------------------------------------------
 
-#: The video families (seven non-3D + ``character_3d`` + the LTX-AV
-#: ``audio_conditioned_video`` lane for audio-reactive scene motion / music).
+#: The video families (the ``character_3d`` token was RETIRED with its family
+#: 2026-08-23, lean-mean order 4 -- zero live declarers; ``audio_conditioned_video``
+#: is the LTX-AV lane for audio-reactive scene motion / music).
 FAMILIES: tuple = (
     "audio_driven_face",
     "lipsync_overlay",
@@ -36,7 +37,6 @@ FAMILIES: tuple = (
     "static_image_gen",
     "static_motion",
     "abstract",
-    "character_3d",
     "audio_conditioned_video",
 )
 
@@ -51,8 +51,7 @@ REQUIRED_INPUT_TOKENS: tuple = (
 #: Hard request-level requirements per family. ``static_image_gen`` requires
 #: text_prompt OR init_image (handled specially); the no-input families
 #: (static_motion / abstract) accept optional asset_refs but require nothing.
-#: ``character_3d`` requires an audio_ref (speech) + init_image (portrait/mesh)
-#: so both the 3D pipeline and the audio-driven lip-sync chain can be built.
+#: (character_3d's row -- audio_ref + init_image -- retired with the family.)
 FAMILY_REQUIRED_INPUTS: dict = {
     "audio_driven_face": ("audio_ref", "init_image"),
     "lipsync_overlay": ("base_clip_ref", "audio_ref"),
@@ -61,7 +60,6 @@ FAMILY_REQUIRED_INPUTS: dict = {
     "static_image_gen": (),   # special-cased: text_prompt OR init_image
     "static_motion": (),
     "abstract": (),
-    "character_3d": ("audio_ref", "init_image"),
     # LTX-AV music/scene lane: audio-reactive motion from a text prompt + the
     # per-beat slice of the frozen master (no portrait needed -- that is the
     # talk lane, which reuses audio_driven_face).
@@ -305,13 +303,12 @@ class AdapterDescriptor(_Forbid):
     provider_vram_tier: str = "radio"
     preprocess_manifest: dict = Field(default_factory=dict)
     dependency_manifest: dict = Field(default_factory=dict)
-    #: 3D capability flag (3D plan section 3): True for engines that consume a
-    #: clean front-facing MESH PORTRAIT (the character_3d lane). The
-    #: ImageDirector granularity lock reads THIS field -- never a hard-coded
-    #: family check -- so custom 3D engines declare it explicitly. A REAL
-    #: schema field because the model is extra="forbid" (an ad-hoc key would
-    #: be rejected).
-    requires_mesh_portrait: bool = False
+    # (requires_mesh_portrait was here -- retired 2026-08-23 with the
+    # character_3d family, lean-mean order 4. Zero declarers, zero carriers in
+    # any YAML/JSON row, and its only reader -- the ImageDirector granularity
+    # lock -- is removed in the same change. extra="forbid" means a stale row
+    # carrying the key now fails LOUD, which is correct: that row was written
+    # against a capability that no longer exists.)
 
 
 class VideoProfileRow(_Forbid):
@@ -326,9 +323,8 @@ class VideoProfileRow(_Forbid):
     dependency_manifest: dict = Field(default_factory=dict)
     preprocess_manifest: dict = Field(default_factory=dict)
     license: dict = Field(default_factory=dict)
-    #: Mirrors AdapterDescriptor.requires_mesh_portrait (3D plan section 3) so
-    #: profile rows carry the 3D capability without an ad-hoc key.
-    requires_mesh_portrait: bool = False
+    # (the requires_mesh_portrait mirror was here -- retired with the field
+    # above, 2026-08-23.)
 
 
 class ExecutionGroup(_Forbid):

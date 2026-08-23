@@ -821,7 +821,7 @@ def _still_spine_requires_scene(shot, engine_id, family):
         return True
     if family in _SCENE_INIT_FAMILIES:
         return True
-    if family in ("audio_driven_face", "character_3d"):
+    if family == "audio_driven_face":  # (character_3d token retired 2026-08-23)
         return False
     if "init_image" in _required_inputs_for_engine(engine_id, family):
         return True
@@ -2139,14 +2139,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # passed against the wrong behaviour.
     _engine_scene_init_required = (
         "init_image" in _required_inputs_for_engine(_eng_id, _family)
-        and _family not in ("audio_driven_face", "character_3d")
+        and _family != "audio_driven_face"
         and _eng_id not in ("ltx_audio_in", "minimax_h3_audio_in")
     )
     _engine_scene_init_optional = bool(
         _eng_id and _vreg.is_registered(_eng_id)
         and getattr(_vreg.get_engine(_eng_id), "provider_side", False)
         and getattr(_vreg.get_engine(_eng_id), "accepts_still", False)
-        and _family not in ("audio_driven_face", "character_3d")
+        and _family != "audio_driven_face"
         and _eng_id not in ("ltx_audio_in", "still_pan", "still_flat", "still_word")
     )
     if ((_family in _SCENE_INIT_FAMILIES
@@ -2627,7 +2627,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # 16:9), so it JOINS the landscape composite like LTX (the clip scales to
     # fill, no pillarbox). The aspect is the SELECTED engine's identity, not a
     # global toggle. lipsync_overlay / character_3d always align to a face.
-    _face_excl = {"audio_driven_face", "lipsync_overlay", "character_3d"}
+    _face_excl = {"audio_driven_face", "lipsync_overlay"}
     if _canvas_fam == "audio_driven_face":
         try:
             _sel_eng = _vreg.get_engine(str(shot.get("engine_id") or ""))

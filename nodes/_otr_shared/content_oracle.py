@@ -26,7 +26,7 @@ from typing import Optional
 
 #: Engine FAMILIES that must show temporal motion (the genuine moving-video
 #: lanes). Everything else -- static_image_gen (still_pan / still_flat),
-#: static_motion (still_motion / still_parallax: a slow pan that freezedetect can
+#: static_motion (still_motion: a slow pan that freezedetect can
 #: false-flag), abstract (viz_green, renamed from "visualizer" 2026-06-30) -- is
 #: motion-EXEMPT: only the luma floor applies. (Operator: "static is OK for
 #: static engines, not a failure.")
@@ -50,7 +50,6 @@ _FAMILY_FALLBACK: dict = {
     "wan_i2v": "image_to_video",
     "wan_ti2v": "image_to_video",
     "mesh_stage": "image_to_video",
-    "still_parallax": "static_motion",
     "still_motion": "static_motion",
     "still_pan": "static_image_gen",
     "still_flat": "static_image_gen",

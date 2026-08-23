@@ -54,7 +54,11 @@ def test_audio_specials_only_fit_audio_supplying_roles():
     assert rc.engine_fits_role(VIS, "character_video") is True
 
 
-def test_character_3d_needs_audio_and_still():
+def test_audio_plus_still_capability_fits_all_three_roles():
+    # (was test_character_3d_needs_audio_and_still -- the family is retired
+    # 2026-08-23; the CAPABILITY COMBO it exercised, audio_ref+init_image,
+    # is generic role_compat math and keeps its coverage under an honest
+    # name. C3D stays as the fixture label for the combo.)
     assert rc.engine_fits_role(C3D, "announcer_visual") is True
     assert rc.engine_fits_role(C3D, "music_visual") is True
     assert rc.engine_fits_role(C3D, "character_video") is True

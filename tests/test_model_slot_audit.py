@@ -114,6 +114,12 @@ def test_retired_and_unknown_engines_fail_loud():
             image_registry.assert_usable(engine, "character_video")
         assert excinfo.value.reason is image_registry.EngineUsabilityReason.MALFORMED_CONFIG
 
+    # The five dormant-3D ids went from merely-unregistered to RETIRED on
+    # 2026-08-23 (lean-mean order 4), and the registry gate consults the
+    # tombstone set FIRST -- so they now fail with the NAMED RetiredEngineError
+    # ("is retired and is no longer selectable"), the truthful diagnosis for an
+    # alpha-era graph, instead of the generic MALFORMED_CONFIG above.
+    from nodes._otr_shared.public_engines import RetiredEngineError
     for engine in (
         "still_parallax",
         "triposr",
@@ -122,9 +128,8 @@ def test_retired_and_unknown_engines_fail_loud():
         "trellis_talk",
     ):
         assert not video_registry.is_registered(engine)
-        with pytest.raises(video_registry.EngineUnusable) as excinfo:
+        with pytest.raises(RetiredEngineError):
             video_registry.assert_usable(engine, "character_video")
-        assert excinfo.value.reason is video_registry.EngineUsabilityReason.MALFORMED_CONFIG
 
     with pytest.raises(audio_engines.EngineUnusable) as excinfo:
         audio_engines.assert_usable("stable_audio_3", "char_voice")

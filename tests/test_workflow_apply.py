@@ -67,7 +67,7 @@ def mapping():
 def _registry_engine_ids():
     from nodes._otr_video_engines import registry as vreg
     from nodes._otr_video_engines import (  # noqa: F401
-        cheap_families, eng_character_3d, eng_cloud_video, eng_humo,
+        cheap_families, eng_cloud_video, eng_humo,
         eng_ltx_video, eng_wan_i2v,
     )
     from nodes._otr_audio_engines import registry as areg

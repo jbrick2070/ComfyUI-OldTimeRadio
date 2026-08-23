@@ -41,13 +41,22 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_five_sfx_ids():
+def test_the_retired_set_is_exactly_the_ten_known_ids():
+    # Five from the 2026-08-06 SFX-bed rip + five from the 2026-08-23
+    # dormant-3D retirement (lean-mean order 4). EXACT on purpose: the set is
+    # append-only, and an id appearing here that no ruling added -- or one
+    # vanishing -- must fail the suite, not drift silently.
     assert RETIRED_ENGINE_IDS == frozenset({
         "cloud_vidu_q2_pro_fast_720p_sfx",
         "google_vid_sfx_omni",
         "google_vid_sfx_veo_fast",
         "google_vid_sfx_veo_lite",
         "google_vid_sfx_veo_pro",
+        "triposg_talk",
+        "hunyuan3d_talk",
+        "trellis_talk",
+        "triposr",
+        "still_parallax",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
 

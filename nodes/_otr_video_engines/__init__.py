@@ -185,13 +185,11 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# UNREGISTERED 2026-06-30 (still_parallax rip-out, item 2 -- "registry IS the
-# menu"): the 0-E easy on-ramp 2.5D depth-parallax engine (DepthAnythingV2-SMALL)
-# is no longer imported here and is NOT selectable. The SOURCE file stays on
-# disk untouched (dark scaffold, same pattern as triposr/character_3d); re-add
-# this import + the @register decorator + a CAPABILITIES row in the SAME
-# change if it returns. mesh_stage's fallback chain now degrades directly to
-# still_motion (no longer via still_parallax).
+# RETIRED 2026-08-23 (lean-mean order 4; unregistered since 2026-06-30):
+# still_parallax, the 2.5D depth-parallax engine. The source file is DELETED
+# and the id is tombstoned in RETIRED_ENGINE_IDS -- an alpha-era saved graph
+# naming it gets the named RetiredEngineError, never a silent resolve.
+# mesh_stage's fallback chain degrades directly to still_motion.
 
 # 0-E easy on-ramp (2026-06-11): mesh_stage -- the traditional local 3D
 # chain (portrait -> hy3d-2mv core-node mesh -> cached GLB -> pinned
@@ -207,12 +205,13 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# UNREGISTERED 2026-06-29 (C3 -- "registry IS the menu"): the dark 3D scaffolds
-# triposg_talk / hunyuan3d_talk / trellis_talk (eng_character_3d) and triposr
-# (eng_triposr) render NotImplementedError, so they are NO LONGER imported here
-# and are NOT selectable. The source files stay on disk; re-add this import +
-# the @register decorator(s) + a CAPABILITIES row in the SAME change when a real
-# forward ships (then they return to the dropdown).
+# RETIRED 2026-08-23 (lean-mean order 4; unregistered since 2026-06-29): the
+# dark 3D scaffolds triposg_talk / hunyuan3d_talk / trellis_talk
+# (eng_character_3d) and triposr (eng_triposr). Every render was
+# NotImplementedError, so the files are DELETED and all four ids are
+# tombstoned in RETIRED_ENGINE_IDS. A real 3D forward starts from a fresh
+# adapter + registration + CAPABILITIES row + removing its id from the
+# tombstone set, in ONE change -- not from resurrecting these scaffolds.
 
 
 # viz_green (renamed from "visualizer" 2026-06-30, item 2): the LOW-VRAM

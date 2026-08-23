@@ -706,9 +706,13 @@ def test_resolve_final_shot_engines_humo_hosts_on_keeps_portrait(monkeypatch):
 # VideoRequest dicts; the chain re-validates family inputs per candidate; the
 # AS-2 resolver-prune fires on a family-changing fallback.
 # --------------------------------------------------------------------------- #
-def _char3d_ledger():
-    """A ShotLock-shaped ledger whose single shot is the v1 character_3d
-    engine (triposg_talk) with a resolvable portrait + per-line voice wav."""
+def _audio_face_ledger():
+    """A ShotLock-shaped ledger whose single shot is a LIVE audio_driven_face
+    engine (humo) with a resolvable portrait + per-line voice wav. (Was the
+    character_3d/triposg_talk fixture until that family was retired 2026-08-23,
+    lean-mean order 4 -- audio_driven_face requires the SAME audio_ref +
+    init_image pair, so every assertion keeps its meaning on a family that can
+    actually render.)"""
     return {
         "audio": {"master_audio_sha256": rd.FROZEN_AUDIO_SHA,
                   "ledger_frozen": True},
@@ -721,24 +725,24 @@ def _char3d_ledger():
         ]},
         "video": {"video_revision": 1, "fps": 25, "shots": [
             {"shot_id": "shot_b010", "source_line_ids": ["b010"],
-             "role": "character_video", "engine_id": "triposg_talk",
-             "family": "character_3d", "group_id": "grp_char",
+             "role": "character_video", "engine_id": "humo",
+             "family": "audio_driven_face", "group_id": "grp_char",
              "target_frame_count": 60, "degradation_trail": [],
              "creative": {"text_prompt": "c07 speaks, lantern glow"}},
         ]},
     }
 
 
-def test_built_character_3d_request_is_schema_valid():
+def test_built_audio_face_request_is_schema_valid():
     """The 7.0 code-verified gap, closed: VideoRequest.model_validate accepts
     the builder output verbatim (no init_w/init_h, no timing.dur_s, no
     top-level char_id; role/family_hint/profile_id emitted; observability is
     the schema-real field)."""
     from nodes._otr_video_engines.schemas import VideoRequest
-    led = _char3d_ledger()
+    led = _audio_face_ledger()
     req = rd.build_request_from_shot(led["video"]["shots"][0], led)
     model = VideoRequest.model_validate(req)
-    assert model.family_hint == "character_3d"
+    assert model.family_hint == "audio_driven_face"
     assert model.role == "character_video"
     assert model.conditioning_refs["char_id"] == "c07"
     assert model.timing.target_duration_s == 2.4
@@ -752,12 +756,12 @@ def test_built_character_3d_request_is_schema_valid():
     VideoRequest.model_validate(soak_req)
 
 
-def test_character_3d_request_missing_inputs_fails_closed():
-    """character_3d REQUIRES audio_ref + init_image: a ledger with neither
+def test_audio_face_request_missing_inputs_fails_closed():
+    """audio_driven_face REQUIRES audio_ref + init_image: a ledger with neither
     yields a request that model_validate REJECTS (defense in depth for the
-    adapter-boundary validation, 3D plan 7.2)."""
+    adapter-boundary validation)."""
     from nodes._otr_video_engines.schemas import VideoRequest
-    led = _char3d_ledger()
+    led = _audio_face_ledger()
     led["images"] = {"images": []}
     led["lines"][0].pop("bark_wav_path")
     req = rd.build_request_from_shot(led["video"]["shots"][0], led)

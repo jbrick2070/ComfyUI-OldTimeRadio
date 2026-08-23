@@ -463,40 +463,10 @@ def test_still_consumer_capability_does_not_swallow_a_malformed_force_map(monkey
         disp.still_consumer_capability(policy, "character_video")
 
 
-def test_three_d_lock_reads_the_EFFECTIVE_engine(monkeypatch):
-    """A derived value that still read the PICKED engine (agy, QA round 2).
-
-    DORMANT, and the finding is recorded honestly as such: no registered engine
-    declares ``requires_mesh_portrait`` today -- the three that do were
-    unregistered 2026-06-29 -- so this cannot fire on a real run. The reported
-    reproducing input (forcing ``mesh_stage``) does NOT actually reproduce,
-    because ``mesh_stage`` never declared that attribute. The trap is that it
-    re-arms the moment a 3D talker is re-registered, so the resolution order is
-    fixed now: effective first, picked only as the fallback.
-    """
-    from nodes import otr_image_director as idir
-
-    calls = []
-
-    def _fake_is_3d(engine_id, slot=None):
-        calls.append(engine_id)
-        return engine_id == "hunyuan3d_talk"
-
-    monkeypatch.setattr(idir, "_is_3d_engine", _fake_is_3d)
-    policy = {
-        "video_models": _resolved("wan_i2v", "wan_i2v", "wan_i2v"),
-        "effective_video_models": {"character_video": "hunyuan3d_talk"},
-    }
-    locked = idir.three_d_locked_slots(policy)
-    assert "character_image_model" in locked, (
-        "the lock must follow the engine that actually renders; it saw %r" % calls)
-
-
-def test_three_d_lock_falls_back_to_the_picked_engine_without_a_freeze(monkeypatch):
-    """A pre-1b policy keeps its old meaning exactly."""
-    from nodes import otr_image_director as idir
-
-    monkeypatch.setattr(idir, "_is_3d_engine",
-                        lambda engine_id, slot=None: engine_id == "hunyuan3d_talk")
-    policy = {"video_models": _resolved("wan_i2v", "wan_i2v", "hunyuan3d_talk")}
-    assert "character_image_model" in idir.three_d_locked_slots(policy)
+# (lean-mean order 4, 2026-08-23) Two tests of three_d_locked_slots were
+# here -- the effective-vs-picked resolution order and its pre-freeze
+# fallback. The lock they pinned is removed with the character_3d family;
+# its own docstring called it DORMANT (zero registered declarers of
+# requires_mesh_portrait since 2026-06-29), and the effective-first rule
+# they defended lives on in mesh_fodder_roles_from_video_policy and the
+# aspects map, which the rest of THIS file still pins.

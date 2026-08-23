@@ -29,39 +29,54 @@ def _req(**over):
 
 
 def test_families_and_tokens_are_single_sourced():
-    # Phase 3 added character_3d (8th); the LTX-AV lane added the 9th family
-    # audio_conditioned_video. FAMILY_REQUIRED_INPUTS stays in sync.
-    assert len(sc.FAMILIES) == 9
-    assert "character_3d" in sc.FAMILIES
+    # Phase 3 added character_3d as the 8th family; lean-mean order 4
+    # (2026-08-23) RETIRED it with its zero-declarer engines, so the count is
+    # back to 8 with audio_conditioned_video (the LTX-AV lane) as the newest.
+    # FAMILY_REQUIRED_INPUTS stays in sync.
+    assert len(sc.FAMILIES) == 8
+    assert "character_3d" not in sc.FAMILIES
     assert "audio_conditioned_video" in sc.FAMILIES
     assert sc.REQUIRED_INPUT_TOKENS == (
         "text_prompt", "init_image", "audio_ref", "base_clip_ref")
     assert set(sc.FAMILY_REQUIRED_INPUTS) == set(sc.FAMILIES)
 
 
-def test_character_3d_requires_audio_and_init_image():
+def test_retired_character_3d_family_is_refused_and_the_mechanism_lives():
+    """Half retirement pin, half mechanism proof (rewritten 2026-08-23).
+
+    The RETIRED family token must be refused by the family_hint validator --
+    a stale request carrying it fails LOUD, never quietly revives the lane.
+    The per-family required-inputs MECHANISM this test used to prove on
+    character_3d is proven on audio_driven_face instead, which requires the
+    SAME (audio_ref, init_image) pair and has live engines (humo)."""
     from pydantic import ValidationError
     base = dict(
-        request_id="r1", shot_id="shot_3d", role="character_video",
-        family_hint="character_3d", profile_id="p3d",
+        request_id="r1", shot_id="shot_af", role="character_video",
+        profile_id="paf",
         timing=sc.Timing(), canvas=sc.Canvas(w=1280, h=720, fps=25),
     )
+    # The retired family token is refused outright.
+    with pytest.raises(ValidationError):
+        sc.VideoRequest(**{**base, "family_hint": "character_3d",
+                           "audio_ref": sc.AudioRef(path="a.wav"),
+                           "asset_refs": {"init_image": "p.png"}})
+    live = {**base, "family_hint": "audio_driven_face"}
     # Missing both inputs
     with pytest.raises(ValidationError):
-        sc.VideoRequest(**base)
+        sc.VideoRequest(**live)
     # Missing init_image
     with pytest.raises(ValidationError):
-        sc.VideoRequest(**{**base, "audio_ref": sc.AudioRef(path="a.wav")})
+        sc.VideoRequest(**{**live, "audio_ref": sc.AudioRef(path="a.wav")})
     # Missing audio_ref
     with pytest.raises(ValidationError):
-        sc.VideoRequest(**{**base, "asset_refs": {"init_image": "p.png"}})
+        sc.VideoRequest(**{**live, "asset_refs": {"init_image": "p.png"}})
     # Both present -> valid
     ok = sc.VideoRequest(**{
-        **base,
+        **live,
         "audio_ref": sc.AudioRef(path="a.wav"),
         "asset_refs": {"init_image": "p.png"},
     })
-    assert ok.family_hint == "character_3d"
+    assert ok.family_hint == "audio_driven_face"
 
 
 def test_abstract_request_needs_no_inputs():
