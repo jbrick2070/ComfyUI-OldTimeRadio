@@ -41,7 +41,7 @@
     "gguf_n_ctx": 4096,
     "gguf_quant": "Q8_0",
     "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
-    "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "technical_model": "google/gemma-4-12b-it",
     "openrouter_slot_a_model": "(enable OpenRouter)",
     "openrouter_slot_b_model": "(enable OpenRouter)",
     "comfy_slot_a_model": "(enable Comfy Credits)",
