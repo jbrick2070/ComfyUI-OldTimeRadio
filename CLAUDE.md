@@ -314,11 +314,49 @@ swept dir to be moved later.
 ## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
 - ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.
+- **`v2.0-alpha` IS THE GITHUB DEFAULT BRANCH as of 2026-08-22.** It was switched from `main`
+  because `main` sits 3,923 commits behind and still advertises `version = "1.0.0"` -- so every
+  bare repo link, every fresh `git clone`, and every ComfyUI-Manager NIGHTLY install was serving
+  stale v1 code while looking like it had worked. A fresh clone now lands on `v2.0-alpha` with the
+  real v2 tree (verified by actual clone, not assumption). Do NOT "helpfully" switch it back, and
+  do not treat `main` as current for ANY purpose -- it is a stale v1.7 release merge, nothing more.
 - The operator eyeball gates TAGS and PROMOTIONS (`v2.0-alpha-stable`, prod, main, v2 release) -- NEVER
   pushes. Pushing to `v2.0-alpha` is always safe, expected, and required.
 - This SUPERSEDES any "do not push until the eyeball passes" line written before 2026-06-10 evening.
 - A stable branch only exists if the operator explicitly declares one.
 - After every push verify: HEAD == origin, no 0-byte files, no BOM, AST parse on touched .py files.
+### 7A. COMFY REGISTRY PUBLISHING (live since 2026-08-22 -- read before touching pyproject.toml)
+The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** under publisher
+**`fluxus`** (the operator's account). `.github/workflows/publish_action.yml` publishes via
+`Comfy-Org/publish-node-action`, keyed on the repo secret `REGISTRY_ACCESS_TOKEN`.
+- **EDITING `pyproject.toml` AUTO-FIRES A PUBLISH.** The workflow triggers on any push to
+  `v2.0-alpha` whose diff touches `pyproject.toml`. Treat that file as a release trigger, not a
+  config file: never edit it "just to tidy" mid-session, and never edit it while a version is
+  already pending. A push that does NOT touch it never publishes.
+- **Every publish needs a NEW version string.** `(node_id, version)` is uniquely indexed
+  server-side; re-publishing the same version is refused.
+- **`.comfyignore` decides what SHIPS** (gitignore syntax, layered on top of git tracking --
+  untracked files are excluded already). It currently strips `tests/`, `kibitz-runs/`,
+  `.github/`, `.claude/`, plus the exec()-using probe/smoke scripts that comfy-cli's security
+  scanner flags. Verify by downloading the published zip, never by assuming.
+- **PENDING IS A QUEUE, NOT A REJECTION.** A new version lands `NodeVersionStatusPending` and is
+  promoted to `Active` only by Comfy-Org's own Cloud Scheduler cron hitting their `/security-scan`
+  endpoint, which ONLY considers versions older than **30 minutes** (`registry.go:938`). Clean
+  scan -> Active; issues found -> `Flagged` (their private Discord, not us); missing zip ->
+  `Deleted`. The scanner itself is a PRIVATE repo and its schedule is not in any public config --
+  possibly nightly. **While a version is Pending, `latest_version` resolves to null, which is
+  exactly why ComfyUI Manager reports "not a CNR node" / "Cannot resolve install target".**
+  That error is NOT a local install fault -- do not send anyone chasing torch/dependency ghosts.
+- **There is NO publisher self-service path to Active.** Confirmed by reading
+  `Comfy-Org/registry-backend`. Waiting, or asking Comfy-Org, are the only moves.
+- **DELETE ASYMMETRY, and it is a trap:** deleting the NODE is a HARD delete (row removed,
+  versions cascade, every version string freed for reuse). Deleting a VERSION is a SOFT delete
+  (status flipped to `deleted`, ROW REMAINS) -- which BURNS that version string permanently.
+  Prefer node-delete for a clean slate; never version-delete a string you want back.
+- **The registry DELETE API needs the operator's browser (Firebase) session -- the publish token
+  returns 401 "user not found".** Claude cannot delete a listing; the operator clicks it. Deletion
+  is also EVENTUALLY consistent: the version list can serve stale reads from different replicas
+  for minutes afterward. Read it 2-3 times before concluding anything.
 ## 8. ROUNDTABLE DEFAULTS (operator directive 2026-06-22)
 Standing shape for EVERY `/roundtable` in this repo. These OVERRIDE the skill's stock
 "Claude is judge-only / panel only critiques" and "dry-run estimate first" defaults.
