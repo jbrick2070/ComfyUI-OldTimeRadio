@@ -1,5 +1,32 @@
 # LEAN-MEAN CLEANUP -- where it actually stands, 2026-08-23
 
+## UPDATE, end of the second overnight push -- ORDERS 1 THROUGH 6 ARE COMPLETE
+
+The section below this update describes the state after orders 1-2; it is kept
+as the historical record. Current truth:
+
+| order | state |
+|---|---|
+| 1 truth & prevention | DONE (140b748d) |
+| 2 zero-reachability removals | DONE (cb73fd2e, 14074ff2, 8a5dbff4) |
+| 3 membership boundary at the director | DONE (34c302b3) -- shaped by a Fable consult, QA'd, seven test pins |
+| 4 dormant 3D family retirement | DONE (a6a43e32 the OOM-proof rebase, 9a25d938 the retirement) -- 906 adapter lines out, five NAMED tombstones, the dormant lock and its schema capability gone, mesh_stage/directory_clip/portrait ledger protected and verified |
+| 5 public/manual node retirements | DONE (d42cd6a7) -- ProjectStateLoader, VRAMGuardian, SaveToEpisodeWorkspace (its known artifact VERIFIED gone from disk first), VideoProbe; all four tombstoned; pack 34 -> 30 |
+| 6 visual/ POC tree | DONE (c45ae5e1) -- HF_TOKEN bake-in moved to nodes/_otr_shared/hf_token.py and PROVEN from its new home BEFORE the 679K tree and its five public ids went; pack 30 -> 25 |
+| 7 consolidation | CANCELLED by the operator (92b9edea) -- "every video lane is independent", "dont consolidate" |
+| 8 ffprobe consolidation | SKIPPED PENDING OPERATOR CONFIRM: it is consolidation by its own title, and the order-7 ruling reads as covering it. Say the word either way. |
+| 9 Writer / StoryOrchestrator splits | NOT STARTED, deliberately -- and now MEASURED for whoever takes it: `_resolve_inputs` is 398 lines (module level), `WriterTailContext` 38, `_run_writer_tail` 911 lines AND A METHOD inside the class, in the 7,417-line file that writes every episode. That is a fresh-window campaign with hash proofs per seam, not a session-tail job. |
+| 10 Writer widget-schema epoch | HELD until after 2.1 ships: workflow-atomic (canonical + all 54 variants regenerate), and a blanket regeneration currently REVERTS the operator's hand-edited ship-candidate ghost_signal_v3 settings (the deferred drift). Wrong week to touch it. |
+| 11 scripts audit + test-root cleanup | Test-root half RE-GROUNDED with evidence: no repo-root conftest and no pythonpath key exist, so the 175 per-file sys.path inserts are LOAD-BEARING, not redundant -- the row's premise is false at HEAD and the plan row now says so. Scripts-audit half remains open (a per-file owner table, documentation-shaped). |
+| 12 OpenRouter diet | BLOCKED by its own stated precondition: draft otr_cloud_lanes.json is not ratified. Nothing to do until it is. |
+
+**The pack roster went 34 -> 25 registered nodes across the night, every
+retirement a NAMED tombstone in DELETED_NODE_TYPES, never a vanishing.** Suites
+green at every push: 12200, 12176, 12157, 12141 -- each drop is deleted test
+files counted in its commit. Canonical workflow byte-identical throughout;
+pyproject.toml never touched.
+
+
 Read `docs/LEAN_MEAN_CLEANUP.md` for the campaign itself. This file is the
 honest progress line: what landed, what did not, and what needs the operator
 rather than another window.
