@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 
 import pytest
 
@@ -179,12 +180,29 @@ def test_at_least_half_the_character_clips_are_non_figure():
 
 def test_character_modes_are_an_unmodified_cycle():
     """Only a bookend may be corrected; a character assignment never moves."""
+    cycle = gsa.GHOST_CHARACTER_CYCLE
     chars = [b for b, r in TIMELINE if r == "character_video"]
     for seed in range(32):
         picked = [gsa.schedule_ghost_modes(TIMELINE, seed)[b] for b in chars]
-        start = gsa.GHOST_MODES.index(picked[0])
-        for i, mode in enumerate(picked):
-            assert mode == gsa.GHOST_MODES[(start + i) % len(gsa.GHOST_MODES)]
+        # ANY rotation, not the first index that matches. `figure` appears
+        # TWICE in the cycle, so `cycle.index(picked[0])` picks 0 even for a run
+        # that legitimately started at index 2 -- a test bug that fails a
+        # perfectly correct schedule.
+        rotations = [tuple(cycle[(off + i) % len(cycle)]
+                           for i in range(len(picked)))
+                     for off in range(len(cycle))]
+        assert tuple(picked) in rotations, (seed, picked)
+
+
+def test_half_the_character_beats_show_a_person():
+    """The episode lost its people in the first draft; this is the floor."""
+    chars = [b for b, r in TIMELINE if r == "character_video"]
+    assert (gsa.GHOST_CHARACTER_CYCLE.count("figure") * 2
+            == len(gsa.GHOST_CHARACTER_CYCLE))
+    for seed in range(64):
+        modes = gsa.schedule_ghost_modes(TIMELINE, seed)
+        figures = sum(1 for b in chars if modes[b] == "figure")
+        assert figures * 2 >= len(chars) - 1, (seed, figures)
 
 
 # --------------------------------------------------------------------------- #
@@ -203,25 +221,36 @@ def test_the_motif_carries_no_face_landmark_or_cast_prose():
                        "woman", "adrian", "spender", "steady", "battered",
                        "leather"):
             assert banned not in low, (mode, motif)
-    # Whole WORDS from the allowlists, never a phrase lifted off the cast row.
+    # Whole WORDS from the allowlists plus a fixed connective vocabulary --
+    # never a phrase lifted off the cast row.
+    allowed = (set(gsa.MOTIF_COLOUR_WORDS) | set(gsa.MOTIF_PROP_WORDS)
+               | set(gsa.MOTIF_SILHOUETTE_WORDS) | set(gsa.MOTIF_GARMENT_WORDS)
+               | {"a", "an", "in", "carrying", "figure"})
     for mode in gsa.GHOST_MODES:
         motif = gsa.motif_for_character(comp, mode, seed_int=comp["seed_int"])
-        for word in motif.split():
-            assert word in (
-                list(gsa.MOTIF_COLOUR_WORDS) + list(gsa.MOTIF_PROP_WORDS)
-                + list(gsa.MOTIF_SILHOUETTE_WORDS)
-                + ["silhouette", "with", "a", "emblem", "signal"]), motif
+        for word in motif.replace(",", " ").split():
+            assert word in allowed, (motif, word)
 
 
 def test_the_three_representations_share_colour_and_prop():
+    """One character, one colour, one prop -- that is the recurrence.
+
+    `figure` says FIGURE, not "silhouette" (2026-08-22). SD1.5 does not know
+    that a silhouette is meant to be somebody: handed "<silhouette> silhouette
+    with a charcoal satchel" it drew vertical black shapes. Handed "a broad
+    figure in a charcoal coat, carrying a satchel" it draws a person, which is
+    what v1 did and what the operator ranked highest.
+    """
     comp = _components()
     cues = {m: gsa.motif_for_character(comp, m, seed_int=comp["seed_int"])
             for m in gsa.GHOST_MODES}
-    shared = set(cues["object"].split()) & set(cues["signal"].split())
-    shared -= {"emblem", "signal"}
-    assert len(shared) >= 2                      # colour + prop
-    assert shared <= set(cues["figure"].split())
-    assert "silhouette" in cues["figure"]
+    assert cues["object"] == cues["signal"], cues   # the same real object
+    shared = {w for w in cues["object"].replace(",", " ").split()
+              if w not in ("a", "an")}
+    assert len(shared) >= 2                          # colour + prop
+    assert shared <= set(cues["figure"].replace(",", " ").split())
+    assert "figure" in cues["figure"]
+    assert "silhouette" not in cues["figure"]
 
 
 def test_a_sparse_cast_row_still_gets_a_stable_motif():
@@ -298,9 +327,25 @@ def test_a_good_leaf_passes_in_every_mode():
     for mode, leaf in (
             ("figure", "an outline lifts one arm into a narrow band of light"),
             ("object", "the clasp turns and a slow shadow crosses it"),
-            ("signal", "bands of static crush inward and open again")):
+            ("signal", "the lamp glows awake and steadies in the dark hall")):
         ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
         assert ok, (mode, why)
+
+
+def test_a_leaf_that_names_a_texture_is_rejected_in_every_mode():
+    """THE REGRESSION THIS RULE EXISTS FOR (measured 2026-08-22).
+
+    The first live v2 arms rendered unreadable texture on every beat whose leaf
+    named static, a waveform or a field, and the only beats that survived were
+    the two naming a real object. A 512x288 SD1.5 draws what it is handed.
+    """
+    for leaf in ("bands of static crush inward and open again",
+                 "a jagged waveform pulses across a dark screen",
+                 "a gradient of noise tightens toward one bright point"):
+        for mode in gsa.GHOST_MODES:
+            ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
+            assert not ok, (mode, leaf)
+            assert "texture" in why
 
 
 @pytest.mark.parametrize("leaf,mode,expect", [
@@ -546,9 +591,16 @@ def test_object_and_signal_laws_are_affirmative_and_non_human():
             motif_cue=gsa.motif_for_bookend("announcer_visual", mode),
             drawable_beat="a slow shadow crosses the dial and lifts away")
         low = out["positive"].lower()
-        for banned in ("no people", "without", "no humans", "person",
-                       "face", "close-up", "portrait"):
-            assert banned not in low, (mode, out["positive"])
+        # PHRASES by substring, single WORDS by word boundary. "the object
+        # fills the frame on a real surface" contains the letters f-a-c-e, and
+        # a substring test on "face" failed it -- a test bug, not a prompt bug,
+        # and exactly the kind that trains a reader to ignore the gate.
+        for phrase in ("no people", "no humans", "without"):
+            assert phrase not in low, (mode, out["positive"])
+        words = set(re.findall(r"[a-z][a-z'-]*", low))
+        for banned in ("person", "people", "face", "portrait", "closeup"):
+            assert banned not in words, (mode, out["positive"])
+        assert "close-up" not in low
 
 
 def test_a_figure_prompt_never_asks_for_a_face_or_a_close_up():

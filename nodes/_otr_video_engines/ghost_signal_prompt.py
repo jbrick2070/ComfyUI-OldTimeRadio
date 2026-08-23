@@ -103,21 +103,40 @@ LANE_HYGIENE_NEGATIVE = (
 #: exclusions belong in the negative and the positive states what to draw.
 GHOST_SHOT_LAW = "steady legible silhouette, one clear action, unbroken shot"
 
-#: THE PROMPT v2 SHOT LAWS, one per representation, ALL AFFIRMATIVE.
+#: THE PROMPT v2 SHOT LAWS, one per representation, ALL AFFIRMATIVE, and since
+#: 2026-08-22 ALL THREE NAME A PHYSICAL THING.
 #:
 #: There is no ``no people`` here and there never will be. The negative channel
 #: is live on this lane, so exclusion belongs there; a positive clause that
 #: attends to an absent human is a request for the model to think about one.
-#: ``object`` and ``signal`` express absence by naming a subject that is not a
-#: person -- an isolated emblem, an abstract field -- which is an instruction the
-#: sampler can actually follow.
+#:
+#: THE FIRST DRAFT OF THESE LAWS IS WHAT TANKED THE PICTURES, and it is worth
+#: writing down exactly how. They read "one isolated emblem FILLING THE
+#: COMPOSITION" and "an ABSTRACT SIGNAL FIELD filling the composition" -- which
+#: are instructions toward abstraction, and a 512x288 SD1.5 obliges by painting
+#: TEXTURE instead of a subject. Measured across a same-seed pair: the v1 arm
+#: rendered a recognisable subject on 4 of 4 sampled beats (a period radio set,
+#: a figure at a lectern, a document, a tuning dial); the first-draft v2 arm
+#: rendered 0 of 4, and its LLM-authored sibling managed 2 of 8 -- both of them
+#: on the only beats whose authored leaf happened to name a real object (a
+#: lantern, a radio dial).
+#:
+#: So the rule the evidence actually supports: LEGIBILITY TRACKS CONCRETE NOUNS.
+#: ``object`` and ``signal`` still keep a person out of frame, but they do it by
+#: naming a REAL THING to look at -- an object on a surface, an object lit from
+#: within -- rather than by asking for a field of nothing.
 GHOST_MODE_LAWS_V2 = {
-    "figure": ("mid-shot or wider, steady legible silhouette, one clear "
+    "figure": ("mid-shot or wider, whole figure legible, one clear action, "
+               "unbroken shot"),
+    "object": ("the object fills the frame on a real surface, one clear "
                "action, unbroken shot"),
-    "object": ("one isolated emblem filling the composition, one clear "
-               "action, unbroken shot"),
-    "signal": ("an abstract signal field filling the composition, one clear "
-               "action, unbroken shot"),
+    # "LIT AGAINST", not "lit from within": the motif prop is whatever the cast
+    # row supplied, and most of them do not glow. A satchel lit from within is
+    # a request the sampler cannot honour; a satchel lit against a dark room
+    # with light moving across it is a picture, and it still keeps a person out
+    # of frame, which is the only thing this mode owed.
+    "signal": ("the object lit against a dark room, moving light across it, "
+               "unbroken shot"),
 }
 
 #: Role framing floors. The character floor is a MID-SHOT: closer than that and

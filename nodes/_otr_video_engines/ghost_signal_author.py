@@ -66,9 +66,24 @@ GHOST_AUTHOR_SCHEMA_VERSION = 1
 #: it is one of the thirteen hashed request keys, so a bump reauthors.
 GHOST_AUTHOR_VERSION = "ghost_drawable_beat_v1"
 
-#: The three coordinated representations. ``figure`` is the only one that may
-#: show a body, and even then as a silhouette rather than a likeness.
+#: The three coordinated representations. ``figure`` is the only one that shows
+#: a body, and it shows a body rather than a likeness -- no face is requested
+#: and none is promised.
 GHOST_MODES = ("figure", "object", "signal")
+
+#: THE CHARACTER CYCLE, and it is deliberately NOT ``GHOST_MODES``.
+#:
+#: The first draft cycled the three modes evenly, so two of every three
+#: character beats were non-figurative and an episode lost its people. Measured
+#: against the v1 arm on the same seeds, that was the single biggest visible
+#: regression -- the older arm rendered four clear human figures across its
+#: eight beats and the new one rendered none.
+#:
+#: Period four, half of it ``figure``. That honours the operator's actual
+#: directive -- *"do not force the same mediocre person into every clip"* --
+#: without emptying the episode of people, and it still cannot produce a run of
+#: three because no two adjacent entries are equal.
+GHOST_CHARACTER_CYCLE = ("figure", "object", "figure", "signal")
 
 #: The two representations a bookend may take. A radio console is not a person.
 GHOST_NON_FIGURE_MODES = ("object", "signal")
@@ -160,15 +175,18 @@ class GhostBudgetError(GhostAuthorError):
 #: real recurrence motif.
 GHOST_BATCH_EXAMPLES = (
     "GOOD, and match this length:\n"
-    "  mode=object   -> the shutter tilts and a slow shadow crosses its slats\n"
-    "  mode=signal   -> banded static tightens around one bright point and "
-    "opens\n"
-    "  mode=figure   -> an outline lifts the spool into a narrowing shaft of "
-    "light\n"
+    "  mode=object   -> the shutter tilts on the desk as a shadow crosses "
+    "its slats\n"
+    "  mode=signal   -> a lamp swings past the crate and the shadow sweeps "
+    "the wall\n"
+    "  mode=figure   -> a figure lifts the spool and holds it against the "
+    "window light\n"
     "BAD, never write these:\n"
-    "  tension builds        (not a thing a picture can show)\n"
-    "  finality sets in      (not a thing a picture can show)\n"
-    "  broadcast begins      (too short, and nothing is drawn)\n"
+    "  tension builds            (not a thing a picture can show)\n"
+    "  finality sets in          (not a thing a picture can show)\n"
+    "  broadcast begins          (too short, and nothing is drawn)\n"
+    "  banded static tightens    (a texture is not a subject)\n"
+    "  a waveform pulses         (a graph is not a subject)\n"
 )
 
 GHOST_BATCH_RULES = (
@@ -181,14 +199,15 @@ GHOST_BATCH_RULES = (
     "2. One entry per shot id given below, same ids, no extras, no repeats.\n"
     "3. Each drawable_beat is %d-%d words -- count them -- lower case, and "
     "never longer than %d characters. Fewer than %d words is rejected.\n"
-    "4. Name a CONCRETE thing and what it does. A mood, a feeling or an "
-    "abstract state is not drawable.\n"
+    "4. Name a CONCRETE thing and what it does -- an object you could pick "
+    "up, or a person. A mood, a feeling, an abstract state, a texture, a "
+    "pattern or a waveform is NOT drawable and will be rejected.\n"
     "5. Write only what is visible. No names, no speech, no captions, no "
     "lettering, no camera or lens words, no quality words.\n"
     "6. Never write what is absent. Say what IS in the frame.\n"
-    "7. mode=figure may show a body as a silhouette. mode=object shows one "
-    "isolated thing. mode=signal shows light, static, shadow or waveform "
-    "and no person at all.\n"
+    "7. mode=figure SHOWS A PERSON (no face needed). mode=object shows one "
+    "real object on a real surface, no person. mode=signal shows a real "
+    "object in a dark room with light moving over it, no person.\n"
     "8. Do not repeat the motif text back; it is already in the picture, and "
     "do not reuse the example objects below -- write from the motif you were "
     "given.\n"
@@ -278,6 +297,20 @@ _HUMAN_WORDS = frozenset({
     "silhouettes", "face", "faces", "head", "heads", "portrait", "eye",
     "eyes", "mouth", "hand", "hands", "arm", "arms", "shoulder", "shoulders",
     "body", "bodies", "someone", "somebody", "he", "she", "they",
+})
+
+#: Words whose SUBJECT is a texture rather than a thing. A 512x288 SD1.5 draws
+#: exactly what it is handed: asked for static it paints static, asked for a
+#: lantern it paints a lantern. The first live v2 arms are the measurement --
+#: every beat whose leaf named one of these rendered as unreadable texture, and
+#: the only beats that survived were the ones naming a real object.
+#:
+#: NOT a taste judgement. A leaf may still describe light, shadow or movement;
+#: it may not make the ABSENCE OF A SUBJECT its subject.
+_ABSTRACT_SUBJECT_WORDS = frozenset({
+    "static", "waveform", "waveforms", "gradient", "gradients", "texture",
+    "textures", "abstraction", "abstract", "pixels", "pixelation", "noise",
+    "geometry", "geometric", "grain", "scanlines", "interference",
 })
 
 #: Positive-channel negation. The negative prompt is the exclusion authority;
@@ -374,10 +407,10 @@ def schedule_ghost_modes(entries, episode_seed) -> dict:
     ``entries`` is the ORDERED list of ``(beat_id, role)`` pairs -- ordered
     because the anti-run rule is a property of the timeline, not of a beat.
 
-    CHARACTER BEATS CYCLE ``figure -> object -> signal`` from a hashed offset.
-    An unmodified cycle of period three satisfies the operator's quota by
-    construction (two of every three character clips are non-figure) and can
-    never produce a run, so no correction is ever applied to a character.
+    CHARACTER BEATS RUN :data:`GHOST_CHARACTER_CYCLE` from a hashed offset --
+    ``figure, object, figure, signal``, so half of them show a person and no two
+    adjacent entries are equal, which means a character can never start a run
+    and never needs correcting.
 
     BOOKENDS alternate ``object``/``signal`` from their own hashed offset. Only
     a bookend may be corrected, and only when it would create a THIRD identical
@@ -385,7 +418,7 @@ def schedule_ghost_modes(entries, episode_seed) -> dict:
     away from the assignments the recurrence design depends on.
     """
     seed = _hash_int(episode_seed, "ghost_mode_schedule", GHOST_AUTHOR_VERSION)
-    char_offset = seed % len(GHOST_MODES)
+    char_offset = seed % len(GHOST_CHARACTER_CYCLE)
     bookend_offset = (seed >> 8) % len(GHOST_NON_FIGURE_MODES)
 
     out = {}
@@ -395,7 +428,8 @@ def schedule_ghost_modes(entries, episode_seed) -> dict:
     for beat_id, role in entries:
         beat_id = str(beat_id)
         if normalize_role(role) == "character_video":
-            mode = GHOST_MODES[(char_offset + char_n) % len(GHOST_MODES)]
+            mode = GHOST_CHARACTER_CYCLE[
+                (char_offset + char_n) % len(GHOST_CHARACTER_CYCLE)]
             char_n += 1
             fixed = True
         else:
@@ -427,6 +461,14 @@ MOTIF_COLOUR_WORDS = (
     "silver", "rust", "ochre", "violet", "purple", "cream", "tan", "charcoal",
 )
 
+#: Garment tokens. ``figure`` carries one so the person on screen is wearing
+#: something a sampler can draw; the non-figure modes have no use for a coat.
+MOTIF_GARMENT_WORDS = (
+    "coat", "overcoat", "trenchcoat", "greatcoat", "jacket", "uniform",
+    "cloak", "cape", "gown", "dress", "suit", "waistcoat", "vest", "apron",
+    "shawl", "robe", "hat", "fedora", "cap", "helmet", "hood", "scarf",
+)
+
 #: Silhouette tokens. ``figure`` alone carries one.
 MOTIF_SILHOUETTE_WORDS = (
     "tall", "short", "broad", "slight", "stooped", "lean", "heavyset",
@@ -449,19 +491,24 @@ MOTIF_PROP_WORDS = (
 #: that kind. Checked in, never generated, never asked of a model.
 MOTIF_FALLBACK_POOLS = {
     "colour": ("amber", "rust", "olive", "charcoal", "cream", "navy"),
+    "garment": ("coat", "uniform", "shawl", "jacket", "hood", "scarf"),
     "silhouette": ("lean", "broad", "slight", "tall", "compact", "angular"),
     "prop": ("lantern", "key", "ledger", "satchel", "chart", "telegraph"),
 }
 
-#: Bookend motifs, by ``(role, mode)``. Compact radio anchors that recur while
+#: Bookend motifs, by ``(role, mode)``. Real radio HARDWARE that recurs while
 #: the unchanged pack cue keeps supplying the anime / archive / material look.
 #: A Ghost bookend with an empty motif is invalid, which is why these are
 #: constants rather than an optional derivation.
+#:
+#: They used to read "radio dial emblem" and "broadcast waveform signal". An
+#: emblem is not a thing and a waveform is a graph, and the bookends rendered as
+#: texture accordingly. A bakelite radio set is a thing.
 GHOST_BOOKEND_MOTIFS = {
-    ("announcer_visual", "object"): "radio dial emblem",
-    ("announcer_visual", "signal"): "radio dial signal",
-    ("music_visual", "object"): "broadcast console emblem",
-    ("music_visual", "signal"): "broadcast waveform signal",
+    ("announcer_visual", "object"): "a bakelite radio set",
+    ("announcer_visual", "signal"): "a glowing radio dial",
+    ("music_visual", "object"): "a broadcast console",
+    ("music_visual", "signal"): "a spinning turntable",
 }
 
 
@@ -507,6 +554,8 @@ def _motif_tokens(components, seed_int) -> dict:
     out = {}
     out["colour"] = _first_allowlisted((costume, silhouette),
                                        MOTIF_COLOUR_WORDS)
+    out["garment"] = _first_allowlisted((costume, silhouette),
+                                        MOTIF_GARMENT_WORDS)
     out["silhouette"] = _first_allowlisted((silhouette,),
                                            MOTIF_SILHOUETTE_WORDS)
     out["prop"] = _first_allowlisted((prop,), MOTIF_PROP_WORDS)
@@ -525,17 +574,24 @@ def motif_for_character(components, mode, *, seed_int=0) -> str:
     """
     mode = str(mode or "")
     tokens = _motif_tokens(components, seed_int)
+    # "an olive key", not "a olive key". The motif is prompt text a person reads
+    # in a receipt and a sampler reads as language; a broken article is a small
+    # thing that makes both of them worse.
+    article = "an" if tokens["colour"][:1] in "aeiou" else "a"
     if mode == "figure":
-        # "an olive key", not "a olive key". The motif is prompt text a person
-        # reads in a receipt and a sampler reads as language; a broken article
-        # is a small thing that makes both of them worse.
-        article = "an" if tokens["colour"][:1] in "aeiou" else "a"
-        return "%s silhouette with %s %s %s" % (
-            tokens["silhouette"], article, tokens["colour"], tokens["prop"])
-    if mode == "object":
-        return "%s %s emblem" % (tokens["colour"], tokens["prop"])
-    if mode == "signal":
-        return "%s %s signal" % (tokens["colour"], tokens["prop"])
+        # A PERSON, SAID PLAINLY. The first draft said "<silhouette> silhouette
+        # with a <colour> <prop>", and SD1.5 drew vertical black shapes -- it
+        # does not know that a "silhouette" is supposed to be someone. v1 said
+        # "a man, a broad steady figure, a charcoal coat, holding a folded
+        # chart" and got a man in a coat. This is that, minus the name leak.
+        return "a %s figure in %s %s %s, carrying %s %s" % (
+            tokens["silhouette"], article, tokens["colour"], tokens["garment"],
+            "an" if tokens["prop"][:1] in "aeiou" else "a", tokens["prop"])
+    if mode in ("object", "signal"):
+        # THE PROP AS ITSELF. "charcoal lantern emblem" is not a thing; a
+        # charcoal lantern is. The two beats that survived the first draft are
+        # the two whose leaf named a real object, which is the whole finding.
+        return "%s %s %s" % (article, tokens["colour"], tokens["prop"])
     raise GhostAuthorError("unknown Ghost representation mode %r" % (mode,))
 
 
@@ -794,6 +850,8 @@ def validate_drawable_beat(leaf, *, mode, names=()) -> tuple:
         return False, "asks for lettering"
     if lowered & _BOILERPLATE_WORDS:
         return False, "carries camera/style boilerplate"
+    if lowered & _ABSTRACT_SUBJECT_WORDS:
+        return False, "names a texture instead of a thing"
     if _SECOND_PERSON_RE.search(text):
         return False, "addresses a second person"
     if _NEGATION_RE.search(text):
@@ -817,28 +875,28 @@ def validate_drawable_beat(leaf, *, mode, names=()) -> tuple:
 #: drawable idea -- which is precisely what the v1 six-word slice was not.
 GHOST_FALLBACK_CLAUSES = {
     "figure": (
-        "a lone outline turns slowly into a widening shaft of light",
-        "an outline steps forward as the floor brightens beneath it",
-        "an outline lifts one arm and the shadow swings across the wall",
-        "an outline leans in while the light narrows to a single band",
-        "an outline straightens as a slow glow rises behind it",
-        "an outline turns away and the light closes behind it",
+        "a figure turns slowly toward a lit doorway",
+        "a figure steps forward across a bare wooden floor",
+        "a figure lifts one hand and holds it against the light",
+        "a figure leans over a table and goes still",
+        "a figure straightens and looks off past the frame",
+        "a figure turns away and walks into the dark",
     ),
     "object": (
-        "the emblem tilts as a slow shadow crosses its face",
-        "the emblem catches a rising glow along one worn edge",
-        "the emblem rocks once and settles into deeper shadow",
-        "the emblem brightens while fine dust drifts across it",
-        "the emblem turns a quarter and the highlight slides off",
-        "the emblem sinks slowly out of a narrowing pool of light",
+        "it tilts on the table as a shadow crosses it",
+        "it catches a rising glow along one worn edge",
+        "it rocks once on the wood and settles again",
+        "it stands on a desk while dust drifts across it",
+        "it turns a quarter and the highlight slides away",
+        "it sinks slowly into the shadow at the table edge",
     ),
     "signal": (
-        "bands of static crush inward and open again",
-        "a slow ripple crosses the field and fades to a flat glow",
-        "concentric rings tighten toward a single bright point",
-        "a bright seam splits the field and drifts apart",
-        "the field pulses once and settles into drifting grain",
-        "long shadows sweep across the field and thin away",
+        "a lamp swings past it and the shadow sweeps the wall",
+        "light crawls across it and steadies against the back wall",
+        "a warm beam finds it and holds on its worn edge",
+        "it sits in the dark as a slow light passes over it",
+        "the light on it narrows to a single bright band",
+        "the light leaves it and the room goes dim",
     ),
 }
 
@@ -846,10 +904,10 @@ GHOST_FALLBACK_CLAUSES = {
 #: open and close on the same picture, which is what a shared pack register
 #: produced on every v1 episode.
 GHOST_FALLBACK_BOOKENDS = {
-    ("opening", "object"): "the emblem lights from cold to warm and holds",
-    ("opening", "signal"): "a single bright line opens into a spreading field",
-    ("closing", "object"): "the emblem dims slowly and the highlight leaves it",
-    ("closing", "signal"): "the field narrows to one fading horizontal line",
+    ("opening", "object"): "it lights from cold to warm on the studio desk",
+    ("opening", "signal"): "a warm light finds it in the dark studio",
+    ("closing", "object"): "it dims slowly and the highlight leaves its edge",
+    ("closing", "signal"): "the light slides off it and the studio goes dark",
 }
 
 
@@ -1263,6 +1321,7 @@ __all__ = [
     "GHOST_BATCH_BASE_TOKENS", "GHOST_BATCH_PER_SHOT_TOKENS",
     "GHOST_BATCH_RULES", "GHOST_BATCH_EXAMPLES",
     "GHOST_TEMPLATE_SHA256", "GHOST_REQUEST_HASH_KEYS", "GHOST_PROMPT_FIELDS",
+    "GHOST_CHARACTER_CYCLE",
     "GHOST_DETERMINISTIC_MODEL_ID",
     "GHOST_BOOKEND_MOTIFS", "GHOST_FALLBACK_CLAUSES",
     "GHOST_FALLBACK_BOOKENDS", "GHOST_ROLES", "GHOST_ARC_CUES",
