@@ -429,18 +429,21 @@ def test_the_client_refusal_names_the_self_escape_hatch(live_registry):
 
 def test_writer_passes_an_owner_to_both_resolvers():
     """Drift guard: a self-owned client bank is dead without owner=."""
-    src = (REPO / "nodes" / "OTR_LedgerScriptWriter.py").read_text(
-        encoding="utf-8")
-    tree = ast.parse(src)
+    # Both resolvers are called from `_resolve_inputs`, which moved to
+    # `_otr_writer_inputs.py` in lean-mean order 9 slice 1 (byte-identically).
+    # Walk the whole writer family so the guard keeps seeing every call site.
     seen = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        name = func.attr if isinstance(func, ast.Attribute) else None
-        if name in ("resolve_fetcher", "resolve_interpreter"):
-            seen.setdefault(name, []).append(
-                {kw.arg for kw in node.keywords})
+    for name_of_file in ("OTR_LedgerScriptWriter.py", "_otr_writer_inputs.py"):
+        tree = ast.parse((REPO / "nodes" / name_of_file).read_text(
+            encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else None
+            if name in ("resolve_fetcher", "resolve_interpreter"):
+                seen.setdefault(name, []).append(
+                    {kw.arg for kw in node.keywords})
     assert set(seen) == {"resolve_fetcher", "resolve_interpreter"}, seen
     for name, calls in seen.items():
         for kwargs in calls:

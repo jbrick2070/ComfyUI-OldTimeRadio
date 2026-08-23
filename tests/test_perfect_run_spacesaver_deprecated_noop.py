@@ -78,8 +78,14 @@ def test_no_production_consumer_remains():
     hits = []
     for p in NODES_DIR.rglob("*.py"):
         rel = p.relative_to(REPO)
-        # Skip the widget's own definition (writer file).
-        if p.name == "OTR_LedgerScriptWriter.py":
+        # Skip the widget's own definition and its own reader. The writer
+        # DECLARES the widget; `_otr_writer_inputs._resolve_inputs` is the
+        # function that reads it into `resolved` and has always been the one
+        # place that does -- lean-mean order 9 slice 1 moved that function out
+        # of the writer file byte-identically, which is a relocation of the
+        # declaration side, not a new consumer. What this guard is really
+        # hunting is a THIRD module quietly acting on the flag.
+        if p.name in ("OTR_LedgerScriptWriter.py", "_otr_writer_inputs.py"):
             continue
         src = p.read_text(encoding="utf-8", errors="replace")
         for pat in STAMP_PATTERNS:

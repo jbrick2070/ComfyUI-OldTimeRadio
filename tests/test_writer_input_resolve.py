@@ -25,6 +25,11 @@ import pytest
 
 PACK_ROOT = Path(__file__).resolve().parent.parent
 WRITER_PATH = PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
+#: `_resolve_inputs` moved here in lean-mean order 9, slice 1 (2026-08-23),
+#: byte-identically. The pins below are about WHERE THE WIRING IS, so they
+#: follow the function -- `run` and `INPUT_TYPES` are still in the writer and
+#: are still read from there.
+WRITER_INPUTS_PATH = PACK_ROOT / "nodes" / "_otr_writer_inputs.py"
 
 
 def _find_function(tree: ast.AST, name: str) -> ast.FunctionDef:
@@ -53,7 +58,7 @@ def test_resolve_inputs_rss_uses_technical_model():
     removed -- the fetch/rerank chain is style-agnostic now -- so the
     wrapper's only positional is technical_model.
     """
-    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+    tree = ast.parse(WRITER_INPUTS_PATH.read_text(encoding="utf-8"))
     resolve_fn = _find_function(tree, "_resolve_inputs")
 
     # (a) writer side: no direct call; entry.fetch(technical_model=...,

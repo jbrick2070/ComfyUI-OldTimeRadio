@@ -90,8 +90,15 @@ def test_writer_threading_is_wired_at_the_real_call_site():
     # the whole chunk, and no unit test of the helpers would notice.
     import pathlib
 
-    src = (pathlib.Path(__file__).resolve().parents[1]
-           / "nodes" / "OTR_LedgerScriptWriter.py").read_text(encoding="utf-8")
+    # The writer MODULE FAMILY: `_resolve_inputs` (which owns the first two
+    # pins) moved to `_otr_writer_inputs.py` in lean-mean order 9 slice 1,
+    # byte-identically. The pin is that the wiring exists at the real call
+    # site, and the call site is still one unit -- so read both halves rather
+    # than weakening any of the four assertions.
+    nodes_dir = pathlib.Path(__file__).resolve().parents[1] / "nodes"
+    src = "\n".join(
+        (nodes_dir / name).read_text(encoding="utf-8")
+        for name in ("OTR_LedgerScriptWriter.py", "_otr_writer_inputs.py"))
     assert "normalize_fetch_result_with_document(" in src
     assert '"source_document": source_document,' in src
     assert "source_sound_world=_source_sound_world," in src

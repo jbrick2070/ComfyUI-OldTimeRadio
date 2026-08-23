@@ -799,8 +799,11 @@ class TestWriterB2aSurface:
         """
         import ast
 
+        # `_resolve_inputs` moved to `_otr_writer_inputs.py` in lean-mean
+        # order 9 slice 1 (2026-08-23), byte-identically. The stripping this
+        # pins happens inside that function, so the pin follows it.
         writer_src = (
-            PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
+            PACK_ROOT / "nodes" / "_otr_writer_inputs.py"
         ).read_text(encoding="utf-8")
         tree = ast.parse(writer_src)
         # Find _resolve_inputs.
