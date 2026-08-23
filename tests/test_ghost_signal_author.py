@@ -776,3 +776,34 @@ def test_no_curse_words_or_placeholder_naming():
     for module in (gsa, gsp):
         low = inspect.getsource(module).lower()
         assert "dummy" not in low
+
+
+def test_a_clock_hand_is_not_a_person():
+    """A live batch died on this, twice, and dropped an episode to fallback.
+
+    `_HUMAN_WORDS` used to carry hand/arm/shoulder, so
+    "the silver ledger sits on a desk as a clock hand ticks" was rejected as
+    "requests a person in object mode" -- and because one bad leaf rejects the
+    WHOLE batch, the episode fell to deterministic clauses over a clock.
+
+    What object/signal owe is that no FULL FIGURE dominates the shot. They do
+    not owe a frame with no body part anywhere in it.
+    """
+    for leaf in ("the silver ledger sits on a desk as a clock hand ticks",
+                 "the radio dial turns as a hand adjusts the knob",
+                 "the lamp tilts and a shoulder passes through the light"):
+        for mode in gsa.GHOST_NON_FIGURE_MODES:
+            ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
+            assert ok, (mode, leaf, why)
+
+
+def test_a_whole_person_is_still_refused_outside_figure_mode():
+    """The rule still means what it is for."""
+    for leaf in ("a man walks past the console in the dark",
+                 "a figure leans over the desk and goes still",
+                 "a woman turns the dial slowly in the dark"):
+        for mode in gsa.GHOST_NON_FIGURE_MODES:
+            ok, why = gsa.validate_drawable_beat(leaf, mode=mode, names=NAMES)
+            assert not ok, (mode, leaf)
+            assert "person" in why
+        assert gsa.validate_drawable_beat(leaf, mode="figure", names=NAMES)[0]

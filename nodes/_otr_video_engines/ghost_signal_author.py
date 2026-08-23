@@ -291,12 +291,22 @@ _BOILERPLATE_WORDS = frozenset({
 
 #: Human tokens forbidden in ``object`` and ``signal`` leaves. Absence of a
 #: person is expressed by choosing a non-human subject, never by asking for it.
+#:
+#: BODY PARTS ARE NOT ON THIS LIST, and a live leg is why (2026-08-22). It used
+#: to carry hand/hands/arm/arms/shoulder/shoulders, and it rejected
+#: *"the silver ledger sits on a desk as a clock hand ticks"* -- a CLOCK hand --
+#: which killed the whole batch and dropped the episode to deterministic
+#: clauses. It also rejected *"the radio dial turns as a hand adjusts the
+#: knob"*, which is the archival-documentary look the operator ranked SECOND
+#: out of five arms.
+#:
+#: What these modes owe is that no FULL FIGURE dominates the shot. They do not
+#: owe a frame with no people in it anywhere, and a word list that cannot tell
+#: a clock hand from a person is a list that costs a live batch to learn that.
 _HUMAN_WORDS = frozenset({
     "person", "people", "man", "men", "woman", "women", "boy", "girl",
     "child", "children", "crowd", "figure", "figures", "silhouette",
-    "silhouettes", "face", "faces", "head", "heads", "portrait", "eye",
-    "eyes", "mouth", "hand", "hands", "arm", "arms", "shoulder", "shoulders",
-    "body", "bodies", "someone", "somebody", "he", "she", "they",
+    "silhouettes", "face", "faces", "portrait", "someone", "somebody",
 })
 
 #: Words whose SUBJECT is a texture rather than a thing. A 512x288 SD1.5 draws
