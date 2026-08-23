@@ -213,10 +213,12 @@ _NODE_MODULES = {
     # OTR_FixedShotDurationStub -- registration REMOVED in the Chunk E
     # cleanbreak completion (2026-06-09; the module-level mapping was
     # already cleared 2026-06-08). OTR_ShotLock owns ALL per-episode
-    # budget / shot-duration logic. The class + pure helpers stay in
-    # nodes/otr_shot_duration_calculator.py for unit tests only; the type
-    # is tombstoned in DELETED_NODE_TYPES so stale workflow JSONs fail
-    # loudly at validation.
+    # budget / shot-duration logic. The implementation module
+    # nodes/otr_shot_duration_calculator.py was DELETED on 2026-08-23
+    # (lean-mean order 2): its only remaining consumer was a test proving
+    # it still existed. The type stays tombstoned in DELETED_NODE_TYPES so
+    # a stale workflow JSON naming it fails LOUDLY at validation -- the code
+    # is what nobody runs, the tombstone is what a user actually hits.
     # OTR_PostAudioVideoPipeline -- DELETED S27 (commit lands in s27-
     # cleanbreak-tail). The class was a subprocess trigger for the
     # pre-2026-04-27 HuMo batch + concat pipeline; it was superseded

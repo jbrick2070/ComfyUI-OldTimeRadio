@@ -215,9 +215,10 @@ class TestEpisodeAssemblerWavSave:
 
 class TestPackageRegistrationsRetired:
     """Chunk E completion: the retired types are gone from the PACKAGE-level
-    lazy registration table too (the 2026-06-08 pass cleared only the module
-    -level mapping in otr_shot_duration_calculator.py, so the picker still
-    showed a tombstoned node). Raw-source check, matching
+    lazy registration table too. (The 2026-06-08 pass cleared only the
+    module-level mapping inside the now-deleted implementation file, so the
+    picker still showed a tombstoned node; that module was removed entirely on
+    2026-08-23, lean-mean order 2.) Raw-source check, matching
     TestWorkflowJsonClean's convention (no heavy package import)."""
 
     PKG_INIT = REPO_ROOT / "__init__.py"
