@@ -45,17 +45,22 @@ def test_clean_fixture_is_40_beats_all_roles_no_char3d():
     for fam in ("audio_driven_face", "image_to_video",
                 "text_to_video", "static_image_gen", "static_motion"):
         assert fam in families
-    # NO char3d stub on the clean fixture; no trail stamped anywhere.
-    assert not any(s["family"] == "character_3d" for s in shots)
+    # NO forced-OOM stub on the clean fixture; no trail stamped anywhere.
+    # (Filter by ENGINE ID, not family: the stub was rebased onto the LIVE
+    # audio_driven_face family on 2026-08-23 -- humo's -- so a family filter
+    # would also match every legitimate humo profile row.)
+    assert not any(s["engine_id"] == "soak_oom_heavy" for s in shots)
     assert all(s["degradation_trail"] == [] for s in shots)
     assert meta["oom_shot_id"] is None
 
 
-def test_oom_fixture_injects_the_char3d_stub():
+def test_oom_fixture_injects_the_heavy_stub():
     section, meta = SOAK.build_soak_fixture(n_beats=40, oom_index=20)
-    char3d = [s for s in section["shots"] if s["family"] == "character_3d"]
-    assert len(char3d) == 1 and char3d[0]["shot_id"] == meta["oom_shot_id"]
-    assert char3d[0]["engine_id"] == "soak_oom_3d"   # synthetic soak stub (C3)
+    stub = [s for s in section["shots"] if s["engine_id"] == "soak_oom_heavy"]
+    assert len(stub) == 1 and stub[0]["shot_id"] == meta["oom_shot_id"]
+    # The stub rides a LIVE heavy family so the OOM contract outlives the
+    # character_3d retirement (lean-mean order 4).
+    assert stub[0]["family"] == "audio_driven_face"
 
 
 def test_fixture_rejects_out_of_range_oom_index():
@@ -81,7 +86,7 @@ def test_forced_oom_raises_and_never_restamps():
     oom_in = {s["shot_id"]: s for s in
               result["oom_input_ledger"]["video"]["shots"]}
     oom_shot = oom_in[result["oom_meta"]["oom_shot_id"]]
-    assert oom_shot["engine_id"] == "soak_oom_3d"
+    assert oom_shot["engine_id"] == "soak_oom_heavy"
     assert oom_shot["degradation_trail"] == []
 
 

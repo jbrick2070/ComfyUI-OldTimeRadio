@@ -14,7 +14,7 @@ Six pins, each naming the arrival path it closes or preserves:
 
   1. unknown CUSTOM id        -> named ValueError at the director (this is the
                                  proof the boundary MOVED -- it passes today)
-  2. force map -> soak_oom_3d -> named error at the director (closes the
+  2. force map -> soak_oom_heavy -> named error at the director (closes the
                                  ENGINE_FAMILY escape: in the family table for
                                  the soak harness, never registered, and the
                                  harness injects at ledger level so no soak leg
@@ -87,16 +87,16 @@ def test_unknown_custom_engine_fails_at_the_director_with_both_names(monkeypatch
 # 2. The ENGINE_FAMILY escape is closed at this boundary.
 # --------------------------------------------------------------------------- #
 def test_force_map_to_the_soak_stub_fails_at_the_director(monkeypatch):
-    """`soak_oom_3d` is in ENGINE_FAMILY (so parse_force_map admits it) but is
+    """`soak_oom_heavy` is in ENGINE_FAMILY (so parse_force_map admits it) but is
     NOT registered. The soak harness injects it at the ledger-fixture level and
     never routes through this node -- verified before this test was written --
     so refusing it here cannot break a soak leg, and DOES stop a leaked
     OTR_FORCE_ENGINE_MAP from planning an episode on a synthetic stub."""
     with pytest.raises(ValueError) as exc:
         _direct(monkeypatch,
-                OTR_FORCE_ENGINE_MAP="character_video=soak_oom_3d")
+                OTR_FORCE_ENGINE_MAP="character_video=soak_oom_heavy")
     msg = str(exc.value)
-    assert "soak_oom_3d" in msg
+    assert "soak_oom_heavy" in msg
     # The dual-knob hint: a force map was active, and the message says so,
     # because the stale half may be the map rather than the pick.
     assert "OTR_FORCE_ENGINE_MAP is active" in msg

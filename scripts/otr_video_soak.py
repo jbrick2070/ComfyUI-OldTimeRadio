@@ -9,7 +9,7 @@ that machinery is RIPPED (Sprint A, E1). What this harness proves now:
   the frozen audio section byte-identical before and after, and two
   back-to-back runs deterministic with no cross-episode carryover.
 * LOUD-failure contract leg: a forced mid-episode OOM on the synthetic
-  ``soak_oom_3d`` character_3d stub PROPAGATES as a raise -- NO swap, NO
+  ``soak_oom_heavy`` heavy-engine stub PROPAGATES as a raise -- NO swap, NO
   restamp, NO degradation trail. The soak asserts the raise.
 
 The LIVE GPU soak (the real OTR_VideoRenderBatch + the real engines on the
@@ -56,13 +56,14 @@ _PROFILES = (
     ("announcer_visual", "still_pan", "static_image_gen"),
 )
 
-#: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
-#: stand-in heavy character_3d engine). Its forced OOM must RAISE -- there is
+#: The forced-OOM group: the synthetic ``soak_oom_heavy`` stub, standing in
+#: for the LIVE audio_driven_face family (rebased off character_3d 2026-08-23
+#: ahead of that family's retirement). Its forced OOM must RAISE -- there is
 #: no chain and no floor (NO FALLBACKS).
-_CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
+_HEAVY_OOM = ("character_video", "soak_oom_heavy", "audio_driven_face")
 
-#: The engines the LOUD-contract leg forces to OOM on the character_3d shot.
-OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
+#: The engines the LOUD-contract leg forces to OOM on the injected shot.
+OOM_ENGINES = frozenset({"soak_oom_heavy", "humo", "humo_1.7B"})
 
 
 class OomSignal(RuntimeError):
@@ -77,7 +78,7 @@ def build_soak_fixture(n_beats: int = 40, oom_index=None):
     """Build a synthetic ``ledger['video']`` section + meta (pure).
 
     ``oom_index=None`` builds a CLEAN all-profiles fixture; an integer injects
-    the synthetic ``soak_oom_3d`` character_3d stub at that index for the
+    the synthetic ``soak_oom_heavy`` heavy-engine stub at that index for the
     LOUD-failure contract leg. Returns ``(section, meta)``.
     """
     if oom_index is not None and not 0 <= oom_index < n_beats:
@@ -85,7 +86,7 @@ def build_soak_fixture(n_beats: int = 40, oom_index=None):
                          % (oom_index, n_beats))
     shots = []
     for i in range(n_beats):
-        role, engine, family = _CHAR3D if i == oom_index \
+        role, engine, family = _HEAVY_OOM if i == oom_index \
             else _PROFILES[i % len(_PROFILES)]
         shots.append({
             "shot_id": "shot_%04d" % i,
@@ -153,7 +154,7 @@ def run_two_episode_soak(*, n_beats: int = 40, oom_index: int = 20) -> dict:
     Both clean runs consume the SAME input ledger; ``run_episode_soak``
     deep-copies it, so neither run mutates the shared fixture (the no-carryover
     guarantee). Fresh renderers each run. The contract leg builds its own
-    fixture with the ``soak_oom_3d`` stub and asserts the forced OOM RAISES.
+    fixture with the ``soak_oom_heavy`` stub and asserts the forced OOM RAISES.
     Returns both result ledgers + the render-call sequences + the contract
     outcome.
     """
@@ -238,7 +239,7 @@ def assert_soak_ok(result: dict):
     oom_in = {s["shot_id"]: s for s in
               result["oom_input_ledger"]["video"]["shots"]}
     oom_shot = oom_in[result["oom_meta"]["oom_shot_id"]]
-    if oom_shot["engine_id"] != "soak_oom_3d" or oom_shot["degradation_trail"]:
+    if oom_shot["engine_id"] != "soak_oom_heavy" or oom_shot["degradation_trail"]:
         raise SoakError("LOUD-failure contract: the forced-OOM fixture was "
                         "restamped (engine=%r trail=%r) -- a failure must "
                         "never swap engines"

@@ -59,7 +59,10 @@ _LOG = logging.getLogger("OTR.video.render_driver")
 
 #: engine_id -> family (covers the soak stub + the A/cheap engines).
 ENGINE_FAMILY = {
-    "soak_oom_3d": "character_3d",       # synthetic soak stub (forced-OOM leg)
+    "soak_oom_heavy": "audio_driven_face",  # synthetic soak stub (forced-OOM leg,
+                                            # rebased off character_3d 2026-08-23
+                                            # so the OOM contract survives the
+                                            # order-4 family retirement)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
@@ -95,13 +98,16 @@ _PROFILES = (
     ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),
 )
-#: The forced-OOM character_3d group: the synthetic ``soak_oom_3d`` stub (a
-#: stand-in heavy character_3d engine). Under NO FALLBACKS its forced OOM
-#: RAISES a named RenderError -- the soak asserts the raise (no trail).
-_CHAR3D = ("character_video", "soak_oom_3d", "character_3d")
-#: The heavy engines the soak forces to OOM on the character_3d shot -- the
+#: The forced-OOM group: the synthetic ``soak_oom_heavy`` stub, standing in for
+#: a LIVE heavy family (audio_driven_face -- humo's). Rebased off character_3d
+#: on 2026-08-23 so the contract does not die with that family's order-4
+#: retirement: what it proves was never about 3D, it is that under NO FALLBACKS
+#: a forced OOM RAISES a named RenderError -- the soak asserts the raise (no
+#: trail, no swap).
+_HEAVY_OOM = ("character_video", "soak_oom_heavy", "audio_driven_face")
+#: The heavy engines the soak forces to OOM on the injected shot -- the
 #: LOUD-failure contract leg asserts the resulting RenderError.
-OOM_ENGINES = frozenset({"soak_oom_3d", "humo", "humo_1.7B"})
+OOM_ENGINES = frozenset({"soak_oom_heavy", "humo", "humo_1.7B"})
 #: The M1 frozen master-audio PCM marker the soak threads through + asserts is
 #: byte-identical after the run (the decision layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
@@ -117,7 +123,7 @@ _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 
 class OomSignal(RuntimeError):
     """Stand-in for a render-time CUDA OOM (a HARD failure) -- the soak forces it
-    on the mid-episode character_3d shot to prove the LOUD-raise contract."""
+    on the mid-episode injected stub shot to prove the LOUD-raise contract."""
 
 
 class RenderFloorError(RuntimeError):
@@ -199,15 +205,15 @@ def build_soak_fixture(n_beats=40, oom_index=None):
     shape to scripts/otr_video_soak.build_soak_fixture).
 
     ``oom_index=None`` (default since the 2026-07-02 NO-FALLBACKS rip) builds a
-    CLEAN all-profiles fixture; an integer injects the synthetic ``soak_oom_3d``
-    character_3d stub at that index for the LOUD-failure contract leg (the
+    CLEAN all-profiles fixture; an integer injects the synthetic ``soak_oom_heavy``
+    heavy-engine stub at that index for the LOUD-failure contract leg (the
     forced OOM must RAISE a named RenderError -- no trail, no swap)."""
     if oom_index is not None and not 0 <= oom_index < n_beats:
         raise ValueError("oom_index %d out of range for %d beats"
                          % (oom_index, n_beats))
     shots = []
     for i in range(n_beats):
-        role, engine, family = _CHAR3D if i == oom_index \
+        role, engine, family = _HEAVY_OOM if i == oom_index \
             else _PROFILES[i % len(_PROFILES)]
         shots.append({
             "shot_id": "shot_%04d" % i, "beat_id": "b%04d" % i, "role": role,
@@ -5686,7 +5692,7 @@ def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None):
     t0 = time.time()
     e1 = run_episode(ledger, assets=assets, frame_count=frame_count)
     e2 = run_episode(ledger, assets=assets, frame_count=frame_count)
-    # LOUD-failure contract leg: a forced OOM on the synthetic character_3d
+    # LOUD-failure contract leg: a forced OOM on the synthetic heavy-engine
     # stub must RAISE RenderError -- no swap, no restamp, no trail.
     oom_contract = {"raised": False, "error_type": "", "detail": ""}
     if oom_index is not None:

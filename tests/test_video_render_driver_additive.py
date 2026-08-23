@@ -49,7 +49,10 @@ def test_build_soak_fixture_shape_and_empty_trails():
     assert len(section["shots"]) == 12
     assert meta["oom_shot_id"] == "shot_0005"
     oom = section["shots"][5]
-    assert (oom["engine_id"], oom["family"]) == ("soak_oom_3d", "character_3d")
+    # Rebased 2026-08-23: stub identity is (soak_oom_heavy, audio_driven_face)
+    # so the forced-OOM contract outlives the character_3d retirement.
+    assert (oom["engine_id"], oom["family"]) == (
+        "soak_oom_heavy", "audio_driven_face")
     # every shot starts with an empty degradation trail
     assert all(s["degradation_trail"] == [] for s in section["shots"])
     # shot 0 is the first profile in the rotation

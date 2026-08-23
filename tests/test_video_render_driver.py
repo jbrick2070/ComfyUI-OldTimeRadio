@@ -50,7 +50,11 @@ def test_fixture_matches_shipped_soak_shape():
     assert len(section["shots"]) == 40
     assert section["video_revision"] == 1
     oom = section["shots"][20]
-    assert (oom["engine_id"], oom["family"]) == ("soak_oom_3d", "character_3d")
+    # Rebased 2026-08-23 (lean-mean order 4 prerequisite): the stub stands in
+    # for the LIVE audio_driven_face family so the OOM contract survives the
+    # character_3d retirement.
+    assert (oom["engine_id"], oom["family"]) == (
+        "soak_oom_heavy", "audio_driven_face")
     assert meta["oom_shot_id"] == "shot_0020"
 
 
@@ -81,7 +85,7 @@ def _passing_report(n=6):
         "episode_1": copy.deepcopy(ep), "episode_2": copy.deepcopy(ep),
         "input_shot_count": n,
         "oom_contract": {"raised": True, "error_type": "RenderError",
-                         "detail": "shot shot_0002 engine 'soak_oom_3d' ..."},
+                         "detail": "shot shot_0002 engine 'soak_oom_heavy' ..."},
     }
 
 
