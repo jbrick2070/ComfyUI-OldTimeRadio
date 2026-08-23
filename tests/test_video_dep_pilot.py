@@ -130,9 +130,16 @@ def test_new_source_is_ascii_no_em_dash():
     # The worker + install scripts (scripts/_*) are gitignored by repo
     # convention (same as the chatterbox / dia sidecars) so they live only in
     # the working tree; check them WHEN PRESENT but never fail a clean checkout.
+    # (lean-mean 2026-08-23) `nodes/_otr_shared/sidecar.py` was the second entry
+    # here and is DELETED. It was the unadopted generic promotion of the audio
+    # sidecar lifecycle -- nothing ever imported it, and the LIVE lifecycle is
+    # `nodes/_otr_audio_engines/_otr_sidecar.py`, which keeps its own copy on
+    # purpose (importing the audio package pulls torch at module scope and would
+    # break the video cold-import invariant V-12). The `exists()` guard below
+    # meant a dangling entry would never fail -- it would just silently check
+    # nothing, which is why it is removed rather than left to rot.
     for src_path in (
         PILOT_SRC,
-        REPO_ROOT / "nodes" / "_otr_shared" / "sidecar.py",
     ):
         if not src_path.exists():
             continue
