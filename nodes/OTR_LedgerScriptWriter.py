@@ -114,6 +114,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -2287,6 +2288,27 @@ class WriterTailContext:
                                # Tail precedence: user-typed episode_title >
                                # override > LLM regen. Legacy passes None ->
                                # byte-identical behavior.
+    style_roll: Any = None
+    """The visual-style roll receipt, or None for a direct pick.
+
+    ADDED 2026-08-23 TO FIX A LIVE NameError, and the docstring above is why it
+    had to be a FIELD. The tail's dynamic-style FLOOR FALLBACK -- the branch
+    that runs when the dynamic visual-style reflection fails -- read a bare
+    `_style_roll`, which is a LOCAL OF `run()`. Two sibling methods share no
+    scope, so that compiled to a global load with nothing behind it: reaching
+    that branch raised `NameError: name '_style_roll' is not defined` and took
+    the whole tail down instead of falling back to a floor style.
+
+    It survived because the invariant was tested with `co_freevars == ()`, and
+    a sibling method's local can NEVER appear as a free variable -- it compiles
+    to LOAD_GLOBAL. The test was checking a thing that could not fail. The
+    replacement walks the bytecode for global loads the module does not define,
+    which is what actually catches this.
+
+    Defaulted so the scifi_news_pro lane and every existing caller build the
+    context exactly as before; a direct visual-style pick has no roll receipt
+    and None is what that branch already handles.
+    """
 
 
 class TailFinalizer(Protocol):
@@ -3958,6 +3980,7 @@ class OTR_LedgerScriptWriter:
                 technical_fn=technical_generate_fn,
                 run_story_spine=_parts.run_story_spine,
                 final_title_override=_parts.final_title_override,
+                style_roll=_style_roll,
             )
             return self._run_writer_tail(
                 _tail_ctx,
@@ -6034,6 +6057,7 @@ class OTR_LedgerScriptWriter:
             technical_fn=technical_generate_fn,
             run_story_spine=True,
             final_title_override=None,
+            style_roll=_style_roll,
         )
         return self._run_writer_tail(_tail_ctx)
 
@@ -6553,9 +6577,9 @@ class OTR_LedgerScriptWriter:
                 else:
                     _fail_class = "transport"
 
-                if _style_roll is not None:
-                    _f_seed = _style_roll.seed
-                    _f_source = _style_roll.seed_source
+                if ctx.style_roll is not None:
+                    _f_seed = ctx.style_roll.seed
+                    _f_source = ctx.style_roll.seed_source
                 else:
                     # Direct pick has no roll receipt: resolve a floor seed at
                     # failure time from process env (OTR_VISUAL_STYLE_SEED

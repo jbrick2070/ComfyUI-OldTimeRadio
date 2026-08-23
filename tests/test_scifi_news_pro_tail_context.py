@@ -1,10 +1,13 @@
 """Writer-tail ownership and persistence contracts."""
 from __future__ import annotations
 
+import builtins
 import dataclasses
+import dis
 import inspect
 import json
 import sys
+import types
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +16,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from nodes import OTR_LedgerScriptWriter as writer_module  # noqa: E402
+from nodes import _otr_writer_inputs as writer_inputs_module  # noqa: E402
 from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     WriterTailContext,
@@ -34,6 +39,10 @@ PINNED_FIELDS = (
     "episode_root", "episode_id", "contract", "style_grammar_on",
     "source_bank_row", "slot_scheduler", "creative_fn", "technical_fn",
     "run_story_spine", "final_title_override",
+    # 2026-08-23: the visual-style roll receipt. It was being read off `run()`'s
+    # locals from inside the tail, which is not a scope the tail has -- see the
+    # field's own docstring and the bytecode guard below.
+    "style_roll",
 )
 
 
@@ -169,6 +178,107 @@ def test_tail_signature_and_no_closure():
     assert list(inspect.signature(fn).parameters) == [
         "self", "ctx", "tail_finalizer"]
     assert fn.__code__.co_freevars == ()
+
+
+# --------------------------------------------------------------------------- #
+# THE GUARD THAT ACTUALLY CATCHES A BORROWED LOCAL
+#
+# `co_freevars == ()` above is real but it is NOT the invariant the tail's
+# docstring claims ("consumes ONLY this context -- no closure over run()
+# locals"). A CLOSURE only forms over an ENCLOSING function's locals, and
+# `run()` does not enclose `_run_writer_tail` -- they are sibling methods. A
+# sibling's local therefore compiles to LOAD_GLOBAL and can never appear in
+# co_freevars, so that assertion could not fail however wrong the code was.
+#
+# It was wrong. `_run_writer_tail` read a bare `_style_roll` on the
+# dynamic-style floor-fallback branch -- a local of `run()` -- and also called
+# `random.Random` in a module that never imported `random`. Two unbound globals
+# on ONE branch: reaching it raised NameError and took the tail down instead of
+# falling back to a floor style. Both are fixed; this is the guard that would
+# have said so.
+# --------------------------------------------------------------------------- #
+def _global_loads(code, found):
+    for instruction in dis.get_instructions(code):
+        if instruction.opname in ("LOAD_GLOBAL", "LOAD_NAME"):
+            found.add(instruction.argval)
+    for const in code.co_consts:
+        if isinstance(const, types.CodeType):
+            _global_loads(const, found)
+    return found
+
+
+def _functions_of(module):
+    """Every function the MODULE ITSELF compiled, module-level and on classes.
+
+    The `co_filename` check is load-bearing: `@dataclass` and `Protocol` attach
+    generated `__repr__` / `__subclasshook__` bodies compiled inside the stdlib,
+    whose globals resolve in dataclasses.py and typing.py rather than here.
+    """
+    own_file = module.__file__
+    for name, obj in vars(module).items():
+        candidates = []
+        if isinstance(obj, types.FunctionType):
+            candidates.append((name, obj))
+        elif isinstance(obj, type) and getattr(obj, "__module__", "") == module.__name__:
+            for method_name, member in vars(obj).items():
+                function = (member.__func__
+                            if isinstance(member, (classmethod, staticmethod))
+                            else member)
+                if isinstance(function, types.FunctionType):
+                    candidates.append(("%s.%s" % (name, method_name), function))
+        for label, function in candidates:
+            if function.__code__.co_filename == own_file:
+                yield label, function
+
+
+@pytest.mark.parametrize("module", [writer_module, writer_inputs_module],
+                         ids=["writer", "writer_inputs"])
+def test_no_function_loads_a_global_its_module_does_not_define(module):
+    """A borrowed local is a NameError with a delay on it."""
+    offenders = {}
+    for label, function in _functions_of(module):
+        for name in _global_loads(function.__code__, set()):
+            if not hasattr(module, name) and not hasattr(builtins, name):
+                offenders.setdefault(name, set()).add(label)
+    assert not offenders, (
+        "%s loads globals it does not define -- each one raises NameError the "
+        "moment its branch runs: %s"
+        % (module.__name__,
+           ", ".join("%s (in %s)" % (name, ", ".join(sorted(where)))
+                     for name, where in sorted(offenders.items()))))
+
+
+def test_the_guard_would_have_caught_the_borrowed_local(tmp_path):
+    """The negative control. A guard nobody has watched fail is a guess.
+
+    This is the shape of the real defect: one method binds a name, a SIBLING
+    method reads it. No closure forms, `co_freevars` stays empty, and the old
+    assertion sails straight past it.
+    """
+    source = (
+        "class Writer:\n"
+        "    def run(self):\n"
+        "        _style_roll = object()\n"
+        "        return self.tail()\n"
+        "\n"
+        "    def tail(self):\n"
+        "        return _style_roll.seed\n"
+    )
+    path = tmp_path / "borrowed_local_module.py"
+    path.write_text(source, encoding="utf-8")
+    module = types.ModuleType("borrowed_local_module")
+    module.__file__ = str(path)
+    exec(compile(source, str(path), "exec"), module.__dict__)
+
+    assert module.Writer.tail.__code__.co_freevars == (), (
+        "the OLD assertion passes on the defect -- that is the whole point")
+    offenders = {}
+    for label, function in _functions_of(module):
+        for name in _global_loads(function.__code__, set()):
+            if not hasattr(module, name) and not hasattr(builtins, name):
+                offenders.setdefault(name, set()).add(label)
+    assert "_style_roll" in offenders, offenders
+    assert offenders["_style_roll"] == {"Writer.tail"}
 
 
 def test_run_delegates_to_tail():
