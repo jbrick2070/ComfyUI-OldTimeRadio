@@ -1,3 +1,60 @@
+## 2026-08-23 -- HEAD 8e0b739d +handoff (v2.0-alpha) -- CODER (lean-mean orders 1-6 complete + item F run + order 3/4/5/6 retirements; 19 commits)
+
+Did: the whole lean-mean campaign through order 6, item F exercised live, and
+  two runner defects found-and-fixed by running it. Highlights, with receipts:
+  order 1 truth/prevention `140b748d` (3 false README claims vs
+  render_driver:55-58; VRAM-eviction failure now named; credits JSON parsed
+  once -- proven over 22 input classes, 0 divergences); order 2 removals
+  `cb73fd2e`/`14074ff2`/`8a5dbff4`; order 3 membership boundary `34c302b3`
+  (Fable-consulted, Sonnet-QA'd, 7 pins); order 4 `a6a43e32`+`9a25d938`
+  (906 adapter lines out, five NAMED tombstones, OOM proof rebased to
+  soak_oom_heavy/audio_driven_face FIRST); order 5 `d42cd6a7` (4 public nodes
+  retired, pack 34->30); order 6 `c45ae5e1` (HF_TOKEN moved to
+  nodes/_otr_shared/hf_token.py and PROVEN exporting BEFORE the 679K visual/
+  tree + 5 ids went; pack ->25). Item F: `otr_g4_wan_ti2v` PROVEN -- obs file
+  115, `signal_lost_the_weeping_valve_20260823_001152_..._final.mp4`,
+  ffprobe 1920x1080/25fps/166.6s, 17 clips each named *_wan_ti2v.mp4, ledger
+  meta.creative_model=unsloth/gemma-4-12b-it-GGUF, VRAM peak 12015 MB.
+  `otr_upscale_ship` BLOCKED ON OPERATOR (Mistral-Nemo markup-ladder failure
+  upstream of the upscale stage; no per-leg override exists by design --
+  docs/2026-08-23-item-F-upscale-ship-writer-failure.md). Two live runner
+  bugs fixed: PBUG-20260823-01 preflight gate `b11a4269`, PBUG-20260823-02
+  false RESULT TIMEOUT `cebe7c75` -- both logged in PROD_BUG_LOG, both with
+  in-repo executable coverage, Bible promotion PENDING in the promotion field.
+  Operator rulings recorded: order 7 consolidation CANCELLED ("every video
+  lane is independent") `92b9edea`; order 8 APPROVED after a Fable explainer
+  ("shares the tape measure, not the judgment calls") `8e0b739d`; D parked
+  with its anchor + cold Fable review banked.
+Current step: lean-mean orders 1-6 DONE, 7 cancelled, 8 approved-and-queued,
+  9 measured (seams 398/38/911 lines), 10 HELD until after 2.1, 11 test-root
+  half re-grounded (the 175 sys.path inserts are LOAD-BEARING -- no repo-root
+  conftest, no pythonpath key; premise false at HEAD), 12 blocked on
+  otr_cloud_lanes ratification. Baselines refreshed in GO_FORWARD: suite
+  12141/134/1, Bible 22/26/3, variants 54/2 (both = the DEFERRED ghost drift),
+  canonical blob c27dff36 unchanged all night, PACK ROSTER NOW 25.
+Next: fresh CODER window takes, in order: order 8 (one ffprobe
+  binary-resolver/raw-probe for in-pipeline callers, every caller KEEPS its
+  failure policy -- GraphExecutionError / -1 / best-effort / CreditsDataError /
+  CORRUPT_OUTPUT; standalone scripts untouched), then order-9 slices
+  (_resolve_inputs -> nodes/_otr_writer_inputs.py first, hash proofs + focused
+  tests per seam, one green push per slice), then the order-11 scripts-audit
+  owner table. Gate per the operator: full suite + Bible every chunk, and ONE
+  LIVE canonical render published to the live otr/obs before the window
+  closes. Also available to the operator: the upscale_ship writer decision and
+  the two pending Bible promotions.
+Models: rung 5 (Opus coder, this window) drove; rung 7 Fable twice, both
+  earning it (the cold D review; the order-3 next-move consult + the order-8
+  operator explainer); rung 4 Sonnet QA on three frozen diffs (order-1 chunk,
+  the preflight fix, order 3 -- each one-clean-review per the 08-20 rule, each
+  with findings folded in). No kibitz arc: the 08-17 test routed every chunk
+  as mechanical-with-verifiable-answer; order 3 was the one design fork and it
+  took the Fable consult + Sonnet QA instead, stated here as exactly that --
+  a consult plus one review, NOT a full arc. Box state: port 8000 FREE, GPU
+  ~2.9 GB desktop baseline, no OTR pythons resident.
+Commits: 19 code/docs commits `140b748d`..`8e0b739d` pushed, every one
+  lockstep-verified. The sha above is the second-to-last on the branch; the
+  last is this handoff commit.
+
 ## 2026-08-22 -- HEAD 36187675 +handoff (v2.0-alpha) -- CODER (Ghost video lane: domain adapter shipped and operator-preferred, cadence seam built, four confounded comparisons traced to one missing seed)
 
 The sha above is the second-to-last on the branch; the last is this handoff

@@ -275,10 +275,38 @@ it walks the AST and refuses the call inside any broad-`except` try.
 `c27dff36`; 54 variants / 0 failures; forbidden sweep 0 runtime hits; BOM /
 0-byte / AST clean. `pyproject.toml` untouched (it is a publish trigger).
 
-**QUEUE HEAD IS NOW ITEM D** (the prompt / dialect / recipe refactor, which
-wants its own full arc and now carries E's enforcement half with it), with
-item F -- the regression sweep over `otr_g4_wan_ti2v` and `otr_upscale_ship`
--- behind it. B, C and E's doc half closed 2026-08-22.
+**QUEUE STATE, updated 2026-08-23 by the overnight coder window (state only;
+plan authorship stays with the planner window):**
+* **D is PARKED by the operator.** He narrowed it to "fix the one real bug"
+  (the prohibition-as-positive-text defect), then redirected to F and then to
+  the cleanup before code was written. The evidence is BANKED, not lost:
+  `docs/2026-08-22-negative-channel-declaration/driver_anchor.md` (untracked by
+  the `docs/2026-*/` convention) carries the full anchor PLUS an independent
+  cold Fable review that converged on the same design. Whoever resumes D
+  starts from evidence, not re-derivation.
+* **F is HALF PROVEN, HALF BLOCKED.** `otr_g4_wan_ti2v` is PROVEN end to end
+  -- published episode 115 in the live `otr/obs`, all three deltas verified
+  separately (`docs/2026-08-23-item-F-g4-wan-ti2v-receipt.md`).
+  `otr_upscale_ship` is BLOCKED ON THE OPERATOR: its pinned Mistral-Nemo
+  writer fails the markup ladder before the upscale stage ever runs, and there
+  is NO legitimate per-leg override (gguf_quant is profile-owned by design) --
+  the three options are laid out in
+  `docs/2026-08-23-item-F-upscale-ship-writer-failure.md`. Running F also
+  found and FIXED two runner defects: PBUG-20260823-01 (the preflight gate
+  could never pass nine profiles) and PBUG-20260823-02 (a healthy render
+  reported as RESULT TIMEOUT).
+* **THE LEAN-MEAN CAMPAIGN consumed the rest of the session: orders 1-6 are
+  COMPLETE, 7 cancelled by ruling, 8 APPROVED and queued.** Full truth table:
+  `docs/2026-08-23-lean-mean-progress.md`. **THE NEXT CODER WINDOW'S QUEUE, by
+  the operator's own words ("do it with everything else that is safe in a new
+  window and lets regression test"): order 8 (ffprobe resolver, failure
+  policies stay per-caller), then the order-9 Writer-split slices (seams
+  pre-measured: 398 / 38 / 911 lines), then the order-11 scripts-audit half
+  -- full suite + Bible every chunk, and a LIVE canonical render proof to the
+  live `otr/obs` before the window closes.** Order 10 stays HELD until after
+  2.1 (workflow-atomic; a blanket variant regen reverts the hand-edited ship
+  candidate). Order 12 stays blocked on `otr_cloud_lanes` ratification.
+B, C and E's doc half closed 2026-08-22.
 
 **A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
 Three green chunks, all pushed on `v2.0-alpha`:
@@ -889,16 +917,20 @@ the exit code. The 2026-08-19 spark run wrote 104 KB and cited real line
 ranges -- that is what a working lane looks like, and on that run it caught two
 of the driver's own tests being tautologies.
 
-**BASELINES (re-measured 2026-08-21 MORNING at settled HEAD `eca57cb1`, after the
-mixed canonical QA):** suite **11326 passed / 114 skipped / 1 xfailed** --
-MEASURED by a full run (347.95 s, EXIT=0, known-fail guard silent), never
-derived. Focused/canonical tests **435 passed / 1 skipped**; Bible
-**22 / 26 / 3**; `build_variants.py --check` **51 variants / 0 failures**;
-canonical validator **23 nodes / 57 links**. The saved canonical Git blob remains
-`c27dff3690030e78d88c3a2607a9ac54fd3935d9`. No production code changed during
-this re-measurement. Entry `12.120` / `PBUG-20260820-01` still requires
-model-specific approved evidence before any generic reference capability can
-ship.
+**BASELINES (re-measured 2026-08-23 OVERNIGHT across the lean-mean campaign;
+supersedes the 2026-08-21 block):** suite **12141 passed / 134 skipped /
+1 xfailed** -- MEASURED by a full run (336.98 s, EXIT=0, known-fail guard
+silent) at the order-6 head, never derived. Bible **22 / 26 / 3** (re-run at
+wrap-up, Bible repo synced to origin/main). `build_variants.py --check`
+**54 variants / 2 failures -- and BOTH failures are the DEFERRED
+`otr_ghost_signal_v3` drift** (`docs/2026-08-22-variant-drift-DEFERRED.md`);
+any third failure is NEW. Canonical validator **23 nodes / 57 links**; the
+saved canonical Git blob remains `c27dff3690030e78d88c3a2607a9ac54fd3935d9`,
+byte-identical through the whole campaign. **The PACK ROSTER baseline moved:
+25 registered nodes** (34 -> 30 at order 5 -> 25 at order 6; every retired id
+is a NAMED tombstone in DELETED_NODE_TYPES). Entry `12.120` /
+`PBUG-20260820-01` still requires model-specific approved evidence before any
+generic reference capability can ship.
 
 **THE PREVIOUS RECEIPT SAID "ZERO REGRESSIONS" AND THAT WAS NOT TRUE.** At HEAD
 `55ddf234` the suite exited **2**, with
@@ -2831,6 +2863,8 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 | duplicate-id cleanup | Same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
 | historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
+| **`PBUG-20260823-01` (preflight gate vocabulary collision)** | **PENDING single-entry promotion** per the 08-07 amendment: live-verified, fixed `b11a4269`, automatable coverage already in-repo (`tests/test_preflight_required_models_are_gateable.py`). Candidate rule: a gate must never treat "absent from an enumeration that could not contain it" as refutation. Check `otr_coverage_index.yaml` + Bible for overlap, then Three-File Contract in ONE survival-guide commit |
+| **`PBUG-20260823-02` (watcher timeout worded as render death)** | **PENDING single-entry promotion**: live-verified on the exposing leg, fixed `cebe7c75`, coverage `tests/test_canonical_runner_timeout_is_not_a_death.py`. Candidate rule: a watcher's timeout is a fact about the WATCHER, never worded as a fact about the work. Same overlap check first |
 | **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
 
 **PROMOTED 2026-08-18 (evening): Bible `12.114`, survival-guide `b9aada7e`, count

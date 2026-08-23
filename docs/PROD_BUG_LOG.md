@@ -5958,3 +5958,51 @@ EXPECTED result, not a regression signal.
   48 kHz stereo, 83.160 s, 12,708,177 bytes. Canonical workflow blob remains
   `c27dff3690030e78d88c3a2607a9ac54fd3935d9`.
 - status: FIXED, matched-A/B live-proven and production-published.
+
+## PBUG-20260823-01 -- the canonical runner's preflight model gate could never pass nine profiles
+- observed: LIVE, 2026-08-23 ~00:20, first-ever leg of `otr_upscale_ship`
+  (item F). The runner refused with `PREFLIGHT FAIL: profile 'otr_upscale_ship'
+  requires model file(s) the running server cannot see: real-esrgan-x2plus`
+  while the live server's `/object_info` UpscaleModelLoader listed
+  `RealESRGAN_x2plus.pth` the whole time.
+- root cause: vocabulary collision, not a missing weight. `/object_info`
+  enumerates FILENAMES; `preflight.required_models` holds two vocabularies --
+  filenames (the five ghost_signal profiles, which the gate was validated
+  against when it shipped 2026-08-22) and logical/HF-repo ids
+  (`real-esrgan-x2plus`, `wan2.2-ti2v-5b`, `google/gemma-4-E2B-it` -- nine
+  profiles). The gate exact-matched, so the nine could not pass for ANY state
+  of the disk. This is why `otr_upscale_ship` sat in the queue as
+  "unexercised".
+- fix: `b11a4269` -- a gate may enforce what it can verify and must only
+  REPORT what it cannot. `_is_weight_filename` (closed suffix list; dotted ids
+  like `wan2.2-ti2v-5b` and the `-gguf`-suffixed id are NOT files) splits
+  enforce from report; both upscale profiles now declare the real filename and
+  get REAL verification. 18 tests incl. a profile<->engine filename pin.
+- verified: `otr_upscale_ship --dry-run` went from the hard refusal to
+  `preflight: 1 required model(s) visible to the server: RealESRGAN_x2plus.pth`.
+- status: FIXED, live-verified. Bible promotion: PENDING (see GO_FORWARD
+  promotion field -- candidate rule: a preflight gate must never treat
+  "absent from an enumeration that could not contain it" as refutation).
+
+## PBUG-20260823-02 -- the canonical runner reported a healthy render as RESULT TIMEOUT
+- observed: LIVE, 2026-08-23 01:30, the `otr_g4_wan_ti2v` item-F leg. At
+  t=5396s the runner printed `RESULT TIMEOUT` and exited 1 while the server
+  reported the prompt RUNNING, the GPU sat at 98%, and the wan clip count
+  climbed 21 -> 33 -> 37. The episode finished ~40 minutes later and published
+  itself to the live `otr/obs` (file 115, ffprobe-verified 1920x1080/25fps,
+  166.6 s). Every wan episode run through the runner's default `--timeout 5400`
+  has been reporting this false failure -- a full wan episode takes ~2h15m on
+  this box.
+- root cause: one terminal-sounding message for two OPPOSITE states (watcher
+  gave up vs render died). The reader's natural act -- kill and re-run -- would
+  have destroyed a healthy 90-minute render; the driver nearly did exactly
+  that.
+- fix: `cebe7c75` -- on TIMEOUT the runner now asks `/queue` and prints one of
+  three verdicts (STILL ALIVE with counts + `--timeout 0` pointer / really
+  ended / queue unreadable = UNKNOWN, stated rather than guessed).
+  `classify_timeout` is pure; 10 tests pin the three outcomes as distinct.
+- verified: against the live mid-render server -- `queue_snapshot` returned
+  `(1, 0)` and the STILL-ALIVE branch fired on the exact leg that exposed it.
+- status: FIXED, live-verified. Bible promotion: PENDING (candidate rule: a
+  watcher's timeout must be reported as a fact about the WATCHER, never
+  worded as a fact about the work).
