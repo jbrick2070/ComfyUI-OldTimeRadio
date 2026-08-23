@@ -65,8 +65,6 @@ DEFAULT_WINDOW_CHARS = 1800
 # ground anything, and pretending otherwise is worse than a loud refusal.
 MIN_WINDOW_CHARS = 240
 
-_SENTENCE_END_RE = re.compile(r"[.!?][\"'’”]?\s")
-
 
 class SourceGroundingError(SourceDocumentError):
     """A grounding could not be selected or is being misused (loud)."""

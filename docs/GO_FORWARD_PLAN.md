@@ -2671,8 +2671,28 @@ is allowed.
 own language is carried as written on the adaptation lanes. The paragraph
 above is kept as the 07-22 record; its STRUCTURAL half (schema / IDs / roster
 / source-proof / rights / graph / markup / nonempty / provider-integrity
-fail-closed) still stands in full. The runtime filters that survived the 08-03
-rip are inventoried and queued for removal as ON DECK item 5.
+fail-closed) still stands in full.
+
+**THE OLD POINTER HERE WAS DEAD AND IS NOW CORRECTED (2026-08-22).** This
+paragraph used to end "the runtime filters that survived the 08-03 rip are
+inventoried and queued for removal as ON DECK item 5". ON DECK item 5 is about
+1,090 cast rows claiming a non-commercial model is commercially clean -- it has
+nothing to do with filters. A window sent there finds nothing, which is exactly
+the failure the top of this file warns about.
+
+**The real state, checked in code rather than inferred:** the spoken-content
+repair pass is ALREADY retired. `run_ledger_cleanup` does not call
+`_otr_content_safety.apply_safety_cleanup`, `meta.ledger_cleanup.safety` is
+stamped `"retired"` so the ledger field keeps an owner, and
+`tests/test_ledger_cleanup_pass.py` is deliberately INVERTED -- it asserts the
+pass never runs and the author's line is never edited. The Shakespeare prompt's
+"guns/knives/weapons" clause was deleted 2026-08-05 with its reason written in
+place.
+
+**So there is nothing queued here, and the module must NOT be deleted.** That
+inverted test is the tripwire that makes a re-armed content filter fail loudly;
+removing the module removes the guard. Reasoning and the wider dead-symbol
+sweep: `docs/2026-08-22-dead-symbol-inventory.md`.
 
 ## Standing operator directives (hard)
 

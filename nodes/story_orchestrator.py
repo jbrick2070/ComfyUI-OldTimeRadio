@@ -1906,13 +1906,11 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
 #   script markup:       ~1.2x (VOICE/SFX/ENV tags, scene headers, beats)
 #   combined:            1.3 * 1.2 = 1.56 → round to 1.6
 #
-# Revision/rewrite passes include structural reorganization → higher overhead.
-# Outlines and pitches are almost entirely non-dialogue description.
+# TWO RATIOS SHIP; three more were written and never read (mixed, outline and
+# an Obsidian-4GB act variant) and were removed 2026-08-22 rather than left as
+# a table the reader has to test against the code to trust.
 _TOKEN_RATIO_DIALOGUE = 1.6    # dialogue-dominant (OTR radio drama default)
-_TOKEN_RATIO_MIXED = 2.0       # revision/rewrite passes, structural changes
-_TOKEN_RATIO_OUTLINE = 2.2     # outlines, pitches, descriptions
 _TOKEN_RATIO_ACT_CHUNK = 2.0   # per-act chunked generation (needs slack for act boundaries)
-_TOKEN_RATIO_ACT_OBSIDIAN = 2.5  # Obsidian 4GB: wider slack for constrained KV cache
 
 
 # ── Intelligent Dialogue Name Normalizer (BUG-023) ──────────────────────────

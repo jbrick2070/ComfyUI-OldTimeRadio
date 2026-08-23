@@ -364,10 +364,6 @@ _LEMMY_CAMEO_FORCE = {
 # Title regeneration (post-composition, news-seed-free per Jeffrey 2026-05-10)
 # ---------------------------------------------------------------------------
 
-_TITLE_PREFIX_RE = None  # compiled lazily inside the helper to keep
-                          # this module's import surface stdlib-only.
-
-
 # ---------------------------------------------------------------------------
 # Model dropdowns -- S30 B2a two-widget surface.
 #

@@ -28,14 +28,6 @@ import re
 _VOICED_ROLES: frozenset[str] = frozenset({"character", "announcer"})
 
 
-# Word-boundary telemetry pattern, built fresh per term for re.escape().
-def _word_boundary_pattern(term: str) -> str:
-    return (
-        r"(?<![A-Za-z0-9])"
-        + re.escape(term)
-        + r"(?![A-Za-z0-9])"
-    )
-
 
 def post_assembly_keyterm_check(
     line_rows: list[dict],

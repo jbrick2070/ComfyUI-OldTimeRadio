@@ -316,9 +316,6 @@ def negative_source_label(pack_negative, obj_negative) -> str:
 #: late in a long prompt -- the excerpt is centred on the match instead.
 _PATH_GUARD_EXCERPT_RADIUS = 90
 
-_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
-
-
 _DRIVE_ROOT_RE = _re.compile(r"^[A-Za-z]:[\/]")
 _UNC_ROOT_RE = _re.compile(r"^[\/]{2}[^\/]")
 _POSIX_ROOT_RE = _re.compile(r"^/[^/\s]")

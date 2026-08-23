@@ -658,10 +658,6 @@ def patch_line_fields(
     return False
 
 
-# Backward-compatible private alias for callers that imported the old mirror.
-# The compiled expression itself now has one owner in _otr_text_metrics.
-_WORD_COUNT_RE = WORD_RE
-
 
 def patch_line_text(
     ledger: dict,
