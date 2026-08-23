@@ -13,3 +13,16 @@ kibitz-runs/
 scripts/_otr_b_spikes/
 scripts/otr_ltx_motion_smoke.py
 scripts/otr_wan_smoke.py
+
+# 2026-08-22: internal-only material that was shipping to every installer --
+# ~23 MB of it, including the operator's own directives file. None of it is
+# imported at runtime (verified: no module under nodes/ or visual/ reads these
+# paths; docs/ appears only inside error-message STRINGS). Readers get all of
+# it on GitHub, where the README's relative links actually resolve.
+CLAUDE.md
+BUG_LOG.md
+BUG_LOG_2026-06.md
+session_handoff.md
+docs/
+kibitz-plugin/
+tmp/

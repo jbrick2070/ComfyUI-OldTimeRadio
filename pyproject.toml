@@ -1,10 +1,14 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.2"
+version = "2.0.0-alpha.3"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
+# Read from requirements.txt so the two files can never disagree. Without this
+# the Comfy Registry recorded `dependencies: []` and a registry install pulled
+# down the code with none of its libraries.
+dynamic = ["dependencies"]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
 ]
@@ -38,6 +42,9 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.pytest.ini_options.markers]
 bug_bible = "Bug Bible regression tests from survival guide"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [build-system]
 requires = ["setuptools>=68.0"]

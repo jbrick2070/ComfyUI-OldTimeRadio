@@ -45,3 +45,13 @@ lm-format-enforcer>=0.11.3,<1.0
 # A 0.5 major bump may reshape those; a follow-up chip re-verifies then.
 spandrel~=0.4.1
 
+# 2026-08-22: both were imported UNGUARDED at module scope (pydantic in 21
+# files, including _otr_visual_styles.py and _otr_story_brief.py which
+# OTR_LedgerScriptWriter pulls in; yaml in _otr_engine_profiles.py) while
+# never being declared here. They only worked because lm-format-enforcer
+# happens to drag pydantic in transitively -- a resolver change would have
+# silently dropped OTR_LedgerScriptWriter and OTR_ImageDirector from the
+# node list. Declare what we actually import.
+pydantic>=2.0
+PyYAML>=6.0
+
