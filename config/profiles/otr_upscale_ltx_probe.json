@@ -78,7 +78,7 @@
   },
   "preflight": {
     "required_models": [
-      "real-esrgan-x2plus"
+      "RealESRGAN_x2plus.pth"
     ],
     "required_keys": []
   },

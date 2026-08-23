@@ -195,6 +195,20 @@ def _server_visible_model_names(schemas) -> set:
     return names
 
 
+#: Weight-file suffixes ComfyUI's folder_paths actually enumerates. A
+#: `preflight.required_models` entry ending in one of these is a FILENAME and is
+#: checkable against /object_info; anything else is a logical or repo id and is
+#: not. Deliberately a closed list rather than "contains a dot": `wan2.2-ti2v-5b`
+#: and `ltx-2.3-22b-dev` both contain dots and are ids, not files.
+_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".pth", ".pt", ".bin", ".gguf",
+                    ".onnx", ".sft")
+
+
+def _is_weight_filename(name: str) -> bool:
+    """True for a real weight FILENAME, false for a logical or HF repo id."""
+    return str(name or "").lower().endswith(_WEIGHT_SUFFIXES)
+
+
 def _assert_profile_models_present(profile_name, schemas) -> list:
     """Refuse in SECONDS what would otherwise fail seven minutes into a render.
 
@@ -221,8 +235,30 @@ def _assert_profile_models_present(profile_name, schemas) -> list:
     required = ((profile.get("preflight") or {}).get("required_models") or [])
     if not required:
         return []
+    # ONLY A FILENAME IS GATEABLE HERE, and this split is the whole fix
+    # (2026-08-23). `/object_info` lists what ComfyUI's folder_paths enumerates:
+    # FILENAMES. It has never contained a logical model id (`real-esrgan-x2plus`,
+    # `wan2.2-ti2v-5b`) or an HF repo id (`google/gemma-4-E2B-it`), and an LLM
+    # weight is not in it at all. So for a non-filename entry, "absent from
+    # /object_info" is not evidence of absence on disk -- it is the wrong
+    # question, and answering it with SystemExit blocks a profile whose weights
+    # are sitting right there.
+    #
+    # THIS WAS NOT THEORETICAL. The gate shipped 2026-08-22 validated against
+    # the ghost_signal profiles, which are the only ones declaring filenames.
+    # Every profile using the logical-id vocabulary -- both upscale profiles,
+    # both 16gb_ltx, all three 8gb_*, both 4060_* -- could not pass it at any
+    # time, for any state of the disk. `otr_upscale_ship` was carried in the
+    # queue as "unexercised" for exactly this reason: `RealESRGAN_x2plus.pth`
+    # was visible in `/object_info` the entire time.
+    #
+    # A filename is enforced (that is what caught the missing v3_sd15_adapter).
+    # Anything else is REPORTED and allowed through, because a gate that cannot
+    # verify a claim must not pretend it refuted it.
+    gateable = [n for n in required if _is_weight_filename(n)]
+    ungateable = [n for n in required if not _is_weight_filename(n)]
     visible = _server_visible_model_names(schemas)
-    missing = [name for name in required if name not in visible]
+    missing = [name for name in gateable if name not in visible]
     if missing:
         raise SystemExit(
             "[canonical-api] PREFLIGHT FAIL: profile %r requires model file(s) "
@@ -232,7 +268,14 @@ def _assert_profile_models_present(profile_name, schemas) -> list:
             "named root, and RESTART the server (folder_paths caches its "
             "listing at boot). Refusing now rather than failing part-way "
             "through a render." % (profile_name, ", ".join(missing)))
-    return list(required)
+    if ungateable:
+        print(
+            "[canonical-api] preflight: %d requirement(s) NOT checked -- %s. "
+            "These are logical/repo ids, not filenames, so /object_info cannot "
+            "speak to them; the engine's own assert_usable remains the gate for "
+            "these. Declare a weight FILENAME to get it checked here."
+            % (len(ungateable), ", ".join(ungateable)), flush=True)
+    return list(gateable)
 
 
 def main(argv: list[str] | None = None) -> int:
