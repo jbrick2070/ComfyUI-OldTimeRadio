@@ -199,7 +199,10 @@ def _beat_id_for_shot(shot: Any) -> str:
 def generate_motion_clauses(ledger: Any, *,
                             generate_fn: Optional[Callable] = None,
                             name_resolver: Optional[Callable] = None,
-                            scene_ctx: str = "") -> dict:
+                            scene_ctx: str = "",
+                            skip_shot: Optional[Callable] = None,
+                            generate_fn_factory: Optional[Callable] = None
+                            ) -> dict:
     """Post-brief BATCH pass: fill ``shots[i]['motion_clause']`` for EVERY shot.
 
     * ``generate_fn(messages, *, temperature, max_new_tokens, stop=None) -> str`` -- the
@@ -207,16 +210,31 @@ def generate_motion_clauses(ledger: Any, *,
       ``fallback`` object; :func:`resolve_motion_clause_text` returns ``None`` for those,
       so the render path keeps its existing prompt (byte-identical).
     * ``name_resolver(char_id) -> str`` -- display name for the subject; falls back to char_id.
+    * ``skip_shot(shot) -> bool`` -- shots this pass must not touch AT ALL. A
+      skipped shot gets NO ``motion_clause`` key: absence means "the pass never
+      ran here", which is a different fact from "the pass produced a fallback",
+      and only absence lets a lane that owns its own motion say so honestly.
+    * ``generate_fn_factory() -> generate_fn | None`` -- a LAZY writer binding,
+      invoked at most once and only when a shot is genuinely eligible.
+
+    THE FACTORY IS NOT A STYLE PREFERENCE (2026-08-22). ``generate_fn=`` is
+    evaluated by the CALLER, so passing it loads a writer LLM before this
+    function has looked at a single shot -- and on an all-Ghost episode every
+    shot is skipped, so those weights are loaded, held across the whole image
+    and video phase on a 16 GB card, and never asked a question.
 
     Returns disposition counts. Idempotent: a stored clause whose ``source_hash`` still
     matches is REUSED (deterministic re-render)."""
     video = (ledger or {}).get("video") if isinstance(ledger, dict) else None
     shots = (video or {}).get("shots") if isinstance(video, dict) else None
-    counts = {"generated": 0, "reused": 0, "fallback": 0, "invalid": 0}
+    counts = {"generated": 0, "reused": 0, "fallback": 0, "invalid": 0,
+              "skipped": 0}
     if not isinstance(shots, list):
         return counts
 
-    on = enabled() and callable(generate_fn)
+    on = enabled() and (callable(generate_fn) or callable(generate_fn_factory))
+    #: The factory is consulted at most once, on the FIRST eligible shot.
+    factory_pending = callable(generate_fn_factory) and not callable(generate_fn)
     line_text = _line_text_index(ledger)
 
     def _name(cid: str) -> str:
@@ -230,6 +248,11 @@ def generate_motion_clauses(ledger: Any, *,
     for shot in shots:
         if not isinstance(shot, dict):
             continue
+        if callable(skip_shot) and skip_shot(shot):
+            # NO KEY WRITTEN. See the docstring: absence is the honest record
+            # for a lane whose motion authority is somewhere else entirely.
+            counts["skipped"] += 1
+            continue
         beat_id = _beat_id_for_shot(shot)
         char_id = str(shot.get("char_id") or "")
         dialogue = line_text.get(beat_id, "")
@@ -242,6 +265,20 @@ def generate_motion_clauses(ledger: Any, *,
                 and resolve_motion_clause_text(shot)):
             counts["reused"] += 1
             continue
+
+        # THE LAZY LOAD LANDS HERE and nowhere earlier: this is the first shot
+        # that is eligible on every axis -- the flag is on, it has dialogue and
+        # it has a character -- so it is the first moment a writer is actually
+        # needed. A factory that returns None is a writer that could not be
+        # built, and the pass degrades to static exactly as a None generate_fn
+        # always has.
+        if (on and factory_pending and dialogue.strip() and char_id):
+            factory_pending = False
+            try:
+                generate_fn = generate_fn_factory()
+            except Exception:  # noqa: BLE001 -- never break the render
+                generate_fn = None
+            on = callable(generate_fn)
 
         # Console / no-dialogue / flag-off -> static fallback (byte-identical path).
         if not on or not dialogue.strip() or not char_id:

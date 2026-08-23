@@ -356,11 +356,13 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     delivery_scale_mode = GHOST_DELIVERY_SCALE_MODE
 
     #: WHERE THE BEAT'S MOTION COMES FROM. A prompt-owned lane has no still to
-    #: inherit movement from, so it has to name its motion authority -- and this
-    #: one is the ledger's own `motion_clause`, with a deterministic pack/intent
-    #: fallback when the optional motion pass is off. Declared rather than
-    #: inferred because G3.7 asks the lane, not the reader.
-    motion_source = "ledger_motion_clause"
+    #: inherit movement from, so it has to name its motion authority. Since
+    #: Prompt v2 (2026-08-22) that authority is the DRAWABLE LEAF stamped on the
+    #: durable row by ShotLock -- one authored visual per beat, carrying the
+    #: movement -- and this lane is explicitly excluded from the optional
+    #: `_otr_motion_clause` pass, whose result it would ignore. Declared rather
+    #: than inferred because G3.7 asks the lane, not the reader.
+    motion_source = "ledger_ghost_drawable_beat"
 
     #: WHERE THE NEGATIVE ACTUALLY LANDS. Not decoration: it names the real graph
     #: binding, and G3.7 checks the CODE against it -- a lane whose adapter

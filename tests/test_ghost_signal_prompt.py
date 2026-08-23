@@ -345,12 +345,28 @@ def test_a_character_falls_back_through_the_intent_table():
         gsp.GHOST_INTENT_ACTIONS["accuse"]
 
 
-def test_an_unmapped_intent_becomes_a_bounded_phrase():
-    got = gsp.resolve_action(
-        "character_video",
-        beat_intent="does something nobody ever wrote a table row for at all")
-    assert got.startswith("moves with ")
-    assert len(got.split()) <= 8       # "moves with" + at most six words
+def test_an_unmapped_intent_is_never_copied_into_the_picture():
+    """THE v1 DEFECT, pinned as its own absence (Prompt v2, 2026-08-22).
+
+    This used to assert the opposite -- that an unmapped intent became
+    ``"moves with " + its first six regex words``. That behaviour is what put
+    *"moves with erin risks exposure by transmitting a"* into a published
+    lane: a cast name in the picture and a sentence with no end. An unknown
+    intent is free text a writer wrote for a human, not a camera instruction,
+    so it now falls through to a COMPLETE checked-in action and no fragment of
+    it survives.
+    """
+    intent = "Erin risks exposure by transmitting a warning to the mainland"
+    got = gsp.resolve_action("character_video", beat_intent=intent,
+                             sigil_seed=4242)
+    assert got in gsp.GHOST_NEUTRAL_ACTIONS
+    assert not got.startswith("moves with")
+    # Not one content word of the intent reaches the prompt -- name first.
+    for leaked in ("erin", "exposure", "transmitting", "mainland"):
+        assert leaked not in got.lower()
+    # Still deterministic on the same hash domain.
+    assert got == gsp.resolve_action("character_video", beat_intent=intent,
+                                     sigil_seed=4242)
 
 
 def test_with_no_clause_no_register_and_no_intent_a_neutral_action_is_chosen():

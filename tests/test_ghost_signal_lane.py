@@ -92,7 +92,12 @@ def test_the_declared_contract_is_exact():
     assert eng.style_join == "compose"
     assert eng.delivery_scale_mode == "lanczos_clean_full_frame"
     assert eng.subject_ownership == "prompt"
-    assert eng.motion_source == "ledger_motion_clause"
+    # PROMPT v2 (2026-08-22): the motion authority is the authored drawable
+    # leaf stamped on the durable row, not the optional `_otr_motion_clause`
+    # pass -- which this lane is now explicitly excluded from, because its
+    # request carries raw dialogue and real cast names and its result would be
+    # ignored anyway.
+    assert eng.motion_source == "ledger_ghost_drawable_beat"
     assert eng.commercial_clean is False
 
 

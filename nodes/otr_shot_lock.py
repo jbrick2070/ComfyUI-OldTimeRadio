@@ -946,24 +946,42 @@ def derive_creative_directives(
     return creative, warnings
 
 
-def _resolve_writer_llm(meta: dict, warnings: list):
-    """Best-effort writer-slot LLM resolver (V-11: no new model_id widget --
-    the model name comes from the ledger meta the writer stamped). Returns a
-    ``callable(prompt)->str`` or None. Fails soft to None in headless/test mode
-    so the deterministic template carries the episode (the live wiring lands
-    with the M4 GPU gate before CW-6)."""
+def writer_model_id_from_meta(meta) -> str:
+    """The writer model the ledger already selected. No widget, no new pick.
+
+    ONE spelling of this read (2026-08-22). Ghost Prompt v2 needs the same
+    identity M4 uses so a normalized-id check can prove the two agree, and a
+    second ``meta.get("technical_model") or ...`` expression is a second chance
+    to disagree about which model an episode ran.
+    """
+    if not isinstance(meta, dict):
+        return ""
+    return str(meta.get("technical_model")
+               or meta.get("creative_writing_model") or "")
+
+
+def _resolve_writer_llm_binding(meta: dict, warnings: list):
+    """``(generate_fn, model_id)`` for the already-selected writer slot.
+
+    The RAW message-based callable -- ``(messages, *, temperature,
+    max_new_tokens) -> str`` -- plus the exact normalized model id the loader
+    cached the entry under. Returns ``(None, "")`` for the two legitimate
+    no-model paths (``OTR_TEST_MODE``, no model in meta) and RAISES for a
+    configured model that will not load, which is the existing fail-loud policy
+    and is not softened here.
+
+    Extracted so Ghost Prompt v2 can send a real chat batch without going
+    through :func:`_resolve_writer_llm`'s prompt-only wrapper, and without a
+    second copy of the slot/policy/GGUF load contract that would drift.
+    """
     import os
 
     if os.environ.get("OTR_TEST_MODE") == "1":
-        return None
-    model_id = ""
-    if isinstance(meta, dict):
-        model_id = str(
-            meta.get("technical_model") or meta.get("creative_writing_model") or ""
-        )
+        return None, ""
+    model_id = writer_model_id_from_meta(meta)
     if not model_id:
         warnings.append("no writer model in meta; creative derivation uses template")
-        return None
+        return None, ""
     try:  # lazy: never import the loader at module scope (V-12)
         # FIXED 2026-06-10 (operator look-QA root cause): this called
         # make_generate_fn(model_id, slot=...) -- a signature that never
@@ -986,15 +1004,7 @@ def _resolve_writer_llm(meta: dict, warnings: list):
             policy=policy_from_meta(meta),
             load_config=load_config_from_meta(meta, "technical"))
         gen = make_generate_fn(entry)
-
-        def _call(prompt: str) -> str:
-            # 0.1 not 0.0: the local HF lane hardcodes do_sample=True and
-            # transformers rejects a non-positive temperature (live 30w4
-            # catch); 0.1 is near-greedy for short derivation prompts.
-            return gen([{"role": "user", "content": str(prompt)}],
-                       temperature=0.1, max_new_tokens=300)
-
-        return _call
+        return gen, str(entry.get("model_id", model_id) or model_id)
     except Exception as exc:  # noqa: BLE001
         # Operator directive (2026-07-16): a REQUESTED writer LLM that fails must
         # FAIL LOUD -- never silently degrade shot/creative derivation to the
@@ -1006,13 +1016,40 @@ def _resolve_writer_llm(meta: dict, warnings: list):
         raise
 
 
+def _resolve_writer_llm(meta: dict, warnings: list):
+    """Best-effort writer-slot LLM resolver (V-11: no new model_id widget --
+    the model name comes from the ledger meta the writer stamped). Returns a
+    ``callable(prompt)->str`` or None. Fails soft to None in headless/test mode
+    so the deterministic template carries the episode (the live wiring lands
+    with the M4 GPU gate before CW-6).
+
+    UNCHANGED CALL SURFACE. Every M4 caller still hands it a prompt STRING and
+    still gets 0.1 / 300 -- the only thing that moved is where the slot is
+    resolved (:func:`_resolve_writer_llm_binding`), so Ghost can reach the raw
+    message generator without this wrapper's fixed budget.
+    """
+    gen, _model_id = _resolve_writer_llm_binding(meta, warnings)
+    if gen is None:
+        return None
+
+    def _call(prompt: str) -> str:
+        # 0.1 not 0.0: the local HF lane hardcodes do_sample=True and
+        # transformers rejects a non-positive temperature (live 30w4
+        # catch); 0.1 is near-greedy for short derivation prompts.
+        return gen([{"role": "user", "content": str(prompt)}],
+                   temperature=0.1, max_new_tokens=300)
+
+    return _call
+
+
 # ---------------------------------------------------------------------------
 # Execution plan (groups + shots) -> ledger['video']
 # ---------------------------------------------------------------------------
 
 
 def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
-                                               policy, subject_sigils=None):
+                                               policy, subject_sigils=None,
+                                               ghost_prompts=None):
     import os
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
@@ -1093,6 +1130,20 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
     _cast_sigil = (subject_sigils or {}).get(str(beat.get("char_id") or "").strip())
     if _cast_sigil:
         shot["subject_sigil"] = _cast_sigil
+    # THE GHOST PROMPT v2 OBJECT, and its coverage is ASSERTED rather than
+    # tolerated. A registered Ghost-profile beat with no authored object must
+    # not fall through to the v1 composer here -- that fall-through would look
+    # exactly like a healthy legacy replay while quietly reproducing the
+    # name-leaking fragment this sprint exists to remove.
+    if ghost_prompts is not None and _ghost_prompt_lane(effective_engine):
+        _cast_ghost = ghost_prompts.get(str(beat.get("beat_id") or ""))
+        if not _cast_ghost:
+            raise ValueError(
+                "[OTR_ShotLock] Ghost beat %s reached cast-time preflight with "
+                "no authored ghost_prompt. Coverage is exact by contract; a "
+                "silent v1 downgrade here is not an acceptable degradation."
+                % (beat.get("beat_id"),))
+        shot["ghost_prompt"] = copy.deepcopy(_cast_ghost)
 
     # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
     #
@@ -1608,7 +1659,387 @@ def _build_subject_sigils(beats, ledger, engine_for):
     return sigils
 
 
-def build_execution_plan(beats, budget, creative, policy, ledger=None):
+# ---------------------------------------------------------------------------
+# GHOST PROMPT v2 -- the one authoring transaction (2026-08-22)
+#
+# ShotLock is the authority because it is the only place that holds all four
+# things at once: the effective route, the durable identities, the ledger lines
+# and the already-selected writer model. Authoring anywhere later would mean
+# either a second route resolution or a render-time LLM call, and this lane
+# renders from stored strings on purpose.
+# ---------------------------------------------------------------------------
+
+
+def _ghost_modules():
+    """The two Ghost text modules, under both import shapes."""
+    try:
+        from ._otr_video_engines import ghost_signal_author as _gsa  # type: ignore
+        from ._otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import ghost_signal_author as _gsa  # type: ignore
+        from _otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
+    return _gsa, _gsp
+
+
+def _ghost_prompt_lane(engine_id) -> bool:
+    """True when ``engine_id`` DECLARES the Ghost prompt capability.
+
+    A capability read, never an engine-name comparison -- five peers ship this
+    profile today (base, official v3, the haunted adapter sibling, hold-3 and
+    hold-5) and a sixth must be picked up by declaring it, not by being added
+    to a list here.
+    """
+    eid = str(engine_id or "")
+    if not eid:
+        return False
+    try:
+        from ._otr_video_engines.registry import get_engine, is_registered  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines.registry import get_engine, is_registered  # type: ignore
+    if not is_registered(eid):
+        return False
+    _gsa, _gsp = _ghost_modules()
+    return (getattr(get_engine(eid), "prompt_profile", None)
+            == _gsp.GHOST_PROMPT_PROFILE)
+
+
+def _ghost_cast_names(ledger) -> tuple:
+    """Every known cast name, ordered, for removal at the model boundary."""
+    names = []
+    for entry in (ledger or {}).get("cast") or []:
+        if isinstance(entry, dict):
+            name = str(entry.get("name") or "").strip()
+            if name and name not in names:
+                names.append(name)
+    return tuple(names)
+
+
+def _ghost_line_index(ledger) -> dict:
+    """``{line_id: line}`` -- the same join the render driver uses."""
+    out = {}
+    for ln in (ledger or {}).get("lines") or []:
+        if isinstance(ln, dict):
+            lid = str(ln.get("line_id") or "")
+            if lid:
+                out.setdefault(lid, ln)
+    return out
+
+
+def _ghost_prior_objects(ledger) -> dict:
+    """``{beat_id: ghost_prompt}`` already on the incoming ledger, for replay.
+
+    Joined by ``source_line_ids[0]`` when present and otherwise by stripping
+    the durable ``shot_`` prefix, which is what covers the synthetic opening.
+    There is no hidden disk lookup: an object replays only if it is already
+    IN the ledger this call was handed.
+    """
+    out = {}
+    for shot in (((ledger or {}).get("video") or {}).get("shots") or []):
+        if not isinstance(shot, dict):
+            continue
+        obj = shot.get("ghost_prompt")
+        if not isinstance(obj, dict):
+            continue
+        sids = shot.get("source_line_ids")
+        beat_id = ""
+        if isinstance(sids, list) and sids:
+            beat_id = str(sids[0])
+        else:
+            shot_id = str(shot.get("shot_id") or "")
+            if shot_id.startswith("shot_"):
+                beat_id = shot_id[len("shot_"):]
+        if beat_id:
+            out[beat_id] = obj
+    return out
+
+
+def _ghost_unload_writer(warnings):
+    """Release the writer before any preflight / image / video work.
+
+    The image and video phases follow immediately and this lane runs on a
+    16 GB card; a writer still resident here is VRAM the render does not have.
+    The assertion is the point -- an unload that silently did nothing would be
+    indistinguishable from one that worked until the first OOM.
+    """
+    try:
+        from ._otr_model_loader import (  # type: ignore
+            has_local_resident_llm, unload_llm_if_local_resident)
+    except ImportError:  # pragma: no cover -- flat test imports
+        try:
+            from _otr_model_loader import (  # type: ignore
+                has_local_resident_llm, unload_llm_if_local_resident)
+        except ImportError:
+            return
+    try:
+        unload_llm_if_local_resident()
+    except Exception as exc:  # noqa: BLE001 -- report, never mask the author
+        # REPORTED, THEN STILL CHECKED. Returning here would skip the one line
+        # that proves anything: an unload that raised is precisely the case
+        # most likely to have left the weights resident, so it is the last
+        # moment to skip asking.
+        warnings.append("Ghost author: writer unload raised (%s)" % (exc,))
+    if has_local_resident_llm():
+        raise RuntimeError(
+            "[OTR_ShotLock] Ghost author: a local writer LLM is STILL resident "
+            "after unload -- refusing to enter the image/video phases holding "
+            "writer weights")
+
+
+def _ghost_validate_batch(leaves, specs, style, meta, names):
+    """Raise unless EVERY leaf in the batch is acceptable.
+
+    Whole-batch, deliberately. Salvaging the good rows and re-asking for the
+    bad ones would make an episode's prompts a function of how many attempts
+    each row happened to take, which is neither reproducible nor auditable.
+    """
+    _gsa, _gsp = _ghost_modules()
+    seen = {}
+    for spec in specs:
+        leaf = leaves.get(spec["id"], "")
+        ok, reason = _gsa.validate_drawable_beat(
+            leaf, mode=spec["mode"], names=names)
+        if not ok:
+            raise _gsa.GhostAuthorValidationError(
+                "leaf for %s rejected (%s): %r" % (spec["id"], reason, leaf))
+        key = leaf.lower()
+        if key in seen:
+            raise _gsa.GhostAuthorValidationError(
+                "leaf for %s repeats the one written for %s: %r"
+                % (spec["id"], seen[key], leaf))
+        seen[key] = spec["id"]
+        fits, why = _gsa.candidate_fits(
+            role=spec["role"], style=style, mode=spec["mode"],
+            motif_cue=spec["motif_cue"], drawable_beat=leaf, ledger_meta=meta)
+        if not fits:
+            raise _gsa.GhostAuthorValidationError(
+                "leaf for %s does not fit (%s): %r" % (spec["id"], why, leaf))
+
+
+def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
+                          warnings, already_used=()):
+    """``(leaves, source, fallback_reason)`` for one whole batch.
+
+    One call for a normal episode. An invalid batch gets ONE fresh whole-batch
+    retry -- not a conversation -- and a second failure receives the complete
+    deterministic batch with the reason recorded, so the disposition is visible
+    in the ledger rather than inferred from prose in a log.
+    """
+    _gsa, _gsp = _ghost_modules()
+    if gen is None:
+        return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
+                                         already_used=already_used),
+                "deterministic_fallback", "no writer model configured")
+
+    prompt = _gsa.build_batch_prompt(specs)
+    budget = _gsa.batch_output_tokens(len(specs))
+    ids = [spec["id"] for spec in specs]
+    reason = ""
+    for attempt in (1, 2):
+        try:
+            raw = gen([{"role": "user", "content": prompt}],
+                      temperature=_gsa.GHOST_BATCH_TEMPERATURE,
+                      max_new_tokens=budget)
+            leaves = _gsa.parse_batch_response(raw, ids)
+            _ghost_validate_batch(leaves, specs, style, meta, names)
+            if attempt > 1:
+                log.warning("[OTR_ShotLock] Ghost author: batch accepted on "
+                            "the retry")
+            return leaves, "writer_llm", ""
+        except _gsa.GhostAuthorError as exc:
+            reason = "attempt %d rejected: %s" % (attempt, exc)
+        except Exception as exc:  # noqa: BLE001 -- generation, not a load
+            reason = "attempt %d generation failed: %s" % (attempt, exc)
+        warnings.append("Ghost author %s" % reason)
+        log.warning("[OTR_ShotLock] Ghost author: %s", reason)
+    return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
+                                     already_used=already_used),
+            "deterministic_fallback", reason)
+
+
+def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
+    """``{beat_id: ghost_prompt}`` for every Ghost beat in this episode.
+
+    Runs ONCE, after the effective route and the durable sigils exist and
+    BEFORE the cast-time preflight -- because the preflight builds a request
+    per beat through the same builder the render path uses, so a Ghost beat
+    reaching it without its authored object would either refuse or silently
+    fall through to the v1 composer.
+
+    ``ledger is None`` yields an empty map: that fixture path already skips the
+    preflight and must stay valid. A REAL ledger with Ghost beats authors every
+    one of them.
+    """
+    import os
+
+    warnings = warnings if isinstance(warnings, list) else []
+    if ledger is None:
+        return {}
+
+    _gsa, _gsp = _ghost_modules()
+
+    ghost_beats = []
+    for b in beats:
+        role = str(b.get("role") or "")
+        picked = str(engine_for(role) or "")
+        # BOTH resolutions, because the cast-time preflight validates against
+        # the route-frozen engine while the durable row carries the picked one.
+        # On a director-built ledger these are the same value; taking the union
+        # means a divergence produces an unused map entry rather than an
+        # unauthored beat that silently renders on the v1 composer.
+        effective = _effective_engine_for_role(role, picked)
+        if _ghost_prompt_lane(picked) or _ghost_prompt_lane(effective):
+            ghost_beats.append(b)
+    if not ghost_beats:
+        return {}
+
+    meta = (ledger or {}).get("meta") or {}
+    # FAIL LOUD BY NAME, and for a BOOKEND-ONLY Ghost episode too: the mode
+    # schedule is keyed on the seed, so collapsing a missing one to 0 would
+    # give every episode the same representation rotation -- deterministic,
+    # reproducible, and wrong in a way no receipt would show.
+    if "episode_seed" not in meta or meta.get("episode_seed") in (None, ""):
+        raise ValueError(
+            "[OTR_ShotLock] a Ghost-profile video lane has beat(s) (%s) but "
+            "ledger meta carries no episode_seed. The representation schedule "
+            "and every deterministic clause are keyed on it; there is no safe "
+            "default." % ", ".join(str(b.get("beat_id")) for b in ghost_beats))
+    episode_seed = meta["episode_seed"]
+
+    try:
+        from ._otr_ledger_consumers import cast_lookup as _cast_lookup  # type: ignore
+        from ._otr_visual_styles import get_visual_style as _get_visual_style  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_ledger_consumers import cast_lookup as _cast_lookup  # type: ignore
+        from _otr_visual_styles import get_visual_style as _get_visual_style  # type: ignore
+
+    style = _get_visual_style(meta)
+    style_id = str(getattr(style, "style_id", "") or "")
+    names = _ghost_cast_names(ledger)
+    lines = _ghost_line_index(ledger)
+
+    # BEFORE ANY MODEL CALL. A pack whose cue plus the longest motif plus a
+    # mode law leaves no room for the SHORTEST checked-in clause is a composer
+    # constant defect, and no number of retries can fix it -- discovering that
+    # as a retry loop would burn a live generation to learn a static fact.
+    _gsa.assert_shell_fits([style], ledger_meta=meta)
+
+    modes = _gsa.schedule_ghost_modes(
+        [(b["beat_id"], b.get("role")) for b in ghost_beats], episode_seed)
+
+    components = {}
+    rows = []
+    for b in ghost_beats:
+        beat_id = str(b["beat_id"])
+        role = _gsa.normalize_role(b.get("role"))
+        mode = modes[beat_id]
+        if role == "character_video":
+            char_id = str(b.get("char_id") or "").strip()
+            if char_id not in components:
+                components[char_id] = _gsp.distill_sigil_components(
+                    _cast_lookup(ledger, char_id) or {},
+                    episode_seed=episode_seed, char_id=char_id,
+                    style_id=style_id)
+            comp = components[char_id]
+            motif = _gsa.motif_for_character(comp, mode,
+                                             seed_int=comp["seed_int"])
+        else:
+            motif = _gsa.motif_for_bookend(role, mode)
+        line = lines.get(beat_id, {})
+        rows.append({
+            "beat_id": beat_id,
+            "role": role,
+            "mode": mode,
+            "motif_cue": motif,
+            "sanitized_intent": _gsa.sanitize_intent(
+                line.get("beat_intent"), names),
+            "normalized_emotion": _gsa.normalize_emotion(line.get("traits")),
+            "mapped_arc": _gsa.map_arc(line.get("arc_phase")),
+        })
+
+    # THE MODEL IDENTITY IS NORMALIZED BEFORE ANYTHING LOADS. `validate_model_id`
+    # is pure -- it strips the display label, rejects a structurally unsafe id
+    # and confirms an admit path -- so the request hash is computed against the
+    # id the loader will actually cache under, and `request_slot` is not called
+    # for an episode whose every row replays.
+    requested_model = writer_model_id_from_meta(meta)
+    model_id = _gsa.GHOST_DETERMINISTIC_MODEL_ID
+    if requested_model and os.environ.get("OTR_TEST_MODE") != "1":
+        try:
+            from . import _otr_model_catalog as _catalog  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            import _otr_model_catalog as _catalog  # type: ignore
+        model_id = _catalog.validate_model_id(requested_model)
+
+    specs = _gsa.build_ghost_author_specs(rows, model_id=model_id)
+    prior = _ghost_prior_objects(ledger)
+
+    out = {}
+    needs = []
+    for spec in specs:
+        stored = prior.get(spec["beat_id"])
+        if isinstance(stored, dict) and \
+                stored.get("request_sha256") == spec["request_sha256"]:
+            # A SAME-HASH MALFORMED OBJECT FAILS CLOSED. The hash says the
+            # inputs are unchanged, so a broken body is corruption rather than
+            # a stale artifact to quietly rewrite.
+            _gsa.validate_ghost_prompt_object(
+                stored, expected_request_sha256=spec["request_sha256"])
+            replayed = dict(stored)
+            if replayed["source"] == "writer_llm":
+                replayed["source"] = "replay"
+            out[spec["beat_id"]] = replayed
+            continue
+        needs.append(spec)
+
+    if needs:
+        gen = None
+        try:
+            if model_id != _gsa.GHOST_DETERMINISTIC_MODEL_ID:
+                gen, loaded_model_id = _resolve_writer_llm_binding(
+                    meta, warnings)
+                if gen is not None and loaded_model_id and \
+                        loaded_model_id != model_id:
+                    raise ValueError(
+                        "[OTR_ShotLock] Ghost author: the loader cached %r "
+                        "while the request hash was computed against %r -- a "
+                        "stored leaf must name the model that wrote it"
+                        % (loaded_model_id, model_id))
+            leaves, source, reason = _ghost_generate_batch(
+                gen, needs, style=style, meta=meta, episode_seed=episode_seed,
+                names=names, warnings=warnings,
+                # EVERY leaf already decided by replay, so a fallback cannot
+                # collide with one. Uniqueness is a property of the EPISODE the
+                # viewer watches, not of whichever subset this call authored.
+                already_used=[obj["drawable_beat"] for obj in out.values()])
+        finally:
+            _ghost_unload_writer(warnings)
+        for spec in needs:
+            out[spec["beat_id"]] = _gsa.build_ghost_prompt_object(
+                spec, leaves[spec["id"]], source=source,
+                fallback_reason=(reason if source == "deterministic_fallback"
+                                 else ""))
+
+    dispositions = {}
+    for obj in out.values():
+        dispositions[obj["source"]] = dispositions.get(obj["source"], 0) + 1
+    log.info("[OTR_ShotLock] Ghost Prompt v2: %d beat(s) authored (%s), "
+             "model=%s, style=%s", len(out),
+             ", ".join("%s=%d" % kv for kv in sorted(dispositions.items())),
+             model_id, style_id)
+    return out
+
+
+def _effective_engine_for_role(role, engine_id) -> str:
+    """One role's effective engine through the ONE route-freeze authority."""
+    try:
+        from ._otr_shared import route_freeze as _rf  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import route_freeze as _rf  # type: ignore
+    return _rf.effective_engine_for_role(str(role or ""), str(engine_id or ""))
+
+
+def build_execution_plan(beats, budget, creative, policy, ledger=None,
+                         warnings=None):
     """Build DAG-validated ``execution_groups`` + per-shot rows.
 
     CW-1 emits one consumer group per role that has beats (no base-clip
@@ -1672,13 +2103,23 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
     # leave the temporary shot without one and force that refusal at plan time.
     subject_sigils = _build_subject_sigils(beats, ledger, engine_for)
 
+    # THE GHOST PROMPT v2 TRANSACTION (2026-08-22), in the same seam and for
+    # the same reason as the sigils above: the cast-time preflight below builds
+    # a request per beat through the render path's own builder, so the authored
+    # object has to exist before it runs and has to be the IDENTICAL object the
+    # durable row will carry.
+    ghost_prompts = _author_ghost_prompts(
+        beats, ledger, engine_for,
+        warnings=warnings if isinstance(warnings, list) else None)
+
     # Preflight family compatibility gate (F2):
     if ledger is not None:
         for b in beats:
             engine_id = engine_for(b["role"])
             if engine_id:
                 _assert_family_inputs_satisfiable_cast_time(
-                    engine_id, b, ledger, policy, subject_sigils)
+                    engine_id, b, ledger, policy, subject_sigils,
+                    ghost_prompts)
 
     # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
     # the retired_role_a / retired_role_b roles -- every beat renders
@@ -1758,6 +2199,13 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None):
         _row_sigil = subject_sigils.get(str(b.get("char_id") or "").strip())
         if _row_sigil:
             shots[-1]["subject_sigil"] = _row_sigil
+        # THE SAME OBJECT the cast-time preflight already validated against, by
+        # value. Absent for every non-Ghost beat, and absence there is the
+        # honest state -- the field is Optional precisely so an episode carries
+        # no trace of a decision it never made.
+        _row_ghost = ghost_prompts.get(str(b.get("beat_id") or ""))
+        if _row_ghost:
+            shots[-1]["ghost_prompt"] = copy.deepcopy(_row_ghost)
         _stamp_frame_bounded(shots[-1])
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)
@@ -2005,7 +2453,8 @@ class OTRShotLock:
         )
         warnings.extend(cre_warn)
 
-        groups, shots = build_execution_plan(beats, budget, creative, policy, led)
+        groups, shots = build_execution_plan(beats, budget, creative, policy,
+                                             led, warnings=warnings)
 
         revision = int(meta.get("video_revision") or 0) + 1
         video_section = {

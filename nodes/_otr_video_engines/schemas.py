@@ -422,6 +422,24 @@ class ShotRow(_Forbid):
     #: episode must not acquire a new seed or style requirement just because
     #: this field exists.
     subject_sigil: Optional[str] = None
+    #: THE AUTHORED GHOST PROMPT v2 OBJECT (2026-08-22), stamped by
+    #: `otr_shot_lock.build_execution_plan` for every beat whose resolved engine
+    #: declares the Ghost prompt profile, and read by the render driver as the
+    #: whole content authority for that beat.
+    #:
+    #: THREE-STATE, exactly like `frame_bounded` above and for the same reason.
+    #: A valid object means Prompt v2; ABSENCE means a legacy row frozen before
+    #: this sprint, which the driver composes through the explicit v1
+    #: compatibility path; and a present-but-malformed object is NEITHER -- it
+    #: fails closed rather than downgrading, because a silent v1 downgrade would
+    #: be indistinguishable from a healthy legacy replay while reproducing the
+    #: name-leaking fragment v2 exists to remove.
+    #:
+    #: Deliberately a plain dict on this schema: `ghost_signal_author`
+    #: `validate_ghost_prompt_object` is the field-set authority and it is
+    #: importable with nothing installed, so the contract lives in one place
+    #: rather than being half-restated here as a second model that can drift.
+    ghost_prompt: Optional[dict] = None
 
 
 class VideoLedgerSection(_Forbid):

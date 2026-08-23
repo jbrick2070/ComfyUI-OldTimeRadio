@@ -43,6 +43,10 @@ from .._otr_speaker_role import (
 # imports only hashlib/re/typing and nothing from this package, so it
 # adds no cold-import weight and cannot create a cycle back to here.
 from . import ghost_signal_prompt as _gsp
+# The Ghost PROMPT v2 finalizer. Also safe at module scope: it imports
+# only stdlib, the pure composer above and the stdlib-only banana
+# route, and it never imports this module back.
+from . import ghost_signal_author as _gsa
 from . import motion_common as _mc
 from . import registry as _vreg
 
@@ -2757,10 +2761,101 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # before every branch rather than inside one: ShotLock builds a request per
     # beat through this same function long before the durable rows are minted.
     _ghost_composed = False
+    #: TRUE ONLY on the Prompt v2 path. It suppresses the common banana funnel
+    #: below for this request and nothing else -- v2 has ALREADY applied the
+    #: route inside its shared finalizer, and letting the funnel transform an
+    #: already-transformed prompt would overwrite a real substitution receipt
+    #: with a zero-substitution one (the transform is idempotent, so the second
+    #: pass genuinely does nothing and would honestly report doing nothing).
+    _ghost_v2_finalized = False
     _ghost_profile = (
         getattr(_vreg.get_engine(_eng_id), "prompt_profile", None)
         if _eng_id and _vreg.is_registered(_eng_id) else None)
     if _ghost_profile == _gsp.GHOST_PROMPT_PROFILE:
+        # PROMPT v2 FIRST, and BEFORE the legacy character-sigil requirement.
+        # A present object is the whole authority for this beat: it carries the
+        # representation, the recurrence motif and the authored drawable leaf,
+        # and it requires no sigil. Absence is explicit v1 compatibility for a
+        # row frozen before this sprint. A present-but-MALFORMED object is
+        # neither -- it fails closed, because a silent v1 downgrade would look
+        # exactly like a healthy legacy replay.
+        _g_obj = shot.get("ghost_prompt")
+        if _g_obj is not None:
+            try:
+                _gsa.validate_ghost_prompt_object(_g_obj)
+            except _gsa.GhostAuthorError as exc:
+                raise FamilyInputGap(
+                    "Ghost Signal beat %s carries a malformed ghost_prompt "
+                    "(%s). A stamped object is the render authority for this "
+                    "lane; refusing rather than downgrading to the v1 composer."
+                    % (shot.get("shot_id"), exc)) from exc
+            # THE CLOUD SAFETY HOOK IS PROVABLY INERT HERE, and it has to be:
+            # `_apply_visual_safety_prompt` fires only for a cloud engine, and
+            # it would append its clause AFTER this branch finalized, defeating
+            # both the component survival check and the token measurement.
+            if _is_cloud_video_engine(_eng_id):
+                raise FamilyInputGap(
+                    "Ghost Signal beat %s resolved to CLOUD engine %r. Prompt "
+                    "v2 finalizes its own prompt -- style, motif, leaf, law, "
+                    "banana receipt and measured window -- so a cloud peer "
+                    "would have a safety clause appended after finalization "
+                    "and past every check this branch just made."
+                    % (shot.get("shot_id"), _eng_id))
+            _g_final = _gsa.finalize_ghost_prompt_v2(
+                role=_shot_role, style=_vstyle, mode=_g_obj["mode"],
+                motif_cue=_g_obj["motif_cue"],
+                drawable_beat=_g_obj["drawable_beat"],
+                ledger_meta=(ledger or {}).get("meta") or {})
+            _g_positive = str(_g_final["positive"]).strip()
+            _g_negative = str(_g_final["negative"]).strip()
+            req["text_prompt"] = _g_positive
+            req["negative_prompt"] = _g_negative
+            _stamp_prompt_meta(req, _gsp.GHOST_PROMPT_SOURCE, _g_positive,
+                               beat=_beat_id_for_shot(shot))
+            _g_obs = req.setdefault("observability", {})
+            _g_obs["prompt_version"] = _gsp.GHOST_PROMPT_VERSION_V2
+            _g_obs["negative_sha8"] = hashlib.sha256(
+                _g_negative.encode("utf-8")).hexdigest()[:8]
+            _g_obs["negative_chars"] = len(_g_negative)
+            _g_obs["prompt_slots"] = list(_g_final.get("slots")
+                                          or _gsp.GHOST_V2_SLOTS)
+            _g_obs["author_version"] = _g_obj["author_version"]
+            _g_obs["ghost_schema_version"] = _g_obj["schema_version"]
+            _g_obs["ghost_source"] = _g_obj["source"]
+            _g_obs["ghost_fallback_reason"] = _g_obj["fallback_reason"]
+            _g_obs["ghost_model_id"] = _g_obj["model_id"]
+            _g_obs["ghost_mode"] = _g_obj["mode"]
+            _g_obs["ghost_request_sha8"] = _g_obj["request_sha256"][:8]
+            _g_obs["ghost_output_sha8"] = _g_obj["output_sha256"][:8]
+            _g_obs["ghost_drawable_beat"] = _g_obj["drawable_beat"]
+            _g_obs["ghost_drawable_beat_sha8"] = _g_obj["output_sha256"][:8]
+            _g_obs["ghost_motif_cue"] = _g_obj["motif_cue"]
+            _g_obs["positive_clip_tokens"] = _g_final["positive_clip_tokens"]
+            _g_obs["positive_clip_windows"] = _g_final["positive_clip_windows"]
+            _g_obs["negative_clip_tokens"] = _g_final["negative_clip_tokens"]
+            _g_obs["negative_clip_windows"] = _g_final["negative_clip_windows"]
+            _g_obs["clip_window_max"] = _g_final["clip_window_max"]
+            _g_obs["clip_counter"] = _g_final["clip_counter"]
+            # The finalizer's OWN receipt, installed here so the funnel below
+            # does not run a second, idempotent transform over the same text.
+            _g_obs.update(_g_final["banana_receipt"])
+            _ghost_v2_finalized = True
+            _ghost_composed = True
+            _LOG.warning(
+                "[OTR.render_driver] GHOST PROMPT v2: %s beat %s mode=%s "
+                "source=%s composed %d chars / %d SD1 tokens in %d window(s), "
+                "negative %d chars / %d tokens",
+                _shot_role, shot.get("shot_id"), _g_obj["mode"],
+                _g_obj["source"], len(_g_positive),
+                _g_final["positive_clip_tokens"],
+                _g_final["positive_clip_windows"], len(_g_negative),
+                _g_final["negative_clip_tokens"])
+    if _ghost_profile == _gsp.GHOST_PROMPT_PROFILE and not _ghost_composed:
+        # THE v1 COMPATIBILITY PATH, reached only when the row carries NO
+        # ghost_prompt -- a ledger frozen before Prompt v2, or a direct unit
+        # fixture. Every newly built Ghost preflight and row carries v2, so a
+        # production episode never lands here.
+        #
         # The DRIVER resolves the live authorities; the composer stays pure and
         # cycle-free. Deliberate: `_ltx_motion_role_key` and the exact-key
         # `motion_registers` lookup already live here, and a second role-to-
@@ -3214,7 +3309,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # UNSTRIPPED: the receipt digests must hash the literal prompt bytes the
     # request carries (Sonnet QA advisory) -- only the emptiness CHECK strips.
     _banana_prompt = str(req.get("text_prompt") or "")
-    if _banana_prompt.strip():
+    if _banana_prompt.strip() and not _ghost_v2_finalized:
         try:
             from .._otr_banana_route import (
                 apply as _banana_apply, banana_gate as _banana_gate,
@@ -4239,7 +4334,19 @@ def run_episode(ledger, *, oom_shot_id=None,
                         # on the REQUEST's observability, which is why they
                         # belong in this loop and the cadence keys below do not.
                         "prompt_version", "negative_sha8", "negative_chars",
-                        "prompt_slots", "subject_sigil_sha8"):
+                        "prompt_slots", "subject_sigil_sha8",
+                        # GHOST PROMPT v2 RECEIPTS (2026-08-22). A key that is
+                        # stamped but not listed here never reaches the node-92
+                        # /history report, which is the only place the operator
+                        # can read what a published episode actually asked for.
+                        "author_version", "ghost_schema_version",
+                        "ghost_source", "ghost_fallback_reason",
+                        "ghost_model_id", "ghost_mode", "ghost_motif_cue",
+                        "ghost_request_sha8", "ghost_output_sha8",
+                        "ghost_drawable_beat", "ghost_drawable_beat_sha8",
+                        "positive_clip_tokens", "positive_clip_windows",
+                        "negative_clip_tokens", "negative_clip_windows",
+                        "clip_window_max", "clip_counter"):
                 if key in obs:
                     row[key] = obs[key]
                 elif isinstance(request, dict) and ("_" + key) in request:

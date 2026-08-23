@@ -55,6 +55,14 @@ GHOST_PROMPT_PROFILE = "ghost_signal_v1"
 #: which composer wrote the text. Bump with the composer, never in place.
 GHOST_PROMPT_VERSION = "ghost_signal_v1"
 
+#: THE PROMPT v2 COMPOSER VERSION, and it is deliberately NOT the capability
+#: token above. ``GHOST_PROMPT_PROFILE`` is what every engine DECLARES and what
+#: the driver branches on; bumping it would silently unregister every peer from
+#: its own lane. What changed is the composer, so the composer's version is what
+#: moves -- a published receipt then says which text authority wrote the prompt
+#: while the adapter keeps advertising the capability it still has.
+GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
+
 #: ``prompt_source`` for :func:`render_driver._stamp_prompt_meta`.
 GHOST_PROMPT_SOURCE = "ghost_signal"
 
@@ -94,6 +102,23 @@ LANE_HYGIENE_NEGATIVE = (
 #: is live on this lane (cfg 8.0 with a real unconditional branch), so
 #: exclusions belong in the negative and the positive states what to draw.
 GHOST_SHOT_LAW = "steady legible silhouette, one clear action, unbroken shot"
+
+#: THE PROMPT v2 SHOT LAWS, one per representation, ALL AFFIRMATIVE.
+#:
+#: There is no ``no people`` here and there never will be. The negative channel
+#: is live on this lane, so exclusion belongs there; a positive clause that
+#: attends to an absent human is a request for the model to think about one.
+#: ``object`` and ``signal`` express absence by naming a subject that is not a
+#: person -- an isolated emblem, an abstract field -- which is an instruction the
+#: sampler can actually follow.
+GHOST_MODE_LAWS_V2 = {
+    "figure": ("mid-shot or wider, steady legible silhouette, one clear "
+               "action, unbroken shot"),
+    "object": ("one isolated emblem filling the composition, one clear "
+               "action, unbroken shot"),
+    "signal": ("an abstract signal field filling the composition, one clear "
+               "action, unbroken shot"),
+}
 
 #: Role framing floors. The character floor is a MID-SHOT: closer than that and
 #: the model starts trying to render a face it cannot hold.
@@ -405,19 +430,23 @@ SIGIL_SOURCE_FIELDS = (
 )
 
 
-def distill_subject_sigil(cast_row, *, episode_seed, char_id, style_id) -> str:
-    """One durable heraldic identity for a character, as four ordered cues.
+def distill_sigil_components(cast_row, *, episode_seed, char_id,
+                             style_id) -> dict:
+    """The BUCKET CHOICES behind a sigil, before they are joined and trimmed.
 
-    Deterministic and CREDIT-FREE: no model is asked anything, and the only
-    non-source input is a sha256 over ``(episode_seed, char_id, style_id,
-    source_text)``. The same character therefore carries the same sigil across
-    every beat of an episode, and a different one in the next episode.
+    Split out for Prompt v2 (2026-08-22) and shared with
+    :func:`distill_subject_sigil`, which joins exactly what this returns -- so
+    the durable sigil stays byte-stable while v2 can select a NON-FACE subset
+    of the same distillation.
 
-    A missing cast row is legal and yields a fully pooled sigil -- it never
-    reaches for the wardrobe writer or any other author. (Reading the raw row
-    rather than ``_appearance_for_char`` is the point: that helper may invoke
-    the optional wardrobe writer, which would turn a deterministic identity
-    read into a hidden mutation and a credit spend.)
+    THE JOIN IS WHERE THE INFORMATION WAS LOST. The 110-character sigil ceiling
+    lands on the LAST bucket, so reading a prop back out of the finished string
+    finds a trimmed one or none at all. Exposing the choices before the join is
+    what lets a recurrence motif carry a whole prop.
+
+    Returns ``{silhouette, landmark, costume, prop, gender_word, seed_int}``.
+    A bucket the cast row never supplied carries its checked-in neutral pool
+    entry, exactly as the sigil does -- there is ONE distillation, not two.
     """
     row = cast_row if isinstance(cast_row, dict) else {}
     name = str(row.get("name") or "")
@@ -443,7 +472,7 @@ def distill_subject_sigil(cast_row, *, episode_seed, char_id, style_id) -> str:
             continue
         candidates.append(cleaned)
 
-    cues = []
+    components = {}
     used = set()
     for bucket, vocabulary in SIGIL_BUCKETS:
         chosen = ""
@@ -456,9 +485,7 @@ def distill_subject_sigil(cast_row, *, episode_seed, char_id, style_id) -> str:
                 break
         if not chosen:
             chosen = _pick(SIGIL_NEUTRAL_POOLS[bucket], seed_int, bucket)
-        chosen = _normalize_ws(chosen).strip(" ,;-")
-        if chosen:
-            cues.append(chosen)
+        components[bucket] = _normalize_ws(chosen).strip(" ,;-")
 
     # Explicit gender ONLY. `normalize_gender` maps absence to "other", so
     # calling it on a blank field would invent a claim the cast row never made
@@ -475,6 +502,37 @@ def distill_subject_sigil(cast_row, *, episode_seed, char_id, style_id) -> str:
         if normalized in ("male", "female"):
             gender_word = "a man" if normalized == "male" else "a woman"
 
+    components["gender_word"] = gender_word
+    components["seed_int"] = seed_int
+    return components
+
+
+def distill_subject_sigil(cast_row, *, episode_seed, char_id, style_id) -> str:
+    """One durable heraldic identity for a character, as four ordered cues.
+
+    Deterministic and CREDIT-FREE: no model is asked anything, and the only
+    non-source input is a sha256 over ``(episode_seed, char_id, style_id,
+    source_text)``. The same character therefore carries the same sigil across
+    every beat of an episode, and a different one in the next episode.
+
+    A missing cast row is legal and yields a fully pooled sigil -- it never
+    reaches for the wardrobe writer or any other author. (Reading the raw row
+    rather than ``_appearance_for_char`` is the point: that helper may invoke
+    the optional wardrobe writer, which would turn a deterministic identity
+    read into a hidden mutation and a credit spend.)
+
+    BYTE-STABLE ACROSS THE v2 REFACTOR. The distillation moved into
+    :func:`distill_sigil_components` and this function joins its result in the
+    same order with the same separators. Goldens pin the exact bytes, because
+    a sigil that shifted would change the composed prompt of every legacy Ghost
+    row that replays through the v1 compatibility path.
+    """
+    components = distill_sigil_components(
+        cast_row, episode_seed=episode_seed, char_id=char_id,
+        style_id=style_id)
+    cues = [components[bucket] for bucket, _vocabulary in SIGIL_BUCKETS
+            if components.get(bucket)]
+    gender_word = components.get("gender_word") or ""
     body = ", ".join(cues)
     sigil = ("%s, %s" % (gender_word, body)) if gender_word else body
     return _trim_to(sigil, GHOST_SIGIL_MAX_CHARS)
@@ -496,11 +554,20 @@ def resolve_action(role, *, motion_clause=None, pack_motion_fallback="",
 
     1. the whole validated motion clause when present;
     2. otherwise, for announcer / music, the pack's own role register;
-    3. otherwise, for a character, the beat intent through the checked-in table
-       (an unmapped non-empty intent becomes a bounded ``moves with ...``);
-    4. otherwise one neutral kinetic action on the sigil hash domain.
+    3. otherwise, for a character, the beat intent through the checked-in table;
+    4. otherwise one COMPLETE neutral kinetic action on the sigil hash domain.
 
     Every step is pack- or ledger-derived and credit-free.
+
+    STEP 3 NO LONGER COPIES AN UNMAPPED INTENT (Prompt v2, 2026-08-22). It used
+    to emit ``"moves with " + the first six regex words``, which is how a
+    published lane came to say *"moves with erin risks exposure by transmitting
+    a"*: a cast name in the picture and a sentence with no end. A beat intent is
+    free text a writer wrote for a human, not a camera instruction -- an unknown
+    one now falls through to a complete checked-in action rather than shipping
+    a fragment of it. Prompt v2 replaces this whole slot with an authored
+    drawable leaf; this repair exists so a LEGACY row replaying through the v1
+    compatibility path cannot reproduce the fragment either.
     """
     clause = _normalize_ws(motion_clause)
     if clause:
@@ -516,12 +583,6 @@ def resolve_action(role, *, motion_clause=None, pack_motion_fallback="",
         mapped = GHOST_INTENT_ACTIONS.get(intent)
         if mapped:
             return mapped
-        # Unmapped but present: bound it rather than pass an unknown noun into
-        # the picture. Six words is enough to carry a movement and short enough
-        # that a runaway intent string cannot eat the budget.
-        words = _WORD_RE.findall(intent)[:6]
-        if words:
-            return "moves with %s" % " ".join(words)
 
     return _pick(GHOST_NEUTRAL_ACTIONS, int(sigil_seed), "action")
 
@@ -728,6 +789,85 @@ def compose_ghost_prompt(*, role, style, subject_sigil="", motion_clause=None,
     }
 
 
+#: The v2 ordered slots, and there are only four. Everything v1 emitted from
+#: the ledger's raw surfaces -- the beat intent, the traits, the arc phase, the
+#: pack motion register -- is gone: an authored drawable leaf replaces all of
+#: it, and re-adding any of them would be re-adding the defect.
+GHOST_V2_SLOTS = ("pack_cue", "motif", "leaf", "law")
+
+
+def compose_ghost_prompt_v2(role, style, mode, motif_cue,
+                            drawable_beat) -> dict:
+    """Compose one Ghost PROMPT v2 positive plus its unchanged negative.
+
+    PURE AND SCALAR. It takes no ledger, no shot, no cast row and no engine --
+    only the five values the render driver and the author-time admission check
+    both already hold, which is what makes it impossible for those two to
+    compose different text from the same stored object.
+
+    It never reads raw ``beat_intent``, raw traits, raw ``arc_phase``, a pack
+    motion register, an open subject or a motion clause. Those are not
+    parameters, so a future edit cannot quietly reach for one.
+
+    Returns ``{"positive", "negative", "components", "slots"}``. ``components``
+    is the four PROTECTED pieces by name, returned alongside the joined string
+    so a caller can prove each survived a downstream transform without parsing
+    prose back out of the result.
+    """
+    role = str(role or "")
+    mode = str(mode or "")
+    motif = _normalize_ws(motif_cue)
+    leaf = _normalize_ws(drawable_beat)
+
+    if role not in GHOST_FRAMING:
+        raise GhostPromptError(
+            "Ghost Prompt v2 does not compose for role %r" % (role,))
+    law = GHOST_MODE_LAWS_V2.get(mode)
+    if not law:
+        raise GhostPromptError(
+            "Ghost Prompt v2 mode %r is not one of %s"
+            % (mode, ", ".join(sorted(GHOST_MODE_LAWS_V2))))
+    if role != "character_video" and mode == "figure":
+        raise GhostPromptError(
+            "Ghost Prompt v2 refuses figure mode on the %s bookend -- a radio "
+            "console is not a person, and the mode scheduler never assigns "
+            "this pairing" % (role,))
+    if not motif:
+        raise GhostPromptError(
+            "Ghost Prompt v2 has no recurrence motif for a %s beat. The motif "
+            "IS the identity mechanism on this lane; an empty one is a "
+            "characterless episode, not a shorter prompt." % (role,))
+    if not leaf:
+        raise GhostPromptError(
+            "Ghost Prompt v2 has no drawable beat for a %s beat -- the "
+            "authored leaf is the only content slot, so an empty one is a "
+            "blank picture" % (role,))
+
+    body = ", ".join((motif, leaf, law))
+    positive = _prefix_pack_cue(style, body)
+
+    # The pack cue as the CUE ITSELF, recovered from what the shared authority
+    # actually prepended rather than re-derived here -- a second derivation is
+    # a second chance to disagree with `prefix_style_cue` about the bytes.
+    pack_cue = ""
+    if positive != body and positive.endswith(body):
+        pack_cue = positive[:len(positive) - len(body)].strip().rstrip(
+            ".").strip()
+
+    return {
+        "positive": positive,
+        "negative": compose_ghost_negative(style),
+        "components": {
+            "pack_cue": pack_cue,
+            "motif": motif,
+            "leaf": leaf,
+            "law": law,
+        },
+        "slots": [name for name in GHOST_V2_SLOTS
+                  if name != "pack_cue" or pack_cue],
+    }
+
+
 def _join(pieces) -> str:
     """Join the ordered slot pieces into one comma-separated prompt."""
     return ", ".join(text for _, text in pieces if _normalize_ws(text))
@@ -746,7 +886,9 @@ def _prefix_pack_cue(style, prompt) -> str:
 
 
 __all__ = [
-    "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_SOURCE",
+    "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_VERSION_V2",
+    "GHOST_PROMPT_SOURCE", "GHOST_MODE_LAWS_V2", "GHOST_V2_SLOTS",
+    "distill_sigil_components", "compose_ghost_prompt_v2",
     "GHOST_PROMPT_MAX_CHARS", "GHOST_PROMPT_TARGET_LOW",
     "GHOST_PROMPT_TARGET_HIGH", "GHOST_NEGATIVE_MAX_CHARS",
     "GHOST_SIGIL_MAX_CHARS", "LANE_HYGIENE_NEGATIVE", "GHOST_SHOT_LAW",
