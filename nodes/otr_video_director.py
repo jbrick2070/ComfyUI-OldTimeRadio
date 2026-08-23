@@ -413,6 +413,60 @@ class OTRVideoDirector:
                     "stills, prompts and shots all plan against %s",
                     _role, _picked, _eff, _eff)
 
+        # THE MEMBERSHIP BOUNDARY (lean-mean order 3, 2026-08-23). Every
+        # non-empty engine id this node hands downstream -- the per-slot PICKS
+        # and the post-freeze EFFECTIVE map -- must be a REGISTERED video
+        # engine, proven HERE, at the unique common ancestor, seconds into the
+        # graph. Until now the director deliberately skipped ids the registry
+        # did not know (`if engine_id in known:` above, the CW-1 carve-out),
+        # so a stale saved pick or a typo'd custom id sailed through and was
+        # caught one node later by OTR_ImageDirector's 3D granularity lock --
+        # whose message ("add requires_mesh_portrait=True/False") misdiagnoses
+        # a stale workflow as an adapter bug. Downstream of THAT guard,
+        # ShotLock / MetaBrief / the dispatcher tolerate unknown ids by
+        # design, so once the dormant-3D family (and the lock riding on it)
+        # retires in order 4, an unknown id would plan portraits and mint
+        # stills for minutes and then die mid-render at assert_usable -- the
+        # forbidden failure shape. Hence this boundary lands FIRST, additive,
+        # with the old guard untouched until this commit is pushed.
+        #
+        # Scope, deliberately the UNION of picked and effective: a pick that
+        # only renders because a force map happens to mask it is a booby trap
+        # that detonates the day the env var is unset, so it fails here too,
+        # with a message that names both knobs. Unresolved custom slots
+        # ({"engine_id": "", "custom": True}) stay a WARNING (declare-later,
+        # the carve-out above). RETIRED ids never reach this check, though the
+        # two paths fail with DIFFERENT named errors (QA-verified, not
+        # assumed): a retired PICK raises RetiredEngineError from
+        # _resolve_and_validate, while a retired FORCE-MAP value raises
+        # RouteFreezeError from parse_force_map -- which catches everything
+        # except its own type and re-wraps, embedding the retired message in
+        # its text. Both fire inside/before freeze_role_engines above, so
+        # neither can fall through to the generic message below.
+        _unregistered = []
+        for _slot, _rv in sorted(resolved_video.items()):
+            _eid = str(_rv.get("engine_id") or "")
+            if _eid and not _vreg.is_registered(resolve_engine_id(_eid)):
+                _unregistered.append(f"slot {_slot!r} picked {_eid!r}")
+        for _role, _eff_id in sorted(effective_video.items()):
+            _eid = str(_eff_id or "")
+            if _eid and not _vreg.is_registered(resolve_engine_id(_eid)):
+                _unregistered.append(f"role {_role!r} effective {_eid!r}")
+        if _unregistered:
+            _fmap = str(routing_snapshot.get("force_engine_map", "") or "")
+            raise ValueError(
+                "OTR_VideoDirector: %s -- not a registered video engine "
+                "(registered: %s). A stale saved workflow, a typo'd "
+                "custom_models_json entry, or a force-map value names an "
+                "engine this build does not register; fix the pick or re-save "
+                "the workflow.%s NO FALLBACK -- failing here, seconds in, "
+                "instead of mid-render at assert_usable." % (
+                    "; ".join(_unregistered),
+                    ", ".join(sorted(_vreg.all_engine_names())),
+                    (" OTR_FORCE_ENGINE_MAP is active (%r) -- the map or the "
+                     "pick it masks may be the stale half." % _fmap)
+                    if _fmap else ""))
+
         policy = {
             # S4 platform-portability (2026-07-10): version 2 adds the
             # explicit device/dtype policy fields (defaults = nv50
