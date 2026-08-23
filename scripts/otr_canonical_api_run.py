@@ -37,6 +37,7 @@ from otr_api import (  # noqa: E402
     load_workflow,
     patch_creative,
     poll_history,
+    queue_snapshot,
     submit_prompt,
     workflow_to_api_prompt,
 )
@@ -209,6 +210,32 @@ def _is_weight_filename(name: str) -> bool:
     return str(name or "").lower().endswith(_WEIGHT_SUFFIXES)
 
 
+def classify_timeout(running: int, pending: int) -> str:
+    """What a poll TIMEOUT actually means, given the server's queue.
+
+    Pure so it can be tested without a server. Three outcomes, and conflating
+    them is the defect this exists to prevent (2026-08-23):
+
+      ``still_running``  the observation window closed while the render carried
+                         on. `--timeout` defaults to 5400s and a full wan_ti2v
+                         episode on the 16 GB box exceeds it, so this is the
+                         COMMON case for the slowest lane -- and it is not a
+                         failure at all. The episode still publishes.
+      ``unknown``        the queue could not be read (``queue_snapshot`` returns
+                         -1/-1 best-effort). Absence of evidence, reported as
+                         such rather than guessed either way.
+      ``not_running``    the queue is empty, so the render really has ended.
+
+    Before this, all three printed "RESULT TIMEOUT" and exited 1, which reads as
+    "the render died" -- the wrong conclusion in the most common case.
+    """
+    if running == -1 or pending == -1:
+        return "unknown"
+    if running > 0 or pending > 0:
+        return "still_running"
+    return "not_running"
+
+
 def _assert_profile_models_present(profile_name, schemas) -> list:
     """Refuse in SECONDS what would otherwise fail seven minutes into a render.
 
@@ -356,6 +383,36 @@ def main(argv: list[str] | None = None) -> int:
         on_tick=heartbeat,
     )
     print(f"[canonical-api] RESULT {status} prompt_id={prompt_id}", flush=True)
+    if status == "TIMEOUT":
+        # A TIMEOUT HERE IS ABOUT THIS PROCESS, NOT ABOUT THE RENDER, and saying
+        # so is the whole point of this branch (2026-08-23). `--timeout`
+        # defaults to 5400s; a full wan_ti2v episode on the 16 GB box exceeds
+        # that, so the observation window closes while the server is still at
+        # 98% GPU happily rendering beat 34. The old line printed
+        # "RESULT TIMEOUT" and exited 1 for BOTH that case and a genuinely dead
+        # render -- two opposite situations, one indistinguishable message, and
+        # the reader's natural conclusion is the wrong one.
+        running, pending = queue_snapshot()
+        verdict = classify_timeout(running, pending)
+        if verdict == "still_running":
+            print(
+                "[canonical-api] ...BUT THE RENDER IS STILL ALIVE: the server "
+                f"reports {running} running / {pending} pending. This process "
+                "stopped WATCHING; it did not stop the render, and the episode "
+                "should still publish to otr/obs on its own. Re-run with "
+                "`--timeout 0` to wait for a terminal result (the documented "
+                "operator mode for long lanes), or watch the server log.",
+                flush=True)
+        elif verdict == "unknown":
+            print(
+                "[canonical-api] and the queue could not be read, so whether "
+                "the render survived is UNKNOWN -- check the server log before "
+                "concluding anything.", flush=True)
+        else:
+            print(
+                "[canonical-api] and the queue is EMPTY, so the render is no "
+                "longer running. Check the server log for how it ended.",
+                flush=True)
     if status != "SUCCESS":
         if err:
             print(f"[canonical-api] ERROR {err}", flush=True)
