@@ -13,6 +13,10 @@ HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) →
 100% local by default. No API keys required. Optional hosted LLM and all-cloud
 routes exist; they stay off unless you turn them on.
 
+> **Already installed it? Load the show:** **Workflow → Browse Templates →
+> EXTENSIONS → comfyui-old-time-radio → otr_canonical**, then **Queue Prompt**.
+> The 34 `OTR_` nodes are the parts; that workflow is the thing you actually run.
+
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
 > branch juggling entirely and install the packaged alpha from the
@@ -68,7 +72,11 @@ console on the first run; it names any missing weight and where it expects it.
 
 ### 4. Run it
 
-1. Drag **`workflows/otr_canonical.json`** into the ComfyUI canvas.
+1. Open **Workflow → Browse Templates**, scroll the left sidebar to **EXTENSIONS**,
+   click **comfyui-old-time-radio**, and pick **otr_canonical**. (The console prints
+   this same path on every start, right under the `[OldTimeRadio]` load banner.)
+   *Prefer files? `workflows/otr_canonical.json` inside the installed pack is the
+   same graph — drag it onto the canvas.*
 2. Hit **Queue Prompt**.
 3. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
    graph rolls a random story bank each run and renders through the procedural still/CRT floor
