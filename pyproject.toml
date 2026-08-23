@@ -1,14 +1,30 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
-# Read from requirements.txt so the two files can never disagree. Without this
-# the Comfy Registry recorded `dependencies: []` and a registry install pulled
-# down the code with none of its libraries.
-dynamic = ["dependencies"]
+# MUST be a STATIC list, kept in sync with requirements.txt by hand. The Comfy
+# Registry reads this literal field -- it does NOT evaluate setuptools' dynamic
+# resolution, which was proven on 2.0.0-alpha.3: `dynamic = ["dependencies"]`
+# published with `dependencies: []` recorded, so a registry install still got
+# no libraries. Every working pack on the registry declares a static list.
+# Torch is deliberately absent: ComfyUI manages its own.
+dependencies = [
+    "transformers>=5.10.4,<6.0",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+    "feedparser>=6.0",
+    "beautifulsoup4>=4.12",
+    "tokenizers>=0.22,<=0.23",
+    "sentencepiece>=0.1.99",
+    "bitsandbytes>=0.42.0",
+    "lm-format-enforcer>=0.11.3,<1.0",
+    "spandrel~=0.4.1",
+    "pydantic>=2.0",
+    "PyYAML>=6.0",
+]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
 ]
@@ -42,9 +58,6 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.pytest.ini_options.markers]
 bug_bible = "Bug Bible regression tests from survival guide"
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
 
 [build-system]
 requires = ["setuptools>=68.0"]
