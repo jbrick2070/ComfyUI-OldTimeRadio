@@ -1032,10 +1032,37 @@ def _fold_inner_dquotes(s) -> str:
 
 def _still_word_fit_card(words: str) -> str:
     """DETERMINISTIC card-length reduction (fail-SOFT): a title card cannot hold a
-    paragraph, so an overflowing line is trimmed to the first clause, else the
-    first ``STILL_WORD_MAX_WORDS`` words, then a ``STILL_WORD_MAX_CHARS`` word-
-    boundary cap. Under both caps -> returned unchanged. Applied BEFORE the hash
-    (pure). NEVER an abort (that would kill every episode -- the §4D class)."""
+    paragraph, so an overflowing line is trimmed to the first sentence, then to
+    whole COMMA CLAUSES, then to the first ``STILL_WORD_MAX_WORDS`` words, then a
+    ``STILL_WORD_MAX_CHARS`` word-boundary cap, and finally its dangling function
+    words are dropped. Under both caps -> returned unchanged, byte for byte.
+    Applied BEFORE the hash (pure). NEVER an abort (that would kill every episode
+    -- the §4D class).
+
+    THE TWO NEW STAGES ARE WHY A SHIPPED CARD READ *"...of a subterranean"* AND
+    STOPPED (2026-08-21 Ideogram verdict, item 2). The reduction was working as
+    designed and the design was one stage short: a word-boundary cut is honest
+    about never splitting a word, but it says nothing about landing mid-thought,
+    and on a card whose ENTIRE JOB is the words a viewer reads that as a sentence
+    somebody forgot to finish.
+
+    * **Whole comma clauses, before any word cut.** A clause is a complete
+      thought; half a clause is not. This is the stage that actually rescues the
+      shipped example, because the trailing word there was an ADJECTIVE and no
+      function-word list can catch that without a parts-of-speech tagger this
+      repo does not ship.
+    * **Never end on a dangling function word.** Shared with the Ghost Signal
+      composer through ``_otr_shared.text_tails`` rather than copied, because
+      two half-written copies of one rule is a table that drifts once.
+
+    A line that reduces to NOTHING (every word a function word) keeps the
+    word-capped text instead of returning empty, so the caller's blank raise
+    still fires only for genuinely blank input."""
+    try:
+        from ._otr_shared import text_tails as _tails  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import text_tails as _tails  # type: ignore
+
     s = str(words or "")
     if len(s.split()) <= STILL_WORD_MAX_WORDS and len(s) <= STILL_WORD_MAX_CHARS:
         return s
@@ -1043,13 +1070,19 @@ def _still_word_fit_card(words: str) -> str:
     if (first and len(first.split()) <= STILL_WORD_MAX_WORDS
             and len(first) <= STILL_WORD_MAX_CHARS):
         s = first
+    # WHOLE CLAUSES BEFORE WHOLE WORDS. Only taken when it actually fits both
+    # ceilings -- a clause prefix that is still too many words is no better than
+    # the text it came from, and falling through to the word cap is correct.
+    clause = _tails.longest_clause_prefix(s, STILL_WORD_MAX_CHARS)
+    if (clause and len(clause.split()) <= STILL_WORD_MAX_WORDS
+            and len(clause) <= STILL_WORD_MAX_CHARS):
+        s = clause
     if len(s.split()) > STILL_WORD_MAX_WORDS:
         s = " ".join(s.split()[:STILL_WORD_MAX_WORDS])
     if len(s) > STILL_WORD_MAX_CHARS:
-        cut = s[:STILL_WORD_MAX_CHARS]
-        idx = cut.rfind(" ")
-        s = cut[:idx] if idx > 0 else cut
-    return s.strip()
+        s = _tails.word_boundary_cut(s, STILL_WORD_MAX_CHARS)
+    trimmed = _tails.drop_dangling_tail(s)
+    return (trimmed or s).strip()
 
 
 

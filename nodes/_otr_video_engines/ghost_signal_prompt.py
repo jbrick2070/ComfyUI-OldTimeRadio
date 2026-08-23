@@ -280,15 +280,18 @@ _SIGIL_REJECT_WORDS = frozenset({
     "you", "your", "yours",
 })
 
-#: Function words a trimmed phrase may not END on. Checked in and pinned, so a
-#: cut lands on a complete thought rather than an unfinished list.
-_DANGLING_TAIL_WORDS = frozenset({
-    "a", "an", "the", "and", "or", "but", "nor", "of", "to", "in", "on",
-    "at", "by", "for", "from", "with", "into", "onto", "over", "under",
-    "that", "which", "who", "whose", "as", "its", "their", "his", "her",
-    "this", "these", "those", "is", "are", "was", "were", "be", "been",
-    "--", "-", "",
-})
+#: Function words a trimmed phrase may not END on, so a cut lands on a complete
+#: thought rather than an unfinished list.
+#:
+#: ONE DEFINITION, TWO CONSUMERS (2026-08-22). The still_word title card had the
+#: same rule half-written in its own module with its own vocabulary; both now
+#: read `_otr_shared.text_tails`, because two copies of one rule is a table that
+#: drifts once. The name stays local so every existing reference and its
+#: goldens keep working.
+try:  # pragma: no cover -- exercised by both import shapes in the suite
+    from .._otr_shared.text_tails import DANGLING_TAIL_WORDS as _DANGLING_TAIL_WORDS
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared.text_tails import DANGLING_TAIL_WORDS as _DANGLING_TAIL_WORDS
 
 _WORD_RE = re.compile(r"[a-z0-9][a-z0-9'\-]*")
 _PHRASE_SPLIT_RE = re.compile(r"[,;.!?]+")

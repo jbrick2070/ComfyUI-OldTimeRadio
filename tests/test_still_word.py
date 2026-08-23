@@ -587,3 +587,90 @@ def test_derive_image_prompts_no_still_word_roles_is_legacy():
     payload, _warn = ip.derive_image_prompts(
         _cast(), _META, llm_fn=None, lines=_lines())
     assert not [o for o in payload["objects"] if o.get("source") == "still_word"]
+
+
+# --------------------------------------------------------------------------- #
+# The 2026-08-21 shipped-card defect: a reduction that stops mid-thought.
+#
+# `still_b001` shipped reading "...of a subterranean" and stopped. The word-
+# boundary cut was honest about never splitting a word and said nothing about
+# landing mid-thought -- and on a card whose entire job is the words, a viewer
+# reads that as a sentence somebody forgot to finish.
+# --------------------------------------------------------------------------- #
+
+from nodes._otr_shared import text_tails as _tails  # noqa: E402
+
+
+def test_a_REDUCED_card_never_ends_on_a_dangling_function_word():
+    """SCOPED TO REDUCTIONS, and the scope is the whole point.
+
+    An authored line that ends on "the" is the AUTHOR's line. THE LAW says an
+    audit may never fail or rewrite a story for style, and shortening someone's
+    sentence because Python dislikes its last word is exactly that. What this
+    function owns is its OWN cut -- so the contract is that a line it actually
+    shortened comes back a complete thought, and a line it left alone comes
+    back byte-identical however it ends.
+    """
+    lines = [
+        "The signal came from the flooded lower levels of a subterranean "
+        "relay station beneath the city",
+        "He left the key on the table beside the letter and the ledger that "
+        "you swore had burned",
+        "She walked out through the door into the long grey corridor beyond "
+        "the archive and the",
+    ]
+    for line in lines:
+        out = ip._still_word_fit_card(line)
+        assert out, line
+        assert out != line, "fixture must actually overflow: %r" % (line,)
+        assert not _tails.is_dangling(out.split()[-1]), out
+
+
+def test_an_authored_short_line_keeps_its_own_ending():
+    """Not this function's business. See the scoping note above."""
+    for line in ("She walked out through the door into the",
+                 "They spoke of the archive and of the"):
+        assert ip._still_word_fit_card(line) == line
+
+
+def test_whole_comma_clauses_are_preferred_over_a_word_cut():
+    """A clause is a complete thought; half a clause is not."""
+    line = ("I found the ledger, the one you said was destroyed, in the "
+            "archive vault beneath the city")
+    out = ip._still_word_fit_card(line)
+    assert out.endswith("destroyed")
+    assert "," in out
+
+
+def test_the_shipped_subterranean_shape_no_longer_stops_mid_phrase():
+    line = ("The signal came from the flooded lower levels of a subterranean "
+            "relay station")
+    out = ip._still_word_fit_card(line)
+    assert "of a subterranean" not in out
+    assert out == "The signal came from the flooded lower levels"
+
+
+def test_a_card_under_both_caps_is_returned_byte_identical():
+    """The reduction must not re-seed a card it was never asked to touch."""
+    for line in ("Short enough already", "I told you the truth",
+                 "Twelve words exactly here one two three four five six"):
+        assert ip._still_word_fit_card(line) == line
+
+
+def test_the_reduction_still_respects_both_ceilings():
+    long_line = " ".join(["subterranean"] * 40)
+    out = ip._still_word_fit_card(long_line)
+    assert len(out.split()) <= ip.STILL_WORD_MAX_WORDS
+    assert len(out) <= ip.STILL_WORD_MAX_CHARS
+
+
+def test_an_all_function_word_line_keeps_text_rather_than_going_blank():
+    """Returning "" here would trip the caller's blank raise and kill a render."""
+    out = ip._still_word_fit_card("of the and to in on at by for from with the")
+    assert out.strip()
+
+
+def test_the_tail_vocabulary_has_exactly_one_definition():
+    """Two half-written copies of one rule is a table that drifts once."""
+    from nodes._otr_video_engines import ghost_signal_prompt as gsp
+    assert gsp._DANGLING_TAIL_WORDS is _tails.DANGLING_TAIL_WORDS

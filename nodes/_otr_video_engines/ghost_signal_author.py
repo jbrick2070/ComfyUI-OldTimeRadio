@@ -42,9 +42,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 from typing import Callable, Optional
+
+_LOG = logging.getLogger("OTR.video.ghost_signal_author")
 
 try:  # pragma: no cover -- exercised by both import shapes in the suite
     from . import ghost_signal_prompt as _gsp
@@ -1071,8 +1074,15 @@ def resolve_token_measure(token_measure_fn=None) -> Optional[Callable]:
         return token_measure_fn
     try:
         _installed_sd1_tokenizer()
-    except GhostTokenizerUnavailable:
+    except GhostTokenizerUnavailable as exc:
         if _test_mode():
+            # SAID OUT LOUD (agy review, 2026-08-22). A silently ungated run
+            # publishes zero token counts that look like a measurement; a
+            # reader of a headless log must be able to see that nothing was
+            # measured and why.
+            _LOG.warning(
+                "[ghost_signal_author] token gate SKIPPED under OTR_TEST_MODE: "
+                "%s -- receipts will carry no counts and no clip_counter", exc)
             return None
         raise
     return measure_clip_tokens
