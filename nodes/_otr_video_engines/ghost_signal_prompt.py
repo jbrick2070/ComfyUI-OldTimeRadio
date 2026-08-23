@@ -128,7 +128,12 @@ GHOST_SHOT_LAW = "steady legible silhouette, one clear action, unbroken shot"
 GHOST_MODE_LAWS_V2 = {
     "figure": ("mid-shot or wider, whole figure legible, one clear action, "
                "unbroken shot"),
-    "object": ("the object fills the frame on a real surface, one clear "
+    # NO "REAL", AND THAT WORD COST AN ANIME EPISODE. This law read "on a REAL
+    # surface" while fixing legibility, and `real` is a MEDIUM instruction: on
+    # the anime pack it rendered photographs of rooms and people -- 8 of 8
+    # legible and not one frame that looked anime. The pack cue owns the
+    # medium; a mode law owns FRAMING and nothing else.
+    "object": ("the object fills the frame on a table top, one clear "
                "action, unbroken shot"),
     # "LIT AGAINST", not "lit from within": the motif prop is whatever the cast
     # row supplied, and most of them do not glow. A satchel lit from within is
