@@ -149,6 +149,23 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
+    # TWO VOCABULARIES, DELIBERATELY, AND THEY ARE NOT INTERCHANGEABLE
+    # (2026-08-23). `model_requirements` here is a LOGICAL id -- it answers
+    # "what capability does this engine need", which is what
+    # capability_profiles derives enable-sets from. A profile's
+    # `preflight.required_models` is a different question with a different
+    # answer: "what FILENAME must the running server be able to see", because
+    # the canonical runner checks it against /object_info, which enumerates
+    # filenames only. `otr_upscale_ship` therefore declares
+    # `RealESRGAN_x2plus.pth` (matching eng_spandrel_esrgan._model_filename),
+    # NOT the id below.
+    #
+    # DO NOT "reconcile" these by copying one into the other. The fastwan lane
+    # has a test (tests/test_fastwan_8gb.py::test_profile_preflight_requires_
+    # the_lora) that asserts `set(CAPABILITIES[...]["model_requirements"]) <=
+    # set(required)` -- extending that pattern to this engine would fail on
+    # purpose-built difference, not on a defect. That is the trap this comment
+    # exists to disarm; it was flagged in QA on 2026-08-23 before it bit.
     "spandrel_esrgan": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu"], "requires_vendor": None,

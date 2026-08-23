@@ -111,18 +111,41 @@ def test_the_upscale_profiles_name_the_file_their_engine_actually_loads():
             f"two files; a rename on either side must move both.")
 
 
-def test_no_profile_declares_a_requirement_the_gate_silently_drops():
-    """Every declared requirement is either enforced or explicitly reported.
+def test_every_ghost_signal_requirement_stays_enforced():
+    """The gate's load-bearing case, read from the PROFILES not a fixture list.
 
-    Not a ratchet against ids -- they are legitimate, and the runner prints them
-    as UNCHECKED. This asserts the classification is TOTAL: every entry lands on
-    exactly one side, so nothing can be quietly ignored by falling between them.
+    REPLACED A TAUTOLOGY, 2026-08-23. This test previously ended in
+    `assert isinstance(enforced, bool)` -- and `_is_weight_filename` returns
+    `str.endswith(...)`, which is always a bool, so the assertion could not fail
+    for any implementation. QA proved it by substituting a classifier that
+    returned True for everything and then False for everything: both mutants
+    passed. It asserted nothing while claiming to assert totality.
+
+    What actually matters is this: `ghost_signal*` is the family whose weights
+    the gate really guards -- the missing `v3_sd15_adapter.ckpt` is the catch
+    that justified building it. If `_is_weight_filename` ever regressed toward
+    False, every one of those would silently become "reported" and the gate
+    would be off while still printing reassuring lines. The parametrized tests
+    above cannot catch that, because they hardcode their own names instead of
+    reading what the profiles declare.
     """
     g = _gate()
     declared = _profiles_with_required_models()
-    assert declared, "no profile declares required_models -- scan is broken"
-    for profile, names in declared.items():
-        for name in names:
-            enforced = g._is_weight_filename(name)
-            assert isinstance(enforced, bool), (
-                f"{profile}: {name!r} did not classify")
+    ghosts = {p: n for p, n in declared.items() if p.startswith("otr_ghost_signal")}
+    assert ghosts, "no ghost_signal profile declares required_models"
+    for profile, names in sorted(ghosts.items()):
+        unenforced = [n for n in names if not g._is_weight_filename(n)]
+        assert not unenforced, (
+            f"{profile} declares {unenforced!r}, which the gate would only "
+            f"REPORT, not enforce. These are the weights whose absence must "
+            f"stop a render in seconds rather than 428.")
+
+
+def test_the_gate_still_enforces_something_repo_wide():
+    """A classifier stuck on False disables the gate everywhere, silently."""
+    g = _gate()
+    enforced = [n for names in _profiles_with_required_models().values()
+                for n in names if g._is_weight_filename(n)]
+    assert len(enforced) >= 5, (
+        f"only {len(enforced)} requirement(s) repo-wide are enforced. The "
+        f"preflight gate is effectively OFF -- suspect _is_weight_filename.")
