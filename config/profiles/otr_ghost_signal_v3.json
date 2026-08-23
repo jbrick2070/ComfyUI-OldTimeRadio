@@ -1,6 +1,6 @@
 {
   "id": "otr_ghost_signal_v3",
-  "display_name": "Ghost Signal -- official AnimateDiff v3",
+  "display_name": "Ghost Signal v3 clean, NO adapter (weaker style capture)",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",

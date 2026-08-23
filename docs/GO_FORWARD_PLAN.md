@@ -162,6 +162,49 @@ episode -- a possible real module trait, still n=1, worth one seeded A/B.
   pack authors 262 chars, and the STILL lane uses the rich tails) is marked
   WONTFIX for the prompt sprint and remains available afterwards.
 
+### SHIP INTENT -- OPERATOR, 2026-08-22 EVENING (read before touching the Ghost lane)
+
+**`v3_haunted` + Prompt v2.1 IS THE PRESUMPTIVE SHIP CONFIGURATION.** In his
+words: *"i think v3_haunted 2.1 will ship and we may ditch the rest we shall
+see."* Not a verdict -- an intent -- so the peers are RETAINED until he says
+otherwise. Do not delete `animatediff15_v3_video`, the cadence peers or the v2
+peer on the strength of this line.
+
+**THE DOMAIN ADAPTER IS WHAT MAKES A STYLE PACK LAND, and it took his eye to
+see it.** He compared two anime episodes -- one looks anime, one does not:
+
+    signal_lost_whiskers_in_the_stacks_20260822_150524      v3_HAUNTED  -> anime
+    signal_lost_turntables_lament_the_last_spin_20260822_185304  v3 clean -> not
+
+Read straight off the per-beat clip filenames. Every arm rendered on 2026-08-22
+except the top-ranked one used the CLEAN engine, because that is what
+`otr_ghost_signal_v3` pins -- which is why a whole day of style comparisons was
+quietly handicapped.
+
+**TWO AXES, AND THEY ARE ORTHOGONAL. Do not conflate them again:**
+* **Subject legibility = the PROMPT.** Proved on an engine-matched same-seed
+  A/B (both clean v3): v1 4/4 recognisable, v2 0/4, v2.1 6/8 with people back.
+* **Style capture = the ADAPTER.** Proved by the two anime episodes above.
+
+**FRAME RATE / SMOOTHNESS IS PARKED, NOT FORGOTTEN (operator, hard).** He asked
+whether the frame rate should drop so it reads smoother and less experimental,
+then answered himself: *"maybe not i dont know noty wortyjh chasng now clos eto
+release ... 2.1 we can chase fream,earets"*. **So do not touch fps, cadence or
+the hold factor before release.** It is a real want for AFTER 2.1, and the
+recipes-are-not-on-the-table directive still governs how it is approached.
+
+**STILL HONESTLY UNANSWERED -- his own question, and nobody should pretend
+otherwise:** which engine is better SYNCHED to the audio and the beats. He said
+plainly he cannot tell, and that clean v3 might synch better if better prompted
+while lacking the anime feel. The two episodes he compared differ in engine AND
+prompts AND script, so nothing isolates it. Answering it properly wants a
+matched pair -- same script, same seeds, haunted vs clean, prompts held
+constant. It has NOT been run.
+
+**The dropdown now says which profile to pick** (`SHIP CANDIDATE -- pick this
+one` vs `clean, NO adapter (weaker style capture)`), because the default being
+non-obvious is exactly what cost a day of confounded comparisons.
+
 ### OPEN, IN PRIORITY ORDER
 
 **GHOST PROMPT V2 IS BUILT, PROVEN AND SHIPPED (closed 2026-08-22, Opus coder
