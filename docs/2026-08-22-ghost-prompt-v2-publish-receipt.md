@@ -286,10 +286,29 @@ is still refused outside `figure` mode.
 * **Proven:** the v2.1 concrete POOLS render subjects again. On `video_art`,
   roughly 3-4 of 8 beats read as a real thing (a radio set with dial-eyes, a
   metal object on wood, silhouetted figures) against 0-2 before.
-* **NOT proven at the time of writing:** v2.1 with real LLM leaves. That leg
-  ran `deterministic_fallback=8` because it started before the clock-hand fix.
-  The decisive arm -- v2.1, `writer_llm`, `archival_documentary`, the pack where
-  v1 scored 4 of 4 -- is owed and is not claimed here.
+* **NOW PROVEN -- the decisive arm rendered and published.** Episode
+  `signal_lost_echoes_unheard_20260822_202248`, v2.1 on `archival_documentary`,
+  `writer_llm=8` with zero fallback and zero replay, `RESULT SUCCESS` +
+  `obs_publish OK`, 23:24.
+
+  **6 of 8 beats render a recognisable subject and 2 of them are people** --
+  piano keys, a lit chain, a person in a white coat, a coil of cream rope on a
+  wooden table, a man walking a street with a second figure behind him, a radio
+  set on a shelf. Two stay weak (a cabinet, a warm gradient).
+
+  | arm | recognisable | figures |
+  |---|---:|---:|
+  | v1 prompts, archival | 4 of 4 sampled | some |
+  | v2 prompts, archival, LLM leaves | 2 of 8 | 0 |
+  | **v2.1 prompts, archival, LLM leaves** | **6 of 8** | **2** |
+
+  **Beat 5 is the end-to-end proof.** gemma wrote *"a hand grabs the cream rope
+  on the wooden table"* and the render is a coil of cream rope on a wooden
+  table. That leaf is exactly what the pre-fix `_HUMAN_WORDS` rejected as "a
+  person in object mode", so the frame exists only because the clock-hand fix
+  landed. And the hygiene v2 was built for is intact: no cast name in the
+  picture, no sentence cut mid-clause, every prompt measured at one CLIP
+  window.
 
 ---
 
