@@ -1,6 +1,46 @@
 # LEAN-MEAN CLEANUP -- where it actually stands, 2026-08-23
 
-## UPDATE, end of the second overnight push -- ORDERS 1 THROUGH 6 ARE COMPLETE
+## UPDATE, the daylight coder window -- ORDERS 8, 9 AND 11 ARE COMPLETE
+
+Orders 1-6 closed overnight; 7 was cancelled by ruling. This window closed 8, 9
+and the scripts half of 11, and found a live NameError on the way. Order 10
+stays HELD -- it is workflow-atomic and a blanket variant regeneration still
+reverts the operator's hand-edited ghost_signal_v3 ship-candidate settings, so
+unholding it is his call, not a coder's.
+
+| order | state |
+|---|---|
+| 8 ffprobe consolidation | **DONE** (00ac7df8 the boundary + 42 tests, 8dd9f2cf the eleven callers). One `nodes/_otr_shared/ffprobe.py` owns binary resolution, the raw probe and the rational rate parse; every caller keeps its own failure policy. Three real defects closed: OTR_FFPROBE reached ONE node out of eleven, the "25/1" parse existed in four dialects, and `otr_post_upscale_procgen_blend` resolved its binary by replacing "ffmpeg" with "ffprobe" across the WHOLE path (silently wrong on the ordinary layout where the DIRECTORY is also named ffmpeg, falling back to a hardcoded 25.0 fps). A three-scan AST ratchet keeps the boundary the only door, and a checked-in evasive fixture proves the scans still catch a caller that hides its literals. |
+| 9 Writer split | **DONE** (8182b38c slice 1, d99c1adc slice 2). 1,927 lines out of `OTR_LedgerScriptWriter.py`: 7,418 -> 5,490. `_resolve_inputs` plus the widget menus it interprets to `nodes/_otr_writer_inputs.py`; the 911-line tail plus its ten helpers and two contracts to `nodes/_otr_writer_tail.py`. BYTE-IDENTICAL with a sha256 per block, 19 blocks in all. The tail travels as a MIXIN because it reads `self` zero times and a free function would have meant re-indenting 911 lines, which no hash can check. |
+| 10 Writer widget-schema epoch | HELD, unchanged. Workflow-atomic (canonical + all 54 variants regenerate), and a blanket regeneration REVERTS the hand-edited ship-candidate ghost_signal_v3 settings. Wrong week; operator's call. |
+| 11 scripts audit + test-root cleanup | **DONE.** Test-root half was already closed on evidence (no repo-root conftest, no pythonpath key, so the 175 per-file `sys.path.insert` calls are load-bearing). Scripts half is now `docs/2026-08-23-lean-mean-order-11-scripts-owner-table.md`: 167 entries classified -- 95 wired, 27 documented-only, 11 unreferenced-and-tracked, 34 untracked. Nothing deleted. THREE files go to the operator, and one of them is a real find: `watcher_overrides.json` documents an allowlist "honored by soak_operator.py:apply_watcher_overrides", and that function no longer exists. |
+| 12 OpenRouter diet | BLOCKED, unchanged -- draft `otr_cloud_lanes.json` is still unratified. |
+
+**A LIVE BUG THE SEAM FOUND, and it is the best thing this window produced.**
+Measuring the tail before moving it turned up TWO unbound globals on one branch
+of `_run_writer_tail`: `_style_roll`, which is a local of `run()` (a SIBLING
+method -- no shared scope), and `random.Random` in a module that never imported
+`random`. That branch is the dynamic visual-style FLOOR FALLBACK, so instead of
+degrading to a floor style when the style reflection failed, the writer raised
+NameError and lost the whole run. Fixed at 0acdc993 by threading `style_roll`
+through `WriterTailContext` -- the contract that dataclass already declared.
+
+**WHY IT SURVIVED IS THE LESSON.** The invariant WAS tested:
+`co_freevars == ()`, against the tail's documented "no closure over run()
+locals". But a closure only forms over an ENCLOSING function's locals, and
+`run()` does not enclose the tail. A sibling's local compiles to LOAD_GLOBAL and
+can never appear in `co_freevars` -- the assertion could not fail on the code it
+was written to protect. The replacement walks the bytecode for global loads the
+module does not define, and a negative-control test builds the exact defect and
+proves the old assertion still passes on it.
+
+**Gates at every push:** full suite green each time (12183 -> 12197 -> 12209 ->
+12212), Bug Bible 22/26/3, canonical validator 23 nodes / 57 links with the
+workflow byte-identical, `pyproject.toml` never touched. Thirty-one structural
+tests followed the writer split and NOT ONE assertion was weakened: their shared
+address now lives once, in `tests/fixtures/writer_family.py`.
+
+## HISTORICAL -- the overnight push (orders 1-6)
 
 The section below this update describes the state after orders 1-2; it is kept
 as the historical record. Current truth:
